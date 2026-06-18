@@ -6,22 +6,23 @@ import type React from 'react';
 
 import type { useScrollViewOffset } from '@/features/feed/hooks/useScrollViewOffset';
 import type { useDerivedValue, useSharedValue } from 'react-native-reanimated';
+import type { FeedEvent, ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
 
-/** Post payload for overlay bottom panel (author, content, stats, actions). Kept minimal to avoid circular deps. */
+/**
+ * Post payload for overlay bottom panel (author, content, stats, actions). Holds
+ * the full `FeedEvent` so the inline "Post your reply" affordance can build a
+ * correct NIP-10 reply target (needs `tags`) and hand the composer a parent
+ * preview. `feedTypes` is a dependency-free leaf module, so no circular import.
+ */
 export interface ImageOverlayPost {
-  event: {
-    id: string;
-    pubkey: string;
-    content: string;
-    created_at: number;
-  };
+  event: FeedEvent;
   metrics: {
     replyCount: number;
     repostCount: number;
     likeCount: number;
     satsZapped: number;
   };
-  profile?: { name: string; picture?: string } | null;
+  profile?: ProfileInfo | null;
   reposted?: boolean;
   liked?: boolean;
   repostPending?: boolean;

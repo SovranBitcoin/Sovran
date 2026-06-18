@@ -14,9 +14,11 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { router } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { Button } from 'heroui-native';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { Easing, FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
@@ -33,20 +35,34 @@ import { useComposerStore } from '@/features/composer/state/composerStore';
 import { publishComposed } from '@/features/composer/publish/useComposerActions';
 import { emptyPollDraft } from '@/features/composer/ui/PollComposeForm';
 import { deriveReplyTarget } from '@/features/feed/lib/replyTarget';
+import { useShiftLogger } from '@/features/feed/lib/contentShiftLog';
 import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
 import type { FeedEvent, ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
 
 type MediaBlock = Extract<ComposerBlock, { kind: 'media' }>;
 
 interface ThreadReplyBarProps {
-  /** The thread's main post — the bar replies to it by default. */
-  targetEvent: FeedEvent;
+  /**
+   * The thread's main post — the bar replies to it by default. Optional so the
+   * bar can render (pinned at the bottom) while the thread is still loading;
+   * posting/expand stay disabled until the target event resolves.
+   */
+  targetEvent?: FeedEvent;
   targetProfile?: ProfileInfo;
   /** Reports the bar's measured height so the list can pad its bottom. */
   onHeightChange?: (height: number) => void;
 }
 
 let mediaSeq = 0;
+
+// The bar grows on focus (header + action row appear). Animating the container's
+// height with `LinearTransition` makes Yoga commit intermediate sizes each frame,
+// so the bottom-anchored bar rises smoothly in step with the keyboard instead of
+// snapping to its expanded height. ~250ms / ease-out roughly matches the iOS
+// keyboard show curve. The revealed sections fade so their content doesn't pop.
+const EXPAND_TRANSITION = LinearTransition.duration(250).easing(Easing.out(Easing.ease));
+const SECTION_FADE_IN = FadeIn.duration(180);
+const SECTION_FADE_OUT = FadeOut.duration(120);
 
 export function ThreadReplyBar({
   targetEvent,
@@ -55,6 +71,12 @@ export function ThreadReplyBar({
 }: ThreadReplyBarProps) {
   const { ndk } = useNDK();
   const insets = useSafeAreaInsets();
+  // Only follow the keyboard while the thread is the active screen. When the
+  // full composer modal is pushed on top (its own keyboard autofocuses), the
+  // app-wide keyboard tracker would otherwise translate this bar up — so on a
+  // back-gesture it slides down into place ("animates in from the top"). Gating
+  // on focus keeps it pinned at the bottom (translateY = 0) behind the modal.
+  const isFocused = useIsFocused();
   const [surface, foreground, muted, accent] = useThemeColor([
     'surface',
     'foreground',
@@ -63,22 +85,28 @@ export function ThreadReplyBar({
   ] as const);
   const ownProfile = useProfileStore((s) => s.getActiveProfile());
   const inputRef = useRef<TextInput>(null);
+  const shift = useShiftLogger('ThreadReplyBar');
 
   const [text, setText] = useState('');
   const [mediaBlocks, setMediaBlocks] = useState<MediaBlock[]>([]);
   const [focused, setFocused] = useState(false);
   const [posting, setPosting] = useState(false);
 
-  const replyTarget = useMemo(() => deriveReplyTarget(targetEvent), [targetEvent]);
-  const targetName = targetProfile?.name || `${tryNpubEncode(targetEvent.pubkey).slice(0, 12)}…`;
+  const replyTarget = useMemo(
+    () => (targetEvent ? deriveReplyTarget(targetEvent) : null),
+    [targetEvent]
+  );
+  const targetName = targetEvent
+    ? targetProfile?.name || `${tryNpubEncode(targetEvent.pubkey).slice(0, 12)}…`
+    : '';
 
   const hasContent = text.trim().length > 0 || mediaBlocks.length > 0;
   const expanded = focused || hasContent;
   const uploading = mediaBlocks.some((b) => b.uploadProgress !== undefined);
-  const canPost = !posting && hasContent && !uploading;
+  const canPost = !posting && hasContent && !uploading && !!replyTarget;
 
   const handlePost = useCallback(async () => {
-    if (!ndk || !canPost) return;
+    if (!ndk || !canPost || !replyTarget) return;
     setPosting(true);
     const blocks: ComposerBlock[] = [{ id: 'reply-text', kind: 'text', text }, ...mediaBlocks];
     const outcome = await publishComposed(ndk, { blocks, target: replyTarget });
@@ -123,6 +151,7 @@ export function ThreadReplyBar({
   // Hand the current draft + reply context to the full composer.
   const expandToFull = useCallback(
     (withPoll: boolean) => {
+      if (!replyTarget || !targetEvent) return;
       const store = useComposerStore.getState();
       store.open(replyTarget, { parentEvent: targetEvent, parentProfile: targetProfile });
       const firstText = useComposerStore.getState().blocks.find((b) => b.kind === 'text');
@@ -153,14 +182,43 @@ export function ThreadReplyBar({
 
   return (
     <KeyboardStickyView
-      offset={{ closed: 0, opened: 0 }}
-      onLayout={(e) => onHeightChange?.(e.nativeEvent.layout.height)}
-      style={{ position: 'absolute', left: 0, right: 0, bottom: insets.bottom }}>
-      <View style={[styles.container, { backgroundColor: surface, borderTopColor: borderColor }]}>
-        {expanded ? (
-          <Text size={12} style={{ color: muted, marginBottom: 8 }}>
-            Replying to {targetName}
-          </Text>
+      enabled={isFocused}
+      // Anchored to the very bottom of the screen with the safe-area inset baked
+      // into the container's padding, so the opaque background reaches the home
+      // indicator and page content can't show through beneath the bar. When the
+      // keyboard opens, `opened: insets.bottom` tucks that safe-area padding
+      // behind the keyboard so the input still rests flush on the keyboard top.
+      offset={{ closed: 0, opened: insets.bottom }}
+      onLayout={(e) => {
+        const height = e.nativeEvent.layout.height;
+        // The bar grows on focus ("Replying to" header + action row) and when
+        // media thumbnails attach. ThreadView pads the list by this height, so
+        // any change here shifts how far the last reply sits above the bar.
+        shift.report('thread.shift.replybar', 'height', height, {
+          focused,
+          expanded,
+          mediaCount: mediaBlocks.length,
+          posting,
+        });
+        onHeightChange?.(height);
+      }}
+      style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
+      <Animated.View
+        layout={EXPAND_TRANSITION}
+        style={[
+          styles.container,
+          {
+            backgroundColor: surface,
+            borderTopColor: borderColor,
+            paddingBottom: insets.bottom + 10,
+          },
+        ]}>
+        {expanded && targetEvent ? (
+          <Animated.View entering={SECTION_FADE_IN} exiting={SECTION_FADE_OUT}>
+            <Text size={12} style={{ color: muted, marginBottom: 8 }}>
+              Replying to {targetName}
+            </Text>
+          </Animated.View>
         ) : null}
 
         {mediaBlocks.length > 0 ? (
@@ -210,6 +268,7 @@ export function ThreadReplyBar({
           />
           <Pressable
             onPress={() => expandToFull(false)}
+            disabled={!replyTarget}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="Expand composer">
@@ -218,28 +277,31 @@ export function ThreadReplyBar({
         </HStack>
 
         {expanded ? (
-          <HStack gap={20} align="center" style={{ marginTop: 10 }}>
-            <Pressable
-              onPress={handleAddMedia}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Add photo or video">
-              <Icon name="mdi:image-plus" size={24} color={accent} />
-            </Pressable>
-            <Pressable
-              onPress={() => expandToFull(true)}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Add poll">
-              <Icon name="mdi:poll" size={24} color={accent} />
-            </Pressable>
-            <View style={{ flex: 1 }} />
-            <Button variant="primary" size="sm" isDisabled={!canPost} onPress={handlePost}>
-              <Button.Label>{posting ? 'Posting…' : 'Reply'}</Button.Label>
-            </Button>
-          </HStack>
+          <Animated.View entering={SECTION_FADE_IN} exiting={SECTION_FADE_OUT}>
+            <HStack gap={20} align="center" style={{ marginTop: 10 }}>
+              <Pressable
+                onPress={handleAddMedia}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Add photo or video">
+                <Icon name="mdi:image-plus" size={24} color={accent} />
+              </Pressable>
+              <Pressable
+                onPress={() => expandToFull(true)}
+                disabled={!replyTarget}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Add poll">
+                <Icon name="mdi:poll" size={24} color={accent} />
+              </Pressable>
+              <View style={{ flex: 1 }} />
+              <Button variant="primary" size="sm" isDisabled={!canPost} onPress={handlePost}>
+                <Button.Label>{posting ? 'Posting…' : 'Reply'}</Button.Label>
+              </Button>
+            </HStack>
+          </Animated.View>
         ) : null}
-      </View>
+      </Animated.View>
     </KeyboardStickyView>
   );
 }

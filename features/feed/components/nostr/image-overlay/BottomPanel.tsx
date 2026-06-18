@@ -8,6 +8,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import opacity from 'hex-color-opacity';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
@@ -15,6 +16,7 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { formatRelative } from '@/shared/lib/date';
 import { formatCount, formatSats } from '../feedFormat';
 import { parseContent } from '../feedParse';
@@ -23,7 +25,9 @@ import type { ImageOverlayPost } from './types';
 import { BOTTOM_PANEL_PADDING_HORIZONTAL, BOTTOM_PANEL_PADDING_TOP } from './config';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
-const PANEL_BG = 'rgba(0,0,0,0.9)';
+import { POST_ACTION_ICON_SIZES } from '../MetricsFooter';
+// Absolute bar text stays white — it floats over the dark, blurred image, not
+// over the sheet's `surface` background.
 const PANEL_TEXT = 'rgba(255,255,255,0.95)';
 const PANEL_TEXT_MUTED = 'rgba(255,255,255,0.6)';
 const LIKED_COLOR = '#ff5a7a';
@@ -31,8 +35,6 @@ const LIKED_COLOR = '#ff5a7a';
 const PANEL_CONTENT_TRUNCATE_LIMIT = 120;
 const PANEL_INLINE_IMAGE_MAX_HEIGHT = 200;
 const PANEL_INLINE_IMAGE_BG = 'rgba(40, 40, 48, 0.95)';
-
-export { PANEL_BG };
 
 type PanelBlock = { type: 'text'; value: string } | { type: 'image'; url: string };
 
@@ -90,6 +92,20 @@ function segmentsToBlocks(segments: ContentSegment[]): PanelBlock[] {
   }
   if (textAcc.length > 0) blocks.push({ type: 'text', value: textAcc });
   return blocks;
+}
+
+/**
+ * The text the author actually wrote, excluding bare image URLs (which render
+ * as image blocks, not text). Truncation and the "show more" affordance key off
+ * this so an image-only post — whose raw content is just a long media URL —
+ * doesn't surface a lone "show more" sitting over empty/hidden text.
+ */
+function extractPanelText(content: string): string {
+  return segmentsToBlocks(parseContent(content))
+    .filter((b): b is Extract<PanelBlock, { type: 'text' }> => b.type === 'text')
+    .map((b) => b.value)
+    .join('')
+    .trim();
 }
 
 /** Renders an image full width at original aspect ratio, capped by max height; letterbox areas show a blurred cover of the same image. */
@@ -194,7 +210,11 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
   /** Called after applying initialContentExpanded so caller can clear the flag. */
   onConsumedExpand?: () => void;
 }) {
-  const repostedColor = useThemeColor('success');
+  const [foreground, muted, repostedColor] = useThemeColor([
+    'foreground',
+    'muted',
+    'success',
+  ] as const);
   const [contentExpanded, setContentExpanded] = useState(initialContentExpanded ?? false);
 
   useEffect(() => {
@@ -208,12 +228,19 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
 
-  const { blocks, showInlineImages } = useMemo(() => {
+  const { blocks, showInlineImages, textContent } = useMemo(() => {
     const allSegments = parseContent(fullContent);
     const allBlocks = segmentsToBlocks(allSegments);
     const showInline = shouldShowInlineImagesInPanel(allBlocks);
-    if (fullContent.length <= PANEL_CONTENT_TRUNCATE_LIMIT || contentExpanded) {
-      return { blocks: allBlocks, showInlineImages: showInline };
+    // Bare image URLs render as image blocks, so the author's actual text drives
+    // truncation/"show more" — never the raw media URL of an image-only post.
+    const text = allBlocks
+      .filter((b): b is Extract<PanelBlock, { type: 'text' }> => b.type === 'text')
+      .map((b) => b.value)
+      .join('')
+      .trim();
+    if (text.length <= PANEL_CONTENT_TRUNCATE_LIMIT || contentExpanded) {
+      return { blocks: allBlocks, showInlineImages: showInline, textContent: text };
     }
     let count = 0;
     const out: PanelBlock[] = [];
@@ -222,7 +249,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
         if (count + block.value.length > PANEL_CONTENT_TRUNCATE_LIMIT) {
           const take = PANEL_CONTENT_TRUNCATE_LIMIT - count;
           out.push({ type: 'text', value: block.value.slice(0, take) + '…' });
-          return { blocks: out, showInlineImages: showInline };
+          return { blocks: out, showInlineImages: showInline, textContent: text };
         }
         out.push(block);
         count += block.value.length;
@@ -230,11 +257,11 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
         out.push(block);
       }
     }
-    return { blocks: out, showInlineImages: showInline };
+    return { blocks: out, showInlineImages: showInline, textContent: text };
   }, [fullContent, contentExpanded]);
 
-  const hasContent = fullContent.length > 0;
-  const canExpand = fullContent.length > PANEL_CONTENT_TRUNCATE_LIMIT;
+  const hasContent = textContent.length > 0;
+  const canExpand = textContent.length > PANEL_CONTENT_TRUNCATE_LIMIT;
   const showMoreVisible = canExpand && !contentExpanded;
   const showLessVisible = canExpand && contentExpanded;
 
@@ -258,10 +285,10 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
             name={displayName}
           />
           <View style={styles.authorTextWrap}>
-            <Text bold size={14} style={{ color: PANEL_TEXT }} numberOfLines={1}>
+            <Text bold size={14} style={{ color: foreground }} numberOfLines={1}>
               {displayName}
             </Text>
-            <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+            <Text size={13} style={{ color: muted }}>
               {shortTime}
             </Text>
           </View>
@@ -274,7 +301,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
                 <Text
                   key={i}
                   size={14}
-                  style={[styles.contentText, { color: PANEL_TEXT_MUTED }]}
+                  style={[styles.contentText, { color: foreground }]}
                   numberOfLines={contentExpanded ? undefined : 2}>
                   {block.value}
                 </Text>
@@ -285,7 +312,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
             {showMoreVisible && (
               <Text
                 size={14}
-                style={[styles.contentText, { color: PANEL_TEXT_MUTED, marginTop: 4 }]}
+                style={[styles.contentText, { color: muted, marginTop: 4 }]}
                 onPress={() => setContentExpanded((e) => !e)}>
                 show more
               </Text>
@@ -293,7 +320,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
             {showLessVisible && (
               <Text
                 size={14}
-                style={[styles.contentText, { color: PANEL_TEXT_MUTED, marginTop: 4 }]}
+                style={[styles.contentText, { color: muted, marginTop: 4 }]}
                 onPress={() => setContentExpanded((e) => !e)}>
                 show less
               </Text>
@@ -303,8 +330,12 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
         {/* Stats / actions row */}
         <View style={styles.metricsRow}>
           <View style={styles.metricBtn}>
-            <Icon name="iconamoon:comment-fill" size={16} color={PANEL_TEXT_MUTED} />
-            <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+            <Icon
+              name="iconamoon:comment-fill"
+              size={POST_ACTION_ICON_SIZES.regular.comment}
+              color={muted}
+            />
+            <Text size={13} style={{ color: muted }}>
               {formatCount(metrics.replyCount)}
             </Text>
           </View>
@@ -314,10 +345,10 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
             style={styles.metricBtn}>
             <Icon
               name="garden:arrow-retweet-fill-16"
-              size={17}
-              color={reposted ? repostedColor : PANEL_TEXT_MUTED}
+              size={POST_ACTION_ICON_SIZES.regular.repost}
+              color={reposted ? repostedColor : muted}
             />
-            <Text size={13} style={{ color: reposted ? repostedColor : PANEL_TEXT_MUTED }}>
+            <Text size={13} style={{ color: reposted ? repostedColor : muted }}>
               {formatCount(metrics.repostCount)}
             </Text>
           </Pressable>
@@ -327,16 +358,20 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
             style={styles.metricBtn}>
             <Icon
               name="iconamoon:heart-fill"
-              size={16}
-              color={liked ? LIKED_COLOR : PANEL_TEXT_MUTED}
+              size={POST_ACTION_ICON_SIZES.regular.base}
+              color={liked ? LIKED_COLOR : muted}
             />
-            <Text size={13} style={{ color: liked ? LIKED_COLOR : PANEL_TEXT_MUTED }}>
+            <Text size={13} style={{ color: liked ? LIKED_COLOR : muted }}>
               {formatCount(metrics.likeCount)}
             </Text>
           </Pressable>
           <View style={styles.metricBtn}>
-            <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
-            <Text overpass size={13} style={{ color: PANEL_TEXT_MUTED }}>
+            <Icon
+              name="mingcute:lightning-fill"
+              size={POST_ACTION_ICON_SIZES.regular.base}
+              color={muted}
+            />
+            <Text overpass size={13} style={{ color: muted }}>
               {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
             </Text>
           </View>
@@ -346,7 +381,13 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
   );
 });
 
-/** Fixed reply row shown at bottom of the sheet (does not scroll). */
+/**
+ * Fixed reply row at the bottom of the sheet (does not scroll). Mirrors the
+ * thread screen's `ThreadReplyBar` collapsed state — own avatar, a themed
+ * rounded input pill, and the expand affordance — so the two reply surfaces
+ * read identically. Tapping anywhere hands off to the thread, where the live
+ * composer lives.
+ */
 export const ImageOverlayBottomPanelReply = React.memo(function ImageOverlayBottomPanelReply({
   currentUserPubkey,
   onReplyPress,
@@ -354,21 +395,25 @@ export const ImageOverlayBottomPanelReply = React.memo(function ImageOverlayBott
   currentUserPubkey: string | null;
   onReplyPress: () => void;
 }) {
+  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+  const ownProfile = useProfileStore((s) => s.getActiveProfile());
+  const fieldBg = opacity(foreground, 0.06);
   return (
     <Log name="ImageOverlayBottomPanelReply">
       <Pressable onPress={onReplyPress} style={styles.replyRow}>
         <Avatar
-          state="fallback"
-          seed={currentUserPubkey ?? ''}
-          size={28}
-          name=""
-          fallbackVariant="beam"
+          state={ownProfile?.cachedPicture ? 'image' : 'fallback'}
+          picture={ownProfile?.cachedPicture}
+          seed={ownProfile?.pubkey ?? currentUserPubkey ?? ''}
+          size={30}
+          name={ownProfile?.cachedDisplayName}
         />
-        <View style={styles.replyInputWrap}>
-          <Text size={14} style={{ color: PANEL_TEXT_MUTED }}>
+        <View style={[styles.replyInputPill, { backgroundColor: fieldBg }]}>
+          <Text size={15} style={{ color: muted }}>
             Post your reply
           </Text>
         </View>
+        <Icon name="mdi:arrow-expand" size={20} color={muted} />
       </Pressable>
     </Log>
   );
@@ -391,8 +436,9 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
-  const contentPreview = fullContent.slice(0, 120);
-  const contentTruncated = fullContent.length > 120;
+  const textContent = useMemo(() => extractPanelText(fullContent), [fullContent]);
+  const contentPreview = textContent.slice(0, 120);
+  const contentTruncated = textContent.length > 120;
 
   const handleCommentPress = useCallback(() => {
     onOpenSheet();
@@ -429,7 +475,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
             </Text>
           </View>
         </Pressable>
-        {fullContent.length > 0 ? (
+        {textContent.length > 0 ? (
           <View style={absoluteBarStyles.contentRow}>
             <Text
               size={13}
@@ -453,7 +499,11 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
             onPress={handleCommentPress}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={styles.metricBtn}>
-            <Icon name="iconamoon:comment-fill" size={16} color={PANEL_TEXT_MUTED} />
+            <Icon
+              name="iconamoon:comment-fill"
+              size={POST_ACTION_ICON_SIZES.regular.comment}
+              color={PANEL_TEXT_MUTED}
+            />
             <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
               {formatCount(metrics.replyCount)}
             </Text>
@@ -464,7 +514,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
             style={styles.metricBtn}>
             <Icon
               name="garden:arrow-retweet-fill-16"
-              size={17}
+              size={POST_ACTION_ICON_SIZES.regular.repost}
               color={reposted ? repostedColor : PANEL_TEXT_MUTED}
             />
             <Text size={13} style={{ color: reposted ? repostedColor : PANEL_TEXT_MUTED }}>
@@ -477,7 +527,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
             style={styles.metricBtn}>
             <Icon
               name="iconamoon:heart-fill"
-              size={16}
+              size={POST_ACTION_ICON_SIZES.regular.base}
               color={liked ? LIKED_COLOR : PANEL_TEXT_MUTED}
             />
             <Text size={13} style={{ color: liked ? LIKED_COLOR : PANEL_TEXT_MUTED }}>
@@ -485,7 +535,11 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
             </Text>
           </Pressable>
           <View style={styles.metricBtn}>
-            <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
+            <Icon
+              name="mingcute:lightning-fill"
+              size={POST_ACTION_ICON_SIZES.regular.base}
+              color={PANEL_TEXT_MUTED}
+            />
             <Text overpass size={13} style={{ color: PANEL_TEXT_MUTED }}>
               {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
             </Text>
@@ -553,14 +607,13 @@ const styles = StyleSheet.create({
   replyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 20,
+    gap: 8,
   },
-  replyInputWrap: {
+  replyInputPill: {
     flex: 1,
+    minHeight: 38,
+    borderRadius: 19,
     justifyContent: 'center',
+    paddingHorizontal: 14,
   },
 });

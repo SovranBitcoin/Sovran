@@ -29,7 +29,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
-import { log, Log } from '@/shared/lib/logger';
+import { log, Log, feedLog } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
@@ -456,6 +456,14 @@ export function UserFeed({
             missingProfilePubkeys: phase1.missingProfilePubkeys,
           });
           if (cancelled) return;
+          // Async enrichment lands after first paint and reflows rows (quoted
+          // posts resolving, author names/avatars filling in). See HomeFeed.
+          feedLog.info('feed.shift.enrich', {
+            surface: 'user',
+            quotedEvents: updates.quotedEvents?.size ?? 0,
+            metrics: updates.metrics?.size ?? 0,
+            profiles: updates.profiles?.size ?? 0,
+          });
           startTransition(() => {
             if (updates.quotedEvents) {
               setQuotedEventsMap((prev) => {
@@ -578,6 +586,12 @@ export function UserFeed({
             })
           : dedupedItems;
 
+      feedLog.info('feed.shift.append', {
+        surface: 'user',
+        appended: newItems.length,
+        total: feedItemIdsRef.current.size,
+        paginationUntil: page.paginationUntil,
+      });
       startTransition(() => {
         if (newItems.length > 0) setFeedItems((prev) => [...prev, ...newItems]);
         setMetricsMap((prev) => {
@@ -781,6 +795,18 @@ export function UserFeed({
   useEffect(() => {
     feedRowsRef.current = feedRows;
   }, [feedRows]);
+
+  // Render boundary / skeleton→content swap: mirrors HomeFeed's `feed.ui.render`
+  // so a profile-feed content shift can be traced the same way.
+  useEffect(() => {
+    feedLog.info('feed.shift.render', {
+      surface: 'user',
+      feedItems: feedItems.length,
+      rows: feedRows.length,
+      isLoading,
+      empty: !isLoading && feedRows.length === 0,
+    });
+  }, [feedItems.length, feedRows.length, isLoading]);
 
   const renderFeedItem = useCallback(
     ({ item: row, index }: LegendListRenderItemProps<FeedRow, string | undefined>) => {

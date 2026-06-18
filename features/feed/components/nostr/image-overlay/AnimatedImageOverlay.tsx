@@ -26,9 +26,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { BlurView } from 'expo-blur';
+import opacity from 'hex-color-opacity';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { deriveReplyTarget } from '@/features/feed/lib/replyTarget';
+import { useComposerStore } from '@/features/composer/state/composerStore';
 import { Log } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -42,7 +46,6 @@ import {
   ImageOverlayBottomPanelContent,
   ImageOverlayBottomPanelReply,
   ImageOverlayAbsoluteBar,
-  PANEL_BG,
 } from './BottomPanel';
 import {
   ANDROID_SCRIM_MAX_OPACITY,
@@ -91,6 +94,10 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { keys: nostrKeys } = useNostrKeysContext();
+  // The sheet is a true bottom drawer (not an overlay on the image), so it reads
+  // like the feed it came from: same `surface` background, with the handle and
+  // reply divider tinted from `foreground` rather than hardcoded white.
+  const [panelSurface, panelForeground] = useThemeColor(['surface', 'foreground'] as const);
   const panelMinHeightReportedRef = useRef(false);
 
   const imageScale = useSharedValue(1);
@@ -246,12 +253,18 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     [videoFeedLayouts, setVideoFeedIndex]
   );
 
+  // Reply from the image itself: prime the composer with a NIP-10 reply target +
+  // parent preview, then open it as a modal that slides up OVER the overlay (the
+  // stack modal renders above the FullWindowOverlay). The overlay stays mounted
+  // behind it, so dismissing the composer returns to the image.
   const onReplyPress = useCallback(() => {
     if (!activeOverlayPost) return;
-    router.navigate({
-      pathname: '/(user-flow)/thread',
-      params: { eventId: activeOverlayPost.event.id },
+    const target = deriveReplyTarget(activeOverlayPost.event);
+    useComposerStore.getState().open(target, {
+      parentEvent: activeOverlayPost.event,
+      parentProfile: activeOverlayPost.profile ?? undefined,
     });
+    router.navigate('/(user-flow)/composer');
     // eslint-disable-next-line react-hooks/exhaustive-deps -- depend on event.id only so memoized panel gets stable callback
   }, [activeOverlayPost?.event.id]);
 
@@ -1296,6 +1309,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             rBottomPanelStyle,
             rBottomPanelLayoutStyle,
             {
+              backgroundColor: panelSurface,
               paddingBottom: insets.bottom + BOTTOM_PANEL_PADDING_BOTTOM_EXTRA,
             },
           ]}
@@ -1303,7 +1317,12 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           <View style={overlayStyles.panelContentWrap} collapsable={false}>
             <GestureDetector gesture={handlePan}>
               <View style={overlayStyles.panelHandle} collapsable={false}>
-                <View style={overlayStyles.panelHandleBar} />
+                <View
+                  style={[
+                    overlayStyles.panelHandleBar,
+                    { backgroundColor: opacity(panelForeground, 0.2) },
+                  ]}
+                />
               </View>
             </GestureDetector>
             <GestureDetector gesture={scrollAreaPan}>
@@ -1329,7 +1348,12 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
                     />
                   </View>
                 </GHScrollView>
-                <View style={overlayStyles.bottomPanelReplyWrap} collapsable={false}>
+                <View
+                  style={[
+                    overlayStyles.bottomPanelReplyWrap,
+                    { borderTopColor: opacity(panelForeground, 0.1) },
+                  ]}
+                  collapsable={false}>
                   <ImageOverlayBottomPanelReply
                     currentUserPubkey={nostrKeys?.pubkey ?? null}
                     onReplyPress={onReplyPress}
@@ -1452,7 +1476,6 @@ const overlayStyles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: zIndex.raised,
-    backgroundColor: PANEL_BG,
     borderTopLeftRadius: BOTTOM_PANEL_SHEET_TOP_BORDER_RADIUS,
     borderTopRightRadius: BOTTOM_PANEL_SHEET_TOP_BORDER_RADIUS,
     overflow: 'hidden',
@@ -1485,7 +1508,8 @@ const overlayStyles = StyleSheet.create({
   },
   bottomPanelReplyWrap: {
     paddingHorizontal: BOTTOM_PANEL_PADDING_HORIZONTAL,
-    paddingTop: 8,
+    paddingTop: 10,
     paddingBottom: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
 });

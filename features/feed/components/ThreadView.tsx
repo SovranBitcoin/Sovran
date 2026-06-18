@@ -10,7 +10,6 @@ import { StyleSheet } from 'react-native';
 import Animated, { FadeIn, Easing } from 'react-native-reanimated';
 import { LegendList, type LegendListRenderItemProps } from '@legendapp/list/react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
 
 import { Text } from '@/shared/ui/primitives/Text';
@@ -27,6 +26,13 @@ import {
   SKELETON_EXIT_DURATION_MS,
 } from '@/shared/ui/composed/SkeletonExitShimmer';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
+import {
+  ThreadEmbedProvider,
+  useThreadEmbed,
+  ThreadEmbedSheet,
+  LinkEmbedView,
+  EmbedActionBar,
+} from './thread-embed';
 
 import { useThread, type ThreadItem } from '@/features/feed/hooks/useThread';
 import { usePostActions } from '@/features/feed/hooks/usePostActions';
@@ -41,8 +47,10 @@ import { actionMenuPopup } from '@/shared/lib/popup';
 import {
   DEFAULT_REPLY_SKELETON_COUNT,
   MAX_REPLY_SKELETON_COUNT,
+  REPLY_SKELETON_VARIANTS,
   sortRepliesByMeasuredHeights,
 } from '@/features/feed/lib/threadReplySkeletons';
+import { NOTE_CONTENT_LINE_HEIGHT } from './nostr/NoteContent';
 
 interface ThreadViewProps {
   eventId: string;
@@ -132,6 +140,40 @@ function threadKeyExtractor(item: ThreadListItem): string {
 
 function threadItemType(item: ThreadListItem): string {
   return item.type;
+}
+
+// Height hints (px) for the content-free skeleton / sort-tabs rows, fed to
+// LegendList's `getFixedItemSize` so it doesn't lay them out at the generic
+// `estimatedItemSize` (200) and snap them on first paint. The skeletons size
+// themselves naturally — these are deterministic now that each skeleton bar is
+// pinned to a single line (`numberOfLines={1}` in `PostCardSkeleton`), so a
+// content line is exactly `NOTE_CONTENT_LINE_HEIGHT`. The values are biased a
+// hair high so the list never under-reserves (a few px of gap is invisible; an
+// under-reservation would overlap rows). Keep in sync with `PostCardSkeleton` /
+// `ReplySortPicker`.
+//
+//   reply skeleton = chrome (gutter padding + author row + spacer + metrics
+//   footer) + one NOTE_CONTENT_LINE_HEIGHT per content line of its variant.
+const REPLY_SKELETON_CHROME_HEIGHT = 80;
+const TARGET_SKELETON_FIXED_HEIGHT = 176;
+const REPLY_SORT_TABS_FIXED_HEIGHT = 52;
+
+function replySkeletonHeight(skeletonIndex: number): number {
+  const variant = REPLY_SKELETON_VARIANTS[skeletonIndex % REPLY_SKELETON_VARIANTS.length];
+  return REPLY_SKELETON_CHROME_HEIGHT + variant.content.length * NOTE_CONTENT_LINE_HEIGHT;
+}
+
+function threadFixedItemSize(item: ThreadListItem): number | undefined {
+  switch (item.type) {
+    case 'target-skeleton':
+      return TARGET_SKELETON_FIXED_HEIGHT;
+    case 'reply-skeleton':
+      return replySkeletonHeight(item.skeletonIndex);
+    case 'reply-sort-tabs':
+      return REPLY_SORT_TABS_FIXED_HEIGHT;
+    default:
+      return undefined;
+  }
 }
 
 function createReplySkeletonItems(count: number): ThreadSkeletonItem[] {
@@ -230,15 +272,17 @@ function ReplySortPicker({
 }
 
 function ThreadViewInner({ eventId }: ThreadViewProps) {
-  const [foreground, background, defaultColor, surfaceTertiary] = useThemeColor([
+  const [foreground, surface, defaultColor, surfaceTertiary] = useThemeColor([
     'foreground',
-    'background',
+    'surface',
     'default',
     'surface-tertiary',
   ] as const);
   const headerHeight = useHeaderHeight();
-  const insets = useSafeAreaInsets();
   const imageOverlay = useImageOverlay();
+  const embed = useThreadEmbed();
+  const embedOpen = embed?.open;
+  const targetFooterOpacity = embed?.targetFooterOpacity;
   const [replyBarHeight, setReplyBarHeight] = useState(0);
 
   const {
@@ -409,6 +453,59 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     transitionPhase,
   ]);
 
+  // Content-shift trace: the thread reply list transitions through distinct
+  // rendering phases (loading skeletons → offscreen measuring → exit-reveal →
+  // real replies). Each transition re-composes the visible rows and can shift
+  // the scroll position; log every phase change with its row makeup so a jump
+  // can be tied to the exact transition. Pairs with `thread.reply_skeleton.*`.
+  const lastThreadPhaseRef = useRef<string>('');
+  useEffect(() => {
+    const phase =
+      isLoading && items.length === 0
+        ? 'loading-skeletons'
+        : measuredOrder
+          ? transitionPhase === 'exiting'
+            ? 'exit-reveal'
+            : 'measured-replies'
+          : isMeasuring
+            ? 'measuring'
+            : isFetching
+              ? 'fetching-with-skeletons'
+              : 'replies';
+    let skeletons = 0;
+    let transitionReplies = 0;
+    let realReplies = 0;
+    for (const it of displayItems) {
+      if (it.type === 'target-skeleton' || it.type === 'reply-skeleton') skeletons += 1;
+      else if (it.type === 'transition-reply') transitionReplies += 1;
+      else if (it.type === 'reply') realReplies += 1;
+    }
+    const signature = `${phase}:${displayItems.length}:${skeletons}:${transitionReplies}:${realReplies}`;
+    if (lastThreadPhaseRef.current === signature) return;
+    const prevPhase = lastThreadPhaseRef.current;
+    lastThreadPhaseRef.current = signature;
+    feedLog.info('thread.shift.phase', {
+      eventId,
+      phase,
+      prevSignature: prevPhase || null,
+      rows: displayItems.length,
+      skeletons,
+      transitionReplies,
+      realReplies,
+      replyBarHeight,
+    });
+  }, [
+    displayItems,
+    eventId,
+    isFetching,
+    isLoading,
+    isMeasuring,
+    items.length,
+    measuredOrder,
+    replyBarHeight,
+    transitionPhase,
+  ]);
+
   const handleSkeletonMeasured = useCallback((skeletonIndex: number, height: number) => {
     skeletonHeightsRef.current.set(skeletonIndex, height);
     // Only nudge React on the first capture; later layouts only update the ref.
@@ -570,6 +667,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           quotedEvents={quotedEventsRef.current}
           profiles={profilesRef.current}
           getMetrics={getMetrics}
+          onLinkPress={isTarget ? embedOpen : undefined}
+          footerOpacity={isTarget ? targetFooterOpacity : undefined}
           showLineAbove={isParent ? index > 0 : isTarget ? hasParents : false}
           showLineBelow={isParent}
           liked={engagement.liked}
@@ -595,6 +694,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     [
       openPostActions,
       openComposer,
+      embedOpen,
+      targetFooterOpacity,
       getDisplayMetrics,
       getEngagementState,
       getMetrics,
@@ -625,13 +726,31 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     void loadMoreReplies();
   }, [loadMoreReplies, isFetching, isMeasuring]);
 
+  // Target-post actions for the floating embed action bar (mirrors the
+  // target PostCard's MetricsFooter wiring). Hooks stay above the early
+  // return below.
+  const targetEvent = targetItem?.event;
+  const onTargetComment = useCallback(() => {
+    if (!targetEvent) return;
+    openComposer(deriveReplyTarget(targetEvent), {
+      parentEvent: targetEvent,
+      parentProfile: profilesRef.current.get(targetEvent.pubkey),
+    });
+  }, [targetEvent, openComposer, profilesRef]);
+  const onTargetLike = useCallback(() => {
+    if (targetEvent) void toggleLike(targetEvent);
+  }, [targetEvent, toggleLike]);
+  const onTargetRepost = useCallback(() => {
+    if (targetEvent) void toggleRepost(targetEvent);
+  }, [targetEvent, toggleRepost]);
+
   if (error && items.length === 0) {
     return (
       <View
         style={[
           styles.container,
           styles.centerContent,
-          { backgroundColor: background, paddingTop: headerHeight },
+          { backgroundColor: surface, paddingTop: headerHeight },
         ]}>
         <Icon name="mdi:message-text" size={40} color={defaultColor} />
         <Spacer size={12} />
@@ -647,55 +766,82 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       <ImageOverlayProvider
         getDisplayMetrics={getDisplayMetrics}
         getEngagementState={getEngagementState}>
-        <View style={[styles.container, { backgroundColor: background }]}>
-          <LegendList
-            data={displayItems}
-            keyExtractor={threadKeyExtractor}
-            getItemType={threadItemType}
-            estimatedItemSize={200}
-            drawDistance={500}
-            renderItem={renderItem}
-            extraData={[
-              dataVersion,
-              engagementRevision,
-              isFetching ? 1 : 0,
-              isLoadingMoreReplies ? 1 : 0,
-              hasMoreReplies ? 1 : 0,
-              replySort,
-            ].join(':')}
-            recycleItems
-            ListFooterComponent={
-              isLoadingMoreReplies && !isMeasuring ? (
-                <View style={styles.hiddenReplyFooter}>
-                  <Spinner size={18} color={opacity(foreground, 0.45)} />
-                </View>
-              ) : hiddenReplyCount > 0 && !isFetching && !hasMoreReplies ? (
-                <View style={styles.hiddenReplyFooter}>
-                  <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
-                    {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not
-                    loaded
-                  </Text>
-                </View>
-              ) : null
-            }
-            onEndReached={handleEndReached}
-            onEndReachedThreshold={0.4}
-            style={{ flex: 1 }}
-            contentContainerStyle={{
-              paddingTop: headerHeight,
-              paddingBottom: (replyBarHeight || 80) + insets.bottom + 16,
-            }}
-            showsVerticalScrollIndicator={false}
-            onScroll={
-              imageOverlay?.scrollOffsetY != null
-                ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-                    imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
-                  }
-                : undefined
-            }
-            scrollEventThrottle={16}
-            initialScrollIndex={!isLoading && targetIndex > 0 ? targetIndex : undefined}
-          />
+        <View style={[styles.container, { backgroundColor: surface }]}>
+          {embed?.embedUrl ? (
+            <LinkEmbedView
+              url={embed.embedUrl}
+              opacity={embed.embedOpacity}
+              onScroll={embed.handleEmbedScroll}
+              topInset={headerHeight}
+            />
+          ) : null}
+          <ThreadEmbedSheet
+            footer={
+              // Always mounted so the reply bar is pinned at the bottom from
+              // the first frame (no pop-in when the target loads). Travels
+              // with the sheet so it slides away as the embed is revealed.
+              <ThreadReplyBar
+                targetEvent={targetItem?.event}
+                targetProfile={
+                  targetItem ? profilesRef.current.get(targetItem.event.pubkey) : undefined
+                }
+                onHeightChange={setReplyBarHeight}
+              />
+            }>
+            <LegendList
+              data={displayItems}
+              keyExtractor={threadKeyExtractor}
+              getItemType={threadItemType}
+              getFixedItemSize={threadFixedItemSize}
+              estimatedItemSize={200}
+              drawDistance={500}
+              renderItem={renderItem}
+              extraData={[
+                dataVersion,
+                engagementRevision,
+                isFetching ? 1 : 0,
+                isLoadingMoreReplies ? 1 : 0,
+                hasMoreReplies ? 1 : 0,
+                replySort,
+              ].join(':')}
+              recycleItems
+              ListFooterComponent={
+                isLoadingMoreReplies && !isMeasuring ? (
+                  <View style={styles.hiddenReplyFooter}>
+                    <Spinner size={18} color={opacity(foreground, 0.45)} />
+                  </View>
+                ) : hiddenReplyCount > 0 && !isFetching && !hasMoreReplies ? (
+                  <View style={styles.hiddenReplyFooter}>
+                    <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
+                      {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not
+                      loaded
+                    </Text>
+                  </View>
+                ) : null
+              }
+              onEndReached={handleEndReached}
+              onEndReachedThreshold={0.4}
+              style={{ flex: 1 }}
+              contentContainerStyle={{
+                // The embed sheet is positioned starting just below the header
+                // (`expandedOffset`), so the list itself no longer pads the top.
+                paddingTop: 0,
+                // replyBarHeight already includes the bottom safe-area inset (the
+                // bar's opaque container reaches the screen bottom), so the inset
+                // is not added again here.
+                paddingBottom: (replyBarHeight || 80) + 16,
+              }}
+              showsVerticalScrollIndicator={false}
+              onScroll={(e: { nativeEvent: { contentOffset: { y: number } } }) => {
+                const y = e.nativeEvent.contentOffset.y;
+                if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;
+                if (embed) embed.scrollY.value = y;
+              }}
+              scrollEventThrottle={16}
+              scrollEnabled={embed ? embed.listScrollEnabled : undefined}
+              initialScrollIndex={!isLoading && targetIndex > 0 ? targetIndex : undefined}
+            />
+          </ThreadEmbedSheet>
           {isMeasuring && measurementTargets.length > 0 ? (
             <View
               style={styles.measurementTree}
@@ -728,11 +874,16 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               })}
             </View>
           ) : null}
-          {targetItem ? (
-            <ThreadReplyBar
-              targetEvent={targetItem.event}
-              targetProfile={profilesRef.current.get(targetItem.event.pubkey)}
-              onHeightChange={setReplyBarHeight}
+          {embed && targetEvent ? (
+            <EmbedActionBar
+              metrics={getDisplayMetrics(targetEvent.id)}
+              liked={getEngagementState(targetEvent.id).liked}
+              reposted={getEngagementState(targetEvent.id).reposted}
+              likePending={getEngagementState(targetEvent.id).likePending}
+              repostPending={getEngagementState(targetEvent.id).repostPending}
+              onCommentPress={onTargetComment}
+              onRepostPress={onTargetRepost}
+              onLikePress={onTargetLike}
             />
           ) : null}
           <AnimatedImageOverlay />
@@ -742,7 +893,15 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   );
 }
 
-export const ThreadView = React.memo(ThreadViewInner);
+function ThreadViewWithEmbed(props: ThreadViewProps) {
+  return (
+    <ThreadEmbedProvider>
+      <ThreadViewInner {...props} />
+    </ThreadEmbedProvider>
+  );
+}
+
+export const ThreadView = React.memo(ThreadViewWithEmbed);
 
 const styles = StyleSheet.create({
   container: {

@@ -19,6 +19,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import opacity from 'hex-color-opacity';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { log, Log, feedLog } from '@/shared/lib/logger';
+import { useShiftLogger } from '@/features/feed/lib/contentShiftLog';
 import {
   LegendList,
   type LegendListRenderItemProps,
@@ -147,11 +148,21 @@ function FeedThreadPair({
 }) {
   const foreground = useThemeColor('foreground');
   const [firstHeight, setFirstHeight] = useState(0);
+  const shift = useShiftLogger('FeedThreadPair');
 
-  const handleFirstLayout = useCallback((event: LayoutChangeEvent) => {
-    const nextHeight = Math.round(event.nativeEvent.layout.height);
-    setFirstHeight((currentHeight) => (currentHeight === nextHeight ? currentHeight : nextHeight));
-  }, []);
+  const handleFirstLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const nextHeight = Math.round(event.nativeEvent.layout.height);
+      // The first post's height drives the connector line length AND the
+      // second (reply) post's vertical offset. When it changes after async
+      // content settles, the whole pair reflows below it.
+      shift.report('feed.shift.threadpair.height', 'first', nextHeight);
+      setFirstHeight((currentHeight) =>
+        currentHeight === nextHeight ? currentHeight : nextHeight
+      );
+    },
+    [shift]
+  );
 
   const connectorStyle = useMemo(() => {
     const secondAvatarTop = firstHeight + secondAvatarCenterY - FEED_AVATAR_SIZE / 2;
@@ -396,6 +407,17 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           signal: controller.signal,
         });
         if (!isActiveLoad(requestId)) return;
+        // Enrichment arrives after the first paint: quoted posts resolve from
+        // placeholders, mention/author names and avatars fill in. Each updates
+        // a map that re-renders rows and can grow their height — log the counts
+        // so a post-paint shift can be tied to which enrichment landed.
+        feedLog.info('feed.shift.enrich', {
+          spec: feedSpecs[specIndex]?.name,
+          quotedEvents: updates.quotedEvents?.size ?? 0,
+          metrics: updates.metrics?.size ?? 0,
+          profiles: updates.profiles?.size ?? 0,
+          isRefresh,
+        });
         startTransition(() => {
           if (updates.quotedEvents) {
             setQuotedEventsMap((prev) => {
@@ -534,6 +556,15 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         feedItemIdsRef.current.add(item.type === 'note' ? item.event.id : item.repostEvent.id);
       }
 
+      // Appending a page extends the list below the fold. With a stable
+      // `estimatedItemSize`/key list this should not move the viewport, but a
+      // mismatch between estimated and real row heights does — log the append
+      // so a scroll jump on "load more" can be correlated.
+      feedLog.info('feed.shift.append', {
+        appended: newItems.length,
+        total: feedItemIdsRef.current.size,
+        paginationUntil: page.paginationUntil,
+      });
       startTransition(() => {
         setFeedItems((prev) => [...prev, ...newItems]);
         setMetricsMap((prev) => {

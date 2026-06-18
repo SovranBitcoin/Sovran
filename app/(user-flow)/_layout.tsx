@@ -14,31 +14,48 @@
 import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
+import {
+  androidHeaderScrimOptions,
+  createFlowLayoutScreenOptions,
+} from '../../config/flowLayoutOptions';
 
 const PROFILE_OPTIONS = { title: 'Profile' };
 const USER_MESSAGES_OPTIONS = { headerShown: false };
-const COMPOSER_OPTIONS = { headerShown: false };
 const SHARE_OPTIONS = { title: 'Share profile' };
-const THREAD_OPTIONS = { title: 'Thread' };
 const GEOHASH_CHAT_OPTIONS = { headerShown: false };
 const BITCHAT_NETWORK_OPTIONS = { headerShown: false };
 const BITCHAT_DM_OPTIONS = { headerShown: false };
 
 export default function UserFlowLayout() {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, background, surface] = useThemeColor([
+    'foreground',
+    'background',
+    'surface',
+  ] as const);
   const screenOptions = useMemo(
     () => createFlowLayoutScreenOptions({ foreground, background }),
     [foreground, background]
+  );
+  const composerOptions = useMemo(
+    () => ({ headerShown: false, contentStyle: { backgroundColor: surface } }),
+    [surface]
+  );
+  const threadOptions = useMemo(
+    () => ({
+      title: 'Thread',
+      contentStyle: { backgroundColor: surface },
+      ...androidHeaderScrimOptions(surface),
+    }),
+    [surface]
   );
 
   return (
     <Stack screenOptions={screenOptions}>
       <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
       <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
-      <Stack.Screen name="composer" options={COMPOSER_OPTIONS} />
+      <Stack.Screen name="composer" options={composerOptions} />
       <Stack.Screen name="share" options={SHARE_OPTIONS} />
-      <Stack.Screen name="thread" options={THREAD_OPTIONS} />
+      <Stack.Screen name="thread" options={threadOptions} />
       <Stack.Screen name="geohashChat" options={GEOHASH_CHAT_OPTIONS} />
       <Stack.Screen name="bitchatNetwork" options={BITCHAT_NETWORK_OPTIONS} />
       <Stack.Screen name="bitchatDM" options={BITCHAT_DM_OPTIONS} />

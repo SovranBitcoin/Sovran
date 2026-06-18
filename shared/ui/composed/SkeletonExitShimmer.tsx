@@ -43,12 +43,25 @@ const GRADIENT_START = { x: 0, y: 0.5 } as const;
 const GRADIENT_END = { x: 1, y: 0.5 } as const;
 const EXIT_SHIMMER_BAR_BASE = { width: HIGHLIGHT_WIDTH } as const;
 
+function shimmerColors(
+  highlightColor: string | undefined,
+  fallbackHighlight: string
+): readonly [string, string, string] {
+  if (highlightColor)
+    return [opacity(highlightColor, 0), highlightColor, opacity(highlightColor, 0)];
+  return ['transparent', fallbackHighlight, 'transparent'];
+}
+
 /**
  * Fades the wrapped skeleton out while a single bright shimmer line sweeps
  * across. The children stay mounted; only opacity changes. The shimmer line
  * is a separate absolute overlay.
  */
-export function SkeletonExitReveal({ active, children }: PropsWithChildren<{ active: boolean }>) {
+export function SkeletonExitReveal({
+  active,
+  children,
+  highlightColor,
+}: PropsWithChildren<{ active: boolean; highlightColor?: string }>) {
   const { width: screenWidth } = useWindowDimensions();
   const foreground = useThemeColor('foreground');
   const [containerWidth, setContainerWidth] = useState(0);
@@ -88,9 +101,8 @@ export function SkeletonExitReveal({ active, children }: PropsWithChildren<{ act
   });
 
   const gradientColors = useMemo<readonly [string, string, string]>(() => {
-    const highlight = opacity(foreground, 0.55);
-    return ['transparent', highlight, 'transparent'];
-  }, [foreground]);
+    return shimmerColors(highlightColor, opacity(foreground, 0.55));
+  }, [foreground, highlightColor]);
 
   const shimmerBarStyle = useMemo(
     () => [styles.shimmerBar, EXIT_SHIMMER_BAR_BASE, shimmerStyle],
@@ -120,7 +132,13 @@ export function SkeletonExitReveal({ active, children }: PropsWithChildren<{ act
  * loading state. One bright highlight stripe sweeps left-to-right, pauses,
  * then repeats. Pure transform animation (native driver).
  */
-export function SkeletonLoadingShimmer({ active }: { active: boolean }) {
+export function SkeletonLoadingShimmer({
+  active,
+  highlightColor,
+}: {
+  active: boolean;
+  highlightColor?: string;
+}) {
   const { width: screenWidth } = useWindowDimensions();
   const background = useThemeColor('background');
   const [containerWidth, setContainerWidth] = useState(0);
@@ -167,9 +185,8 @@ export function SkeletonLoadingShimmer({ active }: { active: boolean }) {
   });
 
   const gradientColors = useMemo<readonly [string, string, string]>(() => {
-    const highlight = opacity(background, 0.85);
-    return ['transparent', highlight, 'transparent'];
-  }, [background]);
+    return shimmerColors(highlightColor, opacity(background, 0.85));
+  }, [background, highlightColor]);
 
   const widthStyle = useMemo(() => ({ width: highlightWidth }), [highlightWidth]);
   const shimmerBarStyle = useMemo(

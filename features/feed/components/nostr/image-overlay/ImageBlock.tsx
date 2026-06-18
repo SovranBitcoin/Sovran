@@ -24,6 +24,11 @@ import { useImageOverlay } from './provider';
 import type { ImageOverlayPost, MediaType, ThumbnailLayout } from './types';
 import { ANDROID_THUMB_DIM_MAX_OPACITY, THUMB_BLUR_MAX_INTENSITY } from './config';
 import { Log, feedLog } from '@/shared/lib/logger';
+import { useShiftLogger, urlHost } from '../../../lib/contentShiftLog';
+import { getCachedAspect, rememberAspect } from './imageAspectCache';
+
+/** Aspect ratio reserved before the image's intrinsic size is known. */
+const DEFAULT_IMAGE_ASPECT = 16 / 9;
 
 /** The subset of GestureResponderEvent.nativeEvent the calibration reads. */
 type GestureTouchPoint = { pageX: number; pageY: number; locationX: number; locationY: number };
@@ -56,6 +61,7 @@ export const ImageBlock = React.memo(function ImageBlock({
   mediaTypes,
   mediaIndex,
   imageIndex,
+  initialAspectRatio,
   onBeforeOpen,
   onPressIn,
   onPressOut,
@@ -77,6 +83,14 @@ export const ImageBlock = React.memo(function ImageBlock({
   url: string;
   /** NIP-92 imeta alt text, used as the image's accessibility label. */
   alt?: string;
+  /**
+   * Aspect ratio (width / height) known ahead of load — e.g. from the post's
+   * NIP-92 imeta `dim`. Used as the initial reserved size so the image lays out
+   * correctly on the first frame. A runtime cache of ratios learned from prior
+   * `onLoad`s takes precedence (covers navigating in from an already-rendered
+   * feed, where imeta may be absent).
+   */
+  initialAspectRatio?: number;
   /** When the post has multiple images, pass all urls so the overlay can show a pager. */
   allImageUrls?: string[];
   /** Index of this image among the post's images (for opening overlay at the correct page). */
@@ -92,8 +106,14 @@ export const ImageBlock = React.memo(function ImageBlock({
   onPressOut?: () => void;
 } & Partial<ImageBlockOverlayPostProps>) {
   const [foreground] = useThemeColor(['foreground'] as const);
-  const [aspectRatio, setAspectRatio] = useState(16 / 9);
+  // Seed the reserved size from what we already know (a ratio learned from a
+  // prior onLoad, else the post's imeta dim) so the image doesn't flash 16:9 and
+  // resize. Lazy initializer so the lookup runs once at mount.
+  const [aspectRatio, setAspectRatio] = useState(
+    () => getCachedAspect(url) ?? initialAspectRatio ?? DEFAULT_IMAGE_ASPECT
+  );
   const [error, setError] = useState(false);
+  const shift = useShiftLogger('ImageBlock');
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
   /** Ref to the actual image so we measure the image bounds for shared-element, not the container. */
   const imageRef = useRef<React.ComponentRef<typeof Image> | null>(null);
@@ -235,8 +255,10 @@ export const ImageBlock = React.memo(function ImageBlock({
             ? {
                 event: {
                   id: overlayEvent.id,
+                  kind: overlayEvent.kind,
                   pubkey: overlayEvent.pubkey,
                   content: overlayEvent.content,
+                  tags: overlayEvent.tags,
                   created_at: overlayEvent.created_at,
                 },
                 metrics: {
@@ -355,9 +377,34 @@ export const ImageBlock = React.memo(function ImageBlock({
       accessibilityRole="image"
       onLoad={(e) => {
         const { width, height } = e.source;
-        if (width && height) setAspectRatio(width / height);
+        if (width && height) {
+          const next = width / height;
+          // Remember it so a later ImageBlock for this URL (e.g. the same post in
+          // a thread) can reserve the right box up front instead of flashing.
+          rememberAspect(url, next);
+          // If we'd already reserved the right ratio (cache/imeta), this is a
+          // no-op; otherwise the box resizes and shifts siblings — log the jump.
+          shift.report('feed.shift.image.aspect', url, next, {
+            host: urlHost(url),
+            mediaIndex: layoutIndex,
+            intrinsicWidth: width,
+            intrinsicHeight: height,
+            defaultAspect: DEFAULT_IMAGE_ASPECT,
+          });
+          setAspectRatio(next);
+        }
       }}
-      onError={() => setError(true)}
+      onError={() => {
+        feedLog.info('feed.shift.image.error', {
+          component: 'ImageBlock',
+          host: urlHost(url),
+          mediaIndex: layoutIndex,
+          // The block collapses from its reserved aspect box to the fixed-height
+          // "Image unavailable" placeholder — a downward shift of all siblings.
+          fromAspect: Math.round(aspectRatio * 100) / 100,
+        });
+        setError(true);
+      }}
     />
   );
 
