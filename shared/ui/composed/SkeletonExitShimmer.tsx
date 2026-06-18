@@ -29,24 +29,10 @@ import {
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
-export const SKELETON_EXIT_DURATION_MS = 620;
+const SKELETON_EXIT_DURATION_MS = 620;
 // Internal timing — not exported (only this module reads them).
 const SKELETON_LOADING_SHIMMER_DURATION_MS = 2200;
 const SKELETON_LOADING_SHIMMER_GAP_MS = 350;
-const SKELETON_LOADING_SHIMMER_CYCLE_MS =
-  SKELETON_LOADING_SHIMMER_DURATION_MS + SKELETON_LOADING_SHIMMER_GAP_MS;
-
-/**
- * Returns ms to wait before triggering the exit so the in-flight loading
- * shimmer pass finishes first. If the shimmer is currently in its idle gap
- * (between passes) this returns 0 — there's no pass to interrupt.
- */
-export function msUntilLoadingShimmerPassEnds(loadingStartedAt: number): number {
-  const elapsed = Math.max(0, Date.now() - loadingStartedAt);
-  const elapsedInCycle = elapsed % SKELETON_LOADING_SHIMMER_CYCLE_MS;
-  if (elapsedInCycle < SKELETON_LOADING_SHIMMER_GAP_MS) return 0;
-  return SKELETON_LOADING_SHIMMER_CYCLE_MS - elapsedInCycle;
-}
 
 const HIGHLIGHT_WIDTH = 90;
 const LOADING_HIGHLIGHT_WIDTH_RATIO = 1.1;

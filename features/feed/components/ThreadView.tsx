@@ -7,7 +7,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import Animated, { FadeIn, Easing } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import {
   LegendList,
   type LegendListRef,
@@ -25,10 +25,6 @@ import Icon from 'assets/icons';
 
 import { type FeedEvent, type NoteMetrics, DEFAULT_METRICS } from './nostr/feedTypes';
 import { PostCard, PostCardSkeleton } from './nostr/PostCard';
-import {
-  msUntilLoadingShimmerPassEnds,
-  SKELETON_EXIT_DURATION_MS,
-} from '@/shared/ui/composed/SkeletonExitShimmer';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import {
   ThreadEmbedProvider,
@@ -58,15 +54,12 @@ import {
 import {
   DEFAULT_REPLY_SKELETON_COUNT,
   MAX_REPLY_SKELETON_COUNT,
-  sortRepliesByMeasuredHeights,
 } from '@/features/feed/lib/threadReplySkeletons';
 import { threadFixedItemSize } from '@/features/feed/lib/threadListLayout';
 
 interface ThreadViewProps {
   eventId: string;
 }
-
-const REPLY_MEASUREMENT_CANDIDATE_LIMIT = 12;
 
 const REPLY_SORT_OPTIONS: {
   id: ThreadReplySort;
@@ -106,30 +99,21 @@ const REPLY_SORT_OPTIONS: {
   },
 ];
 
-const TRANSITION_REPLY_FADE_IN = FadeIn.duration(SKELETON_EXIT_DURATION_MS).easing(
-  Easing.out(Easing.cubic)
-);
+// Replies fade their real content in; the skeleton they replace fades out, for a
+// simple crossfade with no height-matching/measurement.
+const REPLY_FADE_IN = FadeIn.duration(220);
+const SKELETON_FADE_OUT = FadeOut.duration(220);
 
 type ThreadSkeletonItem =
   | { type: 'target-skeleton'; id: string }
   | { type: 'reply-skeleton'; id: string; skeletonIndex: number };
-
-type ThreadTransitionItem = {
-  type: 'transition-reply';
-  event: FeedEvent;
-  skeletonIndex: number;
-};
 
 type ThreadReplySortTabsItem = {
   type: 'reply-sort-tabs';
   id: 'reply-sort-tabs';
 };
 
-type ThreadListItem =
-  | ThreadItem
-  | ThreadSkeletonItem
-  | ThreadTransitionItem
-  | ThreadReplySortTabsItem;
+type ThreadListItem = ThreadItem | ThreadSkeletonItem | ThreadReplySortTabsItem;
 
 function threadKeyExtractor(item: ThreadListItem): string {
   switch (item.type) {
@@ -138,7 +122,6 @@ function threadKeyExtractor(item: ThreadListItem): string {
     case 'target':
       return `t_${item.event.id}`;
     case 'reply':
-    case 'transition-reply':
       return `r_${item.event.id}`;
     case 'reply-sort-tabs':
       return item.id;
@@ -288,87 +271,11 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const openPostActions = usePostActions({ getProfileName });
   const openComposer = useOpenComposer();
 
-  const skeletonHeightsRef = useRef<Map<number, number>>(new Map());
-  const replyHeightsRef = useRef<Map<string, number>>(new Map());
-  const repliesSeenWhileFetchingRef = useRef(false);
-  const shimmerStartedAtRef = useRef<number>(Date.now());
-  const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<LegendListRef>(null);
-  const [measuredOrder, setMeasuredOrder] = useState<FeedEvent[] | null>(null);
-  const measureCommittedRef = useRef(false);
-  const [measuredVersion, setMeasuredVersion] = useState(0);
-  const [transitionPhase, setTransitionPhase] = useState<'idle' | 'exiting' | 'done'>('idle');
-
-  useEffect(() => {
-    skeletonHeightsRef.current = new Map();
-    replyHeightsRef.current = new Map();
-    measureCommittedRef.current = false;
-    repliesSeenWhileFetchingRef.current = false;
-    shimmerStartedAtRef.current = Date.now();
-    if (exitTimeoutRef.current) {
-      clearTimeout(exitTimeoutRef.current);
-      exitTimeoutRef.current = null;
-    }
-    setMeasuredOrder(null);
-    setMeasuredVersion(0);
-    setTransitionPhase('idle');
-  }, [eventId, replySort]);
-
-  useEffect(() => {
-    return () => {
-      if (exitTimeoutRef.current) clearTimeout(exitTimeoutRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!measuredOrder) return;
-    const handle = setTimeout(() => setTransitionPhase('done'), SKELETON_EXIT_DURATION_MS);
-    return () => clearTimeout(handle);
-  }, [measuredOrder]);
 
   const targetIndex = useMemo(() => items.findIndex((item) => item.type === 'target'), [items]);
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
   const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
-
-  const replyEvents = useMemo(
-    () => items.filter((it): it is Extract<ThreadItem, { type: 'reply' }> => it.type === 'reply'),
-    [items]
-  );
-
-  useEffect(() => {
-    if (!measuredOrder) return;
-    const nextEvents = replyEvents.map((item) => item.event);
-    const nextIds = new Set(nextEvents.map((event) => event.id));
-    const kept = measuredOrder.filter((event) => nextIds.has(event.id));
-    const keptIds = new Set(kept.map((event) => event.id));
-    const appended = nextEvents.filter((event) => !keptIds.has(event.id));
-    if (kept.length === measuredOrder.length && appended.length === 0) return;
-    setMeasuredOrder([...kept, ...appended]);
-  }, [measuredOrder, replyEvents]);
-
-  const measurementSlotCount = useMemo(
-    () => Math.min(MAX_REPLY_SKELETON_COUNT, replyEvents.length),
-    [replyEvents.length]
-  );
-
-  const measurementCandidateCount = useMemo(
-    () => Math.min(REPLY_MEASUREMENT_CANDIDATE_LIMIT, replyEvents.length),
-    [replyEvents.length]
-  );
-
-  useEffect(() => {
-    if (isFetching && replyEvents.length > 0) {
-      repliesSeenWhileFetchingRef.current = true;
-    }
-  }, [isFetching, replyEvents.length]);
-
-  const hasSkeletonMeasurement = measuredVersion > 0 && skeletonHeightsRef.current.size > 0;
-  const isMeasuring =
-    !isFetching &&
-    measurementSlotCount > 0 &&
-    measuredOrder === null &&
-    hasSkeletonMeasurement &&
-    !repliesSeenWhileFetchingRef.current;
 
   const displayItems = useMemo<ThreadListItem[]>(() => {
     if (isLoading && items.length === 0) {
@@ -383,64 +290,37 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       ];
     }
 
-    if (measuredOrder) {
-      const nonReplyItems = items.filter((it) => it.type !== 'reply');
-      if (transitionPhase === 'exiting') {
-        return withReplySortTabs([
-          ...nonReplyItems,
-          ...measuredOrder.map<ThreadListItem>((event, index) => ({
-            type: 'transition-reply' as const,
-            event,
-            skeletonIndex: index,
-          })),
-        ]);
-      }
-      return withReplySortTabs([
-        ...nonReplyItems,
-        ...measuredOrder.map<ThreadItem>((event) => ({ type: 'reply', event })),
-      ]);
-    }
-
-    if (isMeasuring) {
-      const nonReplyItems = items.filter((it) => it.type !== 'reply');
-      const targetReplyCount = getTargetReplyCount(items, metricsRef);
-      const skeletonCount =
-        targetReplyCount == null
-          ? Math.min(MAX_REPLY_SKELETON_COUNT, replyEvents.length)
-          : Math.min(MAX_REPLY_SKELETON_COUNT, Math.max(replyEvents.length, targetReplyCount));
-      return withReplySortTabs([...nonReplyItems, ...createReplySkeletonItems(skeletonCount)]);
-    }
-
-    if (!isFetching) return withReplySortTabs(items);
-
+    // Real replies render immediately (they fade in); any remaining unfetched
+    // replies show as fixed-height skeletons appended below, which crossfade to
+    // real cards as they load. No measurement / height-matching.
     const targetReplyCount = getTargetReplyCount(items, metricsRef);
     if (targetReplyCount === 0) return withReplySortTabs(items);
 
     const pendingReplyCount =
       targetReplyCount == null
-        ? DEFAULT_REPLY_SKELETON_COUNT
+        ? isFetching
+          ? DEFAULT_REPLY_SKELETON_COUNT
+          : 0
         : Math.max(0, targetReplyCount - getRenderedReplyCount(items));
     const skeletonCount = Math.min(MAX_REPLY_SKELETON_COUNT, pendingReplyCount);
 
     if (skeletonCount === 0) return withReplySortTabs(items);
 
     return withReplySortTabs([...items, ...createReplySkeletonItems(skeletonCount)]);
-  }, [
-    isFetching,
-    isLoading,
-    isMeasuring,
-    items,
-    measuredOrder,
-    metricsRef,
-    replyEvents.length,
-    transitionPhase,
-  ]);
+  }, [isFetching, isLoading, items, metricsRef]);
+
+  const threadPhase =
+    isLoading && items.length === 0
+      ? 'loading-skeletons'
+      : isFetching
+        ? 'fetching-with-skeletons'
+        : 'replies';
 
   const visualList = useVisualListLogger<ThreadListItem>({
     scope: threadVisualScope,
     surface: 'thread',
     component: 'ThreadLegendList',
-    phase: transitionPhase,
+    phase: threadPhase,
     extra: () => ({
       eventId,
       rows: displayItems.length,
@@ -448,7 +328,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       replyBarHeight,
       isFetching,
       isLoadingMoreReplies,
-      isMeasuring,
     }),
     getItemKey: (item) => threadKeyExtractor(item),
     getItemContext: (item) => ({
@@ -460,40 +339,23 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   });
 
   const threadVisualState = useMemo(() => {
-    const phase =
-      isLoading && items.length === 0
-        ? 'loading-skeletons'
-        : measuredOrder
-          ? transitionPhase === 'exiting'
-            ? 'exit-reveal'
-            : 'measured-replies'
-          : isMeasuring
-            ? 'measuring'
-            : isFetching
-              ? 'fetching-with-skeletons'
-              : 'replies';
     let skeletons = 0;
-    let transitionReplies = 0;
     let realReplies = 0;
     for (const it of displayItems) {
       if (it.type === 'target-skeleton' || it.type === 'reply-skeleton') skeletons += 1;
-      else if (it.type === 'transition-reply') transitionReplies += 1;
       else if (it.type === 'reply') realReplies += 1;
     }
     return {
       eventId,
-      phase,
+      phase: threadPhase,
       rows: displayItems.length,
       skeletons,
-      transitionReplies,
       realReplies,
       replySort,
       replyBarHeight,
       isFetching,
       isLoading,
       isLoadingMoreReplies,
-      isMeasuring,
-      hasMeasuredOrder: !!measuredOrder,
     };
   }, [
     displayItems,
@@ -501,12 +363,9 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     isFetching,
     isLoading,
     isLoadingMoreReplies,
-    isMeasuring,
-    items.length,
-    measuredOrder,
     replyBarHeight,
     replySort,
-    transitionPhase,
+    threadPhase,
   ]);
 
   useVisualStateLogger({
@@ -523,124 +382,30 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     },
   });
 
-  // Content-shift trace: the thread reply list transitions through distinct
-  // rendering phases (loading skeletons → offscreen measuring → exit-reveal →
-  // real replies). Each transition re-composes the visible rows and can shift
-  // the scroll position; log every phase change with its row makeup so a jump
-  // can be tied to the exact transition. Pairs with `thread.reply_skeleton.*`.
+  // Content-shift trace: log each reply-list phase change with its row makeup so
+  // a jump can be tied to the exact transition. Pairs with `thread.reply_skeleton.*`.
   const lastThreadPhaseRef = useRef<string>('');
   useEffect(() => {
-    const phase =
-      isLoading && items.length === 0
-        ? 'loading-skeletons'
-        : measuredOrder
-          ? transitionPhase === 'exiting'
-            ? 'exit-reveal'
-            : 'measured-replies'
-          : isMeasuring
-            ? 'measuring'
-            : isFetching
-              ? 'fetching-with-skeletons'
-              : 'replies';
     let skeletons = 0;
-    let transitionReplies = 0;
     let realReplies = 0;
     for (const it of displayItems) {
       if (it.type === 'target-skeleton' || it.type === 'reply-skeleton') skeletons += 1;
-      else if (it.type === 'transition-reply') transitionReplies += 1;
       else if (it.type === 'reply') realReplies += 1;
     }
-    const signature = `${phase}:${displayItems.length}:${skeletons}:${transitionReplies}:${realReplies}`;
+    const signature = `${threadPhase}:${displayItems.length}:${skeletons}:${realReplies}`;
     if (lastThreadPhaseRef.current === signature) return;
     const prevPhase = lastThreadPhaseRef.current;
     lastThreadPhaseRef.current = signature;
     feedLog.info('thread.shift.phase', {
       eventId,
-      phase,
+      phase: threadPhase,
       prevSignature: prevPhase || null,
       rows: displayItems.length,
       skeletons,
-      transitionReplies,
       realReplies,
       replyBarHeight,
     });
-  }, [
-    displayItems,
-    eventId,
-    isFetching,
-    isLoading,
-    isMeasuring,
-    items.length,
-    measuredOrder,
-    replyBarHeight,
-    transitionPhase,
-  ]);
-
-  const handleSkeletonMeasured = useCallback((skeletonIndex: number, height: number) => {
-    skeletonHeightsRef.current.set(skeletonIndex, height);
-    // Only nudge React on the first capture; later layouts only update the ref.
-    // The hidden measurement tree gates on this state alone, not on every
-    // individual height, so additional re-renders here are wasted work.
-    setMeasuredVersion((v) => (v === 0 ? 1 : v));
-  }, []);
-
-  const handleReplyMeasured = useCallback(
-    (replyId: string, height: number) => {
-      if (measureCommittedRef.current) return;
-      replyHeightsRef.current.set(replyId, height);
-
-      const events = replyEvents.map((it) => it.event);
-      const slotCount = Math.min(MAX_REPLY_SKELETON_COUNT, events.length);
-      const candidateCount = Math.min(REPLY_MEASUREMENT_CANDIDATE_LIMIT, events.length);
-      if (slotCount === 0) return;
-
-      let capturedCandidates = 0;
-      for (let i = 0; i < candidateCount; i += 1) {
-        if (replyHeightsRef.current.has(events[i].id)) capturedCandidates += 1;
-      }
-
-      const skeletonHeightCount = skeletonHeightsRef.current.size;
-      if (capturedCandidates < candidateCount || skeletonHeightCount === 0) return;
-
-      const skeletonHeights = Array.from(
-        { length: Math.min(slotCount, skeletonHeightCount) },
-        (_, i) => skeletonHeightsRef.current.get(i)
-      ).filter((h): h is number => typeof h === 'number');
-
-      if (skeletonHeights.length === 0) return;
-
-      const result = sortRepliesByMeasuredHeights(events, skeletonHeights, replyHeightsRef.current);
-
-      const candidateHeights = events.slice(0, candidateCount).map((event) => ({
-        eventId: event.id.slice(0, 8),
-        originalIndex: events.indexOf(event),
-        measuredHeight: replyHeightsRef.current.get(event.id) ?? null,
-      }));
-
-      feedLog.info('thread.reply_skeleton.measured_sort', {
-        eventId,
-        skeletonHeights,
-        replyCount: events.length,
-        candidateCount,
-        candidateHeights,
-        matches: result.matches.slice(0, MAX_REPLY_SKELETON_COUNT),
-      });
-
-      measureCommittedRef.current = true;
-      const waitMs = msUntilLoadingShimmerPassEnds(shimmerStartedAtRef.current);
-      const commitExit = () => {
-        exitTimeoutRef.current = null;
-        setTransitionPhase('exiting');
-        setMeasuredOrder(result.replies);
-      };
-      if (waitMs <= 0) {
-        commitExit();
-      } else {
-        exitTimeoutRef.current = setTimeout(commitExit, waitMs);
-      }
-    },
-    [eventId, replyEvents]
-  );
+  }, [displayItems, eventId, replyBarHeight, threadPhase]);
 
   const getMetrics = useCallback(
     (id: string): NoteMetrics => metricsRef.current.get(id) || DEFAULT_METRICS,
@@ -669,12 +434,11 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       }
 
       if (item.type === 'reply-skeleton') {
+        // Fades out as the real reply that replaces it fades in (crossfade).
         return (
-          <PostCardSkeleton
-            variant="thread-reply"
-            index={item.skeletonIndex}
-            onMeasureHeight={handleSkeletonMeasured}
-          />
+          <Animated.View exiting={SKELETON_FADE_OUT}>
+            <PostCardSkeleton variant="thread-reply" index={item.skeletonIndex} />
+          </Animated.View>
         );
       }
 
@@ -689,47 +453,13 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         );
       }
 
-      if (item.type === 'transition-reply') {
-        const metrics = getDisplayMetrics(item.event.id);
-        const engagement = getEngagementState(item.event.id);
-        return (
-          <View style={styles.transitionStack}>
-            <Animated.View entering={TRANSITION_REPLY_FADE_IN}>
-              <PostCard
-                variant="thread-reply"
-                event={item.event}
-                metrics={metrics}
-                quotedEvents={quotedEventsRef.current}
-                profiles={profilesRef.current}
-                getMetrics={getMetrics}
-                showLineAbove={false}
-                showLineBelow={false}
-                liked={engagement.liked}
-                reposted={engagement.reposted}
-                likePending={engagement.likePending}
-                repostPending={engagement.repostPending}
-                likePendingDirection={engagement.likePendingDirection}
-                repostPendingDirection={engagement.repostPendingDirection}
-                onLikePress={() => toggleLike(item.event)}
-                onRepostPress={() => toggleRepost(item.event)}
-                onMorePress={() => openPostActions(item.event)}
-                getThreadContext={getThreadContext}
-              />
-            </Animated.View>
-            <View style={StyleSheet.absoluteFill} pointerEvents="none">
-              <PostCardSkeleton variant="thread-reply" index={item.skeletonIndex} exiting />
-            </View>
-          </View>
-        );
-      }
-
       const isParent = item.type === 'parent';
       const isTarget = item.type === 'target';
 
       const metrics = getDisplayMetrics(item.event.id);
       const engagement = getEngagementState(item.event.id);
 
-      return (
+      const card = (
         <PostCard
           variant={isTarget ? 'thread-target' : 'thread-reply'}
           event={item.event}
@@ -747,7 +477,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           repostPending={engagement.repostPending}
           likePendingDirection={engagement.likePendingDirection}
           repostPendingDirection={engagement.repostPendingDirection}
-          skeletonMatch={item.type === 'reply' ? item.skeletonMatch : undefined}
           onLikePress={() => toggleLike(item.event)}
           onRepostPress={() => toggleRepost(item.event)}
           onCommentPress={() =>
@@ -760,6 +489,13 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           getThreadContext={getThreadContext}
         />
       );
+
+      // Replies fade their real content in over the skeleton they replace. The
+      // target/parents are stable from frame one, so they render without a fade.
+      if (item.type === 'reply') {
+        return <Animated.View entering={REPLY_FADE_IN}>{card}</Animated.View>;
+      }
+      return card;
     },
     [
       openPostActions,
@@ -769,7 +505,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       getDisplayMetrics,
       getEngagementState,
       getMetrics,
-      handleSkeletonMeasured,
       hasParents,
       profilesRef,
       quotedEventsRef,
@@ -792,14 +527,13 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         itemKey={threadKeyExtractor(props.item)}
         itemType={threadItemType(props.item)}
         index={props.index}
-        phase={transitionPhase}
+        phase={threadPhase}
         extra={{
           eventId,
           rows: displayItems.length,
           replySort,
           replyBarHeight,
           isFetching,
-          isMeasuring,
         }}>
         {renderThreadItem(props)}
       </VisualLayoutProbe>
@@ -808,27 +542,20 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       displayItems.length,
       eventId,
       isFetching,
-      isMeasuring,
       renderThreadItem,
       replyBarHeight,
       replySort,
       threadVisualScope,
-      transitionPhase,
+      threadPhase,
     ]
   );
 
-  const measurementTargets = useMemo(
-    () => replyEvents.slice(0, measurementCandidateCount).map((it) => it.event),
-    [measurementCandidateCount, replyEvents]
-  );
-
   const handleEndReached = useCallback(() => {
-    // Don't start reply pagination while the initial fetch or the skeleton
-    // measurement pass is running — the footer spinner would otherwise overlay
-    // the measurement tree / exit shimmer (duplicate spinners).
-    if (isFetching || isMeasuring) return;
+    // Don't start reply pagination while the initial fetch is running — the
+    // footer spinner would otherwise overlap the loading skeletons.
+    if (isFetching) return;
     void loadMoreReplies();
-  }, [loadMoreReplies, isFetching, isMeasuring]);
+  }, [loadMoreReplies, isFetching]);
 
   // Target-post actions for the floating embed action bar (mirrors the
   // target PostCard's MetricsFooter wiring). Hooks stay above the early
@@ -911,7 +638,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               ].join(':')}
               recycleItems
               ListFooterComponent={
-                isLoadingMoreReplies && !isMeasuring ? (
+                isLoadingMoreReplies ? (
                   <View style={styles.hiddenReplyFooter}>
                     <Spinner size={18} color={opacity(foreground, 0.45)} />
                   </View>
@@ -958,38 +685,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               initialScrollIndex={!isLoading && targetIndex > 0 ? targetIndex : undefined}
             />
           </ThreadEmbedSheet>
-          {isMeasuring && measurementTargets.length > 0 ? (
-            <View
-              style={styles.measurementTree}
-              pointerEvents="none"
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants">
-              {measurementTargets.map((event) => {
-                const metrics = getDisplayMetrics(event.id);
-                const engagement = getEngagementState(event.id);
-                return (
-                  <PostCard
-                    key={`measure_${event.id}`}
-                    variant="thread-reply"
-                    event={event}
-                    metrics={metrics}
-                    quotedEvents={quotedEventsRef.current}
-                    profiles={profilesRef.current}
-                    getMetrics={getMetrics}
-                    liked={engagement.liked}
-                    reposted={engagement.reposted}
-                    likePending={engagement.likePending}
-                    repostPending={engagement.repostPending}
-                    likePendingDirection={engagement.likePendingDirection}
-                    repostPendingDirection={engagement.repostPendingDirection}
-                    getThreadContext={getThreadContext}
-                    onMeasureHeight={handleReplyMeasured}
-                    measurementMode
-                  />
-                );
-              })}
-            </View>
-          ) : null}
           {embed && targetEvent ? (
             <EmbedActionBar
               metrics={getDisplayMetrics(targetEvent.id)}
@@ -1031,16 +726,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
     alignItems: 'center',
-  },
-  measurementTree: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    opacity: 0,
-  },
-  transitionStack: {
-    position: 'relative',
   },
   replySortContainer: {
     paddingHorizontal: 16,
