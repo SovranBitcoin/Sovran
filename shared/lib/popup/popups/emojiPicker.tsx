@@ -24,18 +24,24 @@ import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { BottomSheet } from 'heroui-native';
-import { LegendList } from '@legendapp/list/react-native';
+import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import * as Clipboard from 'expo-clipboard';
 import opacity from 'hex-color-opacity';
 import Icon, { CurrencyIcon } from 'assets/icons';
 
 import { encode } from '@/shared/lib/third-party/emoji';
 import { log, useRenderLogger } from '@/shared/lib/logger';
+import {
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+  useVisualListLogger,
+  visualLayoutScopePart,
+} from '@/shared/lib/contentShiftLog';
 import { AnimatedEmoji } from '@/shared/ui/primitives/AnimatedEmoji';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 
 import { showActionSheet } from './bridge';
 import { copyPopup } from './copy';
@@ -129,7 +135,19 @@ function chunkEmojis(emojis: EmojiEntry[]): EmojiEntry[][] {
 // uses the chunked `renderRow` path.
 const emojiKeyExtractor = (item: EmojiEntry): string => item.emoji;
 const noopRenderItem = (): null => null;
-const searchRowKeyExtractor = (_row: EmojiEntry[], index: number): string => `search-row-${index}`;
+
+function emojiCodepointKey(emoji: string): string {
+  return Array.from(emoji)
+    .map((char) => char.codePointAt(0)?.toString(16) ?? 'unknown')
+    .join('-');
+}
+
+const searchRowKeyExtractor = (row: EmojiEntry[], index: number): string => {
+  const rowKey = row
+    .map((entry) => `${emojiCodepointKey(entry.emoji)}:${entry.keywords[0] ?? 'emoji'}`)
+    .join('|');
+  return rowKey.length > 0 ? rowKey : `search-row-${index}`;
+};
 
 /**
  * Search field — copy of `ActionMenuHost`'s `MenuSearchField` so the
@@ -334,6 +352,51 @@ export function EmojiPickerContent({
     (items: EmojiEntry[]) => <EmojiRow emojis={items} onSelect={handleEmojiSelect} />,
     [handleEmojiSelect]
   );
+  const searchListRef = useRef<LegendListRef>(null);
+  const visualSearchList = useVisualListLogger<EmojiEntry[]>({
+    scope: 'emoji.search.list',
+    surface: 'composer',
+    component: 'EmojiSearchLegendList',
+    phase: isSearching ? 'searching' : 'idle',
+    extra: () => ({
+      queryLength: searchQuery.length,
+      resultCount: searchResults.length,
+      rowCount: searchRows.length,
+      cols: COLS,
+    }),
+    getItemKey: (row, index) => visualLayoutScopePart(searchRowKeyExtractor(row, index)),
+    getItemContext: (row, index) => ({
+      itemType: 'emoji-search-row',
+      index,
+      emojiCount: row.length,
+      firstKeyword: row[0]?.keywords[0] ?? null,
+    }),
+    getListState: () => searchListRef.current?.getState() ?? null,
+  });
+  const renderEmojiSearchRow = useCallback(
+    ({ item, index }: { item: EmojiEntry[]; index: number }) => {
+      const rowKey = searchRowKeyExtractor(item, index);
+      return (
+        <VisualLayoutProbe
+          scope="emoji.search.list"
+          surface="composer"
+          component="EmojiSearchRow"
+          itemKey={visualLayoutScopePart(rowKey)}
+          itemType="emoji-search-row"
+          index={index}
+          phase={isSearching ? 'searching' : 'idle'}
+          extra={{
+            queryLength: searchQuery.length,
+            resultCount: searchResults.length,
+            emojiCount: item.length,
+            firstKeyword: item[0]?.keywords[0] ?? null,
+          }}>
+          <EmojiRow emojis={item} onSelect={handleEmojiSelect} />
+        </VisualLayoutProbe>
+      );
+    },
+    [handleEmojiSelect, isSearching, searchQuery.length, searchResults.length]
+  );
 
   // `overrideContent` swaps the body wholesale. Empty search → centered
   // "No emoji found"; non-empty → its own virtualized `LegendList` so
@@ -349,11 +412,18 @@ export function EmojiPickerContent({
     }
     return (
       <LegendList<EmojiEntry[]>
+        ref={searchListRef}
         data={searchRows}
         keyExtractor={searchRowKeyExtractor}
-        renderItem={({ item }) => <EmojiRow emojis={item} onSelect={handleEmojiSelect} />}
+        renderItem={renderEmojiSearchRow}
         estimatedItemSize={EMOJI_ROW_HEIGHT}
         recycleItems
+        onItemSizeChanged={visualSearchList.onItemSizeChanged}
+        onLoad={visualSearchList.onLoad}
+        onMetricsChange={visualSearchList.onMetricsChange}
+        onStickyHeaderChange={visualSearchList.onStickyHeaderChange}
+        onViewableItemsChanged={visualSearchList.onViewableItemsChanged}
+        viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
         // Match the SectionAnchorList draw window so search and
         // sectioned mode have the same buffer behavior on fast scroll.
         drawDistance={150}
@@ -365,7 +435,14 @@ export function EmojiPickerContent({
         )}
       />
     );
-  }, [isSearching, searchResults.length, searchRows, foreground, handleEmojiSelect]);
+  }, [
+    isSearching,
+    searchResults.length,
+    searchRows,
+    foreground,
+    renderEmojiSearchRow,
+    visualSearchList,
+  ]);
 
   return (
     <SectionAnchorList<EmojiEntry>

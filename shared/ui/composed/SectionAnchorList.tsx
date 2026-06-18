@@ -54,7 +54,14 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { LegendList, type LegendListRef, type ViewToken } from '@legendapp/list/react-native';
+import {
+  LegendList,
+  type LegendListRef,
+  type LegendListRenderItemProps,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type OnViewableItemsChangedInfo,
+} from '@legendapp/list/react-native';
 import opacity from 'hex-color-opacity';
 
 import { ScrollEdgeFade } from './ScrollEdgeFade';
@@ -63,6 +70,14 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useRenderLogger } from '@/shared/lib/logger';
 import { zIndex } from '@/shared/styles/tokens';
+import {
+  remeasureVisualLayoutScope,
+  useVisualListLogger,
+  useVisualScrollMetricsLogger,
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+  visualLayoutScopePart,
+} from '@/shared/lib/contentShiftLog';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 
 const sectionListLog = log.child({ module: 'sectionAnchorList' });
 
@@ -159,6 +174,17 @@ const FADE_RATIO = 0.5;
 type FlatRow<T> =
   | { kind: 'header'; sectionId: string; render: () => ReactNode }
   | { kind: 'row'; sectionId: string; items: T[]; rowIndex: number; rowKey: string };
+
+function sectionAnchorVisualItemType<T>(item: FlatRow<T>): string {
+  if (item.kind === 'header') return 'header';
+  return item.items.length > 1 ? 'grid-row' : 'row';
+}
+
+function sectionAnchorVisualItemKey<T>(item: FlatRow<T>, index: number): string {
+  const sectionId = visualLayoutScopePart(item.sectionId);
+  if (item.kind === 'header') return `header:${sectionId}:${index}`;
+  return `row:${sectionId}:${item.rowIndex}:${index}`;
+}
 
 export function SectionAnchorList<T>({
   sections,
@@ -294,6 +320,19 @@ export function SectionAnchorList<T>({
     return { flatItems: items, sectionFirstIndex: firstIndex };
   }, [sections, rowChunkSize, keyExtractor]);
 
+  const flatRowStats = useMemo(
+    () =>
+      flatItems.reduce(
+        (stats, item) => {
+          if (item.kind === 'header') stats.headers += 1;
+          else stats.rows += 1;
+          return stats;
+        },
+        { headers: 0, rows: 0 }
+      ),
+    [flatItems]
+  );
+
   // One-shot mount log + the inverse for unmount. Captures the size of
   // the dataset and the relevant LegendList tuning so log-doctor's
   // `stats` mode can correlate later events to the picker config.
@@ -331,6 +370,74 @@ export function SectionAnchorList<T>({
   // content paddingTop AND the `viewOffset` on `scrollToIndex`.
   const viewportTopOffset = chromeHeight + HEADROOM;
 
+  const activeAnchorRef = useRef(activeAnchor);
+  useEffect(() => {
+    activeAnchorRef.current = activeAnchor;
+  }, [activeAnchor]);
+
+  const visualScope = useMemo(() => {
+    const sectionSignature = sections
+      .slice(0, 4)
+      .map((section) => visualLayoutScopePart(section.id))
+      .join('.');
+    return `sectionAnchor.${sectionSignature || 'empty'}`;
+  }, [sections]);
+  const visualPhase = overrideContent != null ? 'override' : 'ready';
+  const visualExtra = useCallback(
+    () => ({
+      activeAnchor: activeAnchorRef.current ?? null,
+      sections: sections.length,
+      flatRows: flatItems.length,
+      rowRows: flatRowStats.rows,
+      headerRows: flatRowStats.headers,
+      rowChunkSize,
+      estimatedItemSize,
+      estimatedHeaderSize,
+      chromeHeight,
+      viewportTopOffset,
+      contentBottomInset,
+      hasOverride: overrideContent != null,
+    }),
+    [
+      chromeHeight,
+      contentBottomInset,
+      estimatedHeaderSize,
+      estimatedItemSize,
+      flatItems.length,
+      flatRowStats.headers,
+      flatRowStats.rows,
+      overrideContent,
+      rowChunkSize,
+      sections.length,
+      viewportTopOffset,
+    ]
+  );
+  const visualList = useVisualListLogger<FlatRow<T>>({
+    scope: visualScope,
+    surface: 'shared',
+    component: 'SectionAnchorList',
+    phase: visualPhase,
+    extra: visualExtra,
+    getItemKey: sectionAnchorVisualItemKey,
+    getItemContext: (item, index) => ({
+      itemType: sectionAnchorVisualItemType(item),
+      sectionId: visualLayoutScopePart(item.sectionId),
+      rowIndex: item.kind === 'row' ? item.rowIndex : null,
+      rowItems: item.kind === 'row' ? item.items.length : null,
+      index,
+    }),
+    getListState: () => listRef.current?.getState() ?? null,
+  });
+  const anchorScrollMetrics = useVisualScrollMetricsLogger({
+    enabled: showAnchors,
+    scope: visualScope,
+    surface: 'shared',
+    component: 'SectionAnchorListAnchorScrollView',
+    axis: 'x',
+    phase: visualPhase,
+    extra: visualExtra,
+  });
+
   // Active-anchor: pick the topmost visible row's sectionId. LegendList
   // sorts `viewableItems` by index, so [0] is the topmost in-view row.
   // Suppressed during programmatic scrolls so the animation doesn't
@@ -342,16 +449,12 @@ export function SectionAnchorList<T>({
   // `onViewableItemsChanged` prop → re-runs viewability tracking.
   // Empirically this added ~1 LegendList re-render per flip and
   // amplified scroll-time JS thread blocks.
-  const activeAnchorRef = useRef(activeAnchor);
-  useEffect(() => {
-    activeAnchorRef.current = activeAnchor;
-  }, [activeAnchor]);
   const handleViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    ({ viewableItems }: OnViewableItemsChangedInfo<FlatRow<T>>) => {
       if (programmaticScroll.current) return;
       if (viewableItems.length === 0) return;
       const top = viewableItems[0]!;
-      const row = top.item as FlatRow<T> | undefined;
+      const row = top.item;
       const sectionId = row?.sectionId;
       if (sectionId && sectionId !== activeAnchorRef.current) {
         sectionListLog.debug('sectionList.viewable.flip', {
@@ -365,15 +468,20 @@ export function SectionAnchorList<T>({
     },
     []
   );
+  const onVisualViewableItemsChanged = visualList.onViewableItemsChanged;
+  const handleViewableItemsChangedWithVisual = useCallback(
+    (info: OnViewableItemsChangedInfo<FlatRow<T>>) => {
+      handleViewableItemsChanged(info);
+      onVisualViewableItemsChanged(info);
+    },
+    [handleViewableItemsChanged, onVisualViewableItemsChanged]
+  );
 
   // viewabilityConfig must be referentially stable across renders or
   // RN warns. `itemVisiblePercentThreshold: 1` means "any pixel of the
   // row is visible" — what we want for a quick activeAnchor flip the
   // moment a new section's first row enters the viewport.
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 1,
-    minimumViewTime: 0,
-  }).current;
+  const viewabilityConfig = VISUAL_LIST_VIEWABILITY_CONFIG;
 
   const handleAnchorPress = useCallback(
     (id: string) => {
@@ -432,7 +540,7 @@ export function SectionAnchorList<T>({
   // Per-row renderer for LegendList. Headers render `section.renderHeader()`
   // wholesale; rows dispatch to `renderRow` (chunked) or `renderItem` (single).
   const renderListItem = useCallback(
-    ({ item }: { item: FlatRow<T> }) => {
+    ({ item, index }: LegendListRenderItemProps<FlatRow<T>>) => {
       recycleCount.current += 1;
       const now = Date.now();
       // Throttle to one log per second so a burst of recycling shows
@@ -445,16 +553,46 @@ export function SectionAnchorList<T>({
           sectionListLog.debug('sectionList.recycle.rate', { invokesLastSec: rate });
         }
       }
-      if (item.kind === 'header') return <>{item.render()}</>;
-      if (rowChunkSize > 1) {
-        if (!renderRow) return null;
-        return <>{renderRow(item.items, item.sectionId, item.rowIndex)}</>;
+      let content: ReactNode = null;
+      if (item.kind === 'header') {
+        content = item.render();
+      } else if (rowChunkSize > 1) {
+        content = renderRow ? renderRow(item.items, item.sectionId, item.rowIndex) : null;
+      } else {
+        const single = item.items[0];
+        content = single === undefined ? null : renderItem(single, item.sectionId);
       }
-      const single = item.items[0];
-      if (single === undefined) return null;
-      return <>{renderItem(single, item.sectionId)}</>;
+
+      return (
+        <VisualLayoutProbe
+          scope={visualScope}
+          surface="shared"
+          component="SectionAnchorListRow"
+          itemKey={sectionAnchorVisualItemKey(item, index)}
+          itemType={sectionAnchorVisualItemType(item)}
+          index={index}
+          phase={visualPhase}
+          extra={() => ({
+            activeAnchor: activeAnchorRef.current ?? null,
+            sectionId: visualLayoutScopePart(item.sectionId),
+            rowIndex: item.kind === 'row' ? item.rowIndex : null,
+            rowItems: item.kind === 'row' ? item.items.length : null,
+            viewportTopOffset,
+            contentBottomInset,
+          })}>
+          {content}
+        </VisualLayoutProbe>
+      );
     },
-    [renderItem, renderRow, rowChunkSize]
+    [
+      contentBottomInset,
+      renderItem,
+      renderRow,
+      rowChunkSize,
+      viewportTopOffset,
+      visualPhase,
+      visualScope,
+    ]
   );
 
   const listKeyExtractor = useCallback((item: FlatRow<T>) => {
@@ -482,6 +620,16 @@ export function SectionAnchorList<T>({
     return Component;
   }, [ScrollComponent]);
 
+  const handleListScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      remeasureVisualLayoutScope(visualScope, 'scroll', {
+        minIntervalMs: 500,
+        extra: { scrollY: Math.round(event.nativeEvent.contentOffset.y) },
+      });
+    },
+    [visualScope]
+  );
+
   return (
     <View style={{ flex: 1 }}>
       {/* Body — virtualized LegendList for sections, or wholesale
@@ -491,7 +639,17 @@ export function SectionAnchorList<T>({
         // The override path needs the same paddingTop the LegendList
         // would have applied, so caller-rendered content also clears
         // the chrome.
-        <View style={{ flex: 1, paddingTop: viewportTopOffset }}>{overrideContent}</View>
+        <VisualLayoutProbe
+          scope={visualScope}
+          surface="shared"
+          component="SectionAnchorListOverride"
+          itemKey="override"
+          itemType="override"
+          phase={visualPhase}
+          extra={visualExtra}
+          style={{ flex: 1, paddingTop: viewportTopOffset }}>
+          {overrideContent}
+        </VisualLayoutProbe>
       ) : (
         <LegendList
           ref={listRef}
@@ -512,8 +670,14 @@ export function SectionAnchorList<T>({
           drawDistance={150}
           style={{ flex: 1 }}
           contentContainerStyle={listContentContainerStyleMerged as never}
-          onViewableItemsChanged={handleViewableItemsChanged}
+          onItemSizeChanged={visualList.onItemSizeChanged}
+          onLoad={visualList.onLoad}
+          onMetricsChange={visualList.onMetricsChange}
+          onStickyHeaderChange={visualList.onStickyHeaderChange}
+          onScroll={handleListScroll}
+          onViewableItemsChanged={handleViewableItemsChangedWithVisual}
           viewabilityConfig={viewabilityConfig}
+          scrollEventThrottle={16}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           renderScrollComponent={renderScrollComponent}
@@ -545,6 +709,10 @@ export function SectionAnchorList<T>({
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 style={styles.anchorBarWrapper}
+                onLayout={anchorScrollMetrics.onLayout}
+                onContentSizeChange={anchorScrollMetrics.onContentSizeChange}
+                onScroll={anchorScrollMetrics.onScroll}
+                scrollEventThrottle={250}
                 contentContainerStyle={styles.anchorBarContent}>
                 {sections.map((s) => {
                   const isSelected = activeAnchor === s.id;

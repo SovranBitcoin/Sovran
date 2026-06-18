@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Keyboard,
   ScrollView,
@@ -13,13 +13,20 @@ import {
   useReanimatedKeyboardAnimation,
 } from 'react-native-keyboard-controller';
 import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
-import { LegendList } from '@legendapp/list/react-native';
+import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import type { Logger } from '@/shared/lib/logger';
+import {
+  remeasureVisualLayoutScope,
+  useVisualListLogger,
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+  visualLayoutScopePart,
+} from '@/shared/lib/contentShiftLog';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 
 import { LiquidChatComposer } from './LiquidChatComposer';
 import { ChatMessageBubble } from './ChatMessageBubble';
@@ -167,6 +174,7 @@ export function ChatScreen({
   // inset; doubling them up pushes content too far down).
   const resolvedBottomInset = bottomInset !== undefined ? bottomInset : safeAreaInsets.bottom;
   const resolvedTopInset = topInset > 0 ? topInset : headerHeight > 0 ? 0 : safeAreaInsets.top;
+  const chatVisualScope = useMemo(() => `chat.${visualLayoutScopePart(surface)}.list`, [surface]);
 
   const [draft, setDraft] = useState('');
 
@@ -268,13 +276,75 @@ export function ChatScreen({
     });
   }, [draft, dispatchSend]);
 
+  const visualPhase = isLoading ? 'loading' : messages.length === 0 ? 'empty' : 'ready';
+  const visualExtra = useCallback(
+    () => ({
+      surface,
+      messageCount: messages.length,
+      composerHeight,
+      bottomInset: resolvedBottomInset,
+      topInset: resolvedTopInset,
+      isLoading: !!isLoading,
+      draftLength: draft.length,
+    }),
+    [
+      composerHeight,
+      draft.length,
+      isLoading,
+      messages.length,
+      resolvedBottomInset,
+      resolvedTopInset,
+      surface,
+    ]
+  );
+  const listRef = useRef<LegendListRef>(null);
+  const visualList = useVisualListLogger<ChatBubbleMessage>({
+    scope: chatVisualScope,
+    surface: 'chat',
+    component: 'ChatLegendList',
+    phase: visualPhase,
+    extra: visualExtra,
+    getItemKey: (message, index) =>
+      `message:${message.isOwn ? 'own' : 'other'}:${message.timestamp}:${index}`,
+    getItemContext: (message, index) => ({
+      itemType: message.isOwn ? 'own-message' : 'counterparty-message',
+      deliveryStatus: message.deliveryStatus ?? null,
+      timestamp: message.timestamp,
+      isOwn: message.isOwn,
+      index,
+    }),
+    getListState: () => listRef.current?.getState() ?? null,
+  });
+
+  const handleListScroll = useCallback(() => {
+    remeasureVisualLayoutScope(chatVisualScope, 'scroll', {
+      extra: visualExtra(),
+      maxItems: 24,
+      minIntervalMs: 300,
+    });
+  }, [chatVisualScope, visualExtra]);
+
   const renderItem = useCallback(
-    ({ item }: { item: ChatBubbleMessage }) => {
+    ({ item, index }: { item: ChatBubbleMessage; index: number }) => {
       const group = groupingMap.get(item.id);
       const isFirstInGroup = group?.isFirst ?? true;
       const isLastInGroup = group?.isLast ?? true;
       return (
-        <RNView style={{ paddingHorizontal: 16 }}>
+        <VisualLayoutProbe
+          scope={chatVisualScope}
+          surface="chat"
+          component="ChatMessageRow"
+          itemKey={`message:${item.isOwn ? 'own' : 'other'}:${item.timestamp}:${index}`}
+          itemType={item.isOwn ? 'own-message' : 'counterparty-message'}
+          index={index}
+          phase={visualPhase}
+          extra={() => ({
+            ...visualExtra(),
+            deliveryStatus: item.deliveryStatus ?? null,
+            isFirstInGroup,
+            isLastInGroup,
+          })}
+          style={{ paddingHorizontal: 16 }}>
           {renderBubble ? (
             renderBubble({ message: item, isFirstInGroup, isLastInGroup })
           ) : (
@@ -285,10 +355,10 @@ export function ChatScreen({
               counterpartyAvatar={counterpartyAvatar}
             />
           )}
-        </RNView>
+        </VisualLayoutProbe>
       );
     },
-    [groupingMap, counterpartyAvatar, renderBubble]
+    [chatVisualScope, counterpartyAvatar, groupingMap, renderBubble, visualExtra, visualPhase]
   );
 
   const keyExtractor = useCallback((m: ChatBubbleMessage) => m.id, []);
@@ -362,37 +432,65 @@ export function ChatScreen({
               },
               listKeyboardLiftStyle,
             ]}>
-            {messages.length === 0 ? (
-              wrappedEmptyContent
-            ) : (
-              <LegendList
-                data={messages}
-                keyExtractor={keyExtractor}
-                renderItem={renderItem}
-                estimatedItemSize={ESTIMATED_BUBBLE_HEIGHT}
-                // Canonical LegendList v3 chat pattern, mirroring AiChatScreen:
-                // - `initialScrollAtEnd` lands the first paint at the latest
-                //   message without manual scroll-chasers.
-                // - `alignItemsAtEnd` docks short histories to the bottom by
-                //   adding top padding internally (only works without our own
-                //   `paddingTop` on `contentContainerStyle`).
-                // - `maintainScrollAtEnd` + threshold keeps the viewport
-                //   pinned to the latest when new messages append, as long as
-                //   the user is near the bottom.
-                // - `maintainVisibleContentPosition` keeps the visible item
-                //   anchored when items above the viewport resize or load
-                //   asynchronously (late bubble-height measurements, etc.).
-                initialScrollAtEnd
-                alignItemsAtEnd
-                maintainScrollAtEnd
-                maintainScrollAtEndThreshold={0.1}
-                maintainVisibleContentPosition
-                onStartReached={onStartReached}
-                onStartReachedThreshold={onStartReachedThreshold}
-                recycleItems
-                contentContainerStyle={listContentContainerStyle}
-              />
-            )}
+            <VisualLayoutProbe
+              scope={chatVisualScope}
+              surface="chat"
+              component="ChatListViewport"
+              itemKey="list:viewport"
+              itemType="list"
+              phase={visualPhase}
+              extra={visualExtra}
+              style={{ flex: 1 }}>
+              {messages.length === 0 ? (
+                <VisualLayoutProbe
+                  scope={chatVisualScope}
+                  surface="chat"
+                  component="ChatEmptyContent"
+                  itemKey="empty:content"
+                  itemType="empty"
+                  phase={visualPhase}
+                  extra={visualExtra}
+                  style={{ flex: 1 }}>
+                  {wrappedEmptyContent}
+                </VisualLayoutProbe>
+              ) : (
+                <LegendList
+                  ref={listRef}
+                  data={messages}
+                  keyExtractor={keyExtractor}
+                  renderItem={renderItem}
+                  estimatedItemSize={ESTIMATED_BUBBLE_HEIGHT}
+                  // Canonical LegendList v3 chat pattern, mirroring AiChatScreen:
+                  // - `initialScrollAtEnd` lands the first paint at the latest
+                  //   message without manual scroll-chasers.
+                  // - `alignItemsAtEnd` docks short histories to the bottom by
+                  //   adding top padding internally (only works without our own
+                  //   `paddingTop` on `contentContainerStyle`).
+                  // - `maintainScrollAtEnd` + threshold keeps the viewport
+                  //   pinned to the latest when new messages append, as long as
+                  //   the user is near the bottom.
+                  // - `maintainVisibleContentPosition` keeps the visible item
+                  //   anchored when items above the viewport resize or load
+                  //   asynchronously (late bubble-height measurements, etc.).
+                  initialScrollAtEnd
+                  alignItemsAtEnd
+                  maintainScrollAtEnd
+                  maintainScrollAtEndThreshold={0.1}
+                  maintainVisibleContentPosition
+                  onItemSizeChanged={visualList.onItemSizeChanged}
+                  onLoad={visualList.onLoad}
+                  onMetricsChange={visualList.onMetricsChange}
+                  onStickyHeaderChange={visualList.onStickyHeaderChange}
+                  onViewableItemsChanged={visualList.onViewableItemsChanged}
+                  viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
+                  onScroll={handleListScroll}
+                  onStartReached={onStartReached}
+                  onStartReachedThreshold={onStartReachedThreshold}
+                  recycleItems
+                  contentContainerStyle={listContentContainerStyle}
+                />
+              )}
+            </VisualLayoutProbe>
           </Reanimated.View>
 
           {/* Composer rides the keyboard via `<KeyboardStickyView />` from
@@ -408,34 +506,43 @@ export function ChatScreen({
               glass instead of clipping at a hard cut-off. */}
           <KeyboardStickyView
             offset={{ closed: 0, opened: 0 }}
-            onLayout={handleComposerLayout}
             style={{ position: 'absolute', left: 0, right: 0, bottom: resolvedBottomInset }}>
-            {composerActions ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{
-                  paddingHorizontal: 12,
-                  gap: 8,
-                  alignItems: 'center',
-                }}
-                style={{ flexGrow: 0 }}>
-                {composerActions}
-              </ScrollView>
-            ) : null}
-            <LiquidChatComposer
-              value={draft}
-              onChangeText={setDraft}
-              onSend={handleSubmit}
-              disabled={composerDisabled}
-              placeholder={composerPlaceholder}
-              onPlusPress={composerOnPlusPress}
-              onVoicePress={composerOnVoicePress}
-              bottomPadding={8}
-              testID={composerTestID}
-              surface={surface}
-            />
+            <VisualLayoutProbe
+              scope={chatVisualScope}
+              surface="chat"
+              component="ChatComposerDock"
+              itemKey="composer:dock"
+              itemType="composer"
+              phase={visualPhase}
+              extra={visualExtra}
+              onLayout={handleComposerLayout}>
+              {composerActions ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{
+                    paddingHorizontal: 12,
+                    gap: 8,
+                    alignItems: 'center',
+                  }}
+                  style={{ flexGrow: 0 }}>
+                  {composerActions}
+                </ScrollView>
+              ) : null}
+              <LiquidChatComposer
+                value={draft}
+                onChangeText={setDraft}
+                onSend={handleSubmit}
+                disabled={composerDisabled}
+                placeholder={composerPlaceholder}
+                onPlusPress={composerOnPlusPress}
+                onVoicePress={composerOnVoicePress}
+                bottomPadding={8}
+                testID={composerTestID}
+                surface={surface}
+              />
+            </VisualLayoutProbe>
           </KeyboardStickyView>
         </>
       )}

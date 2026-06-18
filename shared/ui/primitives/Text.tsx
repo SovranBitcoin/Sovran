@@ -1,11 +1,24 @@
 import React from 'react';
-import { Text as DefaultText, TextStyle, ColorValue, View } from 'react-native';
+import {
+  Text as DefaultText,
+  TextStyle,
+  ColorValue,
+  View,
+  type StyleProp,
+  type LayoutChangeEvent,
+  type ViewStyle,
+} from 'react-native';
 import opacity from 'hex-color-opacity';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import {
+  useVisualLayoutLogger,
+  visualLayoutScopePart,
+  type VisualLayoutConfig,
+} from '@/shared/lib/contentShiftLog';
 
 interface GradientTextProps extends TextProps {
   children: React.ReactNode;
@@ -126,6 +139,13 @@ interface CustomTextProps extends TextProps {
    *  children so swapping to real content produces no visual jump. */
   fallback?: React.ReactNode;
   color?: string;
+  visualScope?: string;
+  visualKey?: string;
+  visualSurface?: string;
+  visualComponent?: string;
+  visualPhase?: string;
+  visualExtra?: VisualLayoutConfig['extra'];
+  visualDisabled?: boolean;
 }
 
 /**
@@ -208,7 +228,19 @@ export function UntranslatedText({ size = 14, italic = false, ...props }: Custom
  * unavailable (e.g. `placeholder="Username"` ≈ name-length bar).
  */
 export function Text({ loading, size = 14, italic = false, ...props }: CustomTextProps) {
-  const { children, placeholder, fallback, ...otherProps } = props;
+  const {
+    children,
+    placeholder,
+    fallback,
+    visualScope,
+    visualKey,
+    visualSurface,
+    visualComponent,
+    visualPhase,
+    visualExtra,
+    visualDisabled,
+    ...otherProps
+  } = props;
   const foreground = useThemeColor('foreground');
   // Skeleton fill — kept low-opacity so a list of placeholders reads as
   // ambient "stuff is loading" rather than a row of bold rectangles. The
@@ -218,16 +250,22 @@ export function Text({ loading, size = 14, italic = false, ...props }: CustomTex
 
   if (loading) {
     return (
-      <View pointerEvents="none" style={loadingWrapperStyle}>
-        <View style={[loadingInsetStyle, { borderRadius: 4, backgroundColor: loadingColor }]} />
-        <UntranslatedText
-          size={size}
-          italic={italic}
-          {...otherProps}
-          style={[otherProps.style, hiddenTextStyle]}>
-          {placeholder ?? children ?? (typeof fallback === 'string' ? fallback : '\u00A0')}
-        </UntranslatedText>
-      </View>
+      <TextLoadingPlaceholder
+        size={size}
+        italic={italic}
+        placeholder={placeholder}
+        fallback={fallback}
+        visualScope={visualScope}
+        visualKey={visualKey}
+        visualSurface={visualSurface}
+        visualComponent={visualComponent}
+        visualPhase={visualPhase}
+        visualExtra={visualExtra}
+        visualDisabled={visualDisabled}
+        loadingColor={loadingColor}
+        textProps={otherProps}>
+        {children}
+      </TextLoadingPlaceholder>
     );
   }
 
@@ -245,6 +283,108 @@ export function Text({ loading, size = 14, italic = false, ...props }: CustomTex
     <UntranslatedText size={size} italic={italic} {...otherProps}>
       {children}
     </UntranslatedText>
+  );
+}
+
+type TextLoadingPlaceholderProps = {
+  children?: React.ReactNode;
+  fallback?: React.ReactNode;
+  italic: boolean;
+  loadingColor: string;
+  placeholder?: string;
+  size: number;
+  textProps: Omit<
+    CustomTextProps,
+    | 'children'
+    | 'fallback'
+    | 'italic'
+    | 'loading'
+    | 'placeholder'
+    | 'size'
+    | 'visualComponent'
+    | 'visualDisabled'
+    | 'visualExtra'
+    | 'visualKey'
+    | 'visualPhase'
+    | 'visualScope'
+    | 'visualSurface'
+  >;
+  visualScope?: string;
+  visualKey?: string;
+  visualSurface?: string;
+  visualComponent?: string;
+  visualPhase?: string;
+  visualExtra?: VisualLayoutConfig['extra'];
+  visualDisabled?: boolean;
+};
+
+let textLoadingVisualInstance = 0;
+
+function TextLoadingPlaceholder({
+  children,
+  fallback,
+  italic,
+  loadingColor,
+  placeholder,
+  size,
+  textProps,
+  visualScope = 'loading.text',
+  visualKey,
+  visualSurface = 'shared',
+  visualComponent = 'TextLoading',
+  visualPhase = 'loading',
+  visualExtra,
+  visualDisabled,
+}: TextLoadingPlaceholderProps): React.ReactElement {
+  const instanceKeyRef = React.useRef<string | null>(null);
+  if (instanceKeyRef.current === null) {
+    textLoadingVisualInstance += 1;
+    instanceKeyRef.current = `text-loading:${textLoadingVisualInstance}`;
+  }
+  const placeholderText =
+    placeholder ?? children ?? (typeof fallback === 'string' ? fallback : '\u00A0');
+  const layout = useVisualLayoutLogger({
+    enabled: visualDisabled !== true,
+    scope: visualScope,
+    surface: visualSurface,
+    component: visualComponent,
+    itemKey: visualKey ? visualLayoutScopePart(visualKey) : instanceKeyRef.current,
+    itemType: 'text-loading',
+    phase: visualPhase,
+    extra: () => ({
+      size,
+      placeholderLength: typeof placeholderText === 'string' ? placeholderText.length : null,
+      hasFallback: fallback != null,
+      ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
+    }),
+  });
+  const handleLayout = React.useCallback(
+    (event: LayoutChangeEvent) => {
+      layout.onLayout(event);
+    },
+    [layout]
+  );
+  const loadingBarStyle = React.useMemo<StyleProp<ViewStyle>>(
+    () => [loadingInsetStyle, { borderRadius: 4, backgroundColor: loadingColor }],
+    [loadingColor]
+  );
+  const hiddenTextCompositeStyle = React.useMemo(
+    () => [textProps.style, hiddenTextStyle],
+    [textProps.style]
+  );
+
+  return (
+    <View
+      ref={layout.ref}
+      collapsable={false}
+      pointerEvents="none"
+      style={loadingWrapperStyle}
+      onLayout={handleLayout}>
+      <View style={loadingBarStyle} />
+      <UntranslatedText size={size} italic={italic} {...textProps} style={hiddenTextCompositeStyle}>
+        {placeholderText}
+      </UntranslatedText>
+    </View>
   );
 }
 

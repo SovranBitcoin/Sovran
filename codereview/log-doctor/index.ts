@@ -33,6 +33,7 @@
  *   coco         Coco/Colada wallet module breakdown, issues, mint requests
  *   network      Network request/response pairs with latency
  *   feed         Feed/thread GraphQL, page mapping, and reply seed/render flow
+ *   visual       Layout/content-shift telemetry, row positions, overlaps, jumps
  *   full         Full entries but deduplicated and trimmed
  *   diff         Compare latest session against previous to isolate failure-specific entries
  *   devices      List device/session labels found in a mixed log
@@ -54,6 +55,10 @@
  *   --since <ms>        Only entries after this _t value
  *   --until <ms>        Only entries before this _t value
  *   --event <pattern>   Filter to events matching this substring
+ *   --scope <pattern>   Visual mode: filter visual rows by params.scope
+ *   --component <pat>   Visual mode: filter visual rows by params.component
+ *   --key <pattern>     Visual mode: filter visual rows by key/rowKey or nested visual row keys
+ *   --item-type <pat>   Visual mode: filter visual rows by itemType or nested visual row itemType
  *   --device <pattern>  Filter to device label/session/platform matching pattern
  *   --platform <name>   Filter to platform: ios, android, web, ...
  *   --session <id>      Filter to logSessionId/expoSessionId matching id
@@ -125,6 +130,10 @@ interface Options {
   since: number | null;
   until: number | null;
   eventFilter: string | null;
+  visualScopeFilter: string | null;
+  visualComponentFilter: string | null;
+  visualKeyFilter: string | null;
+  visualItemTypeFilter: string | null;
   deviceFilter: string | null;
   platformFilter: string | null;
   sessionFilter: string | null;
@@ -152,6 +161,10 @@ export function parseArgs(argv: string[]): Options {
     since: null,
     until: null,
     eventFilter: null,
+    visualScopeFilter: null,
+    visualComponentFilter: null,
+    visualKeyFilter: null,
+    visualItemTypeFilter: null,
     deviceFilter: null,
     platformFilter: null,
     sessionFilter: null,
@@ -186,6 +199,14 @@ export function parseArgs(argv: string[]): Options {
       opts.until = parseFloat(args[++i]);
     } else if (arg === '--event' && args[i + 1]) {
       opts.eventFilter = args[++i];
+    } else if (arg === '--scope' && args[i + 1]) {
+      opts.visualScopeFilter = args[++i];
+    } else if (arg === '--component' && args[i + 1]) {
+      opts.visualComponentFilter = args[++i];
+    } else if (arg === '--key' && args[i + 1]) {
+      opts.visualKeyFilter = args[++i];
+    } else if (arg === '--item-type' && args[i + 1]) {
+      opts.visualItemTypeFilter = args[++i];
     } else if (arg === '--device' && args[i + 1]) {
       opts.deviceFilter = args[++i];
     } else if (arg === '--platform' && args[i + 1]) {
@@ -248,6 +269,14 @@ export function parseLogInput(raw: string): LogEntry[] {
   }
 
   return entries;
+}
+
+export function shouldReadFromStdin(
+  stat: Pick<fs.Stats, 'isFIFO' | 'isFile' | 'isSocket'>,
+  isTTY: boolean | undefined
+): boolean {
+  if (isTTY === true) return false;
+  return stat.isFIFO() || stat.isFile() || stat.isSocket();
 }
 
 // ─── Device/session helpers ─────────────────────────────────────────────────
@@ -922,6 +951,45 @@ function isToastAuditEvent(entry: LogEntry): boolean {
 
 export function modeToasts(entries: LogEntry[], opts: Options): string {
   return renderGroupedTimeline('toast audit', entries.filter(isToastAuditEvent), opts);
+}
+
+function visualParamValues(value: unknown, names: string[]): string[] {
+  if (!value || typeof value !== 'object') return [];
+  const record = value as Record<string, unknown>;
+  const values: string[] = [];
+  for (const name of names) {
+    const direct = record[name];
+    if (direct !== undefined && direct !== null) values.push(String(direct));
+  }
+  for (const nestedName of [
+    'viewable',
+    'changed',
+    'buffered',
+    'rows',
+    'overlaps',
+    'containerViolations',
+  ]) {
+    const nested = record[nestedName];
+    if (!Array.isArray(nested)) continue;
+    for (const row of nested) {
+      values.push(...visualParamValues(row, names));
+    }
+  }
+  return values;
+}
+
+function visualParamMatches(entry: LogEntry, pattern: string | null, names: string[]): boolean {
+  if (!pattern) return true;
+  return visualParamValues(entry.params, names).some((value) => matchesPattern(value, pattern));
+}
+
+function visualEntryMatches(entry: LogEntry, opts: Options): boolean {
+  return (
+    visualParamMatches(entry, opts.visualScopeFilter, ['scope']) &&
+    visualParamMatches(entry, opts.visualComponentFilter, ['component']) &&
+    visualParamMatches(entry, opts.visualKeyFilter, ['key', 'rowKey']) &&
+    visualParamMatches(entry, opts.visualItemTypeFilter, ['itemType', 'rowLabel'])
+  );
 }
 
 // ─── Mode: errors ────────────────────────────────────────────────────────────
@@ -1659,6 +1727,990 @@ function modeFeed(entries: LogEntry[], opts: Options): string {
   }
 
   const { page, footer } = paginate(feedEntries, opts);
+  lines.push('TIMELINE:');
+  for (const e of page) {
+    const t = e._t ? `[${Math.round(e._t)}ms]` : '';
+    lines.push(`${t} ${levelIcon(e.level)} ${e.event} ${shortParams(e.params)}`);
+  }
+  lines.push(footer);
+  return lines.join('\n');
+}
+
+// ─── Visual Layout Helpers ─────────────────────────────────────────────────
+
+const VISUAL_ANALYSIS_OVERLAP_WARN_PX = 4;
+const VISUAL_ANALYSIS_GAP_WARN_PX = 80;
+
+type LatestVirtualPositionSnapshot = {
+  latest: LogEntry | undefined;
+  latestChunkCount: number;
+  latestChunks: LogEntry[];
+  rows: Array<Record<string, unknown>>;
+};
+
+type VisualOrderGapRow = {
+  key: string;
+  itemType: string;
+  index: number | null;
+  measuredY: number | null;
+  measuredBottom: number | null;
+  measuredH: number | null;
+  virtualY: number | null;
+  virtualH: number | null;
+  virtualBottom: number | null;
+  flags: string[];
+};
+
+type VisualOrderGapSummary = {
+  scope: string;
+  rows: VisualOrderGapRow[];
+  measuredRows: number;
+  virtualRows: number;
+  measuredOrderBreaks: number;
+  measuredOverlaps: number;
+  measuredVirtualDeltaMismatches: number;
+  largeMeasuredGaps: number;
+};
+
+function visualNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function roundVisual(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function latestVirtualPositionSnapshot(scoped: LogEntry[]): LatestVirtualPositionSnapshot {
+  const latest = scoped[scoped.length - 1];
+  const latestChunkCount = Number(latest?.params?.chunkCount ?? 1);
+  const latestChunks = scoped
+    .slice(-Math.max(1, latestChunkCount))
+    .slice()
+    .sort((a, b) => Number(a.params?.chunkIndex ?? 0) - Number(b.params?.chunkIndex ?? 0));
+  const rows = latestChunks.flatMap((entry) =>
+    Array.isArray(entry.params?.rows) ? (entry.params.rows as Array<Record<string, unknown>>) : []
+  );
+  return { latest, latestChunkCount, latestChunks, rows };
+}
+
+function buildVisualOrderGapSummaries(input: {
+  measuredByScopeAndKey: Map<string, LogEntry>;
+  itemSizeByScopeAndKey: Map<string, LogEntry>;
+  virtualPositionsByScope: Map<string, LogEntry[]>;
+}): VisualOrderGapSummary[] {
+  const scopes = new Set<string>();
+  for (const entry of input.measuredByScopeAndKey.values()) {
+    scopes.add(String(entry.params?.scope ?? '?'));
+  }
+  for (const entry of input.itemSizeByScopeAndKey.values()) {
+    scopes.add(String(entry.params?.scope ?? '?'));
+  }
+  for (const scope of input.virtualPositionsByScope.keys()) scopes.add(scope);
+
+  const summaries: VisualOrderGapSummary[] = [];
+  for (const scope of scopes) {
+    const byKey = new Map<
+      string,
+      {
+        measureEntry: LogEntry | null;
+        sizeEntry: LogEntry | null;
+        virtualRow: Record<string, unknown> | null;
+      }
+    >();
+
+    const ensure = (key: string) => {
+      const existing = byKey.get(key);
+      if (existing) return existing;
+      const created = { measureEntry: null, sizeEntry: null, virtualRow: null };
+      byKey.set(key, created);
+      return created;
+    };
+
+    const virtualSnapshot = latestVirtualPositionSnapshot(
+      input.virtualPositionsByScope.get(scope) ?? []
+    );
+    for (const row of virtualSnapshot.rows) {
+      const key = typeof row.key === 'string' && row.key.length > 0 ? row.key : null;
+      if (!key) continue;
+      ensure(key).virtualRow = row;
+    }
+
+    for (const entry of input.measuredByScopeAndKey.values()) {
+      if (String(entry.params?.scope ?? '?') !== scope) continue;
+      const key = fieldString(entry.params?.key);
+      if (!key) continue;
+      ensure(key).measureEntry = entry;
+    }
+
+    for (const entry of input.itemSizeByScopeAndKey.values()) {
+      if (String(entry.params?.scope ?? '?') !== scope) continue;
+      const key = fieldString(entry.params?.key) ?? fieldString(entry.params?.rowKey);
+      if (!key) continue;
+      ensure(key).sizeEntry = entry;
+    }
+
+    const rows: VisualOrderGapRow[] = [...byKey.entries()]
+      .map(([key, sources]) => {
+        const measureParams = sources.measureEntry?.params ?? {};
+        const sizeParams = sources.sizeEntry?.params ?? {};
+        const virtualRow = sources.virtualRow ?? {};
+        const index =
+          visualNumber(virtualRow.index) ??
+          visualNumber(sizeParams.index) ??
+          visualNumber(measureParams.index);
+        const measuredY = visualNumber(measureParams.pageY);
+        const measuredH = visualNumber(measureParams.height);
+        const measuredBottom =
+          visualNumber(measureParams.bottom) ??
+          (measuredY == null || measuredH == null ? null : measuredY + measuredH);
+        const virtualY = visualNumber(virtualRow.virtualY) ?? visualNumber(measureParams.virtualY);
+        const virtualH =
+          visualNumber(virtualRow.virtualH) ??
+          visualNumber(sizeParams.itemSize) ??
+          visualNumber(measureParams.virtualH);
+        const virtualBottom =
+          visualNumber(virtualRow.virtualBottom) ??
+          (virtualY == null || virtualH == null ? null : virtualY + virtualH);
+
+        return {
+          key,
+          itemType: String(
+            virtualRow.itemType ?? sizeParams.itemType ?? measureParams.itemType ?? '?'
+          ),
+          index,
+          measuredY,
+          measuredBottom,
+          measuredH,
+          virtualY,
+          virtualH,
+          virtualBottom,
+          flags: [
+            sources.measureEntry ? null : 'missingMeasuredPosition',
+            virtualY == null ? 'missingVirtualPosition' : null,
+            virtualH == null ? 'missingSize' : null,
+          ].filter(Boolean) as string[],
+        };
+      })
+      .filter((row) => row.index != null || row.measuredY != null || row.virtualY != null)
+      .sort((a, b) => {
+        if (a.index != null && b.index != null && a.index !== b.index) return a.index - b.index;
+        if (a.index != null && b.index == null) return -1;
+        if (a.index == null && b.index != null) return 1;
+        return (a.virtualY ?? a.measuredY ?? 0) - (b.virtualY ?? b.measuredY ?? 0);
+      });
+
+    if (rows.length < 2) continue;
+
+    let measuredRows = 0;
+    let virtualRows = 0;
+    let measuredOrderBreaks = 0;
+    let measuredOverlaps = 0;
+    let measuredVirtualDeltaMismatches = 0;
+    let largeMeasuredGaps = 0;
+    let previousMeasured: VisualOrderGapRow | null = null;
+
+    for (const row of rows) {
+      if (row.measuredY != null && row.measuredBottom != null) measuredRows += 1;
+      if (row.virtualY != null) virtualRows += 1;
+      if (
+        row.index == null ||
+        row.measuredY == null ||
+        row.measuredBottom == null ||
+        previousMeasured == null ||
+        previousMeasured.index == null ||
+        previousMeasured.measuredY == null ||
+        previousMeasured.measuredBottom == null
+      ) {
+        if (row.measuredY != null && row.measuredBottom != null) previousMeasured = row;
+        continue;
+      }
+
+      const indexGap = row.index - previousMeasured.index;
+      const measuredDeltaY = row.measuredY - previousMeasured.measuredY;
+      const measuredOverlap = previousMeasured.measuredBottom - row.measuredY;
+      const measuredGap = row.measuredY - previousMeasured.measuredBottom;
+      const virtualDeltaY =
+        row.virtualY == null || previousMeasured.virtualY == null
+          ? null
+          : row.virtualY - previousMeasured.virtualY;
+      const virtualDeltaMismatch = virtualDeltaY == null ? null : measuredDeltaY - virtualDeltaY;
+
+      if (measuredDeltaY < -VISUAL_ANALYSIS_OVERLAP_WARN_PX) {
+        measuredOrderBreaks += 1;
+        row.flags.push(`measuredOrderBreak:${roundVisual(measuredDeltaY)}`);
+      }
+      if (measuredOverlap > VISUAL_ANALYSIS_OVERLAP_WARN_PX) {
+        measuredOverlaps += 1;
+        row.flags.push(`measuredOverlap:${roundVisual(measuredOverlap)}`);
+      }
+      if (indexGap === 1 && measuredGap > VISUAL_ANALYSIS_GAP_WARN_PX) {
+        largeMeasuredGaps += 1;
+        row.flags.push(`largeMeasuredGap:${roundVisual(measuredGap)}`);
+      }
+      if (
+        indexGap === 1 &&
+        virtualDeltaMismatch != null &&
+        Math.abs(virtualDeltaMismatch) > VISUAL_ANALYSIS_GAP_WARN_PX
+      ) {
+        measuredVirtualDeltaMismatches += 1;
+        row.flags.push(`virtualDeltaMismatch:${roundVisual(virtualDeltaMismatch)}`);
+      }
+
+      previousMeasured = row;
+    }
+
+    summaries.push({
+      scope,
+      rows,
+      measuredRows,
+      virtualRows,
+      measuredOrderBreaks,
+      measuredOverlaps,
+      measuredVirtualDeltaMismatches,
+      largeMeasuredGaps,
+    });
+  }
+
+  return summaries;
+}
+
+export function modeVisual(entries: LogEntry[], opts: Options): string {
+  const visualEntries = entries.filter(
+    (e) =>
+      (e.event.startsWith('visual.layout.') ||
+        e.event.includes('.shift.') ||
+        e.event.startsWith('thread.reply_skeleton.')) &&
+      visualEntryMatches(e, opts)
+  );
+
+  if (visualEntries.length === 0) return 'No visual layout/content-shift entries found.';
+
+  const layoutEntries = visualEntries.filter((e) => e.event.startsWith('visual.layout.'));
+  const rowMeasureEntries = layoutEntries.filter((e) => e.event === 'visual.layout.measure');
+  const itemSizeEntries = layoutEntries.filter(
+    (e) => e.event === 'visual.layout.item_size_changed'
+  );
+  const listMetricEntries = layoutEntries.filter((e) => e.event === 'visual.layout.list_metrics');
+  const listLoadEntries = layoutEntries.filter((e) => e.event === 'visual.layout.list_load');
+  const viewabilityEntries = layoutEntries.filter((e) => e.event === 'visual.layout.viewability');
+  const virtualPositionEntries = layoutEntries.filter(
+    (e) => e.event === 'visual.layout.virtual_positions'
+  );
+  const stickyHeaderEntries = layoutEntries.filter(
+    (e) => e.event === 'visual.layout.sticky_header'
+  );
+  const scopeSnapshotEntries = layoutEntries.filter(
+    (e) => e.event === 'visual.layout.scope_snapshot'
+  );
+  const stateChangeEntries = layoutEntries.filter((e) => e.event === 'visual.layout.state_change');
+  const shiftEntries = visualEntries.filter((e) => e.event.includes('.shift.'));
+  const skeletonEntries = visualEntries.filter((e) => e.event.startsWith('thread.reply_skeleton.'));
+  const anomalous = layoutEntries.filter((e) => {
+    const p = e.params ?? {};
+    return (
+      e.level === 'warn' ||
+      p.zeroArea === true ||
+      p.farOutsideX === true ||
+      p.farOutsideY === true ||
+      p.absurdWidth === true ||
+      p.absurdHeight === true ||
+      p.jumpX === true ||
+      p.jumpY === true ||
+      Number(p.overlapCount ?? 0) > 0 ||
+      Number(p.containerViolationCount ?? 0) > 0 ||
+      p.virtualAnomaly === true ||
+      Number(p.duplicateKeyCount ?? 0) > 0 ||
+      Number(p.farVirtualCount ?? 0) > 0 ||
+      Number(p.invalidSizeCount ?? 0) > 0 ||
+      Number(p.missingSizeCount ?? 0) > 0 ||
+      Number(p.missingVirtualPositionCount ?? 0) > 0 ||
+      Number(p.outsideContentLengthCount ?? 0) > 0 ||
+      Number(p.virtualOverlapCount ?? 0) > 0 ||
+      Number(p.virtualOrderBreakCount ?? 0) > 0 ||
+      p.snapshotAnomaly === true ||
+      Number(p.measuredOverlapCount ?? 0) > 0 ||
+      Number(p.measuredOrderBreakCount ?? 0) > 0 ||
+      Number(p.containerViolationCount ?? 0) > 0 ||
+      Number(p.zeroAreaCount ?? 0) > 0 ||
+      Number(p.farOutsideXCount ?? 0) > 0 ||
+      Number(p.farOutsideYCount ?? 0) > 0 ||
+      Number(p.absurdWidthCount ?? 0) > 0 ||
+      Number(p.absurdHeightCount ?? 0) > 0 ||
+      p.sizeJump === true ||
+      p.invalidSize === true ||
+      p.metricJump === true
+    );
+  });
+
+  const measuredByScopeAndKey = new Map<string, LogEntry>();
+  for (const e of rowMeasureEntries) {
+    const scope = String(e.params?.scope ?? '?');
+    const key = String(e.params?.key ?? '?');
+    measuredByScopeAndKey.set(`${scope}:${key}`, e);
+  }
+
+  const itemSizeByScopeAndKey = new Map<string, LogEntry>();
+  for (const e of itemSizeEntries) {
+    const scope = String(e.params?.scope ?? '?');
+    const key = String(e.params?.key ?? e.params?.rowKey ?? '?');
+    itemSizeByScopeAndKey.set(`${scope}:${key}`, e);
+  }
+
+  const metricsByScope = new Map<string, LogEntry>();
+  for (const e of listMetricEntries) {
+    const scope = String(e.params?.scope ?? '?');
+    metricsByScope.set(scope, e);
+  }
+
+  const viewabilityByScope = new Map<string, LogEntry>();
+  for (const e of viewabilityEntries) {
+    const scope = String(e.params?.scope ?? '?');
+    viewabilityByScope.set(scope, e);
+  }
+
+  const stickyHeadersByScope = new Map<string, LogEntry[]>();
+  for (const e of stickyHeaderEntries) {
+    const scope = String(e.params?.scope ?? '?');
+    const scoped = stickyHeadersByScope.get(scope) ?? [];
+    scoped.push(e);
+    stickyHeadersByScope.set(scope, scoped);
+  }
+
+  const virtualPositionsByScope = new Map<string, LogEntry[]>();
+  for (const e of virtualPositionEntries) {
+    const scope = String(e.params?.scope ?? '?');
+    const scoped = virtualPositionsByScope.get(scope) ?? [];
+    scoped.push(e);
+    virtualPositionsByScope.set(scope, scoped);
+  }
+  const scopeSnapshotsByScope = new Map<string, LogEntry[]>();
+  for (const e of scopeSnapshotEntries) {
+    const scope = String(e.params?.scope ?? '?');
+    const scoped = scopeSnapshotsByScope.get(scope) ?? [];
+    scoped.push(e);
+    scopeSnapshotsByScope.set(scope, scoped);
+  }
+  const stateChangesByScope = new Map<string, LogEntry[]>();
+  for (const e of stateChangeEntries) {
+    const scope = String(e.params?.scope ?? '?');
+    const scoped = stateChangesByScope.get(scope) ?? [];
+    scoped.push(e);
+    stateChangesByScope.set(scope, scoped);
+  }
+  const orderGapSummaries = buildVisualOrderGapSummaries({
+    measuredByScopeAndKey,
+    itemSizeByScopeAndKey,
+    virtualPositionsByScope,
+  });
+  const orderGapAnomalies = orderGapSummaries.filter(
+    (summary) =>
+      summary.measuredOrderBreaks > 0 ||
+      summary.measuredOverlaps > 0 ||
+      summary.measuredVirtualDeltaMismatches > 0 ||
+      summary.largeMeasuredGaps > 0
+  );
+
+  const lines: string[] = [];
+  lines.push('VISUAL LAYOUT LOG:');
+  const activeFilters = [
+    opts.visualScopeFilter ? `scope=${opts.visualScopeFilter}` : null,
+    opts.visualComponentFilter ? `component=${opts.visualComponentFilter}` : null,
+    opts.visualKeyFilter ? `key=${opts.visualKeyFilter}` : null,
+    opts.visualItemTypeFilter ? `itemType=${opts.visualItemTypeFilter}` : null,
+  ].filter(Boolean);
+  if (activeFilters.length > 0) {
+    lines.push(`  filters: ${activeFilters.join(' ')}`);
+  }
+  lines.push(
+    `  entries=${visualEntries.length} layout=${layoutEntries.length} rows=${rowMeasureEntries.length} ` +
+      `itemSizes=${itemSizeEntries.length} metrics=${listMetricEntries.length} ` +
+      `viewability=${viewabilityEntries.length} sticky=${stickyHeaderEntries.length} ` +
+      `virtual=${virtualPositionEntries.length} scopeSnapshots=${scopeSnapshotEntries.length} ` +
+      `states=${stateChangeEntries.length} ` +
+      `loads=${listLoadEntries.length} ` +
+      `shifts=${shiftEntries.length} skeleton=${skeletonEntries.length} ` +
+      `anomalies=${anomalous.length + orderGapAnomalies.length}`
+  );
+  lines.push('');
+
+  if (anomalous.length > 0 || orderGapAnomalies.length > 0) {
+    lines.push('ANOMALIES:');
+    for (const summary of orderGapAnomalies.slice(-8)) {
+      lines.push(
+        `WARN measured-order scope=${summary.scope} rows=${summary.rows.length} ` +
+          `measured=${summary.measuredRows} virtual=${summary.virtualRows} ` +
+          `measuredOverlaps=${summary.measuredOverlaps} ` +
+          `orderBreaks=${summary.measuredOrderBreaks} ` +
+          `virtualDeltaMismatches=${summary.measuredVirtualDeltaMismatches} ` +
+          `largeGaps=${summary.largeMeasuredGaps}`
+      );
+      for (const row of summary.rows.filter((item) => item.flags.length > 0).slice(0, 4)) {
+        lines.push(
+          `     order ${row.key.slice(0, 18)} type=${row.itemType} idx=${row.index ?? '?'} ` +
+            `y=${row.measuredY ?? '?'} bottom=${row.measuredBottom ?? '?'} ` +
+            `virtualY=${row.virtualY ?? '?'} virtualH=${row.virtualH ?? '?'} ` +
+            `flags=${row.flags.join(',')}`
+        );
+      }
+    }
+    for (const e of anomalous.slice(-24)) {
+      const p = e.params ?? {};
+      const t = e._t ? `[${Math.round(e._t)}ms]` : '';
+      if (e.event === 'visual.layout.item_size_changed') {
+        lines.push(
+          `${t} ${levelIcon(e.level)} ${String(p.surface ?? '?')}/${String(p.component ?? '?')} ` +
+            `key=${String(p.key ?? p.rowKey ?? '?').slice(0, 18)} type=${String(p.itemType ?? '?')} ` +
+            `idx=${p.index ?? '?'} size=${p.itemSize ?? '?'} prev=${p.previousItemSize ?? '?'} ` +
+            `dSize=${p.deltaItemSize ?? '?'}`
+        );
+      } else if (e.event === 'visual.layout.list_metrics') {
+        lines.push(
+          `${t} ${levelIcon(e.level)} ${String(p.surface ?? '?')}/${String(p.component ?? '?')} ` +
+            `scope=${String(p.scope ?? '?')} size=${p.size ?? '?'} scroll=${p.scroll ?? '?'} ` +
+            `scrollLen=${p.scrollLength ?? '?'} contentLen=${p.contentLength ?? '?'} ` +
+            `dContent=${p.deltaContentLength ?? '?'}`
+        );
+      } else if (e.event === 'visual.layout.virtual_positions') {
+        lines.push(
+          `${t} ${levelIcon(e.level)} ${String(p.surface ?? '?')}/${String(p.component ?? '?')} ` +
+            `scope=${String(p.scope ?? '?')} chunk=${p.chunkIndex ?? '?'}/${p.chunkCount ?? '?'} ` +
+            `rows=${p.rowCount ?? p.totalRows ?? '?'} virtualOverlap=${p.virtualOverlapCount ?? 0} ` +
+            `orderBreak=${p.virtualOrderBreakCount ?? 0} duplicateKeys=${p.duplicateKeyCount ?? 0} ` +
+            `missingVirtual=${p.missingVirtualPositionCount ?? 0} missingSize=${p.missingSizeCount ?? 0} ` +
+            `invalidSize=${p.invalidSizeCount ?? 0} farVirtual=${p.farVirtualCount ?? 0} ` +
+            `outsideContent=${p.outsideContentLengthCount ?? 0}`
+        );
+      } else if (e.event === 'visual.layout.scope_snapshot') {
+        lines.push(
+          `${t} ${levelIcon(e.level)} scope-snapshot scope=${String(p.scope ?? '?')} ` +
+            `reason=${String(p.reason ?? '?')} chunk=${p.chunkIndex ?? '?'}/${p.chunkCount ?? '?'} ` +
+            `rows=${p.rowCount ?? p.totalRows ?? '?'} measured=${p.measuredRows ?? '?'} ` +
+            `stale=${p.staleRows ?? '?'} overlaps=${p.measuredOverlapCount ?? 0} ` +
+            `orderBreaks=${p.measuredOrderBreakCount ?? 0} containers=${
+              p.containerViolationCount ?? 0
+            } zero=${p.zeroAreaCount ?? 0} farY=${p.farOutsideYCount ?? 0}`
+        );
+      } else {
+        lines.push(
+          `${t} ${levelIcon(e.level)} ${String(p.surface ?? '?')}/${String(p.component ?? '?')} ` +
+            `key=${String(p.key ?? '?').slice(0, 18)} type=${String(p.itemType ?? '?')} ` +
+            `y=${p.pageY ?? '?'} h=${p.height ?? '?'} dY=${p.deltaY ?? '?'} ` +
+            `overlaps=${p.overlapCount ?? 0} containers=${p.containerViolationCount ?? 0} ` +
+            `visible=${p.visible ?? '?'} reason=${p.reason ?? '?'} ` +
+            `mount=${p.mountOrder ?? '?'} pos=${p.stylePosition ?? '?'} z=${p.styleZIndex ?? '?'} ` +
+            `elev=${p.styleElevation ?? '?'}`
+        );
+      }
+      const overlaps = Array.isArray(p.overlaps) ? p.overlaps : [];
+      for (const overlap of overlaps.slice(0, 3) as Array<Record<string, unknown>>) {
+        lines.push(
+          `     overlaps ${String(overlap.component ?? '?')}/${String(overlap.itemType ?? '?')} ` +
+            `key=${String(overlap.key ?? '?').slice(0, 18)} y=${overlap.y ?? '?'} h=${overlap.height ?? '?'} ` +
+            `area=${overlap.overlapArea ?? '?'} mount=${overlap.mountOrder ?? '?'}`
+        );
+      }
+      const containerViolations = Array.isArray(p.containerViolations) ? p.containerViolations : [];
+      for (const violation of containerViolations.slice(0, 3) as Array<Record<string, unknown>>) {
+        lines.push(
+          `     outside ${String(violation.component ?? '?')}/${String(violation.itemType ?? '?')} ` +
+            `key=${String(violation.key ?? '?').slice(0, 18)} y=${violation.y ?? '?'} ` +
+            `h=${violation.height ?? '?'} overflowX=${violation.overflowX ?? '?'} ` +
+            `overflowY=${violation.overflowY ?? '?'} mount=${violation.mountOrder ?? '?'}`
+        );
+      }
+    }
+    lines.push('');
+  }
+
+  if (metricsByScope.size > 0) {
+    lines.push('LATEST LIST METRICS:');
+    for (const [scope, e] of Array.from(metricsByScope.entries()).slice(-20)) {
+      const p = e.params ?? {};
+      lines.push(
+        `  ${scope}: ${String(p.component ?? '?')} size=${p.size ?? '?'} scroll=${p.scroll ?? '?'} ` +
+          `scrollLen=${p.scrollLength ?? '?'} contentLen=${p.contentLength ?? '?'} ` +
+          `dContent=${p.deltaContentLength ?? '?'} jump=${p.metricJump ?? '?'} rows=${p.rows ?? '?'} ` +
+          `axis=${p.axis ?? '?'} reason=${p.scrollReason ?? '?'}`
+      );
+    }
+    lines.push('');
+  }
+
+  if (stateChangesByScope.size > 0) {
+    lines.push('LAYOUT STATE CHANGES:');
+    for (const [scope, scoped] of Array.from(stateChangesByScope.entries()).slice(-12)) {
+      const latest = scoped[scoped.length - 1];
+      const p = latest?.params ?? {};
+      lines.push(
+        `  ${scope}: changes=${scoped.length} component=${String(p.component ?? '?')} ` +
+          `stateKey=${String(p.stateKey ?? '?')} phase=${String(p.phase ?? '?')} ` +
+          `first=${p.firstMeasure ?? '?'} signature=${String(p.signature ?? '?').slice(0, 80)}`
+      );
+      const state =
+        p.state && typeof p.state === 'object' ? (p.state as Record<string, unknown>) : {};
+      const stateParts = Object.keys(state)
+        .sort()
+        .slice(0, 12)
+        .map((key) => `${key}=${String(state[key])}`)
+        .join(' ');
+      if (stateParts.length > 0) lines.push(`    ${stateParts}`);
+    }
+    lines.push('');
+  }
+
+  if (stickyHeadersByScope.size > 0) {
+    lines.push('STICKY HEADER CHANGES:');
+    for (const [scope, scoped] of Array.from(stickyHeadersByScope.entries()).slice(-12)) {
+      const latest = scoped[scoped.length - 1];
+      const p = latest?.params ?? {};
+      lines.push(
+        `  ${scope}: changes=${scoped.length} component=${String(p.component ?? '?')} ` +
+          `key=${String(p.key ?? p.rowKey ?? '?').slice(0, 24)} ` +
+          `type=${String(p.itemType ?? p.rowLabel ?? '?')} idx=${p.index ?? '?'} ` +
+          `activeSticky=${p.activeStickyIndex ?? '?'} virtualY=${p.virtualY ?? '?'} ` +
+          `virtualH=${p.virtualH ?? '?'} rows=${p.rows ?? '?'}`
+      );
+    }
+    lines.push('');
+  }
+
+  if (viewabilityByScope.size > 0) {
+    lines.push('LATEST VIEWABILITY:');
+    for (const [scope, e] of Array.from(viewabilityByScope.entries()).slice(-20)) {
+      const p = e.params ?? {};
+      const viewable = Array.isArray(p.viewable) ? p.viewable : [];
+      const visibleKeys = viewable
+        .slice(0, 6)
+        .map((token: Record<string, unknown>) => `${token.index ?? '?'}:${token.itemType ?? '?'}`)
+        .join(', ');
+      lines.push(
+        `  ${scope}: ${String(p.component ?? '?')} range=${p.start ?? '?'}-${p.end ?? '?'} ` +
+          `viewable=${p.viewableCount ?? '?'} changed=${p.changedCount ?? '?'} rows=${p.rows ?? '?'} ` +
+          `items=[${visibleKeys}]`
+      );
+    }
+    lines.push('');
+  }
+
+  if (viewabilityByScope.size > 0) {
+    lines.push('VIEWABLE POSITION COVERAGE:');
+    for (const [scope, e] of Array.from(viewabilityByScope.entries()).slice(-12)) {
+      const p = e.params ?? {};
+      const viewable = Array.isArray(p.viewable)
+        ? (p.viewable as Array<Record<string, unknown>>)
+        : [];
+      let positioned = 0;
+      let virtualPositioned = 0;
+      let missingPosition = 0;
+      let missingVirtualPosition = 0;
+      let missingSize = 0;
+      let missingKey = 0;
+      const visibleSample = viewable.slice(0, 12);
+      const numberValue = (value: unknown) =>
+        typeof value === 'number' && Number.isFinite(value) ? value : null;
+      const virtualOverlapCount = (token: Record<string, unknown>, tokenIndex: number) => {
+        const y = numberValue(token.virtualY);
+        const h = numberValue(token.virtualH);
+        if (y == null || h == null) return 0;
+        const bottom = y + h;
+        let overlaps = 0;
+        visibleSample.forEach((other, otherIndex) => {
+          if (otherIndex === tokenIndex) return;
+          const otherY = numberValue(other.virtualY);
+          const otherH = numberValue(other.virtualH);
+          if (otherY == null || otherH == null) return;
+          const overlap = Math.min(bottom, otherY + otherH) - Math.max(y, otherY);
+          if (overlap > 4) overlaps += 1;
+        });
+        return overlaps;
+      };
+      const rows = visibleSample.map((token, tokenIndex) => {
+        const key = typeof token.key === 'string' && token.key.length > 0 ? token.key : null;
+        if (!key) missingKey += 1;
+        const measureEntry = key ? (measuredByScopeAndKey.get(`${scope}:${key}`) ?? null) : null;
+        const sizeEntry = key ? (itemSizeByScopeAndKey.get(`${scope}:${key}`) ?? null) : null;
+        if (measureEntry) positioned += 1;
+        else missingPosition += 1;
+
+        const measureParams = measureEntry?.params ?? {};
+        const sizeParams = sizeEntry?.params ?? {};
+        const virtualY = numberValue(token.virtualY);
+        const virtualH =
+          numberValue(token.virtualH) ??
+          numberValue(sizeParams.itemSize) ??
+          numberValue(token.size) ??
+          numberValue(measureParams.height);
+        const virtualBottom = numberValue(token.virtualBottom);
+        if (virtualY != null) virtualPositioned += 1;
+        else missingVirtualPosition += 1;
+        if (virtualH == null) missingSize += 1;
+        const virtualOverlaps = virtualOverlapCount(token, tokenIndex);
+        const flags = [
+          key ? null : 'missingKey',
+          measureEntry ? null : 'missingPosition',
+          virtualY == null ? 'missingVirtualPosition' : null,
+          virtualH == null ? 'missingSize' : null,
+          virtualOverlaps > 0 ? `virtualOverlap:${virtualOverlaps}` : null,
+          Number(measureParams.overlapCount ?? 0) > 0
+            ? `overlap:${measureParams.overlapCount}`
+            : null,
+          Number(measureParams.containerViolationCount ?? 0) > 0
+            ? `outsideContainer:${measureParams.containerViolationCount}`
+            : null,
+          measureParams.jumpY === true ? 'jumpY' : null,
+          sizeParams.sizeJump === true ? 'sizeJump' : null,
+        ].filter(Boolean);
+        return (
+          `    key=${String(key ?? '?').slice(0, 18)} type=${String(token.itemType ?? '?')} ` +
+          `idx=${token.index ?? '?'} y=${measureParams.pageY ?? '?'} h=${measureParams.height ?? '?'} ` +
+          `virtualY=${virtualY ?? '?'} virtualH=${virtualH ?? '?'} ` +
+          `virtualBottom=${virtualBottom ?? '?'} visible=${token.isViewable ?? '?'} ` +
+          `flags=${flags.join(',') || '-'}`
+        );
+      });
+      lines.push(
+        `  ${scope}: viewable=${viewable.length} positioned=${positioned} ` +
+          `virtualPositioned=${virtualPositioned} missingPosition=${missingPosition} ` +
+          `missingVirtualPosition=${missingVirtualPosition} missingSize=${missingSize} ` +
+          `missingKey=${missingKey}`
+      );
+      lines.push(...rows);
+      if (viewable.length > 12) lines.push(`    ... +${viewable.length - 12} more viewable rows`);
+    }
+    lines.push('');
+  }
+
+  if (viewabilityByScope.size > 0) {
+    lines.push('BUFFERED VIRTUAL POSITIONS:');
+    for (const [scope, e] of Array.from(viewabilityByScope.entries()).slice(-8)) {
+      const p = e.params ?? {};
+      const buffered = Array.isArray(p.buffered)
+        ? (p.buffered as Array<Record<string, unknown>>)
+        : [];
+      if (buffered.length === 0) {
+        lines.push(`  ${scope}: no buffered position snapshot`);
+        continue;
+      }
+      lines.push(
+        `  ${scope}: buffered=${buffered.length} scroll=${p.scroll ?? '?'} ` +
+          `scrollLength=${p.scrollLength ?? '?'} contentLength=${p.contentLength ?? '?'}`
+      );
+      for (const row of buffered.slice(0, 16)) {
+        const flags = [
+          typeof row.virtualY === 'number' ? null : 'missingVirtualPosition',
+          typeof row.virtualH === 'number' ? null : 'missingSize',
+        ].filter(Boolean);
+        lines.push(
+          `    key=${String(row.key ?? '?').slice(0, 18)} type=${String(row.itemType ?? '?')} ` +
+            `idx=${row.index ?? '?'} virtualY=${row.virtualY ?? '?'} ` +
+            `virtualH=${row.virtualH ?? '?'} virtualBottom=${row.virtualBottom ?? '?'} ` +
+            `flags=${flags.join(',') || '-'}`
+        );
+      }
+      if (buffered.length > 16) lines.push(`    ... +${buffered.length - 16} more buffered rows`);
+    }
+    lines.push('');
+  }
+
+  if (virtualPositionsByScope.size > 0) {
+    lines.push('FULL VIRTUAL POSITION SNAPSHOTS:');
+    for (const [scope, scoped] of Array.from(virtualPositionsByScope.entries()).slice(-8)) {
+      const { latest, latestChunkCount, latestChunks, rows } =
+        latestVirtualPositionSnapshot(scoped);
+      const sortedRows = rows.slice().sort((a, b) => Number(a.index ?? 0) - Number(b.index ?? 0));
+      const numberValue = (value: unknown) =>
+        typeof value === 'number' && Number.isFinite(value) ? value : null;
+      let virtualPositioned = 0;
+      let missingMeasuredPosition = 0;
+      let missingVirtualPosition = 0;
+      let missingSize = 0;
+      let virtualOverlaps = 0;
+      let orderBreaks = 0;
+      let previousVirtualBottom: number | null = null;
+      let previousVirtualY: number | null = null;
+
+      for (const row of sortedRows) {
+        const key = typeof row.key === 'string' && row.key.length > 0 ? row.key : null;
+        const virtualY = numberValue(row.virtualY);
+        const virtualH = numberValue(row.virtualH);
+        if (key && !measuredByScopeAndKey.has(`${scope}:${key}`)) missingMeasuredPosition += 1;
+        if (virtualY == null) missingVirtualPosition += 1;
+        else virtualPositioned += 1;
+        if (virtualH == null) missingSize += 1;
+        if (
+          virtualY != null &&
+          previousVirtualBottom != null &&
+          virtualY < previousVirtualBottom - 4
+        ) {
+          virtualOverlaps += 1;
+        }
+        if (virtualY != null && previousVirtualY != null && virtualY < previousVirtualY - 4) {
+          orderBreaks += 1;
+        }
+        previousVirtualY = virtualY ?? previousVirtualY;
+        previousVirtualBottom =
+          virtualY == null || virtualH == null ? previousVirtualBottom : virtualY + virtualH;
+      }
+
+      lines.push(
+        `  ${scope}: rows=${latest?.params?.totalRows ?? rows.length} chunks=${latestChunks.length}/${latestChunkCount} ` +
+          `virtualPositioned=${virtualPositioned} missingMeasuredPosition=${missingMeasuredPosition} ` +
+          `missingVirtualPosition=${latest?.params?.missingVirtualPositionCount ?? missingVirtualPosition} ` +
+          `missingSize=${latest?.params?.missingSizeCount ?? missingSize} ` +
+          `invalidSize=${latest?.params?.invalidSizeCount ?? 0} farVirtual=${
+            latest?.params?.farVirtualCount ?? 0
+          } outsideContent=${latest?.params?.outsideContentLengthCount ?? 0} ` +
+          `duplicateKeys=${latest?.params?.duplicateKeyCount ?? 0} ` +
+          `virtualOverlaps=${latest?.params?.virtualOverlapCount ?? virtualOverlaps} ` +
+          `orderBreaks=${latest?.params?.virtualOrderBreakCount ?? orderBreaks}`
+      );
+
+      for (const row of sortedRows.slice(0, 16)) {
+        const key = typeof row.key === 'string' && row.key.length > 0 ? row.key : null;
+        const measureEntry = key ? (measuredByScopeAndKey.get(`${scope}:${key}`) ?? null) : null;
+        const flags = [
+          measureEntry ? null : 'missingMeasuredPosition',
+          typeof row.virtualY === 'number' ? null : 'missingVirtualPosition',
+          typeof row.virtualH === 'number'
+            ? Number(row.virtualH) <= 0
+              ? 'invalidSize'
+              : null
+            : 'missingSize',
+        ].filter(Boolean);
+        lines.push(
+          `    key=${String(key ?? '?').slice(0, 18)} type=${String(row.itemType ?? '?')} ` +
+            `idx=${row.index ?? '?'} virtualY=${row.virtualY ?? '?'} ` +
+            `virtualH=${row.virtualH ?? '?'} virtualBottom=${row.virtualBottom ?? '?'} ` +
+            `measuredY=${measureEntry?.params?.pageY ?? '?'} measuredH=${
+              measureEntry?.params?.height ?? '?'
+            } flags=${flags.join(',') || '-'}`
+        );
+      }
+      if (sortedRows.length > 16) {
+        lines.push(`    ... +${sortedRows.length - 16} more virtual rows`);
+      }
+    }
+    lines.push('');
+  }
+
+  if (scopeSnapshotsByScope.size > 0) {
+    lines.push('MEASURED SCOPE SNAPSHOTS:');
+    for (const [scope, scoped] of Array.from(scopeSnapshotsByScope.entries()).slice(-8)) {
+      const latest = scoped[scoped.length - 1];
+      const latestChunkCount = Number(latest?.params?.chunkCount ?? 1);
+      const latestChunks = scoped
+        .slice(-Math.max(1, latestChunkCount))
+        .slice()
+        .sort((a, b) => Number(a.params?.chunkIndex ?? 0) - Number(b.params?.chunkIndex ?? 0));
+      const rows = latestChunks.flatMap((entry) =>
+        Array.isArray(entry.params?.rows)
+          ? (entry.params.rows as Array<Record<string, unknown>>)
+          : []
+      );
+      const sortedRows = rows.slice().sort((a, b) => {
+        const aIndex = visualNumber(a.index);
+        const bIndex = visualNumber(b.index);
+        if (aIndex != null && bIndex != null && aIndex !== bIndex) return aIndex - bIndex;
+        if (aIndex != null && bIndex == null) return -1;
+        if (aIndex == null && bIndex != null) return 1;
+        return (visualNumber(a.y) ?? 0) - (visualNumber(b.y) ?? 0);
+      });
+
+      lines.push(
+        `  ${scope}: rows=${latest?.params?.totalRows ?? rows.length} chunks=${latestChunks.length}/${latestChunkCount} ` +
+          `measured=${latest?.params?.measuredRows ?? '?'} stale=${latest?.params?.staleRows ?? '?'} ` +
+          `visible=${latest?.params?.visibleRows ?? '?'} containers=${
+            latest?.params?.containerRows ?? '?'
+          } overlaps=${latest?.params?.measuredOverlapCount ?? 0} ` +
+          `orderBreaks=${latest?.params?.measuredOrderBreakCount ?? 0} ` +
+          `containerViolations=${latest?.params?.containerViolationCount ?? 0} ` +
+          `zero=${latest?.params?.zeroAreaCount ?? 0} farY=${
+            latest?.params?.farOutsideYCount ?? 0
+          } absurdH=${latest?.params?.absurdHeightCount ?? 0}`
+      );
+
+      for (const row of sortedRows.slice(0, 16)) {
+        const flags = Array.isArray(row.flags) ? row.flags.join(',') : '-';
+        lines.push(
+          `    key=${String(row.key ?? '?').slice(0, 18)} type=${String(row.itemType ?? '?')} ` +
+            `idx=${row.index ?? '?'} y=${row.y ?? '?'} h=${row.height ?? '?'} ` +
+            `bottom=${row.bottom ?? '?'} mount=${row.mountOrder ?? '?'} ` +
+            `pos=${row.stylePosition ?? '?'} z=${row.styleZIndex ?? '?'} flags=${flags || '-'}`
+        );
+      }
+      if (sortedRows.length > 16) {
+        lines.push(`    ... +${sortedRows.length - 16} more measured rows`);
+      }
+    }
+    lines.push('');
+  }
+
+  if (orderGapSummaries.length > 0) {
+    lines.push('ORDER/GAP ANALYSIS:');
+    for (const summary of orderGapSummaries.slice(-12)) {
+      lines.push(
+        `  ${summary.scope}: rows=${summary.rows.length} measured=${summary.measuredRows} ` +
+          `virtual=${summary.virtualRows} measuredOverlaps=${summary.measuredOverlaps} ` +
+          `orderBreaks=${summary.measuredOrderBreaks} ` +
+          `virtualDeltaMismatches=${summary.measuredVirtualDeltaMismatches} ` +
+          `largeGaps=${summary.largeMeasuredGaps}`
+      );
+      for (const row of summary.rows.slice(0, 12)) {
+        lines.push(
+          `    key=${row.key.slice(0, 18)} type=${row.itemType} idx=${row.index ?? '?'} ` +
+            `y=${row.measuredY ?? '?'} bottom=${row.measuredBottom ?? '?'} ` +
+            `virtualY=${row.virtualY ?? '?'} virtualH=${row.virtualH ?? '?'} ` +
+            `virtualBottom=${row.virtualBottom ?? '?'} flags=${row.flags.join(',') || '-'}`
+        );
+      }
+      if (summary.rows.length > 12) lines.push(`    ... +${summary.rows.length - 12} more rows`);
+    }
+    lines.push('');
+  }
+
+  if (itemSizeByScopeAndKey.size > 0 || measuredByScopeAndKey.size > 0) {
+    lines.push('SIZE/POSITION CORRELATION:');
+    const byScope = new Map<
+      string,
+      Array<{ key: string; sizeEntry: LogEntry | null; measureEntry: LogEntry | null }>
+    >();
+    const allKeys = new Set([...itemSizeByScopeAndKey.keys(), ...measuredByScopeAndKey.keys()]);
+    for (const scopedKey of allKeys) {
+      const sizeEntry = itemSizeByScopeAndKey.get(scopedKey) ?? null;
+      const measureEntry = measuredByScopeAndKey.get(scopedKey) ?? null;
+      const scope = String(sizeEntry?.params?.scope ?? measureEntry?.params?.scope ?? '?');
+      const key = String(
+        sizeEntry?.params?.key ?? sizeEntry?.params?.rowKey ?? measureEntry?.params?.key ?? '?'
+      );
+      const scoped = byScope.get(scope) ?? [];
+      scoped.push({ key, sizeEntry, measureEntry });
+      byScope.set(scope, scoped);
+    }
+    for (const [scope, rows] of Array.from(byScope.entries()).slice(-12)) {
+      const sorted = rows.slice().sort((a, b) => {
+        const aIndex = Number(a.sizeEntry?.params?.index ?? a.measureEntry?.params?.index ?? 0);
+        const bIndex = Number(b.sizeEntry?.params?.index ?? b.measureEntry?.params?.index ?? 0);
+        if (aIndex !== bIndex) return aIndex - bIndex;
+        return (
+          Number(a.measureEntry?.params?.pageY ?? 0) - Number(b.measureEntry?.params?.pageY ?? 0)
+        );
+      });
+      lines.push(`  ${scope}: rows=${sorted.length}`);
+      for (const row of sorted.slice(0, 12)) {
+        const sizeParams = row.sizeEntry?.params ?? {};
+        const measureParams = row.measureEntry?.params ?? {};
+        const virtualH =
+          typeof sizeParams.itemSize === 'number' ? Number(sizeParams.itemSize) : null;
+        const measuredH =
+          typeof measureParams.height === 'number' ? Number(measureParams.height) : null;
+        const heightDelta =
+          virtualH != null && measuredH != null
+            ? Math.round((measuredH - virtualH) * 100) / 100
+            : null;
+        const flags = [
+          row.sizeEntry ? null : 'missingSize',
+          row.measureEntry ? null : 'missingPosition',
+          heightDelta != null && Math.abs(heightDelta) > 4 ? `heightDelta:${heightDelta}` : null,
+          Number(measureParams.overlapCount ?? 0) > 0
+            ? `overlap:${measureParams.overlapCount}`
+            : null,
+          Number(measureParams.containerViolationCount ?? 0) > 0
+            ? `outsideContainer:${measureParams.containerViolationCount}`
+            : null,
+          measureParams.jumpY === true ? 'jumpY' : null,
+          sizeParams.sizeJump === true ? 'sizeJump' : null,
+        ].filter(Boolean);
+        lines.push(
+          `    key=${row.key.slice(0, 18)} type=${String(
+            sizeParams.itemType ?? measureParams.itemType ?? '?'
+          )} idx=${sizeParams.index ?? measureParams.index ?? '?'} ` +
+            `virtualH=${virtualH == null ? '?' : virtualH} measuredH=${
+              measuredH == null ? '?' : measuredH
+            } dH=${heightDelta == null ? '?' : heightDelta} ` +
+            `y=${measureParams.pageY ?? '?'} bottom=${measureParams.bottom ?? '?'} ` +
+            `visible=${measureParams.visible ?? '?'} flags=${flags.join(',') || '-'}`
+        );
+      }
+      if (sorted.length > 12) lines.push(`    ... +${sorted.length - 12} more rows`);
+    }
+    lines.push('');
+  }
+
+  if (itemSizeByScopeAndKey.size > 0) {
+    lines.push('LATEST ITEM SIZES:');
+    const itemSizesByScope = new Map<string, LogEntry[]>();
+    for (const e of itemSizeByScopeAndKey.values()) {
+      const scope = String(e.params?.scope ?? '?');
+      const scoped = itemSizesByScope.get(scope) ?? [];
+      scoped.push(e);
+      itemSizesByScope.set(scope, scoped);
+    }
+    for (const [scope, scoped] of Array.from(itemSizesByScope.entries()).slice(-12)) {
+      const sorted = scoped
+        .slice()
+        .sort((a, b) => Number(a.params?.index ?? 0) - Number(b.params?.index ?? 0));
+      lines.push(`  ${scope}: rows=${sorted.length}`);
+      for (const e of sorted.slice(0, 12)) {
+        const p = e.params ?? {};
+        const flags = [
+          p.sizeJump === true ? 'sizeJump' : null,
+          p.invalidSize === true ? 'invalid' : null,
+          p.firstMeasure === true ? 'first' : null,
+        ].filter(Boolean);
+        lines.push(
+          `    ${String(p.component ?? '?')} key=${String(p.key ?? p.rowKey ?? '?').slice(0, 18)} ` +
+            `type=${String(p.itemType ?? '?')} idx=${p.index ?? '?'} size=${p.itemSize ?? '?'} ` +
+            `prev=${p.previousItemSize ?? '?'} dSize=${p.deltaItemSize ?? '?'} ` +
+            `flags=${flags.join(',') || '-'}`
+        );
+      }
+      if (sorted.length > 12) lines.push(`    ... +${sorted.length - 12} more rows`);
+    }
+    lines.push('');
+  }
+
+  if (measuredByScopeAndKey.size > 0) {
+    lines.push('LATEST MEASURED POSITIONS:');
+    const measuredByScope = new Map<string, LogEntry[]>();
+    for (const e of measuredByScopeAndKey.values()) {
+      const scope = String(e.params?.scope ?? '?');
+      const scoped = measuredByScope.get(scope) ?? [];
+      scoped.push(e);
+      measuredByScope.set(scope, scoped);
+    }
+    for (const [scope, scoped] of Array.from(measuredByScope.entries()).slice(-12)) {
+      const sorted = scoped
+        .slice()
+        .sort((a, b) => Number(a.params?.pageY ?? 0) - Number(b.params?.pageY ?? 0));
+      lines.push(`  ${scope}: rows=${sorted.length}`);
+      for (const e of sorted.slice(0, 12)) {
+        const p = e.params ?? {};
+        const flags = [
+          p.visible === false ? 'hidden' : null,
+          p.jumpY === true ? 'jumpY' : null,
+          p.jumpX === true ? 'jumpX' : null,
+          p.zeroArea === true ? 'zero' : null,
+          p.farOutsideY === true ? 'farY' : null,
+          p.absurdHeight === true ? 'absurdH' : null,
+          Number(p.overlapCount ?? 0) > 0 ? `overlap:${p.overlapCount}` : null,
+          Number(p.containerViolationCount ?? 0) > 0
+            ? `outsideContainer:${p.containerViolationCount}`
+            : null,
+        ].filter(Boolean);
+        lines.push(
+          `    ${String(p.component ?? '?')} key=${String(p.key ?? '?').slice(0, 18)} ` +
+            `type=${String(p.itemType ?? '?')} y=${p.pageY ?? '?'} h=${p.height ?? '?'} ` +
+            `bottom=${p.bottom ?? '?'} visible=${p.visible ?? '?'} ` +
+            `mount=${p.mountOrder ?? '?'} pos=${p.stylePosition ?? '?'} z=${p.styleZIndex ?? '?'} ` +
+            `elev=${p.styleElevation ?? '?'} flags=${flags.join(',') || '-'}`
+        );
+      }
+      if (sorted.length > 12) lines.push(`    ... +${sorted.length - 12} more rows`);
+    }
+    lines.push('');
+  }
+
+  const { page, footer } = paginate(visualEntries, opts);
   lines.push('TIMELINE:');
   for (const e of page) {
     const t = e._t ? `[${Math.round(e._t)}ms]` : '';
@@ -2504,6 +3556,7 @@ function modeBudget(entries: LogEntry[], opts: Options): string {
     { name: 'coco', fn: modeCoco },
     { name: 'network', fn: modeNetwork },
     { name: 'feed', fn: modeFeed },
+    { name: 'visual', fn: modeVisual },
     { name: 'full (json)', fn: (e, o) => modeFull(e, { ...o, format: 'json' }) },
     { name: 'full (md)', fn: (e, o) => modeFull(e, { ...o, format: 'md' }) },
     { name: 'full (yaml)', fn: (e, o) => modeFull(e, { ...o, format: 'yaml' }) },
@@ -3074,12 +4127,12 @@ async function main() {
     }
   }
 
-  // Read from log.txt (default) or stdin if piped
+  // Read from log.txt (default) or stdin if piped/redirected.
   let raw: string;
   const logPath = nodePath.resolve(process.cwd(), 'log.txt');
+  const stdinStat = fs.fstatSync(0);
 
-  if (process.stdin.isTTY !== undefined && !process.stdin.isTTY) {
-    // Data is being piped in
+  if (shouldReadFromStdin(stdinStat, process.stdin.isTTY)) {
     raw = fs.readFileSync(0, 'utf-8');
   } else if (fs.existsSync(logPath)) {
     const stat = fs.statSync(logPath);
@@ -3096,7 +4149,7 @@ async function main() {
     console.error('  2. Pipe logs: cat logs.jsonl | npm run log-doctor -- stats');
     console.error('');
     console.error(
-      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, full, diff, devices, payment, toasts, flows, ws, gc, budget, phone'
+      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, phone'
     );
     process.exit(1);
   }
@@ -3156,6 +4209,9 @@ async function main() {
     case 'feed':
       output = modeFeed(entries, opts);
       break;
+    case 'visual':
+      output = modeVisual(entries, opts);
+      break;
     case 'full':
       output = modeFull(entries, opts);
       break;
@@ -3192,7 +4248,7 @@ async function main() {
     default:
       console.error(`Unknown mode: ${opts.mode}`);
       console.error(
-        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, phone'
+        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, phone'
       );
       process.exit(1);
   }

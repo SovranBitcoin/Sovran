@@ -27,6 +27,7 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { uploadMedia } from '@/shared/lib/nostr/media/mediaUpload';
@@ -35,7 +36,7 @@ import { useComposerStore } from '@/features/composer/state/composerStore';
 import { publishComposed } from '@/features/composer/publish/useComposerActions';
 import { emptyPollDraft } from '@/features/composer/ui/PollComposeForm';
 import { deriveReplyTarget } from '@/features/feed/lib/replyTarget';
-import { useShiftLogger } from '@/features/feed/lib/contentShiftLog';
+import { useShiftLogger, useVisualLayoutLogger } from '@/shared/lib/contentShiftLog';
 import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
 import type { FeedEvent, ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
 
@@ -104,6 +105,23 @@ export function ThreadReplyBar({
   const expanded = focused || hasContent;
   const uploading = mediaBlocks.some((b) => b.uploadProgress !== undefined);
   const canPost = !posting && hasContent && !uploading && !!replyTarget;
+  const replyBarVisualScope = targetEvent
+    ? `thread.${targetEvent.id}.replybar`
+    : 'thread.loading.replybar';
+  const visualLayout = useVisualLayoutLogger({
+    scope: replyBarVisualScope,
+    surface: 'thread',
+    component: 'ThreadReplyBar',
+    itemKey: 'replybar',
+    itemType: 'sticky-composer',
+    phase: isFocused ? 'focused' : 'idle',
+    extra: () => ({
+      focused,
+      expanded,
+      mediaCount: mediaBlocks.length,
+      posting,
+    }),
+  });
 
   const handlePost = useCallback(async () => {
     if (!ndk || !canPost || !replyTarget) return;
@@ -204,6 +222,8 @@ export function ThreadReplyBar({
       }}
       style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
       <Animated.View
+        ref={visualLayout.ref}
+        onLayout={visualLayout.onLayout}
         layout={EXPAND_TRANSITION}
         style={[
           styles.container,
@@ -232,7 +252,19 @@ export function ThreadReplyBar({
                 />
                 {block.uploadProgress !== undefined ? (
                   <View style={styles.thumbScrim}>
-                    <ActivityIndicator color={INVARIANT_WHITE} size="small" />
+                    <VisualLayoutProbe
+                      scope={replyBarVisualScope}
+                      surface="thread"
+                      component="ThreadReplyBarMediaUploadIndicator"
+                      itemKey={`media-upload:${block.id}`}
+                      itemType="activity-indicator"
+                      phase="uploading"
+                      extra={() => ({
+                        mediaKind: block.mediaKind,
+                        uploadProgress: block.uploadProgress ?? null,
+                      })}>
+                      <ActivityIndicator color={INVARIANT_WHITE} size="small" />
+                    </VisualLayoutProbe>
                   </View>
                 ) : null}
                 <Pressable

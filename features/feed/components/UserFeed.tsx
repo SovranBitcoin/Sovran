@@ -94,6 +94,13 @@ import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import {
+  remeasureVisualLayoutScope,
+  useVisualListLogger,
+  useVisualStateLogger,
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+} from '@/shared/lib/contentShiftLog';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 
 // ============================================================================
 // Types (UserFeed-specific)
@@ -353,6 +360,7 @@ export function UserFeed({
 }: UserFeedProps) {
   const foreground = useThemeColor('foreground');
   const imageOverlay = useImageOverlay();
+  const userFeedVisualScope = useMemo(() => `feed.user.${pubkey.slice(0, 12)}.list`, [pubkey]);
   const [, startTransition] = useTransition();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(new Map());
@@ -385,6 +393,7 @@ export function UserFeed({
 
   const feedListRef = useRef<LegendListRef>(null);
   const overlaySourceIndexRef = useRef(-1);
+  const scrollOffsetRef = useRef(0);
 
   useEffect(() => {
     if (!pubkey) {
@@ -796,6 +805,53 @@ export function UserFeed({
     feedRowsRef.current = feedRows;
   }, [feedRows]);
 
+  const visualList = useVisualListLogger<FeedRow>({
+    scope: userFeedVisualScope,
+    surface: 'profile',
+    component: 'UserFeedList',
+    phase: isLoading ? 'loading' : 'ready',
+    extra: () => ({
+      rows: feedRowsRef.current.length,
+      isLoading,
+      isLoadingMore,
+      isOwnProfile: !!isOwnProfile,
+    }),
+    getItemKey: (row) => row.key,
+    getItemContext: (row) => ({
+      rowKey: row.key,
+      rowLabel: getFeedRowItemType(row),
+      itemType: getFeedRowItemType(row),
+    }),
+    getListState: () => feedListRef.current?.getState() ?? null,
+  });
+
+  useVisualStateLogger({
+    scope: userFeedVisualScope,
+    surface: 'profile',
+    component: 'UserFeed',
+    stateKey: 'user-feed-state',
+    phase: isLoading ? 'loading' : isLoadingMore ? 'loading-more' : 'ready',
+    state: {
+      authorKnown: Boolean(authorName),
+      empty: !isLoading && feedRows.length === 0,
+      feedItems: feedItems.length,
+      hasHeader: ListHeaderComponent != null,
+      isLoading,
+      isLoadingMore,
+      isOwnProfile: !!isOwnProfile,
+      metrics: metricsMap.size,
+      profiles: profilesMap.size,
+      quotedEvents: quotedEventsMap.size,
+      rows: feedRows.length,
+      videos: videoPosts.length,
+    },
+    remeasure: {
+      reason: 'user-feed-state',
+      minIntervalMs: 300,
+      maxItems: 32,
+    },
+  });
+
   // Render boundary / skeleton→content swap: mirrors HomeFeed's `feed.ui.render`
   // so a profile-feed content shift can be traced the same way.
   useEffect(() => {
@@ -994,6 +1050,42 @@ export function UserFeed({
     ]
   );
 
+  const renderItem = useCallback(
+    (props: LegendListRenderItemProps<FeedRow, string | undefined>) => (
+      <VisualLayoutProbe
+        scope={userFeedVisualScope}
+        surface="profile"
+        component="UserFeedRow"
+        itemKey={props.item.key}
+        itemType={getFeedRowItemType(props.item)}
+        index={props.index}
+        extra={() => ({
+          scrollY: Math.round(scrollOffsetRef.current),
+          rows: feedRowsRef.current.length,
+          isOwnProfile: !!isOwnProfile,
+        })}>
+        {renderFeedItem(props)}
+      </VisualLayoutProbe>
+    ),
+    [isOwnProfile, renderFeedItem, userFeedVisualScope]
+  );
+
+  const handleListScroll = useCallback(
+    (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+      const y = e.nativeEvent.contentOffset.y;
+      scrollOffsetRef.current = y;
+      if (imageOverlay?.scrollOffsetY != null) {
+        imageOverlay.scrollOffsetY.value = y;
+      }
+      remeasureVisualLayoutScope(userFeedVisualScope, 'scroll', {
+        minIntervalMs: 500,
+        maxItems: 32,
+        extra: { scrollY: Math.round(y) },
+      });
+    },
+    [imageOverlay, userFeedVisualScope]
+  );
+
   const feedHeader = (
     <View>
       {ListHeaderComponent}
@@ -1002,7 +1094,16 @@ export function UserFeed({
           Notes
         </Text>
         {isLoading ? (
-          <Spinner size={22} style={{ marginTop: 32 }} />
+          <VisualLayoutProbe
+            scope={userFeedVisualScope}
+            surface="profile"
+            component="UserFeedInitialSpinner"
+            itemKey="initial-spinner"
+            itemType="spinner"
+            index={0}
+            extra={{ isLoading }}>
+            <Spinner size={22} style={{ marginTop: 32 }} />
+          </VisualLayoutProbe>
         ) : feedItems.length === 0 ? (
           <EmptyFeed isOwnProfile={isOwnProfile} />
         ) : null}
@@ -1014,20 +1115,21 @@ export function UserFeed({
     isLoading || feedItems.length === 0 ? (
       // When loading or empty, render without LegendList (header-only mode)
       <LegendList
-        data={[] as FeedItem[]}
+        ref={feedListRef}
+        data={[] as FeedRow[]}
         estimatedItemSize={200}
         renderItem={() => null}
         ListHeaderComponent={feedHeader}
+        onItemSizeChanged={visualList.onItemSizeChanged}
+        onLoad={visualList.onLoad}
+        onMetricsChange={visualList.onMetricsChange}
+        onStickyHeaderChange={visualList.onStickyHeaderChange}
+        onViewableItemsChanged={visualList.onViewableItemsChanged}
+        viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
-        onScroll={
-          imageOverlay?.scrollOffsetY != null
-            ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-                imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
-              }
-            : undefined
-        }
+        onScroll={handleListScroll}
         scrollEventThrottle={16}
       />
     ) : (
@@ -1039,25 +1141,39 @@ export function UserFeed({
         estimatedItemSize={300}
         drawDistance={500}
         maintainVisibleContentPosition
-        renderItem={renderFeedItem}
+        renderItem={renderItem}
         itemsAreEqual={feedRowsAreEqual}
         recycleItems
         ListHeaderComponent={feedHeader}
         ListFooterComponent={
-          isLoadingMore ? <Spinner size={18} style={{ paddingVertical: 24 }} /> : null
+          isLoadingMore ? (
+            <VisualLayoutProbe
+              scope={userFeedVisualScope}
+              surface="profile"
+              component="UserFeedPaginationSpinner"
+              itemKey="pagination-spinner"
+              itemType="spinner"
+              index={feedRows.length}
+              extra={() => ({
+                scrollY: Math.round(scrollOffsetRef.current),
+                rows: feedRowsRef.current.length,
+              })}>
+              <Spinner size={18} style={{ paddingVertical: 24 }} />
+            </VisualLayoutProbe>
+          ) : null
         }
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}
+        onItemSizeChanged={visualList.onItemSizeChanged}
+        onLoad={visualList.onLoad}
+        onMetricsChange={visualList.onMetricsChange}
+        onStickyHeaderChange={visualList.onStickyHeaderChange}
+        onViewableItemsChanged={visualList.onViewableItemsChanged}
+        viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
-        onScroll={
-          imageOverlay?.scrollOffsetY != null
-            ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-                imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
-              }
-            : undefined
-        }
+        onScroll={handleListScroll}
         scrollEventThrottle={16}
       />
     );

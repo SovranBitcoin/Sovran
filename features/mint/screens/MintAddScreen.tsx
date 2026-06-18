@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, memo, useRef } from 'react';
 import { Platform, TextInput, useWindowDimensions } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
@@ -27,8 +27,10 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import {
   LegendList,
+  type LegendListRef,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from '@legendapp/list/react-native';
@@ -38,6 +40,11 @@ import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import opacity from 'hex-color-opacity';
+import {
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+  useVisualListLogger,
+  visualLayoutScopePart,
+} from '@/shared/lib/contentShiftLog';
 import { log, cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
@@ -211,12 +218,30 @@ const LoadingMintsList = memo(function LoadingMintsList({ count = 5 }: { count?:
               <Skeleton
                 className="bg-surface-tertiary h-[42px] w-[42px]"
                 style={{ borderRadius: 42 * 0.25 }}
+                visualScope="mint.add.loading"
+                visualKey={`avatar:${index}`}
+                visualSurface="mint"
+                visualComponent="MintAddLoadingSkeleton"
+                visualExtra={{ rowIndex: index, part: 'avatar' }}
               />
               <VStack flex={1} gap={8}>
-                <Skeleton className="bg-surface-tertiary h-[16px]" style={{ width: 150 }} />
+                <Skeleton
+                  className="bg-surface-tertiary h-[16px]"
+                  style={{ width: 150 }}
+                  visualScope="mint.add.loading"
+                  visualKey={`name:${index}`}
+                  visualSurface="mint"
+                  visualComponent="MintAddLoadingSkeleton"
+                  visualExtra={{ rowIndex: index, part: 'name' }}
+                />
                 <Skeleton
                   className="bg-surface-tertiary h-[20px] rounded-full"
                   style={{ width: 80 }}
+                  visualScope="mint.add.loading"
+                  visualKey={`badge:${index}`}
+                  visualSurface="mint"
+                  visualComponent="MintAddLoadingSkeleton"
+                  visualExtra={{ rowIndex: index, part: 'badge' }}
                 />
               </VStack>
             </View>
@@ -224,10 +249,20 @@ const LoadingMintsList = memo(function LoadingMintsList({ count = 5 }: { count?:
               <Skeleton
                 className="bg-surface-tertiary h-[24px] rounded-full"
                 style={{ width: 56 }}
+                visualScope="mint.add.loading"
+                visualKey={`metric-a:${index}`}
+                visualSurface="mint"
+                visualComponent="MintAddLoadingSkeleton"
+                visualExtra={{ rowIndex: index, part: 'metric-a' }}
               />
               <Skeleton
                 className="bg-surface-tertiary h-[24px] rounded-full"
                 style={{ width: 60 }}
+                visualScope="mint.add.loading"
+                visualKey={`metric-b:${index}`}
+                visualSurface="mint"
+                visualComponent="MintAddLoadingSkeleton"
+                visualExtra={{ rowIndex: index, part: 'metric-b' }}
               />
             </View>
           </VStack>
@@ -581,21 +616,70 @@ export function MintAddScreen() {
     [scrollY]
   );
 
-  const renderItem = useCallback(
-    ({ item }: { item: SearchableMint }) => (
-      <MintItem
-        mint={item}
-        selected={selectedMints.has(item.url)}
-        onToggle={handleToggleMint}
-        globalLoading={isAdding}
-      />
-    ),
-    [selectedMints, handleToggleMint, isAdding]
-  );
-
   const keyExtractor = useCallback((item: SearchableMint) => item.url, []);
-
   const showContent = !searchLoading || displayMints.length > 0;
+  const visualPhase = !showContent ? 'loading' : isSearching ? 'searching' : 'catalog';
+  const listRef = useRef<LegendListRef>(null);
+  const visualList = useVisualListLogger<SearchableMint>({
+    scope: 'mint.add.results',
+    surface: 'mint',
+    component: 'MintAddLegendList',
+    phase: visualPhase,
+    extra: () => ({
+      itemCount: displayMints.length,
+      selectedCurrency,
+      isSearching,
+      queryLength: searchQuery.trim().length,
+      selectedCount: selectedMints.size,
+      totalHeaderHeight,
+    }),
+    getItemKey: (item) => visualLayoutScopePart(item.url),
+    getItemContext: (item, index) => ({
+      itemType: 'mint-add-row',
+      index,
+      selected: selectedMints.has(item.url),
+      pseudo: 'isPseudoMint' in item,
+    }),
+    getListState: () => listRef.current?.getState() ?? null,
+  });
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: SearchableMint; index: number }) => (
+      <VisualLayoutProbe
+        scope="mint.add.results"
+        surface="mint"
+        component="MintAddRow"
+        itemKey={visualLayoutScopePart(item.url)}
+        itemType="mint-add-row"
+        index={index}
+        phase={visualPhase}
+        extra={{
+          itemCount: displayMints.length,
+          selectedCurrency,
+          isSearching,
+          queryLength: searchQuery.trim().length,
+          selected: selectedMints.has(item.url),
+          pseudo: 'isPseudoMint' in item,
+        }}>
+        <MintItem
+          mint={item}
+          selected={selectedMints.has(item.url)}
+          onToggle={handleToggleMint}
+          globalLoading={isAdding}
+        />
+      </VisualLayoutProbe>
+    ),
+    [
+      displayMints.length,
+      handleToggleMint,
+      isAdding,
+      isSearching,
+      searchQuery,
+      selectedCurrency,
+      selectedMints,
+      visualPhase,
+    ]
+  );
 
   // Log list render state for performance analysis
   useEffect(() => {
@@ -763,6 +847,7 @@ export function MintAddScreen() {
         </View>
       ) : (
         <LegendList
+          ref={listRef}
           data={displayMints}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
@@ -770,6 +855,12 @@ export function MintAddScreen() {
           estimatedItemSize={120}
           recycleItems
           drawDistance={300}
+          onItemSizeChanged={visualList.onItemSizeChanged}
+          onLoad={visualList.onLoad}
+          onMetricsChange={visualList.onMetricsChange}
+          onStickyHeaderChange={visualList.onStickyHeaderChange}
+          onViewableItemsChanged={visualList.onViewableItemsChanged}
+          viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
           style={{ flex: 1, height: 0 }}
           contentContainerStyle={{ paddingBottom: 120 }}
           ListHeaderComponent={listHeader}

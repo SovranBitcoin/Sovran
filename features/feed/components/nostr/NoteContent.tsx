@@ -14,7 +14,7 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { decode as bolt11Decode } from '@gandlaf21/bolt11-decode';
 import { log, feedLog } from '@/shared/lib/logger';
-import { useShiftLogger } from '../../lib/contentShiftLog';
+import { useShiftLogger, useVisualLayoutLogger } from '@/shared/lib/contentShiftLog';
 import { openExternalUrl } from '@/shared/lib/url';
 import { staticPopup } from '@/shared/lib/popup';
 import { ImageBlock, useImageOverlay } from './image-overlay';
@@ -35,10 +35,15 @@ import { POLL_KIND } from './poll/pollParse';
 import { formatRelative } from '@/shared/lib/date';
 import { sharedStyles } from './feedStyles';
 import { fontSize } from '@/shared/styles/tokens';
+import { NOTE_CONTENT_LINE_HEIGHT } from '@/features/feed/lib/threadListLayout';
+
+// Re-exported so `NoteContent` stays the import site for note-rendering
+// consumers (PostCard); the value's source of truth lives in `threadListLayout`
+// so the rendered line height and the skeleton fixed-size math can't drift.
+export { NOTE_CONTENT_LINE_HEIGHT };
 
 const EMPTY_QUOTED_EVENTS: Map<string, FeedEvent> = new Map();
 export const NOTE_CONTENT_FONT_SIZE = fontSize.lg;
-export const NOTE_CONTENT_LINE_HEIGHT = 24;
 
 // ─── Inline renderers ────────────────────────────────────────────────────────
 
@@ -616,19 +621,33 @@ export const NoteContent = React.memo(function NoteContent({
 
   const hasInline = inlineSegments.length > 0;
   const hasBlocks = blockSegments.length > 0;
+  const visualLayout = useVisualLayoutLogger({
+    scope: `feed.note.${noteKey.slice(0, 12)}`,
+    surface: 'feed',
+    component: 'NoteContent',
+    itemKey: noteKey,
+    itemType: overlayEvent ? `kind-${overlayEvent.kind}` : 'inline',
+    extra: () => ({
+      contentLength: content.length,
+      blockCount: blockSegments.length,
+      expanded,
+      truncated: isTruncated,
+    }),
+  });
 
   // Body height after layout. Re-fires when async data (a mention name
   // resolving, a quoted event arriving, an image settling its aspect ratio)
   // reflows the note — the raw signal for "the post grew/shrank under me".
   const handleNoteLayout = useCallback(
     (e: LayoutChangeEvent) => {
+      visualLayout.onLayout(e);
       shift.report('feed.shift.note.height', noteKey, e.nativeEvent.layout.height, {
         contentLength: content.length,
         blockCount: blockSegments.length,
         expanded,
       });
     },
-    [shift, noteKey, content.length, blockSegments.length, expanded]
+    [visualLayout, shift, noteKey, content.length, blockSegments.length, expanded]
   );
   const taggedQuoteIds = useMemo(() => {
     if (!overlayEvent) return [];
@@ -706,7 +725,7 @@ export const NoteContent = React.memo(function NoteContent({
   // while quote cards remain below it when the poll cites another post.
   if (overlayEvent?.kind === POLL_KIND) {
     return (
-      <VStack gap={0} onLayout={handleNoteLayout}>
+      <VStack ref={visualLayout.ref} gap={0} onLayout={handleNoteLayout}>
         <PollCard event={overlayEvent} />
         {blockSegments.map((seg, i) => renderQuoteBlockSegment(seg, i))}
         {taggedQuoteIds.map((id) => renderQuoteCard(id, `q${id}`))}
@@ -715,7 +734,7 @@ export const NoteContent = React.memo(function NoteContent({
   }
 
   return (
-    <VStack gap={0} onLayout={handleNoteLayout}>
+    <VStack ref={visualLayout.ref} gap={0} onLayout={handleNoteLayout}>
       {hasInline && (
         <Text
           size={NOTE_CONTENT_FONT_SIZE}

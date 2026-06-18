@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { LegendList } from '@legendapp/list/react-native';
+import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import Icon from 'assets/icons';
 
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
@@ -20,6 +20,11 @@ import { formatRelative } from '@/shared/lib/date';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import { Log, log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import {
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+  useVisualListLogger,
+  visualLayoutScopePart,
+} from '@/shared/lib/contentShiftLog';
+import {
   ContactRow,
   geohashIdentity,
   mintIdentity,
@@ -27,6 +32,7 @@ import {
   type Identity,
 } from '@/shared/ui/composed/ContactRow';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { navigateToProfile } from '../lib/navigateToProfile';
@@ -54,6 +60,18 @@ interface WhitenoiseRequestRow {
 }
 
 type ContactsListItem = RecentContact | MintContact | WhitenoiseRequestRow;
+
+function contactsListItemKey(item: ContactsListItem, index: number): string {
+  if (item.type === 'request') return item.request.id || item.request.fromPubkey;
+  if (item.type === 'mint') return item.mint?.mintUrl ?? item.pubkey ?? `mint-${index}`;
+  return item.pubkey || `contact-${index}`;
+}
+
+function contactsListItemType(item: ContactsListItem): string {
+  if (item.type === 'request') return 'whitenoise-request';
+  if (item.type === 'mint') return 'mint-contact';
+  return `contact-${item.protocol ?? 'nip17'}`;
+}
 
 function GroupsTierRow({ tier }: { tier: TierEntry }) {
   const router = useGuardedRouter();
@@ -260,6 +278,44 @@ export const ContactsScreen = () => {
       (item) => item.type === 'contact' && MOCK_ALLOWED_PUBKEYS_HEX.has(item.pubkey)
     );
   }, [rawListData, mockMode]);
+  const contactListRef = useRef<LegendListRef>(null);
+  const groupListRef = useRef<LegendListRef>(null);
+  const contactVisualList = useVisualListLogger<ContactsListItem>({
+    scope: 'contacts.contacts.list',
+    surface: 'contacts',
+    component: 'ContactsLegendList',
+    phase: showContactsSpinner ? 'loading' : activeFilter.toLowerCase(),
+    extra: () => ({
+      activeFilter,
+      activeTab,
+      rowCount: currentListData.length,
+      mockMode,
+      mintInfoLoading,
+    }),
+    getItemKey: (item, index) => visualLayoutScopePart(contactsListItemKey(item, index)),
+    getItemContext: (item, index) => ({
+      itemType: contactsListItemType(item),
+      index,
+    }),
+    getListState: () => contactListRef.current?.getState() ?? null,
+  });
+  const groupVisualList = useVisualListLogger<TierEntry>({
+    scope: 'contacts.groups.list',
+    surface: 'contacts',
+    component: 'ContactGroupsLegendList',
+    phase: activeTab,
+    extra: () => ({
+      rowCount: locationTiers.length,
+      activeTab,
+    }),
+    getItemKey: (item) => visualLayoutScopePart(item.key),
+    getItemContext: (item, index) => ({
+      itemType: 'location-tier',
+      index,
+      transport: item.transport,
+    }),
+    getListState: () => groupListRef.current?.getState() ?? null,
+  });
 
   const handleFilterChange = useCallback((filter: ContactsFilter) => {
     log.debug('contacts.filter_changed', { filter });
@@ -267,7 +323,9 @@ export const ContactsScreen = () => {
   }, []);
 
   const renderContactItem = useCallback(
-    ({ item }: { item: ContactsListItem }) => {
+    ({ item, index }: { item: ContactsListItem; index: number }) => {
+      const visualKey = visualLayoutScopePart(contactsListItemKey(item, index));
+      const visualType = contactsListItemType(item);
       // White Noise pending invite — keep it in this list so the empty/
       // loading/scrolling behaviour is the same as the other pills, but
       // swap the trailing slot for accept/decline buttons.
@@ -278,25 +336,40 @@ export const ContactsScreen = () => {
         // relay set — that's the whole point of a "request". So render with
         // the seeded fallback immediately rather than a skeleton forever.
         return (
-          <ContactRow
-            identity={[nostrIdentity(req.fromPubkey, profile, { isLoadingProfile: false })]}
-            subtitle="Wants to start a White Noise chat"
-            hideMetadata
-            trailing={
-              <RequestActions
-                isBusy={whitenoiseBusyId === req.id}
-                onAccept={() => {
-                  paymentLog.info('contact.whitenoise.accept', { pubkey: req.fromPubkey });
-                  void acceptWhitenoiseRequest(req);
-                }}
-                onDecline={() => {
-                  paymentLog.info('contact.whitenoise.decline', { pubkey: req.fromPubkey });
-                  void declineWhitenoiseRequest(req);
-                }}
-              />
-            }
-            testID={`request-row:${req.fromPubkey}`}
-          />
+          <VisualLayoutProbe
+            scope="contacts.contacts.list"
+            surface="contacts"
+            component="ContactsRow"
+            itemKey={visualKey}
+            itemType={visualType}
+            index={index}
+            phase={activeFilter.toLowerCase()}
+            extra={{
+              activeFilter,
+              activeTab,
+              rowCount: currentListData.length,
+              busy: whitenoiseBusyId === req.id,
+            }}>
+            <ContactRow
+              identity={[nostrIdentity(req.fromPubkey, profile, { isLoadingProfile: false })]}
+              subtitle="Wants to start a White Noise chat"
+              hideMetadata
+              trailing={
+                <RequestActions
+                  isBusy={whitenoiseBusyId === req.id}
+                  onAccept={() => {
+                    paymentLog.info('contact.whitenoise.accept', { pubkey: req.fromPubkey });
+                    void acceptWhitenoiseRequest(req);
+                  }}
+                  onDecline={() => {
+                    paymentLog.info('contact.whitenoise.decline', { pubkey: req.fromPubkey });
+                    void declineWhitenoiseRequest(req);
+                  }}
+                />
+              }
+              testID={`request-row:${req.fromPubkey}`}
+            />
+          </VisualLayoutProbe>
         );
       }
 
@@ -347,23 +420,69 @@ export const ContactsScreen = () => {
       // suppresses metadata — the pill row would read as noise next to a
       // human sentence.
       return (
-        <ContactRow
-          identity={identity}
-          subtitle={lastMessage}
-          hideMetadata={!!lastMessage}
-          titleTrailing={
-            protocolLabel || lastMessageAt ? (
-              <Text style={{ fontSize: 12, color: muted }}>
-                {[protocolLabel, lastMessageAt].filter(Boolean).join(' · ')}
-              </Text>
-            ) : undefined
-          }
-          onPress={() => navigateToProfile(item.pubkey, mintUrl)}
-          testID={`contact-row:nostr:${item.pubkey}`}
-        />
+        <VisualLayoutProbe
+          scope="contacts.contacts.list"
+          surface="contacts"
+          component="ContactsRow"
+          itemKey={visualKey}
+          itemType={visualType}
+          index={index}
+          phase={activeFilter.toLowerCase()}
+          extra={{
+            activeFilter,
+            activeTab,
+            rowCount: currentListData.length,
+            protocol: item.type === 'contact' ? item.protocol : null,
+            hasLastMessage: !!lastMessage,
+            hasMint: !!mintUrl,
+          }}>
+          <ContactRow
+            identity={identity}
+            subtitle={lastMessage}
+            hideMetadata={!!lastMessage}
+            titleTrailing={
+              protocolLabel || lastMessageAt ? (
+                <Text style={{ fontSize: 12, color: muted }}>
+                  {[protocolLabel, lastMessageAt].filter(Boolean).join(' · ')}
+                </Text>
+              ) : undefined
+            }
+            onPress={() => navigateToProfile(item.pubkey, mintUrl)}
+            testID={`contact-row:nostr:${item.pubkey}`}
+          />
+        </VisualLayoutProbe>
       );
     },
-    [profilesMap, whitenoiseBusyId, acceptWhitenoiseRequest, declineWhitenoiseRequest, muted]
+    [
+      activeFilter,
+      activeTab,
+      currentListData.length,
+      profilesMap,
+      whitenoiseBusyId,
+      acceptWhitenoiseRequest,
+      declineWhitenoiseRequest,
+      muted,
+    ]
+  );
+  const renderGroupItem = useCallback(
+    ({ item, index }: { item: TierEntry; index: number }) => (
+      <VisualLayoutProbe
+        scope="contacts.groups.list"
+        surface="contacts"
+        component="ContactGroupsRow"
+        itemKey={visualLayoutScopePart(item.key)}
+        itemType="location-tier"
+        index={index}
+        phase={activeTab}
+        extra={{
+          activeTab,
+          rowCount: locationTiers.length,
+          transport: item.transport,
+        }}>
+        <GroupsTierRow tier={item} />
+      </VisualLayoutProbe>
+    ),
+    [activeTab, locationTiers.length]
   );
 
   const renderEmpty = useCallback(() => {
@@ -426,26 +545,34 @@ export const ContactsScreen = () => {
     if (showContactsSpinner) {
       return (
         <View style={styles.emptyContainer}>
-          <Spinner size={22} color={muted} />
+          <Spinner
+            size={22}
+            color={muted}
+            visualScope="contacts.contacts.loading"
+            visualKey="initial-spinner"
+            visualSurface="contacts"
+            visualComponent="ContactsInitialSpinner"
+          />
         </View>
       );
     }
     return (
       <LegendList
+        ref={contactListRef}
         data={currentListData}
         extraData={profilesMap}
         estimatedItemSize={68}
         refreshControl={pullToAi.refreshControl}
         onEndReached={hasMoreContacts ? loadMoreContacts : undefined}
         onEndReachedThreshold={0.4}
-        keyExtractor={(item, index) => {
-          return (
-            item.pubkey ||
-            (item.type === 'mint' ? item.mint?.mintUrl : undefined) ||
-            `contact-${index}`
-          );
-        }}
+        keyExtractor={contactsListItemKey}
         renderItem={renderContactItem}
+        onItemSizeChanged={contactVisualList.onItemSizeChanged}
+        onLoad={contactVisualList.onLoad}
+        onMetricsChange={contactVisualList.onMetricsChange}
+        onStickyHeaderChange={contactVisualList.onStickyHeaderChange}
+        onViewableItemsChanged={contactVisualList.onViewableItemsChanged}
+        viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"
         ListEmptyComponent={renderEmpty}
@@ -461,11 +588,18 @@ export const ContactsScreen = () => {
   // Groups tab — the user's location tiers (provinces, countries, transports).
   const renderGroupsList = () => (
     <LegendList
+      ref={groupListRef}
       data={locationTiers}
       estimatedItemSize={68}
       keyExtractor={(item) => item.key}
       refreshControl={pullToAi.refreshControl}
-      renderItem={({ item }) => <GroupsTierRow tier={item} />}
+      renderItem={renderGroupItem}
+      onItemSizeChanged={groupVisualList.onItemSizeChanged}
+      onLoad={groupVisualList.onLoad}
+      onMetricsChange={groupVisualList.onMetricsChange}
+      onStickyHeaderChange={groupVisualList.onStickyHeaderChange}
+      onViewableItemsChanged={groupVisualList.onViewableItemsChanged}
+      viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="always"
       ListEmptyComponent={

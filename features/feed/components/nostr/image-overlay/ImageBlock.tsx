@@ -24,7 +24,7 @@ import { useImageOverlay } from './provider';
 import type { ImageOverlayPost, MediaType, ThumbnailLayout } from './types';
 import { ANDROID_THUMB_DIM_MAX_OPACITY, THUMB_BLUR_MAX_INTENSITY } from './config';
 import { Log, feedLog } from '@/shared/lib/logger';
-import { useShiftLogger, urlHost } from '../../../lib/contentShiftLog';
+import { useShiftLogger, useVisualLayoutLogger, urlHost } from '@/shared/lib/contentShiftLog';
 import { getCachedAspect, rememberAspect } from './imageAspectCache';
 
 /** Aspect ratio reserved before the image's intrinsic size is known. */
@@ -119,6 +119,27 @@ export const ImageBlock = React.memo(function ImageBlock({
   const imageRef = useRef<React.ComponentRef<typeof Image> | null>(null);
   const imageOverlay = useImageOverlay();
   const layoutIndex = mediaIndex ?? imageIndex ?? 0;
+  const imageHost = urlHost(url);
+  const visualLayout = useVisualLayoutLogger({
+    scope: `feed.media.${overlayEvent?.id?.slice(0, 12) ?? imageHost}`,
+    surface: 'feed',
+    component: 'ImageBlock',
+    itemKey: overlayEvent?.id ? `${overlayEvent.id}:${layoutIndex}` : `${imageHost}:${layoutIndex}`,
+    itemType: mediaTypes?.[layoutIndex] ?? 'image',
+    index: layoutIndex,
+    extra: () => ({
+      host: imageHost,
+      aspectRatio: Math.round(aspectRatio * 100) / 100,
+      overlayActive: imageOverlay?.activeUrl === url,
+    }),
+  });
+  const setContainerRef = useCallback(
+    (node: React.ComponentRef<typeof View> | null) => {
+      containerRef.current = node;
+      visualLayout.ref(node);
+    },
+    [visualLayout]
+  );
 
   type Measureable = {
     measureInWindow: (cb: (x: number, y: number, w: number, h: number) => void) => void;
@@ -397,7 +418,7 @@ export const ImageBlock = React.memo(function ImageBlock({
       onError={() => {
         feedLog.info('feed.shift.image.error', {
           component: 'ImageBlock',
-          host: urlHost(url),
+          host: imageHost,
           mediaIndex: layoutIndex,
           // The block collapses from its reserved aspect box to the fixed-height
           // "Image unavailable" placeholder — a downward shift of all siblings.
@@ -413,10 +434,13 @@ export const ImageBlock = React.memo(function ImageBlock({
     <Log name="ImageBlock">
       <View style={styles.imageBlockOuter}>
         <View
-          ref={containerRef}
+          ref={setContainerRef}
           collapsable={false}
           style={{ aspectRatio }}
-          onLayout={registerLayout}>
+          onLayout={(event) => {
+            registerLayout();
+            visualLayout.onLayout(event);
+          }}>
           {imageOverlay?.open ? (
             <Pressable
               onPressIn={onPressIn}

@@ -23,6 +23,7 @@ export type { Logger, RedactedError } from './loggerCore';
 
 export {
   createLogger,
+  monotonicNow,
   log,
   initLog,
   initPhase,

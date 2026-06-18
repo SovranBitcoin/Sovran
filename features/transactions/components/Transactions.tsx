@@ -3,6 +3,7 @@ import { StyleSheet, useWindowDimensions } from 'react-native';
 import { Easing, LinearTransition } from 'react-native-reanimated';
 
 import { AnimatedLegendList } from '@legendapp/list/reanimated';
+import type { LegendListRef } from '@legendapp/list/react-native';
 import { Link } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import groupBy from 'lodash/groupBy';
@@ -35,6 +36,12 @@ import {
   type TransactionPaymentType,
 } from '@sovranbitcoin/colada';
 import { log, Log } from '@/shared/lib/logger';
+import {
+  remeasureVisualLayoutScope,
+  useVisualListLogger,
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+  visualLayoutScopePart,
+} from '@/shared/lib/contentShiftLog';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { spacing, zIndex } from '@/shared/styles/tokens';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
@@ -42,6 +49,7 @@ import {
   useSwapTransactionsStore,
   type SwapGroup,
 } from '@/shared/stores/profile/swapTransactionsStore';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 
 // ---------------------------------------------------------------------------
 // Timeline item: a discriminated union so transactions and swap groups can
@@ -63,6 +71,11 @@ function getTimelineKey(item: TimelineItem): string {
   return `${entry.type}-${entry.createdAt}-${entry.amount}`;
 }
 
+function getTimelineVisualKey(item: TimelineItem, rowIndex: number | undefined): string {
+  const row = rowIndex == null ? 'row' : String(rowIndex);
+  return `${item.kind}:${getTimelineCreatedAt(item)}:${row}`;
+}
+
 // ---------------------------------------------------------------------------
 
 interface Account {
@@ -73,6 +86,10 @@ interface Section {
   title: string;
   data: TimelineItem[];
   index?: string;
+}
+
+function getSectionVisualKey(section: Section): string {
+  return `section:${section.index ?? section.title}`;
 }
 
 const DATE_HEADER_HEIGHT = 30;
@@ -167,6 +184,13 @@ export const Transactions = React.memo(
 
     const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
     const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
+    const transactionsVisualScope = useMemo(
+      () =>
+        `transactions.${embedded ? 'embedded' : showMore ? 'summary' : 'list'}.${visualLayoutScopePart(
+          listKey ?? `${account.unit}-${tab}`
+        )}`,
+      [account.unit, embedded, listKey, showMore, tab]
+    );
 
     const swapGroups = useMemo(() => {
       if (account.unit === 'all') return Object.values(swapGroupsById);
@@ -376,6 +400,51 @@ export const Transactions = React.memo(
       return ESTIMATED_SECTION_CHROME_HEIGHT + averageRows * ESTIMATED_TRANSACTION_ROW_HEIGHT;
     }, [sectionsToDisplay]);
 
+    const visualPhase = isFetching ? 'loading' : timelineItems.length === 0 ? 'empty' : 'ready';
+    const listRef = useRef<LegendListRef>(null);
+    const visualExtra = useCallback(
+      () => ({
+        accountUnit: account.unit,
+        showMore,
+        embedded,
+        tab,
+        filter,
+        paymentType: type,
+        sectionCount: sectionsToDisplay.length,
+        timelineCount: timelineItems.length,
+        historyCount: history.length,
+        isFetching,
+      }),
+      [
+        account.unit,
+        embedded,
+        filter,
+        history.length,
+        isFetching,
+        sectionsToDisplay.length,
+        showMore,
+        tab,
+        timelineItems.length,
+        type,
+      ]
+    );
+    const visualList = useVisualListLogger<Section>({
+      scope: transactionsVisualScope,
+      surface: 'transactions',
+      component: 'TransactionsLegendList',
+      phase: visualPhase,
+      extra: visualExtra,
+      getItemKey: getSectionVisualKey,
+      getItemContext: (section) => ({
+        rowKey: getSectionVisualKey(section),
+        itemType: 'section',
+        sectionLabel: section.index ?? 'unindexed',
+        sectionTitle: section.title,
+        sectionRows: section.data.length,
+      }),
+      getListState: () => listRef.current?.getState() ?? null,
+    });
+
     // Embedded (per-person) list groups purely by date — no pending/confirmed/
     // expired split — so each date renders once under a single date header.
     const embeddedSections = useMemo<Section[]>(() => {
@@ -421,42 +490,94 @@ export const Transactions = React.memo(
     }, [visiblePendingEcash, onVisiblePendingEcashChange]);
 
     const renderTimelineItem = useCallback(
-      (item: TimelineItem) => {
+      (item: TimelineItem, rowIndex?: number) => {
         const key = getTimelineKey(item);
+        const visualKey = getTimelineVisualKey(item, rowIndex);
+        const visualRow = {
+          scope: transactionsVisualScope,
+          surface: 'transactions',
+          component: item.kind === 'swap' ? 'SwapTransactionRow' : 'TransactionRow',
+          itemKey: `row:${visualKey}`,
+          itemType: item.kind,
+          index: rowIndex,
+          phase: visualPhase,
+          extra: visualExtra,
+        };
         if (item.kind === 'swap') {
-          return <SwapTransactionRow key={key} group={item.data} />;
+          return (
+            <VisualLayoutProbe key={key} {...visualRow}>
+              <SwapTransactionRow group={item.data} />
+            </VisualLayoutProbe>
+          );
         }
         return (
-          <Transaction
-            key={key}
-            historyEntry={item.data}
-            onPress={onTransactionPress}
-            onCancel={onCancelPendingEcash}
-          />
+          <VisualLayoutProbe key={key} {...visualRow}>
+            <Transaction
+              historyEntry={item.data}
+              onPress={onTransactionPress}
+              onCancel={onCancelPendingEcash}
+            />
+          </VisualLayoutProbe>
         );
       },
-      [onTransactionPress, onCancelPendingEcash]
+      [onCancelPendingEcash, onTransactionPress, transactionsVisualScope, visualExtra, visualPhase]
     );
 
     const renderSection = useCallback(
-      ({ item: section }: { item: Section }) => (
-        <VStack spacing={4} className="mb-4">
-          <Text size={14} heavy color={opacity(foreground, 0.33)} style={styles.dateHeader}>
-            {section.title}
-          </Text>
-          <View style={[styles.card, { borderColor }]}>
-            <BlurCardFrame accentColor={muted}>
-              <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
-            </BlurCardFrame>
-          </View>
-        </VStack>
+      ({ item: section, index }: { item: Section; index?: number }) => (
+        <VisualLayoutProbe
+          scope={transactionsVisualScope}
+          surface="transactions"
+          component="TransactionsSection"
+          itemKey={getSectionVisualKey(section)}
+          itemType="section"
+          index={index}
+          phase={visualPhase}
+          extra={() => ({
+            ...visualExtra(),
+            sectionTitle: section.title,
+            sectionRows: section.data.length,
+          })}>
+          <VStack spacing={4} className="mb-4">
+            <Text size={14} heavy color={opacity(foreground, 0.33)} style={styles.dateHeader}>
+              {section.title}
+            </Text>
+            <View style={[styles.card, { borderColor }]}>
+              <BlurCardFrame accentColor={muted}>
+                <View style={styles.content}>
+                  {section.data.map((item, rowIndex) => renderTimelineItem(item, rowIndex))}
+                </View>
+              </BlurCardFrame>
+            </View>
+          </VStack>
+        </VisualLayoutProbe>
       ),
-      [foreground, muted, borderColor, renderTimelineItem]
+      [
+        borderColor,
+        foreground,
+        muted,
+        renderTimelineItem,
+        transactionsVisualScope,
+        visualExtra,
+        visualPhase,
+      ]
     );
 
     const resolvedHeader = useMemo(
       () => <View>{typeof header === 'function' ? header() : header}</View>,
       [header]
+    );
+
+    const handleListScroll = useCallback(
+      (event: Parameters<NonNullable<Props['onScroll']>>[0]) => {
+        onScroll?.(event);
+        remeasureVisualLayoutScope(transactionsVisualScope, 'scroll', {
+          extra: visualExtra(),
+          maxItems: 24,
+          minIntervalMs: 300,
+        });
+      },
+      [onScroll, transactionsVisualScope, visualExtra]
     );
 
     const emptyComponent = useMemo(
@@ -466,36 +587,66 @@ export const Transactions = React.memo(
         // spinner) instead of flashing the "No transactions found" card, which
         // reads as "you have none" when we simply haven't loaded yet.
         isFetching ? (
-          <Spinner size={22} style={{ alignSelf: 'center', marginTop: 48 }} />
+          <VisualLayoutProbe
+            scope={transactionsVisualScope}
+            surface="transactions"
+            component="TransactionsEmptySpinner"
+            itemKey="empty:initial-spinner"
+            itemType="spinner"
+            phase={visualPhase}
+            extra={visualExtra}>
+            <Spinner size={22} style={{ alignSelf: 'center', marginTop: 48 }} />
+          </VisualLayoutProbe>
         ) : (
-          <View className="pt-8">
-            <View style={[styles.card, { borderColor }]}>
-              <BlurCardFrame accentColor={muted}>
-                <View style={styles.emptyState}>
-                  <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
-                  <Text
-                    size={16}
-                    style={{
-                      color: opacity(foreground, 0.66),
-                      fontFamily: 'OxygenBold',
-                      textAlign: 'center',
-                    }}>
-                    No transactions found
-                  </Text>
-                  <Text
-                    size={14}
-                    style={{
-                      color: opacity(foreground, 0.4),
-                      textAlign: 'center',
-                    }}>
-                    Try adjusting your filters or check back later
-                  </Text>
-                </View>
-              </BlurCardFrame>
+          <VisualLayoutProbe
+            scope={transactionsVisualScope}
+            surface="transactions"
+            component="TransactionsEmptyState"
+            itemKey="empty:no-results"
+            itemType="empty"
+            phase={visualPhase}
+            extra={visualExtra}>
+            <View className="pt-8">
+              <View style={[styles.card, { borderColor }]}>
+                <BlurCardFrame accentColor={muted}>
+                  <View style={styles.emptyState}>
+                    <Icon
+                      name="fluent:clock-12-filled"
+                      size={36}
+                      color={opacity(foreground, 0.33)}
+                    />
+                    <Text
+                      size={16}
+                      style={{
+                        color: opacity(foreground, 0.66),
+                        fontFamily: 'OxygenBold',
+                        textAlign: 'center',
+                      }}>
+                      No transactions found
+                    </Text>
+                    <Text
+                      size={14}
+                      style={{
+                        color: opacity(foreground, 0.4),
+                        textAlign: 'center',
+                      }}>
+                      Try adjusting your filters or check back later
+                    </Text>
+                  </View>
+                </BlurCardFrame>
+              </View>
             </View>
-          </View>
+          </VisualLayoutProbe>
         ),
-      [isFetching, muted, borderColor, foreground]
+      [
+        borderColor,
+        foreground,
+        isFetching,
+        muted,
+        transactionsVisualScope,
+        visualExtra,
+        visualPhase,
+      ]
     );
 
     if (embedded) {
@@ -515,52 +666,74 @@ export const Transactions = React.memo(
     if (showMore) {
       if (isFetching) {
         return (
-          <View
-            className="flex items-center"
-            style={{
-              minHeight: screenHeight / 2,
-            }}>
-            <Spacer size={24} />
-            <Spinner size={32} color={opacity(foreground, 0.33)} />
-            <Text heavy size={16} style={{ color: opacity(foreground, 0.66) }}>
-              Loading Transactions...
-            </Text>
-            <Text color={opacity(foreground, 0.4)} size={16}>
-              Please wait while we fetch your history
-            </Text>
-          </View>
+          <VisualLayoutProbe
+            scope={transactionsVisualScope}
+            surface="transactions"
+            component="TransactionsSummaryLoading"
+            itemKey="summary:loading"
+            itemType="spinner"
+            phase={visualPhase}
+            extra={visualExtra}>
+            <View
+              className="flex items-center"
+              style={{
+                minHeight: screenHeight / 2,
+              }}>
+              <Spacer size={24} />
+              <Spinner size={32} color={opacity(foreground, 0.33)} />
+              <Text heavy size={16} style={{ color: opacity(foreground, 0.66) }}>
+                Loading Transactions...
+              </Text>
+              <Text color={opacity(foreground, 0.4)} size={16}>
+                Please wait while we fetch your history
+              </Text>
+            </View>
+          </VisualLayoutProbe>
         );
       }
 
       if (timelineItems.length === 0) {
         return (
-          <View>
-            <Spacer size={24} />
-            <View style={[styles.card, { borderColor }]}>
-              <BlurCardFrame accentColor={muted}>
-                <View style={styles.emptyState}>
-                  <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
-                  <Text
-                    size={16}
-                    style={{
-                      color: opacity(foreground, 0.66),
-                      fontFamily: 'OxygenBold',
-                      textAlign: 'center',
-                    }}>
-                    No History
-                  </Text>
-                  <Text
-                    size={14}
-                    style={{
-                      color: opacity(foreground, 0.4),
-                      textAlign: 'center',
-                    }}>
-                    Your history will show up here
-                  </Text>
-                </View>
-              </BlurCardFrame>
+          <VisualLayoutProbe
+            scope={transactionsVisualScope}
+            surface="transactions"
+            component="TransactionsSummaryEmpty"
+            itemKey="summary:empty"
+            itemType="empty"
+            phase={visualPhase}
+            extra={visualExtra}>
+            <View>
+              <Spacer size={24} />
+              <View style={[styles.card, { borderColor }]}>
+                <BlurCardFrame accentColor={muted}>
+                  <View style={styles.emptyState}>
+                    <Icon
+                      name="fluent:clock-12-filled"
+                      size={36}
+                      color={opacity(foreground, 0.33)}
+                    />
+                    <Text
+                      size={16}
+                      style={{
+                        color: opacity(foreground, 0.66),
+                        fontFamily: 'OxygenBold',
+                        textAlign: 'center',
+                      }}>
+                      No History
+                    </Text>
+                    <Text
+                      size={14}
+                      style={{
+                        color: opacity(foreground, 0.4),
+                        textAlign: 'center',
+                      }}>
+                      Your history will show up here
+                    </Text>
+                  </View>
+                </BlurCardFrame>
+              </View>
             </View>
-          </View>
+          </VisualLayoutProbe>
         );
       }
 
@@ -636,6 +809,7 @@ export const Transactions = React.memo(
     return (
       <Log name="Transactions">
         <AnimatedLegendList
+          ref={listRef}
           key={listKey}
           style={{ flex: 1 }}
           data={sectionsToDisplay}
@@ -660,7 +834,13 @@ export const Transactions = React.memo(
           contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
           ListHeaderComponent={resolvedHeader}
           ListEmptyComponent={emptyComponent}
-          onScroll={onScroll}
+          onItemSizeChanged={visualList.onItemSizeChanged}
+          onLoad={visualList.onLoad}
+          onMetricsChange={visualList.onMetricsChange}
+          onStickyHeaderChange={visualList.onStickyHeaderChange}
+          onViewableItemsChanged={visualList.onViewableItemsChanged}
+          viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
+          onScroll={handleListScroll}
           scrollEventThrottle={16}
           renderItem={renderSection}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}

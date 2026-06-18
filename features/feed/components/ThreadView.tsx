@@ -8,7 +8,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, { FadeIn, Easing } from 'react-native-reanimated';
-import { LegendList, type LegendListRenderItemProps } from '@legendapp/list/react-native';
+import {
+  LegendList,
+  type LegendListRef,
+  type LegendListRenderItemProps,
+} from '@legendapp/list/react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import opacity from 'hex-color-opacity';
 
@@ -39,18 +43,24 @@ import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import { useOpenComposer } from '@/features/composer/publish/useComposerActions';
 import { deriveReplyTarget } from '@/features/feed/lib/replyTarget';
 import { ThreadReplyBar } from '@/features/feed/components/ThreadReplyBar';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import type { ThreadReplySort } from '@/features/feed/data/feedClient';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { feedLog, Log } from '@/shared/lib/logger';
 import { actionMenuPopup } from '@/shared/lib/popup';
 import {
+  remeasureVisualLayoutScope,
+  useVisualListLogger,
+  useVisualStateLogger,
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+} from '@/shared/lib/contentShiftLog';
+import {
   DEFAULT_REPLY_SKELETON_COUNT,
   MAX_REPLY_SKELETON_COUNT,
-  REPLY_SKELETON_VARIANTS,
   sortRepliesByMeasuredHeights,
 } from '@/features/feed/lib/threadReplySkeletons';
-import { NOTE_CONTENT_LINE_HEIGHT } from './nostr/NoteContent';
+import { threadFixedItemSize } from '@/features/feed/lib/threadListLayout';
 
 interface ThreadViewProps {
   eventId: string;
@@ -140,40 +150,6 @@ function threadKeyExtractor(item: ThreadListItem): string {
 
 function threadItemType(item: ThreadListItem): string {
   return item.type;
-}
-
-// Height hints (px) for the content-free skeleton / sort-tabs rows, fed to
-// LegendList's `getFixedItemSize` so it doesn't lay them out at the generic
-// `estimatedItemSize` (200) and snap them on first paint. The skeletons size
-// themselves naturally — these are deterministic now that each skeleton bar is
-// pinned to a single line (`numberOfLines={1}` in `PostCardSkeleton`), so a
-// content line is exactly `NOTE_CONTENT_LINE_HEIGHT`. The values are biased a
-// hair high so the list never under-reserves (a few px of gap is invisible; an
-// under-reservation would overlap rows). Keep in sync with `PostCardSkeleton` /
-// `ReplySortPicker`.
-//
-//   reply skeleton = chrome (gutter padding + author row + spacer + metrics
-//   footer) + one NOTE_CONTENT_LINE_HEIGHT per content line of its variant.
-const REPLY_SKELETON_CHROME_HEIGHT = 80;
-const TARGET_SKELETON_FIXED_HEIGHT = 176;
-const REPLY_SORT_TABS_FIXED_HEIGHT = 52;
-
-function replySkeletonHeight(skeletonIndex: number): number {
-  const variant = REPLY_SKELETON_VARIANTS[skeletonIndex % REPLY_SKELETON_VARIANTS.length];
-  return REPLY_SKELETON_CHROME_HEIGHT + variant.content.length * NOTE_CONTENT_LINE_HEIGHT;
-}
-
-function threadFixedItemSize(item: ThreadListItem): number | undefined {
-  switch (item.type) {
-    case 'target-skeleton':
-      return TARGET_SKELETON_FIXED_HEIGHT;
-    case 'reply-skeleton':
-      return replySkeletonHeight(item.skeletonIndex);
-    case 'reply-sort-tabs':
-      return REPLY_SORT_TABS_FIXED_HEIGHT;
-    default:
-      return undefined;
-  }
 }
 
 function createReplySkeletonItems(count: number): ThreadSkeletonItem[] {
@@ -284,6 +260,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const embedOpen = embed?.open;
   const targetFooterOpacity = embed?.targetFooterOpacity;
   const [replyBarHeight, setReplyBarHeight] = useState(0);
+  const threadVisualScope = useMemo(() => `thread.${eventId}.list`, [eventId]);
 
   const {
     items,
@@ -316,6 +293,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const repliesSeenWhileFetchingRef = useRef(false);
   const shimmerStartedAtRef = useRef<number>(Date.now());
   const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listRef = useRef<LegendListRef>(null);
   const [measuredOrder, setMeasuredOrder] = useState<FeedEvent[] | null>(null);
   const measureCommittedRef = useRef(false);
   const [measuredVersion, setMeasuredVersion] = useState(0);
@@ -394,8 +372,13 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 
   const displayItems = useMemo<ThreadListItem[]>(() => {
     if (isLoading && items.length === 0) {
+      // Include the sort-tabs row in the very first skeleton frame so it doesn't
+      // pop in (52px) once the target loads and shove every reply/skeleton down —
+      // that insertion lands on the same frame the reply skeletons appear and
+      // reads as a content shift.
       return [
         { type: 'target-skeleton', id: 'target-skeleton' },
+        { type: 'reply-sort-tabs', id: 'reply-sort-tabs' },
         ...createReplySkeletonItems(DEFAULT_REPLY_SKELETON_COUNT),
       ];
     }
@@ -452,6 +435,93 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     replyEvents.length,
     transitionPhase,
   ]);
+
+  const visualList = useVisualListLogger<ThreadListItem>({
+    scope: threadVisualScope,
+    surface: 'thread',
+    component: 'ThreadLegendList',
+    phase: transitionPhase,
+    extra: () => ({
+      eventId,
+      rows: displayItems.length,
+      replySort,
+      replyBarHeight,
+      isFetching,
+      isLoadingMoreReplies,
+      isMeasuring,
+    }),
+    getItemKey: (item) => threadKeyExtractor(item),
+    getItemContext: (item) => ({
+      rowKey: threadKeyExtractor(item),
+      rowLabel: threadItemType(item),
+      itemType: threadItemType(item),
+    }),
+    getListState: () => listRef.current?.getState() ?? null,
+  });
+
+  const threadVisualState = useMemo(() => {
+    const phase =
+      isLoading && items.length === 0
+        ? 'loading-skeletons'
+        : measuredOrder
+          ? transitionPhase === 'exiting'
+            ? 'exit-reveal'
+            : 'measured-replies'
+          : isMeasuring
+            ? 'measuring'
+            : isFetching
+              ? 'fetching-with-skeletons'
+              : 'replies';
+    let skeletons = 0;
+    let transitionReplies = 0;
+    let realReplies = 0;
+    for (const it of displayItems) {
+      if (it.type === 'target-skeleton' || it.type === 'reply-skeleton') skeletons += 1;
+      else if (it.type === 'transition-reply') transitionReplies += 1;
+      else if (it.type === 'reply') realReplies += 1;
+    }
+    return {
+      eventId,
+      phase,
+      rows: displayItems.length,
+      skeletons,
+      transitionReplies,
+      realReplies,
+      replySort,
+      replyBarHeight,
+      isFetching,
+      isLoading,
+      isLoadingMoreReplies,
+      isMeasuring,
+      hasMeasuredOrder: !!measuredOrder,
+    };
+  }, [
+    displayItems,
+    eventId,
+    isFetching,
+    isLoading,
+    isLoadingMoreReplies,
+    isMeasuring,
+    items.length,
+    measuredOrder,
+    replyBarHeight,
+    replySort,
+    transitionPhase,
+  ]);
+
+  useVisualStateLogger({
+    scope: threadVisualScope,
+    surface: 'thread',
+    component: 'ThreadView',
+    stateKey: 'thread-state',
+    phase: threadVisualState.phase,
+    state: threadVisualState,
+    remeasure: {
+      reason: 'thread-state',
+      minIntervalMs: 250,
+      maxItems: 32,
+    },
+  });
 
   // Content-shift trace: the thread reply list transitions through distinct
   // rendering phases (loading skeletons → offscreen measuring → exit-reveal →
@@ -592,7 +662,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     };
   }, [items, profilesRef, metricsRef, quotedEventsRef]);
 
-  const renderItem = useCallback(
+  const renderThreadItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<ThreadListItem, string | undefined>) => {
       if (item.type === 'target-skeleton') {
         return <PostCardSkeleton variant="thread-target" index={index} />;
@@ -713,6 +783,40 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     ]
   );
 
+  const renderItem = useCallback(
+    (props: LegendListRenderItemProps<ThreadListItem, string | undefined>) => (
+      <VisualLayoutProbe
+        scope={threadVisualScope}
+        surface="thread"
+        component="ThreadRow"
+        itemKey={threadKeyExtractor(props.item)}
+        itemType={threadItemType(props.item)}
+        index={props.index}
+        phase={transitionPhase}
+        extra={{
+          eventId,
+          rows: displayItems.length,
+          replySort,
+          replyBarHeight,
+          isFetching,
+          isMeasuring,
+        }}>
+        {renderThreadItem(props)}
+      </VisualLayoutProbe>
+    ),
+    [
+      displayItems.length,
+      eventId,
+      isFetching,
+      isMeasuring,
+      renderThreadItem,
+      replyBarHeight,
+      replySort,
+      threadVisualScope,
+      transitionPhase,
+    ]
+  );
+
   const measurementTargets = useMemo(
     () => replyEvents.slice(0, measurementCandidateCount).map((it) => it.event),
     [measurementCandidateCount, replyEvents]
@@ -789,6 +893,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               />
             }>
             <LegendList
+              ref={listRef}
               data={displayItems}
               keyExtractor={threadKeyExtractor}
               getItemType={threadItemType}
@@ -821,6 +926,12 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               }
               onEndReached={handleEndReached}
               onEndReachedThreshold={0.4}
+              onItemSizeChanged={visualList.onItemSizeChanged}
+              onLoad={visualList.onLoad}
+              onMetricsChange={visualList.onMetricsChange}
+              onStickyHeaderChange={visualList.onStickyHeaderChange}
+              onViewableItemsChanged={visualList.onViewableItemsChanged}
+              viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
               style={{ flex: 1 }}
               contentContainerStyle={{
                 // The embed sheet is positioned starting just below the header
@@ -836,6 +947,11 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 const y = e.nativeEvent.contentOffset.y;
                 if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;
                 if (embed) embed.scrollY.value = y;
+                remeasureVisualLayoutScope(threadVisualScope, 'scroll', {
+                  minIntervalMs: 500,
+                  maxItems: 32,
+                  extra: { eventId, scrollY: Math.round(y), replySort },
+                });
               }}
               scrollEventThrottle={16}
               scrollEnabled={embed ? embed.listScrollEnabled : undefined}

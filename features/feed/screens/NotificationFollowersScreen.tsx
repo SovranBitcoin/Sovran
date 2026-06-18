@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import {
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  type LayoutChangeEvent,
+  type ViewToken,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import opacity from 'hex-color-opacity';
@@ -12,6 +20,12 @@ import {
 } from '@/features/feed/data/notificationFollowersCache';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import { takeNotificationFollowersSeed } from '@/features/feed/lib/notificationFollowersSeedCache';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
+import {
+  remeasureVisualLayoutScope,
+  useVisualListLogger,
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+} from '@/shared/lib/contentShiftLog';
 import {
   emptyNotificationsResult,
   filterNotificationsResult,
@@ -35,11 +49,36 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 const FOLLOW_PAGE_SIZE = 50;
 const FOLLOW_FETCH_MAX_PAGES = 4;
+const NOTIFICATION_FOLLOWERS_VISUAL_SCOPE = 'feed.notification_followers.list';
 
 type FollowFetchResult = {
   result: FeedNotificationsResult;
   hasMore: boolean;
 };
+
+type VisualFlatListMetrics = {
+  contentLength: number | null;
+  scroll: number;
+  size: number | null;
+};
+
+function followerVisualToken(token: ViewToken) {
+  return {
+    index: typeof token.index === 'number' ? token.index : null,
+    key: token.key,
+    isViewable: token.isViewable,
+    item: token.item as FeedNotification,
+  };
+}
+
+function visualViewabilityRange(tokens: ViewToken[]) {
+  const indexes = tokens
+    .map((token) => token.index)
+    .filter((index): index is number => typeof index === 'number');
+  const start = indexes.length > 0 ? Math.min(...indexes) : 0;
+  const end = indexes.length > 0 ? Math.max(...indexes) : -1;
+  return { start, end, startBuffered: start, endBuffered: end };
+}
 
 export function NotificationFollowersScreen() {
   useLifecycleLogger('NotificationFollowersScreen', feedLog);
@@ -75,6 +114,11 @@ export function NotificationFollowersScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const loadSequenceRef = useRef(0);
   const refreshControllerRef = useRef<AbortController | null>(null);
+  const followerListMetricsRef = useRef<VisualFlatListMetrics>({
+    contentLength: null,
+    scroll: 0,
+    size: null,
+  });
   // True only for a real seed (fresh from the notifications screen → no fetch on
   // first focus). A warm-cache-derived initialResult stays false so the focus
   // effect runs loadFirstPage and applies the SWR isFresh gate.
@@ -309,6 +353,82 @@ export function NotificationFollowersScreen() {
   }, []);
 
   const followers = result.notifications;
+  const visualPhase = isInitialLoading ? 'initial-loading' : isRefreshing ? 'refreshing' : 'ready';
+  const {
+    onMetricsChange: onVisualListMetricsChange,
+    onViewableItemsChanged: onVisualViewableItemsChanged,
+  } = useVisualListLogger<FeedNotification>({
+    scope: NOTIFICATION_FOLLOWERS_VISUAL_SCOPE,
+    surface: 'notifications',
+    component: 'NotificationFollowersFlatList',
+    phase: visualPhase,
+    extra: () => ({
+      followers: followers.length,
+      rows: followers.length,
+      loadingMore: isLoadingMore,
+    }),
+    getItemKey: (notification) => `follower:${notification.event.id}`,
+    getItemContext: (notification) => ({
+      itemType: notification.reason,
+      rowLabel: notification.reason,
+    }),
+  });
+  const reportFollowerListMetrics = useCallback(
+    (reason: string) => {
+      const metrics = followerListMetricsRef.current;
+      onVisualListMetricsChange({
+        reason,
+        size: metrics.size,
+        scroll: metrics.scroll,
+        scrollLength: metrics.size,
+        contentLength: metrics.contentLength,
+      });
+    },
+    [onVisualListMetricsChange]
+  );
+  const handleListLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      followerListMetricsRef.current.size = event.nativeEvent.layout.height;
+      reportFollowerListMetrics('layout');
+    },
+    [reportFollowerListMetrics]
+  );
+  const handleContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      followerListMetricsRef.current.contentLength = height;
+      reportFollowerListMetrics('content-size');
+    },
+    [reportFollowerListMetrics]
+  );
+  const handleListViewableItemsChanged = useCallback(
+    ({ viewableItems, changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
+      onVisualViewableItemsChanged({
+        ...visualViewabilityRange([...viewableItems, ...changed]),
+        viewableItems: viewableItems.map(followerVisualToken),
+        changed: changed.map(followerVisualToken),
+      });
+    },
+    [onVisualViewableItemsChanged]
+  );
+  const handleListScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      followerListMetricsRef.current = {
+        contentLength: contentSize.height,
+        scroll: contentOffset.y,
+        size: layoutMeasurement.height,
+      };
+      reportFollowerListMetrics('scroll');
+      remeasureVisualLayoutScope(NOTIFICATION_FOLLOWERS_VISUAL_SCOPE, 'scroll', {
+        extra: {
+          phase: visualPhase,
+          followers: followers.length,
+          loadingMore: isLoadingMore,
+        },
+      });
+    },
+    [followers.length, isLoadingMore, reportFollowerListMetrics, visualPhase]
+  );
 
   return (
     <Screen name="NotificationFollowersScreen" scroll="custom" bgColor={surface}>
@@ -334,28 +454,67 @@ export function NotificationFollowersScreen() {
           )}
           ListEmptyComponent={
             isInitialLoading ? (
-              <Spinner size={22} color={opacity(foreground, 0.65)} style={styles.loader} />
+              <VisualLayoutProbe
+                scope={NOTIFICATION_FOLLOWERS_VISUAL_SCOPE}
+                surface="notifications"
+                component="NotificationFollowersInitialSpinner"
+                itemKey="empty:initial-spinner"
+                itemType="spinner"
+                extra={{ phase: visualPhase }}>
+                <Spinner size={22} color={opacity(foreground, 0.65)} style={styles.loader} />
+              </VisualLayoutProbe>
             ) : (
-              <EmptyFollowers errorMessage={errorMessage} foreground={foreground} muted={muted} />
+              <VisualLayoutProbe
+                scope={NOTIFICATION_FOLLOWERS_VISUAL_SCOPE}
+                surface="notifications"
+                component="NotificationFollowersEmptyState"
+                itemKey={errorMessage ? 'empty:error' : 'empty:no-results'}
+                itemType={errorMessage ? 'error' : 'empty'}
+                extra={{ viewerReady: !!viewerPubkey }}>
+                <EmptyFollowers errorMessage={errorMessage} foreground={foreground} muted={muted} />
+              </VisualLayoutProbe>
             )
           }
           ListFooterComponent={
             // Only when there's content — never stacked on the empty/initial spinner.
             isLoadingMore && followers.length > 0 ? (
-              <Spinner size={18} color={opacity(foreground, 0.65)} style={styles.footerSpinner} />
+              <VisualLayoutProbe
+                scope={NOTIFICATION_FOLLOWERS_VISUAL_SCOPE}
+                surface="notifications"
+                component="NotificationFollowersPaginationSpinner"
+                itemKey="footer:pagination-spinner"
+                itemType="spinner"
+                extra={{ followers: followers.length }}>
+                <Spinner size={18} color={opacity(foreground, 0.65)} style={styles.footerSpinner} />
+              </VisualLayoutProbe>
             ) : null
           }
+          onLayout={handleListLayout}
+          onContentSizeChange={handleContentSizeChange}
           onEndReached={loadMoreFollowers}
           onEndReachedThreshold={0.4}
-          renderItem={({ item }) => (
-            <FollowerRow
-              notification={item}
-              result={result}
-              foreground={foreground}
-              muted={muted}
-              pressedBackground={opacity(surfaceTertiary, 0.45)}
-              onPress={() => openProfile(item)}
-            />
+          onScroll={handleListScroll}
+          scrollEventThrottle={250}
+          viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
+          onViewableItemsChanged={handleListViewableItemsChanged}
+          renderItem={({ item, index }) => (
+            <VisualLayoutProbe
+              scope={NOTIFICATION_FOLLOWERS_VISUAL_SCOPE}
+              surface="notifications"
+              component="NotificationFollowerRow"
+              itemKey={`follower:${item.event.id}`}
+              itemType={item.reason}
+              index={index}
+              extra={{ phase: visualPhase }}>
+              <FollowerRow
+                notification={item}
+                result={result}
+                foreground={foreground}
+                muted={muted}
+                pressedBackground={opacity(surfaceTertiary, 0.45)}
+                onPress={() => openProfile(item)}
+              />
+            </VisualLayoutProbe>
           )}
         />
       </Log>

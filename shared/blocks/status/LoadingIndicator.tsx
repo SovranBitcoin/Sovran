@@ -13,7 +13,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
   Easing,
   type EasingFunction,
@@ -30,6 +30,11 @@ import Animated, {
 import Svg, { Circle, Defs, Mask, Path, Rect } from 'react-native-svg';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import {
+  useVisualLayoutLogger,
+  visualLayoutScopePart,
+  type VisualLayoutConfig,
+} from '@/shared/lib/contentShiftLog';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -47,7 +52,17 @@ export interface SegmentedProgress {
   segmentCount: number;
 }
 
-export interface LoadingIndicatorProps {
+type LoadingIndicatorVisualProps = {
+  visualScope?: string;
+  visualKey?: string;
+  visualSurface?: string;
+  visualComponent?: string;
+  visualPhase?: string;
+  visualExtra?: VisualLayoutConfig['extra'];
+  visualDisabled?: boolean;
+};
+
+export interface LoadingIndicatorProps extends LoadingIndicatorVisualProps {
   phase?: Phase;
   result?: Result;
   size?: number;
@@ -155,6 +170,8 @@ const D_ICON_IN = 420;
 const D_ICON_OUT = 250;
 const T_FILL = 350;
 const T_ICON = 550;
+
+let loadingIndicatorVisualInstance = 0;
 
 export interface NormalizedSegmentedProgress {
   segmentCount: number;
@@ -320,6 +337,13 @@ export function LoadingIndicator({
   playOnMount = false,
   segmentedProgress,
   confirmationProgress,
+  visualScope = 'loading.status_indicator',
+  visualKey,
+  visualSurface = 'shared',
+  visualComponent = 'LoadingIndicator',
+  visualPhase,
+  visualExtra,
+  visualDisabled,
 }: LoadingIndicatorProps): React.ReactElement {
   const [themeFg, themeSuccess, themeDanger, themeWarning] = useThemeColor([
     'foreground',
@@ -368,6 +392,37 @@ export function LoadingIndicator({
         : effectiveResult === 'warning'
           ? warnColor
           : okColor;
+  const visualInstanceKeyRef = React.useRef<string | null>(null);
+  if (visualInstanceKeyRef.current === null) {
+    loadingIndicatorVisualInstance += 1;
+    visualInstanceKeyRef.current = `loading-indicator:${loadingIndicatorVisualInstance}`;
+  }
+  const visualLayout = useVisualLayoutLogger({
+    enabled: visualDisabled !== true,
+    scope: visualScope,
+    surface: visualSurface,
+    component: visualComponent,
+    itemKey: visualKey ? visualLayoutScopePart(visualKey) : visualInstanceKeyRef.current,
+    itemType: 'status-indicator',
+    phase: visualPhase ?? effectivePhase,
+    extra: () => ({
+      size,
+      phase: effectivePhase,
+      result: effectiveResult,
+      transitionDelayMs,
+      playOnMount,
+      segmented: isSegmentedMode,
+      completedSegments: normalizedSegmentedProgress?.completedSegments ?? null,
+      segmentCount: normalizedSegmentedProgress?.segmentCount ?? null,
+      ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
+    }),
+  });
+  const handleVisualLayout = React.useCallback(
+    (event: LayoutChangeEvent) => {
+      visualLayout.onLayout(event);
+    },
+    [visualLayout]
+  );
 
   // Mount in terminal state when phase='done': skip the ring/fill/icon
   // choreography and render the resolved frame immediately. Matches
@@ -534,7 +589,11 @@ export function LoadingIndicator({
   const resultDiscRadius = isSegmentedMode ? SEGMENT_RESULT_DISC_R : RING_R;
 
   return (
-    <View style={{ width: size, height: size }}>
+    <View
+      ref={visualLayout.ref}
+      collapsable={false}
+      style={{ width: size, height: size }}
+      onLayout={handleVisualLayout}>
       {/* Disc + glyphs (mask cut-out). Scales/fades via outer Animated.View. */}
       <Animated.View style={[StyleSheet.absoluteFill, fillWrapStyle]}>
         <Svg width={size} height={size} viewBox="0 0 100 100">

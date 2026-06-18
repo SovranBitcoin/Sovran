@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import BoringAvatar from '@mealection/react-native-boring-avatars';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,6 +20,11 @@ import {
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { prefetchImage } from '@/shared/lib/imageCache';
 import { log } from '@/shared/lib/logger';
+import {
+  useVisualLayoutLogger,
+  visualLayoutScopePart,
+  type VisualLayoutConfig,
+} from '@/shared/lib/contentShiftLog';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Badge } from './Badge';
@@ -38,6 +43,13 @@ interface AvatarProps {
   seed?: string;
   /** Preview override. Normal app avatars read the persisted Settings value. */
   fallbackVariant?: AvatarFallbackVariant;
+  visualScope?: string;
+  visualKey?: string;
+  visualSurface?: string;
+  visualComponent?: string;
+  visualPhase?: string;
+  visualExtra?: VisualLayoutConfig['extra'];
+  visualDisabled?: boolean;
 }
 
 type ImageStatus = 'loading' | 'loaded' | 'failed';
@@ -152,6 +164,17 @@ function LoadingContent({ borderRadius, color }: { borderRadius: number; color: 
   );
 }
 
+// Every non-loading state renders this frame as its root via a plain `View`
+// (the loading state uses a `View` too). Keeping the root element type identical
+// across states means a fallback→image / image-loading→loaded transition is a
+// child swap, NOT a remount — a remount forces a relayout that nudges neighbours
+// a couple px ("padding-top"-like content shift when a pfp finishes loading).
+// Do not switch any of these roots back to `VStack` (a different component type).
+const avatarFrameStyle = { position: 'relative' as const, overflow: 'hidden' as const };
+const hiddenImageOpacityStyle = { opacity: 0 };
+
+let avatarLoadingVisualInstance = 0;
+
 export const Avatar = ({
   state,
   picture,
@@ -161,6 +184,13 @@ export const Avatar = ({
   status,
   seed,
   fallbackVariant,
+  visualScope = 'loading.avatar',
+  visualKey,
+  visualSurface = 'shared',
+  visualComponent = 'AvatarLoading',
+  visualPhase = 'loading',
+  visualExtra,
+  visualDisabled,
 }: AvatarProps) => {
   const foreground = useThemeColor('foreground');
   // Match the skeleton fill used by `Text` — low-opacity foreground reads
@@ -186,7 +216,18 @@ export const Avatar = ({
 
   const borderRadius = size / 2;
   const statusIconSize = size * 0.33;
-  const avatarStyle = { width: size, height: size, borderRadius, overflow: 'hidden' } as const;
+  const avatarStyle = useMemo(
+    () => ({ width: size, height: size, borderRadius, overflow: 'hidden' as const }),
+    [borderRadius, size]
+  );
+  const containerStyle = useMemo(
+    () => ({
+      ...avatarStyle,
+      justifyContent: 'center' as const,
+      alignItems: 'center' as const,
+    }),
+    [avatarStyle]
+  );
 
   const fallbackSeed = useMemo(
     () => sanitizeAvatarFallbackSeed(seed ?? name ?? alt ?? 'avatar'),
@@ -223,19 +264,59 @@ export const Avatar = ({
     </VStack>
   ) : null;
 
-  const containerStyle = {
-    ...avatarStyle,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  };
-
   const defaultAlt = 'Avatar';
   const imageAlt = alt || defaultAlt;
+  const previousPicture = loadedPicture && loadedPicture !== picture ? loadedPicture : null;
+  const pictureSource = useMemo(() => ({ uri: picture }), [picture]);
+  const previousPictureSource = useMemo(
+    () => (previousPicture ? { uri: previousPicture } : null),
+    [previousPicture]
+  );
+  const hiddenImageStyle = useMemo(
+    () => [StyleSheet.absoluteFillObject, avatarStyle, hiddenImageOpacityStyle],
+    [avatarStyle]
+  );
+  const showsLoadingPlaceholder =
+    state === 'loading' ||
+    (state === 'image' && !!picture && imageStatus !== 'loaded' && !previousPicture);
+  const visualInstanceKeyRef = React.useRef<string | null>(null);
+  if (visualInstanceKeyRef.current === null) {
+    avatarLoadingVisualInstance += 1;
+    visualInstanceKeyRef.current = `avatar-loading:${avatarLoadingVisualInstance}`;
+  }
+  const visualLayout = useVisualLayoutLogger({
+    enabled: visualDisabled !== true && showsLoadingPlaceholder,
+    scope: visualScope,
+    surface: visualSurface,
+    component: visualComponent,
+    itemKey: visualKey ? visualLayoutScopePart(visualKey) : visualInstanceKeyRef.current,
+    itemType: 'avatar-loading',
+    phase: visualPhase,
+    extra: () => ({
+      size,
+      state,
+      hasPicture: !!picture,
+      hasStatus: !!status,
+      hasPreviousPicture: !!previousPicture,
+      ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
+    }),
+  });
+  const handleVisualLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      visualLayout.onLayout(event);
+    },
+    [visualLayout]
+  );
 
   // 1. Loading state — 50% foreground fill, no image, no gradient.
   if (state === 'loading') {
     return (
-      <View style={containerStyle} accessibilityRole="image">
+      <View
+        ref={visualLayout.ref}
+        collapsable={false}
+        style={containerStyle}
+        accessibilityRole="image"
+        onLayout={handleVisualLayout}>
         <LoadingContent borderRadius={borderRadius} color={loadingColor} />
         {StatusBadgeWrapper}
       </View>
@@ -245,7 +326,7 @@ export const Avatar = ({
   // 2. Fallback state — selected fallback style.
   if (state === 'fallback') {
     return (
-      <VStack style={{ position: 'relative', overflow: 'hidden' }}>
+      <View style={avatarFrameStyle}>
         <View style={containerStyle} accessibilityRole="image" accessibilityLabel={imageAlt}>
           <AvatarFallbackContent
             fallbackSeed={fallbackSeed}
@@ -255,7 +336,7 @@ export const Avatar = ({
           />
         </View>
         {StatusBadgeWrapper}
-      </VStack>
+      </View>
     );
   }
 
@@ -265,7 +346,7 @@ export const Avatar = ({
       log.warn('avatar.image_missing_picture');
     }
     return (
-      <VStack style={{ position: 'relative', overflow: 'hidden' }}>
+      <View style={avatarFrameStyle}>
         <View style={containerStyle} accessibilityRole="image" accessibilityLabel={imageAlt}>
           <AvatarFallbackContent
             fallbackSeed={fallbackSeed}
@@ -275,14 +356,14 @@ export const Avatar = ({
           />
         </View>
         {StatusBadgeWrapper}
-      </VStack>
+      </View>
     );
   }
 
   // 4. Image state — image failed to load → selected fallback style.
   if (imageStatus === 'failed') {
     return (
-      <VStack style={{ position: 'relative', overflow: 'hidden' }}>
+      <View style={avatarFrameStyle}>
         <View style={containerStyle} accessibilityRole="image" accessibilityLabel={imageAlt}>
           <AvatarFallbackContent
             fallbackSeed={fallbackSeed}
@@ -292,7 +373,7 @@ export const Avatar = ({
           />
         </View>
         {StatusBadgeWrapper}
-      </VStack>
+      </View>
     );
   }
 
@@ -300,12 +381,15 @@ export const Avatar = ({
   // place while the next URL warms, avoiding a fallback/loading flash when a
   // profile picture changes during a transition.
   if (imageStatus !== 'loaded') {
-    const previousPicture = loadedPicture && loadedPicture !== picture ? loadedPicture : null;
     return (
-      <View style={{ position: 'relative', overflow: 'hidden' }}>
+      <View
+        ref={visualLayout.ref}
+        collapsable={false}
+        style={avatarFrameStyle}
+        onLayout={handleVisualLayout}>
         {previousPicture ? (
           <ExpoImage
-            source={{ uri: previousPicture }}
+            source={previousPictureSource}
             cachePolicy="memory-disk"
             style={avatarStyle}
             accessibilityLabel={imageAlt}
@@ -316,9 +400,9 @@ export const Avatar = ({
           </View>
         )}
         <ExpoImage
-          source={{ uri: picture }}
+          source={pictureSource}
           cachePolicy="memory-disk"
-          style={[StyleSheet.absoluteFillObject, avatarStyle, { opacity: 0 }]}
+          style={hiddenImageStyle}
           accessibilityLabel={imageAlt}
           onLoad={handleImageLoad}
           onError={handleImageError}
@@ -330,15 +414,15 @@ export const Avatar = ({
 
   // 6. Image state — loaded → show the image.
   return (
-    <VStack style={{ position: 'relative', overflow: 'hidden' }}>
+    <View style={avatarFrameStyle}>
       <ExpoImage
-        source={{ uri: picture }}
+        source={pictureSource}
         cachePolicy="memory-disk"
         style={avatarStyle}
         accessibilityLabel={imageAlt}
         onError={handleImageError}
       />
       {StatusBadgeWrapper}
-    </VStack>
+    </View>
   );
 };

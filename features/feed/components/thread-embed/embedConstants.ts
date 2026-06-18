@@ -9,6 +9,8 @@
  * - middle:   `MIDDLE_REVEAL_FRACTION` of the screen revealed for the web view.
  * - inline:   slid down until only the floating action bar remains.
  */
+import { Platform } from 'react-native';
+
 import { radius } from '@/shared/styles/tokens';
 
 /**
@@ -17,6 +19,12 @@ import { radius } from '@/shared/styles/tokens';
  * smaller / shows more of the page.
  */
 export const MIDDLE_REVEAL_FRACTION = 0.7;
+
+/** Standard navigation bar height (px), excluding the top safe-area inset.
+ *  Used to derive a stable header offset on the first render before
+ *  `useHeaderHeight()` reports, so the absolutely-positioned thread sheet never
+ *  drops a frame later. iOS uses 44, Android 56 (matches react-navigation). */
+export const DEFAULT_NAV_BAR_HEIGHT = Platform.OS === 'ios' ? 44 : 56;
 
 /** Fallback action-bar height (px) used for the inline snap until it's measured. */
 export const INLINE_ACTION_BAR_FALLBACK = 96;

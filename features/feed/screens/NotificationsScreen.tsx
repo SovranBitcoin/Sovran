@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import {
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  type LayoutChangeEvent,
+  type ViewToken,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import opacity from 'hex-color-opacity';
@@ -32,6 +40,12 @@ import {
 import { seedThread } from '@/features/feed/lib/threadSeedCache';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
 import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
+import {
+  remeasureVisualLayoutScope,
+  useVisualListLogger,
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+} from '@/shared/lib/contentShiftLog';
 import { formatDate, formatRelative } from '@/shared/lib/date';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -61,8 +75,39 @@ const NOTIFICATION_TABS: { id: NotificationTab; label: string }[] = [
 
 const NOTIFICATIONS_PAGE_SIZE = 50;
 const MAX_GROUP_AVATARS = 3;
+const EMPTY_NOTIFICATIONS: readonly FeedNotification[] = [];
 
 type LoadMode = 'initial' | 'refresh';
+
+type VisualFlatListMetrics = {
+  contentLength: number | null;
+  scroll: number;
+  size: number | null;
+};
+
+function notificationItemType(item: NotificationListItem): string {
+  if (item.type === 'single') return item.notification.reason;
+  if (item.type === 'group') return `group:${item.reason}`;
+  return 'welcome';
+}
+
+function notificationVisualToken(token: ViewToken) {
+  return {
+    index: typeof token.index === 'number' ? token.index : null,
+    key: token.key,
+    isViewable: token.isViewable,
+    item: token.item as NotificationListItem,
+  };
+}
+
+function visualViewabilityRange(tokens: ViewToken[]) {
+  const indexes = tokens
+    .map((token) => token.index)
+    .filter((index): index is number => typeof index === 'number');
+  const start = indexes.length > 0 ? Math.min(...indexes) : 0;
+  const end = indexes.length > 0 ? Math.max(...indexes) : -1;
+  return { start, end, startBuffered: start, endBuffered: end };
+}
 
 export function NotificationsScreen() {
   useLifecycleLogger('NotificationsScreen', feedLog);
@@ -95,6 +140,15 @@ export function NotificationsScreen() {
     'muted',
     'surface-tertiary',
   ] as const);
+  const notificationsVisualScope = useMemo(
+    () => `feed.notifications.${activeTab.toLowerCase()}.list`,
+    [activeTab]
+  );
+  const notificationListMetricsRef = useRef<VisualFlatListMetrics>({
+    contentLength: null,
+    scroll: 0,
+    size: null,
+  });
 
   const fetchNotificationsPage = useCallback(
     async ({
@@ -369,7 +423,7 @@ export function NotificationsScreen() {
   const seedCreatedAt = useWalletLifecycleStore((s) => s.seedCreatedAt);
   const termsDate = useSettingsStore((s) => s.termsAccepted?.date ?? null);
 
-  const notifications = result?.notifications ?? [];
+  const notifications = result?.notifications ?? EMPTY_NOTIFICATIONS;
   const notificationItems = useMemo<NotificationListItem[]>(() => {
     // The App tab is purely app announcements — the welcome card lives here, not
     // mixed into the real notifications on All.
@@ -378,6 +432,92 @@ export function NotificationsScreen() {
     }
     return buildNotificationListItems(notifications);
   }, [notifications, activeTab, seedCreatedAt, termsDate]);
+  const visualPhase = isInitialLoading ? 'initial-loading' : isRefreshing ? 'refreshing' : 'ready';
+  const {
+    onMetricsChange: onVisualListMetricsChange,
+    onViewableItemsChanged: onVisualViewableItemsChanged,
+  } = useVisualListLogger<NotificationListItem>({
+    scope: notificationsVisualScope,
+    surface: 'notifications',
+    component: 'NotificationsFlatList',
+    phase: visualPhase,
+    extra: () => ({
+      tab: activeTab,
+      replyScope,
+      items: notificationItems.length,
+      rows: notificationItems.length,
+      loadingMore: isLoadingMore,
+    }),
+    getItemKey: (item) => `notification:${item.id}`,
+    getItemContext: (item) => ({
+      itemType: notificationItemType(item),
+      rowLabel: item.type,
+    }),
+  });
+  const reportNotificationListMetrics = useCallback(
+    (reason: string) => {
+      const metrics = notificationListMetricsRef.current;
+      onVisualListMetricsChange({
+        reason,
+        size: metrics.size,
+        scroll: metrics.scroll,
+        scrollLength: metrics.size,
+        contentLength: metrics.contentLength,
+      });
+    },
+    [onVisualListMetricsChange]
+  );
+  const handleListLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      notificationListMetricsRef.current.size = event.nativeEvent.layout.height;
+      reportNotificationListMetrics('layout');
+    },
+    [reportNotificationListMetrics]
+  );
+  const handleContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      notificationListMetricsRef.current.contentLength = height;
+      reportNotificationListMetrics('content-size');
+    },
+    [reportNotificationListMetrics]
+  );
+  const handleListViewableItemsChanged = useCallback(
+    ({ viewableItems, changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
+      onVisualViewableItemsChanged({
+        ...visualViewabilityRange([...viewableItems, ...changed]),
+        viewableItems: viewableItems.map(notificationVisualToken),
+        changed: changed.map(notificationVisualToken),
+      });
+    },
+    [onVisualViewableItemsChanged]
+  );
+  const handleListScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      notificationListMetricsRef.current = {
+        contentLength: contentSize.height,
+        scroll: contentOffset.y,
+        size: layoutMeasurement.height,
+      };
+      reportNotificationListMetrics('scroll');
+      remeasureVisualLayoutScope(notificationsVisualScope, 'scroll', {
+        extra: {
+          tab: activeTab,
+          phase: visualPhase,
+          items: notificationItems.length,
+          loadingMore: isLoadingMore,
+        },
+      });
+    },
+    [
+      activeTab,
+      isLoadingMore,
+      notificationItems.length,
+      notificationsVisualScope,
+      reportNotificationListMetrics,
+      visualPhase,
+    ]
+  );
 
   // Render boundary for notifications: result rows → rendered list items, and
   // whether the screen is empty. Cross-check with feed.notifications.fetch.done
@@ -394,26 +534,34 @@ export function NotificationsScreen() {
   return (
     <Screen name="NotificationsScreen" scroll="custom" bgColor={surface}>
       <Log name="NotificationsContent" style={styles.root}>
-        <View
-          style={[
-            styles.filtersRow,
-            {
-              backgroundColor: surface,
-              borderBottomColor: separator,
-            },
-          ]}>
-          <View style={styles.filtersContent}>
-            {NOTIFICATION_TABS.map((tab) => (
-              <FeedTabButton
-                key={tab.id}
-                label={tab.label}
-                active={activeTab === tab.id}
-                showChevron={tab.id === 'MENTIONS' && activeTab === 'MENTIONS'}
-                onPress={() => handleNotificationTabPress(tab.id)}
-              />
-            ))}
+        <VisualLayoutProbe
+          scope={notificationsVisualScope}
+          surface="notifications"
+          component="NotificationsTabs"
+          itemKey="tabs"
+          itemType="tabs"
+          extra={{ tab: activeTab, replyScope }}>
+          <View
+            style={[
+              styles.filtersRow,
+              {
+                backgroundColor: surface,
+                borderBottomColor: separator,
+              },
+            ]}>
+            <View style={styles.filtersContent}>
+              {NOTIFICATION_TABS.map((tab) => (
+                <FeedTabButton
+                  key={tab.id}
+                  label={tab.label}
+                  active={activeTab === tab.id}
+                  showChevron={tab.id === 'MENTIONS' && activeTab === 'MENTIONS'}
+                  onPress={() => handleNotificationTabPress(tab.id)}
+                />
+              ))}
+            </View>
           </View>
-        </View>
+        </VisualLayoutProbe>
         <FlatList
           data={notificationItems}
           keyExtractor={(item) => item.id}
@@ -435,35 +583,74 @@ export function NotificationsScreen() {
           )}
           ListEmptyComponent={
             isInitialLoading ? (
-              <Spinner size={22} color={opacity(foreground, 0.65)} style={styles.loader} />
+              <VisualLayoutProbe
+                scope={notificationsVisualScope}
+                surface="notifications"
+                component="NotificationsInitialSpinner"
+                itemKey="empty:initial-spinner"
+                itemType="spinner"
+                extra={{ tab: activeTab, phase: visualPhase }}>
+                <Spinner size={22} color={opacity(foreground, 0.65)} style={styles.loader} />
+              </VisualLayoutProbe>
             ) : (
-              <EmptyNotifications
-                viewerReady={!!viewerPubkey}
-                errorMessage={errorMessage}
-                foreground={foreground}
-                muted={muted}
-              />
+              <VisualLayoutProbe
+                scope={notificationsVisualScope}
+                surface="notifications"
+                component="NotificationsEmptyState"
+                itemKey={errorMessage ? 'empty:error' : 'empty:no-results'}
+                itemType={errorMessage ? 'error' : 'empty'}
+                extra={{ tab: activeTab, viewerReady: !!viewerPubkey }}>
+                <EmptyNotifications
+                  viewerReady={!!viewerPubkey}
+                  errorMessage={errorMessage}
+                  foreground={foreground}
+                  muted={muted}
+                />
+              </VisualLayoutProbe>
             )
           }
           ListFooterComponent={
             // Only when there's content — never stacked on the empty-state spinner.
             isLoadingMore && notificationItems.length > 0 ? (
-              <Spinner size={18} color={opacity(foreground, 0.65)} style={styles.footerSpinner} />
+              <VisualLayoutProbe
+                scope={notificationsVisualScope}
+                surface="notifications"
+                component="NotificationsPaginationSpinner"
+                itemKey="footer:pagination-spinner"
+                itemType="spinner"
+                extra={{ tab: activeTab, items: notificationItems.length }}>
+                <Spinner size={18} color={opacity(foreground, 0.65)} style={styles.footerSpinner} />
+              </VisualLayoutProbe>
             ) : null
           }
+          onLayout={handleListLayout}
+          onContentSizeChange={handleContentSizeChange}
           onEndReached={loadMoreNotifications}
           onEndReachedThreshold={0.4}
-          renderItem={({ item }) => (
-            <NotificationListRow
-              item={item}
-              result={result}
-              foreground={foreground}
-              surface={surface}
-              muted={muted}
-              pressedBackground={opacity(surfaceTertiary, 0.45)}
-              onPressNotification={openNotification}
-              onPressFollowGroup={openFollowGroup}
-            />
+          onScroll={handleListScroll}
+          scrollEventThrottle={250}
+          viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
+          onViewableItemsChanged={handleListViewableItemsChanged}
+          renderItem={({ item, index }) => (
+            <VisualLayoutProbe
+              scope={notificationsVisualScope}
+              surface="notifications"
+              component="NotificationListRow"
+              itemKey={`notification:${item.id}`}
+              itemType={item.type}
+              index={index}
+              extra={{ tab: activeTab, phase: visualPhase }}>
+              <NotificationListRow
+                item={item}
+                result={result}
+                foreground={foreground}
+                surface={surface}
+                muted={muted}
+                pressedBackground={opacity(surfaceTertiary, 0.45)}
+                onPressNotification={openNotification}
+                onPressFollowGroup={openFollowGroup}
+              />
+            </VisualLayoutProbe>
           )}
         />
       </Log>

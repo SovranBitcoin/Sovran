@@ -18,8 +18,9 @@
  *
  * Mirrors the `ImageOverlayProvider` pattern (sibling `image-overlay/`).
  */
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
 import {
   type SharedValue,
@@ -35,6 +36,7 @@ import { openExternalUrl } from '@/shared/lib/url';
 import { feedLog, log } from '@/shared/lib/logger';
 import { staticPopup } from '@/shared/lib/popup';
 import {
+  DEFAULT_NAV_BAR_HEIGHT,
   INLINE_ACTION_BAR_FALLBACK,
   INLINE_HANDLE_PEEK,
   MIDDLE_REVEAL_FRACTION,
@@ -80,9 +82,28 @@ const ThreadEmbedContext = createContext<ThreadEmbedContextValue | null>(null);
 
 export function ThreadEmbedProvider({ children }: { children: React.ReactNode }) {
   const { height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   // The sheet rests with its top just below the navigation header (i.e. just
   // above the first pfp/name), not at the very top of the screen.
-  const expandedOffset = useHeaderHeight();
+  //
+  // `useHeaderHeight()` can report 0 on the first render(s) before the native
+  // header measures. Because the sheet is absolutely positioned at
+  // `top: expandedOffset`, a 0 → real settle drops the ENTIRE thread down a
+  // frame later — the "whole page jumps down" shift. When the real value is
+  // available we trust it (no offset change in the normal case); only for the
+  // 0-first-render case do we substitute a close estimate (safe-area top + the
+  // standard nav bar height) so frame one already approximates the settled value.
+  const navHeaderHeight = useHeaderHeight();
+  const expandedOffset =
+    navHeaderHeight > 0 ? navHeaderHeight : insets.top + DEFAULT_NAV_BAR_HEIGHT;
+
+  useEffect(() => {
+    feedLog.info('thread.offset.header', {
+      navHeaderHeight,
+      insetTop: insets.top,
+      expandedOffset,
+    });
+  }, [navHeaderHeight, insets.top, expandedOffset]);
   const [actionBarHeight, setActionBarHeightState] = useState(INLINE_ACTION_BAR_FALLBACK);
 
   // Middle snap: most of the page revealed, thread as a bottom strip.

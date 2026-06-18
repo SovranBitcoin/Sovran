@@ -42,7 +42,12 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { NoteContent, QuotedPostCard } from '@/features/feed/components/nostr/NoteContent';
 import { THREAD_CONNECTOR_LINE_STYLE } from '@/features/feed/components/nostr/threadConnectorStyle';
-import { useShiftLogger } from '@/features/feed/lib/contentShiftLog';
+import {
+  useShiftLogger,
+  useVisualScrollMetricsLogger,
+  useVisualStateLogger,
+} from '@/shared/lib/contentShiftLog';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
 import {
   DEFAULT_METRICS,
@@ -70,8 +75,7 @@ const PLACEHOLDER: Record<string, string> = {
   quote: 'Add a comment',
 };
 
-const REPLY_INITIAL_CONTENT_OFFSET = { x: 0, y: 1_000_000 };
-const REPLY_MAINTAIN_VISIBLE_CONTENT_POSITION = { minIndexForVisible: 1 };
+const COMPOSER_VISUAL_SCOPE = 'composer.post';
 
 export function PostComposer() {
   const { ndk } = useNDK();
@@ -135,6 +139,67 @@ export function PostComposer() {
   const uploading = mediaBlocks.some((b) => b.kind === 'media' && b.uploadProgress !== undefined);
   const canPost = !busy && hasPostContent && !overBudget && !uploading;
   const showPollBeforeQuote = isQuote && !!poll;
+  const composerPhase = busy
+    ? 'posting'
+    : uploading
+      ? 'uploading'
+      : keyboardVisible
+        ? 'typing'
+        : 'editing';
+  const composerScrollMetrics = useVisualScrollMetricsLogger({
+    scope: COMPOSER_VISUAL_SCOPE,
+    surface: 'composer',
+    component: 'PostComposerScrollView',
+    axis: 'y',
+    phase: composerPhase,
+    extra: () => ({
+      mode: target?.mode ?? 'new',
+      keyboardVisible,
+      textLength,
+      mediaCount: mediaBlocks.length,
+      hasPoll: !!poll,
+      showPollBeforeQuote,
+      overBudget,
+    }),
+  });
+  const mediaTrayScrollMetrics = useVisualScrollMetricsLogger({
+    enabled: mediaBlocks.length > 0,
+    scope: COMPOSER_VISUAL_SCOPE,
+    surface: 'composer',
+    component: 'PostComposerMediaTrayScrollView',
+    axis: 'x',
+    phase: composerPhase,
+    extra: () => ({
+      mode: target?.mode ?? 'new',
+      mediaCount: mediaBlocks.length,
+      uploading,
+    }),
+  });
+  useVisualStateLogger({
+    scope: COMPOSER_VISUAL_SCOPE,
+    surface: 'composer',
+    component: 'PostComposer',
+    stateKey: 'composer-state',
+    phase: composerPhase,
+    state: {
+      mode: target?.mode ?? 'new',
+      keyboardVisible,
+      busy,
+      textLength,
+      mediaCount: mediaBlocks.length,
+      uploading,
+      hasPoll: !!poll,
+      showPollBeforeQuote,
+      overBudget,
+      canPost,
+      hasError: !!error,
+    },
+    remeasure: {
+      reason: 'composer-state',
+      minIntervalMs: 250,
+      maxItems: 24,
+    },
+  });
 
   const handleCancel = useCallback(() => {
     close();
@@ -188,13 +253,23 @@ export function PostComposer() {
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: surface }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View
+      <VisualLayoutProbe
+        scope={COMPOSER_VISUAL_SCOPE}
+        surface="composer"
+        component="PostComposerHeader"
+        itemKey="header"
+        itemType="header"
         style={[
           styles.headerRow,
           {
             paddingTop: insets.top + spacing.md,
           },
-        ]}>
+        ]}
+        extra={{
+          mode: target?.mode ?? 'new',
+          keyboardVisible,
+          busy,
+        }}>
         <Button variant="ghost" size="md" onPress={handleCancel}>
           <Button.Label>Cancel</Button.Label>
         </Button>
@@ -206,112 +281,168 @@ export function PostComposer() {
           style={!canPost ? styles.disabledPostButton : undefined}>
           <Button.Label>{busy ? 'Posting…' : 'Post'}</Button.Label>
         </Button>
-      </View>
+      </VisualLayoutProbe>
 
-      <ScrollView
-        className="flex-1 px-4"
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={isReply ? styles.replyScrollContent : undefined}
-        contentOffset={isReply ? REPLY_INITIAL_CONTENT_OFFSET : undefined}
-        maintainVisibleContentPosition={
-          isReply ? REPLY_MAINTAIN_VISIBLE_CONTENT_POSITION : undefined
-        }>
-        {isReply && parentEvent ? (
-          <ReplyOriginalPost
-            event={parentEvent}
-            profile={parentProfile}
-            lineColor={lineColor}
-            foreground={foreground}
-            muted={mutedColor}
-          />
-        ) : null}
-        <View style={isReply ? styles.replyInputRow : undefined}>
-          {isReply ? (
-            <View style={styles.gutterCol}>
-              <View
-                style={[
-                  styles.lineAbove,
-                  THREAD_CONNECTOR_LINE_STYLE,
-                  { borderLeftColor: lineColor },
-                ]}
-              />
-              <Avatar
-                state={ownProfile?.cachedPicture ? 'image' : 'fallback'}
-                picture={ownProfile?.cachedPicture}
-                seed={ownProfile?.pubkey ?? ''}
-                size={AVATAR_SIZE}
-                name={ownProfile?.cachedDisplayName}
+      <VisualLayoutProbe
+        scope={COMPOSER_VISUAL_SCOPE}
+        surface="composer"
+        component="PostComposerBody"
+        itemKey="body"
+        itemType="scroll"
+        style={styles.flex1}
+        extra={{
+          mode: target?.mode ?? 'new',
+          mediaCount: mediaBlocks.length,
+          hasPoll: !!poll,
+          showPollBeforeQuote,
+        }}>
+        <ScrollView
+          className="flex-1 px-4"
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={isReply ? styles.replyScrollContent : undefined}
+          onLayout={composerScrollMetrics.onLayout}
+          onContentSizeChange={composerScrollMetrics.onContentSizeChange}
+          onScroll={composerScrollMetrics.onScroll}
+          scrollEventThrottle={250}>
+          {isReply && parentEvent ? (
+            <ReplyOriginalPost
+              event={parentEvent}
+              profile={parentProfile}
+              lineColor={lineColor}
+              foreground={foreground}
+              muted={mutedColor}
+            />
+          ) : null}
+          <View style={isReply ? styles.replyInputRow : undefined}>
+            {isReply ? (
+              <View style={styles.gutterCol}>
+                <View
+                  style={[
+                    styles.lineAbove,
+                    THREAD_CONNECTOR_LINE_STYLE,
+                    { borderLeftColor: lineColor },
+                  ]}
+                />
+                <Avatar
+                  state={ownProfile?.cachedPicture ? 'image' : 'fallback'}
+                  picture={ownProfile?.cachedPicture}
+                  seed={ownProfile?.pubkey ?? ''}
+                  size={AVATAR_SIZE}
+                  name={ownProfile?.cachedDisplayName}
+                />
+              </View>
+            ) : null}
+            <TextInput
+              value={textBlock?.kind === 'text' ? textBlock.text : ''}
+              onChangeText={(text) => textBlock && setBlockText(textBlock.id, text)}
+              placeholder={PLACEHOLDER[target?.mode ?? 'new']}
+              placeholderTextColor={mutedColor}
+              multiline
+              autoFocus
+              style={[styles.input, { color: foreground }, isReply ? styles.inputReply : null]}
+            />
+          </View>
+
+          {showPollBeforeQuote ? <PollComposeForm /> : null}
+
+          {isQuote && parentEvent ? (
+            <View style={styles.quotedWrap}>
+              <QuotedPostCard
+                event={parentEvent}
+                profiles={quotedProfiles}
+                getMetrics={stubMetrics}
               />
             </View>
           ) : null}
-          <TextInput
-            value={textBlock?.kind === 'text' ? textBlock.text : ''}
-            onChangeText={(text) => textBlock && setBlockText(textBlock.id, text)}
-            placeholder={PLACEHOLDER[target?.mode ?? 'new']}
-            placeholderTextColor={mutedColor}
-            multiline
-            autoFocus
-            style={[styles.input, { color: foreground }, isReply ? styles.inputReply : null]}
-          />
-        </View>
 
-        {showPollBeforeQuote ? <PollComposeForm /> : null}
+          {mediaBlocks.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mt-3"
+              onLayout={mediaTrayScrollMetrics.onLayout}
+              onContentSizeChange={mediaTrayScrollMetrics.onContentSizeChange}
+              onScroll={mediaTrayScrollMetrics.onScroll}
+              scrollEventThrottle={250}>
+              {mediaBlocks.map((block) =>
+                block.kind === 'media' ? (
+                  <VisualLayoutProbe
+                    key={block.id}
+                    scope={COMPOSER_VISUAL_SCOPE}
+                    surface="composer"
+                    component="PostComposerMediaBlock"
+                    itemKey={block.id}
+                    itemType={block.mediaKind}
+                    className="mr-2"
+                    extra={{
+                      uploading: block.uploadProgress !== undefined,
+                      uploadProgress: block.uploadProgress ?? null,
+                    }}>
+                    <Image
+                      source={{ uri: block.localUri ?? block.descriptor?.url }}
+                      style={{ width: 96, height: 96, borderRadius: 12 }}
+                      contentFit="cover"
+                    />
+                    {block.uploadProgress !== undefined ? (
+                      <View
+                        className="absolute inset-0 items-center justify-center"
+                        style={styles.uploadScrim}>
+                        <VisualLayoutProbe
+                          scope={COMPOSER_VISUAL_SCOPE}
+                          surface="composer"
+                          component="PostComposerMediaUploadIndicator"
+                          itemKey={`media-upload:${block.id}`}
+                          itemType="activity-indicator"
+                          phase="uploading"
+                          extra={{
+                            mediaKind: block.mediaKind,
+                            uploadProgress: block.uploadProgress ?? null,
+                          }}>
+                          <ActivityIndicator color={INVARIANT_WHITE} />
+                        </VisualLayoutProbe>
+                      </View>
+                    ) : null}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => removeBlock(block.id)}
+                      accessibilityLabel="Remove media">
+                      <Icon name="mdi:close-circle" size={18} color={mutedColor} />
+                    </Button>
+                  </VisualLayoutProbe>
+                ) : null
+              )}
+            </ScrollView>
+          ) : null}
 
-        {isQuote && parentEvent ? (
-          <View style={styles.quotedWrap}>
-            <QuotedPostCard
-              event={parentEvent}
-              profiles={quotedProfiles}
-              getMetrics={stubMetrics}
-            />
-          </View>
-        ) : null}
+          {!showPollBeforeQuote && poll ? <PollComposeForm /> : null}
 
-        {mediaBlocks.length > 0 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3">
-            {mediaBlocks.map((block) =>
-              block.kind === 'media' ? (
-                <View key={block.id} className="mr-2">
-                  <Image
-                    source={{ uri: block.localUri ?? block.descriptor?.url }}
-                    style={{ width: 96, height: 96, borderRadius: 12 }}
-                    contentFit="cover"
-                  />
-                  {block.uploadProgress !== undefined ? (
-                    <View
-                      className="absolute inset-0 items-center justify-center"
-                      style={styles.uploadScrim}>
-                      <ActivityIndicator color={INVARIANT_WHITE} />
-                    </View>
-                  ) : null}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onPress={() => removeBlock(block.id)}
-                    accessibilityLabel="Remove media">
-                    <Icon name="mdi:close-circle" size={18} color={mutedColor} />
-                  </Button>
-                </View>
-              ) : null
-            )}
-          </ScrollView>
-        ) : null}
+          {error ? (
+            <Text size={13} className="mt-3" style={{ color: dangerColor }}>
+              {error}
+            </Text>
+          ) : null}
+        </ScrollView>
+      </VisualLayoutProbe>
 
-        {!showPollBeforeQuote && poll ? <PollComposeForm /> : null}
-
-        {error ? (
-          <Text size={13} className="mt-3" style={{ color: dangerColor }}>
-            {error}
-          </Text>
-        ) : null}
-      </ScrollView>
-
-      <View
+      <VisualLayoutProbe
+        scope={COMPOSER_VISUAL_SCOPE}
+        surface="composer"
+        component="PostComposerToolbar"
+        itemKey="toolbar"
+        itemType="toolbar"
         className="flex-row items-center gap-5 px-4 py-2"
         style={{
           paddingBottom: keyboardVisible ? 10 : insets.bottom + 10,
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: mutedColor,
+        }}
+        extra={{
+          mode: target?.mode ?? 'new',
+          keyboardVisible,
+          mediaCount: mediaBlocks.length,
+          hasPoll: !!poll,
+          canPost,
         }}>
         <Pressable
           onPress={handleAddMedia}
@@ -347,7 +478,7 @@ export function PostComposer() {
         <Text size={13} style={{ color: overBudget ? dangerColor : mutedColor }}>
           {remaining}
         </Text>
-      </View>
+      </VisualLayoutProbe>
     </KeyboardAvoidingView>
   );
 }
@@ -378,7 +509,12 @@ function ReplyOriginalPost({
   }, [event.pubkey, profile]);
 
   return (
-    <View
+    <VisualLayoutProbe
+      scope={COMPOSER_VISUAL_SCOPE}
+      surface="composer"
+      component="ReplyOriginalPost"
+      itemKey={event.id}
+      itemType="reply-original"
       style={styles.ogRow}
       onLayout={(e) => {
         // The replied-to post renders in full above the input; its height (which
@@ -387,7 +523,8 @@ function ReplyOriginalPost({
         shift.report('composer.shift.reply_original', event.id, e.nativeEvent.layout.height, {
           contentLength: event.content.length,
         });
-      }}>
+      }}
+      extra={{ contentLength: event.content.length }}>
       <View style={styles.gutterCol}>
         <Avatar
           state={profile?.picture ? 'image' : 'fallback'}
@@ -415,7 +552,7 @@ function ReplyOriginalPost({
           Replying to {name}
         </Text>
       </View>
-    </View>
+    </VisualLayoutProbe>
   );
 }
 
@@ -438,9 +575,11 @@ const styles = StyleSheet.create({
     height: AVATAR_SIZE / 2,
   },
   lineBelow: { flex: 1, marginTop: 6 },
+  // Top-align the reply content so the replied-to post stays pinned at the top
+  // and does not move when the keyboard shows/hides (the scroll viewport resizes
+  // from the bottom). `flexGrow` lets the input fill the remaining space.
   replyScrollContent: {
     flexGrow: 1,
-    justifyContent: 'flex-end',
   },
   replyInputRow: { flexDirection: 'row', gap: 12, paddingTop: 4 },
   quotedWrap: { marginTop: 4 },
@@ -464,5 +603,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  flex1: {
+    flex: 1,
   },
 });
