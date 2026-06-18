@@ -11,6 +11,7 @@ export const NAGG_CAPABILITIES = {
   EVENTS_EXCLUDE_IDS_PUBKEYS: 'graphql.events.excludeIdsPubkeys',
   AGGREGATE_EVENTS_SHUFFLE: 'graphql.aggregateEvents.shuffle',
   RANK_PUBKEY_SCORE_TERMS: 'graphql.rank.pubkeyScoreTerms',
+  RANK_PUBKEY_SCORE_FILTERS: 'graphql.rank.pubkeyScoreFilters',
   RANK_CANDIDATE_FIELD_TERMS: 'graphql.rank.candidateFieldTerms',
   RANK_DERIVED_METRIC_TERMS: 'graphql.rank.derivedMetricTerms',
   RANK_SHUFFLE: 'graphql.rank.shuffle',

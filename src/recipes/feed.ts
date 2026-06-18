@@ -1,6 +1,8 @@
 import type { EventQueryInput, MetricInput, ShuffleInput, WeightedRankTermInput } from './rank';
 import { engagementRankTerms, recencyTerm, vertexAuthorScoreTerm, viewerFollowBoost } from './rank';
 
+const VERTEX_SCORED_PUBKEY_FILTER = { source: 'vertex' } as const;
+
 export type RankedEventsInput = {
   references: EventQueryInput;
   via: { key: string; value?: string; values?: string[] };
@@ -132,11 +134,16 @@ export function forYouRankedEventsInput(options: {
       until: options.until,
       limit: 1000,
       tags: options.excludeTags,
+      pubkeyScore: VERTEX_SCORED_PUBKEY_FILTER,
     },
     via: { key: 'e' },
     target: { kinds: [1, 1111], limit: options.limit ?? 30, offset: 0 },
     metric: { name: 'actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
-    terms: [...engagementRankTerms(), vertexAuthorScoreTerm(0.3), recencyTerm(1.1)],
+    terms: [
+      ...engagementRankTerms({ pubkeyScore: VERTEX_SCORED_PUBKEY_FILTER }),
+      vertexAuthorScoreTerm(0.3),
+      recencyTerm(1.1),
+    ],
     candidatePubkeyBoosts: options.viewerPubkey ? [viewerFollowBoost(options.viewerPubkey, 5)] : undefined,
     ...(options.viewerPubkey ? { pubkey: options.viewerPubkey } : {}),
     shuffle: options.shuffle,

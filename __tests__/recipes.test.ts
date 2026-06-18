@@ -153,6 +153,12 @@ describe("rank recipes", () => {
 
     expect(forYou.target?.pubkeysFrom).toBeUndefined();
     expect(following.target?.pubkeysFrom).toBeDefined();
+    expect(forYou.references.pubkeyScore).toEqual({ source: "vertex" });
+    expect(
+      forYou.terms
+        ?.filter((term) => term.references)
+        .every((term) => term.references?.pubkeyScore?.source === "vertex"),
+    ).toBe(true);
     expect(forYou.terms?.some((term) => term.pubkeyScore)).toBe(true);
     expect(following.terms?.some((term) => term.pubkeyScore)).toBe(true);
   });

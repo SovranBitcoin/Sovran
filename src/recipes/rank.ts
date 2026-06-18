@@ -28,6 +28,12 @@ export type EventQueryInput = {
   offset?: number;
   shuffle?: ShuffleInput;
   pubkeysFrom?: unknown[];
+  pubkeyScore?: PubkeyScoreFilterInput;
+};
+
+export type PubkeyScoreFilterInput = {
+  source?: string;
+  minFollowers?: number;
 };
 
 export type WeightedRankTermInput = {
@@ -70,31 +76,43 @@ export type ReferenceRankInput = {
   shuffle?: ShuffleInput;
 };
 
-export function engagementRankTerms(): WeightedRankTermInput[] {
+export type EngagementRankTermOptions = {
+  pubkeyScore?: PubkeyScoreFilterInput;
+};
+
+function engagementReferences(
+  input: EventQueryInput,
+  options: EngagementRankTermOptions
+): EventQueryInput {
+  if (!options.pubkeyScore) return input;
+  return { ...input, pubkeyScore: options.pubkeyScore };
+}
+
+export function engagementRankTerms(options: EngagementRankTermOptions = {}): WeightedRankTermInput[] {
   return [
     {
-      references: { kinds: [7], limit: 500 },
+      references: engagementReferences({ kinds: [7], limit: 500 }, options),
       via: { key: 'e' },
       metric: { name: 'likes', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
       weight: 3,
       transform: 'LOG1P',
     },
     {
-      references: { kinds: [1, 1111], limit: 500 },
+      references: engagementReferences({ kinds: [1, 1111], limit: 500 }, options),
       via: { key: 'e' },
       metric: { name: 'replies', op: 'COUNT' },
       weight: 2.5,
       transform: 'LOG1P',
     },
     {
-      references: { kinds: [6, 16], limit: 500 },
+      references: engagementReferences({ kinds: [6, 16], limit: 500 }, options),
       via: { key: 'e' },
       metric: { name: 'reposts', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
       weight: 2,
       transform: 'LOG1P',
     },
     {
-      references: { kinds: [9735], limit: 500 },
+      references: engagementReferences({ kinds: [9735], limit: 500 }, options),
       via: { key: 'e' },
       metric: { name: 'zapSats', op: 'SUM', derived: 'nip57.amount_sats' },
       weight: 1.5,
