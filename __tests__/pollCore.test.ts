@@ -123,6 +123,31 @@ describe('poll event builders', () => {
     ]);
   });
 
+  it('builds a quoted poll with q and p tags', () => {
+    const event = buildPollEvent({
+      question: 'Q?',
+      options: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+      ],
+      pollType: 'singlechoice',
+      relays: ['wss://r'],
+      quote: {
+        eventId: 'quoted-event',
+        relayHint: 'wss://quote.example',
+        pubkey: 'quote-author',
+      },
+      createdAt: 1,
+    });
+
+    expect(event.tags).toEqual(
+      expect.arrayContaining([
+        ['q', 'quoted-event', 'wss://quote.example', 'quote-author'],
+        ['p', 'quote-author'],
+      ])
+    );
+  });
+
   it('builds a kind:1018 vote', () => {
     const event = buildVoteEvent({ pollId: 'poll1', optionIds: ['a', 'b'], createdAt: 1 });
     expect(event.kind).toBe(POLL_VOTE_KIND);

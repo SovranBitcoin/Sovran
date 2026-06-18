@@ -40,8 +40,9 @@ import { PollComposeForm, emptyPollDraft } from '@/features/composer/ui/PollComp
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
-import { NoteContent } from '@/features/feed/components/nostr/NoteContent';
+import { NoteContent, QuotedPostCard } from '@/features/feed/components/nostr/NoteContent';
 import { THREAD_CONNECTOR_LINE_STYLE } from '@/features/feed/components/nostr/threadConnectorStyle';
+import { useShiftLogger } from '@/features/feed/lib/contentShiftLog';
 import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
 import {
   DEFAULT_METRICS,
@@ -49,6 +50,7 @@ import {
   type NoteMetrics,
   type ProfileInfo,
 } from '@/features/feed/components/nostr/feedTypes';
+import { alpha, spacing } from '@/shared/styles/tokens';
 
 const AVATAR_SIZE = 36;
 const EMPTY_EVENTS = new Map<string, FeedEvent>();
@@ -67,6 +69,9 @@ const PLACEHOLDER: Record<string, string> = {
   reply: 'Post your reply',
   quote: 'Add a comment',
 };
+
+const REPLY_INITIAL_CONTENT_OFFSET = { x: 0, y: 1_000_000 };
+const REPLY_MAINTAIN_VISIBLE_CONTENT_POSITION = { minIndexForVisible: 1 };
 
 export function PostComposer() {
   const { ndk } = useNDK();
@@ -101,7 +106,8 @@ export function PostComposer() {
   }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [foreground, mutedColor, accentColor, dangerColor, lineColor] = useThemeColor([
+  const [surface, foreground, mutedColor, accentColor, dangerColor, lineColor] = useThemeColor([
+    'surface',
     'foreground',
     'muted',
     'accent',
@@ -111,13 +117,24 @@ export function PostComposer() {
   const ownProfile = useProfileStore((s) => s.getActiveProfile());
 
   const isReply = target?.mode === 'reply' && !!parentEvent;
+  const isQuote = target?.mode === 'quote' && !!parentEvent;
+  // Profiles map for the quoted card: just the quoted author, so its avatar and
+  // display name resolve without a feed-wide profile map.
+  const quotedProfiles = useMemo(() => {
+    const map = new Map<string, ProfileInfo>();
+    if (parentEvent && parentProfile) map.set(parentEvent.pubkey, parentProfile);
+    return map;
+  }, [parentEvent, parentProfile]);
   const textBlock = blocks.find((b) => b.kind === 'text');
   const mediaBlocks = useMemo(() => blocks.filter((b) => b.kind === 'media'), [blocks]);
   const textLength = textBlock?.kind === 'text' ? textBlock.text.length : 0;
+  const hasPostContent =
+    (textBlock?.kind === 'text' && textBlock.text.trim().length > 0) || mediaBlocks.length > 0;
   const remaining = config.charBudget - textLength;
   const overBudget = remaining < 0;
   const uploading = mediaBlocks.some((b) => b.kind === 'media' && b.uploadProgress !== undefined);
-  const canPost = !busy && !overBudget && !uploading;
+  const canPost = !busy && hasPostContent && !overBudget && !uploading;
+  const showPollBeforeQuote = isQuote && !!poll;
 
   const handleCancel = useCallback(() => {
     close();
@@ -125,6 +142,7 @@ export function PostComposer() {
   }, [close]);
 
   const handlePost = useCallback(async () => {
+    if (!canPost) return;
     setBusy(true);
     setError(null);
     const outcome = await publish();
@@ -134,7 +152,7 @@ export function PostComposer() {
       return;
     }
     setError(OUTCOME_MESSAGE[outcome] ?? 'Something went wrong.');
-  }, [publish]);
+  }, [canPost, publish]);
 
   const handleAddMedia = useCallback(async () => {
     if (!ndk || mediaBlocks.length >= config.maxMedia) return;
@@ -168,20 +186,36 @@ export function PostComposer() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: surface }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View
-        className="flex-row items-center justify-between px-4 pb-3"
-        style={{ paddingTop: insets.top + 12 }}>
-        <Button variant="ghost" size="sm" onPress={handleCancel}>
+        style={[
+          styles.headerRow,
+          {
+            paddingTop: insets.top + spacing.md,
+          },
+        ]}>
+        <Button variant="ghost" size="md" onPress={handleCancel}>
           <Button.Label>Cancel</Button.Label>
         </Button>
-        <Button variant="primary" size="sm" onPress={handlePost} isDisabled={!canPost}>
+        <Button
+          variant="primary"
+          size="sm"
+          onPress={handlePost}
+          isDisabled={!canPost}
+          style={!canPost ? styles.disabledPostButton : undefined}>
           <Button.Label>{busy ? 'Posting…' : 'Post'}</Button.Label>
         </Button>
       </View>
 
-      <ScrollView className="flex-1 px-4" keyboardShouldPersistTaps="handled">
+      <ScrollView
+        className="flex-1 px-4"
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={isReply ? styles.replyScrollContent : undefined}
+        contentOffset={isReply ? REPLY_INITIAL_CONTENT_OFFSET : undefined}
+        maintainVisibleContentPosition={
+          isReply ? REPLY_MAINTAIN_VISIBLE_CONTENT_POSITION : undefined
+        }>
         {isReply && parentEvent ? (
           <ReplyOriginalPost
             event={parentEvent}
@@ -221,6 +255,18 @@ export function PostComposer() {
           />
         </View>
 
+        {showPollBeforeQuote ? <PollComposeForm /> : null}
+
+        {isQuote && parentEvent ? (
+          <View style={styles.quotedWrap}>
+            <QuotedPostCard
+              event={parentEvent}
+              profiles={quotedProfiles}
+              getMetrics={stubMetrics}
+            />
+          </View>
+        ) : null}
+
         {mediaBlocks.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3">
             {mediaBlocks.map((block) =>
@@ -251,7 +297,7 @@ export function PostComposer() {
           </ScrollView>
         ) : null}
 
-        {poll ? <PollComposeForm /> : null}
+        {!showPollBeforeQuote && poll ? <PollComposeForm /> : null}
 
         {error ? (
           <Text size={13} className="mt-3" style={{ color: dangerColor }}>
@@ -324,6 +370,7 @@ function ReplyOriginalPost({
   muted: string;
 }) {
   const name = profile?.name || `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
+  const shift = useShiftLogger('ReplyOriginalPost');
   const profiles = useMemo(() => {
     const map = new Map<string, ProfileInfo>();
     if (profile) map.set(event.pubkey, profile);
@@ -331,7 +378,16 @@ function ReplyOriginalPost({
   }, [event.pubkey, profile]);
 
   return (
-    <View style={styles.ogRow}>
+    <View
+      style={styles.ogRow}
+      onLayout={(e) => {
+        // The replied-to post renders in full above the input; its height (which
+        // grows as the OG note's media/quotes resolve) pushes the input and the
+        // connecting line down. Log shifts so the reply view's jumps are traceable.
+        shift.report('composer.shift.reply_original', event.id, e.nativeEvent.layout.height, {
+          contentLength: event.content.length,
+        });
+      }}>
       <View style={styles.gutterCol}>
         <Avatar
           state={profile?.picture ? 'image' : 'fallback'}
@@ -364,6 +420,14 @@ function ReplyOriginalPost({
 }
 
 const styles = StyleSheet.create({
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.lg,
+    paddingBottom: spacing.md,
+  },
   ogRow: { flexDirection: 'row', gap: 12, paddingTop: 12 },
   ogContent: { flex: 1 },
   gutterCol: { width: AVATAR_SIZE, alignItems: 'center' },
@@ -374,9 +438,22 @@ const styles = StyleSheet.create({
     height: AVATAR_SIZE / 2,
   },
   lineBelow: { flex: 1, marginTop: 6 },
+  replyScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+  },
   replyInputRow: { flexDirection: 'row', gap: 12, paddingTop: 4 },
-  input: { fontSize: 17, minHeight: 120, paddingTop: 8 },
-  inputReply: { flex: 1, minHeight: 80 },
+  quotedWrap: { marginTop: 4 },
+  // Start at a single line; a multiline TextInput grows on its own as content
+  // wraps, so no minHeight is forced.
+  input: { fontSize: 17, paddingTop: 8 },
+  inputReply: {
+    flex: 1,
+    minHeight: 72,
+    paddingBottom: spacing['2xl'],
+    marginBottom: spacing.md,
+  },
+  disabledPostButton: { opacity: alpha.disabled },
   uploadScrim: {
     position: 'absolute',
     top: 0,

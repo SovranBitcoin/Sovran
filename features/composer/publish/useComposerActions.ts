@@ -64,6 +64,14 @@ async function publishPoll(ndk: NDK, state: ComposerSnapshot): Promise<PublishOu
     pollType: poll.type,
     endsAt: poll.endsAt,
     relays: ownWrite,
+    quote:
+      state.target?.mode === 'quote'
+        ? {
+            eventId: state.target.quotedId,
+            pubkey: state.target.quotedPubkey,
+            relayHint: state.target.relayHint,
+          }
+        : undefined,
   });
   const event = new NDKEvent(ndk);
   event.kind = unsigned.kind;

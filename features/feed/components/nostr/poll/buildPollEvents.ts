@@ -12,6 +12,12 @@ export interface UnsignedPollEvent {
   tags: string[][];
 }
 
+export interface PollQuoteReference {
+  eventId: string;
+  pubkey: string;
+  relayHint?: string;
+}
+
 /** Builds the kind:1068 poll event. */
 export function buildPollEvent(opts: {
   question: string;
@@ -19,6 +25,7 @@ export function buildPollEvent(opts: {
   pollType: PollType;
   endsAt?: number;
   relays?: readonly string[];
+  quote?: PollQuoteReference;
   createdAt?: number;
 }): UnsignedPollEvent {
   const tags: string[][] = [];
@@ -26,6 +33,10 @@ export function buildPollEvent(opts: {
   tags.push(['polltype', opts.pollType]);
   if (opts.endsAt !== undefined) tags.push(['endsAt', String(opts.endsAt)]);
   for (const relay of opts.relays ?? []) tags.push(['relay', relay]);
+  if (opts.quote) {
+    tags.push(['q', opts.quote.eventId, opts.quote.relayHint ?? '', opts.quote.pubkey]);
+    tags.push(['p', opts.quote.pubkey]);
+  }
   return {
     kind: POLL_KIND,
     content: opts.question,
