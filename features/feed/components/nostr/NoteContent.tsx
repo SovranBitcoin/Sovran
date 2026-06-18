@@ -118,12 +118,15 @@ const VideoBlockInner = React.memo(function VideoBlockInner({
   onBeforeOpen,
   openOverlay,
   overlayLayout,
+  aspectRatio: aspectRatioProp,
 }: {
   url: string;
   onTap?: () => void;
   onBeforeOpen?: () => void;
   openOverlay?: (layout: ImageOverlayLayout) => void;
   overlayLayout?: Omit<ImageOverlayLayout, 'pageX' | 'pageY' | 'width' | 'height'>;
+  /** NIP-92 imeta-derived aspect ratio for the inline player (overlay wins if present). */
+  aspectRatio?: number;
 }) {
   const surface = useThemeColor('surface');
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
@@ -164,7 +167,7 @@ const VideoBlockInner = React.memo(function VideoBlockInner({
   }, [isAndroid, handleTap]);
 
   const hasTap = !!(openOverlay && overlayLayout) || !!onTap;
-  const aspectRatio = overlayLayout?.aspectRatio ?? 16 / 9;
+  const aspectRatio = overlayLayout?.aspectRatio ?? aspectRatioProp ?? 16 / 9;
 
   const content = (
     <View style={[sharedStyles.videoBlockOuter, { backgroundColor: surface }]}>
@@ -722,6 +725,11 @@ export const NoteContent = React.memo(function NoteContent({
                 const mediaIndex = mediaSegments.findIndex(
                   (m) => m.kind === 'video' && m.url === seg.url
                 );
+                const videoImeta = imetaByUrl.get(seg.url);
+                const videoAspect =
+                  videoImeta?.width && videoImeta?.height
+                    ? videoImeta.width / videoImeta.height
+                    : 16 / 9;
                 const overlayLayout: Omit<
                   ImageOverlayLayout,
                   'pageX' | 'pageY' | 'width' | 'height'
@@ -731,12 +739,13 @@ export const NoteContent = React.memo(function NoteContent({
                   mediaTypes: allMediaTypes.length > 0 ? allMediaTypes : undefined,
                   initialIndex: mediaIndex >= 0 ? mediaIndex : 0,
                   post: overlayPost,
-                  aspectRatio: 16 / 9,
+                  aspectRatio: videoAspect,
                 };
                 return (
                   <VideoBlock
                     key={`b${i}`}
                     url={seg.url}
+                    aspectRatio={videoAspect}
                     onBeforeOpen={onBeforeOpen}
                     onTap={
                       !imageOverlay?.open
