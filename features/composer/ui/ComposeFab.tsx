@@ -10,11 +10,14 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import { useOpenComposer } from '@/features/composer/publish/useComposerActions';
 
 export function ComposeFab() {
   const openComposer = useOpenComposer();
   const [accent] = useThemeColor(['accent'] as const);
+  // Float above the native tab bar + home indicator (no fixed bottom offset).
+  const bottom = useTabBarBottomPadding(16);
   const onPress = useCallback(() => openComposer({ mode: 'new' }), [openComposer]);
 
   return (
@@ -22,7 +25,7 @@ export function ComposeFab() {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="New post"
-      style={[styles.fab, { backgroundColor: accent }]}>
+      style={[styles.fab, { backgroundColor: accent, bottom }]}>
       <Icon name="mdi:pencil" size={24} color={INVARIANT_WHITE} />
     </Pressable>
   );
@@ -32,7 +35,6 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 28,
     width: 56,
     height: 56,
     borderRadius: 28,

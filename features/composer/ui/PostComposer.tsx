@@ -22,6 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { router } from 'expo-router';
 import { Button } from 'heroui-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Icon from 'assets/icons';
 import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
@@ -64,6 +65,7 @@ export function PostComposer() {
   const config = useComposeConfig();
   const publish = usePublishNote();
 
+  const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [foreground, mutedColor, accentColor, dangerColor] = useThemeColor([
@@ -132,7 +134,9 @@ export function PostComposer() {
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View className="flex-row items-center justify-between px-4 py-3">
+      <View
+        className="flex-row items-center justify-between px-4 pb-3"
+        style={{ paddingTop: insets.top + 12 }}>
         <Button variant="ghost" size="sm" onPress={handleCancel}>
           <Button.Label>Cancel</Button.Label>
         </Button>
@@ -192,8 +196,12 @@ export function PostComposer() {
       </ScrollView>
 
       <View
-        className="flex-row items-center gap-4 px-4 py-3"
-        style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: mutedColor }}>
+        className="flex-row items-center gap-4 px-4 pt-3"
+        style={{
+          paddingBottom: insets.bottom + 12,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: mutedColor,
+        }}>
         <Button
           variant="ghost"
           size="sm"
