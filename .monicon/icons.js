@@ -1045,6 +1045,11 @@ module.exports = {
     "width": 16,
     "height": 16
   },
+  "mdi:arrow-expand": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M10 21v-2H6.41l4.5-4.5l-1.41-1.41l-4.5 4.5V14H3v7zm4.5-10.09l4.5-4.5V10h2V3h-7v2h3.59l-4.5 4.5z\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
   "internal:whitenoise": {
     "svg": "<svg viewBox=\"0 0 58 44\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M0 44V0H14.7304V13.4775L21.2348 0H35.9652V13.4775L42.4696 0H57.2V44H42.4696V30.5225L35.9652 44H21.2348V30.5225L14.7304 44H0ZM12.4348 2.29565H2.29565V39.2432L12.4348 18.2342V2.29565ZM44.7652 41.7043H54.9044V4.75676L44.7652 25.7658V41.7043ZM34.5241 41.7043L53.5431 2.29565H43.9107L24.8917 41.7043H34.5241ZM32.3083 2.29565H22.6759L3.65691 41.7043H13.2893L32.3083 2.29565ZM33.6696 4.75676L23.5304 25.7658V39.2432L33.6696 18.2342V4.75676Z\"/></svg>",
     "width": 16,

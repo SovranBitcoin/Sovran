@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
-import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
+import { INVARIANT_BLACK } from '@/shared/lib/brandColors';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
 import { useOpenComposer } from '@/features/composer/publish/useComposerActions';
@@ -19,7 +19,10 @@ const FAB_TAB_BAR_GAP = 16;
 
 export function ComposeFab() {
   const openComposer = useOpenComposer();
-  const [accent] = useThemeColor(['accent'] as const);
+  // Inverted fill: the theme `accent` token is the foreground colour (white in
+  // dark themes), which made a white icon invisible. Fill with foreground and
+  // draw the icon in the background colour — high contrast in both themes.
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const insets = useSafeAreaInsets();
   // Match the AI tab composer's bottom anchor: on the NativeTabs (liquid-glass)
   // path the system already grows `insets.bottom` to cover the tab bar + home
@@ -35,8 +38,8 @@ export function ComposeFab() {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="New post"
-      style={[styles.fab, { backgroundColor: accent, bottom }]}>
-      <Icon name="mdi:pencil" size={24} color={INVARIANT_WHITE} />
+      style={[styles.fab, { backgroundColor: foreground, bottom }]}>
+      <Icon name="mdi:pencil" size={24} color={background} />
     </Pressable>
   );
 }

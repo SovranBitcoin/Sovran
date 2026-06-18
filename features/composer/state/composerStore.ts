@@ -11,6 +11,13 @@ import { create } from 'zustand';
 
 import type { ComposerBlock, PollDraft } from '@/features/composer/config/types';
 import type { ComposerTarget } from '@/features/composer/publish/buildNoteEvent';
+import type { FeedEvent, ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
+
+/** Display-only context for the composer (e.g. the post being replied to). */
+export interface ComposerOpenContext {
+  parentEvent?: FeedEvent;
+  parentProfile?: ProfileInfo;
+}
 
 type MediaBlock = Extract<ComposerBlock, { kind: 'media' }>;
 
@@ -28,8 +35,11 @@ interface ComposerState {
   poll?: PollDraft;
   /** Pubkeys inserted via @-mention, for `p` tags. */
   mentionPubkeys: string[];
+  /** The post being replied to (display-only; kept out of the pure target). */
+  parentEvent?: FeedEvent;
+  parentProfile?: ProfileInfo;
 
-  open: (target: ComposerTarget) => void;
+  open: (target: ComposerTarget, context?: ComposerOpenContext) => void;
   close: () => void;
   setBlockText: (id: string, text: string) => void;
   addMediaBlock: (block: Omit<MediaBlock, 'id'>) => string;
@@ -47,14 +57,18 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
   contentWarning: undefined,
   poll: undefined,
   mentionPubkeys: [],
+  parentEvent: undefined,
+  parentProfile: undefined,
 
-  open: (target) =>
+  open: (target, context) =>
     set({
       target,
       blocks: [emptyTextBlock()],
       contentWarning: undefined,
       poll: undefined,
       mentionPubkeys: [],
+      parentEvent: context?.parentEvent,
+      parentProfile: context?.parentProfile,
     }),
 
   close: () => set({ target: null }),

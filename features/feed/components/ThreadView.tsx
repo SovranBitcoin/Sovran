@@ -10,6 +10,7 @@ import { StyleSheet } from 'react-native';
 import Animated, { FadeIn, Easing } from 'react-native-reanimated';
 import { LegendList, type LegendListRenderItemProps } from '@legendapp/list/react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
 
 import { Text } from '@/shared/ui/primitives/Text';
@@ -30,8 +31,8 @@ import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './n
 import { useThread, type ThreadItem } from '@/features/feed/hooks/useThread';
 import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import { useOpenComposer } from '@/features/composer/publish/useComposerActions';
-import type { ComposerTarget } from '@/features/composer/publish/buildNoteEvent';
-import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
+import { deriveReplyTarget } from '@/features/feed/lib/replyTarget';
+import { ThreadReplyBar } from '@/features/feed/components/ThreadReplyBar';
 import type { ThreadReplySort } from '@/features/feed/data/feedClient';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -228,21 +229,6 @@ function ReplySortPicker({
   );
 }
 
-/** Builds a NIP-10 reply target from the post being replied to. */
-function deriveReplyTarget(event: FeedEvent): ComposerTarget {
-  const eTags = event.tags.filter((t) => t[0] === 'e');
-  const rootTag = eTags.find((t) => t[3] === 'root') ?? eTags[0];
-  const pTags = event.tags.filter((t) => t[0] === 'p').map((t) => t[1]);
-  return {
-    mode: 'reply',
-    parentId: event.id,
-    parentPubkey: event.pubkey,
-    parentPTags: pTags,
-    rootId: rootTag?.[1],
-    relayHint: getOwnWriteRelays()[0],
-  };
-}
-
 function ThreadViewInner({ eventId }: ThreadViewProps) {
   const [foreground, background, defaultColor, surfaceTertiary] = useThemeColor([
     'foreground',
@@ -251,7 +237,9 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     'surface-tertiary',
   ] as const);
   const headerHeight = useHeaderHeight();
+  const insets = useSafeAreaInsets();
   const imageOverlay = useImageOverlay();
+  const [replyBarHeight, setReplyBarHeight] = useState(0);
 
   const {
     items,
@@ -317,6 +305,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   }, [measuredOrder]);
 
   const targetIndex = useMemo(() => items.findIndex((item) => item.type === 'target'), [items]);
+  const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
   const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
 
   const replyEvents = useMemo(
@@ -592,7 +581,12 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           skeletonMatch={item.type === 'reply' ? item.skeletonMatch : undefined}
           onLikePress={() => toggleLike(item.event)}
           onRepostPress={() => toggleRepost(item.event)}
-          onCommentPress={() => openComposer(deriveReplyTarget(item.event))}
+          onCommentPress={() =>
+            openComposer(deriveReplyTarget(item.event), {
+              parentEvent: item.event,
+              parentProfile: profilesRef.current.get(item.event.pubkey),
+            })
+          }
           onMorePress={() => openPostActions(item.event)}
           getThreadContext={getThreadContext}
         />
@@ -687,7 +681,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
             onEndReached={handleEndReached}
             onEndReachedThreshold={0.4}
             style={{ flex: 1 }}
-            contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: 120 }}
+            contentContainerStyle={{
+              paddingTop: headerHeight,
+              paddingBottom: (replyBarHeight || 80) + insets.bottom + 16,
+            }}
             showsVerticalScrollIndicator={false}
             onScroll={
               imageOverlay?.scrollOffsetY != null
@@ -730,6 +727,13 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 );
               })}
             </View>
+          ) : null}
+          {targetItem ? (
+            <ThreadReplyBar
+              targetEvent={targetItem.event}
+              targetProfile={profilesRef.current.get(targetItem.event.pubkey)}
+              onHeightChange={setReplyBarHeight}
+            />
           ) : null}
           <AnimatedImageOverlay />
         </View>

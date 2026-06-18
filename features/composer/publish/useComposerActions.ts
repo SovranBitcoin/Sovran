@@ -17,17 +17,21 @@ import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
 import { resolveOutboxRelays } from '@/shared/lib/nostr/outbox/recipientRelays';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { buildPollEvent } from '@/features/feed/components/nostr/poll/buildPollEvents';
-import { useComposerStore } from '@/features/composer/state/composerStore';
+import {
+  useComposerStore,
+  type ComposerOpenContext,
+} from '@/features/composer/state/composerStore';
 import { buildNoteEvent, type ComposerTarget } from '@/features/composer/publish/buildNoteEvent';
+import type { ComposerBlock } from '@/features/composer/config/types';
 
 type ComposerSnapshot = ReturnType<typeof useComposerStore.getState>;
 
 /** Returns a function that opens the composer for a given target. */
-export function useOpenComposer(): (target: ComposerTarget) => void {
+export function useOpenComposer(): (target: ComposerTarget, context?: ComposerOpenContext) => void {
   const open = useComposerStore((s) => s.open);
   return useCallback(
-    (target) => {
-      open(target);
+    (target, context) => {
+      open(target, context);
       router.navigate('/(user-flow)/composer');
     },
     [open]
@@ -77,6 +81,58 @@ async function publishPoll(ndk: NDK, state: ComposerSnapshot): Promise<PublishOu
   return 'ok';
 }
 
+export interface ComposedDraft {
+  blocks: readonly ComposerBlock[];
+  target: ComposerTarget;
+  mentionPubkeys?: readonly string[];
+  contentWarning?: string;
+}
+
+/**
+ * Builds + publishes a kind:1 note from a draft through the outbox-aware seam.
+ * Shared by the full composer (`usePublishNote`) and the thread reply bar, so
+ * both reuse outbox routing without coupling to the global composer store.
+ */
+export async function publishComposed(ndk: NDK, draft: ComposedDraft): Promise<PublishOutcome> {
+  if (!ndk?.signer) return 'no-key';
+  if (draft.blocks.some((b) => b.kind === 'media' && !b.descriptor)) return 'media-pending';
+
+  const note = buildNoteEvent({
+    blocks: draft.blocks,
+    target: draft.target,
+    mentionPubkeys: draft.mentionPubkeys,
+    contentWarning: draft.contentWarning,
+  });
+  if (note.content.trim().length === 0 && !note.tags.some((t) => t[0] === 'imeta')) {
+    return 'empty';
+  }
+
+  const relayHint = getOwnWriteRelays()[0];
+  const mentionPubkeys = note.tags.filter((t) => t[0] === 'p').map((t) => t[1]);
+  const relays = await resolveOutboxRelays(ndk, {
+    ownWriteRelays: getOwnWriteRelays(),
+    mentionPubkeys,
+    hintRelays: relayHint ? [relayHint] : undefined,
+  });
+
+  const event = new NDKEvent(ndk);
+  event.kind = note.kind;
+  event.content = note.content;
+  event.created_at = note.created_at;
+  event.tags = note.tags;
+
+  const result = await publishEvent({ ndk, event, relays, resolveOn: 'all-settled' });
+  if (result.isErr()) {
+    nostrLog.warn('composer.publish_failed', { reason: result.error.type });
+    return 'failed';
+  }
+  nostrLog.info('composer.published', {
+    mode: draft.target.mode,
+    accepted: result.value.accepted.length,
+  });
+  return 'ok';
+}
+
 /** Returns a function that publishes the current composer draft. */
 export function usePublishNote(): () => Promise<PublishOutcome> {
   const { ndk } = useNDK();
@@ -85,49 +141,20 @@ export function usePublishNote(): () => Promise<PublishOutcome> {
     if (!ndk?.signer) return 'no-key';
     const state = useComposerStore.getState();
 
-    // Media must be uploaded (have a descriptor) before publishing.
-    const pendingMedia = state.blocks.some((b) => b.kind === 'media' && !b.descriptor);
-    if (pendingMedia) return 'media-pending';
-
     // Poll mode publishes a NIP-88 kind:1068 instead of a kind:1 note.
     if (state.poll) {
+      const pendingMedia = state.blocks.some((b) => b.kind === 'media' && !b.descriptor);
+      if (pendingMedia) return 'media-pending';
       return publishPoll(ndk, state);
     }
 
-    const note = buildNoteEvent({
+    const outcome = await publishComposed(ndk, {
       blocks: state.blocks,
       target: state.target ?? { mode: 'new' },
       mentionPubkeys: state.mentionPubkeys,
       contentWarning: state.contentWarning,
     });
-    if (note.content.trim().length === 0 && !note.tags.some((t) => t[0] === 'imeta')) {
-      return 'empty';
-    }
-
-    const relayHint = getOwnWriteRelays()[0];
-    const mentionPubkeys = note.tags.filter((t) => t[0] === 'p').map((t) => t[1]);
-    const relays = await resolveOutboxRelays(ndk, {
-      ownWriteRelays: getOwnWriteRelays(),
-      mentionPubkeys,
-      hintRelays: relayHint ? [relayHint] : undefined,
-    });
-
-    const event = new NDKEvent(ndk);
-    event.kind = note.kind;
-    event.content = note.content;
-    event.created_at = note.created_at;
-    event.tags = note.tags;
-
-    const result = await publishEvent({ ndk, event, relays, resolveOn: 'all-settled' });
-    if (result.isErr()) {
-      nostrLog.warn('composer.publish_failed', { reason: result.error.type });
-      return 'failed';
-    }
-    nostrLog.info('composer.published', {
-      mode: state.target?.mode ?? 'new',
-      accepted: result.value.accepted.length,
-    });
-    useComposerStore.getState().close();
-    return 'ok';
+    if (outcome === 'ok') useComposerStore.getState().close();
+    return outcome;
   }, [ndk]);
 }

@@ -269,6 +269,7 @@ export const icons: string[] = [
   'mdi:share-variant-outline',
   'mdi:link-variant',
   'mdi:image-broken-variant',
+  'mdi:arrow-expand',
 ];
 
 export function BitcoinMaskIcon() {

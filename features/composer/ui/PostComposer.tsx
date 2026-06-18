@@ -7,9 +7,10 @@
  * `ComposeConfig`; the char meter enforces the relay-sourced budget; send goes
  * through the outbox-aware publish seam.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -26,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Icon from 'assets/icons';
 import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { uploadMedia } from '@/shared/lib/nostr/media/mediaUpload';
 import { useComposeConfig } from '@/features/composer/config/useComposeConfig';
@@ -35,7 +37,12 @@ import {
   type PublishOutcome,
 } from '@/features/composer/publish/useComposerActions';
 import { PollComposeForm, emptyPollDraft } from '@/features/composer/ui/PollComposeForm';
+import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Text } from '@/shared/ui/primitives/Text';
+import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
+import type { FeedEvent, ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
 
 const OUTCOME_MESSAGE: Partial<Record<PublishOutcome, string>> = {
   'no-key': 'No signing key available.',
@@ -61,11 +68,27 @@ export function PostComposer() {
   const removeBlock = useComposerStore((s) => s.removeBlock);
   const poll = useComposerStore((s) => s.poll);
   const setPoll = useComposerStore((s) => s.setPoll);
+  const parentEvent = useComposerStore((s) => s.parentEvent);
+  const parentProfile = useComposerStore((s) => s.parentProfile);
   const close = useComposerStore((s) => s.close);
   const config = useComposeConfig();
   const publish = usePublishNote();
 
   const insets = useSafeAreaInsets();
+  // Keyboard-aware toolbar inset: when the keyboard is up the toolbar already
+  // sits flush on the keyboard top, so the home-indicator inset would be dead
+  // space below it. Collapse it while typing.
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvt, () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener(hideEvt, () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [foreground, mutedColor, accentColor, dangerColor] = useThemeColor([
@@ -146,6 +169,14 @@ export function PostComposer() {
       </View>
 
       <ScrollView className="flex-1 px-4" keyboardShouldPersistTaps="handled">
+        {target?.mode === 'reply' && parentEvent ? (
+          <ReplyContext
+            event={parentEvent}
+            profile={parentProfile}
+            foreground={foreground}
+            muted={mutedColor}
+          />
+        ) : null}
         <TextInput
           value={textBlock?.kind === 'text' ? textBlock.text : ''}
           onChangeText={(text) => textBlock && setBlockText(textBlock.id, text)}
@@ -196,33 +227,33 @@ export function PostComposer() {
       </ScrollView>
 
       <View
-        className="flex-row items-center gap-4 px-4 pt-3"
+        className="flex-row items-center gap-5 px-4 py-2"
         style={{
-          paddingBottom: insets.bottom + 12,
+          paddingBottom: keyboardVisible ? 10 : insets.bottom + 10,
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: mutedColor,
         }}>
-        <Button
-          variant="ghost"
-          size="sm"
+        <Pressable
           onPress={handleAddMedia}
-          isDisabled={!!poll || mediaBlocks.length >= config.maxMedia}
+          disabled={!!poll || mediaBlocks.length >= config.maxMedia}
+          hitSlop={10}
+          accessibilityRole="button"
           accessibilityLabel="Add photo or video">
           <Icon
             name="mdi:image-plus"
-            size={22}
+            size={24}
             color={poll || mediaBlocks.length >= config.maxMedia ? mutedColor : accentColor}
           />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
+        </Pressable>
+        <Pressable
           onPress={() => setPoll(poll ? undefined : emptyPollDraft())}
-          isDisabled={!config.allowPoll || mediaBlocks.length > 0}
+          disabled={!config.allowPoll || mediaBlocks.length > 0}
+          hitSlop={10}
+          accessibilityRole="button"
           accessibilityLabel={poll ? 'Remove poll' : 'Add poll'}>
           <Icon
             name="mdi:poll"
-            size={22}
+            size={24}
             color={
               !config.allowPoll || mediaBlocks.length > 0
                 ? mutedColor
@@ -231,7 +262,7 @@ export function PostComposer() {
                   : mutedColor
             }
           />
-        </Button>
+        </Pressable>
         <View className="flex-1" />
         <Text size={13} style={{ color: overBudget ? dangerColor : mutedColor }}>
           {remaining}
@@ -241,7 +272,50 @@ export function PostComposer() {
   );
 }
 
+/** The post being replied to, shown above the input in reply mode. */
+function ReplyContext({
+  event,
+  profile,
+  foreground,
+  muted,
+}: {
+  event: FeedEvent;
+  profile?: ProfileInfo;
+  foreground: string;
+  muted: string;
+}) {
+  const name = profile?.name || `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
+  return (
+    <View style={styles.replyContext}>
+      <Text size={12} style={{ color: muted, marginBottom: 6 }}>
+        Replying to {name}
+      </Text>
+      <HStack gap={8}>
+        <Avatar
+          state={profile?.picture ? 'image' : 'fallback'}
+          picture={profile?.picture}
+          seed={event.pubkey}
+          size={28}
+          name={name}
+        />
+        <VStack style={{ flex: 1 }}>
+          <Text bold size={13} style={{ color: foreground }} numberOfLines={1}>
+            {name}
+          </Text>
+          <Text size={13} style={{ color: muted }} numberOfLines={4}>
+            {event.content}
+          </Text>
+        </VStack>
+      </HStack>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  replyContext: {
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
   uploadScrim: {
     position: 'absolute',
     top: 0,
