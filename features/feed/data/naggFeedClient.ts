@@ -1252,7 +1252,7 @@ function forYouInputFromSpec({
     since,
     limit,
     offset,
-  }) as RankedEventsInput;
+  });
 }
 
 function recentInputFromSpec({
