@@ -38,11 +38,21 @@ import {
 } from '@/features/composer/publish/useComposerActions';
 import { PollComposeForm, emptyPollDraft } from '@/features/composer/ui/PollComposeForm';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Text } from '@/shared/ui/primitives/Text';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { NoteContent } from '@/features/feed/components/nostr/NoteContent';
+import { THREAD_CONNECTOR_LINE_STYLE } from '@/features/feed/components/nostr/threadConnectorStyle';
 import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
-import type { FeedEvent, ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
+import {
+  DEFAULT_METRICS,
+  type FeedEvent,
+  type NoteMetrics,
+  type ProfileInfo,
+} from '@/features/feed/components/nostr/feedTypes';
+
+const AVATAR_SIZE = 36;
+const EMPTY_EVENTS = new Map<string, FeedEvent>();
+const stubMetrics = (): NoteMetrics => DEFAULT_METRICS;
 
 const OUTCOME_MESSAGE: Partial<Record<PublishOutcome, string>> = {
   'no-key': 'No signing key available.',
@@ -91,13 +101,16 @@ export function PostComposer() {
   }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [foreground, mutedColor, accentColor, dangerColor] = useThemeColor([
+  const [foreground, mutedColor, accentColor, dangerColor, lineColor] = useThemeColor([
     'foreground',
     'muted',
     'accent',
     'danger',
+    'default',
   ] as const);
+  const ownProfile = useProfileStore((s) => s.getActiveProfile());
 
+  const isReply = target?.mode === 'reply' && !!parentEvent;
   const textBlock = blocks.find((b) => b.kind === 'text');
   const mediaBlocks = useMemo(() => blocks.filter((b) => b.kind === 'media'), [blocks]);
   const textLength = textBlock?.kind === 'text' ? textBlock.text.length : 0;
@@ -169,23 +182,44 @@ export function PostComposer() {
       </View>
 
       <ScrollView className="flex-1 px-4" keyboardShouldPersistTaps="handled">
-        {target?.mode === 'reply' && parentEvent ? (
-          <ReplyContext
+        {isReply && parentEvent ? (
+          <ReplyOriginalPost
             event={parentEvent}
             profile={parentProfile}
+            lineColor={lineColor}
             foreground={foreground}
             muted={mutedColor}
           />
         ) : null}
-        <TextInput
-          value={textBlock?.kind === 'text' ? textBlock.text : ''}
-          onChangeText={(text) => textBlock && setBlockText(textBlock.id, text)}
-          placeholder={PLACEHOLDER[target?.mode ?? 'new']}
-          placeholderTextColor={mutedColor}
-          multiline
-          autoFocus
-          style={{ color: foreground, fontSize: 17, minHeight: 120, paddingTop: 8 }}
-        />
+        <View style={isReply ? styles.replyInputRow : undefined}>
+          {isReply ? (
+            <View style={styles.gutterCol}>
+              <View
+                style={[
+                  styles.lineAbove,
+                  THREAD_CONNECTOR_LINE_STYLE,
+                  { borderLeftColor: lineColor },
+                ]}
+              />
+              <Avatar
+                state={ownProfile?.cachedPicture ? 'image' : 'fallback'}
+                picture={ownProfile?.cachedPicture}
+                seed={ownProfile?.pubkey ?? ''}
+                size={AVATAR_SIZE}
+                name={ownProfile?.cachedDisplayName}
+              />
+            </View>
+          ) : null}
+          <TextInput
+            value={textBlock?.kind === 'text' ? textBlock.text : ''}
+            onChangeText={(text) => textBlock && setBlockText(textBlock.id, text)}
+            placeholder={PLACEHOLDER[target?.mode ?? 'new']}
+            placeholderTextColor={mutedColor}
+            multiline
+            autoFocus
+            style={[styles.input, { color: foreground }, isReply ? styles.inputReply : null]}
+          />
+        </View>
 
         {mediaBlocks.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3">
@@ -272,50 +306,77 @@ export function PostComposer() {
   );
 }
 
-/** The post being replied to, shown above the input in reply mode. */
-function ReplyContext({
+/**
+ * The post being replied to, rendered in full above the input with a dotted
+ * connector running from its avatar down to the composer's own avatar.
+ */
+function ReplyOriginalPost({
   event,
   profile,
+  lineColor,
   foreground,
   muted,
 }: {
   event: FeedEvent;
   profile?: ProfileInfo;
+  lineColor: string;
   foreground: string;
   muted: string;
 }) {
   const name = profile?.name || `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
+  const profiles = useMemo(() => {
+    const map = new Map<string, ProfileInfo>();
+    if (profile) map.set(event.pubkey, profile);
+    return map;
+  }, [event.pubkey, profile]);
+
   return (
-    <View style={styles.replyContext}>
-      <Text size={12} style={{ color: muted, marginBottom: 6 }}>
-        Replying to {name}
-      </Text>
-      <HStack gap={8}>
+    <View style={styles.ogRow}>
+      <View style={styles.gutterCol}>
         <Avatar
           state={profile?.picture ? 'image' : 'fallback'}
           picture={profile?.picture}
           seed={event.pubkey}
-          size={28}
+          size={AVATAR_SIZE}
           name={name}
         />
-        <VStack style={{ flex: 1 }}>
-          <Text bold size={13} style={{ color: foreground }} numberOfLines={1}>
-            {name}
-          </Text>
-          <Text size={13} style={{ color: muted }} numberOfLines={4}>
-            {event.content}
-          </Text>
-        </VStack>
-      </HStack>
+        <View
+          style={[styles.lineBelow, THREAD_CONNECTOR_LINE_STYLE, { borderLeftColor: lineColor }]}
+        />
+      </View>
+      <View style={styles.ogContent}>
+        <Text bold size={15} style={{ color: foreground, marginBottom: 2 }} numberOfLines={1}>
+          {name}
+        </Text>
+        <NoteContent
+          content={event.content}
+          event={event}
+          profiles={profiles}
+          quotedEvents={EMPTY_EVENTS}
+          getMetrics={stubMetrics}
+        />
+        <Text size={13} style={{ color: muted, marginTop: 6 }}>
+          Replying to {name}
+        </Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  replyContext: {
-    paddingTop: 12,
-    paddingBottom: 4,
+  ogRow: { flexDirection: 'row', gap: 12, paddingTop: 12 },
+  ogContent: { flex: 1 },
+  gutterCol: { width: AVATAR_SIZE, alignItems: 'center' },
+  lineAbove: {
+    position: 'absolute',
+    top: 0,
+    left: AVATAR_SIZE / 2 - 1,
+    height: AVATAR_SIZE / 2,
   },
+  lineBelow: { flex: 1, marginTop: 6 },
+  replyInputRow: { flexDirection: 'row', gap: 12, paddingTop: 4 },
+  input: { fontSize: 17, minHeight: 120, paddingTop: 8 },
+  inputReply: { flex: 1, minHeight: 80 },
   uploadScrim: {
     position: 'absolute',
     top: 0,
