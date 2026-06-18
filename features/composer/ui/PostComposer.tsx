@@ -26,7 +26,7 @@ import { Button } from 'heroui-native';
 import Icon from 'assets/icons';
 import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { uploadMedia } from '@/shared/lib/nostr/media';
+import { uploadMedia } from '@/shared/lib/nostr/media/mediaUpload';
 import { useComposeConfig } from '@/features/composer/config/useComposeConfig';
 import { useComposerStore } from '@/features/composer/state/composerStore';
 import {

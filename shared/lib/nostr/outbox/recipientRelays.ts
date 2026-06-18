@@ -19,7 +19,7 @@ const TTL_MS = 10 * 60 * 1000; // 10 min
 const cache = new Map<string, { readRelays: string[]; at: number }>();
 
 /** Fetches (cache-first) a pubkey's NIP-65 read relays. `[]` when unknown. */
-export async function getRecipientReadRelays(ndk: NDK, pubkey: string): Promise<string[]> {
+async function getRecipientReadRelays(ndk: NDK, pubkey: string): Promise<string[]> {
   const cached = cache.get(pubkey);
   if (cached && Date.now() - cached.at < TTL_MS) return cached.readRelays;
 

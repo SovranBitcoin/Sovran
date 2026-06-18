@@ -15,14 +15,9 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRelayHealth, type RelayHealth } from '@/shared/hooks/useRelayHealth';
 import { log } from '@/shared/lib/logger';
 import { publishEvent } from '@/shared/lib/nostr/publish';
-import {
-  DEFAULT_RELAYS,
-  getOwnWriteRelays,
-  RELAY_LIST_KIND,
-  safeNormalizeRelay,
-  serializeRelayList,
-  useRelayListStore,
-} from '@/shared/lib/nostr/outbox';
+import { DEFAULT_RELAYS, safeNormalizeRelay } from '@/shared/lib/nostr/outbox/defaults';
+import { RELAY_LIST_KIND, serializeRelayList } from '@/shared/lib/nostr/outbox/nip65';
+import { getOwnWriteRelays, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { Section } from '@/shared/ui/composed/Section';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
