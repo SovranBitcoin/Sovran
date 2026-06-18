@@ -4,25 +4,16 @@ import {
   buildThreadStructure,
   type ThreadStructure,
 } from '@/features/feed/lib/buildThreadStructure';
-import {
-  DEFAULT_REPLY_SKELETON_COUNT,
-  MAX_REPLY_SKELETON_COUNT,
-  type ReplySkeletonMatch,
-  sortRepliesForSkeletons,
-} from '@/features/feed/lib/threadReplySkeletons';
-
 export type ThreadItem =
   | { type: 'parent'; event: FeedEvent }
   | { type: 'target'; event: FeedEvent }
-  | { type: 'reply'; event: FeedEvent; skeletonMatch?: ReplySkeletonMatch };
+  | { type: 'reply'; event: FeedEvent };
 
 export type BuiltThreadItems = {
   items: ThreadItem[];
   hiddenReplyCount: number;
   expectedReplies: number;
   receivedReplies: number;
-  skeletonMatchCount: number;
-  sortedMatches: ReplySkeletonMatch[];
 };
 
 export function bucketsFromThreadResult(result: ThreadResult): ThreadSeedBuckets {
@@ -38,7 +29,6 @@ export function bucketsFromThreadResult(result: ThreadResult): ThreadSeedBuckets
 export function buildThreadItemsFromResult(
   eventId: string,
   result: ThreadResult,
-  charsPerLine: number,
   orderedReplyIds?: readonly string[]
 ): BuiltThreadItems | null {
   const { thread } = result;
@@ -47,24 +37,16 @@ export function buildThreadItemsFromResult(
   const target = thread.target;
   const targetMetrics = result.metrics.get(eventId);
   const expectedReplies = targetMetrics?.replyCount ?? 0;
-  const skeletonMatchCount = Math.min(
-    MAX_REPLY_SKELETON_COUNT,
-    targetMetrics?.replyCount ?? DEFAULT_REPLY_SKELETON_COUNT
-  );
-  const sortedReplies = sortRepliesForSkeletons(thread.replies, skeletonMatchCount, charsPerLine);
   const replyById = new Map(thread.replies.map((event) => [event.id, event]));
-  const matchById = new Map(sortedReplies.matches.map((match) => [match.eventId, match]));
+  // Replies render in the order the server returned them (the chosen sort). The
+  // page-id ordering, when present, preserves pagination order across fetches.
   const replies = orderedReplyIds
     ? orderedReplyIds.map((id) => replyById.get(id)).filter((event): event is FeedEvent => !!event)
-    : sortedReplies.replies;
+    : thread.replies;
   const items: ThreadItem[] = [
     ...thread.parents.map<ThreadItem>((event) => ({ type: 'parent', event })),
     { type: 'target', event: target },
-    ...replies.map<ThreadItem>((event, index) => ({
-      type: 'reply',
-      event,
-      skeletonMatch: matchById.get(event.id) ?? sortedReplies.matches[index],
-    })),
+    ...replies.map<ThreadItem>((event) => ({ type: 'reply', event })),
   ];
 
   return {
@@ -72,8 +54,6 @@ export function buildThreadItemsFromResult(
     hiddenReplyCount: Math.max(0, expectedReplies - replies.length),
     expectedReplies,
     receivedReplies: thread.replies.length,
-    skeletonMatchCount,
-    sortedMatches: sortedReplies.matches,
   };
 }
 
@@ -104,8 +84,7 @@ export function orderedReplyIdsForThreadResult(
 
 export function buildThreadItemsFromSeed(
   eventId: string,
-  seed: ThreadSeedBuckets,
-  charsPerLine: number
+  seed: ThreadSeedBuckets
 ): BuiltThreadItems | null {
   const thread = includeSelectedReplyIdsInThread(
     buildThreadStructure(eventId, seed.allEvents),
@@ -133,7 +112,6 @@ export function buildThreadItemsFromSeed(
       loadedReplyCount: 0,
       hasMoreReplies: false,
     },
-    charsPerLine,
     replyPageEventIds
   );
 }

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { type LayoutChangeEvent, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -35,13 +35,12 @@ import {
 } from '@/shared/ui/composed/SkeletonExitShimmer';
 import { sharedStyles } from './feedStyles';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { feedLog, Log } from '@/shared/lib/logger';
+import { Log } from '@/shared/lib/logger';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { alpha, radius, spacing } from '@/shared/styles/tokens';
 import {
   REPLY_SKELETON_VARIANTS,
   TARGET_SKELETON_VARIANT,
-  type ReplySkeletonMatch,
 } from '@/features/feed/lib/threadReplySkeletons';
 import { THREAD_CONNECTOR_LINE_STYLE } from './threadConnectorStyle';
 
@@ -90,7 +89,6 @@ interface PostCardProps {
   likePendingDirection?: 'activating' | 'deactivating';
   onNestedProfilePressIn?: () => void;
   onNestedProfilePressOut?: () => void;
-  skeletonMatch?: ReplySkeletonMatch;
   /**
    * Called immediately before navigating to this post's thread. Returns the
    * data the caller already has (visible parent chain via `allEvents`, plus
@@ -98,14 +96,6 @@ interface PostCardProps {
    * post optimistically. The tapped event itself is merged in automatically.
    */
   getThreadContext?: () => ThreadSeed | null;
-  onMeasureHeight?: (eventId: string, height: number) => void;
-  /**
-   * Render in measurement-only mode: skip avatar image prefetch and force the
-   * avatar into its loading skeleton. Used by the hidden measurement tree so
-   * we don't fire 12 simultaneous network requests just to capture heights.
-   * Has no effect on the rendered height (avatar dimensions are fixed).
-   */
-  measurementMode?: boolean;
 }
 
 export const PostCard = React.memo(function PostCard({
@@ -138,10 +128,7 @@ export const PostCard = React.memo(function PostCard({
   likePendingDirection,
   onNestedProfilePressIn,
   onNestedProfilePressOut,
-  skeletonMatch,
   getThreadContext,
-  onMeasureHeight,
-  measurementMode = false,
 }: PostCardProps) {
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
 
@@ -257,31 +244,6 @@ export const PostCard = React.memo(function PostCard({
     [handleThreadPress]
   );
 
-  const lastReplyLayoutHeightRef = useRef<number | null>(null);
-  const handleReplyLayout = useCallback(
-    (eventLayout: LayoutChangeEvent) => {
-      if (!isThread) return;
-      const height = Math.round(eventLayout.nativeEvent.layout.height);
-      if (lastReplyLayoutHeightRef.current === height) return;
-      lastReplyLayoutHeightRef.current = height;
-      onMeasureHeight?.(event.id, height);
-      feedLog.info('thread.reply_skeleton.reply_layout', {
-        eventId: event.id,
-        skeletonIndex: skeletonMatch?.skeletonIndex ?? null,
-        skeletonLineCount: skeletonMatch?.skeletonLineCount ?? null,
-        estimatedLineCount: skeletonMatch?.estimatedLineCount ?? null,
-        lineDelta: skeletonMatch?.lineDelta ?? null,
-        sortOriginalIndex: skeletonMatch?.originalIndex ?? null,
-        sortSortedIndex: skeletonMatch?.sortedIndex ?? null,
-        sortScore: skeletonMatch?.score ?? null,
-        contentLength: event.content.length,
-        contentPreview: skeletonMatch?.contentPreview,
-        measuredHeight: height,
-      });
-    },
-    [event.content.length, event.id, isThread, onMeasureHeight, skeletonMatch]
-  );
-
   // ── Thread target: stacked layout (no gutter) ──
   if (isTarget) {
     const fullDate = event.created_at ? formatDate(event.created_at * 1000, 'short-date-time') : '';
@@ -385,8 +347,8 @@ export const PostCard = React.memo(function PostCard({
           onPressOut={handleNestedPressOut}
           onPress={navigateToProfile}>
           <Avatar
-            state={measurementMode ? 'loading' : profile?.picture ? 'image' : 'fallback'}
-            picture={measurementMode ? undefined : profile?.picture}
+            state={profile?.picture ? 'image' : 'fallback'}
+            picture={profile?.picture}
             seed={event.pubkey}
             size={AVATAR_SIZE}
             name={displayName}
@@ -521,9 +483,7 @@ export const PostCard = React.memo(function PostCard({
   if (isThread) {
     return (
       <Log name="PostCard">
-        <Pressable onPress={handleThreadPress} onLayout={handleReplyLayout}>
-          {gutterContent}
-        </Pressable>
+        <Pressable onPress={handleThreadPress}>{gutterContent}</Pressable>
       </Log>
     );
   }
@@ -535,18 +495,15 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
   variant,
   index = 0,
   exiting = false,
-  onMeasureHeight,
 }: {
   variant: Extract<PostCardVariant, 'thread-target' | 'thread-reply'>;
   index?: number;
   exiting?: boolean;
-  onMeasureHeight?: (skeletonIndex: number, height: number) => void;
 }) {
   const [foreground, loadingShimmerSurface] = useThemeColor(['foreground', 'surface'] as const);
   const textMuted = useMemo(() => ({ color: opacity(foreground, alpha.muted) }), [foreground]);
   const targetDateStyle = useMemo(() => [textMuted, pcStyles.targetDate], [textMuted]);
   const replyVariant = REPLY_SKELETON_VARIANTS[index % REPLY_SKELETON_VARIANTS.length];
-  const lastSkeletonLayoutHeightRef = useRef<number | null>(null);
 
   // Render invisible, then fade in once the row has laid out ("settled") so the
   // first-frame list positioning is never seen — any residual settle happens
@@ -559,26 +516,6 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
     revealedRef.current = true;
     revealOpacity.value = withTiming(1, { duration: 160, easing: Easing.out(Easing.cubic) });
   }, [revealOpacity]);
-
-  const handleSkeletonLayout = useCallback(
-    (eventLayout: LayoutChangeEvent) => {
-      if (variant !== 'thread-reply') return;
-      const height = Math.round(eventLayout.nativeEvent.layout.height);
-      if (lastSkeletonLayoutHeightRef.current === height) return;
-      lastSkeletonLayoutHeightRef.current = height;
-      onMeasureHeight?.(index, height);
-      feedLog.info('thread.reply_skeleton.skeleton_layout', {
-        skeletonIndex: index,
-        skeletonLineCount: replyVariant.content.length,
-        contentPlaceholders: replyVariant.content,
-        authorPlaceholder: replyVariant.author,
-        timestampPlaceholder: replyVariant.timestamp,
-        metricWidth: replyVariant.metricWidth,
-        measuredHeight: height,
-      });
-    },
-    [index, onMeasureHeight, replyVariant, variant]
-  );
 
   if (variant === 'thread-target') {
     const skeletonVariant = TARGET_SKELETON_VARIANT;
@@ -638,12 +575,7 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
   const skeletonVariant = replyVariant;
 
   return (
-    <Reanimated.View
-      onLayout={(e) => {
-        handleSkeletonLayout(e);
-        revealOnSettle();
-      }}
-      style={revealStyle}>
+    <Reanimated.View onLayout={revealOnSettle} style={revealStyle}>
       <SkeletonExitReveal active={exiting}>
         <View style={pcStyles.gutterRow} pointerEvents="none">
           <View style={pcStyles.gutterCol}>

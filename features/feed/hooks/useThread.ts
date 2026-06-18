@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { InteractionManager, useWindowDimensions } from 'react-native';
+import { InteractionManager } from 'react-native';
 
 import type {
   FeedEvent,
@@ -21,7 +21,6 @@ import {
   type BuiltThreadItems,
   type ThreadItem,
 } from '@/features/feed/lib/threadItems';
-import { charsPerLineForWidth } from '@/features/feed/lib/threadReplySkeletons';
 import { feedLog } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
@@ -75,19 +74,10 @@ export function useThread(eventId: string): UseThreadResult {
   const requestGenerationRef = useRef(0);
   const loadMoreAbortControllerRef = useRef<AbortController | null>(null);
 
-  const { width: viewportWidth } = useWindowDimensions();
-  const charsPerLineRef = useRef(charsPerLineForWidth(viewportWidth));
-  charsPerLineRef.current = charsPerLineForWidth(viewportWidth);
-
   const applyThreadResult = useCallback(
     (result: ThreadResult, source: 'initial' | 'more'): BuiltThreadItems | null => {
       const orderedReplyIds = orderedReplyIdsForThreadResult(result, source, replyOrderRef.current);
-      const built = buildThreadItemsFromResult(
-        eventId,
-        result,
-        charsPerLineRef.current,
-        orderedReplyIds
-      );
+      const built = buildThreadItemsFromResult(eventId, result, orderedReplyIds);
       if (!built) return null;
 
       replyOrderRef.current = built.items
@@ -115,20 +105,6 @@ export function useThread(eventId: string): UseThreadResult {
         hasMoreReplies: nextHasMore,
         replyOffset: replyOffsetRef.current,
         replySort,
-      });
-
-      feedLog.info('thread.reply_skeleton.sort', {
-        eventId,
-        expectedReplies: built.expectedReplies,
-        receivedReplies: built.receivedReplies,
-        skeletonMatchCount: built.skeletonMatchCount,
-        originalOrder: result.thread.replies.slice(0, 10).map((event, originalIndex) => ({
-          originalIndex,
-          eventId: event.id,
-          contentLength: event.content.length,
-        })),
-        sortedOrder: built.sortedMatches.slice(0, 10),
-        visibleMatches: built.sortedMatches.filter((match) => match.skeletonIndex !== null),
       });
 
       return built;
@@ -236,7 +212,7 @@ export function useThread(eventId: string): UseThreadResult {
       : (preservedSeed ?? consumeThreadSeed(eventId));
     if (seed) {
       threadSeedRef.current = seed;
-      const seeded = buildThreadItemsFromSeed(eventId, seed, charsPerLineRef.current);
+      const seeded = buildThreadItemsFromSeed(eventId, seed);
       if (seeded) {
         replyOrderRef.current = seeded.items
           .filter((item): item is Extract<ThreadItem, { type: 'reply' }> => item.type === 'reply')
