@@ -2,9 +2,9 @@
  * Shared amount-entry shell: centred amount display + optional secondary pill
  * + optional quick-send suggestions + CustomKeyboard + primary Next button.
  *
- * Consumed by the send/receive flow's AmountSelector adapter (machine-driven)
- * and by the Split-Bill step-1 screen (local-state). Keep it framework-neutral:
- * no colada imports, no feature imports that would create cycles.
+ * Consumed by the send/receive flow's AmountSelector adapter (machine-driven).
+ * Keep it framework-neutral: no colada imports, no feature imports that would
+ * create cycles, so any local-state caller can reuse it without the machine.
  */
 
 import { useCallback, useEffect, useMemo } from 'react';
@@ -118,6 +118,14 @@ interface AmountEntryViewProps {
   nextText?: string;
   nextTestID?: string;
   nextIcon?: string;
+  /**
+   * True when the entered amount exceeds the spendable balance. The owning
+   * adapter derives this from the payment engine (colada) rather than this
+   * primitive guessing from a notice string, because an over-balance ecash
+   * send still resolves (it rounds down to the balance) and so produces no
+   * blocking `noticeText`. Tints the amount danger like any other problem.
+   */
+  exceedsBalance?: boolean;
   noticeText?: string | null;
   /**
    * Persistent, warning-tinted notice under the amount (e.g. the Nut-Drop
@@ -161,10 +169,9 @@ interface AmountEntryViewProps {
   leadingBottomButton?: React.ReactNode;
 
   /**
-   * Color semantics:
-   *   'send'    — danger tint on raw input; AmountFormatter uses useTypeColors.
-   *   'receive' — foreground; AmountFormatter uses useTypeColors.
-   *   'neutral' — foreground; AmountFormatter renders without useTypeColors.
+   * Gates the quick-send suggestions row (send only). It does NOT affect the
+   * amount colour — the amount is neutral foreground on send and receive
+   * alike, going `danger` only on a genuine problem (#214).
    */
   transactionType?: AmountEntryTransactionType;
 }
@@ -182,6 +189,7 @@ export function AmountEntryView({
   nextText = 'Next',
   nextTestID = 'amount-next',
   nextIcon,
+  exceedsBalance = false,
   noticeText = null,
   warningText = null,
   fiatSymbol = null,
@@ -194,11 +202,10 @@ export function AmountEntryView({
   leadingBottomButton,
   transactionType = 'neutral',
 }: AmountEntryViewProps) {
-  const [foreground, background, danger, success, warning] = useThemeColor([
+  const [foreground, background, danger, warning] = useThemeColor([
     'foreground',
     'background',
     'danger',
-    'success',
     'warning',
   ] as const);
   const insets = useSafeAreaInsets();
@@ -214,14 +221,26 @@ export function AmountEntryView({
   const topPadding = insets.top + (isCompactPhone ? 12 : 24);
 
   const isFiat = inputMode === 'fiat';
-  const isSend = transactionType === 'send';
-  const isReceive = transactionType === 'receive';
-  // Match `AmountFormatter.resolveColor`: send → danger, receive → success,
-  // anything else → foreground. Keeps the fiat raw-input path (which doesn't
-  // route through AmountFormatter) in sync with the BTC glyph path.
-  const typeTint = isSend ? danger : isReceive ? success : foreground;
-  const activeColor = rawInput ? typeTint : opacity(foreground, 0.4);
-  const placeholderColor = opacity(typeTint, 0.35);
+  // The amount is neutral foreground on BOTH send and receive — the colour
+  // encodes only validity, never transaction direction. This keeps the two
+  // screens identical.
+  //   • nothing typed yet (empty input) → a dimmed foreground placeholder "0".
+  //   • genuine problem — what the user typed can't proceed (a danger notice,
+  //     or an amount that exceeds the spendable balance) → danger, so the
+  //     number and its notice move in lockstep and red reliably means
+  //     "something's wrong with this amount".
+  //   • otherwise (anything typed, including "0"/"0.") → full foreground.
+  // Dimming is reserved for the empty placeholder and the fiat decimal prefill
+  // ("00") so the digits the user actually typed always read at full contrast —
+  // a half-typed "0." must not blend into the dimmed prefill behind it. Reserving
+  // red for the problem state stops a valid amount from reading as an error
+  // (#214). One decision drives both the fiat raw-input path and the BTC glyph
+  // path (passed to AmountFormatter via `color`).
+  const hasInput = rawInput.length > 0;
+  const hasNotice = noticeText != null && noticeText.length > 0;
+  const isProblem = hasInput && (hasNotice || exceedsBalance);
+  const amountColor = !hasInput ? opacity(foreground, 0.4) : isProblem ? danger : foreground;
+  const placeholderColor = opacity(foreground, 0.35);
 
   const suggestionsRow = useMemo(() => {
     if (transactionType !== 'send' || suggestions.length === 0) return null;
@@ -298,7 +317,6 @@ export function AmountEntryView({
     );
   }, [transactionType, suggestions, onSuggestionTap, foreground, background]);
 
-  const useTypeColors = transactionType === 'send' || transactionType === 'receive';
   const logNextPress = useCallback(
     (source: 'plain' | 'leading-row') => {
       cashuLog.info('amount_entry.next.press', {
@@ -402,7 +420,7 @@ export function AmountEntryView({
                 symbol={fiatSymbol}
                 size={amountTextSize}
                 lineHeight={amountLineHeight}
-                activeColor={activeColor}
+                activeColor={amountColor}
                 placeholderColor={placeholderColor}
               />
             ) : (
@@ -413,10 +431,7 @@ export function AmountEntryView({
                 lineHeight={amountLineHeight}
                 weight="heavy"
                 animated
-                useTypeColors={useTypeColors}
-                transactionType={
-                  useTypeColors ? (transactionType as 'send' | 'receive') : undefined
-                }
+                color={amountColor}
                 centered
               />
             )}
