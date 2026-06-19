@@ -233,6 +233,10 @@ export function AmountSelector({
   const nextLoading = machineBusy || actions.next.loading;
   const nextDisabled = !actions.next.available;
   const nextNoticeText = nextDisabled ? actions.next.reason : undefined;
+  // Over-balance is reported separately from `available`: an ecash send rounds
+  // down to the balance and stays available, so it never surfaces as a notice.
+  // The amount still reads as a problem (red) when the entry exceeds balance.
+  const exceedsBalance = actions.next.exceedsBalance === true;
   const transactionTypeForView: AmountEntryTransactionType = transactionType;
 
   // When the recipient header is in play, surface the mint as a 50/50
@@ -301,6 +305,7 @@ export function AmountSelector({
         onNext={handleNext}
         nextLoading={nextLoading}
         nextDisabled={nextDisabled}
+        exceedsBalance={exceedsBalance}
         noticeText={nextNoticeText}
         nextTestID="amount-next"
         fiatSymbol={fiatSymbol}
