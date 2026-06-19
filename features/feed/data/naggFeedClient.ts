@@ -78,35 +78,13 @@ const BASE_EVENT_SELECTION = `
   tags
 `;
 
+// Precomputed per-note engagement counts: ONE batched server lookup over nagg's
+// rollup tables (note_*_counts / note_engagement_real) instead of four live
+// aggregateReferencedBy aggregations PER node. `replies` is the NIP-10/22 direct
+// reply count (not any-e-tag), matching the thread view. This is the primary For
+// You latency fix — it removes ~4 live ClickHouse aggregations per feed node.
 const METRIC_SELECTION = `
-  likes: aggregateReferencedBy(input: {
-    via: { key: "e" }
-    events: { kinds: [7], limit: 500 }
-    metrics: [
-      { name: "pubkeys", op: "COUNT_DISTINCT", distinctField: "PUBKEY" }
-    ]
-  }) { rows { metrics } }
-  reposts: aggregateReferencedBy(input: {
-    via: { key: "e" }
-    events: { kinds: [6, 16], limit: 500 }
-    metrics: [
-      { name: "pubkeys", op: "COUNT_DISTINCT", distinctField: "PUBKEY" }
-    ]
-  }) { rows { metrics } }
-  replyStats: aggregateReferencedBy(input: {
-    via: { key: "e" }
-    events: { kinds: [1], limit: 500 }
-    metrics: [
-      { name: "events", op: "COUNT" }
-    ]
-  }) { rows { metrics } }
-  zaps: aggregateReferencedBy(input: {
-    via: { key: "e" }
-    events: { kinds: [9735], limit: 500 }
-    metrics: [
-      { name: "amountSats", op: "SUM", derived: "nip57.amount_sats" }
-    ]
-  }) { rows { metrics } }
+  noteStats { likes reposts replies zapSats }
 `;
 
 const AUTHOR_METADATA_SELECTION = `
@@ -136,30 +114,23 @@ const FEED_REPLY_PREVIEW_CHILD_SELECTION = `
 
 const FEED_REPLY_PREVIEW_SOURCE_SELECTION = `
   ${FEED_REPLY_PREVIEW_BASE_SELECTION}
-  childFollowedReply: rankedReferencedBy(input: {
-    via: { key: "e" }
-    events: {
-      kinds: [1, 1111]
-      pubkeysFrom: [{
-        latestEventTags: {
-          pubkey: $viewerPubkey
-          kinds: [3]
-          tag: { key: "p" }
-          limit: 1
-          maxValues: 2000
-        }
-      }]
-      limit: 50
-    }
-    rank: {
-      references: { kinds: [7], limit: 500 }
-      via: { key: "e" }
-      metric: { name: "likers", op: "COUNT_DISTINCT", distinctField: "PUBKEY" }
-    }
-    limit: 1
-  }) {
+  childFollowedReply: followedReply(viewer: $viewerPubkey) {
     nodes {
       ${FEED_REPLY_PREVIEW_CHILD_SELECTION}
+    }
+  }
+`;
+
+// Precomputed "a person you follow replied" preview: ONE batched server lookup
+// (note_reply_edges ⋈ note_like_counts ⋈ the viewer's follow set) per feed page,
+// replacing the per-node rankedReferencedBy over the viewer's 2000-entry follow
+// list — the single most expensive per-node selection on the For You feed. Same
+// `{ nodes }` shape as the old alias, so the page mapper is unchanged. Requires
+// nagg to expose the `followedReply(viewer:)` field (deploy nagg before shipping).
+const FEED_FOLLOWED_REPLY_SELECTION = `
+  followedReply(viewer: $viewerPubkey) {
+    nodes {
+      ${FEED_REPLY_PREVIEW_BASE_SELECTION}
     }
   }
 `;
@@ -248,32 +219,7 @@ query NaggGraphqlRankedFeed($input: RankedEventsInput!, $viewerPubkey: String!, 
           ${FEED_REPLY_PREVIEW_SOURCE_SELECTION}
         }
       }
-      followedReply: rankedReferencedBy(input: {
-        via: { key: "e" }
-        events: {
-          kinds: [1, 1111]
-          pubkeysFrom: [{
-            latestEventTags: {
-              pubkey: $viewerPubkey
-              kinds: [3]
-              tag: { key: "p" }
-              limit: 1
-              maxValues: 2000
-            }
-          }]
-          limit: 50
-        }
-        rank: {
-          references: { kinds: [7], limit: 500 }
-          via: { key: "e" }
-          metric: { name: "likers", op: "COUNT_DISTINCT", distinctField: "PUBKEY" }
-        }
-        limit: 1
-      }) {
-        nodes {
-          ${FEED_REPLY_PREVIEW_BASE_SELECTION}
-        }
-      }
+      ${FEED_FOLLOWED_REPLY_SELECTION}
       ${METRIC_SELECTION}
     }
     pageInfo { endCursor hasNextPage }
@@ -290,32 +236,7 @@ query NaggGraphqlRankedFeed($input: RankedEventsInput!, $viewerPubkey: String!) 
       ${ROOT_CONTEXT_SELECTION}
       ${EVENT_REFS_SELECTION}
       ${QUOTED_CONTENT_SELECTION}
-      followedReply: rankedReferencedBy(input: {
-        via: { key: "e" }
-        events: {
-          kinds: [1, 1111]
-          pubkeysFrom: [{
-            latestEventTags: {
-              pubkey: $viewerPubkey
-              kinds: [3]
-              tag: { key: "p" }
-              limit: 1
-              maxValues: 2000
-            }
-          }]
-          limit: 50
-        }
-        rank: {
-          references: { kinds: [7], limit: 500 }
-          via: { key: "e" }
-          metric: { name: "likers", op: "COUNT_DISTINCT", distinctField: "PUBKEY" }
-        }
-        limit: 1
-      }) {
-        nodes {
-          ${FEED_REPLY_PREVIEW_BASE_SELECTION}
-        }
-      }
+      ${FEED_FOLLOWED_REPLY_SELECTION}
       ${METRIC_SELECTION}
     }
     pageInfo { endCursor hasNextPage }
@@ -352,32 +273,7 @@ query NaggGraphqlFollowingPopular($input: RankedEventsInput!, $viewerPubkey: Str
           ${FEED_REPLY_PREVIEW_SOURCE_SELECTION}
         }
       }
-      followedReply: rankedReferencedBy(input: {
-        via: { key: "e" }
-        events: {
-          kinds: [1, 1111]
-          pubkeysFrom: [{
-            latestEventTags: {
-              pubkey: $viewerPubkey
-              kinds: [3]
-              tag: { key: "p" }
-              limit: 1
-              maxValues: 2000
-            }
-          }]
-          limit: 50
-        }
-        rank: {
-          references: { kinds: [7], limit: 500 }
-          via: { key: "e" }
-          metric: { name: "likers", op: "COUNT_DISTINCT", distinctField: "PUBKEY" }
-        }
-        limit: 1
-      }) {
-        nodes {
-          ${FEED_REPLY_PREVIEW_BASE_SELECTION}
-        }
-      }
+      ${FEED_FOLLOWED_REPLY_SELECTION}
       ${METRIC_SELECTION}
     }
     pageInfo { endCursor hasNextPage }
@@ -394,32 +290,7 @@ query NaggGraphqlFollowingPopular($input: RankedEventsInput!, $viewerPubkey: Str
       ${ROOT_CONTEXT_SELECTION}
       ${EVENT_REFS_SELECTION}
       ${QUOTED_CONTENT_SELECTION}
-      followedReply: rankedReferencedBy(input: {
-        via: { key: "e" }
-        events: {
-          kinds: [1, 1111]
-          pubkeysFrom: [{
-            latestEventTags: {
-              pubkey: $viewerPubkey
-              kinds: [3]
-              tag: { key: "p" }
-              limit: 1
-              maxValues: 2000
-            }
-          }]
-          limit: 50
-        }
-        rank: {
-          references: { kinds: [7], limit: 500 }
-          via: { key: "e" }
-          metric: { name: "likers", op: "COUNT_DISTINCT", distinctField: "PUBKEY" }
-        }
-        limit: 1
-      }) {
-        nodes {
-          ${FEED_REPLY_PREVIEW_BASE_SELECTION}
-        }
-      }
+      ${FEED_FOLLOWED_REPLY_SELECTION}
       ${METRIC_SELECTION}
     }
     pageInfo { endCursor hasNextPage }
@@ -499,28 +370,7 @@ const THREAD_REPLY_SELECTION = `
 
 const THREAD_RELEVANT_REPLY_SELECTION = `
   ${THREAD_REPLY_SELECTION}
-  childFollowedReply: rankedReferencedBy(input: {
-    via: { key: "e" }
-    events: {
-      kinds: [1, 1111]
-      pubkeysFrom: [{
-        latestEventTags: {
-          pubkey: $viewerPubkey
-          kinds: [3]
-          tag: { key: "p" }
-          limit: 1
-          maxValues: 2000
-        }
-      }]
-      limit: 50
-    }
-    rank: {
-      references: { kinds: [7], limit: 500 }
-      via: { key: "e" }
-      metric: { name: "likers", op: "COUNT_DISTINCT", distinctField: "PUBKEY" }
-    }
-    limit: 1
-  }) {
+  childFollowedReply: followedReply(viewer: $viewerPubkey) {
     nodes {
       ${THREAD_REPLY_SELECTION}
     }
@@ -536,28 +386,7 @@ const AUTHOR_REPLIES_SELECTION = `
 `;
 
 const FOLLOWED_REPLY_SELECTION = `
-  followedReply: rankedReferencedBy(input: {
-    via: { key: "e" }
-    events: {
-      kinds: [1, 1111]
-      pubkeysFrom: [{
-        latestEventTags: {
-          pubkey: $viewerPubkey
-          kinds: [3]
-          tag: { key: "p" }
-          limit: 1
-          maxValues: 2000
-        }
-      }]
-      limit: 50
-    }
-    rank: {
-      references: { kinds: [7], limit: 500 }
-      via: { key: "e" }
-      metric: { name: "likers", op: "COUNT_DISTINCT", distinctField: "PUBKEY" }
-    }
-    limit: 1
-  }) {
+  followedReply(viewer: $viewerPubkey) {
     nodes {
       ${THREAD_REPLY_SELECTION}
     }
@@ -594,7 +423,7 @@ query NaggGraphqlThread($id: String!, $limit: Int!, $offset: Int!) {
   event(id: $id) {
     ${THREAD_EVENT_SELECTION}
     replies: referencedBy(input: {
-      via: { key: "e" }
+      via: { key: "e", directReplies: true }
       events: { kinds: [1, 1111], limit: $limit }
       limit: $limit
       offset: $offset
@@ -619,7 +448,7 @@ query NaggGraphqlThread(
   event(id: $id) {
     ${THREAD_EVENT_SELECTION}
     replies: rankedReferencedBy(input: {
-      via: { key: "e" }
+      via: { key: "e", directReplies: true }
       events: { kinds: [1, 1111], limit: $candidateLimit }
       rank: $rank
       limit: $limit
@@ -648,7 +477,7 @@ query NaggGraphqlThreadRelevant(
     ${AUTHOR_REPLIES_SELECTION}
     ${FOLLOWED_REPLY_SELECTION}
     replies: rankedReferencedBy(input: {
-      via: { key: "e" }
+      via: { key: "e", directReplies: true }
       events: { kinds: [1, 1111], limit: $candidateLimit }
       rank: $rank
       limit: $rankedLimit
@@ -658,7 +487,7 @@ query NaggGraphqlThreadRelevant(
       }
     }
     allReplies: referencedBy(input: {
-      via: { key: "e" }
+      via: { key: "e", directReplies: true }
       events: { kinds: [1, 1111], limit: $candidateLimit }
       limit: $candidateLimit
     }) {
