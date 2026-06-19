@@ -39,6 +39,7 @@ export const EmbedActionBar = React.memo(function EmbedActionBar({
   repostPending,
   onCommentPress,
   onRepostPress,
+  onQuotePress,
   onLikePress,
 }: {
   metrics: NoteMetrics;
@@ -48,6 +49,7 @@ export const EmbedActionBar = React.memo(function EmbedActionBar({
   repostPending: boolean;
   onCommentPress: () => void;
   onRepostPress: () => void;
+  onQuotePress?: () => void;
   onLikePress: () => void;
 }) {
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
@@ -119,6 +121,7 @@ export const EmbedActionBar = React.memo(function EmbedActionBar({
           showBorder={false}
           onCommentPress={onCommentPress}
           onRepostPress={onRepostPress}
+          onQuotePress={onQuotePress}
           onLikePress={onLikePress}
           reposted={reposted}
           liked={liked}

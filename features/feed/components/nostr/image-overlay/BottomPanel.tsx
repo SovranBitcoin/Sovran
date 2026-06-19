@@ -1,14 +1,16 @@
 /**
  * Bottom panel components for the image overlay:
  * - ImageOverlayBottomPanelContent: scrollable author, content (with inline images), metrics
- * - ImageOverlayBottomPanelReply: fixed reply row at bottom of sheet
  * - ImageOverlayAbsoluteBar: author/stats bar when sheet is closed
+ *
+ * The live "Post your reply" composer is the shared `ThreadReplyBar`, mounted at
+ * the overlay root by `AnimatedImageOverlay` (not here) so it can anchor to the
+ * screen bottom and rise with the keyboard.
  * - InlinePanelImage: image with blurred letterbox for aspect ratio mismatch
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import opacity from 'hex-color-opacity';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
@@ -16,7 +18,6 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { formatRelative } from '@/shared/lib/date';
 import { formatCount, formatSats } from '../feedFormat';
 import { parseContent } from '../feedParse';
@@ -24,7 +25,32 @@ import type { ContentSegment } from '../feedTypes';
 import type { ImageOverlayPost } from './types';
 import { BOTTOM_PANEL_PADDING_HORIZONTAL, BOTTOM_PANEL_PADDING_TOP } from './config';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { openRepostMenu } from '@/features/feed/lib/repostMenu';
+import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { Log } from '@/shared/lib/logger';
+
+// The Repost/Quote menu can't render over the image overlay (a FullWindowOverlay
+// the menu's bottom sheet mounts beneath), so the overlay closes first, then the
+// menu opens once it's on its way out.
+const OVERLAY_CLOSE_BEFORE_MENU_MS = 240;
+
+/**
+ * Repost handler for the overlay's repost buttons: dismiss the lightbox, then
+ * open the shared Repost-or-Quote menu. `onRequestClose` is the overlay's close.
+ */
+function useOverlayRepostMenu(post: ImageOverlayPost, onRequestClose?: () => void) {
+  const quotePost = useQuotePost();
+  return useCallback(() => {
+    onRequestClose?.();
+    setTimeout(() => {
+      openRepostMenu({
+        reposted: !!post.reposted,
+        onRepost: () => post.onRepostPress?.(),
+        onQuote: () => quotePost(post.event, post.profile ?? undefined),
+      });
+    }, OVERLAY_CLOSE_BEFORE_MENU_MS);
+  }, [post, onRequestClose, quotePost]);
+}
 import { POST_ACTION_ICON_SIZES } from '../MetricsFooter';
 // Absolute bar text stays white — it floats over the dark, blurred image, not
 // over the sheet's `surface` background.
@@ -203,12 +229,15 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
   post,
   initialContentExpanded,
   onConsumedExpand,
+  onRequestClose,
 }: {
   post: ImageOverlayPost;
   /** When true, content starts expanded (e.g. opened via "show more" on absolute bar). */
   initialContentExpanded?: boolean;
   /** Called after applying initialContentExpanded so caller can clear the flag. */
   onConsumedExpand?: () => void;
+  /** Dismisses the lightbox so the Repost/Quote menu can render over it. */
+  onRequestClose?: () => void;
 }) {
   const [foreground, muted, repostedColor] = useThemeColor([
     'foreground',
@@ -223,7 +252,8 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
       onConsumedExpand?.();
     }
   }, [initialContentExpanded, onConsumedExpand]);
-  const { event, metrics, profile, reposted, liked, onRepostPress, onLikePress } = post;
+  const { event, metrics, profile, reposted, liked, onLikePress } = post;
+  const handleRepostPress = useOverlayRepostMenu(post, onRequestClose);
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
@@ -340,7 +370,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
             </Text>
           </View>
           <Pressable
-            onPress={onRepostPress}
+            onPress={handleRepostPress}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={styles.metricBtn}>
             <Icon
@@ -381,44 +411,6 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
   );
 });
 
-/**
- * Fixed reply row at the bottom of the sheet (does not scroll). Mirrors the
- * thread screen's `ThreadReplyBar` collapsed state — own avatar, a themed
- * rounded input pill, and the expand affordance — so the two reply surfaces
- * read identically. Tapping anywhere hands off to the thread, where the live
- * composer lives.
- */
-export const ImageOverlayBottomPanelReply = React.memo(function ImageOverlayBottomPanelReply({
-  currentUserPubkey,
-  onReplyPress,
-}: {
-  currentUserPubkey: string | null;
-  onReplyPress: () => void;
-}) {
-  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
-  const ownProfile = useProfileStore((s) => s.getActiveProfile());
-  const fieldBg = opacity(foreground, 0.06);
-  return (
-    <Log name="ImageOverlayBottomPanelReply">
-      <Pressable onPress={onReplyPress} style={styles.replyRow}>
-        <Avatar
-          state={ownProfile?.cachedPicture ? 'image' : 'fallback'}
-          picture={ownProfile?.cachedPicture}
-          seed={ownProfile?.pubkey ?? currentUserPubkey ?? ''}
-          size={30}
-          name={ownProfile?.cachedDisplayName}
-        />
-        <View style={[styles.replyInputPill, { backgroundColor: fieldBg }]}>
-          <Text size={15} style={{ color: muted }}>
-            Post your reply
-          </Text>
-        </View>
-        <Icon name="mdi:arrow-expand" size={20} color={muted} />
-      </Pressable>
-    </Log>
-  );
-});
-
 /** Options when opening the sheet from the absolute bar. */
 type ImageOverlayOpenSheetOptions = { expandContent?: boolean };
 
@@ -426,13 +418,17 @@ type ImageOverlayOpenSheetOptions = { expandContent?: boolean };
 export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteBar({
   post,
   onOpenSheet,
+  onRequestClose,
 }: {
   post: ImageOverlayPost;
   /** Called when user taps comment or show more. Pass { expandContent: true } when opening via "show more" so the sheet opens with content expanded. */
   onOpenSheet: (options?: ImageOverlayOpenSheetOptions) => void;
+  /** Dismisses the lightbox so the Repost/Quote menu can render over it. */
+  onRequestClose?: () => void;
 }) {
   const repostedColor = useThemeColor('success');
-  const { event, metrics, profile, reposted, liked, onRepostPress, onLikePress } = post;
+  const handleRepostPress = useOverlayRepostMenu(post, onRequestClose);
+  const { event, metrics, profile, reposted, liked, onLikePress } = post;
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
@@ -509,7 +505,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
             </Text>
           </Pressable>
           <Pressable
-            onPress={onRepostPress}
+            onPress={handleRepostPress}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={styles.metricBtn}>
             <Icon
@@ -603,17 +599,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-  },
-  replyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  replyInputPill: {
-    flex: 1,
-    minHeight: 38,
-    borderRadius: 19,
-    justifyContent: 'center',
-    paddingHorizontal: 14,
   },
 });

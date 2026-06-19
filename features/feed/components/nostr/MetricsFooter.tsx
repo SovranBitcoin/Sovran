@@ -7,7 +7,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import { openRepostMenu } from '@/features/feed/lib/repostMenu';
 import type { NoteMetrics } from './feedTypes';
 import { formatCount, formatSats } from './feedFormat';
 import { sharedStyles } from './feedStyles';
@@ -97,33 +97,11 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   const iconSizes = compact ? POST_ACTION_ICON_SIZES.compact : POST_ACTION_ICON_SIZES.regular;
   const textSize = compact ? 11 : 13;
 
-  // The repost button opens a menu offering a plain repost or a quote. Quote is
-  // disabled/greyed-out for now.
+  // The repost button opens the shared Repost-or-Quote menu. Quote is greyed out
+  // when no `onQuotePress` is supplied.
   const handleRepostPress = React.useCallback(() => {
     if (!onRepostPress) return;
-    actionMenuPopup({
-      title: 'Repost',
-      buttons: [
-        {
-          text: reposted ? 'Undo repost' : 'Repost',
-          icon: 'garden:arrow-retweet-fill-16',
-          onPress: (close) => {
-            close();
-            onRepostPress();
-          },
-        },
-        {
-          text: 'Quote',
-          icon: 'mdi:format-quote-close',
-          disabled: !onQuotePress,
-          reason: onQuotePress ? undefined : 'Coming soon',
-          onPress: (close) => {
-            close();
-            onQuotePress?.();
-          },
-        },
-      ],
-    });
+    openRepostMenu({ reposted, onRepost: onRepostPress, onQuote: onQuotePress });
   }, [onRepostPress, onQuotePress, reposted]);
 
   return (

@@ -25,8 +25,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import type { FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
 import { formatDate, formatRelative } from '@/shared/lib/date';
-import { tryNpubEncode, tryNeventEncode } from './feedParse';
-import { useOpenComposer } from '@/features/composer/publish/useComposerActions';
+import { tryNpubEncode } from './feedParse';
+import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { NoteContent, NOTE_CONTENT_FONT_SIZE, NOTE_CONTENT_LINE_HEIGHT } from './NoteContent';
 import { MetricsFooter, POST_ACTION_ICON_SIZES } from './MetricsFooter';
 import {
@@ -196,21 +196,11 @@ export const PostCard = React.memo(function PostCard({
     });
   }, [event.pubkey]);
 
-  const openComposer = useOpenComposer();
-  const handleQuotePress = useCallback(() => {
-    const nevent = tryNeventEncode(event.id, event.pubkey, event.kind);
-    openComposer(
-      {
-        mode: 'quote',
-        quotedId: event.id,
-        quotedPubkey: event.pubkey,
-        quotedNevent: nevent || undefined,
-      },
-      // Carry the quoted post + its author so the composer can render it under
-      // the input, the same way reply mode renders the post being replied to.
-      { parentEvent: event, parentProfile: profile }
-    );
-  }, [event, profile, openComposer]);
+  const quotePost = useQuotePost();
+  const handleQuotePress = useCallback(
+    () => quotePost(event, profile),
+    [quotePost, event, profile]
+  );
 
   const suppressThreadTapRef = useRef(false);
 
