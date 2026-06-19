@@ -393,6 +393,10 @@ function RootLayoutContent() {
           {/* Main drawer with tabs inside */}
           <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
 
+          {/* Catch-all for unresolved routes — degrades gracefully instead of
+              leaving the user on a dead screen. */}
+          <Stack.Screen name="+not-found" options={{ headerShown: false }} />
+
           {/* All modal screens configured from MODAL_SCREENS */}
           {modalScreenElements}
         </Stack>

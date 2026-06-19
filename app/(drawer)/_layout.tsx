@@ -25,7 +25,10 @@ import { useNip46RequestsStore } from '@/features/nostrSigner';
 
 type MenuRoute =
   | '/(drawer)/(tabs)/feed'
-  | '/(drawer)/(tabs)/index'
+  // Wallet is the `(tabs)/index` folder, which expo-router collapses to an
+  // empty path segment — so its canonical route is the app root `/`, not
+  // `/(drawer)/(tabs)/index` (that path resolves to +not-found at runtime).
+  | '/'
   | '/(drawer)/(tabs)/contacts'
   | '/(drawer)/(tabs)/notifications'
   | '/(drawer)/(tabs)/ai'
@@ -64,7 +67,7 @@ const MENU_ITEMS: MenuItem[] = [
   {
     icon: { default: 'fluent:wallet-20-regular', selected: 'fluent:wallet-20-filled' },
     label: 'Wallet',
-    route: '/(drawer)/(tabs)/index',
+    route: '/',
     activeSegments: ['(drawer)', '(tabs)', 'index'],
   },
   {
