@@ -171,7 +171,10 @@ function LoadingContent({ borderRadius, color }: { borderRadius: number; color: 
 // a couple px ("padding-top"-like content shift when a pfp finishes loading).
 // Do not switch any of these roots back to `VStack` (a different component type).
 const avatarFrameStyle = { position: 'relative' as const, overflow: 'hidden' as const };
-const hiddenImageOpacityStyle = { opacity: 0 };
+/** Fade duration (ms) for a profile picture loading in over its placeholder.
+ *  expo-image skips this for memory-cached images, so recycled avatars stay
+ *  instant — only a real network/disk load fades. */
+const AVATAR_IMAGE_FADE_MS = 200;
 
 let avatarLoadingVisualInstance = 0;
 
@@ -272,8 +275,8 @@ export const Avatar = ({
     () => (previousPicture ? { uri: previousPicture } : null),
     [previousPicture]
   );
-  const hiddenImageStyle = useMemo(
-    () => [StyleSheet.absoluteFillObject, avatarStyle, hiddenImageOpacityStyle],
+  const overlayImageStyle = useMemo(
+    () => [StyleSheet.absoluteFillObject, avatarStyle],
     [avatarStyle]
   );
   const showsLoadingPlaceholder =
@@ -377,49 +380,37 @@ export const Avatar = ({
     );
   }
 
-  // 5. Image state — image still loading. Keep the previous decoded image in
-  // place while the next URL warms, avoiding a fallback/loading flash when a
-  // profile picture changes during a transition.
-  if (imageStatus !== 'loaded') {
-    return (
-      <View
-        ref={visualLayout.ref}
-        collapsable={false}
-        style={avatarFrameStyle}
-        onLayout={handleVisualLayout}>
-        {previousPicture ? (
-          <ExpoImage
-            source={previousPictureSource}
-            cachePolicy="memory-disk"
-            style={avatarStyle}
-            accessibilityLabel={imageAlt}
-          />
-        ) : (
-          <View style={containerStyle}>
-            <LoadingContent borderRadius={borderRadius} color={loadingColor} />
-          </View>
-        )}
-        <ExpoImage
-          source={pictureSource}
-          cachePolicy="memory-disk"
-          style={hiddenImageStyle}
-          accessibilityLabel={imageAlt}
-          onLoad={handleImageLoad}
-          onError={handleImageError}
-        />
-        {StatusBadgeWrapper}
-      </View>
-    );
-  }
-
-  // 6. Image state — loaded → show the image.
+  // 5. Image state — the picture fades in over a placeholder via expo-image's
+  // native transition. The transition is skipped for memory-cached images, so it
+  // only smooths a real load (network/disk) and never re-fades when an avatar
+  // recycles back into view while scrolling. Behind it sits the previous decoded
+  // image (while the URL is changing) or the loading fill, so the fade crossfades
+  // from a placeholder rather than from empty space.
   return (
-    <View style={avatarFrameStyle}>
+    <View
+      ref={visualLayout.ref}
+      collapsable={false}
+      style={avatarFrameStyle}
+      onLayout={handleVisualLayout}>
+      {previousPicture ? (
+        <ExpoImage
+          source={previousPictureSource}
+          cachePolicy="memory-disk"
+          style={avatarStyle}
+          accessibilityLabel={imageAlt}
+        />
+      ) : (
+        <View style={containerStyle}>
+          <LoadingContent borderRadius={borderRadius} color={loadingColor} />
+        </View>
+      )}
       <ExpoImage
         source={pictureSource}
         cachePolicy="memory-disk"
-        style={avatarStyle}
+        transition={AVATAR_IMAGE_FADE_MS}
+        style={overlayImageStyle}
         accessibilityLabel={imageAlt}
+        onLoad={handleImageLoad}
         onError={handleImageError}
       />
       {StatusBadgeWrapper}
