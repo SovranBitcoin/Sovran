@@ -2,9 +2,9 @@
  * Shared amount-entry shell: centred amount display + optional secondary pill
  * + optional quick-send suggestions + CustomKeyboard + primary Next button.
  *
- * Consumed by the send/receive flow's AmountSelector adapter (machine-driven)
- * and by the Split-Bill step-1 screen (local-state). Keep it framework-neutral:
- * no colada imports, no feature imports that would create cycles.
+ * Consumed by the send/receive flow's AmountSelector adapter (machine-driven).
+ * Keep it framework-neutral: no colada imports, no feature imports that would
+ * create cycles, so any local-state caller can reuse it without the machine.
  */
 
 import { useCallback, useEffect, useMemo } from 'react';
@@ -217,7 +217,13 @@ export function AmountEntryView({
   const isFiat = inputMode === 'fiat';
   const isReceive = transactionType === 'receive';
   // The amount tint encodes input validity, not transaction direction:
-  //   • genuine problem — input present AND a danger notice is showing (e.g.
+  //   • no real amount yet (empty, or a typed zero like "0"/".") → dimmed
+  //     foreground placeholder. Gated on the parsed value rather than the
+  //     raw string so a typed "0" reads as "nothing entered yet" in both the
+  //     fiat and sat paths, while a tiny fiat entry ("0.01") that rounds to
+  //     zero sats still renders bright (we read the typed value, not the sat
+  //     conversion).
+  //   • genuine problem — a real amount AND a danger notice is showing (e.g.
   //     "Insufficient balance") → danger, so the number and its notice move
   //     in lockstep and red reliably means "this amount can't proceed".
   //   • receive flow → success, a positive affordance (green never reads as
@@ -226,9 +232,10 @@ export function AmountEntryView({
   // Reserving red for the problem state stops a valid send amount from
   // reading as an error (#214). One decision drives both the fiat raw-input
   // path and the BTC glyph path (passed to AmountFormatter via `color`).
-  const hasProblem = rawInput.length > 0 && noticeText != null && noticeText.length > 0;
+  const hasAmount = parseFloat(rawInput) > 0;
+  const hasProblem = hasAmount && noticeText != null && noticeText.length > 0;
   const baseTint = isReceive ? success : foreground;
-  const amountColor = !rawInput ? opacity(foreground, 0.4) : hasProblem ? danger : baseTint;
+  const amountColor = !hasAmount ? opacity(foreground, 0.4) : hasProblem ? danger : baseTint;
   const placeholderColor = opacity(baseTint, 0.35);
 
   const suggestionsRow = useMemo(() => {
