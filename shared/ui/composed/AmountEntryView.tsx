@@ -223,26 +223,23 @@ export function AmountEntryView({
   const isFiat = inputMode === 'fiat';
   // The amount is neutral foreground on BOTH send and receive — the colour
   // encodes only validity, never transaction direction. This keeps the two
-  // screens identical and lets the fiat decimal prefill read the same
-  // everywhere: typed digits full-colour, the unfilled "00" dimmed.
-  //   • no real amount yet (empty, or a typed zero like "0"/".") → dimmed
-  //     foreground placeholder. Gated on the parsed value rather than the
-  //     raw string so a typed "0" reads as "nothing entered yet" in both the
-  //     fiat and sat paths, while a tiny fiat entry ("0.01") that rounds to
-  //     zero sats still renders bright (we read the typed value, not the sat
-  //     conversion).
-  //   • genuine problem — a real amount that can't proceed (a danger notice,
+  // screens identical.
+  //   • nothing typed yet (empty input) → a dimmed foreground placeholder "0".
+  //   • genuine problem — what the user typed can't proceed (a danger notice,
   //     or an amount that exceeds the spendable balance) → danger, so the
   //     number and its notice move in lockstep and red reliably means
   //     "something's wrong with this amount".
-  //   • otherwise (a valid amount) → foreground.
-  // Reserving red for the problem state stops a valid amount from reading as
-  // an error (#214). One decision drives both the fiat raw-input path and the
-  // BTC glyph path (passed to AmountFormatter via `color`).
-  const hasAmount = parseFloat(rawInput) > 0;
+  //   • otherwise (anything typed, including "0"/"0.") → full foreground.
+  // Dimming is reserved for the empty placeholder and the fiat decimal prefill
+  // ("00") so the digits the user actually typed always read at full contrast —
+  // a half-typed "0." must not blend into the dimmed prefill behind it. Reserving
+  // red for the problem state stops a valid amount from reading as an error
+  // (#214). One decision drives both the fiat raw-input path and the BTC glyph
+  // path (passed to AmountFormatter via `color`).
+  const hasInput = rawInput.length > 0;
   const hasNotice = noticeText != null && noticeText.length > 0;
-  const isProblem = hasAmount && (hasNotice || exceedsBalance);
-  const amountColor = !hasAmount ? opacity(foreground, 0.4) : isProblem ? danger : foreground;
+  const isProblem = hasInput && (hasNotice || exceedsBalance);
+  const amountColor = !hasInput ? opacity(foreground, 0.4) : isProblem ? danger : foreground;
   const placeholderColor = opacity(foreground, 0.35);
 
   const suggestionsRow = useMemo(() => {
