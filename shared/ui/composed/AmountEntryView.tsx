@@ -161,10 +161,11 @@ interface AmountEntryViewProps {
   leadingBottomButton?: React.ReactNode;
 
   /**
-   * Color semantics:
-   *   'send'    — danger tint on raw input; AmountFormatter uses useTypeColors.
-   *   'receive' — foreground; AmountFormatter uses useTypeColors.
-   *   'neutral' — foreground; AmountFormatter renders without useTypeColors.
+   * Selects the amount's base tint and gates the quick-send suggestions row
+   * (send only). 'receive' tints the amount `success` (green) as a positive
+   * affordance; 'send'/'neutral' use `foreground`. A genuine problem state
+   * (input present + a danger `noticeText`) overrides any base tint with
+   * `danger` — red signals validity, never transaction direction (#214).
    */
   transactionType?: AmountEntryTransactionType;
 }
@@ -214,14 +215,21 @@ export function AmountEntryView({
   const topPadding = insets.top + (isCompactPhone ? 12 : 24);
 
   const isFiat = inputMode === 'fiat';
-  const isSend = transactionType === 'send';
   const isReceive = transactionType === 'receive';
-  // Match `AmountFormatter.resolveColor`: send → danger, receive → success,
-  // anything else → foreground. Keeps the fiat raw-input path (which doesn't
-  // route through AmountFormatter) in sync with the BTC glyph path.
-  const typeTint = isSend ? danger : isReceive ? success : foreground;
-  const activeColor = rawInput ? typeTint : opacity(foreground, 0.4);
-  const placeholderColor = opacity(typeTint, 0.35);
+  // The amount tint encodes input validity, not transaction direction:
+  //   • genuine problem — input present AND a danger notice is showing (e.g.
+  //     "Insufficient balance") → danger, so the number and its notice move
+  //     in lockstep and red reliably means "this amount can't proceed".
+  //   • receive flow → success, a positive affordance (green never reads as
+  //     an error).
+  //   • otherwise (a valid send/neutral amount) → foreground.
+  // Reserving red for the problem state stops a valid send amount from
+  // reading as an error (#214). One decision drives both the fiat raw-input
+  // path and the BTC glyph path (passed to AmountFormatter via `color`).
+  const hasProblem = rawInput.length > 0 && noticeText != null && noticeText.length > 0;
+  const baseTint = isReceive ? success : foreground;
+  const amountColor = !rawInput ? opacity(foreground, 0.4) : hasProblem ? danger : baseTint;
+  const placeholderColor = opacity(baseTint, 0.35);
 
   const suggestionsRow = useMemo(() => {
     if (transactionType !== 'send' || suggestions.length === 0) return null;
@@ -298,7 +306,6 @@ export function AmountEntryView({
     );
   }, [transactionType, suggestions, onSuggestionTap, foreground, background]);
 
-  const useTypeColors = transactionType === 'send' || transactionType === 'receive';
   const logNextPress = useCallback(
     (source: 'plain' | 'leading-row') => {
       cashuLog.info('amount_entry.next.press', {
@@ -402,7 +409,7 @@ export function AmountEntryView({
                 symbol={fiatSymbol}
                 size={amountTextSize}
                 lineHeight={amountLineHeight}
-                activeColor={activeColor}
+                activeColor={amountColor}
                 placeholderColor={placeholderColor}
               />
             ) : (
@@ -413,10 +420,7 @@ export function AmountEntryView({
                 lineHeight={amountLineHeight}
                 weight="heavy"
                 animated
-                useTypeColors={useTypeColors}
-                transactionType={
-                  useTypeColors ? (transactionType as 'send' | 'receive') : undefined
-                }
+                color={amountColor}
                 centered
               />
             )}

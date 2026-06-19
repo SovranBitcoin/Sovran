@@ -8,7 +8,6 @@ import {
   ViewStyle,
 } from 'react-native';
 
-import opacity from 'hex-color-opacity';
 import { LiquidGlassText } from 'liquid-glass-text';
 import type { GlassVariant } from 'liquid-glass-text';
 
@@ -24,7 +23,6 @@ import { View } from '@/shared/ui/primitives/View/View';
 
 type CurrencyUnit = 'sat' | 'usd' | 'eur' | string;
 type FontWeight = 'light' | 'regular' | 'medium' | 'heavy';
-type TransactionType = 'send' | 'receive';
 
 // MonaSans ships ₿ (U+20BF) as a proper glyph, so we can render the Bitcoin
 // sign inline with the digits instead of compositing a separate SVG icon.
@@ -59,8 +57,6 @@ interface AmountFormatterProps {
   centered?: boolean;
   className?: string;
   animated?: boolean;
-  useTypeColors?: boolean;
-  transactionType?: TransactionType;
   /**
    * Opt in to Liquid Glass on iOS 26+. Silently falls through to the plain
    * MonaSans text path on older iOS and on Android.
@@ -97,17 +93,11 @@ export function AmountFormatter({
   centered = false,
   className,
   animated = false,
-  useTypeColors = false,
-  transactionType = 'send',
   liquid = false,
   glassVariant = 'regular',
   sign,
 }: AmountFormatterProps) {
-  const [foreground, danger, receiveColor] = useThemeColor([
-    'foreground',
-    'danger',
-    'success',
-  ] as const);
+  const foreground = useThemeColor('foreground');
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
   const numericAmount = amountToNumber(amount);
 
@@ -118,15 +108,7 @@ export function AmountFormatter({
   );
   const text = sign ? `${sign} ${decorated}` : decorated;
 
-  const resolvedColor = resolveColor({
-    color,
-    useTypeColors,
-    amount: numericAmount,
-    transactionType,
-    foreground,
-    danger,
-    receiveColor,
-  });
+  const resolvedColor = resolveColor({ color, foreground });
 
   const { liquidGlass } = useCapabilities();
   const useGlass = liquid && liquidGlass;
@@ -144,8 +126,6 @@ export function AmountFormatter({
       weight,
       centered,
       animated,
-      useTypeColors,
-      transactionType,
       liquid,
       liquidGlass,
       useGlass,
@@ -164,10 +144,8 @@ export function AmountFormatter({
     sign,
     size,
     text.length,
-    transactionType,
     unit,
     useGlass,
-    useTypeColors,
     weight,
   ]);
 
@@ -255,30 +233,16 @@ function plainTextStyle(
 
 function resolveColor({
   color,
-  useTypeColors,
-  amount,
-  transactionType,
   foreground,
-  danger,
-  receiveColor,
 }: {
   color: string | null | undefined;
-  useTypeColors: boolean;
-  amount: number;
-  transactionType: TransactionType;
   foreground: string;
-  danger: string;
-  receiveColor: string;
 }): string | null {
   // `color === null` is an explicit opt-out: "no tint at all" on the liquid
   // path. Must be checked before the `||` fallback, or null would coerce
   // back to foreground.
   if (color === null) return null;
   if (color) return color;
-  if (useTypeColors) {
-    if (!amount) return opacity(foreground, 0.4);
-    return transactionType === 'receive' ? receiveColor : danger;
-  }
   return foreground;
 }
 
