@@ -15,11 +15,20 @@ import Reanimated, {
 import { Image } from 'expo-image';
 import { BlurView } from '@/shared/ui/primitives/BlurView';
 import { View } from '@/shared/ui/primitives/View/View';
+import { Text } from '@/shared/ui/primitives/Text';
+import Icon from 'assets/icons';
+import opacity from 'hex-color-opacity';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../feedTypes';
 import { useImageOverlay } from './provider';
 import type { ImageOverlayPost, MediaType, ThumbnailLayout } from './types';
 import { ANDROID_THUMB_DIM_MAX_OPACITY, THUMB_BLUR_MAX_INTENSITY } from './config';
 import { Log, feedLog } from '@/shared/lib/logger';
+import { useShiftLogger, useVisualLayoutLogger, urlHost } from '@/shared/lib/contentShiftLog';
+import { getCachedAspect, rememberAspect } from './imageAspectCache';
+
+/** Aspect ratio reserved before the image's intrinsic size is known. */
+const DEFAULT_IMAGE_ASPECT = 16 / 9;
 
 /** The subset of GestureResponderEvent.nativeEvent the calibration reads. */
 type GestureTouchPoint = { pageX: number; pageY: number; locationX: number; locationY: number };
@@ -46,11 +55,13 @@ interface ImageBlockOverlayPostProps {
 
 export const ImageBlock = React.memo(function ImageBlock({
   url,
+  alt,
   allImageUrls,
   allMediaUrls,
   mediaTypes,
   mediaIndex,
   imageIndex,
+  initialAspectRatio,
   onBeforeOpen,
   onPressIn,
   onPressOut,
@@ -70,6 +81,16 @@ export const ImageBlock = React.memo(function ImageBlock({
   onActionPressOut,
 }: {
   url: string;
+  /** NIP-92 imeta alt text, used as the image's accessibility label. */
+  alt?: string;
+  /**
+   * Aspect ratio (width / height) known ahead of load — e.g. from the post's
+   * NIP-92 imeta `dim`. Used as the initial reserved size so the image lays out
+   * correctly on the first frame. A runtime cache of ratios learned from prior
+   * `onLoad`s takes precedence (covers navigating in from an already-rendered
+   * feed, where imeta may be absent).
+   */
+  initialAspectRatio?: number;
   /** When the post has multiple images, pass all urls so the overlay can show a pager. */
   allImageUrls?: string[];
   /** Index of this image among the post's images (for opening overlay at the correct page). */
@@ -84,13 +105,41 @@ export const ImageBlock = React.memo(function ImageBlock({
   onPressIn?: () => void;
   onPressOut?: () => void;
 } & Partial<ImageBlockOverlayPostProps>) {
-  const [aspectRatio, setAspectRatio] = useState(16 / 9);
+  const [foreground] = useThemeColor(['foreground'] as const);
+  // Seed the reserved size from what we already know (a ratio learned from a
+  // prior onLoad, else the post's imeta dim) so the image doesn't flash 16:9 and
+  // resize. Lazy initializer so the lookup runs once at mount.
+  const [aspectRatio, setAspectRatio] = useState(
+    () => getCachedAspect(url) ?? initialAspectRatio ?? DEFAULT_IMAGE_ASPECT
+  );
   const [error, setError] = useState(false);
+  const shift = useShiftLogger('ImageBlock');
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
   /** Ref to the actual image so we measure the image bounds for shared-element, not the container. */
   const imageRef = useRef<React.ComponentRef<typeof Image> | null>(null);
   const imageOverlay = useImageOverlay();
   const layoutIndex = mediaIndex ?? imageIndex ?? 0;
+  const imageHost = urlHost(url);
+  const visualLayout = useVisualLayoutLogger({
+    scope: `feed.media.${overlayEvent?.id?.slice(0, 12) ?? imageHost}`,
+    surface: 'feed',
+    component: 'ImageBlock',
+    itemKey: overlayEvent?.id ? `${overlayEvent.id}:${layoutIndex}` : `${imageHost}:${layoutIndex}`,
+    itemType: mediaTypes?.[layoutIndex] ?? 'image',
+    index: layoutIndex,
+    extra: () => ({
+      host: imageHost,
+      aspectRatio: Math.round(aspectRatio * 100) / 100,
+      overlayActive: imageOverlay?.activeUrl === url,
+    }),
+  });
+  const setContainerRef = useCallback(
+    (node: React.ComponentRef<typeof View> | null) => {
+      containerRef.current = node;
+      visualLayout.ref(node);
+    },
+    [visualLayout]
+  );
 
   type Measureable = {
     measureInWindow: (cb: (x: number, y: number, w: number, h: number) => void) => void;
@@ -227,8 +276,10 @@ export const ImageBlock = React.memo(function ImageBlock({
             ? {
                 event: {
                   id: overlayEvent.id,
+                  kind: overlayEvent.kind,
                   pubkey: overlayEvent.pubkey,
                   content: overlayEvent.content,
+                  tags: overlayEvent.tags,
                   created_at: overlayEvent.created_at,
                 },
                 metrics: {
@@ -319,7 +370,19 @@ export const ImageBlock = React.memo(function ImageBlock({
     opacity: (thumbnailBlur.value / THUMB_BLUR_MAX_INTENSITY) * ANDROID_THUMB_DIM_MAX_OPACITY,
   }));
 
-  if (error) return null;
+  if (error) {
+    return (
+      <View
+        accessible
+        accessibilityLabel={alt ? `Image unavailable: ${alt}` : 'Image unavailable'}
+        style={[styles.unavailable, { backgroundColor: opacity(foreground, 0.06) }]}>
+        <Icon name="mdi:image-broken-variant" size={22} color={opacity(foreground, 0.4)} />
+        <Text size={12} style={{ color: opacity(foreground, 0.4), marginTop: 4 }}>
+          Image unavailable
+        </Text>
+      </View>
+    );
+  }
 
   const image = (
     <Image
@@ -330,11 +393,39 @@ export const ImageBlock = React.memo(function ImageBlock({
       cachePolicy="disk"
       recyclingKey={url}
       transition={300}
+      accessible={!!alt}
+      accessibilityLabel={alt}
+      accessibilityRole="image"
       onLoad={(e) => {
         const { width, height } = e.source;
-        if (width && height) setAspectRatio(width / height);
+        if (width && height) {
+          const next = width / height;
+          // Remember it so a later ImageBlock for this URL (e.g. the same post in
+          // a thread) can reserve the right box up front instead of flashing.
+          rememberAspect(url, next);
+          // If we'd already reserved the right ratio (cache/imeta), this is a
+          // no-op; otherwise the box resizes and shifts siblings — log the jump.
+          shift.report('feed.shift.image.aspect', url, next, {
+            host: urlHost(url),
+            mediaIndex: layoutIndex,
+            intrinsicWidth: width,
+            intrinsicHeight: height,
+            defaultAspect: DEFAULT_IMAGE_ASPECT,
+          });
+          setAspectRatio(next);
+        }
       }}
-      onError={() => setError(true)}
+      onError={() => {
+        feedLog.info('feed.shift.image.error', {
+          component: 'ImageBlock',
+          host: imageHost,
+          mediaIndex: layoutIndex,
+          // The block collapses from its reserved aspect box to the fixed-height
+          // "Image unavailable" placeholder — a downward shift of all siblings.
+          fromAspect: Math.round(aspectRatio * 100) / 100,
+        });
+        setError(true);
+      }}
     />
   );
 
@@ -343,10 +434,13 @@ export const ImageBlock = React.memo(function ImageBlock({
     <Log name="ImageBlock">
       <View style={styles.imageBlockOuter}>
         <View
-          ref={containerRef}
+          ref={setContainerRef}
           collapsable={false}
           style={{ aspectRatio }}
-          onLayout={registerLayout}>
+          onLayout={(event) => {
+            registerLayout();
+            visualLayout.onLayout(event);
+          }}>
           {imageOverlay?.open ? (
             <Pressable
               onPressIn={onPressIn}
@@ -383,6 +477,13 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  unavailable: {
+    marginVertical: 6,
+    borderRadius: 12,
+    paddingVertical: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   thumbnailDimAndroid: {
     borderRadius: 12,

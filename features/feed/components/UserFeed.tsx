@@ -29,11 +29,13 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
-import { log, Log } from '@/shared/lib/logger';
+import { log, Log, feedLog } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
+import { Button } from 'heroui-native';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
+import { useOpenComposer } from '@/features/composer/publish/useComposerActions';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
@@ -89,8 +91,16 @@ import {
   type ImageOverlayReplaceLayout,
 } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
+import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import {
+  remeasureVisualLayoutScope,
+  useVisualListLogger,
+  useVisualStateLogger,
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+} from '@/shared/lib/contentShiftLog';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 
 // ============================================================================
 // Types (UserFeed-specific)
@@ -315,12 +325,23 @@ export const RepostCard = React.memo(function RepostCard({
 // Empty State
 // ============================================================================
 
-function EmptyFeed() {
+function EmptyFeed({ isOwnProfile }: { isOwnProfile?: boolean }) {
+  const openComposer = useOpenComposer();
+  const action = isOwnProfile ? (
+    <Button variant="secondary" size="sm" onPress={() => openComposer({ mode: 'new' })}>
+      <Button.Label>Write a post</Button.Label>
+    </Button>
+  ) : undefined;
   return (
     <EmptyState
       icon="mdi:message-text"
       title="No posts yet"
-      subtitle="This user hasn't posted any notes."
+      subtitle={
+        isOwnProfile
+          ? 'Share your first note with the world.'
+          : "This user hasn't posted any notes."
+      }
+      action={action}
     />
   );
 }
@@ -339,6 +360,7 @@ export function UserFeed({
 }: UserFeedProps) {
   const foreground = useThemeColor('foreground');
   const imageOverlay = useImageOverlay();
+  const userFeedVisualScope = useMemo(() => `feed.user.${pubkey.slice(0, 12)}.list`, [pubkey]);
   const [, startTransition] = useTransition();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(new Map());
@@ -371,6 +393,7 @@ export function UserFeed({
 
   const feedListRef = useRef<LegendListRef>(null);
   const overlaySourceIndexRef = useRef(-1);
+  const scrollOffsetRef = useRef(0);
 
   useEffect(() => {
     if (!pubkey) {
@@ -442,6 +465,14 @@ export function UserFeed({
             missingProfilePubkeys: phase1.missingProfilePubkeys,
           });
           if (cancelled) return;
+          // Async enrichment lands after first paint and reflows rows (quoted
+          // posts resolving, author names/avatars filling in). See HomeFeed.
+          feedLog.info('feed.shift.enrich', {
+            surface: 'user',
+            quotedEvents: updates.quotedEvents?.size ?? 0,
+            metrics: updates.metrics?.size ?? 0,
+            profiles: updates.profiles?.size ?? 0,
+          });
           startTransition(() => {
             if (updates.quotedEvents) {
               setQuotedEventsMap((prev) => {
@@ -564,6 +595,12 @@ export function UserFeed({
             })
           : dedupedItems;
 
+      feedLog.info('feed.shift.append', {
+        surface: 'user',
+        appended: newItems.length,
+        total: feedItemIdsRef.current.size,
+        paginationUntil: page.paginationUntil,
+      });
       startTransition(() => {
         if (newItems.length > 0) setFeedItems((prev) => [...prev, ...newItems]);
         setMetricsMap((prev) => {
@@ -657,6 +694,7 @@ export function UserFeed({
   );
   const toggleLikeRef = useLatestRef(toggleLike);
   const toggleRepostRef = useLatestRef(toggleRepost);
+  const openPostActions = usePostActions();
 
   const videoPosts = useMemo((): VideoPostRecord[] => {
     const sourceEvents: FeedEvent[] = [];
@@ -767,6 +805,65 @@ export function UserFeed({
     feedRowsRef.current = feedRows;
   }, [feedRows]);
 
+  const visualList = useVisualListLogger<FeedRow>({
+    scope: userFeedVisualScope,
+    surface: 'profile',
+    component: 'UserFeedList',
+    phase: isLoading ? 'loading' : 'ready',
+    extra: () => ({
+      rows: feedRowsRef.current.length,
+      isLoading,
+      isLoadingMore,
+      isOwnProfile: !!isOwnProfile,
+    }),
+    getItemKey: (row) => row.key,
+    getItemContext: (row) => ({
+      rowKey: row.key,
+      rowLabel: getFeedRowItemType(row),
+      itemType: getFeedRowItemType(row),
+    }),
+    getListState: () => feedListRef.current?.getState() ?? null,
+  });
+
+  useVisualStateLogger({
+    scope: userFeedVisualScope,
+    surface: 'profile',
+    component: 'UserFeed',
+    stateKey: 'user-feed-state',
+    phase: isLoading ? 'loading' : isLoadingMore ? 'loading-more' : 'ready',
+    state: {
+      authorKnown: Boolean(authorName),
+      empty: !isLoading && feedRows.length === 0,
+      feedItems: feedItems.length,
+      hasHeader: ListHeaderComponent != null,
+      isLoading,
+      isLoadingMore,
+      isOwnProfile: !!isOwnProfile,
+      metrics: metricsMap.size,
+      profiles: profilesMap.size,
+      quotedEvents: quotedEventsMap.size,
+      rows: feedRows.length,
+      videos: videoPosts.length,
+    },
+    remeasure: {
+      reason: 'user-feed-state',
+      minIntervalMs: 300,
+      maxItems: 32,
+    },
+  });
+
+  // Render boundary / skeleton→content swap: mirrors HomeFeed's `feed.ui.render`
+  // so a profile-feed content shift can be traced the same way.
+  useEffect(() => {
+    feedLog.info('feed.shift.render', {
+      surface: 'user',
+      feedItems: feedItems.length,
+      rows: feedRows.length,
+      isLoading,
+      empty: !isLoading && feedRows.length === 0,
+    });
+  }, [feedItems.length, feedRows.length, isLoading]);
+
   const renderFeedItem = useCallback(
     ({ item: row, index }: LegendListRenderItemProps<FeedRow, string | undefined>) => {
       const item = row.item;
@@ -797,6 +894,7 @@ export function UserFeed({
                 likePendingDirection={rootEngagement.likePendingDirection}
                 repostPendingDirection={rootEngagement.repostPendingDirection}
                 onLikePress={() => toggleLikeRef.current(rootEvent)}
+                onMorePress={() => openPostActions(rootEvent)}
                 onRepostPress={() => toggleRepostRef.current(rootEvent)}
                 skipAnimation={!isFirstRender.current}
                 showLineBelow
@@ -819,6 +917,7 @@ export function UserFeed({
                 likePendingDirection={engagement.likePendingDirection}
                 repostPendingDirection={engagement.repostPendingDirection}
                 onLikePress={() => toggleLikeRef.current(item.event)}
+                onMorePress={() => openPostActions(item.event)}
                 onRepostPress={() => toggleRepostRef.current(item.event)}
                 showLineAbove
                 getThreadContext={() => getThreadContextRef.current()}
@@ -844,6 +943,7 @@ export function UserFeed({
             likePendingDirection={engagement.likePendingDirection}
             repostPendingDirection={engagement.repostPendingDirection}
             onLikePress={() => toggleLikeRef.current(item.event)}
+            onMorePress={() => openPostActions(item.event)}
             onRepostPress={() => toggleRepostRef.current(item.event)}
             skipAnimation={!isFirstRender.current}
             getThreadContext={() => getThreadContextRef.current()}
@@ -876,6 +976,7 @@ export function UserFeed({
               likePendingDirection={rootEngagement.likePendingDirection}
               repostPendingDirection={rootEngagement.repostPendingDirection}
               onLikePress={() => toggleLikeRef.current(rootEvent)}
+              onMorePress={() => openPostActions(rootEvent)}
               onRepostPress={() => toggleRepostRef.current(rootEvent)}
               skipAnimation={!isFirstRender.current}
               showLineBelow
@@ -901,6 +1002,7 @@ export function UserFeed({
               likePendingDirection={engagement.likePendingDirection}
               repostPendingDirection={engagement.repostPendingDirection}
               onLikePress={() => toggleLikeRef.current(originalEvent)}
+              onMorePress={() => openPostActions(originalEvent)}
               onRepostPress={() => toggleRepostRef.current(originalEvent)}
               skipAnimation={!isFirstRender.current}
               getThreadContext={() => getThreadContextRef.current()}
@@ -944,7 +1046,44 @@ export function UserFeed({
       toggleLikeRef,
       toggleRepostRef,
       getThreadContextRef,
+      openPostActions,
     ]
+  );
+
+  const renderItem = useCallback(
+    (props: LegendListRenderItemProps<FeedRow, string | undefined>) => (
+      <VisualLayoutProbe
+        scope={userFeedVisualScope}
+        surface="profile"
+        component="UserFeedRow"
+        itemKey={props.item.key}
+        itemType={getFeedRowItemType(props.item)}
+        index={props.index}
+        extra={() => ({
+          scrollY: Math.round(scrollOffsetRef.current),
+          rows: feedRowsRef.current.length,
+          isOwnProfile: !!isOwnProfile,
+        })}>
+        {renderFeedItem(props)}
+      </VisualLayoutProbe>
+    ),
+    [isOwnProfile, renderFeedItem, userFeedVisualScope]
+  );
+
+  const handleListScroll = useCallback(
+    (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+      const y = e.nativeEvent.contentOffset.y;
+      scrollOffsetRef.current = y;
+      if (imageOverlay?.scrollOffsetY != null) {
+        imageOverlay.scrollOffsetY.value = y;
+      }
+      remeasureVisualLayoutScope(userFeedVisualScope, 'scroll', {
+        minIntervalMs: 500,
+        maxItems: 32,
+        extra: { scrollY: Math.round(y) },
+      });
+    },
+    [imageOverlay, userFeedVisualScope]
   );
 
   const feedHeader = (
@@ -955,9 +1094,18 @@ export function UserFeed({
           Notes
         </Text>
         {isLoading ? (
-          <Spinner size={22} style={{ marginTop: 32 }} />
+          <VisualLayoutProbe
+            scope={userFeedVisualScope}
+            surface="profile"
+            component="UserFeedInitialSpinner"
+            itemKey="initial-spinner"
+            itemType="spinner"
+            index={0}
+            extra={{ isLoading }}>
+            <Spinner size={22} style={{ marginTop: 32 }} />
+          </VisualLayoutProbe>
         ) : feedItems.length === 0 ? (
-          <EmptyFeed />
+          <EmptyFeed isOwnProfile={isOwnProfile} />
         ) : null}
       </View>
     </View>
@@ -967,20 +1115,21 @@ export function UserFeed({
     isLoading || feedItems.length === 0 ? (
       // When loading or empty, render without LegendList (header-only mode)
       <LegendList
-        data={[] as FeedItem[]}
+        ref={feedListRef}
+        data={[] as FeedRow[]}
         estimatedItemSize={200}
         renderItem={() => null}
         ListHeaderComponent={feedHeader}
+        onItemSizeChanged={visualList.onItemSizeChanged}
+        onLoad={visualList.onLoad}
+        onMetricsChange={visualList.onMetricsChange}
+        onStickyHeaderChange={visualList.onStickyHeaderChange}
+        onViewableItemsChanged={visualList.onViewableItemsChanged}
+        viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
-        onScroll={
-          imageOverlay?.scrollOffsetY != null
-            ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-                imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
-              }
-            : undefined
-        }
+        onScroll={handleListScroll}
         scrollEventThrottle={16}
       />
     ) : (
@@ -992,25 +1141,39 @@ export function UserFeed({
         estimatedItemSize={300}
         drawDistance={500}
         maintainVisibleContentPosition
-        renderItem={renderFeedItem}
+        renderItem={renderItem}
         itemsAreEqual={feedRowsAreEqual}
         recycleItems
         ListHeaderComponent={feedHeader}
         ListFooterComponent={
-          isLoadingMore ? <Spinner size={18} style={{ paddingVertical: 24 }} /> : null
+          isLoadingMore ? (
+            <VisualLayoutProbe
+              scope={userFeedVisualScope}
+              surface="profile"
+              component="UserFeedPaginationSpinner"
+              itemKey="pagination-spinner"
+              itemType="spinner"
+              index={feedRows.length}
+              extra={() => ({
+                scrollY: Math.round(scrollOffsetRef.current),
+                rows: feedRowsRef.current.length,
+              })}>
+              <Spinner size={18} style={{ paddingVertical: 24 }} />
+            </VisualLayoutProbe>
+          ) : null
         }
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}
+        onItemSizeChanged={visualList.onItemSizeChanged}
+        onLoad={visualList.onLoad}
+        onMetricsChange={visualList.onMetricsChange}
+        onStickyHeaderChange={visualList.onStickyHeaderChange}
+        onViewableItemsChanged={visualList.onViewableItemsChanged}
+        viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
-        onScroll={
-          imageOverlay?.scrollOffsetY != null
-            ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-                imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
-              }
-            : undefined
-        }
+        onScroll={handleListScroll}
         scrollEventThrottle={16}
       />
     );

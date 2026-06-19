@@ -15,14 +15,18 @@ import {
 } from 'react';
 import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
-import { Text } from '@/shared/ui/primitives/Text';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { Spacer } from '@/shared/ui/primitives/View/Spacer';
-import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { log, Log, feedLog } from '@/shared/lib/logger';
+import {
+  remeasureVisualLayoutScope,
+  useShiftLogger,
+  useVisualListLogger,
+  useVisualStateLogger,
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+} from '@/shared/lib/contentShiftLog';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import {
   LegendList,
   type LegendListRenderItemProps,
@@ -30,10 +34,20 @@ import {
 } from '@legendapp/list/react-native';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
+import { router } from 'expo-router';
+import { Button } from 'heroui-native';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import type { FeedParseResult } from '@/features/feed/data/feedClient';
 import { feedPageCache, feedPageKey } from '@/features/feed/data/feedCache';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { usePostActions } from '@/features/feed/hooks/usePostActions';
+import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
+import { EmptyState } from '@/shared/ui/composed/EmptyState';
+import {
+  selectFeedEmptyMode,
+  FEED_EMPTY_COPY,
+  type FeedEmptyMode,
+} from '@/features/feed/lib/feedEmptyStates';
 
 import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from './nostr/feedTypes';
 import { DEFAULT_METRICS } from './nostr/feedTypes';
@@ -89,6 +103,7 @@ export const FEED_FILTER_FOLLOWING_RECENT = 'Following Recent';
 // the user scrolls, rather than fetching a large batch up front.
 const FEED_INITIAL_LIMIT = 15;
 const FEED_PAGE_LIMIT = 10;
+const HOME_FEED_VISUAL_SCOPE = 'feed.home.list';
 
 // Stable config object — avoids re-triggering useBackgroundConfig every render
 const BG_CONFIG = { blurMode: 'full' as const };
@@ -106,21 +121,27 @@ const FEED_REPOST_ORIGINAL_AVATAR_CENTER_Y = FEED_REPOST_HEADER_HEIGHT + FEED_AV
 // Empty / Error States
 // ============================================================================
 
-function EmptyFeed() {
-  const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
-
+function EmptyFeed({
+  mode,
+  onRefresh,
+  onFindPeople,
+}: {
+  mode: FeedEmptyMode;
+  onRefresh: () => void;
+  onFindPeople: () => void;
+}) {
+  if (mode === 'loading') return null;
+  const copy = FEED_EMPTY_COPY[mode];
+  const action = copy.ctaLabel ? (
+    <Button
+      variant="secondary"
+      size="sm"
+      onPress={copy.ctaAction === 'find-people' ? onFindPeople : onRefresh}>
+      <Button.Label>{copy.ctaLabel}</Button.Label>
+    </Button>
+  ) : undefined;
   return (
-    <VStack align="center" style={styles.emptyState}>
-      <Icon name="mdi:message-text" size={40} color={defaultColor} />
-      <Spacer size={8} />
-      <Text bold size={16} style={{ color: opacity(foreground, 0.5) }}>
-        No posts yet
-      </Text>
-      <Spacer size={4} />
-      <Text size={13} style={styles.emptyText}>
-        Pull down to refresh or try a different feed.
-      </Text>
-    </VStack>
+    <EmptyState icon={copy.icon} title={copy.title} subtitle={copy.subtitle} action={action} />
   );
 }
 
@@ -135,11 +156,21 @@ function FeedThreadPair({
 }) {
   const foreground = useThemeColor('foreground');
   const [firstHeight, setFirstHeight] = useState(0);
+  const shift = useShiftLogger('FeedThreadPair');
 
-  const handleFirstLayout = useCallback((event: LayoutChangeEvent) => {
-    const nextHeight = Math.round(event.nativeEvent.layout.height);
-    setFirstHeight((currentHeight) => (currentHeight === nextHeight ? currentHeight : nextHeight));
-  }, []);
+  const handleFirstLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const nextHeight = Math.round(event.nativeEvent.layout.height);
+      // The first post's height drives the connector line length AND the
+      // second (reply) post's vertical offset. When it changes after async
+      // content settles, the whole pair reflows below it.
+      shift.report('feed.shift.threadpair.height', 'first', nextHeight);
+      setFirstHeight((currentHeight) =>
+        currentHeight === nextHeight ? currentHeight : nextHeight
+      );
+    },
+    [shift]
+  );
 
   const connectorStyle = useMemo(() => {
     const secondAvatarTop = firstHeight + secondAvatarCenterY - FEED_AVATAR_SIZE / 2;
@@ -207,6 +238,11 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const [isLoading, setIsLoading] = useState(() => !seed);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const followCount = useNostrSocialStore((s) => Object.keys(s.followingPubkeys).length);
+  const isFollowingFeed =
+    activeFilter === FEED_FILTER_FOLLOWING_POPULAR || activeFilter === FEED_FILTER_FOLLOWING_RECENT;
+  const openPostActions = usePostActions();
   const hasMoreRef = useRef(
     seed ? seed.paginationUntil > 0 && seed.orderedFeedItems.length > 0 : true
   );
@@ -365,6 +401,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         feedPageCache.setEntry(cacheKey, phase1, { viewerKey: userPubkey || '' });
         feedPageCache.markTouched(cacheKey);
         didApplyPage = true;
+        setLoadError(false);
         setIsLoading(false);
         setIsRefreshing(false);
         requestAnimationFrame(() => {
@@ -378,6 +415,17 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           signal: controller.signal,
         });
         if (!isActiveLoad(requestId)) return;
+        // Enrichment arrives after the first paint: quoted posts resolve from
+        // placeholders, mention/author names and avatars fill in. Each updates
+        // a map that re-renders rows and can grow their height — log the counts
+        // so a post-paint shift can be tied to which enrichment landed.
+        feedLog.info('feed.shift.enrich', {
+          spec: feedSpecs[specIndex]?.name,
+          quotedEvents: updates.quotedEvents?.size ?? 0,
+          metrics: updates.metrics?.size ?? 0,
+          profiles: updates.profiles?.size ?? 0,
+          isRefresh,
+        });
         startTransition(() => {
           if (updates.quotedEvents) {
             setQuotedEventsMap((prev) => {
@@ -412,6 +460,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           setQuotedEventsMap(new Map());
           setProfilesMap(new Map());
         }
+        setLoadError(true);
         setIsLoading(false);
         setIsRefreshing(false);
       } finally {
@@ -515,6 +564,15 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         feedItemIdsRef.current.add(item.type === 'note' ? item.event.id : item.repostEvent.id);
       }
 
+      // Appending a page extends the list below the fold. With a stable
+      // `estimatedItemSize`/key list this should not move the viewport, but a
+      // mismatch between estimated and real row heights does — log the append
+      // so a scroll jump on "load more" can be correlated.
+      feedLog.info('feed.shift.append', {
+        appended: newItems.length,
+        total: feedItemIdsRef.current.size,
+        paginationUntil: page.paginationUntil,
+      });
       startTransition(() => {
         setFeedItems((prev) => [...prev, ...newItems]);
         setMetricsMap((prev) => {
@@ -737,6 +795,26 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     feedRowsRef.current = feedRows;
   }, [feedRows]);
 
+  const visualList = useVisualListLogger<FeedRow>({
+    scope: HOME_FEED_VISUAL_SCOPE,
+    surface: 'feed',
+    component: 'HomeFeedList',
+    phase: isLoading ? 'loading' : isRefreshing ? 'refreshing' : 'ready',
+    extra: () => ({
+      filter: feedSpecs[activeSpecIndex]?.name ?? null,
+      rows: feedRowsRef.current.length,
+      isLoading,
+      isLoadingMore,
+    }),
+    getItemKey: (row) => row.key,
+    getItemContext: (row) => ({
+      rowKey: row.key,
+      rowLabel: getFeedRowItemType(row),
+      itemType: getFeedRowItemType(row),
+    }),
+    getListState: () => listRef.current?.getState() ?? null,
+  });
+
   // Render boundary: how many feed items became rendered rows, and whether the
   // screen is currently showing the empty state. `feedItems > 0 && rows === 0`
   // means a render-stage drop; `empty: true` with items 0 after load means the
@@ -750,6 +828,35 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       empty: !isLoading && feedRows.length === 0,
     });
   }, [feedItems.length, feedRows.length, isLoading, activeSpecIndex, feedSpecs]);
+
+  useVisualStateLogger({
+    scope: HOME_FEED_VISUAL_SCOPE,
+    surface: 'feed',
+    component: 'HomeFeed',
+    stateKey: 'feed-state',
+    phase: isLoading
+      ? 'loading'
+      : isRefreshing
+        ? 'refreshing'
+        : isLoadingMore
+          ? 'loading-more'
+          : 'ready',
+    state: {
+      filter: feedSpecs[activeSpecIndex]?.name ?? null,
+      feedItems: feedItems.length,
+      rows: feedRows.length,
+      isLoading,
+      isRefreshing,
+      isLoadingMore,
+      loadError,
+      empty: !isLoading && feedRows.length === 0,
+    },
+    remeasure: {
+      reason: 'feed-state',
+      minIntervalMs: 300,
+      maxItems: 32,
+    },
+  });
 
   const renderFeedItem = useCallback(
     ({ item: row, index }: LegendListRenderItemProps<FeedRow, string | undefined>) => {
@@ -781,6 +888,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   likePendingDirection={engagement.likePendingDirection}
                   repostPendingDirection={engagement.repostPendingDirection}
                   onLikePress={() => toggleLikeRef.current(item.event)}
+                  onMorePress={() => openPostActions(item.event)}
                   onRepostPress={() => toggleRepostRef.current(item.event)}
                   skipAnimation={!isFirstRender.current}
                   getThreadContext={() => getThreadContextRef.current(replyPreviewEvents)}
@@ -813,6 +921,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                         likePendingDirection={replyEngagement.likePendingDirection}
                         repostPendingDirection={replyEngagement.repostPendingDirection}
                         onLikePress={() => toggleLikeRef.current(replyEvent)}
+                        onMorePress={() => openPostActions(replyEvent)}
                         onRepostPress={() => toggleRepostRef.current(replyEvent)}
                         getThreadContext={() => getThreadContextRef.current()}
                         showFooterBorder={isLastReply}
@@ -849,6 +958,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   likePendingDirection={rootEngagement.likePendingDirection}
                   repostPendingDirection={rootEngagement.repostPendingDirection}
                   onLikePress={() => toggleLikeRef.current(rootEvent)}
+                  onMorePress={() => openPostActions(rootEvent)}
                   onRepostPress={() => toggleRepostRef.current(rootEvent)}
                   skipAnimation={!isFirstRender.current}
                   getThreadContext={() => getThreadContextRef.current()}
@@ -874,6 +984,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   likePendingDirection={engagement.likePendingDirection}
                   repostPendingDirection={engagement.repostPendingDirection}
                   onLikePress={() => toggleLikeRef.current(item.event)}
+                  onMorePress={() => openPostActions(item.event)}
                   onRepostPress={() => toggleRepostRef.current(item.event)}
                   getThreadContext={() => getThreadContextRef.current()}
                   fullBleedFooterBorder
@@ -900,6 +1011,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             likePendingDirection={engagement.likePendingDirection}
             repostPendingDirection={engagement.repostPendingDirection}
             onLikePress={() => toggleLikeRef.current(item.event)}
+            onMorePress={() => openPostActions(item.event)}
             onRepostPress={() => toggleRepostRef.current(item.event)}
             skipAnimation={!isFirstRender.current}
             getThreadContext={() => getThreadContextRef.current()}
@@ -936,6 +1048,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 likePendingDirection={rootEngagement.likePendingDirection}
                 repostPendingDirection={rootEngagement.repostPendingDirection}
                 onLikePress={() => toggleLikeRef.current(rootEvent)}
+                onMorePress={() => openPostActions(rootEvent)}
                 onRepostPress={() => toggleRepostRef.current(rootEvent)}
                 skipAnimation={!isFirstRender.current}
                 getThreadContext={() => getThreadContextRef.current()}
@@ -964,6 +1077,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 likePendingDirection={repostEngagement.likePendingDirection}
                 repostPendingDirection={repostEngagement.repostPendingDirection}
                 onLikePress={() => toggleLikeRef.current(originalEvent)}
+                onMorePress={() => openPostActions(originalEvent)}
                 onRepostPress={() => toggleRepostRef.current(originalEvent)}
                 skipAnimation={!isFirstRender.current}
                 getThreadContext={() => getThreadContextRef.current()}
@@ -1009,6 +1123,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       toggleLikeRef,
       toggleRepostRef,
       getThreadContextRef,
+      openPostActions,
     ]
   );
 
@@ -1022,10 +1137,33 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     tintColor: refreshTintColor,
   });
 
-  const renderItem = renderFeedItem;
+  const renderItem = useCallback(
+    (props: LegendListRenderItemProps<FeedRow, string | undefined>) => (
+      <VisualLayoutProbe
+        scope={HOME_FEED_VISUAL_SCOPE}
+        surface="feed"
+        component="HomeFeedRow"
+        itemKey={props.item.key}
+        itemType={getFeedRowItemType(props.item)}
+        index={props.index}
+        extra={() => ({
+          scrollY: Math.round(scrollOffsetRef.current),
+          filter: feedSpecs[activeSpecIndex]?.name ?? null,
+          rows: feedRowsRef.current.length,
+        })}>
+        {renderFeedItem(props)}
+      </VisualLayoutProbe>
+    ),
+    [activeSpecIndex, feedSpecs, renderFeedItem]
+  );
 
   const handleScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number } } }) => {
     scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
+    remeasureVisualLayoutScope(HOME_FEED_VISUAL_SCOPE, 'scroll', {
+      minIntervalMs: 500,
+      maxItems: 32,
+      extra: { scrollY: Math.round(e.nativeEvent.contentOffset.y) },
+    });
   }, []);
 
   const onScroll = useCallback(
@@ -1057,17 +1195,58 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             itemsAreEqual={feedRowsAreEqual}
             recycleItems
             ListEmptyComponent={
-              isLoading ? <Spinner size={22} style={styles.loader} /> : <EmptyFeed />
+              isLoading ? (
+                <VisualLayoutProbe
+                  scope={HOME_FEED_VISUAL_SCOPE}
+                  surface="feed"
+                  component="HomeFeedInitialSpinner"
+                  itemKey="initial-spinner"
+                  itemType="spinner"
+                  index={0}
+                  extra={{ isLoading }}>
+                  <Spinner size={22} style={styles.loader} />
+                </VisualLayoutProbe>
+              ) : (
+                <EmptyFeed
+                  mode={selectFeedEmptyMode({
+                    isLoading,
+                    hasError: loadError,
+                    rowCount: 0,
+                    isFollowingFeed,
+                    followCount,
+                  })}
+                  onRefresh={handleRefresh}
+                  onFindPeople={() => router.push('/contacts')}
+                />
+              )
             }
             ListFooterComponent={
               // Only show the pagination spinner once there's content — never
               // alongside the empty-state spinner.
               isLoadingMore && feedRows.length > 0 ? (
-                <Spinner size={18} style={styles.loadMoreSpinner} />
+                <VisualLayoutProbe
+                  scope={HOME_FEED_VISUAL_SCOPE}
+                  surface="feed"
+                  component="HomeFeedPaginationSpinner"
+                  itemKey="pagination-spinner"
+                  itemType="spinner"
+                  index={feedRows.length}
+                  extra={() => ({
+                    scrollY: Math.round(scrollOffsetRef.current),
+                    rows: feedRowsRef.current.length,
+                  })}>
+                  <Spinner size={18} style={styles.loadMoreSpinner} />
+                </VisualLayoutProbe>
               ) : null
             }
             onEndReached={handleEndReached}
             onEndReachedThreshold={0.4}
+            onItemSizeChanged={visualList.onItemSizeChanged}
+            onLoad={visualList.onLoad}
+            onMetricsChange={visualList.onMetricsChange}
+            onStickyHeaderChange={visualList.onStickyHeaderChange}
+            onViewableItemsChanged={visualList.onViewableItemsChanged}
+            viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
             style={styles.flex1}
             contentContainerStyle={LIST_CONTENT_STYLE}
             showsVerticalScrollIndicator={false}

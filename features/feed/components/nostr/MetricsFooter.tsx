@@ -1,16 +1,29 @@
 import React from 'react';
 import opacity from 'hex-color-opacity';
-import { alpha } from '@/shared/styles/tokens';
+import { alpha, iconSize } from '@/shared/styles/tokens';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import { openRepostMenu } from '@/features/feed/lib/repostMenu';
 import type { NoteMetrics } from './feedTypes';
 import { formatCount, formatSats } from './feedFormat';
 import { sharedStyles } from './feedStyles';
+
+export const POST_ACTION_ICON_SIZES = {
+  compact: {
+    base: iconSize.md,
+    comment: iconSize.md - 1,
+    repost: iconSize.md + 1,
+  },
+  regular: {
+    base: iconSize.lg,
+    comment: iconSize.lg - 1,
+    repost: iconSize.lg + 1,
+  },
+} as const;
 
 const AnimatedMetric = React.memo(function AnimatedMetric({
   iconName,
@@ -49,6 +62,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   showBorder = true,
   onCommentPress,
   onRepostPress,
+  onQuotePress,
   onLikePress,
   reposted = false,
   liked = false,
@@ -65,6 +79,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   showBorder?: boolean;
   onCommentPress?: () => void;
   onRepostPress?: () => void;
+  onQuotePress?: () => void;
   onLikePress?: () => void;
   reposted?: boolean;
   liked?: boolean;
@@ -79,34 +94,15 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   const iconColor = opacity(borderColor, alpha.disabled);
   const textColor = opacity(borderColor, alpha.disabled);
   const likedColor = '#ff5a7a';
-  const iconSize = compact ? 13 : 16;
+  const iconSizes = compact ? POST_ACTION_ICON_SIZES.compact : POST_ACTION_ICON_SIZES.regular;
   const textSize = compact ? 11 : 13;
 
-  // The repost button opens a menu offering a plain repost or a quote. Quote is
-  // disabled/greyed-out for now.
+  // The repost button opens the shared Repost-or-Quote menu. Quote is greyed out
+  // when no `onQuotePress` is supplied.
   const handleRepostPress = React.useCallback(() => {
     if (!onRepostPress) return;
-    actionMenuPopup({
-      title: 'Repost',
-      buttons: [
-        {
-          text: reposted ? 'Undo repost' : 'Repost',
-          icon: 'garden:arrow-retweet-fill-16',
-          onPress: (close) => {
-            close();
-            onRepostPress();
-          },
-        },
-        {
-          text: 'Quote',
-          icon: 'mdi:format-quote-close',
-          disabled: true,
-          reason: 'Coming soon',
-          onPress: (close) => close(),
-        },
-      ],
-    });
-  }, [onRepostPress, reposted]);
+    openRepostMenu({ reposted, onRepost: onRepostPress, onQuote: onQuotePress });
+  }, [onRepostPress, onQuotePress, reposted]);
 
   return (
     <View
@@ -121,9 +117,11 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           disabled={!onCommentPress}
           onPressIn={onActionPressIn}
           onPressOut={onActionPressOut}
+          accessibilityRole="button"
+          accessibilityLabel={`Reply, ${metrics.replyCount} replies`}
           hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
           <HStack align="center" gap={5}>
-            <Icon name="iconamoon:comment-fill" size={iconSize - 1} color={iconColor} />
+            <Icon name="iconamoon:comment-fill" size={iconSizes.comment} color={iconColor} />
             <Text size={textSize} style={{ color: textColor }}>
               {formatCount(metrics.replyCount)}
             </Text>
@@ -134,10 +132,12 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           disabled={!onRepostPress || repostPending}
           onPressIn={onActionPressIn}
           onPressOut={onActionPressOut}
+          accessibilityRole="button"
+          accessibilityLabel={`${reposted ? 'Reposted' : 'Repost'}, ${metrics.repostCount} reposts`}
           hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
           <AnimatedMetric
             iconName="garden:arrow-retweet-fill-16"
-            iconSize={iconSize + 1}
+            iconSize={iconSizes.repost}
             text={formatCount(metrics.repostCount)}
             inactiveColor={textColor}
             activeColor={repostedColor}
@@ -151,10 +151,12 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           disabled={!onLikePress || likePending}
           onPressIn={onActionPressIn}
           onPressOut={onActionPressOut}
+          accessibilityRole="button"
+          accessibilityLabel={`${liked ? 'Liked' : 'Like'}, ${metrics.likeCount} likes`}
           hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
           <AnimatedMetric
             iconName="iconamoon:heart-fill"
-            iconSize={iconSize}
+            iconSize={iconSizes.base}
             text={formatCount(metrics.likeCount)}
             inactiveColor={textColor}
             activeColor={likedColor}
@@ -165,13 +167,13 @@ export const MetricsFooter = React.memo(function MetricsFooter({
         </Pressable>
         {metrics.satsZapped > 0 ? (
           <HStack align="center" gap={4}>
-            <Icon name="mingcute:lightning-fill" size={iconSize} color={iconColor} />
+            <Icon name="mingcute:lightning-fill" size={iconSizes.base} color={iconColor} />
             <Text overpass size={textSize} style={{ color: textColor }}>
               {formatSats(metrics.satsZapped)}
             </Text>
           </HStack>
         ) : (
-          <Icon name="mingcute:lightning-fill" size={iconSize} color={iconColor} />
+          <Icon name="mingcute:lightning-fill" size={iconSizes.base} color={iconColor} />
         )}
       </HStack>
     </View>

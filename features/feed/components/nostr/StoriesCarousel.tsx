@@ -5,18 +5,21 @@
  * Each "user" is a followed nostr account with video posts as their "stories".
  */
 
-import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, type FC } from 'react';
 import {
   FlatList,
-  GestureResponderEvent,
   Platform,
   StyleSheet,
   useWindowDimensions,
   View,
+  type GestureResponderEvent,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ViewToken,
 } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Animated, {
-  SharedValue,
   useSharedValue,
   useAnimatedReaction,
   useAnimatedScrollHandler,
@@ -24,6 +27,7 @@ import Animated, {
   runOnJS,
   FadeIn,
   FadeOut,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEventListener } from 'expo';
@@ -37,6 +41,8 @@ import { StoryProgressBar } from './StoryProgressBar';
 import { easeGradient } from './easeGradient';
 import type { ProfileInfo, VideoPostRecord } from './feedTypes';
 import { Log } from '@/shared/lib/logger';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
+import { remeasureVisualLayoutScope, useVisualListLogger } from '@/shared/lib/contentShiftLog';
 
 // ============================================================================
 // Types
@@ -57,6 +63,8 @@ const VIEWABILITY_CONFIG = {
   minimumViewTime: 0,
 };
 
+const STORIES_VISUAL_SCOPE = 'feed.stories.carousel';
+
 const TOP_GRADIENT = easeGradient({
   colorStops: {
     0: { color: 'rgba(0,0,0,0.4)' },
@@ -68,6 +76,31 @@ function safePlayerCall(player: ReturnType<typeof useVideoPlayer>, fn: (p: typeo
   try {
     fn(player);
   } catch {}
+}
+
+function storyVisualKey(user: StoryUser, index: number | null = null): string {
+  return `story-user:${user.pubkey || (index == null ? 'unknown' : String(index))}`;
+}
+
+function storyVisualToken(token: ViewToken) {
+  const item = token.item as StoryUser;
+  const index = typeof token.index === 'number' ? token.index : null;
+  return {
+    index,
+    key: typeof token.key === 'string' ? token.key : storyVisualKey(item, index),
+    isViewable: token.isViewable,
+    item,
+    percentVisible: token.isViewable ? 100 : 0,
+  };
+}
+
+function storyViewabilityRange(tokens: ViewToken[]) {
+  const indexes = tokens
+    .map((token) => token.index)
+    .filter((index): index is number => typeof index === 'number');
+  const start = indexes.length > 0 ? Math.min(...indexes) : 0;
+  const end = indexes.length > 0 ? Math.max(...indexes) : -1;
+  return { start, end, startBuffered: start, endBuffered: end };
 }
 
 // ============================================================================
@@ -95,6 +128,55 @@ export const StoriesCarousel: FC<CarouselProps> = ({
   const listAnimatedIndex = useSharedValue(startIndex);
   const isDragging = useSharedValue(false);
   const carouselPointerEvents = useSharedValue<'auto' | 'none'>('auto');
+  const lastReportedScrollX = useSharedValue(startIndex * width);
+  const metricsRef = useRef({
+    contentLength: storyUsers.length * width,
+    scroll: startIndex * width,
+    size: width,
+  });
+  const visualPhase = isClosing ? 'closing' : 'active';
+  const {
+    onMetricsChange: onVisualListMetricsChange,
+    onViewableItemsChanged: onVisualViewableItemsChanged,
+  } = useVisualListLogger<StoryUser>({
+    scope: STORIES_VISUAL_SCOPE,
+    surface: 'feed',
+    component: 'StoriesCarouselFlatList',
+    phase: visualPhase,
+    extra: () => ({
+      userCount: storyUsers.length,
+      startIndex,
+      listCurrentIndex,
+      width,
+    }),
+    getItemKey: (user, index) => storyVisualKey(user, index),
+    getItemContext: (user, index) => ({
+      itemType: 'story-user',
+      index,
+      rowLabel: user.profile?.name ?? null,
+      videoPosts: user.videoPosts.length,
+    }),
+  });
+  const reportCarouselMetrics = useCallback(
+    (reason: string) => {
+      const metrics = metricsRef.current;
+      onVisualListMetricsChange({
+        reason,
+        size: metrics.size,
+        scroll: metrics.scroll,
+        scrollLength: metrics.size,
+        contentLength: metrics.contentLength,
+      });
+    },
+    [onVisualListMetricsChange]
+  );
+  const reportCarouselScrollFromUI = useCallback(
+    (scroll: number, size: number, contentLength: number) => {
+      metricsRef.current = { contentLength, scroll, size };
+      reportCarouselMetrics('scroll');
+    },
+    [reportCarouselMetrics]
+  );
 
   const scrollHandler = useAnimatedScrollHandler({
     onBeginDrag: () => {
@@ -103,6 +185,13 @@ export const StoriesCarousel: FC<CarouselProps> = ({
     onScroll: (event) => {
       carouselPointerEvents.set('none');
       listAnimatedIndex.set(event.contentOffset.x / width);
+      const scroll = event.contentOffset.x;
+      const size = event.layoutMeasurement.width || width;
+      const contentLength = event.contentSize.width || storyUsers.length * width;
+      if (Math.abs(scroll - lastReportedScrollX.get()) >= Math.max(32, width / 2)) {
+        lastReportedScrollX.set(scroll);
+        runOnJS(reportCarouselScrollFromUI)(scroll, size, contentLength);
+      }
     },
     onMomentumEnd: () => {
       carouselPointerEvents.set('auto');
@@ -117,49 +206,117 @@ export const StoriesCarousel: FC<CarouselProps> = ({
   }));
 
   const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: { index: number | null }[] }) => {
+    ({ viewableItems, changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0]?.index !== null) {
         setListCurrentIndex(viewableItems[0].index!);
       }
+      onVisualViewableItemsChanged({
+        ...storyViewabilityRange([...viewableItems, ...changed]),
+        viewableItems: viewableItems.map(storyVisualToken),
+        changed: changed.map(storyVisualToken),
+      });
     },
-    []
+    [onVisualViewableItemsChanged]
   );
+  const handleCarouselLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const size = event.nativeEvent.layout.width;
+      metricsRef.current.size = size;
+      metricsRef.current.contentLength = storyUsers.length * size;
+      reportCarouselMetrics('layout');
+    },
+    [reportCarouselMetrics, storyUsers.length]
+  );
+  const handleCarouselContentSizeChange = useCallback(
+    (contentWidth: number) => {
+      metricsRef.current.contentLength = contentWidth;
+      reportCarouselMetrics('content-size');
+    },
+    [reportCarouselMetrics]
+  );
+  const handleCarouselScrollSettled = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      metricsRef.current = {
+        contentLength: contentSize.width,
+        scroll: contentOffset.x,
+        size: layoutMeasurement.width,
+      };
+      reportCarouselMetrics('settled');
+      remeasureVisualLayoutScope(STORIES_VISUAL_SCOPE, 'scroll-settled', {
+        extra: {
+          userCount: storyUsers.length,
+          listCurrentIndex,
+          isClosing,
+        },
+      });
+    },
+    [isClosing, listCurrentIndex, reportCarouselMetrics, storyUsers.length]
+  );
+
+  useEffect(() => {
+    metricsRef.current = {
+      contentLength: storyUsers.length * width,
+      scroll: listCurrentIndex * width,
+      size: width,
+    };
+    reportCarouselMetrics('state');
+  }, [listCurrentIndex, reportCarouselMetrics, storyUsers.length, width]);
 
   return (
     <Log name="StoriesCarousel">
-      <Animated.FlatList
-        ref={scrollRef as any}
-        data={storyUsers}
-        keyExtractor={(item) => item.pubkey}
-        renderItem={({ item, index }) => (
-          <UserStoriesItem
-            user={item}
-            userIndex={index}
-            totalUsers={storyUsers.length}
-            listAnimatedIndex={listAnimatedIndex}
-            listCurrentIndex={listCurrentIndex}
-            isDragging={isDragging}
-            scrollRef={scrollRef}
-            onClose={onClose}
-            isClosing={isClosing}
-          />
-        )}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        onScroll={scrollHandler}
-        scrollEventThrottle={16}
-        pagingEnabled
-        viewabilityConfig={VIEWABILITY_CONFIG}
-        onViewableItemsChanged={onViewableItemsChanged}
-        decelerationRate="fast"
-        style={rContainerStyle}
-        getItemLayout={(_, index) => ({
-          length: width,
-          offset: width * index,
-          index,
-        })}
-        initialScrollIndex={startIndex}
-      />
+      <VisualLayoutProbe
+        scope={STORIES_VISUAL_SCOPE}
+        surface="feed"
+        component="StoriesCarousel"
+        itemKey="viewport"
+        itemType="horizontal-flatlist"
+        phase={isClosing ? 'closing' : 'active'}
+        style={styles.flex1}
+        extra={{
+          userCount: storyUsers.length,
+          startIndex,
+          listCurrentIndex,
+          width,
+        }}>
+        <Animated.FlatList
+          ref={scrollRef as any}
+          data={storyUsers}
+          keyExtractor={(item) => item.pubkey}
+          renderItem={({ item, index }) => (
+            <UserStoriesItem
+              user={item}
+              userIndex={index}
+              totalUsers={storyUsers.length}
+              listAnimatedIndex={listAnimatedIndex}
+              listCurrentIndex={listCurrentIndex}
+              isDragging={isDragging}
+              scrollRef={scrollRef}
+              onClose={onClose}
+              isClosing={isClosing}
+            />
+          )}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          onLayout={handleCarouselLayout}
+          onContentSizeChange={handleCarouselContentSizeChange}
+          onScroll={scrollHandler}
+          onScrollEndDrag={handleCarouselScrollSettled}
+          onMomentumScrollEnd={handleCarouselScrollSettled}
+          scrollEventThrottle={16}
+          pagingEnabled
+          viewabilityConfig={VIEWABILITY_CONFIG}
+          onViewableItemsChanged={onViewableItemsChanged}
+          decelerationRate="fast"
+          style={[styles.flex1, rContainerStyle]}
+          getItemLayout={(_, index) => ({
+            length: width,
+            offset: width * index,
+            index,
+          })}
+          initialScrollIndex={startIndex}
+        />
+      </VisualLayoutProbe>
     </Log>
   );
 };
@@ -332,68 +489,85 @@ const UserStoriesItem: FC<UserItemProps> = ({
 
   const profileName = user.profile?.name || user.pubkey.slice(0, 12) + '…';
   const profilePicture = user.profile?.picture;
+  const visualKey = `story:${userIndex}:${user.pubkey.slice(0, 12)}`;
 
   return (
     <StoriesContainer listAnimatedIndex={listAnimatedIndex} userIndex={userIndex}>
-      <Pressable
+      <VisualLayoutProbe
+        scope={STORIES_VISUAL_SCOPE}
+        surface="feed"
+        component="StoriesCarouselItem"
+        itemKey={visualKey}
+        itemType="story-user"
+        index={userIndex}
+        phase={isClosing ? 'closing' : isActive ? 'active' : 'inactive'}
         style={styles.flex1}
-        onPress={onStoryPress}
-        onLongPress={onStoryLongPress}
-        delayLongPress={250}
-        onPressOut={onStoryPressOut}>
-        <Animated.View
-          key={currentVideo?.videoUrl}
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(200)}
-          style={StyleSheet.absoluteFill}>
-          {isClosing ? (
-            <View
-              style={[StyleSheet.absoluteFill, styles.videoRadius, styles.closingPlaceholder]}
-            />
-          ) : (
-            <VideoView
-              player={player}
-              style={[StyleSheet.absoluteFill, styles.videoRadius]}
-              contentFit="contain"
-              nativeControls={false}
-            />
-          )}
-        </Animated.View>
+        extra={{
+          currentStoryIndex,
+          storyCount: user.videoPosts.length,
+          active: isActive,
+          hasVideo: !!currentVideo,
+        }}>
+        <Pressable
+          style={styles.flex1}
+          onPress={onStoryPress}
+          onLongPress={onStoryLongPress}
+          delayLongPress={250}
+          onPressOut={onStoryPressOut}>
+          <Animated.View
+            key={currentVideo?.videoUrl}
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(200)}
+            style={StyleSheet.absoluteFill}>
+            {isClosing ? (
+              <View
+                style={[StyleSheet.absoluteFill, styles.videoRadius, styles.closingPlaceholder]}
+              />
+            ) : (
+              <VideoView
+                player={player}
+                style={[StyleSheet.absoluteFill, styles.videoRadius]}
+                contentFit="contain"
+                nativeControls={false}
+              />
+            )}
+          </Animated.View>
 
-        <LinearGradient
-          colors={TOP_GRADIENT.colors}
-          locations={TOP_GRADIENT.locations}
-          style={styles.topGradient}
-        />
-      </Pressable>
-
-      <View style={styles.header} pointerEvents="box-none">
-        <View style={styles.progressRow} pointerEvents="none">
-          {user.videoPosts.map((_, idx) => (
-            <StoryProgressBar
-              key={idx}
-              index={idx}
-              currentStoryIndex={currentStoryIndex}
-              storyProgress={storyProgress}
-            />
-          ))}
-        </View>
-        <View style={styles.profileRow} pointerEvents="box-none">
-          <Avatar
-            state={profilePicture ? 'image' : 'fallback'}
-            picture={profilePicture}
-            seed={user.pubkey}
-            name={profileName}
-            size={36}
+          <LinearGradient
+            colors={TOP_GRADIENT.colors}
+            locations={TOP_GRADIENT.locations}
+            style={styles.topGradient}
           />
-          <Text size={14} bold style={[styles.profileName, styles.flex1]} numberOfLines={1}>
-            {profileName}
-          </Text>
-          <Pressable onPress={handleClose} hitSlop={12} style={styles.closeButton}>
-            <Icon name="mdi:close" size={22} color="#fff" />
-          </Pressable>
+        </Pressable>
+
+        <View style={styles.header} pointerEvents="box-none">
+          <View style={styles.progressRow} pointerEvents="none">
+            {user.videoPosts.map((_, idx) => (
+              <StoryProgressBar
+                key={idx}
+                index={idx}
+                currentStoryIndex={currentStoryIndex}
+                storyProgress={storyProgress}
+              />
+            ))}
+          </View>
+          <View style={styles.profileRow} pointerEvents="box-none">
+            <Avatar
+              state={profilePicture ? 'image' : 'fallback'}
+              picture={profilePicture}
+              seed={user.pubkey}
+              name={profileName}
+              size={36}
+            />
+            <Text size={14} bold style={[styles.profileName, styles.flex1]} numberOfLines={1}>
+              {profileName}
+            </Text>
+            <Pressable onPress={handleClose} hitSlop={12} style={styles.closeButton}>
+              <Icon name="mdi:close" size={22} color="#fff" />
+            </Pressable>
+          </View>
         </View>
-      </View>
+      </VisualLayoutProbe>
     </StoriesContainer>
   );
 };

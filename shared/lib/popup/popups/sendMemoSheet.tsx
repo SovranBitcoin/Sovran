@@ -15,7 +15,7 @@ import {
   type TextInputSelectionChangeEventData,
 } from 'react-native';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
-import { LegendList } from '@legendapp/list/react-native';
+import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import { BottomSheet } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
@@ -25,12 +25,18 @@ import Icon from 'assets/icons';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { ContactRow, nostrIdentity } from '@/shared/ui/composed/ContactRow';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { relays as defaultRelays } from '@/shared/ndk';
+import {
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+  useVisualListLogger,
+  visualLayoutScopePart,
+} from '@/shared/lib/contentShiftLog';
 import {
   CONTACT_SEARCH_MIN_LENGTH,
   useContactSearch,
@@ -354,17 +360,48 @@ function MentionSearchResults({
     trimmedQuery.length >= CONTACT_SEARCH_MIN_LENGTH &&
     results.length === 0 &&
     (searchLoading || !hasSearched);
+  const mentionListRef = useRef<LegendListRef>(null);
+  const visualList = useVisualListLogger<MentionSearchResult>({
+    scope: 'composer.memo.mentions.list',
+    surface: 'composer',
+    component: 'SendMemoMentionList',
+    phase: showSkeletons ? 'loading' : 'results',
+    extra: () => ({
+      queryLength: trimmedQuery.length,
+      resultCount: results.length,
+      panelHeight: height,
+    }),
+    getItemKey: (item) => item.pubkey,
+    getItemContext: (_item, index) => ({
+      itemType: 'mention-result',
+      index,
+    }),
+    getListState: () => mentionListRef.current?.getState() ?? null,
+  });
 
   const renderResult = useCallback(
-    ({ item }: { item: MentionSearchResult }) => (
-      <ContactRow
-        identity={nostrIdentity(item.pubkey, item.profile)}
-        trailingVariant="none"
-        onPress={() => onSelectResult(item)}
-        testID={`send-memo-mention:${item.pubkey}`}
-      />
+    ({ item, index }: { item: MentionSearchResult; index: number }) => (
+      <VisualLayoutProbe
+        scope="composer.memo.mentions.list"
+        surface="composer"
+        component="SendMemoMentionRow"
+        itemKey={visualLayoutScopePart(item.pubkey)}
+        itemType="mention-result"
+        index={index}
+        phase={showSkeletons ? 'loading' : 'results'}
+        extra={{
+          queryLength: trimmedQuery.length,
+          resultCount: results.length,
+        }}>
+        <ContactRow
+          identity={nostrIdentity(item.pubkey, item.profile)}
+          trailingVariant="none"
+          onPress={() => onSelectResult(item)}
+          testID={`send-memo-mention:${item.pubkey}`}
+        />
+      </VisualLayoutProbe>
     ),
-    [onSelectResult]
+    [onSelectResult, results.length, showSkeletons, trimmedQuery.length]
   );
 
   const keyExtractor = useCallback((item: MentionSearchResult) => item.pubkey, []);
@@ -402,11 +439,18 @@ function MentionSearchResults({
   } else {
     content = (
       <LegendList<MentionSearchResult>
+        ref={mentionListRef}
         data={results}
         keyExtractor={keyExtractor}
         renderItem={renderResult}
         estimatedItemSize={68}
         recycleItems
+        onItemSizeChanged={visualList.onItemSizeChanged}
+        onLoad={visualList.onLoad}
+        onMetricsChange={visualList.onMetricsChange}
+        onStickyHeaderChange={visualList.onStickyHeaderChange}
+        onViewableItemsChanged={visualList.onViewableItemsChanged}
+        viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"
         showsVerticalScrollIndicator={false}

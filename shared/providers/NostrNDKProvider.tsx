@@ -10,6 +10,7 @@ import React, {
 import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { relays } from '@/shared/ndk';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
+import { useOwnRelayListSync } from '@/shared/lib/nostr/outbox/useOwnRelayListSync';
 import { useInitializationStage } from './InitializationProvider';
 import { useNostrKeysContext } from './NostrKeysProvider';
 import { initLog, initPhaseSync, nostrLog, useInitMount } from '@/shared/lib/logger';
@@ -139,6 +140,10 @@ export function NostrNDKProvider({
     // the readiness transition.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage.canStart, initializeNDK, nostrKeys?.privateKey]);
+
+  // Ingest the active profile's NIP-65 relay list (or first-run-publish the
+  // defaults) and seed the pool, once NDK is ready. Self-deferred internally.
+  useOwnRelayListSync(nostrKeys?.pubkey, isInitialized);
 
   // Memoized so context consumers (e.g. the NIP-46 signer service) only
   // re-render when readiness actually flips, not on every provider render.

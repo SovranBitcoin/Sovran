@@ -253,6 +253,23 @@ export const icons: string[] = [
   // Drawer and bottom tab bar route icons — selected/unselected pairs
   'mdi:account-group-outline',
   'mdi:robot-outline',
+
+  // Nostr posting — composer, polls, relays, share, media states
+  'mdi:pencil',
+  'mdi:image-plus',
+  'mdi:poll',
+  'mdi:minus-circle-outline',
+  'mdi:checkbox-marked',
+  'mdi:radiobox-marked',
+  'mdi:checkbox-blank-outline',
+  'mdi:radiobox-blank',
+  'mdi:server-network-off',
+  'mdi:wifi-off',
+  'mdi:account-multiple-plus-outline',
+  'mdi:share-variant-outline',
+  'mdi:link-variant',
+  'mdi:image-broken-variant',
+  'mdi:arrow-expand',
 ];
 
 export function BitcoinMaskIcon() {

@@ -165,6 +165,7 @@ a typical session — your numbers will differ.
 | `stats`            | ~1.1K          | Event frequency, slowest ops, error rate |
 | `coco`             | ~3K            | Coco wallet module breakdown             |
 | `network`          | ~4K            | Request/response pairs with latency      |
+| `visual`           | session-sized  | Layout rows, overlaps, container bounds  |
 | `timeline`         | ~5K            | One-line-per-entry with delta timing     |
 | `startup`          | ~5K            | Initialization waterfall, gate sequence  |
 | `full --format md` | ~6K            | Pipe-delimited dense summary             |
@@ -180,6 +181,33 @@ npx tsx codereview/log-doctor/index.ts stats   --latest
 npx tsx codereview/log-doctor/index.ts errors  --latest --context 5
 npx tsx codereview/log-doctor/index.ts slow    --latest --threshold 200
 npx tsx codereview/log-doctor/index.ts coco    --latest
+
+# Visual content-shift investigation.
+# First run a dev build and exercise Feed, Thread, Profile, Search, and Composer surfaces.
+npx tsx codereview/log-doctor/index.ts visual --latest
+npx tsx codereview/log-doctor/index.ts visual --latest --scope 'thread\\.'
+npx tsx codereview/log-doctor/index.ts visual --latest --component PostComposerToolbar
+npx tsx codereview/log-doctor/index.ts visual --latest --key reply-sort-tabs
+npx tsx codereview/log-doctor/index.ts visual --latest --item-type reply-sort-tabs
+npx tsx codereview/log-doctor/index.ts timeline --event 'visual\\.layout|\\.shift\\.' --latest
+# Includes row/window rects, skeleton/spinner/status-indicator/text/avatar loading rects,
+# LegendList item-size, metrics, load, viewability, full getState() virtual positions
+# with duplicate-key/far-position/overlap/order/content-length anomaly counts,
+# sticky-header change markers for tab/header pinning bugs,
+# FlatList metrics/viewability where no virtual state exists, including feed
+# story-carousel paging,
+# ScrollView viewport/content/offset metrics for stateful composer-style surfaces
+# and horizontal rails such as recent people strips / section anchors,
+# probe style stack context (position/zIndex/elevation/pointerEvents/mount order),
+# container-boundary violations, buffered virtual row windows, layout state-change
+# markers for feed/thread/profile/composer phases, scope-level measured snapshots
+# after explicit remeasures, and measured
+# row order/gap analysis that flags physical overlaps, order breaks, and measured-vs-virtual
+# delta mismatches.
+# Visual mode joins item-size, measured-position, full virtual-position, and buffered rows by stable row key.
+# `VIEWABLE POSITION COVERAGE` flags visible rows missing measured or virtual positions.
+# `--scope`, `--component`, `--key`, and `--item-type` narrow visual summaries by params.
+# `__tests__/visualLayoutCoverage.test.ts` guards direct LegendList call-site coverage.
 
 # Cap any mode at a token budget — output is auto-pruned to fit.
 npx tsx codereview/log-doctor/index.ts errors --token-budget 8000

@@ -15,9 +15,9 @@
  * the app-detail screen's "View Activity" link.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView } from 'react-native';
-import { LegendList } from '@legendapp/list/react-native';
+import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -41,10 +41,16 @@ import { connectionForClient } from '@/features/nostrSigner/lib/connectionMatch'
 import { ACTIVITY_CAP } from '@/features/nostrSigner/lib/nip46Types';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatRelative } from '@/shared/lib/date';
+import {
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+  useVisualListLogger,
+  visualLayoutScopePart,
+} from '@/shared/lib/contentShiftLog';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import { Screen } from '@/shared/ui/composed/Screen';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -174,9 +180,32 @@ export function SignerActivityScreen(): React.ReactElement {
   const openDetail = useCallback((entryId: string) => {
     router.push(`/(signer-flow)/activity-detail?id=${encodeURIComponent(entryId)}` as never);
   }, []);
+  const keyExtractor = useCallback((item: Nip46ActivityEntry) => item.id, []);
+  const filterPhase =
+    filter.kind === 'app' ? 'app-filter' : filter.kind === 'denied' ? 'denied-filter' : 'all';
+  const listRef = useRef<LegendListRef>(null);
+  const visualList = useVisualListLogger<Nip46ActivityEntry>({
+    scope: 'signer.activity.list',
+    surface: 'signer',
+    component: 'SignerActivityLegendList',
+    phase: filterPhase,
+    extra: () => ({
+      rowCount: filtered.length,
+      filterKind: filter.kind,
+    }),
+    getItemKey: (item) => visualLayoutScopePart(item.id),
+    getItemContext: (item, index) => ({
+      itemType: 'signer-activity',
+      index,
+      verdict: item.verdict,
+      method: item.method,
+      kind: item.kind ?? null,
+    }),
+    getListState: () => listRef.current?.getState() ?? null,
+  });
 
   const renderItem = useCallback(
-    ({ item }: { item: Nip46ActivityEntry }) => {
+    ({ item, index }: { item: Nip46ActivityEntry; index: number }) => {
       const display = ACTIVITY_VERDICT_DISPLAY[item.verdict];
       const entry = permissionEntryFor({
         method: item.method,
@@ -184,26 +213,42 @@ export function SignerActivityScreen(): React.ReactElement {
       });
       const appName = appDisplayName(connectionForClient(apps, item.clientPubkey));
       return (
-        <ListRow
-          padding="compact"
-          iconCircle={{ icon: display.icon, color: toneColors[display.tone], size: 40 }}
-          title={item.summary?.headline ?? entry.headline}
-          subtitle={`${appName} · ${formatRelative(item.at, 'chat-bubble')}`}
-          wrapSubtitle
-          accent={
-            display.accentLine !== undefined ? (
-              <Text size={12} color={toneColors[display.tone]} numberOfLines={1}>
-                {display.accentLine}
-              </Text>
-            ) : undefined
-          }
-          trailing={<Icon name="mdi:chevron-right" size={20} color={muted} />}
-          onPress={() => openDetail(item.id)}
-          accessibilityHint="Opens the request details"
-        />
+        <VisualLayoutProbe
+          scope="signer.activity.list"
+          surface="signer"
+          component="SignerActivityRow"
+          itemKey={visualLayoutScopePart(item.id)}
+          itemType="signer-activity"
+          index={index}
+          phase={filterPhase}
+          extra={{
+            rowCount: filtered.length,
+            filterKind: filter.kind,
+            verdict: item.verdict,
+            method: item.method,
+            kind: item.kind ?? null,
+          }}>
+          <ListRow
+            padding="compact"
+            iconCircle={{ icon: display.icon, color: toneColors[display.tone], size: 40 }}
+            title={item.summary?.headline ?? entry.headline}
+            subtitle={`${appName} · ${formatRelative(item.at, 'chat-bubble')}`}
+            wrapSubtitle
+            accent={
+              display.accentLine !== undefined ? (
+                <Text size={12} color={toneColors[display.tone]} numberOfLines={1}>
+                  {display.accentLine}
+                </Text>
+              ) : undefined
+            }
+            trailing={<Icon name="mdi:chevron-right" size={20} color={muted} />}
+            onPress={() => openDetail(item.id)}
+            accessibilityHint="Opens the request details"
+          />
+        </VisualLayoutProbe>
       );
     },
-    [apps, muted, openDetail, toneColors]
+    [apps, filter.kind, filterPhase, filtered.length, muted, openDetail, toneColors]
   );
 
   const chips = (
@@ -251,13 +296,20 @@ export function SignerActivityScreen(): React.ReactElement {
           recycled fixed-height rows keep scrolling cheap. Rows are stateless
           (ListRow + derived props), so recycling is safe. */}
       <LegendList
+        ref={listRef}
         data={filtered}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         renderItem={renderItem}
         recycleItems
         estimatedItemSize={ESTIMATED_ROW_HEIGHT}
         estimatedHeaderSize={CHIP_HEADER_HEIGHT}
         drawDistance={400}
+        onItemSizeChanged={visualList.onItemSizeChanged}
+        onLoad={visualList.onLoad}
+        onMetricsChange={visualList.onMetricsChange}
+        onStickyHeaderChange={visualList.onStickyHeaderChange}
+        onViewableItemsChanged={visualList.onViewableItemsChanged}
+        viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
         contentContainerStyle={listContentStyle}
         scrollIndicatorInsets={indicatorInsets}
         ListHeaderComponent={chips}

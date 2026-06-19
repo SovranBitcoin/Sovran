@@ -39,11 +39,6 @@
       "count": 6
     }
   },
-  "features/contacts/components/SearchPostsList.tsx": {
-    "react/display-name": {
-      "count": 1
-    }
-  },
   "features/feed/components/nostr/MetricsFooter.tsx": {
     "no-restricted-syntax": {
       "count": 1

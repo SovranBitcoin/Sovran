@@ -1,8 +1,11 @@
 /**
  * Bottom panel components for the image overlay:
  * - ImageOverlayBottomPanelContent: scrollable author, content (with inline images), metrics
- * - ImageOverlayBottomPanelReply: fixed reply row at bottom of sheet
  * - ImageOverlayAbsoluteBar: author/stats bar when sheet is closed
+ *
+ * The live "Post your reply" composer is the shared `ThreadReplyBar`, mounted at
+ * the overlay root by `AnimatedImageOverlay` (not here) so it can anchor to the
+ * screen bottom and rise with the keyboard.
  * - InlinePanelImage: image with blurred letterbox for aspect ratio mismatch
  */
 
@@ -22,8 +25,35 @@ import type { ContentSegment } from '../feedTypes';
 import type { ImageOverlayPost } from './types';
 import { BOTTOM_PANEL_PADDING_HORIZONTAL, BOTTOM_PANEL_PADDING_TOP } from './config';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { openRepostMenu } from '@/features/feed/lib/repostMenu';
+import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { Log } from '@/shared/lib/logger';
-const PANEL_BG = 'rgba(0,0,0,0.9)';
+
+// The Repost/Quote menu can't render over the image overlay (a FullWindowOverlay
+// the menu's bottom sheet mounts beneath), so the overlay closes first, then the
+// menu opens once it's on its way out.
+const OVERLAY_CLOSE_BEFORE_MENU_MS = 240;
+
+/**
+ * Repost handler for the overlay's repost buttons: dismiss the lightbox, then
+ * open the shared Repost-or-Quote menu. `onRequestClose` is the overlay's close.
+ */
+function useOverlayRepostMenu(post: ImageOverlayPost, onRequestClose?: () => void) {
+  const quotePost = useQuotePost();
+  return useCallback(() => {
+    onRequestClose?.();
+    setTimeout(() => {
+      openRepostMenu({
+        reposted: !!post.reposted,
+        onRepost: () => post.onRepostPress?.(),
+        onQuote: () => quotePost(post.event, post.profile ?? undefined),
+      });
+    }, OVERLAY_CLOSE_BEFORE_MENU_MS);
+  }, [post, onRequestClose, quotePost]);
+}
+import { POST_ACTION_ICON_SIZES } from '../MetricsFooter';
+// Absolute bar text stays white — it floats over the dark, blurred image, not
+// over the sheet's `surface` background.
 const PANEL_TEXT = 'rgba(255,255,255,0.95)';
 const PANEL_TEXT_MUTED = 'rgba(255,255,255,0.6)';
 const LIKED_COLOR = '#ff5a7a';
@@ -31,8 +61,6 @@ const LIKED_COLOR = '#ff5a7a';
 const PANEL_CONTENT_TRUNCATE_LIMIT = 120;
 const PANEL_INLINE_IMAGE_MAX_HEIGHT = 200;
 const PANEL_INLINE_IMAGE_BG = 'rgba(40, 40, 48, 0.95)';
-
-export { PANEL_BG };
 
 type PanelBlock = { type: 'text'; value: string } | { type: 'image'; url: string };
 
@@ -90,6 +118,20 @@ function segmentsToBlocks(segments: ContentSegment[]): PanelBlock[] {
   }
   if (textAcc.length > 0) blocks.push({ type: 'text', value: textAcc });
   return blocks;
+}
+
+/**
+ * The text the author actually wrote, excluding bare image URLs (which render
+ * as image blocks, not text). Truncation and the "show more" affordance key off
+ * this so an image-only post — whose raw content is just a long media URL —
+ * doesn't surface a lone "show more" sitting over empty/hidden text.
+ */
+function extractPanelText(content: string): string {
+  return segmentsToBlocks(parseContent(content))
+    .filter((b): b is Extract<PanelBlock, { type: 'text' }> => b.type === 'text')
+    .map((b) => b.value)
+    .join('')
+    .trim();
 }
 
 /** Renders an image full width at original aspect ratio, capped by max height; letterbox areas show a blurred cover of the same image. */
@@ -187,14 +229,21 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
   post,
   initialContentExpanded,
   onConsumedExpand,
+  onRequestClose,
 }: {
   post: ImageOverlayPost;
   /** When true, content starts expanded (e.g. opened via "show more" on absolute bar). */
   initialContentExpanded?: boolean;
   /** Called after applying initialContentExpanded so caller can clear the flag. */
   onConsumedExpand?: () => void;
+  /** Dismisses the lightbox so the Repost/Quote menu can render over it. */
+  onRequestClose?: () => void;
 }) {
-  const repostedColor = useThemeColor('success');
+  const [foreground, muted, repostedColor] = useThemeColor([
+    'foreground',
+    'muted',
+    'success',
+  ] as const);
   const [contentExpanded, setContentExpanded] = useState(initialContentExpanded ?? false);
 
   useEffect(() => {
@@ -203,17 +252,25 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
       onConsumedExpand?.();
     }
   }, [initialContentExpanded, onConsumedExpand]);
-  const { event, metrics, profile, reposted, liked, onRepostPress, onLikePress } = post;
+  const { event, metrics, profile, reposted, liked, onLikePress } = post;
+  const handleRepostPress = useOverlayRepostMenu(post, onRequestClose);
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
 
-  const { blocks, showInlineImages } = useMemo(() => {
+  const { blocks, showInlineImages, textContent } = useMemo(() => {
     const allSegments = parseContent(fullContent);
     const allBlocks = segmentsToBlocks(allSegments);
     const showInline = shouldShowInlineImagesInPanel(allBlocks);
-    if (fullContent.length <= PANEL_CONTENT_TRUNCATE_LIMIT || contentExpanded) {
-      return { blocks: allBlocks, showInlineImages: showInline };
+    // Bare image URLs render as image blocks, so the author's actual text drives
+    // truncation/"show more" — never the raw media URL of an image-only post.
+    const text = allBlocks
+      .filter((b): b is Extract<PanelBlock, { type: 'text' }> => b.type === 'text')
+      .map((b) => b.value)
+      .join('')
+      .trim();
+    if (text.length <= PANEL_CONTENT_TRUNCATE_LIMIT || contentExpanded) {
+      return { blocks: allBlocks, showInlineImages: showInline, textContent: text };
     }
     let count = 0;
     const out: PanelBlock[] = [];
@@ -222,7 +279,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
         if (count + block.value.length > PANEL_CONTENT_TRUNCATE_LIMIT) {
           const take = PANEL_CONTENT_TRUNCATE_LIMIT - count;
           out.push({ type: 'text', value: block.value.slice(0, take) + '…' });
-          return { blocks: out, showInlineImages: showInline };
+          return { blocks: out, showInlineImages: showInline, textContent: text };
         }
         out.push(block);
         count += block.value.length;
@@ -230,11 +287,11 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
         out.push(block);
       }
     }
-    return { blocks: out, showInlineImages: showInline };
+    return { blocks: out, showInlineImages: showInline, textContent: text };
   }, [fullContent, contentExpanded]);
 
-  const hasContent = fullContent.length > 0;
-  const canExpand = fullContent.length > PANEL_CONTENT_TRUNCATE_LIMIT;
+  const hasContent = textContent.length > 0;
+  const canExpand = textContent.length > PANEL_CONTENT_TRUNCATE_LIMIT;
   const showMoreVisible = canExpand && !contentExpanded;
   const showLessVisible = canExpand && contentExpanded;
 
@@ -258,10 +315,10 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
             name={displayName}
           />
           <View style={styles.authorTextWrap}>
-            <Text bold size={14} style={{ color: PANEL_TEXT }} numberOfLines={1}>
+            <Text bold size={14} style={{ color: foreground }} numberOfLines={1}>
               {displayName}
             </Text>
-            <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+            <Text size={13} style={{ color: muted }}>
               {shortTime}
             </Text>
           </View>
@@ -274,7 +331,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
                 <Text
                   key={i}
                   size={14}
-                  style={[styles.contentText, { color: PANEL_TEXT_MUTED }]}
+                  style={[styles.contentText, { color: foreground }]}
                   numberOfLines={contentExpanded ? undefined : 2}>
                   {block.value}
                 </Text>
@@ -285,7 +342,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
             {showMoreVisible && (
               <Text
                 size={14}
-                style={[styles.contentText, { color: PANEL_TEXT_MUTED, marginTop: 4 }]}
+                style={[styles.contentText, { color: muted, marginTop: 4 }]}
                 onPress={() => setContentExpanded((e) => !e)}>
                 show more
               </Text>
@@ -293,7 +350,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
             {showLessVisible && (
               <Text
                 size={14}
-                style={[styles.contentText, { color: PANEL_TEXT_MUTED, marginTop: 4 }]}
+                style={[styles.contentText, { color: muted, marginTop: 4 }]}
                 onPress={() => setContentExpanded((e) => !e)}>
                 show less
               </Text>
@@ -303,21 +360,25 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
         {/* Stats / actions row */}
         <View style={styles.metricsRow}>
           <View style={styles.metricBtn}>
-            <Icon name="iconamoon:comment-fill" size={16} color={PANEL_TEXT_MUTED} />
-            <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+            <Icon
+              name="iconamoon:comment-fill"
+              size={POST_ACTION_ICON_SIZES.regular.comment}
+              color={muted}
+            />
+            <Text size={13} style={{ color: muted }}>
               {formatCount(metrics.replyCount)}
             </Text>
           </View>
           <Pressable
-            onPress={onRepostPress}
+            onPress={handleRepostPress}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={styles.metricBtn}>
             <Icon
               name="garden:arrow-retweet-fill-16"
-              size={17}
-              color={reposted ? repostedColor : PANEL_TEXT_MUTED}
+              size={POST_ACTION_ICON_SIZES.regular.repost}
+              color={reposted ? repostedColor : muted}
             />
-            <Text size={13} style={{ color: reposted ? repostedColor : PANEL_TEXT_MUTED }}>
+            <Text size={13} style={{ color: reposted ? repostedColor : muted }}>
               {formatCount(metrics.repostCount)}
             </Text>
           </Pressable>
@@ -327,49 +388,25 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
             style={styles.metricBtn}>
             <Icon
               name="iconamoon:heart-fill"
-              size={16}
-              color={liked ? LIKED_COLOR : PANEL_TEXT_MUTED}
+              size={POST_ACTION_ICON_SIZES.regular.base}
+              color={liked ? LIKED_COLOR : muted}
             />
-            <Text size={13} style={{ color: liked ? LIKED_COLOR : PANEL_TEXT_MUTED }}>
+            <Text size={13} style={{ color: liked ? LIKED_COLOR : muted }}>
               {formatCount(metrics.likeCount)}
             </Text>
           </Pressable>
           <View style={styles.metricBtn}>
-            <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
-            <Text overpass size={13} style={{ color: PANEL_TEXT_MUTED }}>
+            <Icon
+              name="mingcute:lightning-fill"
+              size={POST_ACTION_ICON_SIZES.regular.base}
+              color={muted}
+            />
+            <Text overpass size={13} style={{ color: muted }}>
               {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
             </Text>
           </View>
         </View>
       </View>
-    </Log>
-  );
-});
-
-/** Fixed reply row shown at bottom of the sheet (does not scroll). */
-export const ImageOverlayBottomPanelReply = React.memo(function ImageOverlayBottomPanelReply({
-  currentUserPubkey,
-  onReplyPress,
-}: {
-  currentUserPubkey: string | null;
-  onReplyPress: () => void;
-}) {
-  return (
-    <Log name="ImageOverlayBottomPanelReply">
-      <Pressable onPress={onReplyPress} style={styles.replyRow}>
-        <Avatar
-          state="fallback"
-          seed={currentUserPubkey ?? ''}
-          size={28}
-          name=""
-          fallbackVariant="beam"
-        />
-        <View style={styles.replyInputWrap}>
-          <Text size={14} style={{ color: PANEL_TEXT_MUTED }}>
-            Post your reply
-          </Text>
-        </View>
-      </Pressable>
     </Log>
   );
 });
@@ -381,18 +418,23 @@ type ImageOverlayOpenSheetOptions = { expandContent?: boolean };
 export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteBar({
   post,
   onOpenSheet,
+  onRequestClose,
 }: {
   post: ImageOverlayPost;
   /** Called when user taps comment or show more. Pass { expandContent: true } when opening via "show more" so the sheet opens with content expanded. */
   onOpenSheet: (options?: ImageOverlayOpenSheetOptions) => void;
+  /** Dismisses the lightbox so the Repost/Quote menu can render over it. */
+  onRequestClose?: () => void;
 }) {
   const repostedColor = useThemeColor('success');
-  const { event, metrics, profile, reposted, liked, onRepostPress, onLikePress } = post;
+  const handleRepostPress = useOverlayRepostMenu(post, onRequestClose);
+  const { event, metrics, profile, reposted, liked, onLikePress } = post;
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
-  const contentPreview = fullContent.slice(0, 120);
-  const contentTruncated = fullContent.length > 120;
+  const textContent = useMemo(() => extractPanelText(fullContent), [fullContent]);
+  const contentPreview = textContent.slice(0, 120);
+  const contentTruncated = textContent.length > 120;
 
   const handleCommentPress = useCallback(() => {
     onOpenSheet();
@@ -429,7 +471,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
             </Text>
           </View>
         </Pressable>
-        {fullContent.length > 0 ? (
+        {textContent.length > 0 ? (
           <View style={absoluteBarStyles.contentRow}>
             <Text
               size={13}
@@ -453,18 +495,22 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
             onPress={handleCommentPress}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={styles.metricBtn}>
-            <Icon name="iconamoon:comment-fill" size={16} color={PANEL_TEXT_MUTED} />
+            <Icon
+              name="iconamoon:comment-fill"
+              size={POST_ACTION_ICON_SIZES.regular.comment}
+              color={PANEL_TEXT_MUTED}
+            />
             <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
               {formatCount(metrics.replyCount)}
             </Text>
           </Pressable>
           <Pressable
-            onPress={onRepostPress}
+            onPress={handleRepostPress}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={styles.metricBtn}>
             <Icon
               name="garden:arrow-retweet-fill-16"
-              size={17}
+              size={POST_ACTION_ICON_SIZES.regular.repost}
               color={reposted ? repostedColor : PANEL_TEXT_MUTED}
             />
             <Text size={13} style={{ color: reposted ? repostedColor : PANEL_TEXT_MUTED }}>
@@ -477,7 +523,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
             style={styles.metricBtn}>
             <Icon
               name="iconamoon:heart-fill"
-              size={16}
+              size={POST_ACTION_ICON_SIZES.regular.base}
               color={liked ? LIKED_COLOR : PANEL_TEXT_MUTED}
             />
             <Text size={13} style={{ color: liked ? LIKED_COLOR : PANEL_TEXT_MUTED }}>
@@ -485,7 +531,11 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
             </Text>
           </Pressable>
           <View style={styles.metricBtn}>
-            <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
+            <Icon
+              name="mingcute:lightning-fill"
+              size={POST_ACTION_ICON_SIZES.regular.base}
+              color={PANEL_TEXT_MUTED}
+            />
             <Text overpass size={13} style={{ color: PANEL_TEXT_MUTED }}>
               {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
             </Text>
@@ -549,18 +599,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-  },
-  replyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 20,
-  },
-  replyInputWrap: {
-    flex: 1,
-    justifyContent: 'center',
   },
 });

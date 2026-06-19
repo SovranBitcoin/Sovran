@@ -7,10 +7,12 @@
  * the unified search surface can feed it different buckets (All, People, Groups,
  * Mints) from one `useSearchAggregates` call without duplicating queries.
  */
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { LegendList } from '@legendapp/list/react-native';
+import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
+import { useVisualListLogger, VISUAL_LIST_VIEWABILITY_CONFIG } from '@/shared/lib/contentShiftLog';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import type { AllSearchResult } from '@/features/contacts/hooks/useAllSearchResults';
@@ -38,6 +40,11 @@ type SearchResultRowsProps = {
 };
 
 const keyExtractor = (item: AllSearchResult) => item.id;
+const SEARCH_RESULTS_VISUAL_SCOPE = 'search.results';
+
+function searchResultItemType(item: AllSearchResult): string {
+  return item.type === 'contact' && item.isLoadingProfile ? 'contact-loading' : item.type;
+}
 
 function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
   return {
@@ -130,7 +137,7 @@ export function SearchResultRows({
     return results.length === 0;
   }, [results.length, loading, searchQuery]);
 
-  const renderItem = useCallback(({ item }: { item: AllSearchResult }) => {
+  const renderSearchResult = useCallback((item: AllSearchResult) => {
     switch (item.type) {
       case 'geohash':
         return <GeohashJumpRow geohash={item.geohash} />;
@@ -174,14 +181,63 @@ export function SearchResultRows({
       })),
     []
   );
+  const listData = showPlaceholders ? placeholderData : showNoResults ? [] : results;
+  const listRef = useRef<LegendListRef>(null);
+  const visualList = useVisualListLogger<AllSearchResult>({
+    scope: SEARCH_RESULTS_VISUAL_SCOPE,
+    surface: 'search',
+    component: 'SearchResultRowsList',
+    phase: loading ? 'loading' : 'ready',
+    extra: {
+      loading,
+      placeholders: showPlaceholders,
+      queryLength: searchQuery.trim().length,
+      rows: listData.length,
+    },
+    getItemKey: (item) => item.id,
+    getItemContext: (item) => ({
+      rowKey: item.id,
+      rowLabel: searchResultItemType(item),
+      itemType: searchResultItemType(item),
+    }),
+    getListState: () => listRef.current?.getState() ?? null,
+  });
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: AllSearchResult; index: number }) => (
+      <VisualLayoutProbe
+        scope={SEARCH_RESULTS_VISUAL_SCOPE}
+        surface="search"
+        component="SearchResultRow"
+        itemKey={item.id}
+        itemType={searchResultItemType(item)}
+        index={index}
+        extra={{
+          loading,
+          placeholders: showPlaceholders,
+          queryLength: searchQuery.trim().length,
+        }}>
+        {renderSearchResult(item)}
+      </VisualLayoutProbe>
+    ),
+    [loading, renderSearchResult, searchQuery, showPlaceholders]
+  );
 
   return (
     <View style={styles.container}>
       <LegendList
-        data={showPlaceholders ? placeholderData : showNoResults ? [] : results}
+        ref={listRef}
+        data={listData}
         estimatedItemSize={68}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
+        getItemType={searchResultItemType}
+        onItemSizeChanged={visualList.onItemSizeChanged}
+        onLoad={visualList.onLoad}
+        onMetricsChange={visualList.onMetricsChange}
+        onStickyHeaderChange={visualList.onStickyHeaderChange}
+        onViewableItemsChanged={visualList.onViewableItemsChanged}
+        viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"
         ListEmptyComponent={renderEmpty}

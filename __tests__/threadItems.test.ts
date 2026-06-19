@@ -66,8 +66,7 @@ describe('thread item builders', () => {
       emptySeed({
         allEvents: mapEvents([root, seededReply, quoteOnly]),
         metrics: new Map([['root', { ...EMPTY_METRICS, replyCount: 3 }]]),
-      }),
-      42
+      })
     );
 
     expect(built?.items.map((item) => `${item.type}:${item.event.id}`)).toEqual([
@@ -97,8 +96,7 @@ describe('thread item builders', () => {
       emptySeed({
         allEvents: mapEvents([root, firstPreviewReply, secondPreviewReply]),
         replyPreviewEventIds: ['first-preview', 'second-preview'],
-      }),
-      42
+      })
     );
 
     expect(
@@ -129,8 +127,7 @@ describe('thread item builders', () => {
       emptySeed({
         allEvents: mapEvents([root, authorReply, followedTail]),
         replyPreviewEventIds: ['author-reply', 'followed-tail'],
-      }),
-      42
+      })
     );
 
     expect(
@@ -169,7 +166,7 @@ describe('thread item builders', () => {
     };
 
     const orderedIds = orderedReplyIdsForThreadResult(result, 'more', ['seeded-reply']);
-    const built = buildThreadItemsFromResult('root', result, 42, orderedIds);
+    const built = buildThreadItemsFromResult('root', result, orderedIds);
 
     expect(orderedIds).toEqual(['seeded-reply', 'next-reply']);
     expect(

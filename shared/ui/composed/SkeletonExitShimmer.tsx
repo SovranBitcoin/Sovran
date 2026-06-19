@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PropsWithChildren,
+} from 'react';
 import { StyleSheet, View, type LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -14,27 +21,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import {
+  useVisualLayoutLogger,
+  visualLayoutScopePart,
+  type VisualLayoutConfig,
+} from '@/shared/lib/contentShiftLog';
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
-export const SKELETON_EXIT_DURATION_MS = 620;
+const SKELETON_EXIT_DURATION_MS = 620;
 // Internal timing — not exported (only this module reads them).
 const SKELETON_LOADING_SHIMMER_DURATION_MS = 2200;
 const SKELETON_LOADING_SHIMMER_GAP_MS = 350;
-const SKELETON_LOADING_SHIMMER_CYCLE_MS =
-  SKELETON_LOADING_SHIMMER_DURATION_MS + SKELETON_LOADING_SHIMMER_GAP_MS;
-
-/**
- * Returns ms to wait before triggering the exit so the in-flight loading
- * shimmer pass finishes first. If the shimmer is currently in its idle gap
- * (between passes) this returns 0 — there's no pass to interrupt.
- */
-export function msUntilLoadingShimmerPassEnds(loadingStartedAt: number): number {
-  const elapsed = Math.max(0, Date.now() - loadingStartedAt);
-  const elapsedInCycle = elapsed % SKELETON_LOADING_SHIMMER_CYCLE_MS;
-  if (elapsedInCycle < SKELETON_LOADING_SHIMMER_GAP_MS) return 0;
-  return SKELETON_LOADING_SHIMMER_CYCLE_MS - elapsedInCycle;
-}
 
 const HIGHLIGHT_WIDTH = 90;
 const LOADING_HIGHLIGHT_WIDTH_RATIO = 1.1;
@@ -43,16 +41,100 @@ const GRADIENT_START = { x: 0, y: 0.5 } as const;
 const GRADIENT_END = { x: 1, y: 0.5 } as const;
 const EXIT_SHIMMER_BAR_BASE = { width: HIGHLIGHT_WIDTH } as const;
 
+type SkeletonShimmerVisualProps = {
+  visualScope?: string;
+  visualKey?: string;
+  visualSurface?: string;
+  visualComponent?: string;
+  visualPhase?: string;
+  visualExtra?: VisualLayoutConfig['extra'];
+  visualDisabled?: boolean;
+};
+
+let skeletonShimmerVisualInstance = 0;
+
+function useSkeletonShimmerVisualLayout({
+  active,
+  defaultComponent,
+  defaultItemType,
+  defaultPhase,
+  visualScope = 'loading.skeleton_shimmer',
+  visualKey,
+  visualSurface = 'shared',
+  visualComponent,
+  visualPhase,
+  visualExtra,
+  visualDisabled,
+}: SkeletonShimmerVisualProps & {
+  active: boolean;
+  defaultComponent: string;
+  defaultItemType: string;
+  defaultPhase: string;
+}) {
+  const instanceKeyRef = useRef<string | null>(null);
+  if (instanceKeyRef.current === null) {
+    skeletonShimmerVisualInstance += 1;
+    instanceKeyRef.current = `shimmer:${skeletonShimmerVisualInstance}`;
+  }
+
+  return useVisualLayoutLogger({
+    enabled: visualDisabled !== true,
+    scope: visualScope,
+    surface: visualSurface,
+    component: visualComponent ?? defaultComponent,
+    itemKey: visualKey ? visualLayoutScopePart(visualKey) : instanceKeyRef.current,
+    itemType: defaultItemType,
+    phase: visualPhase ?? (active ? defaultPhase : 'idle'),
+    extra: () => ({
+      active,
+      ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
+    }),
+  });
+}
+
+function shimmerColors(
+  highlightColor: string | undefined,
+  fallbackHighlight: string
+): readonly [string, string, string] {
+  if (highlightColor)
+    return [opacity(highlightColor, 0), highlightColor, opacity(highlightColor, 0)];
+  return ['transparent', fallbackHighlight, 'transparent'];
+}
+
 /**
  * Fades the wrapped skeleton out while a single bright shimmer line sweeps
  * across. The children stay mounted; only opacity changes. The shimmer line
  * is a separate absolute overlay.
  */
-export function SkeletonExitReveal({ active, children }: PropsWithChildren<{ active: boolean }>) {
+export function SkeletonExitReveal({
+  active,
+  children,
+  highlightColor,
+  visualScope,
+  visualKey,
+  visualSurface,
+  visualComponent,
+  visualPhase,
+  visualExtra,
+  visualDisabled,
+}: PropsWithChildren<{ active: boolean; highlightColor?: string } & SkeletonShimmerVisualProps>) {
   const { width: screenWidth } = useWindowDimensions();
   const foreground = useThemeColor('foreground');
   const [containerWidth, setContainerWidth] = useState(0);
   const progress = useSharedValue(0);
+  const visualLayout = useSkeletonShimmerVisualLayout({
+    active,
+    defaultComponent: 'SkeletonExitReveal',
+    defaultItemType: 'skeleton-exit-shimmer',
+    defaultPhase: 'exiting',
+    visualScope,
+    visualKey,
+    visualSurface,
+    visualComponent,
+    visualPhase,
+    visualExtra,
+    visualDisabled,
+  });
 
   useEffect(() => {
     if (!active) {
@@ -67,10 +149,14 @@ export function SkeletonExitReveal({ active, children }: PropsWithChildren<{ act
     return () => cancelAnimation(progress);
   }, [active, progress]);
 
-  const handleLayout = useCallback((event: LayoutChangeEvent) => {
-    const w = Math.round(event.nativeEvent.layout.width);
-    setContainerWidth((prev) => (prev === w ? prev : w));
-  }, []);
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const w = Math.round(event.nativeEvent.layout.width);
+      setContainerWidth((prev) => (prev === w ? prev : w));
+      visualLayout.onLayout(event);
+    },
+    [visualLayout]
+  );
 
   const sweepWidth = containerWidth > 0 ? containerWidth : screenWidth;
 
@@ -88,9 +174,8 @@ export function SkeletonExitReveal({ active, children }: PropsWithChildren<{ act
   });
 
   const gradientColors = useMemo<readonly [string, string, string]>(() => {
-    const highlight = opacity(foreground, 0.55);
-    return ['transparent', highlight, 'transparent'];
-  }, [foreground]);
+    return shimmerColors(highlightColor, opacity(foreground, 0.55));
+  }, [foreground, highlightColor]);
 
   const shimmerBarStyle = useMemo(
     () => [styles.shimmerBar, EXIT_SHIMMER_BAR_BASE, shimmerStyle],
@@ -98,7 +183,11 @@ export function SkeletonExitReveal({ active, children }: PropsWithChildren<{ act
   );
 
   return (
-    <View onLayout={handleLayout} style={styles.container}>
+    <View
+      ref={visualLayout.ref}
+      collapsable={false}
+      onLayout={handleLayout}
+      style={styles.container}>
       <Animated.View style={active ? fadeStyle : undefined}>{children}</Animated.View>
       {active && (
         <Animated.View pointerEvents="none" style={shimmerBarStyle}>
@@ -120,11 +209,37 @@ export function SkeletonExitReveal({ active, children }: PropsWithChildren<{ act
  * loading state. One bright highlight stripe sweeps left-to-right, pauses,
  * then repeats. Pure transform animation (native driver).
  */
-export function SkeletonLoadingShimmer({ active }: { active: boolean }) {
+export function SkeletonLoadingShimmer({
+  active,
+  highlightColor,
+  visualScope,
+  visualKey,
+  visualSurface,
+  visualComponent,
+  visualPhase,
+  visualExtra,
+  visualDisabled,
+}: {
+  active: boolean;
+  highlightColor?: string;
+} & SkeletonShimmerVisualProps) {
   const { width: screenWidth } = useWindowDimensions();
   const background = useThemeColor('background');
   const [containerWidth, setContainerWidth] = useState(0);
   const progress = useSharedValue(0);
+  const visualLayout = useSkeletonShimmerVisualLayout({
+    active,
+    defaultComponent: 'SkeletonLoadingShimmer',
+    defaultItemType: 'skeleton-loading-shimmer',
+    defaultPhase: 'loading',
+    visualScope,
+    visualKey,
+    visualSurface,
+    visualComponent,
+    visualPhase,
+    visualExtra,
+    visualDisabled,
+  });
 
   useEffect(() => {
     if (!active) {
@@ -149,10 +264,14 @@ export function SkeletonLoadingShimmer({ active }: { active: boolean }) {
     return () => cancelAnimation(progress);
   }, [active, progress]);
 
-  const handleLayout = useCallback((event: LayoutChangeEvent) => {
-    const w = Math.round(event.nativeEvent.layout.width);
-    setContainerWidth((prev) => (prev === w ? prev : w));
-  }, []);
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const w = Math.round(event.nativeEvent.layout.width);
+      setContainerWidth((prev) => (prev === w ? prev : w));
+      visualLayout.onLayout(event);
+    },
+    [visualLayout]
+  );
 
   const sweepWidth = containerWidth > 0 ? containerWidth : screenWidth;
   const highlightWidth = Math.max(40, Math.round(sweepWidth * LOADING_HIGHLIGHT_WIDTH_RATIO));
@@ -167,9 +286,8 @@ export function SkeletonLoadingShimmer({ active }: { active: boolean }) {
   });
 
   const gradientColors = useMemo<readonly [string, string, string]>(() => {
-    const highlight = opacity(background, 0.85);
-    return ['transparent', highlight, 'transparent'];
-  }, [background]);
+    return shimmerColors(highlightColor, opacity(background, 0.85));
+  }, [background, highlightColor]);
 
   const widthStyle = useMemo(() => ({ width: highlightWidth }), [highlightWidth]);
   const shimmerBarStyle = useMemo(
@@ -177,10 +295,23 @@ export function SkeletonLoadingShimmer({ active }: { active: boolean }) {
     [shimmerStyle, widthStyle]
   );
 
-  if (!active) return <View onLayout={handleLayout} style={StyleSheet.absoluteFill} />;
+  if (!active)
+    return (
+      <View
+        ref={visualLayout.ref}
+        collapsable={false}
+        onLayout={handleLayout}
+        style={StyleSheet.absoluteFill}
+      />
+    );
 
   return (
-    <View onLayout={handleLayout} pointerEvents="none" style={styles.loadingContainer}>
+    <View
+      ref={visualLayout.ref}
+      collapsable={false}
+      onLayout={handleLayout}
+      pointerEvents="none"
+      style={styles.loadingContainer}>
       <Animated.View style={shimmerBarStyle} pointerEvents="none">
         <AnimatedLinearGradient
           colors={gradientColors}

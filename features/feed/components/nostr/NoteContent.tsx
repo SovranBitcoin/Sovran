@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform, type LayoutChangeEvent } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -13,7 +13,8 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { decode as bolt11Decode } from '@gandlaf21/bolt11-decode';
-import { log } from '@/shared/lib/logger';
+import { log, feedLog } from '@/shared/lib/logger';
+import { useShiftLogger, useVisualLayoutLogger } from '@/shared/lib/contentShiftLog';
 import { openExternalUrl } from '@/shared/lib/url';
 import { staticPopup } from '@/shared/lib/popup';
 import { ImageBlock, useImageOverlay } from './image-overlay';
@@ -22,14 +23,27 @@ import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { ContentSegment, FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
-import { collectQuoteTagIds, parseContent, prettifyUrl, tryNpubEncode } from './feedParse';
+import {
+  collectQuoteTagIds,
+  parseContent,
+  parseImetaTags,
+  prettifyUrl,
+  tryNpubEncode,
+} from './feedParse';
+import { PollCard } from './poll/PollCard';
+import { POLL_KIND } from './poll/pollParse';
 import { formatRelative } from '@/shared/lib/date';
 import { sharedStyles } from './feedStyles';
 import { fontSize } from '@/shared/styles/tokens';
+import { NOTE_CONTENT_LINE_HEIGHT } from '@/features/feed/lib/threadListLayout';
+
+// Re-exported so `NoteContent` stays the import site for note-rendering
+// consumers (PostCard); the value's source of truth lives in `threadListLayout`
+// so the rendered line height and the skeleton fixed-size math can't drift.
+export { NOTE_CONTENT_LINE_HEIGHT };
 
 const EMPTY_QUOTED_EVENTS: Map<string, FeedEvent> = new Map();
 export const NOTE_CONTENT_FONT_SIZE = fontSize.lg;
-export const NOTE_CONTENT_LINE_HEIGHT = 24;
 
 // ─── Inline renderers ────────────────────────────────────────────────────────
 
@@ -76,10 +90,14 @@ const InlineHashtag = React.memo(function InlineHashtag({ tag }: { tag: string }
 
 const InlineLink = React.memo(function InlineLink({
   url,
+  onActivate,
   onPressIn,
   onPressOut,
 }: {
   url: string;
+  /** When provided, handles the tap instead of opening the OS browser (used to
+   *  embed the link in-thread). */
+  onActivate?: (url: string) => void;
   onPressIn?: () => void;
   onPressOut?: () => void;
 }) {
@@ -91,6 +109,10 @@ const InlineLink = React.memo(function InlineLink({
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={async () => {
+        if (onActivate) {
+          onActivate(url);
+          return;
+        }
         const result = await openExternalUrl(url);
         if (result.isErr()) {
           log.warn('feed.inline_link.open_failed', { reason: result.error.type });
@@ -110,12 +132,15 @@ const VideoBlockInner = React.memo(function VideoBlockInner({
   onBeforeOpen,
   openOverlay,
   overlayLayout,
+  aspectRatio: aspectRatioProp,
 }: {
   url: string;
   onTap?: () => void;
   onBeforeOpen?: () => void;
   openOverlay?: (layout: ImageOverlayLayout) => void;
   overlayLayout?: Omit<ImageOverlayLayout, 'pageX' | 'pageY' | 'width' | 'height'>;
+  /** NIP-92 imeta-derived aspect ratio for the inline player (overlay wins if present). */
+  aspectRatio?: number;
 }) {
   const surface = useThemeColor('surface');
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
@@ -156,7 +181,7 @@ const VideoBlockInner = React.memo(function VideoBlockInner({
   }, [isAndroid, handleTap]);
 
   const hasTap = !!(openOverlay && overlayLayout) || !!onTap;
-  const aspectRatio = overlayLayout?.aspectRatio ?? 16 / 9;
+  const aspectRatio = overlayLayout?.aspectRatio ?? aspectRatioProp ?? 16 / 9;
 
   const content = (
     <View style={[sharedStyles.videoBlockOuter, { backgroundColor: surface }]}>
@@ -267,7 +292,7 @@ const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { melt
 
 // ─── QuotedPostCard ──────────────────────────────────────────────────────────
 
-const QuotedPostCard = React.memo(function QuotedPostCard({
+export const QuotedPostCard = React.memo(function QuotedPostCard({
   event,
   profiles,
   getMetrics,
@@ -392,6 +417,7 @@ export const NoteContent = React.memo(function NoteContent({
   profiles,
   getMetrics,
   onVideoTap,
+  onLinkPress,
   onQuotedPressIn,
   onQuotedPressOut,
   onInlineActionPressIn,
@@ -424,6 +450,9 @@ export const NoteContent = React.memo(function NoteContent({
   /** Called when overlay is opened from this post. */
   onOverlayOpenedFromIndex?: (index: number) => void;
   onVideoTap?: (url: string) => void;
+  /** When set, tapping an inline link calls this (to embed it in-thread)
+   *  instead of opening the OS browser. */
+  onLinkPress?: (url: string) => void;
   onQuotedPressIn?: () => void;
   onQuotedPressOut?: () => void;
   onInlineActionPressIn?: () => void;
@@ -449,6 +478,21 @@ export const NoteContent = React.memo(function NoteContent({
   const foreground = useThemeColor('foreground');
   const [expanded, setExpanded] = useState(false);
   const imageOverlay = useImageOverlay();
+  const shift = useShiftLogger('NoteContent');
+  const noteKey = overlayEvent?.id ?? 'inline-note';
+
+  const toggleExpanded = useCallback(
+    (next: boolean) => {
+      feedLog.info('feed.shift.note.expand', {
+        component: 'NoteContent',
+        key: noteKey,
+        expanded: next,
+        contentLength: content.length,
+      });
+      setExpanded(next);
+    },
+    [noteKey, content.length]
+  );
 
   const onBeforeOpen = useCallback(() => {
     if (typeof feedIndex === 'number' && onOverlayOpenedFromIndex) {
@@ -482,6 +526,9 @@ export const NoteContent = React.memo(function NoteContent({
     return { inlineSegments: inline, blockSegments: blocks };
   }, [content]);
 
+  // NIP-92 imeta metadata (alt text / dimensions) keyed by media url.
+  const imetaByUrl = useMemo(() => parseImetaTags(overlayEvent?.tags ?? []), [overlayEvent]);
+
   const { mediaSegments, allMediaUrls, allMediaTypes, overlayPost } = useMemo(() => {
     const media = blockSegments.filter(
       (s): s is ContentSegment & { kind: 'image' | 'video'; url: string } =>
@@ -494,8 +541,10 @@ export const NoteContent = React.memo(function NoteContent({
         ? {
             event: {
               id: overlayEvent.id,
+              kind: overlayEvent.kind,
               pubkey: overlayEvent.pubkey,
               content: overlayEvent.content,
+              tags: overlayEvent.tags,
               created_at: overlayEvent.created_at,
             },
             metrics: {
@@ -572,6 +621,34 @@ export const NoteContent = React.memo(function NoteContent({
 
   const hasInline = inlineSegments.length > 0;
   const hasBlocks = blockSegments.length > 0;
+  const visualLayout = useVisualLayoutLogger({
+    scope: `feed.note.${noteKey.slice(0, 12)}`,
+    surface: 'feed',
+    component: 'NoteContent',
+    itemKey: noteKey,
+    itemType: overlayEvent ? `kind-${overlayEvent.kind}` : 'inline',
+    extra: () => ({
+      contentLength: content.length,
+      blockCount: blockSegments.length,
+      expanded,
+      truncated: isTruncated,
+    }),
+  });
+
+  // Body height after layout. Re-fires when async data (a mention name
+  // resolving, a quoted event arriving, an image settling its aspect ratio)
+  // reflows the note — the raw signal for "the post grew/shrank under me".
+  const handleNoteLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      visualLayout.onLayout(e);
+      shift.report('feed.shift.note.height', noteKey, e.nativeEvent.layout.height, {
+        contentLength: content.length,
+        blockCount: blockSegments.length,
+        expanded,
+      });
+    },
+    [visualLayout, shift, noteKey, content.length, blockSegments.length, expanded]
+  );
   const taggedQuoteIds = useMemo(() => {
     if (!overlayEvent) return [];
     const inlineQuoteIds = new Set(
@@ -612,6 +689,7 @@ export const NoteContent = React.memo(function NoteContent({
           <InlineLink
             key={i}
             url={seg.url}
+            onActivate={onLinkPress}
             onPressIn={onInlineActionPressIn}
             onPressOut={onInlineActionPressOut}
           />
@@ -627,8 +705,36 @@ export const NoteContent = React.memo(function NoteContent({
     }
   };
 
+  const renderQuoteCard = (eventId: string, key: string) => (
+    <QuotedPostCard
+      key={key}
+      event={quotedEvents.get(eventId)}
+      profiles={profiles}
+      getMetrics={getMetrics}
+      onPressIn={onQuotedPressIn}
+      onPressOut={onQuotedPressOut}
+    />
+  );
+
+  const renderQuoteBlockSegment = (seg: ContentSegment, i: number) => {
+    if (seg.kind !== 'nevent' && seg.kind !== 'note') return null;
+    return renderQuoteCard(seg.eventId, `b${i}`);
+  };
+
+  // A NIP-88 poll (kind:1068) renders the poll card in place of text content,
+  // while quote cards remain below it when the poll cites another post.
+  if (overlayEvent?.kind === POLL_KIND) {
+    return (
+      <VStack ref={visualLayout.ref} gap={0} onLayout={handleNoteLayout}>
+        <PollCard event={overlayEvent} />
+        {blockSegments.map((seg, i) => renderQuoteBlockSegment(seg, i))}
+        {taggedQuoteIds.map((id) => renderQuoteCard(id, `q${id}`))}
+      </VStack>
+    );
+  }
+
   return (
-    <VStack gap={0}>
+    <VStack ref={visualLayout.ref} gap={0} onLayout={handleNoteLayout}>
       {hasInline && (
         <Text
           size={NOTE_CONTENT_FONT_SIZE}
@@ -643,7 +749,7 @@ export const NoteContent = React.memo(function NoteContent({
               style={accentColor}
               onPressIn={onInlineActionPressIn}
               onPressOut={onInlineActionPressOut}
-              onPress={() => setExpanded(true)}>
+              onPress={() => toggleExpanded(true)}>
               {' show more'}
             </Text>
           )}
@@ -653,7 +759,7 @@ export const NoteContent = React.memo(function NoteContent({
               style={accentColor}
               onPressIn={onInlineActionPressIn}
               onPressOut={onInlineActionPressOut}
-              onPress={() => setExpanded(false)}>
+              onPress={() => toggleExpanded(false)}>
               {' show less'}
             </Text>
           )}
@@ -672,10 +778,17 @@ export const NoteContent = React.memo(function NoteContent({
                 const mediaIndex = mediaSegments.findIndex(
                   (m) => m.kind === 'image' && m.url === seg.url
                 );
+                const imageImeta = imetaByUrl.get(seg.url);
+                const imetaAspect =
+                  imageImeta?.width && imageImeta?.height
+                    ? imageImeta.width / imageImeta.height
+                    : undefined;
                 return (
                   <ImageBlock
                     key={`b${i}`}
                     url={seg.url}
+                    alt={imageImeta?.alt}
+                    initialAspectRatio={imetaAspect}
                     allImageUrls={imageUrls.length > 1 ? imageUrls : undefined}
                     imageIndex={imageIndex >= 0 ? imageIndex : 0}
                     allMediaUrls={allMediaUrls.length > 0 ? allMediaUrls : undefined}
@@ -705,6 +818,11 @@ export const NoteContent = React.memo(function NoteContent({
                 const mediaIndex = mediaSegments.findIndex(
                   (m) => m.kind === 'video' && m.url === seg.url
                 );
+                const videoImeta = imetaByUrl.get(seg.url);
+                const videoAspect =
+                  videoImeta?.width && videoImeta?.height
+                    ? videoImeta.width / videoImeta.height
+                    : 16 / 9;
                 const overlayLayout: Omit<
                   ImageOverlayLayout,
                   'pageX' | 'pageY' | 'width' | 'height'
@@ -714,12 +832,13 @@ export const NoteContent = React.memo(function NoteContent({
                   mediaTypes: allMediaTypes.length > 0 ? allMediaTypes : undefined,
                   initialIndex: mediaIndex >= 0 ? mediaIndex : 0,
                   post: overlayPost,
-                  aspectRatio: 16 / 9,
+                  aspectRatio: videoAspect,
                 };
                 return (
                   <VideoBlock
                     key={`b${i}`}
                     url={seg.url}
+                    aspectRatio={videoAspect}
                     onBeforeOpen={onBeforeOpen}
                     onTap={
                       !imageOverlay?.open
@@ -737,31 +856,13 @@ export const NoteContent = React.memo(function NoteContent({
                 return <LightningBlock key={`b${i}`} meltTarget={seg.meltTarget} />;
               case 'nevent':
               case 'note':
-                return (
-                  <QuotedPostCard
-                    key={`b${i}`}
-                    event={quotedEvents.get(seg.eventId)}
-                    profiles={profiles}
-                    getMetrics={getMetrics}
-                    onPressIn={onQuotedPressIn}
-                    onPressOut={onQuotedPressOut}
-                  />
-                );
+                return renderQuoteCard(seg.eventId, `b${i}`);
               default:
                 return null;
             }
           });
         })()}
-      {taggedQuoteIds.map((id) => (
-        <QuotedPostCard
-          key={`q${id}`}
-          event={quotedEvents.get(id)}
-          profiles={profiles}
-          getMetrics={getMetrics}
-          onPressIn={onQuotedPressIn}
-          onPressOut={onQuotedPressOut}
-        />
-      ))}
+      {taggedQuoteIds.map((id) => renderQuoteCard(id, `q${id}`))}
     </VStack>
   );
 });

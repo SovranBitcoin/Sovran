@@ -26,24 +26,20 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { BlurView } from 'expo-blur';
+import opacity from 'hex-color-opacity';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { ThreadReplyBar } from '@/features/feed/components/ThreadReplyBar';
 import { Log } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import type { ImageOverlayContextValue } from './types';
 import { IMAGE_OVERLAY_TIMING_CONFIG, useImageOverlay } from './provider';
 import { clearAndroidOverlayNode, setAndroidOverlayNode } from './AndroidImageOverlayHost';
 import { MemoizedMediaPagerPage } from './MediaPagerPage';
 import { OverlayDot } from './PagerDots';
 import { duration, zIndex } from '@/shared/styles/tokens';
-import {
-  ImageOverlayBottomPanelContent,
-  ImageOverlayBottomPanelReply,
-  ImageOverlayAbsoluteBar,
-  PANEL_BG,
-} from './BottomPanel';
+import { ImageOverlayBottomPanelContent, ImageOverlayAbsoluteBar } from './BottomPanel';
 import {
   ANDROID_SCRIM_MAX_OPACITY,
   DISMISS_ACTIVE_OFFSET_Y,
@@ -80,17 +76,29 @@ import {
   BOTTOM_PANEL_SHEET_SNAP_60_FRACTION,
   BOTTOM_PANEL_STIFF_DURATION_MS,
   BOTTOM_PANEL_PADDING_BOTTOM_EXTRA,
-  BOTTOM_PANEL_PADDING_HORIZONTAL,
   BOTTOM_PANEL_SHEET_TOP_BORDER_RADIUS,
 } from './config';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
-function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue }) {
-  const insets = useSafeAreaInsets();
+function AnimatedImageOverlayContent({
+  ctx,
+  safeBottom,
+}: {
+  ctx: ImageOverlayContextValue;
+  /** Correct bottom safe-area inset, read outside the FullWindowOverlay (where
+   *  `useSafeAreaInsets().bottom` is inflated). Use this for all bottom layout. */
+  safeBottom: number;
+}) {
+  const rawInsets = useSafeAreaInsets();
+  // Override the unreliable in-overlay bottom inset with the correct one.
+  const insets = useMemo(() => ({ ...rawInsets, bottom: safeBottom }), [rawInsets, safeBottom]);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const { keys: nostrKeys } = useNostrKeysContext();
+  // The sheet is a true bottom drawer (not an overlay on the image), so it reads
+  // like the feed it came from: same `surface` background, with the handle and
+  // reply divider tinted from `foreground` rather than hardcoded white.
+  const [panelSurface, panelForeground] = useThemeColor(['surface', 'foreground'] as const);
   const panelMinHeightReportedRef = useRef(false);
 
   const imageScale = useSharedValue(1);
@@ -188,6 +196,18 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
 
   /** Sheet is closed initially (absolute overlay only); opens to 60% when user taps comment or show more. */
   const [sheetOpen, setSheetOpen] = useState(false);
+  // The floating reply composer's measured height. Used to pad the panel content
+  // (so it clears the pinned bar) and to time the bar's fade-out so it disappears
+  // before the collapsing drawer gets shorter than the bar (no poke-out).
+  const [replyBarHeight, setReplyBarHeight] = useState(0);
+  const replyBarHeightSv = useSharedValue(0);
+  const handleReplyBarHeight = useCallback(
+    (height: number) => {
+      setReplyBarHeight(height);
+      replyBarHeightSv.value = height;
+    },
+    [replyBarHeightSv]
+  );
   useEffect(() => {
     if (!activeOverlayPost) setSheetOpen(false);
   }, [activeOverlayPost]);
@@ -245,15 +265,6 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     },
     [videoFeedLayouts, setVideoFeedIndex]
   );
-
-  const onReplyPress = useCallback(() => {
-    if (!activeOverlayPost) return;
-    router.navigate({
-      pathname: '/(user-flow)/thread',
-      params: { eventId: activeOverlayPost.event.id },
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- depend on event.id only so memoized panel gets stable callback
-  }, [activeOverlayPost?.event.id]);
 
   const rContainerStyle = useAnimatedStyle(() => ({
     pointerEvents: imageState.value === 'open' ? 'auto' : 'none',
@@ -391,6 +402,19 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
       height: h,
     };
   }, [screenHeight, panelHeightSv]);
+
+  // Fade the pinned reply bar in/out with the drawer's openness — like the
+  // link-embed action bar (likes/reposts/zaps). It's a separate, screen-anchored
+  // element (never in the drawer's layout, so it can't reflow/jitter as the sheet
+  // is dragged). At every normal snap the drawer is far taller than the bar, so
+  // the bar stays fully opaque and motionless; only the final collapse fades it,
+  // and the fade completes by the time the drawer shrinks to the bar's height so
+  // the bar never pokes above the closing sheet.
+  const rReplyBarFadeStyle = useAnimatedStyle(() => {
+    const bar = replyBarHeightSv.value || 120;
+    const t = (panelHeightSv.value - bar) / 100;
+    return { opacity: Math.min(1, Math.max(0, t)) };
+  });
 
   /** When true, dismiss pan was active; skip image tap-to-toggle so drag-to-dismiss doesn't trigger toggle. */
   const dismissPanActiveRef = useRef(false);
@@ -1263,7 +1287,11 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
                             ? 'none'
                             : 'auto'
                         }>
-                        <ImageOverlayAbsoluteBar post={pagePost} onOpenSheet={openSheet} />
+                        <ImageOverlayAbsoluteBar
+                          post={pagePost}
+                          onOpenSheet={openSheet}
+                          onRequestClose={() => triggerClose()}
+                        />
                       </Animated.View>
                     </GestureDetector>
                   ) : null}
@@ -1284,7 +1312,11 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
                 },
               ]}
               pointerEvents={sheetOpen ? 'none' : 'auto'}>
-              <ImageOverlayAbsoluteBar post={activeOverlayPost} onOpenSheet={openSheet} />
+              <ImageOverlayAbsoluteBar
+                post={activeOverlayPost}
+                onOpenSheet={openSheet}
+                onRequestClose={() => triggerClose()}
+              />
             </Animated.View>
           </GestureDetector>
         ) : null}
@@ -1296,14 +1328,22 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             rBottomPanelStyle,
             rBottomPanelLayoutStyle,
             {
-              paddingBottom: insets.bottom + BOTTOM_PANEL_PADDING_BOTTOM_EXTRA,
+              backgroundColor: panelSurface,
+              // Reserve the pinned reply bar's height so the last metrics row
+              // clears it. Constant, so it doesn't shift as the sheet resizes.
+              paddingBottom: sheetOpen ? replyBarHeight : 0,
             },
           ]}
           pointerEvents="auto">
           <View style={overlayStyles.panelContentWrap} collapsable={false}>
             <GestureDetector gesture={handlePan}>
               <View style={overlayStyles.panelHandle} collapsable={false}>
-                <View style={overlayStyles.panelHandleBar} />
+                <View
+                  style={[
+                    overlayStyles.panelHandleBar,
+                    { backgroundColor: opacity(panelForeground, 0.2) },
+                  ]}
+                />
               </View>
             </GestureDetector>
             <GestureDetector gesture={scrollAreaPan}>
@@ -1326,18 +1366,34 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
                       post={activeOverlayPost}
                       initialContentExpanded={openWithContentExpanded}
                       onConsumedExpand={() => setOpenWithContentExpanded(false)}
+                      onRequestClose={() => triggerClose()}
                     />
                   </View>
                 </GHScrollView>
-                <View style={overlayStyles.bottomPanelReplyWrap} collapsable={false}>
-                  <ImageOverlayBottomPanelReply
-                    currentUserPubkey={nostrKeys?.pubkey ?? null}
-                    onReplyPress={onReplyPress}
-                  />
-                </View>
               </View>
             </GestureDetector>
           </View>
+        </Animated.View>
+      ) : null}
+      {/* The live reply composer — the SAME component as the thread's sticky reply
+          bar. Pinned to the screen bottom above the drawer (zIndex.modal over the
+          panel's zIndex.raised) and FADED in/out with the drawer's openness — like
+          the link-embed action bar — so it never sits in the drawer's animating
+          layout and can't reflow as the sheet is resized. It lifts with the
+          keyboard itself (`insideOverlay`); expand / poll close the lightbox. */}
+      {activeOverlayPost && sheetOpen ? (
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { zIndex: zIndex.modal }, rReplyBarFadeStyle]}
+          pointerEvents="box-none">
+          <ThreadReplyBar
+            targetEvent={activeOverlayPost.event}
+            targetProfile={activeOverlayPost.profile ?? undefined}
+            onExpand={() => triggerClose()}
+            onHeightChange={handleReplyBarHeight}
+            scopeId="overlay"
+            insideOverlay
+            bottomInset={safeBottom}
+          />
         </Animated.View>
       ) : null}
     </View>
@@ -1366,6 +1422,12 @@ export function AnimatedImageOverlay() {
   // with ctx possibly null); platform/ctx branching lives in effect bodies
   // and the render path below.
   const ownerKey = useId();
+  // Read the safe-area inset HERE, outside the FullWindowOverlay. Inside the
+  // overlay, `useSafeAreaInsets().bottom` is inflated (~3x) — the overlay sits
+  // in a separate native window that mis-reports the bottom inset — which padded
+  // the reply bar far above the home indicator. This value is correct; pass it
+  // down so the content and the reply bar anchor like the thread.
+  const safeBottom = useSafeAreaInsets().bottom;
   const androidActive = Platform.OS === 'android' && ctx?.activeUrl != null;
 
   // While a media url is active, host the overlay element in the main window.
@@ -1377,11 +1439,11 @@ export function AnimatedImageOverlay() {
     setAndroidOverlayNode(
       ownerKey,
       <Log name="AnimatedImageOverlay">
-        <AnimatedImageOverlayContent ctx={ctx} />
+        <AnimatedImageOverlayContent ctx={ctx} safeBottom={safeBottom} />
       </Log>
     );
     return () => clearAndroidOverlayNode(ownerKey);
-  }, [androidActive, ctx, ownerKey]);
+  }, [androidActive, ctx, ownerKey, safeBottom]);
 
   // Hardware back closes the overlay — replaces the old Modal onRequestClose.
   useEffect(() => {
@@ -1395,7 +1457,7 @@ export function AnimatedImageOverlay() {
 
   if (!ctx) return null;
   if (Platform.OS === 'android') return null;
-  const content = <AnimatedImageOverlayContent ctx={ctx} />;
+  const content = <AnimatedImageOverlayContent ctx={ctx} safeBottom={safeBottom} />;
   if (Platform.OS === 'ios') {
     return (
       <Log name="AnimatedImageOverlay">
@@ -1452,7 +1514,6 @@ const overlayStyles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: zIndex.raised,
-    backgroundColor: PANEL_BG,
     borderTopLeftRadius: BOTTOM_PANEL_SHEET_TOP_BORDER_RADIUS,
     borderTopRightRadius: BOTTOM_PANEL_SHEET_TOP_BORDER_RADIUS,
     overflow: 'hidden',
@@ -1482,10 +1543,5 @@ const overlayStyles = StyleSheet.create({
   },
   bottomPanelScrollContent: {
     flexGrow: 1,
-  },
-  bottomPanelReplyWrap: {
-    paddingHorizontal: BOTTOM_PANEL_PADDING_HORIZONTAL,
-    paddingTop: 8,
-    paddingBottom: 0,
   },
 });

@@ -687,6 +687,7 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
 
     if (
       core.dedupWindowMs > 0 &&
+      !event.startsWith('visual.') &&
       logLevel !== 'warn' &&
       logLevel !== 'error' &&
       logLevel !== 'fatal'

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { type LayoutChangeEvent, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -13,6 +13,7 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import opacity from 'hex-color-opacity';
 import Reanimated, {
+  type SharedValue,
   useSharedValue,
   useAnimatedStyle,
   withDelay,
@@ -25,21 +26,21 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
 import { formatDate, formatRelative } from '@/shared/lib/date';
 import { tryNpubEncode } from './feedParse';
+import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { NoteContent, NOTE_CONTENT_FONT_SIZE, NOTE_CONTENT_LINE_HEIGHT } from './NoteContent';
-import { MetricsFooter } from './MetricsFooter';
+import { MetricsFooter, POST_ACTION_ICON_SIZES } from './MetricsFooter';
 import {
   SkeletonExitReveal,
   SkeletonLoadingShimmer,
 } from '@/shared/ui/composed/SkeletonExitShimmer';
 import { sharedStyles } from './feedStyles';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { feedLog, Log } from '@/shared/lib/logger';
+import { Log } from '@/shared/lib/logger';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
-import { alpha, iconSize, radius, spacing } from '@/shared/styles/tokens';
+import { alpha, radius, spacing } from '@/shared/styles/tokens';
 import {
   REPLY_SKELETON_VARIANTS,
   TARGET_SKELETON_VARIANT,
-  type ReplySkeletonMatch,
 } from '@/features/feed/lib/threadReplySkeletons';
 import { THREAD_CONNECTOR_LINE_STYLE } from './threadConnectorStyle';
 
@@ -70,6 +71,12 @@ interface PostCardProps {
   onOverlayOpenedFromIndex?: (index: number) => void;
 
   onVideoTap?: (url: string) => void;
+  /** Thread target only: tapping an inline link embeds it in-thread instead of
+   *  opening the OS browser. */
+  onLinkPress?: (url: string) => void;
+  /** Thread target only: fades the in-sheet footer out as the embed sheet
+   *  collapses (it crossfades with the floating action bar). */
+  footerOpacity?: SharedValue<number>;
   onCommentPress?: () => void;
   onRepostPress?: () => void;
   onLikePress?: () => void;
@@ -82,7 +89,6 @@ interface PostCardProps {
   likePendingDirection?: 'activating' | 'deactivating';
   onNestedProfilePressIn?: () => void;
   onNestedProfilePressOut?: () => void;
-  skeletonMatch?: ReplySkeletonMatch;
   /**
    * Called immediately before navigating to this post's thread. Returns the
    * data the caller already has (visible parent chain via `allEvents`, plus
@@ -90,14 +96,6 @@ interface PostCardProps {
    * post optimistically. The tapped event itself is merged in automatically.
    */
   getThreadContext?: () => ThreadSeed | null;
-  onMeasureHeight?: (eventId: string, height: number) => void;
-  /**
-   * Render in measurement-only mode: skip avatar image prefetch and force the
-   * avatar into its loading skeleton. Used by the hidden measurement tree so
-   * we don't fire 12 simultaneous network requests just to capture heights.
-   * Has no effect on the rendered height (avatar dimensions are fixed).
-   */
-  measurementMode?: boolean;
 }
 
 export const PostCard = React.memo(function PostCard({
@@ -116,6 +114,8 @@ export const PostCard = React.memo(function PostCard({
   feedIndex,
   onOverlayOpenedFromIndex,
   onVideoTap,
+  onLinkPress,
+  footerOpacity,
   onCommentPress,
   onRepostPress,
   onLikePress,
@@ -128,10 +128,7 @@ export const PostCard = React.memo(function PostCard({
   likePendingDirection,
   onNestedProfilePressIn,
   onNestedProfilePressOut,
-  skeletonMatch,
   getThreadContext,
-  onMeasureHeight,
-  measurementMode = false,
 }: PostCardProps) {
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
 
@@ -170,6 +167,10 @@ export const PostCard = React.memo(function PostCard({
     transform: [{ translateY: (1 - progress.get()) * 12 }],
   }));
 
+  // Thread target: crossfade the in-sheet footer out as the embed sheet
+  // collapses. No-op (opacity 1) when not driven.
+  const footerFadeStyle = useAnimatedStyle(() => ({ opacity: footerOpacity?.get() ?? 1 }));
+
   const navigateToThread = useCallback(() => {
     const ctx = getThreadContext?.() ?? null;
     const allEvents = new Map(ctx?.allEvents ?? []);
@@ -194,6 +195,12 @@ export const PostCard = React.memo(function PostCard({
       params: { pubkey: event.pubkey },
     });
   }, [event.pubkey]);
+
+  const quotePost = useQuotePost();
+  const handleQuotePress = useCallback(
+    () => quotePost(event, profile),
+    [quotePost, event, profile]
+  );
 
   const suppressThreadTapRef = useRef(false);
 
@@ -225,31 +232,6 @@ export const PostCard = React.memo(function PostCard({
         runOnJS(handleThreadPress)();
       }),
     [handleThreadPress]
-  );
-
-  const lastReplyLayoutHeightRef = useRef<number | null>(null);
-  const handleReplyLayout = useCallback(
-    (eventLayout: LayoutChangeEvent) => {
-      if (!isThread) return;
-      const height = Math.round(eventLayout.nativeEvent.layout.height);
-      if (lastReplyLayoutHeightRef.current === height) return;
-      lastReplyLayoutHeightRef.current = height;
-      onMeasureHeight?.(event.id, height);
-      feedLog.info('thread.reply_skeleton.reply_layout', {
-        eventId: event.id,
-        skeletonIndex: skeletonMatch?.skeletonIndex ?? null,
-        skeletonLineCount: skeletonMatch?.skeletonLineCount ?? null,
-        estimatedLineCount: skeletonMatch?.estimatedLineCount ?? null,
-        lineDelta: skeletonMatch?.lineDelta ?? null,
-        sortOriginalIndex: skeletonMatch?.originalIndex ?? null,
-        sortSortedIndex: skeletonMatch?.sortedIndex ?? null,
-        sortScore: skeletonMatch?.score ?? null,
-        contentLength: event.content.length,
-        contentPreview: skeletonMatch?.contentPreview,
-        measuredHeight: height,
-      });
-    },
-    [event.content.length, event.id, isThread, onMeasureHeight, skeletonMatch]
   );
 
   // ── Thread target: stacked layout (no gutter) ──
@@ -296,6 +278,7 @@ export const PostCard = React.memo(function PostCard({
               getMetrics={getMetrics}
               event={event}
               onVideoTap={onVideoTap}
+              onLinkPress={onLinkPress}
               onQuotedPressIn={handleNestedPressIn}
               onQuotedPressOut={handleNestedPressOut}
               onInlineActionPressIn={handleNestedPressIn}
@@ -309,12 +292,13 @@ export const PostCard = React.memo(function PostCard({
             ) : null}
           </View>
 
-          <View style={pcStyles.targetMetrics}>
+          <Reanimated.View style={[pcStyles.targetMetrics, footerFadeStyle]}>
             <MetricsFooter
               metrics={metrics}
               borderColor={foreground}
               onCommentPress={onCommentPress ?? navigateToThread}
               onRepostPress={onRepostPress}
+              onQuotePress={handleQuotePress}
               onLikePress={onLikePress}
               reposted={reposted}
               liked={liked}
@@ -325,7 +309,7 @@ export const PostCard = React.memo(function PostCard({
               onActionPressIn={handleNestedPressIn}
               onActionPressOut={handleNestedPressOut}
             />
-          </View>
+          </Reanimated.View>
         </View>
       </Log>
     );
@@ -353,8 +337,8 @@ export const PostCard = React.memo(function PostCard({
           onPressOut={handleNestedPressOut}
           onPress={navigateToProfile}>
           <Avatar
-            state={measurementMode ? 'loading' : profile?.picture ? 'image' : 'fallback'}
-            picture={measurementMode ? undefined : profile?.picture}
+            state={profile?.picture ? 'image' : 'fallback'}
+            picture={profile?.picture}
             seed={event.pubkey}
             size={AVATAR_SIZE}
             name={displayName}
@@ -460,6 +444,7 @@ export const PostCard = React.memo(function PostCard({
             showBorder={!fullBleedFooterBorder && showMetricsBorder}
             onCommentPress={isThread ? (onCommentPress ?? navigateToThread) : undefined}
             onRepostPress={onRepostPress}
+            onQuotePress={handleQuotePress}
             onLikePress={onLikePress}
             reposted={reposted}
             liked={liked}
@@ -488,9 +473,7 @@ export const PostCard = React.memo(function PostCard({
   if (isThread) {
     return (
       <Log name="PostCard">
-        <Pressable onPress={handleThreadPress} onLayout={handleReplyLayout}>
-          {gutterContent}
-        </Pressable>
+        <Pressable onPress={handleThreadPress}>{gutterContent}</Pressable>
       </Log>
     );
   }
@@ -502,51 +485,41 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
   variant,
   index = 0,
   exiting = false,
-  onMeasureHeight,
 }: {
   variant: Extract<PostCardVariant, 'thread-target' | 'thread-reply'>;
   index?: number;
   exiting?: boolean;
-  onMeasureHeight?: (skeletonIndex: number, height: number) => void;
 }) {
-  const foreground = useThemeColor('foreground');
+  const [foreground, loadingShimmerSurface] = useThemeColor(['foreground', 'surface'] as const);
   const textMuted = useMemo(() => ({ color: opacity(foreground, alpha.muted) }), [foreground]);
   const targetDateStyle = useMemo(() => [textMuted, pcStyles.targetDate], [textMuted]);
   const replyVariant = REPLY_SKELETON_VARIANTS[index % REPLY_SKELETON_VARIANTS.length];
-  const lastSkeletonLayoutHeightRef = useRef<number | null>(null);
 
-  const handleSkeletonLayout = useCallback(
-    (eventLayout: LayoutChangeEvent) => {
-      if (variant !== 'thread-reply') return;
-      const height = Math.round(eventLayout.nativeEvent.layout.height);
-      if (lastSkeletonLayoutHeightRef.current === height) return;
-      lastSkeletonLayoutHeightRef.current = height;
-      onMeasureHeight?.(index, height);
-      feedLog.info('thread.reply_skeleton.skeleton_layout', {
-        skeletonIndex: index,
-        skeletonLineCount: replyVariant.content.length,
-        contentPlaceholders: replyVariant.content,
-        authorPlaceholder: replyVariant.author,
-        timestampPlaceholder: replyVariant.timestamp,
-        metricWidth: replyVariant.metricWidth,
-        measuredHeight: height,
-      });
-    },
-    [index, onMeasureHeight, replyVariant, variant]
-  );
+  // Render invisible, then fade in once the row has laid out ("settled") so the
+  // first-frame list positioning is never seen — any residual settle happens
+  // while opacity is 0, and the skeleton appears already in its final spot.
+  const revealedRef = useRef(false);
+  const revealOpacity = useSharedValue(0);
+  const revealStyle = useAnimatedStyle(() => ({ opacity: revealOpacity.value }));
+  const revealOnSettle = useCallback(() => {
+    if (revealedRef.current) return;
+    revealedRef.current = true;
+    revealOpacity.value = withTiming(1, { duration: 160, easing: Easing.out(Easing.cubic) });
+  }, [revealOpacity]);
 
   if (variant === 'thread-target') {
     const skeletonVariant = TARGET_SKELETON_VARIANT;
 
     return (
-      <View>
+      <Reanimated.View onLayout={revealOnSettle} style={revealStyle}>
         <View style={pcStyles.targetRow} pointerEvents="none">
           <HStack align="center" gap={spacing.sm + 2} style={sharedStyles.mb6}>
             <Avatar state="loading" size={AVATAR_SIZE} />
             <VStack style={sharedStyles.flex1}>
-              <Text loading placeholder={skeletonVariant.author} bold size={15} />
+              <Text loading numberOfLines={1} placeholder={skeletonVariant.author} bold size={15} />
               <Text
                 loading
+                numberOfLines={1}
                 placeholder={skeletonVariant.npub}
                 semibold
                 size={13}
@@ -560,6 +533,7 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
               <Text
                 key={line}
                 loading
+                numberOfLines={1}
                 placeholder={line}
                 size={NOTE_CONTENT_FONT_SIZE}
                 style={pcStyles.noteTextLine}
@@ -567,7 +541,13 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
             ))}
           </VStack>
 
-          <Text loading placeholder={skeletonVariant.date} size={13} style={targetDateStyle} />
+          <Text
+            loading
+            numberOfLines={1}
+            placeholder={skeletonVariant.date}
+            size={13}
+            style={targetDateStyle}
+          />
         </View>
 
         <View style={pcStyles.targetMetrics}>
@@ -577,15 +557,15 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
             labelWidth={skeletonVariant.metricWidth}
           />
         </View>
-        <SkeletonLoadingShimmer active />
-      </View>
+        <SkeletonLoadingShimmer active highlightColor={loadingShimmerSurface} />
+      </Reanimated.View>
     );
   }
 
   const skeletonVariant = replyVariant;
 
   return (
-    <View onLayout={handleSkeletonLayout}>
+    <Reanimated.View onLayout={revealOnSettle} style={revealStyle}>
       <SkeletonExitReveal active={exiting}>
         <View style={pcStyles.gutterRow} pointerEvents="none">
           <View style={pcStyles.gutterCol}>
@@ -594,8 +574,14 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
 
           <View style={sharedStyles.flex1}>
             <HStack align="center" gap={spacing.sm - 2} style={sharedStyles.mb4}>
-              <Text loading placeholder={skeletonVariant.author} bold size={14} />
-              <Text loading placeholder={skeletonVariant.timestamp} size={13} style={textMuted} />
+              <Text loading numberOfLines={1} placeholder={skeletonVariant.author} bold size={14} />
+              <Text
+                loading
+                numberOfLines={1}
+                placeholder={skeletonVariant.timestamp}
+                size={13}
+                style={textMuted}
+              />
             </HStack>
 
             <VStack spacing={0}>
@@ -603,6 +589,7 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
                 <Text
                   key={line}
                   loading
+                  numberOfLines={1}
                   placeholder={line}
                   size={NOTE_CONTENT_FONT_SIZE}
                   style={pcStyles.noteTextLine}
@@ -622,8 +609,8 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
           </View>
         </View>
       </SkeletonExitReveal>
-      <SkeletonLoadingShimmer active={!exiting} />
-    </View>
+      <SkeletonLoadingShimmer active={!exiting} highlightColor={loadingShimmerSurface} />
+    </Reanimated.View>
   );
 });
 
@@ -636,7 +623,7 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
   borderColor: string;
   labelWidth: number;
 }) {
-  const glyph = compact ? 13 : iconSize.md;
+  const glyph = compact ? POST_ACTION_ICON_SIZES.compact.base : POST_ACTION_ICON_SIZES.regular.base;
   const labelHeight = compact ? 14 : spacing.md;
   const skeletonFill = useMemo(() => opacity(borderColor, 0.07), [borderColor]);
   const footerStyle = useMemo(

@@ -31,6 +31,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
+import { publishEvent } from '@/shared/lib/nostr/publish';
 import { Card } from '@/shared/ui/composed/Card';
 import { Section } from '@/shared/ui/composed/Section';
 import Icon, { CurrencyIcon } from 'assets/icons';
@@ -58,6 +59,7 @@ import {
   type TopFollower,
 } from '@/shared/hooks/useNostrProfile';
 import { UserFeed } from '@/features/feed';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { formatDate } from '@/shared/lib/date';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
@@ -76,6 +78,7 @@ import type { VideoPostRecord, StoryUser } from '@/features/feed';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useVisualStateLogger } from '@/shared/lib/contentShiftLog';
 import { Log, nostrLog, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 const BANNER_HEIGHT = 150;
@@ -145,12 +148,14 @@ function ProfileStatsGridComponent({
   reputationScore,
   joinedDate,
   isLoading,
+  visualScope,
 }: {
   followingCount?: number;
   followerCount?: number;
   reputationScore?: number;
   joinedDate?: string;
   isLoading: boolean;
+  visualScope: string;
 }) {
   const [foreground, surfaceTertiary, surfaceSecondary] = useThemeColor([
     'foreground',
@@ -242,11 +247,18 @@ function ProfileStatsGridComponent({
   // rather than four independently-pulsing boxes.
   if (showSkeleton) {
     return (
-      <View style={styles.statsGrid}>
+      <VisualLayoutProbe
+        scope={visualScope}
+        surface="profile"
+        component="ProfileStatsGrid"
+        itemKey="stats-skeleton"
+        itemType="skeleton"
+        style={styles.statsGrid}
+        extra={{ isLoading }}>
         <View style={styles.statsRow}>{stats.slice(0, 2).map(renderStatCard)}</View>
         <View style={styles.statsRow}>{stats.slice(2, 4).map(renderStatCard)}</View>
         <SkeletonLoadingShimmer active />
-      </View>
+      </VisualLayoutProbe>
     );
   }
 
@@ -254,7 +266,14 @@ function ProfileStatsGridComponent({
   // a small caption beneath them so we show two pills + text instead of "N/A".
   if (reputationUnavailable) {
     return (
-      <View style={styles.statsGrid}>
+      <VisualLayoutProbe
+        scope={visualScope}
+        surface="profile"
+        component="ProfileStatsGrid"
+        itemKey="stats-loaded-compact"
+        itemType="loaded"
+        style={styles.statsGrid}
+        extra={{ reputationUnavailable }}>
         <View style={styles.statsRow}>
           {renderStatCard(stats[0])}
           {renderStatCard(stats[1])}
@@ -269,15 +288,22 @@ function ProfileStatsGridComponent({
           }}>
           Joined {joinedDate || 'Unknown'}
         </Text>
-      </View>
+      </VisualLayoutProbe>
     );
   }
 
   return (
-    <View style={styles.statsGrid}>
+    <VisualLayoutProbe
+      scope={visualScope}
+      surface="profile"
+      component="ProfileStatsGrid"
+      itemKey="stats-loaded"
+      itemType="loaded"
+      style={styles.statsGrid}
+      extra={{ reputationUnavailable }}>
       <View style={styles.statsRow}>{stats.slice(0, 2).map(renderStatCard)}</View>
       <View style={styles.statsRow}>{stats.slice(2, 4).map(renderStatCard)}</View>
-    </View>
+    </VisualLayoutProbe>
   );
 }
 const ProfileStatsGrid = React.memo(ProfileStatsGridComponent);
@@ -289,9 +315,11 @@ const ProfileStatsGrid = React.memo(ProfileStatsGridComponent);
 function TopFollowersComponent({
   topFollowers,
   isLoading,
+  visualScope,
 }: {
   topFollowers: TopFollower[];
   isLoading: boolean;
+  visualScope: string;
 }) {
   const foreground = useThemeColor('foreground');
   const profileFlowGroup = useActiveProfileFlowGroup();
@@ -368,7 +396,14 @@ function TopFollowersComponent({
   );
 
   return (
-    <View style={{ paddingHorizontal: 16 }}>
+    <VisualLayoutProbe
+      scope={visualScope}
+      surface="profile"
+      component="TopFollowers"
+      itemKey={isLoading ? 'top-followers-skeleton' : 'top-followers-loaded'}
+      itemType={isLoading ? 'skeleton' : 'loaded'}
+      style={styles.topFollowersSection}
+      extra={{ isLoading, followers: followersWithProfiles.length }}>
       <Text
         bold
         size={12}
@@ -386,7 +421,7 @@ function TopFollowersComponent({
         </Animated.View>
       )}
       <Spacer size={16} />
-    </View>
+    </VisualLayoutProbe>
   );
 }
 const TopFollowers = React.memo(TopFollowersComponent);
@@ -410,6 +445,7 @@ function BannerWithAvatarComponent({
   onSendMoney,
   hasStories,
   onAvatarPress,
+  visualScope,
 }: {
   bannerUrl?: string;
   pictureUrl?: string;
@@ -425,6 +461,7 @@ function BannerWithAvatarComponent({
   onSendMoney: () => void;
   hasStories?: boolean;
   onAvatarPress?: () => void;
+  visualScope: string;
 }) {
   const [foreground, surfaceSecondary, background] = useThemeColor([
     'foreground',
@@ -523,7 +560,19 @@ function BannerWithAvatarComponent({
   );
 
   return (
-    <View>
+    <VisualLayoutProbe
+      scope={visualScope}
+      surface="profile"
+      component="ProfileBannerHeader"
+      itemKey="profile-banner-header"
+      itemType={bannerState}
+      extra={{
+        isLoading,
+        bannerState,
+        showFollowButton,
+        isFollowLoading,
+        hasStories: !!hasStories,
+      }}>
       {/* Banner */}
       <View style={[styles.bannerContainer, { backgroundColor: surfaceSecondary }]}>
         {bannerState === 'loading' ? (
@@ -704,7 +753,7 @@ function BannerWithAvatarComponent({
           </HStack>
         )}
       </VStack>
-    </View>
+    </VisualLayoutProbe>
   );
 }
 const BannerWithAvatar = React.memo(BannerWithAvatarComponent);
@@ -732,6 +781,10 @@ export function UserProfileScreen() {
     if (npubParam) return npubToPubkey(npubParam);
     return '';
   }, [npubParam, pubkeyParam]);
+  const profileHeaderVisualScope = useMemo(
+    () => `profile.${pubkey ? pubkey.slice(0, 12) : 'unknown'}.header`,
+    [pubkey]
+  );
   const addRecentPerson = useRecentPeopleStore((state) => state.addRecentPerson);
 
   useEffect(() => {
@@ -997,7 +1050,10 @@ export function UserProfileScreen() {
       contactEvent.tags = nextTags;
       contactEvent.content = contactsContent;
       contactEvent.created_at = createdAt;
-      await contactEvent.publish();
+      // Contact list is replaceable + important: land it on as many write relays
+      // as possible via the central seam (outbox-aware, with retry).
+      const published = await publishEvent({ ndk, event: contactEvent, resolveOn: 'all-settled' });
+      if (published.isErr()) throw new Error('contacts publish failed');
       nostrLog.info('user.profile.follow.published', { pubkey, shouldFollow });
       setContactsFromRelay({ tags: nextTags, content: contactsContent, createdAt });
       clearFollowOptimistic(pubkey);
@@ -1103,6 +1159,49 @@ export function UserProfileScreen() {
     return items;
   }, [npub, cachedProfile, handleCopy, handleOpenLink, iconColor]);
 
+  useVisualStateLogger({
+    enabled: !!pubkey,
+    scope: profileHeaderVisualScope,
+    surface: 'profile',
+    component: 'UserProfileScreen',
+    stateKey: 'profile-state',
+    phase: isMetadataLoading
+      ? 'metadata-loading'
+      : isProfileApiLoading
+        ? 'profile-api-loading'
+        : followInFlight
+          ? 'follow-updating'
+          : 'ready',
+    state: {
+      aboutVisible: Boolean(cachedProfile?.about),
+      bannerKnown: Boolean(cachedProfile?.banner),
+      displayNameKnown: displayName.length > 0,
+      followerCountKnown: followerCount !== undefined,
+      followingCountKnown: followingCount !== undefined,
+      followInFlight,
+      hasMintUrl: Boolean(profileMintUrl),
+      hasStories,
+      isFollowingProfile,
+      isMetadataLoading,
+      isOwnProfile,
+      isProfileApiLoading,
+      lud16Known: Boolean(cachedProfile?.lud16),
+      nip05Known: Boolean(cachedProfile?.nip05),
+      pictureKnown: Boolean(cachedProfile?.picture),
+      profileInfoRows: profileInfoItems.length,
+      reputationKnown: reputationScore !== undefined,
+      showFollowButton: !!nostrKeys?.pubkey && !isOwnProfile && !!pubkey,
+      topFollowers: profileData?.topFollowers?.length ?? 0,
+      videos: userVideoPosts.length,
+      websiteKnown: Boolean(cachedProfile?.website),
+    },
+    remeasure: {
+      reason: 'profile-state',
+      minIntervalMs: 300,
+      maxItems: 24,
+    },
+  });
+
   return (
     <Log name="UserProfileScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
@@ -1175,6 +1274,7 @@ export function UserProfileScreen() {
                 onSendMoney={handleSendMoney}
                 hasStories={hasStories}
                 onAvatarPress={handleAvatarStoryPress}
+                visualScope={profileHeaderVisualScope}
               />
 
               <Spacer size={16} />
@@ -1187,6 +1287,7 @@ export function UserProfileScreen() {
                   reputationScore={reputationScore}
                   joinedDate={joinedDate}
                   isLoading={isProfileApiLoading}
+                  visualScope={profileHeaderVisualScope}
                 />
               </View>
 
@@ -1196,6 +1297,7 @@ export function UserProfileScreen() {
               <TopFollowers
                 topFollowers={profileData?.topFollowers || []}
                 isLoading={isProfileApiLoading}
+                visualScope={profileHeaderVisualScope}
               />
 
               {cachedProfile?.about && (
@@ -1283,6 +1385,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+  },
+  topFollowersSection: {
+    paddingHorizontal: 16,
   },
   topFollowerGridItem: {
     alignItems: 'center',

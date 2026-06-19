@@ -975,6 +975,81 @@ module.exports = {
     "width": 16,
     "height": 16
   },
+  "mdi:pencil": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83l3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:image-plus": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3zm-4.7 6H5c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v8.3c-.6-.2-1.3-.3-2-.3c-1.1 0-2.2.3-3.1.9L14.5 12L11 16.5l-2.5-3L5 18h8.1c-.1.3-.1.7-.1 1c0 .7.1 1.4.3 2\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:poll": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M3 22V8h4v14zm7 0V2h4v20zm7 0v-8h4v8z\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:minus-circle-outline": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8m0-18A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2M7 13h10v-2H7\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:checkbox-marked": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"m10 17l-5-5l1.41-1.42L10 14.17l7.59-7.59L19 8m0-5H5c-1.11 0-2 .89-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:radiobox-marked": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M12 20a8 8 0 0 1-8-8a8 8 0 0 1 8-8a8 8 0 0 1 8 8a8 8 0 0 1-8 8m0-18A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 5a5 5 0 0 0-5 5a5 5 0 0 0 5 5a5 5 0 0 0 5-5a5 5 0 0 0-5-5\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:checkbox-blank-outline": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M19 3H5c-1.11 0-2 .89-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2m0 2v14H5V5z\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:radiobox-blank": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M12 20a8 8 0 0 1-8-8a8 8 0 0 1 8-8a8 8 0 0 1 8 8a8 8 0 0 1-8 8m0-18A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:server-network-off": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M13 19h1a1 1 0 0 1 1 1h.73L13 17.27zm9 1v1.18L20.82 20zm-1 2.72L19.73 24l-2-2H15a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1H2v-2h7a1 1 0 0 1 1-1h1v-2H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h2.73l-2-2H4a1 1 0 0 1-1-1v-.73l-2-2L2.28 4zM4 3h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H9.82L7 6.18V5H5.82L3.84 3zm16 8a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2.18l-6-6zM9 7h1V5H9zm0 8h1v-.73l-1-1zm-4-2v2h2v-2z\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:wifi-off": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M2.28 3L1 4.27l1.47 1.47c-.43.26-.86.55-1.27.86L3 9c.53-.4 1.08-.75 1.66-1.07l2.23 2.23c-.74.34-1.45.75-2.09 1.24l1.8 2.4c.78-.58 1.66-1.03 2.6-1.33L11.75 15c-1.25.07-2.41.5-3.35 1.2L12 21l2.46-3.27L17.74 21L19 19.72M12 3c-2.15 0-4.2.38-6.1 1.07l2.39 2.4C9.5 6.16 10.72 6 12 6c3.38 0 6.5 1.11 9 3l1.8-2.4C19.79 4.34 16.06 3 12 3m0 6c-.38 0-.75 0-1.12.05l3.19 3.2c1.22.28 2.36.82 3.33 1.55l1.8-2.4C17.2 9.89 14.7 9 12 9\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:account-multiple-plus-outline": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M13 11a3 3 0 1 0-3-3a3 3 0 0 0 3 3m0-4a1 1 0 1 1-1 1a1 1 0 0 1 1-1m4.11 3.86a5 5 0 0 0 0-5.72A2.9 2.9 0 0 1 18 5a3 3 0 0 1 0 6a2.9 2.9 0 0 1-.89-.14M13 13c-6 0-6 4-6 4v2h12v-2s0-4-6-4m-4 4c0-.29.32-2 4-2c3.5 0 3.94 1.56 4 2m7 0v2h-3v-2a5.6 5.6 0 0 0-1.8-3.94C24 13.55 24 17 24 17M8 12H5v3H3v-3H0v-2h3V7h2v3h3Z\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:share-variant-outline": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81c1.66 0 3-1.34 3-3s-1.34-3-3-3s-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66c0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91s-1.31-2.92-2.92-2.92M18 4c.55 0 1 .45 1 1s-.45 1-1 1s-1-.45-1-1s.45-1 1-1M6 13c-.55 0-1-.45-1-1s.45-1 1-1s1 .45 1 1s-.45 1-1 1m12 7c-.55 0-1-.45-1-1s.45-1 1-1s1 .45 1 1s-.45 1-1 1\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:link-variant": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M10.59 13.41c.41.39.41 1.03 0 1.42c-.39.39-1.03.39-1.42 0a5.003 5.003 0 0 1 0-7.07l3.54-3.54a5.003 5.003 0 0 1 7.07 0a5.003 5.003 0 0 1 0 7.07l-1.49 1.49c.01-.82-.12-1.64-.4-2.42l.47-.48a2.98 2.98 0 0 0 0-4.24a2.98 2.98 0 0 0-4.24 0l-3.53 3.53a2.98 2.98 0 0 0 0 4.24m2.82-4.24c.39-.39 1.03-.39 1.42 0a5.003 5.003 0 0 1 0 7.07l-3.54 3.54a5.003 5.003 0 0 1-7.07 0a5.003 5.003 0 0 1 0-7.07l1.49-1.49c-.01.82.12 1.64.4 2.43l-.47.47a2.98 2.98 0 0 0 0 4.24a2.98 2.98 0 0 0 4.24 0l3.53-3.53a2.98 2.98 0 0 0 0-4.24a.973.973 0 0 1 0-1.42\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:image-broken-variant": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M21 5v6.59l-3-3.01l-4 4.01l-4-4l-4 4l-3-3.01V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2m-3 6.42l3 3.01V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6.58l3 2.99l4-4l4 4\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:arrow-expand": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M10 21v-2H6.41l4.5-4.5l-1.41-1.41l-4.5 4.5V14H3v7zm4.5-10.09l4.5-4.5V10h2V3h-7v2h3.59l-4.5 4.5z\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
   "internal:whitenoise": {
     "svg": "<svg viewBox=\"0 0 58 44\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M0 44V0H14.7304V13.4775L21.2348 0H35.9652V13.4775L42.4696 0H57.2V44H42.4696V30.5225L35.9652 44H21.2348V30.5225L14.7304 44H0ZM12.4348 2.29565H2.29565V39.2432L12.4348 18.2342V2.29565ZM44.7652 41.7043H54.9044V4.75676L44.7652 25.7658V41.7043ZM34.5241 41.7043L53.5431 2.29565H43.9107L24.8917 41.7043H34.5241ZM32.3083 2.29565H22.6759L3.65691 41.7043H13.2893L32.3083 2.29565ZM33.6696 4.75676L23.5304 25.7658V39.2432L33.6696 18.2342V4.75676Z\"/></svg>",
     "width": 16,

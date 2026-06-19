@@ -5,9 +5,13 @@
  * resolver) fetches their posts, rendered read-only with `PostCard` — tapping a
  * post opens its thread.
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { LegendList } from '@legendapp/list/react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet } from 'react-native';
+import {
+  LegendList,
+  type LegendListRef,
+  type LegendListRenderItemProps,
+} from '@legendapp/list/react-native';
 
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import type { FeedParseResult } from '@/features/feed/data/feedClient';
@@ -22,6 +26,14 @@ import {
 import { PostCard } from '@/features/feed/components/nostr/PostCard';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
+import {
+  remeasureVisualLayoutScope,
+  useVisualListLogger,
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+} from '@/shared/lib/contentShiftLog';
+import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
+
+const SEARCH_POSTS_VISUAL_SCOPE = 'search.posts.list';
 
 export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
   const pubkeysKey = pubkeys.join(',');
@@ -102,11 +114,42 @@ export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
     [metricsMap]
   );
 
-  const renderItem = useMemo(
-    () =>
-      ({ item }: { item: FeedItem }) => {
-        if (item.type !== 'note') return null;
-        return (
+  const visualExtra = useCallback(
+    () => ({
+      pubkeyCount: pubkeys.length,
+      rows: noteItems.length,
+      loading,
+    }),
+    [loading, noteItems.length, pubkeys.length]
+  );
+  const listRef = useRef<LegendListRef>(null);
+  const visualList = useVisualListLogger<FeedItem>({
+    scope: SEARCH_POSTS_VISUAL_SCOPE,
+    surface: 'search',
+    component: 'SearchPostsLegendList',
+    phase: loading ? 'loading' : 'ready',
+    extra: visualExtra,
+    getItemKey: (item, _index, fallbackKey) => (item.type === 'note' ? item.event.id : fallbackKey),
+    getItemContext: (item, index) => ({
+      itemType: item.type,
+      index,
+    }),
+    getListState: () => listRef.current?.getState() ?? null,
+  });
+
+  const renderItem = useCallback(
+    ({ item, index }: LegendListRenderItemProps<FeedItem>) => {
+      if (item.type !== 'note') return null;
+      return (
+        <VisualLayoutProbe
+          scope={SEARCH_POSTS_VISUAL_SCOPE}
+          surface="search"
+          component="SearchPostsRow"
+          itemKey={item.event.id}
+          itemType="note"
+          index={index}
+          phase={loading ? 'loading' : 'ready'}
+          extra={visualExtra}>
           <PostCard
             variant="feed"
             event={item.event}
@@ -116,43 +159,104 @@ export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
             getMetrics={getMetrics}
             showFooterBorder
           />
-        );
-      },
-    [getMetrics, quotedMap, profilesMap]
+        </VisualLayoutProbe>
+      );
+    },
+    [getMetrics, loading, profilesMap, quotedMap, visualExtra]
+  );
+
+  const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
+    remeasureVisualLayoutScope(SEARCH_POSTS_VISUAL_SCOPE, 'scroll', {
+      minIntervalMs: 500,
+      maxItems: 24,
+      extra: { scrollY: Math.round(event.nativeEvent.contentOffset.y) },
+    });
+  }, []);
+
+  const renderEmptyPeople = useMemo(
+    () => (
+      <VisualLayoutProbe
+        scope={SEARCH_POSTS_VISUAL_SCOPE}
+        surface="search"
+        component="SearchPostsEmptyPeople"
+        itemKey="empty-people"
+        itemType="empty"
+        phase="empty"
+        style={styles.center}
+        extra={visualExtra}>
+        <EmptyState
+          icon="mdi:magnify"
+          title="No people found"
+          subtitle="Search for people to see their recent posts."
+        />
+      </VisualLayoutProbe>
+    ),
+    [visualExtra]
+  );
+  const renderEmptyPosts = useMemo(
+    () => (
+      <VisualLayoutProbe
+        scope={SEARCH_POSTS_VISUAL_SCOPE}
+        surface="search"
+        component="SearchPostsEmptyPosts"
+        itemKey="empty-posts"
+        itemType="empty"
+        phase="empty"
+        style={styles.center}
+        extra={visualExtra}>
+        <EmptyState
+          icon="mdi:message-text"
+          title="No posts"
+          subtitle="The people matching your search haven't posted recently."
+        />
+      </VisualLayoutProbe>
+    ),
+    [visualExtra]
   );
 
   if (pubkeys.length === 0) {
-    return (
-      <EmptyState
-        icon="mdi:magnify"
-        title="No people found"
-        subtitle="Search for people to see their recent posts."
-      />
-    );
+    return renderEmptyPeople;
   }
   if (loading && noteItems.length === 0) {
     return (
-      <View style={styles.center}>
-        <Spinner />
-      </View>
+      <VisualLayoutProbe
+        scope={SEARCH_POSTS_VISUAL_SCOPE}
+        surface="search"
+        component="SearchPostsInitialSpinner"
+        itemKey="initial-spinner"
+        itemType="spinner"
+        phase="loading"
+        style={styles.center}
+        extra={visualExtra}>
+        <Spinner
+          visualScope={SEARCH_POSTS_VISUAL_SCOPE}
+          visualSurface="search"
+          visualComponent="SearchPostsInitialSpinner"
+          visualKey="spinner"
+          visualExtra={visualExtra}
+        />
+      </VisualLayoutProbe>
     );
   }
   if (noteItems.length === 0) {
-    return (
-      <EmptyState
-        icon="mdi:message-text"
-        title="No posts"
-        subtitle="The people matching your search haven't posted recently."
-      />
-    );
+    return renderEmptyPosts;
   }
 
   return (
     <LegendList
+      ref={listRef}
       data={noteItems}
       keyExtractor={(item) => (item.type === 'note' ? item.event.id : '')}
       renderItem={renderItem}
       contentContainerStyle={styles.list}
+      onItemSizeChanged={visualList.onItemSizeChanged}
+      onLoad={visualList.onLoad}
+      onMetricsChange={visualList.onMetricsChange}
+      onStickyHeaderChange={visualList.onStickyHeaderChange}
+      onScroll={handleScroll}
+      onViewableItemsChanged={visualList.onViewableItemsChanged}
+      viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
+      scrollEventThrottle={16}
     />
   );
 }

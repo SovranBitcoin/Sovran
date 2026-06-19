@@ -700,6 +700,7 @@ describe('createNaggFeedClient', () => {
           kinds: [7, 9735, 6, 16, 1, 1111],
           since: Math.floor(1234567890 / 1000) - 86_400,
           limit: 1000,
+          pubkeyScore: { source: 'vertex' },
         },
         target: { kinds: [1, 1111], limit: 30, offset: 0 },
         metric: { name: 'actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
@@ -746,6 +747,7 @@ describe('createNaggFeedClient', () => {
           kinds: [7, 9735, 6, 16, 1, 1111],
           since: Math.floor(1234567890 / 1000) - 86_400,
           limit: 1000,
+          pubkeyScore: { source: 'vertex' },
         },
         target: { kinds: [1, 1111], limit: 12, offset: 0 },
         metric: { name: 'actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
@@ -755,6 +757,9 @@ describe('createNaggFeedClient', () => {
       expect(body.variables.input.terms).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ pubkeyScore: { source: 'vertex', target: 'AUTHOR' } }),
+          expect.objectContaining({
+            references: expect.objectContaining({ pubkeyScore: { source: 'vertex' } }),
+          }),
           expect.objectContaining({
             candidateField: 'CREATED_AT',
             transform: 'RECENCY_HALFLIFE',
@@ -828,6 +833,7 @@ describe('createNaggFeedClient', () => {
             kinds: [7, 9735, 6, 16, 1, 1111],
             since: Math.floor(1234567890 / 1000) - 86_400,
             limit: 1000,
+            pubkeyScore: { source: 'vertex' },
           },
           target: { kinds: [1, 1111], limit: 30, offset: 0 },
           metric: { name: 'actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },

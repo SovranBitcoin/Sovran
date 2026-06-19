@@ -218,6 +218,12 @@ export const SettingsScreen = () => {
               title="Notifications"
               description={notificationPolicyLabel(notificationPolicy)}
             />
+            <Separator className="mx-4" />
+            <SettingsListLinkItem
+              href="/(settings-flow)/relays"
+              title="Relays"
+              description="Manage where your posts publish"
+            />
           </ListGroup>
         </Section>
         <Section title="App Information">

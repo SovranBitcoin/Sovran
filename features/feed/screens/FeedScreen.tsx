@@ -9,6 +9,7 @@ import {
   FEED_FILTER_FOLLOWING_RECENT,
 } from '@/features/feed/components/HomeFeed';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
+import { ComposeFab } from '@/features/composer/ui/ComposeFab';
 import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
 import { Log, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { actionMenuPopup } from '@/shared/lib/popup';
@@ -161,6 +162,7 @@ export function FeedScreen() {
       <ScreenContainer>
         <HomeFeed activeFilter={activeFilter} />
       </ScreenContainer>
+      <ComposeFab />
       <SearchOverlay recentContext="feed" />
     </Log>
   );

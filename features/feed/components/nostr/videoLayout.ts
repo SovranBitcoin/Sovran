@@ -9,6 +9,7 @@ import type {
   VideoPostRecord,
 } from './feedTypes';
 import { DEFAULT_METRICS } from './feedTypes';
+import type { ImageOverlayPost } from './image-overlay/types';
 import { URL_REGEX, VIDEO_EXT, normalizeFeedEvent, parseContent, parseJson } from './feedParse';
 
 export const MAX_VIDEO_FEED_PAGES = 20;
@@ -80,20 +81,7 @@ export function buildVideoOverlayLayout(
   mediaTypes: ('image' | 'video')[];
   initialIndex: number;
   aspectRatio: number;
-  post: {
-    event: { id: string; pubkey: string; content: string; created_at: number };
-    metrics: { replyCount: number; repostCount: number; likeCount: number; satsZapped: number };
-    profile?: ProfileInfo;
-    reposted: boolean;
-    liked: boolean;
-    repostPending: boolean;
-    likePending: boolean;
-    repostPendingDirection?: 'activating' | 'deactivating';
-    likePendingDirection?: 'activating' | 'deactivating';
-    onCommentPress: () => void;
-    onRepostPress: () => void;
-    onLikePress: () => void;
-  };
+  post: ImageOverlayPost;
 } | null {
   const item = feedItems[feedIndex];
   const candidates =
@@ -129,8 +117,10 @@ export function buildVideoOverlayLayout(
     post: {
       event: {
         id: event.id,
+        kind: event.kind,
         pubkey: event.pubkey,
         content: event.content,
+        tags: event.tags,
         created_at: event.created_at,
       },
       metrics: {

@@ -129,6 +129,8 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'transaction-location-store',
   'transaction-distribution-store',
   'nostr-social-store',
+  'nostr-relay-list-store',
+  'nostr-media-server-store',
   'nostr-metadata-cache',
   'theme-store',
   'bitchat-dm-messages-store',
