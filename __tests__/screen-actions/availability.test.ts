@@ -592,6 +592,91 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
   });
 });
 
+// ---------------------------------------------------------------------------
+// amountEntry — exceedsBalance
+//
+// `next.exceedsBalance` flags a spend whose amount is larger than the spendable
+// balance, independently of `next.available`. An ecash send rounds the amount
+// down to the balance and so stays available, hiding the shortfall; this signal
+// lets the UI surface it anyway. The ceiling is the RICHEST single mint (a
+// payment draws from one mint, and the wallet can pick the fullest), never the
+// currently selected mint. Receive flows have no ceiling.
+// ---------------------------------------------------------------------------
+
+describe('amountEntryAvailability — exceedsBalance', () => {
+  const balanceContext = (balances: Record<string, number>) => ({
+    trustedMintUrls: Object.keys(balances),
+    mintBalances: balances,
+  });
+
+  it('flags a send amount above the largest mint balance', () => {
+    const actions = getAvailableActions('amountEntry', {
+      destination: 'sendEcash',
+      effectiveSatAmount: 2500,
+      methodContext: balanceContext({ [MINT1]: 1000, [MINT2]: 2000 }),
+    });
+
+    expect(actions.next.exceedsBalance).toBe(true);
+    // Still available — ecash rounds the amount down to the balance.
+    expect(actions.next.available).toBe(true);
+  });
+
+  it('does not flag a send amount within the largest mint balance', () => {
+    const actions = getAvailableActions('amountEntry', {
+      destination: 'sendEcash',
+      effectiveSatAmount: 2000,
+      methodContext: balanceContext({ [MINT1]: 1000, [MINT2]: 2000 }),
+    });
+
+    expect(actions.next.exceedsBalance).toBe(false);
+  });
+
+  it('uses the richest mint even when a poorer mint is selected', () => {
+    const actions = getAvailableActions('amountEntry', {
+      destination: 'sendEcash',
+      selectedMintUrl: MINT1,
+      effectiveSatAmount: 1500,
+      methodContext: balanceContext({ [MINT1]: 1000, [MINT2]: 2000 }),
+    });
+
+    // 1500 exceeds the selected MINT1 (1000) but fits inside MINT2 (2000),
+    // the best single-mint send — so it is NOT over balance.
+    expect(actions.next.exceedsBalance).toBe(false);
+  });
+
+  it('flags a melt (lightning) send above every mint', () => {
+    const actions = getAvailableActions('amountEntry', {
+      destination: 'meltQuote',
+      selectedMintUrl: MINT1,
+      effectiveSatAmount: 5000,
+      methodContext: balanceContext({ [MINT1]: 1000, [MINT2]: 2000 }),
+    });
+
+    expect(actions.next.exceedsBalance).toBe(true);
+  });
+
+  it('never flags a receive (mintQuote) regardless of amount', () => {
+    const actions = getAvailableActions('amountEntry', {
+      destination: 'mintQuote',
+      selectedMintUrl: MINT1,
+      effectiveSatAmount: 1_000_000,
+      methodContext: balanceContext({ [MINT1]: 0 }),
+    });
+
+    expect(actions.next.exceedsBalance).toBe(false);
+  });
+
+  it('does not flag a zero/empty amount', () => {
+    const actions = getAvailableActions('amountEntry', {
+      destination: 'sendEcash',
+      effectiveSatAmount: 0,
+      methodContext: balanceContext({ [MINT1]: 0, [MINT2]: 0 }),
+    });
+
+    expect(actions.next.exceedsBalance).toBe(false);
+  });
+});
+
 describe('mintSelectorAvailability', () => {
   it('always exposes cancel as available', () => {
     const actions = getAvailableActions('mintSelector', {

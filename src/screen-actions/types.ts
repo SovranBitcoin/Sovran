@@ -101,6 +101,14 @@ export interface ActionAvailability {
    * split-button menu and pass `{ variantId }` to `execute`.
    */
   variants?: ActionVariant[];
+  /**
+   * Amount-entry `next` only: true when the entered amount is larger than the
+   * spendable balance. Reported independently of `available` because an ecash
+   * send rounds the amount down to the balance and so stays available — only
+   * lightning, which can't round down, would otherwise surface the shortfall.
+   * Lets the UI flag an over-balance amount even when a rail can still fire.
+   */
+  exceedsBalance?: boolean;
 }
 
 export interface ActionState extends ActionAvailability {

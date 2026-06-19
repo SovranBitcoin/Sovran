@@ -336,6 +336,19 @@ function amountEntryAvailability(
     | AmountEntryMethodContext
     | undefined;
   const selectedMintUrl = getSelectedMintUrl(entry);
+
+  // Whether the entered amount outstrips the spendable balance. A single
+  // ecash/lightning payment draws from one mint, and the wallet can send from
+  // whichever mint holds the most, so the true ceiling is the richest single
+  // mint balance — not the currently selected mint (a poorer pinned mint must
+  // not flag an amount the wallet could still cover elsewhere). Only the spend
+  // flows can overspend; receive (mintQuote) has no balance ceiling. Computed
+  // here, beside the per-rail balance checks, so the UI never re-derives it.
+  const balanceValues = Object.values(methodContext?.mintBalances ?? {});
+  const spendableSat = balanceValues.length > 0 ? Math.max(...balanceValues) : 0;
+  const isSpendDestination = isSendEcash || isMeltQuote || isPaymentRequest;
+  const exceedsBalance =
+    isSpendDestination && effectiveSat > 0 && effectiveSat > spendableSat;
   const receiveLightningRequirement: MintMethodRequirement = {
     operation: "mint",
     method: "bolt11",
@@ -554,6 +567,8 @@ function amountEntryAvailability(
     effectiveSat,
     nextCanFire,
     hasAvailableNextVariant,
+    spendableSat,
+    exceedsBalance,
     nextUnavailableReason: nextUnavailableReason ?? null,
     variantSummary: nextVariants.map((variant) => ({
       id: variant.id,
@@ -572,6 +587,7 @@ function amountEntryAvailability(
       ...(nextCanFire && !hasAvailableNextVariant && nextUnavailableReason
         ? { reason: nextUnavailableReason }
         : {}),
+      exceedsBalance,
       variants: nextVariants,
     },
     paste: { available: isSendSideAmountEntry },
