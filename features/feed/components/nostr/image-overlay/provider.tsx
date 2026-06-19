@@ -451,7 +451,16 @@ export function ImageOverlayProvider({
       // contains any video; pure-image overlays keep their thumbnail aspect
       // so the shared-element transition lands precisely.
       const hasVideo = types.some((t) => t === 'video');
-      const aspectRatio = hasVideo
+      // A multi-item pager (any video, or more than one image) fills the full
+      // viewport so every page shows at its own natural size via
+      // contentFit="contain" — exactly like a solo image, always as large as it
+      // fits. Sizing the container to the tapped image's aspect instead would
+      // letterbox every other (differently-shaped) image into that one box,
+      // which read as the container "randomly" changing size between pages.
+      // A single image keeps its own aspect so the shared-element transition
+      // lands precisely on the feed thumbnail.
+      const fillViewport = hasVideo || urls.length > 1;
+      const aspectRatio = fillViewport
         ? screenWidth / availableHeight
         : (layout.aspectRatio ?? layout.width / layout.height);
       // Use actual thumbnail aspect ratio so overlay image rect matches the feed image; shared-element close animates correctly.
@@ -625,11 +634,16 @@ export function ImageOverlayProvider({
         layout.mediaTypes && layout.mediaTypes.length === urls.length
           ? layout.mediaTypes
           : urls.map((u) => inferMediaType(u));
-      // See open() above — videos need a full-viewport container so
-      // contentFit=contain shows them at natural aspect at max size.
+      // See open() above — a multi-item pager (video, or more than one image)
+      // needs a full-viewport container so contentFit=contain shows every page
+      // at its natural aspect at max size, instead of letterboxing the others
+      // into the first item's box.
       const hasVideo = types.some((t) => t === 'video');
+      const fillViewport = hasVideo || urls.length > 1;
       // Replace layout has no pageX/pageY/width/height; use aspectRatio only.
-      const aspectRatio = hasVideo ? screenWidth / availableHeight : (layout.aspectRatio ?? 16 / 9);
+      const aspectRatio = fillViewport
+        ? screenWidth / availableHeight
+        : (layout.aspectRatio ?? 16 / 9);
       const { width: expW, height: expH } = computeExpandedSize(
         screenWidth,
         availableHeight,
