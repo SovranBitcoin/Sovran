@@ -81,6 +81,6 @@ describe('NotFoundScreen', () => {
       (button.props as { onPress: () => void }).onPress();
     });
     expect(mockReplace).toHaveBeenCalledTimes(1);
-    expect(mockReplace).toHaveBeenCalledWith('/(drawer)/(tabs)/index');
+    expect(mockReplace).toHaveBeenCalledWith('/');
   });
 });

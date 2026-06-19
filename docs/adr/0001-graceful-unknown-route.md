@@ -6,16 +6,26 @@
 
 ## Context
 
-#212 reported that following a link to the Wallet screen navigated to a
-missing route and threw. Investigation of `main` found the opposite: the
-drawer Wallet item points at `/(drawer)/(tabs)/index`, which is a real,
-type-checked route, and an audit of all 100+ navigation call sites found **zero**
-targets that resolve to a missing route. The reported crash does not reproduce.
+#212 reported that clicking **Wallet** in the drawer ("drop down") menu
+navigated to a missing route and threw.
 
-What the app genuinely lacked was the issue's *Expected behavior* clause: "if
-the intended route no longer exists, the app should fail gracefully and keep the
-user in a usable state." There was no expo-router `+not-found` catch-all and no
-error boundary, so a future stale/renamed route would strand the user.
+The drawer's Wallet item targeted `/(drawer)/(tabs)/index`. The wallet screen
+lives in the `app/(drawer)/(tabs)/index/` folder, and **expo-router collapses an
+`index` folder to an empty path segment** — so the wallet's real, mounted route
+is the group root `/`, and *no route is mounted at `/(drawer)/(tabs)/index`*.
+The typed-routes generator nonetheless emits both `/(drawer)/(tabs)/index` and
+the shorthand `/index` as "valid" hrefs, which is why this passed type-check
+while failing at runtime: both resolve to `+not-found`. (Verified by resolving
+each path against the route tree via `getStateFromPath` — see
+`__tests__/walletRouteResolution.test.tsx`.)
+
+Two gaps, fixed together:
+
+1. **The actual bug** — the Wallet link pointed at a path that does not resolve.
+2. **Missing graceful degradation** — the issue's *Expected behavior* clause
+   ("if the intended route no longer exists, the app should fail gracefully and
+   keep the user in a usable state"). There was no expo-router `+not-found`
+   catch-all, so the broken link (and any future stale route) stranded the user.
 
 Note: an early hypothesis that the broken link was a custom-scheme deep link
 (`sovran://wallet`) was disproved — the source Nostr note merely describes the
@@ -23,8 +33,14 @@ repro in prose; no deep-link dispatch is involved.
 
 ## Decision
 
-Add an expo-router `+not-found` catch-all (`app/+not-found.tsx` →
-`shared/blocks/NotFoundScreen`) that:
+**Fix the link:** point the drawer's Wallet item (and the not-found recovery
+button) at `/`, the canonical route that resolves to the wallet via the
+`initialRouteName` chain (root → `(drawer)` → `(tabs)` → `index`). `/` is in the
+typed `Href` union; the runtime-correct `/(drawer)/(tabs)` is not, so `/` is
+preferred over a cast.
+
+**Add the safety net:** an expo-router `+not-found` catch-all (`app/+not-found.tsx`
+→ `shared/blocks/NotFoundScreen`) that:
 
 - logs the unresolved path once via the canonical logger (`log.warn('nav.unknown_route', { path })`)
   so a recurring broken link is observable rather than silent; and

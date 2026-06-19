@@ -28,8 +28,12 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
-/** Canonical wallet route — the app's initial tab and natural landing point. */
-const WALLET_ROUTE = '/(drawer)/(tabs)/index' as const;
+/**
+ * Canonical wallet route. The wallet lives in the `(tabs)/index` folder, which
+ * expo-router collapses to an empty path segment, so the app root `/` is what
+ * resolves to it (`/(drawer)/(tabs)/index` resolves to +not-found at runtime).
+ */
+const WALLET_ROUTE = '/' as const;
 
 export function NotFoundScreen() {
   const pathname = usePathname();
