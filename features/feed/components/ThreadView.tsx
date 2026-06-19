@@ -7,7 +7,13 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import {
   LegendList,
   type LegendListRef,
@@ -38,6 +44,7 @@ import { useThread, type ThreadItem } from '@/features/feed/hooks/useThread';
 import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import { useOpenComposer } from '@/features/composer/publish/useComposerActions';
 import { deriveReplyTarget } from '@/features/feed/lib/replyTarget';
+import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { ThreadReplyBar } from '@/features/feed/components/ThreadReplyBar';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import type { ThreadReplySort } from '@/features/feed/data/feedClient';
@@ -99,8 +106,8 @@ const REPLY_SORT_OPTIONS: {
   },
 ];
 
-// Replies fade their real content in; the skeleton they replace fades out, for a
-// simple crossfade with no height-matching/measurement.
+// When a reply's real content loads it fades in while the skeleton it replaces
+// fades out — a crossfade in the same row slot.
 const REPLY_FADE_IN = FadeIn.duration(220);
 const SKELETON_FADE_OUT = FadeOut.duration(220);
 
@@ -273,6 +280,31 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 
   const listRef = useRef<LegendListRef>(null);
 
+  // The sort-tabs ("Relevant") row and the replies sit below the target, so their
+  // on-screen position is whatever LegendList computes for the target — which
+  // starts at `estimatedItemSize` and snaps to the real measured height a frame
+  // later, shifting everything below. Rather than fight that reconciliation, we
+  // keep those rows occupying their space but at opacity 0 until the real target
+  // has laid out, then fade them in at their settled positions (the shift happens
+  // while they're invisible). The target itself is the stable anchor and renders
+  // immediately.
+  const revealedRef = useRef(false);
+  const revealOpacity = useSharedValue(0);
+  const revealStyle = useAnimatedStyle(() => ({ opacity: revealOpacity.value }));
+  const handleTargetSettled = useCallback(() => {
+    if (revealedRef.current) return;
+    revealedRef.current = true;
+    // One frame after the target measures, LegendList has repositioned the rows
+    // below it — reveal then so they fade in already in their final spot.
+    requestAnimationFrame(() => {
+      revealOpacity.value = withTiming(1, { duration: 220 });
+    });
+  }, [revealOpacity]);
+  useEffect(() => {
+    revealedRef.current = false;
+    revealOpacity.value = 0;
+  }, [eventId, revealOpacity]);
+
   const targetIndex = useMemo(() => items.findIndex((item) => item.type === 'target'), [items]);
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
   const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
@@ -443,13 +475,16 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       }
 
       if (item.type === 'reply-sort-tabs') {
+        // Hidden until the target settles, then fades in at its final position.
         return (
-          <ReplySortPicker
-            selected={replySort}
-            onSelect={setReplySort}
-            foreground={foreground}
-            surfaceTertiary={surfaceTertiary}
-          />
+          <Animated.View style={revealStyle}>
+            <ReplySortPicker
+              selected={replySort}
+              onSelect={setReplySort}
+              foreground={foreground}
+              surfaceTertiary={surfaceTertiary}
+            />
+          </Animated.View>
         );
       }
 
@@ -490,8 +525,9 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         />
       );
 
-      // Replies fade their real content in over the skeleton they replace. The
-      // target/parents are stable from frame one, so they render without a fade.
+      // Each reply fades its real content in as it loads, crossfading with the
+      // skeleton it replaces (which fades out via SKELETON_FADE_OUT). The
+      // target/parents are the stable anchor and render immediately.
       if (item.type === 'reply') {
         return <Animated.View entering={REPLY_FADE_IN}>{card}</Animated.View>;
       }
@@ -506,6 +542,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       getEngagementState,
       getMetrics,
       hasParents,
+      revealStyle,
       profilesRef,
       quotedEventsRef,
       replySort,
@@ -528,6 +565,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         itemType={threadItemType(props.item)}
         index={props.index}
         phase={threadPhase}
+        onLayout={props.item.type === 'target' ? handleTargetSettled : undefined}
         extra={{
           eventId,
           rows: displayItems.length,
@@ -541,6 +579,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     [
       displayItems.length,
       eventId,
+      handleTargetSettled,
       isFetching,
       renderThreadItem,
       replyBarHeight,
@@ -574,6 +613,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const onTargetRepost = useCallback(() => {
     if (targetEvent) void toggleRepost(targetEvent);
   }, [targetEvent, toggleRepost]);
+  const quotePost = useQuotePost();
+  const onTargetQuote = useCallback(() => {
+    if (targetEvent) quotePost(targetEvent, profilesRef.current.get(targetEvent.pubkey));
+  }, [targetEvent, quotePost, profilesRef]);
 
   if (error && items.length === 0) {
     return (
@@ -694,6 +737,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               repostPending={getEngagementState(targetEvent.id).repostPending}
               onCommentPress={onTargetComment}
               onRepostPress={onTargetRepost}
+              onQuotePress={onTargetQuote}
               onLikePress={onTargetLike}
             />
           ) : null}

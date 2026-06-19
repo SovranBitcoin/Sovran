@@ -86,16 +86,17 @@ export function ThreadEmbedProvider({ children }: { children: React.ReactNode })
   // The sheet rests with its top just below the navigation header (i.e. just
   // above the first pfp/name), not at the very top of the screen.
   //
-  // `useHeaderHeight()` can report 0 on the first render(s) before the native
-  // header measures. Because the sheet is absolutely positioned at
-  // `top: expandedOffset`, a 0 → real settle drops the ENTIRE thread down a
-  // frame later — the "whole page jumps down" shift. When the real value is
-  // available we trust it (no offset change in the normal case); only for the
-  // 0-first-render case do we substitute a close estimate (safe-area top + the
-  // standard nav bar height) so frame one already approximates the settled value.
+  // The sheet is absolutely positioned at `top: expandedOffset`, so any change
+  // to this value after the first render drops the ENTIRE thread down a frame
+  // later (the "whole page jumps down" shift). `useHeaderHeight()` is unsafe for
+  // this: it can report 0 — or a non-final value — on the first render(s) and
+  // then settle. Derive the offset from the safe-area top + the standard nav bar
+  // height instead; both are available synchronously and never settle, so the
+  // sheet's resting position is identical on the very first frame. (Standard
+  // `title` header, `app/(user-flow)/thread.tsx`.) `navHeaderHeight` is logged
+  // only to verify it matches.
   const navHeaderHeight = useHeaderHeight();
-  const expandedOffset =
-    navHeaderHeight > 0 ? navHeaderHeight : insets.top + DEFAULT_NAV_BAR_HEIGHT;
+  const expandedOffset = insets.top + DEFAULT_NAV_BAR_HEIGHT;
 
   useEffect(() => {
     feedLog.info('thread.offset.header', {
