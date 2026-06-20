@@ -507,6 +507,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           showLineAbove={isParent ? index > 0 : isTarget ? hasParents : false}
           showLineBelow={isParent}
           liked={engagement.liked}
+          replied={engagement.replied}
           reposted={engagement.reposted}
           likePending={engagement.likePending}
           repostPending={engagement.repostPending}

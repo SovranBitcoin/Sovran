@@ -235,6 +235,7 @@ function engagementEqual(a: EngagementViewState, b: EngagementViewState): boolea
   return (
     a.liked === b.liked &&
     a.reposted === b.reposted &&
+    a.replied === b.replied &&
     a.likePending === b.likePending &&
     a.repostPending === b.repostPending &&
     a.likePendingDirection === b.likePendingDirection &&
