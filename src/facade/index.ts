@@ -2,6 +2,7 @@ export * from './feed';
 export * from './thread';
 export * from './notifications';
 export * from './own-state';
+export * from './mint-reviews';
 export * from './strategy';
 export * from './nagg-tier';
 export * from './placeholders';

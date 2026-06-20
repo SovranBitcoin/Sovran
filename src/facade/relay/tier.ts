@@ -3,9 +3,21 @@ import type { FeedBundle, FeedPageRequest, FeedSpec } from '../feed';
 import type { ThreadBundle, ThreadRequest } from '../thread';
 import type { NotificationsBundle, NotificationsRequest } from '../notifications';
 import { ownActionKinds, type OwnHistoryBundle, type OwnHistoryRequest } from '../own-state';
+import {
+  summarizeReviews,
+  discoverFromReviews,
+  MINT_REVIEW_KIND,
+  CASHU_MINT_K,
+  type DiscoverMintsRequest,
+  type DiscoveredMint,
+  type MintReviewsRequest,
+  type MintReviewsSummary,
+} from '../mint-reviews';
+import { toFeedEvent } from '../event';
+import type { NaggFeedEvent } from '../../map/feed';
 import type { NostrTierStrategy } from '../strategy';
 import { demuxRelayFeed, demuxRelayThread, demuxRelayNotifications, demuxRelayOwnHistory } from './demux';
-import type { NostrFilter, RelayConnection } from './protocol';
+import type { NostrFilter, RawRelayEvent, RelayConnection } from './protocol';
 
 // ---------------------------------------------------------------------------
 // Raw-relay tier (tier 3, the floor)
@@ -108,7 +120,50 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
         (error) => failed(error),
       );
     },
+
+    async getMintReviews(request: MintReviewsRequest): Promise<TierOutcome<MintReviewsSummary>> {
+      const filter: NostrFilter = {
+        kinds: [MINT_REVIEW_KIND],
+        '#k': [CASHU_MINT_K],
+        '#u': [request.mintUrl],
+        limit: request.limit ?? 100,
+      };
+      const result = await config.connection.request([filter], {
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<MintReviewsSummary>>(
+        (events) => answered(summarizeReviews(request.mintUrl, toFeedEvents(events))),
+        (error) => failed(error),
+      );
+    },
+
+    async discoverMints(request: DiscoverMintsRequest): Promise<TierOutcome<DiscoveredMint[]>> {
+      const filter: NostrFilter = {
+        kinds: [MINT_REVIEW_KIND],
+        '#k': [CASHU_MINT_K],
+        limit: request.limit ?? 200,
+        ...(request.authors && request.authors.length > 0 ? { authors: request.authors } : {}),
+      };
+      const result = await config.connection.request([filter], {
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<DiscoveredMint[]>>(
+        (events) => answered(discoverFromReviews(toFeedEvents(events))),
+        (error) => failed(error),
+      );
+    },
   };
+}
+
+function toFeedEvents(events: ReadonlyArray<RawRelayEvent>): NaggFeedEvent[] {
+  const out: NaggFeedEvent[] = [];
+  for (const raw of events) {
+    const event = toFeedEvent(raw);
+    if (event) out.push(event);
+  }
+  return out;
 }
 
 function filtersForSpec(

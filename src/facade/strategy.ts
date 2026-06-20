@@ -4,6 +4,12 @@ import type { FeedBundle, FeedPageRequest } from './feed';
 import type { ThreadBundle, ThreadRequest } from './thread';
 import type { NotificationsBundle, NotificationsRequest } from './notifications';
 import type { OwnHistoryBundle, OwnHistoryRequest } from './own-state';
+import type {
+  DiscoverMintsRequest,
+  DiscoveredMint,
+  MintReviewsRequest,
+  MintReviewsSummary,
+} from './mint-reviews';
 
 // ---------------------------------------------------------------------------
 // Tier strategy — one deep module per source, implementing the surfaces it can
@@ -23,4 +29,6 @@ export interface NostrTierStrategy {
   thread?(request: ThreadRequest): Promise<TierOutcome<ThreadBundle>>;
   notifications?(request: NotificationsRequest): Promise<TierOutcome<NotificationsBundle>>;
   ownHistory?(request: OwnHistoryRequest): Promise<TierOutcome<OwnHistoryBundle>>;
+  getMintReviews?(request: MintReviewsRequest): Promise<TierOutcome<MintReviewsSummary>>;
+  discoverMints?(request: DiscoverMintsRequest): Promise<TierOutcome<DiscoveredMint[]>>;
 }

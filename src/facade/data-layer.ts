@@ -14,6 +14,14 @@ import type {
   ResolvedNotifications,
 } from './notifications';
 import type { OwnHistoryBundle, OwnHistoryRequest, ResolvedOwnHistory } from './own-state';
+import type {
+  DiscoverMintsRequest,
+  DiscoveredMint,
+  MintReviewsRequest,
+  MintReviewsSummary,
+  ResolvedDiscoveredMints,
+  ResolvedMintReviews,
+} from './mint-reviews';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -39,6 +47,12 @@ export interface NostrDataLayer {
   getOwnHistory(
     request: OwnHistoryRequest,
   ): Promise<Result<ResolvedOwnHistory, TierResolutionError>>;
+  getMintReviews(
+    request: MintReviewsRequest,
+  ): Promise<Result<ResolvedMintReviews, TierResolutionError>>;
+  discoverMints(
+    request: DiscoverMintsRequest,
+  ): Promise<Result<ResolvedDiscoveredMints, TierResolutionError>>;
 }
 
 export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLayer {
@@ -73,6 +87,26 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
       );
       const resolved = await resolveAcrossTiers<OwnHistoryBundle>(candidates);
       return resolved.map(({ tier, value }) => assembleOwnHistory(tier, request.actionType, value));
+    },
+
+    async getMintReviews(request) {
+      const candidates = candidatesFor<MintReviewsSummary>(
+        config.tiers,
+        'getMintReviews',
+        (tier) => () => tier.getMintReviews!(request),
+      );
+      const resolved = await resolveAcrossTiers<MintReviewsSummary>(candidates);
+      return resolved.map(({ tier, value }) => ({ tier, ...value }));
+    },
+
+    async discoverMints(request) {
+      const candidates = candidatesFor<DiscoveredMint[]>(
+        config.tiers,
+        'discoverMints',
+        (tier) => () => tier.discoverMints!(request),
+      );
+      const resolved = await resolveAcrossTiers<DiscoveredMint[]>(candidates);
+      return resolved.map(({ tier, value }) => ({ tier, mints: value }));
     },
   };
 }

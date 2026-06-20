@@ -23,6 +23,14 @@ import {
   type OwnHistoryBundle,
   type OwnHistoryRequest,
 } from './own-state';
+import {
+  MintReviewsResponseSchema,
+  DiscoverMintsResponseSchema,
+  type DiscoverMintsRequest,
+  type DiscoveredMint,
+  type MintReviewsRequest,
+  type MintReviewsSummary,
+} from './mint-reviews';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -132,6 +140,50 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<OwnHistoryBundle>>(
         (page) => answered(bundleFromOwnEvents(page.events)),
+        (error) => failed(error),
+      );
+    },
+
+    async getMintReviews(request: MintReviewsRequest): Promise<TierOutcome<MintReviewsSummary>> {
+      // Server-side per-mint aggregate (GroupBy:["u"]) — kills the per-result N+1.
+      const result = await client.rest<typeof MintReviewsResponseSchema>({
+        path: '/nostr/mint/reviews',
+        method: 'GET',
+        searchParams: { u: request.mintUrl, ...(request.limit ? { limit: request.limit } : {}) },
+        responseSchema: MintReviewsResponseSchema,
+        operationName: 'MintReviews',
+        refresh: request.refresh,
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<MintReviewsSummary>>(
+        (page) =>
+          answered({
+            mintUrl: page.summary.mintUrl,
+            averageScore: page.summary.averageScore,
+            reviewCount: page.summary.reviewCount,
+            reviews: [], // the aggregate gives avg+count; individual reviews come from a lower tier
+          }),
+        (error) => failed(error),
+      );
+    },
+
+    async discoverMints(request: DiscoverMintsRequest): Promise<TierOutcome<DiscoveredMint[]>> {
+      const result = await client.rest<typeof DiscoverMintsResponseSchema>({
+        path: '/nostr/mint/discover',
+        method: 'GET',
+        searchParams: {
+          ...(request.limit ? { limit: request.limit } : {}),
+          ...(request.authors && request.authors.length > 0 ? { authors: request.authors } : {}),
+        },
+        responseSchema: DiscoverMintsResponseSchema,
+        operationName: 'DiscoverMints',
+        refresh: request.refresh,
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<DiscoveredMint[]>>(
+        (page) => answered(page.mints),
         (error) => failed(error),
       );
     },
