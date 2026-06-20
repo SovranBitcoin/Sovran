@@ -10,25 +10,28 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 // Types
 // ---------------------------------------------------------------------------
 
-type NostrReactionState = {
-  reactionEventId?: string;
-  updatedAt: number;
-};
+/** One of our own actions on a target event (the `ownEventId` is OUR reaction / repost / reply). */
+type EngagementAction = { ownEventId?: string };
 
-type NostrRepostState = {
-  repostEventId?: string;
-  updatedAt: number;
-};
-
-type NostrRepliedState = {
-  replyEventId?: string;
+/**
+ * Our viewer-state for a single target event: which of like / repost / reply we
+ * did, each with our own event id. ONE record per target replaces the former
+ * three parallel maps — adding a new engagement type (e.g. zap, bookmark) is a
+ * field here, not a whole new map. Confirmed state only; the optimistic overlay
+ * lives in the `optimistic*` maps and is merged by readers.
+ */
+type EngagementRecord = {
+  liked?: EngagementAction;
+  reposted?: EngagementAction;
+  replied?: EngagementAction;
+  /** Newest contributing action's `created_at`, for the recency cap. */
   updatedAt: number;
 };
 
 /**
- * Recency cap on the canonical own-engagement maps. The global own-events sync
+ * Recency cap on the canonical own-engagement map. The global own-events sync
  * (`useOwnEventsSync`) can backfill thousands of our likes/reposts/replies; cap
- * each map to the most-recent N by `updatedAt` so the persisted blob and
+ * the map to the most-recent N records by `updatedAt` so the persisted blob and
  * rehydrate stay bounded. Engagement older than the cap simply won't highlight
  * (rare, and the post would have to be re-encountered).
  */
@@ -55,10 +58,11 @@ interface NostrSocialState {
   contactsUpdatedAt: number;
   followingPubkeys: Record<string, true>;
 
-  likesByEventId: Record<string, NostrReactionState>;
-  repostsByEventId: Record<string, NostrRepostState>;
-  /** Target event id → our reply to it. Drives the "you replied" highlight. */
-  repliedByEventId: Record<string, NostrRepliedState>;
+  /**
+   * Target event id → our engagement record (liked / reposted / replied). One
+   * unified map; the `replied` field drives the "you replied" highlight.
+   */
+  engagementByEventId: Record<string, EngagementRecord>;
   deletedRepostOriginalIds: Record<string, number>;
 
   optimisticFollowsByPubkey: Record<string, FollowOptimisticState>;
@@ -162,15 +166,27 @@ function capByRecency<V extends { updatedAt: number }>(
   return next;
 }
 
-/** Merge own-engagement rows (target → record) into a map, keeping the newest per target. */
-function upsertByTarget<V extends { updatedAt: number }>(
-  base: Record<string, V>,
-  rows: { targetEventId: string; createdAt: number; record: V }[]
-): Record<string, V> {
+type EngagementActionKind = 'liked' | 'reposted' | 'replied';
+
+/**
+ * Merge one action type's own-engagement rows into the unified map: set the
+ * action on each target's record (preserving the record's other actions) and
+ * advance `updatedAt`. Recency-caps by record. Replaces the former per-map
+ * `upsertByTarget` — the merge is now additive across action types.
+ */
+function ingestEngagementAction(
+  base: Record<string, EngagementRecord>,
+  action: EngagementActionKind,
+  rows: { targetEventId: string; ownEventId: string; createdAt: number }[]
+): Record<string, EngagementRecord> {
   const next = { ...base };
-  for (const { targetEventId, createdAt, record } of rows) {
+  for (const { targetEventId, ownEventId, createdAt } of rows) {
     const existing = next[targetEventId];
-    if (!existing || createdAt >= existing.updatedAt) next[targetEventId] = record;
+    next[targetEventId] = {
+      ...existing,
+      [action]: { ownEventId },
+      updatedAt: Math.max(existing?.updatedAt ?? 0, createdAt),
+    };
   }
   return capByRecency(next, MAX_ENGAGEMENT_ENTRIES);
 }
@@ -184,9 +200,7 @@ const INITIAL_STATE: NostrSocialState = {
   contactsContent: '',
   contactsUpdatedAt: 0,
   followingPubkeys: {},
-  likesByEventId: {},
-  repostsByEventId: {},
-  repliedByEventId: {},
+  engagementByEventId: {},
   deletedRepostOriginalIds: {},
   optimisticFollowsByPubkey: {},
   optimisticLikesByEventId: {},
@@ -197,16 +211,13 @@ const INITIAL_STATE: NostrSocialState = {
 // that grow unbounded if the user hammers reactions/follows offline. The .max()
 // caps below stop a runaway blob from hanging rehydrate; if the limits are hit
 // the merge falls back to defaults.
-const PersistedReactionState = z.looseObject({
-  reactionEventId: z.string().max(128).optional(),
-  updatedAt: z.number().int().nonnegative(),
+const PersistedEngagementAction = z.looseObject({
+  ownEventId: z.string().max(128).optional(),
 });
-const PersistedRepostState = z.looseObject({
-  repostEventId: z.string().max(128).optional(),
-  updatedAt: z.number().int().nonnegative(),
-});
-const PersistedRepliedState = z.looseObject({
-  replyEventId: z.string().max(128).optional(),
+const PersistedEngagementRecord = z.looseObject({
+  liked: PersistedEngagementAction.optional(),
+  reposted: PersistedEngagementAction.optional(),
+  replied: PersistedEngagementAction.optional(),
   updatedAt: z.number().int().nonnegative(),
 });
 const PersistedFollowOptimistic = z.looseObject({
@@ -231,9 +242,7 @@ const PersistedNostrSocialStore = z.object({
   contactsContent: z.string().max(65_536).default(''),
   contactsUpdatedAt: z.number().int().nonnegative().default(0),
   followingPubkeys: z.record(z.string().max(128), z.literal(true)).default({}),
-  likesByEventId: z.record(z.string().max(128), PersistedReactionState).default({}),
-  repostsByEventId: z.record(z.string().max(128), PersistedRepostState).default({}),
-  repliedByEventId: z.record(z.string().max(128), PersistedRepliedState).default({}),
+  engagementByEventId: z.record(z.string().max(128), PersistedEngagementRecord).default({}),
   deletedRepostOriginalIds: z
     .record(z.string().max(128), z.number().int().nonnegative())
     .default({}),
@@ -344,12 +353,13 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         if (likes.length === 0) return;
         storeLog.info('social.likes.ingest', { likeCount: likes.length });
         set((state) => ({
-          likesByEventId: upsertByTarget(
-            state.likesByEventId,
+          engagementByEventId: ingestEngagementAction(
+            state.engagementByEventId,
+            'liked',
             likes.map((l) => ({
               targetEventId: l.targetEventId,
+              ownEventId: l.reactionEventId,
               createdAt: l.createdAt,
-              record: { reactionEventId: l.reactionEventId, updatedAt: l.createdAt },
             }))
           ),
         }));
@@ -359,12 +369,13 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         if (reposts.length === 0) return;
         storeLog.info('social.reposts.ingest', { repostCount: reposts.length });
         set((state) => ({
-          repostsByEventId: upsertByTarget(
-            state.repostsByEventId,
+          engagementByEventId: ingestEngagementAction(
+            state.engagementByEventId,
+            'reposted',
             reposts.map((r) => ({
               targetEventId: r.targetEventId,
+              ownEventId: r.repostEventId,
               createdAt: r.createdAt,
-              record: { repostEventId: r.repostEventId, updatedAt: r.createdAt },
             }))
           ),
         }));
@@ -374,12 +385,13 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         if (replies.length === 0) return;
         storeLog.info('social.replies.ingest', { replyCount: replies.length });
         set((state) => ({
-          repliedByEventId: upsertByTarget(
-            state.repliedByEventId,
+          engagementByEventId: ingestEngagementAction(
+            state.engagementByEventId,
+            'replied',
             replies.map((r) => ({
               targetEventId: r.targetEventId,
+              ownEventId: r.replyEventId,
               createdAt: r.createdAt,
-              record: { replyEventId: r.replyEventId, updatedAt: r.createdAt },
             }))
           ),
         }));
@@ -389,32 +401,29 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         if (deletedEventIds.length === 0) return;
         const deleted = new Set(deletedEventIds);
         set((state) => {
-          const prune = <V extends { [k: string]: unknown }>(
-            map: Record<string, V>,
-            ownIdKey: keyof V
-          ): { next: Record<string, V>; removed: number } => {
-            let removed = 0;
-            const next: Record<string, V> = {};
-            for (const [target, record] of Object.entries(map)) {
-              const ownId = record[ownIdKey];
-              if (typeof ownId === 'string' && deleted.has(ownId)) {
+          let removed = 0;
+          const next: Record<string, EngagementRecord> = {};
+          const actions: EngagementActionKind[] = ['liked', 'reposted', 'replied'];
+          for (const [target, record] of Object.entries(state.engagementByEventId)) {
+            const kept: EngagementRecord = { updatedAt: record.updatedAt };
+            let changed = false;
+            for (const action of actions) {
+              const entry = record[action];
+              if (!entry) continue;
+              if (entry.ownEventId && deleted.has(entry.ownEventId)) {
                 removed += 1;
+                changed = true;
                 continue;
               }
-              next[target] = record;
+              kept[action] = entry;
             }
-            return { next, removed };
-          };
-          const likes = prune(state.likesByEventId, 'reactionEventId');
-          const reposts = prune(state.repostsByEventId, 'repostEventId');
-          const replies = prune(state.repliedByEventId, 'replyEventId');
-          const removed = likes.removed + reposts.removed + replies.removed;
+            // Drop the record only when its last surviving action is gone.
+            if (kept.liked || kept.reposted || kept.replied) {
+              next[target] = changed ? kept : record;
+            }
+          }
           if (removed > 0) storeLog.info('social.own.deletions_applied', { removed });
-          return {
-            likesByEventId: likes.next,
-            repostsByEventId: reposts.next,
-            repliedByEventId: replies.next,
-          };
+          return { engagementByEventId: next };
         });
       },
 
@@ -474,9 +483,7 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         contactsContent: state.contactsContent,
         contactsUpdatedAt: state.contactsUpdatedAt,
         followingPubkeys: state.followingPubkeys,
-        likesByEventId: state.likesByEventId,
-        repostsByEventId: state.repostsByEventId,
-        repliedByEventId: state.repliedByEventId,
+        engagementByEventId: state.engagementByEventId,
         deletedRepostOriginalIds: state.deletedRepostOriginalIds,
         optimisticFollowsByPubkey: state.optimisticFollowsByPubkey,
         optimisticLikesByEventId: state.optimisticLikesByEventId,
