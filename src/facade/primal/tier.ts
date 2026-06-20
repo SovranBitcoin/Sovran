@@ -123,22 +123,35 @@ function defaultResolveFeedSpec(
   spec: FeedSpec,
   paging: { until?: number; limit?: number },
 ): PrimalCacheRequest | null {
+  const limit = paging.limit ?? 30;
+  const pagedParams = (feedSpec: object, userPubkey?: string): PrimalCacheRequest['params'] => ({
+    spec: JSON.stringify(feedSpec),
+    limit,
+    ...(paging.until ? { until: paging.until } : {}),
+    ...(userPubkey ? { user_pubkey: userPubkey } : {}),
+  });
+
+  // The `spec` is a Primal `mega_feed_directive` feed spec. Valid notes-feed ids
+  // (primal-server app.jl `mega_feed_directive`): global-trending / all-notes /
+  // latest / most-zapped / … — NOT an arbitrary id. "for-you" is not a Primal
+  // concept, so map it to Primal's closest no-auth algo feed: global trending.
   switch (spec.kind) {
     case 'for-you':
       return {
         verb: 'mega_feed_directive',
-        params: {
-          spec: JSON.stringify({ id: 'for-you', kind: 'notes' }),
-          limit: paging.limit ?? 30,
-          ...(paging.until ? { until: paging.until } : {}),
-          ...(spec.viewerPubkey ? { user_pubkey: spec.viewerPubkey } : {}),
-        },
+        params: pagedParams({ id: 'global-trending', kind: 'notes', hours: 24 }, spec.viewerPubkey),
       };
     case 'following-popular':
+      // The viewer's follows feed (Primal's `latest`), keyed by their pubkey;
+      // empty when Primal doesn't hold their follow graph → falls to the floor.
+      return {
+        verb: 'mega_feed_directive',
+        params: pagedParams({ id: 'latest', kind: 'notes' }, spec.viewerPubkey),
+      };
     case 'following-recent':
     case 'user':
-      // No direct Primal cache directive wired for these yet — fall through to
-      // the relay floor (which serves following-recent/user from the author list).
+      // No Primal directive wired — fall through to the relay floor (which
+      // serves following-recent/user from the author list).
       return null;
   }
 }
