@@ -429,6 +429,7 @@ export const NoteContent = React.memo(function NoteContent({
   profile: overlayProfile,
   reposted,
   liked,
+  replied,
   repostPending,
   likePending,
   repostPendingDirection,
@@ -465,6 +466,7 @@ export const NoteContent = React.memo(function NoteContent({
   profile?: ProfileInfo | null;
   reposted?: boolean;
   liked?: boolean;
+  replied?: boolean;
   repostPending?: boolean;
   likePending?: boolean;
   repostPendingDirection?: 'activating' | 'deactivating';
@@ -556,6 +558,7 @@ export const NoteContent = React.memo(function NoteContent({
             profile: overlayProfile ?? null,
             reposted,
             liked,
+            replied,
             repostPending,
             likePending,
             repostPendingDirection,
@@ -580,6 +583,7 @@ export const NoteContent = React.memo(function NoteContent({
     overlayProfile,
     reposted,
     liked,
+    replied,
     repostPending,
     likePending,
     repostPendingDirection,
@@ -802,6 +806,7 @@ export const NoteContent = React.memo(function NoteContent({
                     profile={overlayProfile}
                     reposted={reposted}
                     liked={liked}
+                    replied={replied}
                     repostPending={repostPending}
                     likePending={likePending}
                     repostPendingDirection={repostPendingDirection}

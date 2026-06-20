@@ -28,6 +28,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { openRepostMenu } from '@/features/feed/lib/repostMenu';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { Log } from '@/shared/lib/logger';
+import { POST_ACTION_ICON_SIZES } from '../MetricsFooter';
 
 // The Repost/Quote menu can't render over the image overlay (a FullWindowOverlay
 // the menu's bottom sheet mounts beneath), so the overlay closes first, then the
@@ -51,7 +52,6 @@ function useOverlayRepostMenu(post: ImageOverlayPost, onRequestClose?: () => voi
     }, OVERLAY_CLOSE_BEFORE_MENU_MS);
   }, [post, onRequestClose, quotePost]);
 }
-import { POST_ACTION_ICON_SIZES } from '../MetricsFooter';
 // Absolute bar text stays white — it floats over the dark, blurred image, not
 // over the sheet's `surface` background.
 const PANEL_TEXT = 'rgba(255,255,255,0.95)';
@@ -239,10 +239,11 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
   /** Dismisses the lightbox so the Repost/Quote menu can render over it. */
   onRequestClose?: () => void;
 }) {
-  const [foreground, muted, repostedColor] = useThemeColor([
+  const [foreground, muted, repostedColor, repliedColor] = useThemeColor([
     'foreground',
     'muted',
     'success',
+    'link',
   ] as const);
   const [contentExpanded, setContentExpanded] = useState(initialContentExpanded ?? false);
 
@@ -252,7 +253,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
       onConsumedExpand?.();
     }
   }, [initialContentExpanded, onConsumedExpand]);
-  const { event, metrics, profile, reposted, liked, onLikePress } = post;
+  const { event, metrics, profile, reposted, liked, replied, onLikePress } = post;
   const handleRepostPress = useOverlayRepostMenu(post, onRequestClose);
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
@@ -363,9 +364,9 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
             <Icon
               name="iconamoon:comment-fill"
               size={POST_ACTION_ICON_SIZES.regular.comment}
-              color={muted}
+              color={replied ? repliedColor : muted}
             />
-            <Text size={13} style={{ color: muted }}>
+            <Text size={13} style={{ color: replied ? repliedColor : muted }}>
               {formatCount(metrics.replyCount)}
             </Text>
           </View>
@@ -427,8 +428,9 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
   onRequestClose?: () => void;
 }) {
   const repostedColor = useThemeColor('success');
+  const repliedColor = useThemeColor('link');
   const handleRepostPress = useOverlayRepostMenu(post, onRequestClose);
-  const { event, metrics, profile, reposted, liked, onLikePress } = post;
+  const { event, metrics, profile, reposted, liked, replied, onLikePress } = post;
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
@@ -498,9 +500,9 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
             <Icon
               name="iconamoon:comment-fill"
               size={POST_ACTION_ICON_SIZES.regular.comment}
-              color={PANEL_TEXT_MUTED}
+              color={replied ? repliedColor : PANEL_TEXT_MUTED}
             />
-            <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+            <Text size={13} style={{ color: replied ? repliedColor : PANEL_TEXT_MUTED }}>
               {formatCount(metrics.replyCount)}
             </Text>
           </Pressable>

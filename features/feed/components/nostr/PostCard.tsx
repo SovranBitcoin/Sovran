@@ -418,6 +418,7 @@ export const PostCard = React.memo(function PostCard({
           onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
           reposted={reposted}
           liked={liked}
+          replied={replied}
           repostPending={repostPending}
           likePending={likePending}
           repostPendingDirection={repostPendingDirection}

@@ -34,6 +34,7 @@ import { useThreadEmbed } from './ThreadEmbedProvider';
 export const EmbedActionBar = React.memo(function EmbedActionBar({
   metrics,
   liked,
+  replied,
   reposted,
   likePending,
   repostPending,
@@ -44,6 +45,7 @@ export const EmbedActionBar = React.memo(function EmbedActionBar({
 }: {
   metrics: NoteMetrics;
   liked: boolean;
+  replied: boolean;
   reposted: boolean;
   likePending: boolean;
   repostPending: boolean;
@@ -125,6 +127,7 @@ export const EmbedActionBar = React.memo(function EmbedActionBar({
           onLikePress={onLikePress}
           reposted={reposted}
           liked={liked}
+          replied={replied}
           repostPending={repostPending}
           likePending={likePending}
         />

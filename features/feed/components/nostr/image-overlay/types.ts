@@ -25,6 +25,7 @@ export interface ImageOverlayPost {
   profile?: ProfileInfo | null;
   reposted?: boolean;
   liked?: boolean;
+  replied?: boolean;
   repostPending?: boolean;
   likePending?: boolean;
   repostPendingDirection?: 'activating' | 'deactivating';
