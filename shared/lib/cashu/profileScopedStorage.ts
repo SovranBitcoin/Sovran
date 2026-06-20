@@ -129,6 +129,7 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'transaction-location-store',
   'transaction-distribution-store',
   'nostr-social-store',
+  'own-content-store',
   'nostr-relay-list-store',
   'nostr-media-server-store',
   'nostr-metadata-cache',
@@ -174,6 +175,7 @@ async function rehydrateProfileStores(): Promise<void> {
   const { useTransactionDistributionStore } =
     await import('@/shared/stores/profile/transactionDistributionStore');
   const { useNostrSocialStore } = await import('@/shared/stores/profile/nostrSocialStore');
+  const { useOwnContentStore } = await import('@/shared/stores/profile/ownContentStore');
   const { useNpcMintStore } = await import('@/shared/stores/profile/npcMintStore');
   const { useThemeStore } = await import('@/shared/stores/profile/themeStore');
   const { useBitchatDmMessagesStore } = await import('@/features/bitchat/stores/bitchatDmMessages');
@@ -222,6 +224,7 @@ async function rehydrateProfileStores(): Promise<void> {
         optimisticLikesByEventId: {},
         optimisticRepostsByEventId: {},
       });
+      useOwnContentStore.setState({ byId: {} });
       useThemeStore.setState({
         _hasHydrated: false,
         activeAlbumSlug: null,
@@ -248,6 +251,7 @@ async function rehydrateProfileStores(): Promise<void> {
     useTransactionDistributionStore.persist.rehydrate(),
     useNpcMintStore.persist.rehydrate(),
     useNostrSocialStore.persist.rehydrate(),
+    useOwnContentStore.persist.rehydrate(),
     useThemeStore.persist.rehydrate(),
     useBitchatDmMessagesStore.persist.rehydrate(),
     useFeedIgnoreStore.persist.rehydrate(),

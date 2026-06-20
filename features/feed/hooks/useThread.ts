@@ -12,7 +12,7 @@ import type {
   ThreadSeedBuckets,
 } from '@/features/feed/data/feedClient';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
-import { consumeThreadSeed } from '@/features/feed/lib/threadSeedCache';
+import { consumeThreadSeed, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import {
   bucketsFromThreadResult,
   buildThreadItemsFromResult,
@@ -23,6 +23,23 @@ import {
 } from '@/features/feed/lib/threadItems';
 import { feedLog } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { ingestOwnContent, useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
+
+/**
+ * Build a single-note thread seed from a locally-stored own note, so a just-
+ * posted (or other-client) note opens its thread instantly even before it has
+ * round-tripped through relays/nagg. Scoped to the active viewer.
+ */
+function ownContentSeed(eventId: string, viewerPubkey: string | undefined): ThreadSeed | undefined {
+  const entry = useOwnContentStore.getState().getOwn(eventId, viewerPubkey);
+  if (!entry) return undefined;
+  return {
+    allEvents: new Map([[eventId, entry.event]]),
+    profiles: new Map(),
+    metrics: new Map(),
+    quotedEvents: new Map(),
+  };
+}
 
 export type { ThreadItem } from '@/features/feed/lib/threadItems';
 
@@ -84,6 +101,8 @@ export function useThread(eventId: string): UseThreadResult {
         .filter((item): item is Extract<ThreadItem, { type: 'reply' }> => item.type === 'reply')
         .map((item) => item.event.id);
       threadSeedRef.current = bucketsFromThreadResult(result);
+      // Passive convergence: settle any own notes this thread surfaced.
+      ingestOwnContent(threadSeedRef.current.allEvents.values(), viewerPubkey);
       profilesRef.current = result.profiles;
       metricsRef.current = result.metrics;
       quotedEventsRef.current = result.quotedEvents;
@@ -109,7 +128,7 @@ export function useThread(eventId: string): UseThreadResult {
 
       return built;
     },
-    [eventId, replySort]
+    [eventId, replySort, viewerPubkey]
   );
 
   const loadMoreReplies = useCallback(async () => {
@@ -207,9 +226,9 @@ export function useThread(eventId: string): UseThreadResult {
     setIsLoadingMoreReplies(false);
     setHasMoreReplies(false);
 
-    const seed = eventChanged
-      ? consumeThreadSeed(eventId)
-      : (preservedSeed ?? consumeThreadSeed(eventId));
+    const seed =
+      (eventChanged ? consumeThreadSeed(eventId) : (preservedSeed ?? consumeThreadSeed(eventId))) ??
+      ownContentSeed(eventId, viewerPubkey);
     if (seed) {
       threadSeedRef.current = seed;
       const seeded = buildThreadItemsFromSeed(eventId, seed);
@@ -270,7 +289,9 @@ export function useThread(eventId: string): UseThreadResult {
         replyOffsetRef.current = result.loadedReplyCount;
 
         if (!applyThreadResult(result, 'initial')) {
-          setError('Post not found');
+          // A locally-seeded own note may not be on nagg yet — keep the seeded
+          // render instead of clobbering it with a not-found error.
+          if (!seed) setError('Post not found');
           setIsLoading(false);
           setIsFetching(false);
           return;

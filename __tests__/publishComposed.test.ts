@@ -15,7 +15,11 @@ jest.mock(
       content = '';
       created_at = 0;
       tags: string[][] = [];
+      id = 'signed-evt-id';
+      pubkey = 'me-pubkey';
+      sign = jest.fn(async () => {});
     },
+    normalizeRelayUrl: (url: string) => url,
     useNDK: () => ({ ndk: null }),
   }),
   { virtual: true }
@@ -23,6 +27,19 @@ jest.mock(
 
 jest.mock('@/shared/lib/logger', () => ({
   nostrLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+}));
+
+const mockOwnContent = {
+  recordOwn: jest.fn(),
+  confirmOwn: jest.fn(),
+  removeOwn: jest.fn(),
+};
+jest.mock('@/shared/stores/profile/ownContentStore', () => ({
+  useOwnContentStore: { getState: () => mockOwnContent },
+}));
+
+jest.mock('@/shared/lib/popup/popups/notePublished', () => ({
+  notePublishedPopup: jest.fn(),
 }));
 
 jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({
@@ -39,16 +56,25 @@ import { okAsync, errAsync } from 'neverthrow';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 
 import { publishEvent } from '@/shared/lib/nostr/publish';
+import { resolveOutboxRelays } from '@/shared/lib/nostr/outbox/recipientRelays';
+import { notePublishedPopup } from '@/shared/lib/popup/popups/notePublished';
 import { publishComposed } from '@/features/composer/publish/useComposerActions';
 import type { ComposerBlock } from '@/features/composer/config/types';
 
 const mockPublishEvent = publishEvent as unknown as jest.Mock;
+const mockResolveOutbox = resolveOutboxRelays as unknown as jest.Mock;
+const mockNotePublished = notePublishedPopup as unknown as jest.Mock;
 const signerNdk = { signer: {} } as unknown as NDK;
 const text = (t: string): ComposerBlock => ({ id: 'x', kind: 'text', text: t });
 
 beforeEach(() => {
   mockPublishEvent.mockReset();
   mockPublishEvent.mockReturnValue(okAsync({ accepted: [{ url: 'wss://write.example' }] }));
+  mockResolveOutbox.mockClear();
+  mockOwnContent.recordOwn.mockClear();
+  mockOwnContent.confirmOwn.mockClear();
+  mockOwnContent.removeOwn.mockClear();
+  mockNotePublished.mockClear();
 });
 
 describe('publishComposed', () => {
@@ -84,24 +110,57 @@ describe('publishComposed', () => {
     });
     expect(out).toBe('ok');
     expect(mockPublishEvent).toHaveBeenCalledTimes(1);
-    const event = mockPublishEvent.mock.calls[0][0].event;
-    expect(event.kind).toBe(1);
-    expect(event.content).toBe('nice post');
-    expect(event.tags).toEqual(
+    const call = mockPublishEvent.mock.calls[0][0];
+    expect(call.event.kind).toBe(1);
+    expect(call.event.content).toBe('nice post');
+    expect(call.event.tags).toEqual(
       expect.arrayContaining([
         ['e', 'root1', '', 'root'],
         ['e', 'p1', '', 'reply'],
         ['p', 'pub1'],
       ])
     );
+    // Optimistic publish; the reply's mention is resolved off the critical path.
+    expect(call.resolveOn).toBe('optimistic');
+    expect(call.backgroundRelays).toBeInstanceOf(Promise);
+    expect(mockResolveOutbox).toHaveBeenCalledTimes(1);
+    // Records optimistically, confirms on success, and offers a "View" toast.
+    expect(mockOwnContent.recordOwn).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'signed-evt-id', kind: 1 }),
+      'pending'
+    );
+    expect(mockOwnContent.confirmOwn).toHaveBeenCalledWith('signed-evt-id');
+    expect(mockOwnContent.removeOwn).not.toHaveBeenCalled();
+    expect(mockNotePublished).toHaveBeenCalledWith({ eventId: 'signed-evt-id' });
   });
 
-  it('returns failed when the publish seam errors', async () => {
+  it('publishes a top-level note to own relays without fetching recipient relays', async () => {
+    const out = await publishComposed(signerNdk, {
+      blocks: [text('gm')],
+      target: { mode: 'new' },
+    });
+    expect(out).toBe('ok');
+    const call = mockPublishEvent.mock.calls[0][0];
+    expect(call.resolveOn).toBe('optimistic');
+    expect(call.backgroundRelays).toBeUndefined();
+    expect(call.relays).toEqual(['wss://write.example']); // own write relays, resolved synchronously
+    expect(mockResolveOutbox).not.toHaveBeenCalled(); // no mentions → no network fetch
+  });
+
+  it('returns failed when the publish seam errors and drops the optimistic note', async () => {
     mockPublishEvent.mockReturnValue(errAsync({ type: 'all-failed', relayResults: [] }));
     const out = await publishComposed(signerNdk, {
       blocks: [text('hi')],
       target: { mode: 'new' },
     });
     expect(out).toBe('failed');
+    // No phantom: a failed publish removes the optimistic entry and shows no toast.
+    expect(mockOwnContent.recordOwn).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'signed-evt-id' }),
+      'pending'
+    );
+    expect(mockOwnContent.removeOwn).toHaveBeenCalledWith('signed-evt-id');
+    expect(mockOwnContent.confirmOwn).not.toHaveBeenCalled();
+    expect(mockNotePublished).not.toHaveBeenCalled();
   });
 });

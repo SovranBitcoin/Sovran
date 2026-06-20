@@ -12,6 +12,11 @@
  * `relay.publish(event, timeoutMs)` resolves on the relay's OK frame and
  * rejects on error/timeout. Unlike `NDKRelaySet.publish`, this gives genuine
  * per-relay outcomes and resolve-on-first-accept.
+ *
+ * Three resolve modes, one engine: `first-ok` and `all-settled` resolve only
+ * once the fan-out is done; `optimistic` resolves the instant the first relay
+ * accepts and finishes the fan-out (plus recipient/outbox relays) in the
+ * background — see {@link runOptimistic}.
  */
 import NDK, { NDKEvent, NDKRelaySet, normalizeRelayUrl } from '@nostr-dev-kit/ndk-mobile';
 import type { NDKRelay } from '@nostr-dev-kit/ndk-mobile';
@@ -31,10 +36,24 @@ import type {
   RetryPolicy,
 } from '@/shared/lib/nostr/publish/types';
 
-/** In-flight publishes keyed by signed event id — joins duplicate calls. */
+/**
+ * In-flight publishes keyed by signed event id — joins duplicate calls. For
+ * `optimistic` publishes the entry is held until the BACKGROUND fan-out
+ * finishes (not just first-accept), so a duplicate during the background window
+ * still joins instead of starting a second fan-out.
+ */
 const inFlight = new Map<string, Promise<Result<PublishResult, PublishError>>>();
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+type AcceptResult = Extract<PublishRelayResult, { ok: true }>;
+
+/** Assembles the structured result from a set of per-relay outcomes. */
+function buildPublishResult(eventId: string, relayResults: PublishRelayResult[]): PublishResult {
+  const accepted = relayResults.filter((r): r is AcceptResult => r.ok);
+  const failed = relayResults.filter((r): r is Extract<PublishRelayResult, { ok: false }> => !r.ok);
+  return { eventId, relayResults, accepted, failed, anyAccepted: accepted.length > 0 };
+}
 
 /**
  * Resolves the target {@link NDKRelay} objects. With an explicit url set, builds
@@ -75,48 +94,222 @@ async function publishOne(
 }
 
 /**
- * Publishes to every relay, retrying only the failed ones with exponential
- * backoff. `first-ok` short-circuits the retry loop once any relay accepts.
+ * Publishes to every relay concurrently, once. `onAccept` fires the instant any
+ * relay accepts (before the round settles) — the hook the optimistic mode uses
+ * to resolve on the genuine first accept rather than the slowest relay.
  */
-async function publishToRelays(
+async function publishRound(
+  relays: NDKRelay[],
+  event: NDKEvent,
+  timeoutMs: number,
+  onAccept?: (result: AcceptResult) => void
+): Promise<{ results: PublishRelayResult[]; failed: NDKRelay[] }> {
+  const settled = await Promise.all(
+    relays.map(async (relay) => {
+      const result = await publishOne(relay, event, timeoutMs);
+      if (result.ok) onAccept?.(result);
+      return { result, relay };
+    })
+  );
+  return {
+    results: settled.map((s) => s.result),
+    failed: settled.filter((s) => !s.result.ok).map((s) => s.relay),
+  };
+}
+
+interface FanOutHooks {
+  resolveOn: 'first-ok' | 'all-settled';
+  onAccept?: (result: AcceptResult) => void;
+  onRelayResult?: (result: PublishRelayResult) => void;
+  /**
+   * Called after each round settles with the 0-based attempt index and whether
+   * any relay has accepted so far. Return `true` to stop the fan-out early
+   * (the optimistic mode uses this to bail after a fully-failed first round).
+   */
+  onRoundSettled?: (attempt: number, anyAccepted: boolean) => boolean;
+}
+
+/**
+ * Runs the full retry budget over `relays`, retrying only the relays that
+ * failed, accumulating terminal outcomes into `finalByUrl`. The single engine
+ * behind all resolve modes.
+ */
+async function fanOut(
   relays: NDKRelay[],
   event: NDKEvent,
   timeoutMs: number,
   policy: RetryPolicy,
-  resolveOn: 'first-ok' | 'all-settled',
-  onRelayResult?: (result: PublishRelayResult) => void
-): Promise<PublishRelayResult[]> {
-  const finalByUrl = new Map<string, PublishRelayResult>();
+  finalByUrl: Map<string, PublishRelayResult>,
+  hooks: FanOutHooks
+): Promise<void> {
   let pending = relays;
-
   for (let attempt = 0; attempt <= policy.attempts; attempt += 1) {
     if (pending.length === 0) break;
 
-    const settled = await Promise.all(pending.map((relay) => publishOne(relay, event, timeoutMs)));
-    const nextPending: NDKRelay[] = [];
-
-    settled.forEach((result, i) => {
-      if (result.ok) {
-        finalByUrl.set(result.url, result);
-        onRelayResult?.(result);
-        return;
-      }
-      // Record the latest failure; retry unless this was the last round.
+    const { results, failed } = await publishRound(pending, event, timeoutMs, hooks.onAccept);
+    const isLast = attempt === policy.attempts;
+    for (const result of results) {
       finalByUrl.set(result.url, result);
-      if (attempt < policy.attempts) {
-        nextPending.push(pending[i]);
-      } else {
-        onRelayResult?.(result);
-      }
-    });
+      // Accepts stream immediately; failures only once they're terminal (last round).
+      if (result.ok || isLast) hooks.onRelayResult?.(result);
+    }
 
-    if (resolveOn === 'first-ok' && [...finalByUrl.values()].some((r) => r.ok)) break;
+    const anyAccepted = [...finalByUrl.values()].some((r) => r.ok);
+    if (hooks.onRoundSettled?.(attempt, anyAccepted)) return;
+    if (hooks.resolveOn === 'first-ok' && anyAccepted) return;
 
-    pending = nextPending;
+    pending = isLast ? [] : failed;
     if (pending.length > 0) await delay(backoffDelayMs(attempt, policy));
   }
+}
 
-  return [...finalByUrl.values()];
+interface PublishRun {
+  /** Resolves when delivery is assured (or has definitively failed). */
+  assured: Promise<Result<PublishResult, PublishError>>;
+  /** Resolves when ALL work — including background fan-out — has finished. */
+  done: Promise<void>;
+}
+
+/**
+ * Optimistic publish: resolve `assured` the instant the first relay accepts so
+ * the UI can dismiss, then finish the fan-out and the recipient/outbox relays
+ * in the background. If the first round over the base relays accepts nowhere,
+ * resolve `all-failed` immediately and abandon the rest (the caller keeps the
+ * composer open with the draft intact).
+ */
+function runOptimistic(
+  ndk: NDK,
+  event: NDKEvent,
+  eventId: string,
+  timeoutMs: number,
+  policy: RetryPolicy,
+  opts: PublishOptions
+): PublishRun {
+  let settle!: (result: Result<PublishResult, PublishError>) => void;
+  const assured = new Promise<Result<PublishResult, PublishError>>((resolve) => {
+    settle = resolve;
+  });
+  // Held on an object so TS doesn't narrow it away across the `await` below
+  // (it's only ever mutated inside the fan-out callbacks).
+  const status = { resolved: false, ok: false };
+  const resolveAssured = (result: Result<PublishResult, PublishError>): void => {
+    if (status.resolved) return;
+    status.resolved = true;
+    status.ok = result.isOk();
+    settle(result);
+  };
+
+  const finalByUrl = new Map<string, PublishRelayResult>();
+  const onAccept = (result: AcceptResult): void =>
+    resolveAssured(ok(buildPublishResult(eventId, [result])));
+
+  const done = (async (): Promise<void> => {
+    try {
+      const base = targetRelays(ndk, opts.relays);
+      if (base.length === 0) {
+        nostrLog.warn('nostr.publish.no_relays', { kind: event.kind });
+        resolveAssured(err({ type: 'no-relays' }));
+        return;
+      }
+
+      await fanOut(base, event, timeoutMs, policy, finalByUrl, {
+        resolveOn: 'all-settled',
+        onAccept,
+        onRelayResult: opts.onRelayResult,
+        onRoundSettled: (attempt, anyAccepted) => {
+          if (attempt === 0 && !anyAccepted) {
+            // Nothing accepted on the first attempt: surface the failure now so
+            // the user keeps their draft, and don't leave a zombie background
+            // publish running for a post they'll likely retry.
+            nostrLog.error('nostr.publish.all_failed', {
+              kind: event.kind,
+              relayCount: finalByUrl.size,
+            });
+            resolveAssured(err({ type: 'all-failed', relayResults: [...finalByUrl.values()] }));
+            return true;
+          }
+          return false;
+        },
+      });
+
+      if (!status.ok) return;
+
+      // Recipient (outbox) relays: best-effort reach, off the user's critical
+      // path. Failures here never surface — the note is already on the network.
+      if (opts.backgroundRelays) {
+        const extraUrls = await opts.backgroundRelays.catch((error: unknown) => {
+          nostrLog.warn('nostr.publish.background_relays_unresolved', {
+            kind: event.kind,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          return [] as readonly string[];
+        });
+        const extra = targetRelays(ndk, extraUrls).filter((relay) => !finalByUrl.has(relay.url));
+        if (extra.length > 0) {
+          await fanOut(extra, event, timeoutMs, policy, finalByUrl, {
+            resolveOn: 'all-settled',
+            onRelayResult: opts.onRelayResult,
+          });
+        }
+      }
+
+      const accepted = [...finalByUrl.values()].filter((r) => r.ok).length;
+      nostrLog.info('nostr.publish.optimistic_settled', {
+        kind: event.kind,
+        accepted,
+        relayCount: finalByUrl.size,
+      });
+    } catch (error) {
+      // Never let the UI hang: if anything threw before delivery was assured,
+      // settle `assured` now (idempotent, so a post-assurance throw is just
+      // logged). Guarantees the returned promise always resolves.
+      nostrLog.error('nostr.publish.optimistic_threw', {
+        kind: event.kind,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      resolveAssured(err({ type: 'all-failed', relayResults: [...finalByUrl.values()] }));
+    }
+  })();
+
+  return { assured, done };
+}
+
+/** Runs `first-ok` / `all-settled`: a single fan-out, resolved once it's done. */
+async function runBlocking(
+  ndk: NDK,
+  event: NDKEvent,
+  eventId: string,
+  timeoutMs: number,
+  policy: RetryPolicy,
+  opts: PublishOptions
+): Promise<Result<PublishResult, PublishError>> {
+  const relays = targetRelays(ndk, opts.relays);
+  if (relays.length === 0) {
+    nostrLog.warn('nostr.publish.no_relays', { kind: event.kind });
+    return err({ type: 'no-relays' });
+  }
+
+  const finalByUrl = new Map<string, PublishRelayResult>();
+  await fanOut(relays, event, timeoutMs, policy, finalByUrl, {
+    resolveOn: opts.resolveOn === 'first-ok' ? 'first-ok' : 'all-settled',
+    onRelayResult: opts.onRelayResult,
+  });
+
+  const result = buildPublishResult(eventId, [...finalByUrl.values()]);
+  if (!result.anyAccepted) {
+    nostrLog.error('nostr.publish.all_failed', {
+      kind: event.kind,
+      relayCount: result.relayResults.length,
+    });
+    return err({ type: 'all-failed', relayResults: result.relayResults });
+  }
+
+  nostrLog.info('nostr.publish.ok', {
+    kind: event.kind,
+    accepted: result.accepted.length,
+    failed: result.failed.length,
+  });
+  return ok(result);
 }
 
 async function runPublish(opts: PublishOptions): Promise<Result<PublishResult, PublishError>> {
@@ -143,44 +336,17 @@ async function runPublish(opts: PublishOptions): Promise<Result<PublishResult, P
   const existing = inFlight.get(eventId);
   if (existing) return existing;
 
-  const run = (async (): Promise<Result<PublishResult, PublishError>> => {
-    const relays = targetRelays(ndk, opts.relays);
-    if (relays.length === 0) {
-      nostrLog.warn('nostr.publish.no_relays', { kind: event.kind });
-      return err({ type: 'no-relays' });
-    }
+  if (resolveOn === 'optimistic') {
+    // `assured` resolves on first accept; the dedup entry is held until the
+    // background fan-out finishes. `done` settles its own errors internally
+    // (see runOptimistic), so it never rejects — just clean up when it's done.
+    const { assured, done } = runOptimistic(ndk, event, eventId, timeoutMs, policy, opts);
+    inFlight.set(eventId, assured);
+    void done.finally(() => inFlight.delete(eventId));
+    return assured;
+  }
 
-    const relayResults = await publishToRelays(
-      relays,
-      event,
-      timeoutMs,
-      policy,
-      resolveOn,
-      opts.onRelayResult
-    );
-    const accepted = relayResults.filter(
-      (r): r is Extract<PublishRelayResult, { ok: true }> => r.ok
-    );
-    const failed = relayResults.filter(
-      (r): r is Extract<PublishRelayResult, { ok: false }> => !r.ok
-    );
-
-    if (accepted.length === 0) {
-      nostrLog.error('nostr.publish.all_failed', {
-        kind: event.kind,
-        relayCount: relayResults.length,
-      });
-      return err({ type: 'all-failed', relayResults });
-    }
-
-    nostrLog.info('nostr.publish.ok', {
-      kind: event.kind,
-      accepted: accepted.length,
-      failed: failed.length,
-    });
-    return ok({ eventId, relayResults, accepted, failed, anyAccepted: true });
-  })();
-
+  const run = runBlocking(ndk, event, eventId, timeoutMs, policy, opts);
   inFlight.set(eventId, run);
   try {
     return await run;
