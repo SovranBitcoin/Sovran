@@ -72,6 +72,16 @@ interface NostrSocialState {
 
 interface NostrSocialActions {
   setContactsFromRelay: (params: { tags: string[][]; content: string; createdAt: number }) => void;
+  /**
+   * Seed the read-side follow set from the tiered facade's social-graph bundle
+   * (nagg → Primal → relay). Read-only accelerator: it sets `followingPubkeys`
+   * and bumps the LWW gate but NEVER writes `contactsTags`/`content` — the raw
+   * kind-3 from `useOwnEventsSync`'s relay sub stays the write-authoritative
+   * source for follow/unfollow re-publish (it preserves relay hints + petnames
+   * the facade's parsed `follows` drop). LWW-gated by the kind-3 `created_at` so
+   * a facade seed and a relay delta can't fight — the newer contact list wins.
+   */
+  seedFollowsFromFacade: (params: { follows: string[]; createdAt: number }) => void;
   setFollowOptimistic: (pubkey: string, value: boolean, pending: boolean) => void;
   clearFollowOptimistic: (pubkey: string) => void;
   clearSettledFollowOptimistic: () => void;
@@ -283,6 +293,29 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
             contactsUpdatedAt: createdAt,
             followingPubkeys: following,
           };
+        });
+      },
+
+      seedFollowsFromFacade: ({ follows, createdAt }) => {
+        set((state) => {
+          // LWW: skip when the authoritative kind-3 (relay sub) already landed
+          // an equal-or-newer list. The relay path's own guard uses `<`, so an
+          // equal `created_at` there still fills the raw `contactsTags` we leave
+          // untouched here.
+          if (createdAt <= state.contactsUpdatedAt) {
+            storeLog.debug('social.contacts.seed.stale', {
+              createdAt,
+              current: state.contactsUpdatedAt,
+            });
+            return state;
+          }
+          const following = extractFollowingFromTags(follows.map((pk) => ['p', pk]));
+          storeLog.info('social.contacts.seed', {
+            followingCount: Object.keys(following).length,
+            createdAt,
+          });
+          // Read side only — no `contactsTags`/`content`; the relay sub owns those.
+          return { followingPubkeys: following, contactsUpdatedAt: createdAt };
         });
       },
 
