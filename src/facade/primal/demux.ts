@@ -8,6 +8,7 @@ import type {
 } from '@sovranbitcoin/schemas';
 import type { NaggFeedEvent, NaggProfileInfo } from '../../map/feed';
 import { synthesizeRecencyManifest } from '../../tiers';
+import { toFeedEvent } from '../event';
 import type { FeedBundle, FeedItem } from '../feed';
 import { PRIMAL_KIND, type RawPrimalEvent } from './protocol';
 import {
@@ -123,27 +124,4 @@ function deriveCursor(manifest: OrderingManifest, eventsById: Map<string, NaggFe
     if (event) return { createdAt: event.created_at, id };
   }
   return null;
-}
-
-function toFeedEvent(raw: RawPrimalEvent): NaggFeedEvent | null {
-  if (typeof raw.id !== 'string' || typeof raw.pubkey !== 'string') return null;
-  return {
-    id: raw.id,
-    kind: raw.kind,
-    pubkey: raw.pubkey,
-    content: typeof raw.content === 'string' ? raw.content : '',
-    tags: coerceTags(raw.tags),
-    created_at: typeof raw.created_at === 'number' ? raw.created_at : 0,
-  };
-}
-
-function coerceTags(tags: unknown): string[][] {
-  if (!Array.isArray(tags)) return [];
-  const out: string[][] = [];
-  for (const tag of tags) {
-    if (Array.isArray(tag) && tag.every((t) => typeof t === 'string')) {
-      out.push(tag as string[]);
-    }
-  }
-  return out;
 }
