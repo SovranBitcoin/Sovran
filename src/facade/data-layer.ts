@@ -8,6 +8,11 @@ import {
 } from '../tiers';
 import type { FeedBundle, FeedPageRequest, ResolvedFeedPage } from './feed';
 import type { ThreadBundle, ThreadRequest, ResolvedThread } from './thread';
+import type {
+  NotificationsBundle,
+  NotificationsRequest,
+  ResolvedNotifications,
+} from './notifications';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -27,6 +32,9 @@ export type NostrDataLayerConfig = {
 export interface NostrDataLayer {
   getFeedPage(request: FeedPageRequest): Promise<Result<ResolvedFeedPage, TierResolutionError>>;
   getThread(request: ThreadRequest): Promise<Result<ResolvedThread, TierResolutionError>>;
+  getNotifications(
+    request: NotificationsRequest,
+  ): Promise<Result<ResolvedNotifications, TierResolutionError>>;
 }
 
 export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLayer {
@@ -41,6 +49,16 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
       const candidates = candidatesFor(config.tiers, 'thread', (tier) => () => tier.thread!(request));
       const resolved = await resolveAcrossTiers<ThreadBundle>(candidates);
       return resolved.map(({ tier, value }) => assembleThread(tier, value));
+    },
+
+    async getNotifications(request) {
+      const candidates = candidatesFor(
+        config.tiers,
+        'notifications',
+        (tier) => () => tier.notifications!(request),
+      );
+      const resolved = await resolveAcrossTiers<NotificationsBundle>(candidates);
+      return resolved.map(({ tier, value }) => assembleNotifications(tier, value));
     },
   };
 }
@@ -85,6 +103,23 @@ function assembleThread(tier: NostrTier, bundle: ThreadBundle): ResolvedThread {
     replies,
     stats: bundle.stats,
     ...(bundle.actions ? { actions: bundle.actions } : {}),
+    profiles: bundle.profiles,
+    quoted: bundle.quoted,
+    cursor: bundle.cursor,
+    missingIds,
+  };
+}
+
+function assembleNotifications(tier: NostrTier, bundle: NotificationsBundle): ResolvedNotifications {
+  const missingIds: string[] = [];
+  const notifications = applyOrderingManifest(bundle.manifest, bundle.itemsById, {
+    onMissing: (id) => missingIds.push(id),
+  });
+  return {
+    tier,
+    notifications,
+    grouped: bundle.grouped,
+    stats: bundle.stats,
     profiles: bundle.profiles,
     quoted: bundle.quoted,
     cursor: bundle.cursor,

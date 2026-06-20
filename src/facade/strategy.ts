@@ -2,6 +2,7 @@ import type { NostrTier } from '@sovranbitcoin/schemas';
 import type { TierOutcome } from '../tiers';
 import type { FeedBundle, FeedPageRequest } from './feed';
 import type { ThreadBundle, ThreadRequest } from './thread';
+import type { NotificationsBundle, NotificationsRequest } from './notifications';
 
 // ---------------------------------------------------------------------------
 // Tier strategy — one deep module per source, implementing the surfaces it can
@@ -19,4 +20,5 @@ export interface NostrTierStrategy {
   readonly tier: NostrTier;
   feedPage?(request: FeedPageRequest): Promise<TierOutcome<FeedBundle>>;
   thread?(request: ThreadRequest): Promise<TierOutcome<ThreadBundle>>;
+  notifications?(request: NotificationsRequest): Promise<TierOutcome<NotificationsBundle>>;
 }

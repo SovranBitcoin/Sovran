@@ -1,6 +1,6 @@
 import type { NaggClient } from '../transport';
-import { NaggFeedPageSchema, NaggThreadSchema } from '../schemas';
-import { rankedFeedAppView, threadAppView } from '../recipes/appview-feed';
+import { NaggFeedPageSchema, NaggThreadSchema, NaggNotificationsPageSchema } from '../schemas';
+import { rankedFeedAppView, threadAppView, notificationsAppView } from '../recipes/appview-feed';
 import { forYouRankedEventsInput, followingPopularRankedEventsInput } from '../recipes/feed';
 import type { NaggFeedPage } from '../map/feed';
 import { answered, failed, type TierOutcome } from '../tiers';
@@ -11,6 +11,12 @@ import {
   type FeedSpec,
 } from './feed';
 import { bundleFromThread, type ThreadBundle, type ThreadRequest, type ThreadSource } from './thread';
+import {
+  bundleFromNotifications,
+  type NotificationsBundle,
+  type NotificationsRequest,
+  type NotificationsSource,
+} from './notifications';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -68,6 +74,34 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<ThreadBundle>>(
         (thread) => answered(bundleFromThread(thread as ThreadSource)),
+        (error) => failed(error),
+      );
+    },
+
+    async notifications(request: NotificationsRequest): Promise<TierOutcome<NotificationsBundle>> {
+      const grouped = request.grouped !== false;
+      const binding = notificationsAppView({
+        pubkey: request.viewerPubkey,
+        tab: request.tab,
+        policy: request.policy,
+        replyScope: request.replyScope,
+        since: request.since,
+        until: request.cursor?.createdAt,
+        limit: request.limit,
+        grouped,
+      });
+      const result = await client.rest<typeof NaggNotificationsPageSchema>({
+        path: binding.path,
+        method: binding.method ?? 'GET',
+        searchParams: binding.searchParams,
+        responseSchema: NaggNotificationsPageSchema,
+        operationName: binding.operationName,
+        refresh: request.refresh,
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<NotificationsBundle>>(
+        (page) => answered(bundleFromNotifications(page as NotificationsSource, grouped)),
         (error) => failed(error),
       );
     },
