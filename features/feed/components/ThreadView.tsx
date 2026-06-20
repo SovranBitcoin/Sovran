@@ -507,6 +507,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           showLineAbove={isParent ? index > 0 : isTarget ? hasParents : false}
           showLineBelow={isParent}
           liked={engagement.liked}
+          replied={engagement.replied}
           reposted={engagement.reposted}
           likePending={engagement.likePending}
           repostPending={engagement.repostPending}
@@ -732,6 +733,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
             <EmbedActionBar
               metrics={getDisplayMetrics(targetEvent.id)}
               liked={getEngagementState(targetEvent.id).liked}
+              replied={getEngagementState(targetEvent.id).replied}
               reposted={getEngagementState(targetEvent.id).reposted}
               likePending={getEngagementState(targetEvent.id).likePending}
               repostPending={getEngagementState(targetEvent.id).repostPending}

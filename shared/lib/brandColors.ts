@@ -14,6 +14,12 @@ export const BLUETOOTH_ACCENT = '#0A84FF';
  *  channel state — bitchat mesh broadcast icon, BLE peer connected dots. */
 export const CONNECTED_ACCENT = '#34C759';
 
+/** Reply/comment accent (#3B9EFF). Fixed cross-theme blue used to highlight
+ *  the comment icon when the viewer has replied to a post — a sibling to the
+ *  fixed pink "like" accent (so the cue reads the same on every theme, unlike
+ *  the theme-derived `link` token which can render greyish). */
+export const COMMENT_ACCENT = '#3B9EFF';
+
 /** Bitcoin orange (#F7931A). Used wherever a "bitcoin-accepting" or
  *  "bitcoin-denominated" semantic cue is rendered: BTCMap markers, splitBill
  *  participant pills, mint-info bitcoin glyphs. Matches `orange-300` in

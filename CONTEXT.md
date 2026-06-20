@@ -70,6 +70,24 @@ heuristics, unlike engagement state.
 without a dedicated always-on subscription. Seam: `ingestOwnContent`.
 
 **Viewer-state** — a viewer's relation to a post (did _I_ like / repost / quote /
-reply; do I follow this profile). Today derived client-side from relay
-subscriptions; the authoritative source is planned to be nagg app-view payloads
-(see ADR 0001).
+reply; do I follow this profile). Authoritative source is the client-side
+own-events relay sync (NOT nagg) — see **own-events sync** and ADR 0002 (which
+supersedes ADR 0001's nagg approach).
+
+**Own-events sync** — `useOwnEventsSync` (`shared/lib/nostr/ownsync/`): one
+long-lived app-level relay subscription for all our own events
+`{ authors:[me], kinds:[0,1,3,5,6,7] }` that hydrates the canonical own-state
+stores so they're authoritative everywhere. The single owner of "keep my own
+state synced"; replaces the former per-screen engagement subs, profile-screen
+contact sub, and boot kind:0 sync. `partitionOwnEvents` is the pure routing.
+
+**Global upsert** — `nostrSocialStore.ingestOwnLikes/Reposts/Replies`: merge our
+own engagement keyed by target, newest-per-target, recency-capped
+(`MAX_ENGAGEMENT_ENTRIES`). Unlike the removed scoped `syncLikesFromRelay`, it
+never deletes by an on-screen target set; deletions come via `applyOwnDeletions`
+(our kind:5). The canonical maps are the source of truth, overlaid by optimistic
+toggles.
+
+**Replied index** — `nostrSocialStore.repliedByEventId` (target id → our reply):
+drives the "you replied" comment-icon highlight, populated from our own kind:1
+reply e-tags by the own-events sync.

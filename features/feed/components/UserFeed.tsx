@@ -134,6 +134,7 @@ export const RepostCard = React.memo(function RepostCard({
   onOverlayOpenedFromIndex,
   onVideoTap,
   liked = false,
+  replied = false,
   reposted = false,
   likePending = false,
   repostPending = false,
@@ -156,11 +157,12 @@ export const RepostCard = React.memo(function RepostCard({
   getMetrics: (eventId: string) => NoteMetrics;
   reposterName: string;
   reposterPubkey: string;
-  reposters?: Array<{ name: string; pubkey: string }>;
+  reposters?: { name: string; pubkey: string }[];
   feedIndex?: number;
   onOverlayOpenedFromIndex?: (index: number) => void;
   onVideoTap?: (url: string) => void;
   liked?: boolean;
+  replied?: boolean;
   reposted?: boolean;
   likePending?: boolean;
   repostPending?: boolean;
@@ -285,6 +287,7 @@ export const RepostCard = React.memo(function RepostCard({
             onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
             onVideoTap={onVideoTap}
             liked={liked}
+            replied={replied}
             reposted={reposted}
             likePending={likePending}
             repostPending={repostPending}
@@ -888,6 +891,7 @@ export function UserFeed({
                 profiles={row.profiles}
                 getMetrics={getMetrics}
                 liked={rootEngagement.liked}
+                replied={rootEngagement.replied}
                 reposted={rootEngagement.reposted}
                 likePending={rootEngagement.likePending}
                 repostPending={rootEngagement.repostPending}
@@ -911,6 +915,7 @@ export function UserFeed({
                 profiles={row.profiles}
                 getMetrics={getMetrics}
                 liked={engagement.liked}
+                replied={engagement.replied}
                 reposted={engagement.reposted}
                 likePending={engagement.likePending}
                 repostPending={engagement.repostPending}
@@ -937,6 +942,7 @@ export function UserFeed({
             profiles={row.profiles}
             getMetrics={getMetrics}
             liked={engagement.liked}
+            replied={engagement.replied}
             reposted={engagement.reposted}
             likePending={engagement.likePending}
             repostPending={engagement.repostPending}
@@ -970,6 +976,7 @@ export function UserFeed({
               profiles={row.profiles}
               getMetrics={getMetrics}
               liked={rootEngagement.liked}
+              replied={rootEngagement.replied}
               reposted={rootEngagement.reposted}
               likePending={rootEngagement.likePending}
               repostPending={rootEngagement.repostPending}
@@ -996,6 +1003,7 @@ export function UserFeed({
               reposterPubkey={row.reposterPubkey ?? pubkey}
               reposters={row.reposters}
               liked={engagement.liked}
+              replied={engagement.replied}
               reposted={engagement.reposted}
               likePending={engagement.likePending}
               repostPending={engagement.repostPending}
@@ -1026,6 +1034,7 @@ export function UserFeed({
           reposterPubkey={row.reposterPubkey ?? pubkey}
           reposters={row.reposters}
           liked={engagement.liked}
+          replied={engagement.replied}
           reposted={engagement.reposted}
           likePending={engagement.likePending}
           repostPending={engagement.repostPending}

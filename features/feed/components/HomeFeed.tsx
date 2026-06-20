@@ -882,6 +882,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   profiles={row.profiles}
                   getMetrics={getMetrics}
                   liked={engagement.liked}
+                  replied={engagement.replied}
                   reposted={engagement.reposted}
                   likePending={engagement.likePending}
                   repostPending={engagement.repostPending}
@@ -915,6 +916,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                         profiles={row.profiles}
                         getMetrics={getMetrics}
                         liked={replyEngagement.liked}
+                        replied={replyEngagement.replied}
                         reposted={replyEngagement.reposted}
                         likePending={replyEngagement.likePending}
                         repostPending={replyEngagement.repostPending}
@@ -952,6 +954,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   profiles={row.profiles}
                   getMetrics={getMetrics}
                   liked={rootEngagement.liked}
+                  replied={rootEngagement.replied}
                   reposted={rootEngagement.reposted}
                   likePending={rootEngagement.likePending}
                   repostPending={rootEngagement.repostPending}
@@ -978,6 +981,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   profiles={row.profiles}
                   getMetrics={getMetrics}
                   liked={engagement.liked}
+                  replied={engagement.replied}
                   reposted={engagement.reposted}
                   likePending={engagement.likePending}
                   repostPending={engagement.repostPending}
@@ -1005,6 +1009,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             profiles={row.profiles}
             getMetrics={getMetrics}
             liked={engagement.liked}
+            replied={engagement.replied}
             reposted={engagement.reposted}
             likePending={engagement.likePending}
             repostPending={engagement.repostPending}
@@ -1042,6 +1047,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 profiles={row.profiles}
                 getMetrics={getMetrics}
                 liked={rootEngagement.liked}
+                replied={rootEngagement.replied}
                 reposted={rootEngagement.reposted}
                 likePending={rootEngagement.likePending}
                 repostPending={rootEngagement.repostPending}
@@ -1071,6 +1077,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
                 reposters={row.reposters}
                 liked={repostEngagement.liked}
+                replied={repostEngagement.replied}
                 reposted={repostEngagement.reposted}
                 likePending={repostEngagement.likePending}
                 repostPending={repostEngagement.repostPending}
@@ -1102,6 +1109,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
           reposters={row.reposters}
           liked={repostEngagement.liked}
+          replied={repostEngagement.replied}
           reposted={repostEngagement.reposted}
           likePending={repostEngagement.likePending}
           repostPending={repostEngagement.repostPending}

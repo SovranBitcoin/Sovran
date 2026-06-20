@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { EventDeletion, Reaction, Repost } from 'nostr-tools/kinds';
 import { useShallow } from 'zustand/shallow';
 
@@ -15,6 +15,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 type EngagementState = {
   liked: boolean;
   reposted: boolean;
+  replied: boolean;
   likePending: boolean;
   repostPending: boolean;
   likePendingDirection?: 'activating' | 'deactivating';
@@ -25,80 +26,6 @@ export type EngagementViewState = EngagementState;
 
 const OPTIMISTIC_SETTLE_GRACE_MS = 15_000;
 const OPTIMISTIC_STALE_WARN_MS = 30_000;
-
-// ---------------------------------------------------------------------------
-// Shared Nostr-event tag helpers
-// ---------------------------------------------------------------------------
-
-function normalizeTags(input: unknown): string[][] {
-  if (!Array.isArray(input)) return [];
-  return input.filter(Array.isArray) as string[][];
-}
-
-function getFirstTagValue(tags: string[][], name: string): string | undefined {
-  const tag = tags.find((t) => t[0] === name && !!t[1]);
-  return tag?.[1];
-}
-
-// ---------------------------------------------------------------------------
-// Generic relay-engagement builder (deduplicates relayLikes / relayReposts)
-// ---------------------------------------------------------------------------
-
-interface RelayEngagement {
-  targetEventId: string;
-  engagementEventId: string;
-  createdAt: number;
-}
-
-/**
- * Builds a de-duplicated, most-recent-per-target list of relay engagements
- * (likes or reposts) from raw NDK subscription events, after filtering out
- * deletions of the specified `kind`.
- */
-function buildRelayEngagements(opts: {
-  rawEvents: any[] | undefined;
-  deletionEvents: any[] | undefined;
-  knownTargets: Map<string, FeedEvent>;
-  kind: number;
-  contentFilter?: (content: string) => boolean;
-}): RelayEngagement[] {
-  const { rawEvents, deletionEvents, knownTargets, kind, contentFilter } = opts;
-
-  const targetByEngagementId = new Map<string, string>();
-  for (const event of rawEvents || []) {
-    if (typeof event.id !== 'string') continue;
-    if (contentFilter && typeof event.content === 'string' && !contentFilter(event.content))
-      continue;
-    const tags = normalizeTags(event.tags);
-    const targetId = getFirstTagValue(tags, 'e');
-    if (!targetId || !knownTargets.has(targetId)) continue;
-    targetByEngagementId.set(event.id, targetId);
-  }
-
-  const deletedIds = new Set<string>();
-  for (const event of deletionEvents || []) {
-    const tags = normalizeTags(event.tags);
-    if (getFirstTagValue(tags, 'k') !== String(kind)) continue;
-    const eid = getFirstTagValue(tags, 'e');
-    if (eid) deletedIds.add(eid);
-  }
-
-  const latest = new Map<string, RelayEngagement>();
-  for (const event of rawEvents || []) {
-    if (typeof event.id !== 'string' || deletedIds.has(event.id)) continue;
-    const targetId = targetByEngagementId.get(event.id);
-    if (!targetId) continue;
-    const candidate: RelayEngagement = {
-      targetEventId: targetId,
-      engagementEventId: event.id,
-      createdAt: event.created_at || 0,
-    };
-    const prev = latest.get(targetId);
-    if (!prev || candidate.createdAt >= prev.createdAt) latest.set(targetId, candidate);
-  }
-
-  return Array.from(latest.values());
-}
 
 // ---------------------------------------------------------------------------
 // Generic toggle-engagement helper (deduplicates toggleLike / toggleRepost)
@@ -239,16 +166,24 @@ export function useNostrEngagement(
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
 
-  // State slices — grouped with useShallow to minimise re-subscriptions
-  const { likesByEventId, repostsByEventId, optimisticLikesByEventId, optimisticRepostsByEventId } =
-    useNostrSocialStore(
-      useShallow((s) => ({
-        likesByEventId: s.likesByEventId,
-        repostsByEventId: s.repostsByEventId,
-        optimisticLikesByEventId: s.optimisticLikesByEventId,
-        optimisticRepostsByEventId: s.optimisticRepostsByEventId,
-      }))
-    );
+  // State slices — grouped with useShallow to minimise re-subscriptions. The
+  // canonical maps are populated globally by useOwnEventsSync, so this hook only
+  // reads them (no per-screen relay subscription) and owns the optimistic toggle.
+  const {
+    likesByEventId,
+    repostsByEventId,
+    repliedByEventId,
+    optimisticLikesByEventId,
+    optimisticRepostsByEventId,
+  } = useNostrSocialStore(
+    useShallow((s) => ({
+      likesByEventId: s.likesByEventId,
+      repostsByEventId: s.repostsByEventId,
+      repliedByEventId: s.repliedByEventId,
+      optimisticLikesByEventId: s.optimisticLikesByEventId,
+      optimisticRepostsByEventId: s.optimisticRepostsByEventId,
+    }))
+  );
 
   const lastStaleWarningRef = useRef(0);
 
@@ -262,74 +197,7 @@ export function useNostrEngagement(
 
   const eventIds = useMemo(() => Array.from(eventsById.keys()), [eventsById]);
 
-  // ---- relay subscription filters ----
-
-  const reactionFilters = useMemo(() => {
-    if (!nostrKeys?.pubkey || eventIds.length === 0) return null;
-    return [{ authors: [nostrKeys.pubkey], kinds: [Reaction], '#e': eventIds, limit: 500 }];
-  }, [eventIds, nostrKeys?.pubkey]);
-
-  const repostFilters = useMemo(() => {
-    if (!nostrKeys?.pubkey || eventIds.length === 0) return null;
-    return [{ authors: [nostrKeys.pubkey], kinds: [Repost], '#e': eventIds, limit: 500 }];
-  }, [eventIds, nostrKeys?.pubkey]);
-
-  const deletionFilters = useMemo(() => {
-    if (!nostrKeys?.pubkey) return null;
-    return [{ authors: [nostrKeys.pubkey], kinds: [EventDeletion], '#k': ['6', '7'], limit: 500 }];
-  }, [nostrKeys?.pubkey]);
-
-  const { events: myReactionEvents } = useSubscribe({ filters: reactionFilters });
-  const { events: myRepostEvents } = useSubscribe({ filters: repostFilters });
-  const { events: myDeletionEvents } = useSubscribe({ filters: deletionFilters });
-
-  // ---- build relay engagements (unified) ----
-
-  const relayLikes = useMemo(
-    () =>
-      buildRelayEngagements({
-        rawEvents: myReactionEvents,
-        deletionEvents: myDeletionEvents,
-        knownTargets: eventsById,
-        kind: Reaction,
-        contentFilter: (c) => c === '+' || c === '',
-      }),
-    [eventsById, myDeletionEvents, myReactionEvents]
-  );
-
-  const relayReposts = useMemo(
-    () =>
-      buildRelayEngagements({
-        rawEvents: myRepostEvents,
-        deletionEvents: myDeletionEvents,
-        knownTargets: eventsById,
-        kind: Repost,
-      }),
-    [eventsById, myDeletionEvents, myRepostEvents]
-  );
-
-  // ---- sync relay data into store ----
-
-  useEffect(() => {
-    if (eventIds.length === 0) return;
-    const { syncLikesFromRelay, syncRepostsFromRelay } = useNostrSocialStore.getState();
-
-    const likesPayload = relayLikes.map((l) => ({
-      targetEventId: l.targetEventId,
-      reactionEventId: l.engagementEventId,
-      createdAt: l.createdAt,
-    }));
-    const repostsPayload = relayReposts.map((r) => ({
-      targetEventId: r.targetEventId,
-      repostEventId: r.engagementEventId,
-      createdAt: r.createdAt,
-    }));
-
-    syncLikesFromRelay(eventIds, likesPayload);
-    syncRepostsFromRelay(eventIds, repostsPayload);
-  }, [eventIds, relayLikes, relayReposts]);
-
-  // ---- settle optimistic entries when relay catches up ----
+  // ---- settle optimistic entries when the global sync catches up ----
 
   useEffect(() => {
     const { clearLikeOptimistic, clearRepostOptimistic } = useNostrSocialStore.getState();
@@ -387,6 +255,7 @@ export function useNostrEngagement(
     eventIds,
     likesByEventId,
     repostsByEventId,
+    repliedByEventId,
     optimisticLikesByEventId,
     optimisticRepostsByEventId,
   ]);
@@ -403,6 +272,7 @@ export function useNostrEngagement(
       return {
         liked: optLike ? optLike.value : baseLiked,
         reposted: optRepost ? optRepost.value : baseReposted,
+        replied: !!repliedByEventId[eventId],
         likePending: !!optLike?.pending,
         repostPending: !!optRepost?.pending,
         likePendingDirection: optLike?.pending
@@ -417,7 +287,13 @@ export function useNostrEngagement(
           : undefined,
       };
     },
-    [likesByEventId, optimisticLikesByEventId, optimisticRepostsByEventId, repostsByEventId]
+    [
+      likesByEventId,
+      repliedByEventId,
+      optimisticLikesByEventId,
+      optimisticRepostsByEventId,
+      repostsByEventId,
+    ]
   );
 
   const getDisplayMetrics = useCallback(

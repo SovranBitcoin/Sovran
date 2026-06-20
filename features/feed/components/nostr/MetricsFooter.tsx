@@ -7,6 +7,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { COMMENT_ACCENT } from '@/shared/lib/brandColors';
 import { openRepostMenu } from '@/features/feed/lib/repostMenu';
 import type { NoteMetrics } from './feedTypes';
 import { formatCount, formatSats } from './feedFormat';
@@ -66,6 +67,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   onLikePress,
   reposted = false,
   liked = false,
+  replied = false,
   repostPending = false,
   likePending = false,
   repostPendingDirection: _repostPendingDirection,
@@ -83,6 +85,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   onLikePress?: () => void;
   reposted?: boolean;
   liked?: boolean;
+  replied?: boolean;
   repostPending?: boolean;
   likePending?: boolean;
   repostPendingDirection?: 'activating' | 'deactivating';
@@ -91,6 +94,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   onActionPressOut?: () => void;
 }) {
   const repostedColor = useThemeColor('success');
+  const repliedColor = COMMENT_ACCENT;
   const iconColor = opacity(borderColor, alpha.disabled);
   const textColor = opacity(borderColor, alpha.disabled);
   const likedColor = '#ff5a7a';
@@ -118,14 +122,18 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           onPressIn={onActionPressIn}
           onPressOut={onActionPressOut}
           accessibilityRole="button"
-          accessibilityLabel={`Reply, ${metrics.replyCount} replies`}
+          accessibilityLabel={`${replied ? 'Replied' : 'Reply'}, ${metrics.replyCount} replies`}
           hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
-          <HStack align="center" gap={5}>
-            <Icon name="iconamoon:comment-fill" size={iconSizes.comment} color={iconColor} />
-            <Text size={textSize} style={{ color: textColor }}>
-              {formatCount(metrics.replyCount)}
-            </Text>
-          </HStack>
+          <AnimatedMetric
+            iconName="iconamoon:comment-fill"
+            iconSize={iconSizes.comment}
+            text={formatCount(metrics.replyCount)}
+            inactiveColor={textColor}
+            activeColor={repliedColor}
+            textSize={textSize}
+            isActive={replied}
+            pending={false}
+          />
         </Pressable>
         <Pressable
           onPress={handleRepostPress}
