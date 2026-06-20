@@ -1077,6 +1077,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
                 reposters={row.reposters}
                 liked={repostEngagement.liked}
+                replied={repostEngagement.replied}
                 reposted={repostEngagement.reposted}
                 likePending={repostEngagement.likePending}
                 repostPending={repostEngagement.repostPending}
@@ -1108,6 +1109,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
           reposters={row.reposters}
           liked={repostEngagement.liked}
+          replied={repostEngagement.replied}
           reposted={repostEngagement.reposted}
           likePending={repostEngagement.likePending}
           repostPending={repostEngagement.repostPending}
