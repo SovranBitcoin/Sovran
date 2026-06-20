@@ -3,10 +3,6 @@ import { mergeRelevantReplyNodes } from '../recipes/reply-graph';
 import type { NaggFeedEvent, NaggFeedPage, NaggNoteMetrics, NaggProfileInfo } from './feed';
 import { DEFAULT_NAGG_NOTE_METRICS, firstTagValue } from './feed';
 
-export type NaggGraphqlAggregate = {
-  rows?: Array<{ dimensions?: Record<string, string>; metrics?: Record<string, number> }>;
-};
-
 export type NaggGraphqlConnection<T> = {
   nodes?: T[];
   pageInfo?: { endCursor?: string | null; hasNextPage?: boolean };
@@ -33,11 +29,22 @@ export type NaggGraphqlEventNode = {
   allReplies?: NaggGraphqlConnection<NaggGraphqlEventNode>;
   replies?: NaggGraphqlConnection<NaggGraphqlEventNode>;
   childReplies?: NaggGraphqlConnection<NaggGraphqlEventNode>;
-  likes?: NaggGraphqlAggregate;
-  reposts?: NaggGraphqlAggregate;
-  replyStats?: NaggGraphqlAggregate;
-  zaps?: NaggGraphqlAggregate;
+  // Precomputed per-event engagement counts (the `noteStats` GraphQL field, read
+  // from nagg's rollup count tables). Replaces the four live aggregateReferencedBy
+  // selections the feed used to embed per node.
+  noteStats?: NaggGraphqlNoteStats;
   [key: string]: unknown;
+};
+
+export type NaggGraphqlNoteStats = {
+  likes?: number;
+  reposts?: number;
+  replies?: number;
+  zapSats?: number;
+  realLikes?: number;
+  realReposts?: number;
+  realReplies?: number;
+  realZapSats?: number;
 };
 
 export type GraphqlNodesToNaggPageOptions<TNode extends NaggGraphqlEventNode> = {
@@ -172,12 +179,17 @@ export function profileFromMetadataEvent(
 }
 
 export function metricsFromGraphqlNode(node: NaggGraphqlEventNode): NaggNoteMetrics {
+  const stats = node.noteStats;
   return {
-    likeCount: aggregateMetric(node.likes, 'pubkeys'),
-    repostCount: aggregateMetric(node.reposts, 'pubkeys'),
-    replyCount: aggregateMetric(node.replyStats, 'events'),
-    satsZapped: aggregateMetric(node.zaps, 'amountSats'),
+    likeCount: finiteCount(stats?.likes),
+    repostCount: finiteCount(stats?.reposts),
+    replyCount: finiteCount(stats?.replies),
+    satsZapped: finiteCount(stats?.zapSats),
   };
+}
+
+function finiteCount(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
 function replyGraphEventFromNode(node: NaggGraphqlEventNode | null | undefined) {
@@ -208,11 +220,6 @@ function hydrateConnection(
 
 function isFeedEvent(event: NaggFeedEvent | undefined): event is NaggFeedEvent {
   return !!event;
-}
-
-function aggregateMetric(aggregate: NaggGraphqlAggregate | undefined, key: string): number {
-  const value = aggregate?.rows?.[0]?.metrics?.[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
 function createdAtSeconds(value: string | number | Date): number {

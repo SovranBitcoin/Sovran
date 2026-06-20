@@ -310,10 +310,7 @@ describe('one parser, both transports (cross-fixture)', () => {
               content: 'root',
               tags: [],
               createdAt: 1_699_900_000,
-              likes: { rows: [{ metrics: { pubkeys: 0 } }] },
-              reposts: { rows: [{ metrics: { pubkeys: 0 } }] },
-              replyStats: { rows: [{ metrics: { events: 0 } }] },
-              zaps: { rows: [{ metrics: { amountSats: 0 } }] },
+              noteStats: { likes: 0, reposts: 0, replies: 0, zapSats: 0 },
             },
           ],
         },
@@ -327,10 +324,7 @@ describe('one parser, both transports (cross-fixture)', () => {
             createdAt: 1_699_000_000,
           },
         ],
-        likes: { rows: [{ metrics: { pubkeys: 3 } }] },
-        reposts: { rows: [{ metrics: { pubkeys: 1 } }] },
-        replyStats: { rows: [{ metrics: { events: 2 } }] },
-        zaps: { rows: [{ metrics: { amountSats: 100 } }] },
+        noteStats: { likes: 3, reposts: 1, replies: 2, zapSats: 100 },
       },
     ];
 

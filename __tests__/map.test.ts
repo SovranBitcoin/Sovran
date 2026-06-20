@@ -76,10 +76,7 @@ describe('GraphQL mapper', () => {
           createdAt: 99,
         },
       ],
-      likes: { rows: [{ metrics: { pubkeys: 2 } }] },
-      reposts: { rows: [{ metrics: { pubkeys: 1 } }] },
-      replyStats: { rows: [{ metrics: { events: 3 } }] },
-      zaps: { rows: [{ metrics: { amountSats: 4 } }] },
+      noteStats: { likes: 2, reposts: 1, replies: 3, zapSats: 4 },
     };
     const reply = {
       id: 'reply',
