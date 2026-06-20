@@ -132,6 +132,8 @@ describe('relay notifications — flat floor + ownership gate', () => {
     expect(out.tier).toBe('relay');
     expect(out.grouped).toBe(false);
     expect(out.notifications.map((n) => n.reason)).toEqual(['reaction', 'reply', 'zap']); // newest-first
+    // each carries the target event id (from #e) so the client groups them like nagg
+    expect(out.notifications.every((n) => n['targetEventId'] === MYEVENT)).toBe(true);
   });
 
   test('fail-closed: an engagement referencing an event I do NOT own is dropped', async () => {

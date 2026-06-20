@@ -124,7 +124,16 @@ export function demuxRelayNotifications(
     if (!reason) continue;
     if (!referencesViewer(event, viewerPubkey, own, reason)) continue;
     if (itemsById.has(event.id)) continue;
-    itemsById.set(event.id, { type: 'single', event, reason, actorVertexScore: 0 });
+    // Carry the referenced (target) event id so client-side grouping/dedup keys
+    // these the SAME way as the nagg tier (reason + target), not by the engagement id.
+    const targetEventId = event.tags.find((t) => t[0] === 'e')?.[1];
+    itemsById.set(event.id, {
+      type: 'single',
+      event,
+      reason,
+      actorVertexScore: 0,
+      ...(targetEventId ? { targetEventId } : {}),
+    });
     ordered.push(event);
   }
 
