@@ -51,8 +51,7 @@ import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useAppBalance } from '@/features/wallet';
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
 import { useSwapStatusListener } from '@/shared/hooks/useSwapStatusListener';
-import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { Metadata } from 'nostr-tools/kinds';
+import { useOwnEventsSync } from '@/shared/lib/nostr/ownsync/useOwnEventsSync';
 import PopupHost from '@/shared/blocks/popup/PopupHost';
 import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
 import { AndroidImageOverlayHost } from '@/features/feed/components/nostr/image-overlay/AndroidImageOverlayHost';
@@ -239,30 +238,14 @@ function ProfileBalanceSync() {
   return null;
 }
 
-/** Invisible component that syncs the active profile's Nostr kind-0 metadata to profileStore */
-function ProfileMetadataSync() {
-  const { keys: nostrKeys } = useNostrKeysContext();
-  const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
-
-  const filters = useMemo(
-    () => (nostrKeys?.pubkey ? [{ kinds: [Metadata], authors: [nostrKeys.pubkey], limit: 1 }] : []),
-    [nostrKeys?.pubkey]
-  );
-
-  const { events } = useSubscribe({ filters });
-
-  useEffect(() => {
-    if (!events?.length) return;
-    try {
-      const parsed = JSON.parse(events[0].content);
-      const displayName = parsed.display_name || parsed.name || undefined;
-      const picture = parsed.picture || undefined;
-      useProfileStore.getState().updateProfileMetadata(activeAccountIndex, displayName, picture);
-    } catch {
-      // Malformed kind-0 content — ignore
-    }
-  }, [events, activeAccountIndex]);
-
+/**
+ * Invisible component that runs the single own-events relay sync: hydrates the
+ * canonical own-state stores (profile, follows, likes, reposts, replies, own
+ * notes) so they're authoritative everywhere. Subsumes the former kind-0-only
+ * `ProfileMetadataSync`.
+ */
+function OwnEventsSync() {
+  useOwnEventsSync();
   return null;
 }
 
@@ -368,7 +351,7 @@ function RootLayoutContent() {
       <PaymentStatusListener />
       <SwapStatusListener />
       <ProfileBalanceSync />
-      <ProfileMetadataSync />
+      <OwnEventsSync />
       <StatusBar
         backgroundColor={background}
         style={currentTheme.includes('light') ? 'dark' : 'light'}

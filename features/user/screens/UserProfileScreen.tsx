@@ -47,7 +47,7 @@ import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { SendMessageMenu } from '@/features/user/components/SendMessageMenu';
-import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
 import { copyPopup, type CopyTarget, staticPopup, paramPopup } from '@/shared/lib/popup';
@@ -818,21 +818,11 @@ export function UserProfileScreen() {
   // entry is shared across surfaces and persists across launches.
   const { metadata: cachedProfile, isLoading: isMetadataLoading } = useNostrProfileMetadata(pubkey);
 
-  const contactListFilters = useMemo(
-    () =>
-      nostrKeys?.pubkey ? [{ authors: [nostrKeys.pubkey], kinds: [Contacts], limit: 20 }] : null,
-    [nostrKeys?.pubkey]
-  );
-  const { events: contactListEvents } = useSubscribe({ filters: contactListFilters });
-
   const contactsTags = useNostrSocialStore((state) => state.contactsTags);
   const contactsContent = useNostrSocialStore((state) => state.contactsContent);
   const setContactsFromRelay = useNostrSocialStore((state) => state.setContactsFromRelay);
   const setFollowOptimistic = useNostrSocialStore((state) => state.setFollowOptimistic);
   const clearFollowOptimistic = useNostrSocialStore((state) => state.clearFollowOptimistic);
-  const clearSettledFollowOptimistic = useNostrSocialStore(
-    (state) => state.clearSettledFollowOptimistic
-  );
   const followOptimisticEntry = useNostrSocialStore((state) =>
     pubkey ? state.optimisticFollowsByPubkey[pubkey] : undefined
   );
@@ -924,33 +914,8 @@ export function UserProfileScreen() {
       ? formatDate(profileData.created_at * 1000, 'long-date')
       : undefined;
 
-  const latestContactListEvent = useMemo(() => {
-    if (!nostrKeys?.pubkey) return null;
-    const candidates = (contactListEvents || []).filter(
-      (event) => event.kind === Contacts && event.pubkey === nostrKeys.pubkey
-    );
-    if (candidates.length === 0) return null;
-    return [...candidates].sort((a, b) => {
-      const byCreatedAt = (b.created_at || 0) - (a.created_at || 0);
-      if (byCreatedAt !== 0) return byCreatedAt;
-      return (b.id || '').localeCompare(a.id || '');
-    })[0];
-  }, [contactListEvents, nostrKeys?.pubkey]);
-
-  useEffect(() => {
-    if (!latestContactListEvent) return;
-    const tags = Array.isArray(latestContactListEvent.tags)
-      ? (latestContactListEvent.tags as string[][])
-      : [];
-    const content =
-      typeof latestContactListEvent.content === 'string' ? latestContactListEvent.content : '';
-    setContactsFromRelay({
-      tags,
-      content,
-      createdAt: latestContactListEvent.created_at || 0,
-    });
-    clearSettledFollowOptimistic();
-  }, [latestContactListEvent, setContactsFromRelay, clearSettledFollowOptimistic]);
+  // Our kind:3 contacts are synced globally by useOwnEventsSync (which also
+  // settles follow optimism); no per-screen contact subscription needed.
 
   // Displayed aggregation counts come from Vertex (nagg) everywhere for
   // consistency — both follower and following. On the own profile we fall back

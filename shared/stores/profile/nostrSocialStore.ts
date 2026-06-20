@@ -156,9 +156,7 @@ function capByRecency<V extends { updatedAt: number }>(
 ): Record<string, V> {
   const keys = Object.keys(map);
   if (keys.length <= max) return map;
-  const kept = keys
-    .sort((a, b) => map[b].updatedAt - map[a].updatedAt)
-    .slice(0, max);
+  const kept = keys.sort((a, b) => map[b].updatedAt - map[a].updatedAt).slice(0, max);
   const next: Record<string, V> = {};
   for (const key of kept) next[key] = map[key];
   return next;
@@ -233,15 +231,9 @@ const PersistedNostrSocialStore = z.object({
   contactsContent: z.string().max(65_536).default(''),
   contactsUpdatedAt: z.number().int().nonnegative().default(0),
   followingPubkeys: z.record(z.string().max(128), z.literal(true)).default({}),
-  likesByEventId: z
-    .record(z.string().max(128), PersistedReactionState)
-    .default({}),
-  repostsByEventId: z
-    .record(z.string().max(128), PersistedRepostState)
-    .default({}),
-  repliedByEventId: z
-    .record(z.string().max(128), PersistedRepliedState)
-    .default({}),
+  likesByEventId: z.record(z.string().max(128), PersistedReactionState).default({}),
+  repostsByEventId: z.record(z.string().max(128), PersistedRepostState).default({}),
+  repliedByEventId: z.record(z.string().max(128), PersistedRepliedState).default({}),
   deletedRepostOriginalIds: z
     .record(z.string().max(128), z.number().int().nonnegative())
     .default({}),
@@ -256,7 +248,7 @@ const PersistedNostrSocialStore = z.object({
 
 export const useNostrSocialStore = create<NostrSocialStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       ...INITIAL_STATE,
 
       // ---- contacts ----
