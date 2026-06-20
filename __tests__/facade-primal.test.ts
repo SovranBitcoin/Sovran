@@ -97,8 +97,24 @@ describe('Primal tier through the facade', () => {
 
   test('a spec Primal cannot serve is `unsupported`, not a failure', async () => {
     const tier = createPrimalTier({ connection: fakeConnection(BATCH) });
-    const outcome = await tier.feedPage!({ spec: { kind: 'following-popular', viewerPubkey: PUB } });
+    // following-recent has no Primal directive wired → falls through to the floor.
+    const outcome = await tier.feedPage!({ spec: { kind: 'following-recent', authors: [PUB] } });
     expect(outcome.kind).toBe('unsupported');
+  });
+
+  test('for-you maps to a valid Primal feed directive (global-trending)', async () => {
+    let captured: { verb: string; params: Record<string, unknown> } | undefined;
+    const tier = createPrimalTier({
+      connection: {
+        request: (req) => {
+          captured = req;
+          return Promise.resolve(ok(BATCH));
+        },
+      },
+    });
+    await tier.feedPage!({ spec: { kind: 'for-you', viewerPubkey: PUB } });
+    expect(captured?.verb).toBe('mega_feed_directive');
+    expect(JSON.parse(String(captured?.params.spec))).toMatchObject({ id: 'global-trending', kind: 'notes' });
   });
 });
 
