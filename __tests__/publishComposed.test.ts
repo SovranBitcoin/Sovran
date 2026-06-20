@@ -16,6 +16,7 @@ jest.mock(
       created_at = 0;
       tags: string[][] = [];
     },
+    normalizeRelayUrl: (url: string) => url,
     useNDK: () => ({ ndk: null }),
   }),
   { virtual: true }
@@ -39,16 +40,19 @@ import { okAsync, errAsync } from 'neverthrow';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 
 import { publishEvent } from '@/shared/lib/nostr/publish';
+import { resolveOutboxRelays } from '@/shared/lib/nostr/outbox/recipientRelays';
 import { publishComposed } from '@/features/composer/publish/useComposerActions';
 import type { ComposerBlock } from '@/features/composer/config/types';
 
 const mockPublishEvent = publishEvent as unknown as jest.Mock;
+const mockResolveOutbox = resolveOutboxRelays as unknown as jest.Mock;
 const signerNdk = { signer: {} } as unknown as NDK;
 const text = (t: string): ComposerBlock => ({ id: 'x', kind: 'text', text: t });
 
 beforeEach(() => {
   mockPublishEvent.mockReset();
   mockPublishEvent.mockReturnValue(okAsync({ accepted: [{ url: 'wss://write.example' }] }));
+  mockResolveOutbox.mockClear();
 });
 
 describe('publishComposed', () => {
@@ -84,16 +88,33 @@ describe('publishComposed', () => {
     });
     expect(out).toBe('ok');
     expect(mockPublishEvent).toHaveBeenCalledTimes(1);
-    const event = mockPublishEvent.mock.calls[0][0].event;
-    expect(event.kind).toBe(1);
-    expect(event.content).toBe('nice post');
-    expect(event.tags).toEqual(
+    const call = mockPublishEvent.mock.calls[0][0];
+    expect(call.event.kind).toBe(1);
+    expect(call.event.content).toBe('nice post');
+    expect(call.event.tags).toEqual(
       expect.arrayContaining([
         ['e', 'root1', '', 'root'],
         ['e', 'p1', '', 'reply'],
         ['p', 'pub1'],
       ])
     );
+    // Optimistic publish; the reply's mention is resolved off the critical path.
+    expect(call.resolveOn).toBe('optimistic');
+    expect(call.backgroundRelays).toBeInstanceOf(Promise);
+    expect(mockResolveOutbox).toHaveBeenCalledTimes(1);
+  });
+
+  it('publishes a top-level note to own relays without fetching recipient relays', async () => {
+    const out = await publishComposed(signerNdk, {
+      blocks: [text('gm')],
+      target: { mode: 'new' },
+    });
+    expect(out).toBe('ok');
+    const call = mockPublishEvent.mock.calls[0][0];
+    expect(call.resolveOn).toBe('optimistic');
+    expect(call.backgroundRelays).toBeUndefined();
+    expect(call.relays).toEqual(['wss://write.example']); // own write relays, resolved synchronously
+    expect(mockResolveOutbox).not.toHaveBeenCalled(); // no mentions → no network fetch
   });
 
   it('returns failed when the publish seam errors', async () => {

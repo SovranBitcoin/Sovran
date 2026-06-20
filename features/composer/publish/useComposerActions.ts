@@ -15,6 +15,7 @@ import { router } from 'expo-router';
 import { nostrLog } from '@/shared/lib/logger';
 import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
 import { resolveOutboxRelays } from '@/shared/lib/nostr/outbox/recipientRelays';
+import { resolveWriteRelays } from '@/shared/lib/nostr/outbox/resolveWriteRelays';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { buildPollEvent } from '@/features/feed/components/nostr/poll/buildPollEvents';
 import {
@@ -115,13 +116,20 @@ export async function publishComposed(ndk: NDK, draft: ComposedDraft): Promise<P
     return 'empty';
   }
 
-  const relayHint = getOwnWriteRelays()[0];
+  const ownWriteRelays = getOwnWriteRelays();
+  const relayHint = ownWriteRelays[0];
+  const hintRelays = relayHint ? [relayHint] : undefined;
   const mentionPubkeys = note.tags.filter((t) => t[0] === 'p').map((t) => t[1]);
-  const relays = await resolveOutboxRelays(ndk, {
-    ownWriteRelays: getOwnWriteRelays(),
-    mentionPubkeys,
-    hintRelays: relayHint ? [relayHint] : undefined,
-  });
+
+  // Base set = the author's own write relays, resolved synchronously (no
+  // network) so the optimistic publish can fire immediately.
+  const baseRelays = resolveWriteRelays({ ownWriteRelays, hintRelays });
+  // Recipient inbox relays need a network fetch (their NIP-65 lists); resolve
+  // them off the critical path and fold them into the background fan-out so
+  // mentions still reach their inboxes without the user waiting on the fetch.
+  const backgroundRelays = mentionPubkeys.length
+    ? resolveOutboxRelays(ndk, { ownWriteRelays, mentionPubkeys, hintRelays })
+    : undefined;
 
   const event = new NDKEvent(ndk);
   event.kind = note.kind;
@@ -129,7 +137,13 @@ export async function publishComposed(ndk: NDK, draft: ComposedDraft): Promise<P
   event.created_at = note.created_at;
   event.tags = note.tags;
 
-  const result = await publishEvent({ ndk, event, relays, resolveOn: 'all-settled' });
+  const result = await publishEvent({
+    ndk,
+    event,
+    relays: baseRelays,
+    backgroundRelays,
+    resolveOn: 'optimistic',
+  });
   if (result.isErr()) {
     nostrLog.warn('composer.publish_failed', { reason: result.error.type });
     return 'failed';

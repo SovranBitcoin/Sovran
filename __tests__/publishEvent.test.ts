@@ -12,7 +12,12 @@ jest.mock(
     __esModule: true,
     default: class NDK {},
     NDKEvent: class NDKEvent {},
-    NDKRelaySet: { fromRelayUrls: jest.fn() },
+    NDKRelaySet: {
+      // Resolve an explicit url set against the fake pool (mirrors NDK).
+      fromRelayUrls: jest.fn((urls: string[], ndk: { pool: { relays: Map<string, unknown> } }) => ({
+        relays: urls.map((u) => ndk.pool.relays.get(u)).filter(Boolean),
+      })),
+    },
     normalizeRelayUrl: (url: string) => url,
   }),
   { virtual: true }
@@ -180,5 +185,99 @@ describe('publishEvent', () => {
     });
 
     expect(seen).toEqual(expect.arrayContaining(['wss://a:true', 'wss://b:false']));
+  });
+});
+
+/** Drains background fan-out work (microtasks + zero-delay backoff timers). */
+const flushBackground = async (): Promise<void> => {
+  for (let i = 0; i < 20; i += 1) {
+    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+  }
+};
+
+describe('publishEvent optimistic mode', () => {
+  it('resolves ok on the first accept, then retries failed base relays in the background', async () => {
+    let badCalls = 0;
+    const good = relay('wss://good', accept);
+    const bad = relay('wss://bad', () => {
+      badCalls += 1;
+      return badCalls >= 2 ? Promise.resolve(true) : Promise.reject(new Error('temp'));
+    });
+    const ndk = fakeNdk([good, bad]);
+
+    const res = await publishEvent({
+      ndk,
+      event: signedEvent('opt1'),
+      relays: ['wss://good', 'wss://bad'],
+      resolveOn: 'optimistic',
+      retry: fastRetry,
+    });
+
+    expect(res.isOk()).toBe(true);
+    expect(res._unsafeUnwrap().anyAccepted).toBe(true);
+
+    await flushBackground();
+    expect(bad.publish).toHaveBeenCalledTimes(2); // failed round retried in the background
+  });
+
+  it('fails fast with no background retries when the first round accepts nowhere', async () => {
+    const bad = relay('wss://bad', reject('down'));
+    const ndk = fakeNdk([bad]);
+
+    const res = await publishEvent({
+      ndk,
+      event: signedEvent('opt2'),
+      relays: ['wss://bad'],
+      resolveOn: 'optimistic',
+      retry: fastRetry,
+    });
+
+    expect(res.isErr()).toBe(true);
+    expect(res._unsafeUnwrapErr().type).toBe('all-failed');
+
+    await flushBackground();
+    // No zombie retries: the user keeps the draft and may resubmit.
+    expect(bad.publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('fans out to background recipient relays once the post is assured', async () => {
+    const own = relay('wss://own', accept);
+    const recipient = relay('wss://recipient', accept);
+    const ndk = fakeNdk([own, recipient]);
+
+    const res = await publishEvent({
+      ndk,
+      event: signedEvent('opt3'),
+      relays: ['wss://own'],
+      backgroundRelays: Promise.resolve(['wss://recipient']),
+      resolveOn: 'optimistic',
+      retry: fastRetry,
+    });
+
+    expect(res.isOk()).toBe(true);
+    expect(own.publish).toHaveBeenCalledTimes(1);
+
+    await flushBackground();
+    expect(recipient.publish).toHaveBeenCalledTimes(1); // reached off the critical path
+  });
+
+  it('skips background recipient relays when the post failed', async () => {
+    const own = relay('wss://own', reject('down'));
+    const recipient = relay('wss://recipient', accept);
+    const ndk = fakeNdk([own, recipient]);
+
+    const res = await publishEvent({
+      ndk,
+      event: signedEvent('opt4'),
+      relays: ['wss://own'],
+      backgroundRelays: Promise.resolve(['wss://recipient']),
+      resolveOn: 'optimistic',
+      retry: fastRetry,
+    });
+
+    expect(res.isErr()).toBe(true);
+    await flushBackground();
+    expect(recipient.publish).not.toHaveBeenCalled();
   });
 });
