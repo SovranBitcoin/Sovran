@@ -1,22 +1,13 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { Metadata } from 'nostr-tools/kinds';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Kind0MetadataSchema,
   useCachedNostrProfile,
   useNostrMetadataCache,
   type NostrProfileMetadata,
 } from '@/shared/stores/global/nostrMetadataCache';
-import { nostrLog } from '@/shared/lib/logger';
+import { fetchProfilesViaFacade } from '@/shared/lib/nostr/fetchProfiles';
 
 const STALE_TTL_MS = 24 * 60 * 60 * 1000;
-
-// `useSubscribe` puts `opts` in its re-subscribe effect deps
-// (ndk-mobile/src/hooks/subscribe.ts). A fresh `{ closeOnEose: true }`
-// per render fails Object.is, the subscription tears down on EOSE,
-// `handleClosed` triggers a re-render, and we loop forever
-// ("Maximum update depth exceeded"). Module-level constant fixes it.
-const SUBSCRIBE_OPTS = { closeOnEose: true } as const;
 
 interface UseNostrProfileMetadataResult {
   metadata: NostrProfileMetadata | undefined;
@@ -26,36 +17,33 @@ interface UseNostrProfileMetadataResult {
 export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrProfileMetadataResult {
   const setProfile = useNostrMetadataCache((s) => s.setProfile);
   const { metadata, isStale, isMissing } = useCachedNostrProfile(pubkey ?? '');
+  const [isFetching, setIsFetching] = useState(false);
 
-  const filters = useMemo(() => {
-    if (!pubkey) return null;
-    if (!isMissing && !isStale) return null;
-    return [{ kinds: [Metadata], authors: [pubkey], limit: 1 }];
-  }, [pubkey, isMissing, isStale]);
+  // Once a pubkey is attempted we don't re-fetch it for this hook's lifetime,
+  // so a not-found profile (cache stays missing) can't loop the effect.
+  const attempted = useRef<Set<string>>(new Set());
+  const needsFetch = !!pubkey && (isMissing || isStale) && !attempted.current.has(pubkey);
 
-  const { events, eose } = useSubscribe({ filters, opts: SUBSCRIBE_OPTS });
-
-  // NDK hands back a fresh `events` array on every relay buffer flush.
-  // Without an event-id guard, we'd JSON.parse the same kind-0 ~50ms on
-  // every flush during EOSE traffic. Track the last id we processed.
-  const lastProcessedId = useRef<string | null>(null);
   useEffect(() => {
-    if (!pubkey || !events?.length) return;
-    const newest = events.reduce(
-      (best, e) => ((e.created_at ?? 0) > (best.created_at ?? 0) ? e : best),
-      events[0]
-    );
-    if (newest.id === lastProcessedId.current) return;
-    lastProcessedId.current = newest.id ?? null;
-    const parsed = parseRawMetadata(newest.content);
-    if (!parsed) {
-      nostrLog.warn('nostr.metadata.parse_failed', { pubkey: pubkey.slice(0, 8) });
-      return;
-    }
-    setProfile(pubkey, parsed);
-  }, [events, pubkey, setProfile]);
+    if (!pubkey || !needsFetch) return;
+    attempted.current.add(pubkey);
+    let cancelled = false;
+    setIsFetching(true);
+    void fetchProfilesViaFacade([pubkey])
+      .then((profiles) => {
+        if (cancelled) return;
+        const found = profiles[pubkey];
+        if (found) setProfile(pubkey, found);
+      })
+      .finally(() => {
+        if (!cancelled) setIsFetching(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pubkey, needsFetch, setProfile]);
 
-  const isLoading = isMissing && !eose;
+  const isLoading = isMissing && isFetching;
   return { metadata, isLoading };
 }
 
@@ -126,50 +114,42 @@ export function useNostrProfileMetadataMany(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stableKey, byPubkey]);
 
-  const filters = useMemo(() => {
-    if (pubkeys.length === 0) return null;
+  // Pubkeys missing or stale in the cache and not yet attempted this lifetime.
+  const attempted = useRef<Set<string>>(new Set());
+  const toFetch = useMemo(() => {
+    if (pubkeys.length === 0) return [];
     const now = Date.now();
-    const needsFetch: string[] = [];
+    const out: string[] = [];
     for (const pk of pubkeys) {
+      if (attempted.current.has(pk)) continue;
       const entry = byPubkey[pk];
-      if (!entry || now - entry.fetchedAt > STALE_TTL_MS) needsFetch.push(pk);
+      if (!entry || now - entry.fetchedAt > STALE_TTL_MS) out.push(pk);
     }
-    if (needsFetch.length === 0) return null;
-    return [{ kinds: [Metadata], authors: needsFetch }];
+    return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stableKey, byPubkey]);
 
-  const { events, eose } = useSubscribe({ filters });
-
-  // Track high-water-mark for processed events so a fresh `events`
-  // reference (NDK buffer flush) doesn't re-parse rows we've already
-  // committed to the cache. The store's `setProfile` short-circuits
-  // identical writes anyway but JSON.parse of the full batch is the
-  // cost we want to avoid here.
-  const processedCount = useRef(0);
+  const [isFetching, setIsFetching] = useState(false);
+  const toFetchKey = toFetch.join(',');
   useEffect(() => {
-    if (!events?.length) return;
-    if (events.length === processedCount.current) return;
-    processedCount.current = events.length;
+    if (toFetch.length === 0) return;
+    for (const pk of toFetch) attempted.current.add(pk);
+    let cancelled = false;
+    setIsFetching(true);
+    void fetchProfilesViaFacade(toFetch)
+      .then((profiles) => {
+        if (cancelled || Object.keys(profiles).length === 0) return;
+        setManyProfiles(profiles);
+      })
+      .finally(() => {
+        if (!cancelled) setIsFetching(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toFetchKey, setManyProfiles]);
 
-    const newestByPubkey = new Map<string, { content: string; created_at: number }>();
-    for (const e of events) {
-      const ts = e.created_at ?? 0;
-      const prev = newestByPubkey.get(e.pubkey);
-      if (!prev || ts > prev.created_at) {
-        newestByPubkey.set(e.pubkey, { content: e.content, created_at: ts });
-      }
-    }
-
-    const batch: Record<string, Omit<NostrProfileMetadata, 'fetchedAt'>> = {};
-    for (const [pk, { content }] of newestByPubkey) {
-      const parsed = parseRawMetadata(content);
-      if (parsed) batch[pk] = parsed;
-      else nostrLog.warn('nostr.metadata.parse_failed', { pubkey: pk.slice(0, 8) });
-    }
-    if (Object.keys(batch).length > 0) setManyProfiles(batch);
-  }, [events, setManyProfiles]);
-
-  const isLoading = filters !== null && !eose;
+  const isLoading = isFetching;
   return { metadata, isLoading };
 }
