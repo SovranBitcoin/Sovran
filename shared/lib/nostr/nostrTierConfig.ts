@@ -1,4 +1,5 @@
 import { backendConfig } from '@/shared/config/backend';
+import { log } from '@/shared/lib/logger';
 import { DEFAULT_RELAYS } from '@/shared/lib/nostr/outbox/defaults';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
@@ -22,11 +23,22 @@ export type NostrTierConfig = {
 
 export function getNostrTierConfig(): NostrTierConfig {
   const s = useSettingsStore.getState();
-  return {
+  const config: NostrTierConfig = {
     nagg: { enabled: s.naggTierEnabled, appViewBaseUrl: backendConfig.nostrAppViewBaseUrl },
     primal: { enabled: s.primalTierEnabled, url: backendConfig.primalCacheUrl },
     relay: { enabled: s.relayTierEnabled, relays: DEFAULT_RELAYS },
   };
+  log.info('nostr.tierConfig.resolved', {
+    enabled: [
+      config.nagg.enabled ? 'nagg' : null,
+      config.primal.enabled ? 'primal' : null,
+      config.relay.enabled ? 'relay' : null,
+    ].filter(Boolean),
+    naggUrl: config.nagg.appViewBaseUrl,
+    primalUrl: config.primal.url,
+    relays: config.relay.relays.length,
+  });
+  return config;
 }
 
 /** Reactive hook form for components that want to display tier state. */
