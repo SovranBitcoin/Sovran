@@ -3,6 +3,7 @@ export * from './thread';
 export * from './notifications';
 export * from './own-state';
 export * from './mint-reviews';
+export * from './social-graph';
 export * from './strategy';
 export * from './nagg-tier';
 export * from './placeholders';

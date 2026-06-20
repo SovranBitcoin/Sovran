@@ -22,6 +22,7 @@ import type {
   ResolvedDiscoveredMints,
   ResolvedMintReviews,
 } from './mint-reviews';
+import type { SocialGraph, SocialGraphRequest, ResolvedSocialGraph } from './social-graph';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -53,6 +54,9 @@ export interface NostrDataLayer {
   discoverMints(
     request: DiscoverMintsRequest,
   ): Promise<Result<ResolvedDiscoveredMints, TierResolutionError>>;
+  getSocialGraph(
+    request: SocialGraphRequest,
+  ): Promise<Result<ResolvedSocialGraph, TierResolutionError>>;
 }
 
 export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLayer {
@@ -107,6 +111,16 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
       );
       const resolved = await resolveAcrossTiers<DiscoveredMint[]>(candidates);
       return resolved.map(({ tier, value }) => ({ tier, mints: value }));
+    },
+
+    async getSocialGraph(request) {
+      const candidates = candidatesFor<SocialGraph>(
+        config.tiers,
+        'getSocialGraph',
+        (tier) => () => tier.getSocialGraph!(request),
+      );
+      const resolved = await resolveAcrossTiers<SocialGraph>(candidates);
+      return resolved.map(({ tier, value }) => ({ tier, ...value }));
     },
   };
 }

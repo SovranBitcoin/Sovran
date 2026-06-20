@@ -10,6 +10,7 @@ import type {
   MintReviewsRequest,
   MintReviewsSummary,
 } from './mint-reviews';
+import type { SocialGraph, SocialGraphRequest } from './social-graph';
 
 // ---------------------------------------------------------------------------
 // Tier strategy — one deep module per source, implementing the surfaces it can
@@ -31,4 +32,5 @@ export interface NostrTierStrategy {
   ownHistory?(request: OwnHistoryRequest): Promise<TierOutcome<OwnHistoryBundle>>;
   getMintReviews?(request: MintReviewsRequest): Promise<TierOutcome<MintReviewsSummary>>;
   discoverMints?(request: DiscoverMintsRequest): Promise<TierOutcome<DiscoveredMint[]>>;
+  getSocialGraph?(request: SocialGraphRequest): Promise<TierOutcome<SocialGraph>>;
 }

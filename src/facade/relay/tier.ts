@@ -13,6 +13,11 @@ import {
   type MintReviewsRequest,
   type MintReviewsSummary,
 } from '../mint-reviews';
+import {
+  socialGraphFromEvents,
+  type SocialGraph,
+  type SocialGraphRequest,
+} from '../social-graph';
 import { toFeedEvent } from '../event';
 import type { NaggFeedEvent } from '../../map/feed';
 import type { NostrTierStrategy } from '../strategy';
@@ -151,6 +156,23 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<DiscoveredMint[]>>(
         (events) => answered(discoverFromReviews(toFeedEvents(events))),
+        (error) => failed(error),
+      );
+    },
+
+    async getSocialGraph(request: SocialGraphRequest): Promise<TierOutcome<SocialGraph>> {
+      // The viewer's own replaceable lists; profiles are fetched separately (the
+      // app batches missing kind-0s), so the floor returns follows/relays/mutes.
+      const filter: NostrFilter = {
+        kinds: [3, 10_002, 10_000],
+        authors: [request.pubkey],
+      };
+      const result = await config.connection.request([filter], {
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<SocialGraph>>(
+        (events) => answered(socialGraphFromEvents(request.pubkey, toFeedEvents(events))),
         (error) => failed(error),
       );
     },

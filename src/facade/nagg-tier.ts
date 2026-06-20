@@ -31,6 +31,12 @@ import {
   type MintReviewsRequest,
   type MintReviewsSummary,
 } from './mint-reviews';
+import {
+  SocialGraphResponseSchema,
+  socialGraphFromResponse,
+  type SocialGraph,
+  type SocialGraphRequest,
+} from './social-graph';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -184,6 +190,24 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<DiscoveredMint[]>>(
         (page) => answered(page.mints),
+        (error) => failed(error),
+      );
+    },
+
+    async getSocialGraph(request: SocialGraphRequest): Promise<TierOutcome<SocialGraph>> {
+      // One bundled response: follows + each follow's profile + relay/mute lists.
+      const result = await client.rest<typeof SocialGraphResponseSchema>({
+        path: '/nostr/social-graph',
+        method: 'GET',
+        searchParams: { pubkey: request.pubkey },
+        responseSchema: SocialGraphResponseSchema,
+        operationName: 'SocialGraph',
+        refresh: request.refresh,
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<SocialGraph>>(
+        (data) => answered(socialGraphFromResponse(data)),
         (error) => failed(error),
       );
     },
