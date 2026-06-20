@@ -22,6 +22,7 @@ const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // package name → sibling directory, relative to the app root. Add a row when a
 // registry-versioned sibling should resolve to local source during dev.
 const SIBLINGS = [
+  { pkg: '@sovranbitcoin/schemas', dir: '../sovran-schemas' },
   { pkg: '@sovranbitcoin/colada', dir: '../colada' },
   { pkg: '@sovranbitcoin/nagg-ts', dir: '../nagg-ts' },
 ];
