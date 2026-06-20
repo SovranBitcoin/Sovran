@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { NostrCursor, NostrTier, OrderingManifest } from '@sovranbitcoin/schemas';
-import { OwnActionType } from '@sovranbitcoin/schemas';
+import type { OwnActionType } from '@sovranbitcoin/schemas';
 import type { NaggFeedEvent } from '../map/feed';
 import { NaggFeedEventSchema } from '../schemas';
 import { synthesizeRecencyManifest } from '../tiers';
