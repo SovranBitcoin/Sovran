@@ -9,6 +9,7 @@ import type {
 import type { NaggFeedEvent, NaggProfileInfo } from '../../map/feed';
 import { synthesizeRecencyManifest } from '../../tiers';
 import { toFeedEvent } from '../event';
+import { nostrLog } from '../../log';
 import type { FeedBundle, FeedItem } from '../feed';
 import type { ThreadBundle } from '../thread';
 import { bundleFromOwnEvents, ownActionKinds, type OwnHistoryBundle } from '../own-state';
@@ -110,6 +111,14 @@ function parsePrimalBatch(events: ReadonlyArray<RawPrimalEvent>): PrimalBatch {
 
 export function demuxPrimalFeed(events: ReadonlyArray<RawPrimalEvent>): FeedBundle {
   const batch = parsePrimalBatch(events);
+  nostrLog.debug('nostr.primal.demux.feed', {
+    rawEvents: events.length,
+    notes: batch.notesById.size,
+    profiles: Object.keys(batch.profiles).length,
+    stats: Object.keys(batch.stats).length,
+    actions: Object.keys(batch.actions).length,
+    serverManifest: !!batch.feedRange,
+  });
   const itemsById = new Map<string, FeedItem>();
   for (const [id, event] of batch.notesById) itemsById.set(id, { type: 'note', event });
 

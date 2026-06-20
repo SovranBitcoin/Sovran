@@ -6,6 +6,7 @@ import {
   type TierCandidate,
   type TierResolutionError,
 } from '../tiers';
+import { nostrLog, type NostrLogData } from '../log';
 import type { FeedBundle, FeedPageRequest, ResolvedFeedPage } from './feed';
 import type { ThreadBundle, ThreadRequest, ResolvedThread } from './thread';
 import type {
@@ -64,79 +65,137 @@ export interface NostrDataLayer {
 }
 
 export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLayer {
+  const tierNames = config.tiers.map((t) => t.tier);
+  nostrLog.info('nostr.facade.created', { tiers: tierNames });
+
   return {
     async getFeedPage(request) {
-      const candidates = candidatesFor(config.tiers, 'feedPage', (tier) => () => tier.feedPage!(request));
-      const resolved = await resolveAcrossTiers<FeedBundle>(candidates);
-      return resolved.map(({ tier, value }) => assembleFeedPage(tier, value));
+      return runRead(
+        'feed',
+        { spec: request.spec.kind, limit: request.limit ?? null, paged: !!request.cursor },
+        async () => {
+          const candidates = candidatesFor(config.tiers, 'feedPage', (t) => () => t.feedPage!(request));
+          return (await resolveAcrossTiers<FeedBundle>(candidates)).map(({ tier, value }) =>
+            assembleFeedPage(tier, value),
+          );
+        },
+        (p) => ({ items: p.items.length, missingIds: p.missingIds.length, hasActions: !!p.actions }),
+      );
     },
 
     async getThread(request) {
-      const candidates = candidatesFor(config.tiers, 'thread', (tier) => () => tier.thread!(request));
-      const resolved = await resolveAcrossTiers<ThreadBundle>(candidates);
-      return resolved.map(({ tier, value }) => assembleThread(tier, value));
+      return runRead(
+        'thread',
+        { noteId: short(request.noteId), sort: request.sort ?? 'relevant' },
+        async () => {
+          const candidates = candidatesFor(config.tiers, 'thread', (t) => () => t.thread!(request));
+          return (await resolveAcrossTiers<ThreadBundle>(candidates)).map(({ tier, value }) =>
+            assembleThread(tier, value),
+          );
+        },
+        (t) => ({ replies: t.replies.length, missingIds: t.missingIds.length }),
+      );
     },
 
     async getNotifications(request) {
-      const candidates = candidatesFor(
-        config.tiers,
+      return runRead(
         'notifications',
-        (tier) => () => tier.notifications!(request),
+        { tab: request.tab ?? 'ALL', grouped: request.grouped !== false, paged: !!request.cursor },
+        async () => {
+          const candidates = candidatesFor(config.tiers, 'notifications', (t) => () => t.notifications!(request));
+          return (await resolveAcrossTiers<NotificationsBundle>(candidates)).map(({ tier, value }) =>
+            assembleNotifications(tier, value),
+          );
+        },
+        (n) => ({ notifications: n.notifications.length, grouped: n.grouped }),
       );
-      const resolved = await resolveAcrossTiers<NotificationsBundle>(candidates);
-      return resolved.map(({ tier, value }) => assembleNotifications(tier, value));
     },
 
     async getOwnHistory(request) {
-      const candidates = candidatesFor(
-        config.tiers,
+      return runRead(
         'ownHistory',
-        (tier) => () => tier.ownHistory!(request),
+        { actionType: request.actionType, paged: !!request.cursor },
+        async () => {
+          const candidates = candidatesFor(config.tiers, 'ownHistory', (t) => () => t.ownHistory!(request));
+          return (await resolveAcrossTiers<OwnHistoryBundle>(candidates)).map(({ tier, value }) =>
+            assembleOwnHistory(tier, request.actionType, value),
+          );
+        },
+        (h) => ({ entries: h.entries.length }),
       );
-      const resolved = await resolveAcrossTiers<OwnHistoryBundle>(candidates);
-      return resolved.map(({ tier, value }) => assembleOwnHistory(tier, request.actionType, value));
     },
 
     async getMintReviews(request) {
-      const candidates = candidatesFor<MintReviewsSummary>(
-        config.tiers,
-        'getMintReviews',
-        (tier) => () => tier.getMintReviews!(request),
+      return runRead(
+        'mintReviews',
+        { mintUrl: request.mintUrl },
+        async () => {
+          const candidates = candidatesFor<MintReviewsSummary>(config.tiers, 'getMintReviews', (t) => () => t.getMintReviews!(request));
+          return (await resolveAcrossTiers<MintReviewsSummary>(candidates)).map(({ tier, value }) => ({ tier, ...value }));
+        },
+        (r) => ({ reviewCount: r.reviewCount, averageScore: r.averageScore }),
       );
-      const resolved = await resolveAcrossTiers<MintReviewsSummary>(candidates);
-      return resolved.map(({ tier, value }) => ({ tier, ...value }));
     },
 
     async discoverMints(request) {
-      const candidates = candidatesFor<DiscoveredMint[]>(
-        config.tiers,
+      return runRead(
         'discoverMints',
-        (tier) => () => tier.discoverMints!(request),
+        { limit: request.limit ?? null },
+        async () => {
+          const candidates = candidatesFor<DiscoveredMint[]>(config.tiers, 'discoverMints', (t) => () => t.discoverMints!(request));
+          return (await resolveAcrossTiers<DiscoveredMint[]>(candidates)).map(({ tier, value }) => ({ tier, mints: value }));
+        },
+        (r) => ({ mints: r.mints.length }),
       );
-      const resolved = await resolveAcrossTiers<DiscoveredMint[]>(candidates);
-      return resolved.map(({ tier, value }) => ({ tier, mints: value }));
     },
 
     async getSocialGraph(request) {
-      const candidates = candidatesFor<SocialGraph>(
-        config.tiers,
-        'getSocialGraph',
-        (tier) => () => tier.getSocialGraph!(request),
+      return runRead(
+        'socialGraph',
+        { pubkey: short(request.pubkey) },
+        async () => {
+          const candidates = candidatesFor<SocialGraph>(config.tiers, 'getSocialGraph', (t) => () => t.getSocialGraph!(request));
+          return (await resolveAcrossTiers<SocialGraph>(candidates)).map(({ tier, value }) => ({ tier, ...value }));
+        },
+        (g) => ({ follows: g.follows.length, profiles: Object.keys(g.profiles).length, mutes: g.mutes.length }),
       );
-      const resolved = await resolveAcrossTiers<SocialGraph>(candidates);
-      return resolved.map(({ tier, value }) => ({ tier, ...value }));
     },
 
     async getDmEnvelopes(request) {
-      const candidates = candidatesFor<DmEnvelopesBundle>(
-        config.tiers,
-        'getDmEnvelopes',
-        (tier) => () => tier.getDmEnvelopes!(request),
+      return runRead(
+        'dmEnvelopes',
+        { viewer: short(request.viewerPubkey), paged: !!request.cursor },
+        async () => {
+          const candidates = candidatesFor<DmEnvelopesBundle>(config.tiers, 'getDmEnvelopes', (t) => () => t.getDmEnvelopes!(request));
+          return (await resolveAcrossTiers<DmEnvelopesBundle>(candidates)).map(({ tier, value }) => ({ tier, envelopes: value.envelopes, cursor: value.cursor }));
+        },
+        (d) => ({ envelopes: d.envelopes.length }),
       );
-      const resolved = await resolveAcrossTiers<DmEnvelopesBundle>(candidates);
-      return resolved.map(({ tier, value }) => ({ tier, envelopes: value.envelopes, cursor: value.cursor }));
     },
   };
+}
+
+/** Log a read's request + outcome (answering tier + counts, or the exhaustion trail). */
+async function runRead<R extends { tier: NostrTier }>(
+  surface: string,
+  summary: NostrLogData,
+  run: () => Promise<Result<R, TierResolutionError>>,
+  describe: (resolved: R) => NostrLogData,
+): Promise<Result<R, TierResolutionError>> {
+  nostrLog.info(`nostr.read.${surface}.request`, summary);
+  const result = await run();
+  result.match(
+    (resolved) => nostrLog.info(`nostr.read.${surface}.done`, { tier: resolved.tier, ...describe(resolved) }),
+    (error) =>
+      nostrLog.warn(`nostr.read.${surface}.exhausted`, {
+        attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
+      }),
+  );
+  return result;
+}
+
+function short(id: string): string {
+  return id.length > 12 ? `${id.slice(0, 8)}…` : id;
 }
 
 /** Build the ordered candidate list from strategies that implement a surface. */

@@ -1,6 +1,7 @@
 import { ok, err, type Result } from 'neverthrow';
 import { DEFAULT_TIMEOUT_MS, type RequestControls } from '../../timeout';
 import type { NaggError } from '../../errors';
+import { nostrLog } from '../../log';
 
 // ---------------------------------------------------------------------------
 // Raw-relay pool protocol (tier 3, the floor)
@@ -86,11 +87,13 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
       }
 
       const quorum = Math.max(1, Math.min(config.eoseQuorum ?? Math.ceil(relays.length / 2), relays.length));
+      nostrLog.debug('nostr.relay.subscribe', { relays: relays.length, quorum, filters: filters.length });
 
       return new Promise<Result<RawRelayEvent[], NaggError>>((resolve) => {
         const subId = `sov-${++counter}`;
         const byId = new Map<string, RawRelayEvent>();
         const sockets: WebSocketLike[] = [];
+        const startedAt = Date.now();
         let eoseCount = 0;
         let closedCount = 0;
         let anyResponded = false;
@@ -114,9 +117,16 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
           }
           const events = [...byId.values()];
           if (events.length === 0 && !anyResponded) {
+            nostrLog.warn('nostr.relay.failed', { relays: relays.length, durationMs: Date.now() - startedAt });
             resolve(err({ type: 'network', message: 'all relays failed', cause: undefined }));
             return;
           }
+          nostrLog.debug('nostr.relay.resolved', {
+            events: events.length,
+            eoseCount,
+            quorum,
+            durationMs: Date.now() - startedAt,
+          });
           resolve(ok(events));
         }
 

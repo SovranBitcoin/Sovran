@@ -10,6 +10,7 @@ import {
 import { forYouRankedEventsInput, followingPopularRankedEventsInput } from '../recipes/feed';
 import type { NaggFeedPage } from '../map/feed';
 import { answered, failed, type TierOutcome } from '../tiers';
+import { nostrLog } from '../log';
 import {
   bundleFromFeedPage,
   type FeedBundle,
@@ -78,6 +79,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
     tier: 'nagg',
     async feedPage(request: FeedPageRequest): Promise<TierOutcome<FeedBundle>> {
       const binding = feedBindingForSpec(request);
+      nostrLog.debug('nostr.nagg.feed', { path: binding.path, spec: request.spec.kind });
       const result = await client.rest<typeof NaggFeedPageSchema>({
         path: binding.path,
         method: binding.method ?? 'POST',
@@ -97,6 +99,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
 
     async thread(request: ThreadRequest): Promise<TierOutcome<ThreadBundle>> {
       const binding = threadAppView({ id: request.noteId, limit: request.limit });
+      nostrLog.debug('nostr.nagg.thread', { path: binding.path });
       const result = await client.rest<typeof NaggThreadSchema>({
         path: binding.path,
         method: binding.method ?? 'GET',
@@ -125,6 +128,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
         limit: request.limit,
         grouped,
       });
+      nostrLog.debug('nostr.nagg.notifications', { path: binding.path, grouped });
       const result = await client.rest<typeof NaggNotificationsPageSchema>({
         path: binding.path,
         method: binding.method ?? 'GET',
@@ -144,6 +148,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
     async ownHistory(request: OwnHistoryRequest): Promise<TierOutcome<OwnHistoryBundle>> {
       // nagg is the only tier that fully covers own-state (it stores reactions/
       // reposts/zaps). One paginated endpoint per action type, cursor = until+id.
+      nostrLog.debug('nostr.nagg.ownHistory', { actionType: request.actionType });
       const result = await client.rest<typeof OwnHistoryResponseSchema>({
         path: `/nostr/own/${request.actionType}`,
         method: 'GET',
@@ -167,6 +172,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
 
     async getMintReviews(request: MintReviewsRequest): Promise<TierOutcome<MintReviewsSummary>> {
       // Server-side per-mint aggregate (GroupBy:["u"]) — kills the per-result N+1.
+      nostrLog.debug('nostr.nagg.mintReviews', { mintUrl: request.mintUrl });
       const result = await client.rest<typeof MintReviewsResponseSchema>({
         path: '/nostr/mint/reviews',
         method: 'GET',
@@ -190,6 +196,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
     },
 
     async discoverMints(request: DiscoverMintsRequest): Promise<TierOutcome<DiscoveredMint[]>> {
+      nostrLog.debug('nostr.nagg.discoverMints', { limit: request.limit ?? null });
       const result = await client.rest<typeof DiscoverMintsResponseSchema>({
         path: '/nostr/mint/discover',
         method: 'GET',
@@ -211,6 +218,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
 
     async getSocialGraph(request: SocialGraphRequest): Promise<TierOutcome<SocialGraph>> {
       // One bundled response: follows + each follow's profile + relay/mute lists.
+      nostrLog.debug('nostr.nagg.socialGraph', { pubkey: request.pubkey.slice(0, 8) });
       const result = await client.rest<typeof SocialGraphResponseSchema>({
         path: '/nostr/social-graph',
         method: 'GET',
@@ -236,6 +244,7 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
         until: request.cursor?.createdAt,
         limit: request.limit,
       });
+      nostrLog.debug('nostr.nagg.dmEnvelopes', { path: binding.path });
       const result = await client.rest<typeof NaggDmEnvelopesDataSchema>({
         path: binding.path,
         method: binding.method ?? 'GET',

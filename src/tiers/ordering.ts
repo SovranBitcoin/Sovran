@@ -1,4 +1,5 @@
 import type { OrderingManifest } from '@sovranbitcoin/schemas';
+import { nostrLog } from '../log';
 
 // ---------------------------------------------------------------------------
 // Ordering-manifest applier
@@ -30,6 +31,7 @@ export function applyOrderingManifest<T>(
   const lookup = bundle instanceof Map ? bundle : new Map(Object.entries(bundle));
   const ordered: T[] = [];
   const seen = new Set<string>();
+  let missing = 0;
 
   for (const id of manifest.elements) {
     // Defend against a duplicate id in the manifest — render each at most once.
@@ -38,12 +40,19 @@ export function applyOrderingManifest<T>(
 
     const item = lookup.get(id);
     if (item === undefined) {
+      missing += 1;
       options.onMissing?.(id);
       continue;
     }
     ordered.push(item);
   }
 
+  nostrLog.debug('nostr.ordering.applied', {
+    orderBy: manifest.orderBy,
+    elements: manifest.elements.length,
+    rendered: ordered.length,
+    missing,
+  });
   return ordered;
 }
 

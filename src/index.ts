@@ -1,5 +1,6 @@
 export * from './capabilities';
 export * from './errors';
+export * from './log';
 export * from './schemas';
 export * as map from './map';
 export * from './timeout';

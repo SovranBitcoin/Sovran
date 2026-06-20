@@ -1,5 +1,6 @@
 import type { NaggFeedEvent, NaggProfileInfo } from '../../map/feed';
 import { synthesizeRecencyManifest } from '../../tiers';
+import { nostrLog } from '../../log';
 import { toFeedEvent } from '../event';
 import type { FeedBundle, FeedItem } from '../feed';
 import type { ThreadBundle } from '../thread';
@@ -46,6 +47,11 @@ function parseRelayBatch(events: ReadonlyArray<RawRelayEvent>): RelayBatch {
 
 export function demuxRelayFeed(events: ReadonlyArray<RawRelayEvent>): FeedBundle {
   const { notesById, profiles } = parseRelayBatch(events);
+  nostrLog.debug('nostr.relay.demux.feed', {
+    rawEvents: events.length,
+    notes: notesById.size,
+    profiles: Object.keys(profiles).length,
+  });
   const itemsById = new Map<string, FeedItem>();
   for (const [id, event] of notesById) itemsById.set(id, { type: 'note', event });
 

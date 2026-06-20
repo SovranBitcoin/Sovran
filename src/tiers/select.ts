@@ -1,4 +1,5 @@
 import { ok, err, type Result } from 'neverthrow';
+import { nostrLog } from '../log';
 import type {
   TierCandidate,
   TierResolution,
@@ -25,21 +26,36 @@ export async function resolveAcrossTiers<T>(
   candidates: ReadonlyArray<TierCandidate<T>>,
 ): Promise<Result<TierResolution<T>, TierResolutionError>> {
   const attempts: TierAttemptLog[] = [];
+  nostrLog.debug('nostr.tier.select.start', { tiers: candidates.map((c) => c.tier) });
 
   for (const candidate of candidates) {
+    nostrLog.debug('nostr.tier.try', { tier: candidate.tier });
+    const startedAt = Date.now();
     const outcome = await candidate.attempt();
+    const durationMs = Date.now() - startedAt;
     switch (outcome.kind) {
       case 'answered':
+        nostrLog.info('nostr.tier.answered', { tier: candidate.tier, durationMs });
         return ok({ tier: candidate.tier, value: outcome.value });
       case 'unsupported':
+        nostrLog.debug('nostr.tier.unsupported', { tier: candidate.tier, durationMs });
         attempts.push({ tier: candidate.tier, outcome: 'unsupported' });
         continue;
       case 'failed':
+        nostrLog.warn('nostr.tier.failed', {
+          tier: candidate.tier,
+          durationMs,
+          errorType: outcome.error.type,
+          message: outcome.error.message,
+        });
         attempts.push({ tier: candidate.tier, outcome: 'failed', error: outcome.error });
         continue;
     }
   }
 
+  nostrLog.warn('nostr.tier.exhausted', {
+    attempts: attempts.map((a) => `${a.tier}=${a.outcome}`),
+  });
   return err({
     type: 'all_tiers_exhausted',
     message:

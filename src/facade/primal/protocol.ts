@@ -1,6 +1,7 @@
 import { ok, err, type Result } from 'neverthrow';
 import { DEFAULT_TIMEOUT_MS, type RequestControls } from '../../timeout';
 import type { NaggError } from '../../errors';
+import { nostrLog } from '../../log';
 
 // ---------------------------------------------------------------------------
 // Primal cache wire protocol
@@ -102,6 +103,8 @@ export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): 
         const subId = `sov-${++counter}`;
         const events: RawPrimalEvent[] = [];
         let settled = false;
+        const startedAt = Date.now();
+        nostrLog.debug('nostr.primal.connect', { url: config.url, verb: request.verb, subId });
         const socket = new Ctor(config.url);
 
         const timeoutMs = controls?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -114,6 +117,12 @@ export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): 
           if (settled) return;
           settled = true;
           clearTimeout(timer);
+          nostrLog.debug('nostr.primal.finish', {
+            subId,
+            ok: result.isOk(),
+            events: events.length,
+            durationMs: Date.now() - startedAt,
+          });
           try {
             socket.close();
           } catch {
@@ -127,6 +136,7 @@ export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): 
         );
 
         socket.onopen = () => {
+          nostrLog.debug('nostr.primal.req', { subId, verb: request.verb });
           socket.send(JSON.stringify(['REQ', subId, { cache: [request.verb, request.params] }]));
         };
 
@@ -136,12 +146,15 @@ export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): 
           if (message[0] === 'EVENT' && message[2] && typeof message[2] === 'object') {
             events.push(message[2] as RawPrimalEvent);
           } else if (message[0] === 'EOSE') {
+            nostrLog.debug('nostr.primal.eose', { subId, events: events.length });
             finish(ok(events));
           }
         };
 
-        socket.onerror = () =>
+        socket.onerror = () => {
+          nostrLog.warn('nostr.primal.error', { subId, url: config.url });
           finish(err({ type: 'network', message: 'Primal socket error', cause: undefined }));
+        };
 
         socket.onclose = () => {
           // Reaching here means EOSE never fired (EOSE calls finish first). A close
