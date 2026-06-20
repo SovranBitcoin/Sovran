@@ -2,6 +2,7 @@ import { answered, failed, unsupported, type TierOutcome } from '../../tiers';
 import type { FeedBundle, FeedPageRequest, FeedSpec } from '../feed';
 import type { ThreadBundle, ThreadRequest } from '../thread';
 import type { OwnHistoryBundle, OwnHistoryRequest } from '../own-state';
+import { profilesFromKind0, type ProfilesBundle, type ProfilesRequest } from '../profiles';
 import type { NostrTierStrategy } from '../strategy';
 import { demuxPrimalFeed, demuxPrimalThread, demuxPrimalOwnHistory } from './demux';
 import type { PrimalCacheRequest, PrimalConnection } from './protocol';
@@ -91,6 +92,18 @@ export function createPrimalTier(config: PrimalTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<OwnHistoryBundle>>(
         (events) => answered(demuxPrimalOwnHistory(events, request.actionType)),
+        (error) => failed(error),
+      );
+    },
+
+    async getProfiles(request: ProfilesRequest): Promise<TierOutcome<ProfilesBundle>> {
+      if (request.pubkeys.length === 0) return answered({ profiles: {} });
+      const result = await config.connection.request(
+        { verb: 'user_infos', params: { pubkeys: request.pubkeys } },
+        { signal: request.signal, timeoutMs: request.timeoutMs },
+      );
+      return result.match<TierOutcome<ProfilesBundle>>(
+        (events) => answered({ profiles: profilesFromKind0(events) }),
         (error) => failed(error),
       );
     },

@@ -12,6 +12,7 @@ import type {
 } from './mint-reviews';
 import type { SocialGraph, SocialGraphRequest } from './social-graph';
 import type { DmEnvelopesBundle, DmEnvelopesRequest } from './dm';
+import type { ProfilesBundle, ProfilesRequest } from './profiles';
 
 // ---------------------------------------------------------------------------
 // Tier strategy — one deep module per source, implementing the surfaces it can
@@ -35,4 +36,5 @@ export interface NostrTierStrategy {
   discoverMints?(request: DiscoverMintsRequest): Promise<TierOutcome<DiscoveredMint[]>>;
   getSocialGraph?(request: SocialGraphRequest): Promise<TierOutcome<SocialGraph>>;
   getDmEnvelopes?(request: DmEnvelopesRequest): Promise<TierOutcome<DmEnvelopesBundle>>;
+  getProfiles?(request: ProfilesRequest): Promise<TierOutcome<ProfilesBundle>>;
 }

@@ -25,6 +25,7 @@ import {
   type DmEnvelopesBundle,
   type DmEnvelopesRequest,
 } from '../dm';
+import { profilesFromKind0, type ProfilesBundle, type ProfilesRequest } from '../profiles';
 import { toFeedEvent } from '../event';
 import type { NaggFeedEvent } from '../../map/feed';
 import type { NostrTierStrategy } from '../strategy';
@@ -227,6 +228,19 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
           // Relay can't paginate gift wraps by arrival → no cursor.
           return answered({ envelopes, cursor: null });
         },
+        (error) => failed(error),
+      );
+    },
+
+    async getProfiles(request: ProfilesRequest): Promise<TierOutcome<ProfilesBundle>> {
+      if (request.pubkeys.length === 0) return answered({ profiles: {} });
+      const filter: NostrFilter = { kinds: [0], authors: request.pubkeys };
+      const result = await config.connection.request([filter], {
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<ProfilesBundle>>(
+        (events) => answered({ profiles: profilesFromKind0(events) }),
         (error) => failed(error),
       );
     },

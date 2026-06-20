@@ -25,6 +25,7 @@ import type {
 } from './mint-reviews';
 import type { SocialGraph, SocialGraphRequest, ResolvedSocialGraph } from './social-graph';
 import type { DmEnvelopesBundle, DmEnvelopesRequest, ResolvedDmEnvelopes } from './dm';
+import type { ProfilesBundle, ProfilesRequest, ResolvedProfiles } from './profiles';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -62,6 +63,7 @@ export interface NostrDataLayer {
   getDmEnvelopes(
     request: DmEnvelopesRequest,
   ): Promise<Result<ResolvedDmEnvelopes, TierResolutionError>>;
+  getProfiles(request: ProfilesRequest): Promise<Result<ResolvedProfiles, TierResolutionError>>;
 }
 
 export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLayer {
@@ -170,6 +172,18 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
           return (await resolveAcrossTiers<DmEnvelopesBundle>(candidates)).map(({ tier, value }) => ({ tier, envelopes: value.envelopes, cursor: value.cursor }));
         },
         (d) => ({ envelopes: d.envelopes.length }),
+      );
+    },
+
+    async getProfiles(request) {
+      return runRead(
+        'profiles',
+        { pubkeys: request.pubkeys.length },
+        async () => {
+          const candidates = candidatesFor<ProfilesBundle>(config.tiers, 'getProfiles', (t) => () => t.getProfiles!(request));
+          return (await resolveAcrossTiers<ProfilesBundle>(candidates)).map(({ tier, value }) => ({ tier, profiles: value.profiles }));
+        },
+        (r) => ({ profiles: Object.keys(r.profiles).length }),
       );
     },
   };

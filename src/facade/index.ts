@@ -5,6 +5,7 @@ export * from './own-state';
 export * from './mint-reviews';
 export * from './social-graph';
 export * from './dm';
+export * from './profiles';
 export * from './strategy';
 export * from './nagg-tier';
 export * from './placeholders';
