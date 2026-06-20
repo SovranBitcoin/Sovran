@@ -63,6 +63,7 @@ import type {
 } from './feedClient';
 import { emptyFeedParseResult } from './feedClient';
 import { ingestOwnContent } from '@/shared/stores/profile/ownContentStore';
+import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 import { hasEmptyExplicitPubkeys, hydrateSpecWithPubkey } from './feedSpec';
 import { parseJson } from '../components/nostr/feedParse';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
@@ -1484,6 +1485,24 @@ function ownNoteCandidatesFromFeed(result: FeedParseResult): FeedEvent[] {
   return events;
 }
 
+/**
+ * Low-confidence-seed a feed page's inline (nagg) profiles into the single
+ * metadata cache. nagg's ProfileInfo is minimal ({ name, picture }); the seed
+ * fills gaps only and never clobbers the richer relay kind-0 the cache holds,
+ * and marks new entries immediately stale so a real kind-0 fetch still runs.
+ */
+function seedFeedProfilesIntoCache(profilesMap: Map<string, ProfileInfo>): void {
+  if (profilesMap.size === 0) return;
+  const entries: Record<string, { name?: string; picture?: string }> = {};
+  for (const [pubkey, profile] of profilesMap) {
+    entries[pubkey] = {
+      ...(profile.name ? { name: profile.name } : {}),
+      ...(profile.picture ? { picture: profile.picture } : {}),
+    };
+  }
+  useNostrMetadataCache.getState().seedManyProfilesLowConfidence(entries);
+}
+
 function compareNotificationsNewestFirst(
   left: FeedNotificationsResult['notifications'][number],
   right: FeedNotificationsResult['notifications'][number]
@@ -1703,6 +1722,9 @@ export function createNaggFeedClient(): FeedClient {
       const logResult = (source: string, result: FeedParseResult): FeedParseResult => {
         // Passive convergence: settle any of our own notes this page surfaced.
         ingestOwnContent(ownNoteCandidatesFromFeed(result), userPubkey);
+        // Single profile cache: low-confidence-seed this page's inline (nagg)
+        // profiles so they're not an ephemeral map the relay layer re-fetches.
+        seedFeedProfilesIntoCache(result.profilesMap);
         return logFeedPageResult(source, result, {
           limit,
           until,

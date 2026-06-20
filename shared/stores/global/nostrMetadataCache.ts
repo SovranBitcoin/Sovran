@@ -90,14 +90,22 @@ interface NostrMetadataCacheState {
   setManyProfiles: (entries: Record<string, MetadataPartial>) => void;
 
   /**
-   * Low-confidence bulk seed for server-side search / recommendation
-   * responses. Two invariants vs `setManyProfiles`:
-   *   - Never overwrites existing fields — relay-sourced kind-0 always
-   *     wins because it's authoritative.
-   *   - New entries get `fetchedAt: 0` so the next consumer treats them
-   *     as immediately stale and triggers a real kind-0 fetch. The
-   *     search snapshot is a first-paint hint, not a substitute.
+   * Low-confidence bulk seed (pubkey → partial metadata). Two invariants vs
+   * `setManyProfiles`:
+   *   - Never overwrites existing fields — relay-sourced kind-0 always wins
+   *     because it's authoritative; only fills gaps.
+   *   - New entries get `fetchedAt: 0` so the next consumer treats them as
+   *     immediately stale and triggers a real kind-0 fetch. The seed is a
+   *     first-paint hint, not a substitute.
+   *
+   * Fed by any non-authoritative source — server search/recommendation
+   * snapshots AND the nagg feed's inline profiles — so the metadata cache is
+   * the SINGLE profile store instead of nagg profiles being a separate
+   * ephemeral map that the relay layer then re-fetches.
    */
+  seedManyProfilesLowConfidence: (entries: Record<string, MetadataPartial>) => void;
+
+  /** Convenience over {@link seedManyProfilesLowConfidence} for search results. */
   seedFromSearchResults: (results: SearchResultLike[]) => void;
 
   removeProfile: (pubkey: string) => void;
@@ -146,7 +154,7 @@ const PersistedNostrMetadataCache = z.object({
 
 export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       byPubkey: {},
 
       setProfile: (pubkey, metadata) => {
@@ -180,33 +188,39 @@ export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
         });
       },
 
-      seedFromSearchResults: (results) => {
+      seedManyProfilesLowConfidence: (entries) => {
         set((state) => {
           const next = { ...state.byPubkey };
           let changed = 0;
           let inserted = 0;
-          for (const r of results) {
-            if (!r.pubkey) continue;
-            const existing = next[r.pubkey];
+          for (const [pubkey, profile] of Object.entries(entries)) {
+            if (!pubkey) continue;
+            const existing = next[pubkey];
             if (existing) {
-              const filled = fillMissing(existing, r.profile);
+              const filled = fillMissing(existing, profile);
               if (!fieldsEqual(filled, existing)) {
-                next[r.pubkey] = { ...filled, fetchedAt: existing.fetchedAt };
+                next[pubkey] = { ...filled, fetchedAt: existing.fetchedAt };
                 changed++;
               }
             } else {
-              next[r.pubkey] = { ...r.profile, fetchedAt: 0 };
+              next[pubkey] = { ...profile, fetchedAt: 0 };
               inserted++;
             }
           }
           if (changed === 0 && inserted === 0) return state;
           evictIfOverCap(next);
-          storeLog.debug('store.nostr_metadata.seeded_from_search', {
+          storeLog.debug('store.nostr_metadata.seeded_low_confidence', {
             inserted,
             filled: changed,
           });
           return { byPubkey: next };
         });
+      },
+
+      seedFromSearchResults: (results) => {
+        const entries: Record<string, MetadataPartial> = {};
+        for (const r of results) if (r.pubkey) entries[r.pubkey] = r.profile;
+        get().seedManyProfilesLowConfidence(entries);
       },
 
       removeProfile: (pubkey) => {
