@@ -78,6 +78,22 @@ const slideFromRight = (name: string, presentation: 'modal' | 'card' = 'card'): 
 });
 
 /**
+ * Slide from bottom: full-screen modal that rises vertically on both iOS and
+ * Android. For self-contained screens that draw their own chrome (header,
+ * safe-area insets) and want the keyboard to animate up from the bottom rather
+ * than be dragged in alongside a horizontal slide. The screen owns its
+ * background, so no contentStyle is set here.
+ */
+const slideFromBottom = (name: string): ModalConfig => ({
+  name,
+  options: {
+    presentation: 'fullScreenModal',
+    headerShown: false,
+    animation: 'slide_from_bottom',
+  },
+});
+
+/**
  * Standalone single-screen modal. iOS: pageSheet/formSheet with material blur
  * header (unchanged). Android: native bottom sheet (see ANDROID_SHEET_OPTIONS).
  */
@@ -156,6 +172,7 @@ const flowGroups = [
 
 const standaloneScreens: ModalConfig[] = [
   card('userMessages'),
+  slideFromBottom('composer'),
   slideFromRight('(settings-flow)'),
   slideFromRight('(signer-flow)'),
   slideFromRight('(user-flow)'),

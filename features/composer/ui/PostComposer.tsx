@@ -7,7 +7,7 @@
  * `ComposeConfig`; the char meter enforces the relay-sourced budget; send goes
  * through the outbox-aware publish seam.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -21,7 +21,9 @@ import {
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
+import type { ParamListBase } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Button } from 'heroui-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -94,6 +96,30 @@ export function PostComposer() {
   const publish = usePublishNote();
 
   const insets = useSafeAreaInsets();
+  // Focus the input only once the present transition has settled. Focusing
+  // during the slide-up (as `autoFocus` did) makes the keyboard appear to arrive
+  // with the screen — on Android it reads as sliding in from the side. Waiting
+  // for `transitionEnd` lets the keyboard rise from the bottom on its own. A
+  // timed fallback covers the reduced-motion / no-animation case where the event
+  // may not fire.
+  const inputRef = useRef<TextInput>(null);
+  const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
+  useEffect(() => {
+    let done = false;
+    const focusInput = () => {
+      if (done) return;
+      done = true;
+      inputRef.current?.focus();
+    };
+    const unsubscribe = navigation.addListener('transitionEnd', (e) => {
+      if (!e.data.closing) focusInput();
+    });
+    const fallback = setTimeout(focusInput, 500);
+    return () => {
+      unsubscribe();
+      clearTimeout(fallback);
+    };
+  }, [navigation]);
   // Keyboard-aware toolbar inset: when the keyboard is up the toolbar already
   // sits flush on the keyboard top, so the home-indicator inset would be dead
   // space below it. Collapse it while typing.
@@ -333,12 +359,12 @@ export function PostComposer() {
               </View>
             ) : null}
             <TextInput
+              ref={inputRef}
               value={textBlock?.kind === 'text' ? textBlock.text : ''}
               onChangeText={(text) => textBlock && setBlockText(textBlock.id, text)}
               placeholder={PLACEHOLDER[target?.mode ?? 'new']}
               placeholderTextColor={mutedColor}
               multiline
-              autoFocus
               style={[styles.input, { color: foreground }, isReply ? styles.inputReply : null]}
             />
           </View>
