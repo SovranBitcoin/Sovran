@@ -43,6 +43,7 @@
     "zod": "^4.3.6"
   },
   "scripts": {
+    "postinstall": "node scripts/link-local-siblings.mjs",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
