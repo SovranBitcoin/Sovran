@@ -18,23 +18,23 @@ import {
 
 import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
 
-export interface OwnLikeRow {
+interface OwnLikeRow {
   targetEventId: string;
   reactionEventId: string;
   createdAt: number;
 }
-export interface OwnRepostRow {
+interface OwnRepostRow {
   targetEventId: string;
   repostEventId: string;
   createdAt: number;
 }
-export interface OwnReplyRow {
+interface OwnReplyRow {
   targetEventId: string;
   replyEventId: string;
   createdAt: number;
 }
 
-export interface OwnEventsPartition {
+interface OwnEventsPartition {
   /** Newest kind:0 in the batch. */
   latestProfile?: FeedEvent;
   /** Newest kind:3 in the batch. */
