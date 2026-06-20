@@ -1,6 +1,12 @@
 import type { NaggClient } from '../transport';
 import { NaggFeedPageSchema, NaggThreadSchema, NaggNotificationsPageSchema } from '../schemas';
-import { rankedFeedAppView, threadAppView, notificationsAppView } from '../recipes/appview-feed';
+import {
+  rankedFeedAppView,
+  followsFeedAppView,
+  userFeedAppView,
+  threadAppView,
+  notificationsAppView,
+} from '../recipes/appview-feed';
 import { forYouRankedEventsInput, followingPopularRankedEventsInput } from '../recipes/feed';
 import type { NaggFeedPage } from '../map/feed';
 import { answered, failed, type TierOutcome } from '../tiers';
@@ -71,11 +77,12 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
   return {
     tier: 'nagg',
     async feedPage(request: FeedPageRequest): Promise<TierOutcome<FeedBundle>> {
-      const binding = rankedBindingForSpec(request);
+      const binding = feedBindingForSpec(request);
       const result = await client.rest<typeof NaggFeedPageSchema>({
         path: binding.path,
         method: binding.method ?? 'POST',
         body: binding.body,
+        searchParams: binding.searchParams,
         responseSchema: NaggFeedPageSchema,
         operationName: binding.operationName,
         refresh: request.refresh,
@@ -247,29 +254,23 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
   };
 }
 
-function rankedBindingForSpec(request: FeedPageRequest) {
+// Map a FeedSpec to the right app-view binding: ranked specs POST the ranked
+// recipe; chronological specs GET the follows / user feed routes. All return the
+// canonical NaggFeedPage, so the tier bridges them identically.
+function feedBindingForSpec(request: FeedPageRequest) {
   const until = request.cursor?.createdAt;
   const limit = request.limit;
-  const input = rankedInputForSpec(request.spec, { until, limit });
-  return rankedFeedAppView(input);
-}
-
-function rankedInputForSpec(
-  spec: FeedSpec,
-  paging: { until?: number; limit?: number },
-) {
+  const spec = request.spec;
   switch (spec.kind) {
     case 'for-you':
-      return forYouRankedEventsInput({
-        viewerPubkey: spec.viewerPubkey,
-        until: paging.until,
-        limit: paging.limit,
-      });
+      return rankedFeedAppView(forYouRankedEventsInput({ viewerPubkey: spec.viewerPubkey, until, limit }));
     case 'following-popular':
-      return followingPopularRankedEventsInput({
-        viewerPubkey: spec.viewerPubkey,
-        until: paging.until,
-        limit: paging.limit,
-      });
+      return rankedFeedAppView(
+        followingPopularRankedEventsInput({ viewerPubkey: spec.viewerPubkey, until, limit }),
+      );
+    case 'following-recent':
+      return followsFeedAppView({ pubkeys: spec.authors, until, limit });
+    case 'user':
+      return userFeedAppView({ pubkey: spec.pubkey, until, limit });
   }
 }

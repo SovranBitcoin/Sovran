@@ -135,7 +135,10 @@ function defaultResolveFeedSpec(
         },
       };
     case 'following-popular':
-      // No direct Primal equivalent without server-side follow-graph wiring — fall through.
+    case 'following-recent':
+    case 'user':
+      // No direct Primal cache directive wired for these yet — fall through to
+      // the relay floor (which serves following-recent/user from the author list).
       return null;
   }
 }

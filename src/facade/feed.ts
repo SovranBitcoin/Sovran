@@ -19,10 +19,18 @@ import type { TierOutcome } from '../tiers';
 // applies the manifest uniformly so ordering (anti-reshuffle) lives in ONE place.
 // ---------------------------------------------------------------------------
 
-/** Which algorithmic feed the caller wants. Tiers map this to their own query. */
+/**
+ * Which feed the caller wants. Tiers map this to their own query.
+ * - `for-you` / `following-popular`: server-RANKED (nagg derives follows itself).
+ * - `following-recent`: CHRONOLOGICAL over an explicit author list the caller
+ *   already holds (the app's social store), so no server-side follow resolution.
+ * - `user`: a single author's profile feed.
+ */
 export type FeedSpec =
   | { kind: 'for-you'; viewerPubkey?: string }
-  | { kind: 'following-popular'; viewerPubkey: string };
+  | { kind: 'following-popular'; viewerPubkey: string }
+  | { kind: 'following-recent'; authors: string[] }
+  | { kind: 'user'; pubkey: string };
 
 export type FeedPageRequest = RequestControls & {
   spec: FeedSpec;

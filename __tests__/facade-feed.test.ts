@@ -104,6 +104,24 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
     ]);
   });
 
+  test('user feed hits /nostr/feed/user with the author', async () => {
+    const { client, urlOf } = naggClientReturning(FEED_PAGE);
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+    const result = await layer.getFeedPage({ spec: { kind: 'user', pubkey: PUB } });
+    expect(result.isOk()).toBe(true);
+    expect(urlOf()).toContain('/nostr/feed/user');
+    expect(urlOf()).toContain('pubkey=' + PUB);
+  });
+
+  test('following-recent GETs /nostr/feed with the explicit author list', async () => {
+    const { client, urlOf } = naggClientReturning(FEED_PAGE);
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+    const result = await layer.getFeedPage({ spec: { kind: 'following-recent', authors: [PUB, ID_A] } });
+    expect(result.isOk()).toBe(true);
+    expect(urlOf()).toContain('/nostr/feed');
+    expect(urlOf()).toContain('pubkeys=');
+  });
+
   test('a malformed nagg response is a tier failure (schema), not a crash', async () => {
     // missing required `metrics`/`profiles` → NaggFeedPageSchema rejects
     const { client } = naggClientReturning({ items: [], paginationUntil: 0, paginationOffset: 0 });

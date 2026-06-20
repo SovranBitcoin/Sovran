@@ -273,5 +273,25 @@ function filtersForSpec(
       // Needs the viewer's follow list (kind 3) resolved first — handled once the
       // social-graph surface lands; until then, fall through.
       return null;
+    case 'following-recent':
+      // The caller already resolved the author list, so the floor can serve it.
+      if (spec.authors.length === 0) return null;
+      return [
+        {
+          kinds: [1],
+          authors: spec.authors,
+          limit: paging.limit ?? 30,
+          ...(paging.until ? { until: paging.until } : {}),
+        },
+      ];
+    case 'user':
+      return [
+        {
+          kinds: [1],
+          authors: [spec.pubkey],
+          limit: paging.limit ?? 30,
+          ...(paging.until ? { until: paging.until } : {}),
+        },
+      ];
   }
 }

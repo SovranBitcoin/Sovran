@@ -6,6 +6,7 @@ import {
   createRelayPoolConnection,
   type RelayConnection,
   type RawRelayEvent,
+  type NostrFilter,
 } from '../src/facade/relay';
 import { createNostrDataLayer, pendingFeedTier } from '../src/facade';
 import type { NaggError } from '../src/errors';
@@ -65,6 +66,22 @@ describe('relay tier through the facade — three-tier fallback', () => {
     const tier = createRelayTier({ connection: fakeConnection([]) });
     const outcome = await tier.feedPage!({ spec: { kind: 'following-popular', viewerPubkey: PUB } });
     expect(outcome.kind).toBe('unsupported');
+  });
+
+  test('user feed is served on the floor (kind 1 by author)', async () => {
+    let captured: NostrFilter[] | undefined;
+    const connection: RelayConnection = {
+      request: (filters): Promise<Result<RawRelayEvent[], NaggError>> => {
+        captured = filters;
+        return Promise.resolve(ok([note(ID_A, 200)]));
+      },
+    };
+    const layer = createNostrDataLayer({ tiers: [createRelayTier({ connection })] });
+    const result = await layer.getFeedPage({ spec: { kind: 'user', pubkey: PUB } });
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().tier).toBe('relay');
+    expect(captured?.[0]?.authors).toEqual([PUB]);
+    expect(captured?.[0]?.kinds).toEqual([1]);
   });
 });
 
