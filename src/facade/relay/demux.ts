@@ -4,6 +4,8 @@ import { toFeedEvent } from '../event';
 import type { FeedBundle, FeedItem } from '../feed';
 import type { ThreadBundle } from '../thread';
 import type { NotificationItem, NotificationsBundle } from '../notifications';
+import { bundleFromOwnEvents, type OwnHistoryBundle } from '../own-state';
+import type { OwnActionType } from '@sovranbitcoin/schemas';
 import type { RawRelayEvent } from './protocol';
 
 // ---------------------------------------------------------------------------
@@ -139,6 +141,33 @@ export function demuxRelayNotifications(
     quoted: {},
     cursor: lastEvent ? { createdAt: lastEvent.created_at, id: lastEvent.id } : null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Relay own-history
+//
+// The floor fetches the viewer's own events for one action type (kind-keyed,
+// authors=[me]). authored vs replies share kind 1, so they split here on the
+// presence of an `e` reference (a reply marks the note it answers).
+// ---------------------------------------------------------------------------
+
+export function demuxRelayOwnHistory(
+  events: ReadonlyArray<RawRelayEvent>,
+  actionType: OwnActionType,
+): OwnHistoryBundle {
+  const own = [];
+  for (const raw of events) {
+    const event = toFeedEvent(raw);
+    if (!event) continue;
+    if (actionType === 'authored' && isReply(event.tags)) continue;
+    if (actionType === 'replies' && !isReply(event.tags)) continue;
+    own.push(event);
+  }
+  return bundleFromOwnEvents(own);
+}
+
+function isReply(tags: string[][]): boolean {
+  return tags.some((t) => t[0] === 'e');
 }
 
 function reasonForKind(kind: number): string | undefined {

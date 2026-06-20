@@ -1,8 +1,9 @@
 import { answered, failed, unsupported, type TierOutcome } from '../../tiers';
 import type { FeedBundle, FeedPageRequest, FeedSpec } from '../feed';
 import type { ThreadBundle, ThreadRequest } from '../thread';
+import type { OwnHistoryBundle, OwnHistoryRequest } from '../own-state';
 import type { NostrTierStrategy } from '../strategy';
-import { demuxPrimalFeed, demuxPrimalThread } from './demux';
+import { demuxPrimalFeed, demuxPrimalThread, demuxPrimalOwnHistory } from './demux';
 import type { PrimalCacheRequest, PrimalConnection } from './protocol';
 
 // ---------------------------------------------------------------------------
@@ -74,7 +75,48 @@ export function createPrimalTier(config: PrimalTierConfig): NostrTierStrategy {
         (error) => failed(error),
       );
     },
+
+    async ownHistory(request: OwnHistoryRequest): Promise<TierOutcome<OwnHistoryBundle>> {
+      const cacheRequest = ownHistoryCacheRequest(request);
+      // Primal has no my-likes / my-reposts list verb → fall straight through to the floor.
+      if (!cacheRequest) return unsupported();
+
+      const result = await config.connection.request(cacheRequest, {
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<OwnHistoryBundle>>(
+        (events) => answered(demuxPrimalOwnHistory(events, request.actionType)),
+        (error) => failed(error),
+      );
+    },
   };
+}
+
+function ownHistoryCacheRequest(request: OwnHistoryRequest): PrimalCacheRequest | null {
+  const pubkey = request.viewerPubkey;
+  const limit = request.limit ?? 100;
+  const until = request.cursor?.createdAt;
+  const paged = (extra: Record<string, unknown>) => ({ ...extra, limit, ...(until ? { until } : {}) });
+  switch (request.actionType) {
+    case 'authored':
+      return { verb: 'feed', params: paged({ notes: 'authored', pubkey }) };
+    case 'replies':
+      return { verb: 'feed', params: paged({ notes: 'replies', pubkey }) };
+    case 'bookmarks':
+      return { verb: 'feed', params: paged({ notes: 'bookmarks', pubkey }) };
+    case 'zaps-sent':
+      return { verb: 'user_zaps_sent', params: paged({ sender: pubkey }) };
+    case 'follows':
+      return { verb: 'contact_list', params: { pubkey } };
+    case 'mutes':
+      return { verb: 'mutelist', params: { pubkey } };
+    case 'relays':
+      return { verb: 'get_user_relays', params: { pubkey } };
+    case 'likes':
+    case 'reposts':
+      return null;
+  }
 }
 
 function defaultResolveFeedSpec(

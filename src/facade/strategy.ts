@@ -3,6 +3,7 @@ import type { TierOutcome } from '../tiers';
 import type { FeedBundle, FeedPageRequest } from './feed';
 import type { ThreadBundle, ThreadRequest } from './thread';
 import type { NotificationsBundle, NotificationsRequest } from './notifications';
+import type { OwnHistoryBundle, OwnHistoryRequest } from './own-state';
 
 // ---------------------------------------------------------------------------
 // Tier strategy — one deep module per source, implementing the surfaces it can
@@ -21,4 +22,5 @@ export interface NostrTierStrategy {
   feedPage?(request: FeedPageRequest): Promise<TierOutcome<FeedBundle>>;
   thread?(request: ThreadRequest): Promise<TierOutcome<ThreadBundle>>;
   notifications?(request: NotificationsRequest): Promise<TierOutcome<NotificationsBundle>>;
+  ownHistory?(request: OwnHistoryRequest): Promise<TierOutcome<OwnHistoryBundle>>;
 }

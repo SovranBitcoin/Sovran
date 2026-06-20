@@ -13,6 +13,7 @@ import type {
   NotificationsRequest,
   ResolvedNotifications,
 } from './notifications';
+import type { OwnHistoryBundle, OwnHistoryRequest, ResolvedOwnHistory } from './own-state';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -35,6 +36,9 @@ export interface NostrDataLayer {
   getNotifications(
     request: NotificationsRequest,
   ): Promise<Result<ResolvedNotifications, TierResolutionError>>;
+  getOwnHistory(
+    request: OwnHistoryRequest,
+  ): Promise<Result<ResolvedOwnHistory, TierResolutionError>>;
 }
 
 export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLayer {
@@ -59,6 +63,16 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
       );
       const resolved = await resolveAcrossTiers<NotificationsBundle>(candidates);
       return resolved.map(({ tier, value }) => assembleNotifications(tier, value));
+    },
+
+    async getOwnHistory(request) {
+      const candidates = candidatesFor(
+        config.tiers,
+        'ownHistory',
+        (tier) => () => tier.ownHistory!(request),
+      );
+      const resolved = await resolveAcrossTiers<OwnHistoryBundle>(candidates);
+      return resolved.map(({ tier, value }) => assembleOwnHistory(tier, request.actionType, value));
     },
   };
 }
@@ -108,6 +122,18 @@ function assembleThread(tier: NostrTier, bundle: ThreadBundle): ResolvedThread {
     cursor: bundle.cursor,
     missingIds,
   };
+}
+
+function assembleOwnHistory(
+  tier: NostrTier,
+  actionType: ResolvedOwnHistory['actionType'],
+  bundle: OwnHistoryBundle,
+): ResolvedOwnHistory {
+  const missingIds: string[] = [];
+  const entries = applyOrderingManifest(bundle.manifest, bundle.itemsById, {
+    onMissing: (id) => missingIds.push(id),
+  });
+  return { tier, actionType, entries, cursor: bundle.cursor, missingIds };
 }
 
 function assembleNotifications(tier: NostrTier, bundle: NotificationsBundle): ResolvedNotifications {

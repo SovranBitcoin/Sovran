@@ -17,6 +17,12 @@ import {
   type NotificationsRequest,
   type NotificationsSource,
 } from './notifications';
+import {
+  bundleFromOwnEvents,
+  OwnHistoryResponseSchema,
+  type OwnHistoryBundle,
+  type OwnHistoryRequest,
+} from './own-state';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -102,6 +108,30 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<NotificationsBundle>>(
         (page) => answered(bundleFromNotifications(page as NotificationsSource, grouped)),
+        (error) => failed(error),
+      );
+    },
+
+    async ownHistory(request: OwnHistoryRequest): Promise<TierOutcome<OwnHistoryBundle>> {
+      // nagg is the only tier that fully covers own-state (it stores reactions/
+      // reposts/zaps). One paginated endpoint per action type, cursor = until+id.
+      const result = await client.rest<typeof OwnHistoryResponseSchema>({
+        path: `/nostr/own/${request.actionType}`,
+        method: 'GET',
+        searchParams: {
+          pubkey: request.viewerPubkey,
+          ...(request.cursor?.createdAt ? { until: request.cursor.createdAt } : {}),
+          ...(request.cursor?.id ? { cursorId: request.cursor.id } : {}),
+          limit: request.limit ?? 100,
+        },
+        responseSchema: OwnHistoryResponseSchema,
+        operationName: `OwnHistory:${request.actionType}`,
+        refresh: request.refresh,
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<OwnHistoryBundle>>(
+        (page) => answered(bundleFromOwnEvents(page.events)),
         (error) => failed(error),
       );
     },

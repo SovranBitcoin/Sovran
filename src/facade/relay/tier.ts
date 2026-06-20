@@ -2,8 +2,9 @@ import { answered, failed, unsupported, type TierOutcome } from '../../tiers';
 import type { FeedBundle, FeedPageRequest, FeedSpec } from '../feed';
 import type { ThreadBundle, ThreadRequest } from '../thread';
 import type { NotificationsBundle, NotificationsRequest } from '../notifications';
+import { ownActionKinds, type OwnHistoryBundle, type OwnHistoryRequest } from '../own-state';
 import type { NostrTierStrategy } from '../strategy';
-import { demuxRelayFeed, demuxRelayThread, demuxRelayNotifications } from './demux';
+import { demuxRelayFeed, demuxRelayThread, demuxRelayNotifications, demuxRelayOwnHistory } from './demux';
 import type { NostrFilter, RelayConnection } from './protocol';
 
 // ---------------------------------------------------------------------------
@@ -83,6 +84,27 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<NotificationsBundle>>(
         (events) => answered(demuxRelayNotifications(events, request.viewerPubkey, request.ownEventIds)),
+        (error) => failed(error),
+      );
+    },
+
+    async ownHistory(request: OwnHistoryRequest): Promise<TierOutcome<OwnHistoryBundle>> {
+      // A zap receipt isn't authored by the sender, so the floor can't cleanly
+      // list zaps-sent (it would have to scan every 9735) — accepted ceiling.
+      if (request.actionType === 'zaps-sent') return unsupported();
+
+      const filter: NostrFilter = {
+        kinds: ownActionKinds(request.actionType),
+        authors: [request.viewerPubkey],
+        limit: request.limit ?? 100,
+        ...(request.cursor?.createdAt ? { until: request.cursor.createdAt } : {}),
+      };
+      const result = await config.connection.request([filter], {
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<OwnHistoryBundle>>(
+        (events) => answered(demuxRelayOwnHistory(events, request.actionType)),
         (error) => failed(error),
       );
     },

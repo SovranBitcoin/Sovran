@@ -11,6 +11,8 @@ import { synthesizeRecencyManifest } from '../../tiers';
 import { toFeedEvent } from '../event';
 import type { FeedBundle, FeedItem } from '../feed';
 import type { ThreadBundle } from '../thread';
+import { bundleFromOwnEvents, ownActionKinds, type OwnHistoryBundle } from '../own-state';
+import type { OwnActionType } from '@sovranbitcoin/schemas';
 import { PRIMAL_KIND, type RawPrimalEvent } from './protocol';
 import {
   PrimalNoteStatsContent,
@@ -156,6 +158,21 @@ export function demuxPrimalThread(events: ReadonlyArray<RawPrimalEvent>, rootId:
     quoted: {},
     cursor: deriveCursor(manifest, repliesById),
   };
+}
+
+/** Collect the viewer's own events of the action's kind(s) from a Primal batch. */
+export function demuxPrimalOwnHistory(
+  events: ReadonlyArray<RawPrimalEvent>,
+  actionType: OwnActionType,
+): OwnHistoryBundle {
+  const kinds = new Set(ownActionKinds(actionType));
+  const own: NaggFeedEvent[] = [];
+  for (const raw of events) {
+    if (!kinds.has(raw.kind)) continue;
+    const event = toFeedEvent(raw);
+    if (event) own.push(event);
+  }
+  return bundleFromOwnEvents(own);
 }
 
 function recencyOf(notesById: Map<string, NaggFeedEvent>): OrderingManifest {
