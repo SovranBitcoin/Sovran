@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+// Local mirror of the shared @sovranbitcoin/schemas OrderingManifest. Defined in
+// nagg-ts's own zod (not imported as a value) so composing it into the feed/
+// thread schemas keeps the inferred types portable — the symlinked shared
+// package carries its own zod copy, and mixing the two breaks type emission.
+export const NaggOrderingSchema = z.object({
+  orderBy: z.enum(['rank', 'created_at', 'arrival']),
+  elements: z.array(z.string()).max(5000),
+});
+
 export const NaggGraphqlErrorSchema = z
   .object({
     message: z.string().optional(),
@@ -195,6 +204,9 @@ export const NaggFeedItemSchema = z.discriminatedUnion('type', [
 
 export const NaggFeedPageSchema = z.object({
   items: z.array(NaggFeedItemSchema),
+  // Server-authoritative render order + semantic; present on the REST app-view
+  // (the GraphQL path omits it, so the facade derives it from item order).
+  ordering: NaggOrderingSchema.optional(),
   metrics: z.record(z.string(), NaggNoteMetricsSchema),
   profiles: z.record(z.string(), NaggProfileInfoSchema),
   quoted: z.record(z.string(), NaggFeedEventSchema),
@@ -207,6 +219,7 @@ export const NaggFeedPageSchema = z.object({
 export const NaggThreadSchema = z.object({
   root: NaggFeedEventSchema,
   events: z.array(NaggFeedEventSchema),
+  ordering: NaggOrderingSchema.optional(),
   metrics: z.record(z.string(), NaggNoteMetricsSchema),
   profiles: z.record(z.string(), NaggProfileInfoSchema),
   quoted: z.record(z.string(), NaggFeedEventSchema),

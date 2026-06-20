@@ -72,6 +72,20 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
     expect(page.missingIds).toEqual([]);
   });
 
+  test('prefers the server ordering manifest over deriving from item order', async () => {
+    // server returns items [A, B] but a manifest ordering them [B, A] with the
+    // created_at semantic — the facade must render by the manifest, not item order.
+    const { client } = naggClientReturning({
+      ...FEED_PAGE,
+      ordering: { orderBy: 'created_at', elements: [ID_B, ID_A] },
+    });
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+
+    const result = await layer.getFeedPage({ spec: { kind: 'for-you', viewerPubkey: PUB } });
+    const page = result._unsafeUnwrap();
+    expect(page.items.map((i) => (i.type === 'note' ? i.event.id : ''))).toEqual([ID_B, ID_A]);
+  });
+
   test('falls through to the next tier when nagg errors, then exhausts honestly', async () => {
     const { client } = naggClientReturning({}, { ok: false, status: 503 });
     const layer = createNostrDataLayer({

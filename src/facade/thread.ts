@@ -33,6 +33,8 @@ export type ThreadRequest = RequestControls & {
 export type ThreadSource = {
   root: NaggFeedEvent;
   events: NaggFeedEvent[];
+  /** Server-authoritative reply order; present on the REST app-view. */
+  ordering?: OrderingManifest;
   metrics: Record<string, NaggNoteMetrics>;
   profiles: Record<string, NaggProfileInfo>;
   quoted: Record<string, NaggFeedEvent>;
@@ -87,7 +89,8 @@ export function bundleFromThread(source: ThreadSource): ThreadBundle {
   return {
     root: { type: 'note', event: source.root },
     itemsById,
-    manifest: { orderBy: 'rank', elements },
+    // Prefer nagg's server manifest; derive from reply order when absent.
+    manifest: source.ordering ?? { orderBy: 'rank', elements },
     stats: statsFromMetrics(source.metrics),
     profiles: source.profiles,
     quoted: source.quoted,

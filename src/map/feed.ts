@@ -42,11 +42,18 @@ export type NaggFeedItem<TEvent extends NaggFeedEvent = NaggFeedEvent> =
       reposters?: Array<NaggReposterInfo<TEvent>>;
     };
 
+export type NaggOrderingManifest = {
+  orderBy: 'rank' | 'created_at' | 'arrival';
+  elements: string[];
+};
+
 export type NaggFeedPage<
   TEvent extends NaggFeedEvent = NaggFeedEvent,
   TProfile extends NaggProfileInfo = NaggProfileInfo,
 > = {
   items: Array<NaggFeedItem<TEvent>>;
+  /** Server-authoritative render order; present on the REST app-view, absent on GraphQL. */
+  ordering?: NaggOrderingManifest;
   metrics: Record<string, NaggNoteMetrics>;
   profiles: Record<string, TProfile>;
   quoted: Record<string, TEvent>;

@@ -118,9 +118,14 @@ export function bundleFromFeedPage(page: NaggFeedPage): FeedBundle {
   const cursor: NostrCursor =
     page.paginationUntil > 0 && lastId ? { createdAt: page.paginationUntil, id: lastId } : null;
 
+  // Prefer nagg's server-authoritative manifest (it knows the order SEMANTIC —
+  // rank vs created_at); fall back to deriving from item order when absent (the
+  // GraphQL path and tiers that don't emit one).
+  const manifest: OrderingManifest = page.ordering ?? { orderBy: 'rank', elements };
+
   return {
     itemsById,
-    manifest: { orderBy: 'rank', elements },
+    manifest,
     stats: statsFromMetrics(page.metrics),
     profiles: page.profiles,
     quoted: page.quoted,
