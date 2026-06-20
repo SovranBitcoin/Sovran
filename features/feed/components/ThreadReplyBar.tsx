@@ -237,7 +237,7 @@ export function ThreadReplyBar({
       // Let the host dismiss any surface it owns (the image overlay closes its
       // lightbox) before the composer route is pushed on top.
       onExpand?.();
-      router.navigate('/(user-flow)/composer');
+      router.navigate('/composer');
     },
     [replyTarget, targetEvent, targetProfile, text, mediaBlocks, onExpand]
   );

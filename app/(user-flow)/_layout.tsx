@@ -36,10 +36,6 @@ export default function UserFlowLayout() {
     () => createFlowLayoutScreenOptions({ foreground, background }),
     [foreground, background]
   );
-  const composerOptions = useMemo(
-    () => ({ headerShown: false, contentStyle: { backgroundColor: surface } }),
-    [surface]
-  );
   const threadOptions = useMemo(
     () => ({
       title: 'Thread',
@@ -53,7 +49,6 @@ export default function UserFlowLayout() {
     <Stack screenOptions={screenOptions}>
       <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
       <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
-      <Stack.Screen name="composer" options={composerOptions} />
       <Stack.Screen name="share" options={SHARE_OPTIONS} />
       <Stack.Screen name="thread" options={threadOptions} />
       <Stack.Screen name="geohashChat" options={GEOHASH_CHAT_OPTIONS} />

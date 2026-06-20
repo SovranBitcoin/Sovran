@@ -32,7 +32,7 @@ export function useOpenComposer(): (target: ComposerTarget, context?: ComposerOp
   return useCallback(
     (target, context) => {
       open(target, context);
-      router.navigate('/(user-flow)/composer');
+      router.navigate('/composer');
     },
     [open]
   );
