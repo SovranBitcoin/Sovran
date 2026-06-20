@@ -80,7 +80,7 @@ describe('Primal tier through the facade', () => {
 
   test('Primal answers For-You when nagg cannot (fallthrough to tier 2)', async () => {
     const layer = createNostrDataLayer({
-      feedTiers: [
+      tiers: [
         pendingFeedTier('nagg'), // nagg unsupported here → fall through
         createPrimalTier({ connection: fakeConnection(BATCH) }),
         pendingFeedTier('relay'),

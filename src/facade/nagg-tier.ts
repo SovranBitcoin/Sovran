@@ -1,6 +1,6 @@
 import type { NaggClient } from '../transport';
-import { NaggFeedPageSchema } from '../schemas';
-import { rankedFeedAppView } from '../recipes/appview-feed';
+import { NaggFeedPageSchema, NaggThreadSchema } from '../schemas';
+import { rankedFeedAppView, threadAppView } from '../recipes/appview-feed';
 import { forYouRankedEventsInput, followingPopularRankedEventsInput } from '../recipes/feed';
 import type { NaggFeedPage } from '../map/feed';
 import { answered, failed, type TierOutcome } from '../tiers';
@@ -9,8 +9,9 @@ import {
   type FeedBundle,
   type FeedPageRequest,
   type FeedSpec,
-  type FeedTier,
 } from './feed';
+import { bundleFromThread, type ThreadBundle, type ThreadRequest, type ThreadSource } from './thread';
+import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
 // nagg tier (tier 1, gold)
@@ -30,7 +31,7 @@ export type NaggTierConfig = {
   client: NaggClient;
 };
 
-export function createNaggTier(config: NaggTierConfig): FeedTier {
+export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
   const { client } = config;
 
   return {
@@ -49,6 +50,24 @@ export function createNaggTier(config: NaggTierConfig): FeedTier {
       });
       return result.match<TierOutcome<FeedBundle>>(
         (page) => answered(bundleFromFeedPage(page as NaggFeedPage)),
+        (error) => failed(error),
+      );
+    },
+
+    async thread(request: ThreadRequest): Promise<TierOutcome<ThreadBundle>> {
+      const binding = threadAppView({ id: request.noteId, limit: request.limit });
+      const result = await client.rest<typeof NaggThreadSchema>({
+        path: binding.path,
+        method: binding.method ?? 'GET',
+        searchParams: binding.searchParams,
+        responseSchema: NaggThreadSchema,
+        operationName: binding.operationName,
+        refresh: request.refresh,
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<ThreadBundle>>(
+        (thread) => answered(bundleFromThread(thread as ThreadSource)),
         (error) => failed(error),
       );
     },

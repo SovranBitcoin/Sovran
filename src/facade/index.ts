@@ -1,4 +1,6 @@
 export * from './feed';
+export * from './thread';
+export * from './strategy';
 export * from './nagg-tier';
 export * from './placeholders';
 export * from './data-layer';

@@ -47,7 +47,7 @@ describe('relay tier through the facade — three-tier fallback', () => {
 
   test('relay answers a degraded For-You when nagg and Primal cannot', async () => {
     const layer = createNostrDataLayer({
-      feedTiers: [
+      tiers: [
         pendingFeedTier('nagg'),
         pendingFeedTier('primal'),
         createRelayTier({ connection: fakeConnection([note(ID_A, 1_700_000_200), note(ID_B, 1_700_000_100)]) }),

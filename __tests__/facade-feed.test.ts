@@ -52,7 +52,7 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
   test('answers from nagg with an ordered, validated, stats-mapped page', async () => {
     const { client, urlOf } = naggClientReturning(FEED_PAGE);
     const layer = createNostrDataLayer({
-      feedTiers: [createNaggTier({ client }), pendingFeedTier('primal'), pendingFeedTier('relay')],
+      tiers: [createNaggTier({ client }), pendingFeedTier('primal'), pendingFeedTier('relay')],
     });
 
     const result = await layer.getFeedPage({ spec: { kind: 'for-you', viewerPubkey: PUB } });
@@ -75,7 +75,7 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
   test('falls through to the next tier when nagg errors, then exhausts honestly', async () => {
     const { client } = naggClientReturning({}, { ok: false, status: 503 });
     const layer = createNostrDataLayer({
-      feedTiers: [createNaggTier({ client }), pendingFeedTier('primal'), pendingFeedTier('relay')],
+      tiers: [createNaggTier({ client }), pendingFeedTier('primal'), pendingFeedTier('relay')],
     });
 
     const result = await layer.getFeedPage({ spec: { kind: 'for-you' } });
@@ -93,7 +93,7 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
   test('a malformed nagg response is a tier failure (schema), not a crash', async () => {
     // missing required `metrics`/`profiles` → NaggFeedPageSchema rejects
     const { client } = naggClientReturning({ items: [], paginationUntil: 0, paginationOffset: 0 });
-    const layer = createNostrDataLayer({ feedTiers: [createNaggTier({ client })] });
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
 
     const result = await layer.getFeedPage({ spec: { kind: 'for-you' } });
     expect(result.isErr()).toBe(true);
