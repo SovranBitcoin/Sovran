@@ -16,6 +16,7 @@ const DEFAULT_METRICS: NoteMetrics = {
 const DEFAULT_ENGAGEMENT = {
   liked: false,
   reposted: false,
+  replied: false,
   likePending: false,
   repostPending: false,
 };

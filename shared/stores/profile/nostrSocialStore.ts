@@ -20,6 +20,20 @@ type NostrRepostState = {
   updatedAt: number;
 };
 
+type NostrRepliedState = {
+  replyEventId?: string;
+  updatedAt: number;
+};
+
+/**
+ * Recency cap on the canonical own-engagement maps. The global own-events sync
+ * (`useOwnEventsSync`) can backfill thousands of our likes/reposts/replies; cap
+ * each map to the most-recent N by `updatedAt` so the persisted blob and
+ * rehydrate stay bounded. Engagement older than the cap simply won't highlight
+ * (rare, and the post would have to be re-encountered).
+ */
+const MAX_ENGAGEMENT_ENTRIES = 5000;
+
 type FollowOptimisticState = {
   value: boolean;
   pending: boolean;
@@ -43,6 +57,8 @@ interface NostrSocialState {
 
   likesByEventId: Record<string, NostrReactionState>;
   repostsByEventId: Record<string, NostrRepostState>;
+  /** Target event id → our reply to it. Drives the "you replied" highlight. */
+  repliedByEventId: Record<string, NostrRepliedState>;
   deletedRepostOriginalIds: Record<string, number>;
 
   optimisticFollowsByPubkey: Record<string, FollowOptimisticState>;
@@ -59,14 +75,23 @@ interface NostrSocialActions {
   markRepostDeleted: (originalEventId: string) => void;
   unmarkRepostDeleted: (originalEventId: string) => void;
 
-  syncLikesFromRelay: (
-    targetEventIds: string[],
+  /**
+   * Global upsert of our own likes from the own-events sync. Unlike the legacy
+   * scoped `syncLikesFromRelay`, this never deletes (no on-screen target set):
+   * it merges newer entries and recency-caps. Deletions arrive via
+   * {@link applyOwnDeletions}.
+   */
+  ingestOwnLikes: (
     likes: { targetEventId: string; reactionEventId: string; createdAt: number }[]
   ) => void;
-  syncRepostsFromRelay: (
-    targetEventIds: string[],
+  ingestOwnReposts: (
     reposts: { targetEventId: string; repostEventId: string; createdAt: number }[]
   ) => void;
+  ingestOwnReplies: (
+    replies: { targetEventId: string; replyEventId: string; createdAt: number }[]
+  ) => void;
+  /** Apply our own kind:5 deletions: drop any like/repost/reply whose own event id was deleted. */
+  applyOwnDeletions: (deletedEventIds: string[]) => void;
 
   setLikeOptimistic: (
     eventId: string,
@@ -90,7 +115,6 @@ interface NostrSocialActions {
   ) => void;
   clearLikeOptimistic: (eventId: string) => void;
   clearRepostOptimistic: (eventId: string) => void;
-  clearSettledEngagementOptimistic: () => void;
 }
 
 type NostrSocialStore = NostrSocialState & NostrSocialActions;
@@ -125,6 +149,34 @@ function withOptimisticEntry<V extends { updatedAt: number }>(
   return { ...map, [key]: { ...params, updatedAt: Date.now() } as unknown as V };
 }
 
+/** Keep only the `max` most-recent entries (by `updatedAt`); no-op under the cap. */
+function capByRecency<V extends { updatedAt: number }>(
+  map: Record<string, V>,
+  max: number
+): Record<string, V> {
+  const keys = Object.keys(map);
+  if (keys.length <= max) return map;
+  const kept = keys
+    .sort((a, b) => map[b].updatedAt - map[a].updatedAt)
+    .slice(0, max);
+  const next: Record<string, V> = {};
+  for (const key of kept) next[key] = map[key];
+  return next;
+}
+
+/** Merge own-engagement rows (target → record) into a map, keeping the newest per target. */
+function upsertByTarget<V extends { updatedAt: number }>(
+  base: Record<string, V>,
+  rows: { targetEventId: string; createdAt: number; record: V }[]
+): Record<string, V> {
+  const next = { ...base };
+  for (const { targetEventId, createdAt, record } of rows) {
+    const existing = next[targetEventId];
+    if (!existing || createdAt >= existing.updatedAt) next[targetEventId] = record;
+  }
+  return capByRecency(next, MAX_ENGAGEMENT_ENTRIES);
+}
+
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
@@ -136,6 +188,7 @@ const INITIAL_STATE: NostrSocialState = {
   followingPubkeys: {},
   likesByEventId: {},
   repostsByEventId: {},
+  repliedByEventId: {},
   deletedRepostOriginalIds: {},
   optimisticFollowsByPubkey: {},
   optimisticLikesByEventId: {},
@@ -152,6 +205,10 @@ const PersistedReactionState = z.looseObject({
 });
 const PersistedRepostState = z.looseObject({
   repostEventId: z.string().max(128).optional(),
+  updatedAt: z.number().int().nonnegative(),
+});
+const PersistedRepliedState = z.looseObject({
+  replyEventId: z.string().max(128).optional(),
   updatedAt: z.number().int().nonnegative(),
 });
 const PersistedFollowOptimistic = z.looseObject({
@@ -176,8 +233,15 @@ const PersistedNostrSocialStore = z.object({
   contactsContent: z.string().max(65_536).default(''),
   contactsUpdatedAt: z.number().int().nonnegative().default(0),
   followingPubkeys: z.record(z.string().max(128), z.literal(true)).default({}),
-  likesByEventId: z.record(z.string().max(128), PersistedReactionState).default({}),
-  repostsByEventId: z.record(z.string().max(128), PersistedRepostState).default({}),
+  likesByEventId: z
+    .record(z.string().max(128), PersistedReactionState)
+    .default({}),
+  repostsByEventId: z
+    .record(z.string().max(128), PersistedRepostState)
+    .default({}),
+  repliedByEventId: z
+    .record(z.string().max(128), PersistedRepliedState)
+    .default({}),
   deletedRepostOriginalIds: z
     .record(z.string().max(128), z.number().int().nonnegative())
     .default({}),
@@ -282,64 +346,83 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         }));
       },
 
-      // ---- sync from relay ----
+      // ---- own-events sync (global upsert; see useOwnEventsSync) ----
 
-      syncLikesFromRelay: (targetEventIds, likes) => {
-        storeLog.info('social.likes.sync', {
-          targetCount: targetEventIds.length,
-          likeCount: likes.length,
-        });
-        const byTarget: Record<string, NostrReactionState> = {};
-        for (const like of likes) {
-          const existing = byTarget[like.targetEventId];
-          if (!existing || like.createdAt >= existing.updatedAt) {
-            byTarget[like.targetEventId] = {
-              reactionEventId: like.reactionEventId,
-              updatedAt: like.createdAt,
-            };
-          }
-        }
-
-        set((state) => {
-          const nextLikes = { ...state.likesByEventId };
-          for (const id of targetEventIds) {
-            const relay = byTarget[id];
-            if (relay) nextLikes[id] = relay;
-            else delete nextLikes[id];
-          }
-          return { likesByEventId: nextLikes };
-        });
+      ingestOwnLikes: (likes) => {
+        if (likes.length === 0) return;
+        storeLog.info('social.likes.ingest', { likeCount: likes.length });
+        set((state) => ({
+          likesByEventId: upsertByTarget(
+            state.likesByEventId,
+            likes.map((l) => ({
+              targetEventId: l.targetEventId,
+              createdAt: l.createdAt,
+              record: { reactionEventId: l.reactionEventId, updatedAt: l.createdAt },
+            }))
+          ),
+        }));
       },
 
-      syncRepostsFromRelay: (targetEventIds, reposts) => {
-        storeLog.info('social.reposts.sync', {
-          targetCount: targetEventIds.length,
-          repostCount: reposts.length,
-        });
-        const byTarget: Record<string, NostrRepostState> = {};
-        for (const repost of reposts) {
-          const existing = byTarget[repost.targetEventId];
-          if (!existing || repost.createdAt >= existing.updatedAt) {
-            byTarget[repost.targetEventId] = {
-              repostEventId: repost.repostEventId,
-              updatedAt: repost.createdAt,
-            };
-          }
-        }
+      ingestOwnReposts: (reposts) => {
+        if (reposts.length === 0) return;
+        storeLog.info('social.reposts.ingest', { repostCount: reposts.length });
+        set((state) => ({
+          repostsByEventId: upsertByTarget(
+            state.repostsByEventId,
+            reposts.map((r) => ({
+              targetEventId: r.targetEventId,
+              createdAt: r.createdAt,
+              record: { repostEventId: r.repostEventId, updatedAt: r.createdAt },
+            }))
+          ),
+        }));
+      },
 
+      ingestOwnReplies: (replies) => {
+        if (replies.length === 0) return;
+        storeLog.info('social.replies.ingest', { replyCount: replies.length });
+        set((state) => ({
+          repliedByEventId: upsertByTarget(
+            state.repliedByEventId,
+            replies.map((r) => ({
+              targetEventId: r.targetEventId,
+              createdAt: r.createdAt,
+              record: { replyEventId: r.replyEventId, updatedAt: r.createdAt },
+            }))
+          ),
+        }));
+      },
+
+      applyOwnDeletions: (deletedEventIds) => {
+        if (deletedEventIds.length === 0) return;
+        const deleted = new Set(deletedEventIds);
         set((state) => {
-          const nextReposts = { ...state.repostsByEventId };
-          const nextDeleted = { ...state.deletedRepostOriginalIds };
-          for (const id of targetEventIds) {
-            const relay = byTarget[id];
-            if (relay) {
-              nextReposts[id] = relay;
-            } else {
-              delete nextReposts[id];
-              delete nextDeleted[id];
+          const prune = <V extends { [k: string]: unknown }>(
+            map: Record<string, V>,
+            ownIdKey: keyof V
+          ): { next: Record<string, V>; removed: number } => {
+            let removed = 0;
+            const next: Record<string, V> = {};
+            for (const [target, record] of Object.entries(map)) {
+              const ownId = record[ownIdKey];
+              if (typeof ownId === 'string' && deleted.has(ownId)) {
+                removed += 1;
+                continue;
+              }
+              next[target] = record;
             }
-          }
-          return { repostsByEventId: nextReposts, deletedRepostOriginalIds: nextDeleted };
+            return { next, removed };
+          };
+          const likes = prune(state.likesByEventId, 'reactionEventId');
+          const reposts = prune(state.repostsByEventId, 'repostEventId');
+          const replies = prune(state.repliedByEventId, 'replyEventId');
+          const removed = likes.removed + reposts.removed + replies.removed;
+          if (removed > 0) storeLog.info('social.own.deletions_applied', { removed });
+          return {
+            likesByEventId: likes.next,
+            repostsByEventId: reposts.next,
+            repliedByEventId: replies.next,
+          };
         });
       },
 
@@ -388,39 +471,6 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
           optimisticRepostsByEventId: omitKey(state.optimisticRepostsByEventId, eventId),
         }));
       },
-
-      clearSettledEngagementOptimistic: () => {
-        set((state) => {
-          const filterSettled = <Base>(
-            optimistic: Record<string, EngagementOptimisticState>,
-            base: Record<string, Base>
-          ) => {
-            const next: Record<string, EngagementOptimisticState> = {};
-            for (const [id, opt] of Object.entries(optimistic)) {
-              if (opt.pending || opt.value !== !!base[id]) next[id] = opt;
-            }
-            return next;
-          };
-
-          const nextLikes = filterSettled(state.optimisticLikesByEventId, state.likesByEventId);
-          const nextReposts = filterSettled(
-            state.optimisticRepostsByEventId,
-            state.repostsByEventId
-          );
-          const clearedLikes =
-            Object.keys(state.optimisticLikesByEventId).length - Object.keys(nextLikes).length;
-          const clearedReposts =
-            Object.keys(state.optimisticRepostsByEventId).length - Object.keys(nextReposts).length;
-          if (clearedLikes > 0 || clearedReposts > 0) {
-            storeLog.debug('social.engagement.settled.clear', { clearedLikes, clearedReposts });
-          }
-
-          return {
-            optimisticLikesByEventId: nextLikes,
-            optimisticRepostsByEventId: nextReposts,
-          };
-        });
-      },
     }),
     persistConfig({
       name: 'nostr-social-store',
@@ -434,6 +484,7 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         followingPubkeys: state.followingPubkeys,
         likesByEventId: state.likesByEventId,
         repostsByEventId: state.repostsByEventId,
+        repliedByEventId: state.repliedByEventId,
         deletedRepostOriginalIds: state.deletedRepostOriginalIds,
         optimisticFollowsByPubkey: state.optimisticFollowsByPubkey,
         optimisticLikesByEventId: state.optimisticLikesByEventId,

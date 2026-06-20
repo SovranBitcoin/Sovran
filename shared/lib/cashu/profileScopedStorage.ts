@@ -219,6 +219,7 @@ async function rehydrateProfileStores(): Promise<void> {
         followingPubkeys: {},
         likesByEventId: {},
         repostsByEventId: {},
+        repliedByEventId: {},
         deletedRepostOriginalIds: {},
         optimisticFollowsByPubkey: {},
         optimisticLikesByEventId: {},

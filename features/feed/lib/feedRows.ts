@@ -21,6 +21,7 @@ export type FeedRow = {
 export const DEFAULT_ENGAGEMENT_STATE: EngagementViewState = Object.freeze({
   liked: false,
   reposted: false,
+  replied: false,
   likePending: false,
   repostPending: false,
 });
