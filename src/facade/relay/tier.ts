@@ -18,6 +18,12 @@ import {
   type SocialGraph,
   type SocialGraphRequest,
 } from '../social-graph';
+import {
+  DM_ENVELOPE_KINDS,
+  type DmEnvelope,
+  type DmEnvelopesBundle,
+  type DmEnvelopesRequest,
+} from '../dm';
 import { toFeedEvent } from '../event';
 import type { NaggFeedEvent } from '../../map/feed';
 import type { NostrTierStrategy } from '../strategy';
@@ -173,6 +179,38 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<SocialGraph>>(
         (events) => answered(socialGraphFromEvents(request.pubkey, toFeedEvents(events))),
+        (error) => failed(error),
+      );
+    },
+
+    async getDmEnvelopes(request: DmEnvelopesRequest): Promise<TierOutcome<DmEnvelopesBundle>> {
+      // Gift-wrap created_at is randomized into the past, so NO since/limit — they
+      // would silently drop old conversations. Pure opaque-envelope transport.
+      const filter: NostrFilter = {
+        kinds: DM_ENVELOPE_KINDS,
+        '#p': [request.viewerPubkey],
+      };
+      const result = await config.connection.request([filter], {
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<DmEnvelopesBundle>>(
+        (events) => {
+          const envelopes: DmEnvelope[] = [];
+          for (const raw of events) {
+            if (typeof raw.id !== 'string' || typeof raw.pubkey !== 'string') continue;
+            envelopes.push({
+              id: raw.id,
+              pubkey: raw.pubkey,
+              kind: raw.kind,
+              content: typeof raw.content === 'string' ? raw.content : '',
+              tags: Array.isArray(raw.tags) ? (raw.tags as string[][]) : [],
+              createdAt: typeof raw.created_at === 'number' ? raw.created_at : 0,
+            });
+          }
+          // Relay can't paginate gift wraps by arrival → no cursor.
+          return answered({ envelopes, cursor: null });
+        },
         (error) => failed(error),
       );
     },

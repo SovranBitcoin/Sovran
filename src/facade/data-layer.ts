@@ -23,6 +23,7 @@ import type {
   ResolvedMintReviews,
 } from './mint-reviews';
 import type { SocialGraph, SocialGraphRequest, ResolvedSocialGraph } from './social-graph';
+import type { DmEnvelopesBundle, DmEnvelopesRequest, ResolvedDmEnvelopes } from './dm';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -57,6 +58,9 @@ export interface NostrDataLayer {
   getSocialGraph(
     request: SocialGraphRequest,
   ): Promise<Result<ResolvedSocialGraph, TierResolutionError>>;
+  getDmEnvelopes(
+    request: DmEnvelopesRequest,
+  ): Promise<Result<ResolvedDmEnvelopes, TierResolutionError>>;
 }
 
 export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLayer {
@@ -121,6 +125,16 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
       );
       const resolved = await resolveAcrossTiers<SocialGraph>(candidates);
       return resolved.map(({ tier, value }) => ({ tier, ...value }));
+    },
+
+    async getDmEnvelopes(request) {
+      const candidates = candidatesFor<DmEnvelopesBundle>(
+        config.tiers,
+        'getDmEnvelopes',
+        (tier) => () => tier.getDmEnvelopes!(request),
+      );
+      const resolved = await resolveAcrossTiers<DmEnvelopesBundle>(candidates);
+      return resolved.map(({ tier, value }) => ({ tier, envelopes: value.envelopes, cursor: value.cursor }));
     },
   };
 }

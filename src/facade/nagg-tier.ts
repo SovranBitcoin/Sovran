@@ -37,6 +37,14 @@ import {
   type SocialGraph,
   type SocialGraphRequest,
 } from './social-graph';
+import {
+  bundleFromNaggDmNodes,
+  DM_ENVELOPE_KINDS,
+  type DmEnvelopesBundle,
+  type DmEnvelopesRequest,
+} from './dm';
+import { NaggDmEnvelopesDataSchema } from '../schemas';
+import { dmEnvelopesAppView } from '../recipes/dm';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -208,6 +216,31 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<SocialGraph>>(
         (data) => answered(socialGraphFromResponse(data)),
+        (error) => failed(error),
+      );
+    },
+
+    async getDmEnvelopes(request: DmEnvelopesRequest): Promise<TierOutcome<DmEnvelopesBundle>> {
+      // Index/router only — opaque envelopes, paginated by ingest time. nagg
+      // stores arrival time so an incremental sync CAN bound against it.
+      const binding = dmEnvelopesAppView({
+        viewer: request.viewerPubkey,
+        kinds: DM_ENVELOPE_KINDS,
+        until: request.cursor?.createdAt,
+        limit: request.limit,
+      });
+      const result = await client.rest<typeof NaggDmEnvelopesDataSchema>({
+        path: binding.path,
+        method: binding.method ?? 'GET',
+        searchParams: binding.searchParams,
+        responseSchema: NaggDmEnvelopesDataSchema,
+        operationName: binding.operationName,
+        refresh: request.refresh,
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<DmEnvelopesBundle>>(
+        (data) => answered(bundleFromNaggDmNodes(data.dmEnvelopes.nodes)),
         (error) => failed(error),
       );
     },
