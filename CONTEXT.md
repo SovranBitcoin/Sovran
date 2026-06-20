@@ -31,3 +31,45 @@ larger than the spendable balance. Needed because an over-balance ecash send
 still resolves (it rounds down to the balance) and so produces no blocking
 Notice — only lightning, which can't round down, would otherwise reveal the
 shortfall. Drives the red Amount tint independently of a Notice.
+
+## Publishing & own content
+
+**Publish seam** — `shared/lib/nostr/publish/publishEvent.ts`, the single path
+every Nostr write routes through. One engine (`fanOut` over `publishRound`),
+three `resolveOn` modes.
+
+**resolveOn modes** — `first-ok` (resolve once any relay accepts, then stop),
+`all-settled` (run the full retry budget for widest reach; replaceable lists),
+`optimistic` (resolve on the first accept, finish fan-out + retries in the
+background).
+
+**Assured vs settled** — _assured_ = delivery is guaranteed (first relay
+accepted) and the UI may proceed; _settled_ = the full background fan-out
+(retries + recipient relays) has finished. Optimistic publishing resolves the
+caller at _assured_ and continues to _settled_ in the background.
+
+**Background / recipient (outbox) relays** — a mentioned user's NIP-65 read
+relays. They need a network lookup, so they're resolved off the critical path
+and folded into the background fan-out via `PublishOptions.backgroundRelays`.
+
+**Own content** — notes/replies/quotes (kind:1) authored by the active profile,
+held in `ownContentStore` (`shared/stores/profile/ownContentStore.ts`): a
+per-profile, persisted, id-keyed local cache. Serves instant "View" of a
+just-posted note and a note-by-id fallback for the thread reader.
+
+**Status (pending → local → confirmed)** — `pending`: publish in flight;
+`local`: delivery assured but not yet echoed back by a relay/app-view;
+`confirmed`: seen from a relay/app-view. A failed publish is removed (no phantom).
+
+**Settle-by-id** — own content reconciles by exact `event.id` (a signed note
+already knows its id), so a relay echo is the same key — no timestamp/content
+heuristics, unlike engagement state.
+
+**Passive ingest** — recording own kind:1 notes the app already encounters
+(feed/thread reads) into `ownContentStore`, giving cross-client convergence
+without a dedicated always-on subscription. Seam: `ingestOwnContent`.
+
+**Viewer-state** — a viewer's relation to a post (did _I_ like / repost / quote /
+reply; do I follow this profile). Today derived client-side from relay
+subscriptions; the authoritative source is planned to be nagg app-view payloads
+(see ADR 0001).

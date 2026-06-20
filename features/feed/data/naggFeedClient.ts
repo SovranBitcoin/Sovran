@@ -62,6 +62,7 @@ import type {
   PostsByPubkeysRequest,
 } from './feedClient';
 import { emptyFeedParseResult } from './feedClient';
+import { ingestOwnContent } from '@/shared/stores/profile/ownContentStore';
 import { hasEmptyExplicitPubkeys, hydrateSpecWithPubkey } from './feedSpec';
 import { parseJson } from '../components/nostr/feedParse';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
@@ -1465,6 +1466,24 @@ function collectHydrationFromGraphqlNodes(nodes: GraphqlEventNode[]): {
   };
 }
 
+/**
+ * Own-note candidates from a feed page — note events, their roots, and reposted
+ * originals. `ingestOwnContent` filters these to our own kind:1, so passing the
+ * superset here is safe and keeps the choke-point in one place.
+ */
+function ownNoteCandidatesFromFeed(result: FeedParseResult): FeedEvent[] {
+  const events: FeedEvent[] = [];
+  for (const item of result.orderedFeedItems) {
+    if (item.type === 'note') {
+      events.push(item.event);
+      if (item.rootEvent) events.push(item.rootEvent);
+    } else if (item.originalEvent) {
+      events.push(item.originalEvent);
+    }
+  }
+  return events;
+}
+
 function compareNotificationsNewestFirst(
   left: FeedNotificationsResult['notifications'][number],
   right: FeedNotificationsResult['notifications'][number]
@@ -1681,8 +1700,10 @@ export function createNaggFeedClient(): FeedClient {
       timeoutMs,
     }: FeedPageRequest) {
       const startedAt = Date.now();
-      const logResult = (source: string, result: FeedParseResult): FeedParseResult =>
-        logFeedPageResult(source, result, {
+      const logResult = (source: string, result: FeedParseResult): FeedParseResult => {
+        // Passive convergence: settle any of our own notes this page surfaced.
+        ingestOwnContent(ownNoteCandidatesFromFeed(result), userPubkey);
+        return logFeedPageResult(source, result, {
           limit,
           until,
           offset,
@@ -1690,6 +1711,7 @@ export function createNaggFeedClient(): FeedClient {
           viewerPubkey: !!userPubkey,
           durationMs: Date.now() - startedAt,
         });
+      };
       const hydratedSpec = hydrateSpecWithPubkey(spec, userPubkey);
       if (hasEmptyExplicitPubkeys(hydratedSpec)) {
         return logResult('empty-explicit-pubkeys', emptyFeedParseResult());

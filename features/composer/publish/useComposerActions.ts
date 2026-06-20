@@ -17,6 +17,9 @@ import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
 import { resolveOutboxRelays } from '@/shared/lib/nostr/outbox/recipientRelays';
 import { resolveWriteRelays } from '@/shared/lib/nostr/outbox/resolveWriteRelays';
 import { publishEvent } from '@/shared/lib/nostr/publish';
+import { notePublishedPopup } from '@/shared/lib/popup/popups/notePublished';
+import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
+import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
 import { buildPollEvent } from '@/features/feed/components/nostr/poll/buildPollEvents';
 import {
   useComposerStore,
@@ -137,6 +140,28 @@ export async function publishComposed(ndk: NDK, draft: ComposedDraft): Promise<P
   event.created_at = note.created_at;
   event.tags = note.tags;
 
+  // Sign now so we have the final event id before publishing: it lets us record
+  // the note locally (optimistic) and point the "View" toast at its thread.
+  try {
+    await event.sign();
+  } catch (error) {
+    nostrLog.warn('composer.sign_failed', {
+      reason: error instanceof Error ? error.message : 'unknown',
+    });
+    return 'failed';
+  }
+
+  const ownNote: FeedEvent = {
+    id: event.id,
+    kind: note.kind,
+    pubkey: event.pubkey,
+    content: note.content,
+    tags: note.tags,
+    created_at: note.created_at,
+  };
+  const ownContent = useOwnContentStore.getState();
+  ownContent.recordOwn(ownNote, 'pending');
+
   const result = await publishEvent({
     ndk,
     event,
@@ -145,9 +170,12 @@ export async function publishComposed(ndk: NDK, draft: ComposedDraft): Promise<P
     resolveOn: 'optimistic',
   });
   if (result.isErr()) {
+    ownContent.removeOwn(ownNote.id); // no phantom: a failed post never lingers
     nostrLog.warn('composer.publish_failed', { reason: result.error.type });
     return 'failed';
   }
+  ownContent.confirmOwn(ownNote.id);
+  notePublishedPopup({ eventId: ownNote.id });
   nostrLog.info('composer.published', {
     mode: draft.target.mode,
     accepted: result.value.accepted.length,
