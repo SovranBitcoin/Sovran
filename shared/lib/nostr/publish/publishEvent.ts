@@ -337,16 +337,12 @@ async function runPublish(opts: PublishOptions): Promise<Result<PublishResult, P
   if (existing) return existing;
 
   if (resolveOn === 'optimistic') {
+    // `assured` resolves on first accept; the dedup entry is held until the
+    // background fan-out finishes. `done` settles its own errors internally
+    // (see runOptimistic), so it never rejects — just clean up when it's done.
     const { assured, done } = runOptimistic(ndk, event, eventId, timeoutMs, policy, opts);
     inFlight.set(eventId, assured);
-    void done
-      .catch((error: unknown) =>
-        nostrLog.error('nostr.publish.background_failed', {
-          kind: event.kind,
-          message: error instanceof Error ? error.message : String(error),
-        })
-      )
-      .finally(() => inFlight.delete(eventId));
+    void done.finally(() => inFlight.delete(eventId));
     return assured;
   }
 
