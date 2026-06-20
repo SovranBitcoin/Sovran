@@ -1,7 +1,16 @@
 import { feedLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import { mapAppSpecToFeedSpec, resolvedFeedPageToParseResult } from './facadeFeedAdapter';
-import { emptyFeedParseResult, type FeedClient, type FeedParseResult } from './feedClient';
+import {
+  resolvedNotificationsToResult,
+  toFacadeNotificationsRequest,
+} from './facadeNotificationsAdapter';
+import {
+  emptyFeedParseResult,
+  type FeedClient,
+  type FeedNotificationsResult,
+  type FeedParseResult,
+} from './feedClient';
 
 // ---------------------------------------------------------------------------
 // Facade-backed feed client (local-dev tier validation).
@@ -47,5 +56,35 @@ export function createFacadeFeedClient(fallback: FeedClient): FeedClient {
         }
       );
     },
+
+    async getNotifications(request): Promise<FeedNotificationsResult> {
+      const facadeRequest = toFacadeNotificationsRequest(request);
+      if (!facadeRequest) return fallback.getNotifications(request);
+
+      const layer = buildNostrDataLayer();
+      if (!layer) return emptyNotificationsResult();
+
+      const result = await layer.getNotifications(facadeRequest);
+      return result.match(
+        (page) => resolvedNotificationsToResult(page),
+        (error) => {
+          feedLog.warn('notifications.facade.exhausted', {
+            attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
+          });
+          return emptyNotificationsResult();
+        }
+      );
+    },
+  };
+}
+
+function emptyNotificationsResult(): FeedNotificationsResult {
+  return {
+    notifications: [],
+    profilesMap: new Map(),
+    metricsMap: new Map(),
+    quotedEventsMap: new Map(),
+    paginationUntil: 0,
+    hasNextPage: false,
   };
 }
