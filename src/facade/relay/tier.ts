@@ -1,8 +1,9 @@
 import { answered, failed, unsupported, type TierOutcome } from '../../tiers';
 import type { FeedBundle, FeedPageRequest, FeedSpec } from '../feed';
 import type { ThreadBundle, ThreadRequest } from '../thread';
+import type { NotificationsBundle, NotificationsRequest } from '../notifications';
 import type { NostrTierStrategy } from '../strategy';
-import { demuxRelayFeed, demuxRelayThread } from './demux';
+import { demuxRelayFeed, demuxRelayThread, demuxRelayNotifications } from './demux';
 import type { NostrFilter, RelayConnection } from './protocol';
 
 // ---------------------------------------------------------------------------
@@ -55,6 +56,33 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
           const bundle = demuxRelayThread(events, request.noteId);
           return bundle ? answered(bundle) : unsupported();
         },
+        (error) => failed(error),
+      );
+    },
+
+    async notifications(request: NotificationsRequest): Promise<TierOutcome<NotificationsBundle>> {
+      const limit = request.limit ?? 50;
+      const filters: NostrFilter[] = [
+        // engagement + mentions that p-tag me
+        {
+          kinds: [1, 6, 7, 9735],
+          '#p': [request.viewerPubkey],
+          limit,
+          ...(request.since ? { since: request.since } : {}),
+          ...(request.cursor?.createdAt ? { until: request.cursor.createdAt } : {}),
+        },
+      ];
+      // The load-bearing #e backstop: replies/engagement that omit #p but reference my events.
+      if (request.ownEventIds && request.ownEventIds.length > 0) {
+        filters.push({ kinds: [1], '#e': request.ownEventIds, limit });
+      }
+
+      const result = await config.connection.request(filters, {
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<NotificationsBundle>>(
+        (events) => answered(demuxRelayNotifications(events, request.viewerPubkey, request.ownEventIds)),
         (error) => failed(error),
       );
     },

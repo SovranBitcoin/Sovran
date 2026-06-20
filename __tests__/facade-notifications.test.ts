@@ -1,6 +1,9 @@
 import { describe, test, expect } from 'vitest';
+import { ok, type Result } from 'neverthrow';
 import { createNaggClient } from '../src/transport';
-import { createNaggTier, createNostrDataLayer } from '../src/facade';
+import { createNaggTier, createNostrDataLayer, pendingFeedTier } from '../src/facade';
+import { createRelayTier, type RelayConnection, type RawRelayEvent } from '../src/facade/relay';
+import type { NaggError } from '../src/errors';
 
 const TARGET = 'a'.repeat(64);
 const REPLY = 'b'.repeat(64);
@@ -93,5 +96,57 @@ describe('NostrDataLayer.getNotifications — nagg tier', () => {
     const result = await layer.getNotifications({ viewerPubkey: PUB, grouped: false });
     expect(result._unsafeUnwrap().grouped).toBe(false);
     expect(urlOf()).toContain('grouped=false');
+  });
+});
+
+describe('relay notifications — flat floor + ownership gate', () => {
+  const ME = 'a'.repeat(64);
+  const ACTOR = 'b'.repeat(64);
+  const MYEVENT = 'e'.repeat(64);
+  const OTHER = 'f'.repeat(64);
+
+  function relayEvent(id: string, kind: number, target: string, created_at: number): RawRelayEvent {
+    return { id, pubkey: ACTOR, kind, tags: [['e', target], ['p', ME]], created_at };
+  }
+  function fakeRelay(events: RawRelayEvent[]): RelayConnection {
+    return { request: (): Promise<Result<RawRelayEvent[], NaggError>> => Promise.resolve(ok(events)) };
+  }
+
+  test('produces a flat, newest-first list and degrades grouped to false', async () => {
+    const layer = createNostrDataLayer({
+      tiers: [
+        pendingFeedTier('nagg'),
+        createRelayTier({
+          connection: fakeRelay([
+            relayEvent('1'.repeat(64), 7, MYEVENT, 300), // reaction
+            relayEvent('2'.repeat(64), 1, MYEVENT, 200), // reply
+            relayEvent('3'.repeat(64), 9735, MYEVENT, 100), // zap
+          ]),
+        }),
+      ],
+    });
+
+    const result = await layer.getNotifications({ viewerPubkey: ME, ownEventIds: [MYEVENT] });
+    expect(result.isOk()).toBe(true);
+    const out = result._unsafeUnwrap();
+    expect(out.tier).toBe('relay');
+    expect(out.grouped).toBe(false);
+    expect(out.notifications.map((n) => n.reason)).toEqual(['reaction', 'reply', 'zap']); // newest-first
+  });
+
+  test('fail-closed: an engagement referencing an event I do NOT own is dropped', async () => {
+    const tier = createRelayTier({
+      connection: fakeRelay([
+        relayEvent('1'.repeat(64), 7, MYEVENT, 300), // references mine → keep
+        relayEvent('4'.repeat(64), 7, OTHER, 400), // references someone else's → drop
+      ]),
+    });
+
+    const outcome = await tier.notifications!({ viewerPubkey: ME, ownEventIds: [MYEVENT] });
+    expect(outcome.kind).toBe('answered');
+    if (outcome.kind === 'answered') {
+      const ids = [...outcome.value.itemsById.keys()];
+      expect(ids).toEqual(['1'.repeat(64)]);
+    }
   });
 });

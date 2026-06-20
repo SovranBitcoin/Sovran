@@ -34,6 +34,12 @@ export type NotificationsRequest = RequestControls & {
   cursor?: NostrCursor;
   limit?: number;
   refresh?: boolean;
+  /**
+   * The viewer's own recent event ids, for the relay floor's `#e`/`#q` backstop
+   * and the fail-closed "references an event I own" gate (clients omit `#p` on
+   * replies, so this is load-bearing there). Ignored by the server tiers.
+   */
+  ownEventIds?: string[];
 };
 
 export type NotificationActor = {

@@ -3,6 +3,7 @@ import { synthesizeRecencyManifest } from '../../tiers';
 import { toFeedEvent } from '../event';
 import type { FeedBundle, FeedItem } from '../feed';
 import type { ThreadBundle } from '../thread';
+import type { NotificationItem, NotificationsBundle } from '../notifications';
 import type { RawRelayEvent } from './protocol';
 
 // ---------------------------------------------------------------------------
@@ -93,6 +94,85 @@ export function demuxRelayThread(
     quoted: {},
     cursor: lastEvent ? { createdAt: lastEvent.created_at, id: lastEvent.id } : null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Relay notifications (flat, ungrouped)
+//
+// The floor can't aggregate, so notifications are FLAT (grouped=false): one
+// entry per reaction/repost/zap/reply that references the viewer. Fail-closed
+// "references an event I own" gate — when the viewer's own event ids are known
+// (the `#e`/`#q` backstop), an engagement must `#e`-reference one of them;
+// otherwise we fall back to a `#p` match (the subscription already filtered #p).
+// ---------------------------------------------------------------------------
+
+export function demuxRelayNotifications(
+  events: ReadonlyArray<RawRelayEvent>,
+  viewerPubkey: string,
+  ownEventIds?: string[],
+): NotificationsBundle {
+  const own = ownEventIds && ownEventIds.length > 0 ? new Set(ownEventIds) : null;
+  const itemsById = new Map<string, NotificationItem>();
+  const ordered: NaggFeedEvent[] = [];
+
+  for (const raw of events) {
+    const event = toFeedEvent(raw);
+    if (!event) continue;
+    const reason = reasonForKind(event.kind);
+    if (!reason) continue;
+    if (!referencesViewer(event, viewerPubkey, own, reason)) continue;
+    if (itemsById.has(event.id)) continue;
+    itemsById.set(event.id, { type: 'single', event, reason, actorVertexScore: 0 });
+    ordered.push(event);
+  }
+
+  const manifest = synthesizeRecencyManifest(ordered.map((e) => ({ id: e.id, created_at: e.created_at })));
+  const lastId = manifest.elements[manifest.elements.length - 1];
+  const lastEvent = lastId ? itemsById.get(lastId)?.event : undefined;
+
+  return {
+    itemsById,
+    manifest,
+    grouped: false,
+    stats: {},
+    profiles: {},
+    quoted: {},
+    cursor: lastEvent ? { createdAt: lastEvent.created_at, id: lastEvent.id } : null,
+  };
+}
+
+function reasonForKind(kind: number): string | undefined {
+  switch (kind) {
+    case 7:
+      return 'reaction';
+    case 6:
+    case 16:
+      return 'repost';
+    case 9735:
+      return 'zap';
+    case 1:
+      return 'reply';
+    default:
+      return undefined;
+  }
+}
+
+function referencesViewer(
+  event: NaggFeedEvent,
+  viewerPubkey: string,
+  own: Set<string> | null,
+  reason: string,
+): boolean {
+  const eTags = event.tags.filter((t) => t[0] === 'e').map((t) => t[1]);
+  const pTags = event.tags.filter((t) => t[0] === 'p').map((t) => t[1]);
+  if (reason === 'reply') {
+    // replies often omit #p — include if they p-tag me OR e-reference one of my events
+    return pTags.includes(viewerPubkey) || (!!own && eTags.some((id) => own.has(id)));
+  }
+  // reaction/repost/zap: fail-closed against stray inherited p-tags when we know
+  // our own ids; otherwise trust the #p the subscription filtered on.
+  if (own) return eTags.some((id) => own.has(id));
+  return pTags.includes(viewerPubkey);
 }
 
 function profileFromContent(content: string | undefined): NaggProfileInfo {
