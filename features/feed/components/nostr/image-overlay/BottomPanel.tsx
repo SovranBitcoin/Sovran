@@ -25,6 +25,7 @@ import type { ContentSegment } from '../feedTypes';
 import type { ImageOverlayPost } from './types';
 import { BOTTOM_PANEL_PADDING_HORIZONTAL, BOTTOM_PANEL_PADDING_TOP } from './config';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { COMMENT_ACCENT } from '@/shared/lib/brandColors';
 import { openRepostMenu } from '@/features/feed/lib/repostMenu';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { Log } from '@/shared/lib/logger';
@@ -239,12 +240,12 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
   /** Dismisses the lightbox so the Repost/Quote menu can render over it. */
   onRequestClose?: () => void;
 }) {
-  const [foreground, muted, repostedColor, repliedColor] = useThemeColor([
+  const [foreground, muted, repostedColor] = useThemeColor([
     'foreground',
     'muted',
     'success',
-    'link',
   ] as const);
+  const repliedColor = COMMENT_ACCENT;
   const [contentExpanded, setContentExpanded] = useState(initialContentExpanded ?? false);
 
   useEffect(() => {
@@ -428,7 +429,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
   onRequestClose?: () => void;
 }) {
   const repostedColor = useThemeColor('success');
-  const repliedColor = useThemeColor('link');
+  const repliedColor = COMMENT_ACCENT;
   const handleRepostPress = useOverlayRepostMenu(post, onRequestClose);
   const { event, metrics, profile, reposted, liked, replied, onLikePress } = post;
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
