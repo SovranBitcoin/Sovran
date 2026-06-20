@@ -204,54 +204,71 @@ function runOptimistic(
     resolveAssured(ok(buildPublishResult(eventId, [result])));
 
   const done = (async (): Promise<void> => {
-    const base = targetRelays(ndk, opts.relays);
-    if (base.length === 0) {
-      nostrLog.warn('nostr.publish.no_relays', { kind: event.kind });
-      resolveAssured(err({ type: 'no-relays' }));
-      return;
-    }
-
-    await fanOut(base, event, timeoutMs, policy, finalByUrl, {
-      resolveOn: 'all-settled',
-      onAccept,
-      onRelayResult: opts.onRelayResult,
-      onRoundSettled: (attempt, anyAccepted) => {
-        if (attempt === 0 && !anyAccepted) {
-          // Nothing accepted on the first attempt: surface the failure now so
-          // the user keeps their draft, and don't leave a zombie background
-          // publish running for a post they'll likely retry.
-          nostrLog.error('nostr.publish.all_failed', {
-            kind: event.kind,
-            relayCount: finalByUrl.size,
-          });
-          resolveAssured(err({ type: 'all-failed', relayResults: [...finalByUrl.values()] }));
-          return true;
-        }
-        return false;
-      },
-    });
-
-    if (!status.ok) return;
-
-    // Recipient (outbox) relays: best-effort reach, off the user's critical
-    // path. Failures here never surface — the note is already on the network.
-    if (opts.backgroundRelays) {
-      const extraUrls = await opts.backgroundRelays.catch(() => [] as readonly string[]);
-      const extra = targetRelays(ndk, extraUrls).filter((relay) => !finalByUrl.has(relay.url));
-      if (extra.length > 0) {
-        await fanOut(extra, event, timeoutMs, policy, finalByUrl, {
-          resolveOn: 'all-settled',
-          onRelayResult: opts.onRelayResult,
-        });
+    try {
+      const base = targetRelays(ndk, opts.relays);
+      if (base.length === 0) {
+        nostrLog.warn('nostr.publish.no_relays', { kind: event.kind });
+        resolveAssured(err({ type: 'no-relays' }));
+        return;
       }
-    }
 
-    const accepted = [...finalByUrl.values()].filter((r) => r.ok).length;
-    nostrLog.info('nostr.publish.optimistic_settled', {
-      kind: event.kind,
-      accepted,
-      relayCount: finalByUrl.size,
-    });
+      await fanOut(base, event, timeoutMs, policy, finalByUrl, {
+        resolveOn: 'all-settled',
+        onAccept,
+        onRelayResult: opts.onRelayResult,
+        onRoundSettled: (attempt, anyAccepted) => {
+          if (attempt === 0 && !anyAccepted) {
+            // Nothing accepted on the first attempt: surface the failure now so
+            // the user keeps their draft, and don't leave a zombie background
+            // publish running for a post they'll likely retry.
+            nostrLog.error('nostr.publish.all_failed', {
+              kind: event.kind,
+              relayCount: finalByUrl.size,
+            });
+            resolveAssured(err({ type: 'all-failed', relayResults: [...finalByUrl.values()] }));
+            return true;
+          }
+          return false;
+        },
+      });
+
+      if (!status.ok) return;
+
+      // Recipient (outbox) relays: best-effort reach, off the user's critical
+      // path. Failures here never surface — the note is already on the network.
+      if (opts.backgroundRelays) {
+        const extraUrls = await opts.backgroundRelays.catch((error: unknown) => {
+          nostrLog.warn('nostr.publish.background_relays_unresolved', {
+            kind: event.kind,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          return [] as readonly string[];
+        });
+        const extra = targetRelays(ndk, extraUrls).filter((relay) => !finalByUrl.has(relay.url));
+        if (extra.length > 0) {
+          await fanOut(extra, event, timeoutMs, policy, finalByUrl, {
+            resolveOn: 'all-settled',
+            onRelayResult: opts.onRelayResult,
+          });
+        }
+      }
+
+      const accepted = [...finalByUrl.values()].filter((r) => r.ok).length;
+      nostrLog.info('nostr.publish.optimistic_settled', {
+        kind: event.kind,
+        accepted,
+        relayCount: finalByUrl.size,
+      });
+    } catch (error) {
+      // Never let the UI hang: if anything threw before delivery was assured,
+      // settle `assured` now (idempotent, so a post-assurance throw is just
+      // logged). Guarantees the returned promise always resolves.
+      nostrLog.error('nostr.publish.optimistic_threw', {
+        kind: event.kind,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      resolveAssured(err({ type: 'all-failed', relayResults: [...finalByUrl.values()] }));
+    }
   })();
 
   return { assured, done };

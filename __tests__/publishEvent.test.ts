@@ -28,7 +28,7 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 
 import type NDK from '@nostr-dev-kit/ndk-mobile';
-import type { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
+import { NDKRelaySet, type NDKEvent } from '@nostr-dev-kit/ndk-mobile';
 
 import { publishEvent } from '@/shared/lib/nostr/publish';
 
@@ -260,6 +260,25 @@ describe('publishEvent optimistic mode', () => {
 
     await flushBackground();
     expect(recipient.publish).toHaveBeenCalledTimes(1); // reached off the critical path
+  });
+
+  it('settles with an error (never hangs) when relay resolution throws', async () => {
+    const ndk = fakeNdk([relay('wss://x', accept)]);
+    (NDKRelaySet.fromRelayUrls as jest.Mock).mockImplementationOnce(() => {
+      throw new Error('relay set boom');
+    });
+
+    // If `assured` failed to settle this `await` would hang and time out.
+    const res = await publishEvent({
+      ndk,
+      event: signedEvent('throw1'),
+      relays: ['wss://x'],
+      resolveOn: 'optimistic',
+      retry: fastRetry,
+    });
+
+    expect(res.isErr()).toBe(true);
+    expect(res._unsafeUnwrapErr().type).toBe('all-failed');
   });
 
   it('skips background recipient relays when the post failed', async () => {
