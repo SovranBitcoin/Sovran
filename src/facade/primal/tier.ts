@@ -1,6 +1,8 @@
 import { answered, failed, unsupported, type TierOutcome } from '../../tiers';
-import type { FeedBundle, FeedPageRequest, FeedSpec, FeedTier } from '../feed';
-import { demuxPrimalFeed } from './demux';
+import type { FeedBundle, FeedPageRequest, FeedSpec } from '../feed';
+import type { ThreadBundle, ThreadRequest } from '../thread';
+import type { NostrTierStrategy } from '../strategy';
+import { demuxPrimalFeed, demuxPrimalThread } from './demux';
 import type { PrimalCacheRequest, PrimalConnection } from './protocol';
 
 // ---------------------------------------------------------------------------
@@ -28,7 +30,7 @@ export type PrimalTierConfig = {
   resolveFeedSpec?: PrimalFeedSpecResolver;
 };
 
-export function createPrimalTier(config: PrimalTierConfig): FeedTier {
+export function createPrimalTier(config: PrimalTierConfig): NostrTierStrategy {
   const resolveFeedSpec = config.resolveFeedSpec ?? defaultResolveFeedSpec;
 
   return {
@@ -46,6 +48,29 @@ export function createPrimalTier(config: PrimalTierConfig): FeedTier {
       });
       return result.match<TierOutcome<FeedBundle>>(
         (events) => answered(demuxPrimalFeed(events)),
+        (error) => failed(error),
+      );
+    },
+
+    async thread(request: ThreadRequest): Promise<TierOutcome<ThreadBundle>> {
+      const cacheRequest: PrimalCacheRequest = {
+        verb: 'thread_view',
+        params: {
+          event_id: request.noteId,
+          limit: request.limit ?? 100,
+          ...(request.viewerPubkey ? { user_pubkey: request.viewerPubkey } : {}),
+        },
+      };
+      const result = await config.connection.request(cacheRequest, {
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<ThreadBundle>>(
+        (events) => {
+          const bundle = demuxPrimalThread(events, request.noteId);
+          // No root in the batch → Primal couldn't serve this thread; fall through.
+          return bundle ? answered(bundle) : unsupported();
+        },
         (error) => failed(error),
       );
     },

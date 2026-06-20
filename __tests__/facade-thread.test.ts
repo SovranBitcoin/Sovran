@@ -1,6 +1,10 @@
 import { describe, test, expect } from 'vitest';
+import { ok, type Result } from 'neverthrow';
 import { createNaggClient } from '../src/transport';
 import { createNaggTier, createNostrDataLayer, pendingFeedTier } from '../src/facade';
+import { createPrimalTier, type PrimalConnection, type RawPrimalEvent } from '../src/facade/primal';
+import { createRelayTier, type RelayConnection, type RawRelayEvent } from '../src/facade/relay';
+import type { NaggError } from '../src/errors';
 
 const ROOT = 'a'.repeat(64);
 const R1 = 'b'.repeat(64);
@@ -73,5 +77,52 @@ describe('NostrDataLayer.getThread — nagg tier', () => {
     expect(result.isErr()).toBe(true);
     const error = result._unsafeUnwrapErr();
     expect(error.attempts.map((a) => a.tier)).toEqual(['nagg']);
+  });
+});
+
+describe('thread parity — Primal and relay tiers', () => {
+  const primalBatch: RawPrimalEvent[] = [
+    { id: ROOT, pubkey: PUB, kind: 1, content: 'root', tags: [], created_at: 1_700_000_000 },
+    { id: R1, pubkey: PUB, kind: 1, content: 'r1', tags: [], created_at: 1_700_000_100 },
+    { id: R2, pubkey: PUB, kind: 1, content: 'r2', tags: [], created_at: 1_700_000_200 },
+    { kind: 10_000_113, content: JSON.stringify({ order_by: 'rank', elements: [ROOT, R1, R2] }) },
+  ];
+
+  function fakePrimal(events: RawPrimalEvent[]): PrimalConnection {
+    return { request: (): Promise<Result<RawPrimalEvent[], NaggError>> => Promise.resolve(ok(events)) };
+  }
+  function fakeRelay(events: RawRelayEvent[]): RelayConnection {
+    return { request: (): Promise<Result<RawRelayEvent[], NaggError>> => Promise.resolve(ok(events)) };
+  }
+
+  test('Primal serves the thread when nagg cannot; root excluded from replies', async () => {
+    const layer = createNostrDataLayer({
+      tiers: [pendingFeedTier('nagg'), createPrimalTier({ connection: fakePrimal(primalBatch) })],
+    });
+    const result = await layer.getThread({ noteId: ROOT });
+    expect(result.isOk()).toBe(true);
+    const thread = result._unsafeUnwrap();
+    expect(thread.tier).toBe('primal');
+    expect(thread.root.type === 'note' && thread.root.event.id).toBe(ROOT);
+    // manifest had [ROOT, R1, R2]; root filtered out of replies
+    expect(thread.replies.map((r) => (r.type === 'note' ? r.event.id : ''))).toEqual([R1, R2]);
+  });
+
+  test('relay floor serves the thread (root by id + #e replies, newest-first)', async () => {
+    const relayBatch: RawRelayEvent[] = [
+      { id: ROOT, pubkey: PUB, kind: 1, content: 'root', tags: [], created_at: 1_700_000_000 },
+      { id: R1, pubkey: PUB, kind: 1, content: 'r1', tags: [['e', ROOT]], created_at: 1_700_000_100 },
+      { id: R2, pubkey: PUB, kind: 1, content: 'r2', tags: [['e', ROOT]], created_at: 1_700_000_200 },
+    ];
+    const layer = createNostrDataLayer({
+      tiers: [pendingFeedTier('nagg'), createRelayTier({ connection: fakeRelay(relayBatch) })],
+    });
+    const result = await layer.getThread({ noteId: ROOT });
+    expect(result.isOk()).toBe(true);
+    const thread = result._unsafeUnwrap();
+    expect(thread.tier).toBe('relay');
+    expect(thread.root.type === 'note' && thread.root.event.id).toBe(ROOT);
+    expect(thread.replies.map((r) => (r.type === 'note' ? r.event.id : ''))).toEqual([R2, R1]); // newest-first
+    expect(thread.stats).toEqual({}); // no engagement on the floor
   });
 });

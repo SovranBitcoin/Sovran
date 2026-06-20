@@ -97,7 +97,7 @@ describe('Primal tier through the facade', () => {
 
   test('a spec Primal cannot serve is `unsupported`, not a failure', async () => {
     const tier = createPrimalTier({ connection: fakeConnection(BATCH) });
-    const outcome = await tier.feedPage({ spec: { kind: 'following-popular', viewerPubkey: PUB } });
+    const outcome = await tier.feedPage!({ spec: { kind: 'following-popular', viewerPubkey: PUB } });
     expect(outcome.kind).toBe('unsupported');
   });
 });

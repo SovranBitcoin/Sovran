@@ -63,7 +63,7 @@ describe('relay tier through the facade — three-tier fallback', () => {
 
   test('following-popular is unsupported on the floor (needs the follow list)', async () => {
     const tier = createRelayTier({ connection: fakeConnection([]) });
-    const outcome = await tier.feedPage({ spec: { kind: 'following-popular', viewerPubkey: PUB } });
+    const outcome = await tier.feedPage!({ spec: { kind: 'following-popular', viewerPubkey: PUB } });
     expect(outcome.kind).toBe('unsupported');
   });
 });
