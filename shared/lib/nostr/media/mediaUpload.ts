@@ -9,12 +9,18 @@ import type NDK from '@nostr-dev-kit/ndk-mobile';
 import type { ResultAsync } from 'neverthrow';
 
 import { uploadToBlossom, type BlossomError } from '@/shared/lib/nostr/media/blossomClient';
+import { ensureUrlExtension, resolveMediaType } from '@/shared/lib/nostr/media/mediaType';
 import { getMediaServer } from '@/shared/lib/nostr/media/mediaServerStore';
 import type { MediaDescriptor } from '@/shared/lib/nostr/media/types';
 
 export interface PickedAsset {
   uri: string;
-  mimeType: string;
+  /** Picker-supplied mime; may be absent or wrong — resolved against the name. */
+  mimeType?: string;
+  /** The asset's own file name, the most trustworthy type signal. */
+  fileName?: string;
+  /** Media family, the last-resort hint when name/uri/mime resolve nothing. */
+  kind?: 'image' | 'video';
   width?: number;
   height?: number;
 }
@@ -30,15 +36,22 @@ export interface UploadMediaOptions {
 
 /** Uploads a picked asset and returns a ready-to-serialize media descriptor. */
 export function uploadMedia(opts: UploadMediaOptions): ResultAsync<MediaDescriptor, BlossomError> {
+  const { mimeType, extension } = resolveMediaType({
+    fileName: opts.asset.fileName,
+    uri: opts.asset.uri,
+    mimeType: opts.asset.mimeType,
+    kind: opts.asset.kind,
+  });
   return uploadToBlossom({
     ndk: opts.ndk,
     server: opts.server ?? getMediaServer(),
     fileUri: opts.asset.uri,
-    mimeType: opts.asset.mimeType,
+    mimeType,
   }).map((descriptor) => ({
-    url: descriptor.url,
+    // Guarantee a renderable suffix; Blossom may return a bare-hash URL.
+    url: ensureUrlExtension(descriptor.url, extension),
     sha256: descriptor.sha256,
-    mimeType: opts.asset.mimeType,
+    mimeType,
     sizeBytes: descriptor.size,
     width: opts.asset.width,
     height: opts.asset.height,

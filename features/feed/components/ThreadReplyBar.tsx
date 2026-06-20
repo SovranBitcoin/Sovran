@@ -191,7 +191,6 @@ export function ThreadReplyBar({
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
     const mediaKind = asset.type === 'video' ? 'video' : 'image';
-    const mimeType = asset.mimeType ?? (mediaKind === 'video' ? 'video/mp4' : 'image/jpeg');
     const id = `m${(mediaSeq += 1)}`;
     setMediaBlocks((prev) => [
       ...prev,
@@ -200,7 +199,14 @@ export function ThreadReplyBar({
 
     const upload = await uploadMedia({
       ndk,
-      asset: { uri: asset.uri, mimeType, width: asset.width, height: asset.height },
+      asset: {
+        uri: asset.uri,
+        mimeType: asset.mimeType,
+        fileName: asset.fileName ?? undefined,
+        kind: mediaKind,
+        width: asset.width,
+        height: asset.height,
+      },
     });
     setMediaBlocks((prev) => {
       if (upload.isErr()) return prev.filter((b) => b.id !== id);
