@@ -70,9 +70,10 @@ heuristics, unlike engagement state.
 without a dedicated always-on subscription. Seam: `ingestOwnContent`.
 
 **Viewer-state** — a viewer's relation to a post (did _I_ like / repost / quote /
-reply; do I follow this profile). Authoritative source is the client-side
-own-events relay sync (NOT nagg) — see **own-events sync** and ADR 0002 (which
-supersedes ADR 0001's nagg approach).
+reply; do I follow this profile). The local store stays authoritative (optimistic
+LWW, ADR 0002), but its **seed source** is now the tiered facade, not a hardcoded
+relay sub — see **tiered facade** and ADR 0003 (which supersedes ADR 0002's
+relay-only seeding while keeping its store-authority mandate).
 
 **Own-events sync** — `useOwnEventsSync` (`shared/lib/nostr/ownsync/`): one
 long-lived app-level relay subscription for all our own events
@@ -91,3 +92,51 @@ toggles.
 **Replied index** — `nostrSocialStore.repliedByEventId` (target id → our reply):
 drives the "you replied" comment-icon highlight, populated from our own kind:1
 reply e-tags by the own-events sync.
+
+## Tiered Nostr data layer
+
+**Tiered facade** — `@sovranbitcoin/nagg-ts`, the single opinionated entry point
+for every Nostr read. Expressed in app domain terms (feed, thread, notifications,
+conversations, social graph, own viewer-state, mint reviews); internally selects
+the best available **tier** and hides fallback, bundling, ordering, validation,
+dedupe, and cache-write. Callers never choose a tier or assemble events. See
+ADR 0003.
+
+**Tier** — one of three independently-operated read sources, tried in order:
+**nagg** (we operate; gold, fully bundled + ranked) → **Primal cache** (Primal
+operates, we build only a client adapter; almost as good) → **raw relays** (many
+operators; the rough-but-functional floor). A tier that can't answer a given read
+returns `unsupported` and the facade falls through to the next.
+
+**Bundle** — one enriched response per read: notes + author profiles + aggregate
+stats + (optionally) the per-viewer action overlay, joined client-side by id.
+Replaces N round-trips with one batch.
+
+**NoteStats vs NoteActions** — the load-bearing split. **NoteStats** = viewer-
+INDEPENDENT aggregate counts (likes/reposts/replies/zaps), cacheable and shared
+across viewers, held in the stats store. **NoteActions** = the per-VIEWER overlay
+("which of THESE did I like/repost/…"), never cacheable across viewers, held in
+the single authoritative viewer-state store. Adding a new engagement type is a
+field on each, not three new maps.
+
+**Ordering manifest** — a server-authoritative ordered id list (`FeedRange`
+style) returned alongside the unordered bundle. The client renders strictly by it,
+index by index; ids absent from the manifest aren't rendered. A structural defense
+against the list reshuffling under your thumb. The relay floor synthesizes one
+from a stable sort key (created_at).
+
+**Live seam** — the ONE place a caller explicitly asks for relays: a listener that
+surfaces a "Load new" pill for items newer than the current page (feeds-recent,
+follow deltas, own-state deltas). nagg owns history/pagination; the listener only
+cares about items newer than the page, never backfill.
+
+**Own-history endpoints** — the paginated nagg own-events read family (authored,
+replies, likes, reposts, zaps-sent, bookmarks, follows, mutes, relays), cursor =
+`(created_at, id)`, lazy paging. Seeds the viewer-state store on cold start and
+lets the user scroll back past the local cap. nagg is the only tier that covers
+all action types; Primal lacks my-likes / my-reposts, so those fall through to
+relays.
+
+**Seen state** — one timestamp "seen-up-to" published as a NIP-78 kind-30078
+app-data event so it syncs across devices via relays AND is readable on the
+backend-free relay tier. Unread = `count(created_at > seenUntil)`.
