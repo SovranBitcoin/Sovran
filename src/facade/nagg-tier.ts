@@ -9,7 +9,7 @@ import {
 } from '../recipes/appview-feed';
 import { forYouRankedEventsInput, followingPopularRankedEventsInput } from '../recipes/feed';
 import type { NaggFeedPage } from '../map/feed';
-import { answered, failed, type TierOutcome } from '../tiers';
+import { answered, failed, unsupported, type TierOutcome } from '../tiers';
 import { nostrLog } from '../log';
 import {
   bundleFromFeedPage,
@@ -92,7 +92,16 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
         timeoutMs: request.timeoutMs,
       });
       return result.match<TierOutcome<FeedBundle>>(
-        (page) => answered(bundleFromFeedPage(page as NaggFeedPage)),
+        (page) => {
+          const bundle = bundleFromFeedPage(page as NaggFeedPage);
+          // An empty feed page isn't a useful answer — fall through to the next
+          // tier so a quiet/unavailable nagg appview doesn't blank the feed.
+          if (bundle.itemsById.size === 0) {
+            nostrLog.debug('nostr.nagg.feed.empty');
+            return unsupported();
+          }
+          return answered(bundle);
+        },
         (error) => failed(error),
       );
     },

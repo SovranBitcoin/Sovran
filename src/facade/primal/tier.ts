@@ -48,7 +48,11 @@ export function createPrimalTier(config: PrimalTierConfig): NostrTierStrategy {
         timeoutMs: request.timeoutMs,
       });
       return result.match<TierOutcome<FeedBundle>>(
-        (events) => answered(demuxPrimalFeed(events)),
+        (events) => {
+          const bundle = demuxPrimalFeed(events);
+          // Empty page → fall through (e.g. Primal lacks this viewer's data).
+          return bundle.itemsById.size === 0 ? unsupported() : answered(bundle);
+        },
         (error) => failed(error),
       );
     },
