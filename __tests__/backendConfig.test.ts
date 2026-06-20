@@ -7,6 +7,7 @@ describe('backend config', () => {
       apiBaseUrl: 'https://api.sovran.money/api',
       scoreApiBaseUrl: 'https://nagg.up.railway.app',
       nostrGraphqlEndpoint: 'https://nagg.up.railway.app/graphql',
+      primalCacheUrl: 'wss://cache2.primal.net/v1',
       nostrDmAppView: false,
       nostrFeedAppView: false,
       nostrNotificationsAppView: false,
@@ -26,6 +27,7 @@ describe('backend config', () => {
       apiBaseUrl: 'https://api.example.test/api',
       scoreApiBaseUrl: 'http://localhost:8080',
       nostrGraphqlEndpoint: 'http://localhost:8081/graphql',
+      primalCacheUrl: 'wss://cache2.primal.net/v1',
       nostrDmAppView: false,
       nostrFeedAppView: false,
       nostrNotificationsAppView: false,
@@ -81,6 +83,14 @@ describe('backend config', () => {
         EXPO_PUBLIC_API_BASE_URL: 'https://api.example.test/api',
       }).scoreApiBaseUrl
     ).toBe('https://nostr-index.example.test');
+  });
+
+  it('defaults the Primal cache URL and honors an override', () => {
+    expect(parseBackendConfig({}).primalCacheUrl).toBe('wss://cache2.primal.net/v1');
+    expect(
+      parseBackendConfig({ EXPO_PUBLIC_PRIMAL_CACHE_URL: 'wss://my-cache.example/v1' })
+        .primalCacheUrl
+    ).toBe('wss://my-cache.example/v1');
   });
 
   it('rejects invalid Nostr app-view URLs', () => {

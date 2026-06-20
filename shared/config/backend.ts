@@ -2,6 +2,12 @@ import { z } from 'zod';
 
 const DEFAULT_NOSTR_APPVIEW_BASE_URL = 'https://nagg.up.railway.app';
 const DEFAULT_API_BASE_URL = 'https://api.sovran.money/api';
+/**
+ * Primal's PUBLIC cache server (Primal operates it; we only connect). Tier 2 of
+ * the resilient Nostr data layer — the `nagg → Primal cache → raw relays`
+ * fallback. Override via EXPO_PUBLIC_PRIMAL_CACHE_URL for a different instance.
+ */
+const DEFAULT_PRIMAL_CACHE_URL = 'wss://cache2.primal.net/v1';
 
 const emptyStringToUndefined = (value: unknown) =>
   typeof value === 'string' && value.trim() === '' ? undefined : value;
@@ -23,6 +29,8 @@ const BackendEnv = z.object({
   EXPO_PUBLIC_API_BASE_URL: RequiredUrl(DEFAULT_API_BASE_URL),
   EXPO_PUBLIC_SCORE_API_BASE_URL: OptionalUrl,
   EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: OptionalUrl,
+  // Primal public cache server (tier 2). Defaults to wss://cache2.primal.net/v1.
+  EXPO_PUBLIC_PRIMAL_CACHE_URL: OptionalUrl,
   // Flip the contacts/DM-list fetch from GraphQL `dmEnvelopes` to the dedicated
   // REST app-view `/nostr/dm/envelopes` once it's deployed. Defaults to GraphQL.
   EXPO_PUBLIC_NOSTR_DM_APPVIEW: z.preprocess(emptyStringToUndefined, z.string().optional()),
@@ -45,6 +53,8 @@ type BackendConfig = {
   apiBaseUrl: string;
   scoreApiBaseUrl: string;
   nostrGraphqlEndpoint: string;
+  /** Primal public cache server URL (tier 2 of the Nostr data layer). */
+  primalCacheUrl: string;
   /** Prefer the REST app-view `/nostr/dm/envelopes` for the contacts/DM list. */
   nostrDmAppView: boolean;
   /** Route feed / thread fetches through nagg's REST app-view. */
@@ -60,6 +70,7 @@ function readBackendEnv(): BackendEnvInput {
     EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
     EXPO_PUBLIC_SCORE_API_BASE_URL: process.env.EXPO_PUBLIC_SCORE_API_BASE_URL,
     EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: process.env.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT,
+    EXPO_PUBLIC_PRIMAL_CACHE_URL: process.env.EXPO_PUBLIC_PRIMAL_CACHE_URL,
     EXPO_PUBLIC_NOSTR_DM_APPVIEW: process.env.EXPO_PUBLIC_NOSTR_DM_APPVIEW,
     EXPO_PUBLIC_NOSTR_FEED_APPVIEW: process.env.EXPO_PUBLIC_NOSTR_FEED_APPVIEW,
     EXPO_PUBLIC_NOSTR_NOTIFICATIONS_APPVIEW: process.env.EXPO_PUBLIC_NOSTR_NOTIFICATIONS_APPVIEW,
@@ -85,6 +96,7 @@ export function parseBackendConfig(env: BackendEnvInput = readBackendEnv()): Bac
     scoreApiBaseUrl: parsed.data.EXPO_PUBLIC_SCORE_API_BASE_URL ?? nostrAppViewBaseUrl,
     nostrGraphqlEndpoint:
       parsed.data.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT ?? `${nostrAppViewBaseUrl}/graphql`,
+    primalCacheUrl: parsed.data.EXPO_PUBLIC_PRIMAL_CACHE_URL ?? DEFAULT_PRIMAL_CACHE_URL,
     nostrDmAppView: parsed.data.EXPO_PUBLIC_NOSTR_DM_APPVIEW === 'true',
     nostrFeedAppView: parsed.data.EXPO_PUBLIC_NOSTR_FEED_APPVIEW === 'true',
     nostrNotificationsAppView: parsed.data.EXPO_PUBLIC_NOSTR_NOTIFICATIONS_APPVIEW === 'true',

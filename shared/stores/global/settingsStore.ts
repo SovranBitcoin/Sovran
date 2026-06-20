@@ -72,6 +72,17 @@ interface SettingsState {
    * inert in production builds (see `loggerFile.ts`).
    */
   fileLoggingEnabled: boolean;
+  /**
+   * Dev toggles: per-tier enablement for the resilient Nostr data layer
+   * (nagg → Primal cache → raw relays). Each flag, when false, removes that tier
+   * from the facade's fallback chain — so a developer can simulate "nagg is
+   * down", "Primal is down", or "relays are down" and watch the degradation.
+   * Default on. The facade reads these when it's wired into the read paths
+   * (see `nostrTierSettings`); until then they're inert.
+   */
+  naggTierEnabled: boolean;
+  primalTierEnabled: boolean;
+  relayTierEnabled: boolean;
   avatarFallbackVariant: AvatarFallbackVariant;
   /** Minimum transfer amount in sats to include in a rebalance plan. */
   minTransferThreshold: number;
@@ -122,6 +133,9 @@ const PersistedSettings = z.object({
   regenerateP2PKOnReceive: z.boolean().default(true),
   sendLocationEnabled: z.boolean().default(false),
   fileLoggingEnabled: z.boolean().default(false),
+  naggTierEnabled: z.boolean().default(true),
+  primalTierEnabled: z.boolean().default(true),
+  relayTierEnabled: z.boolean().default(true),
   avatarFallbackVariant: z.enum(AVATAR_FALLBACK_VARIANTS).default(DEFAULT_AVATAR_FALLBACK_VARIANT),
   minTransferThreshold: z.number().int().nonnegative().default(5),
   middlemanRouting: PersistedMiddlemanRouting.default({
@@ -152,6 +166,9 @@ const DEFAULT_SETTINGS: SettingsState = {
   regenerateP2PKOnReceive: true,
   sendLocationEnabled: false,
   fileLoggingEnabled: false,
+  naggTierEnabled: true,
+  primalTierEnabled: true,
+  relayTierEnabled: true,
   avatarFallbackVariant: DEFAULT_AVATAR_FALLBACK_VARIANT,
   minTransferThreshold: 5,
   middlemanRouting: DEFAULT_MIDDLEMAN_ROUTING,
@@ -211,6 +228,11 @@ interface SettingsActions {
   // On-device file logging (dev diagnostics)
   setFileLoggingEnabled: (enabled: boolean) => void;
   getFileLoggingEnabled: () => boolean;
+
+  // Nostr data-layer per-tier enablement (dev)
+  setNaggTierEnabled: (enabled: boolean) => void;
+  setPrimalTierEnabled: (enabled: boolean) => void;
+  setRelayTierEnabled: (enabled: boolean) => void;
 
   // Avatar fallback variation
   setAvatarFallbackVariant: (variant: AvatarFallbackVariant) => void;
@@ -345,6 +367,20 @@ export const useSettingsStore = create<SettingsStore>()(
           applyFileLogging(enabled);
         },
         getFileLoggingEnabled: () => get().fileLoggingEnabled,
+
+        // Nostr data-layer tiers (dev)
+        setNaggTierEnabled: (enabled: boolean) => {
+          storeLog.info('store.settings.set_nagg_tier_enabled', { enabled });
+          set({ naggTierEnabled: enabled });
+        },
+        setPrimalTierEnabled: (enabled: boolean) => {
+          storeLog.info('store.settings.set_primal_tier_enabled', { enabled });
+          set({ primalTierEnabled: enabled });
+        },
+        setRelayTierEnabled: (enabled: boolean) => {
+          storeLog.info('store.settings.set_relay_tier_enabled', { enabled });
+          set({ relayTierEnabled: enabled });
+        },
 
         // Avatar fallback
         setAvatarFallbackVariant: (variant: AvatarFallbackVariant) => {
