@@ -132,6 +132,16 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
         for (const url of relays) {
           const socket = new Ctor(url);
           sockets.push(socket);
+          // A real socket fires onerror THEN onclose for the same failure; count
+          // each socket's terminal state ONCE, or one dead relay would count twice
+          // and prematurely drive closedCount past the threshold.
+          let terminal = false;
+          const markClosed = () => {
+            if (terminal) return;
+            terminal = true;
+            closedCount += 1;
+            if (closedCount >= relays.length) finish();
+          };
           socket.onopen = () => {
             socket.send(JSON.stringify(['REQ', subId, ...filters]));
           };
@@ -147,14 +157,8 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
               maybeSettle();
             }
           };
-          socket.onerror = () => {
-            closedCount += 1;
-            if (closedCount >= relays.length) finish();
-          };
-          socket.onclose = () => {
-            closedCount += 1;
-            if (closedCount >= relays.length) finish();
-          };
+          socket.onerror = markClosed;
+          socket.onclose = markClosed;
         }
       });
     },

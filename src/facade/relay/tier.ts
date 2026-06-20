@@ -1,3 +1,4 @@
+import type { NostrCursor } from '@sovranbitcoin/schemas';
 import { answered, failed, unsupported, type TierOutcome } from '../../tiers';
 import type { FeedBundle, FeedPageRequest, FeedSpec } from '../feed';
 import type { ThreadBundle, ThreadRequest } from '../thread';
@@ -59,7 +60,7 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
         timeoutMs: request.timeoutMs,
       });
       return result.match<TierOutcome<FeedBundle>>(
-        (events) => answered(demuxRelayFeed(events)),
+        (events) => answered(demuxRelayFeed(withoutBoundary(events, request.cursor))),
         (error) => failed(error),
       );
     },
@@ -96,9 +97,17 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
           ...(request.cursor?.createdAt ? { until: request.cursor.createdAt } : {}),
         },
       ];
-      // The load-bearing #e backstop: replies/engagement that omit #p but reference my events.
+      // The load-bearing #e backstop: replies/engagement that omit #p but reference
+      // my events. It MUST page with the same since/until as the primary filter, or
+      // every page re-fetches the full backstop set from newest (stale duplicates).
       if (request.ownEventIds && request.ownEventIds.length > 0) {
-        filters.push({ kinds: [1], '#e': request.ownEventIds, limit });
+        filters.push({
+          kinds: [1],
+          '#e': request.ownEventIds,
+          limit,
+          ...(request.since ? { since: request.since } : {}),
+          ...(request.cursor?.createdAt ? { until: request.cursor.createdAt } : {}),
+        });
       }
 
       const result = await config.connection.request(filters, {
@@ -106,7 +115,14 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
         timeoutMs: request.timeoutMs,
       });
       return result.match<TierOutcome<NotificationsBundle>>(
-        (events) => answered(demuxRelayNotifications(events, request.viewerPubkey, request.ownEventIds)),
+        (events) =>
+          answered(
+            demuxRelayNotifications(
+              withoutBoundary(events, request.cursor),
+              request.viewerPubkey,
+              request.ownEventIds,
+            ),
+          ),
         (error) => failed(error),
       );
     },
@@ -127,7 +143,7 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
         timeoutMs: request.timeoutMs,
       });
       return result.match<TierOutcome<OwnHistoryBundle>>(
-        (events) => answered(demuxRelayOwnHistory(events, request.actionType)),
+        (events) => answered(demuxRelayOwnHistory(withoutBoundary(events, request.cursor), request.actionType)),
         (error) => failed(error),
       );
     },
@@ -215,6 +231,19 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       );
     },
   };
+}
+
+/**
+ * Drop the exact boundary event the previous page already showed. NIP-01 `until`
+ * is INCLUSIVE, so paging with `until: cursor.createdAt` re-returns the cursor's
+ * own event at the top of the next page; the cursor carries `id` precisely to
+ * disambiguate it. Same-second siblings (different ids) are kept.
+ */
+function withoutBoundary(
+  events: ReadonlyArray<RawRelayEvent>,
+  cursor: NostrCursor | undefined,
+): ReadonlyArray<RawRelayEvent> {
+  return cursor ? events.filter((e) => e.id !== cursor.id) : events;
 }
 
 function toFeedEvents(events: ReadonlyArray<RawRelayEvent>): NaggFeedEvent[] {

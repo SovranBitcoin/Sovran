@@ -151,4 +151,21 @@ describe('relay notifications — flat floor + ownership gate', () => {
       expect(ids).toEqual(['1'.repeat(64)]);
     }
   });
+
+  // Bug 3 (Stage-F): the #e backstop filter must page with the same until as the
+  // primary filter, or every page re-fetches the full backstop set from newest.
+  test('the #e backstop filter carries the cursor until', async () => {
+    let captured: Array<Record<string, unknown>> | undefined;
+    const connection: RelayConnection = {
+      request: (filters): Promise<Result<RawRelayEvent[], NaggError>> => {
+        captured = filters as unknown as Array<Record<string, unknown>>;
+        return Promise.resolve(ok([]));
+      },
+    };
+    const tier = createRelayTier({ connection });
+    await tier.notifications!({ viewerPubkey: ME, ownEventIds: [MYEVENT], cursor: { createdAt: 500, id: 'a'.repeat(64) } });
+    expect(captured?.[0]?.until).toBe(500); // primary
+    expect(captured?.[1]?.['#e']).toEqual([MYEVENT]); // backstop
+    expect(captured?.[1]?.until).toBe(500); // backstop now paged (was missing)
+  });
 });

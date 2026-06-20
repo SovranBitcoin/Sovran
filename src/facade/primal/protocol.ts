@@ -144,9 +144,11 @@ export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): 
           finish(err({ type: 'network', message: 'Primal socket error', cause: undefined }));
 
         socket.onclose = () => {
-          // Closed before EOSE — treat whatever arrived as the (possibly empty) batch
-          // rather than a hard error, so a clean early close still degrades gracefully.
-          finish(ok(events));
+          // Reaching here means EOSE never fired (EOSE calls finish first). A close
+          // before EOSE is a TRUNCATED batch, not a complete one — fail so the facade
+          // falls through to the relay floor rather than rendering a short page as if
+          // it were whole.
+          finish(err({ type: 'network', message: 'Primal closed before EOSE', cause: undefined }));
         };
       });
     },

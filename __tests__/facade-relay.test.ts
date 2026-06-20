@@ -107,3 +107,58 @@ describe('relay pool connection — dedup + EOSE quorum', () => {
     expect(ids).toEqual([ID_A, ID_B, ID_C].sort()); // ID_B not duplicated
   });
 });
+
+describe('regression — relay correctness (Stage-F adversarial review)', () => {
+  function fakeConnection(events: RawRelayEvent[]): RelayConnection {
+    return { request: (): Promise<Result<RawRelayEvent[], NaggError>> => Promise.resolve(ok(events)) };
+  }
+
+  // Bug 1: a real socket fires onerror THEN onclose; a flaky relay must not
+  // double-count and prematurely fail the whole page before a healthy relay delivers.
+  class FlakySocket {
+    onopen: ((ev: unknown) => void) | null = null;
+    onmessage: ((ev: { data: unknown }) => void) | null = null;
+    onerror: ((ev: unknown) => void) | null = null;
+    onclose: ((ev: unknown) => void) | null = null;
+    constructor(public url: string) {
+      queueMicrotask(() => {
+        if (this.url === 'wss://bad') {
+          this.onerror?.({});
+          this.onclose?.({}); // same dead socket fires both
+        } else {
+          this.onopen?.({});
+        }
+      });
+    }
+    send(data: string) {
+      const [, subId] = JSON.parse(data) as [string, string];
+      queueMicrotask(() => {
+        this.onmessage?.({ data: JSON.stringify(['EVENT', subId, note(ID_A, 100)]) });
+        this.onmessage?.({ data: JSON.stringify(['EOSE', subId]) });
+      });
+    }
+    close() {}
+  }
+
+  test('one flaky relay (error+close) does not fail the whole page', async () => {
+    const connection = createRelayPoolConnection({
+      relays: ['wss://bad', 'wss://good'],
+      WebSocketImpl: FlakySocket as unknown as new (url: string) => never,
+      settleMs: 5,
+    });
+    const result = await connection.request([{ kinds: [1] }]);
+    expect(result.isOk()).toBe(true); // would be err "all relays failed" before the fix
+    expect(result._unsafeUnwrap().map((e) => e.id)).toEqual([ID_A]);
+  });
+
+  // Bug 2: NIP-01 until is inclusive; the cursor's own (boundary) event must not
+  // re-render at the top of the next page.
+  test('feed does not re-render the cursor boundary event (seam dedup)', async () => {
+    const layer = createNostrDataLayer({
+      tiers: [createRelayTier({ connection: fakeConnection([note(ID_A, 102), note(ID_B, 101)]) })],
+    });
+    const result = await layer.getFeedPage({ spec: { kind: 'for-you' }, cursor: { createdAt: 101, id: ID_B } });
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().items.map((i) => (i.type === 'note' ? i.event.id : ''))).toEqual([ID_A]);
+  });
+});
