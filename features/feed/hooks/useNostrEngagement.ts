@@ -255,6 +255,7 @@ export function useNostrEngagement(
     eventIds,
     likesByEventId,
     repostsByEventId,
+    repliedByEventId,
     optimisticLikesByEventId,
     optimisticRepostsByEventId,
   ]);

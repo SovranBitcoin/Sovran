@@ -16,7 +16,19 @@ import {
   ShortTextNote,
 } from 'nostr-tools/kinds';
 
-import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
+/**
+ * Minimal Nostr event shape this layer needs. Defined here (not imported from
+ * the feature layer) so the own-sync core stays a shared module with no
+ * `features` dependency; structurally compatible with feed `FeedEvent`.
+ */
+export interface OwnSyncEvent {
+  id: string;
+  kind: number;
+  pubkey: string;
+  content: string;
+  tags: string[][];
+  created_at: number;
+}
 
 interface OwnLikeRow {
   targetEventId: string;
@@ -36,14 +48,14 @@ interface OwnReplyRow {
 
 interface OwnEventsPartition {
   /** Newest kind:0 in the batch. */
-  latestProfile?: FeedEvent;
+  latestProfile?: OwnSyncEvent;
   /** Newest kind:3 in the batch. */
-  latestContacts?: FeedEvent;
+  latestContacts?: OwnSyncEvent;
   likes: OwnLikeRow[];
   reposts: OwnRepostRow[];
   replies: OwnReplyRow[];
   /** Every own kind:1 (posts, replies, quotes) — for ownContentStore. */
-  ownNotes: FeedEvent[];
+  ownNotes: OwnSyncEvent[];
   /** Target event ids deleted by our kind:5 events. */
   deletedEventIds: string[];
 }
@@ -76,7 +88,7 @@ function isLikeReaction(content: string): boolean {
   return content === '+' || content === '';
 }
 
-export function partitionOwnEvents(events: readonly FeedEvent[]): OwnEventsPartition {
+export function partitionOwnEvents(events: readonly OwnSyncEvent[]): OwnEventsPartition {
   const out: OwnEventsPartition = {
     likes: [],
     reposts: [],

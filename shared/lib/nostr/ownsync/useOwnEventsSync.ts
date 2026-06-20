@@ -19,14 +19,13 @@ import { useEffect, useMemo, useRef } from 'react';
 
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 
-import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
 import { nostrLog } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
 
-import { OWN_EVENT_KINDS, partitionOwnEvents } from './partitionOwnEvents';
+import { OWN_EVENT_KINDS, partitionOwnEvents, type OwnSyncEvent } from './partitionOwnEvents';
 
 /** Backfill window for our own events. Replaceable kinds (0/3) ignore it. */
 const BACKFILL_SEC = 365 * 24 * 60 * 60; // 1 year
@@ -37,14 +36,14 @@ const PER_KIND_LIMIT = 5000;
 // useNostrProfileMetadata). closeOnEose:false keeps it live for cross-client updates.
 const OWN_SUBSCRIBE_OPTS = { closeOnEose: false } as const;
 
-function toFeedEvent(raw: {
+function toOwnSyncEvent(raw: {
   id: string;
   kind: number;
   pubkey: string;
   content?: unknown;
   tags?: unknown;
   created_at?: number;
-}): FeedEvent {
+}): OwnSyncEvent {
   return {
     id: raw.id,
     kind: raw.kind,
@@ -55,7 +54,7 @@ function toFeedEvent(raw: {
   };
 }
 
-function applyProfile(event: FeedEvent, accountIndex: number): void {
+function applyProfile(event: OwnSyncEvent, accountIndex: number): void {
   try {
     const parsed = JSON.parse(event.content) as {
       display_name?: string;
@@ -86,18 +85,22 @@ export function useOwnEventsSync(): void {
 
   // Only dispatch events we haven't seen; reset when the active profile changes.
   const processedRef = useRef<Set<string>>(new Set());
+  // Newest kind:0 created_at applied so far — guards against an older profile
+  // event (in a later/out-of-order batch) regressing the cached name/avatar.
+  const lastProfileAtRef = useRef(0);
   useEffect(() => {
     processedRef.current = new Set();
+    lastProfileAtRef.current = 0;
   }, [pubkey]);
 
   useEffect(() => {
     if (!pubkey || !events?.length) return;
-    const fresh: FeedEvent[] = [];
+    const fresh: OwnSyncEvent[] = [];
     for (const raw of events) {
       const id = (raw as { id?: string }).id;
       if (!id || processedRef.current.has(id)) continue;
       processedRef.current.add(id);
-      fresh.push(toFeedEvent(raw as Parameters<typeof toFeedEvent>[0]));
+      fresh.push(toOwnSyncEvent(raw as Parameters<typeof toOwnSyncEvent>[0]));
     }
     if (fresh.length === 0) return;
 
@@ -119,7 +122,10 @@ export function useOwnEventsSync(): void {
       });
       social.clearSettledFollowOptimistic();
     }
-    if (part.latestProfile) applyProfile(part.latestProfile, activeAccountIndex);
+    if (part.latestProfile && part.latestProfile.created_at > lastProfileAtRef.current) {
+      applyProfile(part.latestProfile, activeAccountIndex);
+      lastProfileAtRef.current = part.latestProfile.created_at;
+    }
 
     nostrLog.debug('nostr.ownsync.ingested', {
       fresh: fresh.length,
