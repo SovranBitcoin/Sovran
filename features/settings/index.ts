@@ -5,7 +5,7 @@ export { SettingsProfileScreen } from './screens/SettingsProfileScreen';
 export { SettingsKeyringScreen } from './screens/SettingsKeyringScreen';
 export { SettingsRecoveryScreen } from './screens/SettingsRecoveryScreen';
 export { SettingsRoutingScreen } from './screens/SettingsRoutingScreen';
-export { SettingsRelaysScreen } from './screens/SettingsRelaysScreen';
+export { SettingsNetworkScreen } from './screens/SettingsNetworkScreen';
 export { SettingsStorageScreen } from './screens/SettingsStorageScreen';
 export { SettingsDesignSystemScreen } from './screens/SettingsDesignSystemScreen';
 export { SettingsDesignSystemLoadingScreen } from './screens/SettingsDesignSystemLoadingScreen';

@@ -160,12 +160,6 @@ export const SettingsScreen = () => {
   const setWhitenoiseEnabled = useSettingsStore((state) => state.setWhitenoiseEnabled);
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
-  const naggTierEnabled = useSettingsStore((state) => state.naggTierEnabled);
-  const setNaggTierEnabled = useSettingsStore((state) => state.setNaggTierEnabled);
-  const primalTierEnabled = useSettingsStore((state) => state.primalTierEnabled);
-  const setPrimalTierEnabled = useSettingsStore((state) => state.setPrimalTierEnabled);
-  const relayTierEnabled = useSettingsStore((state) => state.relayTierEnabled);
-  const setRelayTierEnabled = useSettingsStore((state) => state.setRelayTierEnabled);
   const avatarFallbackVariant = useSettingsStore((state) => state.avatarFallbackVariant);
   const notificationPolicy = useNotificationPolicyStore((state) => state.policy);
   const signerPendingCount = useNip46RequestsStore((state) => state.pending.length);
@@ -226,9 +220,9 @@ export const SettingsScreen = () => {
             />
             <Separator className="mx-4" />
             <SettingsListLinkItem
-              href="/(settings-flow)/relays"
-              title="Relays"
-              description="Manage where your posts publish"
+              href="/(settings-flow)/network"
+              title="Network"
+              description="Aggregators, caching, and relays"
             />
           </ListGroup>
         </Section>
@@ -415,72 +409,6 @@ export const SettingsScreen = () => {
                       </ListGroup.ItemContent>
                       <ListGroup.ItemSuffix>
                         <HeroSwitch isSelected={mockNoGlass} onSelectedChange={setMockNoGlass} />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
-                <Separator className="mx-4" />
-                <PressableFeedback
-                  animation={false}
-                  onPress={() => setNaggTierEnabled(!naggTierEnabled)}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Nostr tier: nagg</ListGroup.ItemTitle>
-                        <ListGroup.ItemDescription>
-                          Off = skip our nagg app-view (simulate nagg down)
-                        </ListGroup.ItemDescription>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch
-                          isSelected={naggTierEnabled}
-                          onSelectedChange={setNaggTierEnabled}
-                        />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
-                <Separator className="mx-4" />
-                <PressableFeedback
-                  animation={false}
-                  onPress={() => setPrimalTierEnabled(!primalTierEnabled)}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Nostr tier: Primal cache</ListGroup.ItemTitle>
-                        <ListGroup.ItemDescription>
-                          Off = skip Primal&apos;s cache server (simulate Primal down)
-                        </ListGroup.ItemDescription>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch
-                          isSelected={primalTierEnabled}
-                          onSelectedChange={setPrimalTierEnabled}
-                        />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
-                <Separator className="mx-4" />
-                <PressableFeedback
-                  animation={false}
-                  onPress={() => setRelayTierEnabled(!relayTierEnabled)}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Nostr tier: raw relays</ListGroup.ItemTitle>
-                        <ListGroup.ItemDescription>
-                          Off = skip the raw-relay floor (simulate relays down)
-                        </ListGroup.ItemDescription>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch
-                          isSelected={relayTierEnabled}
-                          onSelectedChange={setRelayTierEnabled}
-                        />
                       </ListGroup.ItemSuffix>
                     </ListGroup.Item>
                   </PressableFeedback.Scale>

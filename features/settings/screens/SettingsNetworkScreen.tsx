@@ -1,9 +1,12 @@
 /**
- * @fileoverview Relay management (NIP-65).
+ * @fileoverview Network configuration — the three tiers of the resilient Nostr
+ * data layer: aggregators (nagg), caching (Primal), and relays.
  *
- * Lists the active profile's relays with live connection health, read/write
- * markers, and delete; lets the user add a relay, restore the default set, and
- * publish the list as `kind:10002` so the outbox model can route their posts.
+ * Each tier has an enable/disable switch (a disabled tier drops out of the
+ * facade's nagg → Primal → relays fallback chain — handy for simulating a tier
+ * being down). The relays section additionally manages the active profile's
+ * NIP-65 list (kind:10002): connection health, read/write markers, add/remove,
+ * restore defaults, and publish.
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
@@ -11,6 +14,8 @@ import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Button, Card, Input, ListGroup, Separator, Switch, TextField } from 'heroui-native';
 
 import Icon from 'assets/icons';
+import { backendConfig } from '@/shared/config/backend';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRelayHealth, type RelayHealth } from '@/shared/hooks/useRelayHealth';
 import { log } from '@/shared/lib/logger';
@@ -23,8 +28,14 @@ import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { Text } from '@/shared/ui/primitives/Text';
 
-export function SettingsRelaysScreen() {
+export function SettingsNetworkScreen() {
   const { ndk } = useNDK();
+  const naggTierEnabled = useSettingsStore((s) => s.naggTierEnabled);
+  const setNaggTierEnabled = useSettingsStore((s) => s.setNaggTierEnabled);
+  const primalTierEnabled = useSettingsStore((s) => s.primalTierEnabled);
+  const setPrimalTierEnabled = useSettingsStore((s) => s.setPrimalTierEnabled);
+  const relayTierEnabled = useSettingsStore((s) => s.relayTierEnabled);
+  const setRelayTierEnabled = useSettingsStore((s) => s.setRelayTierEnabled);
   const entries = useRelayListStore((s) => s.entries);
   const source = useRelayListStore((s) => s.source);
   const addRelay = useRelayListStore((s) => s.addRelay);
@@ -98,11 +109,45 @@ export function SettingsRelaysScreen() {
   );
 
   return (
-    <ScreenWrapper name="SettingsRelaysScreen" scroll="custom" safeArea>
+    <ScreenWrapper name="SettingsNetworkScreen" scroll="custom" safeArea>
       <ScrollView
         className="px-4"
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ paddingBottom: 32 }}>
+        <Text size={13} className="mb-3 px-1" style={{ color: mutedColor }}>
+          Sovran reads Nostr nagg-first, then falls back to Primal&apos;s cache, then raw relays.
+          Turn a source off to skip it (e.g. to test the fallback).
+        </Text>
+
+        <Section title="Aggregator">
+          <TierToggleCard
+            name="nagg"
+            description="Our app-view — fully bundled, ranked"
+            url={backendConfig.nostrAppViewBaseUrl}
+            enabled={naggTierEnabled}
+            onToggle={setNaggTierEnabled}
+          />
+        </Section>
+
+        <Section title="Caching">
+          <TierToggleCard
+            name="Primal cache"
+            description="Primal's public cache server"
+            url={backendConfig.primalCacheUrl}
+            enabled={primalTierEnabled}
+            onToggle={setPrimalTierEnabled}
+          />
+        </Section>
+
+        <Section title="Relays">
+          <TierToggleCard
+            name="Raw relays"
+            description="The decentralised floor — a bit rough but functional"
+            enabled={relayTierEnabled}
+            onToggle={setRelayTierEnabled}
+          />
+        </Section>
+
         {sortedEntries.length === 0 ? (
           <EmptyState
             icon="mdi:server-network-off"
@@ -205,6 +250,39 @@ export function SettingsRelaysScreen() {
         </Section>
       </ScrollView>
     </ScreenWrapper>
+  );
+}
+
+function TierToggleCard({
+  name,
+  description,
+  url,
+  enabled,
+  onToggle,
+}: {
+  name: string;
+  description: string;
+  url?: string;
+  enabled: boolean;
+  onToggle: (next: boolean) => void;
+}) {
+  return (
+    <ListGroup variant="secondary">
+      <View className="flex-row items-center gap-3 px-4 py-3">
+        <View className="flex-1">
+          <Text size={15}>{name}</Text>
+          <Text size={12} className="text-muted mt-0.5">
+            {description}
+          </Text>
+          {url ? (
+            <Text size={12} className="text-muted mt-1" numberOfLines={1}>
+              {url}
+            </Text>
+          ) : null}
+        </View>
+        <Switch isSelected={enabled} onSelectedChange={onToggle} />
+      </View>
+    </ListGroup>
   );
 }
 
