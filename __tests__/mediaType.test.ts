@@ -56,6 +56,10 @@ describe('extensionForMime', () => {
     expect(extensionForMime('application/octet-stream')).toBeUndefined();
     expect(extensionForMime(undefined)).toBeUndefined();
   });
+
+  it('prefers jpg over jpeg for image/jpeg', () => {
+    expect(extensionForMime('image/jpeg')).toBe('jpg');
+  });
 });
 
 describe('ensureUrlExtension', () => {

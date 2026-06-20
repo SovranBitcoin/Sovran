@@ -27,18 +27,16 @@ const EXTENSION_TO_MIME = {
 
 type KnownExtension = keyof typeof EXTENSION_TO_MIME;
 
-/** Canonical MIME type → preferred extension (the reverse of the table above). */
-const MIME_TO_EXTENSION: Record<string, KnownExtension> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/gif': 'gif',
-  'image/webp': 'webp',
-  'image/heic': 'heic',
-  'image/heif': 'heif',
-  'video/mp4': 'mp4',
-  'video/quicktime': 'mov',
-  'video/webm': 'webm',
-};
+/**
+ * Canonical MIME type → preferred extension, derived from the table above so the
+ * two never drift. The first extension listed for a mime wins (e.g. `jpg`, not
+ * `jpeg`), so order entries in `EXTENSION_TO_MIME` preference-first.
+ */
+const MIME_TO_EXTENSION: Record<string, KnownExtension> = Object.fromEntries(
+  (Object.entries(EXTENSION_TO_MIME) as [KnownExtension, string][])
+    .reverse()
+    .map(([ext, mime]) => [mime, ext])
+);
 
 /** The known media extension at the end of a filename or URL path, if any. */
 function extensionOf(nameOrUri: string | undefined): KnownExtension | undefined {
@@ -79,6 +77,7 @@ export function resolveMediaType(hints: PickedMediaHints): ResolvedMediaType {
   if (fromName) return { extension: fromName, mimeType: EXTENSION_TO_MIME[fromName] };
 
   const fromMime = extensionForMime(hints.mimeType);
+  // `&& hints.mimeType` narrows it to a non-undefined string for the return type.
   if (fromMime && hints.mimeType) return { extension: fromMime, mimeType: hints.mimeType };
 
   const extension: KnownExtension = hints.kind === 'video' ? 'mp4' : 'jpg';
