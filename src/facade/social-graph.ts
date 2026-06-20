@@ -25,6 +25,10 @@ export type SocialGraph = {
   profiles: Record<string, NaggProfileInfo>;
   relayList: RelayListEntry[];
   mutes: string[];
+  /** `created_at` of the kind-3 the follows came from (0 if unknown). The app's
+   *  last-writer-wins gate uses this so a facade seed and a relay delta cannot
+   *  fight — the newer contact list always wins. */
+  contactsUpdatedAt: number;
 };
 
 export type SocialGraphRequest = RequestControls & {
@@ -49,6 +53,9 @@ export const SocialGraphResponseSchema = z.object({
     .array(z.object({ url: z.string(), read: z.boolean().optional(), write: z.boolean().optional() }))
     .optional(),
   mutes: z.array(z.string()).optional(),
+  /** `created_at` of the contact list nagg bundled this from (optional until the
+   *  app-view surfaces it; treated as 0/unknown when absent). */
+  contacts_updated_at: z.number().optional(),
 });
 
 export function socialGraphFromResponse(data: z.infer<typeof SocialGraphResponseSchema>): SocialGraph {
@@ -58,6 +65,7 @@ export function socialGraphFromResponse(data: z.infer<typeof SocialGraphResponse
     profiles: data.profiles ?? {},
     relayList: (data.relays ?? []).map((r) => ({ url: r.url, read: r.read ?? true, write: r.write ?? true })),
     mutes: data.mutes ?? [],
+    contactsUpdatedAt: data.contacts_updated_at ?? 0,
   };
 }
 
@@ -81,6 +89,7 @@ export function socialGraphFromEvents(pubkey: string, events: ReadonlyArray<Nagg
     profiles: {}, // the floor fetches profiles separately (batched by the app)
     relayList: relays ? parseRelayList(relays) : [],
     mutes: mutes ? pTagValues(mutes) : [],
+    contactsUpdatedAt: contacts?.created_at ?? 0,
   };
 }
 

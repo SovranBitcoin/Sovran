@@ -18,6 +18,7 @@ describe('socialGraphFromEvents — relay floor parse', () => {
   test('parses follows, relay list (NIP-65 markers), and mutes from the latest events', () => {
     const graph = socialGraphFromEvents(ME, [CONTACTS, RELAYS, MUTES].map((e) => ({ ...e })));
     expect(graph.follows).toEqual([F1, F2]);
+    expect(graph.contactsUpdatedAt).toBe(200); // the kind-3's created_at, for the app's LWW gate
     expect(graph.mutes).toEqual([M1]);
     expect(graph.relayList).toEqual([
       { url: 'wss://a', read: true, write: true },
