@@ -1,7 +1,9 @@
 /**
  * @fileoverview Home Feed ("For You") Component
  *
- * Algorithmic feed powered by Nagg's GraphQL API.
+ * Algorithmic feed served through the tier-selecting facade: nagg's REST
+ * app-view returns one fully-bundled page (events + profiles + engagement
+ * stats), with Primal cache / raw relays as fallback tiers.
  */
 
 import {

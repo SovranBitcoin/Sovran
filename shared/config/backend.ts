@@ -97,9 +97,14 @@ export function parseBackendConfig(env: BackendEnvInput = readBackendEnv()): Bac
     nostrGraphqlEndpoint:
       parsed.data.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT ?? `${nostrAppViewBaseUrl}/graphql`,
     primalCacheUrl: parsed.data.EXPO_PUBLIC_PRIMAL_CACHE_URL ?? DEFAULT_PRIMAL_CACHE_URL,
-    nostrDmAppView: parsed.data.EXPO_PUBLIC_NOSTR_DM_APPVIEW === 'true',
-    nostrFeedAppView: parsed.data.EXPO_PUBLIC_NOSTR_FEED_APPVIEW === 'true',
-    nostrNotificationsAppView: parsed.data.EXPO_PUBLIC_NOSTR_NOTIFICATIONS_APPVIEW === 'true',
+    // nagg's REST app-view is the default transport: it returns one fully
+    // bundled payload per page (events + profiles + the reliable single-query
+    // engagement stats), which the flaky GraphQL noteStats join does not. GraphQL
+    // stays only as an automatic fallback (see runNaggQuery) and an explicit dev
+    // opt-out (`EXPO_PUBLIC_NOSTR_*_APPVIEW=false`).
+    nostrDmAppView: parsed.data.EXPO_PUBLIC_NOSTR_DM_APPVIEW !== 'false',
+    nostrFeedAppView: parsed.data.EXPO_PUBLIC_NOSTR_FEED_APPVIEW !== 'false',
+    nostrNotificationsAppView: parsed.data.EXPO_PUBLIC_NOSTR_NOTIFICATIONS_APPVIEW !== 'false',
   };
 }
 
