@@ -7,13 +7,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeOut,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import {
   LegendList,
   type LegendListRef,
@@ -280,30 +274,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 
   const listRef = useRef<LegendListRef>(null);
 
-  // The sort-tabs ("Relevant") row and the replies sit below the target, so their
-  // on-screen position is whatever LegendList computes for the target — which
-  // starts at `estimatedItemSize` and snaps to the real measured height a frame
-  // later, shifting everything below. Rather than fight that reconciliation, we
-  // keep those rows occupying their space but at opacity 0 until the real target
-  // has laid out, then fade them in at their settled positions (the shift happens
-  // while they're invisible). The target itself is the stable anchor and renders
-  // immediately.
-  const revealedRef = useRef(false);
-  const revealOpacity = useSharedValue(0);
-  const revealStyle = useAnimatedStyle(() => ({ opacity: revealOpacity.value }));
-  const handleTargetSettled = useCallback(() => {
-    if (revealedRef.current) return;
-    revealedRef.current = true;
-    // One frame after the target measures, LegendList has repositioned the rows
-    // below it — reveal then so they fade in already in their final spot.
-    requestAnimationFrame(() => {
-      revealOpacity.value = withTiming(1, { duration: 220 });
-    });
-  }, [revealOpacity]);
-  useEffect(() => {
-    revealedRef.current = false;
-    revealOpacity.value = 0;
-  }, [eventId, revealOpacity]);
+  // Position stability is owned by the list's `maintainVisibleContentPosition`
+  // (see the LegendList below): the target is the anchor, so a row's height
+  // snapping from estimate to measured — and the parent chain prepending above
+  // — never move it. No opacity-reveal masking needed.
 
   const targetIndex = useMemo(() => items.findIndex((item) => item.type === 'target'), [items]);
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
@@ -475,16 +449,13 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       }
 
       if (item.type === 'reply-sort-tabs') {
-        // Hidden until the target settles, then fades in at its final position.
         return (
-          <Animated.View style={revealStyle}>
-            <ReplySortPicker
-              selected={replySort}
-              onSelect={setReplySort}
-              foreground={foreground}
-              surfaceTertiary={surfaceTertiary}
-            />
-          </Animated.View>
+          <ReplySortPicker
+            selected={replySort}
+            onSelect={setReplySort}
+            foreground={foreground}
+            surfaceTertiary={surfaceTertiary}
+          />
         );
       }
 
@@ -543,7 +514,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       getEngagementState,
       getMetrics,
       hasParents,
-      revealStyle,
       profilesRef,
       quotedEventsRef,
       replySort,
@@ -566,7 +536,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         itemType={threadItemType(props.item)}
         index={props.index}
         phase={threadPhase}
-        onLayout={props.item.type === 'target' ? handleTargetSettled : undefined}
         extra={{
           eventId,
           rows: displayItems.length,
@@ -580,7 +549,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     [
       displayItems.length,
       eventId,
-      handleTargetSettled,
       isFetching,
       renderThreadItem,
       replyBarHeight,
@@ -726,6 +694,16 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               }}
               scrollEventThrottle={16}
               scrollEnabled={embed ? embed.listScrollEnabled : undefined}
+              // Anchor on the tapped note. The seed (or skeletons) paint the
+              // target first, then the full thread prepends the parent chain
+              // ABOVE it; this holds the first visible row (the target) in
+              // place, so parents fill in off-screen above and the target never
+              // shifts under the thumb — and a row's height snapping from
+              // estimate to measured doesn't move it either.
+              maintainVisibleContentPosition
+              // Deliberately NO `maintainScrollAtEnd`: this is a thread, not a
+              // chat. Replies appended below (or via loadMoreReplies) must not
+              // yank the view down — the reader's position is preserved.
               initialScrollIndex={!isLoading && targetIndex > 0 ? targetIndex : undefined}
             />
           </ThreadEmbedSheet>
