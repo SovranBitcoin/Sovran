@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { searchUsers as apiSearchUsers, type NostrSearchResult } from '@/shared/lib/apiClient';
+import { type NostrSearchResult } from '@/shared/lib/apiClient';
+import { searchProfilesViaFacade } from '@/shared/lib/nostr/searchProfiles';
 import { paymentLog, redactError } from '@/shared/lib/logger';
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 
@@ -67,7 +68,7 @@ export function useContactSearch(searchQuery: string) {
     const search = async () => {
       try {
         paymentLog.debug('payment.contacts.search', { query: debouncedQuery, limit: 10 });
-        const result = await apiSearchUsers({
+        const result = await searchProfilesViaFacade({
           query: debouncedQuery,
           limit: 10,
           signal: controller.signal,
