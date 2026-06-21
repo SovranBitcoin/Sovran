@@ -303,6 +303,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     void listRef.current?.scrollToIndex({ index: targetIndex, viewPosition: 0, animated: false });
   }, [targetIndex]);
 
+  // Read by the size-change handler below without re-subscribing it every render.
+  const targetIndexRef = useRef(targetIndex);
+  targetIndexRef.current = targetIndex;
+
   const displayItems = useMemo<ThreadListItem[]>(() => {
     if (isLoading && items.length === 0) {
       // Include the sort-tabs row in the very first skeleton frame so it doesn't
@@ -363,6 +367,31 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     }),
     getListState: () => listRef.current?.getState() ?? null,
   });
+
+  // Sustained pin: a one-shot scrollToIndex completes against the *estimated*
+  // parent height, so when the parent then measures to its real (taller) height
+  // the focused note still drops. Re-assert the pin whenever a row ABOVE the
+  // target changes size (i.e. as the parent chain measures), so the height delta
+  // fills in off-screen above instead of shoving the note down. Stops once the
+  // parents have settled (no more size changes) and never fights a reader who
+  // has grabbed the list.
+  const handleItemSizeChanged = useCallback(
+    (info: {
+      size: number;
+      previous: number;
+      index: number;
+      itemKey: string;
+      itemData: ThreadListItem;
+    }) => {
+      visualList.onItemSizeChanged?.(info);
+      if (readerMovedRef.current) return;
+      const tIndex = targetIndexRef.current;
+      if (tIndex > 0 && info.index < tIndex) {
+        void listRef.current?.scrollToIndex({ index: tIndex, viewPosition: 0, animated: false });
+      }
+    },
+    [visualList]
+  );
 
   const threadVisualState = useMemo(() => {
     let skeletons = 0;
@@ -685,7 +714,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               }
               onEndReached={handleEndReached}
               onEndReachedThreshold={0.4}
-              onItemSizeChanged={visualList.onItemSizeChanged}
+              onItemSizeChanged={handleItemSizeChanged}
               onLoad={visualList.onLoad}
               onMetricsChange={visualList.onMetricsChange}
               onStickyHeaderChange={visualList.onStickyHeaderChange}
