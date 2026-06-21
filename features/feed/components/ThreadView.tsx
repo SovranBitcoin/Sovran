@@ -274,14 +274,34 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 
   const listRef = useRef<LegendListRef>(null);
 
-  // Position stability is owned by the list's `maintainVisibleContentPosition`
-  // (see the LegendList below): the target is the anchor, so a row's height
-  // snapping from estimate to measured — and the parent chain prepending above
-  // — never move it. No opacity-reveal masking needed.
-
+  // Position stability has two owners. Steady state: the list's
+  // `maintainVisibleContentPosition` (see below) holds the visible anchor when a
+  // row resizes or replies append. The hard case is the parent chain arriving
+  // AFTER the target has painted — parents prepend at the *estimated* row height,
+  // the data-anchor corrects against that estimate, then they measure to their
+  // real (taller) height and the delta shoves the focused note down. So when
+  // parents first appear we drive an explicit scrollToIndex to the target: an
+  // active scroll target is re-resolved on every layout pass, which pins the note
+  // through the measurement settle. No opacity-reveal masking needed.
   const targetIndex = useMemo(() => items.findIndex((item) => item.type === 'target'), [items]);
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
   const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
+
+  // Pin the target through the parent prepend. Fires once per thread, and never
+  // if the reader has already grabbed the list (readerMovedRef).
+  const pinnedTargetRef = useRef(false);
+  const readerMovedRef = useRef(false);
+  useEffect(() => {
+    pinnedTargetRef.current = false;
+    readerMovedRef.current = false;
+  }, [eventId]);
+  useEffect(() => {
+    if (pinnedTargetRef.current || readerMovedRef.current) return;
+    // targetIndex <= 0 → no parents above the target, so nothing prepends.
+    if (targetIndex <= 0) return;
+    pinnedTargetRef.current = true;
+    void listRef.current?.scrollToIndex({ index: targetIndex, viewPosition: 0, animated: false });
+  }, [targetIndex]);
 
   const displayItems = useMemo<ThreadListItem[]>(() => {
     if (isLoading && items.length === 0) {
@@ -693,13 +713,15 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 });
               }}
               scrollEventThrottle={16}
+              onScrollBeginDrag={() => {
+                // A reader-initiated drag opts out of the one-shot target pin.
+                readerMovedRef.current = true;
+              }}
               scrollEnabled={embed ? embed.listScrollEnabled : undefined}
-              // Anchor on the tapped note. The seed (or skeletons) paint the
-              // target first, then the full thread prepends the parent chain
-              // ABOVE it; this holds the first visible row (the target) in
-              // place, so parents fill in off-screen above and the target never
-              // shifts under the thumb — and a row's height snapping from
-              // estimate to measured doesn't move it either.
+              // Anchor on the tapped note. Holds the visible anchor when rows
+              // resize or replies append; the parent-prepend case is pinned
+              // explicitly via the scrollToIndex effect above (mvcp alone
+              // corrects against the estimated parent height, not the measured).
               maintainVisibleContentPosition
               // Deliberately NO `maintainScrollAtEnd`: this is a thread, not a
               // chat. Replies appended below (or via loadMoreReplies) must not

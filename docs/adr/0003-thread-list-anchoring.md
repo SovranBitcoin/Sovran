@@ -23,10 +23,20 @@ masked one symptom, not the parent-prepend shift.
 
 Anchor the thread `LegendList` on the **tapped note**:
 
-- Add **`maintainVisibleContentPosition`**. It holds the first visible row (the
-  target) in place, so the parent chain fills in **off-screen above** and a
-  height snap above the anchor doesn't move it. This is the same mechanism the DM
-  screen already relies on for prepended older messages.
+- Add **`maintainVisibleContentPosition`** (`{data:true, size:true}`). It holds
+  the visible anchor when a row resizes or replies append — the same mechanism the
+  DM screen relies on for prepended older messages.
+- **Pin the target through the parent prepend** with an explicit one-shot
+  `scrollToIndex(targetIndex)` when parents first appear. `maintainVisibleContent`
+  `Position` alone is insufficient here: a prepended parent first lays out at the
+  flat `estimatedItemSize`, the data-anchor corrects against *that estimate*, then
+  the parent measures to its real (taller, variable) height and the delta shoves
+  the focused note down (an open upstream issue for variable-height prepends). An
+  active scroll target is re-resolved on every layout pass, so driving
+  `scrollToIndex` pins the note through the measurement settle. It fires once per
+  thread and bails if the reader has already dragged the list. The DM screen
+  doesn't need this — chat bubbles are short and near-uniform, so the estimate
+  error is negligible; a full parent card is not.
 - Keep landing on the target via `initialScrollIndex`. "Start at the bottom" =
   scrolled past the parent chain to the focused note (target at the top of the
   viewport, replies reading downward below it).
