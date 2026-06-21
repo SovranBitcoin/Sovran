@@ -42,7 +42,6 @@ import { feedPageCache, feedPageKey } from '@/features/feed/data/feedCache';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
 import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import {
   selectFeedEmptyMode,
@@ -76,7 +75,6 @@ import {
   type ImageOverlayReplaceLayout,
 } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
-import { useLazyNoteStats } from '@/features/feed/hooks/useLazyNoteStats';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 
@@ -671,23 +669,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     }
     return Array.from(map.values());
   }, [feedItems]);
-
-  // The inline feed noteStats join is flaky (counts often arrive as zero), so
-  // lazily pull authoritative engagement counts from /nostr/notes/stats for the
-  // visible notes and merge them in — they animate up via MetricsFooter.
-  const actionableEventIds = useMemo(
-    () => actionableEvents.map((event) => event.id),
-    [actionableEvents]
-  );
-  const mergeNoteStats = useCallback((stats: Map<string, NoteMetrics>) => {
-    setMetricsMap((prev) => {
-      const next = new Map(prev);
-      for (const [id, metrics] of stats) next.set(id, metrics);
-      return next;
-    });
-  }, []);
-  const naggTierEnabled = useSettingsStore((s) => s.naggTierEnabled);
-  useLazyNoteStats(actionableEventIds, mergeNoteStats, naggTierEnabled);
 
   const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost } = useNostrEngagement(
     actionableEvents,
