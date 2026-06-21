@@ -1,15 +1,22 @@
 import { feedLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
+import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import { mapAppSpecToFeedSpec, resolvedFeedPageToParseResult } from './facadeFeedAdapter';
 import {
   resolvedNotificationsToResult,
   toFacadeNotificationsRequest,
 } from './facadeNotificationsAdapter';
 import {
+  emptyThreadResult,
+  resolvedThreadToResult,
+  toFacadeThreadRequest,
+} from './facadeThreadAdapter';
+import {
   emptyFeedParseResult,
   type FeedClient,
   type FeedNotificationsResult,
   type FeedParseResult,
+  type ThreadResult,
 } from './feedClient';
 
 // ---------------------------------------------------------------------------
@@ -53,6 +60,29 @@ export function createFacadeFeedClient(fallback: FeedClient): FeedClient {
             attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
           });
           return emptyFeedParseResult();
+        }
+      );
+    },
+
+    async getThread(request): Promise<ThreadResult> {
+      // nagg's GraphQL thread is the viewer-ranked gold path (authoredReplyChain
+      // + rankedReferencedBy); its REST app-view — and thus the facade's nagg
+      // tier — can't reproduce that ranking. So keep the GraphQL path whenever
+      // nagg is enabled, and only route threads through the facade (Primal →
+      // relay) when nagg is toggled off, so the cache/relay tiers can serve them.
+      if (getNostrTierConfig().nagg.enabled) return fallback.getThread(request);
+
+      const layer = buildNostrDataLayer();
+      if (!layer) return emptyThreadResult(request);
+
+      const result = await layer.getThread(toFacadeThreadRequest(request));
+      return result.match(
+        (thread) => resolvedThreadToResult(thread, request),
+        (error) => {
+          feedLog.warn('thread.facade.exhausted', {
+            attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
+          });
+          return emptyThreadResult(request);
         }
       );
     },
