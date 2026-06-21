@@ -7,13 +7,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeOut,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import {
   LegendList,
   type LegendListRef,
@@ -280,34 +274,38 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 
   const listRef = useRef<LegendListRef>(null);
 
-  // The sort-tabs ("Relevant") row and the replies sit below the target, so their
-  // on-screen position is whatever LegendList computes for the target — which
-  // starts at `estimatedItemSize` and snaps to the real measured height a frame
-  // later, shifting everything below. Rather than fight that reconciliation, we
-  // keep those rows occupying their space but at opacity 0 until the real target
-  // has laid out, then fade them in at their settled positions (the shift happens
-  // while they're invisible). The target itself is the stable anchor and renders
-  // immediately.
-  const revealedRef = useRef(false);
-  const revealOpacity = useSharedValue(0);
-  const revealStyle = useAnimatedStyle(() => ({ opacity: revealOpacity.value }));
-  const handleTargetSettled = useCallback(() => {
-    if (revealedRef.current) return;
-    revealedRef.current = true;
-    // One frame after the target measures, LegendList has repositioned the rows
-    // below it — reveal then so they fade in already in their final spot.
-    requestAnimationFrame(() => {
-      revealOpacity.value = withTiming(1, { duration: 220 });
-    });
-  }, [revealOpacity]);
-  useEffect(() => {
-    revealedRef.current = false;
-    revealOpacity.value = 0;
-  }, [eventId, revealOpacity]);
-
+  // Position stability has two owners. Steady state: the list's
+  // `maintainVisibleContentPosition` (see below) holds the visible anchor when a
+  // row resizes or replies append. The hard case is the parent chain arriving
+  // AFTER the target has painted — parents prepend at the *estimated* row height,
+  // the data-anchor corrects against that estimate, then they measure to their
+  // real (taller) height and the delta shoves the focused note down. So when
+  // parents first appear we drive an explicit scrollToIndex to the target: an
+  // active scroll target is re-resolved on every layout pass, which pins the note
+  // through the measurement settle. No opacity-reveal masking needed.
   const targetIndex = useMemo(() => items.findIndex((item) => item.type === 'target'), [items]);
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
   const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
+
+  // Pin the target through the parent prepend. Fires once per thread, and never
+  // if the reader has already grabbed the list (readerMovedRef).
+  const pinnedTargetRef = useRef(false);
+  const readerMovedRef = useRef(false);
+  useEffect(() => {
+    pinnedTargetRef.current = false;
+    readerMovedRef.current = false;
+  }, [eventId]);
+  useEffect(() => {
+    if (pinnedTargetRef.current || readerMovedRef.current) return;
+    // targetIndex <= 0 → no parents above the target, so nothing prepends.
+    if (targetIndex <= 0) return;
+    pinnedTargetRef.current = true;
+    void listRef.current?.scrollToIndex({ index: targetIndex, viewPosition: 0, animated: false });
+  }, [targetIndex]);
+
+  // Read by the size-change handler below without re-subscribing it every render.
+  const targetIndexRef = useRef(targetIndex);
+  targetIndexRef.current = targetIndex;
 
   const displayItems = useMemo<ThreadListItem[]>(() => {
     if (isLoading && items.length === 0) {
@@ -369,6 +367,31 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     }),
     getListState: () => listRef.current?.getState() ?? null,
   });
+
+  // Sustained pin: a one-shot scrollToIndex completes against the *estimated*
+  // parent height, so when the parent then measures to its real (taller) height
+  // the focused note still drops. Re-assert the pin whenever a row ABOVE the
+  // target changes size (i.e. as the parent chain measures), so the height delta
+  // fills in off-screen above instead of shoving the note down. Stops once the
+  // parents have settled (no more size changes) and never fights a reader who
+  // has grabbed the list.
+  const handleItemSizeChanged = useCallback(
+    (info: {
+      size: number;
+      previous: number;
+      index: number;
+      itemKey: string;
+      itemData: ThreadListItem;
+    }) => {
+      visualList.onItemSizeChanged?.(info);
+      if (readerMovedRef.current) return;
+      const tIndex = targetIndexRef.current;
+      if (tIndex > 0 && info.index < tIndex) {
+        void listRef.current?.scrollToIndex({ index: tIndex, viewPosition: 0, animated: false });
+      }
+    },
+    [visualList]
+  );
 
   const threadVisualState = useMemo(() => {
     let skeletons = 0;
@@ -475,16 +498,13 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       }
 
       if (item.type === 'reply-sort-tabs') {
-        // Hidden until the target settles, then fades in at its final position.
         return (
-          <Animated.View style={revealStyle}>
-            <ReplySortPicker
-              selected={replySort}
-              onSelect={setReplySort}
-              foreground={foreground}
-              surfaceTertiary={surfaceTertiary}
-            />
-          </Animated.View>
+          <ReplySortPicker
+            selected={replySort}
+            onSelect={setReplySort}
+            foreground={foreground}
+            surfaceTertiary={surfaceTertiary}
+          />
         );
       }
 
@@ -543,7 +563,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       getEngagementState,
       getMetrics,
       hasParents,
-      revealStyle,
       profilesRef,
       quotedEventsRef,
       replySort,
@@ -566,7 +585,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         itemType={threadItemType(props.item)}
         index={props.index}
         phase={threadPhase}
-        onLayout={props.item.type === 'target' ? handleTargetSettled : undefined}
         extra={{
           eventId,
           rows: displayItems.length,
@@ -580,7 +598,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     [
       displayItems.length,
       eventId,
-      handleTargetSettled,
       isFetching,
       renderThreadItem,
       replyBarHeight,
@@ -697,7 +714,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               }
               onEndReached={handleEndReached}
               onEndReachedThreshold={0.4}
-              onItemSizeChanged={visualList.onItemSizeChanged}
+              onItemSizeChanged={handleItemSizeChanged}
               onLoad={visualList.onLoad}
               onMetricsChange={visualList.onMetricsChange}
               onStickyHeaderChange={visualList.onStickyHeaderChange}
@@ -725,7 +742,19 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 });
               }}
               scrollEventThrottle={16}
+              onScrollBeginDrag={() => {
+                // A reader-initiated drag opts out of the one-shot target pin.
+                readerMovedRef.current = true;
+              }}
               scrollEnabled={embed ? embed.listScrollEnabled : undefined}
+              // Anchor on the tapped note. Holds the visible anchor when rows
+              // resize or replies append; the parent-prepend case is pinned
+              // explicitly via the scrollToIndex effect above (mvcp alone
+              // corrects against the estimated parent height, not the measured).
+              maintainVisibleContentPosition
+              // Deliberately NO `maintainScrollAtEnd`: this is a thread, not a
+              // chat. Replies appended below (or via loadMoreReplies) must not
+              // yank the view down — the reader's position is preserved.
               initialScrollIndex={!isLoading && targetIndex > 0 ? targetIndex : undefined}
             />
           </ThreadEmbedSheet>

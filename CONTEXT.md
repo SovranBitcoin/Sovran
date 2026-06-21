@@ -91,3 +91,16 @@ toggles.
 **Replied index** — `nostrSocialStore.repliedByEventId` (target id → our reply):
 drives the "you replied" comment-icon highlight, populated from our own kind:1
 reply e-tags by the own-events sync.
+
+## Thread reading
+
+**Thread anchor** — the tapped note (`target`) is the thread list's stable
+anchor. The view lands on it (scrolled past the parent chain); parents fill in
+off-screen above and replies below, and neither moves the target under the
+thumb. See ADR 0003.
+
+**maintainVisibleContentPosition** — the LegendList prop that owns thread
+position stability: it pins the first visible row so a parent prepend or a
+row's height snap doesn't shift the anchor. Distinct from `maintainScrollAtEnd`
+(chat-style auto-pin), which the thread deliberately omits so loading replies
+never auto-scrolls the reader.
