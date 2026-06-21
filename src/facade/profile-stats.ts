@@ -18,6 +18,8 @@ export type ProfileStatsRequest = RequestControls & {
   pubkey: string;
   /** Forwarded to Primal's `user_profile` (its `user_pubkey` param). */
   viewerPubkey?: string;
+  /** Bypass the cache-first short-circuit and force a fresh tier fetch. */
+  refresh?: boolean;
 };
 
 export type ProfileStats = {

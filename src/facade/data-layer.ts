@@ -1,4 +1,4 @@
-import type { Result } from 'neverthrow';
+import { ok, type Result } from 'neverthrow';
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import {
   resolveAcrossTiers,
@@ -25,11 +25,12 @@ import type {
 } from './mint-reviews';
 import type { SocialGraph, SocialGraphRequest, ResolvedSocialGraph } from './social-graph';
 import type { DmEnvelopesBundle, DmEnvelopesRequest, ResolvedDmEnvelopes } from './dm';
-import type { ProfilesBundle, ProfilesRequest, ResolvedProfiles } from './profiles';
-import type {
-  ProfileStatsBundle,
-  ProfileStatsRequest,
-  ResolvedProfileStats,
+import type { ProfileMetadata, ProfilesBundle, ProfilesRequest, ResolvedProfiles } from './profiles';
+import {
+  profileStatsIsEmpty,
+  type ProfileStatsBundle,
+  type ProfileStatsRequest,
+  type ResolvedProfileStats,
 } from './profile-stats';
 import type { ProfileSearchBundle, SearchRequest, ResolvedProfileSearch } from './search';
 import type { NostrTierStrategy } from './strategy';
@@ -37,6 +38,7 @@ import {
   createNostrEntityCache,
   type NostrEntityCache,
   type EntityCacheLimits,
+  type CachedProfile,
 } from './cache/entity-cache';
 import {
   ingestFeedPage,
@@ -228,11 +230,19 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         'profiles',
         { pubkeys: request.pubkeys.length },
         async () => {
-          const candidates = candidatesFor<ProfilesBundle>(config.tiers, 'getProfiles', (t) => () => t.getProfiles!(request));
+          // Cache-first: split into what we already hold vs what to fetch.
+          const { profiles: cached, missing } = cache.readProfiles(request.pubkeys);
+          const cachedMeta = metadataMapOf(cached);
+          // Everything already cached → serve instantly, no network round-trip.
+          if (missing.length === 0 && !request.refresh) {
+            return ok<ResolvedProfiles, TierResolutionError>({ tier: 'cache', profiles: cachedMeta });
+          }
+          // Otherwise fetch only the missing (or all, on refresh) and merge.
+          const fetchReq = request.refresh ? request : { ...request, pubkeys: missing };
+          const candidates = candidatesFor<ProfilesBundle>(config.tiers, 'getProfiles', (t) => () => t.getProfiles!(fetchReq));
           return (await resolveAcrossTiers<ProfilesBundle>(candidates)).map(({ tier, value }) => {
-            const resolved = { tier, profiles: value.profiles };
-            ingestProfiles(cache, resolved);
-            return resolved;
+            ingestProfiles(cache, { tier, profiles: value.profiles });
+            return { tier, profiles: { ...cachedMeta, ...value.profiles } };
           });
         },
         (r) => ({ profiles: Object.keys(r.profiles).length }),
@@ -244,6 +254,17 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         'profileStats',
         { pubkey: short(request.pubkey) },
         async () => {
+          // Cache-first: if we fetched this header before, serve it now —
+          // overlaying the freshest accumulated profile metadata.
+          const cachedStats = cache.getProfileStats(request.pubkey);
+          if (cachedStats && !request.refresh && !profileStatsIsEmpty(cachedStats)) {
+            const freshProfile = cache.getProfile(request.pubkey);
+            return ok<ResolvedProfileStats, TierResolutionError>({
+              tier: 'cache',
+              ...cachedStats,
+              metadata: freshProfile ? metadataOf(freshProfile) : cachedStats.metadata,
+            });
+          }
           const candidates = candidatesFor<ProfileStatsBundle>(config.tiers, 'getProfileStats', (t) => () => t.getProfileStats!(request));
           return (await resolveAcrossTiers<ProfileStatsBundle>(candidates)).map(({ tier, value }) => {
             const resolved = { tier, ...value };
@@ -295,6 +316,18 @@ async function runRead<R extends { tier: NostrTier }>(
 
 function short(id: string): string {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
+}
+
+/** Strip a cached profile down to the contract `ProfileMetadata` (drop pubkey/seenAt). */
+function metadataOf(cached: CachedProfile): ProfileMetadata {
+  const { pubkey: _pubkey, seenAt: _seenAt, ...metadata } = cached;
+  return metadata;
+}
+
+function metadataMapOf(cached: Record<string, CachedProfile>): Record<string, ProfileMetadata> {
+  const out: Record<string, ProfileMetadata> = {};
+  for (const [pubkey, profile] of Object.entries(cached)) out[pubkey] = metadataOf(profile);
+  return out;
 }
 
 /** Build the ordered candidate list from strategies that implement a surface. */
