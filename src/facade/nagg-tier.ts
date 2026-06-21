@@ -52,6 +52,13 @@ import {
 } from './dm';
 import { NaggDmEnvelopesDataSchema } from '../schemas';
 import { dmEnvelopesAppView } from '../recipes/dm';
+import {
+  hitFromNaggSearchResult,
+  NaggProfileSearchRestSchema,
+  type ProfileSearchBundle,
+  type SearchRequest,
+} from './search';
+import { profileSearchAppView } from '../recipes/profile-search';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -266,6 +273,28 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<DmEnvelopesBundle>>(
         (data) => answered(bundleFromNaggDmNodes(data.dmEnvelopes.nodes)),
+        (error) => failed(error),
+      );
+    },
+
+    async searchProfiles(request: SearchRequest): Promise<TierOutcome<ProfileSearchBundle>> {
+      // Gold path: Vertex-pagerank-ranked profile search over the app-view.
+      const binding = profileSearchAppView({ query: request.query, limit: request.limit });
+      nostrLog.debug('nostr.nagg.searchProfiles', { path: binding.path, q: request.query.length });
+      const result = await client.rest<typeof NaggProfileSearchRestSchema>({
+        path: binding.path,
+        method: binding.method ?? 'GET',
+        searchParams: binding.searchParams,
+        responseSchema: NaggProfileSearchRestSchema,
+        operationName: binding.operationName,
+        refresh: request.refresh,
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      // 0 results is a valid "no match" — nagg is authoritative for profile
+      // search, so we don't cascade to the relay floor on an empty answer.
+      return result.match<TierOutcome<ProfileSearchBundle>>(
+        (data) => answered({ hits: data.results.map(hitFromNaggSearchResult) }),
         (error) => failed(error),
       );
     },

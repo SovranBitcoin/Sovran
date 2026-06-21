@@ -26,6 +26,7 @@ import type {
 import type { SocialGraph, SocialGraphRequest, ResolvedSocialGraph } from './social-graph';
 import type { DmEnvelopesBundle, DmEnvelopesRequest, ResolvedDmEnvelopes } from './dm';
 import type { ProfilesBundle, ProfilesRequest, ResolvedProfiles } from './profiles';
+import type { ProfileSearchBundle, SearchRequest, ResolvedProfileSearch } from './search';
 import type { NostrTierStrategy } from './strategy';
 
 // ---------------------------------------------------------------------------
@@ -64,6 +65,9 @@ export interface NostrDataLayer {
     request: DmEnvelopesRequest,
   ): Promise<Result<ResolvedDmEnvelopes, TierResolutionError>>;
   getProfiles(request: ProfilesRequest): Promise<Result<ResolvedProfiles, TierResolutionError>>;
+  searchProfiles(
+    request: SearchRequest,
+  ): Promise<Result<ResolvedProfileSearch, TierResolutionError>>;
 }
 
 export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLayer {
@@ -184,6 +188,18 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
           return (await resolveAcrossTiers<ProfilesBundle>(candidates)).map(({ tier, value }) => ({ tier, profiles: value.profiles }));
         },
         (r) => ({ profiles: Object.keys(r.profiles).length }),
+      );
+    },
+
+    async searchProfiles(request) {
+      return runRead(
+        'searchProfiles',
+        { q: request.query.length, limit: request.limit ?? null },
+        async () => {
+          const candidates = candidatesFor<ProfileSearchBundle>(config.tiers, 'searchProfiles', (t) => () => t.searchProfiles!(request));
+          return (await resolveAcrossTiers<ProfileSearchBundle>(candidates)).map(({ tier, value }) => ({ tier, hits: value.hits }));
+        },
+        (r) => ({ hits: r.hits.length }),
       );
     },
   };

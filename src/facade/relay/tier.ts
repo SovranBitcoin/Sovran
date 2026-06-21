@@ -26,6 +26,11 @@ import {
   type DmEnvelopesRequest,
 } from '../dm';
 import { profilesFromKind0, type ProfilesBundle, type ProfilesRequest } from '../profiles';
+import {
+  profileSearchHitsFromKind0,
+  type ProfileSearchBundle,
+  type SearchRequest,
+} from '../search';
 import { toFeedEvent } from '../event';
 import type { NaggFeedEvent } from '../../map/feed';
 import type { NostrTierStrategy } from '../strategy';
@@ -241,6 +246,24 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<ProfilesBundle>>(
         (events) => answered({ profiles: profilesFromKind0(events) }),
+        (error) => failed(error),
+      );
+    },
+
+    async searchProfiles(request: SearchRequest): Promise<TierOutcome<ProfileSearchBundle>> {
+      // NIP-50 floor: relays that advertise it full-text-search kind-0; the rest
+      // ignore `search` and return nothing. Unranked — no global pagerank here.
+      const filter: NostrFilter = {
+        kinds: [0],
+        search: request.query,
+        limit: request.limit ?? 20,
+      };
+      const result = await config.connection.request([filter], {
+        signal: request.signal,
+        timeoutMs: request.timeoutMs,
+      });
+      return result.match<TierOutcome<ProfileSearchBundle>>(
+        (events) => answered({ hits: profileSearchHitsFromKind0(events) }),
         (error) => failed(error),
       );
     },

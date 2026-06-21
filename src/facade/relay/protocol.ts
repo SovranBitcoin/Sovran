@@ -28,6 +28,9 @@ export type NostrFilter = {
   since?: number;
   until?: number;
   limit?: number;
+  /** NIP-50 full-text search. Only relays that advertise NIP-50 honour it;
+   *  others ignore the field, so a search filter degrades to (no) results. */
+  search?: string;
 } & { [tag: `#${string}`]: string[] | undefined };
 
 export type RawRelayEvent = {

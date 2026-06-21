@@ -13,6 +13,7 @@ import type {
 import type { SocialGraph, SocialGraphRequest } from './social-graph';
 import type { DmEnvelopesBundle, DmEnvelopesRequest } from './dm';
 import type { ProfilesBundle, ProfilesRequest } from './profiles';
+import type { ProfileSearchBundle, SearchRequest } from './search';
 
 // ---------------------------------------------------------------------------
 // Tier strategy — one deep module per source, implementing the surfaces it can
@@ -37,4 +38,5 @@ export interface NostrTierStrategy {
   getSocialGraph?(request: SocialGraphRequest): Promise<TierOutcome<SocialGraph>>;
   getDmEnvelopes?(request: DmEnvelopesRequest): Promise<TierOutcome<DmEnvelopesBundle>>;
   getProfiles?(request: ProfilesRequest): Promise<TierOutcome<ProfilesBundle>>;
+  searchProfiles?(request: SearchRequest): Promise<TierOutcome<ProfileSearchBundle>>;
 }
