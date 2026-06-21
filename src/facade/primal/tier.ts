@@ -3,6 +3,11 @@ import type { FeedBundle, FeedPageRequest, FeedSpec } from '../feed';
 import type { ThreadBundle, ThreadRequest } from '../thread';
 import type { OwnHistoryBundle, OwnHistoryRequest } from '../own-state';
 import { profilesFromKind0, type ProfilesBundle, type ProfilesRequest } from '../profiles';
+import {
+  profileSearchHitsFromKind0,
+  type ProfileSearchBundle,
+  type SearchRequest,
+} from '../search';
 import type { NostrTierStrategy } from '../strategy';
 import { demuxPrimalFeed, demuxPrimalThread, demuxPrimalOwnHistory } from './demux';
 import type { PrimalCacheRequest, PrimalConnection } from './protocol';
@@ -104,6 +109,20 @@ export function createPrimalTier(config: PrimalTierConfig): NostrTierStrategy {
       );
       return result.match<TierOutcome<ProfilesBundle>>(
         (events) => answered({ profiles: profilesFromKind0(events) }),
+        (error) => failed(error),
+      );
+    },
+
+    async searchProfiles(request: SearchRequest): Promise<TierOutcome<ProfileSearchBundle>> {
+      // Primal's profile-search cache verb returns matched users' kind-0 in
+      // relevance order. Unranked (no Vertex pagerank), but a real cache-tier
+      // search so cache-only mode isn't stuck on the NIP-50 relay floor.
+      const result = await config.connection.request(
+        { verb: 'user_search', params: { query: request.query, limit: request.limit ?? 20 } },
+        { signal: request.signal, timeoutMs: request.timeoutMs },
+      );
+      return result.match<TierOutcome<ProfileSearchBundle>>(
+        (events) => answered({ hits: profileSearchHitsFromKind0(events) }),
         (error) => failed(error),
       );
     },

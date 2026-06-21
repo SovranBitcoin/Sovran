@@ -8,6 +8,7 @@ import {
   profileSearchHitsFromKind0,
 } from '../src/facade';
 import { createRelayTier, type RelayConnection, type RawRelayEvent } from '../src/facade/relay';
+import { createPrimalTier, type PrimalConnection, type RawPrimalEvent } from '../src/facade/primal';
 import type { NaggError } from '../src/errors';
 
 const A = 'a'.repeat(64);
@@ -62,6 +63,28 @@ describe('searchProfiles through the facade', () => {
     expect(out.hits[0]?.pubkey).toBe(A);
     expect(out.hits[0]?.metadata.displayName).toBe('Alice');
     expect(out.hits[0]?.rank).toBe(1);
+  });
+
+  test('Primal serves user_search before the relay floor (cache-only mode)', async () => {
+    let verb: string | undefined;
+    let params: Record<string, unknown> | undefined;
+    const primal: PrimalConnection = {
+      request: (req): Promise<Result<RawPrimalEvent[], NaggError>> => {
+        verb = req.verb;
+        params = req.params;
+        return Promise.resolve(
+          ok([{ id: '3'.repeat(64), pubkey: A, kind: 0, content: JSON.stringify({ name: 'aria' }), created_at: 100 }]),
+        );
+      },
+    };
+    const layer = createNostrDataLayer({ tiers: [createPrimalTier({ connection: primal })] });
+
+    const result = await layer.searchProfiles({ query: 'ari', limit: 5 });
+    expect(verb).toBe('user_search');
+    expect(params).toMatchObject({ query: 'ari', limit: 5 });
+    const out = result._unsafeUnwrap();
+    expect(out.tier).toBe('primal');
+    expect(out.hits[0]?.metadata.name).toBe('aria');
   });
 
   test('relay NIP-50 floor serves unranked kind-0 hits when nagg is down', async () => {
