@@ -714,6 +714,18 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 paddingBottom: (replyBarHeight || 80) + 16,
               }}
               showsVerticalScrollIndicator={false}
+              // Anchor-on-the-tapped-note stability. Bare `maintainVisibleContentPosition`
+              // normalizes to `{ data: true, size: true }` in @legendapp/list v3:
+              //  - `data: true`  → when the parent chain prepends above the focused note
+              //    (the T1 full-thread update), LegendList compensates contentOffset so the
+              //    note does NOT drop. This is OFF by default (`{ data: false }`); omitting
+              //    the prop is exactly why the note used to shift when parents loaded in.
+              //  - `size: true`  → absorbs the estimate→measured reconciliation of rows.
+              // Mirrors the DM ChatScreen's anchoring half. We deliberately do NOT take
+              // ChatScreen's `initialScrollAtEnd` / `alignItemsAtEnd` / `maintainScrollAtEnd`:
+              // a thread anchors on the tapped note via `initialScrollIndex` and must never
+              // auto-pin to the bottom like a chat.
+              maintainVisibleContentPosition
               onScroll={(e: { nativeEvent: { contentOffset: { y: number } } }) => {
                 const y = e.nativeEvent.contentOffset.y;
                 if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;

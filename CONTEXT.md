@@ -140,3 +140,13 @@ relays.
 **Seen state** — one timestamp "seen-up-to" published as a NIP-78 kind-30078
 app-data event so it syncs across devices via relays AND is readable on the
 backend-free relay tier. Unread = `count(created_at > seenUntil)`.
+
+## Thread reading
+
+**Thread anchor** — the tapped/focused note a thread opens on. It stays visually
+fixed while the parent chain prepends above it (the T1 full-thread update) and
+replies append below. Achieved by `initialScrollIndex` (land on the note) +
+`maintainVisibleContentPosition` (bare → `{ data: true, size: true }`: `data`
+compensates the parent prepend, `size` absorbs measurement reconciliation). The
+thread never auto-pins to the bottom — it omits the DM `ChatScreen`'s
+`initialScrollAtEnd` / `alignItemsAtEnd` / `maintainScrollAtEnd`. See ADR 0004.
