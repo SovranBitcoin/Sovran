@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vitest';
 import { ok, type Result } from 'neverthrow';
 import {
   demuxPrimalFeed,
+  demuxPrimalThread,
   createPrimalTier,
   createPrimalWebSocketConnection,
   type PrimalConnection,
@@ -151,5 +152,29 @@ describe('Primal WebSocket connection — protocol plumbing', () => {
     const result = await connection.request({ verb: 'mega_feed_directive', params: { limit: 30 } });
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap()).toHaveLength(BATCH.length);
+  });
+});
+
+describe('demuxPrimalThread — replies survive a non-reply feedRange', () => {
+  const ROOT = 'd'.repeat(64);
+  const R1 = 'e'.repeat(64);
+  const R2 = 'f'.repeat(64);
+
+  test('renders every reply even when feedRange lists only the root', () => {
+    // Reproduces the live bug: Primal thread_view streams the reply notes, but
+    // its feedRange points at the primary note / pagination window — NOT the
+    // replies. The old manifest filtered replies through it and dropped them.
+    const batch: RawPrimalEvent[] = [
+      { id: ROOT, pubkey: PUB, kind: 1, content: 'root', tags: [], created_at: 1_700_000_000 },
+      { id: R1, pubkey: PUB, kind: 1, content: 'reply 1', tags: [], created_at: 1_700_000_100 },
+      { id: R2, pubkey: PUB, kind: 1, content: 'reply 2', tags: [], created_at: 1_700_000_200 },
+      { kind: 10_000_113, content: JSON.stringify({ order_by: 'rank', elements: [ROOT] }) },
+    ];
+
+    const bundle = demuxPrimalThread(batch, ROOT);
+    expect(bundle).not.toBeNull();
+    expect([...bundle!.itemsById.keys()].sort()).toEqual([R1, R2].sort());
+    // Both replies are in the manifest (root excluded), so they actually render.
+    expect(bundle!.manifest.elements.sort()).toEqual([R1, R2].sort());
   });
 });

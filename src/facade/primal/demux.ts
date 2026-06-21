@@ -151,10 +151,19 @@ export function demuxPrimalThread(events: ReadonlyArray<RawPrimalEvent>, rootId:
     repliesById.set(id, event);
   }
 
-  // Use Primal's manifest with the root filtered out, else synthesize from replies.
-  const manifest = batch.feedRange
-    ? { orderBy: batch.feedRange.orderBy, elements: batch.feedRange.elements.filter((id) => id !== rootId) }
-    : recencyOf(repliesById);
+  // Render EVERY reply. Primal's thread feedRange is the primary-note /
+  // pagination window, NOT the reply list — using it to order/filter replies
+  // drops them all (manifest references the root, not the replies). So keep any
+  // feedRange order that actually points at a reply, then append the remaining
+  // replies by recency. The app post-sorts replies anyway; what matters here is
+  // that no reply in the batch is left out of the manifest.
+  const recency = recencyOf(repliesById);
+  const ordered = (batch.feedRange?.elements ?? []).filter((id) => repliesById.has(id));
+  const seen = new Set(ordered);
+  const manifest: OrderingManifest = {
+    orderBy: batch.feedRange?.orderBy ?? recency.orderBy,
+    elements: [...ordered, ...recency.elements.filter((id) => !seen.has(id))],
+  };
   const hasActions = Object.keys(batch.actions).length > 0;
 
   return {
