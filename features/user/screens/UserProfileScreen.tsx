@@ -243,6 +243,11 @@ function ProfileStatsGridComponent({
     </View>
   );
 
+  // Settled with nothing reliable to show — relay-only mode can't fetch
+  // follower/following counts (a reverse index relays don't have), reputation,
+  // or joined date. Render no grid rather than misleading "0 / 0 / N/A".
+  if (!isLoading && !hasValidData) return null;
+
   // While loading: 2×2 placeholders under one shimmer sweep (thread-style),
   // rather than four independently-pulsing boxes.
   if (showSkeleton) {

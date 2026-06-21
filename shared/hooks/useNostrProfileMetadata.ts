@@ -14,34 +14,55 @@ interface UseNostrProfileMetadataResult {
   isLoading: boolean;
 }
 
+const MAX_FETCH_ATTEMPTS = 3;
+const RETRY_BACKOFF_MS = 4_000;
+
 export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrProfileMetadataResult {
   const setProfile = useNostrMetadataCache((s) => s.setProfile);
   const { metadata, isStale, isMissing } = useCachedNostrProfile(pubkey ?? '');
   const [isFetching, setIsFetching] = useState(false);
 
-  // Once a pubkey is attempted we don't re-fetch it for this hook's lifetime,
-  // so a not-found profile (cache stays missing) can't loop the effect.
-  const attempted = useRef<Set<string>>(new Set());
-  const needsFetch = !!pubkey && (isMissing || isStale) && !attempted.current.has(pubkey);
+  // Per-pubkey attempt counter, capped at MAX_FETCH_ATTEMPTS. A facade fetch can
+  // come back empty for a TRANSIENT reason (a tier was momentarily down / the
+  // cache hadn't warmed). The old code marked the pubkey done after ONE such miss
+  // and never retried, so kind-0 could stay missing forever. We now retry on a
+  // short backoff a bounded number of times; a genuine not-found still settles
+  // after the cap without looping.
+  const attempts = useRef<Map<string, number>>(new Map());
+  const [retryNonce, setRetryNonce] = useState(0);
+  const attemptCount = pubkey ? (attempts.current.get(pubkey) ?? 0) : MAX_FETCH_ATTEMPTS;
+  const needsFetch = !!pubkey && (isMissing || isStale) && attemptCount < MAX_FETCH_ATTEMPTS;
 
   useEffect(() => {
     if (!pubkey || !needsFetch) return;
-    attempted.current.add(pubkey);
+    attempts.current.set(pubkey, (attempts.current.get(pubkey) ?? 0) + 1);
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     setIsFetching(true);
     void fetchProfilesViaFacade([pubkey])
       .then((profiles) => {
         if (cancelled) return;
         const found = profiles[pubkey];
-        if (found) setProfile(pubkey, found);
+        if (found) {
+          attempts.current.set(pubkey, MAX_FETCH_ATTEMPTS); // resolved → stop retrying
+          setProfile(pubkey, found);
+          return;
+        }
+        // Nothing resolved this round — schedule a bounded retry.
+        retryTimer = setTimeout(() => {
+          if (!cancelled) setRetryNonce((n) => n + 1);
+        }, RETRY_BACKOFF_MS);
       })
       .finally(() => {
         if (!cancelled) setIsFetching(false);
       });
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [pubkey, needsFetch, setProfile]);
+    // retryNonce drives the bounded retry: bumping it re-runs the effect, which
+    // re-reads the (now-incremented) attempt count through `needsFetch`.
+  }, [pubkey, needsFetch, retryNonce, setProfile]);
 
   const isLoading = isMissing && isFetching;
   return { metadata, isLoading };

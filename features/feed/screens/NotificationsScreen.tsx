@@ -54,6 +54,7 @@ import { feedLog, Log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
+import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
 import { actionMenuPopup } from '@/shared/lib/popup';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -392,11 +393,11 @@ export function NotificationsScreen() {
         });
         return;
       }
-      const openEvent = notificationOpenEvent(notification);
+      const openEventId = notificationOpenEventId(notification);
       const allEvents = new Map([[notification.event.id, notification.event]]);
       if (notification.targetEvent)
         allEvents.set(notification.targetEvent.id, notification.targetEvent);
-      seedThread(openEvent.id, {
+      seedThread(openEventId, {
         allEvents,
         profiles: threadContext.profiles,
         metrics: threadContext.metrics,
@@ -404,7 +405,7 @@ export function NotificationsScreen() {
       });
       router.push({
         pathname: '/(user-flow)/thread',
-        params: { eventId: openEvent.id },
+        params: { eventId: openEventId },
       });
     },
     [threadContext]
@@ -424,7 +425,29 @@ export function NotificationsScreen() {
   const seedCreatedAt = useWalletLifecycleStore((s) => s.seedCreatedAt);
   const termsDate = useSettingsStore((s) => s.termsAccepted?.date ?? null);
 
-  const notifications = result?.notifications ?? EMPTY_NOTIFICATIONS;
+  const rawNotifications = result?.notifications ?? EMPTY_NOTIFICATIONS;
+
+  // A like/repost/zap is always engagement on one of OUR posts, so its target's
+  // content is in the own-content cache (notes we authored, keyed by id). nagg
+  // bundles the full `targetEvent`; the relay/cache tiers only carry
+  // `targetEventId`, leaving no preview. Resolve the missing target from local
+  // own-content so the post preview renders regardless of serving tier — its
+  // author is us, so no profile refetch is needed (see viewerPubkey below).
+  const ownContentById = useOwnContentStore((s) => s.byId);
+  const notifications = useMemo(() => {
+    let changed = false;
+    const hydrated = rawNotifications.map((n) => {
+      if (n.targetEvent) return n;
+      if (n.reason !== 'reaction' && n.reason !== 'repost' && n.reason !== 'zap') return n;
+      const targetId = n.targetEventId;
+      if (!targetId) return n;
+      const entry = ownContentById[targetId];
+      if (!entry) return n;
+      changed = true;
+      return { ...n, targetEvent: entry.event };
+    });
+    return changed ? hydrated : rawNotifications;
+  }, [rawNotifications, ownContentById]);
 
   // The serving tier's `profilesMap` is empty on the relay/cache path (only nagg
   // bundles notification author profiles), leaving rows with a truncated-pubkey
@@ -433,12 +456,15 @@ export function NotificationsScreen() {
   // merge it in as a fallback, so names/avatars resolve regardless of tier.
   const actorPubkeys = useMemo(() => {
     const set = new Set<string>();
+    // Our own profile authors every like/repost/zap target preview — warm it too
+    // so the contained post shows our name + avatar, not a truncated pubkey.
+    if (viewerPubkey) set.add(viewerPubkey);
     for (const n of notifications) {
       if (n.event?.pubkey) set.add(n.event.pubkey);
       for (const actor of n.sampleActors ?? []) if (actor.pubkey) set.add(actor.pubkey);
     }
     return [...set];
-  }, [notifications]);
+  }, [notifications, viewerPubkey]);
   const { metadata: cachedProfiles } = useNostrProfileMetadataMany(actorPubkeys);
 
   const resultForRows = useMemo<FeedNotificationsResult | null>(() => {
@@ -1142,16 +1168,20 @@ function formatNotificationTimestamp(createdAt: number): string {
   return createdAt > 0 ? formatRelative(createdAt * 1000, 'compact') : '';
 }
 
-function notificationOpenEvent(notification: FeedNotification): FeedEvent {
+// For a like/repost/zap, tapping the row should open the POST that was engaged
+// with — not the reaction/repost/zap event. nagg bundles the full `targetEvent`,
+// but the relay/cache tiers only carry `targetEventId` (the post isn't fetched),
+// so resolve by id and let the thread screen load it. Falls back to the
+// notification's own event for replies/mentions (where the event IS the post).
+function notificationOpenEventId(notification: FeedNotification): string {
   if (
-    notification.targetEvent &&
-    (notification.reason === 'reaction' ||
-      notification.reason === 'repost' ||
-      notification.reason === 'zap')
+    notification.reason === 'reaction' ||
+    notification.reason === 'repost' ||
+    notification.reason === 'zap'
   ) {
-    return notification.targetEvent;
+    return notification.targetEventId ?? notification.targetEvent?.id ?? notification.event.id;
   }
-  return notification.event;
+  return notification.event.id;
 }
 
 function notificationPreviewEvent(notification: FeedNotification): FeedEvent | undefined {

@@ -652,9 +652,18 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 
   // ── Derived data ──
 
+  // Read the live `metricsMap` state (not `metricsRef`): this accessor feeds the
+  // render path via `getDisplayMetrics` → `feedRows`. `useLatestRef` writes its
+  // ref in `useInsertionEffect`, i.e. AFTER commit, so during the render where a
+  // late `setMetricsMap` lands, `metricsRef.current` is still the previous map.
+  // Reading the ref here left rows rendered with DEFAULT_METRICS until an
+  // unrelated re-render (a scroll-refresh) rebuilt `feedRows` once the ref had
+  // caught up — the "metrics only appear after pull-to-refresh" bug. Depending on
+  // `metricsMap` instead changes this callback's identity the moment metrics
+  // arrive, so `feedRows` recomputes against fresh aggregate counts immediately.
   const getMetrics = useCallback(
-    (noteId: string): NoteMetrics => metricsRef.current.get(noteId) || DEFAULT_METRICS,
-    []
+    (noteId: string): NoteMetrics => metricsMap.get(noteId) || DEFAULT_METRICS,
+    [metricsMap]
   );
 
   const actionableEvents = useMemo(() => {

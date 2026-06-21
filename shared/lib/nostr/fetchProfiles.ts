@@ -21,3 +21,27 @@ export async function fetchProfilesViaFacade(
     () => ({})
   );
 }
+
+/**
+ * Fetch one profile's header (kind-0 metadata + follow/follower/note counts +
+ * joined date) through the tier-selecting facade. Primal serves it via
+ * `user_profile`; the relay floor derives metadata + following-count. Returns
+ * null when every tier is disabled/exhausted. Reputation is NOT here — it's
+ * nagg-only and stays on the REST path.
+ */
+export async function fetchProfileStatsViaFacade(
+  pubkey: string,
+  options: { viewerPubkey?: string; signal?: AbortSignal } = {}
+): Promise<facade.ResolvedProfileStats | null> {
+  const layer = buildNostrDataLayer();
+  if (!layer) return null;
+  const result = await layer.getProfileStats({
+    pubkey,
+    ...(options.viewerPubkey ? { viewerPubkey: options.viewerPubkey } : {}),
+    ...(options.signal ? { signal: options.signal } : {}),
+  });
+  return result.match(
+    (resolved) => resolved,
+    () => null
+  );
+}
