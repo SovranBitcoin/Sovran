@@ -66,6 +66,26 @@ describe('NostrDataLayer.getThread — nagg tier', () => {
     expect(thread.stats[ROOT]).toEqual({ likes: 9, reposts: 0, replies: 2, zaps: 0, satsZapped: 0 });
   });
 
+  test('an empty thread with null hydration maps still answers (the 0/42 fix)', async () => {
+    // A root with no replies/stats: Go serializes nil maps as JSON null. This must
+    // parse as an empty thread, NOT fail validation and silently fall through.
+    const { client } = naggClientReturning({
+      root: event(ROOT, 1_700_000_000),
+      events: [],
+      metrics: null,
+      profiles: null,
+      quoted: null,
+    });
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+    const result = await layer.getThread({ noteId: ROOT });
+    expect(result.isOk()).toBe(true);
+    const thread = result._unsafeUnwrap();
+    expect(thread.tier).toBe('nagg'); // gold tier serves it, no fallthrough
+    expect(thread.root.type === 'note' && thread.root.event.id).toBe(ROOT);
+    expect(thread.replies).toEqual([]);
+    expect(thread.stats).toEqual({});
+  });
+
   test('a feed-only tier is skipped for thread reads (not in the attempt trail)', async () => {
     const { client } = naggClientReturning({}, { ok: false, status: 503 });
     const layer = createNostrDataLayer({

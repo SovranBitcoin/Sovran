@@ -161,6 +161,14 @@ export function createPrimalTier(config: PrimalTierConfig): NostrTierStrategy {
       );
     },
 
+    // NOTE: the Primal tier deliberately does NOT implement getMintReviews /
+    // discoverMints. Primal has no NIP-87 awareness, and its only generic
+    // addressable-event store (`parametrized_replaceable_events`) is indexed by
+    // (pubkey, kind, identifier/#d) — there is no #u/#k index, so it cannot do the
+    // cross-author "all kind-38000 where u=<mintUrl>" aggregate the surface needs.
+    // The facade therefore falls straight through to the relay floor, which serves
+    // the IDENTICAL MintReviewsSummary shape. Capability ceiling, not a shape gap.
+
     async searchProfiles(request: SearchRequest): Promise<TierOutcome<ProfileSearchBundle>> {
       // Primal's profile-search cache verb returns matched users' kind-0 in
       // relevance order. Unranked (no Vertex pagerank), but a real cache-tier

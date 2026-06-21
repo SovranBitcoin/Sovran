@@ -123,13 +123,33 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
   });
 
   test('a malformed nagg response is a tier failure (schema), not a crash', async () => {
-    // missing required `metrics`/`profiles` → NaggFeedPageSchema rejects
-    const { client } = naggClientReturning({ items: [], paginationUntil: 0, paginationOffset: 0 });
+    // `items` must be an array; a wrong-typed core field → NaggFeedPageSchema rejects.
+    // (Missing hydration maps are NOT malformed — they default to {} — see the
+    //  null-hydration test below.)
+    const { client } = naggClientReturning({ items: 'nope', paginationUntil: 0, paginationOffset: 0 });
     const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
 
     const result = await layer.getFeedPage({ spec: { kind: 'for-you' } });
     expect(result.isErr()).toBe(true);
     expect(result._unsafeUnwrapErr().attempts[0]).toMatchObject({ tier: 'nagg', outcome: 'failed' });
+  });
+
+  test('null hydration maps (Go nil → JSON null) parse as empty, not a failure', async () => {
+    // The thread-0/42 fix: an empty page sends metrics/profiles/quoted as null.
+    const { client } = naggClientReturning({
+      ...FEED_PAGE,
+      metrics: null,
+      profiles: null,
+      quoted: null,
+    });
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+    const result = await layer.getFeedPage({ spec: { kind: 'for-you', viewerPubkey: PUB } });
+    expect(result.isOk()).toBe(true);
+    const page = result._unsafeUnwrap();
+    expect(page.tier).toBe('nagg');
+    expect(page.items.map((i) => (i.type === 'note' ? i.event.id : ''))).toEqual([ID_A, ID_B]);
+    expect(page.stats).toEqual({}); // null metrics defaulted to {}
+    expect(page.profiles).toEqual({});
   });
 
   test('write-through: a feed read populates the shared entity cache', async () => {
