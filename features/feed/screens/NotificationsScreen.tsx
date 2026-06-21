@@ -53,6 +53,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { feedLog, Log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
+import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { actionMenuPopup } from '@/shared/lib/popup';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -424,6 +425,37 @@ export function NotificationsScreen() {
   const termsDate = useSettingsStore((s) => s.termsAccepted?.date ?? null);
 
   const notifications = result?.notifications ?? EMPTY_NOTIFICATIONS;
+
+  // The serving tier's `profilesMap` is empty on the relay/cache path (only nagg
+  // bundles notification author profiles), leaving rows with a truncated-pubkey
+  // name + fallback avatar. Warm + read the shared metadata cache (filled by the
+  // facade getProfiles: Primal user_infos → relay kind-0) for every actor and
+  // merge it in as a fallback, so names/avatars resolve regardless of tier.
+  const actorPubkeys = useMemo(() => {
+    const set = new Set<string>();
+    for (const n of notifications) {
+      if (n.event?.pubkey) set.add(n.event.pubkey);
+      for (const actor of n.sampleActors ?? []) if (actor.pubkey) set.add(actor.pubkey);
+    }
+    return [...set];
+  }, [notifications]);
+  const { metadata: cachedProfiles } = useNostrProfileMetadataMany(actorPubkeys);
+
+  const resultForRows = useMemo<FeedNotificationsResult | null>(() => {
+    if (!result || cachedProfiles.size === 0) return result;
+    const profilesMap = new Map(result.profilesMap);
+    for (const [pk, meta] of cachedProfiles) {
+      const existing = profilesMap.get(pk);
+      // Fill a missing actor, or upgrade a name-only tier entry that lacks a picture.
+      if (existing && existing.picture) continue;
+      const name = meta.displayName || meta.name || existing?.name;
+      const picture = meta.picture ?? existing?.picture;
+      if (!name && !picture) continue;
+      profilesMap.set(pk, { name: name ?? '', ...(picture ? { picture } : {}) });
+    }
+    return { ...result, profilesMap };
+  }, [result, cachedProfiles]);
+
   const notificationItems = useMemo<NotificationListItem[]>(() => {
     // The App tab is purely app announcements — the welcome card lives here, not
     // mixed into the real notifications on All.
@@ -642,7 +674,7 @@ export function NotificationsScreen() {
               extra={{ tab: activeTab, phase: visualPhase }}>
               <NotificationListRow
                 item={item}
-                result={result}
+                result={resultForRows}
                 foreground={foreground}
                 surface={surface}
                 muted={muted}
