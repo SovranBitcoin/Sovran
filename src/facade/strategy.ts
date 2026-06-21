@@ -13,6 +13,7 @@ import type {
 import type { SocialGraph, SocialGraphRequest } from './social-graph';
 import type { DmEnvelopesBundle, DmEnvelopesRequest } from './dm';
 import type { ProfilesBundle, ProfilesRequest } from './profiles';
+import type { ProfileStatsBundle, ProfileStatsRequest } from './profile-stats';
 import type { ProfileSearchBundle, SearchRequest } from './search';
 
 // ---------------------------------------------------------------------------
@@ -38,5 +39,6 @@ export interface NostrTierStrategy {
   getSocialGraph?(request: SocialGraphRequest): Promise<TierOutcome<SocialGraph>>;
   getDmEnvelopes?(request: DmEnvelopesRequest): Promise<TierOutcome<DmEnvelopesBundle>>;
   getProfiles?(request: ProfilesRequest): Promise<TierOutcome<ProfilesBundle>>;
+  getProfileStats?(request: ProfileStatsRequest): Promise<TierOutcome<ProfileStatsBundle>>;
   searchProfiles?(request: SearchRequest): Promise<TierOutcome<ProfileSearchBundle>>;
 }

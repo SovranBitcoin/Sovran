@@ -26,6 +26,8 @@ import { nostrLog } from '../../log';
 export const PRIMAL_KIND = {
   metadata: 0,
   note: 1,
+  repost: 6,
+  genericRepost: 16,
   zap: 9_735,
   userStats: 10_000_105,
   noteStats: 10_000_100,

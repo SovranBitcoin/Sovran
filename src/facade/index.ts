@@ -6,6 +6,7 @@ export * from './mint-reviews';
 export * from './social-graph';
 export * from './dm';
 export * from './profiles';
+export * from './profile-stats';
 export * from './search';
 export * from './strategy';
 export * from './nagg-tier';

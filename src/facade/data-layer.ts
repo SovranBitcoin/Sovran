@@ -26,6 +26,11 @@ import type {
 import type { SocialGraph, SocialGraphRequest, ResolvedSocialGraph } from './social-graph';
 import type { DmEnvelopesBundle, DmEnvelopesRequest, ResolvedDmEnvelopes } from './dm';
 import type { ProfilesBundle, ProfilesRequest, ResolvedProfiles } from './profiles';
+import type {
+  ProfileStatsBundle,
+  ProfileStatsRequest,
+  ResolvedProfileStats,
+} from './profile-stats';
 import type { ProfileSearchBundle, SearchRequest, ResolvedProfileSearch } from './search';
 import type { NostrTierStrategy } from './strategy';
 
@@ -65,6 +70,9 @@ export interface NostrDataLayer {
     request: DmEnvelopesRequest,
   ): Promise<Result<ResolvedDmEnvelopes, TierResolutionError>>;
   getProfiles(request: ProfilesRequest): Promise<Result<ResolvedProfiles, TierResolutionError>>;
+  getProfileStats(
+    request: ProfileStatsRequest,
+  ): Promise<Result<ResolvedProfileStats, TierResolutionError>>;
   searchProfiles(
     request: SearchRequest,
   ): Promise<Result<ResolvedProfileSearch, TierResolutionError>>;
@@ -188,6 +196,23 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
           return (await resolveAcrossTiers<ProfilesBundle>(candidates)).map(({ tier, value }) => ({ tier, profiles: value.profiles }));
         },
         (r) => ({ profiles: Object.keys(r.profiles).length }),
+      );
+    },
+
+    async getProfileStats(request) {
+      return runRead(
+        'profileStats',
+        { pubkey: short(request.pubkey) },
+        async () => {
+          const candidates = candidatesFor<ProfileStatsBundle>(config.tiers, 'getProfileStats', (t) => () => t.getProfileStats!(request));
+          return (await resolveAcrossTiers<ProfileStatsBundle>(candidates)).map(({ tier, value }) => ({ tier, ...value }));
+        },
+        (r) => ({
+          hasMetadata: !!r.metadata,
+          followers: r.followersCount ?? null,
+          following: r.followingCount ?? null,
+          joinedAt: r.joinedAt ?? null,
+        }),
       );
     },
 

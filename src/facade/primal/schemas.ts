@@ -42,6 +42,16 @@ export const PrimalFeedRangeContent = z.object({
 });
 export type PrimalFeedRangeContent = z.infer<typeof PrimalFeedRangeContent>;
 
+/** kind 10000105 — USER_PROFILE aggregate stats (counts + `time_joined`). */
+export const PrimalUserProfileContent = z.object({
+  pubkey: z.string().optional(),
+  follows_count: z.number().optional(),
+  followers_count: z.number().optional(),
+  note_count: z.number().optional(),
+  time_joined: z.number().nullish(),
+});
+export type PrimalUserProfileContent = z.infer<typeof PrimalUserProfileContent>;
+
 /** kind 0 — profile metadata (the standard NIP-01 content JSON). */
 export const PrimalProfileContent = z
   .object({

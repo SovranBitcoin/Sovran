@@ -132,9 +132,14 @@ export function demuxRelayNotifications(
     if (itemsById.has(event.id)) continue;
     // Carry the referenced (target) event id so client-side grouping/dedup keys
     // these the SAME way as the nagg tier (reason + target), not by the engagement id.
+    //
+    // Leave `type` UNSET. The relay floor can't aggregate, so these are an
+    // ungrouped transport: the app's buildNotificationListItems client-groups by
+    // reason+target only when `type` is absent — a `type: 'single'` here would
+    // short-circuit each engagement to its own row (grouping by the engagement
+    // event instead of its target), which is exactly the bug we're avoiding.
     const targetEventId = event.tags.find((t) => t[0] === 'e')?.[1];
     itemsById.set(event.id, {
-      type: 'single',
       event,
       reason,
       actorVertexScore: 0,

@@ -205,6 +205,12 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       );
     },
 
+    // NOTE: the relay floor deliberately does NOT implement getProfileStats.
+    // Follower counts need a server-side reverse index relays don't have, and
+    // even a profile's own kind-3 / joined date is unreliable to fetch off raw
+    // relays — so in relay-only mode the facade returns no profile-stats
+    // candidate and the app hides the counts rather than showing wrong numbers.
+
     async getDmEnvelopes(request: DmEnvelopesRequest): Promise<TierOutcome<DmEnvelopesBundle>> {
       // Gift-wrap created_at is randomized into the past, so NO since/limit — they
       // would silently drop old conversations. Pure opaque-envelope transport.

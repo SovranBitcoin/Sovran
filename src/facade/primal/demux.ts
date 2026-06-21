@@ -6,20 +6,24 @@ import type {
   OrderingManifest,
   NostrCursor,
 } from '@sovranbitcoin/schemas';
-import type { NaggFeedEvent, NaggProfileInfo } from '../../map/feed';
+import type { NaggFeedEvent, NaggProfileInfo, NaggReposterInfo } from '../../map/feed';
 import { synthesizeRecencyManifest } from '../../tiers';
-import { toFeedEvent } from '../event';
+import { toFeedEvent, type RawWireEvent } from '../event';
 import { nostrLog } from '../../log';
 import type { FeedBundle, FeedItem } from '../feed';
 import type { ThreadBundle } from '../thread';
 import { bundleFromOwnEvents, ownActionKinds, type OwnHistoryBundle } from '../own-state';
 import type { OwnActionType } from '@sovranbitcoin/schemas';
+import { profilesFromKind0, type ProfileMetadata } from '../profiles';
+import type { ProfileStatsBundle } from '../profile-stats';
+import { socialGraphFromEvents, type SocialGraph } from '../social-graph';
 import { PRIMAL_KIND, type RawPrimalEvent } from './protocol';
 import {
   PrimalNoteStatsContent,
   PrimalNoteActionsContent,
   PrimalFeedRangeContent,
   PrimalProfileContent,
+  PrimalUserProfileContent,
   parseContent,
 } from './schemas';
 
@@ -35,16 +39,40 @@ import {
 // thread surfaces share one batch parser and assemble their bundle differently.
 // ---------------------------------------------------------------------------
 
+// A repost collapsed onto its original. Primal keys the feed item by the
+// ORIGINAL note id (megaFeed.ts convertToNotesMega: `id = parseRepost(note).id`)
+// and carries the reposter(s) as metadata, so we do the same.
+type PrimalRepost = {
+  repostEvent: NaggFeedEvent;
+  originalEvent: NaggFeedEvent | null;
+  originalEventId: string;
+  reposters: NaggReposterInfo[];
+};
+
 type PrimalBatch = {
   notesById: Map<string, NaggFeedEvent>;
+  repostsByOriginalId: Map<string, PrimalRepost>;
   stats: NoteStatsMap;
   actions: NoteActionsMap;
   profiles: Record<string, NaggProfileInfo>;
   feedRange: OrderingManifest | null;
 };
 
+/** Primal inlines the reposted note as stringified JSON in the kind-6 content. */
+function parseRepostOriginal(content: string): NaggFeedEvent | null {
+  if (!content) return null;
+  try {
+    const parsed = JSON.parse(content) as RawWireEvent;
+    if (!parsed || typeof parsed !== 'object' || typeof parsed.kind !== 'number') return null;
+    return toFeedEvent(parsed);
+  } catch {
+    return null;
+  }
+}
+
 function parsePrimalBatch(events: ReadonlyArray<RawPrimalEvent>): PrimalBatch {
   const notesById = new Map<string, NaggFeedEvent>();
+  const repostsByOriginalId = new Map<string, PrimalRepost>();
   const stats: Record<string, NoteStats> = {};
   const actions: Record<string, NoteActions> = {};
   const profiles: Record<string, NaggProfileInfo> = {};
@@ -55,6 +83,30 @@ function parsePrimalBatch(events: ReadonlyArray<RawPrimalEvent>): PrimalBatch {
       case PRIMAL_KIND.note: {
         const event = toFeedEvent(raw);
         if (event && !notesById.has(event.id)) notesById.set(event.id, event);
+        break;
+      }
+      case PRIMAL_KIND.repost:
+      case PRIMAL_KIND.genericRepost: {
+        const repostEvent = toFeedEvent(raw);
+        if (!repostEvent) break;
+        // The reposted note is inline in the content; the `e` tag is the fallback id.
+        const originalEvent = parseRepostOriginal(repostEvent.content);
+        const originalEventId = originalEvent?.id ?? repostEvent.tags.find((t) => t[0] === 'e')?.[1];
+        if (!originalEventId) break;
+        const reposter: NaggReposterInfo = { pubkey: repostEvent.pubkey, event: repostEvent };
+        const existing = repostsByOriginalId.get(originalEventId);
+        if (existing) {
+          // Several people reposted the same note → one item, many reposters.
+          existing.reposters.push(reposter);
+          if (!existing.originalEvent && originalEvent) existing.originalEvent = originalEvent;
+        } else {
+          repostsByOriginalId.set(originalEventId, {
+            repostEvent,
+            originalEvent: originalEvent ?? null,
+            originalEventId,
+            reposters: [reposter],
+          });
+        }
         break;
       }
       case PRIMAL_KIND.metadata: {
@@ -106,7 +158,7 @@ function parsePrimalBatch(events: ReadonlyArray<RawPrimalEvent>): PrimalBatch {
     }
   }
 
-  return { notesById, stats, actions, profiles, feedRange };
+  return { notesById, repostsByOriginalId, stats, actions, profiles, feedRange };
 }
 
 export function demuxPrimalFeed(events: ReadonlyArray<RawPrimalEvent>): FeedBundle {
@@ -114,17 +166,44 @@ export function demuxPrimalFeed(events: ReadonlyArray<RawPrimalEvent>): FeedBund
   nostrLog.debug('nostr.primal.demux.feed', {
     rawEvents: events.length,
     notes: batch.notesById.size,
+    reposts: batch.repostsByOriginalId.size,
     profiles: Object.keys(batch.profiles).length,
     stats: Object.keys(batch.stats).length,
     actions: Object.keys(batch.actions).length,
     serverManifest: !!batch.feedRange,
   });
   const itemsById = new Map<string, FeedItem>();
-  for (const [id, event] of batch.notesById) itemsById.set(id, { type: 'note', event });
+  // Feed position per item id, for the recency fallback + cursor (a repost's
+  // position is WHEN it was reposted, i.e. the kind-6 created_at).
+  const timestampsById = new Map<string, number>();
+  // A feedRange may reference a repost by either the original id (Primal's
+  // canonical item id) or the kind-6 event id — alias both to the original.
+  const idAlias = new Map<string, string>();
 
-  // Prefer Primal's authoritative manifest; otherwise synthesize one from the
-  // notes we received so the bundle still renders by a stable order.
-  const manifest = batch.feedRange ?? recencyOf(batch.notesById);
+  // Reposts win over a bare copy of the reposted note: Primal sends the original
+  // as a reference (page.mentions), not its own feed row.
+  for (const [originalId, repost] of batch.repostsByOriginalId) {
+    itemsById.set(originalId, {
+      type: 'repost',
+      repostEvent: repost.repostEvent,
+      originalEvent: repost.originalEvent ?? batch.notesById.get(originalId) ?? null,
+      originalEventId: originalId,
+      reposters: repost.reposters,
+    });
+    timestampsById.set(originalId, repost.repostEvent.created_at);
+    idAlias.set(repost.repostEvent.id, originalId);
+  }
+  for (const [id, event] of batch.notesById) {
+    if (itemsById.has(id)) continue; // already represented as a repost's original
+    itemsById.set(id, { type: 'note', event });
+    timestampsById.set(id, event.created_at);
+  }
+
+  // Prefer Primal's authoritative manifest (resolved through the repost alias and
+  // filtered to items we actually hold); otherwise synthesize one by recency.
+  const manifest = batch.feedRange
+    ? resolveManifest(batch.feedRange, itemsById, idAlias)
+    : synthesizeRecencyManifest([...timestampsById].map(([id, created_at]) => ({ id, created_at })));
   const hasActions = Object.keys(batch.actions).length > 0;
 
   return {
@@ -134,8 +213,40 @@ export function demuxPrimalFeed(events: ReadonlyArray<RawPrimalEvent>): FeedBund
     ...(hasActions ? { actions: batch.actions } : {}),
     profiles: batch.profiles,
     quoted: {},
-    cursor: deriveCursor(manifest, batch.notesById),
+    cursor: deriveCursorByTimestamp(manifest, timestampsById),
   };
+}
+
+/** Map feedRange ids through the repost alias, drop unknowns, dedupe — so a
+ *  repost referenced by its kind-6 id or original id lands on the same item. */
+function resolveManifest(
+  feedRange: OrderingManifest,
+  itemsById: Map<string, FeedItem>,
+  idAlias: Map<string, string>,
+): OrderingManifest {
+  const seen = new Set<string>();
+  const elements: string[] = [];
+  for (const raw of feedRange.elements) {
+    const id = itemsById.has(raw) ? raw : idAlias.get(raw);
+    if (!id || seen.has(id) || !itemsById.has(id)) continue;
+    seen.add(id);
+    elements.push(id);
+  }
+  return { orderBy: feedRange.orderBy, elements };
+}
+
+/** Cursor = the oldest rendered item's (created_at, id) — its feed-position
+ *  timestamp, which for a repost is the kind-6 created_at, not the original's. */
+function deriveCursorByTimestamp(
+  manifest: OrderingManifest,
+  timestampsById: Map<string, number>,
+): NostrCursor {
+  for (let i = manifest.elements.length - 1; i >= 0; i--) {
+    const id = manifest.elements[i];
+    const createdAt = timestampsById.get(id);
+    if (createdAt !== undefined) return { createdAt, id };
+  }
+  return null;
 }
 
 export function demuxPrimalThread(events: ReadonlyArray<RawPrimalEvent>, rootId: string): ThreadBundle | null {
@@ -191,6 +302,63 @@ export function demuxPrimalOwnHistory(
     if (event) own.push(event);
   }
   return bundleFromOwnEvents(own);
+}
+
+/**
+ * `user_profile` batch → one profile's header. The real kind-0 gives metadata;
+ * the synthetic USER_PROFILE (10000105) gives follow/follower/note counts and
+ * `time_joined` (joined date). Both are keyed to the requested pubkey.
+ */
+export function demuxPrimalProfileStats(
+  events: ReadonlyArray<RawPrimalEvent>,
+  pubkey: string,
+): ProfileStatsBundle {
+  const metadata: ProfileMetadata | undefined = profilesFromKind0(events)[pubkey];
+  let followersCount: number | undefined;
+  let followingCount: number | undefined;
+  let noteCount: number | undefined;
+  let joinedAt: number | undefined;
+
+  for (const raw of events) {
+    if (raw.kind !== PRIMAL_KIND.userStats) continue;
+    const stats = parseContent(PrimalUserProfileContent, raw.content);
+    if (!stats || (stats.pubkey && stats.pubkey !== pubkey)) continue;
+    if (stats.followers_count != null) followersCount = stats.followers_count;
+    if (stats.follows_count != null) followingCount = stats.follows_count;
+    if (stats.note_count != null) noteCount = stats.note_count;
+    if (stats.time_joined != null) joinedAt = stats.time_joined;
+  }
+
+  return {
+    pubkey,
+    ...(metadata ? { metadata } : {}),
+    ...(followersCount !== undefined ? { followersCount } : {}),
+    ...(followingCount !== undefined ? { followingCount } : {}),
+    ...(noteCount !== undefined ? { noteCount } : {}),
+    ...(joinedAt !== undefined ? { joinedAt } : {}),
+  };
+}
+
+/**
+ * `contact_list` (extended_response) batch → the profile's follow set plus the
+ * bundled kind-0s of who it follows. Reuses the floor's kind-3 parser, then
+ * layers the followed users' profiles on top from the extended payload.
+ */
+export function demuxPrimalSocialGraph(
+  events: ReadonlyArray<RawPrimalEvent>,
+  pubkey: string,
+): SocialGraph {
+  const feedEvents: NaggFeedEvent[] = [];
+  for (const raw of events) {
+    const event = toFeedEvent(raw);
+    if (event) feedEvents.push(event);
+  }
+  const graph = socialGraphFromEvents(pubkey, feedEvents);
+  const profiles: Record<string, NaggProfileInfo> = {};
+  for (const [pk, m] of Object.entries(profilesFromKind0(events))) {
+    profiles[pk] = { name: m.displayName || m.name || '', ...(m.picture ? { picture: m.picture } : {}) };
+  }
+  return { ...graph, profiles };
 }
 
 function recencyOf(notesById: Map<string, NaggFeedEvent>): OrderingManifest {

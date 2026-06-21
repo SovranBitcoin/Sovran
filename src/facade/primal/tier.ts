@@ -4,12 +4,24 @@ import type { ThreadBundle, ThreadRequest } from '../thread';
 import type { OwnHistoryBundle, OwnHistoryRequest } from '../own-state';
 import { profilesFromKind0, type ProfilesBundle, type ProfilesRequest } from '../profiles';
 import {
+  profileStatsIsEmpty,
+  type ProfileStatsBundle,
+  type ProfileStatsRequest,
+} from '../profile-stats';
+import type { SocialGraph, SocialGraphRequest } from '../social-graph';
+import {
   profileSearchHitsFromKind0,
   type ProfileSearchBundle,
   type SearchRequest,
 } from '../search';
 import type { NostrTierStrategy } from '../strategy';
-import { demuxPrimalFeed, demuxPrimalThread, demuxPrimalOwnHistory } from './demux';
+import {
+  demuxPrimalFeed,
+  demuxPrimalThread,
+  demuxPrimalOwnHistory,
+  demuxPrimalProfileStats,
+  demuxPrimalSocialGraph,
+} from './demux';
 import type { PrimalCacheRequest, PrimalConnection } from './protocol';
 
 // ---------------------------------------------------------------------------
@@ -97,6 +109,42 @@ export function createPrimalTier(config: PrimalTierConfig): NostrTierStrategy {
       });
       return result.match<TierOutcome<OwnHistoryBundle>>(
         (events) => answered(demuxPrimalOwnHistory(events, request.actionType)),
+        (error) => failed(error),
+      );
+    },
+
+    async getProfileStats(request: ProfileStatsRequest): Promise<TierOutcome<ProfileStatsBundle>> {
+      // `user_profile` bundles the real kind-0 + the synthetic USER_PROFILE stats
+      // (counts + time_joined) for one pubkey. No reputation — that's nagg-only.
+      const result = await config.connection.request(
+        {
+          verb: 'user_profile',
+          params: {
+            pubkey: request.pubkey,
+            ...(request.viewerPubkey ? { user_pubkey: request.viewerPubkey } : {}),
+          },
+        },
+        { signal: request.signal, timeoutMs: request.timeoutMs },
+      );
+      return result.match<TierOutcome<ProfileStatsBundle>>(
+        (events) => {
+          const bundle = demuxPrimalProfileStats(events, request.pubkey);
+          // Nothing useful (Primal doesn't hold this profile) → fall to the floor.
+          return profileStatsIsEmpty(bundle) ? unsupported() : answered(bundle);
+        },
+        (error) => failed(error),
+      );
+    },
+
+    async getSocialGraph(request: SocialGraphRequest): Promise<TierOutcome<SocialGraph>> {
+      // `contact_list` (extended_response) returns the kind-3 plus the bundled
+      // kind-0 of everyone followed — the same shape nagg's social-graph seed has.
+      const result = await config.connection.request(
+        { verb: 'contact_list', params: { pubkey: request.pubkey, extended_response: true } },
+        { signal: request.signal, timeoutMs: request.timeoutMs },
+      );
+      return result.match<TierOutcome<SocialGraph>>(
+        (events) => answered(demuxPrimalSocialGraph(events, request.pubkey)),
         (error) => failed(error),
       );
     },

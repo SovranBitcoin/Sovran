@@ -3,6 +3,8 @@ import { ok, type Result } from 'neverthrow';
 import {
   demuxPrimalFeed,
   demuxPrimalThread,
+  demuxPrimalProfileStats,
+  demuxPrimalSocialGraph,
   createPrimalTier,
   createPrimalWebSocketConnection,
   type PrimalConnection,
@@ -59,6 +61,67 @@ describe('demuxPrimalFeed — Primal batch → contract bundle', () => {
     expect(bundle.manifest.elements).toEqual([ID_A, ID_B]);
   });
 
+  test('reconstructs a repost: original content inline in the kind-6, keyed by the original id', () => {
+    const ID_ORIG = 'd'.repeat(64);
+    const ID_REPOST = 'e'.repeat(64);
+    const REPOSTER = 'f'.repeat(64);
+    const original = {
+      id: ID_ORIG,
+      pubkey: PUB,
+      kind: 1,
+      content: 'the reposted note',
+      tags: [],
+      created_at: 1_700_000_050,
+    };
+    const bundle = demuxPrimalFeed([
+      // Primal inlines the original note as stringified JSON in the repost content.
+      {
+        id: ID_REPOST,
+        pubkey: REPOSTER,
+        kind: 6,
+        content: JSON.stringify(original),
+        tags: [['e', ID_ORIG]],
+        created_at: 1_700_000_300,
+      },
+      { kind: 10_000_113, content: JSON.stringify({ order_by: 'rank', elements: [ID_ORIG] }) },
+    ]);
+
+    // Item is keyed by the ORIGINAL note id, not the kind-6 event id.
+    expect([...bundle.itemsById.keys()]).toEqual([ID_ORIG]);
+    const item = bundle.itemsById.get(ID_ORIG)!;
+    expect(item.type).toBe('repost');
+    if (item.type !== 'repost') throw new Error('expected repost');
+    expect(item.originalEventId).toBe(ID_ORIG);
+    expect(item.originalEvent?.content).toBe('the reposted note');
+    expect(item.repostEvent.id).toBe(ID_REPOST);
+    expect(item.reposters?.map((r) => r.pubkey)).toEqual([REPOSTER]);
+    // Manifest renders the item even though feedRange referenced the original id.
+    expect(bundle.manifest.elements).toEqual([ID_ORIG]);
+    // Cursor uses the repost's feed-position timestamp (kind-6 created_at).
+    expect(bundle.cursor).toEqual({ createdAt: 1_700_000_300, id: ID_ORIG });
+  });
+
+  test('collapses multiple reposts of the same note into one item with many reposters', () => {
+    const ID_ORIG = 'd'.repeat(64);
+    const original = { id: ID_ORIG, pubkey: PUB, kind: 1, content: 'hi', tags: [], created_at: 1 };
+    const mk = (repostId: string, who: string, at: number): RawPrimalEvent => ({
+      id: repostId,
+      pubkey: who,
+      kind: 6,
+      content: JSON.stringify(original),
+      tags: [['e', ID_ORIG]],
+      created_at: at,
+    });
+    const bundle = demuxPrimalFeed([
+      mk('1'.repeat(64), 'a'.repeat(64), 100),
+      mk('2'.repeat(64), 'b'.repeat(64), 200),
+    ]);
+    expect([...bundle.itemsById.keys()]).toEqual([ID_ORIG]);
+    const item = bundle.itemsById.get(ID_ORIG)!;
+    if (item.type !== 'repost') throw new Error('expected repost');
+    expect(item.reposters?.map((r) => r.pubkey).sort()).toEqual(['a'.repeat(64), 'b'.repeat(64)]);
+  });
+
   test('skips a synthetic event with malformed content instead of crashing', () => {
     const bundle = demuxPrimalFeed([
       ...BATCH,
@@ -67,6 +130,72 @@ describe('demuxPrimalFeed — Primal batch → contract bundle', () => {
     ]);
     // original valid stats survive; the malformed ones are dropped
     expect(Object.keys(bundle.stats)).toEqual([ID_A]);
+  });
+});
+
+describe('demuxPrimalProfileStats — user_profile batch → profile header', () => {
+  test('maps kind-0 metadata + the USER_PROFILE (10000105) counts and time_joined', () => {
+    const bundle = demuxPrimalProfileStats(
+      [
+        {
+          pubkey: PUB,
+          kind: 0,
+          content: JSON.stringify({ name: 'alice', about: 'hi', nip05: 'a@b.c' }),
+          created_at: 1_700_000_000,
+        },
+        {
+          kind: 10_000_105,
+          content: JSON.stringify({
+            pubkey: PUB,
+            follows_count: 42,
+            followers_count: 100,
+            note_count: 7,
+            time_joined: 1_600_000_000,
+          }),
+        },
+      ],
+      PUB
+    );
+    expect(bundle.pubkey).toBe(PUB);
+    expect(bundle.metadata).toMatchObject({ name: 'alice', about: 'hi', nip05: 'a@b.c' });
+    expect(bundle.followingCount).toBe(42);
+    expect(bundle.followersCount).toBe(100);
+    expect(bundle.noteCount).toBe(7);
+    expect(bundle.joinedAt).toBe(1_600_000_000);
+  });
+
+  test('null time_joined is omitted, not coerced to 0', () => {
+    const bundle = demuxPrimalProfileStats(
+      [{ kind: 10_000_105, content: JSON.stringify({ pubkey: PUB, followers_count: 3, time_joined: null }) }],
+      PUB
+    );
+    expect(bundle.followersCount).toBe(3);
+    expect(bundle.joinedAt).toBeUndefined();
+  });
+});
+
+describe('demuxPrimalSocialGraph — contact_list → follows + bundled profiles', () => {
+  test('parses the kind-3 follow set and layers followed users’ kind-0', () => {
+    const FOLLOW_A = '1'.repeat(64);
+    const FOLLOW_B = '2'.repeat(64);
+    const graph = demuxPrimalSocialGraph(
+      [
+        {
+          id: 'k3'.padEnd(64, '0'),
+          pubkey: PUB,
+          kind: 3,
+          content: '',
+          tags: [['p', FOLLOW_A], ['p', FOLLOW_B]],
+          created_at: 1_700_000_500,
+        },
+        { pubkey: FOLLOW_A, kind: 0, content: JSON.stringify({ name: 'bob', picture: 'http://x/b.png' }) },
+      ],
+      PUB
+    );
+    expect(graph.pubkey).toBe(PUB);
+    expect(graph.follows.sort()).toEqual([FOLLOW_A, FOLLOW_B].sort());
+    expect(graph.contactsUpdatedAt).toBe(1_700_000_500);
+    expect(graph.profiles[FOLLOW_A]).toEqual({ name: 'bob', picture: 'http://x/b.png' });
   });
 });
 
