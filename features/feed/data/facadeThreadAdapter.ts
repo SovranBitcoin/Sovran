@@ -10,9 +10,14 @@ import type { ThreadRequest, ThreadResult } from './feedClient';
 // tier can't reproduce. Dependency-light (facade + feed types + the pure
 // buildThreadStructure) so it stays unit-testable.
 
-/** Map the app's 5-way reply sort to the facade's two tiers can serve. The
- *  engagement sorts (likes/zaps/reposts) have no cache/relay equivalent, so they
- *  degrade to relevance — honestly, rather than returning nothing. */
+// Per-tier budget for a facade thread fetch. Lower than the facade's 30s default
+// so a Primal→relay fall-through (when Primal lacks the note) can't hold the
+// thread skeleton for a full minute before settling to "no replies".
+const THREAD_TIER_TIMEOUT_MS = 12_000;
+
+/** Map the app's 5-way reply sort to what the facade tiers serve natively.
+ *  Primal's thread_view has NO server sort param (the client post-sorts), so we
+ *  fetch in relevance/new order and post-sort engagement modes below. */
 function toFacadeSort(sort: ThreadRequest['sort']): facade.ThreadSort {
   return sort === 'new' ? 'new' : 'relevant';
 }
@@ -24,8 +29,53 @@ export function toFacadeThreadRequest(request: ThreadRequest): facade.ThreadRequ
     ...(request.viewerPubkey ? { viewerPubkey: request.viewerPubkey } : {}),
     ...(typeof request.limit === 'number' ? { limit: request.limit } : {}),
     ...(request.signal ? { signal: request.signal } : {}),
-    ...(typeof request.timeoutMs === 'number' ? { timeoutMs: request.timeoutMs } : {}),
+    timeoutMs: request.timeoutMs ?? THREAD_TIER_TIMEOUT_MS,
   };
+}
+
+type ReplyStat = {
+  likes: number;
+  reposts: number;
+  replies: number;
+  zaps: number;
+  satsZapped: number;
+};
+const ZERO_STAT: ReplyStat = { likes: 0, reposts: 0, replies: 0, zaps: 0, satsZapped: 0 };
+
+/**
+ * Post-sort reply ids to approximate the app's 5 sort modes against the bundled
+ * per-note stats — Primal's cache has no server-side reply sort, so (like the
+ * Primal clients) we sort locally. The UI renders replies in replyPageEventIds
+ * order, so this ordering is what the sort tabs actually change.
+ */
+function sortedReplyIds(
+  events: readonly FeedEvent[],
+  stats: Record<string, ReplyStat>,
+  sort: ThreadRequest['sort']
+): string[] {
+  const stat = (id: string): ReplyStat => stats[id] ?? ZERO_STAT;
+  const recency = (event: FeedEvent): number => event.created_at ?? 0;
+  const score = (event: FeedEvent): number => {
+    const s = stat(event.id);
+    switch (sort) {
+      case 'new':
+        return recency(event);
+      case 'likes':
+        return s.likes;
+      case 'zaps':
+        return s.satsZapped;
+      case 'reposts':
+        return s.reposts;
+      case 'relevant':
+      default:
+        // No cache relevance score is bundled, so approximate "top" replies by
+        // weighted engagement; recency breaks ties.
+        return s.likes + s.reposts * 2 + s.replies;
+    }
+  };
+  return [...events]
+    .sort((a, b) => score(b) - score(a) || recency(b) - recency(a))
+    .map((event) => event.id);
 }
 
 function feedItemEvent(item: facade.FeedItem): FeedEvent | undefined {
@@ -69,7 +119,11 @@ export function resolvedThreadToResult(
     });
   }
 
-  const replyPageEventIds = replyEvents.map((event) => event.id);
+  const replyPageEventIds = sortedReplyIds(
+    replyEvents,
+    thread.stats as Record<string, ReplyStat>,
+    request.sort
+  );
   return {
     allEvents,
     profiles,

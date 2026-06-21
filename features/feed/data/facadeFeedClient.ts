@@ -72,19 +72,30 @@ export function createFacadeFeedClient(fallback: FeedClient): FeedClient {
       // relay) when nagg is toggled off, so the cache/relay tiers can serve them.
       if (getNostrTierConfig().nagg.enabled) return fallback.getThread(request);
 
-      const layer = buildNostrDataLayer();
-      if (!layer) return emptyThreadResult(request);
+      // Never throw: useThread's seeded-error path keeps isLoading=true on a
+      // throw (so a transient nagg error doesn't clobber a seeded render), which
+      // would leave the thread on skeletons forever. Any failure here resolves
+      // to an empty thread so loading always clears.
+      try {
+        const layer = buildNostrDataLayer();
+        if (!layer) return emptyThreadResult(request);
 
-      const result = await layer.getThread(toFacadeThreadRequest(request));
-      return result.match(
-        (thread) => resolvedThreadToResult(thread, request),
-        (error) => {
-          feedLog.warn('thread.facade.exhausted', {
-            attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
-          });
-          return emptyThreadResult(request);
-        }
-      );
+        const result = await layer.getThread(toFacadeThreadRequest(request));
+        return result.match(
+          (thread) => resolvedThreadToResult(thread, request),
+          (error) => {
+            feedLog.warn('thread.facade.exhausted', {
+              attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
+            });
+            return emptyThreadResult(request);
+          }
+        );
+      } catch (error) {
+        feedLog.warn('thread.facade.threw', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return emptyThreadResult(request);
+      }
     },
 
     async getNotifications(request): Promise<FeedNotificationsResult> {
