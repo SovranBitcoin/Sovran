@@ -7,7 +7,13 @@ import {
   type TierResolutionError,
 } from '../tiers';
 import { nostrLog, type NostrLogData } from '../log';
-import type { FeedBundle, FeedPageRequest, ResolvedFeedPage } from './feed';
+import { feedItemKey, type FeedBundle, type FeedItem, type FeedPageRequest, type ResolvedFeedPage } from './feed';
+import {
+  createSurfaceSession,
+  type FetchPage,
+  type LiveSubscribe,
+  type SurfaceSession,
+} from './session/surface-session';
 import type { ThreadBundle, ThreadRequest, ResolvedThread } from './thread';
 import type {
   NotificationsBundle,
@@ -75,6 +81,13 @@ export interface NostrDataLayer {
   /** The shared additive entity cache this layer populates. Read/subscribe from a binding. */
   readonly cache: NostrEntityCache;
   getFeedPage(request: FeedPageRequest): Promise<Result<ResolvedFeedPage, TierResolutionError>>;
+  /**
+   * A live-aware feed SESSION: a normal paginated API (firstPage/loadOlder/
+   * loadNew) over the tiered fetch, with a relay-only background listener feeding
+   * the "Load new" pill. Pages still fall back across tiers; only the live delta
+   * is relay-only. The app drives this instead of getFeedPage for scrollable feeds.
+   */
+  openFeedSession(request: FeedPageRequest): SurfaceSession<FeedItem>;
   getThread(request: ThreadRequest): Promise<Result<ResolvedThread, TierResolutionError>>;
   getNotifications(
     request: NotificationsRequest,
@@ -108,8 +121,42 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
   nostrLog.info('nostr.facade.created', { tiers: tierNames });
   const cache = config.cache ?? createNostrEntityCache(config.cacheLimits);
 
+  // The relay tier (if configured) owns the live "Load new" listener — the one
+  // explicit relay seam. Pages come from whichever tier answers; the delta is
+  // relay-only.
+  const liveTier = config.tiers.find((t) => typeof t.feedLiveSubscribe === 'function');
+
   return {
     cache,
+
+    openFeedSession(request) {
+      const fetchPage: FetchPage<FeedItem> = async (bound) => {
+        const pageRequest: FeedPageRequest = {
+          ...request,
+          cursor: bound.until ? { createdAt: bound.until.createdAt, id: bound.until.id } : request.cursor,
+          limit: bound.limit,
+        };
+        const candidates = candidatesFor(config.tiers, 'feedPage', (t) => () => t.feedPage!(pageRequest));
+        const resolved = await resolveAcrossTiers<FeedBundle>(candidates);
+        return resolved.match(
+          ({ tier, value }) => {
+            const page = assembleFeedPage(tier, value);
+            ingestFeedPage(cache, page);
+            return page.items;
+          },
+          () => [],
+        );
+      };
+      const liveSubscribe: LiveSubscribe<FeedItem> | undefined = liveTier
+        ? (since, onItems) => liveTier.feedLiveSubscribe!(request, since, onItems)
+        : undefined;
+      return createSurfaceSession<FeedItem>({
+        keyOf: feedItemKey,
+        fetchPage,
+        liveSubscribe,
+        ...(request.limit ? { pageSize: request.limit } : {}),
+      });
+    },
 
     async getFeedPage(request) {
       return runRead(

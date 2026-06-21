@@ -47,6 +47,13 @@ export interface RelayConnection {
     filters: NostrFilter[],
     controls?: RequestControls,
   ): Promise<Result<RawRelayEvent[], NaggError>>;
+  /**
+   * Open a LONG-LIVED subscription: `onEvent` fires per (deduped) event as it
+   * arrives; the subscription stays open past EOSE. Returns an unsubscribe. This
+   * is the one explicit relay seam — the live listener behind a surface session's
+   * "Load new". Optional: a connection that can't stream omits it.
+   */
+  subscribe?(filters: NostrFilter[], onEvent: (event: RawRelayEvent) => void): () => void;
 }
 
 type WebSocketLike = {
@@ -174,6 +181,50 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
           socket.onclose = markClosed;
         }
       });
+    },
+
+    subscribe(filters, onEvent) {
+      const relays = config.relays.filter((r) => r.length > 0);
+      if (!Ctor || relays.length === 0) return () => {};
+
+      const subId = `sov-live-${++counter}`;
+      const seen = new Set<string>();
+      const sockets: WebSocketLike[] = [];
+      let closed = false;
+      nostrLog.debug('nostr.relay.listen', { relays: relays.length, filters: filters.length });
+
+      for (const url of relays) {
+        const socket = new Ctor(url);
+        sockets.push(socket);
+        socket.onopen = () => {
+          if (!closed) socket.send(JSON.stringify(['REQ', subId, ...filters]));
+        };
+        socket.onmessage = (event) => {
+          const message = parseMessage(event.data);
+          // Stay open past EOSE — a live listener only cares about EVENTs.
+          if (!message || message[1] !== subId || message[0] !== 'EVENT') return;
+          const raw = message[2];
+          if (!raw || typeof raw !== 'object') return;
+          const candidate = raw as RawRelayEvent;
+          if (typeof candidate.id !== 'string' || seen.has(candidate.id)) return;
+          seen.add(candidate.id);
+          onEvent(candidate);
+        };
+        // onerror/onclose: a dropped relay simply stops feeding the listener.
+      }
+
+      return () => {
+        if (closed) return;
+        closed = true;
+        for (const socket of sockets) {
+          try {
+            socket.send(JSON.stringify(['CLOSE', subId]));
+            socket.close();
+          } catch {
+            // ignore
+          }
+        }
+      };
     },
   };
 }
