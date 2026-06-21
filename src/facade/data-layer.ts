@@ -33,6 +33,19 @@ import type {
 } from './profile-stats';
 import type { ProfileSearchBundle, SearchRequest, ResolvedProfileSearch } from './search';
 import type { NostrTierStrategy } from './strategy';
+import {
+  createNostrEntityCache,
+  type NostrEntityCache,
+  type EntityCacheLimits,
+} from './cache/entity-cache';
+import {
+  ingestFeedPage,
+  ingestThread,
+  ingestNotifications,
+  ingestSocialGraph,
+  ingestProfiles,
+  ingestProfileStats,
+} from './cache/ingest';
 
 // ---------------------------------------------------------------------------
 // NostrDataLayer — the opinionated facade
@@ -46,9 +59,19 @@ import type { NostrTierStrategy } from './strategy';
 export type NostrDataLayerConfig = {
   /** Strategies tried in order. Conventionally [nagg, primal, relay]. */
   tiers: ReadonlyArray<NostrTierStrategy>;
+  /**
+   * Shared entity cache. Reads write their entities through it and (where
+   * supported) serve from it first. Pass one in to control its lifecycle —
+   * the app supplies a PROFILE-SCOPED instance and clears it on identity switch.
+   * Created with defaults when omitted.
+   */
+  cache?: NostrEntityCache;
+  cacheLimits?: EntityCacheLimits;
 };
 
 export interface NostrDataLayer {
+  /** The shared additive entity cache this layer populates. Read/subscribe from a binding. */
+  readonly cache: NostrEntityCache;
   getFeedPage(request: FeedPageRequest): Promise<Result<ResolvedFeedPage, TierResolutionError>>;
   getThread(request: ThreadRequest): Promise<Result<ResolvedThread, TierResolutionError>>;
   getNotifications(
@@ -81,17 +104,22 @@ export interface NostrDataLayer {
 export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLayer {
   const tierNames = config.tiers.map((t) => t.tier);
   nostrLog.info('nostr.facade.created', { tiers: tierNames });
+  const cache = config.cache ?? createNostrEntityCache(config.cacheLimits);
 
   return {
+    cache,
+
     async getFeedPage(request) {
       return runRead(
         'feed',
         { spec: request.spec.kind, limit: request.limit ?? null, paged: !!request.cursor },
         async () => {
           const candidates = candidatesFor(config.tiers, 'feedPage', (t) => () => t.feedPage!(request));
-          return (await resolveAcrossTiers<FeedBundle>(candidates)).map(({ tier, value }) =>
-            assembleFeedPage(tier, value),
-          );
+          return (await resolveAcrossTiers<FeedBundle>(candidates)).map(({ tier, value }) => {
+            const page = assembleFeedPage(tier, value);
+            ingestFeedPage(cache, page);
+            return page;
+          });
         },
         (p) => ({ items: p.items.length, missingIds: p.missingIds.length, hasActions: !!p.actions }),
       );
@@ -103,9 +131,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         { noteId: short(request.noteId), sort: request.sort ?? 'relevant' },
         async () => {
           const candidates = candidatesFor(config.tiers, 'thread', (t) => () => t.thread!(request));
-          return (await resolveAcrossTiers<ThreadBundle>(candidates)).map(({ tier, value }) =>
-            assembleThread(tier, value),
-          );
+          return (await resolveAcrossTiers<ThreadBundle>(candidates)).map(({ tier, value }) => {
+            const thread = assembleThread(tier, value);
+            ingestThread(cache, thread);
+            return thread;
+          });
         },
         (t) => ({ replies: t.replies.length, missingIds: t.missingIds.length }),
       );
@@ -117,9 +147,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         { tab: request.tab ?? 'ALL', grouped: request.grouped !== false, paged: !!request.cursor },
         async () => {
           const candidates = candidatesFor(config.tiers, 'notifications', (t) => () => t.notifications!(request));
-          return (await resolveAcrossTiers<NotificationsBundle>(candidates)).map(({ tier, value }) =>
-            assembleNotifications(tier, value),
-          );
+          return (await resolveAcrossTiers<NotificationsBundle>(candidates)).map(({ tier, value }) => {
+            const notifs = assembleNotifications(tier, value);
+            ingestNotifications(cache, notifs);
+            return notifs;
+          });
         },
         (n) => ({ notifications: n.notifications.length, grouped: n.grouped }),
       );
@@ -169,7 +201,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         { pubkey: short(request.pubkey) },
         async () => {
           const candidates = candidatesFor<SocialGraph>(config.tiers, 'getSocialGraph', (t) => () => t.getSocialGraph!(request));
-          return (await resolveAcrossTiers<SocialGraph>(candidates)).map(({ tier, value }) => ({ tier, ...value }));
+          return (await resolveAcrossTiers<SocialGraph>(candidates)).map(({ tier, value }) => {
+            const graph = { tier, ...value };
+            ingestSocialGraph(cache, graph);
+            return graph;
+          });
         },
         (g) => ({ follows: g.follows.length, profiles: Object.keys(g.profiles).length, mutes: g.mutes.length }),
       );
@@ -193,7 +229,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         { pubkeys: request.pubkeys.length },
         async () => {
           const candidates = candidatesFor<ProfilesBundle>(config.tiers, 'getProfiles', (t) => () => t.getProfiles!(request));
-          return (await resolveAcrossTiers<ProfilesBundle>(candidates)).map(({ tier, value }) => ({ tier, profiles: value.profiles }));
+          return (await resolveAcrossTiers<ProfilesBundle>(candidates)).map(({ tier, value }) => {
+            const resolved = { tier, profiles: value.profiles };
+            ingestProfiles(cache, resolved);
+            return resolved;
+          });
         },
         (r) => ({ profiles: Object.keys(r.profiles).length }),
       );
@@ -205,7 +245,11 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         { pubkey: short(request.pubkey) },
         async () => {
           const candidates = candidatesFor<ProfileStatsBundle>(config.tiers, 'getProfileStats', (t) => () => t.getProfileStats!(request));
-          return (await resolveAcrossTiers<ProfileStatsBundle>(candidates)).map(({ tier, value }) => ({ tier, ...value }));
+          return (await resolveAcrossTiers<ProfileStatsBundle>(candidates)).map(({ tier, value }) => {
+            const resolved = { tier, ...value };
+            ingestProfileStats(cache, resolved);
+            return resolved;
+          });
         },
         (r) => ({
           hasMetadata: !!r.metadata,

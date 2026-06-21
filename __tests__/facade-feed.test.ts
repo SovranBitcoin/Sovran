@@ -131,4 +131,27 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
     expect(result.isErr()).toBe(true);
     expect(result._unsafeUnwrapErr().attempts[0]).toMatchObject({ tier: 'nagg', outcome: 'failed' });
   });
+
+  test('write-through: a feed read populates the shared entity cache', async () => {
+    const { client } = naggClientReturning(FEED_PAGE);
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+
+    // Cold cache: nothing about these entities yet.
+    expect(layer.cache.getNote(ID_A)).toBeUndefined();
+
+    const result = await layer.getFeedPage({ spec: { kind: 'for-you', viewerPubkey: PUB } });
+    expect(result.isOk()).toBe(true);
+
+    // A later, different surface (a thread on ID_A, a profile page for PUB) now
+    // serves these instantly from the cache — no second fetch needed.
+    expect(layer.cache.getNote(ID_A)?.content).toBe(`note ${ID_A}`);
+    expect(layer.cache.getNoteStats(ID_A)).toEqual({
+      likes: 5,
+      reposts: 2,
+      replies: 1,
+      zaps: 0,
+      satsZapped: 2100,
+    });
+    expect(layer.cache.getProfile(PUB)?.name).toBe('alice');
+  });
 });

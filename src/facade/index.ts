@@ -13,5 +13,8 @@ export * from './nagg-tier';
 export * from './placeholders';
 export * from './data-layer';
 export * from './event';
+export * from './cache/store';
+export * from './cache/entity-cache';
+export * from './cache/ingest';
 export * as primal from './primal';
 export * as relay from './relay';
