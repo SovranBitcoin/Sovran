@@ -148,13 +148,15 @@ fixed while the parent chain prepends above it (the T1 full-thread update) and
 replies append below. Achieved by `initialScrollIndex` (land on the note) +
 `maintainVisibleContentPosition` (bare → `{ data: true, size: true }`: `data`
 compensates the parent prepend, `size` absorbs measurement reconciliation) +
-`anchoredEndSpace` (the **end reserve**). The thread never auto-pins to the
-bottom — it omits the DM `ChatScreen`'s `initialScrollAtEnd` / `alignItemsAtEnd` /
-`maintainScrollAtEnd`. See ADR 0004.
+the **focus reserve**. The thread never auto-pins to the bottom — it omits the DM
+`ChatScreen`'s `initialScrollAtEnd` / `alignItemsAtEnd` / `maintainScrollAtEnd`.
+See ADR 0004.
 
-**End reserve** — `anchoredEndSpace={{ anchorIndex: targetIndex }}`: tail space the
-thread reserves so the focused note can scroll to the top. mVCP's prepend
+**Focus reserve** — `focusReserve`: extra `paddingBottom` the thread adds so the
+focused note can be scrolled to (and held at) the top. mVCP's prepend
 compensation is clamped at the max scroll offset, so without room below, a short
-thread still drops the note when parents load. The reserve = `viewport − (content
-from the note down) − footer − paddingBottom`, shrinking to 0 once replies fill
-the screen. See [[Thread anchor]] and ADR 0004.
+thread drops the note when parents load, the scroll snaps, and the note can't be
+refocused. The reserve = `viewport − (rows below the note × approx height)`,
+shrinking to 0 as replies fill the screen. Owned in `ThreadView` (not the
+library's opaque `anchoredEndSpace`) so it's deterministic and logged
+(`thread.reserve`). See [[Thread anchor]] and ADR 0004.

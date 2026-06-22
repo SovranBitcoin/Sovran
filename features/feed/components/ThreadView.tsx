@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -110,6 +110,11 @@ const REPLY_SORT_OPTIONS: {
 // fades out — a crossfade in the same row slot.
 const REPLY_FADE_IN = FadeIn.duration(220);
 const SKELETON_FADE_OUT = FadeOut.duration(220);
+
+// Rough per-row height used only to discount the content already below the
+// focused note when sizing the focus reserve (see `focusReserve`). Deliberately
+// approximate — it just keeps the reserve from over-padding long threads.
+const FOCUS_RESERVE_ROW_APPROX = 150;
 
 type ThreadSkeletonItem =
   | { type: 'target-skeleton'; id: string }
@@ -245,6 +250,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     'surface-tertiary',
   ] as const);
   const headerHeight = useHeaderHeight();
+  const { height: windowHeight } = useWindowDimensions();
   const imageOverlay = useImageOverlay();
   const embed = useThreadEmbed();
   const embedOpen = embed?.open;
@@ -309,23 +315,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
   const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
 
-  // Reserve just enough tail space for the focused note to reach the top of the
-  // viewport. Without it, a thread with little content below the target can't
-  // scroll far enough for `maintainVisibleContentPosition` to hold the note as
-  // the parent chain grows above — the compensation clamps at the max scroll
-  // offset and the note still drops. `anchoredEndSpace` sizes the reserve to
-  // `viewport - (content from anchorIndex down) - footer - paddingBottom`, so it
-  // shrinks to 0 once the replies below already fill the screen (no dead gap on
-  // long threads) and waits for measured sizes before sizing (no estimate thrash).
-  //
-  // The prop is consumed by the @legendapp/list@3.0.0 RN runtime
-  // (`state.props.anchoredEndSpace`) but the package omits it from the exported
-  // RN prop type, so it's typed locally and passed via spread (JSX spread
-  // bypasses excess-property checking — no `any`).
-  const anchoredEndSpaceProps: {
-    anchoredEndSpace?: { anchorIndex: number; anchorOffset?: number };
-  } = targetIndex >= 0 ? { anchoredEndSpace: { anchorIndex: targetIndex } } : {};
-
   const displayItems = useMemo<ThreadListItem[]>(() => {
     if (isLoading && items.length === 0) {
       // Include the sort-tabs row in the very first skeleton frame so it doesn't
@@ -357,6 +346,35 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 
     return withReplySortTabs([...items, ...createReplySkeletonItems(skeletonCount)]);
   }, [isFetching, isLoading, items, metricsRef]);
+
+  // Focus reserve: extra bottom space so the tapped reply can always be scrolled
+  // to (and held at) the top of the viewport, even when little content sits below
+  // it. Opening a thread on a reply lands a tall parent chain above the note; with
+  // no room below, the scroll bottoms out (clamps/snaps) and the note can't be
+  // refocused, and `maintainVisibleContentPosition` has nowhere to scroll to hold
+  // it as the parent grows. We reserve `viewport − (content already below the
+  // note)`, so the reserve is generous on short threads and shrinks toward 0 as
+  // replies fill the screen (no dead gap on long threads). Owned here (not the
+  // library's `anchoredEndSpace`) so it's deterministic, hot-reloadable, and
+  // logged. `targetIndex` indexes `displayItems` too — the sort-tabs row is
+  // inserted after the target and skeletons are appended last.
+  const focusReserve = useMemo(() => {
+    if (targetIndex <= 0) return 0;
+    const listViewport = Math.max(0, windowHeight - headerHeight - (replyBarHeight || 80));
+    const belowCount = Math.max(0, displayItems.length - 1 - targetIndex);
+    return Math.max(0, listViewport - belowCount * FOCUS_RESERVE_ROW_APPROX);
+  }, [targetIndex, windowHeight, headerHeight, replyBarHeight, displayItems.length]);
+
+  useEffect(() => {
+    if (focusReserve <= 0) return;
+    feedLog.info('thread.reserve', {
+      eventId,
+      targetIndex,
+      rows: displayItems.length,
+      focusReserve: Math.round(focusReserve),
+      windowHeight: Math.round(windowHeight),
+    });
+  }, [focusReserve, eventId, targetIndex, displayItems.length, windowHeight]);
 
   const threadPhase =
     isLoading && items.length === 0
@@ -681,7 +699,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               />
             }>
             <LegendList
-              {...anchoredEndSpaceProps}
               ref={listRef}
               data={displayItems}
               keyExtractor={threadKeyExtractor}
@@ -728,8 +745,9 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 paddingTop: 0,
                 // replyBarHeight already includes the bottom safe-area inset (the
                 // bar's opaque container reaches the screen bottom), so the inset
-                // is not added again here.
-                paddingBottom: (replyBarHeight || 80) + 16,
+                // is not added again here. `focusReserve` adds room below the note
+                // so it can be scrolled to the top (see its definition above).
+                paddingBottom: (replyBarHeight || 80) + 16 + focusReserve,
               }}
               showsVerticalScrollIndicator={false}
               // Anchor-on-the-tapped-note stability. Bare `maintainVisibleContentPosition`
@@ -739,8 +757,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               //    note does NOT drop. This is OFF by default (`{ data: false }`); omitting
               //    the prop is exactly why the note used to shift when parents loaded in.
               //  - `size: true`  → absorbs the estimate→measured reconciliation of rows.
-              // Works together with `anchoredEndSpace` (above): mVCP holds the note,
-              // the reserve guarantees the scroll room mVCP needs to do so.
+              // Works together with `focusReserve` (the bottom padding): mVCP holds the
+              // note, the reserve guarantees the scroll room mVCP needs to do so.
               // Mirrors the DM ChatScreen's anchoring half. We deliberately do NOT take
               // ChatScreen's `initialScrollAtEnd` / `alignItemsAtEnd` / `maintainScrollAtEnd`:
               // a thread anchors on the tapped note via `initialScrollIndex` and must never

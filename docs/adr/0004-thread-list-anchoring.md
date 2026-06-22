@@ -49,15 +49,22 @@ already relies on:
 1. **`maintainVisibleContentPosition` (bare → `{ data: true, size: true }`)** on
    the thread `LegendList`. `data:true` compensates the parent prepend; `size:true`
    absorbs estimate→measured reconciliation.
-2. **`anchoredEndSpace={{ anchorIndex: targetIndex }}`** reserves tail space so the
-   focused note can reach the top of the viewport. mVCP compensates a prepend by
-   *raising the scroll offset*, but that is clamped at the max scroll offset — a
-   thread with little content below the target can't scroll far enough, so the note
-   drops anyway. The reserve sizes to `viewport − (content from anchorIndex down) −
-   footer − paddingBottom`, shrinking to 0 once the replies below already fill the
-   screen (no dead gap on long threads), and waits for measured sizes (no estimate
-   thrash). It is read by the v3.0.0 RN runtime but omitted from the exported RN
-   prop type, so it is typed locally and passed via spread.
+2. **`focusReserve` — explicit bottom padding** so the focused note can reach (and
+   be held at) the top of the viewport. mVCP compensates a prepend by _raising the
+   scroll offset_, but that is clamped at the max scroll offset — a thread with
+   little content below the target can't scroll far enough, so the note drops, the
+   scroll bottoms out (snaps), and the note can't be refocused. We add
+   `viewport − (rows already below the note × approx row height)` to `paddingBottom`,
+   so it's generous on short threads and shrinks toward 0 as replies fill the screen
+   (no dead gap on long threads).
+
+   This is owned in `ThreadView` rather than the library's `anchoredEndSpace` on
+   purpose: `anchoredEndSpace` is opaque (no public type on the RN entry; not
+   reflected in our shift logs) and behaved inconsistently across 3.0.x. The
+   explicit reserve is deterministic, hot-reloads with the component (no bundle /
+   dependency-version ambiguity), and emits a `thread.reserve` log so a trace can
+   confirm it's live and its size.
+
 3. **`initialScrollIndex={targetIndex}`** lands the first paint on the tapped note.
 4. **No bottom-dock / auto-pin props.** Unlike `ChatScreen`, the thread omits
    `initialScrollAtEnd`, `alignItemsAtEnd`, and `maintainScrollAtEnd` — it anchors
@@ -71,7 +78,7 @@ already relies on:
   proof is on-device (native `ScrollView` mVCP cannot be exercised in jest).
 - `data:true` routes the data path through native `ScrollView` mVCP (Android needs
   RN ≥ 0.72; satisfied by our Expo SDK). The known racy edge (LegendApp/legend-list
-  #463) bites *near the bottom* of a list; our anchor is the top-pinned note with a
+  #463) bites _near the bottom_ of a list; our anchor is the top-pinned note with a
   single prepend — the well-behaved case.
 - **Requires `@legendapp/list` ≥ 3.0.4.** The combination was inert/janky on the
   first v3 release (3.0.0): the data-anchoring path was mis-batched (fixed 3.0.3),
