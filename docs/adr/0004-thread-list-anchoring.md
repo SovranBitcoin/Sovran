@@ -116,6 +116,16 @@ already relies on:
   `anchoredEndSpace` reported stale sizes during load (fixed 3.0.4), and
   `scrollToIndex`/`initialScrollIndex` mislanded on iOS (fixed 3.0.1). We pin 3.0.6.
   Re-verify these prop contracts on any future bump — v3 is still beta.
+- **Known residual (out of scope): replies settling _below_ the note.** The anchor
+  holds the note perfectly (verified: pageY constant across a 49-reply load), but the
+  replies under it still reflow as they resolve — reply skeletons (fixed height) don't
+  match variable real-reply heights, and reply images without `imeta` dims reshape on
+  load (16:9 → real). The two-list swap can't hide this: the seed list renders the
+  same replies, so reply reflow is visible on whichever list is shown (unlike the
+  parents, which exist only on the real list). This is the same variable-height /
+  media-reservation problem the feed has; the durable fix is feed-wide (skeleton
+  height matching + reply-image dimension reservation via `imeta` / the aspect cache),
+  not thread-anchor work.
 
 ## Alternatives rejected
 
