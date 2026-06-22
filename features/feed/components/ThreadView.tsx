@@ -298,24 +298,36 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const targetIndexRef = useRef(-1);
   const readerMovedRef = useRef(false);
 
-  // Direct swap after settle. The parent prepend reconciles (mVCP + our
-  // counter-scroll) over several frames; shown, that reads as jitter. So we render
-  // TWO lists: a seed list (tapped note + replies, no parents) the reader sees
-  // immediately, and the real list (full thread) that resolves OFF-SCREEN. Once the
-  // real list has settled at the focused note we swap to it INSTANTLY — no fade,
-  // because the resolved view is a pixel match for the seed (same note at top, same
-  // replies below; the parents are just scrolled off above). `revealed` = real list
-  // is shown.
+  // Direct swap after settle. We render TWO lists: a seed list (tapped note +
+  // replies, no parents) the reader sees immediately, and the real list (full
+  // thread) that resolves OFF-SCREEN. Once the parents above the note have stopped
+  // resizing, we land the note authoritatively and swap to the real list INSTANTLY —
+  // no fade, because the resolved view is a pixel match for the seed (same note at
+  // top, parents scrolled off above). `revealed`/`revealedRef` = real list is shown.
   const [revealed, setRevealed] = useState(false);
+  const revealedRef = useRef(false);
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Fire once the parents go quiet: put the note at the top with a single
+  // authoritative `scrollToIndex` (correct for ANY number of parents — far more
+  // robust than summing per-row counter-scroll deltas, which undershoot when several
+  // parents measure in a burst), then reveal next frame so the scroll has applied
+  // while still hidden.
   const scheduleReveal = useCallback((delayMs: number) => {
     if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-    settleTimerRef.current = setTimeout(() => setRevealed(true), delayMs);
+    settleTimerRef.current = setTimeout(() => {
+      revealedRef.current = true;
+      const idx = targetIndexRef.current;
+      if (idx > 0) {
+        void listRef.current?.scrollToIndex({ index: idx, viewPosition: 0, animated: false });
+      }
+      requestAnimationFrame(() => setRevealed(true));
+    }, delayMs);
   }, []);
 
   useEffect(() => {
     setRevealed(false);
+    revealedRef.current = false;
     readerMovedRef.current = false;
     if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
   }, [eventId]);
@@ -380,6 +392,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   useEffect(() => {
     if (!fullReady || revealed) return;
     if (!hasParents) {
+      revealedRef.current = true;
       setRevealed(true);
       return;
     }
@@ -444,9 +457,16 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     getListState: () => listRef.current?.getState() ?? null,
   });
 
-  // Keep the visual-shift logging, then reconcile the parent prepend (see the
-  // `targetIndexRef`/`readerMovedRef` note above). Only rows above the focused
-  // note shift it, and only until the reader takes over scrolling.
+  // Above-note size changes (parents measuring / late media reshaping) are what
+  // would move the focused note. Two regimes, split on `revealed`:
+  //  - BEFORE the swap (off-screen): don't counter-scroll per row — summing many
+  //    deltas in a burst undershoots with multiple parents. Just keep pushing the
+  //    swap out until the parents go quiet; `scheduleReveal` then lands the note with
+  //    one authoritative `scrollToIndex`.
+  //  - AFTER the swap: a late parent image (no imeta dims, slow to load) can still
+  //    reshape; the parent is off-screen above the note, so counter-scroll by its
+  //    exact delta to absorb the growth and keep the note fixed. One change at a time
+  //    here, so no burst/undershoot. (mVCP runs `size:false` → we're the sole owner.)
   const handleItemSizeChanged = useCallback(
     (info: {
       size: number;
@@ -459,19 +479,14 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       if (readerMovedRef.current) return;
       const tIndex = targetIndexRef.current;
       if (tIndex <= 0 || info.index >= tIndex) return;
-      // Compensate EVERY above-note size change by the exact delta, so the note holds
-      // through the prepend's estimate→measured jump AND late media: an image with no
-      // imeta dims (and not cached) reserves a 16:9 box, then reshapes to its real
-      // aspect on load — a second, larger above-note change. (We don't fight mVCP
-      // here: it runs `size:false`, so we are the sole owner of this axis — no
-      // double-correction, no oscillation.)
+      if (!revealedRef.current) {
+        scheduleReveal(150);
+        return;
+      }
       const delta = info.size - info.previous;
       if (delta === 0) return;
       const current = listRef.current?.getState()?.scroll ?? 0;
       void listRef.current?.scrollToOffset({ offset: current + delta, animated: false });
-      // While still hidden this also pushes the swap out until the above-note rows
-      // (incl. images that load fast) stop changing size, so we reveal a settled list.
-      scheduleReveal(150);
     },
     [visualList, scheduleReveal]
   );

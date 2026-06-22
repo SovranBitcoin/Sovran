@@ -66,40 +66,40 @@ already relies on:
    dependency-version ambiguity), and emits a `thread.reserve` log so a trace can
    confirm it's live and its size.
 
-3. **Own the size axis** (`onItemSizeChanged`). While the reader hasn't scrolled, we
-   counter-scroll by the exact delta (`scrollToOffset(scroll + (size − previous))`)
-   for **every** size change of a row **above** the note. This covers two things a
-   single global `estimatedItemSize` can't (parents range ~145–523px; v3 has no
-   per-item estimate):
-   - the prepend's **estimate→measured** jump (live trace: estimate 200 vs measured
-     145 → note moved up 55px; a media parent measured 523 → down 323px), and
-   - **late media**: an image with no `imeta` dims (and not cached) reserves a 16:9
-     box, then reshapes to its real aspect on `onLoad` — a second, larger above-note
-     change (videos are locked to imeta-or-16:9, so they don't reshape).
+3. **Own the size axis** (`onItemSizeChanged`), split on whether the real list is
+   shown yet (`revealedRef`). The note can be moved by above-note rows changing size:
+   the prepend's **estimate→measured** jump (parents range ~145–523px; v3 has no
+   per-item estimate) and **late media** (an image with no `imeta` dims reshapes 16:9
+   → real on `onLoad`; videos are locked, so they don't reshape).
+   - **Before the swap (off-screen):** do **not** counter-scroll per row. Summing many
+     deltas in a burst undershoots — with 3 parents (711px total) it landed at scroll
+     575, ~136px short, and arrived as one visible `jumpY:−530` at the swap. Instead we
+     just wait for the parents to go quiet, then (4) lands the note authoritatively.
+   - **After the swap:** a slow parent image can still reshape; the parent is off-screen
+     above the note, so we counter-scroll by its exact delta to absorb it. One change at
+     a time here → no burst, no undershoot.
 
-   Because the parents sit off-screen above the pinned note, absorbing their growth
-   keeps the note fixed. It's the report's "manual offset compensation when you
-   control insertion timing," and it's the **sole** owner of this axis (mVCP runs
-   `size:false`), so it can't race the library the way PR #225's `scrollToIndex`
-   re-pin did. A `readerMovedRef` (set on `onScrollBeginDrag`) hands control back to
-   the user, after which mVCP `data` still anchors future prepends.
+   We're the **sole** owner of this axis (mVCP runs `size:false`), so it can't race the
+   library the way PR #225's sustained `scrollToIndex` re-pin did. A `readerMovedRef`
+   (set on `onScrollBeginDrag`) hands control back to the user, after which mVCP `data`
+   still anchors future prepends.
 
 4. **`initialScrollIndex={targetIndex}`** lands the first paint on the tapped note.
 5. **No bottom-dock / auto-pin props.** Unlike `ChatScreen`, the thread omits
    `initialScrollAtEnd`, `alignItemsAtEnd`, and `maintainScrollAtEnd` — it anchors
    on the note, not the tail, and must never auto-scroll down.
-6. **Resolve off-screen, then swap directly.** Even with (1)–(3), the prepend +
-   re-anchor plays out over several frames and _reads as jitter_ on screen. So we
-   render **two lists**: a **seed list** (tapped note + replies, parents filtered out)
-   that the reader sees immediately, and the **real list** (full thread) that resolves
-   **off-screen** (`opacity: 0`, `pointerEvents: none`). The counter-scroll lands the
-   note off-screen; once the above-note rows stop changing size (`scheduleReveal`
-   debounce + fallback), we **swap instantly** — `revealed` flips, the real list shows,
-   the seed unmounts. No fade is needed because the resolved view is a pixel match for
-   the seed: same note at the top, same replies below; the parents are simply scrolled
-   off above. (A fade would only be masking a residual — and (3) makes the landing
-   exact.) This replaces the older per-row opacity "reveal hack" (which only masked the
-   rows _below_ the note).
+6. **Resolve off-screen, land authoritatively, then swap directly.** Even with
+   (1)–(3), the prepend + re-anchor plays out over several frames and _reads as jitter_
+   on screen. So we render **two lists**: a **seed list** (tapped note + replies,
+   parents filtered out) that the reader sees immediately, and the **real list** (full
+   thread) that resolves **off-screen** (`opacity: 0`, `pointerEvents: none`). Once the
+   above-note rows stop changing size (`scheduleReveal` debounce + fallback), we do one
+   **`scrollToIndex(noteIndex, { viewPosition: 0 })`** to put the note at the top —
+   exact for any parent count, by which point the parents are measured — and reveal on
+   the next frame (so the scroll has applied while still hidden). The **swap is
+   instant** (`revealed` flips, seed unmounts); no fade, because the resolved view is a
+   pixel match for the seed. This replaces both the older per-row opacity "reveal hack"
+   and the fragile delta-summing landing.
 
 ## Consequences
 
