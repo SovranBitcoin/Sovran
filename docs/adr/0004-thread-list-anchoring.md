@@ -49,8 +49,17 @@ already relies on:
 1. **`maintainVisibleContentPosition` (bare → `{ data: true, size: true }`)** on
    the thread `LegendList`. `data:true` compensates the parent prepend; `size:true`
    absorbs estimate→measured reconciliation.
-2. **`initialScrollIndex={targetIndex}`** lands the first paint on the tapped note.
-3. **No bottom-dock / auto-pin props.** Unlike `ChatScreen`, the thread omits
+2. **`anchoredEndSpace={{ anchorIndex: targetIndex }}`** reserves tail space so the
+   focused note can reach the top of the viewport. mVCP compensates a prepend by
+   *raising the scroll offset*, but that is clamped at the max scroll offset — a
+   thread with little content below the target can't scroll far enough, so the note
+   drops anyway. The reserve sizes to `viewport − (content from anchorIndex down) −
+   footer − paddingBottom`, shrinking to 0 once the replies below already fill the
+   screen (no dead gap on long threads), and waits for measured sizes (no estimate
+   thrash). It is read by the v3.0.0 RN runtime but omitted from the exported RN
+   prop type, so it is typed locally and passed via spread.
+3. **`initialScrollIndex={targetIndex}`** lands the first paint on the tapped note.
+4. **No bottom-dock / auto-pin props.** Unlike `ChatScreen`, the thread omits
    `initialScrollAtEnd`, `alignItemsAtEnd`, and `maintainScrollAtEnd` — it anchors
    on the note, not the tail, and must never auto-scroll down.
 

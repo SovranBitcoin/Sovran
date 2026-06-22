@@ -309,6 +309,23 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
   const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
 
+  // Reserve just enough tail space for the focused note to reach the top of the
+  // viewport. Without it, a thread with little content below the target can't
+  // scroll far enough for `maintainVisibleContentPosition` to hold the note as
+  // the parent chain grows above — the compensation clamps at the max scroll
+  // offset and the note still drops. `anchoredEndSpace` sizes the reserve to
+  // `viewport - (content from anchorIndex down) - footer - paddingBottom`, so it
+  // shrinks to 0 once the replies below already fill the screen (no dead gap on
+  // long threads) and waits for measured sizes before sizing (no estimate thrash).
+  //
+  // The prop is consumed by the @legendapp/list@3.0.0 RN runtime
+  // (`state.props.anchoredEndSpace`) but the package omits it from the exported
+  // RN prop type, so it's typed locally and passed via spread (JSX spread
+  // bypasses excess-property checking — no `any`).
+  const anchoredEndSpaceProps: {
+    anchoredEndSpace?: { anchorIndex: number; anchorOffset?: number };
+  } = targetIndex >= 0 ? { anchoredEndSpace: { anchorIndex: targetIndex } } : {};
+
   const displayItems = useMemo<ThreadListItem[]>(() => {
     if (isLoading && items.length === 0) {
       // Include the sort-tabs row in the very first skeleton frame so it doesn't
@@ -664,6 +681,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               />
             }>
             <LegendList
+              {...anchoredEndSpaceProps}
               ref={listRef}
               data={displayItems}
               keyExtractor={threadKeyExtractor}
@@ -721,6 +739,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               //    note does NOT drop. This is OFF by default (`{ data: false }`); omitting
               //    the prop is exactly why the note used to shift when parents loaded in.
               //  - `size: true`  → absorbs the estimate→measured reconciliation of rows.
+              // Works together with `anchoredEndSpace` (above): mVCP holds the note,
+              // the reserve guarantees the scroll room mVCP needs to do so.
               // Mirrors the DM ChatScreen's anchoring half. We deliberately do NOT take
               // ChatScreen's `initialScrollAtEnd` / `alignItemsAtEnd` / `maintainScrollAtEnd`:
               // a thread anchors on the tapped note via `initialScrollIndex` and must never

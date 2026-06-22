@@ -147,6 +147,14 @@ backend-free relay tier. Unread = `count(created_at > seenUntil)`.
 fixed while the parent chain prepends above it (the T1 full-thread update) and
 replies append below. Achieved by `initialScrollIndex` (land on the note) +
 `maintainVisibleContentPosition` (bare → `{ data: true, size: true }`: `data`
-compensates the parent prepend, `size` absorbs measurement reconciliation). The
-thread never auto-pins to the bottom — it omits the DM `ChatScreen`'s
-`initialScrollAtEnd` / `alignItemsAtEnd` / `maintainScrollAtEnd`. See ADR 0004.
+compensates the parent prepend, `size` absorbs measurement reconciliation) +
+`anchoredEndSpace` (the **end reserve**). The thread never auto-pins to the
+bottom — it omits the DM `ChatScreen`'s `initialScrollAtEnd` / `alignItemsAtEnd` /
+`maintainScrollAtEnd`. See ADR 0004.
+
+**End reserve** — `anchoredEndSpace={{ anchorIndex: targetIndex }}`: tail space the
+thread reserves so the focused note can scroll to the top. mVCP's prepend
+compensation is clamped at the max scroll offset, so without room below, a short
+thread still drops the note when parents load. The reserve = `viewport − (content
+from the note down) − footer − paddingBottom`, shrinking to 0 once replies fill
+the screen. See [[Thread anchor]] and ADR 0004.
