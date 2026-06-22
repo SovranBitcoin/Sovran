@@ -50,6 +50,106 @@ const AVATAR_SIZE = 36;
 
 const METRIC_SKELETON_ITEMS = [0, 1, 2, 3] as const;
 
+/**
+ * The gutter post's header row (name · time, plus the "⋯ more" button), shared by
+ * the real `PostCard` and `PostCardSkeleton` so their chrome can NEVER drift — a
+ * skeleton that hand-duplicated this row had silently dropped the more-button and
+ * rendered ~6px short, growing the row when real content replaced it. Rendering both
+ * states from one component guarantees identical height/structure.
+ */
+function PostCardGutterHeader({
+  loading = false,
+  foreground,
+  hasMore,
+  isThread = false,
+  displayName,
+  nameFallback,
+  shortTime,
+  placeholderAuthor,
+  placeholderTimestamp,
+  onProfilePress,
+  onMorePress,
+  onNestedPressIn,
+  onNestedPressOut,
+}: {
+  loading?: boolean;
+  foreground: string;
+  hasMore: boolean;
+  isThread?: boolean;
+  displayName?: string;
+  nameFallback?: string;
+  shortTime?: string;
+  placeholderAuthor?: string;
+  placeholderTimestamp?: string;
+  onProfilePress?: () => void;
+  onMorePress?: () => void;
+  onNestedPressIn?: () => void;
+  onNestedPressOut?: () => void;
+}) {
+  const textPrimary = { color: opacity(foreground, 0.9) };
+  const textMuted = { color: opacity(foreground, 0.4) };
+  const textDimmed = { color: opacity(foreground, 0.3) };
+  return (
+    <HStack align="center" gap={6} style={sharedStyles.mb4}>
+      <HStack align="center" gap={6} style={pcStyles.headerTextRow}>
+        {loading ? (
+          <Text loading numberOfLines={1} placeholder={placeholderAuthor} bold size={14} />
+        ) : (
+          <Pressable
+            onPressIn={onNestedPressIn}
+            onPressOut={onNestedPressOut}
+            onPress={onProfilePress}>
+            <Text
+              bold
+              size={14}
+              style={textPrimary}
+              numberOfLines={isThread ? 1 : undefined}
+              fallback={nameFallback}>
+              {displayName}
+            </Text>
+          </Pressable>
+        )}
+        {loading ? (
+          <Text
+            loading
+            numberOfLines={1}
+            placeholder={placeholderTimestamp}
+            size={13}
+            style={textMuted}
+          />
+        ) : shortTime ? (
+          <>
+            <Text bold size={13} style={[textDimmed, pcStyles.dotSeparator]}>
+              {'•'}
+            </Text>
+            <Text size={13} style={textMuted}>
+              {shortTime}
+            </Text>
+          </>
+        ) : null}
+      </HStack>
+      {hasMore ? (
+        loading ? (
+          // Empty box at the real more-button's exact dimensions — reserves the same
+          // height so the skeleton row matches the real row.
+          <View style={pcStyles.moreButton} />
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="More post actions"
+            onPressIn={onNestedPressIn}
+            onPressOut={onNestedPressOut}
+            onPress={onMorePress}
+            haptics
+            style={pcStyles.moreButton}>
+            <Icon name="tabler:dots" size={18} color={opacity(foreground, 0.5)} />
+          </Pressable>
+        )
+      ) : null}
+    </HStack>
+  );
+}
+
 interface PostCardProps {
   event: FeedEvent;
   metrics: NoteMetrics;
@@ -359,45 +459,18 @@ export const PostCard = React.memo(function PostCard({
       </View>
 
       <View style={sharedStyles.flex1}>
-        <HStack align="center" gap={6} style={sharedStyles.mb4}>
-          <HStack align="center" gap={6} style={pcStyles.headerTextRow}>
-            <Pressable
-              onPressIn={handleNestedPressIn}
-              onPressOut={handleNestedPressOut}
-              onPress={navigateToProfile}>
-              <Text
-                bold
-                size={14}
-                style={textPrimary}
-                numberOfLines={isThread ? 1 : undefined}
-                fallback={nameFallback}>
-                {displayName}
-              </Text>
-            </Pressable>
-            {shortTime ? (
-              <>
-                <Text bold size={13} style={[textDimmed, pcStyles.dotSeparator]}>
-                  {'•'}
-                </Text>
-                <Text size={13} style={textMuted}>
-                  {shortTime}
-                </Text>
-              </>
-            ) : null}
-          </HStack>
-          {onMorePress ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="More post actions"
-              onPressIn={handleNestedPressIn}
-              onPressOut={handleNestedPressOut}
-              onPress={handleMorePress}
-              haptics
-              style={pcStyles.moreButton}>
-              <Icon name="tabler:dots" size={18} color={opacity(foreground, 0.5)} />
-            </Pressable>
-          ) : null}
-        </HStack>
+        <PostCardGutterHeader
+          foreground={foreground}
+          hasMore={!!onMorePress}
+          isThread={isThread}
+          displayName={displayName}
+          nameFallback={nameFallback}
+          shortTime={shortTime}
+          onProfilePress={navigateToProfile}
+          onMorePress={handleMorePress}
+          onNestedPressIn={handleNestedPressIn}
+          onNestedPressOut={handleNestedPressOut}
+        />
 
         <NoteContent
           content={event.content}
@@ -578,30 +651,16 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
           </View>
 
           <View style={sharedStyles.flex1}>
-            {/* Mirror the real reply's author row exactly: name/time in a flex header
-                row, plus the "⋯ more" button box on the right. The real more button
-                (pcStyles.moreButton: 30×28, marginTop -4 → 24px) makes the real row
-                24px tall; without this placeholder the skeleton row was only the 18px
-                text line box, so the reply grew 6px when real content replaced it. */}
-            <HStack align="center" gap={6} style={sharedStyles.mb4}>
-              <HStack align="center" gap={6} style={pcStyles.headerTextRow}>
-                <Text
-                  loading
-                  numberOfLines={1}
-                  placeholder={skeletonVariant.author}
-                  bold
-                  size={14}
-                />
-                <Text
-                  loading
-                  numberOfLines={1}
-                  placeholder={skeletonVariant.timestamp}
-                  size={13}
-                  style={textMuted}
-                />
-              </HStack>
-              <View style={pcStyles.moreButton} />
-            </HStack>
+            {/* Same header component as the real post (loading state) — guarantees the
+                author row (incl. the more-button box) matches the real row's height. */}
+            <PostCardGutterHeader
+              loading
+              foreground={foreground}
+              hasMore
+              isThread
+              placeholderAuthor={skeletonVariant.author}
+              placeholderTimestamp={skeletonVariant.timestamp}
+            />
 
             <VStack spacing={0}>
               {skeletonVariant.content.map((line) => (
