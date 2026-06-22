@@ -12,6 +12,7 @@ export { SettingsDesignSystemLoadingScreen } from './screens/SettingsDesignSyste
 export { SettingsDesignSystemSegmentedScreen } from './screens/SettingsDesignSystemSegmentedScreen';
 export { SettingsDesignSystemTimelineScreen } from './screens/SettingsDesignSystemTimelineScreen';
 export { SettingsDesignSystemEmptyStatesScreen } from './screens/SettingsDesignSystemEmptyStatesScreen';
+export { SettingsDesignSystemSkeletonCrossfadeScreen } from './screens/SettingsDesignSystemSkeletonCrossfadeScreen';
 export { SettingsAvatarScreen } from './screens/SettingsAvatarScreen';
 export { SettingsNotificationPolicyScreen } from './screens/SettingsNotificationPolicyScreen';
 export { DeleteScreen } from './screens/DeleteScreen';

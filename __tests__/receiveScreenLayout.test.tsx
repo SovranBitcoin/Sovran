@@ -20,12 +20,22 @@ jest.mock('@/shared/lib/logger', () => ({
   paymentLog: {
     warn: jest.fn(),
   },
+  // The loading placeholder's SkeletonLoadingShimmer routes through
+  // contentShiftLog, which reads feedLog.isLevelEnabled. Disabled → no logging.
+  feedLog: {
+    isLevelEnabled: () => false,
+    info: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  },
   useLifecycleLogger: jest.fn(),
 }));
 
 jest.mock('@/shared/hooks/useThemeColor', () => ({
+  // Hex values: the loading placeholder now renders a SkeletonLoadingShimmer
+  // whose gradient runs colors through hex-color-opacity, which rejects names.
   useThemeColor: (tokens: string | string[]) =>
-    Array.isArray(tokens) ? tokens.map(() => 'muted') : 'muted',
+    Array.isArray(tokens) ? tokens.map(() => '#888888') : '#888888',
 }));
 
 jest.mock('@/shared/hooks/useMintInfo', () => ({

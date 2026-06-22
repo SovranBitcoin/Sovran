@@ -9,6 +9,12 @@ import { prefetchImage } from '@/shared/lib/imageCache';
 
 const MINT_DEFAULT_ICON = 'mingcute:bank-fill';
 
+// Mirrors `AVATAR_IMAGE_FADE_MS`: a real network/disk load fades the icon in
+// over its placeholder rather than popping. expo-image skips the transition for
+// memory-cached images, so a recycled icon stays put. This is independent of any
+// parent skeleton→content crossfade — the icon never blocks the data swap.
+const MINT_ICON_IMAGE_FADE_MS = 200;
+
 interface MintIconProps {
   iconUrl?: string | null;
   name?: string | null;
@@ -87,6 +93,7 @@ export function MintIcon({
           source={imageSource}
           cachePolicy="memory-disk"
           contentFit="cover"
+          transition={MINT_ICON_IMAGE_FADE_MS}
           style={StyleSheet.absoluteFill}
           accessibilityLabel={imageAlt}
           onError={handleImageError}

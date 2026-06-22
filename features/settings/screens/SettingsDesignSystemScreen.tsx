@@ -36,6 +36,11 @@ const COMPONENTS: ComponentEntry[] = [
     title: 'Empty states',
     description: 'Every "nothing to show" surface, unified via EmptyState',
   },
+  {
+    href: '/(settings-flow)/design-system-skeleton-crossfade',
+    title: 'Skeleton crossfade',
+    description: 'Region wave, 220ms skeleton→content fade, independent image fades',
+  },
 ];
 
 const DesignSystemLinkItem: React.FC<ComponentEntry> = ({ href, title, description }) => (

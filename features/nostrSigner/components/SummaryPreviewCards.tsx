@@ -32,6 +32,7 @@ import { popup } from '@/shared/lib/popup';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
+import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -139,20 +140,9 @@ export function ReferencedNoteCard({
 
   if (eventId === undefined) return null;
 
-  if (fetched.status === 'loading' || fetched.status === 'idle') {
-    return (
-      <View className="bg-surface rounded-2xl p-3" style={PREVIEW_CARD_STYLE}>
-        <HStack spacing={8} style={CENTER_ROW_STYLE}>
-          <Skeleton style={SKELETON_AVATAR_STYLE} />
-          <Skeleton style={SKELETON_NAME_STYLE} />
-        </HStack>
-        <Skeleton style={SKELETON_LINE_FULL_STYLE} />
-        <Skeleton style={SKELETON_LINE_SHORT_STYLE} />
-      </View>
-    );
-  }
+  const isPreviewLoading = fetched.status === 'loading' || fetched.status === 'idle';
 
-  if (fetched.status === 'unavailable' || fetched.event === undefined) {
+  if (!isPreviewLoading && (fetched.status === 'unavailable' || fetched.event === undefined)) {
     return (
       <View className="bg-surface rounded-2xl p-3">
         <Text size={13} color={muted}>
@@ -163,16 +153,36 @@ export function ReferencedNoteCard({
   }
 
   return (
-    <View className="bg-surface rounded-2xl p-3" style={PREVIEW_CARD_STYLE}>
-      <PeerIdentityRow
-        pubkey={fetched.event.pubkey}
-        nameOverride={fetched.author?.name}
-        pictureOverride={fetched.author?.picture}
-      />
-      <Text size={14} numberOfLines={3} color={foreground}>
-        {boundDisplay(fetched.event.content.trim(), CONTENT_PREVIEW_MAX_CHARS)}
-      </Text>
-    </View>
+    <SkeletonContentCrossfade
+      loading={isPreviewLoading}
+      visualKey="referenced-post-preview"
+      visualSurface="nostr-signer"
+      renderSkeleton={() => (
+        <View className="bg-surface rounded-2xl p-3" style={PREVIEW_CARD_STYLE}>
+          <HStack spacing={8} style={CENTER_ROW_STYLE}>
+            <Skeleton style={SKELETON_AVATAR_STYLE} />
+            <Skeleton style={SKELETON_NAME_STYLE} />
+          </HStack>
+          <Skeleton style={SKELETON_LINE_FULL_STYLE} />
+          <Skeleton style={SKELETON_LINE_SHORT_STYLE} />
+        </View>
+      )}
+      renderContent={() => {
+        if (fetched.event === undefined) return null;
+        return (
+          <View className="bg-surface rounded-2xl p-3" style={PREVIEW_CARD_STYLE}>
+            <PeerIdentityRow
+              pubkey={fetched.event.pubkey}
+              nameOverride={fetched.author?.name}
+              pictureOverride={fetched.author?.picture}
+            />
+            <Text size={14} numberOfLines={3} color={foreground}>
+              {boundDisplay(fetched.event.content.trim(), CONTENT_PREVIEW_MAX_CHARS)}
+            </Text>
+          </View>
+        );
+      }}
+    />
   );
 }
 

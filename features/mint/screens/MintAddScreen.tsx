@@ -32,6 +32,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { List } from '@/shared/ui/composed/List';
+import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
@@ -579,7 +580,6 @@ export function MintAddScreen() {
   // loading rows render through the SAME List + ContactRow path as real rows —
   // identical container chrome, no content shift on the data swap.
   const isInitialLoading = searchLoading && displayMints.length === 0;
-  const listData: SearchableMint[] = isInitialLoading ? SKELETON_MINTS : displayMints;
   const getItemType = useCallback(
     (item: SearchableMint) => ('isSkeleton' in item ? 'skeleton' : 'mint'),
     []
@@ -745,6 +745,39 @@ export function MintAddScreen() {
     [searchQuery, selectedCurrency]
   );
 
+  // One List renderer for both crossfade branches: the skeleton branch and the
+  // real branch render the SAME List + ContactRow path, so the swap shifts
+  // nothing. Two List instances coexist only for the ~220ms fade.
+  const renderResultList = useCallback(
+    (data: SearchableMint[]) => (
+      <List
+        data={data}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        getItemType={getItemType}
+        extraData={selectedMints}
+        drawDistance={300}
+        style={{ flex: 1, height: 0 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        ListHeaderComponent={listHeader}
+        // Skeleton data is non-empty, so the empty state can't flash mid-load.
+        ListEmptyComponent={isInitialLoading ? undefined : emptyComponent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      />
+    ),
+    [
+      renderItem,
+      keyExtractor,
+      getItemType,
+      selectedMints,
+      listHeader,
+      isInitialLoading,
+      emptyComponent,
+      handleScroll,
+    ]
+  );
+
   return (
     <Screen
       name="MintAddScreen"
@@ -760,20 +793,13 @@ export function MintAddScreen() {
       deferContent={false}>
       <Stack.Screen options={screenOptions} />
       <Spacer size={16} />
-      <List
-        data={listData}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        getItemType={getItemType}
-        extraData={selectedMints}
-        drawDistance={300}
-        style={{ flex: 1, height: 0 }}
-        contentContainerStyle={{ paddingBottom: 120 }}
-        ListHeaderComponent={listHeader}
-        // Skeleton data is non-empty, so the empty state can't flash mid-load.
-        ListEmptyComponent={isInitialLoading ? undefined : emptyComponent}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
+      <SkeletonContentCrossfade
+        loading={isInitialLoading}
+        style={{ flex: 1 }}
+        visualKey="mint-add-results"
+        visualSurface="mint-add"
+        renderSkeleton={() => renderResultList(SKELETON_MINTS)}
+        renderContent={() => renderResultList(displayMints)}
       />
     </Screen>
   );
