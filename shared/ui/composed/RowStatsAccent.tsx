@@ -168,25 +168,27 @@ export function RowStatsAccent({ stats, note, noteColor, nip05 }: RowStatsAccent
  * stats-bearing row (e.g. a mint result) is loading, so the accent's height is
  * reserved and the row doesn't grow when the real `RowStatsAccent` pills arrive.
  *
- * Co-located with `RowStatsAccent` so the geometry stays in one file: the same
- * outer `HStack` (`gap: 4, marginTop: 2`) wraps two pill placeholders sized like
- * the real `★ 4.5` / `85%` stats (12px icon + 12px text ≈ a 14px bar).
+ * Co-located with `RowStatsAccent` so the geometry can't drift: it mirrors the
+ * real pill's structure exactly — the same outer `HStack` (`gap: 4, marginTop:
+ * 2`) and per-pill `HStack` (`gap: 3`) of a 12px icon box + a `Text` at the
+ * same `size`/`bold`. The `Text loading` bar self-sizes to the real 12px line
+ * box, so the accent line is the same height whether loading or loaded (a fixed
+ * pixel bar previously under-shot the text line height by a couple of pixels).
  */
 export function RowStatsAccentSkeleton({ seed }: { seed?: string }) {
   return (
     <HStack align="center" style={{ gap: 4, marginTop: 2 }}>
-      <Skeleton
-        className="bg-skeleton rounded-full"
-        style={{ width: 44, height: 14 }}
-        visualKey={`accent:${seed ?? 'x'}`}
-        visualComponent="RowStatsAccentSkeleton"
-      />
-      <Skeleton
-        className="bg-skeleton rounded-full"
-        style={{ width: 52, height: 14 }}
-        visualKey={`accent2:${seed ?? 'x'}`}
-        visualComponent="RowStatsAccentSkeleton"
-      />
+      {[`accent:${seed ?? 'x'}`, `accent2:${seed ?? 'x'}`].map((key, i) => (
+        <HStack key={key} align="center" style={{ gap: 3 }}>
+          <Skeleton
+            className="bg-skeleton rounded-full"
+            style={{ width: 12, height: 12 }}
+            visualKey={key}
+            visualComponent="RowStatsAccentSkeleton"
+          />
+          <Text size={12} bold loading placeholder={i === 0 ? '4.5' : '98%'} />
+        </HStack>
+      ))}
     </HStack>
   );
 }
