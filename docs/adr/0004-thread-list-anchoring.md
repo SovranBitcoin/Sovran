@@ -82,15 +82,18 @@ measured` (live trace: estimate 200 vs measured 145 → note jumped **up 55px**;
 5. **No bottom-dock / auto-pin props.** Unlike `ChatScreen`, the thread omits
    `initialScrollAtEnd`, `alignItemsAtEnd`, and `maintainScrollAtEnd` — it anchors
    on the note, not the tail, and must never auto-scroll down.
-6. **Crossfade the reconciliation off-screen.** Even with (1)–(3), the prepend +
-   re-anchor plays out over several frames and _reads as jitter_ on screen. So the
-   list withholds the parents (`listData` filters them out) and renders only the
-   seed (tapped note + skeletons) at full opacity. When the full thread is ready we
-   fade the list out (120ms), inject the parents while hidden (`showParents`), let
-   the scroll settle (revealed when the above-note size-changes go quiet, with a
-   fallback), then fade back in (180ms). The reader sees the tapped note → a brief
-   crossfade → the settled thread, never the reconciliation. This replaces the older
-   per-row opacity "reveal hack" (which only masked the rows _below_ the note).
+6. **Resolve off-screen, then swap directly.** Even with (1)–(3), the prepend +
+   re-anchor plays out over several frames and _reads as jitter_ on screen. So we
+   render **two lists**: a **seed list** (tapped note + replies, parents filtered out)
+   that the reader sees immediately, and the **real list** (full thread) that resolves
+   **off-screen** (`opacity: 0`, `pointerEvents: none`). The counter-scroll lands the
+   note off-screen; once the above-note rows stop changing size (`scheduleReveal`
+   debounce + fallback), we **swap instantly** — `revealed` flips, the real list shows,
+   the seed unmounts. No fade is needed because the resolved view is a pixel match for
+   the seed: same note at the top, same replies below; the parents are simply scrolled
+   off above. (A fade would only be masking a residual — and (3) makes the landing
+   exact.) This replaces the older per-row opacity "reveal hack" (which only masked the
+   rows _below_ the note).
 
 ## Consequences
 
