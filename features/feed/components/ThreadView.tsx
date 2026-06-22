@@ -20,6 +20,7 @@ import {
   type LegendListRef,
   type LegendListRenderItemProps,
 } from '@legendapp/list/react-native';
+import { FlashList, type FlashListProps } from '@shopify/flash-list';
 import { useHeaderHeight } from '@react-navigation/elements';
 import opacity from 'hex-color-opacity';
 
@@ -51,6 +52,7 @@ import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import type { ThreadReplySort } from '@/features/feed/data/feedClient';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { feedLog, Log } from '@/shared/lib/logger';
 import { actionMenuPopup } from '@/shared/lib/popup';
 import {
@@ -258,6 +260,9 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   ] as const);
   const headerHeight = useHeaderHeight();
   const { height: windowHeight } = useWindowDimensions();
+  // Spike toggle (Settings → Developer): render the thread on FlashList v2 (synchronous
+  // Fabric layout) with the legend-list scaffolding stripped, to A/B scroll stability.
+  const flashListThread = useSettingsStore((s) => s.flashListThread);
   const imageOverlay = useImageOverlay();
   const embed = useThreadEmbed();
   const embedOpen = embed?.open;
@@ -812,118 +817,153 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 onHeightChange={setReplyBarHeight}
               />
             }>
-            <View style={styles.listWrap}>
-              {/* Real list — full thread; resolves off-screen (opacity 0), then
+            {flashListThread ? (
+              // SPIKE: FlashList v2, scaffolding stripped. One plain list, mVCP on by
+              // default (synchronous Fabric layout), note landed via initialScrollIndex.
+              // No two-list / crossfade / focusReserve / counter-scroll / reply gating —
+              // we're testing whether the library holds the note on its own.
+              <FlashList
+                data={displayItems}
+                keyExtractor={threadKeyExtractor}
+                getItemType={threadItemType}
+                renderItem={renderItem as unknown as FlashListProps<ThreadListItem>['renderItem']}
+                drawDistance={500}
+                onEndReached={handleEndReached}
+                onEndReachedThreshold={0.4}
+                ListFooterComponent={
+                  isLoadingMoreReplies ? (
+                    <View style={styles.hiddenReplyFooter}>
+                      <Spinner size={18} color={opacity(foreground, 0.45)} />
+                    </View>
+                  ) : null
+                }
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingTop: 0,
+                  paddingBottom: (replyBarHeight || 80) + 16,
+                }}
+                onScroll={(e: { nativeEvent: { contentOffset: { y: number } } }) => {
+                  const y = e.nativeEvent.contentOffset.y;
+                  if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;
+                  if (embed) embed.scrollY.value = y;
+                }}
+                scrollEventThrottle={16}
+                initialScrollIndex={!isLoading && fullTargetIndex > 0 ? fullTargetIndex : undefined}
+              />
+            ) : (
+              <View style={styles.listWrap}>
+                {/* Real list — full thread; resolves off-screen (opacity 0), then
                   crossfades in over the seed once the rows have settled. zIndex keeps
                   it above the seed regardless of mount order. */}
-              <Animated.View
-                style={[StyleSheet.absoluteFill, styles.realLayer, realListStyle]}
-                pointerEvents={revealed ? 'auto' : 'none'}>
-                <LegendList
-                  ref={listRef}
-                  data={realData}
-                  keyExtractor={threadKeyExtractor}
-                  getItemType={threadItemType}
-                  getFixedItemSize={threadFixedItemSize}
-                  estimatedItemSize={200}
-                  drawDistance={500}
-                  renderItem={renderItem}
-                  extraData={[
-                    dataVersion,
-                    engagementRevision,
-                    isFetching ? 1 : 0,
-                    isLoadingMoreReplies ? 1 : 0,
-                    hasMoreReplies ? 1 : 0,
-                    replySort,
-                  ].join(':')}
-                  recycleItems
-                  ListFooterComponent={
-                    isLoadingMoreReplies ? (
-                      <View style={styles.hiddenReplyFooter}>
-                        <Spinner size={18} color={opacity(foreground, 0.45)} />
-                      </View>
-                    ) : hiddenReplyCount > 0 && !isFetching && !hasMoreReplies ? (
-                      <View style={styles.hiddenReplyFooter}>
-                        <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
-                          {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not
-                          loaded
-                        </Text>
-                      </View>
-                    ) : null
-                  }
-                  onEndReached={handleEndReached}
-                  onEndReachedThreshold={0.4}
-                  onItemSizeChanged={handleItemSizeChanged}
-                  onScrollBeginDrag={() => {
-                    readerMovedRef.current = true;
-                  }}
-                  onLoad={visualList.onLoad}
-                  onMetricsChange={visualList.onMetricsChange}
-                  onStickyHeaderChange={visualList.onStickyHeaderChange}
-                  onViewableItemsChanged={visualList.onViewableItemsChanged}
-                  viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
-                  style={{ flex: 1 }}
-                  contentContainerStyle={{
-                    // The embed sheet is positioned starting just below the header
-                    // (`expandedOffset`), so the list itself no longer pads the top.
-                    paddingTop: 0,
-                    // replyBarHeight already includes the bottom safe-area inset (the
-                    // bar's opaque container reaches the screen bottom), so the inset
-                    // is not added again here. `focusReserve` adds room below the note
-                    // so it can be scrolled to the top (see its definition above).
-                    paddingBottom: (replyBarHeight || 80) + 16 + focusReserve,
-                  }}
-                  showsVerticalScrollIndicator={false}
-                  // Anchor-on-the-tapped-note stability (see THREAD_MVCP): `data:true`
-                  // compensates the parent prepend; `size:false` leaves the size axis to our
-                  // `onItemSizeChanged` counter-scroll (sole owner → no double-correction).
-                  // Paired with `focusReserve` (bottom padding) for the scroll room it needs.
-                  // We deliberately do NOT take ChatScreen's `initialScrollAtEnd` /
-                  // `alignItemsAtEnd` / `maintainScrollAtEnd`: a thread anchors on the tapped
-                  // note via `initialScrollIndex` and must never auto-pin to the bottom.
-                  maintainVisibleContentPosition={THREAD_MVCP}
-                  onScroll={(e: { nativeEvent: { contentOffset: { y: number } } }) => {
-                    const y = e.nativeEvent.contentOffset.y;
-                    if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;
-                    if (embed) embed.scrollY.value = y;
-                    remeasureVisualLayoutScope(threadVisualScope, 'scroll', {
-                      minIntervalMs: 500,
-                      maxItems: 32,
-                      extra: { eventId, scrollY: Math.round(y), replySort },
-                    });
-                  }}
-                  scrollEventThrottle={16}
-                  scrollEnabled={embed ? embed.listScrollEnabled : undefined}
-                  initialScrollIndex={
-                    !isLoading && fullTargetIndex > 0 ? fullTargetIndex : undefined
-                  }
-                />
-              </Animated.View>
-              {/* Seed — tapped note + reply skeletons (no parents), shown underneath
-                  until the real list has crossfaded in. Display-only (no scroll, no
-                  handlers); kept mounted through the fade, then dropped. */}
-              {seedHidden ? null : (
-                <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                <Animated.View
+                  style={[StyleSheet.absoluteFill, styles.realLayer, realListStyle]}
+                  pointerEvents={revealed ? 'auto' : 'none'}>
                   <LegendList
-                    data={seedData}
+                    ref={listRef}
+                    data={realData}
                     keyExtractor={threadKeyExtractor}
                     getItemType={threadItemType}
                     getFixedItemSize={threadFixedItemSize}
                     estimatedItemSize={200}
                     drawDistance={500}
                     renderItem={renderItem}
+                    extraData={[
+                      dataVersion,
+                      engagementRevision,
+                      isFetching ? 1 : 0,
+                      isLoadingMoreReplies ? 1 : 0,
+                      hasMoreReplies ? 1 : 0,
+                      replySort,
+                    ].join(':')}
                     recycleItems
-                    scrollEnabled={false}
-                    showsVerticalScrollIndicator={false}
-                    style={styles.flexOne}
-                    contentContainerStyle={{
-                      paddingTop: 0,
-                      paddingBottom: (replyBarHeight || 80) + 16,
+                    ListFooterComponent={
+                      isLoadingMoreReplies ? (
+                        <View style={styles.hiddenReplyFooter}>
+                          <Spinner size={18} color={opacity(foreground, 0.45)} />
+                        </View>
+                      ) : hiddenReplyCount > 0 && !isFetching && !hasMoreReplies ? (
+                        <View style={styles.hiddenReplyFooter}>
+                          <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
+                            {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'}{' '}
+                            not loaded
+                          </Text>
+                        </View>
+                      ) : null
+                    }
+                    onEndReached={handleEndReached}
+                    onEndReachedThreshold={0.4}
+                    onItemSizeChanged={handleItemSizeChanged}
+                    onScrollBeginDrag={() => {
+                      readerMovedRef.current = true;
                     }}
+                    onLoad={visualList.onLoad}
+                    onMetricsChange={visualList.onMetricsChange}
+                    onStickyHeaderChange={visualList.onStickyHeaderChange}
+                    onViewableItemsChanged={visualList.onViewableItemsChanged}
+                    viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{
+                      // The embed sheet is positioned starting just below the header
+                      // (`expandedOffset`), so the list itself no longer pads the top.
+                      paddingTop: 0,
+                      // replyBarHeight already includes the bottom safe-area inset (the
+                      // bar's opaque container reaches the screen bottom), so the inset
+                      // is not added again here. `focusReserve` adds room below the note
+                      // so it can be scrolled to the top (see its definition above).
+                      paddingBottom: (replyBarHeight || 80) + 16 + focusReserve,
+                    }}
+                    showsVerticalScrollIndicator={false}
+                    // Anchor-on-the-tapped-note stability (see THREAD_MVCP): `data:true`
+                    // compensates the parent prepend; `size:false` leaves the size axis to our
+                    // `onItemSizeChanged` counter-scroll (sole owner → no double-correction).
+                    // Paired with `focusReserve` (bottom padding) for the scroll room it needs.
+                    // We deliberately do NOT take ChatScreen's `initialScrollAtEnd` /
+                    // `alignItemsAtEnd` / `maintainScrollAtEnd`: a thread anchors on the tapped
+                    // note via `initialScrollIndex` and must never auto-pin to the bottom.
+                    maintainVisibleContentPosition={THREAD_MVCP}
+                    onScroll={(e: { nativeEvent: { contentOffset: { y: number } } }) => {
+                      const y = e.nativeEvent.contentOffset.y;
+                      if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;
+                      if (embed) embed.scrollY.value = y;
+                      remeasureVisualLayoutScope(threadVisualScope, 'scroll', {
+                        minIntervalMs: 500,
+                        maxItems: 32,
+                        extra: { eventId, scrollY: Math.round(y), replySort },
+                      });
+                    }}
+                    scrollEventThrottle={16}
+                    scrollEnabled={embed ? embed.listScrollEnabled : undefined}
+                    initialScrollIndex={
+                      !isLoading && fullTargetIndex > 0 ? fullTargetIndex : undefined
+                    }
                   />
-                </View>
-              )}
-            </View>
+                </Animated.View>
+                {/* Seed — tapped note + reply skeletons (no parents), shown underneath
+                  until the real list has crossfaded in. Display-only (no scroll, no
+                  handlers); kept mounted through the fade, then dropped. */}
+                {seedHidden ? null : (
+                  <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                    <LegendList
+                      data={seedData}
+                      keyExtractor={threadKeyExtractor}
+                      getItemType={threadItemType}
+                      getFixedItemSize={threadFixedItemSize}
+                      estimatedItemSize={200}
+                      drawDistance={500}
+                      renderItem={renderItem}
+                      recycleItems
+                      scrollEnabled={false}
+                      showsVerticalScrollIndicator={false}
+                      style={styles.flexOne}
+                      contentContainerStyle={{
+                        paddingTop: 0,
+                        paddingBottom: (replyBarHeight || 80) + 16,
+                      }}
+                    />
+                  </View>
+                )}
+              </View>
+            )}
           </ThreadEmbedSheet>
           {embed && targetEvent ? (
             <EmbedActionBar

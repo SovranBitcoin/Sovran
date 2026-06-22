@@ -160,6 +160,8 @@ export const SettingsScreen = () => {
   const setWhitenoiseEnabled = useSettingsStore((state) => state.setWhitenoiseEnabled);
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
+  const flashListThread = useSettingsStore((state) => state.flashListThread);
+  const setFlashListThread = useSettingsStore((state) => state.setFlashListThread);
   const avatarFallbackVariant = useSettingsStore((state) => state.avatarFallbackVariant);
   const notificationPolicy = useNotificationPolicyStore((state) => state.policy);
   const signerPendingCount = useNip46RequestsStore((state) => state.pending.length);
@@ -409,6 +411,25 @@ export const SettingsScreen = () => {
                       </ListGroup.ItemContent>
                       <ListGroup.ItemSuffix>
                         <HeroSwitch isSelected={mockNoGlass} onSelectedChange={setMockNoGlass} />
+                      </ListGroup.ItemSuffix>
+                    </ListGroup.Item>
+                  </PressableFeedback.Scale>
+                  <PressableFeedback.Ripple />
+                </PressableFeedback>
+                <Separator className="mx-4" />
+                <PressableFeedback
+                  animation={false}
+                  onPress={() => setFlashListThread(!flashListThread)}>
+                  <PressableFeedback.Scale>
+                    <ListGroup.Item disabled>
+                      <ListGroup.ItemContent>
+                        <ListGroup.ItemTitle>FlashList thread (spike)</ListGroup.ItemTitle>
+                      </ListGroup.ItemContent>
+                      <ListGroup.ItemSuffix>
+                        <HeroSwitch
+                          isSelected={flashListThread}
+                          onSelectedChange={setFlashListThread}
+                        />
                       </ListGroup.ItemSuffix>
                     </ListGroup.Item>
                   </PressableFeedback.Scale>

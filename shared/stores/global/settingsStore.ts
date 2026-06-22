@@ -83,6 +83,12 @@ interface SettingsState {
   naggTierEnabled: boolean;
   primalTierEnabled: boolean;
   relayTierEnabled: boolean;
+  /**
+   * Dev/spike toggle: render the thread screen on FlashList v2 (synchronous Fabric
+   * layout) instead of the legend-list implementation, to A/B the scroll stability.
+   * Off by default. See `spike/flashlist-v2-thread`.
+   */
+  flashListThread: boolean;
   avatarFallbackVariant: AvatarFallbackVariant;
   /** Minimum transfer amount in sats to include in a rebalance plan. */
   minTransferThreshold: number;
@@ -136,6 +142,7 @@ const PersistedSettings = z.object({
   naggTierEnabled: z.boolean().default(true),
   primalTierEnabled: z.boolean().default(true),
   relayTierEnabled: z.boolean().default(true),
+  flashListThread: z.boolean().default(false),
   avatarFallbackVariant: z.enum(AVATAR_FALLBACK_VARIANTS).default(DEFAULT_AVATAR_FALLBACK_VARIANT),
   minTransferThreshold: z.number().int().nonnegative().default(5),
   middlemanRouting: PersistedMiddlemanRouting.default({
@@ -169,6 +176,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   naggTierEnabled: true,
   primalTierEnabled: true,
   relayTierEnabled: true,
+  flashListThread: false,
   avatarFallbackVariant: DEFAULT_AVATAR_FALLBACK_VARIANT,
   minTransferThreshold: 5,
   middlemanRouting: DEFAULT_MIDDLEMAN_ROUTING,
@@ -233,6 +241,9 @@ interface SettingsActions {
   setNaggTierEnabled: (enabled: boolean) => void;
   setPrimalTierEnabled: (enabled: boolean) => void;
   setRelayTierEnabled: (enabled: boolean) => void;
+
+  // FlashList v2 thread spike (dev)
+  setFlashListThread: (enabled: boolean) => void;
 
   // Avatar fallback variation
   setAvatarFallbackVariant: (variant: AvatarFallbackVariant) => void;
@@ -382,6 +393,11 @@ export const useSettingsStore = create<SettingsStore>()(
           set({ relayTierEnabled: enabled });
         },
 
+        setFlashListThread: (enabled: boolean) => {
+          storeLog.info('store.settings.set_flashlist_thread', { enabled });
+          set({ flashListThread: enabled });
+        },
+
         // Avatar fallback
         setAvatarFallbackVariant: (variant: AvatarFallbackVariant) => {
           storeLog.info('store.settings.set_avatar_fallback_variant', { variant });
@@ -452,6 +468,7 @@ export const useSettingsStore = create<SettingsStore>()(
           regenerateP2PKOnReceive: state.regenerateP2PKOnReceive,
           sendLocationEnabled: state.sendLocationEnabled,
           fileLoggingEnabled: state.fileLoggingEnabled,
+          flashListThread: state.flashListThread,
           avatarFallbackVariant: state.avatarFallbackVariant,
           minTransferThreshold: state.minTransferThreshold,
           middlemanRouting: state.middlemanRouting,
