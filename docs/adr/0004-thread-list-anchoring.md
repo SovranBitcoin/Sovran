@@ -73,6 +73,11 @@ already relies on:
   RN ≥ 0.72; satisfied by our Expo SDK). The known racy edge (LegendApp/legend-list
   #463) bites *near the bottom* of a list; our anchor is the top-pinned note with a
   single prepend — the well-behaved case.
+- **Requires `@legendapp/list` ≥ 3.0.4.** The combination was inert/janky on the
+  first v3 release (3.0.0): the data-anchoring path was mis-batched (fixed 3.0.3),
+  `anchoredEndSpace` reported stale sizes during load (fixed 3.0.4), and
+  `scrollToIndex`/`initialScrollIndex` mislanded on iOS (fixed 3.0.1). We pin 3.0.6.
+  Re-verify these prop contracts on any future bump — v3 is still beta.
 
 ## Alternatives rejected
 

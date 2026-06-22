@@ -68,7 +68,7 @@
     "@gandlaf21/bolt11-decode": "^3.1.1",
     "@gorhom/bottom-sheet": "5.2.9",
     "@internet-privacy/marmot-ts": "file:./vendor/marmot-ts",
-    "@legendapp/list": "3.0.0",
+    "@legendapp/list": "3.0.6",
     "@mealection/react-native-boring-avatars": "1.1.2",
     "@monicon/metro": "^2.0.7",
     "@monicon/native": "^1.2.2",
