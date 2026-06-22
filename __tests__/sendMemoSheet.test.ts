@@ -16,7 +16,7 @@ jest.mock('@gorhom/bottom-sheet', () => ({
   BottomSheetScrollView: 'BottomSheetScrollView',
   BottomSheetTextInput: 'BottomSheetTextInput',
 }));
-jest.mock('@legendapp/list/react-native', () => ({ LegendList: 'LegendList' }));
+jest.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 jest.mock('heroui-native', () => ({
   BottomSheet: { Title: 'BottomSheet.Title' },
 }));

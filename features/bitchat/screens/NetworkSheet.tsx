@@ -6,20 +6,14 @@
  * same info density: nickname, connection state, last-seen, antenna icon.
  */
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
-import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log, useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
-import {
-  VISUAL_LIST_VIEWABILITY_CONFIG,
-  useVisualListLogger,
-  visualLayoutScopePart,
-} from '@/shared/lib/contentShiftLog';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -28,7 +22,7 @@ import opacity from 'hex-color-opacity';
 import type { BLEPeer } from 'bitchat-module';
 
 import { ContactRow, bleIdentity } from '@/shared/ui/composed/ContactRow';
-import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
+import { List } from '@/shared/ui/composed/List';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { useBLEPeers } from '../hooks/useBLEPeers';
@@ -101,47 +95,7 @@ export default function NetworkSheet() {
     router.back();
   }, []);
   const keyExtractor = useCallback((peer: BLEPeer) => peer.peerID, []);
-  const listRef = useRef<LegendListRef>(null);
-  const visualList = useVisualListLogger<BLEPeer>({
-    scope: 'bitchat.network.list',
-    surface: 'bitchat',
-    component: 'NetworkSheetLegendList',
-    phase: bluetoothBlocked ? 'blocked' : peers.length === 0 ? 'scanning' : 'peers',
-    extra: () => ({
-      peerCount: sortedPeers.length,
-      connectedCount,
-      directLinkCount,
-      bluetoothStatus: bluetooth.status,
-    }),
-    getItemKey: (peer) => visualLayoutScopePart(peer.peerID),
-    getItemContext: (peer, index) => ({
-      itemType: 'ble-peer',
-      index,
-      connected: peer.isConnected,
-      hasDirectLink: peer.hasDirectLink,
-    }),
-    getListState: () => listRef.current?.getState() ?? null,
-  });
-  const renderPeerItem = useCallback(
-    ({ item, index }: { item: BLEPeer; index: number }) => (
-      <VisualLayoutProbe
-        scope="bitchat.network.list"
-        surface="bitchat"
-        component="NetworkPeerRow"
-        itemKey={visualLayoutScopePart(item.peerID)}
-        itemType="ble-peer"
-        index={index}
-        phase={bluetoothBlocked ? 'blocked' : peers.length === 0 ? 'scanning' : 'peers'}
-        extra={{
-          peerCount: sortedPeers.length,
-          connected: item.isConnected,
-          hasDirectLink: item.hasDirectLink,
-        }}>
-        <PeerRow peer={item} />
-      </VisualLayoutProbe>
-    ),
-    [bluetoothBlocked, peers.length, sortedPeers.length]
-  );
+  const renderPeerItem = useCallback(({ item }: { item: BLEPeer }) => <PeerRow peer={item} />, []);
 
   const subtitleText = useMemo(() => {
     if (bluetoothBlocked) return 'Bluetooth unavailable';
@@ -190,20 +144,12 @@ export default function NetworkSheet() {
         </Text>
       </HStack>
 
-      <LegendList
-        ref={listRef}
+      <List
         data={sortedPeers}
         keyExtractor={keyExtractor}
         renderItem={renderPeerItem}
-        estimatedItemSize={68}
-        onItemSizeChanged={visualList.onItemSizeChanged}
-        onLoad={visualList.onLoad}
-        onMetricsChange={visualList.onMetricsChange}
-        onStickyHeaderChange={visualList.onStickyHeaderChange}
-        onViewableItemsChanged={visualList.onViewableItemsChanged}
-        viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
         keyboardDismissMode="on-drag"
-        // LegendList needs an explicit flex:1 — the Screen wrapper only makes
+        // The list needs an explicit flex:1 — the Screen wrapper only makes
         // itself flex:1, children still need to claim remaining height.
         style={{ flex: 1 }}
         contentContainerStyle={

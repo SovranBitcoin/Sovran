@@ -12,7 +12,7 @@ import { create } from 'zustand';
 // Failed reclaims skip `collapsing` entirely — the row stays as a normal
 // pending entry.
 //
-// Both the row's height collapse and the LegendList sibling reflow are
+// Both the row's height collapse and the FlashList sibling reflow are
 // driven from the same linear timing curve so they read as one continuous
 // rigid motion — no spring, no overshoot, no bounce. Hold the row in the
 // bucket until the timing curve has finished.

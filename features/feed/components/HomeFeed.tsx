@@ -21,19 +21,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import opacity from 'hex-color-opacity';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { log, Log, feedLog } from '@/shared/lib/logger';
-import {
-  remeasureVisualLayoutScope,
-  useShiftLogger,
-  useVisualListLogger,
-  useVisualStateLogger,
-  VISUAL_LIST_VIEWABILITY_CONFIG,
-} from '@/shared/lib/contentShiftLog';
-import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
-import {
-  LegendList,
-  type LegendListRenderItemProps,
-  type LegendListRef,
-} from '@legendapp/list/react-native';
+import { List } from '@/shared/ui/composed/List';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { router } from 'expo-router';
@@ -62,7 +50,6 @@ import {
 import {
   buildFeedRows,
   DEFAULT_ENGAGEMENT_STATE,
-  feedRowsAreEqual,
   getFeedRowItemType,
   getFeedRowKey,
   type FeedRow,
@@ -105,7 +92,6 @@ export const FEED_FILTER_FOLLOWING_RECENT = 'Following Recent';
 // the user scrolls, rather than fetching a large batch up front.
 const FEED_INITIAL_LIMIT = 15;
 const FEED_PAGE_LIMIT = 10;
-const HOME_FEED_VISUAL_SCOPE = 'feed.home.list';
 
 // Stable config object — avoids re-triggering useBackgroundConfig every render
 const BG_CONFIG = { blurMode: 'full' as const };
@@ -158,21 +144,14 @@ function FeedThreadPair({
 }) {
   const foreground = useThemeColor('foreground');
   const [firstHeight, setFirstHeight] = useState(0);
-  const shift = useShiftLogger('FeedThreadPair');
 
-  const handleFirstLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const nextHeight = Math.round(event.nativeEvent.layout.height);
-      // The first post's height drives the connector line length AND the
-      // second (reply) post's vertical offset. When it changes after async
-      // content settles, the whole pair reflows below it.
-      shift.report('feed.shift.threadpair.height', 'first', nextHeight);
-      setFirstHeight((currentHeight) =>
-        currentHeight === nextHeight ? currentHeight : nextHeight
-      );
-    },
-    [shift]
-  );
+  const handleFirstLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = Math.round(event.nativeEvent.layout.height);
+    // The first post's height drives the connector line length AND the
+    // second (reply) post's vertical offset. When it changes after async
+    // content settles, the whole pair reflows below it.
+    setFirstHeight((currentHeight) => (currentHeight === nextHeight ? currentHeight : nextHeight));
+  }, []);
 
   const connectorStyle = useMemo(() => {
     const secondAvatarTop = firstHeight + secondAvatarCenterY - FEED_AVATAR_SIZE / 2;
@@ -270,8 +249,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const feedRowsRef = useRef<FeedRow[]>([]);
 
   const isFirstRender = useRef(true);
-
-  const listRef = useRef<LegendListRef>(null);
 
   const scrollOffsetRef = useRef(0);
   const loadSequenceRef = useRef(0);
@@ -806,26 +783,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     feedRowsRef.current = feedRows;
   }, [feedRows]);
 
-  const visualList = useVisualListLogger<FeedRow>({
-    scope: HOME_FEED_VISUAL_SCOPE,
-    surface: 'feed',
-    component: 'HomeFeedList',
-    phase: isLoading ? 'loading' : isRefreshing ? 'refreshing' : 'ready',
-    extra: () => ({
-      filter: feedSpecs[activeSpecIndex]?.name ?? null,
-      rows: feedRowsRef.current.length,
-      isLoading,
-      isLoadingMore,
-    }),
-    getItemKey: (row) => row.key,
-    getItemContext: (row) => ({
-      rowKey: row.key,
-      rowLabel: getFeedRowItemType(row),
-      itemType: getFeedRowItemType(row),
-    }),
-    getListState: () => listRef.current?.getState() ?? null,
-  });
-
   // Render boundary: how many feed items became rendered rows, and whether the
   // screen is currently showing the empty state. `feedItems > 0 && rows === 0`
   // means a render-stage drop; `empty: true` with items 0 after load means the
@@ -840,37 +797,8 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     });
   }, [feedItems.length, feedRows.length, isLoading, activeSpecIndex, feedSpecs]);
 
-  useVisualStateLogger({
-    scope: HOME_FEED_VISUAL_SCOPE,
-    surface: 'feed',
-    component: 'HomeFeed',
-    stateKey: 'feed-state',
-    phase: isLoading
-      ? 'loading'
-      : isRefreshing
-        ? 'refreshing'
-        : isLoadingMore
-          ? 'loading-more'
-          : 'ready',
-    state: {
-      filter: feedSpecs[activeSpecIndex]?.name ?? null,
-      feedItems: feedItems.length,
-      rows: feedRows.length,
-      isLoading,
-      isRefreshing,
-      isLoadingMore,
-      loadError,
-      empty: !isLoading && feedRows.length === 0,
-    },
-    remeasure: {
-      reason: 'feed-state',
-      minIntervalMs: 300,
-      maxItems: 32,
-    },
-  });
-
   const renderFeedItem = useCallback(
-    ({ item: row, index }: LegendListRenderItemProps<FeedRow, string | undefined>) => {
+    ({ item: row, index }: { item: FeedRow; index: number }) => {
       const item = row.item;
       const feedIndex = index;
       if (item.type === 'note') {
@@ -1156,43 +1084,14 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     tintColor: refreshTintColor,
   });
 
-  const renderItem = useCallback(
-    (props: LegendListRenderItemProps<FeedRow, string | undefined>) => (
-      <VisualLayoutProbe
-        scope={HOME_FEED_VISUAL_SCOPE}
-        surface="feed"
-        component="HomeFeedRow"
-        itemKey={props.item.key}
-        itemType={getFeedRowItemType(props.item)}
-        index={props.index}
-        extra={() => ({
-          scrollY: Math.round(scrollOffsetRef.current),
-          filter: feedSpecs[activeSpecIndex]?.name ?? null,
-          rows: feedRowsRef.current.length,
-        })}>
-        {renderFeedItem(props)}
-      </VisualLayoutProbe>
-    ),
-    [activeSpecIndex, feedSpecs, renderFeedItem]
-  );
-
-  const handleScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number } } }) => {
-    scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
-    remeasureVisualLayoutScope(HOME_FEED_VISUAL_SCOPE, 'scroll', {
-      minIntervalMs: 500,
-      maxItems: 32,
-      extra: { scrollY: Math.round(e.nativeEvent.contentOffset.y) },
-    });
-  }, []);
-
   const onScroll = useCallback(
     (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-      handleScroll(e);
+      scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
       if (imageOverlay?.scrollOffsetY != null) {
         imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
       }
     },
-    [handleScroll, imageOverlay]
+    [imageOverlay]
   );
 
   return (
@@ -1203,28 +1102,15 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         onSwipeUpToNextPost={onSwipeUpToNextPost}
         getVideoFeedLayoutsAndIndex={getVideoFeedLayoutsAndIndex}>
         <View style={styles.flex1}>
-          <LegendList
-            ref={listRef}
+          <List
             data={feedRows}
             keyExtractor={getFeedRowKey}
             getItemType={getFeedRowItemType}
-            estimatedItemSize={300}
             drawDistance={400}
-            renderItem={renderItem}
-            itemsAreEqual={feedRowsAreEqual}
-            recycleItems
+            renderItem={renderFeedItem}
             ListEmptyComponent={
               isLoading ? (
-                <VisualLayoutProbe
-                  scope={HOME_FEED_VISUAL_SCOPE}
-                  surface="feed"
-                  component="HomeFeedInitialSpinner"
-                  itemKey="initial-spinner"
-                  itemType="spinner"
-                  index={0}
-                  extra={{ isLoading }}>
-                  <Spinner size={22} style={styles.loader} />
-                </VisualLayoutProbe>
+                <Spinner size={22} style={styles.loader} />
               ) : (
                 <EmptyFeed
                   mode={selectFeedEmptyMode({
@@ -1243,29 +1129,11 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
               // Only show the pagination spinner once there's content — never
               // alongside the empty-state spinner.
               isLoadingMore && feedRows.length > 0 ? (
-                <VisualLayoutProbe
-                  scope={HOME_FEED_VISUAL_SCOPE}
-                  surface="feed"
-                  component="HomeFeedPaginationSpinner"
-                  itemKey="pagination-spinner"
-                  itemType="spinner"
-                  index={feedRows.length}
-                  extra={() => ({
-                    scrollY: Math.round(scrollOffsetRef.current),
-                    rows: feedRowsRef.current.length,
-                  })}>
-                  <Spinner size={18} style={styles.loadMoreSpinner} />
-                </VisualLayoutProbe>
+                <Spinner size={18} style={styles.loadMoreSpinner} />
               ) : null
             }
             onEndReached={handleEndReached}
             onEndReachedThreshold={0.4}
-            onItemSizeChanged={visualList.onItemSizeChanged}
-            onLoad={visualList.onLoad}
-            onMetricsChange={visualList.onMetricsChange}
-            onStickyHeaderChange={visualList.onStickyHeaderChange}
-            onViewableItemsChanged={visualList.onViewableItemsChanged}
-            viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
             style={styles.flex1}
             contentContainerStyle={LIST_CONTENT_STYLE}
             showsVerticalScrollIndicator={false}

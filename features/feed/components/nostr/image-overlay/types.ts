@@ -91,7 +91,7 @@ export type ImageOverlayContextValue = {
   openToCenter: () => void;
   /**
    * Register a thumbnail's layout (e.g. from onLayout + measureInWindow). Use eventId + imageIndex when opening from a post so dismiss uses this post's position, not another card's.
-   * Pass measureNow so close() can re-measure the live node just-in-time: recycled LegendList rows never re-fire onLayout when size is unchanged, so the registered rect can be stale.
+   * Pass measureNow so close() can re-measure the live node just-in-time: recycled FlashList rows never re-fire onLayout when size is unchanged, so the registered rect can be stale.
    */
   registerThumbnailLayout: (
     url: string,

@@ -15,10 +15,10 @@
  * content clears it.
  *
  * Internals:
- *   - The body uses `@legendapp/list/react-native` (LegendList) under the hood for
- *     virtualization with item recycling. With `recycleItems` plus
- *     per-type estimated sizes, this handles 400+ equal-cell grids
- *     (emoji picker) at 60fps even on older devices.
+ *   - The body uses `@shopify/flash-list` (FlashList v2) under the hood for
+ *     virtualization with item recycling. FlashList recycles cells and
+ *     measures synchronously, so this handles 400+ equal-cell grids
+ *     (emoji picker) at 60fps even on older devices with no size hints.
  *   - Sections are flattened into a single typed data array of
  *     `{kind:'header'|'row', sectionId, ...}` rows. For grids, callers
  *     pass `rowChunkSize > 1` and `renderRow` to lay N items per row;
@@ -27,12 +27,12 @@
  *     visible index wins) with a ~400ms suppression window after a
  *     programmatic `scrollToIndex` to avoid feedback loops.
  *   - `overrideContent` lets callers swap the body wholesale (e.g.
- *     search-results mode). When non-null, the LegendList unmounts and
+ *     search-results mode). When non-null, the FlashList unmounts and
  *     the anchor bar hides — caller is responsible for any inner
- *     virtualization in this branch (typically another `LegendList`).
+ *     virtualization in this branch (typically another list).
  *   - `ScrollComponent` injection lets hosts pass
  *     `BottomSheetScrollView` so gorhom's pan gestures + keyboard
- *     handling stay coherent inside a sheet. LegendList wires it via
+ *     handling stay coherent inside a sheet. FlashList wires it via
  *     its `renderScrollComponent` prop.
  */
 
@@ -55,13 +55,11 @@ import {
 } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import {
-  LegendList,
-  type LegendListRef,
-  type LegendListRenderItemProps,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-  type OnViewableItemsChangedInfo,
-} from '@legendapp/list/react-native';
+  FlashList,
+  type FlashListRef,
+  type ListRenderItemInfo,
+  type ViewToken,
+} from '@shopify/flash-list';
 import opacity from 'hex-color-opacity';
 
 import { ScrollEdgeFade } from './ScrollEdgeFade';
@@ -70,16 +68,13 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useRenderLogger } from '@/shared/lib/logger';
 import { zIndex } from '@/shared/styles/tokens';
-import {
-  remeasureVisualLayoutScope,
-  useVisualListLogger,
-  useVisualScrollMetricsLogger,
-  VISUAL_LIST_VIEWABILITY_CONFIG,
-  visualLayoutScopePart,
-} from '@/shared/lib/contentShiftLog';
-import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 
 const sectionListLog = log.child({ module: 'sectionAnchorList' });
+
+// "Any pixel of the row is visible" — flips the active anchor the moment a new
+// section's first row enters the viewport. Module-level so the prop reference is
+// stable across renders (RN warns on a changing viewabilityConfig).
+const ANCHOR_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 1, minimumViewTime: 0 } as const;
 
 export interface AnchorSection<T> {
   id: string;
@@ -123,7 +118,7 @@ interface SectionAnchorListProps<T> {
    * When non-null, the sections view is replaced wholesale by this node
    * and the anchor bar hides. Used for search-results mode in the emoji
    * picker. Callers that need virtualization in this branch should
-   * compose their own `LegendList` here.
+   * compose their own `FlashList` here.
    */
   overrideContent?: ReactNode;
   /** Bottom content-container padding — clears a floating bottom bar. */
@@ -131,7 +126,7 @@ interface SectionAnchorListProps<T> {
   /**
    * Injected scroll container. Defaults to react-native's `ScrollView`.
    * Pass `BottomSheetScrollView` when rendering inside @gorhom/bottom-sheet
-   * to preserve gesture + keyboard handling — LegendList uses this as
+   * to preserve gesture + keyboard handling — FlashList uses this as
    * its `renderScrollComponent` so the sheet sees the same scroll node
    * it would for a plain `<BottomSheetScrollView>`.
    */
@@ -144,22 +139,18 @@ interface SectionAnchorListProps<T> {
    * left/right/top insets.
    */
   anchorBarStyle?: StyleProp<ViewStyle>;
-  /** Estimated height of one chunked row (px). Defaults to 60. */
-  estimatedItemSize?: number;
-  /** Estimated height of a section-header row (px). Defaults to 0. */
-  estimatedHeaderSize?: number;
   /**
-   * Extra style on the LegendList's `contentContainerStyle`. Useful for
+   * Extra style on the FlashList's `contentContainerStyle`. Useful for
    * `paddingHorizontal` when the rendered rows shouldn't carry their
    * own inset. Merged with this component's own paddingTop/paddingBottom.
    */
   listContentContainerStyle?: StyleProp<ViewStyle>;
   /**
    * External state that affects how rows render but isn't part of `sections`.
-   * LegendList recycles rows; with `recycleItems` on, it skips re-invoking
-   * `renderItem` for already-mounted rows when the `data` ref is unchanged.
-   * Pass anything that should force a re-render here (selection sets,
-   * filter flags, etc.) — same convention as FlatList / FlashList.
+   * FlashList recycles rows and skips re-invoking `renderItem` for mounted
+   * rows when the `data` ref is unchanged. Pass anything that should force a
+   * re-render here (selection sets, filter flags, etc.) — same convention as
+   * FlatList.
    */
   extraData?: unknown;
 }
@@ -175,17 +166,6 @@ type FlatRow<T> =
   | { kind: 'header'; sectionId: string; render: () => ReactNode }
   | { kind: 'row'; sectionId: string; items: T[]; rowIndex: number; rowKey: string };
 
-function sectionAnchorVisualItemType<T>(item: FlatRow<T>): string {
-  if (item.kind === 'header') return 'header';
-  return item.items.length > 1 ? 'grid-row' : 'row';
-}
-
-function sectionAnchorVisualItemKey<T>(item: FlatRow<T>, index: number): string {
-  const sectionId = visualLayoutScopePart(item.sectionId);
-  if (item.kind === 'header') return `header:${sectionId}:${index}`;
-  return `row:${sectionId}:${item.rowIndex}:${index}`;
-}
-
 export function SectionAnchorList<T>({
   sections,
   renderItem,
@@ -198,8 +178,6 @@ export function SectionAnchorList<T>({
   ScrollComponent,
   topFadeColor,
   anchorBarStyle,
-  estimatedItemSize = 60,
-  estimatedHeaderSize = 0,
   listContentContainerStyle,
   extraData,
 }: SectionAnchorListProps<T>) {
@@ -213,7 +191,7 @@ export function SectionAnchorList<T>({
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
 
   const [activeAnchor, setActiveAnchor] = useState<string | undefined>(sections[0]?.id);
-  const listRef = useRef<LegendListRef>(null);
+  const listRef = useRef<FlashListRef<FlatRow<T>>>(null);
   const tabScrollRef = useRef<ScrollView | null>(null);
   const tabOffsets = useRef<Record<string, { x: number; width: number }>>({});
   const programmaticScroll = useRef(false);
@@ -320,22 +298,9 @@ export function SectionAnchorList<T>({
     return { flatItems: items, sectionFirstIndex: firstIndex };
   }, [sections, rowChunkSize, keyExtractor]);
 
-  const flatRowStats = useMemo(
-    () =>
-      flatItems.reduce(
-        (stats, item) => {
-          if (item.kind === 'header') stats.headers += 1;
-          else stats.rows += 1;
-          return stats;
-        },
-        { headers: 0, rows: 0 }
-      ),
-    [flatItems]
-  );
-
   // One-shot mount log + the inverse for unmount. Captures the size of
-  // the dataset and the relevant LegendList tuning so log-doctor's
-  // `stats` mode can correlate later events to the picker config.
+  // the dataset so log-doctor's `stats` mode can correlate later events
+  // to the picker config.
   useEffect(() => {
     const totalDataItems = sections.reduce((acc, s) => acc + s.data.length, 0);
     sectionListLog.info('sectionList.mount', {
@@ -343,8 +308,6 @@ export function SectionAnchorList<T>({
       totalDataItems,
       flatRows: flatItems.length,
       rowChunkSize,
-      estimatedItemSize,
-      estimatedHeaderSize,
       hasOverride: overrideContent != null,
     });
     return () => {
@@ -366,7 +329,7 @@ export function SectionAnchorList<T>({
   const showAnchors = sections.length > 0;
 
   // Viewport "top" for list-reading purposes is just below the chrome
-  // + headroom — same offset value drives the LegendList's scroll
+  // + headroom — same offset value drives the FlashList's scroll
   // content paddingTop AND the `viewOffset` on `scrollToIndex`.
   const viewportTopOffset = chromeHeight + HEADROOM;
 
@@ -375,82 +338,19 @@ export function SectionAnchorList<T>({
     activeAnchorRef.current = activeAnchor;
   }, [activeAnchor]);
 
-  const visualScope = useMemo(() => {
-    const sectionSignature = sections
-      .slice(0, 4)
-      .map((section) => visualLayoutScopePart(section.id))
-      .join('.');
-    return `sectionAnchor.${sectionSignature || 'empty'}`;
-  }, [sections]);
-  const visualPhase = overrideContent != null ? 'override' : 'ready';
-  const visualExtra = useCallback(
-    () => ({
-      activeAnchor: activeAnchorRef.current ?? null,
-      sections: sections.length,
-      flatRows: flatItems.length,
-      rowRows: flatRowStats.rows,
-      headerRows: flatRowStats.headers,
-      rowChunkSize,
-      estimatedItemSize,
-      estimatedHeaderSize,
-      chromeHeight,
-      viewportTopOffset,
-      contentBottomInset,
-      hasOverride: overrideContent != null,
-    }),
-    [
-      chromeHeight,
-      contentBottomInset,
-      estimatedHeaderSize,
-      estimatedItemSize,
-      flatItems.length,
-      flatRowStats.headers,
-      flatRowStats.rows,
-      overrideContent,
-      rowChunkSize,
-      sections.length,
-      viewportTopOffset,
-    ]
-  );
-  const visualList = useVisualListLogger<FlatRow<T>>({
-    scope: visualScope,
-    surface: 'shared',
-    component: 'SectionAnchorList',
-    phase: visualPhase,
-    extra: visualExtra,
-    getItemKey: sectionAnchorVisualItemKey,
-    getItemContext: (item, index) => ({
-      itemType: sectionAnchorVisualItemType(item),
-      sectionId: visualLayoutScopePart(item.sectionId),
-      rowIndex: item.kind === 'row' ? item.rowIndex : null,
-      rowItems: item.kind === 'row' ? item.items.length : null,
-      index,
-    }),
-    getListState: () => listRef.current?.getState() ?? null,
-  });
-  const anchorScrollMetrics = useVisualScrollMetricsLogger({
-    enabled: showAnchors,
-    scope: visualScope,
-    surface: 'shared',
-    component: 'SectionAnchorListAnchorScrollView',
-    axis: 'x',
-    phase: visualPhase,
-    extra: visualExtra,
-  });
-
-  // Active-anchor: pick the topmost visible row's sectionId. LegendList
+  // Active-anchor: pick the topmost visible row's sectionId. FlashList
   // sorts `viewableItems` by index, so [0] is the topmost in-view row.
   // Suppressed during programmatic scrolls so the animation doesn't
   // trip self-reinforcing setActiveAnchor() updates.
   //
   // Ref-pattern for `activeAnchor` so the callback identity stays
   // stable across renders. With `[activeAnchor]` as a dep, every
-  // anchor flip re-creates the callback → LegendList sees a new
+  // anchor flip re-creates the callback → FlashList sees a new
   // `onViewableItemsChanged` prop → re-runs viewability tracking.
-  // Empirically this added ~1 LegendList re-render per flip and
+  // Empirically this added ~1 FlashList re-render per flip and
   // amplified scroll-time JS thread blocks.
   const handleViewableItemsChanged = useCallback(
-    ({ viewableItems }: OnViewableItemsChangedInfo<FlatRow<T>>) => {
+    ({ viewableItems }: { viewableItems: ViewToken<FlatRow<T>>[] }) => {
       if (programmaticScroll.current) return;
       if (viewableItems.length === 0) return;
       const top = viewableItems[0]!;
@@ -468,20 +368,6 @@ export function SectionAnchorList<T>({
     },
     []
   );
-  const onVisualViewableItemsChanged = visualList.onViewableItemsChanged;
-  const handleViewableItemsChangedWithVisual = useCallback(
-    (info: OnViewableItemsChangedInfo<FlatRow<T>>) => {
-      handleViewableItemsChanged(info);
-      onVisualViewableItemsChanged(info);
-    },
-    [handleViewableItemsChanged, onVisualViewableItemsChanged]
-  );
-
-  // viewabilityConfig must be referentially stable across renders or
-  // RN warns. `itemVisiblePercentThreshold: 1` means "any pixel of the
-  // row is visible" — what we want for a quick activeAnchor flip the
-  // moment a new section's first row enters the viewport.
-  const viewabilityConfig = VISUAL_LIST_VIEWABILITY_CONFIG;
 
   const handleAnchorPress = useCallback(
     (id: string) => {
@@ -530,17 +416,17 @@ export function SectionAnchorList<T>({
     [listContentContainerStyle, viewportTopOffset, contentBottomInset]
   );
 
-  // Counter incremented every time LegendList invokes `renderListItem`
+  // Counter incremented every time FlashList invokes `renderListItem`
   // — i.e. every time a row enters the recycling pool with new data.
   // Logged in a throttled effect below so we can see "recycler invokes
   // per second" without flooding the log on each call.
   const recycleCount = useRef(0);
   const lastRecycleLog = useRef(0);
 
-  // Per-row renderer for LegendList. Headers render `section.renderHeader()`
+  // Per-row renderer for FlashList. Headers render `section.renderHeader()`
   // wholesale; rows dispatch to `renderRow` (chunked) or `renderItem` (single).
   const renderListItem = useCallback(
-    ({ item, index }: LegendListRenderItemProps<FlatRow<T>>) => {
+    ({ item }: ListRenderItemInfo<FlatRow<T>>) => {
       recycleCount.current += 1;
       const now = Date.now();
       // Throttle to one log per second so a burst of recycling shows
@@ -563,36 +449,9 @@ export function SectionAnchorList<T>({
         content = single === undefined ? null : renderItem(single, item.sectionId);
       }
 
-      return (
-        <VisualLayoutProbe
-          scope={visualScope}
-          surface="shared"
-          component="SectionAnchorListRow"
-          itemKey={sectionAnchorVisualItemKey(item, index)}
-          itemType={sectionAnchorVisualItemType(item)}
-          index={index}
-          phase={visualPhase}
-          extra={() => ({
-            activeAnchor: activeAnchorRef.current ?? null,
-            sectionId: visualLayoutScopePart(item.sectionId),
-            rowIndex: item.kind === 'row' ? item.rowIndex : null,
-            rowItems: item.kind === 'row' ? item.items.length : null,
-            viewportTopOffset,
-            contentBottomInset,
-          })}>
-          {content}
-        </VisualLayoutProbe>
-      );
+      return <>{content}</>;
     },
-    [
-      contentBottomInset,
-      renderItem,
-      renderRow,
-      rowChunkSize,
-      viewportTopOffset,
-      visualPhase,
-      visualScope,
-    ]
+    [renderItem, renderRow, rowChunkSize]
   );
 
   const listKeyExtractor = useCallback((item: FlatRow<T>) => {
@@ -601,13 +460,6 @@ export function SectionAnchorList<T>({
   }, []);
 
   const getItemType = useCallback((item: FlatRow<T>) => item.kind, []);
-
-  const getFixedItemSize = useCallback(
-    (_item: FlatRow<T>, _index: number, type: string | undefined) => {
-      return type === 'header' ? estimatedHeaderSize : estimatedItemSize;
-    },
-    [estimatedHeaderSize, estimatedItemSize]
-  );
 
   // `renderScrollComponent` lets the host inject its scroll container
   // (e.g. `BottomSheetScrollView` for gorhom integration). Default to
@@ -620,64 +472,35 @@ export function SectionAnchorList<T>({
     return Component;
   }, [ScrollComponent]);
 
-  const handleListScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      remeasureVisualLayoutScope(visualScope, 'scroll', {
-        minIntervalMs: 500,
-        extra: { scrollY: Math.round(event.nativeEvent.contentOffset.y) },
-      });
-    },
-    [visualScope]
-  );
-
   return (
     <View style={{ flex: 1 }}>
-      {/* Body — virtualized LegendList for sections, or wholesale
+      {/* Body — virtualized FlashList for sections, or wholesale
           `overrideContent` (e.g. search-results mode). Chrome is
           absolute-positioned over the top edge regardless. */}
       {overrideContent != null ? (
-        // The override path needs the same paddingTop the LegendList
+        // The override path needs the same paddingTop the FlashList
         // would have applied, so caller-rendered content also clears
         // the chrome.
-        <VisualLayoutProbe
-          scope={visualScope}
-          surface="shared"
-          component="SectionAnchorListOverride"
-          itemKey="override"
-          itemType="override"
-          phase={visualPhase}
-          extra={visualExtra}
-          style={{ flex: 1, paddingTop: viewportTopOffset }}>
-          {overrideContent}
-        </VisualLayoutProbe>
+        <View style={{ flex: 1, paddingTop: viewportTopOffset }}>{overrideContent}</View>
       ) : (
-        <LegendList
+        <FlashList
           ref={listRef}
           data={flatItems}
           renderItem={renderListItem}
           keyExtractor={listKeyExtractor}
           getItemType={getItemType}
-          getFixedItemSize={getFixedItemSize}
-          recycleItems
           extraData={extraData}
           // Tuned down from 250 → 150 after a stress test showed that
           // continuous fast scroll across many sections caused 6s+ JS
           // thread blocks: the bigger the over-render buffer, the more
-          // rows LegendList synchronously reconciles per scroll frame.
+          // rows the list synchronously reconciles per scroll frame.
           // 150px = ~4 rows ahead of the viewport at 40px row height —
           // enough to avoid blank flashes at typical scroll velocities,
           // small enough that fast flicks don't pre-render a long tail.
           drawDistance={150}
-          style={{ flex: 1 }}
-          contentContainerStyle={listContentContainerStyleMerged as never}
-          onItemSizeChanged={visualList.onItemSizeChanged}
-          onLoad={visualList.onLoad}
-          onMetricsChange={visualList.onMetricsChange}
-          onStickyHeaderChange={visualList.onStickyHeaderChange}
-          onScroll={handleListScroll}
-          onViewableItemsChanged={handleViewableItemsChangedWithVisual}
-          viewabilityConfig={viewabilityConfig}
-          scrollEventThrottle={16}
+          contentContainerStyle={listContentContainerStyleMerged}
+          onViewableItemsChanged={handleViewableItemsChanged}
+          viewabilityConfig={ANCHOR_VIEWABILITY_CONFIG}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           renderScrollComponent={renderScrollComponent}
@@ -709,10 +532,6 @@ export function SectionAnchorList<T>({
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 style={styles.anchorBarWrapper}
-                onLayout={anchorScrollMetrics.onLayout}
-                onContentSizeChange={anchorScrollMetrics.onContentSizeChange}
-                onScroll={anchorScrollMetrics.onScroll}
-                scrollEventThrottle={250}
                 contentContainerStyle={styles.anchorBarContent}>
                 {sections.map((s) => {
                   const isSelected = activeAnchor === s.id;

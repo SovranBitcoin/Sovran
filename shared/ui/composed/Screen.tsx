@@ -48,7 +48,7 @@ interface ScreenProps {
    * `animated` uses Animated.ScrollView and exposes scroll offset via `scrollY`.
    * `none` renders children directly with no scroll container.
    * `custom` also renders children directly — use when you supply your own
-   *   scroller (FlatList / LegendList) and want the wrapper to hands-off.
+   *   scroller (FlatList / FlashList) and want the wrapper to hands-off.
    */
   scroll?: ScreenScrollMode;
   scrollY?: SharedValue<number>;

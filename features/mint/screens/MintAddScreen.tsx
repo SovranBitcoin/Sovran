@@ -1,5 +1,11 @@
-import React, { useState, useMemo, useCallback, useEffect, memo, useRef } from 'react';
-import { Platform, TextInput, useWindowDimensions } from 'react-native';
+import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import {
+  Platform,
+  TextInput,
+  useWindowDimensions,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -27,24 +33,13 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
-import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
-import {
-  LegendList,
-  type LegendListRef,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from '@legendapp/list/react-native';
+import { List } from '@/shared/ui/composed/List';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import opacity from 'hex-color-opacity';
-import {
-  VISUAL_LIST_VIEWABILITY_CONFIG,
-  useVisualListLogger,
-  visualLayoutScopePart,
-} from '@/shared/lib/contentShiftLog';
 import { log, cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
@@ -618,67 +613,17 @@ export function MintAddScreen() {
 
   const keyExtractor = useCallback((item: SearchableMint) => item.url, []);
   const showContent = !searchLoading || displayMints.length > 0;
-  const visualPhase = !showContent ? 'loading' : isSearching ? 'searching' : 'catalog';
-  const listRef = useRef<LegendListRef>(null);
-  const visualList = useVisualListLogger<SearchableMint>({
-    scope: 'mint.add.results',
-    surface: 'mint',
-    component: 'MintAddLegendList',
-    phase: visualPhase,
-    extra: () => ({
-      itemCount: displayMints.length,
-      selectedCurrency,
-      isSearching,
-      queryLength: searchQuery.trim().length,
-      selectedCount: selectedMints.size,
-      totalHeaderHeight,
-    }),
-    getItemKey: (item) => visualLayoutScopePart(item.url),
-    getItemContext: (item, index) => ({
-      itemType: 'mint-add-row',
-      index,
-      selected: selectedMints.has(item.url),
-      pseudo: 'isPseudoMint' in item,
-    }),
-    getListState: () => listRef.current?.getState() ?? null,
-  });
 
   const renderItem = useCallback(
-    ({ item, index }: { item: SearchableMint; index: number }) => (
-      <VisualLayoutProbe
-        scope="mint.add.results"
-        surface="mint"
-        component="MintAddRow"
-        itemKey={visualLayoutScopePart(item.url)}
-        itemType="mint-add-row"
-        index={index}
-        phase={visualPhase}
-        extra={{
-          itemCount: displayMints.length,
-          selectedCurrency,
-          isSearching,
-          queryLength: searchQuery.trim().length,
-          selected: selectedMints.has(item.url),
-          pseudo: 'isPseudoMint' in item,
-        }}>
-        <MintItem
-          mint={item}
-          selected={selectedMints.has(item.url)}
-          onToggle={handleToggleMint}
-          globalLoading={isAdding}
-        />
-      </VisualLayoutProbe>
+    ({ item }: { item: SearchableMint }) => (
+      <MintItem
+        mint={item}
+        selected={selectedMints.has(item.url)}
+        onToggle={handleToggleMint}
+        globalLoading={isAdding}
+      />
     ),
-    [
-      displayMints.length,
-      handleToggleMint,
-      isAdding,
-      isSearching,
-      searchQuery,
-      selectedCurrency,
-      selectedMints,
-      visualPhase,
-    ]
+    [handleToggleMint, isAdding, selectedMints]
   );
 
   // Log list render state for performance analysis
@@ -846,21 +791,12 @@ export function MintAddScreen() {
           <LoadingMintsList />
         </View>
       ) : (
-        <LegendList
-          ref={listRef}
+        <List
           data={displayMints}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           extraData={selectedMints}
-          estimatedItemSize={120}
-          recycleItems
           drawDistance={300}
-          onItemSizeChanged={visualList.onItemSizeChanged}
-          onLoad={visualList.onLoad}
-          onMetricsChange={visualList.onMetricsChange}
-          onStickyHeaderChange={visualList.onStickyHeaderChange}
-          onViewableItemsChanged={visualList.onViewableItemsChanged}
-          viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
           style={{ flex: 1, height: 0 }}
           contentContainerStyle={{ paddingBottom: 120 }}
           ListHeaderComponent={listHeader}

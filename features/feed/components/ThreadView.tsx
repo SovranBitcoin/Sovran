@@ -7,20 +7,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeOut,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
-import {
-  LegendList,
-  type LegendListRef,
-  type LegendListRenderItemProps,
-} from '@legendapp/list/react-native';
-import { FlashList, type FlashListProps } from '@shopify/flash-list';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { FlashList } from '@shopify/flash-list';
 import { useHeaderHeight } from '@react-navigation/elements';
 import opacity from 'hex-color-opacity';
 
@@ -48,24 +36,15 @@ import { useOpenComposer } from '@/features/composer/publish/useComposerActions'
 import { deriveReplyTarget } from '@/features/feed/lib/replyTarget';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { ThreadReplyBar } from '@/features/feed/components/ThreadReplyBar';
-import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import type { ThreadReplySort } from '@/features/feed/data/feedClient';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { feedLog, Log } from '@/shared/lib/logger';
 import { actionMenuPopup } from '@/shared/lib/popup';
-import {
-  remeasureVisualLayoutScope,
-  useVisualListLogger,
-  useVisualStateLogger,
-  VISUAL_LIST_VIEWABILITY_CONFIG,
-} from '@/shared/lib/contentShiftLog';
 import {
   DEFAULT_REPLY_SKELETON_COUNT,
   MAX_REPLY_SKELETON_COUNT,
 } from '@/features/feed/lib/threadReplySkeletons';
-import { threadFixedItemSize } from '@/features/feed/lib/threadListLayout';
 
 interface ThreadViewProps {
   eventId: string;
@@ -109,21 +88,16 @@ const REPLY_SORT_OPTIONS: {
   },
 ];
 
-// When a reply's real content loads it fades in while the skeleton it replaces
-// fades out — a crossfade in the same row slot.
+// When a reply's real content loads it fades in over the skeleton it replaces.
+// The ENTER animation is recycling-tolerant on FlashList (it plays at the cell's
+// correct spot and doesn't re-fire on scroll, since recycled cells reuse the
+// instance), so the skeleton it replaces simply unmounts without an exit fade.
 const REPLY_FADE_IN = FadeIn.duration(220);
-const SKELETON_FADE_OUT = FadeOut.duration(220);
 
 // Rough per-row height used only to discount the content already below the
 // focused note when sizing the focus reserve (see `focusReserve`). Deliberately
 // approximate — it just keeps the reserve from over-padding long threads.
 const FOCUS_RESERVE_ROW_APPROX = 150;
-
-// `data: true` lets LegendList compensate the parent prepend; `size: false` hands
-// the size axis entirely to our `onItemSizeChanged` counter-scroll, so the library
-// and our correction never both move the scroll (that double-correction is what
-// oscillated into jitter). Module-level for a stable prop reference.
-const THREAD_MVCP = { data: true, size: false } as const;
 
 type ThreadSkeletonItem =
   | { type: 'target-skeleton'; id: string }
@@ -260,15 +234,11 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   ] as const);
   const headerHeight = useHeaderHeight();
   const { height: windowHeight } = useWindowDimensions();
-  // Spike toggle (Settings → Developer): render the thread on FlashList v2 (synchronous
-  // Fabric layout) with the legend-list scaffolding stripped, to A/B scroll stability.
-  const flashListThread = useSettingsStore((s) => s.flashListThread);
   const imageOverlay = useImageOverlay();
   const embed = useThreadEmbed();
   const embedOpen = embed?.open;
   const targetFooterOpacity = embed?.targetFooterOpacity;
   const [replyBarHeight, setReplyBarHeight] = useState(0);
-  const threadVisualScope = useMemo(() => `thread.${eventId}.list`, [eventId]);
 
   const {
     items,
@@ -295,82 +265,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   );
   const openPostActions = usePostActions({ getProfileName });
   const openComposer = useOpenComposer();
-
-  const listRef = useRef<LegendListRef>(null);
-
-  // Anchor compensation for the parent prepend. `maintainVisibleContentPosition`
-  // scrolls to hold the focused note when the parent prepends, but it anchors
-  // against the parent's *estimate* (`estimatedItemSize`) and never reconciles the
-  // gap once the parent measures to its real height — leaving the note off by
-  // exactly (estimate − measured) px (verified in the shift log: 200 vs 145 → the
-  // note jumped up 55px). We own that reconciliation: while the reader hasn't
-  // scrolled, every size change of a row ABOVE the note (the prepend's
-  // estimate→measured jump, and late media reshaping) is countered by the delta so
-  // the note stays put. Read via refs so the size-change callback is stable.
-  const targetIndexRef = useRef(-1);
-  const readerMovedRef = useRef(false);
-
-  // Resolve off-screen, then crossfade. Two lists: a seed list (tapped note + reply
-  // SKELETONS, no parents) the reader sees immediately, and the real list (full
-  // thread) that resolves OFF-SCREEN — parents settle AND replies measure + load their
-  // images there. Once the on-screen rows stop changing size (debounced, with an
-  // absolute cap), we land the note authoritatively (`scrollToIndex`) and crossfade
-  // the settled real list in over the seed: the note is a pixel match (looks static),
-  // and the reply skeletons fade to ALREADY-SETTLED real replies — so nothing reshifts
-  // after they appear. `revealed`/`revealedRef` = real list is taking over.
-  const [revealed, setRevealed] = useState(false);
-  const revealedRef = useRef(false);
-  const [seedHidden, setSeedHidden] = useState(false);
-  const listOpacity = useSharedValue(0);
-  const realListStyle = useAnimatedStyle(() => ({ opacity: listOpacity.value }));
-  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const capTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Land the note at the top with one authoritative `scrollToIndex` (correct for ANY
-  // number of parents — robust where summing per-row deltas undershoots), then reveal
-  // next frame so the scroll has applied while still hidden.
-  const fireReveal = useCallback(() => {
-    if (revealedRef.current) return;
-    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-    if (capTimerRef.current) clearTimeout(capTimerRef.current);
-    capTimerRef.current = null;
-    revealedRef.current = true;
-    const idx = targetIndexRef.current;
-    if (idx > 0) {
-      void listRef.current?.scrollToIndex({ index: idx, viewPosition: 0, animated: false });
-    }
-    requestAnimationFrame(() => setRevealed(true));
-  }, []);
-
-  // Debounced "rows have gone quiet" timer — reset by each on-screen size change so the
-  // reveal waits until parents AND the first replies have settled.
-  const scheduleReveal = useCallback(
-    (delayMs: number) => {
-      if (revealedRef.current) return;
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-      settleTimerRef.current = setTimeout(fireReveal, delayMs);
-    },
-    [fireReveal]
-  );
-
-  // Crossfade the real list in once it's the authoritative view, then drop the seed.
-  useEffect(() => {
-    if (!revealed) return;
-    listOpacity.value = withTiming(1, { duration: 200 }, (finished) => {
-      if (finished) runOnJS(setSeedHidden)(true);
-    });
-  }, [revealed, listOpacity]);
-
-  useEffect(() => {
-    setRevealed(false);
-    revealedRef.current = false;
-    readerMovedRef.current = false;
-    setSeedHidden(false);
-    listOpacity.value = 0;
-    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-    if (capTimerRef.current) clearTimeout(capTimerRef.current);
-    capTimerRef.current = null;
-  }, [eventId, listOpacity]);
 
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
   const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
@@ -407,36 +301,12 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     return withReplySortTabs([...items, ...createReplySkeletonItems(skeletonCount)]);
   }, [isFetching, isLoading, items, metricsRef]);
 
-  // The seed (visible until the crossfade) shows the note + reply SKELETONS, no
-  // parents. The real list renders the FULL thread the whole time, including replies,
-  // so the replies measure and load their images OFF-SCREEN and are already settled by
-  // the time the crossfade reveals them — that's what stops the post-appearance
-  // reshift. (Only the real list renders real replies, so images aren't double-loaded.)
-  const seedData = useMemo<ThreadListItem[]>(
-    () => displayItems.filter((i) => i.type !== 'parent' && i.type !== 'reply'),
-    [displayItems]
-  );
-  const realData = displayItems;
-  // The note's index in the real list (parents precede it; replies/skeletons follow,
-  // so the index is the same gated or not) — for the focus reserve and the landing.
+  // The note's index in the list (parents precede it; replies/skeletons follow) —
+  // for the focus reserve and the initial landing.
   const fullTargetIndex = useMemo(
     () => displayItems.findIndex((i) => i.type === 'target'),
     [displayItems]
   );
-  targetIndexRef.current = fullTargetIndex;
-
-  // Once the full thread is fetched, wait for the on-screen rows (parents above AND
-  // the first replies below) to settle off-screen, then crossfade. Arm the debounced
-  // quiet timer (the size-change handler resets it as rows settle) plus an absolute
-  // cap so a slow network image can't hold the seed indefinitely — anything still
-  // loading past the cap finishes after the crossfade (counter-scroll absorbs an
-  // above-note straggler; a below-note straggler is past the focus and rare).
-  const fullReady = !isLoading && !isFetching && !!targetItem;
-  useEffect(() => {
-    if (!fullReady || revealed) return;
-    scheduleReveal(220);
-    if (!capTimerRef.current) capTimerRef.current = setTimeout(fireReveal, 1000);
-  }, [fullReady, revealed, scheduleReveal, fireReveal]);
 
   // Focus reserve: extra bottom space so the tapped reply can always be scrolled
   // to (and held at) the top of the viewport, even when little content sits below
@@ -445,10 +315,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   // refocused, and `maintainVisibleContentPosition` has nowhere to scroll to hold
   // it as the parent grows. We reserve `viewport − (content already below the
   // note)`, so the reserve is generous on short threads and shrinks toward 0 as
-  // replies fill the screen (no dead gap on long threads). Owned here (not the
-  // library's `anchoredEndSpace`) so it's deterministic, hot-reloadable, and
-  // logged. `targetIndex` indexes `displayItems` too — the sort-tabs row is
-  // inserted after the target and skeletons are appended last.
+  // replies fill the screen (no dead gap on long threads). Owned here (as plain
+  // bottom padding) so it's deterministic, hot-reloadable, and logged.
+  // `fullTargetIndex` indexes `displayItems` — the sort-tabs row is inserted
+  // after the target and skeletons are appended last.
   const focusReserve = useMemo(() => {
     if (fullTargetIndex <= 0) return 0;
     const listViewport = Math.max(0, windowHeight - headerHeight - (replyBarHeight || 80));
@@ -473,106 +343,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       : isFetching
         ? 'fetching-with-skeletons'
         : 'replies';
-
-  const visualList = useVisualListLogger<ThreadListItem>({
-    scope: threadVisualScope,
-    surface: 'thread',
-    component: 'ThreadLegendList',
-    phase: threadPhase,
-    extra: () => ({
-      eventId,
-      rows: displayItems.length,
-      replySort,
-      replyBarHeight,
-      isFetching,
-      isLoadingMoreReplies,
-    }),
-    getItemKey: (item) => threadKeyExtractor(item),
-    getItemContext: (item) => ({
-      rowKey: threadKeyExtractor(item),
-      rowLabel: threadItemType(item),
-      itemType: threadItemType(item),
-    }),
-    getListState: () => listRef.current?.getState() ?? null,
-  });
-
-  // Two regimes, split on `revealed`:
-  //  - BEFORE the crossfade (off-screen): ANY rendered row still changing size — a
-  //    parent measuring, a reply measuring or its image loading — keeps the reveal
-  //    waiting (`scheduleReveal` resets) so we crossfade a fully-settled list. No
-  //    per-row counter-scroll here: `scrollToIndex` (in `fireReveal`) lands the note
-  //    authoritatively, which is robust where summing many deltas would undershoot.
-  //  - AFTER the crossfade: a slow parent image (no imeta dims) can still reshape;
-  //    it's off-screen above the note, so counter-scroll by its exact delta to absorb
-  //    the growth and keep the note fixed. One change at a time → no burst.
-  const handleItemSizeChanged = useCallback(
-    (info: {
-      size: number;
-      previous: number;
-      index: number;
-      itemKey: string;
-      itemData: ThreadListItem;
-    }) => {
-      visualList.onItemSizeChanged?.(info);
-      if (readerMovedRef.current) return;
-      const tIndex = targetIndexRef.current;
-      if (tIndex < 0) return;
-      if (!revealedRef.current) {
-        scheduleReveal(180);
-        return;
-      }
-      if (info.index >= tIndex) return;
-      const delta = info.size - info.previous;
-      if (delta === 0) return;
-      const current = listRef.current?.getState()?.scroll ?? 0;
-      void listRef.current?.scrollToOffset({ offset: current + delta, animated: false });
-    },
-    [visualList, scheduleReveal]
-  );
-
-  const threadVisualState = useMemo(() => {
-    let skeletons = 0;
-    let realReplies = 0;
-    for (const it of displayItems) {
-      if (it.type === 'target-skeleton' || it.type === 'reply-skeleton') skeletons += 1;
-      else if (it.type === 'reply') realReplies += 1;
-    }
-    return {
-      eventId,
-      phase: threadPhase,
-      rows: displayItems.length,
-      skeletons,
-      realReplies,
-      replySort,
-      replyBarHeight,
-      isFetching,
-      isLoading,
-      isLoadingMoreReplies,
-    };
-  }, [
-    displayItems,
-    eventId,
-    isFetching,
-    isLoading,
-    isLoadingMoreReplies,
-    replyBarHeight,
-    replySort,
-    threadPhase,
-  ]);
-
-  useVisualStateLogger({
-    scope: threadVisualScope,
-    surface: 'thread',
-    component: 'ThreadView',
-    stateKey: 'thread-state',
-    phase: threadVisualState.phase,
-    state: threadVisualState,
-    remeasure: {
-      reason: 'thread-state',
-      minIntervalMs: 250,
-      maxItems: 32,
-    },
-  });
 
   // Content-shift trace: log each reply-list phase change with its row makeup so
   // a jump can be tied to the exact transition. Pairs with `thread.reply_skeleton.*`.
@@ -620,22 +390,17 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   }, [items, profilesRef, metricsRef, quotedEventsRef]);
 
   const renderThreadItem = useCallback(
-    ({ item, index }: LegendListRenderItemProps<ThreadListItem, string | undefined>) => {
+    ({ item, index }: { item: ThreadListItem; index: number }) => {
       if (item.type === 'target-skeleton') {
         return <PostCardSkeleton variant="thread-target" index={index} />;
       }
 
       if (item.type === 'reply-skeleton') {
-        const skeleton = <PostCardSkeleton variant="thread-reply" index={item.skeletonIndex} />;
-        // FlashList recycles cells, which fights reanimated exit animations — the
+        // FlashList recycles cells, which fights reanimated exit animations — an
         // exiting skeleton renders in a recycled cell's position for a frame (the
-        // "skeleton in the wrong place" glitch). Skip the exit there; on legend-list
-        // it fades out as the real reply fades in (crossfade).
-        return flashListThread ? (
-          skeleton
-        ) : (
-          <Animated.View exiting={SKELETON_FADE_OUT}>{skeleton}</Animated.View>
-        );
+        // "skeleton in the wrong place" glitch), so the skeleton simply unmounts
+        // and the real reply fades IN over it (see REPLY_FADE_IN below).
+        return <PostCardSkeleton variant="thread-reply" index={item.skeletonIndex} />;
       }
 
       if (item.type === 'reply-sort-tabs') {
@@ -690,8 +455,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       // Each reply fades its real content in as it loads. The ENTER animation is
       // recycling-tolerant on FlashList (it plays at the cell's correct spot and
       // doesn't re-fire on scroll, since recycled cells reuse the instance) — unlike
-      // the skeleton's EXIT, which lingered in a recycled cell's slot (the "wrong
-      // place" glitch), so that one stays off on FlashList.
+      // a skeleton EXIT, which lingered in a recycled cell's slot (the "wrong
+      // place" glitch), so the reply only ever fades IN.
       if (item.type === 'reply') {
         return <Animated.View entering={REPLY_FADE_IN}>{card}</Animated.View>;
       }
@@ -706,7 +471,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       getEngagementState,
       getMetrics,
       hasParents,
-      flashListThread,
       profilesRef,
       quotedEventsRef,
       replySort,
@@ -719,44 +483,28 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     ]
   );
 
-  const renderItem = useCallback(
-    (props: LegendListRenderItemProps<ThreadListItem, string | undefined>) => (
-      <VisualLayoutProbe
-        scope={threadVisualScope}
-        surface="thread"
-        component="ThreadRow"
-        itemKey={threadKeyExtractor(props.item)}
-        itemType={threadItemType(props.item)}
-        index={props.index}
-        phase={threadPhase}
-        extra={{
-          eventId,
-          rows: displayItems.length,
-          replySort,
-          replyBarHeight,
-          isFetching,
-        }}>
-        {renderThreadItem(props)}
-      </VisualLayoutProbe>
-    ),
-    [
-      displayItems.length,
-      eventId,
-      isFetching,
-      renderThreadItem,
-      replyBarHeight,
-      replySort,
-      threadVisualScope,
-      threadPhase,
-    ]
-  );
-
   const handleEndReached = useCallback(() => {
     // Don't start reply pagination while the initial fetch is running — the
     // footer spinner would otherwise overlap the loading skeletons.
     if (isFetching) return;
     void loadMoreReplies();
   }, [loadMoreReplies, isFetching]);
+
+  // FlashList re-renders rows when `data` changes by reference or when `extraData`
+  // changes. Engagement (likes/reposts), pagination flags and the sort live outside
+  // `displayItems`, so fold them into extraData so those updates repaint the rows.
+  const threadExtraData = useMemo(
+    () =>
+      [
+        dataVersion,
+        engagementRevision,
+        isFetching ? 1 : 0,
+        isLoadingMoreReplies ? 1 : 0,
+        hasMoreReplies ? 1 : 0,
+        replySort,
+      ].join(':'),
+    [dataVersion, engagementRevision, isFetching, isLoadingMoreReplies, hasMoreReplies, replySort]
+  );
 
   // Target-post actions for the floating embed action bar (mirrors the
   // target PostCard's MetricsFooter wiring). Hooks stay above the early
@@ -824,154 +572,54 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 onHeightChange={setReplyBarHeight}
               />
             }>
-            {flashListThread ? (
-              // SPIKE: FlashList v2 holds the note via synchronous Fabric layout + default
-              // mVCP — no two-list / crossfade / counter-scroll / reply gating needed. The
-              // ONE non-library-specific piece we keep is `focusReserve`: extra bottom
-              // padding so the anchored note has REAL scroll room below it; without it mVCP
-              // anchors past the scroll bounds and the first gesture snaps to top/bottom.
-              <FlashList
-                data={displayItems}
-                keyExtractor={threadKeyExtractor}
-                getItemType={threadItemType}
-                renderItem={renderItem as unknown as FlashListProps<ThreadListItem>['renderItem']}
-                drawDistance={500}
-                onEndReached={handleEndReached}
-                onEndReachedThreshold={0.4}
-                ListFooterComponent={
-                  isLoadingMoreReplies ? (
-                    <View style={styles.hiddenReplyFooter}>
-                      <Spinner size={18} color={opacity(foreground, 0.45)} />
-                    </View>
-                  ) : null
-                }
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{
-                  paddingTop: 0,
-                  paddingBottom: (replyBarHeight || 80) + 16 + focusReserve,
-                }}
-                onScroll={(e: { nativeEvent: { contentOffset: { y: number } } }) => {
-                  const y = e.nativeEvent.contentOffset.y;
-                  if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;
-                  if (embed) embed.scrollY.value = y;
-                }}
-                scrollEventThrottle={16}
-                initialScrollIndex={!isLoading && fullTargetIndex > 0 ? fullTargetIndex : undefined}
-              />
-            ) : (
-              <View style={styles.listWrap}>
-                {/* Real list — full thread; resolves off-screen (opacity 0), then
-                  crossfades in over the seed once the rows have settled. zIndex keeps
-                  it above the seed regardless of mount order. */}
-                <Animated.View
-                  style={[StyleSheet.absoluteFill, styles.realLayer, realListStyle]}
-                  pointerEvents={revealed ? 'auto' : 'none'}>
-                  <LegendList
-                    ref={listRef}
-                    data={realData}
-                    keyExtractor={threadKeyExtractor}
-                    getItemType={threadItemType}
-                    getFixedItemSize={threadFixedItemSize}
-                    estimatedItemSize={200}
-                    drawDistance={500}
-                    renderItem={renderItem}
-                    extraData={[
-                      dataVersion,
-                      engagementRevision,
-                      isFetching ? 1 : 0,
-                      isLoadingMoreReplies ? 1 : 0,
-                      hasMoreReplies ? 1 : 0,
-                      replySort,
-                    ].join(':')}
-                    recycleItems
-                    ListFooterComponent={
-                      isLoadingMoreReplies ? (
-                        <View style={styles.hiddenReplyFooter}>
-                          <Spinner size={18} color={opacity(foreground, 0.45)} />
-                        </View>
-                      ) : hiddenReplyCount > 0 && !isFetching && !hasMoreReplies ? (
-                        <View style={styles.hiddenReplyFooter}>
-                          <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
-                            {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'}{' '}
-                            not loaded
-                          </Text>
-                        </View>
-                      ) : null
-                    }
-                    onEndReached={handleEndReached}
-                    onEndReachedThreshold={0.4}
-                    onItemSizeChanged={handleItemSizeChanged}
-                    onScrollBeginDrag={() => {
-                      readerMovedRef.current = true;
-                    }}
-                    onLoad={visualList.onLoad}
-                    onMetricsChange={visualList.onMetricsChange}
-                    onStickyHeaderChange={visualList.onStickyHeaderChange}
-                    onViewableItemsChanged={visualList.onViewableItemsChanged}
-                    viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
-                    style={{ flex: 1 }}
-                    contentContainerStyle={{
-                      // The embed sheet is positioned starting just below the header
-                      // (`expandedOffset`), so the list itself no longer pads the top.
-                      paddingTop: 0,
-                      // replyBarHeight already includes the bottom safe-area inset (the
-                      // bar's opaque container reaches the screen bottom), so the inset
-                      // is not added again here. `focusReserve` adds room below the note
-                      // so it can be scrolled to the top (see its definition above).
-                      paddingBottom: (replyBarHeight || 80) + 16 + focusReserve,
-                    }}
-                    showsVerticalScrollIndicator={false}
-                    // Anchor-on-the-tapped-note stability (see THREAD_MVCP): `data:true`
-                    // compensates the parent prepend; `size:false` leaves the size axis to our
-                    // `onItemSizeChanged` counter-scroll (sole owner → no double-correction).
-                    // Paired with `focusReserve` (bottom padding) for the scroll room it needs.
-                    // We deliberately do NOT take ChatScreen's `initialScrollAtEnd` /
-                    // `alignItemsAtEnd` / `maintainScrollAtEnd`: a thread anchors on the tapped
-                    // note via `initialScrollIndex` and must never auto-pin to the bottom.
-                    maintainVisibleContentPosition={THREAD_MVCP}
-                    onScroll={(e: { nativeEvent: { contentOffset: { y: number } } }) => {
-                      const y = e.nativeEvent.contentOffset.y;
-                      if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;
-                      if (embed) embed.scrollY.value = y;
-                      remeasureVisualLayoutScope(threadVisualScope, 'scroll', {
-                        minIntervalMs: 500,
-                        maxItems: 32,
-                        extra: { eventId, scrollY: Math.round(y), replySort },
-                      });
-                    }}
-                    scrollEventThrottle={16}
-                    scrollEnabled={embed ? embed.listScrollEnabled : undefined}
-                    initialScrollIndex={
-                      !isLoading && fullTargetIndex > 0 ? fullTargetIndex : undefined
-                    }
-                  />
-                </Animated.View>
-                {/* Seed — tapped note + reply skeletons (no parents), shown underneath
-                  until the real list has crossfaded in. Display-only (no scroll, no
-                  handlers); kept mounted through the fade, then dropped. */}
-                {seedHidden ? null : (
-                  <View style={StyleSheet.absoluteFill} pointerEvents="none">
-                    <LegendList
-                      data={seedData}
-                      keyExtractor={threadKeyExtractor}
-                      getItemType={threadItemType}
-                      getFixedItemSize={threadFixedItemSize}
-                      estimatedItemSize={200}
-                      drawDistance={500}
-                      renderItem={renderItem}
-                      recycleItems
-                      scrollEnabled={false}
-                      showsVerticalScrollIndicator={false}
-                      style={styles.flexOne}
-                      contentContainerStyle={{
-                        paddingTop: 0,
-                        paddingBottom: (replyBarHeight || 80) + 16,
-                      }}
-                    />
+            {/* FlashList v2 holds the tapped note via synchronous Fabric layout +
+              its default maintainVisibleContentPosition — no two-list crossfade,
+              counter-scroll or reply gating needed. The one non-library-specific
+              piece we keep is `focusReserve`: extra bottom padding so the anchored
+              note has REAL scroll room below it; without it mVCP anchors past the
+              scroll bounds and the first gesture snaps to top/bottom. The thread
+              anchors on the tapped note via `initialScrollIndex` and must never
+              auto-pin to the bottom (so no `startRenderingFromBottom`). */}
+            <FlashList
+              data={displayItems}
+              keyExtractor={threadKeyExtractor}
+              getItemType={threadItemType}
+              renderItem={renderThreadItem}
+              extraData={threadExtraData}
+              drawDistance={500}
+              onEndReached={handleEndReached}
+              onEndReachedThreshold={0.4}
+              ListFooterComponent={
+                isLoadingMoreReplies ? (
+                  <View style={styles.hiddenReplyFooter}>
+                    <Spinner size={18} color={opacity(foreground, 0.45)} />
                   </View>
-                )}
-              </View>
-            )}
+                ) : hiddenReplyCount > 0 && !isFetching && !hasMoreReplies ? (
+                  <View style={styles.hiddenReplyFooter}>
+                    <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
+                      {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not
+                      loaded
+                    </Text>
+                  </View>
+                ) : null
+              }
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                // The embed sheet starts just below the header, so the list pads no
+                // top. `replyBarHeight` already includes the bottom safe-area inset;
+                // `focusReserve` adds the room below the note (see its definition).
+                paddingTop: 0,
+                paddingBottom: (replyBarHeight || 80) + 16 + focusReserve,
+              }}
+              onScroll={(e) => {
+                const y = e.nativeEvent.contentOffset.y;
+                if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;
+                if (embed) embed.scrollY.value = y;
+              }}
+              scrollEventThrottle={16}
+              scrollEnabled={embed ? embed.listScrollEnabled : undefined}
+              initialScrollIndex={!isLoading && fullTargetIndex > 0 ? fullTargetIndex : undefined}
+            />
           </ThreadEmbedSheet>
           {embed && targetEvent ? (
             <EmbedActionBar
@@ -1007,15 +655,6 @@ export const ThreadView = React.memo(ThreadViewWithEmbed);
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  listWrap: {
-    flex: 1,
-  },
-  flexOne: {
-    flex: 1,
-  },
-  realLayer: {
-    zIndex: 1,
   },
   centerContent: {
     justifyContent: 'center',

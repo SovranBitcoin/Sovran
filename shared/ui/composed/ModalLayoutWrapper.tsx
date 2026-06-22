@@ -121,7 +121,7 @@ interface ModalLayoutWrapperProps {
   disableHeaderSpacer?: boolean;
   /**
    * When true, children are rendered directly without wrapping in ScrollView.
-   * Use this when you need to provide your own scrollable component (e.g., FlatList, LegendList).
+   * Use this when you need to provide your own scrollable component (e.g., FlatList, FlashList).
    * You should add your own header spacer using the totalHeaderHeight value.
    */
   useCustomScrollView?: boolean;

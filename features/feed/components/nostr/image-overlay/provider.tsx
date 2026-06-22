@@ -196,7 +196,7 @@ export function ImageOverlayProvider({
   /** See ImageOverlayContextValue.measureSpaceCorrection — tap-calibrated
    *  measure-space delta, stable ref so actionsValue identity is unaffected. */
   const measureSpaceCorrection = useRef({ dx: 0, dy: 0 });
-  /** Per-key just-in-time measure callbacks: close() re-measures the live thumbnail because recycled LegendList rows never re-fire onLayout when size is unchanged, leaving the registered rect stale. */
+  /** Per-key just-in-time measure callbacks: close() re-measures the live thumbnail because recycled FlashList rows never re-fire onLayout when size is unchanged, leaving the registered rect stale. */
   const thumbnailMeasureNowRef = useRef<Record<string, () => Promise<ThumbnailLayout | null>>>({});
   /** Bumped on every open/openReplace; a close() awaiting a re-measure aborts when the session changed under it (no double-close / close-after-reopen race). */
   const openSessionIdRef = useRef(0);
@@ -874,7 +874,7 @@ export function ImageOverlayProvider({
    * (activeIndex can lag behind the pager, so we use the index passed from the overlay).
    *
    * When the dismiss-target key has a registered measureNow, the live node is
-   * re-measured just-in-time (recycled LegendList rows never re-fire onLayout
+   * re-measured just-in-time (recycled FlashList rows never re-fire onLayout
    * when size is unchanged, so the open-time snapshot can be stale). The close
    * animation then starts one tick later; the snapshot path stays the fallback
    * (timeout, unmounted node, or no callback).

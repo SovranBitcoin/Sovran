@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Keyboard,
   ScrollView,
@@ -13,20 +13,13 @@ import {
   useReanimatedKeyboardAnimation,
 } from 'react-native-keyboard-controller';
 import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
-import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
+import { FlashList } from '@shopify/flash-list';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import type { Logger } from '@/shared/lib/logger';
-import {
-  remeasureVisualLayoutScope,
-  useVisualListLogger,
-  VISUAL_LIST_VIEWABILITY_CONFIG,
-  visualLayoutScopePart,
-} from '@/shared/lib/contentShiftLog';
-import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 
 import { LiquidChatComposer } from './LiquidChatComposer';
 import { ChatMessageBubble } from './ChatMessageBubble';
@@ -105,17 +98,17 @@ interface ChatScreenProps {
   onStartReachedThreshold?: number;
 }
 
-/** Hint for LegendList's virtualization math. Real bubble heights are
- *  measured after layout; this value only affects first-render scroll
- *  position accuracy. */
-const ESTIMATED_BUBBLE_HEIGHT = 80;
+// Horizontal gutter applied to every message row (FlashList rows have no
+// padding of their own). Stable module ref so recycled cells don't re-create it.
+const MESSAGE_ROW_STYLE = { paddingHorizontal: 16 } as const;
 
 /**
- * Shared chat surface backed by `@legendapp/list/react-native`. Used by BitChat, Nostr
+ * Shared chat surface backed by `@shopify/flash-list`. Used by BitChat, Nostr
  * DM, WhiteNoise, geohash — every DM-like chat surface. Architecture mirrors
- * `AiChatScreen` (which uses LegendList directly): forward-ordered data,
- * `alignItemsAtEnd` for the chat-style bottom dock, `maintainScrollAtEnd`
- * for stay-at-latest on append, a single shared Reanimated translate that
+ * `AiChatScreen` (which uses FlashList directly): forward-ordered data,
+ * FlashList `maintainVisibleContentPosition` with `startRenderingFromBottom`
+ * for the chat-style bottom dock and `autoscrollToBottomThreshold` for
+ * stay-at-latest on append, plus a single shared Reanimated translate that
  * lifts both the list wrapper and the (absolutely-positioned) composer in
  * lock-step with the keyboard.
  *
@@ -123,7 +116,7 @@ const ESTIMATED_BUBBLE_HEIGHT = 80;
  * FlatList + internal KeyboardAvoidingView). Two reasons we switched:
  *   1. iOS 26 applies a soft `UIScrollEdgeEffect` to RN `FlatList` /
  *      `VirtualizedList` instances by default — visible as a blur/fade band
- *      where the list meets the composer. LegendList's separate
+ *      where the list meets the composer. FlashList's separate
  *      virtualization sidesteps it entirely, matching the AI surface.
  *   2. GiftedChat's KAV interaction with our `position:'absolute'` composer
  *      was unreliable across border-box positioning and modal-stack contexts
@@ -174,11 +167,10 @@ export function ChatScreen({
   // inset; doubling them up pushes content too far down).
   const resolvedBottomInset = bottomInset !== undefined ? bottomInset : safeAreaInsets.bottom;
   const resolvedTopInset = topInset > 0 ? topInset : headerHeight > 0 ? 0 : safeAreaInsets.top;
-  const chatVisualScope = useMemo(() => `chat.${visualLayoutScopePart(surface)}.list`, [surface]);
 
   const [draft, setDraft] = useState('');
 
-  // Measured composer height. Used to pad the LegendList's content so the
+  // Measured composer height. Used to pad the FlashList's content so the
   // newest bubble rests just above the composer's top edge while the
   // composer itself is absolutely positioned over the chat — older bubbles
   // slide *under* the composer's translucent glass on scroll-up (the
@@ -196,10 +188,10 @@ export function ChatScreen({
   //     the keyboard top when focused and back to its laid-out position
   //     when dismissed.
   //
-  //   - List: Reanimated `translateY` on the LegendList wrapper, same as
+  //   - List: Reanimated `translateY` on the FlashList wrapper, same as
   //     AiChatScreen — physically translates the list up so items
   //     (which are positioned in absolute content coordinates inside
-  //     LegendList) shift with the keyboard. Padding-based avoidance on the
+  //     FlashList) shift with the keyboard. Padding-based avoidance on the
   //     wrapper doesn't move the items (it just shrinks the viewport), so
   //     the conversation stays put and only the composer rides up.
   //
@@ -276,75 +268,13 @@ export function ChatScreen({
     });
   }, [draft, dispatchSend]);
 
-  const visualPhase = isLoading ? 'loading' : messages.length === 0 ? 'empty' : 'ready';
-  const visualExtra = useCallback(
-    () => ({
-      surface,
-      messageCount: messages.length,
-      composerHeight,
-      bottomInset: resolvedBottomInset,
-      topInset: resolvedTopInset,
-      isLoading: !!isLoading,
-      draftLength: draft.length,
-    }),
-    [
-      composerHeight,
-      draft.length,
-      isLoading,
-      messages.length,
-      resolvedBottomInset,
-      resolvedTopInset,
-      surface,
-    ]
-  );
-  const listRef = useRef<LegendListRef>(null);
-  const visualList = useVisualListLogger<ChatBubbleMessage>({
-    scope: chatVisualScope,
-    surface: 'chat',
-    component: 'ChatLegendList',
-    phase: visualPhase,
-    extra: visualExtra,
-    getItemKey: (message, index) =>
-      `message:${message.isOwn ? 'own' : 'other'}:${message.timestamp}:${index}`,
-    getItemContext: (message, index) => ({
-      itemType: message.isOwn ? 'own-message' : 'counterparty-message',
-      deliveryStatus: message.deliveryStatus ?? null,
-      timestamp: message.timestamp,
-      isOwn: message.isOwn,
-      index,
-    }),
-    getListState: () => listRef.current?.getState() ?? null,
-  });
-
-  const handleListScroll = useCallback(() => {
-    remeasureVisualLayoutScope(chatVisualScope, 'scroll', {
-      extra: visualExtra(),
-      maxItems: 24,
-      minIntervalMs: 300,
-    });
-  }, [chatVisualScope, visualExtra]);
-
   const renderItem = useCallback(
-    ({ item, index }: { item: ChatBubbleMessage; index: number }) => {
+    ({ item }: { item: ChatBubbleMessage; index: number }) => {
       const group = groupingMap.get(item.id);
       const isFirstInGroup = group?.isFirst ?? true;
       const isLastInGroup = group?.isLast ?? true;
       return (
-        <VisualLayoutProbe
-          scope={chatVisualScope}
-          surface="chat"
-          component="ChatMessageRow"
-          itemKey={`message:${item.isOwn ? 'own' : 'other'}:${item.timestamp}:${index}`}
-          itemType={item.isOwn ? 'own-message' : 'counterparty-message'}
-          index={index}
-          phase={visualPhase}
-          extra={() => ({
-            ...visualExtra(),
-            deliveryStatus: item.deliveryStatus ?? null,
-            isFirstInGroup,
-            isLastInGroup,
-          })}
-          style={{ paddingHorizontal: 16 }}>
+        <RNView style={MESSAGE_ROW_STYLE}>
           {renderBubble ? (
             renderBubble({ message: item, isFirstInGroup, isLastInGroup })
           ) : (
@@ -355,10 +285,10 @@ export function ChatScreen({
               counterpartyAvatar={counterpartyAvatar}
             />
           )}
-        </VisualLayoutProbe>
+        </RNView>
       );
     },
-    [chatVisualScope, counterpartyAvatar, groupingMap, renderBubble, visualExtra, visualPhase]
+    [counterpartyAvatar, groupingMap, renderBubble]
   );
 
   const keyExtractor = useCallback((m: ChatBubbleMessage) => m.id, []);
@@ -384,7 +314,7 @@ export function ChatScreen({
   // composer's top edge. No `paddingTop` here: adding one breaks
   // `alignItemsAtEnd`'s "content < viewport → dock to bottom" math (the
   // contentContainer's own paddingTop counts toward effective content
-  // height, so LegendList thinks the viewport is already filled and skips
+  // height, so FlashList thinks the viewport is already filled and skips
   // the auto-bottom padding it would otherwise insert).
   // `resolvedTopInset` clearance against a transparent floating header is
   // already accounted for at the screen level by consumers that need it
@@ -417,7 +347,7 @@ export function ChatScreen({
       ) : (
         <>
           {/* List wrapper. Layout-based keyboard lift (`top: -keyboardH`)
-              shifts the whole wrapper up so LegendList's items — which it
+              shifts the whole wrapper up so FlashList's items — which it
               positions in absolute content coordinates — ride along.
               Padding-based avoidance only shrinks the viewport without
               moving items, and `translateY` creates a compositor-layer
@@ -432,65 +362,34 @@ export function ChatScreen({
               },
               listKeyboardLiftStyle,
             ]}>
-            <VisualLayoutProbe
-              scope={chatVisualScope}
-              surface="chat"
-              component="ChatListViewport"
-              itemKey="list:viewport"
-              itemType="list"
-              phase={visualPhase}
-              extra={visualExtra}
-              style={{ flex: 1 }}>
+            <RNView style={{ flex: 1 }}>
               {messages.length === 0 ? (
-                <VisualLayoutProbe
-                  scope={chatVisualScope}
-                  surface="chat"
-                  component="ChatEmptyContent"
-                  itemKey="empty:content"
-                  itemType="empty"
-                  phase={visualPhase}
-                  extra={visualExtra}
-                  style={{ flex: 1 }}>
-                  {wrappedEmptyContent}
-                </VisualLayoutProbe>
+                <RNView style={{ flex: 1 }}>{wrappedEmptyContent}</RNView>
               ) : (
-                <LegendList
-                  ref={listRef}
+                <FlashList
                   data={messages}
                   keyExtractor={keyExtractor}
                   renderItem={renderItem}
-                  estimatedItemSize={ESTIMATED_BUBBLE_HEIGHT}
-                  // Canonical LegendList v3 chat pattern, mirroring AiChatScreen:
-                  // - `initialScrollAtEnd` lands the first paint at the latest
-                  //   message without manual scroll-chasers.
-                  // - `alignItemsAtEnd` docks short histories to the bottom by
-                  //   adding top padding internally (only works without our own
-                  //   `paddingTop` on `contentContainerStyle`).
-                  // - `maintainScrollAtEnd` + threshold keeps the viewport
-                  //   pinned to the latest when new messages append, as long as
-                  //   the user is near the bottom.
-                  // - `maintainVisibleContentPosition` keeps the visible item
-                  //   anchored when items above the viewport resize or load
-                  //   asynchronously (late bubble-height measurements, etc.).
-                  initialScrollAtEnd
-                  alignItemsAtEnd
-                  maintainScrollAtEnd
-                  maintainScrollAtEndThreshold={0.1}
-                  maintainVisibleContentPosition
-                  onItemSizeChanged={visualList.onItemSizeChanged}
-                  onLoad={visualList.onLoad}
-                  onMetricsChange={visualList.onMetricsChange}
-                  onStickyHeaderChange={visualList.onStickyHeaderChange}
-                  onViewableItemsChanged={visualList.onViewableItemsChanged}
-                  viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
-                  onScroll={handleListScroll}
+                  // Chat-bottom behavior via FlashList v2's maintainVisibleContentPosition:
+                  // - `startRenderingFromBottom` lands the first paint at the latest
+                  //   message AND docks short histories to the bottom (replacing
+                  //   FlashList's `initialScrollAtEnd` + `alignItemsAtEnd`).
+                  // - `autoscrollToBottomThreshold` keeps the viewport pinned to the
+                  //   latest when new messages append, as long as the user is near the
+                  //   bottom (replacing `maintainScrollAtEnd` + threshold).
+                  // mVCP also keeps the visible item anchored when items above the
+                  // viewport resize/load late (bubble-height measurements, etc.).
+                  maintainVisibleContentPosition={{
+                    startRenderingFromBottom: true,
+                    autoscrollToBottomThreshold: 0.1,
+                  }}
+                  showsVerticalScrollIndicator={false}
                   onStartReached={onStartReached}
                   onStartReachedThreshold={onStartReachedThreshold}
-                  recycleItems
                   contentContainerStyle={listContentContainerStyle}
                 />
               )}
-            </VisualLayoutProbe>
+            </RNView>
           </Reanimated.View>
 
           {/* Composer rides the keyboard via `<KeyboardStickyView />` from
@@ -507,15 +406,7 @@ export function ChatScreen({
           <KeyboardStickyView
             offset={{ closed: 0, opened: 0 }}
             style={{ position: 'absolute', left: 0, right: 0, bottom: resolvedBottomInset }}>
-            <VisualLayoutProbe
-              scope={chatVisualScope}
-              surface="chat"
-              component="ChatComposerDock"
-              itemKey="composer:dock"
-              itemType="composer"
-              phase={visualPhase}
-              extra={visualExtra}
-              onLayout={handleComposerLayout}>
+            <RNView onLayout={handleComposerLayout}>
               {composerActions ? (
                 <ScrollView
                   horizontal
@@ -542,7 +433,7 @@ export function ChatScreen({
                 testID={composerTestID}
                 surface={surface}
               />
-            </VisualLayoutProbe>
+            </RNView>
           </KeyboardStickyView>
         </>
       )}
