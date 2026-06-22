@@ -28,6 +28,7 @@ import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 /** Canonical iconify glyphs for row-accent stats. Use these names so a star
@@ -159,5 +160,35 @@ export function RowStatsAccent({ stats, note, noteColor, nip05 }: RowStatsAccent
         </Text>
       ) : null}
     </>
+  );
+}
+
+/**
+ * Loading placeholder for the accent line. Rendered by `ContactRow` while a
+ * stats-bearing row (e.g. a mint result) is loading, so the accent's height is
+ * reserved and the row doesn't grow when the real `RowStatsAccent` pills arrive.
+ *
+ * Co-located with `RowStatsAccent` so the geometry can't drift: it mirrors the
+ * real pill's structure exactly — the same outer `HStack` (`gap: 4, marginTop:
+ * 2`) and per-pill `HStack` (`gap: 3`) of a 12px icon box + a `Text` at the
+ * same `size`/`bold`. The `Text loading` bar self-sizes to the real 12px line
+ * box, so the accent line is the same height whether loading or loaded (a fixed
+ * pixel bar previously under-shot the text line height by a couple of pixels).
+ */
+export function RowStatsAccentSkeleton({ seed }: { seed?: string }) {
+  return (
+    <HStack align="center" style={{ gap: 4, marginTop: 2 }}>
+      {[`accent:${seed ?? 'x'}`, `accent2:${seed ?? 'x'}`].map((key, i) => (
+        <HStack key={key} align="center" style={{ gap: 3 }}>
+          <Skeleton
+            className="bg-skeleton rounded-full"
+            style={{ width: 12, height: 12 }}
+            visualKey={key}
+            visualComponent="RowStatsAccentSkeleton"
+          />
+          <Text size={12} bold loading placeholder={i === 0 ? '4.5' : '98%'} />
+        </HStack>
+      ))}
+    </HStack>
   );
 }
