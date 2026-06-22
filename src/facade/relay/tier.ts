@@ -36,6 +36,7 @@ import { toFeedEvent } from '../event';
 import type { NaggFeedEvent } from '../../map/feed';
 import type { NostrTierStrategy } from '../strategy';
 import { demuxRelayFeed, demuxRelayThread, demuxRelayNotifications, demuxRelayOwnHistory } from './demux';
+import { buildRelayForYouFeed } from './for-you/build';
 import type { NostrFilter, RawRelayEvent, RelayConnection } from './protocol';
 
 // ---------------------------------------------------------------------------
@@ -56,6 +57,19 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
   return {
     tier: 'relay',
     async feedPage(request: FeedPageRequest): Promise<TierOutcome<FeedBundle>> {
+      // For-You is normally OUT OF REACH on the floor, but the viewer's own likes
+      // are a relay-native ranking signal: build a personalized feed from the
+      // accounts they like (one hop / curated cold-start when likes are thin).
+      // Null = no usable signal → fall through to the honest recency degrade below.
+      if (request.spec.kind === 'for-you' && request.spec.viewerPubkey) {
+        const forYou = await buildRelayForYouFeed({
+          viewerPubkey: request.spec.viewerPubkey,
+          connection: config.connection,
+          request,
+        });
+        if (forYou) return answered(forYou);
+      }
+
       const filters = filtersForSpec(request.spec, {
         until: request.cursor?.createdAt,
         limit: request.limit,

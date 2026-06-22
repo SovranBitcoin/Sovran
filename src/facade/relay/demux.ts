@@ -29,7 +29,7 @@ type RelayBatch = {
   profiles: Record<string, NaggProfileInfo>;
 };
 
-function parseRelayBatch(events: ReadonlyArray<RawRelayEvent>): RelayBatch {
+export function parseRelayBatch(events: ReadonlyArray<RawRelayEvent>): RelayBatch {
   const notesById = new Map<string, NaggFeedEvent>();
   const profiles: Record<string, NaggProfileInfo> = {};
 
