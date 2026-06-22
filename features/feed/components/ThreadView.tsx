@@ -687,15 +687,13 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         />
       );
 
-      // Each reply fades its real content in as it loads, crossfading with the
-      // skeleton it replaces. Skipped on FlashList (recycled cells fight reanimated
-      // enter animations — see the skeleton note above); on legend-list it fades in.
+      // Each reply fades its real content in as it loads. The ENTER animation is
+      // recycling-tolerant on FlashList (it plays at the cell's correct spot and
+      // doesn't re-fire on scroll, since recycled cells reuse the instance) — unlike
+      // the skeleton's EXIT, which lingered in a recycled cell's slot (the "wrong
+      // place" glitch), so that one stays off on FlashList.
       if (item.type === 'reply') {
-        return flashListThread ? (
-          card
-        ) : (
-          <Animated.View entering={REPLY_FADE_IN}>{card}</Animated.View>
-        );
+        return <Animated.View entering={REPLY_FADE_IN}>{card}</Animated.View>;
       }
       return card;
     },
