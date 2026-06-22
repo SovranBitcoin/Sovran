@@ -49,10 +49,24 @@ jest.mock('react-native-reanimated', () => {
     cancelAnimation: () => {},
     useAnimatedStyle: () => ({}),
     runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
-    Easing: { out: () => (t: number) => t, inOut: () => (t: number) => t, cubic: (t: number) => t },
+    interpolate: () => 0,
+    Extrapolation: { CLAMP: 'clamp' },
+    Easing: {
+      out: () => (t: number) => t,
+      inOut: () => (t: number) => t,
+      cubic: (t: number) => t,
+      quad: (t: number) => t,
+    },
     ReduceMotion: { System: 'system' },
   };
 });
+
+jest.mock('@/shared/hooks/useThemeColor', () => ({
+  // SkeletonLoadingShimmer is mocked here, so the value is never run through
+  // hex-color-opacity — a plain token string is fine.
+  useThemeColor: (tokens: string | readonly string[]) =>
+    Array.isArray(tokens) ? tokens.map(() => 'theme-surface') : 'theme-surface',
+}));
 
 jest.mock('@/shared/ui/composed/SkeletonExitShimmer', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');

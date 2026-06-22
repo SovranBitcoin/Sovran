@@ -35,6 +35,7 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({
   // Hex values: the loading placeholder now renders a SkeletonLoadingShimmer
   // whose gradient runs colors through hex-color-opacity, which rejects names.
   useThemeColor: (tokens: string | string[]) =>
+    // eslint-disable-next-line no-restricted-syntax -- test mock needs a real hex
     Array.isArray(tokens) ? tokens.map(() => '#888888') : '#888888',
 }));
 
