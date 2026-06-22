@@ -10,6 +10,7 @@ import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   FadeIn,
   FadeOut,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -297,34 +298,42 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const targetIndexRef = useRef(-1);
   const readerMovedRef = useRef(false);
 
-  // The sort-tabs ("Relevant") row and the replies sit below the target, so their
-  // on-screen position is whatever LegendList computes for the target — which
-  // starts at `estimatedItemSize` and snaps to the real measured height a frame
-  // later, shifting everything below. Rather than fight that reconciliation, we
-  // keep those rows occupying their space but at opacity 0 until the real target
-  // has laid out, then fade them in at their settled positions (the shift happens
-  // while they're invisible). The target itself is the stable anchor and renders
-  // immediately.
-  const revealedRef = useRef(false);
-  const revealOpacity = useSharedValue(0);
-  const revealStyle = useAnimatedStyle(() => ({ opacity: revealOpacity.value }));
-  const handleTargetSettled = useCallback(() => {
-    if (revealedRef.current) return;
-    revealedRef.current = true;
-    // One frame after the target measures, LegendList has repositioned the rows
-    // below it — reveal then so they fade in already in their final spot.
-    requestAnimationFrame(() => {
-      revealOpacity.value = withTiming(1, { duration: 220 });
-    });
-  }, [revealOpacity]);
-  useEffect(() => {
-    revealedRef.current = false;
-    revealOpacity.value = 0;
-    readerMovedRef.current = false;
-  }, [eventId, revealOpacity]);
+  // Crossfade-after-settle. The parent chain prepends into the list and reconciles
+  // (mVCP + our counter-scroll) over several frames; played out on screen that
+  // reconciliation reads as jitter. So we hold the parents OUT of the list and show
+  // only the seed (tapped note + skeletons) at full opacity. When the full thread is
+  // ready we fade the list out, inject the parents while hidden, let the scroll
+  // settle, then fade back in. The reader sees the tapped note → a brief crossfade →
+  // the settled thread, never the reconciliation. `listData`/`listTargetIndex` (below)
+  // are the gated data the list actually renders.
+  const listOpacity = useSharedValue(1);
+  const listAnimatedStyle = useAnimatedStyle(() => ({ opacity: listOpacity.value }));
+  const [showParents, setShowParents] = useState(false);
+  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Each above-note row is reconciled once (no oscillation); also tracks which rows
+  // have settled so the crossfade reveals only after they're quiet.
+  const correctedKeysRef = useRef<Set<string>>(new Set());
 
-  const targetIndex = useMemo(() => items.findIndex((item) => item.type === 'target'), [items]);
-  targetIndexRef.current = targetIndex;
+  // Reveal once the post-inject reconcile goes quiet: each above-note correction
+  // pushes this out; with no corrections the fallback delay reveals anyway.
+  const scheduleSettleReveal = useCallback(
+    (delayMs: number) => {
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = setTimeout(() => {
+        listOpacity.value = withTiming(1, { duration: 180 });
+      }, delayMs);
+    },
+    [listOpacity]
+  );
+
+  useEffect(() => {
+    setShowParents(false);
+    listOpacity.value = 1;
+    readerMovedRef.current = false;
+    correctedKeysRef.current = new Set();
+    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+  }, [eventId, listOpacity]);
+
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
   const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
 
@@ -360,6 +369,36 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     return withReplySortTabs([...items, ...createReplySkeletonItems(skeletonCount)]);
   }, [isFetching, isLoading, items, metricsRef]);
 
+  // Gated data the list renders: parents are withheld until `showParents` flips
+  // (after the fade-out), so the prepend never reconciles on screen.
+  const listData = useMemo<ThreadListItem[]>(
+    () => (showParents ? displayItems : displayItems.filter((i) => i.type !== 'parent')),
+    [showParents, displayItems]
+  );
+  const listTargetIndex = useMemo(() => listData.findIndex((i) => i.type === 'target'), [listData]);
+  targetIndexRef.current = listTargetIndex;
+
+  // Drive the crossfade. Once the full thread is fetched: if it has parents, fade
+  // out → inject them (hidden) → settle → fade in; if not, just show (no prepend,
+  // no jitter).
+  const fullReady = !isLoading && !isFetching && !!targetItem;
+  useEffect(() => {
+    if (!fullReady || showParents) return;
+    if (!hasParents) {
+      setShowParents(true);
+      return;
+    }
+    listOpacity.value = withTiming(0, { duration: 120 }, (finished) => {
+      if (finished) runOnJS(setShowParents)(true);
+    });
+  }, [fullReady, showParents, hasParents, listOpacity]);
+
+  // Parents are now injected (hidden). Arm the reveal with a generous fallback; the
+  // size-change handler shortens it as each above-note row settles.
+  useEffect(() => {
+    if (showParents && hasParents) scheduleSettleReveal(600);
+  }, [showParents, hasParents, scheduleSettleReveal]);
+
   // Focus reserve: extra bottom space so the tapped reply can always be scrolled
   // to (and held at) the top of the viewport, even when little content sits below
   // it. Opening a thread on a reply lands a tall parent chain above the note; with
@@ -372,22 +411,22 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   // logged. `targetIndex` indexes `displayItems` too — the sort-tabs row is
   // inserted after the target and skeletons are appended last.
   const focusReserve = useMemo(() => {
-    if (targetIndex <= 0) return 0;
+    if (listTargetIndex <= 0) return 0;
     const listViewport = Math.max(0, windowHeight - headerHeight - (replyBarHeight || 80));
-    const belowCount = Math.max(0, displayItems.length - 1 - targetIndex);
+    const belowCount = Math.max(0, listData.length - 1 - listTargetIndex);
     return Math.max(0, listViewport - belowCount * FOCUS_RESERVE_ROW_APPROX);
-  }, [targetIndex, windowHeight, headerHeight, replyBarHeight, displayItems.length]);
+  }, [listTargetIndex, windowHeight, headerHeight, replyBarHeight, listData.length]);
 
   useEffect(() => {
     if (focusReserve <= 0) return;
     feedLog.info('thread.reserve', {
       eventId,
-      targetIndex,
-      rows: displayItems.length,
+      targetIndex: listTargetIndex,
+      rows: listData.length,
       focusReserve: Math.round(focusReserve),
       windowHeight: Math.round(windowHeight),
     });
-  }, [focusReserve, eventId, targetIndex, displayItems.length, windowHeight]);
+  }, [focusReserve, eventId, listTargetIndex, listData.length, windowHeight]);
 
   const threadPhase =
     isLoading && items.length === 0
@@ -433,12 +472,19 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       if (readerMovedRef.current) return;
       const tIndex = targetIndexRef.current;
       if (tIndex <= 0 || info.index >= tIndex) return;
+      // Reconcile each above-note row exactly once (its estimate→measured jump);
+      // re-correcting on every micro-change is what oscillated into jitter.
+      if (correctedKeysRef.current.has(info.itemKey)) return;
       const delta = info.size - info.previous;
       if (delta === 0) return;
+      correctedKeysRef.current.add(info.itemKey);
       const current = listRef.current?.getState()?.scroll ?? 0;
       void listRef.current?.scrollToOffset({ offset: current + delta, animated: false });
+      // This correction happens while hidden — push the crossfade reveal until the
+      // above-note rows stop changing size.
+      scheduleSettleReveal(120);
     },
-    [visualList]
+    [visualList, scheduleSettleReveal]
   );
 
   const threadVisualState = useMemo(() => {
@@ -546,16 +592,13 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       }
 
       if (item.type === 'reply-sort-tabs') {
-        // Hidden until the target settles, then fades in at its final position.
         return (
-          <Animated.View style={revealStyle}>
-            <ReplySortPicker
-              selected={replySort}
-              onSelect={setReplySort}
-              foreground={foreground}
-              surfaceTertiary={surfaceTertiary}
-            />
-          </Animated.View>
+          <ReplySortPicker
+            selected={replySort}
+            onSelect={setReplySort}
+            foreground={foreground}
+            surfaceTertiary={surfaceTertiary}
+          />
         );
       }
 
@@ -614,7 +657,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       getEngagementState,
       getMetrics,
       hasParents,
-      revealStyle,
       profilesRef,
       quotedEventsRef,
       replySort,
@@ -637,7 +679,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         itemType={threadItemType(props.item)}
         index={props.index}
         phase={threadPhase}
-        onLayout={props.item.type === 'target' ? handleTargetSettled : undefined}
         extra={{
           eventId,
           rows: displayItems.length,
@@ -651,7 +692,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     [
       displayItems.length,
       eventId,
-      handleTargetSettled,
       isFetching,
       renderThreadItem,
       replyBarHeight,
@@ -734,89 +774,91 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 onHeightChange={setReplyBarHeight}
               />
             }>
-            <LegendList
-              ref={listRef}
-              data={displayItems}
-              keyExtractor={threadKeyExtractor}
-              getItemType={threadItemType}
-              getFixedItemSize={threadFixedItemSize}
-              estimatedItemSize={200}
-              drawDistance={500}
-              renderItem={renderItem}
-              extraData={[
-                dataVersion,
-                engagementRevision,
-                isFetching ? 1 : 0,
-                isLoadingMoreReplies ? 1 : 0,
-                hasMoreReplies ? 1 : 0,
-                replySort,
-              ].join(':')}
-              recycleItems
-              ListFooterComponent={
-                isLoadingMoreReplies ? (
-                  <View style={styles.hiddenReplyFooter}>
-                    <Spinner size={18} color={opacity(foreground, 0.45)} />
-                  </View>
-                ) : hiddenReplyCount > 0 && !isFetching && !hasMoreReplies ? (
-                  <View style={styles.hiddenReplyFooter}>
-                    <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
-                      {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not
-                      loaded
-                    </Text>
-                  </View>
-                ) : null
-              }
-              onEndReached={handleEndReached}
-              onEndReachedThreshold={0.4}
-              onItemSizeChanged={handleItemSizeChanged}
-              onScrollBeginDrag={() => {
-                readerMovedRef.current = true;
-              }}
-              onLoad={visualList.onLoad}
-              onMetricsChange={visualList.onMetricsChange}
-              onStickyHeaderChange={visualList.onStickyHeaderChange}
-              onViewableItemsChanged={visualList.onViewableItemsChanged}
-              viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
-              style={{ flex: 1 }}
-              contentContainerStyle={{
-                // The embed sheet is positioned starting just below the header
-                // (`expandedOffset`), so the list itself no longer pads the top.
-                paddingTop: 0,
-                // replyBarHeight already includes the bottom safe-area inset (the
-                // bar's opaque container reaches the screen bottom), so the inset
-                // is not added again here. `focusReserve` adds room below the note
-                // so it can be scrolled to the top (see its definition above).
-                paddingBottom: (replyBarHeight || 80) + 16 + focusReserve,
-              }}
-              showsVerticalScrollIndicator={false}
-              // Anchor-on-the-tapped-note stability. Bare `maintainVisibleContentPosition`
-              // normalizes to `{ data: true, size: true }` in @legendapp/list v3:
-              //  - `data: true`  → when the parent chain prepends above the focused note
-              //    (the T1 full-thread update), LegendList compensates contentOffset so the
-              //    note does NOT drop. This is OFF by default (`{ data: false }`); omitting
-              //    the prop is exactly why the note used to shift when parents loaded in.
-              //  - `size: true`  → absorbs the estimate→measured reconciliation of rows.
-              // Works together with `focusReserve` (the bottom padding): mVCP holds the
-              // note, the reserve guarantees the scroll room mVCP needs to do so.
-              // Mirrors the DM ChatScreen's anchoring half. We deliberately do NOT take
-              // ChatScreen's `initialScrollAtEnd` / `alignItemsAtEnd` / `maintainScrollAtEnd`:
-              // a thread anchors on the tapped note via `initialScrollIndex` and must never
-              // auto-pin to the bottom like a chat.
-              maintainVisibleContentPosition
-              onScroll={(e: { nativeEvent: { contentOffset: { y: number } } }) => {
-                const y = e.nativeEvent.contentOffset.y;
-                if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;
-                if (embed) embed.scrollY.value = y;
-                remeasureVisualLayoutScope(threadVisualScope, 'scroll', {
-                  minIntervalMs: 500,
-                  maxItems: 32,
-                  extra: { eventId, scrollY: Math.round(y), replySort },
-                });
-              }}
-              scrollEventThrottle={16}
-              scrollEnabled={embed ? embed.listScrollEnabled : undefined}
-              initialScrollIndex={!isLoading && targetIndex > 0 ? targetIndex : undefined}
-            />
+            <Animated.View style={[styles.listWrap, listAnimatedStyle]}>
+              <LegendList
+                ref={listRef}
+                data={listData}
+                keyExtractor={threadKeyExtractor}
+                getItemType={threadItemType}
+                getFixedItemSize={threadFixedItemSize}
+                estimatedItemSize={200}
+                drawDistance={500}
+                renderItem={renderItem}
+                extraData={[
+                  dataVersion,
+                  engagementRevision,
+                  isFetching ? 1 : 0,
+                  isLoadingMoreReplies ? 1 : 0,
+                  hasMoreReplies ? 1 : 0,
+                  replySort,
+                ].join(':')}
+                recycleItems
+                ListFooterComponent={
+                  isLoadingMoreReplies ? (
+                    <View style={styles.hiddenReplyFooter}>
+                      <Spinner size={18} color={opacity(foreground, 0.45)} />
+                    </View>
+                  ) : hiddenReplyCount > 0 && !isFetching && !hasMoreReplies ? (
+                    <View style={styles.hiddenReplyFooter}>
+                      <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
+                        {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not
+                        loaded
+                      </Text>
+                    </View>
+                  ) : null
+                }
+                onEndReached={handleEndReached}
+                onEndReachedThreshold={0.4}
+                onItemSizeChanged={handleItemSizeChanged}
+                onScrollBeginDrag={() => {
+                  readerMovedRef.current = true;
+                }}
+                onLoad={visualList.onLoad}
+                onMetricsChange={visualList.onMetricsChange}
+                onStickyHeaderChange={visualList.onStickyHeaderChange}
+                onViewableItemsChanged={visualList.onViewableItemsChanged}
+                viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
+                style={{ flex: 1 }}
+                contentContainerStyle={{
+                  // The embed sheet is positioned starting just below the header
+                  // (`expandedOffset`), so the list itself no longer pads the top.
+                  paddingTop: 0,
+                  // replyBarHeight already includes the bottom safe-area inset (the
+                  // bar's opaque container reaches the screen bottom), so the inset
+                  // is not added again here. `focusReserve` adds room below the note
+                  // so it can be scrolled to the top (see its definition above).
+                  paddingBottom: (replyBarHeight || 80) + 16 + focusReserve,
+                }}
+                showsVerticalScrollIndicator={false}
+                // Anchor-on-the-tapped-note stability. Bare `maintainVisibleContentPosition`
+                // normalizes to `{ data: true, size: true }` in @legendapp/list v3:
+                //  - `data: true`  → when the parent chain prepends above the focused note
+                //    (the T1 full-thread update), LegendList compensates contentOffset so the
+                //    note does NOT drop. This is OFF by default (`{ data: false }`); omitting
+                //    the prop is exactly why the note used to shift when parents loaded in.
+                //  - `size: true`  → absorbs the estimate→measured reconciliation of rows.
+                // Works together with `focusReserve` (the bottom padding): mVCP holds the
+                // note, the reserve guarantees the scroll room mVCP needs to do so.
+                // Mirrors the DM ChatScreen's anchoring half. We deliberately do NOT take
+                // ChatScreen's `initialScrollAtEnd` / `alignItemsAtEnd` / `maintainScrollAtEnd`:
+                // a thread anchors on the tapped note via `initialScrollIndex` and must never
+                // auto-pin to the bottom like a chat.
+                maintainVisibleContentPosition
+                onScroll={(e: { nativeEvent: { contentOffset: { y: number } } }) => {
+                  const y = e.nativeEvent.contentOffset.y;
+                  if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;
+                  if (embed) embed.scrollY.value = y;
+                  remeasureVisualLayoutScope(threadVisualScope, 'scroll', {
+                    minIntervalMs: 500,
+                    maxItems: 32,
+                    extra: { eventId, scrollY: Math.round(y), replySort },
+                  });
+                }}
+                scrollEventThrottle={16}
+                scrollEnabled={embed ? embed.listScrollEnabled : undefined}
+                initialScrollIndex={!isLoading && listTargetIndex > 0 ? listTargetIndex : undefined}
+              />
+            </Animated.View>
           </ThreadEmbedSheet>
           {embed && targetEvent ? (
             <EmbedActionBar
@@ -851,6 +893,9 @@ export const ThreadView = React.memo(ThreadViewWithEmbed);
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  listWrap: {
     flex: 1,
   },
   centerContent: {

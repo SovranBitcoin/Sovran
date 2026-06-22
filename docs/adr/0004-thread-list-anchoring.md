@@ -82,6 +82,15 @@ measured` (live trace: estimate 200 vs measured 145 → note jumped **up 55px**;
 5. **No bottom-dock / auto-pin props.** Unlike `ChatScreen`, the thread omits
    `initialScrollAtEnd`, `alignItemsAtEnd`, and `maintainScrollAtEnd` — it anchors
    on the note, not the tail, and must never auto-scroll down.
+6. **Crossfade the reconciliation off-screen.** Even with (1)–(3), the prepend +
+   re-anchor plays out over several frames and _reads as jitter_ on screen. So the
+   list withholds the parents (`listData` filters them out) and renders only the
+   seed (tapped note + skeletons) at full opacity. When the full thread is ready we
+   fade the list out (120ms), inject the parents while hidden (`showParents`), let
+   the scroll settle (revealed when the above-note size-changes go quiet, with a
+   fallback), then fade back in (180ms). The reader sees the tapped note → a brief
+   crossfade → the settled thread, never the reconciliation. This replaces the older
+   per-row opacity "reveal hack" (which only masked the rows _below_ the note).
 
 ## Consequences
 
