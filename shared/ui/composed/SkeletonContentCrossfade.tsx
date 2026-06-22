@@ -73,6 +73,13 @@ interface SkeletonContentCrossfadeProps {
    *  swaps instantly — use inside FlashList-recycled cells and for footer-only
    *  skeletons with no in-place content. */
   exit?: ExitMode;
+  /** The color of the surface the skeleton sits ON — the wave is painted in this
+   *  color so it "erases" the skeleton as it sweeps (disappear/reappear), rather
+   *  than reading as a stripe on top. Defaults to the screen `background`; pass
+   *  the container's color when the skeleton is on a card/surface (e.g. a
+   *  `surface-secondary` Card). This is the only thing that should set the wave
+   *  color — never a brand/accent tint. */
+  surfaceColor?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
   /** Telemetry passthrough for the region shimmer (see `contentShiftLog`). */
@@ -89,6 +96,7 @@ export function SkeletonContentCrossfade({
   durationMs = SKELETON_CONTENT_FADE_MS,
   wave = 'region',
   exit = 'fade',
+  surfaceColor,
   style,
   testID,
   visualKey,
@@ -97,11 +105,12 @@ export function SkeletonContentCrossfade({
   visualDisabled,
 }: SkeletonContentCrossfadeProps) {
   const reducedMotion = useReducedMotion();
-  // The wave highlight is ALWAYS the background color. A background-colored band
-  // sweeping over the skeleton momentarily "erases" it, giving the illusion of
-  // the skeleton disappearing and reappearing — not a brighter stripe painted on
-  // top. This is a deliberate, non-overridable design rule.
-  const background = useThemeColor('background');
+  // The wave is painted in the color of the surface the skeleton sits on, so the
+  // band "erases" the skeleton as it sweeps (disappear/reappear) rather than
+  // reading as a brighter stripe on top. Defaults to the screen background;
+  // callers on a card/surface pass that surface's color.
+  const screenBackground = useThemeColor('background');
+  const waveColor = surfaceColor ?? screenBackground;
   const animatedExit = exit === 'fade' && !reducedMotion;
   const showWave = wave === 'region' && !reducedMotion;
 
@@ -172,7 +181,7 @@ export function SkeletonContentCrossfade({
         {showWave ? (
           <SkeletonLoadingShimmer
             active
-            highlightColor={background}
+            highlightColor={waveColor}
             visualKey={visualKey}
             visualSurface={visualSurface}
             visualComponent={visualComponent}

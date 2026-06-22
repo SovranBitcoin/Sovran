@@ -328,6 +328,7 @@ function StatsGridComponent({
   return (
     <SkeletonContentCrossfade
       loading={showSkeleton}
+      surfaceColor={surfaceSecondary}
       visualKey="mint-info-stats"
       visualSurface="mint-info"
       renderSkeleton={() => renderGrid(true)}

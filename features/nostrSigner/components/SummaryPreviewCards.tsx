@@ -124,7 +124,7 @@ export function ReferencedNoteCard({
   eventId?: string;
   embedded?: { id?: string; pubkey: string; text: string };
 }) {
-  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+  const [foreground, muted, surface] = useThemeColor(['foreground', 'muted', 'surface'] as const);
   const fetched = useReferencedEventPreview(embedded === undefined ? eventId : undefined);
 
   if (embedded !== undefined) {
@@ -155,6 +155,7 @@ export function ReferencedNoteCard({
   return (
     <SkeletonContentCrossfade
       loading={isPreviewLoading}
+      surfaceColor={surface}
       visualKey="referenced-post-preview"
       visualSurface="nostr-signer"
       renderSkeleton={() => (

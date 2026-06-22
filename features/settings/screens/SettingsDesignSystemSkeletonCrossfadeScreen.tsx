@@ -5,10 +5,10 @@ import { Button, Card } from 'heroui-native';
 
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
-import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 
 const STEP_DURATION_MS = 2200;
@@ -38,6 +38,9 @@ function DemoProfileRow({ loading, pictureUrl }: { loading: boolean; pictureUrl?
 }
 
 export function SettingsDesignSystemSkeletonCrossfadeScreen() {
+  // The demo cards are `Card variant="secondary"` — the wave must match THAT
+  // surface (what the skeleton sits on), not the screen background.
+  const surfaceSecondary = useThemeColor('surface-secondary');
   const [loading, setLoading] = useState(true);
   const [auto, setAuto] = useState(true);
   // Bust expo-image's cache each cycle so the avatar performs a real load and
@@ -97,6 +100,7 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
             <SkeletonContentCrossfade
               loading={loading}
               wave="region"
+              surfaceColor={surfaceSecondary}
               renderSkeleton={() => <DemoProfileRow loading />}
               renderContent={() => <DemoProfileRow loading={false} pictureUrl={pictureUrl} />}
             />
@@ -115,9 +119,7 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
             <SkeletonContentCrossfade
               loading={loading}
               wave="none"
-              renderSkeleton={() => (
-                <Text loading placeholder="1,000 sats" bold size={20} />
-              )}
+              renderSkeleton={() => <Text loading placeholder="1,000 sats" bold size={20} />}
               renderContent={() => (
                 <Text bold size={20} className="text-foreground">
                   21,000 sats
@@ -150,7 +152,10 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
             <Button variant="secondary" size="sm" onPress={toggle}>
               <Button.Label>{loading ? 'Show content' : 'Show skeleton'}</Button.Label>
             </Button>
-            <Button variant={auto ? 'primary' : 'secondary'} size="sm" onPress={() => setAuto((v) => !v)}>
+            <Button
+              variant={auto ? 'primary' : 'secondary'}
+              size="sm"
+              onPress={() => setAuto((v) => !v)}>
               <Button.Label>{auto ? 'Stop auto-cycle' : 'Start auto-cycle'}</Button.Label>
             </Button>
           </Card.Body>
