@@ -73,8 +73,6 @@ interface SkeletonContentCrossfadeProps {
    *  swaps instantly — use inside FlashList-recycled cells and for footer-only
    *  skeletons with no in-place content. */
   exit?: ExitMode;
-  /** Overrides the shimmer highlight tint (defaults to the theme `surface`). */
-  highlightColor?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
   /** Telemetry passthrough for the region shimmer (see `contentShiftLog`). */
@@ -91,7 +89,6 @@ export function SkeletonContentCrossfade({
   durationMs = SKELETON_CONTENT_FADE_MS,
   wave = 'region',
   exit = 'fade',
-  highlightColor,
   style,
   testID,
   visualKey,
@@ -100,10 +97,11 @@ export function SkeletonContentCrossfade({
   visualDisabled,
 }: SkeletonContentCrossfadeProps) {
   const reducedMotion = useReducedMotion();
-  const surface = useThemeColor('surface');
-  // Surface-tinted highlight (matching the thread shimmer) — the background-tint
-  // fallback is nearly invisible, which reads as "no wave".
-  const resolvedHighlight = highlightColor ?? surface;
+  // The wave highlight is ALWAYS the background color. A background-colored band
+  // sweeping over the skeleton momentarily "erases" it, giving the illusion of
+  // the skeleton disappearing and reappearing — not a brighter stripe painted on
+  // top. This is a deliberate, non-overridable design rule.
+  const background = useThemeColor('background');
   const animatedExit = exit === 'fade' && !reducedMotion;
   const showWave = wave === 'region' && !reducedMotion;
 
@@ -174,7 +172,7 @@ export function SkeletonContentCrossfade({
         {showWave ? (
           <SkeletonLoadingShimmer
             active
-            highlightColor={resolvedHighlight}
+            highlightColor={background}
             visualKey={visualKey}
             visualSurface={visualSurface}
             visualComponent={visualComponent}
