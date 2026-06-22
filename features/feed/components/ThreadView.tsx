@@ -286,6 +286,17 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 
   const listRef = useRef<LegendListRef>(null);
 
+  // Anchor compensation for the parent prepend. `maintainVisibleContentPosition`
+  // scrolls to hold the focused note when the parent prepends, but it anchors
+  // against the parent's *estimate* (`estimatedItemSize`) and never reconciles the
+  // gap once the parent measures to its real height — leaving the note off by
+  // exactly (estimate − measured) px (verified in the shift log: 200 vs 145 → the
+  // note jumped up 55px). We own that one reconciliation: when a row ABOVE the
+  // note changes size before the reader has scrolled, counter-scroll by the delta
+  // so the note stays put. Read via refs so the size-change callback is stable.
+  const targetIndexRef = useRef(-1);
+  const readerMovedRef = useRef(false);
+
   // The sort-tabs ("Relevant") row and the replies sit below the target, so their
   // on-screen position is whatever LegendList computes for the target — which
   // starts at `estimatedItemSize` and snaps to the real measured height a frame
@@ -309,9 +320,11 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   useEffect(() => {
     revealedRef.current = false;
     revealOpacity.value = 0;
+    readerMovedRef.current = false;
   }, [eventId, revealOpacity]);
 
   const targetIndex = useMemo(() => items.findIndex((item) => item.type === 'target'), [items]);
+  targetIndexRef.current = targetIndex;
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
   const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
 
@@ -404,6 +417,29 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     }),
     getListState: () => listRef.current?.getState() ?? null,
   });
+
+  // Keep the visual-shift logging, then reconcile the parent prepend (see the
+  // `targetIndexRef`/`readerMovedRef` note above). Only rows above the focused
+  // note shift it, and only until the reader takes over scrolling.
+  const handleItemSizeChanged = useCallback(
+    (info: {
+      size: number;
+      previous: number;
+      index: number;
+      itemKey: string;
+      itemData: ThreadListItem;
+    }) => {
+      visualList.onItemSizeChanged?.(info);
+      if (readerMovedRef.current) return;
+      const tIndex = targetIndexRef.current;
+      if (tIndex <= 0 || info.index >= tIndex) return;
+      const delta = info.size - info.previous;
+      if (delta === 0) return;
+      const current = listRef.current?.getState()?.scroll ?? 0;
+      void listRef.current?.scrollToOffset({ offset: current + delta, animated: false });
+    },
+    [visualList]
+  );
 
   const threadVisualState = useMemo(() => {
     let skeletons = 0;
@@ -732,7 +768,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               }
               onEndReached={handleEndReached}
               onEndReachedThreshold={0.4}
-              onItemSizeChanged={visualList.onItemSizeChanged}
+              onItemSizeChanged={handleItemSizeChanged}
+              onScrollBeginDrag={() => {
+                readerMovedRef.current = true;
+              }}
               onLoad={visualList.onLoad}
               onMetricsChange={visualList.onMetricsChange}
               onStickyHeaderChange={visualList.onStickyHeaderChange}
