@@ -818,10 +818,11 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               />
             }>
             {flashListThread ? (
-              // SPIKE: FlashList v2, scaffolding stripped. One plain list, mVCP on by
-              // default (synchronous Fabric layout), note landed via initialScrollIndex.
-              // No two-list / crossfade / focusReserve / counter-scroll / reply gating —
-              // we're testing whether the library holds the note on its own.
+              // SPIKE: FlashList v2 holds the note via synchronous Fabric layout + default
+              // mVCP — no two-list / crossfade / counter-scroll / reply gating needed. The
+              // ONE non-library-specific piece we keep is `focusReserve`: extra bottom
+              // padding so the anchored note has REAL scroll room below it; without it mVCP
+              // anchors past the scroll bounds and the first gesture snaps to top/bottom.
               <FlashList
                 data={displayItems}
                 keyExtractor={threadKeyExtractor}
@@ -840,7 +841,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{
                   paddingTop: 0,
-                  paddingBottom: (replyBarHeight || 80) + 16,
+                  paddingBottom: (replyBarHeight || 80) + 16 + focusReserve,
                 }}
                 onScroll={(e: { nativeEvent: { contentOffset: { y: number } } }) => {
                   const y = e.nativeEvent.contentOffset.y;
