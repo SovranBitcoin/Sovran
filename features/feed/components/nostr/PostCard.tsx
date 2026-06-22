@@ -35,7 +35,7 @@ import {
 } from '@/shared/ui/composed/SkeletonExitShimmer';
 import { sharedStyles } from './feedStyles';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Log, feedLog } from '@/shared/lib/logger';
+import { Log } from '@/shared/lib/logger';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { alpha, radius, spacing } from '@/shared/styles/tokens';
 import {
@@ -47,14 +47,6 @@ import { THREAD_CONNECTOR_LINE_STYLE } from './threadConnectorStyle';
 type PostCardVariant = 'feed' | 'repost-original' | 'thread-target' | 'thread-reply';
 
 const AVATAR_SIZE = 36;
-
-// TEMP spike instrumentation: measure each reply chrome element so we can compare
-// skeleton vs real and find the residual height mismatch. Remove after calibration.
-const measureH = (label: string) => (e: { nativeEvent: { layout: { height: number } } }) =>
-  feedLog.info('thread.elem', {
-    label,
-    h: Math.round(e.nativeEvent.layout.height * 100) / 100,
-  });
 
 const METRIC_SKELETON_ITEMS = [0, 1, 2, 3] as const;
 
@@ -367,11 +359,7 @@ export const PostCard = React.memo(function PostCard({
       </View>
 
       <View style={sharedStyles.flex1}>
-        <HStack
-          align="center"
-          gap={6}
-          style={sharedStyles.mb4}
-          onLayout={isThread ? measureH('real-author') : undefined}>
+        <HStack align="center" gap={6} style={sharedStyles.mb4}>
           <HStack align="center" gap={6} style={pcStyles.headerTextRow}>
             <Pressable
               onPressIn={handleNestedPressIn}
@@ -411,43 +399,40 @@ export const PostCard = React.memo(function PostCard({
           ) : null}
         </HStack>
 
-        <View onLayout={isThread ? measureH('real-content') : undefined}>
-          <NoteContent
-            content={event.content}
-            quotedEvents={quotedEvents}
-            profiles={profiles}
-            getMetrics={getMetrics}
-            onVideoTap={onVideoTap}
-            onQuotedPressIn={handleNestedPressIn}
-            onQuotedPressOut={handleNestedPressOut}
-            onInlineActionPressIn={handleNestedPressIn}
-            onInlineActionPressOut={handleNestedPressOut}
-            onImagePressIn={handleNestedPressIn}
-            onImagePressOut={handleNestedPressOut}
-            event={event}
-            metrics={metrics}
-            profile={profile}
-            feedIndex={feedIndex}
-            onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-            reposted={reposted}
-            liked={liked}
-            replied={replied}
-            repostPending={repostPending}
-            likePending={likePending}
-            repostPendingDirection={repostPendingDirection}
-            likePendingDirection={likePendingDirection}
-            onCommentPress={onCommentPress ?? navigateToThread}
-            onRepostPress={onRepostPress}
-            onLikePress={onLikePress}
-            onActionPressIn={handleNestedPressIn}
-            onActionPressOut={handleNestedPressOut}
-          />
-        </View>
+        <NoteContent
+          content={event.content}
+          quotedEvents={quotedEvents}
+          profiles={profiles}
+          getMetrics={getMetrics}
+          onVideoTap={onVideoTap}
+          onQuotedPressIn={handleNestedPressIn}
+          onQuotedPressOut={handleNestedPressOut}
+          onInlineActionPressIn={handleNestedPressIn}
+          onInlineActionPressOut={handleNestedPressOut}
+          onImagePressIn={handleNestedPressIn}
+          onImagePressOut={handleNestedPressOut}
+          event={event}
+          metrics={metrics}
+          profile={profile}
+          feedIndex={feedIndex}
+          onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+          reposted={reposted}
+          liked={liked}
+          replied={replied}
+          repostPending={repostPending}
+          likePending={likePending}
+          repostPendingDirection={repostPendingDirection}
+          likePendingDirection={likePendingDirection}
+          onCommentPress={onCommentPress ?? navigateToThread}
+          onRepostPress={onRepostPress}
+          onLikePress={onLikePress}
+          onActionPressIn={handleNestedPressIn}
+          onActionPressOut={handleNestedPressOut}
+        />
 
         <Spacer size={8} />
 
         <View
-          onLayout={isThread ? measureH('real-footer') : undefined}
           style={[
             fullBleedFooterBorder
               ? pcStyles.inlineMetricsWrapFullBleed
@@ -593,22 +578,32 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
           </View>
 
           <View style={sharedStyles.flex1}>
-            <HStack
-              align="center"
-              gap={spacing.sm - 2}
-              style={sharedStyles.mb4}
-              onLayout={measureH('skel-author')}>
-              <Text loading numberOfLines={1} placeholder={skeletonVariant.author} bold size={14} />
-              <Text
-                loading
-                numberOfLines={1}
-                placeholder={skeletonVariant.timestamp}
-                size={13}
-                style={textMuted}
-              />
+            {/* Mirror the real reply's author row exactly: name/time in a flex header
+                row, plus the "⋯ more" button box on the right. The real more button
+                (pcStyles.moreButton: 30×28, marginTop -4 → 24px) makes the real row
+                24px tall; without this placeholder the skeleton row was only the 18px
+                text line box, so the reply grew 6px when real content replaced it. */}
+            <HStack align="center" gap={6} style={sharedStyles.mb4}>
+              <HStack align="center" gap={6} style={pcStyles.headerTextRow}>
+                <Text
+                  loading
+                  numberOfLines={1}
+                  placeholder={skeletonVariant.author}
+                  bold
+                  size={14}
+                />
+                <Text
+                  loading
+                  numberOfLines={1}
+                  placeholder={skeletonVariant.timestamp}
+                  size={13}
+                  style={textMuted}
+                />
+              </HStack>
+              <View style={pcStyles.moreButton} />
             </HStack>
 
-            <VStack spacing={0} onLayout={measureH('skel-content')}>
+            <VStack spacing={0}>
               {skeletonVariant.content.map((line) => (
                 <Text
                   key={line}
@@ -623,7 +618,7 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
 
             <Spacer size={spacing.sm} />
 
-            <View style={pcStyles.inlineMetricsWrap} onLayout={measureH('skel-footer')}>
+            <View style={pcStyles.inlineMetricsWrap}>
               <MetricsFooterSkeleton
                 compact
                 borderColor={foreground}
