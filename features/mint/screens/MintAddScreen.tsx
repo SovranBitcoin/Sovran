@@ -9,7 +9,6 @@ import {
 import { useSharedValue } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -32,7 +31,6 @@ import { staticPopup, paramPopup } from '@/shared/lib/popup';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { List } from '@/shared/ui/composed/List';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { LoadingIndicator } from '@/shared/blocks/status';
@@ -63,6 +61,26 @@ interface PseudoMint {
   name?: string;
 }
 
+/**
+ * Placeholder fed to the result `List` while the first search is in flight. It
+ * flows through the same `MintItem` → `ContactRow` path as real rows (in loading
+ * mode), so the skeleton can't drift from real-row height. The `url` is a stable
+ * synthetic key that also seeds the deterministic placeholder widths.
+ */
+interface SkeletonMint {
+  url: string;
+  isSkeleton: true;
+}
+
+const noop = () => {};
+
+/** Stable placeholder rows for the initial-search loading state. Fixed identity
+ *  so FlashList keys are stable and each row's seeded placeholder width holds. */
+const SKELETON_MINTS: SkeletonMint[] = Array.from({ length: 5 }, (_, i) => ({
+  url: `skeleton-${i}`,
+  isSkeleton: true,
+}));
+
 interface DisplayMint {
   url: string;
   name: string;
@@ -85,7 +103,7 @@ interface DisplayMint {
   reviewCount?: number;
 }
 
-type SearchableMint = DisplayMint | PseudoMint;
+type SearchableMint = DisplayMint | PseudoMint | SkeletonMint;
 
 function adaptSearchResult(result: MintSearchResult): DisplayMint {
   const profile = useMintProfileStore.getState().getCached(result.url);
@@ -202,88 +220,29 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
   );
 });
 
-// Loading skeleton
-const LoadingMintsList = memo(function LoadingMintsList({ count = 5 }: { count?: number }) {
-  return (
-    <VStack spacing={0}>
-      {Array.from({ length: count }).map((_, index) => (
-        <View key={index} className="bg-surface mb-1 rounded-2xl p-4">
-          <VStack gap={12}>
-            <View className="flex-row items-center gap-3">
-              <Skeleton
-                className="bg-surface-tertiary h-[42px] w-[42px]"
-                style={{ borderRadius: 42 * 0.25 }}
-                visualScope="mint.add.loading"
-                visualKey={`avatar:${index}`}
-                visualSurface="mint"
-                visualComponent="MintAddLoadingSkeleton"
-                visualExtra={{ rowIndex: index, part: 'avatar' }}
-              />
-              <VStack flex={1} gap={8}>
-                <Skeleton
-                  className="bg-surface-tertiary h-[16px]"
-                  style={{ width: 150 }}
-                  visualScope="mint.add.loading"
-                  visualKey={`name:${index}`}
-                  visualSurface="mint"
-                  visualComponent="MintAddLoadingSkeleton"
-                  visualExtra={{ rowIndex: index, part: 'name' }}
-                />
-                <Skeleton
-                  className="bg-surface-tertiary h-[20px] rounded-full"
-                  style={{ width: 80 }}
-                  visualScope="mint.add.loading"
-                  visualKey={`badge:${index}`}
-                  visualSurface="mint"
-                  visualComponent="MintAddLoadingSkeleton"
-                  visualExtra={{ rowIndex: index, part: 'badge' }}
-                />
-              </VStack>
-            </View>
-            <View className="flex-row gap-2">
-              <Skeleton
-                className="bg-surface-tertiary h-[24px] rounded-full"
-                style={{ width: 56 }}
-                visualScope="mint.add.loading"
-                visualKey={`metric-a:${index}`}
-                visualSurface="mint"
-                visualComponent="MintAddLoadingSkeleton"
-                visualExtra={{ rowIndex: index, part: 'metric-a' }}
-              />
-              <Skeleton
-                className="bg-surface-tertiary h-[24px] rounded-full"
-                style={{ width: 60 }}
-                visualScope="mint.add.loading"
-                visualKey={`metric-b:${index}`}
-                visualSurface="mint"
-                visualComponent="MintAddLoadingSkeleton"
-                visualExtra={{ rowIndex: index, part: 'metric-b' }}
-              />
-            </View>
-          </VStack>
-        </View>
-      ))}
-    </VStack>
-  );
-});
-
 // Pre-baked mint row — deferred to the shared `ContactRow` so search results
 // here visually match the mint list, contacts tab, and split-bill picker.
+//
+// `loading` renders the row in skeleton mode through the SAME `ContactRow`, so
+// the loading placeholder and the real row share every layout box (avatar,
+// title, subtitle, stats accent, checkbox) and can't drift in height. The mint
+// fields are read defensively because skeleton items carry only a synthetic
+// `url`; their values are never shown (loading swaps in placeholder bars).
 const MintItem = memo(function MintItem({
   mint,
   selected,
   onToggle,
   globalLoading,
+  loading,
 }: {
   mint: SearchableMint;
   selected: boolean;
   onToggle: (url: string) => void;
   globalLoading: boolean;
+  loading?: boolean;
 }) {
-  const displayName = useMemo(
-    () => getMintDisplayName(mint.url, mint.mintInfo),
-    [mint.url, mint.mintInfo]
-  );
+  const mintInfo = 'mintInfo' in mint ? mint.mintInfo : undefined;
+  const displayName = useMemo(() => getMintDisplayName(mint.url, mintInfo), [mint.url, mintInfo]);
 
   // Search-result preview only: the search endpoint returns `serverStats`
   // (`n_mints`/`n_melts`/`n_errors`) without the per-swap array, so we can't
@@ -307,10 +266,11 @@ const MintItem = memo(function MintItem({
 
   return (
     <ContactRow
+      loading={loading}
       identity={mintIdentity({
         mintUrl: mint.url,
         displayName,
-        iconUrl: mint.mintInfo?.icon_url ?? undefined,
+        iconUrl: mintInfo?.icon_url ?? undefined,
         stats: {
           kymScore:
             'reviewScore' in mint && typeof mint.reviewScore === 'number'
@@ -333,7 +293,7 @@ const MintItem = memo(function MintItem({
       onToggle={() => onToggle(mint.url)}
       selectionVariant="checkbox"
       disabled={globalLoading}
-      testID={`contact-row:mint:${mint.url}`}
+      testID={loading ? `contact-row:mint-skeleton:${mint.url}` : `contact-row:mint:${mint.url}`}
     />
   );
 });
@@ -469,7 +429,8 @@ export function MintAddScreen() {
   // pubkey in NUT-06 contact info. Results land in `useMintProfileStore`
   // and the memo above re-runs once they arrive.
   const profileFetchInputs = useMemo(
-    () => displayMints.map((m) => ({ url: m.url, mintInfo: m.mintInfo })),
+    () =>
+      displayMints.map((m) => ({ url: m.url, mintInfo: 'mintInfo' in m ? m.mintInfo : undefined })),
     [displayMints]
   );
   useMintProfiles(profileFetchInputs);
@@ -614,15 +575,28 @@ export function MintAddScreen() {
   const keyExtractor = useCallback((item: SearchableMint) => item.url, []);
   const showContent = !searchLoading || displayMints.length > 0;
 
+  // Feed the result List skeleton placeholders during the first search so the
+  // loading rows render through the SAME List + ContactRow path as real rows —
+  // identical container chrome, no content shift on the data swap.
+  const isInitialLoading = searchLoading && displayMints.length === 0;
+  const listData: SearchableMint[] = isInitialLoading ? SKELETON_MINTS : displayMints;
+  const getItemType = useCallback(
+    (item: SearchableMint) => ('isSkeleton' in item ? 'skeleton' : 'mint'),
+    []
+  );
+
   const renderItem = useCallback(
-    ({ item }: { item: SearchableMint }) => (
-      <MintItem
-        mint={item}
-        selected={selectedMints.has(item.url)}
-        onToggle={handleToggleMint}
-        globalLoading={isAdding}
-      />
-    ),
+    ({ item }: { item: SearchableMint }) =>
+      'isSkeleton' in item ? (
+        <MintItem mint={item} selected={false} onToggle={noop} globalLoading loading />
+      ) : (
+        <MintItem
+          mint={item}
+          selected={selectedMints.has(item.url)}
+          onToggle={handleToggleMint}
+          globalLoading={isAdding}
+        />
+      ),
     [handleToggleMint, isAdding, selectedMints]
   );
 
@@ -786,25 +760,21 @@ export function MintAddScreen() {
       deferContent={false}>
       <Stack.Screen options={screenOptions} />
       <Spacer size={16} />
-      {!showContent ? (
-        <View className="flex-1 px-4" style={{ paddingTop: totalHeaderHeight }}>
-          <LoadingMintsList />
-        </View>
-      ) : (
-        <List
-          data={displayMints}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          extraData={selectedMints}
-          drawDistance={300}
-          style={{ flex: 1, height: 0 }}
-          contentContainerStyle={{ paddingBottom: 120 }}
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={emptyComponent}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-        />
-      )}
+      <List
+        data={listData}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        getItemType={getItemType}
+        extraData={selectedMints}
+        drawDistance={300}
+        style={{ flex: 1, height: 0 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        ListHeaderComponent={listHeader}
+        // Skeleton data is non-empty, so the empty state can't flash mid-load.
+        ListEmptyComponent={isInitialLoading ? undefined : emptyComponent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      />
     </Screen>
   );
 }

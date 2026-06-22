@@ -28,6 +28,7 @@ import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 /** Canonical iconify glyphs for row-accent stats. Use these names so a star
@@ -159,5 +160,33 @@ export function RowStatsAccent({ stats, note, noteColor, nip05 }: RowStatsAccent
         </Text>
       ) : null}
     </>
+  );
+}
+
+/**
+ * Loading placeholder for the accent line. Rendered by `ContactRow` while a
+ * stats-bearing row (e.g. a mint result) is loading, so the accent's height is
+ * reserved and the row doesn't grow when the real `RowStatsAccent` pills arrive.
+ *
+ * Co-located with `RowStatsAccent` so the geometry stays in one file: the same
+ * outer `HStack` (`gap: 4, marginTop: 2`) wraps two pill placeholders sized like
+ * the real `★ 4.5` / `85%` stats (12px icon + 12px text ≈ a 14px bar).
+ */
+export function RowStatsAccentSkeleton({ seed }: { seed?: string }) {
+  return (
+    <HStack align="center" style={{ gap: 4, marginTop: 2 }}>
+      <Skeleton
+        className="bg-skeleton rounded-full"
+        style={{ width: 44, height: 14 }}
+        visualKey={`accent:${seed ?? 'x'}`}
+        visualComponent="RowStatsAccentSkeleton"
+      />
+      <Skeleton
+        className="bg-skeleton rounded-full"
+        style={{ width: 52, height: 14 }}
+        visualKey={`accent2:${seed ?? 'x'}`}
+        visualComponent="RowStatsAccentSkeleton"
+      />
+    </HStack>
   );
 }

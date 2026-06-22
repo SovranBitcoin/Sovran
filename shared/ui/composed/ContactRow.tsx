@@ -35,6 +35,7 @@ import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import {
   RowStatsAccent,
+  RowStatsAccentSkeleton,
   STAT_ICONS,
   STAT_COLOR_SOCIAL,
   STAT_COLOR_ERROR,
@@ -776,26 +777,47 @@ export function ContactRow({
   const statList: RowStat[] =
     hideMetadata || resolvedLoading ? [] : buildStats(identities, statKeys, { warning, success });
 
+  // While loading, a row that will show an inline stats accent once loaded must
+  // reserve that line's height or the row grows when the pills arrive. Gate to
+  // mint rows (which reliably show a score/audit pill) and callers that asked
+  // for explicit stats — nostr rows often have no accent, so reserving theirs
+  // would over-shoot and shift the other way. Plain contact/ble/geohash
+  // skeletons are unaffected.
+  const reserveAccent =
+    resolvedLoading &&
+    !hideMetadata &&
+    (!!mint || (statsOverride != null && statsOverride.length > 0));
+
   const nip05 =
     showNip05 && !hideMetadata && !resolvedLoading && nostr?.profile?.nip05
       ? { handle: nostr.profile.nip05 }
       : undefined;
   const hasNip05 = !!nip05;
 
-  const accentNode = <RowStatsAccent stats={statList} note={disabledReason} nip05={nip05} />;
+  const accentNode = reserveAccent ? (
+    <RowStatsAccentSkeleton seed={seed} />
+  ) : (
+    <RowStatsAccent stats={statList} note={disabledReason} nip05={nip05} />
+  );
 
   // ---- Trailing ---------------------------------------------------------
 
   const chevronNode = <Icon name="mdi:chevron-right" size={24} color={opacity(foreground, 0.25)} />;
 
   const selectionNode = selectable ? (
-    <SelectableCheck
-      style={selectionVariant === 'checkbox' ? 'square' : 'circle'}
-      selected={selected ?? false}
-      onChange={selectionVariant === 'checkbox' ? () => onToggle?.() : undefined}
-      size={24}
-      variant="success"
-    />
+    resolvedLoading ? (
+      // Reserve the control's exact 24px slot while loading without flashing an
+      // interactive checkbox (mirrors PostCardGutterHeader's empty-box approach).
+      <View style={{ width: 24, height: 24 }} />
+    ) : (
+      <SelectableCheck
+        style={selectionVariant === 'checkbox' ? 'square' : 'circle'}
+        selected={selected ?? false}
+        onChange={selectionVariant === 'checkbox' ? () => onToggle?.() : undefined}
+        size={24}
+        variant="success"
+      />
+    )
   ) : null;
 
   const logMintInteraction = (
