@@ -46,9 +46,10 @@ library's correction" failure mode.
 Anchor the thread declaratively, reusing the same mechanism the DM `ChatScreen`
 already relies on:
 
-1. **`maintainVisibleContentPosition` (bare → `{ data: true, size: true }`)** on
-   the thread `LegendList`. `data:true` compensates the parent prepend; `size:true`
-   absorbs estimate→measured reconciliation.
+1. **`maintainVisibleContentPosition={{ data: true, size: false }}`** on the thread
+   `LegendList`. `data:true` lets the library compensate the parent prepend;
+   `size:false` hands the size axis entirely to our counter-scroll (3) so the two
+   never both move the scroll — that double-correction is what oscillated into jitter.
 2. **`focusReserve` — explicit bottom padding** so the focused note can reach (and
    be held at) the top of the viewport. mVCP compensates a prepend by _raising the
    scroll offset_, but that is clamped at the max scroll offset — a thread with
@@ -65,19 +66,24 @@ already relies on:
    dependency-version ambiguity), and emits a `thread.reserve` log so a trace can
    confirm it's live and its size.
 
-3. **Own the prepend's size reconciliation** (`onItemSizeChanged`). mVCP scrolls to
-   hold the note when the parent prepends, but it anchors against the parent's
-   _estimate_ (`estimatedItemSize`) and never reconciles the gap once the parent
-   measures to its real height — the note ends up off by exactly `estimate −
-measured` (live trace: estimate 200 vs measured 145 → note jumped **up 55px**;
-   an earlier media parent measured 523 → **down 323px**). A single global
-   `estimatedItemSize` can't fix this (parents range ~145–523px), and v3 exposes no
-   per-item estimate. So when a row **above** the note changes size **before the
-   reader has scrolled**, we counter-scroll by the delta (`scrollToOffset(scroll +
-(size − previous))`). This is the report's "manual offset compensation when you
-   control insertion timing" — a one-time reconciliation per parent measure, not a
-   sustained re-pin (which is why it doesn't race mVCP the way PR #225 did). A
-   `readerMovedRef` (set on `onScrollBeginDrag`) hands control back to the user.
+3. **Own the size axis** (`onItemSizeChanged`). While the reader hasn't scrolled, we
+   counter-scroll by the exact delta (`scrollToOffset(scroll + (size − previous))`)
+   for **every** size change of a row **above** the note. This covers two things a
+   single global `estimatedItemSize` can't (parents range ~145–523px; v3 has no
+   per-item estimate):
+   - the prepend's **estimate→measured** jump (live trace: estimate 200 vs measured
+     145 → note moved up 55px; a media parent measured 523 → down 323px), and
+   - **late media**: an image with no `imeta` dims (and not cached) reserves a 16:9
+     box, then reshapes to its real aspect on `onLoad` — a second, larger above-note
+     change (videos are locked to imeta-or-16:9, so they don't reshape).
+
+   Because the parents sit off-screen above the pinned note, absorbing their growth
+   keeps the note fixed. It's the report's "manual offset compensation when you
+   control insertion timing," and it's the **sole** owner of this axis (mVCP runs
+   `size:false`), so it can't race the library the way PR #225's `scrollToIndex`
+   re-pin did. A `readerMovedRef` (set on `onScrollBeginDrag`) hands control back to
+   the user, after which mVCP `data` still anchors future prepends.
+
 4. **`initialScrollIndex={targetIndex}`** lands the first paint on the tapped note.
 5. **No bottom-dock / auto-pin props.** Unlike `ChatScreen`, the thread omits
    `initialScrollAtEnd`, `alignItemsAtEnd`, and `maintainScrollAtEnd` — it anchors

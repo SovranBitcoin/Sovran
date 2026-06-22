@@ -110,6 +110,12 @@ const SKELETON_FADE_OUT = FadeOut.duration(220);
 // approximate — it just keeps the reserve from over-padding long threads.
 const FOCUS_RESERVE_ROW_APPROX = 150;
 
+// `data: true` lets LegendList compensate the parent prepend; `size: false` hands
+// the size axis entirely to our `onItemSizeChanged` counter-scroll, so the library
+// and our correction never both move the scroll (that double-correction is what
+// oscillated into jitter). Module-level for a stable prop reference.
+const THREAD_MVCP = { data: true, size: false } as const;
+
 type ThreadSkeletonItem =
   | { type: 'target-skeleton'; id: string }
   | { type: 'reply-skeleton'; id: string; skeletonIndex: number };
@@ -285,9 +291,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   // against the parent's *estimate* (`estimatedItemSize`) and never reconciles the
   // gap once the parent measures to its real height — leaving the note off by
   // exactly (estimate − measured) px (verified in the shift log: 200 vs 145 → the
-  // note jumped up 55px). We own that one reconciliation: when a row ABOVE the
-  // note changes size before the reader has scrolled, counter-scroll by the delta
-  // so the note stays put. Read via refs so the size-change callback is stable.
+  // note jumped up 55px). We own that reconciliation: while the reader hasn't
+  // scrolled, every size change of a row ABOVE the note (the prepend's
+  // estimate→measured jump, and late media reshaping) is countered by the delta so
+  // the note stays put. Read via refs so the size-change callback is stable.
   const targetIndexRef = useRef(-1);
   const readerMovedRef = useRef(false);
 
@@ -301,9 +308,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   // is shown.
   const [revealed, setRevealed] = useState(false);
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Reconcile each above-note row once (no oscillation); resets the reveal timer so
-  // the swap waits until those rows stop changing size.
-  const correctedKeysRef = useRef<Set<string>>(new Set());
 
   const scheduleReveal = useCallback((delayMs: number) => {
     if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
@@ -313,7 +317,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   useEffect(() => {
     setRevealed(false);
     readerMovedRef.current = false;
-    correctedKeysRef.current = new Set();
     if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
   }, [eventId]);
 
@@ -369,7 +372,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 
   // Once the full thread is fetched, decide when to swap to the real list. With no
   // parents there's no prepend, so swap immediately. With parents, arm a generous
-  // fallback; the size-change handler shortens it as each above-note row settles.
+  // fallback (long enough for a fast/cached parent image to load + reshape
+  // off-screen, so the swap shows it already settled); the size-change handler
+  // shortens it as each above-note row goes quiet. Stragglers (slow network images)
+  // load post-swap and are absorbed by the counter-scroll.
   const fullReady = !isLoading && !isFetching && !!targetItem;
   useEffect(() => {
     if (!fullReady || revealed) return;
@@ -377,7 +383,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       setRevealed(true);
       return;
     }
-    scheduleReveal(600);
+    scheduleReveal(900);
   }, [fullReady, revealed, hasParents, scheduleReveal]);
 
   // Focus reserve: extra bottom space so the tapped reply can always be scrolled
@@ -453,17 +459,19 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       if (readerMovedRef.current) return;
       const tIndex = targetIndexRef.current;
       if (tIndex <= 0 || info.index >= tIndex) return;
-      // Reconcile each above-note row exactly once (its estimate→measured jump);
-      // re-correcting on every micro-change is what oscillated into jitter.
-      if (correctedKeysRef.current.has(info.itemKey)) return;
+      // Compensate EVERY above-note size change by the exact delta, so the note holds
+      // through the prepend's estimate→measured jump AND late media: an image with no
+      // imeta dims (and not cached) reserves a 16:9 box, then reshapes to its real
+      // aspect on load — a second, larger above-note change. (We don't fight mVCP
+      // here: it runs `size:false`, so we are the sole owner of this axis — no
+      // double-correction, no oscillation.)
       const delta = info.size - info.previous;
       if (delta === 0) return;
-      correctedKeysRef.current.add(info.itemKey);
       const current = listRef.current?.getState()?.scroll ?? 0;
       void listRef.current?.scrollToOffset({ offset: current + delta, animated: false });
-      // This correction happens off-screen (real list hidden) — push the swap until
-      // the above-note rows stop changing size, so we reveal a settled list.
-      scheduleReveal(120);
+      // While still hidden this also pushes the swap out until the above-note rows
+      // (incl. images that load fast) stop changing size, so we reveal a settled list.
+      scheduleReveal(150);
     },
     [visualList, scheduleReveal]
   );
@@ -815,20 +823,14 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                     paddingBottom: (replyBarHeight || 80) + 16 + focusReserve,
                   }}
                   showsVerticalScrollIndicator={false}
-                  // Anchor-on-the-tapped-note stability. Bare `maintainVisibleContentPosition`
-                  // normalizes to `{ data: true, size: true }` in @legendapp/list v3:
-                  //  - `data: true`  → when the parent chain prepends above the focused note
-                  //    (the T1 full-thread update), LegendList compensates contentOffset so the
-                  //    note does NOT drop. This is OFF by default (`{ data: false }`); omitting
-                  //    the prop is exactly why the note used to shift when parents loaded in.
-                  //  - `size: true`  → absorbs the estimate→measured reconciliation of rows.
-                  // Works together with `focusReserve` (the bottom padding): mVCP holds the
-                  // note, the reserve guarantees the scroll room mVCP needs to do so.
-                  // Mirrors the DM ChatScreen's anchoring half. We deliberately do NOT take
-                  // ChatScreen's `initialScrollAtEnd` / `alignItemsAtEnd` / `maintainScrollAtEnd`:
-                  // a thread anchors on the tapped note via `initialScrollIndex` and must never
-                  // auto-pin to the bottom like a chat.
-                  maintainVisibleContentPosition
+                  // Anchor-on-the-tapped-note stability (see THREAD_MVCP): `data:true`
+                  // compensates the parent prepend; `size:false` leaves the size axis to our
+                  // `onItemSizeChanged` counter-scroll (sole owner → no double-correction).
+                  // Paired with `focusReserve` (bottom padding) for the scroll room it needs.
+                  // We deliberately do NOT take ChatScreen's `initialScrollAtEnd` /
+                  // `alignItemsAtEnd` / `maintainScrollAtEnd`: a thread anchors on the tapped
+                  // note via `initialScrollIndex` and must never auto-pin to the bottom.
+                  maintainVisibleContentPosition={THREAD_MVCP}
                   onScroll={(e: { nativeEvent: { contentOffset: { y: number } } }) => {
                     const y = e.nativeEvent.contentOffset.y;
                     if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;
