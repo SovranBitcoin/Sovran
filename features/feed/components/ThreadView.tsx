@@ -626,11 +626,15 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       }
 
       if (item.type === 'reply-skeleton') {
-        // Fades out as the real reply that replaces it fades in (crossfade).
-        return (
-          <Animated.View exiting={SKELETON_FADE_OUT}>
-            <PostCardSkeleton variant="thread-reply" index={item.skeletonIndex} />
-          </Animated.View>
+        const skeleton = <PostCardSkeleton variant="thread-reply" index={item.skeletonIndex} />;
+        // FlashList recycles cells, which fights reanimated exit animations — the
+        // exiting skeleton renders in a recycled cell's position for a frame (the
+        // "skeleton in the wrong place" glitch). Skip the exit there; on legend-list
+        // it fades out as the real reply fades in (crossfade).
+        return flashListThread ? (
+          skeleton
+        ) : (
+          <Animated.View exiting={SKELETON_FADE_OUT}>{skeleton}</Animated.View>
         );
       }
 
@@ -684,10 +688,14 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       );
 
       // Each reply fades its real content in as it loads, crossfading with the
-      // skeleton it replaces (which fades out via SKELETON_FADE_OUT). The
-      // target/parents are the stable anchor and render immediately.
+      // skeleton it replaces. Skipped on FlashList (recycled cells fight reanimated
+      // enter animations — see the skeleton note above); on legend-list it fades in.
       if (item.type === 'reply') {
-        return <Animated.View entering={REPLY_FADE_IN}>{card}</Animated.View>;
+        return flashListThread ? (
+          card
+        ) : (
+          <Animated.View entering={REPLY_FADE_IN}>{card}</Animated.View>
+        );
       }
       return card;
     },
@@ -700,6 +708,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       getEngagementState,
       getMetrics,
       hasParents,
+      flashListThread,
       profilesRef,
       quotedEventsRef,
       replySort,
