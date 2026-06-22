@@ -367,15 +367,22 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     return withReplySortTabs([...items, ...createReplySkeletonItems(skeletonCount)]);
   }, [isFetching, isLoading, items, metricsRef]);
 
-  // Seed list data (what the reader sees until the swap): the full thread minus the
-  // parents, so the tapped note sits at the top with its replies below — exactly the
-  // visible region the resolved real list will show.
+  // Real reply CONTENT is withheld until the list is revealed. While the real list
+  // resolves off-screen we don't want replies rendering/loading there — they'd reach
+  // a half-loaded state and be shown un-settled at the swap, their skeleton→real fade
+  // already spent while invisible. So pre-reveal both lists show reply SKELETONS; the
+  // real reply rows mount only once the list is visible, where `REPLY_FADE_IN` plays
+  // as designed. (Parents are unaffected — they still settle off-screen.)
   const seedData = useMemo<ThreadListItem[]>(
-    () => displayItems.filter((i) => i.type !== 'parent'),
+    () => displayItems.filter((i) => i.type !== 'parent' && i.type !== 'reply'),
     [displayItems]
   );
-  // The real (hidden) list renders the full `displayItems`; this is the note's index
-  // there, for the counter-scroll, focus reserve, and initial landing.
+  const realData = useMemo<ThreadListItem[]>(
+    () => (revealed ? displayItems : displayItems.filter((i) => i.type !== 'reply')),
+    [revealed, displayItems]
+  );
+  // The note's index in the real list (parents precede it; replies/skeletons follow,
+  // so the index is the same gated or not) — for the focus reserve and the landing.
   const fullTargetIndex = useMemo(
     () => displayItems.findIndex((i) => i.type === 'target'),
     [displayItems]
@@ -785,7 +792,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 pointerEvents={revealed ? 'auto' : 'none'}>
                 <LegendList
                   ref={listRef}
-                  data={displayItems}
+                  data={realData}
                   keyExtractor={threadKeyExtractor}
                   getItemType={threadItemType}
                   getFixedItemSize={threadFixedItemSize}

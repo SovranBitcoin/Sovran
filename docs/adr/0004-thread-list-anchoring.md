@@ -101,6 +101,15 @@ already relies on:
    pixel match for the seed. This replaces both the older per-row opacity "reveal hack"
    and the fragile delta-summing landing.
 
+7. **Withhold real reply content until revealed.** Both lists pre-reveal show reply
+   **skeletons** only — `seedData` and the hidden `realData` filter out real `reply`
+   rows. If the hidden real list rendered real replies, they'd load (text + images) and
+   reach a half-loaded state off-screen, then be shown un-settled at the swap, their
+   `REPLY_FADE_IN` skeleton→real crossfade already spent while invisible (the "replies
+   show before they've settled" bug). Gating means reply rows mount only once the list
+   is visible, so the fade plays as designed. Parents are unaffected — they still need
+   to settle off-screen for the landing (6), and they're above the note, not below.
+
 ## Consequences
 
 - The focused note holds across the T0→T1 parent prepend with no manual scroll
