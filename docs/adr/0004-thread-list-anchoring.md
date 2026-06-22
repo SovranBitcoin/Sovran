@@ -88,27 +88,30 @@ already relies on:
 5. **No bottom-dock / auto-pin props.** Unlike `ChatScreen`, the thread omits
    `initialScrollAtEnd`, `alignItemsAtEnd`, and `maintainScrollAtEnd` — it anchors
    on the note, not the tail, and must never auto-scroll down.
-6. **Resolve off-screen, land authoritatively, then swap directly.** Even with
-   (1)–(3), the prepend + re-anchor plays out over several frames and _reads as jitter_
-   on screen. So we render **two lists**: a **seed list** (tapped note + replies,
-   parents filtered out) that the reader sees immediately, and the **real list** (full
-   thread) that resolves **off-screen** (`opacity: 0`, `pointerEvents: none`). Once the
-   above-note rows stop changing size (`scheduleReveal` debounce + fallback), we do one
-   **`scrollToIndex(noteIndex, { viewPosition: 0 })`** to put the note at the top —
-   exact for any parent count, by which point the parents are measured — and reveal on
-   the next frame (so the scroll has applied while still hidden). The **swap is
-   instant** (`revealed` flips, seed unmounts); no fade, because the resolved view is a
-   pixel match for the seed. This replaces both the older per-row opacity "reveal hack"
-   and the fragile delta-summing landing.
+6. **Resolve the WHOLE thread off-screen, land authoritatively, then crossfade.** Even
+   with (1)–(3), the reconcile plays out over several frames and _reads as jitter_. So
+   we render **two lists**: a **seed list** (tapped note + reply **skeletons**, no
+   parents) the reader sees immediately, and the **real list** (full thread) that
+   resolves **off-screen** (`opacity: 0`, `pointerEvents: none`) — parents settle AND
+   replies measure + load their images there. We wait for the on-screen rows to stop
+   changing size (`scheduleReveal` debounce **+ absolute cap**, so a slow network image
+   can't stall the seed forever), then do one **`scrollToIndex(noteIndex,
+{ viewPosition: 0 })`** to land the note (exact for any parent count, parents
+   measured by now) and **crossfade** the real list in over the seed (`listOpacity`
+   0→1, ~200ms), dropping the seed when the fade finishes. The crossfade is seamless
+   for the note (pixel match — looks static) and gives the replies their skeleton→real
+   fade. This replaces the per-row "reveal hack", the fragile delta-summing landing,
+   and the earlier instant swap.
 
-7. **Withhold real reply content until revealed.** Both lists pre-reveal show reply
-   **skeletons** only — `seedData` and the hidden `realData` filter out real `reply`
-   rows. If the hidden real list rendered real replies, they'd load (text + images) and
-   reach a half-loaded state off-screen, then be shown un-settled at the swap, their
-   `REPLY_FADE_IN` skeleton→real crossfade already spent while invisible (the "replies
-   show before they've settled" bug). Gating means reply rows mount only once the list
-   is visible, so the fade plays as designed. Parents are unaffected — they still need
-   to settle off-screen for the landing (6), and they're above the note, not below.
+7. **Replies resolve off-screen so they don't reshift after appearing.** The real list
+   renders the full thread (incl. replies) the whole time, so replies measure and load
+   images while hidden and are **already settled** when the crossfade reveals them —
+   no post-appearance reshift, and the skeleton→real transition is the crossfade (6),
+   not a live reflow. The seed shows reply **skeletons** only (`seedData` filters out
+   `parent` and `reply` rows) so it's stable and doesn't double-load the reply images
+   (only the real list renders real replies). Tradeoff: a reply image slower than the
+   cap finishes after the crossfade — but it's below the focus and rare (imeta dims /
+   the warmed aspect cache settle it off-screen in the common case).
 
 ## Consequences
 

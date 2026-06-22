@@ -7,7 +7,14 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import {
   LegendList,
   type LegendListRef,
@@ -298,39 +305,67 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const targetIndexRef = useRef(-1);
   const readerMovedRef = useRef(false);
 
-  // Direct swap after settle. We render TWO lists: a seed list (tapped note +
-  // replies, no parents) the reader sees immediately, and the real list (full
-  // thread) that resolves OFF-SCREEN. Once the parents above the note have stopped
-  // resizing, we land the note authoritatively and swap to the real list INSTANTLY —
-  // no fade, because the resolved view is a pixel match for the seed (same note at
-  // top, parents scrolled off above). `revealed`/`revealedRef` = real list is shown.
+  // Resolve off-screen, then crossfade. Two lists: a seed list (tapped note + reply
+  // SKELETONS, no parents) the reader sees immediately, and the real list (full
+  // thread) that resolves OFF-SCREEN — parents settle AND replies measure + load their
+  // images there. Once the on-screen rows stop changing size (debounced, with an
+  // absolute cap), we land the note authoritatively (`scrollToIndex`) and crossfade
+  // the settled real list in over the seed: the note is a pixel match (looks static),
+  // and the reply skeletons fade to ALREADY-SETTLED real replies — so nothing reshifts
+  // after they appear. `revealed`/`revealedRef` = real list is taking over.
   const [revealed, setRevealed] = useState(false);
   const revealedRef = useRef(false);
+  const [seedHidden, setSeedHidden] = useState(false);
+  const listOpacity = useSharedValue(0);
+  const realListStyle = useAnimatedStyle(() => ({ opacity: listOpacity.value }));
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const capTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fire once the parents go quiet: put the note at the top with a single
-  // authoritative `scrollToIndex` (correct for ANY number of parents — far more
-  // robust than summing per-row counter-scroll deltas, which undershoot when several
-  // parents measure in a burst), then reveal next frame so the scroll has applied
-  // while still hidden.
-  const scheduleReveal = useCallback((delayMs: number) => {
+  // Land the note at the top with one authoritative `scrollToIndex` (correct for ANY
+  // number of parents — robust where summing per-row deltas undershoots), then reveal
+  // next frame so the scroll has applied while still hidden.
+  const fireReveal = useCallback(() => {
+    if (revealedRef.current) return;
     if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-    settleTimerRef.current = setTimeout(() => {
-      revealedRef.current = true;
-      const idx = targetIndexRef.current;
-      if (idx > 0) {
-        void listRef.current?.scrollToIndex({ index: idx, viewPosition: 0, animated: false });
-      }
-      requestAnimationFrame(() => setRevealed(true));
-    }, delayMs);
+    if (capTimerRef.current) clearTimeout(capTimerRef.current);
+    capTimerRef.current = null;
+    revealedRef.current = true;
+    const idx = targetIndexRef.current;
+    if (idx > 0) {
+      void listRef.current?.scrollToIndex({ index: idx, viewPosition: 0, animated: false });
+    }
+    requestAnimationFrame(() => setRevealed(true));
   }, []);
+
+  // Debounced "rows have gone quiet" timer — reset by each on-screen size change so the
+  // reveal waits until parents AND the first replies have settled.
+  const scheduleReveal = useCallback(
+    (delayMs: number) => {
+      if (revealedRef.current) return;
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = setTimeout(fireReveal, delayMs);
+    },
+    [fireReveal]
+  );
+
+  // Crossfade the real list in once it's the authoritative view, then drop the seed.
+  useEffect(() => {
+    if (!revealed) return;
+    listOpacity.value = withTiming(1, { duration: 200 }, (finished) => {
+      if (finished) runOnJS(setSeedHidden)(true);
+    });
+  }, [revealed, listOpacity]);
 
   useEffect(() => {
     setRevealed(false);
     revealedRef.current = false;
     readerMovedRef.current = false;
+    setSeedHidden(false);
+    listOpacity.value = 0;
     if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-  }, [eventId]);
+    if (capTimerRef.current) clearTimeout(capTimerRef.current);
+    capTimerRef.current = null;
+  }, [eventId, listOpacity]);
 
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
   const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
@@ -367,20 +402,16 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     return withReplySortTabs([...items, ...createReplySkeletonItems(skeletonCount)]);
   }, [isFetching, isLoading, items, metricsRef]);
 
-  // Real reply CONTENT is withheld until the list is revealed. While the real list
-  // resolves off-screen we don't want replies rendering/loading there — they'd reach
-  // a half-loaded state and be shown un-settled at the swap, their skeleton→real fade
-  // already spent while invisible. So pre-reveal both lists show reply SKELETONS; the
-  // real reply rows mount only once the list is visible, where `REPLY_FADE_IN` plays
-  // as designed. (Parents are unaffected — they still settle off-screen.)
+  // The seed (visible until the crossfade) shows the note + reply SKELETONS, no
+  // parents. The real list renders the FULL thread the whole time, including replies,
+  // so the replies measure and load their images OFF-SCREEN and are already settled by
+  // the time the crossfade reveals them — that's what stops the post-appearance
+  // reshift. (Only the real list renders real replies, so images aren't double-loaded.)
   const seedData = useMemo<ThreadListItem[]>(
     () => displayItems.filter((i) => i.type !== 'parent' && i.type !== 'reply'),
     [displayItems]
   );
-  const realData = useMemo<ThreadListItem[]>(
-    () => (revealed ? displayItems : displayItems.filter((i) => i.type !== 'reply')),
-    [revealed, displayItems]
-  );
+  const realData = displayItems;
   // The note's index in the real list (parents precede it; replies/skeletons follow,
   // so the index is the same gated or not) — for the focus reserve and the landing.
   const fullTargetIndex = useMemo(
@@ -389,22 +420,18 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   );
   targetIndexRef.current = fullTargetIndex;
 
-  // Once the full thread is fetched, decide when to swap to the real list. With no
-  // parents there's no prepend, so swap immediately. With parents, arm a generous
-  // fallback (long enough for a fast/cached parent image to load + reshape
-  // off-screen, so the swap shows it already settled); the size-change handler
-  // shortens it as each above-note row goes quiet. Stragglers (slow network images)
-  // load post-swap and are absorbed by the counter-scroll.
+  // Once the full thread is fetched, wait for the on-screen rows (parents above AND
+  // the first replies below) to settle off-screen, then crossfade. Arm the debounced
+  // quiet timer (the size-change handler resets it as rows settle) plus an absolute
+  // cap so a slow network image can't hold the seed indefinitely — anything still
+  // loading past the cap finishes after the crossfade (counter-scroll absorbs an
+  // above-note straggler; a below-note straggler is past the focus and rare).
   const fullReady = !isLoading && !isFetching && !!targetItem;
   useEffect(() => {
     if (!fullReady || revealed) return;
-    if (!hasParents) {
-      revealedRef.current = true;
-      setRevealed(true);
-      return;
-    }
-    scheduleReveal(900);
-  }, [fullReady, revealed, hasParents, scheduleReveal]);
+    scheduleReveal(220);
+    if (!capTimerRef.current) capTimerRef.current = setTimeout(fireReveal, 1000);
+  }, [fullReady, revealed, scheduleReveal, fireReveal]);
 
   // Focus reserve: extra bottom space so the tapped reply can always be scrolled
   // to (and held at) the top of the viewport, even when little content sits below
@@ -464,16 +491,15 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     getListState: () => listRef.current?.getState() ?? null,
   });
 
-  // Above-note size changes (parents measuring / late media reshaping) are what
-  // would move the focused note. Two regimes, split on `revealed`:
-  //  - BEFORE the swap (off-screen): don't counter-scroll per row — summing many
-  //    deltas in a burst undershoots with multiple parents. Just keep pushing the
-  //    swap out until the parents go quiet; `scheduleReveal` then lands the note with
-  //    one authoritative `scrollToIndex`.
-  //  - AFTER the swap: a late parent image (no imeta dims, slow to load) can still
-  //    reshape; the parent is off-screen above the note, so counter-scroll by its
-  //    exact delta to absorb the growth and keep the note fixed. One change at a time
-  //    here, so no burst/undershoot. (mVCP runs `size:false` → we're the sole owner.)
+  // Two regimes, split on `revealed`:
+  //  - BEFORE the crossfade (off-screen): ANY rendered row still changing size — a
+  //    parent measuring, a reply measuring or its image loading — keeps the reveal
+  //    waiting (`scheduleReveal` resets) so we crossfade a fully-settled list. No
+  //    per-row counter-scroll here: `scrollToIndex` (in `fireReveal`) lands the note
+  //    authoritatively, which is robust where summing many deltas would undershoot.
+  //  - AFTER the crossfade: a slow parent image (no imeta dims) can still reshape;
+  //    it's off-screen above the note, so counter-scroll by its exact delta to absorb
+  //    the growth and keep the note fixed. One change at a time → no burst.
   const handleItemSizeChanged = useCallback(
     (info: {
       size: number;
@@ -485,11 +511,12 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       visualList.onItemSizeChanged?.(info);
       if (readerMovedRef.current) return;
       const tIndex = targetIndexRef.current;
-      if (tIndex <= 0 || info.index >= tIndex) return;
+      if (tIndex < 0) return;
       if (!revealedRef.current) {
-        scheduleReveal(150);
+        scheduleReveal(180);
         return;
       }
+      if (info.index >= tIndex) return;
       const delta = info.size - info.previous;
       if (delta === 0) return;
       const current = listRef.current?.getState()?.scroll ?? 0;
@@ -786,9 +813,11 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               />
             }>
             <View style={styles.listWrap}>
-              {/* Real list — full thread; resolves off-screen, shown once settled. */}
-              <View
-                style={[StyleSheet.absoluteFill, revealed ? undefined : styles.hiddenList]}
+              {/* Real list — full thread; resolves off-screen (opacity 0), then
+                  crossfades in over the seed once the rows have settled. zIndex keeps
+                  it above the seed regardless of mount order. */}
+              <Animated.View
+                style={[StyleSheet.absoluteFill, styles.realLayer, realListStyle]}
                 pointerEvents={revealed ? 'auto' : 'none'}>
                 <LegendList
                   ref={listRef}
@@ -869,11 +898,11 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                     !isLoading && fullTargetIndex > 0 ? fullTargetIndex : undefined
                   }
                 />
-              </View>
-              {/* Seed list — tapped note + replies (no parents), shown until the real
-                  list resolves. Pixel-matches the real list's visible region, so the
-                  swap is invisible. Display-only (no scroll, no handlers). */}
-              {revealed ? null : (
+              </Animated.View>
+              {/* Seed — tapped note + reply skeletons (no parents), shown underneath
+                  until the real list has crossfaded in. Display-only (no scroll, no
+                  handlers); kept mounted through the fade, then dropped. */}
+              {seedHidden ? null : (
                 <View style={StyleSheet.absoluteFill} pointerEvents="none">
                   <LegendList
                     data={seedData}
@@ -937,8 +966,8 @@ const styles = StyleSheet.create({
   flexOne: {
     flex: 1,
   },
-  hiddenList: {
-    opacity: 0,
+  realLayer: {
+    zIndex: 1,
   },
   centerContent: {
     justifyContent: 'center',
