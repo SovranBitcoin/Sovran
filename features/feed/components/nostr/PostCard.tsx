@@ -42,7 +42,6 @@ import {
   REPLY_SKELETON_VARIANTS,
   TARGET_SKELETON_VARIANT,
 } from '@/features/feed/lib/threadReplySkeletons';
-import { replySkeletonHeight } from '@/features/feed/lib/threadListLayout';
 import { THREAD_CONNECTOR_LINE_STYLE } from './threadConnectorStyle';
 
 type PostCardVariant = 'feed' | 'repost-original' | 'thread-target' | 'thread-reply';
@@ -571,13 +570,7 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
   const skeletonVariant = replyVariant;
 
   return (
-    // Reserve the real reply's measured height for this line count (84 + 24·lines,
-    // from `replySkeletonHeight`) so the row doesn't grow ~7px when the real text
-    // replaces it. The natural skeleton chrome renders a few px short of the real
-    // PostCard; minHeight pins it to the shared height model that real text follows.
-    <Reanimated.View
-      onLayout={revealOnSettle}
-      style={[revealStyle, { minHeight: replySkeletonHeight(index) }]}>
+    <Reanimated.View onLayout={revealOnSettle} style={revealStyle}>
       <SkeletonExitReveal active={exiting}>
         <View style={pcStyles.gutterRow} pointerEvents="none">
           <View style={pcStyles.gutterCol}>
@@ -636,7 +629,11 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
   labelWidth: number;
 }) {
   const glyph = compact ? POST_ACTION_ICON_SIZES.compact.base : POST_ACTION_ICON_SIZES.regular.base;
-  const labelHeight = compact ? 14 : spacing.md;
+  // The real footer's count is a `Text size={11/13}` with no lineHeight, so the
+  // footer row is as tall as that font's line box. The skeleton must use the SAME
+  // size (via a `Text loading` placeholder) — a hardcoded label rectangle was ~7px
+  // shorter, which made the reply row grow when real text replaced the skeleton.
+  const labelTextSize = compact ? 11 : 13;
   const skeletonFill = useMemo(() => opacity(borderColor, 0.07), [borderColor]);
   const footerStyle = useMemo(
     () => [
@@ -655,15 +652,7 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
     }),
     [glyph, skeletonFill]
   );
-  const labelStyle = useMemo(
-    () => ({
-      width: labelWidth,
-      height: labelHeight,
-      borderRadius: radius.sm,
-      backgroundColor: skeletonFill,
-    }),
-    [labelHeight, labelWidth, skeletonFill]
-  );
+  const labelStyle = useMemo(() => ({ width: labelWidth }), [labelWidth]);
 
   return (
     <View style={footerStyle} pointerEvents="none">
@@ -671,7 +660,17 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
         {METRIC_SKELETON_ITEMS.map((item) => (
           <HStack key={item} align="center" gap={spacing.xs}>
             <Skeleton style={glyphStyle} />
-            {item < 3 ? <Skeleton style={labelStyle} /> : null}
+            {item < 3 ? (
+              // Self-sizes to the real count's line box (same `size`), so the footer
+              // row height matches the real footer exactly. Width kept via `labelWidth`.
+              <Text
+                loading
+                numberOfLines={1}
+                size={labelTextSize}
+                placeholder="0"
+                style={labelStyle}
+              />
+            ) : null}
           </HStack>
         ))}
       </HStack>
