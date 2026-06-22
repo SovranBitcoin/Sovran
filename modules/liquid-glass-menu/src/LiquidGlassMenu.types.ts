@@ -11,11 +11,19 @@ export type GlassMenuAction = {
 };
 
 export type LiquidGlassMenuProps = {
-  /** Pill label, e.g. "≈ $12.34". */
+  /** Pill label, e.g. "≈ $12.34". The bold primary line. */
   label: string;
   /** "#RRGGBB" / "#RRGGBBAA". Defaults to the system label color. */
   labelColor?: string;
   labelSize?: number;
+  /** Optional second line under `label` (regular weight, smaller). */
+  subtitle?: string;
+  /** Optional leading SF Symbol (e.g. "bitcoinsign.circle.fill"). */
+  image?: string;
+  /** Tint for `image`, "#RRGGBB" / "#RRGGBBAA". Defaults to the label color. */
+  imageColor?: string;
+  /** Horizontal layout of the button content. Defaults to `'center'`. */
+  contentAlignment?: 'center' | 'leading';
   /** Glass tint, "#RRGGBB" / "#RRGGBBAA". */
   tint?: string | null;
   /** Force the menu/glass to render in a specific scheme. */

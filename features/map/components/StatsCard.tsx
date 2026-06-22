@@ -1,22 +1,14 @@
 import { memo, useCallback, useRef } from 'react';
-import {
-  Host,
-  Button as SwiftUIButton,
-  Menu,
-  HStack as SwiftUIHStack,
-  VStack as SwiftUIVStack,
-  Image as SwiftUIImage,
-  Text as SwiftUIText,
-} from '@expo/ui/swift-ui';
-import { font, foregroundStyle, frame, glassEffect, padding } from '@expo/ui/swift-ui/modifiers';
+import { LiquidGlassMenu } from 'liquid-glass-menu';
 import { Menu as HeroMenu, type MenuTriggerRef } from 'heroui-native';
 import { ActionSheetIOS, Platform, StyleSheet, Text } from 'react-native';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { alpha, radius, shadow, spacing, zIndex, fontSize } from '@/shared/styles/tokens';
+import { alpha, radius, shadow, spacing, fontSize } from '@/shared/styles/tokens';
 import { useCapabilities } from '@/shared/ui/capability';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { MERCHANT_CATEGORIES, type MerchantCategoryId } from '@/shared/lib/map/categories';
@@ -61,6 +53,7 @@ export const StatsCard = memo(function StatsCard({
     'success',
   ] as const);
   const { liquidGlass } = useCapabilities();
+  const colorScheme = useColorScheme();
   const menuTriggerRef = useRef<MenuTriggerRef>(null);
   const openCategoryMenu = useCallback(() => {
     setTimeout(() => menuTriggerRef.current?.open(), 0);
@@ -71,7 +64,9 @@ export const StatsCard = memo(function StatsCard({
     ? 'Loading...'
     : `${totalCount.toLocaleString()} total • ${categoryLabel(category)}`;
 
-  if (!liquidGlass) {
+  // The glass path needs the native UIKit glass-button morph; without it we fall
+  // through to the flat card (which also covers Android and pre-iOS-26).
+  if (!liquidGlass || !LiquidGlassMenu.isSupported) {
     const handlePress = () => {
       if (Platform.OS !== 'ios') {
         // Android: heroui Menu bottom sheet (the canonical pick-one-of-N
@@ -158,59 +153,30 @@ export const StatsCard = memo(function StatsCard({
     );
   }
 
-  // `Menu` (not `ContextMenu`) so the glass capsule opens the category filter on
-  // a single TAP. `ContextMenu` is hardcoded to long-press, which is why the
-  // dropdown "did nothing" when tapped. Omitting `onPrimaryAction` means the tap
-  // opens the menu (matching the proven FiatCurrencyPill.liquid pattern). The
-  // glass effect + frame live on the Menu; the label is the trigger content.
-  const glassCardModifiers = [
-    frame({ width: cardWidth, height: 64, alignment: 'center' }),
-    glassEffect({
-      shape: 'capsule' as const,
-      glass: { variant: 'regular' as const, interactive: true },
-    }),
-  ];
-
+  // Same native UIKit glass-button morph the wallet's FiatCurrencyPill uses, so
+  // the map card animates as smoothly (a SwiftUI `glassEffect` Host felt buggy
+  // by comparison). A single TAP opens the category menu and morphs the capsule;
+  // the leading bitcoin icon + two-line label live inside the button itself.
   return (
     <View style={styles.statsContainer}>
-      <Host style={{ zIndex: zIndex.sticky, height: 64, width: cardWidth }} matchContents>
-        <Menu
-          modifiers={glassCardModifiers}
-          label={
-            <SwiftUIHStack
-              alignment="center"
-              spacing={12}
-              modifiers={[
-                frame({ maxWidth: Infinity, height: 64, alignment: 'leading' }),
-                padding({ horizontal: 18 }),
-              ]}>
-              <SwiftUIImage systemName="bitcoinsign.circle.fill" size={24} color={BITCOIN_ACCENT} />
-              {/* VStack takes the remaining width so the chevron sits at the
-                  far right edge instead of crammed against the subtitle. */}
-              <SwiftUIVStack
-                alignment="leading"
-                spacing={2}
-                modifiers={[frame({ maxWidth: Infinity, alignment: 'leading' })]}>
-                <SwiftUIText
-                  modifiers={[font({ size: 18, weight: 'bold' }), foregroundStyle(foreground)]}>
-                  {visibleText}
-                </SwiftUIText>
-                <SwiftUIText modifiers={[font({ size: 12 }), foregroundStyle(foreground)]}>
-                  {totalText}
-                </SwiftUIText>
-              </SwiftUIVStack>
-              <SwiftUIImage systemName="chevron.down" size={14} color={foreground} />
-            </SwiftUIHStack>
-          }>
-          {CATEGORY_FILTERS.map((cat) => (
-            <SwiftUIButton
-              key={cat}
-              label={`${categoryLabel(cat)}${cat === category ? ' ✓' : ''}`}
-              onPress={() => onCategoryChange(cat)}
-            />
-          ))}
-        </Menu>
-      </Host>
+      <LiquidGlassMenu
+        style={{ width: cardWidth, height: 64 }}
+        image="bitcoinsign.circle.fill"
+        imageColor={BITCOIN_ACCENT}
+        label={visibleText}
+        subtitle={totalText}
+        labelColor={foreground}
+        labelSize={18}
+        contentAlignment="leading"
+        colorScheme={colorScheme}
+        menuTitle="Merchant category"
+        actions={CATEGORY_FILTERS.map((cat) => ({
+          id: cat,
+          title: categoryLabel(cat),
+          selected: cat === category,
+        }))}
+        onSelectAction={({ nativeEvent }) => onCategoryChange(nativeEvent.id as CategoryFilter)}
+      />
     </View>
   );
 });

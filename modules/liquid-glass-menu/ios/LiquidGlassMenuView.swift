@@ -28,6 +28,10 @@ public final class LiquidGlassMenuView: ExpoView {
     var label: String = ""
     var labelColorHex: String?
     var labelSize: CGFloat = 14
+    var subtitle: String = ""
+    var imageName: String = ""
+    var imageColorHex: String?
+    var alignLeading: Bool = false
     var tintHex: String?
     var schemeStr: String = ""
     var hasPrimaryAction: Bool = false
@@ -73,11 +77,39 @@ public final class LiquidGlassMenuView: ExpoView {
         container.font = UIFont.systemFont(ofSize: labelSize, weight: .bold)
         container.foregroundColor = color
         config.attributedTitle = AttributedString(label, attributes: container)
+
+        // Optional second line, rendered regular weight a couple points down.
+        if subtitle.isEmpty {
+            config.attributedSubtitle = nil
+        } else {
+            var sub = AttributeContainer()
+            sub.font = UIFont.systemFont(ofSize: max(11, labelSize - 6), weight: .regular)
+            sub.foregroundColor = color
+            config.attributedSubtitle = AttributedString(subtitle, attributes: sub)
+            config.titleAlignment = .leading
+        }
+
+        // Optional leading SF Symbol, tinted via a color transformer so it keeps
+        // its own colour through the glass rather than inheriting the label tint.
+        if imageName.isEmpty {
+            config.image = nil
+        } else {
+            config.image = UIImage(systemName: imageName)
+            config.imagePlacement = .leading
+            config.imagePadding = 10
+            let imageColor = imageColorHex.flatMap { Self.color(hex: $0) } ?? color
+            config.imageColorTransformer = UIConfigurationColorTransformer { _ in imageColor }
+        }
+
         config.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12)
         if let tint = tintHex.flatMap({ Self.color(hex: $0) }) {
             config.baseBackgroundColor = tint
         }
         button.configuration = config
+
+        // Left-align the whole content (icon + text) for the wider map card; the
+        // currency pill keeps the default centred layout.
+        button.contentHorizontalAlignment = alignLeading ? .leading : .center
 
         overrideUserInterfaceStyle =
             schemeStr == "dark" ? .dark : (schemeStr == "light" ? .light : .unspecified)

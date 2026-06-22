@@ -24,6 +24,22 @@ public class LiquidGlassMenuModule: Module {
                 view.labelSize = CGFloat(value)
                 view.apply()
             }
+            Prop("subtitle") { (view: LiquidGlassMenuView, value: String?) in
+                view.subtitle = value ?? ""
+                view.apply()
+            }
+            Prop("image") { (view: LiquidGlassMenuView, value: String?) in
+                view.imageName = value ?? ""
+                view.apply()
+            }
+            Prop("imageColor") { (view: LiquidGlassMenuView, value: String?) in
+                view.imageColorHex = value
+                view.apply()
+            }
+            Prop("contentAlignment") { (view: LiquidGlassMenuView, value: String?) in
+                view.alignLeading = value == "leading"
+                view.apply()
+            }
             Prop("tint") { (view: LiquidGlassMenuView, value: String?) in
                 view.tintHex = value
                 view.apply()
