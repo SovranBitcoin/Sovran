@@ -18,7 +18,10 @@ export const NOTE_CONTENT_LINE_HEIGHT = 24;
 //
 //   reply skeleton = chrome (gutter padding + author row + spacer + metrics
 //   footer) + one NOTE_CONTENT_LINE_HEIGHT per content line of its variant.
-export const REPLY_SKELETON_CHROME_HEIGHT = 80;
+// Chrome is 84 to match the MEASURED real reply ladder (height = 84 + 24·lines:
+// 1-line = 108px, 2-line = 132px), so a skeleton and the real text it's replaced
+// by occupy the same height (no ~7px reflow). Per-line stays NOTE_CONTENT_LINE_HEIGHT.
+export const REPLY_SKELETON_CHROME_HEIGHT = 84;
 export const TARGET_SKELETON_FIXED_HEIGHT = 176;
 export const REPLY_SORT_TABS_FIXED_HEIGHT = 52;
 

@@ -42,6 +42,7 @@ import {
   REPLY_SKELETON_VARIANTS,
   TARGET_SKELETON_VARIANT,
 } from '@/features/feed/lib/threadReplySkeletons';
+import { replySkeletonHeight } from '@/features/feed/lib/threadListLayout';
 import { THREAD_CONNECTOR_LINE_STYLE } from './threadConnectorStyle';
 
 type PostCardVariant = 'feed' | 'repost-original' | 'thread-target' | 'thread-reply';
@@ -570,7 +571,13 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
   const skeletonVariant = replyVariant;
 
   return (
-    <Reanimated.View onLayout={revealOnSettle} style={revealStyle}>
+    // Reserve the real reply's measured height for this line count (84 + 24·lines,
+    // from `replySkeletonHeight`) so the row doesn't grow ~7px when the real text
+    // replaces it. The natural skeleton chrome renders a few px short of the real
+    // PostCard; minHeight pins it to the shared height model that real text follows.
+    <Reanimated.View
+      onLayout={revealOnSettle}
+      style={[revealStyle, { minHeight: replySkeletonHeight(index) }]}>
       <SkeletonExitReveal active={exiting}>
         <View style={pcStyles.gutterRow} pointerEvents="none">
           <View style={pcStyles.gutterCol}>
