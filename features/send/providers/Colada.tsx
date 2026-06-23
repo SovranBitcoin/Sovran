@@ -40,9 +40,9 @@ import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage'
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 import {
   createSovranHandlers,
-  createSovranNotifications,
   createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
+import { createSovranNotifications } from '@/features/send/lib/sovranNotifications';
 import { createSovranScanSources } from '@/features/send/lib/sovranScanSources';
 import { mintUrlLogFields } from '@/features/send/lib/sovranPaymentLog';
 import {

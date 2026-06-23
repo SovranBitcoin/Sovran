@@ -4,10 +4,8 @@
 
 import type { PaymentMachine } from '@sovranbitcoin/colada';
 import type { Manager } from '@cashu/coco-core';
-import {
-  createSovranHandlers,
-  createSovranNotifications,
-} from '@/features/send/lib/sovranPaymentConfig';
+import { createSovranHandlers } from '@/features/send/lib/sovranPaymentConfig';
+import { createSovranNotifications } from '@/features/send/lib/sovranNotifications';
 import { sendMemoPopup } from '@/shared/lib/popup';
 import { getEncodedToken } from '@cashu/cashu-ts';
 import { sendBLEPrivateMessageWhole } from '@/features/bitchat/lib/blePrivateDelivery';
