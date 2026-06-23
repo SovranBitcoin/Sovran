@@ -7,6 +7,7 @@ import {
   type Merge,
   type NormalizingStore,
 } from './store';
+import { createPendingSet, type PendingSet } from './pending';
 
 // ---------------------------------------------------------------------------
 // Source ranking — when the SAME datum arrives from more than one transport,
@@ -156,6 +157,8 @@ export interface NostrEntityCache {
   readonly notes: NormalizingStore<CachedNote>;
   readonly noteStats: NormalizingStore<CachedNoteStats>;
   readonly profileStats: NormalizingStore<CachedProfileStats>;
+  /** Which profile pubkeys have a fetch in flight (loading vs absent, for bindings). */
+  readonly pendingProfiles: PendingSet;
 
   /** Seed minimal name+picture (feed/notification profiles) at low confidence, tagged by source. */
   ingestProfileInfos(infos: Record<string, NaggProfileInfo>, source: CacheSource): void;
@@ -200,11 +203,14 @@ export function createNostrEntityCache(limits: EntityCacheLimits = {}): NostrEnt
     maxEntries: limits.profileStats ?? DEFAULT_LIMITS.profileStats,
   });
 
+  const pendingProfiles = createPendingSet();
+
   return {
     profiles,
     notes,
     noteStats,
     profileStats,
+    pendingProfiles,
 
     ingestProfileInfos(infos, source) {
       const srcRank = sourceRank(source);

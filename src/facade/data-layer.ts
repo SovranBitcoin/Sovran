@@ -296,13 +296,21 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
           if (missing.length === 0 && !request.refresh) {
             return ok<ResolvedProfiles, TierResolutionError>({ tier: 'cache', profiles: cachedMeta });
           }
-          // Otherwise fetch only the missing (or all, on refresh) and merge.
+          // Otherwise fetch only the missing (or all, on refresh) and merge. Mark
+          // those pubkeys pending so a binding shows a skeleton (not a fallback)
+          // while they resolve; clear in `finally` so an error never strands them.
+          const toFetch = request.refresh ? request.pubkeys : missing;
           const fetchReq = request.refresh ? request : { ...request, pubkeys: missing };
-          const candidates = candidatesFor<ProfilesBundle>(config.tiers, 'getProfiles', (t) => () => t.getProfiles!(fetchReq));
-          return (await resolveAcrossTiers<ProfilesBundle>(candidates)).map(({ tier, value }) => {
-            ingestProfiles(cache, { tier, profiles: value.profiles });
-            return { tier, profiles: { ...cachedMeta, ...value.profiles } };
-          });
+          cache.pendingProfiles.begin(toFetch);
+          try {
+            const candidates = candidatesFor<ProfilesBundle>(config.tiers, 'getProfiles', (t) => () => t.getProfiles!(fetchReq));
+            return (await resolveAcrossTiers<ProfilesBundle>(candidates)).map(({ tier, value }) => {
+              ingestProfiles(cache, { tier, profiles: value.profiles });
+              return { tier, profiles: { ...cachedMeta, ...value.profiles } };
+            });
+          } finally {
+            cache.pendingProfiles.end(toFetch);
+          }
         },
         (r) => ({ profiles: Object.keys(r.profiles).length }),
       );
@@ -324,12 +332,17 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
               metadata: freshProfile ? metadataOf(freshProfile) : cachedStats.metadata,
             });
           }
-          const candidates = candidatesFor<ProfileStatsBundle>(config.tiers, 'getProfileStats', (t) => () => t.getProfileStats!(request));
-          return (await resolveAcrossTiers<ProfileStatsBundle>(candidates)).map(({ tier, value }) => {
-            const resolved = { tier, ...value };
-            ingestProfileStats(cache, resolved);
-            return resolved;
-          });
+          cache.pendingProfiles.begin([request.pubkey]);
+          try {
+            const candidates = candidatesFor<ProfileStatsBundle>(config.tiers, 'getProfileStats', (t) => () => t.getProfileStats!(request));
+            return (await resolveAcrossTiers<ProfileStatsBundle>(candidates)).map(({ tier, value }) => {
+              const resolved = { tier, ...value };
+              ingestProfileStats(cache, resolved);
+              return resolved;
+            });
+          } finally {
+            cache.pendingProfiles.end([request.pubkey]);
+          }
         },
         (r) => ({
           hasMetadata: !!r.metadata,

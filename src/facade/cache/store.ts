@@ -39,8 +39,14 @@ export interface NormalizingStore<T> {
   clear(): void;
   /** Iterate stored records (insertion order). Does NOT touch LRU recency. */
   values(): IterableIterator<T>;
-  /** Observe changes. Returns an unsubscribe. Listeners decide when to revalidate. */
+  /** Observe ALL changes. Returns an unsubscribe. Listeners decide when to revalidate. */
   subscribe(listener: () => void): () => void;
+  /**
+   * Observe changes to ONE key — fires only when that key's stored record actually
+   * changes (an idempotent re-write does NOT fire). Lets a per-row binding subscribe
+   * to its own entity without re-rendering on unrelated writes.
+   */
+  subscribeKey(key: string, listener: () => void): () => void;
   readonly size: number;
 }
 
@@ -57,6 +63,21 @@ export function fieldLevelMerge<T>(existing: T | undefined, patch: Partial<T>): 
   return base;
 }
 
+/** Shallow field equality — primitives by value, nested objects/arrays by reference. */
+function shallowEqual<T>(a: T, b: T): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false;
+  const ak = Object.keys(a as object);
+  const bk = Object.keys(b as object);
+  if (ak.length !== bk.length) return false;
+  for (const key of ak) {
+    if (!Object.is((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function createNormalizingStore<T>(options: NormalizingStoreOptions<T>): NormalizingStore<T> {
   const { maxEntries } = options;
   const merge = options.merge ?? fieldLevelMerge;
@@ -64,9 +85,15 @@ export function createNormalizingStore<T>(options: NormalizingStoreOptions<T>): 
   // always the least-recently-used, giving O(1) eviction.
   const map = new Map<string, T>();
   const listeners = new Set<() => void>();
+  const keyListeners = new Map<string, Set<() => void>>();
 
-  function notify(): void {
+  function notifyGlobal(): void {
     for (const listener of listeners) listener();
+  }
+
+  function notifyKey(key: string): void {
+    const set = keyListeners.get(key);
+    if (set) for (const listener of set) listener();
   }
 
   /** Move a key to the most-recently-used position. */
@@ -83,10 +110,21 @@ export function createNormalizingStore<T>(options: NormalizingStoreOptions<T>): 
     }
   }
 
-  /** Merge one write into the map WITHOUT notifying. Returns nothing. */
-  function write(key: string, patch: Partial<T>): void {
-    const merged = merge(map.get(key), patch);
+  /**
+   * Merge one write into the map WITHOUT notifying. Returns whether the stored
+   * record actually changed: an idempotent re-write keeps the EXISTING reference
+   * (so subscribers' snapshots stay stable and rows don't re-render) and refreshes
+   * only LRU recency.
+   */
+  function write(key: string, patch: Partial<T>): boolean {
+    const existing = map.get(key);
+    const merged = merge(existing, patch);
+    if (existing !== undefined && shallowEqual(existing, merged)) {
+      touch(key, existing);
+      return false;
+    }
     touch(key, merged);
+    return true;
   }
 
   return {
@@ -102,22 +140,28 @@ export function createNormalizingStore<T>(options: NormalizingStoreOptions<T>): 
       return map.has(key);
     },
     set(key, patch) {
-      write(key, patch);
+      const changed = write(key, patch);
       evict();
-      notify();
+      if (changed) {
+        notifyKey(key);
+        notifyGlobal();
+      }
     },
     setMany(entries) {
-      let wrote = false;
+      const changedKeys: string[] = [];
       for (const [key, patch] of entries) {
-        write(key, patch);
-        wrote = true;
+        if (write(key, patch)) changedKeys.push(key);
       }
-      if (!wrote) return;
+      if (changedKeys.length === 0) return;
       evict();
-      notify();
+      for (const key of changedKeys) notifyKey(key);
+      notifyGlobal();
     },
     delete(key) {
-      if (map.delete(key)) notify();
+      if (map.delete(key)) {
+        notifyKey(key);
+        notifyGlobal();
+      }
     },
     values() {
       return map.values();
@@ -125,11 +169,26 @@ export function createNormalizingStore<T>(options: NormalizingStoreOptions<T>): 
     clear() {
       if (map.size === 0) return;
       map.clear();
-      notify();
+      for (const key of keyListeners.keys()) notifyKey(key);
+      notifyGlobal();
     },
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
+    },
+    subscribeKey(key, listener) {
+      let set = keyListeners.get(key);
+      if (!set) {
+        set = new Set();
+        keyListeners.set(key, set);
+      }
+      set.add(listener);
+      return () => {
+        const current = keyListeners.get(key);
+        if (!current) return;
+        current.delete(listener);
+        if (current.size === 0) keyListeners.delete(key);
+      };
     },
     get size() {
       return map.size;

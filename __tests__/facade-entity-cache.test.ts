@@ -55,6 +55,35 @@ describe('NormalizingStore', () => {
     store.set('a', { a: '1' });
     expect(store.getMany(['a', 'missing'])).toEqual([{ a: '1' }, undefined]);
   });
+
+  it('subscribeKey fires only when that key changes', () => {
+    const store = createNormalizingStore<Row>({ maxEntries: 10 });
+    const onA = vi.fn();
+    store.subscribeKey('a', onA);
+    store.set('b', { a: 'b-val' }); // different key — no fire
+    expect(onA).toHaveBeenCalledTimes(0);
+    store.set('a', { a: '1' }); // key a — fires
+    expect(onA).toHaveBeenCalledTimes(1);
+    store.setMany([['c', { a: '3' }], ['a', { b: '2' }]]); // batch touching a — fires once
+    expect(onA).toHaveBeenCalledTimes(2);
+  });
+
+  it('an idempotent re-write keeps the reference and does not notify', () => {
+    const store = createNormalizingStore<Row>({ maxEntries: 10 });
+    const onKey = vi.fn();
+    const onAll = vi.fn();
+    store.set('a', { a: '1', n: 5 });
+    const ref = store.get('a');
+    store.subscribeKey('a', onKey);
+    store.subscribe(onAll);
+    store.set('a', { a: '1' }); // same value — no-op
+    expect(onKey).toHaveBeenCalledTimes(0);
+    expect(onAll).toHaveBeenCalledTimes(0);
+    expect(store.get('a')).toBe(ref); // same reference preserved
+    store.set('a', { a: '2' }); // real change — fires
+    expect(onKey).toHaveBeenCalledTimes(1);
+    expect(store.get('a')).not.toBe(ref);
+  });
 });
 
 describe('NostrEntityCache profile merge (monotonic guard)', () => {
