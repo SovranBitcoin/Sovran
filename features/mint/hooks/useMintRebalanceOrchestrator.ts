@@ -7,6 +7,7 @@ import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
 import { amountToNumber, toSafeSatAmount } from '@/shared/lib/cashu/amount';
 import { prepareBolt11MeltQuote, prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { auditMint, type AuditMintResponse } from '@/shared/lib/apiClient';
+import { computeRouteSuggestion as computeRouteSuggestionPure } from '@/features/mint/lib/rebalanceRouting';
 import { extractDomain } from '@/shared/lib/url';
 import { mintLocalId } from '@/shared/lib/id';
 import { cashuLog } from '@/shared/lib/logger';
@@ -20,9 +21,6 @@ import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import type { MiddlemanRoutingSettings } from '@/shared/stores/global/settingsStore';
 import { MIN_FEE_RESERVE } from '@/features/mint/components/rebalance';
 import {
-  buildSwapGraph,
-  pickIntermediaryPath,
-  addLocalHistoryEdges,
   getLocalCandidatesForDestination,
   releaseTrustWindow,
   formatStrandedRoutingDetail,
@@ -147,53 +145,16 @@ export function useMintRebalanceOrchestrator({
   const computeRouteSuggestion = useCallback(
     async (fromMintUrl: string, toMintUrl: string) => {
       if (!runPlan) return null;
-
-      // Start with mints in the run plan (fast), then optionally widen to a small set of trusted mints.
-      // This improves the chance of finding an intermediary without exploding API calls.
-      const planMints = runPlan.steps.flatMap((s) => [s.fromMintUrl, s.toMintUrl]);
-      const trustedUrls = trustedMints.map((m) => m.mintUrl);
-
-      // Also include mints from local swap history that have reached the destination
-      const allGroups = Object.values(useSwapTransactionsStore.getState().groups);
-      const localCandidateMints = getLocalCandidatesForDestination(
-        allGroups,
+      return computeRouteSuggestionPure({
+        fromMintUrl,
         toMintUrl,
-        fromMintUrl
-      );
-
-      /**
-       * Keep this bounded:
-       * - Each mint candidate can require an auditor call.
-       * - This runs after a failure, so we want a quick suggestion, not a full graph crawl.
-       */
-      const candidates = Array.from(
-        new Set([...planMints, ...trustedUrls, ...localCandidateMints, fromMintUrl, toMintUrl])
-      ).slice(0, 12);
-
-      const audits: AuditMintResponse[] = [];
-      for (const url of candidates) {
-        const a = await fetchAudit(url);
-        if (a) audits.push(a);
-      }
-
-      const graph = buildSwapGraph(audits);
-
-      // Merge our own local swap history into the graph so personally observed
-      // routes (e.g. "minibits → sovran worked last week") supplement auditor data
-      addLocalHistoryEdges(graph, allGroups);
-
-      const trustedMintUrls = new Set(trustedUrls);
-      const result = pickIntermediaryPath({
-        from: fromMintUrl,
-        to: toMintUrl,
-        graph,
-        settings: middlemanRouting,
-        trustedMintUrls,
+        planMintUrls: runPlan.steps.flatMap((s) => [s.fromMintUrl, s.toMintUrl]),
+        trustedMintUrls: trustedMints.map((m) => m.mintUrl),
+        mintInfoMap,
+        middlemanRouting,
+        groups: Object.values(useSwapTransactionsStore.getState().groups),
+        fetchAudit,
       });
-      if (!result.path) return null;
-
-      const pathNames = result.path.map((url) => mintInfoMap[url]?.name || url);
-      return { path: result.path, pathNames };
     },
     [runPlan, fetchAudit, mintInfoMap, trustedMints, middlemanRouting]
   );
