@@ -1,4 +1,4 @@
-export { RebalanceStepRow, type StepStatus } from './RebalanceStepRow';
+export { RebalanceStepRow } from './RebalanceStepRow';
 export { RebalanceChainCard } from './RebalanceChainCard';
 export { groupStepsForDisplay, type StepState } from './groupSteps';
 export {
@@ -14,9 +14,4 @@ export {
   addLocalHistoryEdges,
   getLocalCandidatesForDestination,
 } from './routing';
-export {
-  releaseTrustWindow,
-  formatStrandedRoutingDetail,
-  type StrandedMint,
-  type ReleaseTrustWindowResult,
-} from './releaseTrustWindow';
+export { releaseTrustWindow, formatStrandedRoutingDetail } from './releaseTrustWindow';

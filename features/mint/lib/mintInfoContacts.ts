@@ -3,12 +3,12 @@ import { nip19 } from 'nostr-tools';
 import { extractMintNostrPubkey } from '@/shared/lib/nostr/extractMintNostrPubkey';
 import { truncateMiddle } from '@/shared/lib/strings';
 
-export type MintInfoContactInput = {
+type MintInfoContactInput = {
   method: string;
   info: string | { toString(): string };
 };
 
-export type MintInfoContactRow = {
+type MintInfoContactRow = {
   method: string;
   info: string;
   isNostr: boolean;

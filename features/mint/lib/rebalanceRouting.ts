@@ -24,7 +24,7 @@ import type { SwapGroup } from '@/shared/stores/profile/swapTransactionsStore';
  *  and this runs after a failure where a quick answer beats a full graph crawl. */
 const MAX_ROUTE_CANDIDATES = 12;
 
-export interface RouteSuggestionInput {
+interface RouteSuggestionInput {
   fromMintUrl: string;
   toMintUrl: string;
   /** Mints already referenced by the run plan's steps (from + to of each). */
@@ -38,7 +38,7 @@ export interface RouteSuggestionInput {
   fetchAudit: (mintUrl: string) => Promise<AuditMintResponse | null>;
 }
 
-export interface RouteSuggestion {
+interface RouteSuggestion {
   path: string[];
   pathNames: string[];
 }
