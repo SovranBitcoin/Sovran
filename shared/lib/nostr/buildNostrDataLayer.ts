@@ -47,9 +47,7 @@ function assembleLayer(config: TierConfig): facade.NostrDataLayer | null {
 
   if (config.nagg.enabled) {
     const client = createNaggClient({
-      endpoint: backendConfig.nostrGraphqlEndpoint,
       appView: { baseUrl: config.nagg.appViewBaseUrl, version: 'v1' },
-      transport: 'appview',
     });
     tiers.push(facade.createNaggTier({ client }));
   }

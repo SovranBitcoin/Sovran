@@ -31,19 +31,6 @@ const BackendEnv = z.object({
   EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: OptionalUrl,
   // Primal public cache server (tier 2). Defaults to wss://cache2.primal.net/v1.
   EXPO_PUBLIC_PRIMAL_CACHE_URL: OptionalUrl,
-  // Flip the contacts/DM-list fetch from GraphQL `dmEnvelopes` to the dedicated
-  // REST app-view `/nostr/dm/envelopes` once it's deployed. Defaults to GraphQL.
-  EXPO_PUBLIC_NOSTR_DM_APPVIEW: z.preprocess(emptyStringToUndefined, z.string().optional()),
-  // Flip the feed / thread fetches from GraphQL to nagg's REST app-view
-  // (`/nostr/feed*`, `/nostr/thread`). Defaults to GraphQL; opt in only after
-  // device testing the REST routes.
-  EXPO_PUBLIC_NOSTR_FEED_APPVIEW: z.preprocess(emptyStringToUndefined, z.string().optional()),
-  // Flip the notifications fetch from GraphQL to nagg's REST app-view
-  // (`/nostr/notifications`). Defaults to GraphQL; opt in after device testing.
-  EXPO_PUBLIC_NOSTR_NOTIFICATIONS_APPVIEW: z.preprocess(
-    emptyStringToUndefined,
-    z.string().optional()
-  ),
 });
 
 type BackendEnvInput = Partial<Record<keyof z.input<typeof BackendEnv>, string | undefined>>;
@@ -52,15 +39,16 @@ type BackendConfig = {
   nostrAppViewBaseUrl: string;
   apiBaseUrl: string;
   scoreApiBaseUrl: string;
+  /**
+   * nagg's GraphQL endpoint. The feed/thread/notifications/DM data layer is
+   * app-view-only (no client GraphQL); this remains ONLY for integrations that
+   * embed nagg's GraphQL via coco-core (mint enrichment, mint-operator Nostr
+   * profiles) plus the recent-people-profiles lookup — none of which route
+   * through nagg-ts. Pending their own migration to REST.
+   */
   nostrGraphqlEndpoint: string;
   /** Primal public cache server URL (tier 2 of the Nostr data layer). */
   primalCacheUrl: string;
-  /** Prefer the REST app-view `/nostr/dm/envelopes` for the contacts/DM list. */
-  nostrDmAppView: boolean;
-  /** Route feed / thread fetches through nagg's REST app-view. */
-  nostrFeedAppView: boolean;
-  /** Route notifications fetches through nagg's REST app-view. */
-  nostrNotificationsAppView: boolean;
 };
 
 function readBackendEnv(): BackendEnvInput {
@@ -71,9 +59,6 @@ function readBackendEnv(): BackendEnvInput {
     EXPO_PUBLIC_SCORE_API_BASE_URL: process.env.EXPO_PUBLIC_SCORE_API_BASE_URL,
     EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: process.env.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT,
     EXPO_PUBLIC_PRIMAL_CACHE_URL: process.env.EXPO_PUBLIC_PRIMAL_CACHE_URL,
-    EXPO_PUBLIC_NOSTR_DM_APPVIEW: process.env.EXPO_PUBLIC_NOSTR_DM_APPVIEW,
-    EXPO_PUBLIC_NOSTR_FEED_APPVIEW: process.env.EXPO_PUBLIC_NOSTR_FEED_APPVIEW,
-    EXPO_PUBLIC_NOSTR_NOTIFICATIONS_APPVIEW: process.env.EXPO_PUBLIC_NOSTR_NOTIFICATIONS_APPVIEW,
   };
 }
 
@@ -86,6 +71,9 @@ export function parseBackendConfig(env: BackendEnvInput = readBackendEnv()): Bac
     throw new Error(`Invalid backend config: ${issues}`);
   }
 
+  // nagg's REST app-view is the only Nostr transport: one fully bundled payload
+  // per page (events + profiles + reliable single-query engagement stats). There
+  // is no client-side GraphQL.
   const nostrAppViewBaseUrl =
     parsed.data.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL ??
     parsed.data.EXPO_PUBLIC_NAGG_BASE_URL ??
@@ -97,14 +85,6 @@ export function parseBackendConfig(env: BackendEnvInput = readBackendEnv()): Bac
     nostrGraphqlEndpoint:
       parsed.data.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT ?? `${nostrAppViewBaseUrl}/graphql`,
     primalCacheUrl: parsed.data.EXPO_PUBLIC_PRIMAL_CACHE_URL ?? DEFAULT_PRIMAL_CACHE_URL,
-    // nagg's REST app-view is the default transport: it returns one fully
-    // bundled payload per page (events + profiles + the reliable single-query
-    // engagement stats), which the flaky GraphQL noteStats join does not. GraphQL
-    // stays only as an automatic fallback (see runNaggQuery) and an explicit dev
-    // opt-out (`EXPO_PUBLIC_NOSTR_*_APPVIEW=false`).
-    nostrDmAppView: parsed.data.EXPO_PUBLIC_NOSTR_DM_APPVIEW !== 'false',
-    nostrFeedAppView: parsed.data.EXPO_PUBLIC_NOSTR_FEED_APPVIEW !== 'false',
-    nostrNotificationsAppView: parsed.data.EXPO_PUBLIC_NOSTR_NOTIFICATIONS_APPVIEW !== 'false',
   };
 }
 
