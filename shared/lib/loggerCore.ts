@@ -285,12 +285,33 @@ const SECRET_STRING_PATTERNS: { name: string; test: (s: string) => boolean }[] =
   // their preview) when you need a readable identity in logs. Runs before the
   // base64/hex long-string patterns, which would otherwise preview it.
   { name: 'hex32', test: (s) => /^(0x)?[0-9a-fA-F]{64}$/.test(s) },
+  // BIP32 extended PRIVATE keys (xprv/yprv/zprv + testnet tprv/uprv/vprv).
+  // base58, ~111 chars — without this they fall through to the base64 long
+  // pattern and (being ≤120) get logged in full.
+  {
+    name: 'xprv',
+    test: (s) => /^(xprv|yprv|zprv|tprv|uprv|vprv)[1-9A-HJ-NP-Za-km-z]{100,}$/.test(s),
+  },
+  // WIF private keys: base58, mainnet 5/K/L, testnet 9/c, 51-52 chars.
+  // Otherwise classified as a generic long_string and logged in full.
+  { name: 'wif', test: (s) => /^[59cKL][1-9A-HJ-NP-Za-km-z]{50,51}$/.test(s) },
+  // base64 that decodes to a 32- or 64-byte payload — the size of a private key
+  // or seed. Ambiguous (could be a 32-byte hash) but we hide rather than risk
+  // leaking key material; the length is still reported via `len`.
+  {
+    name: 'base64_key',
+    test: (s) => /^[A-Za-z0-9+/]{43}={0,1}$|^[A-Za-z0-9+/]{86,88}={0,2}$/.test(s),
+  },
 ];
 
 const EMBEDDED_SECRET_PATTERNS: { replacement: string; pattern: RegExp }[] = [
   {
     replacement: '<REDACTED:nsec>',
     pattern: /\bnsec1[023456789acdefghjklmnpqrstuvwxyz]{58}\b/g,
+  },
+  {
+    replacement: '<REDACTED:xprv>',
+    pattern: /\b(xprv|yprv|zprv|tprv|uprv|vprv)[1-9A-HJ-NP-Za-km-z]{100,}/g,
   },
   {
     replacement: '<REDACTED:cashu-token>',
@@ -306,28 +327,38 @@ const EMBEDDED_SECRET_PATTERNS: { replacement: string; pattern: RegExp }[] = [
   },
 ];
 
-const LONG_STRING_PATTERNS: { name: string; test: (s: string) => boolean }[] = [
-  { name: 'npub', test: (s) => /^npub1[023456789acdefghjklmnpqrstuvwxyz]{58}$/.test(s) },
-  { name: 'base64', test: (s) => /^[A-Za-z0-9+/]{60,}={0,2}$/.test(s) },
-  { name: 'hex', test: (s) => /^(0x)?[0-9a-fA-F]{40,}$/.test(s) },
-  {
-    name: 'uuid',
-    test: (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s),
-  },
-  { name: 'url', test: (s) => /^https?:\/\/.{80,}/.test(s) },
-  { name: 'json_blob', test: (s) => s.length > 200 && (s[0] === '{' || s[0] === '[') },
-  { name: 'xml_blob', test: (s) => s.length > 200 && s.trimStart().startsWith('<') },
-  { name: 'solana_pubkey', test: (s) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s) && s.length >= 32 },
-];
+// `noPreview` marks opaque encodings whose first 32 chars could themselves be
+// key material — emit `{ _kind, len }` only, never the bytes (even when short
+// enough to otherwise print in full).
+const LONG_STRING_PATTERNS: { name: string; noPreview?: boolean; test: (s: string) => boolean }[] =
+  [
+    { name: 'npub', test: (s) => /^npub1[023456789acdefghjklmnpqrstuvwxyz]{58}$/.test(s) },
+    { name: 'base64', noPreview: true, test: (s) => /^[A-Za-z0-9+/]{60,}={0,2}$/.test(s) },
+    { name: 'hex', noPreview: true, test: (s) => /^(0x)?[0-9a-fA-F]{40,}$/.test(s) },
+    {
+      name: 'uuid',
+      test: (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s),
+    },
+    { name: 'url', test: (s) => /^https?:\/\/.{80,}/.test(s) },
+    { name: 'json_blob', test: (s) => s.length > 200 && (s[0] === '{' || s[0] === '[') },
+    { name: 'xml_blob', test: (s) => s.length > 200 && s.trimStart().startsWith('<') },
+    // Opaque base58 (>=32 chars): could be a Solana pubkey, a base58-encoded key,
+    // or other key material. Indistinguishable by value, so never show the bytes.
+    {
+      name: 'base58',
+      noPreview: true,
+      test: (s) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s) && s.length >= 32,
+    },
+  ];
 
 type StringClass =
   | { kind: 'secret'; name: string }
-  | { kind: 'long'; name: string }
-  | { kind: 'long'; name: 'long_string' };
+  | { kind: 'long'; name: string; noPreview?: boolean };
 
 function classifyString(s: string): StringClass {
   for (const p of SECRET_STRING_PATTERNS) if (p.test(s)) return { kind: 'secret', name: p.name };
-  for (const p of LONG_STRING_PATTERNS) if (p.test(s)) return { kind: 'long', name: p.name };
+  for (const p of LONG_STRING_PATTERNS)
+    if (p.test(s)) return { kind: 'long', name: p.name, noPreview: p.noPreview };
   return { kind: 'long', name: 'long_string' };
 }
 
@@ -349,6 +380,9 @@ function summarizeString(s: string, maxLen: number): Compact {
     if (redacted.length <= maxLen) return redacted;
     return { _kind: 'redacted_string', len: s.length, preview: redacted.slice(0, 32) + '…' };
   }
+  // Opaque encodings (hex/base64/base58) could be key material — never show
+  // their bytes, even when short enough to otherwise print in full.
+  if (c.kind === 'long' && c.noPreview) return { _kind: c.name, len: s.length };
   if (s.length <= maxLen) return s;
   return { _kind: c.name, len: s.length, preview: s.slice(0, 32) + '…' };
 }
