@@ -19,22 +19,13 @@ import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import type { WallpaperCatalogEntry } from '@/shared/stores/global/wallpaperStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
+import { describeImageLoadError } from '@/shared/lib/imageLoadError';
 
 /** A thumbUrl is only usable if it's a real http(s) URL — empty strings,
  *  whitespace, or junk like "null" must fall through to the gradient rather
  *  than render a blank `<Image>`. */
 function isLikelyImageUrl(url: string | undefined | null): url is string {
   return typeof url === 'string' && /^https?:\/\/\S+/i.test(url.trim());
-}
-
-function describeImageLoadError(event: unknown): string {
-  if (event && typeof event === 'object') {
-    const directError = (event as { error?: unknown }).error;
-    if (typeof directError === 'string') return directError;
-    const nativeEvent = (event as { nativeEvent?: { error?: unknown } }).nativeEvent;
-    if (typeof nativeEvent?.error === 'string') return nativeEvent.error;
-  }
-  return String(event ?? 'unknown');
 }
 
 interface WallpaperThumbnailProps {

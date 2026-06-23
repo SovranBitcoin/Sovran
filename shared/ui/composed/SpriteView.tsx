@@ -6,6 +6,7 @@ import { Image } from '@/shared/ui/primitives/Image';
 import { backgroundImageThemes } from 'config/backgroundImageThemes';
 import { useTheme } from '@/shared/providers/ThemeProvider';
 import { Log, log } from '@/shared/lib/logger';
+import { describeImageLoadError } from '@/shared/lib/imageLoadError';
 
 interface AnimatedSpriteBackgroundProps {
   backgroundColor: string;
@@ -37,16 +38,6 @@ function describeImageSource(source: unknown): Record<string, unknown> {
     return { sourceKind: 'object', sourceKeys: Object.keys(record) };
   }
   return { sourceKind: typeof source };
-}
-
-function describeImageLoadError(event: unknown): string {
-  if (event && typeof event === 'object') {
-    const directError = (event as { error?: unknown }).error;
-    if (typeof directError === 'string') return directError;
-    const nativeEvent = (event as { nativeEvent?: { error?: unknown } }).nativeEvent;
-    if (typeof nativeEvent?.error === 'string') return nativeEvent.error;
-  }
-  return String(event ?? 'unknown');
 }
 
 const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
