@@ -43,14 +43,23 @@ describe('readThread (synchronous cache projection)', () => {
     expect(view.stats.reply?.likes).toBe(2);
   });
 
-  it('does not discover replies (descendants) — those are the network delta', () => {
+  it('surfaces cached direct replies to the tapped note (reply previews)', () => {
     const cache = createNostrEntityCache();
     const root = note('root', 'alice');
     const reply = note('reply', 'bob', [['e', 'root', '', 'root']]);
-    cache.ingestNotes([root, reply]);
-    // Opening the ROOT: the reply (a descendant) is not pulled in by the walk.
+    const unrelated = note('other', 'carol'); // references nothing — must be ignored
+    cache.ingestNotes([root, reply, unrelated]);
     const view = readThread(cache, 'root');
     expect(view.root?.id).toBe('root');
+    expect(view.relatedNotes.map((n) => n.id)).toEqual(['reply']);
+  });
+
+  it('returns no replies for an uncached tapped note (nothing to paint)', () => {
+    const cache = createNostrEntityCache();
+    const reply = note('reply', 'bob', [['e', 'root', '', 'root']]);
+    cache.ingestNotes([reply]); // the reply is cached, but the tapped root is not
+    const view = readThread(cache, 'root');
+    expect(view.root).toBeUndefined();
     expect(view.relatedNotes).toEqual([]);
   });
 

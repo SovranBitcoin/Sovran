@@ -7,10 +7,11 @@ import type { CachedNote, NostrEntityCache } from './entity-cache';
 //
 // Opening a post should paint instantly from data the feed/notifications already
 // ingested. This walks UP from the tapped note via NIP-10 `e` tags to gather the
-// cached ancestor chain (root + parents) plus any cached quoted events, and the
-// author profiles + metrics for every note in that set. It deliberately does NOT
-// discover replies (descendants): those are the network delta the caller fetches
-// next, ranked. The caller runs its own NIP-10 tree builder over `relatedNotes`.
+// cached ancestor chain (root + parents) and any cached quoted events, then scans
+// for cached DIRECT REPLIES to the tapped note (the reply previews the feed
+// ingested), plus the author profiles + metrics for every note in that set. The
+// caller runs its own NIP-10 tree builder over `relatedNotes`; the ranked reply
+// delta from the network still fills in the rest.
 //
 // Pure and framework-free: a binding calls it on first render, then subscribes to
 // the cache stores to revalidate as the delta lands.
@@ -68,6 +69,18 @@ export function readThread(cache: NostrEntityCache, noteId: string): CachedThrea
       } else if (tag[0] === 'q') {
         const q = cache.getNote(ref);
         if (q) quoted[ref] = q;
+      }
+    }
+  }
+
+  // Cached direct replies to the tapped note (reply previews the feed ingested).
+  // A bounded scan over the notes store — cheap against the LRU bound, and only
+  // when the tapped note itself is cached (else there's no thread to paint).
+  if (root) {
+    for (const candidate of cache.notes.values()) {
+      if (collected.has(candidate.id)) continue;
+      if (candidate.tags.some((tag) => tag[0] === 'e' && tag[1] === noteId)) {
+        collected.set(candidate.id, candidate);
       }
     }
   }

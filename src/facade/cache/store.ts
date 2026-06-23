@@ -37,6 +37,8 @@ export interface NormalizingStore<T> {
   setMany(entries: Iterable<readonly [string, Partial<T>]>): void;
   delete(key: string): void;
   clear(): void;
+  /** Iterate stored records (insertion order). Does NOT touch LRU recency. */
+  values(): IterableIterator<T>;
   /** Observe changes. Returns an unsubscribe. Listeners decide when to revalidate. */
   subscribe(listener: () => void): () => void;
   readonly size: number;
@@ -116,6 +118,9 @@ export function createNormalizingStore<T>(options: NormalizingStoreOptions<T>): 
     },
     delete(key) {
       if (map.delete(key)) notify();
+    },
+    values() {
+      return map.values();
     },
     clear() {
       if (map.size === 0) return;
