@@ -42,12 +42,12 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 export type Phase = 'idle' | 'loading' | 'done';
 export type Result = 'success' | 'error' | 'reverted' | 'warning';
 
-export interface ConfirmationProgress {
+interface ConfirmationProgress {
   currentConfirmations: number | null;
   requiredConfirmations: number;
 }
 
-export interface SegmentedProgress {
+interface SegmentedProgress {
   completedSegments: number | null;
   segmentCount: number;
 }
@@ -62,7 +62,7 @@ type LoadingIndicatorVisualProps = {
   visualDisabled?: boolean;
 };
 
-export interface LoadingIndicatorProps extends LoadingIndicatorVisualProps {
+interface LoadingIndicatorProps extends LoadingIndicatorVisualProps {
   phase?: Phase;
   result?: Result;
   size?: number;
@@ -173,7 +173,7 @@ const T_ICON = 550;
 
 let loadingIndicatorVisualInstance = 0;
 
-export interface NormalizedSegmentedProgress {
+interface NormalizedSegmentedProgress {
   segmentCount: number;
   completedSegments: number;
 }
@@ -711,5 +711,3 @@ export function LoadingIndicator({
     </View>
   );
 }
-
-export default LoadingIndicator;

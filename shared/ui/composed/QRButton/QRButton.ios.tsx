@@ -23,7 +23,7 @@ import {
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useQRButtonPressFeedback } from './useQRButtonPressFeedback';
 
-export interface QRButtonProps {
+interface QRButtonProps {
   onPress: () => void;
   accentColor?: string;
   color?: string;

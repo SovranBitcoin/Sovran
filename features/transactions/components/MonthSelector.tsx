@@ -9,7 +9,7 @@ import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
 
-export interface MonthItem {
+interface MonthItem {
   key: string;
   label: string;
   fullLabel: string;

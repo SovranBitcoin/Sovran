@@ -13,7 +13,7 @@ export { sendMemoPopup } from './sendMemoSheet';
 export { emojiPickerPopup } from './emojiPicker';
 export { modelPickerPopup } from './modelPicker';
 export type { ProfileSwitcherAction } from '../actionSheetTypes';
-export { actionMenuPopup, dismissActionMenuPopup } from './actionMenu';
+export { actionMenuPopup } from './actionMenu';
 export {
   paymentStatusPopup,
   swapStatusPopup,
@@ -412,9 +412,9 @@ const PARAM_POPUPS = {
   }),
 } as const satisfies Record<string, (p: never) => PopupSpec>;
 
-export type StaticPopupKey = keyof typeof STATIC_POPUPS;
-export type ParamPopupKey = keyof typeof PARAM_POPUPS;
-export type PopupParams<K extends ParamPopupKey> = Parameters<(typeof PARAM_POPUPS)[K]>[0];
+type StaticPopupKey = keyof typeof STATIC_POPUPS;
+type ParamPopupKey = keyof typeof PARAM_POPUPS;
+type PopupParams<K extends ParamPopupKey> = Parameters<(typeof PARAM_POPUPS)[K]>[0];
 
 export function staticPopup(key: StaticPopupKey, overrides?: PopupOverrides): void {
   popup({ ...STATIC_POPUPS[key], ...overrides });

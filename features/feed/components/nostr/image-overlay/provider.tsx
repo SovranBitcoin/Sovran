@@ -143,7 +143,7 @@ function measureWithTimeout(
   });
 }
 
-export type ImageOverlayProviderProps = {
+type ImageOverlayProviderProps = {
   children: React.ReactNode;
   /** When provided, overlay panel shows live metrics (optimistic counts) for the active post. */
   getDisplayMetrics?: (eventId: string) => NoteMetrics;

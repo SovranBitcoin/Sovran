@@ -26,7 +26,7 @@ export const DEFAULT_ENGAGEMENT_STATE: EngagementViewState = Object.freeze({
   repostPending: false,
 });
 
-export type BuildFeedRowsOptions = {
+type BuildFeedRowsOptions = {
   items: FeedItem[];
   previousRows: FeedRow[];
   profilesMap: Map<string, ProfileInfo>;
@@ -77,7 +77,7 @@ export function buildFeedRows({
   });
 }
 
-export function getFeedItemKey(item: FeedItem): string {
+function getFeedItemKey(item: FeedItem): string {
   return item.type === 'note' ? item.event.id : item.originalEventId;
 }
 
@@ -91,10 +91,6 @@ export function getFeedRowItemType(row: FeedRow): string {
   return `${row.item.type}${row.rootEvent ? '-with-root' : ''}${
     hasReplyPreview ? '-with-preview' : ''
   }`;
-}
-
-export function feedRowsAreEqual(previous: FeedRow, next: FeedRow): boolean {
-  return previous === next;
 }
 
 function getPrimaryEventId(item: FeedItem): string {

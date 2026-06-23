@@ -1154,7 +1154,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 
 const LIST_CONTENT_STYLE = { paddingBottom: 120 };
 
-export const DEFAULT_FEED_SPECS: FeedSpec[] = [
+const DEFAULT_FEED_SPECS: FeedSpec[] = [
   {
     name: FEED_FILTER_FOR_YOU,
     spec: JSON.stringify({ id: 'for-you', kind: 'notes', hours: 24 }),

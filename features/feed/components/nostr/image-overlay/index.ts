@@ -16,13 +16,7 @@
  */
 
 // Provider & hook
-export {
-  ImageOverlayProvider,
-  useImageOverlay,
-  IMAGE_OVERLAY_TIMING_CONFIG,
-  computeExpandedSize,
-} from './provider';
-export type { ImageOverlayProviderProps } from './provider';
+export { ImageOverlayProvider, useImageOverlay } from './provider';
 
 // Main overlay component
 export { AnimatedImageOverlay } from './AnimatedImageOverlay';
@@ -31,11 +25,4 @@ export { AnimatedImageOverlay } from './AnimatedImageOverlay';
 export { ImageBlock } from './ImageBlock';
 
 // Types (re-export for consumers)
-export type {
-  ImageOverlayPost,
-  ImageOverlayLayout,
-  ImageOverlayReplaceLayout,
-  ThumbnailLayout,
-  ImageOverlayContextValue,
-  MediaType,
-} from './types';
+export type { ImageOverlayPost, ImageOverlayLayout, ImageOverlayReplaceLayout } from './types';

@@ -45,12 +45,3 @@ export function notificationReplyScopeLabel(scope: FeedNotificationReplyScope): 
       return 'Thread replies';
   }
 }
-
-export function notificationReplyScopeDescription(scope: FeedNotificationReplyScope): string {
-  switch (scope) {
-    case 'DIRECT':
-      return 'Only replies whose direct parent is your post.';
-    case 'THREAD':
-      return 'Replies anywhere under a post you authored.';
-  }
-}
