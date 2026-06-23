@@ -18,16 +18,24 @@ import {
 //
 // Drives the relay round-trips the pure `discovery` primitives can't: harvest
 // the viewer's likes (widening the window until there's enough signal), expand
-// one hop or cold-start from curated accounts when the viewer's likes are thin,
-// then fetch and rank the candidate authors' last-24h notes. The ranked set is
-// materialized ONCE per viewer and cached, so pagination is a pure slice (no
-// reshuffle) and a warm re-entry costs zero relay round-trips — the lever that
-// keeps the cold path inside the ~3s budget on the second look.
+// one hop or cold-start from curated accounts when likes are thin, then fetch
+// and rank the candidate authors' last-24h notes. That ranked block is the head
+// of a per-viewer CORPUS that is cached and extended lazily: scrolling past it
+// backfills OLDER notes from the same authors (recency-ranked, still per-author
+// capped per block), so the feed paginates indefinitely instead of dead-ending.
 //
-// Returns null when there's no viewer or no usable signal; the caller (the relay
-// tier) then falls through to its honest recency degrade. Nothing here throws on
-// a relay error — a failed round-trip settles as "no events" so a partial answer
-// still renders within budget.
+// Pagination channel: the app's facade only round-trips `cursor.createdAt` (it
+// hardcodes the cursor id to '' — facadeFeedClient), so we carry the next OFFSET
+// into the corpus through `createdAt`. The app treats it opaquely: a `> 0`
+// "has-more" gate it echoes straight back, the same way nagg's own For-You uses
+// a sentinel. Page 0 (no/zero cursor) serves the head; a positive cursor is the
+// offset to resume from.
+//
+// Returns null only when there's no viewer or no usable signal on page 0; the
+// caller (the relay tier) then falls through to its honest recency degrade. A
+// deep page past the corpus returns an empty answered bundle (cursor null) so we
+// stop cleanly instead of degrading to recent-global at the bottom. Nothing here
+// throws on a relay error — a failed round-trip settles as "no events".
 // ---------------------------------------------------------------------------
 
 const SEC = 1;
@@ -47,6 +55,10 @@ const DEFAULTS = {
   perAuthorCap: 2,
   notesLimit: 240,
   notesWindowSec: DAY_SEC,
+  /** Upper bound on the materialized corpus — the feed ends honestly here. */
+  maxCorpus: 600,
+  /** Backfill rounds a single page request may trigger (bounds the latency). */
+  backfillRoundsPerPage: 2,
   viewerLikesTimeoutMs: 1200,
   discoveryTimeoutMs: 1000,
   notesTimeoutMs: 1500,
@@ -54,15 +66,23 @@ const DEFAULTS = {
   defaultPageLimit: 30,
 } as const;
 
-type RankedSet = {
-  rankedIds: string[];
+type ForYouCorpus = {
+  /** The ranked id list, head first; grows as backfill appends older blocks. */
+  orderedIds: string[];
   eventsById: Map<string, NaggFeedEvent>;
   profiles: Record<string, NaggProfileInfo>;
+  /** Candidate authors (for affinity scoring) and the flat author list to query. */
+  candidates: CandidateAuthor[];
+  authors: string[];
+  /** Exclusive upper bound (unix sec) for the next older backfill query. */
+  oldestFetchedAt: number;
+  /** No more older notes to fetch (or corpus cap hit). */
+  exhausted: boolean;
   generatedAt: number;
 };
 
-/** Per-viewer cache of the materialized ranked set. For-You is the only ranked relay spec. */
-const cacheByViewer = new Map<string, RankedSet>();
+/** Per-viewer corpus cache. For-You is the only ranked relay spec. */
+const cacheByViewer = new Map<string, ForYouCorpus>();
 
 export type BuildRelayForYouArgs = {
   viewerPubkey?: string;
@@ -76,24 +96,29 @@ export async function buildRelayForYouFeed(args: BuildRelayForYouArgs): Promise<
   if (!viewerPubkey) return null;
   const now = args.now ?? Date.now();
   const limit = request.limit ?? DEFAULTS.defaultPageLimit;
+  const offset = cursorOffset(request.cursor);
 
-  const cached = freshCache(viewerPubkey, now);
-
-  // Warm page-0: serve the cached ranked set instantly (no relay round-trip).
-  if (!request.cursor && cached && !request.refresh) {
-    return pageFrom(cached, null, limit);
+  // (Re)build the corpus head on a fresh page-0 / refresh / expired cache.
+  let corpus = freshCache(viewerPubkey, now);
+  if (!corpus || (offset === 0 && request.refresh)) {
+    const head = await computeHead(viewerPubkey, connection, request, now);
+    if (!head) return offset > 0 ? emptyPage() : null;
+    corpus = head;
+    cacheByViewer.set(viewerPubkey, corpus);
   }
 
-  // Continuation against a warm cache: pure slice after the cursor id.
-  if (request.cursor && cached) {
-    return pageFrom(cached, request.cursor, limit);
+  // Extend the corpus with older notes until it can serve this page (or runs dry).
+  let rounds = 0;
+  while (
+    corpus.orderedIds.length < offset + limit &&
+    !corpus.exhausted &&
+    rounds < DEFAULTS.backfillRoundsPerPage
+  ) {
+    await backfillOlder(corpus, connection, request);
+    rounds += 1;
   }
 
-  // Cold (or refresh, or stale continuation): rebuild the ranked set, then page.
-  const set = await computeRankedSet(viewerPubkey, connection, request, now);
-  if (!set || set.rankedIds.length === 0) return null;
-  cacheByViewer.set(viewerPubkey, set);
-  return pageFrom(set, request.cursor ?? null, limit);
+  return pageFrom(corpus, offset, limit);
 }
 
 /** Test seam — drop cached state between cases. */
@@ -101,38 +126,57 @@ export function __clearRelayForYouCache(): void {
   cacheByViewer.clear();
 }
 
-function freshCache(viewerPubkey: string, now: number): RankedSet | null {
-  const set = cacheByViewer.get(viewerPubkey);
-  if (!set) return null;
-  return now - set.generatedAt < DEFAULTS.cacheTtlMs ? set : null;
+/** Decode the next-offset we encoded into `cursor.createdAt` (id is always ''). */
+function cursorOffset(cursor: NostrCursor | undefined): number {
+  if (cursor && typeof cursor.createdAt === 'number' && cursor.createdAt > 0) {
+    return Math.floor(cursor.createdAt);
+  }
+  return 0;
 }
 
-/** Slice the materialized ranked list into a rank-manifest bundle. */
-function pageFrom(set: RankedSet, cursor: NostrCursor, limit: number): FeedBundle {
-  const startIndex = cursor ? set.rankedIds.indexOf(cursor.id) + 1 : 0;
-  const slice = set.rankedIds.slice(startIndex, startIndex + limit);
+function freshCache(viewerPubkey: string, now: number): ForYouCorpus | null {
+  const corpus = cacheByViewer.get(viewerPubkey);
+  if (!corpus) return null;
+  return now - corpus.generatedAt < DEFAULTS.cacheTtlMs ? corpus : null;
+}
+
+/** Slice the corpus at `offset` into a rank-manifest bundle, encoding the next offset. */
+function pageFrom(corpus: ForYouCorpus, offset: number, limit: number): FeedBundle {
+  const slice = corpus.orderedIds.slice(offset, offset + limit);
 
   const itemsById = new Map<string, FeedItem>();
   for (const id of slice) {
-    const event = set.eventsById.get(id);
+    const event = corpus.eventsById.get(id);
     if (event) itemsById.set(id, { type: 'note', event });
   }
 
   const manifest: OrderingManifest = { orderBy: 'rank', elements: slice };
-  const hasMore = startIndex + limit < set.rankedIds.length;
-  const lastEvent = slice.length > 0 ? set.eventsById.get(slice[slice.length - 1]) : undefined;
-  const nextCursor: NostrCursor =
-    hasMore && lastEvent ? { createdAt: lastEvent.created_at, id: lastEvent.id } : null;
+  const nextOffset = offset + slice.length;
+  const hasMore = nextOffset < corpus.orderedIds.length || !corpus.exhausted;
+  const cursor: NostrCursor = slice.length > 0 && hasMore ? { createdAt: nextOffset, id: '' } : null;
 
-  return { itemsById, manifest, stats: {}, profiles: set.profiles, quoted: {}, cursor: nextCursor };
+  return { itemsById, manifest, stats: {}, profiles: corpus.profiles, quoted: {}, cursor };
 }
 
-async function computeRankedSet(
+/** An answered-but-empty page: stop cleanly past the corpus without degrading. */
+function emptyPage(): FeedBundle {
+  return {
+    itemsById: new Map(),
+    manifest: { orderBy: 'rank', elements: [] },
+    stats: {},
+    profiles: {},
+    quoted: {},
+    cursor: null,
+  };
+}
+
+/** Build the corpus head: discover candidates, fetch + rank their last-24h notes. */
+async function computeHead(
   viewerPubkey: string,
   connection: RelayConnection,
   request: FeedPageRequest,
   now: number,
-): Promise<RankedSet | null> {
+): Promise<ForYouCorpus | null> {
   const nowSec = Math.floor(now / 1000);
 
   // Stage 1 — the viewer's own likes, widening until there's enough signal.
@@ -180,12 +224,62 @@ async function computeRankedSet(
   const { notesById, profiles } = parseRelayBatch(raw);
   if (notesById.size === 0) return null;
 
-  const { rankedIds, eventsById } = rankNotes({
-    notes: [...notesById.values()],
+  const notes = [...notesById.values()];
+  const { rankedIds, eventsById } = rankNotes({ notes, candidates, perAuthorCap: DEFAULTS.perAuthorCap });
+  return {
+    orderedIds: rankedIds,
+    eventsById,
+    profiles,
     candidates,
+    authors,
+    oldestFetchedAt: oldestCreatedAt(notes, nowSec - DEFAULTS.notesWindowSec),
+    exhausted: false,
+    generatedAt: now,
+  };
+}
+
+/** Fetch the next-older block of candidate-author notes and append it to the corpus. */
+async function backfillOlder(
+  corpus: ForYouCorpus,
+  connection: RelayConnection,
+  request: FeedPageRequest,
+): Promise<void> {
+  const raw = await requestEvents(
+    connection,
+    [{ kinds: [1], authors: corpus.authors, until: corpus.oldestFetchedAt, limit: DEFAULTS.notesLimit }],
+    { signal: request.signal, timeoutMs: DEFAULTS.notesTimeoutMs },
+  );
+  const { notesById, profiles } = parseRelayBatch(raw);
+
+  const fresh: NaggFeedEvent[] = [];
+  for (const note of notesById.values()) {
+    if (note.id && !corpus.eventsById.has(note.id)) fresh.push(note);
+  }
+  if (fresh.length === 0) {
+    corpus.exhausted = true;
+    return;
+  }
+
+  // Rank this block (recency-leaning, still per-author capped so no author floods
+  // a stretch of feed) and append. Authors may recur across blocks — the cap is
+  // per block, which is what keeps the feed both diverse AND effectively endless.
+  const { rankedIds, eventsById } = rankNotes({
+    notes: fresh,
+    candidates: corpus.candidates,
     perAuthorCap: DEFAULTS.perAuthorCap,
   });
-  return { rankedIds, eventsById, profiles, generatedAt: now };
+  for (const id of rankedIds) {
+    const event = eventsById.get(id);
+    if (event) {
+      corpus.orderedIds.push(id);
+      corpus.eventsById.set(id, event);
+    }
+  }
+  mergeProfiles(corpus.profiles, profiles);
+
+  // Step strictly older next time (relay `until` is inclusive) and honor the cap.
+  corpus.oldestFetchedAt = oldestCreatedAt(fresh, corpus.oldestFetchedAt) - 1;
+  if (corpus.orderedIds.length >= DEFAULTS.maxCorpus) corpus.exhausted = true;
 }
 
 /** Harvest the viewer's kind-7 likes, widening the window until target or budget. */
@@ -251,4 +345,20 @@ function toReactions(raw: ReadonlyArray<RawRelayEvent>): NaggFeedEvent[] {
     if (coerced && coerced.kind === 7) out.push(coerced);
   }
   return out;
+}
+
+/** Smallest `created_at` across notes, or the fallback when there are none. */
+function oldestCreatedAt(notes: ReadonlyArray<NaggFeedEvent>, fallback: number): number {
+  let oldest = Infinity;
+  for (const note of notes) if (note.created_at < oldest) oldest = note.created_at;
+  return Number.isFinite(oldest) ? oldest : fallback;
+}
+
+function mergeProfiles(
+  into: Record<string, NaggProfileInfo>,
+  from: Record<string, NaggProfileInfo>,
+): void {
+  for (const [pubkey, profile] of Object.entries(from)) {
+    if (!into[pubkey]) into[pubkey] = profile;
+  }
 }

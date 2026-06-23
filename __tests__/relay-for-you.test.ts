@@ -274,26 +274,77 @@ describe('buildRelayForYouFeed', () => {
     expect(bundle).toBeNull();
   });
 
-  test('pagination slices the cached ranked set without reshuffle and ends cleanly', async () => {
+  test('load-more advances with the app-style empty-id cursor (does NOT re-serve page 0)', async () => {
+    // The facade hardcodes the cursor id to '' and round-trips only createdAt, so
+    // page 1 must advance via the offset we encode there — not re-serve the head.
     const connection = routedConnection({
       viewerLikes: [reaction(V, A, 'eA1'), reaction(V, B, 'eB1')],
       seedLikes: [],
-      // 1 note each from A and B (per-author cap default 2) → 2 ranked notes total
       notes: [note(A, 1, 800), note(B, 1, 700), profile(A, 'Alice'), profile(B, 'Bob')],
     });
     const page0 = await buildRelayForYouFeed({ viewerPubkey: V, connection, request: request({ limit: 1 }), now: NOW });
-    expect(page0!.manifest.elements).toHaveLength(1);
     expect(page0!.cursor).not.toBeNull();
+    expect(page0!.cursor!.id).toBe(''); // offset carried in createdAt, id unused
 
+    // Mimic the app: echo only createdAt back, force id to '' (the real bug surface).
+    const appCursor = { createdAt: page0!.cursor!.createdAt, id: '' };
     const page1 = await buildRelayForYouFeed({
       viewerPubkey: V,
       connection,
-      request: request({ limit: 1, cursor: page0!.cursor }),
+      request: request({ limit: 1, cursor: appCursor }),
       now: NOW,
     });
     expect(page1!.manifest.elements).toHaveLength(1);
-    // No overlap and no reshuffle: page1's item differs from page0's.
-    expect(page1!.manifest.elements[0]).not.toBe(page0!.manifest.elements[0]);
-    expect(page1!.cursor).toBeNull(); // ranked set exhausted
+    expect(page1!.manifest.elements[0]).not.toBe(page0!.manifest.elements[0]); // advanced, no dup
+  });
+
+  test('pagination walks the whole corpus without dupes and terminates', async () => {
+    const connection = routedConnection({
+      viewerLikes: [reaction(V, A, 'eA1'), reaction(V, B, 'eB1')],
+      seedLikes: [],
+      // 2 notes each from A and B = 4 ranked notes; per-author cap is 2.
+      notes: [note(A, 1, 800), note(A, 2, 790), note(B, 1, 700), note(B, 2, 690), profile(A, 'Alice')],
+    });
+    const seen: string[] = [];
+    let cursor: { createdAt: number; id: string } | undefined;
+    for (let i = 0; i < 20; i++) {
+      const page = await buildRelayForYouFeed({ viewerPubkey: V, connection, request: request({ limit: 2, cursor }), now: NOW });
+      seen.push(...page!.manifest.elements);
+      if (!page!.cursor) break;
+      cursor = { createdAt: page!.cursor.createdAt, id: '' }; // app-style echo
+    }
+    expect(new Set(seen).size).toBe(seen.length); // no duplicates across pages
+    expect(seen).toHaveLength(4); // all four notes, then it ends
+  });
+
+  test('backfill extends the feed with OLDER notes from the same authors', async () => {
+    // until-aware fake: no `until` → the 24h head; a `until` → one older block, then dry.
+    const head = [note(A, 1, 9000), note(B, 1, 8900)];
+    const older = [note(A, 2, 5000), note(B, 2, 4900)];
+    const connection: RelayConnection = {
+      request: (filters: NostrFilter[]): Promise<Result<RawRelayEvent[], NaggError>> => {
+        const notesFilter = filters.find((f) => f.kinds?.includes(1));
+        if (notesFilter) {
+          if (notesFilter.until == null) return Promise.resolve(ok([...head, profile(A, 'Alice')]));
+          return Promise.resolve(ok(notesFilter.until > 4900 ? older : []));
+        }
+        const authors = filters[0].authors ?? [];
+        if (authors.length === 1 && authors[0] === V) {
+          return Promise.resolve(ok([reaction(V, A, 'eA1'), reaction(V, B, 'eB1')]));
+        }
+        return Promise.resolve(ok([]));
+      },
+    };
+    const seen: string[] = [];
+    let cursor: { createdAt: number; id: string } | undefined;
+    for (let i = 0; i < 20; i++) {
+      const page = await buildRelayForYouFeed({ viewerPubkey: V, connection, request: request({ limit: 2, cursor }), now: NOW });
+      seen.push(...page!.manifest.elements);
+      if (!page!.cursor) break;
+      cursor = { createdAt: page!.cursor.createdAt, id: '' };
+    }
+    // Started with 2 head notes; backfill pulled 2 older ones → 4 total, no dupes.
+    expect(seen).toHaveLength(4);
+    expect(new Set(seen).size).toBe(4);
   });
 });
