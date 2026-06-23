@@ -1,6 +1,5 @@
 import { createNaggClient, setNostrLogger, facade, type NostrLogger } from '@sovranbitcoin/nagg-ts';
 
-import { backendConfig } from '@/shared/config/backend';
 import { log } from '@/shared/lib/logger';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import { useProfileStore } from '@/shared/stores/global/profileStore';

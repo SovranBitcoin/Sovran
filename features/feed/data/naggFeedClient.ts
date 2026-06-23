@@ -10,30 +10,22 @@ import {
 } from '@sovranbitcoin/nagg-ts';
 import {
   eventsAppView,
-  followingRecentEventsInput,
-  followingRepliesEventsInput,
   followingPopularRankedEventsInput,
   followsFeedAppView,
   forYouRankedEventsInput,
   notificationsAppView,
   profilesAppView,
   rankedFeedAppView,
-  recentNotesEventsInput,
   threadAppView,
   userFeedAppView,
-  withEventExclusions,
   withRankedTargetExclusions,
-  type EventQueryInput,
   type RankedEventsInput,
 } from '@sovranbitcoin/nagg-ts/recipes';
 import { type NaggFeedPage } from '@sovranbitcoin/nagg-ts/map';
 import type { z } from 'zod';
 import { backendConfig } from '@/shared/config/backend';
 import { apiLog, feedLog, redactError } from '@/shared/lib/logger';
-import {
-  buildThreadStructure,
-  type ThreadStructure,
-} from '@/features/feed/lib/buildThreadStructure';
+import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
 import { mapNaggFeedPage } from './mapNaggFeedPage';
 import type {
   FeedClient,
@@ -45,7 +37,6 @@ import type {
   FeedNotificationsRequest,
   FeedNotificationsResult,
   ThreadRequest,
-  ThreadReplySort,
   ThreadResult,
   UserFeedPageRequest,
   PostsByPubkeysRequest,
@@ -59,7 +50,6 @@ import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/fe
 import { useFeedIgnoreStore } from '../stores/ignoreStore';
 
 const RELEVANT_AUTHOR_REPLY_LIMIT = 50;
-
 
 type FeedQueryOptions = {
   includeNote?: (event: FeedEvent, rootEvent?: FeedEvent) => boolean;
@@ -235,30 +225,6 @@ function errorFromNaggError(error: NaggError): Error {
   return out;
 }
 
-
-function feedInputFromSpec({
-  spec,
-  limit,
-  until,
-  offset,
-}: {
-  spec: string;
-  limit: number;
-  until?: number;
-  offset?: number;
-}): EventQueryInput {
-  const parsed = parseJson<Record<string, unknown>>(spec);
-  const pubkeys = pubkeysFromSpec(parsed);
-  const input: EventQueryInput = {
-    kinds: pubkeys.length > 0 ? [1, 6, 16] : [1],
-    limit,
-    ...(until && { until }),
-    ...(offset && { offset }),
-  };
-  if (pubkeys.length > 0) input.pubkeys = pubkeys;
-  return input;
-}
-
 function forYouInputFromSpec({
   parsed,
   viewerPubkey,
@@ -280,23 +246,6 @@ function forYouInputFromSpec({
   });
 }
 
-function recentInputFromSpec({
-  parsed,
-  limit,
-  offset,
-}: {
-  parsed: Record<string, unknown> | null;
-  limit: number;
-  offset?: number;
-}): EventQueryInput {
-  const hours = feedWindowHours(parsed);
-  return recentNotesEventsInput({
-    since: Math.floor(Date.now() / 1000) - hours * 60 * 60,
-    limit,
-    offset,
-  }) as EventQueryInput;
-}
-
 function isForYouSpec(parsed: Record<string, unknown> | null): boolean {
   return parsed?.id === 'for-you' && parsed.kind === 'notes';
 }
@@ -312,8 +261,6 @@ function isFollowingPopularSpec(parsed: Record<string, unknown> | null): boolean
 function isFollowingRecentSpec(parsed: Record<string, unknown> | null): boolean {
   return parsed?.id === 'following-recent' && parsed.kind === 'notes';
 }
-
-
 
 function followingPopularInput({
   viewerPubkey,
@@ -367,16 +314,6 @@ function currentFeedPreferenceFilters(): FeedPreferenceFilters {
   };
 }
 
-function withPreferenceEventFilters(
-  input: EventQueryInput,
-  filters: FeedPreferenceFilters
-): EventQueryInput {
-  return withEventExclusions(input, {
-    excludeIds: filters.ignoredEventIds,
-    excludePubkeys: filters.ignoredPubkeys,
-  });
-}
-
 function withPreferenceRankedFilters(
   input: RankedEventsInput,
   filters: FeedPreferenceFilters
@@ -410,7 +347,14 @@ function feedQueryOptionsFromPreferences(filters: FeedPreferenceFilters): FeedQu
 type NaggFeedPageOf = NaggFeedPage<FeedEvent, ProfileInfo>;
 
 function emptyNaggFeedPage(): NaggFeedPageOf {
-  return { items: [], metrics: {}, profiles: {}, quoted: {}, paginationUntil: 0, paginationOffset: 0 };
+  return {
+    items: [],
+    metrics: {},
+    profiles: {},
+    quoted: {},
+    paginationUntil: 0,
+    paginationOffset: 0,
+  };
 }
 
 function compareNotificationsNewestFirst(
@@ -490,8 +434,6 @@ function logFeedPageResult(
   });
   return result;
 }
-
-
 
 /**
  * Build a {@link FeedNotificationsResult} from the parsed canonical
