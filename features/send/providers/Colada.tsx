@@ -39,13 +39,15 @@ import { paymentLog } from '@/shared/lib/logger';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 import {
-  createSovranExecuteMintQuote,
-  createSovranExecuteReceive,
   createSovranHandlers,
   createSovranNotifications,
   createSovranScanSources,
   createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
+import {
+  createSovranExecuteMintQuote,
+  createSovranExecuteReceive,
+} from '@/features/send/lib/sovranPaymentOperations';
 import { deriveBitchatBLEIdentityMaterial } from '@/features/bitchat/lib/bleIdentity';
 import {
   createSovranScreenActionsBridge,
