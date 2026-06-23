@@ -79,7 +79,12 @@ export function orderedReplyIdsForThreadResult(
     return [...existingOrder, ...nextPageReplyIds.filter((id) => !existingOrderSet.has(id))];
   }
 
-  return pageReplyIds.length > 0 ? pageReplyIds : fallbackReplyIds;
+  // Initial fetch: keep whatever was already on screen (the cache-seeded previews)
+  // as a stable prefix and APPEND the ranked delta, instead of replacing the order
+  // outright — so the replies don't visibly reshuffle when the network result lands.
+  // With no seed, existingOrder is empty and this is just the server's order.
+  const initialReplyIds = pageReplyIds.length > 0 ? pageReplyIds : fallbackReplyIds;
+  return [...existingOrder, ...initialReplyIds.filter((id) => !existingOrderSet.has(id))];
 }
 
 export function buildThreadItemsFromSeed(
@@ -106,7 +111,13 @@ export function buildThreadItemsFromSeed(
       profiles: seed.profiles,
       metrics: seed.metrics,
       quotedEvents: seed.quotedEvents,
-      thread,
+      // Seed the focused note at index 0 — drop any ancestors the originating
+      // context happened to include. The note then mounts at the TOP and stays
+      // focused as the real parent chain loads in above it (held by
+      // maintainVisibleContentPosition), instead of landing mid-list via a fragile
+      // estimated `initialScrollIndex`. This matches the notifications entry (which
+      // seeds no ancestors) so every entry point focuses the note the same way.
+      thread: { ...thread, parents: [] },
       replyPageEventIds,
       replyPageSize: replyPageEventIds.length,
       loadedReplyCount: 0,

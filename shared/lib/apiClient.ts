@@ -8,12 +8,6 @@ import {
   type MintReviewsSummary,
   type RequestControls,
 } from '@sovranbitcoin/colada';
-import {
-  createNaggClient,
-  NaggProfileSearchDataSchema,
-  type NaggProfileSearchResult,
-} from '@sovranbitcoin/nagg-ts';
-import { PROFILE_SEARCH_QUERY, profileSearchInput } from '@sovranbitcoin/nagg-ts/recipes';
 import { ok, err, Result, ResultAsync } from 'neverthrow';
 import { z } from 'zod';
 import { apiLog } from './logger';
@@ -23,7 +17,6 @@ import {
   LatestVersionResponse,
   MintSearchResponse,
   NostrProfileFull as NostrProfileFullStrict,
-  SearchUsersResponse,
   TopFollower as TopFollowerStrict,
   loggableIssues,
   parseWith,
@@ -70,8 +63,6 @@ type MintReviewsResponseType = {
   lastUpdated: number | null;
   fromCache: boolean;
 };
-type SearchUsersResponseType = z.infer<typeof SearchUsersResponse>;
-
 const API_BASE_URL = backendConfig.apiBaseUrl;
 const SCORE_API_BASE_URL = backendConfig.scoreApiBaseUrl;
 
@@ -88,15 +79,6 @@ const mintReviewsEnrichment = createNostrGraphqlMintEnrichment({
   endpoint: backendConfig.nostrGraphqlEndpoint,
   timeoutMs: DEFAULT_TIMEOUT_MS,
 });
-const nostrGraphqlClient = createNaggClient({
-  endpoint: backendConfig.nostrGraphqlEndpoint,
-  // Expose nagg's REST app-view (/v1/nostr/*) alongside GraphQL. `transport`
-  // defaults to 'graphql', so behavior is unchanged until a query opts in with
-  // `transport: 'appview'` + an `appView` binding (see nagg-ts NaggAppViewBinding).
-  appView: { baseUrl: backendConfig.nostrAppViewBaseUrl, version: 'v1' },
-  defaultTimeoutMs: DEFAULT_TIMEOUT_MS,
-});
-
 // Re-export schema-derived types for callers that previously imported them
 // from this module.
 export type {
@@ -255,7 +237,6 @@ function describeRoute(url: string): { host: string; path: string } {
 // Parsers — hoisted to module scope to avoid Zod v4 JIT cost on each call.
 // ---------------------------------------------------------------------------
 
-const parseSearchUsers = parseWith(SearchUsersResponse, 'graphql.profileSearch');
 const parseAuditMint = parseWith(AuditMintResponse, 'cashu/mint/audit');
 const parseMintSearch = parseWith(MintSearchResponse, 'cashu/mints/search');
 const parseNostrProfile = parseWith(NostrProfileFull, 'nostr/profile');
@@ -289,109 +270,9 @@ const parseMintInfo = (input: unknown): Result<GetInfoResponse, ParseError> => {
   return ok(input as GetInfoResponse);
 };
 
-function profileSearchCreatedAtSeconds(value: NaggProfileSearchResult['createdAt']) {
-  if (value == null) return undefined;
-  if (typeof value === 'number') return Number.isFinite(value) ? Math.floor(value) : undefined;
-  const ms = value instanceof Date ? value.getTime() : Date.parse(value);
-  if (!Number.isFinite(ms)) return undefined;
-  return Math.floor(ms / 1000);
-}
-
-function mapProfileSearchResult(row: NaggProfileSearchResult) {
-  const createdAt = profileSearchCreatedAtSeconds(row.createdAt);
-  return {
-    pubkey: row.pubkey,
-    npub: row.npub,
-    ...(typeof row.rank === 'number' ? { rank: row.rank } : {}),
-    ...(typeof row.score === 'number' || row.score === null ? { score: row.score } : {}),
-    ...(row.name ? { name: row.name } : {}),
-    ...(row.displayName ? { displayName: row.displayName } : {}),
-    ...(row.picture ? { picture: row.picture } : {}),
-    ...(row.image ? { image: row.image } : {}),
-    ...(row.banner ? { banner: row.banner } : {}),
-    ...(row.about ? { about: row.about } : {}),
-    ...(row.nip05 ? { nip05: row.nip05 } : {}),
-    ...(typeof row.nip05Valid === 'boolean' ? { nip05Valid: row.nip05Valid } : {}),
-    ...(row.website ? { website: row.website } : {}),
-    ...(row.lud16 ? { lud16: row.lud16 } : {}),
-    ...(row.lud06 ? { lud06: row.lud06 } : {}),
-    ...(typeof row.followers === 'number' ? { followers: row.followers } : {}),
-    ...(typeof row.follows === 'number' ? { follows: row.follows } : {}),
-    ...(createdAt !== undefined ? { created_at: createdAt } : {}),
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Public API client functions
 // ---------------------------------------------------------------------------
-
-export const searchUsers = async ({
-  query,
-  limit = 10,
-  signal,
-}: {
-  query: string;
-  limit?: number;
-  signal?: AbortSignal;
-}): Promise<Result<SearchUsersResponseType, Error>> => {
-  const startedAt = Date.now();
-  const route = describeRoute(backendConfig.nostrGraphqlEndpoint);
-  const logFields = {
-    ...route,
-    operationName: 'ProfileSearch',
-    queryLength: query.trim().length,
-    limit,
-  };
-
-  apiLog.info('api.profile_search.start', logFields);
-  const result = await nostrGraphqlClient.query({
-    query: PROFILE_SEARCH_QUERY,
-    operationName: 'ProfileSearch',
-    variables: { input: profileSearchInput({ query, limit }) },
-    dataSchema: NaggProfileSearchDataSchema,
-    signal,
-  });
-
-  if (result.isErr()) {
-    apiLog.warn('api.profile_search.failed', {
-      ...logFields,
-      durationMs: Date.now() - startedAt,
-      errorType: result.error.type,
-      message: result.error.message,
-    });
-    return err(new Error(result.error.message));
-  }
-
-  const raw = {
-    query: result.value.profileSearch.query,
-    limit: result.value.profileSearch.limit,
-    sort: result.value.profileSearch.sort,
-    fromCache: result.value.profileSearch.fromCache,
-    results: result.value.profileSearch.nodes.map(mapProfileSearchResult),
-  };
-
-  const parsed = parseSearchUsers(raw);
-  if (parsed.isErr()) {
-    apiLog.warn('api.parse_failed', {
-      where: 'graphql.profileSearch',
-      issues: loggableIssues(parsed.error),
-    });
-    apiLog.warn('api.profile_search.failed', {
-      ...logFields,
-      durationMs: Date.now() - startedAt,
-      errorType: 'parse',
-    });
-    return err(toError(parsed.error));
-  }
-
-  apiLog.info('api.profile_search.done', {
-    ...logFields,
-    durationMs: Date.now() - startedAt,
-    resultCount: parsed.value.results.length,
-    fromCache: parsed.value.fromCache,
-  });
-  return ok(parsed.value);
-};
 
 export const auditMint = ({ mintUrl, signal }: { mintUrl: string; signal?: AbortSignal }) =>
   fetchJson(

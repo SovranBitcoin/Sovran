@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import type { BLEPeer } from 'bitchat-module';
@@ -27,14 +26,9 @@ import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import {
-  VISUAL_LIST_VIEWABILITY_CONFIG,
-  useVisualListLogger,
-  visualLayoutScopePart,
-} from '@/shared/lib/contentShiftLog';
 import { useNearPaySessionStore, type NearPayDelivery } from '@/shared/stores/runtime/nearPayStore';
 import { ContactRow, bleIdentity } from '@/shared/ui/composed/ContactRow';
-import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
+import { List } from '@/shared/ui/composed/List';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -243,47 +237,9 @@ export function NearPayPeerListScreen() {
   );
 
   const keyExtractor = useCallback((peer: BLEPeer) => peer.peerID, []);
-  const listRef = useRef<LegendListRef>(null);
-  const visualList = useVisualListLogger<BLEPeer>({
-    scope: 'near-pay.peers.list',
-    surface: 'near-pay',
-    component: 'NearPayPeerLegendList',
-    phase: peers.length === 0 ? 'empty' : 'peers',
-    extra: () => ({
-      peerCount: sortedPeers.length,
-      stalePeerCount: blePeers.length - peers.length,
-      offline: isOffline,
-    }),
-    getItemKey: (peer) => visualLayoutScopePart(peer.peerID),
-    getItemContext: (peer, index) => ({
-      itemType: 'near-pay-peer',
-      index,
-      connected: peer.isConnected,
-      hasDirectLink: peer.hasDirectLink,
-      hasCreq: peerHasValidCreq(peer),
-    }),
-    getListState: () => listRef.current?.getState() ?? null,
-  });
   const renderItem = useCallback(
-    ({ item, index }: { item: BLEPeer; index: number }) => (
-      <VisualLayoutProbe
-        scope="near-pay.peers.list"
-        surface="near-pay"
-        component="NearPayPeerRow"
-        itemKey={visualLayoutScopePart(item.peerID)}
-        itemType="near-pay-peer"
-        index={index}
-        phase={peers.length === 0 ? 'empty' : 'peers'}
-        extra={{
-          peerCount: sortedPeers.length,
-          connected: item.isConnected,
-          hasDirectLink: item.hasDirectLink,
-          hasCreq: peerHasValidCreq(item),
-        }}>
-        <NearPayPeerRow peer={item} onSelect={handleSelectPeer} />
-      </VisualLayoutProbe>
-    ),
-    [handleSelectPeer, peers.length, sortedPeers.length]
+    ({ item }: { item: BLEPeer }) => <NearPayPeerRow peer={item} onSelect={handleSelectPeer} />,
+    [handleSelectPeer]
   );
   const emptyContent = useMemo(
     () => (
@@ -310,18 +266,10 @@ export function NearPayPeerListScreen() {
             {subtitleText}
           </Text>
         </HStack>
-        <LegendList
-          ref={listRef}
+        <List
           data={sortedPeers}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
-          estimatedItemSize={68}
-          onItemSizeChanged={visualList.onItemSizeChanged}
-          onLoad={visualList.onLoad}
-          onMetricsChange={visualList.onMetricsChange}
-          onStickyHeaderChange={visualList.onStickyHeaderChange}
-          onViewableItemsChanged={visualList.onViewableItemsChanged}
-          viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
           keyboardDismissMode="on-drag"
           style={styles.list}
           contentContainerStyle={peers.length === 0 ? styles.emptyListContent : styles.listContent}

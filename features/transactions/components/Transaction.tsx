@@ -260,9 +260,8 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
   // wrapper with `height: 0, opacity: 0`; Reanimated's LinearTransition
   // captures the pre/post layouts and interpolates between them on the
   // UI thread (no per-frame JS re-renders). Yoga commits the new size
-  // each frame on the native side, so the section's measured height
-  // shrinks in real time and AnimatedLegendList's `itemLayoutAnimation`
-  // animates sibling sections in lock-step on the same UI-thread pass.
+  // each frame on the native side, so this row shrinks in real time and
+  // the FlashList sections below reflow as the list re-measures.
   const collapsedStyle = isCollapsing ? { height: 0, opacity: 0 } : null;
 
   const row = (

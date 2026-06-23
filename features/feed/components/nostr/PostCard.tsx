@@ -28,6 +28,7 @@ import { formatDate, formatRelative } from '@/shared/lib/date';
 import { tryNpubEncode } from './feedParse';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { NoteContent, NOTE_CONTENT_FONT_SIZE, NOTE_CONTENT_LINE_HEIGHT } from './NoteContent';
+import { useProfile } from '@/shared/lib/nostr/useEntityCache';
 import { MetricsFooter, POST_ACTION_ICON_SIZES } from './MetricsFooter';
 import {
   SkeletonExitReveal,
@@ -49,6 +50,106 @@ type PostCardVariant = 'feed' | 'repost-original' | 'thread-target' | 'thread-re
 const AVATAR_SIZE = 36;
 
 const METRIC_SKELETON_ITEMS = [0, 1, 2, 3] as const;
+
+/**
+ * The gutter post's header row (name · time, plus the "⋯ more" button), shared by
+ * the real `PostCard` and `PostCardSkeleton` so their chrome can NEVER drift — a
+ * skeleton that hand-duplicated this row had silently dropped the more-button and
+ * rendered ~6px short, growing the row when real content replaced it. Rendering both
+ * states from one component guarantees identical height/structure.
+ */
+function PostCardGutterHeader({
+  loading = false,
+  foreground,
+  hasMore,
+  isThread = false,
+  displayName,
+  nameFallback,
+  shortTime,
+  placeholderAuthor,
+  placeholderTimestamp,
+  onProfilePress,
+  onMorePress,
+  onNestedPressIn,
+  onNestedPressOut,
+}: {
+  loading?: boolean;
+  foreground: string;
+  hasMore: boolean;
+  isThread?: boolean;
+  displayName?: string;
+  nameFallback?: string;
+  shortTime?: string;
+  placeholderAuthor?: string;
+  placeholderTimestamp?: string;
+  onProfilePress?: () => void;
+  onMorePress?: () => void;
+  onNestedPressIn?: () => void;
+  onNestedPressOut?: () => void;
+}) {
+  const textPrimary = { color: opacity(foreground, 0.9) };
+  const textMuted = { color: opacity(foreground, 0.4) };
+  const textDimmed = { color: opacity(foreground, 0.3) };
+  return (
+    <HStack align="center" gap={6} style={sharedStyles.mb4}>
+      <HStack align="center" gap={6} style={pcStyles.headerTextRow}>
+        {loading ? (
+          <Text loading numberOfLines={1} placeholder={placeholderAuthor} bold size={14} />
+        ) : (
+          <Pressable
+            onPressIn={onNestedPressIn}
+            onPressOut={onNestedPressOut}
+            onPress={onProfilePress}>
+            <Text
+              bold
+              size={14}
+              style={textPrimary}
+              numberOfLines={isThread ? 1 : undefined}
+              fallback={nameFallback}>
+              {displayName}
+            </Text>
+          </Pressable>
+        )}
+        {loading ? (
+          <Text
+            loading
+            numberOfLines={1}
+            placeholder={placeholderTimestamp}
+            size={13}
+            style={textMuted}
+          />
+        ) : shortTime ? (
+          <>
+            <Text bold size={13} style={[textDimmed, pcStyles.dotSeparator]}>
+              {'•'}
+            </Text>
+            <Text size={13} style={textMuted}>
+              {shortTime}
+            </Text>
+          </>
+        ) : null}
+      </HStack>
+      {hasMore ? (
+        loading ? (
+          // Empty box at the real more-button's exact dimensions — reserves the same
+          // height so the skeleton row matches the real row.
+          <View style={pcStyles.moreButton} />
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="More post actions"
+            onPressIn={onNestedPressIn}
+            onPressOut={onNestedPressOut}
+            onPress={onMorePress}
+            haptics
+            style={pcStyles.moreButton}>
+            <Icon name="tabler:dots" size={18} color={opacity(foreground, 0.5)} />
+          </Pressable>
+        )
+      ) : null}
+    </HStack>
+  );
+}
 
 interface PostCardProps {
   event: FeedEvent;
@@ -134,7 +235,12 @@ export const PostCard = React.memo(function PostCard({
 }: PostCardProps) {
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
 
-  const profile = profiles.get(event.pubkey);
+  // Author identity comes from the authoritative entity cache, reactively: the
+  // row re-renders in place when this pubkey's profile arrives (no manual re-key),
+  // and any surface that saw this author renders it here too. `status` tells a
+  // genuine loading skeleton apart from a fallback. (`profiles` is still passed to
+  // NoteContent for inline mention chips.)
+  const { profile, status: authorStatus } = useProfile(event.pubkey);
   // Real display name only. The abbreviated npub fallback is passed as Text's
   // `fallback` prop so the name never flashes through a pubkey placeholder.
   const displayName = profile?.name;
@@ -251,7 +357,9 @@ export const PostCard = React.memo(function PostCard({
               onPress={navigateToProfile}>
               <HStack align="center" gap={10} style={sharedStyles.mb6}>
                 <Avatar
-                  state={profile?.picture ? 'image' : 'fallback'}
+                  state={
+                    profile?.picture ? 'image' : authorStatus === 'loading' ? 'loading' : 'fallback'
+                  }
                   picture={profile?.picture}
                   seed={event.pubkey}
                   size={AVATAR_SIZE}
@@ -359,45 +467,18 @@ export const PostCard = React.memo(function PostCard({
       </View>
 
       <View style={sharedStyles.flex1}>
-        <HStack align="center" gap={6} style={sharedStyles.mb4}>
-          <HStack align="center" gap={6} style={pcStyles.headerTextRow}>
-            <Pressable
-              onPressIn={handleNestedPressIn}
-              onPressOut={handleNestedPressOut}
-              onPress={navigateToProfile}>
-              <Text
-                bold
-                size={14}
-                style={textPrimary}
-                numberOfLines={isThread ? 1 : undefined}
-                fallback={nameFallback}>
-                {displayName}
-              </Text>
-            </Pressable>
-            {shortTime ? (
-              <>
-                <Text bold size={13} style={[textDimmed, pcStyles.dotSeparator]}>
-                  {'•'}
-                </Text>
-                <Text size={13} style={textMuted}>
-                  {shortTime}
-                </Text>
-              </>
-            ) : null}
-          </HStack>
-          {onMorePress ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="More post actions"
-              onPressIn={handleNestedPressIn}
-              onPressOut={handleNestedPressOut}
-              onPress={handleMorePress}
-              haptics
-              style={pcStyles.moreButton}>
-              <Icon name="tabler:dots" size={18} color={opacity(foreground, 0.5)} />
-            </Pressable>
-          ) : null}
-        </HStack>
+        <PostCardGutterHeader
+          foreground={foreground}
+          hasMore={!!onMorePress}
+          isThread={isThread}
+          displayName={displayName}
+          nameFallback={nameFallback}
+          shortTime={shortTime}
+          onProfilePress={navigateToProfile}
+          onMorePress={handleMorePress}
+          onNestedPressIn={handleNestedPressIn}
+          onNestedPressOut={handleNestedPressOut}
+        />
 
         <NoteContent
           content={event.content}
@@ -578,16 +659,16 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
           </View>
 
           <View style={sharedStyles.flex1}>
-            <HStack align="center" gap={spacing.sm - 2} style={sharedStyles.mb4}>
-              <Text loading numberOfLines={1} placeholder={skeletonVariant.author} bold size={14} />
-              <Text
-                loading
-                numberOfLines={1}
-                placeholder={skeletonVariant.timestamp}
-                size={13}
-                style={textMuted}
-              />
-            </HStack>
+            {/* Same header component as the real post (loading state) — guarantees the
+                author row (incl. the more-button box) matches the real row's height. */}
+            <PostCardGutterHeader
+              loading
+              foreground={foreground}
+              hasMore
+              isThread
+              placeholderAuthor={skeletonVariant.author}
+              placeholderTimestamp={skeletonVariant.timestamp}
+            />
 
             <VStack spacing={0}>
               {skeletonVariant.content.map((line) => (
@@ -629,7 +710,11 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
   labelWidth: number;
 }) {
   const glyph = compact ? POST_ACTION_ICON_SIZES.compact.base : POST_ACTION_ICON_SIZES.regular.base;
-  const labelHeight = compact ? 14 : spacing.md;
+  // The real footer's count is a `Text size={11/13}` with no lineHeight, so the
+  // footer row is as tall as that font's line box. The skeleton must use the SAME
+  // size (via a `Text loading` placeholder) — a hardcoded label rectangle was ~7px
+  // shorter, which made the reply row grow when real text replaced the skeleton.
+  const labelTextSize = compact ? 11 : 13;
   const skeletonFill = useMemo(() => opacity(borderColor, 0.07), [borderColor]);
   const footerStyle = useMemo(
     () => [
@@ -648,15 +733,7 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
     }),
     [glyph, skeletonFill]
   );
-  const labelStyle = useMemo(
-    () => ({
-      width: labelWidth,
-      height: labelHeight,
-      borderRadius: radius.sm,
-      backgroundColor: skeletonFill,
-    }),
-    [labelHeight, labelWidth, skeletonFill]
-  );
+  const labelStyle = useMemo(() => ({ width: labelWidth }), [labelWidth]);
 
   return (
     <View style={footerStyle} pointerEvents="none">
@@ -664,7 +741,17 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
         {METRIC_SKELETON_ITEMS.map((item) => (
           <HStack key={item} align="center" gap={spacing.xs}>
             <Skeleton style={glyphStyle} />
-            {item < 3 ? <Skeleton style={labelStyle} /> : null}
+            {item < 3 ? (
+              // Self-sizes to the real count's line box (same `size`), so the footer
+              // row height matches the real footer exactly. Width kept via `labelWidth`.
+              <Text
+                loading
+                numberOfLines={1}
+                size={labelTextSize}
+                placeholder="0"
+                style={labelStyle}
+              />
+            ) : null}
           </HStack>
         ))}
       </HStack>

@@ -173,4 +173,34 @@ describe('thread item builders', () => {
       built?.items.filter((item) => item.type === 'reply').map((item) => item.event.id)
     ).toEqual(['seeded-reply', 'next-reply']);
   });
+
+  it('initial fetch keeps the seeded reply order as a stable prefix (no reshuffle)', () => {
+    const root = note({ id: 'root', content: 'root', tags: [], createdAt: 100 });
+    const seededReply = note({
+      id: 'seeded-reply', content: 'seeded', tags: [['e', 'root', '', 'reply']], createdAt: 101,
+    });
+    const rankedFirst = note({
+      id: 'ranked-first', content: 'ranked higher by the server', tags: [['e', 'root', '', 'reply']], createdAt: 102,
+    });
+    const result: ThreadResult = {
+      allEvents: mapEvents([root, seededReply, rankedFirst]),
+      profiles: new Map(),
+      metrics: new Map(),
+      quotedEvents: new Map(),
+      thread: { parents: [], target: root, replies: [seededReply, rankedFirst] },
+      // The server ranks rankedFirst ABOVE the already-on-screen seeded reply.
+      replyPageEventIds: ['ranked-first', 'seeded-reply'],
+      replyPageSize: 10,
+      loadedReplyCount: 2,
+      hasMoreReplies: false,
+    };
+
+    // The seeded reply (already painted) stays first; the ranked delta appends.
+    const orderedIds = orderedReplyIdsForThreadResult(result, 'initial', ['seeded-reply']);
+    expect(orderedIds).toEqual(['seeded-reply', 'ranked-first']);
+
+    // With no seed, the server order is used as-is.
+    const cold = orderedReplyIdsForThreadResult(result, 'initial', []);
+    expect(cold).toEqual(['ranked-first', 'seeded-reply']);
+  });
 });

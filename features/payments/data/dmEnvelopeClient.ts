@@ -1,33 +1,28 @@
 /**
- * GraphQL client for DM envelopes. nagg is zero-knowledge: these calls return
- * the raw encrypted events (NIP-17 gift wraps kind 1059, optional NIP-04 kind 4)
+ * DM envelope client. nagg is zero-knowledge: these calls return the raw
+ * encrypted events (NIP-17 gift wraps kind 1059, optional NIP-04 kind 4)
  * involving the viewer; decryption happens client-side in `dmDecryptPipeline`.
  *
- * Best-effort: the resolvers ship with the nagg deploy, so until then every
- * call returns empty rather than throwing — callers keep working on the
- * existing relay path.
+ * The conversation-list inbox (`fetchDmEnvelopes`) routes through the
+ * tier-selecting facade (nagg DM index → raw-relay floor, gated by the Network
+ * toggles). `fetchDmConversation` hits nagg's REST app-view
+ * (`GET /nostr/dm/conversation`) directly. Both are best-effort: an exhausted/
+ * disabled chain returns empty rather than throwing, so the UI keeps working.
  */
 import {
   createNaggClient,
   type NaggEventConnection,
   NaggDmConversationDataSchema,
-  NaggDmEnvelopesDataSchema,
 } from '@sovranbitcoin/nagg-ts';
-import {
-  DM_CONVERSATION_QUERY,
-  DM_ENVELOPES_QUERY,
-  dmConversationInput,
-  dmEnvelopesAppView,
-  dmEnvelopesInput,
-} from '@sovranbitcoin/nagg-ts/recipes';
+import { dmConversationAppView } from '@sovranbitcoin/nagg-ts/recipes';
 import { backendConfig } from '@/shared/config/backend';
 import { paymentLog } from '@/shared/lib/logger';
+import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
+import { resolvedDmEnvelopesToPage, toFacadeDmEnvelopesRequest } from './facadeDmAdapter';
 
 const DM_TIMEOUT_MS = 12_000;
 
 const client = createNaggClient({
-  endpoint: backendConfig.nostrGraphqlEndpoint,
-  // REST app-view available alongside GraphQL; defaults to GraphQL until a query opts in.
   appView: { baseUrl: backendConfig.nostrAppViewBaseUrl, version: 'v1' },
   defaultTimeoutMs: DM_TIMEOUT_MS,
 });
@@ -69,7 +64,15 @@ function toPage(connection: NaggEventConnection): DmEnvelopePage {
   };
 }
 
-/** All DM envelopes involving the viewer (for the conversation list). */
+/**
+ * All DM envelopes involving the viewer (for the conversation list).
+ *
+ * Routes through the tier-selecting facade: nagg DM index (the same app-view
+ * `/nostr/dm/envelopes` route, paginated by wrap arrival time) → raw-relay floor
+ * (kind 1059/4 by `#p`, no since/limit since gift-wrap `created_at` is
+ * randomized). Which tiers run is gated by the Network settings toggles. The
+ * envelopes stay opaque; decryption happens above in `dmDecryptPipeline`.
+ */
 export async function fetchDmEnvelopes(args: {
   viewer: string;
   kinds?: number[];
@@ -78,31 +81,35 @@ export async function fetchDmEnvelopes(args: {
   refresh?: boolean;
   signal?: AbortSignal;
 }): Promise<DmEnvelopePage> {
-  const recipeInput = {
-    viewer: args.viewer,
-    kinds: args.kinds,
-    until: args.until,
-    limit: args.limit,
-  };
-  const result = await client.query({
-    query: DM_ENVELOPES_QUERY,
-    operationName: 'DmEnvelopes',
-    variables: { input: dmEnvelopesInput(recipeInput) },
-    dataSchema: NaggDmEnvelopesDataSchema,
-    // Dedicated REST app-view for the contacts/DM list when enabled; otherwise
-    // the GraphQL resolver. Both transports parse the same `{ dmEnvelopes: {
-    // nodes, pageInfo } }` connection via `NaggDmEnvelopesDataSchema` — no
-    // per-transport normalize layer (the REST body is already canonical).
-    transport: backendConfig.nostrDmAppView ? 'appview' : 'graphql',
-    appView: dmEnvelopesAppView(recipeInput),
-    refresh: args.refresh,
-    signal: args.signal,
-  });
-  if (result.isErr()) {
-    paymentLog.debug('payment.dm.envelopes.failed', { error: result.error.message });
+  const layer = buildNostrDataLayer();
+  if (!layer) {
+    paymentLog.debug('payment.dm.envelopes.no_tiers');
     return EMPTY_PAGE;
   }
-  return toPage(result.value.dmEnvelopes);
+  const result = await layer.getDmEnvelopes(
+    toFacadeDmEnvelopesRequest({
+      viewer: args.viewer,
+      until: args.until,
+      limit: args.limit,
+      refresh: args.refresh,
+      signal: args.signal,
+    })
+  );
+  return result.match(
+    (resolved) => {
+      paymentLog.debug('payment.dm.envelopes.resolved', {
+        tier: resolved.tier,
+        envelopes: resolved.envelopes.length,
+      });
+      return resolvedDmEnvelopesToPage(resolved);
+    },
+    (error) => {
+      paymentLog.debug('payment.dm.envelopes.exhausted', {
+        attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
+      });
+      return EMPTY_PAGE;
+    }
+  );
 }
 
 /** DM envelopes for one conversation. For gift wraps the counterparty is opaque
@@ -117,19 +124,19 @@ export async function fetchDmConversation(args: {
   refresh?: boolean;
   signal?: AbortSignal;
 }): Promise<DmEnvelopePage> {
-  const result = await client.query({
-    query: DM_CONVERSATION_QUERY,
-    operationName: 'DmConversation',
-    variables: {
-      input: dmConversationInput({
-        viewer: args.viewer,
-        counterparty: args.counterparty,
-        kinds: args.kinds,
-        until: args.until,
-        limit: args.limit,
-      }),
-    },
-    dataSchema: NaggDmConversationDataSchema,
+  const binding = dmConversationAppView({
+    viewer: args.viewer,
+    counterparty: args.counterparty,
+    kinds: args.kinds,
+    until: args.until,
+    limit: args.limit,
+  });
+  const result = await client.rest({
+    path: binding.path,
+    method: binding.method,
+    searchParams: binding.searchParams,
+    responseSchema: NaggDmConversationDataSchema,
+    operationName: binding.operationName,
     refresh: args.refresh,
     signal: args.signal,
   });

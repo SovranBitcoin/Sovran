@@ -52,6 +52,7 @@ import { useAppBalance } from '@/features/wallet';
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
 import { useSwapStatusListener } from '@/shared/hooks/useSwapStatusListener';
 import { useOwnEventsSync } from '@/shared/lib/nostr/ownsync/useOwnEventsSync';
+import { useOwnSocialGraphSeed } from '@/shared/lib/nostr/ownsync/useOwnSocialGraphSeed';
 import PopupHost from '@/shared/blocks/popup/PopupHost';
 import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
 import { AndroidImageOverlayHost } from '@/features/feed/components/nostr/image-overlay/AndroidImageOverlayHost';
@@ -246,6 +247,9 @@ function ProfileBalanceSync() {
  */
 function OwnEventsSync() {
   useOwnEventsSync();
+  // Read-side follow seed from the tiered facade (ADR 0003); the relay sub above
+  // stays the write-authoritative live-delta listener, merged via the same LWW gate.
+  useOwnSocialGraphSeed();
   return null;
 }
 

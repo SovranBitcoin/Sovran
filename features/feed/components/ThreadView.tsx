@@ -6,19 +6,9 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeOut,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
-import {
-  LegendList,
-  type LegendListRef,
-  type LegendListRenderItemProps,
-} from '@legendapp/list/react-native';
+import { StyleSheet, useWindowDimensions } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { FlashList } from '@shopify/flash-list';
 import { useHeaderHeight } from '@react-navigation/elements';
 import opacity from 'hex-color-opacity';
 
@@ -46,23 +36,15 @@ import { useOpenComposer } from '@/features/composer/publish/useComposerActions'
 import { deriveReplyTarget } from '@/features/feed/lib/replyTarget';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { ThreadReplyBar } from '@/features/feed/components/ThreadReplyBar';
-import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import type { ThreadReplySort } from '@/features/feed/data/feedClient';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { feedLog, Log } from '@/shared/lib/logger';
 import { actionMenuPopup } from '@/shared/lib/popup';
 import {
-  remeasureVisualLayoutScope,
-  useVisualListLogger,
-  useVisualStateLogger,
-  VISUAL_LIST_VIEWABILITY_CONFIG,
-} from '@/shared/lib/contentShiftLog';
-import {
   DEFAULT_REPLY_SKELETON_COUNT,
   MAX_REPLY_SKELETON_COUNT,
 } from '@/features/feed/lib/threadReplySkeletons';
-import { threadFixedItemSize } from '@/features/feed/lib/threadListLayout';
 
 interface ThreadViewProps {
   eventId: string;
@@ -106,10 +88,16 @@ const REPLY_SORT_OPTIONS: {
   },
 ];
 
-// When a reply's real content loads it fades in while the skeleton it replaces
-// fades out — a crossfade in the same row slot.
+// When a reply's real content loads it fades in over the skeleton it replaces.
+// The ENTER animation is recycling-tolerant on FlashList (it plays at the cell's
+// correct spot and doesn't re-fire on scroll, since recycled cells reuse the
+// instance), so the skeleton it replaces simply unmounts without an exit fade.
 const REPLY_FADE_IN = FadeIn.duration(220);
-const SKELETON_FADE_OUT = FadeOut.duration(220);
+
+// Rough per-row height used only to discount the content already below the
+// focused note when sizing the focus reserve (see `focusReserve`). Deliberately
+// approximate — it just keeps the reserve from over-padding long threads.
+const FOCUS_RESERVE_ROW_APPROX = 150;
 
 type ThreadSkeletonItem =
   | { type: 'target-skeleton'; id: string }
@@ -245,12 +233,12 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     'surface-tertiary',
   ] as const);
   const headerHeight = useHeaderHeight();
+  const { height: windowHeight } = useWindowDimensions();
   const imageOverlay = useImageOverlay();
   const embed = useThreadEmbed();
   const embedOpen = embed?.open;
   const targetFooterOpacity = embed?.targetFooterOpacity;
   const [replyBarHeight, setReplyBarHeight] = useState(0);
-  const threadVisualScope = useMemo(() => `thread.${eventId}.list`, [eventId]);
 
   const {
     items,
@@ -278,34 +266,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const openPostActions = usePostActions({ getProfileName });
   const openComposer = useOpenComposer();
 
-  const listRef = useRef<LegendListRef>(null);
-
-  // The sort-tabs ("Relevant") row and the replies sit below the target, so their
-  // on-screen position is whatever LegendList computes for the target — which
-  // starts at `estimatedItemSize` and snaps to the real measured height a frame
-  // later, shifting everything below. Rather than fight that reconciliation, we
-  // keep those rows occupying their space but at opacity 0 until the real target
-  // has laid out, then fade them in at their settled positions (the shift happens
-  // while they're invisible). The target itself is the stable anchor and renders
-  // immediately.
-  const revealedRef = useRef(false);
-  const revealOpacity = useSharedValue(0);
-  const revealStyle = useAnimatedStyle(() => ({ opacity: revealOpacity.value }));
-  const handleTargetSettled = useCallback(() => {
-    if (revealedRef.current) return;
-    revealedRef.current = true;
-    // One frame after the target measures, LegendList has repositioned the rows
-    // below it — reveal then so they fade in already in their final spot.
-    requestAnimationFrame(() => {
-      revealOpacity.value = withTiming(1, { duration: 220 });
-    });
-  }, [revealOpacity]);
-  useEffect(() => {
-    revealedRef.current = false;
-    revealOpacity.value = 0;
-  }, [eventId, revealOpacity]);
-
-  const targetIndex = useMemo(() => items.findIndex((item) => item.type === 'target'), [items]);
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
   const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
 
@@ -341,78 +301,48 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     return withReplySortTabs([...items, ...createReplySkeletonItems(skeletonCount)]);
   }, [isFetching, isLoading, items, metricsRef]);
 
+  // The note's index in the list (parents precede it; replies/skeletons follow) —
+  // for the focus reserve and the initial landing.
+  const fullTargetIndex = useMemo(
+    () => displayItems.findIndex((i) => i.type === 'target'),
+    [displayItems]
+  );
+
+  // Focus reserve: extra bottom space so the tapped reply can always be scrolled
+  // to (and held at) the top of the viewport, even when little content sits below
+  // it. Opening a thread on a reply lands a tall parent chain above the note; with
+  // no room below, the scroll bottoms out (clamps/snaps) and the note can't be
+  // refocused, and `maintainVisibleContentPosition` has nowhere to scroll to hold
+  // it as the parent grows. We reserve `viewport − (content already below the
+  // note)`, so the reserve is generous on short threads and shrinks toward 0 as
+  // replies fill the screen (no dead gap on long threads). Owned here (as plain
+  // bottom padding) so it's deterministic, hot-reloadable, and logged.
+  // `fullTargetIndex` indexes `displayItems` — the sort-tabs row is inserted
+  // after the target and skeletons are appended last.
+  const focusReserve = useMemo(() => {
+    if (fullTargetIndex <= 0) return 0;
+    const listViewport = Math.max(0, windowHeight - headerHeight - (replyBarHeight || 80));
+    const belowCount = Math.max(0, displayItems.length - 1 - fullTargetIndex);
+    return Math.max(0, listViewport - belowCount * FOCUS_RESERVE_ROW_APPROX);
+  }, [fullTargetIndex, windowHeight, headerHeight, replyBarHeight, displayItems.length]);
+
+  useEffect(() => {
+    if (focusReserve <= 0) return;
+    feedLog.info('thread.reserve', {
+      eventId,
+      targetIndex: fullTargetIndex,
+      rows: displayItems.length,
+      focusReserve: Math.round(focusReserve),
+      windowHeight: Math.round(windowHeight),
+    });
+  }, [focusReserve, eventId, fullTargetIndex, displayItems.length, windowHeight]);
+
   const threadPhase =
     isLoading && items.length === 0
       ? 'loading-skeletons'
       : isFetching
         ? 'fetching-with-skeletons'
         : 'replies';
-
-  const visualList = useVisualListLogger<ThreadListItem>({
-    scope: threadVisualScope,
-    surface: 'thread',
-    component: 'ThreadLegendList',
-    phase: threadPhase,
-    extra: () => ({
-      eventId,
-      rows: displayItems.length,
-      replySort,
-      replyBarHeight,
-      isFetching,
-      isLoadingMoreReplies,
-    }),
-    getItemKey: (item) => threadKeyExtractor(item),
-    getItemContext: (item) => ({
-      rowKey: threadKeyExtractor(item),
-      rowLabel: threadItemType(item),
-      itemType: threadItemType(item),
-    }),
-    getListState: () => listRef.current?.getState() ?? null,
-  });
-
-  const threadVisualState = useMemo(() => {
-    let skeletons = 0;
-    let realReplies = 0;
-    for (const it of displayItems) {
-      if (it.type === 'target-skeleton' || it.type === 'reply-skeleton') skeletons += 1;
-      else if (it.type === 'reply') realReplies += 1;
-    }
-    return {
-      eventId,
-      phase: threadPhase,
-      rows: displayItems.length,
-      skeletons,
-      realReplies,
-      replySort,
-      replyBarHeight,
-      isFetching,
-      isLoading,
-      isLoadingMoreReplies,
-    };
-  }, [
-    displayItems,
-    eventId,
-    isFetching,
-    isLoading,
-    isLoadingMoreReplies,
-    replyBarHeight,
-    replySort,
-    threadPhase,
-  ]);
-
-  useVisualStateLogger({
-    scope: threadVisualScope,
-    surface: 'thread',
-    component: 'ThreadView',
-    stateKey: 'thread-state',
-    phase: threadVisualState.phase,
-    state: threadVisualState,
-    remeasure: {
-      reason: 'thread-state',
-      minIntervalMs: 250,
-      maxItems: 32,
-    },
-  });
 
   // Content-shift trace: log each reply-list phase change with its row makeup so
   // a jump can be tied to the exact transition. Pairs with `thread.reply_skeleton.*`.
@@ -460,31 +390,27 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   }, [items, profilesRef, metricsRef, quotedEventsRef]);
 
   const renderThreadItem = useCallback(
-    ({ item, index }: LegendListRenderItemProps<ThreadListItem, string | undefined>) => {
+    ({ item, index }: { item: ThreadListItem; index: number }) => {
       if (item.type === 'target-skeleton') {
         return <PostCardSkeleton variant="thread-target" index={index} />;
       }
 
       if (item.type === 'reply-skeleton') {
-        // Fades out as the real reply that replaces it fades in (crossfade).
-        return (
-          <Animated.View exiting={SKELETON_FADE_OUT}>
-            <PostCardSkeleton variant="thread-reply" index={item.skeletonIndex} />
-          </Animated.View>
-        );
+        // FlashList recycles cells, which fights reanimated exit animations — an
+        // exiting skeleton renders in a recycled cell's position for a frame (the
+        // "skeleton in the wrong place" glitch), so the skeleton simply unmounts
+        // and the real reply fades IN over it (see REPLY_FADE_IN below).
+        return <PostCardSkeleton variant="thread-reply" index={item.skeletonIndex} />;
       }
 
       if (item.type === 'reply-sort-tabs') {
-        // Hidden until the target settles, then fades in at its final position.
         return (
-          <Animated.View style={revealStyle}>
-            <ReplySortPicker
-              selected={replySort}
-              onSelect={setReplySort}
-              foreground={foreground}
-              surfaceTertiary={surfaceTertiary}
-            />
-          </Animated.View>
+          <ReplySortPicker
+            selected={replySort}
+            onSelect={setReplySort}
+            foreground={foreground}
+            surfaceTertiary={surfaceTertiary}
+          />
         );
       }
 
@@ -526,9 +452,11 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         />
       );
 
-      // Each reply fades its real content in as it loads, crossfading with the
-      // skeleton it replaces (which fades out via SKELETON_FADE_OUT). The
-      // target/parents are the stable anchor and render immediately.
+      // Each reply fades its real content in as it loads. The ENTER animation is
+      // recycling-tolerant on FlashList (it plays at the cell's correct spot and
+      // doesn't re-fire on scroll, since recycled cells reuse the instance) — unlike
+      // a skeleton EXIT, which lingered in a recycled cell's slot (the "wrong
+      // place" glitch), so the reply only ever fades IN.
       if (item.type === 'reply') {
         return <Animated.View entering={REPLY_FADE_IN}>{card}</Animated.View>;
       }
@@ -543,7 +471,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       getEngagementState,
       getMetrics,
       hasParents,
-      revealStyle,
       profilesRef,
       quotedEventsRef,
       replySort,
@@ -556,46 +483,28 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     ]
   );
 
-  const renderItem = useCallback(
-    (props: LegendListRenderItemProps<ThreadListItem, string | undefined>) => (
-      <VisualLayoutProbe
-        scope={threadVisualScope}
-        surface="thread"
-        component="ThreadRow"
-        itemKey={threadKeyExtractor(props.item)}
-        itemType={threadItemType(props.item)}
-        index={props.index}
-        phase={threadPhase}
-        onLayout={props.item.type === 'target' ? handleTargetSettled : undefined}
-        extra={{
-          eventId,
-          rows: displayItems.length,
-          replySort,
-          replyBarHeight,
-          isFetching,
-        }}>
-        {renderThreadItem(props)}
-      </VisualLayoutProbe>
-    ),
-    [
-      displayItems.length,
-      eventId,
-      handleTargetSettled,
-      isFetching,
-      renderThreadItem,
-      replyBarHeight,
-      replySort,
-      threadVisualScope,
-      threadPhase,
-    ]
-  );
-
   const handleEndReached = useCallback(() => {
     // Don't start reply pagination while the initial fetch is running — the
     // footer spinner would otherwise overlap the loading skeletons.
     if (isFetching) return;
     void loadMoreReplies();
   }, [loadMoreReplies, isFetching]);
+
+  // FlashList re-renders rows when `data` changes by reference or when `extraData`
+  // changes. Engagement (likes/reposts), pagination flags and the sort live outside
+  // `displayItems`, so fold them into extraData so those updates repaint the rows.
+  const threadExtraData = useMemo(
+    () =>
+      [
+        dataVersion,
+        engagementRevision,
+        isFetching ? 1 : 0,
+        isLoadingMoreReplies ? 1 : 0,
+        hasMoreReplies ? 1 : 0,
+        replySort,
+      ].join(':'),
+    [dataVersion, engagementRevision, isFetching, isLoadingMoreReplies, hasMoreReplies, replySort]
+  );
 
   // Target-post actions for the floating embed action bar (mirrors the
   // target PostCard's MetricsFooter wiring). Hooks stay above the early
@@ -663,24 +572,23 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 onHeightChange={setReplyBarHeight}
               />
             }>
-            <LegendList
-              ref={listRef}
+            {/* FlashList v2 holds the tapped note via synchronous Fabric layout +
+              its default maintainVisibleContentPosition — no two-list crossfade,
+              counter-scroll or reply gating needed. The one non-library-specific
+              piece we keep is `focusReserve`: extra bottom padding so the anchored
+              note has REAL scroll room below it; without it mVCP anchors past the
+              scroll bounds and the first gesture snaps to top/bottom. The thread
+              anchors on the tapped note via `initialScrollIndex` and must never
+              auto-pin to the bottom (so no `startRenderingFromBottom`). */}
+            <FlashList
               data={displayItems}
               keyExtractor={threadKeyExtractor}
               getItemType={threadItemType}
-              getFixedItemSize={threadFixedItemSize}
-              estimatedItemSize={200}
+              renderItem={renderThreadItem}
+              extraData={threadExtraData}
               drawDistance={500}
-              renderItem={renderItem}
-              extraData={[
-                dataVersion,
-                engagementRevision,
-                isFetching ? 1 : 0,
-                isLoadingMoreReplies ? 1 : 0,
-                hasMoreReplies ? 1 : 0,
-                replySort,
-              ].join(':')}
-              recycleItems
+              onEndReached={handleEndReached}
+              onEndReachedThreshold={0.4}
               ListFooterComponent={
                 isLoadingMoreReplies ? (
                   <View style={styles.hiddenReplyFooter}>
@@ -695,38 +603,22 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                   </View>
                 ) : null
               }
-              onEndReached={handleEndReached}
-              onEndReachedThreshold={0.4}
-              onItemSizeChanged={visualList.onItemSizeChanged}
-              onLoad={visualList.onLoad}
-              onMetricsChange={visualList.onMetricsChange}
-              onStickyHeaderChange={visualList.onStickyHeaderChange}
-              onViewableItemsChanged={visualList.onViewableItemsChanged}
-              viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
-              style={{ flex: 1 }}
-              contentContainerStyle={{
-                // The embed sheet is positioned starting just below the header
-                // (`expandedOffset`), so the list itself no longer pads the top.
-                paddingTop: 0,
-                // replyBarHeight already includes the bottom safe-area inset (the
-                // bar's opaque container reaches the screen bottom), so the inset
-                // is not added again here.
-                paddingBottom: (replyBarHeight || 80) + 16,
-              }}
               showsVerticalScrollIndicator={false}
-              onScroll={(e: { nativeEvent: { contentOffset: { y: number } } }) => {
+              contentContainerStyle={{
+                // The embed sheet starts just below the header, so the list pads no
+                // top. `replyBarHeight` already includes the bottom safe-area inset;
+                // `focusReserve` adds the room below the note (see its definition).
+                paddingTop: 0,
+                paddingBottom: (replyBarHeight || 80) + 16 + focusReserve,
+              }}
+              onScroll={(e) => {
                 const y = e.nativeEvent.contentOffset.y;
                 if (imageOverlay?.scrollOffsetY != null) imageOverlay.scrollOffsetY.value = y;
                 if (embed) embed.scrollY.value = y;
-                remeasureVisualLayoutScope(threadVisualScope, 'scroll', {
-                  minIntervalMs: 500,
-                  maxItems: 32,
-                  extra: { eventId, scrollY: Math.round(y), replySort },
-                });
               }}
               scrollEventThrottle={16}
               scrollEnabled={embed ? embed.listScrollEnabled : undefined}
-              initialScrollIndex={!isLoading && targetIndex > 0 ? targetIndex : undefined}
+              initialScrollIndex={!isLoading && fullTargetIndex > 0 ? fullTargetIndex : undefined}
             />
           </ThreadEmbedSheet>
           {embed && targetEvent ? (

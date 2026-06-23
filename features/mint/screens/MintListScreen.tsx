@@ -10,12 +10,9 @@
 
 import React, { memo, useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useSharedValue } from 'react-native-reanimated';
-import {
-  LegendList,
-  type LegendListRef,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from '@legendapp/list/react-native';
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+
+import { List } from '@/shared/ui/composed/List';
 
 import type { MintListItem } from '@sovranbitcoin/colada';
 
@@ -32,14 +29,8 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import {
-  VISUAL_LIST_VIEWABILITY_CONFIG,
-  useVisualListLogger,
-  visualLayoutScopePart,
-} from '@/shared/lib/contentShiftLog';
 import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { zIndex } from '@/shared/styles/tokens';
-import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 
 // Inspect-button shape mirrors QRButton (rounded-square with continuous border
 // curve, borderRadius ≈ size × 0.18), but in a neutral surface color so it
@@ -217,28 +208,6 @@ export const MintListScreen = memo(function MintListScreen({
     [selectedCurrency, foreground]
   );
   const keyExtractor = useCallback((item: MintListItem) => item.mintUrl, []);
-  const listRef = useRef<LegendListRef>(null);
-  const visualList = useVisualListLogger<MintListItem>({
-    scope: 'mint.list.mints',
-    surface: 'mint',
-    component: 'MintListLegendList',
-    phase: isExecuting ? 'executing' : 'idle',
-    extra: () => ({
-      itemCount: filteredItems.length,
-      selectedCurrency,
-      isExecuting,
-      totalHeaderHeight,
-    }),
-    getItemKey: (item) => visualLayoutScopePart(item.mintUrl),
-    getItemContext: (item, index) => ({
-      itemType: 'mint-row',
-      index,
-      unit: item.unit,
-      status: item.status,
-      reason: item.reason?.message ?? null,
-    }),
-    getListState: () => listRef.current?.getState() ?? null,
-  });
 
   const bottomButtons = useMemo(
     () => (
@@ -258,48 +227,25 @@ export const MintListScreen = memo(function MintListScreen({
   );
 
   const renderItem = useCallback(
-    ({ item, index }: { item: MintListItem; index: number }) => {
+    ({ item }: { item: MintListItem }) => {
       const inspectable = showDetailsButton && !!onInspectMint;
       const trailing = inspectable ? (
         <MintInspectButton onPress={() => onInspectMint!(item.mintUrl)} />
       ) : null;
       return (
-        <VisualLayoutProbe
-          scope="mint.list.mints"
-          surface="mint"
-          component="MintListRow"
-          itemKey={visualLayoutScopePart(item.mintUrl)}
-          itemType="mint-row"
-          index={index}
-          phase={isExecuting ? 'executing' : 'idle'}
-          extra={{
-            itemCount: filteredItems.length,
-            selectedCurrency,
-            unit: item.unit,
-            status: item.status,
-            reason: item.reason?.message ?? null,
-          }}>
-          <ContactRow
-            identity={mintIdentity(item)}
-            disabled={isExecuting || item.status !== 'available'}
-            disabledReason={getMintDisabledReasonLabel(item.reason) ?? undefined}
-            trailing={trailing}
-            trailingVariant={inspectable ? undefined : 'none'}
-            accentPosition="below"
-            onPress={() => handleMintPress(item)}
-            testID={`contact-row:mint:${item.mintUrl}`}
-          />
-        </VisualLayoutProbe>
+        <ContactRow
+          identity={mintIdentity(item)}
+          disabled={isExecuting || item.status !== 'available'}
+          disabledReason={getMintDisabledReasonLabel(item.reason) ?? undefined}
+          trailing={trailing}
+          trailingVariant={inspectable ? undefined : 'none'}
+          accentPosition="below"
+          onPress={() => handleMintPress(item)}
+          testID={`contact-row:mint:${item.mintUrl}`}
+        />
       );
     },
-    [
-      filteredItems.length,
-      isExecuting,
-      selectedCurrency,
-      showDetailsButton,
-      handleMintPress,
-      onInspectMint,
-    ]
+    [isExecuting, showDetailsButton, handleMintPress, onInspectMint]
   );
 
   return (
@@ -312,20 +258,12 @@ export const MintListScreen = memo(function MintListScreen({
       onHeaderHeightChange={setTotalHeaderHeight}
       footer={bottomButtons}
       bgColor={surface}>
-      <LegendList
-        ref={listRef}
+      <List
         data={filteredItems}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         extraData={isExecuting}
-        estimatedItemSize={120}
         drawDistance={300}
-        onItemSizeChanged={visualList.onItemSizeChanged}
-        onLoad={visualList.onLoad}
-        onMetricsChange={visualList.onMetricsChange}
-        onStickyHeaderChange={visualList.onStickyHeaderChange}
-        onViewableItemsChanged={visualList.onViewableItemsChanged}
-        viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
         style={{ flex: 1, height: 0 }}
         contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 }}
         ListHeaderComponent={listHeader}

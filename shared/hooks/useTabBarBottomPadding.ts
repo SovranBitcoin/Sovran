@@ -12,7 +12,7 @@ const NATIVE_TAB_BAR_HEIGHT = Platform.OS === 'ios' ? (Platform.isPad ? 50 : 49)
 
 /**
  * Bottom padding for in-tab scroll lists so the last row clears the native
- * tab bar. Without this, items at the bottom of LegendList / FlatList sit
+ * tab bar. Without this, items at the bottom of FlashList / FlatList sit
  * behind the tab bar and become unclickable.
  *
  * Use as `contentContainerStyle={{ paddingBottom }}` on any list rendered

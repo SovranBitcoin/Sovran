@@ -24,24 +24,18 @@ import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { BottomSheet } from 'heroui-native';
-import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import * as Clipboard from 'expo-clipboard';
 import opacity from 'hex-color-opacity';
 import Icon, { CurrencyIcon } from 'assets/icons';
 
 import { encode } from '@/shared/lib/third-party/emoji';
 import { log, useRenderLogger } from '@/shared/lib/logger';
-import {
-  VISUAL_LIST_VIEWABILITY_CONFIG,
-  useVisualListLogger,
-  visualLayoutScopePart,
-} from '@/shared/lib/contentShiftLog';
 import { AnimatedEmoji } from '@/shared/ui/primitives/AnimatedEmoji';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
-import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
+import { List } from '@/shared/ui/composed/List';
 
 import { showActionSheet } from './bridge';
 import { copyPopup } from './copy';
@@ -53,14 +47,9 @@ const emojiLog = log.child({ module: 'emojiPicker' });
 
 const COLS = 6;
 const CELL_WIDTH_PCT = `${100 / COLS}%` as const;
-/** Estimated height of one emoji row — six 28pt cells + paddingVertical:6
- *  on each cell ≈ 40px. LegendList uses this to size the virtualization
- *  window before rows have measured. Rows are equal-height so this
- *  estimate is exact. */
-const EMOJI_ROW_HEIGHT = 40;
 
 /**
- * Single emoji cell. Memoized so LegendList's row recycling can detect
+ * Single emoji cell. Memoized so the list's row recycling can detect
  * "same emoji + same onSelect identity = same content" and skip the
  * inner re-render. With ~6 cells per row and dozens of rows recycled
  * during a long scroll, this is the difference between a smooth jump
@@ -92,10 +81,10 @@ const EmojiCell = React.memo(function EmojiCell({
 
 /**
  * Single virtualized row of emojis (up to `COLS` cells). Memoized so
- * LegendList row recycling skips the row's outer render when its
- * `emojis` array reference is stable. Used both as the per-row
- * renderer for category sections inside `SectionAnchorList` AND as
- * the `renderItem` for the search-results `LegendList` override.
+ * list row recycling skips the row's outer render when its `emojis`
+ * array reference is stable. Used both as the per-row renderer for
+ * category sections inside `SectionAnchorList` AND as the `renderItem`
+ * for the search-results `List` override.
  */
 const EmojiRow = React.memo(function EmojiRow({
   emojis,
@@ -343,7 +332,7 @@ export function EmojiPickerContent({
     []
   );
 
-  // Pre-chunk search results so the override `LegendList` virtualizes
+  // Pre-chunk search results so the override `List` virtualizes
   // per row (not per cell) — matches the rowChunkSize=6 layout of the
   // sectioned mode, so cells stay on the same x-grid as the search bar.
   const searchRows = useMemo(() => chunkEmojis(searchResults), [searchResults]);
@@ -352,55 +341,14 @@ export function EmojiPickerContent({
     (items: EmojiEntry[]) => <EmojiRow emojis={items} onSelect={handleEmojiSelect} />,
     [handleEmojiSelect]
   );
-  const searchListRef = useRef<LegendListRef>(null);
-  const visualSearchList = useVisualListLogger<EmojiEntry[]>({
-    scope: 'emoji.search.list',
-    surface: 'composer',
-    component: 'EmojiSearchLegendList',
-    phase: isSearching ? 'searching' : 'idle',
-    extra: () => ({
-      queryLength: searchQuery.length,
-      resultCount: searchResults.length,
-      rowCount: searchRows.length,
-      cols: COLS,
-    }),
-    getItemKey: (row, index) => visualLayoutScopePart(searchRowKeyExtractor(row, index)),
-    getItemContext: (row, index) => ({
-      itemType: 'emoji-search-row',
-      index,
-      emojiCount: row.length,
-      firstKeyword: row[0]?.keywords[0] ?? null,
-    }),
-    getListState: () => searchListRef.current?.getState() ?? null,
-  });
   const renderEmojiSearchRow = useCallback(
-    ({ item, index }: { item: EmojiEntry[]; index: number }) => {
-      const rowKey = searchRowKeyExtractor(item, index);
-      return (
-        <VisualLayoutProbe
-          scope="emoji.search.list"
-          surface="composer"
-          component="EmojiSearchRow"
-          itemKey={visualLayoutScopePart(rowKey)}
-          itemType="emoji-search-row"
-          index={index}
-          phase={isSearching ? 'searching' : 'idle'}
-          extra={{
-            queryLength: searchQuery.length,
-            resultCount: searchResults.length,
-            emojiCount: item.length,
-            firstKeyword: item[0]?.keywords[0] ?? null,
-          }}>
-          <EmojiRow emojis={item} onSelect={handleEmojiSelect} />
-        </VisualLayoutProbe>
-      );
-    },
-    [handleEmojiSelect, isSearching, searchQuery.length, searchResults.length]
+    ({ item }: { item: EmojiEntry[] }) => <EmojiRow emojis={item} onSelect={handleEmojiSelect} />,
+    [handleEmojiSelect]
   );
 
   // `overrideContent` swaps the body wholesale. Empty search → centered
-  // "No emoji found"; non-empty → its own virtualized `LegendList` so
-  // the override path stays cheap with hundreds of matches.
+  // "No emoji found"; non-empty → its own virtualized `List` so the
+  // override path stays cheap with hundreds of matches.
   const overrideContent = useMemo(() => {
     if (!isSearching) return null;
     if (searchResults.length === 0) {
@@ -411,38 +359,21 @@ export function EmojiPickerContent({
       );
     }
     return (
-      <LegendList<EmojiEntry[]>
-        ref={searchListRef}
+      <List<EmojiEntry[]>
         data={searchRows}
         keyExtractor={searchRowKeyExtractor}
         renderItem={renderEmojiSearchRow}
-        estimatedItemSize={EMOJI_ROW_HEIGHT}
-        recycleItems
-        onItemSizeChanged={visualSearchList.onItemSizeChanged}
-        onLoad={visualSearchList.onLoad}
-        onMetricsChange={visualSearchList.onMetricsChange}
-        onStickyHeaderChange={visualSearchList.onStickyHeaderChange}
-        onViewableItemsChanged={visualSearchList.onViewableItemsChanged}
-        viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
         // Match the SectionAnchorList draw window so search and
         // sectioned mode have the same buffer behavior on fast scroll.
         drawDistance={150}
         contentContainerStyle={{ paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
         renderScrollComponent={({ children, ...props }) => (
           <BottomSheetScrollView {...props}>{children}</BottomSheetScrollView>
         )}
       />
     );
-  }, [
-    isSearching,
-    searchResults.length,
-    searchRows,
-    foreground,
-    renderEmojiSearchRow,
-    visualSearchList,
-  ]);
+  }, [isSearching, searchResults.length, searchRows, foreground, renderEmojiSearchRow]);
 
   return (
     <SectionAnchorList<EmojiEntry>
@@ -455,7 +386,6 @@ export function EmojiPickerContent({
       renderRow={renderEmojiRow}
       renderItem={noopRenderItem}
       keyExtractor={emojiKeyExtractor}
-      estimatedItemSize={EMOJI_ROW_HEIGHT}
       ScrollComponent={BottomSheetScrollView as never}
       overrideContent={overrideContent}
       // Tapers to `overlay` so the top fade matches the BottomSheet's

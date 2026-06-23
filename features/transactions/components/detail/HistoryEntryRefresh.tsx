@@ -11,6 +11,7 @@ import type { HistoryEntry } from '@cashu/coco-core';
 import Icon from 'assets/icons';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
+import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { usePaymentCopyResolver } from '@/shared/hooks/usePaymentCopyResolver';
@@ -55,13 +56,18 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
       </ListGroup.ItemPrefix>
       <ListGroup.ItemContent>
         <ListGroup.ItemTitle className="font-normal">{statusLabel}</ListGroup.ItemTitle>
-        {loading ? (
-          <Skeleton className="mt-1 h-4 w-28 rounded-md" />
-        ) : (
-          <ListGroup.ItemDescription className="text-foreground text-base font-bold">
-            {mintInfo?.name}
-          </ListGroup.ItemDescription>
-        )}
+        <SkeletonContentCrossfade
+          loading={loading}
+          wave="none"
+          visualKey="history-refresh-name"
+          visualSurface="transactions"
+          renderSkeleton={() => <Skeleton className="mt-1 h-4 w-28 rounded-md" />}
+          renderContent={() => (
+            <ListGroup.ItemDescription className="text-foreground text-base font-bold">
+              {mintInfo?.name}
+            </ListGroup.ItemDescription>
+          )}
+        />
       </ListGroup.ItemContent>
       {onPress && (
         <ListGroup.ItemSuffix>

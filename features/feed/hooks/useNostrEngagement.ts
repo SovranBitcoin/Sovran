@@ -169,21 +169,14 @@ export function useNostrEngagement(
   // State slices — grouped with useShallow to minimise re-subscriptions. The
   // canonical maps are populated globally by useOwnEventsSync, so this hook only
   // reads them (no per-screen relay subscription) and owns the optimistic toggle.
-  const {
-    likesByEventId,
-    repostsByEventId,
-    repliedByEventId,
-    optimisticLikesByEventId,
-    optimisticRepostsByEventId,
-  } = useNostrSocialStore(
-    useShallow((s) => ({
-      likesByEventId: s.likesByEventId,
-      repostsByEventId: s.repostsByEventId,
-      repliedByEventId: s.repliedByEventId,
-      optimisticLikesByEventId: s.optimisticLikesByEventId,
-      optimisticRepostsByEventId: s.optimisticRepostsByEventId,
-    }))
-  );
+  const { engagementByEventId, optimisticLikesByEventId, optimisticRepostsByEventId } =
+    useNostrSocialStore(
+      useShallow((s) => ({
+        engagementByEventId: s.engagementByEventId,
+        optimisticLikesByEventId: s.optimisticLikesByEventId,
+        optimisticRepostsByEventId: s.optimisticRepostsByEventId,
+      }))
+    );
 
   const lastStaleWarningRef = useRef(0);
 
@@ -205,13 +198,13 @@ export function useNostrEngagement(
     for (const eventId of eventIds) {
       settleOptimistic(
         optimisticLikesByEventId[eventId],
-        !!likesByEventId[eventId],
+        !!engagementByEventId[eventId]?.liked,
         getBaseMetrics(eventId).likeCount,
         () => clearLikeOptimistic(eventId)
       );
       settleOptimistic(
         optimisticRepostsByEventId[eventId],
-        !!repostsByEventId[eventId],
+        !!engagementByEventId[eventId]?.reposted,
         getBaseMetrics(eventId).repostCount,
         () => clearRepostOptimistic(eventId)
       );
@@ -219,10 +212,9 @@ export function useNostrEngagement(
   }, [
     eventIds,
     getBaseMetrics,
-    likesByEventId,
+    engagementByEventId,
     optimisticLikesByEventId,
     optimisticRepostsByEventId,
-    repostsByEventId,
   ]);
 
   // ---- DEV stale-optimistic warning ----
@@ -251,28 +243,22 @@ export function useNostrEngagement(
     engagementRevisionRef.current += 1;
     return engagementRevisionRef.current;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    eventIds,
-    likesByEventId,
-    repostsByEventId,
-    repliedByEventId,
-    optimisticLikesByEventId,
-    optimisticRepostsByEventId,
-  ]);
+  }, [eventIds, engagementByEventId, optimisticLikesByEventId, optimisticRepostsByEventId]);
 
   // ---- public getters ----
 
   const getEngagementState = useCallback(
     (eventId: string): EngagementState => {
-      const baseLiked = !!likesByEventId[eventId];
-      const baseReposted = !!repostsByEventId[eventId];
+      const record = engagementByEventId[eventId];
+      const baseLiked = !!record?.liked;
+      const baseReposted = !!record?.reposted;
       const optLike = optimisticLikesByEventId[eventId];
       const optRepost = optimisticRepostsByEventId[eventId];
 
       return {
         liked: optLike ? optLike.value : baseLiked,
         reposted: optRepost ? optRepost.value : baseReposted,
-        replied: !!repliedByEventId[eventId],
+        replied: !!record?.replied,
         likePending: !!optLike?.pending,
         repostPending: !!optRepost?.pending,
         likePendingDirection: optLike?.pending
@@ -287,13 +273,7 @@ export function useNostrEngagement(
           : undefined,
       };
     },
-    [
-      likesByEventId,
-      repliedByEventId,
-      optimisticLikesByEventId,
-      optimisticRepostsByEventId,
-      repostsByEventId,
-    ]
+    [engagementByEventId, optimisticLikesByEventId, optimisticRepostsByEventId]
   );
 
   const getDisplayMetrics = useCallback(
@@ -327,7 +307,7 @@ export function useNostrEngagement(
         currentState: state.liked,
         isPending: state.likePending,
         previousOptimistic: optimisticLikesByEventId[target.id],
-        relatedEventIdFromStore: likesByEventId[target.id]?.reactionEventId,
+        relatedEventIdFromStore: engagementByEventId[target.id]?.liked?.ownEventId,
         displayedCount: getDisplayMetrics(target.id).likeCount,
         baseCount: getBaseMetrics(target.id).likeCount,
         setOptimistic: setLikeOptimistic,
@@ -340,7 +320,7 @@ export function useNostrEngagement(
       getBaseMetrics,
       getDisplayMetrics,
       getEngagementState,
-      likesByEventId,
+      engagementByEventId,
       ndk,
       nostrKeys?.pubkey,
       optimisticLikesByEventId,
@@ -363,7 +343,7 @@ export function useNostrEngagement(
         currentState: state.reposted,
         isPending: state.repostPending,
         previousOptimistic: optimisticRepostsByEventId[target.id],
-        relatedEventIdFromStore: repostsByEventId[target.id]?.repostEventId,
+        relatedEventIdFromStore: engagementByEventId[target.id]?.reposted?.ownEventId,
         displayedCount: getDisplayMetrics(target.id).repostCount,
         baseCount: getBaseMetrics(target.id).repostCount,
         setOptimistic: setRepostOptimistic,
@@ -378,10 +358,10 @@ export function useNostrEngagement(
       getBaseMetrics,
       getDisplayMetrics,
       getEngagementState,
+      engagementByEventId,
       ndk,
       nostrKeys?.pubkey,
       optimisticRepostsByEventId,
-      repostsByEventId,
     ]
   );
 

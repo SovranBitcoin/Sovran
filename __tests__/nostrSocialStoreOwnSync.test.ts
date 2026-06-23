@@ -20,11 +20,7 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
 }));
 
 beforeEach(() => {
-  useNostrSocialStore.setState({
-    likesByEventId: {},
-    repostsByEventId: {},
-    repliedByEventId: {},
-  });
+  useNostrSocialStore.setState({ engagementByEventId: {} });
 });
 
 describe('nostrSocialStore own-events ingest', () => {
@@ -37,29 +33,43 @@ describe('nostrSocialStore own-events ingest', () => {
     // A second batch that omits t2 must NOT delete it (unlike the old scoped sync).
     s.ingestOwnLikes([{ targetEventId: 't1', reactionEventId: 'r1b', createdAt: 200 }]);
 
-    const { likesByEventId } = useNostrSocialStore.getState();
-    expect(likesByEventId.t1.reactionEventId).toBe('r1b'); // newer wins
-    expect(likesByEventId.t2.reactionEventId).toBe('r2'); // preserved
+    const { engagementByEventId } = useNostrSocialStore.getState();
+    expect(engagementByEventId.t1.liked?.ownEventId).toBe('r1b'); // newer wins
+    expect(engagementByEventId.t2.liked?.ownEventId).toBe('r2'); // preserved
   });
 
-  it('populates the replied index for the "you replied" highlight', () => {
+  it('merges multiple action types into ONE record per target (no +3 maps)', () => {
+    const s = useNostrSocialStore.getState();
+    s.ingestOwnLikes([{ targetEventId: 't1', reactionEventId: 'like1', createdAt: 100 }]);
+    s.ingestOwnReposts([{ targetEventId: 't1', repostEventId: 'repost1', createdAt: 200 }]);
+
+    const record = useNostrSocialStore.getState().engagementByEventId.t1;
+    expect(record.liked?.ownEventId).toBe('like1');
+    expect(record.reposted?.ownEventId).toBe('repost1');
+    expect(record.updatedAt).toBe(200); // newest contributing action
+  });
+
+  it('populates the replied field for the "you replied" highlight', () => {
     useNostrSocialStore
       .getState()
       .ingestOwnReplies([{ targetEventId: 'parent1', replyEventId: 'reply1', createdAt: 100 }]);
-    expect(useNostrSocialStore.getState().repliedByEventId.parent1.replyEventId).toBe('reply1');
+    expect(useNostrSocialStore.getState().engagementByEventId.parent1.replied?.ownEventId).toBe(
+      'reply1'
+    );
   });
 
-  it('applies kind:5 deletions by own event id across likes/reposts/replies', () => {
+  it('applies kind:5 deletions by own event id, clearing only the deleted action', () => {
     const s = useNostrSocialStore.getState();
+    // t1 has BOTH a like (to delete) and a repost (to keep) — the record survives.
     s.ingestOwnLikes([{ targetEventId: 't1', reactionEventId: 'like-del', createdAt: 100 }]);
-    s.ingestOwnReposts([{ targetEventId: 't2', repostEventId: 'repost-keep', createdAt: 100 }]);
+    s.ingestOwnReposts([{ targetEventId: 't1', repostEventId: 'repost-keep', createdAt: 100 }]);
     s.ingestOwnReplies([{ targetEventId: 't3', replyEventId: 'reply-del', createdAt: 100 }]);
 
     s.applyOwnDeletions(['like-del', 'reply-del']);
 
     const next = useNostrSocialStore.getState();
-    expect(next.likesByEventId.t1).toBeUndefined(); // like deleted → un-highlight
-    expect(next.repliedByEventId.t3).toBeUndefined(); // reply deleted
-    expect(next.repostsByEventId.t2?.repostEventId).toBe('repost-keep'); // untouched
+    expect(next.engagementByEventId.t1.liked).toBeUndefined(); // like deleted → un-highlight
+    expect(next.engagementByEventId.t1.reposted?.ownEventId).toBe('repost-keep'); // sibling kept
+    expect(next.engagementByEventId.t3).toBeUndefined(); // last action gone → record dropped
   });
 });

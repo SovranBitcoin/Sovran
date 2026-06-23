@@ -65,11 +65,13 @@ export function buildNotificationListItems(
   notifications: readonly FeedNotification[]
 ): NotificationListItem[] {
   const out: NotificationListItem[] = [];
-  let index = 0;
+  // Open client-side groups keyed by reason+target, so members that aren't
+  // adjacent in the (chronological) stream still merge into one row instead of
+  // each landing on its own. A group is anchored at its first member's position.
+  const clientGroups = new Map<string, Extract<NotificationListItem, { type: 'group' }>>();
 
-  while (index < notifications.length) {
-    const notification = notifications[index];
-    if (!notification) break;
+  for (const notification of notifications) {
+    if (!notification) continue;
 
     // Server-grouped node: one item already represents the whole group, with the
     // representative event plus sampled actors and an exact/capped total.
@@ -90,52 +92,48 @@ export function buildNotificationListItems(
           total,
           ...(notification.totalCapped ? { totalCapped: true } : {}),
         });
-        index += 1;
         continue;
       }
     }
 
     const reason = batchableReason(notification.reason);
-    // Single (server-marked or non-batchable reason) renders on its own.
+    // Single (server-marked or non-batchable reason, e.g. reply/mention) renders
+    // on its own.
     if (!reason || notification.type === 'single') {
       out.push({ type: 'single', id: notification.event.id, notification });
-      index += 1;
       continue;
     }
 
-    // Fallback: client-side consecutive-run grouping for the ungrouped (GraphQL)
-    // transport, which doesn't carry server group metadata.
-    const group = [notification];
-    const batchKey = batchKeyFor(notification, reason);
-    index += 1;
-    while (index < notifications.length) {
-      const next = notifications[index];
-      if (
-        !next ||
-        next.type === 'group' ||
-        next.reason !== reason ||
-        batchKeyFor(next, reason) !== batchKey
-      )
-        break;
-      group.push(next);
-      index += 1;
-    }
-
-    if (group.length === 1) {
-      out.push({ type: 'single', id: notification.event.id, notification });
+    // Fallback: client-side grouping for ungrouped transports (raw relays /
+    // GraphQL) that don't carry server group metadata. Group across the WHOLE
+    // page by reason+target — not just consecutive runs — then demote any
+    // single-member group back to a row below.
+    const key = `${reason}:${batchKeyFor(notification, reason)}`;
+    const open = clientGroups.get(key);
+    if (open) {
+      open.notifications.push(notification);
+      open.total = open.notifications.length;
       continue;
     }
-
-    const first = group[0]!;
-    const last = group[group.length - 1]!;
-    out.push({
+    const group: Extract<NotificationListItem, { type: 'group' }> = {
       type: 'group',
-      id: `${reason}:${first.event.id}:${last.event.id}:${group.length}`,
+      id: `client:${key}`,
       reason,
-      notifications: group,
-      total: group.length,
-    });
+      notifications: [notification],
+      total: 1,
+    };
+    clientGroups.set(key, group);
+    out.push(group);
   }
 
-  return out;
+  // A client group that attracted no other members is really a single.
+  return out.map((item) =>
+    item.type === 'group' && item.id.startsWith('client:') && item.notifications.length === 1
+      ? {
+          type: 'single',
+          id: item.notifications[0]!.event.id,
+          notification: item.notifications[0]!,
+        }
+      : item
+  );
 }

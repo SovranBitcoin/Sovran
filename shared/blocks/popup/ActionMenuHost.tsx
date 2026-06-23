@@ -474,7 +474,7 @@ export function ActionMenuHost() {
   // Map ActionMenuSection[] → AnchorSection<ActionMenuItem>[] for
   // SectionAnchorList. Two shapes:
   //   - Sections with `buttons` use the standard data + renderItem
-  //     path so each profile row virtualizes individually (LegendList
+  //     path so each profile row virtualizes individually (FlashList
   //     mounts only the rows in the draw window). Items render as
   //     `Menu.Item`s; the section gets no header.
   //   - Sections with `renderBody` (custom non-button content, e.g.
@@ -642,20 +642,15 @@ export function ActionMenuHost() {
               sections={sectionsForList}
               // Each section's `data` is its `ActionMenuItem[]` (see
               // `sectionsForList`); we render one Menu.Item per button.
-              // LegendList virtualizes the row stream so even a long
+              // FlashList virtualizes the row stream so even a long
               // profile list (or future >100-item picker) only mounts
               // the rows in the draw window.
               renderItem={(button, sectionId) =>
                 renderActionButton(button, `${sectionId}-${button.testID ?? button.text}`)
               }
               keyExtractor={(button, sectionId) => `${sectionId}-${button.testID ?? button.text}`}
-              // Profile rows are ~58px (avatar 36 + paddingVertical from
-              // Menu.Item). 60 is a safe estimate that overshoots
-              // slightly so LegendList doesn't under-allocate the
-              // viewport on first mount.
-              estimatedItemSize={60}
               // The 12px horizontal inset that previously wrapped each
-              // section now lives on the LegendList contentContainer so
+              // section now lives on the list contentContainer so
               // every row aligns with `Menu.Label`'s `ml-3` (24px from
               // the menu's left edge).
               listContentContainerStyle={{ paddingHorizontal: 12 }}

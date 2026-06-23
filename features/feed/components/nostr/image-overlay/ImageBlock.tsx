@@ -178,7 +178,7 @@ export const ImageBlock = React.memo(function ImageBlock({
   );
 
   /**
-   * Just-in-time re-measure for dismiss targeting. Recycled LegendList rows
+   * Just-in-time re-measure for dismiss targeting. Recycled FlashList rows
    * never re-fire onLayout when size is unchanged, so the rect registered at
    * onLayout can be stale by close time; close() calls this to re-measure the
    * live node. Resolves null when the node is unmounted/unmeasurable.

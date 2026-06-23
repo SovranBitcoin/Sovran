@@ -18,7 +18,6 @@
         "@gandlaf21/bolt11-decode": "^3.1.1",
         "@gorhom/bottom-sheet": "5.2.9",
         "@internet-privacy/marmot-ts": "file:./vendor/marmot-ts",
-        "@legendapp/list": "3.0.0",
         "@mealection/react-native-boring-avatars": "1.1.2",
         "@monicon/metro": "^2.0.7",
         "@monicon/native": "^1.2.2",
@@ -36,6 +35,7 @@
         "@scure/base": "^2.0.0",
         "@scure/bip32": "^1.3.3",
         "@scure/bip39": "^1.2.2",
+        "@shopify/flash-list": "2",
         "@shopify/react-native-skia": "2.4.18",
         "@sovranbitcoin/coco-cashu-plugin-p2pk-import": "^0.1.0",
         "@sovranbitcoin/colada": "^0.7.0",
@@ -820,8 +820,6 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@legendapp/list": ["@legendapp/list@3.0.0", "", { "dependencies": { "use-sync-external-store": "^1.5.0" }, "peerDependencies": { "react": "*" } }, "sha512-b5PzA2OUQrBATFqFi0978N7pNuMPRiANfLWuYzKsl6+CWEN8o5KSDlor2CrLNtxDbIirHJVionON5vQCS4bF2A=="],
-
     "@manypkg/find-root": ["@manypkg/find-root@1.1.0", "", { "dependencies": { "@babel/runtime": "^7.5.5", "@types/node": "^12.7.1", "find-up": "^4.1.0", "fs-extra": "^8.1.0" } }, "sha512-mki5uBvhHzO8kYYix/WRy2WX8S3B5wdVSc9D6KcU5lQNglP2yt58/VfLuAK49glRXChosY8ap2oJ1qgma3GUVA=="],
 
     "@manypkg/get-packages": ["@manypkg/get-packages@1.1.3", "", { "dependencies": { "@babel/runtime": "^7.5.5", "@changesets/types": "^4.0.1", "@manypkg/find-root": "^1.1.0", "fs-extra": "^8.1.0", "globby": "^11.0.0", "read-yaml-file": "^1.1.0" } }, "sha512-fo+QhuU3qE/2TQMQmbVMqaQ6EWbMhi4ABWP+O4AM1NqPBuy0OrApV5LO6BrrgnhtAHS2NH6RrVk9OL181tTi8A=="],
@@ -1065,6 +1063,8 @@
     "@scure/bip32": ["@scure/bip32@1.7.0", "", { "dependencies": { "@noble/curves": "~1.9.0", "@noble/hashes": "~1.8.0", "@scure/base": "~1.2.5" } }, "sha512-E4FFX/N3f4B80AKWp5dP6ow+flD1LQZo/w8UnLGYZO674jS6YnYeepycOOksv+vLPSpgN35wgKgy+ybfTb2SMw=="],
 
     "@scure/bip39": ["@scure/bip39@1.6.0", "", { "dependencies": { "@noble/hashes": "~1.8.0", "@scure/base": "~1.2.5" } }, "sha512-+lF0BbLiJNwVlev4eKelw1WWLaiKXw7sSl8T6FvBlWkdX+94aGJ4o8XjUdlyhTCjd8c+B3KT3JfS8P0bLRNU6A=="],
+
+    "@shopify/flash-list": ["@shopify/flash-list@2.3.2", "", { "peerDependencies": { "@babel/runtime": "*", "react": "*", "react-native": "*" } }, "sha512-vQnd0y0Ag11yzS30llaeCrtIU3xYTMe7KEOP3dveLImnVjQEUw6BEg1+Ztja6aODlVNz1BpvxtlQ5eZGxiLwKw=="],
 
     "@shopify/react-native-skia": ["@shopify/react-native-skia@2.4.18", "", { "dependencies": { "canvaskit-wasm": "0.40.0", "react-reconciler": "0.31.0" }, "peerDependencies": { "react": ">=19.0", "react-native": ">=0.78", "react-native-reanimated": ">=3.19.1" }, "optionalPeers": ["react-native", "react-native-reanimated"], "bin": { "setup-skia-web": "scripts/setup-canvaskit.js" } }, "sha512-/AB/mvb2dGSQVIJTxyG9ZMFn2PjwWlVcFxHU4TV+K25LCU49ntJXl4xda2ghXxdENMggKgO9R5pA+P/AQ0UUrA=="],
 

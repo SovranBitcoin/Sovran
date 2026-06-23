@@ -7,9 +7,7 @@ describe('backend config', () => {
       apiBaseUrl: 'https://api.sovran.money/api',
       scoreApiBaseUrl: 'https://nagg.up.railway.app',
       nostrGraphqlEndpoint: 'https://nagg.up.railway.app/graphql',
-      nostrDmAppView: false,
-      nostrFeedAppView: false,
-      nostrNotificationsAppView: false,
+      primalCacheUrl: 'wss://cache2.primal.net/v1',
     });
   });
 
@@ -26,40 +24,8 @@ describe('backend config', () => {
       apiBaseUrl: 'https://api.example.test/api',
       scoreApiBaseUrl: 'http://localhost:8080',
       nostrGraphqlEndpoint: 'http://localhost:8081/graphql',
-      nostrDmAppView: false,
-      nostrFeedAppView: false,
-      nostrNotificationsAppView: false,
+      primalCacheUrl: 'wss://cache2.primal.net/v1',
     });
-  });
-
-  it('enables the DM app-view transport only when explicitly set to "true"', () => {
-    expect(parseBackendConfig({ EXPO_PUBLIC_NOSTR_DM_APPVIEW: 'true' }).nostrDmAppView).toBe(true);
-    expect(parseBackendConfig({ EXPO_PUBLIC_NOSTR_DM_APPVIEW: 'false' }).nostrDmAppView).toBe(
-      false
-    );
-    expect(parseBackendConfig({}).nostrDmAppView).toBe(false);
-  });
-
-  it('enables the feed app-view transport only when explicitly set to "true"', () => {
-    expect(parseBackendConfig({ EXPO_PUBLIC_NOSTR_FEED_APPVIEW: 'true' }).nostrFeedAppView).toBe(
-      true
-    );
-    expect(parseBackendConfig({ EXPO_PUBLIC_NOSTR_FEED_APPVIEW: 'false' }).nostrFeedAppView).toBe(
-      false
-    );
-    expect(parseBackendConfig({}).nostrFeedAppView).toBe(false);
-  });
-
-  it('enables the notifications app-view transport only when explicitly set to "true"', () => {
-    expect(
-      parseBackendConfig({ EXPO_PUBLIC_NOSTR_NOTIFICATIONS_APPVIEW: 'true' })
-        .nostrNotificationsAppView
-    ).toBe(true);
-    expect(
-      parseBackendConfig({ EXPO_PUBLIC_NOSTR_NOTIFICATIONS_APPVIEW: 'false' })
-        .nostrNotificationsAppView
-    ).toBe(false);
-    expect(parseBackendConfig({}).nostrNotificationsAppView).toBe(false);
   });
 
   it('keeps the legacy Nagg base URL env as an app-view fallback', () => {
@@ -81,6 +47,14 @@ describe('backend config', () => {
         EXPO_PUBLIC_API_BASE_URL: 'https://api.example.test/api',
       }).scoreApiBaseUrl
     ).toBe('https://nostr-index.example.test');
+  });
+
+  it('defaults the Primal cache URL and honors an override', () => {
+    expect(parseBackendConfig({}).primalCacheUrl).toBe('wss://cache2.primal.net/v1');
+    expect(
+      parseBackendConfig({ EXPO_PUBLIC_PRIMAL_CACHE_URL: 'wss://my-cache.example/v1' })
+        .primalCacheUrl
+    ).toBe('wss://my-cache.example/v1');
   });
 
   it('rejects invalid Nostr app-view URLs', () => {

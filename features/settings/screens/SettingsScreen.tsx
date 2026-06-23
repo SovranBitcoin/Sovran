@@ -220,9 +220,9 @@ export const SettingsScreen = () => {
             />
             <Separator className="mx-4" />
             <SettingsListLinkItem
-              href="/(settings-flow)/relays"
-              title="Relays"
-              description="Manage where your posts publish"
+              href="/(settings-flow)/network"
+              title="Network"
+              description="Aggregators, caching, and relays"
             />
           </ListGroup>
         </Section>
