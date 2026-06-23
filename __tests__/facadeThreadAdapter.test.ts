@@ -25,6 +25,7 @@ function buildThread(): facade.ResolvedThread {
   return {
     tier: 'primal',
     root: note(ROOT, 1000),
+    parents: [],
     replies: [note(A, 300), note(B, 200), note(C, 100)],
     stats: STATS,
     profiles: {},
