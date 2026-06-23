@@ -5,6 +5,7 @@ import { paymentLog } from '@/shared/lib/logger';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { prefetchImages } from '@/shared/lib/imageCache';
 import type { DmConversation } from './useDmConversations';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 interface NostrKeys {
   pubkey?: string;
@@ -14,13 +15,6 @@ interface NostrKeys {
 interface MintWithInfo {
   mint: Mint;
   mintInfo: GetInfoResponse;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 export interface MintContact {

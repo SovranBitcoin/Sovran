@@ -27,6 +27,7 @@ import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { cashuLog } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 const ParamsSchema = z.object({
   showAddMintsButton: z.enum(['true', 'false']).optional(),
@@ -39,13 +40,6 @@ const ParamsSchema = z.object({
     .optional(),
   continueParams: z.string().min(1).max(4_000).optional(),
 });
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 function MintListRoute() {
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.list' });

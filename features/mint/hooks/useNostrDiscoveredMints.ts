@@ -15,19 +15,13 @@ import { normalizeMintUrlKey, normalizeUrlForApi } from '@/shared/lib/url';
 
 import type { MintRecommendation } from '@/shared/lib/apiClient';
 import { useMintManagement } from './useMintManagement';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 interface NostrDiscoveredMintData {
   url: string;
   score: number;
   recommendations: MintRecommendation[];
   mintInfo: GetInfoResponse | null;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 interface UseNostrDiscoveredMintsResult {

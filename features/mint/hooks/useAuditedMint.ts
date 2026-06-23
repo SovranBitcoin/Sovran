@@ -7,19 +7,13 @@ import { auditMint, fetchMintInfo } from '@/shared/lib/apiClient';
 import { cashuLog } from '@/shared/lib/logger';
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
 import { transformAuditData, type AuditInfo } from '../lib/auditInfo';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 interface UseAuditedMintResult {
   auditInfo?: AuditInfo;
   mintInfo?: GetInfoResponse;
   loading: boolean;
   error?: string;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {

@@ -44,17 +44,11 @@ import type {
   TransactionLockFilter,
   TransactionCounterpartyFilter,
 } from '../components/TransactionsFilterContext';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 
 const MONTH_SELECTOR_HEIGHT = 48;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 interface TransactionsScreenProps {
   initialTab?: StatusTab;

@@ -10,6 +10,7 @@ import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/l
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 initLog('Module', 'CocoProvider loaded');
 
@@ -29,13 +30,6 @@ const CocoContext = createContext<CocoContextValue>({
 
 interface CocoProviderProps {
   children: ReactNode;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 function defaultSelectedMintLogFields(mintUrl: string | null | undefined): Record<string, unknown> {

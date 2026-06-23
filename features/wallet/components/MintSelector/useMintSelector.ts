@@ -15,6 +15,7 @@ import { getMintDisplayName } from '@/shared/lib/url';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { walletLog } from '@/shared/lib/logger';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 export interface MintSelectorProps {
   /** Mint URL to display. When omitted, reads preferredMintUrl from store. */
@@ -47,13 +48,6 @@ interface MintSelectorShared {
     buttonWidth: number;
     contentWidth: number;
     contentHeight: number;
-  };
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
   };
 }
 

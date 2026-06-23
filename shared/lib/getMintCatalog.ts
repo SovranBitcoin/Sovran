@@ -40,6 +40,7 @@ import {
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 type MintCatalogNetworkMode = 'cache-only' | 'cache-first' | 'network-first';
 
@@ -59,13 +60,6 @@ function isMintInfoObject(value: unknown): value is Record<string, unknown> {
 
 function hasCatalogFields(entry: MintCatalogEntry): boolean {
   return Object.values(entry).some((value) => value !== undefined);
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 function readCachedEntry(mintUrl: string): { entry: MintCatalogEntry; info: unknown } {

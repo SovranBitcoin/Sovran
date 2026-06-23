@@ -13,13 +13,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { extractCashuToken } from '@/shared/ui/composed/chat/extractCashuToken';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 /**
  * App-wide Nut Drop receive pipeline. Mounted in BitchatBLEProvider (inside

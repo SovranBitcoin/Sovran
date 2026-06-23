@@ -4,6 +4,7 @@ import type { Mint } from '@cashu/coco-core';
 import { useManager } from '@cashu/coco-react';
 import { log } from '@/shared/lib/logger';
 import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 // Module-level in-flight dedupe. Multiple components that use this hook
 // (ContactsScreen, settings recovery, mint screens) each kick off their
@@ -13,13 +14,6 @@ import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
 // down to one call; each consumer still gets its own React state, but
 // reads from the shared result.
 let inflightLoad: Promise<Mint[]> | null = null;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 /**
  * Subscribes to the trusted-mints list and re-exposes `getMintInfo` behind

@@ -7,7 +7,7 @@
  */
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { paymentLog } from '@/shared/lib/logger';
-import { mintUrlLogFields } from './sovranPaymentLog';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 import type { Manager } from '@cashu/coco-core';
 import {

@@ -5,13 +5,7 @@ import { store } from '@/redux/store/store.deprecated';
 import { RootState } from '@/redux/store/reducer.deprecated';
 import { CashuProfile } from '@/redux/cashu/types.deprecated';
 import { cashuLog } from '../logger';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 function profileLogFields(profile: CashuProfile): Record<string, unknown> {
   return {

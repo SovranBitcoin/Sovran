@@ -30,17 +30,11 @@ import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
 import { walletLog, initLog, useInitMount } from '@/shared/lib/logger';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 initLog('Module', 'WalletContextProvider loaded');
 
 const WalletContextCtx = createContext<WalletContext | null>(null);
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 function preferredMintLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
   return {

@@ -35,6 +35,7 @@ import {
   type P2PKSecretKeyInput,
 } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 import Constants from 'expo-constants';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 // Shared giveaway P2PK key, injected at build time via app.config.js `extra`
 // (from the non-EXPO_PUBLIC `GIVEAWAY_P2PK_SECRET`). This is intentionally
@@ -48,13 +49,6 @@ const GIVEAWAY_P2PK_SECRET: string | null =
   Constants.expoConfig.extra.giveawayP2pkSecret.length > 0
     ? Constants.expoConfig.extra.giveawayP2pkSecret
     : null;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;

@@ -17,13 +17,7 @@ import { getTokenMetadata } from '@cashu/cashu-ts';
 import { log } from '../logger';
 import { mintLocalId } from '../id';
 import { amountToNumber } from './amount';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 /**
  * Validates if a string is a valid ecash token by attempting to decode it

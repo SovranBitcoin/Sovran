@@ -24,6 +24,7 @@ import { LoadingIndicator } from '@/shared/blocks/status';
 import { staticPopup, paramPopup } from '@/shared/lib/popup';
 import { fetchJson } from '@/shared/lib/apiClient';
 import { MintListResponse, parseWith } from '@sovranbitcoin/schemas';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 // ─── Deep probe: discover mints from audit API ─────────────────────────────
 
@@ -31,13 +32,6 @@ const SOVRAN_MINTS_API = 'https://api.sovran.money/api/cashu/mints';
 const MAX_DISCOVERED_MINTS = 100;
 
 const parseMintList = parseWith(MintListResponse, 'cashu/mints');
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 function normalizeMintUrl(url: string): string {
   return url.replace(/\/$/, '').toLowerCase();

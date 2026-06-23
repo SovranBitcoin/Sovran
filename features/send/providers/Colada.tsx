@@ -42,7 +42,7 @@ import { createSovranHandlers } from '@/features/send/lib/sovranHandlers';
 import { createSovranScreenActionHandlers } from '@/features/send/lib/sovranScreenActions';
 import { createSovranNotifications } from '@/features/send/lib/sovranNotifications';
 import { createSovranScanSources } from '@/features/send/lib/sovranScanSources';
-import { mintUrlLogFields } from '@/features/send/lib/sovranPaymentLog';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 import {
   createSovranExecuteMintQuote,
   createSovranExecuteReceive,

@@ -80,6 +80,7 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useVisualStateLogger } from '@/shared/lib/contentShiftLog';
 import { Log, nostrLog, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 const BANNER_HEIGHT = 150;
 const AVATAR_SIZE = 90;
@@ -95,13 +96,6 @@ const UserProfileParamsSchema = z
     message: 'either npub or pubkey is required',
     path: ['pubkey'],
   });
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 function buildUpdatedContactTags(
   existingTags: string[][],

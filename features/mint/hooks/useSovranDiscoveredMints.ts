@@ -8,6 +8,7 @@ import { normalizeMintUrlKey, normalizeUrlForApi } from '@/shared/lib/url';
 import { MintListResponse, parseWith } from '@sovranbitcoin/schemas';
 
 import { useMintManagement } from './useMintManagement';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 const parseMintList = parseWith(MintListResponse, 'cashu/mints');
 
@@ -28,13 +29,6 @@ interface UseSovranDiscoveredMintsResult {
 const SOVRAN_MINTS_API_URL = 'https://api.sovran.money/api/cashu/mints';
 
 const CONCURRENT_LIMIT = 5;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 /**
  * Appends a mint to state if not already present (by normalized URL).

@@ -35,7 +35,7 @@ import { mintLocalId } from '@/shared/lib/id';
 import { paymentLog } from '@/shared/lib/logger';
 import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
 
-import { mintUrlLogFields } from './sovranPaymentLog';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 type ReceiveOperationLike = {
   id: string;

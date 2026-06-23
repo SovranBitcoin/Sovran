@@ -6,6 +6,7 @@ import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
 import { cashuLog } from '@/shared/lib/logger';
 import { transformAuditData, type AuditInfo } from '../lib/auditInfo';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 export interface AuditedMintData {
   auditInfo?: AuditInfo;
@@ -21,13 +22,6 @@ interface UseAuditedMintsResult {
 }
 
 const CONCURRENT_LIMIT = 5;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 /**
  * Batch hook for loading audit data for multiple mints at once.

@@ -16,15 +16,9 @@ import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStor
 import { isSwapStatusActive } from '@/shared/stores/runtime/swapStatusStore';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { paymentLog } from '@/shared/lib/logger';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 const NPC_RECEIVE_POPUP_MAX_AGE_MS = 5 * 60 * 1000;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 function activeMintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
   return {

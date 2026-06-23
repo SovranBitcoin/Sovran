@@ -10,13 +10,7 @@ import { Keyboard } from 'react-native';
 
 import { paymentLog } from '@/shared/lib/logger';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 export function navigateToProfile(pubkey: string | null | undefined, mintUrl?: string): void {
   Keyboard.dismiss();

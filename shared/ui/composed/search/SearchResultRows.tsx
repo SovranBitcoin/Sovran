@@ -28,6 +28,7 @@ import { paymentLog, cashuLog } from '@/shared/lib/logger';
 import { NoResultsFound } from '@/features/payments/components/NoResultsFound';
 import { CONTACT_SEARCH_MIN_LENGTH } from '@/features/payments/hooks/useContactSearch';
 import type { TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 type SearchResultRowsProps = {
   results: AllSearchResult[];
@@ -41,13 +42,6 @@ const keyExtractor = (item: AllSearchResult) => item.id;
 
 function searchResultItemType(item: AllSearchResult): string {
   return item.type === 'contact' && item.isLoadingProfile ? 'contact-loading' : item.type;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 function GeohashJumpRow({ geohash }: { geohash: string }) {

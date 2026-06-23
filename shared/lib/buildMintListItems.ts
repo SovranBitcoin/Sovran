@@ -8,13 +8,7 @@ import {
 
 import { log } from '@/shared/lib/logger';
 import { getMintDisplayName } from '@/shared/lib/url';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 /**
  * Builds a fully-resolved `MintListItem[]` from trusted mints, their availability,
