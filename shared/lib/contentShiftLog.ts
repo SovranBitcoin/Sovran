@@ -29,6 +29,14 @@ import {
 } from 'react-native';
 
 import { feedLog, monotonicNow } from '@/shared/lib/logger';
+import {
+  type LayoutRect,
+  rectBottom,
+  rectOverlap,
+  rectRight,
+  validRect,
+  viewportFlags,
+} from './contentShiftGeometry';
 
 /** Sub-pixel layout deltas are noise from rounding, not a visible shift. */
 const SHIFT_EPSILON = 0.5;
@@ -88,13 +96,6 @@ export function visualLayoutScopePart(value: string | undefined): string {
   const normalized = (value ?? 'default').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 48);
   return normalized || 'default';
 }
-
-type LayoutRect = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
 
 type MeasureableNode = {
   measureInWindow?: (cb: (x: number, y: number, width: number, height: number) => void) => void;
@@ -358,37 +359,6 @@ function resolveExtra(extra: VisualExtra | undefined): Record<string, unknown> {
   return extra;
 }
 
-function validRect(rect: LayoutRect): boolean {
-  return (
-    Number.isFinite(rect.x) &&
-    Number.isFinite(rect.y) &&
-    Number.isFinite(rect.width) &&
-    Number.isFinite(rect.height)
-  );
-}
-
-function rectBottom(rect: LayoutRect): number {
-  return rect.y + rect.height;
-}
-
-function rectRight(rect: LayoutRect): number {
-  return rect.x + rect.width;
-}
-
-function verticalOverlap(a: LayoutRect, b: LayoutRect): number {
-  return Math.min(rectBottom(a), rectBottom(b)) - Math.max(a.y, b.y);
-}
-
-function horizontalOverlap(a: LayoutRect, b: LayoutRect): number {
-  return Math.min(rectRight(a), rectRight(b)) - Math.max(a.x, b.x);
-}
-
-function rectOverlap(a: LayoutRect, b: LayoutRect): { x: number; y: number; area: number } {
-  const x = horizontalOverlap(a, b);
-  const y = verticalOverlap(a, b);
-  return { x, y, area: x > 0 && y > 0 ? x * y : 0 };
-}
-
 function findOverlaps(
   scope: string,
   itemKey: string,
@@ -485,35 +455,6 @@ function findContainerViolations(
   }
 
   return violations;
-}
-
-function viewportFlags(rect: LayoutRect, viewport: { width: number; height: number }) {
-  const bottom = rectBottom(rect);
-  const right = rectRight(rect);
-  const visible =
-    rect.width > 0 &&
-    rect.height > 0 &&
-    bottom >= 0 &&
-    rect.y <= viewport.height &&
-    right >= 0 &&
-    rect.x <= viewport.width;
-  const farOutsideY = rect.y < -viewport.height * 2 || rect.y > viewport.height * 3;
-  const farOutsideX = rect.x < -viewport.width * 2 || rect.x > viewport.width * 3;
-  const absurdHeight = rect.height > viewport.height * 3;
-  const absurdWidth = rect.width > viewport.width * 3;
-  const zeroArea = rect.width <= 0 || rect.height <= 0;
-  return {
-    visible,
-    offscreenTop: bottom < 0,
-    offscreenBottom: rect.y > viewport.height,
-    offscreenLeft: right < 0,
-    offscreenRight: rect.x > viewport.width,
-    farOutsideY,
-    farOutsideX,
-    absurdHeight,
-    absurdWidth,
-    zeroArea,
-  };
 }
 
 function scopeRecords(scope: string): Map<string, VisualRecord> {
