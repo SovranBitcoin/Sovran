@@ -84,6 +84,29 @@ function activeViewerPubkey(): string | undefined {
 }
 
 /**
+ * Seed the active profile's cached name/picture (from profileStore) into the
+ * entity cache at low confidence ('cache' rank, seenAt 0) so the viewer's own
+ * pfp/name render instantly — notably on the notifications screen, whose targets
+ * are the viewer's own posts — with zero fetch. A real kind-0 from any tier
+ * overrides it. Re-run on every (re)build so it survives an identity switch.
+ */
+function seedOwnProfile(layer: facade.NostrDataLayer): void {
+  const profile = useProfileStore.getState().getActiveProfile();
+  if (!profile?.pubkey) return;
+  const { cachedDisplayName, cachedPicture } = profile;
+  if (!cachedDisplayName && !cachedPicture) return;
+  layer.cache.ingestProfileInfos(
+    {
+      [profile.pubkey]: {
+        name: cachedDisplayName ?? '',
+        ...(cachedPicture ? { picture: cachedPicture } : {}),
+      },
+    },
+    'cache'
+  );
+}
+
+/**
  * The profile-scoped Nostr data-layer singleton (see file header). Returns the
  * memoised facade for the active profile + tier config, rebuilding only when the
  * identity or the toggles change. Returns null when every tier is disabled.
@@ -103,6 +126,7 @@ export function buildNostrDataLayer(): facade.NostrDataLayer | null {
   }
 
   const layer = assembleLayer(config);
+  if (layer) seedOwnProfile(layer);
   memo = layer ? { layer, configKey, pubkey } : null;
   return layer;
 }
