@@ -23,11 +23,16 @@
     "number-flow-react-native",
     "nutpatch",
     "patch-package",
-    "react-native-fast-squircle"
+    "react-native-fast-squircle",
+    "@sovranbitcoin/colada",
+    "@sovranbitcoin/nagg-ts",
+    "@sovranbitcoin/schemas"
   ],
   "ignoreBinaries": ["claude", "eas", "gh", "maestro", "tsx"],
   "ignoreIssues": {
     "**/*.android.{ts,tsx}": ["files"],
+    "**/*.ios.{ts,tsx}": ["files"],
+    "**/*.blur.{ts,tsx}": ["files"],
     "**/*.liquid.{ts,tsx}": ["files"],
     "codereview/**": ["exports", "types"],
     "features/feed/**": ["exports", "types"],

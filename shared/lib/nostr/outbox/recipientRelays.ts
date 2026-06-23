@@ -35,7 +35,7 @@ async function getRecipientReadRelays(ndk: NDK, pubkey: string): Promise<string[
   }
 }
 
-export interface OutboxInput {
+interface OutboxInput {
   ownWriteRelays: readonly string[];
   /** Pubkeys (mentions/recipients) whose read relays the event should reach. */
   mentionPubkeys?: readonly string[];

@@ -11,7 +11,7 @@ import { ResultAsync } from 'neverthrow';
 
 import { nostrLog } from '@/shared/lib/logger';
 
-export interface RelayLimitation {
+interface RelayLimitation {
   max_content_length?: number;
   max_message_length?: number;
   max_subscriptions?: number;
@@ -19,7 +19,7 @@ export interface RelayLimitation {
   payment_required?: boolean;
 }
 
-export interface RelayInformation {
+interface RelayInformation {
   name?: string;
   description?: string;
   software?: string;
@@ -29,7 +29,7 @@ export interface RelayInformation {
   limitation?: RelayLimitation;
 }
 
-export type RelayInfoError = { type: 'fetch-failed' } | { type: 'invalid' };
+type RelayInfoError = { type: 'fetch-failed' } | { type: 'invalid' };
 
 const TTL_MS = 60 * 60 * 1000; // 1h
 const FETCH_TIMEOUT_MS = 6_000;
@@ -74,9 +74,7 @@ function parseInfo(raw: unknown): RelayInformation | null {
 }
 
 /** Fetches (and caches) a relay's NIP-11 document. */
-export function fetchRelayInformation(
-  relayUrl: string
-): ResultAsync<RelayInformation, RelayInfoError> {
+function fetchRelayInformation(relayUrl: string): ResultAsync<RelayInformation, RelayInfoError> {
   const cached = cache.get(relayUrl);
   if (cached && Date.now() - cached.at < TTL_MS) {
     return ResultAsync.fromSafePromise(Promise.resolve(cached.info));

@@ -15,7 +15,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
  * so it ships safely while the app still resolves nagg-ts to the published
  * registry version that predates the facade.
  */
-export type NostrTierConfig = {
+type NostrTierConfig = {
   nagg: { enabled: boolean; appViewBaseUrl: string };
   primal: { enabled: boolean; url: string };
   relay: { enabled: boolean; relays: readonly string[] };
@@ -39,16 +39,4 @@ export function getNostrTierConfig(): NostrTierConfig {
     relays: config.relay.relays.length,
   });
   return config;
-}
-
-/** Reactive hook form for components that want to display tier state. */
-export function useNostrTierConfig(): NostrTierConfig {
-  const naggTierEnabled = useSettingsStore((st) => st.naggTierEnabled);
-  const primalTierEnabled = useSettingsStore((st) => st.primalTierEnabled);
-  const relayTierEnabled = useSettingsStore((st) => st.relayTierEnabled);
-  return {
-    nagg: { enabled: naggTierEnabled, appViewBaseUrl: backendConfig.nostrAppViewBaseUrl },
-    primal: { enabled: primalTierEnabled, url: backendConfig.primalCacheUrl },
-    relay: { enabled: relayTierEnabled, relays: DEFAULT_RELAYS },
-  };
 }

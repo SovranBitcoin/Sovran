@@ -93,7 +93,7 @@ async function publishPoll(ndk: NDK, state: ComposerSnapshot): Promise<PublishOu
   return 'ok';
 }
 
-export interface ComposedDraft {
+interface ComposedDraft {
   blocks: readonly ComposerBlock[];
   target: ComposerTarget;
   mentionPubkeys?: readonly string[];

@@ -2,11 +2,7 @@ import { useCallback, useMemo, useSyncExternalStore } from 'react';
 
 import { facade } from '@sovranbitcoin/nagg-ts';
 
-import type {
-  FeedEvent,
-  NoteMetrics,
-  ProfileInfo,
-} from '@/features/feed/components/nostr/feedTypes';
+import type { ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 
 // ---------------------------------------------------------------------------
@@ -20,7 +16,7 @@ import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 // useSyncExternalStore needs to avoid render loops.
 // ---------------------------------------------------------------------------
 
-export type ProfileStatus = 'cached' | 'loading' | 'absent';
+type ProfileStatus = 'cached' | 'loading' | 'absent';
 
 const NOOP_UNSUB = () => {};
 
@@ -70,28 +66,4 @@ export function useProfile(pubkey: string | undefined): {
     const status: ProfileStatus = record ? 'cached' : pending ? 'loading' : 'absent';
     return { profile, status };
   }, [record, pending]);
-}
-
-/** A cached note body by id (structurally a FeedEvent). */
-export function useNote(id: string | undefined): FeedEvent | undefined {
-  const cache = buildNostrDataLayer()?.cache;
-  return useCachedRecord(cache?.notes, id);
-}
-
-/** Cached engagement metrics for a note id, mapped to the app's NoteMetrics shape. */
-export function useNoteStats(id: string | undefined): NoteMetrics | undefined {
-  const cache = buildNostrDataLayer()?.cache;
-  const record = useCachedRecord(cache?.noteStats, id);
-  return useMemo(
-    () =>
-      record
-        ? {
-            likeCount: record.likes,
-            repostCount: record.reposts,
-            replyCount: record.replies,
-            satsZapped: record.satsZapped,
-          }
-        : undefined,
-    [record]
-  );
 }

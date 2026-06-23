@@ -270,21 +270,6 @@ export function geohashIdentity(
   };
 }
 
-export function selfIdentity(
-  pubkey: string,
-  nickname: string,
-  opts?: { avatarUrl?: string; isActive?: boolean; subtitle?: string }
-): SelfIdentity {
-  return {
-    kind: 'self',
-    pubkey,
-    nickname,
-    avatarUrl: opts?.avatarUrl,
-    isActive: !!opts?.isActive,
-    subtitle: opts?.subtitle,
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
