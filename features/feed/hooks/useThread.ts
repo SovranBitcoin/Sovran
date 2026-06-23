@@ -13,6 +13,7 @@ import type {
 } from '@/features/feed/data/feedClient';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import { consumeThreadSeed, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
+import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import {
   bucketsFromThreadResult,
   buildThreadItemsFromResult,
@@ -38,6 +39,42 @@ function ownContentSeed(eventId: string, viewerPubkey: string | undefined): Thre
     profiles: new Map(),
     metrics: new Map(),
     quotedEvents: new Map(),
+  };
+}
+
+/**
+ * First-frame seed projected from the shared nagg-ts entity cache (populated by
+ * every feed/notifications read). When the tapped note was already seen, this
+ * paints the post + its cached ancestor chain + author profiles/metrics with NO
+ * network — covering deep links and reply-taps that carry no nav snapshot. The
+ * cache only walks ANCESTORS, so a feed nav seed (which also carries reply
+ * previews) is preferred when present; this fills the gap otherwise.
+ */
+function cachedThreadSeed(eventId: string): ThreadSeed | undefined {
+  const layer = buildNostrDataLayer();
+  if (!layer) return undefined;
+  const view = layer.readThread(eventId);
+  if (!view.root) return undefined; // not cached — no instant frame available
+
+  const allEvents = new Map<string, FeedEvent>();
+  allEvents.set(view.root.id, view.root);
+  for (const note of view.relatedNotes) allEvents.set(note.id, note);
+
+  const metrics = new Map<string, NoteMetrics>();
+  for (const [id, stats] of Object.entries(view.stats)) {
+    metrics.set(id, {
+      likeCount: stats.likes,
+      repostCount: stats.reposts,
+      replyCount: stats.replies,
+      satsZapped: stats.satsZapped,
+    });
+  }
+
+  return {
+    allEvents,
+    profiles: new Map<string, ProfileInfo>(Object.entries(view.profiles)),
+    metrics,
+    quotedEvents: new Map<string, FeedEvent>(Object.entries(view.quoted)),
   };
 }
 
@@ -228,6 +265,7 @@ export function useThread(eventId: string): UseThreadResult {
 
     const seed =
       (eventChanged ? consumeThreadSeed(eventId) : (preservedSeed ?? consumeThreadSeed(eventId))) ??
+      cachedThreadSeed(eventId) ??
       ownContentSeed(eventId, viewerPubkey);
     if (seed) {
       threadSeedRef.current = seed;
