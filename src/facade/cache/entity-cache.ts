@@ -1,4 +1,4 @@
-import type { NoteStats, NoteStatsMap } from '@sovranbitcoin/schemas';
+import type { NostrTier, NoteStats, NoteStatsMap } from '@sovranbitcoin/schemas';
 import type { NaggFeedEvent, NaggProfileInfo } from '../../map/feed';
 import type { ProfileMetadata } from '../profiles';
 import {
@@ -7,6 +7,25 @@ import {
   type Merge,
   type NormalizingStore,
 } from './store';
+
+// ---------------------------------------------------------------------------
+// Source ranking — when the SAME datum arrives from more than one transport,
+// the higher-ranked source wins a field conflict (nagg > primal > relay). This
+// applies to PROFILE fields and METRICS only; note/reply EXISTENCE is never
+// tier-gated (see mergeNote), so a brand-new relay event a higher tier hasn't
+// indexed yet is always kept. `'cache'` is rank 0 — a cache-served read never
+// outranks a real network source.
+// ---------------------------------------------------------------------------
+
+/** Which transport a cached datum came from. */
+export type CacheSource = NostrTier;
+
+const TIER_RANK: Record<string, number> = { nagg: 3, primal: 2, relay: 1, cache: 0 };
+
+/** Rank of a source; an unknown/absent source ranks lowest (0). */
+export function sourceRank(source: CacheSource | undefined): number {
+  return source ? TIER_RANK[source] ?? 0 : 0;
+}
 
 // ---------------------------------------------------------------------------
 // NostrEntityCache — the facade's shared, additive, in-memory entity store
@@ -35,10 +54,19 @@ export type CachedProfile = ProfileMetadata & {
   pubkey: string;
   /** kind-0 `created_at`, or 0 for a low-confidence (feed/notification) seed. */
   seenAt: number;
+  /** Source rank of the dominant fields (nagg>primal>relay); breaks freshness ties. */
+  srcRank: number;
 };
 
 /** A note/event body, immutable once known (keyed by event id). */
 export type CachedNote = NaggFeedEvent;
+
+/**
+ * Aggregate note metrics tagged with the rank of their source, so a lower tier
+ * (e.g. relay) can never erase counts a higher tier (nagg) already provided.
+ * Mirrors how `CachedProfile` extends `ProfileMetadata` with provenance.
+ */
+export type CachedNoteStats = NoteStats & { srcRank: number };
 
 /** A profile-header aggregate (counts + joined date), keyed by pubkey. */
 export type CachedProfileStats = {
@@ -60,17 +88,26 @@ const DEFAULT_LIMITS = {
 export type EntityCacheLimits = Partial<typeof DEFAULT_LIMITS>;
 
 /**
- * Profile merge with a monotonic guard: a newer-or-equal write (`seenAt`) wins
- * its fields; an older write only fills fields that are currently absent. The
- * stored `seenAt` always advances to the freshest seen.
+ * Profile merge with a monotonic guard plus source ranking. A fresher write
+ * (`seenAt`) always wins its fields — a genuinely newer kind-0 is the truth,
+ * even from a lower-ranked source. At EQUAL freshness, the higher-ranked source
+ * wins (nagg>primal>relay). An older write only fills currently-absent fields.
+ * Stored `seenAt` advances to the freshest; `srcRank` tracks the winner.
  */
 const mergeProfile: Merge<CachedProfile> = (existing, patch) => {
   if (!existing) return fieldLevelMerge(undefined, patch);
   const incomingAt = patch.seenAt ?? 0;
-  const incomingWins = incomingAt >= existing.seenAt;
-  const base: CachedProfile = { ...existing, seenAt: Math.max(existing.seenAt, incomingAt) };
+  const incomingRank = patch.srcRank ?? 0;
+  const incomingWins =
+    incomingAt > existing.seenAt ||
+    (incomingAt === existing.seenAt && incomingRank >= existing.srcRank);
+  const base: CachedProfile = {
+    ...existing,
+    seenAt: Math.max(existing.seenAt, incomingAt),
+    srcRank: incomingWins ? incomingRank : existing.srcRank,
+  };
   for (const key in patch) {
-    if (key === 'seenAt') continue;
+    if (key === 'seenAt' || key === 'srcRank') continue;
     const value = patch[key as keyof CachedProfile];
     if (value === undefined) continue;
     if (incomingWins || base[key as keyof CachedProfile] === undefined) {
@@ -80,7 +117,12 @@ const mergeProfile: Merge<CachedProfile> = (existing, patch) => {
   return base;
 };
 
-/** Notes are immutable: keep what we have, only fill genuinely-absent fields. */
+/**
+ * Notes are immutable: keep what we have, only fill genuinely-absent fields.
+ * INVARIANT: note existence is NEVER tier-gated. A note id is a content hash, so
+ * the same id from any source is the same body; a NEW id (e.g. a just-posted
+ * relay reply nagg hasn't indexed) is simply inserted, never dropped by ranking.
+ */
 const mergeNote: Merge<CachedNote> = (existing, patch) => {
   if (!existing) return fieldLevelMerge(undefined, patch);
   const base: CachedNote = { ...existing };
@@ -93,19 +135,38 @@ const mergeNote: Merge<CachedNote> = (existing, patch) => {
   return base;
 };
 
+/**
+ * Stats merge by source rank: a lower-ranked source never erases a higher one's
+ * counts. Higher-or-equal rank overlays field-level (last-write at equal rank);
+ * a strictly lower rank is ignored. Note this gates only METRICS, never a note's
+ * presence — stats live in a separate store from note bodies.
+ */
+const mergeNoteStats: Merge<CachedNoteStats> = (existing, patch) => {
+  if (!existing) return fieldLevelMerge(undefined, patch);
+  const incomingRank = patch.srcRank ?? 0;
+  if (incomingRank < existing.srcRank) return existing;
+  const merged = fieldLevelMerge(existing, patch);
+  merged.srcRank = Math.max(existing.srcRank, incomingRank);
+  return merged;
+};
+
 export interface NostrEntityCache {
   /** Stores exposed for granular subscription by a binding. Prefer the helpers below for writes. */
   readonly profiles: NormalizingStore<CachedProfile>;
   readonly notes: NormalizingStore<CachedNote>;
-  readonly noteStats: NormalizingStore<NoteStats>;
+  readonly noteStats: NormalizingStore<CachedNoteStats>;
   readonly profileStats: NormalizingStore<CachedProfileStats>;
 
-  /** Seed minimal name+picture (feed/notification profiles) at low confidence. */
-  ingestProfileInfos(infos: Record<string, NaggProfileInfo>): void;
-  /** Ingest full kind-0 metadata at a given freshness (the event `created_at`). */
-  ingestProfileMetadata(metadata: Record<string, ProfileMetadata>, seenAt: number): void;
+  /** Seed minimal name+picture (feed/notification profiles) at low confidence, tagged by source. */
+  ingestProfileInfos(infos: Record<string, NaggProfileInfo>, source: CacheSource): void;
+  /** Ingest full kind-0 metadata at a given freshness (the event `created_at`), tagged by source. */
+  ingestProfileMetadata(
+    metadata: Record<string, ProfileMetadata>,
+    seenAt: number,
+    source: CacheSource,
+  ): void;
   ingestNotes(events: readonly NaggFeedEvent[]): void;
-  ingestNoteStats(stats: NoteStatsMap): void;
+  ingestNoteStats(stats: NoteStatsMap, source: CacheSource): void;
   ingestProfileStats(stats: CachedProfileStats): void;
 
   getProfile(pubkey: string): CachedProfile | undefined;
@@ -131,8 +192,9 @@ export function createNostrEntityCache(limits: EntityCacheLimits = {}): NostrEnt
     maxEntries: limits.notes ?? DEFAULT_LIMITS.notes,
     merge: mergeNote,
   });
-  const noteStats = createNormalizingStore<NoteStats>({
+  const noteStats = createNormalizingStore<CachedNoteStats>({
     maxEntries: limits.noteStats ?? DEFAULT_LIMITS.noteStats,
+    merge: mergeNoteStats,
   });
   const profileStats = createNormalizingStore<CachedProfileStats>({
     maxEntries: limits.profileStats ?? DEFAULT_LIMITS.profileStats,
@@ -144,24 +206,29 @@ export function createNostrEntityCache(limits: EntityCacheLimits = {}): NostrEnt
     noteStats,
     profileStats,
 
-    ingestProfileInfos(infos) {
+    ingestProfileInfos(infos, source) {
+      const srcRank = sourceRank(source);
       profiles.setMany(
         Object.entries(infos).map(([pubkey, info]) => [
           pubkey,
-          { pubkey, name: info.name, picture: info.picture, seenAt: 0 },
+          { pubkey, name: info.name, picture: info.picture, seenAt: 0, srcRank },
         ]),
       );
     },
-    ingestProfileMetadata(metadata, seenAt) {
+    ingestProfileMetadata(metadata, seenAt, source) {
+      const srcRank = sourceRank(source);
       profiles.setMany(
-        Object.entries(metadata).map(([pubkey, m]) => [pubkey, { ...m, pubkey, seenAt }]),
+        Object.entries(metadata).map(([pubkey, m]) => [pubkey, { ...m, pubkey, seenAt, srcRank }]),
       );
     },
     ingestNotes(events) {
       notes.setMany(events.map((event) => [event.id, event]));
     },
-    ingestNoteStats(stats) {
-      noteStats.setMany(Object.entries(stats));
+    ingestNoteStats(stats, source) {
+      const srcRank = sourceRank(source);
+      noteStats.setMany(
+        Object.entries(stats).map(([id, stat]) => [id, { ...stat, srcRank }]),
+      );
     },
     ingestProfileStats(stats) {
       profileStats.set(stats.pubkey, stats);

@@ -46,6 +46,7 @@ import {
   type EntityCacheLimits,
   type CachedProfile,
 } from './cache/entity-cache';
+import { readThread as readThreadFromCache, type CachedThreadView } from './cache/read-thread';
 import {
   ingestFeedPage,
   ingestThread,
@@ -80,6 +81,13 @@ export type NostrDataLayerConfig = {
 export interface NostrDataLayer {
   /** The shared additive entity cache this layer populates. Read/subscribe from a binding. */
   readonly cache: NostrEntityCache;
+  /**
+   * Synchronous first-frame projection of a thread from the cache alone: the
+   * tapped note + its cached ancestor chain + author profiles/metrics, with no
+   * network. A binding renders this immediately, then awaits `getThread` for the
+   * ranked reply delta. Returns `root: undefined` when the note isn't cached.
+   */
+  readThread(noteId: string): CachedThreadView;
   getFeedPage(request: FeedPageRequest): Promise<Result<ResolvedFeedPage, TierResolutionError>>;
   /**
    * A live-aware feed SESSION: a normal paginated API (firstPage/loadOlder/
@@ -128,6 +136,10 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
 
   return {
     cache,
+
+    readThread(noteId) {
+      return readThreadFromCache(cache, noteId);
+    },
 
     openFeedSession(request) {
       const fetchPage: FetchPage<FeedItem> = async (bound) => {
@@ -365,9 +377,9 @@ function short(id: string): string {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
 }
 
-/** Strip a cached profile down to the contract `ProfileMetadata` (drop pubkey/seenAt). */
+/** Strip a cached profile down to the contract `ProfileMetadata` (drop pubkey/seenAt/srcRank). */
 function metadataOf(cached: CachedProfile): ProfileMetadata {
-  const { pubkey: _pubkey, seenAt: _seenAt, ...metadata } = cached;
+  const { pubkey: _pubkey, seenAt: _seenAt, srcRank: _srcRank, ...metadata } = cached;
   return metadata;
 }
 

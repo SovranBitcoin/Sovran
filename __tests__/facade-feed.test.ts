@@ -165,7 +165,7 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
     // A later, different surface (a thread on ID_A, a profile page for PUB) now
     // serves these instantly from the cache — no second fetch needed.
     expect(layer.cache.getNote(ID_A)?.content).toBe(`note ${ID_A}`);
-    expect(layer.cache.getNoteStats(ID_A)).toEqual({
+    expect(layer.cache.getNoteStats(ID_A)).toMatchObject({
       likes: 5,
       reposts: 2,
       replies: 1,

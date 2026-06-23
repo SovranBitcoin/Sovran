@@ -43,8 +43,8 @@ export function ingestFeedPage(cache: NostrEntityCache, page: ResolvedFeedPage):
   for (const item of page.items) events.push(...eventsFromFeedItem(item));
   events.push(...Object.values(page.quoted));
   cache.ingestNotes(events);
-  cache.ingestNoteStats(page.stats);
-  cache.ingestProfileInfos(page.profiles);
+  cache.ingestNoteStats(page.stats, page.tier);
+  cache.ingestProfileInfos(page.profiles, page.tier);
 }
 
 export function ingestThread(cache: NostrEntityCache, thread: ResolvedThread): void {
@@ -52,8 +52,8 @@ export function ingestThread(cache: NostrEntityCache, thread: ResolvedThread): v
   for (const item of thread.replies) events.push(...eventsFromFeedItem(item));
   events.push(...Object.values(thread.quoted));
   cache.ingestNotes(events);
-  cache.ingestNoteStats(thread.stats);
-  cache.ingestProfileInfos(thread.profiles);
+  cache.ingestNoteStats(thread.stats, thread.tier);
+  cache.ingestProfileInfos(thread.profiles, thread.tier);
 }
 
 export function ingestNotifications(cache: NostrEntityCache, notifs: ResolvedNotifications): void {
@@ -61,21 +61,25 @@ export function ingestNotifications(cache: NostrEntityCache, notifs: ResolvedNot
   for (const item of notifs.notifications) if (item.event) events.push(item.event);
   events.push(...Object.values(notifs.quoted));
   cache.ingestNotes(events);
-  cache.ingestNoteStats(notifs.stats);
-  cache.ingestProfileInfos(notifs.profiles);
+  cache.ingestNoteStats(notifs.stats, notifs.tier);
+  cache.ingestProfileInfos(notifs.profiles, notifs.tier);
 }
 
 export function ingestSocialGraph(cache: NostrEntityCache, graph: ResolvedSocialGraph): void {
-  cache.ingestProfileInfos(graph.profiles);
+  cache.ingestProfileInfos(graph.profiles, graph.tier);
 }
 
 export function ingestProfiles(cache: NostrEntityCache, resolved: ResolvedProfiles): void {
-  cache.ingestProfileMetadata(resolved.profiles, DIRECT_METADATA_SEEN_AT);
+  cache.ingestProfileMetadata(resolved.profiles, DIRECT_METADATA_SEEN_AT, resolved.tier);
 }
 
 export function ingestProfileStats(cache: NostrEntityCache, resolved: ResolvedProfileStats): void {
   if (resolved.metadata) {
-    cache.ingestProfileMetadata({ [resolved.pubkey]: resolved.metadata }, DIRECT_METADATA_SEEN_AT);
+    cache.ingestProfileMetadata(
+      { [resolved.pubkey]: resolved.metadata },
+      DIRECT_METADATA_SEEN_AT,
+      resolved.tier,
+    );
   }
   cache.ingestProfileStats({
     pubkey: resolved.pubkey,
