@@ -41,9 +41,10 @@ import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache
 import {
   createSovranHandlers,
   createSovranNotifications,
-  createSovranScanSources,
   createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
+import { createSovranScanSources } from '@/features/send/lib/sovranScanSources';
+import { mintUrlLogFields } from '@/features/send/lib/sovranPaymentLog';
 import {
   createSovranExecuteMintQuote,
   createSovranExecuteReceive,
@@ -74,13 +75,6 @@ const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' }
 // true cache miss; SWR hits resolve synchronously. Kept well under coco's
 // 10s `updateMint` timeout so one dead mint can't visibly gate the list.
 const FIRST_OPEN_DEADLINE_MS = 3000;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 export function SovranColadaProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
