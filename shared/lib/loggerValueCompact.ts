@@ -15,7 +15,7 @@
  */
 
 /** Tunables shared by the compacting walk (mirrors the logger's options). */
-export interface CompactOpts {
+interface CompactOpts {
   maxStringLength: number;
   maxArrayItems: number;
   maxDepth: number;

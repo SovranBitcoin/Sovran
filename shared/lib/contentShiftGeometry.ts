@@ -30,11 +30,11 @@ export function rectRight(rect: LayoutRect): number {
   return rect.x + rect.width;
 }
 
-export function verticalOverlap(a: LayoutRect, b: LayoutRect): number {
+function verticalOverlap(a: LayoutRect, b: LayoutRect): number {
   return Math.min(rectBottom(a), rectBottom(b)) - Math.max(a.y, b.y);
 }
 
-export function horizontalOverlap(a: LayoutRect, b: LayoutRect): number {
+function horizontalOverlap(a: LayoutRect, b: LayoutRect): number {
   return Math.min(rectRight(a), rectRight(b)) - Math.max(a.x, b.x);
 }
 

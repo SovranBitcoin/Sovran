@@ -5,7 +5,7 @@
  * `{ file, func, line }` for the log entry's `src`. No logger state, no I/O.
  */
 
-export interface SourceLocation {
+interface SourceLocation {
   file: string;
   func: string;
   line: number;

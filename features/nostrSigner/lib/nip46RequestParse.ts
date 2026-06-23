@@ -19,7 +19,7 @@ import {
 } from '@/features/nostrSigner/lib/nip46Types';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 
-export interface ParsedSignParams {
+interface ParsedSignParams {
   unsigned: UnsignedEvent | null;
   kind: number | undefined;
   preview: Nip46ParamsPreview;
