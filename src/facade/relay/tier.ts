@@ -117,12 +117,25 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
         timeoutMs: request.timeoutMs,
       });
       if (result.isErr()) return failed(result.error);
+      let events: ReadonlyArray<RawRelayEvent> = result.value;
 
-      // Second phase: batch kind-0 for every author in the thread, so relay-mode
-      // threads render pfp/name. The feed path already fetches profiles; the thread
-      // path omitted them, leaving every author blank on the floor. Tolerate a
-      // profile-fetch failure — render the notes rather than failing the thread.
-      const events = await withThreadAuthorProfiles(config.connection, result.value, request);
+      // Second phase: fetch the root's ANCESTORS (its NIP-10 `e` referents — the
+      // thread root + immediate parent), so the parent context renders AND caches.
+      // The floor has no server-side thread view, so without this the parent of a
+      // tapped reply isn't in the cache and flashes in from the network.
+      const ancestorIds = rootAncestorIds(events, request.noteId);
+      if (ancestorIds.length > 0) {
+        const ancestors = await config.connection.request([{ ids: ancestorIds }], {
+          signal: request.signal,
+          timeoutMs: request.timeoutMs,
+        });
+        if (ancestors.isOk()) events = [...events, ...ancestors.value];
+      }
+
+      // Third phase: batch kind-0 for every author (now including ancestors), so
+      // relay-mode threads render pfp/name. Tolerate a profile-fetch failure —
+      // render the notes rather than failing the thread.
+      events = await withThreadAuthorProfiles(config.connection, events, request);
       const bundle = demuxRelayThread(events, request.noteId);
       return bundle ? answered(bundle) : unsupported();
     },
@@ -321,6 +334,19 @@ function withoutBoundary(
   cursor: NostrCursor | undefined,
 ): ReadonlyArray<RawRelayEvent> {
   return cursor ? events.filter((e) => e.id !== cursor.id) : events;
+}
+
+/** The root note's NIP-10 `e` referents (thread root + immediate parent) to fetch as ancestors. */
+function rootAncestorIds(events: ReadonlyArray<RawRelayEvent>, rootId: string): string[] {
+  const root = events.find((event) => event.id === rootId);
+  if (!root || !Array.isArray(root.tags)) return [];
+  const ids = new Set<string>();
+  for (const tag of root.tags as unknown[]) {
+    if (Array.isArray(tag) && tag[0] === 'e' && typeof tag[1] === 'string' && tag[1] !== rootId) {
+      ids.add(tag[1]);
+    }
+  }
+  return [...ids];
 }
 
 /**

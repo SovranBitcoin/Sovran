@@ -49,6 +49,7 @@ export function ingestFeedPage(cache: NostrEntityCache, page: ResolvedFeedPage):
 
 export function ingestThread(cache: NostrEntityCache, thread: ResolvedThread): void {
   const events: NaggFeedEvent[] = [...eventsFromFeedItem(thread.root)];
+  for (const item of thread.parents) events.push(...eventsFromFeedItem(item));
   for (const item of thread.replies) events.push(...eventsFromFeedItem(item));
   events.push(...Object.values(thread.quoted));
   cache.ingestNotes(events);

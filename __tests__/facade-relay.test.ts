@@ -119,6 +119,39 @@ describe('relay tier through the facade — three-tier fallback', () => {
     // both note authors were batched into the single kind-0 request
     expect(new Set(kind0Authors)).toEqual(new Set([PUB, REPLY_PUB]));
   });
+
+  test('thread fetches the root ancestors and returns them as parents (not replies)', async () => {
+    const PARENT_PUB = 'e'.repeat(64);
+    // The opened note (ID_A) is itself a reply to ID_C.
+    const rootReply: RawRelayEvent = {
+      id: ID_A, pubkey: PUB, kind: 1, content: 'a reply', tags: [['e', ID_C, '', 'reply']], created_at: 200,
+    };
+    const parent: RawRelayEvent = {
+      id: ID_C, pubkey: PARENT_PUB, kind: 1, content: 'the parent', tags: [], created_at: 100,
+    };
+    const profiles: RawRelayEvent[] = [
+      { pubkey: PUB, kind: 0, content: JSON.stringify({ name: 'alice' }) },
+      { pubkey: PARENT_PUB, kind: 0, content: JSON.stringify({ name: 'bob' }) },
+    ];
+    const connection: RelayConnection = {
+      request: (filters): Promise<Result<RawRelayEvent[], NaggError>> => {
+        if (filters.some((f) => f.kinds?.length === 1 && f.kinds[0] === 0)) {
+          return Promise.resolve(ok(profiles));
+        }
+        // Ancestor fetch: a single ids-only filter (no kinds, no #e).
+        if (filters.length === 1 && filters[0].ids && !filters[0].kinds && !filters[0]['#e']) {
+          return Promise.resolve(ok([parent]));
+        }
+        return Promise.resolve(ok([rootReply])); // the thread fetch
+      },
+    };
+    const layer = createNostrDataLayer({ tiers: [createRelayTier({ connection })] });
+    const thread = (await layer.getThread({ noteId: ID_A }))._unsafeUnwrap();
+
+    expect(thread.parents.map((p) => (p.type === 'note' ? p.event.id : ''))).toEqual([ID_C]);
+    expect(thread.profiles[PARENT_PUB]).toEqual({ name: 'bob' }); // parent author resolved
+    expect(thread.replies.some((r) => r.type === 'note' && r.event.id === ID_C)).toBe(false);
+  });
 });
 
 describe('relay pool connection — dedup + EOSE quorum', () => {

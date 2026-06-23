@@ -439,6 +439,7 @@ function assembleThread(tier: NostrTier, bundle: ThreadBundle): ResolvedThread {
   return {
     tier,
     root: bundle.root,
+    parents: bundle.parents,
     replies,
     stats: bundle.stats,
     ...(bundle.actions ? { actions: bundle.actions } : {}),

@@ -40,11 +40,52 @@ export type ThreadSource = {
   quoted: Record<string, NaggFeedEvent>;
 };
 
+/**
+ * Separate a thread batch's ANCESTORS (notes reachable upward from the root via
+ * NIP-10 `e` tags) from its replies. Shared by the relay and primal demuxers so a
+ * tier without a server-side parent view still surfaces — and caches — the parent
+ * chain, and never lists an ancestor among the replies.
+ */
+export function ancestorParents(
+  notesById: Map<string, NaggFeedEvent>,
+  rootId: string,
+): { parents: FeedItem[]; ancestorIds: Set<string> } {
+  const ancestorIds = new Set<string>();
+  const queue: string[] = [rootId];
+  const visited = new Set<string>();
+  while (queue.length > 0) {
+    const id = queue.shift();
+    if (id === undefined || visited.has(id)) continue;
+    visited.add(id);
+    const note = notesById.get(id);
+    if (!note) continue;
+    for (const tag of note.tags) {
+      if (tag[0] === 'e' && tag[1] && tag[1] !== id && tag[1] !== rootId && notesById.has(tag[1])) {
+        ancestorIds.add(tag[1]);
+        queue.push(tag[1]);
+      }
+    }
+  }
+  const parents: FeedItem[] = [];
+  for (const id of ancestorIds) {
+    const event = notesById.get(id);
+    if (event) parents.push({ type: 'note', event });
+  }
+  return { parents, ancestorIds };
+}
+
 export type ThreadBundle = {
   root: FeedItem;
   /** Replies, unordered, keyed by id. */
   itemsById: Map<string, FeedItem>;
   manifest: OrderingManifest;
+  /**
+   * The root's ANCESTOR chain (its parent, grandparent, …) when the root is
+   * itself a reply — so a tier without a server-side thread view (the relay
+   * floor) can still show, and CACHE, the parent context. Root-ward order;
+   * empty when the root starts a thread. Not part of the reply manifest.
+   */
+  parents: FeedItem[];
   stats: NoteStatsMap;
   actions?: NoteActionsMap;
   profiles: Record<string, NaggProfileInfo>;
@@ -55,6 +96,8 @@ export type ThreadBundle = {
 export type ResolvedThread = {
   tier: NostrTier;
   root: FeedItem;
+  /** The root's ancestor chain (see ThreadBundle.parents). */
+  parents: FeedItem[];
   replies: FeedItem[];
   stats: NoteStatsMap;
   actions?: NoteActionsMap;
@@ -88,6 +131,7 @@ export function bundleFromThread(source: ThreadSource): ThreadBundle {
 
   return {
     root: { type: 'note', event: source.root },
+    parents: [],
     itemsById,
     // Prefer nagg's server manifest; derive from reply order when absent.
     manifest: source.ordering ?? { orderBy: 'rank', elements },

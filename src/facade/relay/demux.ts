@@ -3,7 +3,7 @@ import { synthesizeRecencyManifest } from '../../tiers';
 import { nostrLog } from '../../log';
 import { toFeedEvent } from '../event';
 import type { FeedBundle, FeedItem } from '../feed';
-import type { ThreadBundle } from '../thread';
+import { ancestorParents, type ThreadBundle } from '../thread';
 import type {
   NotificationItem,
   NotificationsBundle,
@@ -84,10 +84,14 @@ export function demuxRelayThread(
   const root = notesById.get(rootId);
   if (!root) return null; // root not delivered → not a usable thread; fall through
 
+  // The root's ancestors are not replies — separate them so the parent context
+  // renders and caches, and isn't listed among the replies.
+  const { parents, ancestorIds } = ancestorParents(notesById, rootId);
+
   const itemsById = new Map<string, FeedItem>();
   const repliesById = new Map<string, NaggFeedEvent>();
   for (const [id, event] of notesById) {
-    if (id === rootId) continue;
+    if (id === rootId || ancestorIds.has(id)) continue;
     itemsById.set(id, { type: 'note', event });
     repliesById.set(id, event);
   }
@@ -100,6 +104,7 @@ export function demuxRelayThread(
 
   return {
     root: { type: 'note', event: root },
+    parents,
     itemsById,
     manifest,
     stats: {},

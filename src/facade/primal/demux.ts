@@ -11,7 +11,7 @@ import { synthesizeRecencyManifest } from '../../tiers';
 import { toFeedEvent, type RawWireEvent } from '../event';
 import { nostrLog } from '../../log';
 import type { FeedBundle, FeedItem } from '../feed';
-import type { ThreadBundle } from '../thread';
+import { ancestorParents, type ThreadBundle } from '../thread';
 import { bundleFromOwnEvents, ownActionKinds, type OwnHistoryBundle } from '../own-state';
 import type { OwnActionType } from '@sovranbitcoin/schemas';
 import { profilesFromKind0, type ProfileMetadata } from '../profiles';
@@ -254,10 +254,14 @@ export function demuxPrimalThread(events: ReadonlyArray<RawPrimalEvent>, rootId:
   const root = batch.notesById.get(rootId);
   if (!root) return null; // no root → not a usable thread; let the tier fall through
 
+  // Primal's thread response carries the ancestors too; classify them as parents
+  // (not replies) so the parent chain renders and caches.
+  const { parents, ancestorIds } = ancestorParents(batch.notesById, rootId);
+
   const itemsById = new Map<string, FeedItem>();
   const repliesById = new Map<string, NaggFeedEvent>();
   for (const [id, event] of batch.notesById) {
-    if (id === rootId) continue;
+    if (id === rootId || ancestorIds.has(id)) continue;
     itemsById.set(id, { type: 'note', event });
     repliesById.set(id, event);
   }
@@ -279,6 +283,7 @@ export function demuxPrimalThread(events: ReadonlyArray<RawPrimalEvent>, rootId:
 
   return {
     root: { type: 'note', event: root },
+    parents,
     itemsById,
     manifest,
     stats: batch.stats,
