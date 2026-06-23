@@ -1,19 +1,13 @@
 import { z } from 'zod';
 
-export const NaggGraphqlErrorSchema = z
-  .object({
-    message: z.string().optional(),
-    path: z.array(z.unknown()).optional(),
-    extensions: z.record(z.string(), z.unknown()).optional(),
-  })
-  .passthrough();
-
-export const NaggGraphqlEnvelopeSchema = z
-  .object({
-    data: z.unknown().optional(),
-    errors: z.array(NaggGraphqlErrorSchema).optional(),
-  })
-  .passthrough();
+// Local mirror of the shared @sovranbitcoin/schemas OrderingManifest. Defined in
+// nagg-ts's own zod (not imported as a value) so composing it into the feed/
+// thread schemas keeps the inferred types portable — the symlinked shared
+// package carries its own zod copy, and mixing the two breaks type emission.
+export const NaggOrderingSchema = z.object({
+  orderBy: z.enum(['rank', 'created_at', 'arrival']),
+  elements: z.array(z.string()).max(5000),
+});
 
 export const NaggUnknownDataSchema = z.unknown();
 
@@ -162,6 +156,20 @@ export const NaggNoteMetricsSchema = z.object({
   satsZapped: z.number(),
 });
 
+/**
+ * A page's hydration side-map (metrics / profiles / quoted), tolerant of the
+ * server omitting it or sending JSON `null`. A Go `nil` map serializes to `null`,
+ * not `{}`, so an empty thread (root with no replies/stats) would otherwise fail
+ * `z.record` validation and silently drop the whole tier — the cause of nagg
+ * never answering the thread surface. Default to an empty map instead.
+ */
+function hydrationMap<T extends z.ZodTypeAny>(value: T) {
+  return z
+    .record(z.string(), value)
+    .nullish()
+    .transform((map): Record<string, z.infer<T>> => map ?? {});
+}
+
 export const NaggProfileInfoSchema = z
   .object({
     name: z.string(),
@@ -195,9 +203,12 @@ export const NaggFeedItemSchema = z.discriminatedUnion('type', [
 
 export const NaggFeedPageSchema = z.object({
   items: z.array(NaggFeedItemSchema),
-  metrics: z.record(z.string(), NaggNoteMetricsSchema),
-  profiles: z.record(z.string(), NaggProfileInfoSchema),
-  quoted: z.record(z.string(), NaggFeedEventSchema),
+  // Server-authoritative render order + semantic; present on the REST app-view
+  // (the GraphQL path omits it, so the facade derives it from item order).
+  ordering: NaggOrderingSchema.optional(),
+  metrics: hydrationMap(NaggNoteMetricsSchema),
+  profiles: hydrationMap(NaggProfileInfoSchema),
+  quoted: hydrationMap(NaggFeedEventSchema),
   paginationUntil: z.number(),
   paginationOffset: z.number(),
 });
@@ -207,9 +218,10 @@ export const NaggFeedPageSchema = z.object({
 export const NaggThreadSchema = z.object({
   root: NaggFeedEventSchema,
   events: z.array(NaggFeedEventSchema),
-  metrics: z.record(z.string(), NaggNoteMetricsSchema),
-  profiles: z.record(z.string(), NaggProfileInfoSchema),
-  quoted: z.record(z.string(), NaggFeedEventSchema),
+  ordering: NaggOrderingSchema.optional(),
+  metrics: hydrationMap(NaggNoteMetricsSchema),
+  profiles: hydrationMap(NaggProfileInfoSchema),
+  quoted: hydrationMap(NaggFeedEventSchema),
 });
 
 // One actor in a grouped notification (a follower / reposter / reactor /
@@ -260,15 +272,22 @@ export const NaggNotificationsPageSchema = z.object({
       })
       .optional(),
   }),
-  metrics: z.record(z.string(), NaggNoteMetricsSchema),
-  profiles: z.record(z.string(), NaggProfileInfoSchema),
-  quoted: z.record(z.string(), NaggFeedEventSchema),
+  metrics: hydrationMap(NaggNoteMetricsSchema),
+  profiles: hydrationMap(NaggProfileInfoSchema),
+  quoted: hydrationMap(NaggFeedEventSchema),
 });
 
 // Note stats: per-id aggregate metrics, keyed by event id.
 export const NaggNoteStatsSchema = z.record(z.string(), NaggNoteMetricsSchema);
 
 // DM envelope data (zero-knowledge — raw encrypted events for client decrypt).
+// Enrichment side-maps only (no events) — `/nostr/events` and `/nostr/profiles`.
+export const NaggEnrichmentSchema = z.object({
+  metrics: hydrationMap(NaggNoteMetricsSchema),
+  profiles: hydrationMap(NaggProfileInfoSchema),
+  quoted: hydrationMap(NaggFeedEventSchema),
+});
+
 export const NaggDmEnvelopesDataSchema = z.object({
   dmEnvelopes: NaggEventConnectionSchema,
 });
@@ -332,7 +351,6 @@ export const NaggWallpaperCatalogDataSchema = z.object({
   albums: NaggEventConnectionSchema,
 });
 
-export type NaggGraphqlEnvelope = z.infer<typeof NaggGraphqlEnvelopeSchema>;
 export type NaggEvent = z.infer<typeof NaggEventSchema>;
 export type NaggAggregateRow = z.infer<typeof NaggAggregateRowSchema>;
 export type NaggEventConnection = z.infer<typeof NaggEventConnectionSchema>;

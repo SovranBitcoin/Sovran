@@ -40,16 +40,8 @@ type RawEventNode = {
   tags: string[][];
 };
 
-export const WALLPAPER_CATALOG_QUERY = `
-query WallpaperCatalog($files: EventQueryInput!, $albums: EventQueryInput!) {
-  files: events(input: $files) {
-    nodes { id pubkey kind createdAt content tags }
-  }
-  albums: events(input: $albums) {
-    nodes { id pubkey kind createdAt content tags }
-  }
-}
-`;
+// The catalog is read with two `eventsQueryAppView` calls (files + albums); the
+// caller composes them and parses via `parseWallpaperCatalog` below.
 
 export function wallpaperFilesInput(adminPubkey: string, limit = 500): EventQueryInput {
   return {

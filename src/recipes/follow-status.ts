@@ -8,18 +8,6 @@ export type FollowStatusInput = {
 
 export type FollowRelationship = 'following' | 'follows_you' | 'mutual' | 'none';
 
-export const FOLLOW_STATUS_QUERY = `
-query FollowStatus($input: FollowStatusInput!) {
-  followStatus(input: $input) {
-    pubkey
-    following
-    followsYou
-    mutual
-    relationship
-  }
-}
-`;
-
 export function followStatusInput(options: FollowStatusInput): FollowStatusInput {
   return {
     viewer: options.viewer,

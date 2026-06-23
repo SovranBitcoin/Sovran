@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { okAsync, ResultAsync } from 'neverthrow';
 import { NaggServiceInfoSchema, type NaggServiceInfo } from './schemas';
 import type { NaggClient } from './transport';
@@ -25,21 +24,6 @@ export type NaggCapability =
   | (typeof NAGG_CAPABILITIES)[keyof typeof NAGG_CAPABILITIES]
   | (string & {});
 
-export const SERVICE_INFO_QUERY = `
-query NaggServiceInfo {
-  serviceInfo {
-    graphqlSchemaVersion
-    appViewVersion
-    capabilities
-    appViews { version routes }
-  }
-}
-`;
-
-const ServiceInfoDataSchema = z.object({
-  serviceInfo: NaggServiceInfoSchema,
-});
-
 export interface NaggCapabilityCache {
   serviceInfo(): ResultAsync<NaggServiceInfo, NaggError>;
   supports(capability: NaggCapability): ResultAsync<boolean, NaggError>;
@@ -47,13 +31,13 @@ export interface NaggCapabilityCache {
 }
 
 export function probeServiceInfo(client: NaggClient): ResultAsync<NaggServiceInfo, NaggError> {
-  return client
-    .query({
-      query: SERVICE_INFO_QUERY,
-      operationName: 'NaggServiceInfo',
-      dataSchema: ServiceInfoDataSchema,
-    })
-    .map((data) => data.serviceInfo);
+  // GET /nostr/capabilities returns the ServiceInfo body directly.
+  return client.rest({
+    path: '/nostr/capabilities',
+    method: 'GET',
+    operationName: 'NaggServiceInfo',
+    responseSchema: NaggServiceInfoSchema,
+  });
 }
 
 export function createNaggCapabilityCache(client: NaggClient): NaggCapabilityCache {

@@ -1,4 +1,5 @@
 import type { EventQueryInput } from './rank';
+import type { NaggAppViewBinding } from '../transport';
 
 export type ProfileSearchInput = {
   query: string;
@@ -7,64 +8,20 @@ export type ProfileSearchInput = {
   source?: string;
 };
 
-export const PROFILE_SEARCH_QUERY = `
-query ProfileSearch($input: ProfileSearchInput!) {
-  profileSearch(input: $input) {
-    query
-    limit
-    sort
-    source
-    fromCache
-    nodes {
-      pubkey
-      npub
-      rank
-      score
-      searchRank
-      searchScore
-      profileRank
-      profileScore
-      followers
-      follows
-      createdAt
-      name
-      displayName
-      picture
-      image
-      banner
-      about
-      nip05
-      nip05Valid
-      website
-      lud16
-      lud06
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
-  }
+/** REST app-view binding for `GET /nostr/search` (the facade's nagg search tier). */
+export function profileSearchAppView(input: ProfileSearchInput): NaggAppViewBinding {
+  return {
+    path: '/nostr/search',
+    method: 'GET',
+    operationName: 'ProfileSearch',
+    searchParams: {
+      query: input.query,
+      limit: input.limit ?? 10,
+      sort: input.sort ?? 'globalPagerank',
+      ...(input.source ? { source: input.source } : {}),
+    },
+  };
 }
-`;
-
-export const PROFILE_EVENTS_SEARCH_QUERY = `
-query ProfileEventsSearch($input: EventQueryInput!) {
-  events(input: $input) {
-    nodes {
-      id
-      pubkey
-      kind
-      createdAt
-      content
-      tags
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
-  }
-}
-`;
 
 export function profileSearchInput(input: ProfileSearchInput): ProfileSearchInput {
   return {

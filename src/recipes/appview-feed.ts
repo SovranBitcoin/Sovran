@@ -100,14 +100,30 @@ export function userFeedAppView(options: UserFeedAppViewOptions = {}): NaggAppVi
 export type ThreadAppViewOptions = {
   /** Root/anchor event id (hex). */
   id: string;
-  /** Max events to return (the REST `limit`; aliases the recipe's "depth"). */
+  /** Max events to fetch (the REST `limit`; aliases the recipe's "depth"). */
   limit?: number;
+  /**
+   * Reply render order: `new` (default, chronological/rank descendants),
+   * `ranked` (engagement), or `relevant` (viewer-specific merge computed
+   * server-side from the author chain + followed-tail + ranked replies).
+   */
+  sort?: 'new' | 'ranked' | 'relevant';
+  /** Viewer pubkey — required for the `relevant` followed-reply tier. */
+  viewer?: string;
+  /** Reply-page offset + size for the ordering manifest (relevant/ranked). */
+  offset?: number;
+  replyLimit?: number;
+  /** Candidate-pool sizes for the relevance merge. */
+  candidateLimit?: number;
+  rankedLimit?: number;
 };
 
 /**
  * App-view binding for the thread view: GET `/nostr/thread`. The server returns
- * the canonical `ThreadResponse` (`NaggThread`) — the root event plus its ordered
- * descendants, with the same `metrics`/`profiles`/`quoted` hydration the feed uses.
+ * the canonical `ThreadResponse` (`NaggThread`) — the root event plus its
+ * descendants and a server-authoritative reply ordering. `sort=relevant`
+ * reproduces the viewer-specific reply merge server-side (replacing the old
+ * client-side GraphQL nested-resolver merge).
  */
 export function threadAppView(options: ThreadAppViewOptions): NaggAppViewBinding {
   return {
@@ -117,6 +133,12 @@ export function threadAppView(options: ThreadAppViewOptions): NaggAppViewBinding
     searchParams: {
       id: options.id,
       ...(options.limit ? { limit: options.limit } : {}),
+      ...(options.sort && options.sort !== 'new' ? { sort: options.sort } : {}),
+      ...(options.viewer ? { viewer: options.viewer } : {}),
+      ...(options.offset ? { offset: options.offset } : {}),
+      ...(options.replyLimit ? { replyLimit: options.replyLimit } : {}),
+      ...(options.candidateLimit ? { candidateLimit: options.candidateLimit } : {}),
+      ...(options.rankedLimit ? { rankedLimit: options.rankedLimit } : {}),
     },
   };
 }

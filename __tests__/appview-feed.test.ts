@@ -8,7 +8,6 @@ import {
   threadAppView,
   userFeedAppView,
 } from '../src/recipes';
-import { graphqlNodesToNaggPage } from '../src/map';
 import {
   NaggFeedPageSchema,
   NaggNoteStatsSchema,
@@ -281,58 +280,11 @@ describe('noteStatsAppView', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Cross-fixture: one parser, both transports.
-//
-// For each feed-family view, a representative nagg REST body fixture AND a
-// representative GraphQL `data` fixture (run through `graphqlNodesToNaggPage`,
-// the GraphQL→canonical distiller wired as `graphqlToData`) are fed through the
-// SAME Nagg*Schema. Both must parse AND produce deep-equal canonical objects.
+// The REST app-view body IS the canonical shape — the schema parses it directly.
 // ---------------------------------------------------------------------------
 
-describe('one parser, both transports (cross-fixture)', () => {
-  test('feed: REST body and distilled GraphQL data parse equal through NaggFeedPageSchema', () => {
-    // GraphQL node selection: a note with a resolved root + per-node aggregates +
-    // author metadata. graphqlNodesToNaggPage distils this to the canonical page.
-    const graphqlNodes = [
-      {
-        id: NOTE_ID,
-        kind: 1,
-        pubkey: PUBKEY,
-        content: 'hello',
-        tags: [['e', ROOT_ID, '', 'root']],
-        createdAt: 1_700_000_000,
-        rootContext: {
-          nodes: [
-            {
-              id: ROOT_ID,
-              kind: 1,
-              pubkey: PUBKEY,
-              content: 'root',
-              tags: [],
-              createdAt: 1_699_900_000,
-              noteStats: { likes: 0, reposts: 0, replies: 0, zapSats: 0 },
-            },
-          ],
-        },
-        authorMetadata: [
-          {
-            id: 'profile-alice',
-            kind: 0,
-            pubkey: PUBKEY,
-            content: JSON.stringify({ name: 'alice', picture: 'https://example/pic.png' }),
-            tags: [],
-            createdAt: 1_699_000_000,
-          },
-        ],
-        noteStats: { likes: 3, reposts: 1, replies: 2, zapSats: 100 },
-      },
-    ];
-
-    // graphqlNodesToNaggPage is the graphqlToData distiller for the feed family.
-    const distilled = graphqlNodesToNaggPage(graphqlNodes);
-
-    // The REST body that nagg emits for the equivalent feed (one note + root),
-    // shaped to converge byte-for-byte on the same canonical page.
+describe('canonical REST parsing', () => {
+  test('feed: the nagg REST body parses through NaggFeedPageSchema', () => {
     const restBody = {
       items: [
         {
@@ -354,20 +306,12 @@ describe('one parser, both transports (cross-fixture)', () => {
       paginationOffset: 1,
     };
 
-    const fromGraphql = NaggFeedPageSchema.safeParse(distilled);
-    const fromRest = NaggFeedPageSchema.safeParse(restBody);
-
-    expect(fromGraphql.success).toBe(true);
-    expect(fromRest.success).toBe(true);
-    // Same parser, same canonical object regardless of transport.
-    expect(fromRest.data).toEqual(fromGraphql.data);
+    const parsed = NaggFeedPageSchema.safeParse(restBody);
+    expect(parsed.success).toBe(true);
   });
 
-  test('notifications: REST body and the GraphQL connection parse through NaggNotificationsPageSchema', () => {
-    // The GraphQL notifications resolver already returns the connection shape
-    // ({ notifications: { nodes, pageInfo }, metrics, profiles, quoted }); the REST
-    // app-view now emits the identical shape, so the same schema parses both.
-    const canonical = {
+  test('notifications: the nagg REST connection body parses through NaggNotificationsPageSchema', () => {
+    const restBody = {
       notifications: {
         nodes: [{ event: restEvent(NOTE_ID), reason: 'mention', actorVertexScore: 0.5 }],
         pageInfo: { hasNextPage: false, endCursor: null },
@@ -377,11 +321,7 @@ describe('one parser, both transports (cross-fixture)', () => {
       quoted: {},
     };
 
-    const fromGraphql = NaggNotificationsPageSchema.safeParse(canonical);
-    const fromRest = NaggNotificationsPageSchema.safeParse(structuredClone(canonical));
-
-    expect(fromGraphql.success).toBe(true);
-    expect(fromRest.success).toBe(true);
-    expect(fromRest.data).toEqual(fromGraphql.data);
+    const parsed = NaggNotificationsPageSchema.safeParse(restBody);
+    expect(parsed.success).toBe(true);
   });
 });
