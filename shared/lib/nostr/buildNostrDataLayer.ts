@@ -1,6 +1,5 @@
 import { createNaggClient, setNostrLogger, facade, type NostrLogger } from '@sovranbitcoin/nagg-ts';
 
-import { backendConfig } from '@/shared/config/backend';
 import { log } from '@/shared/lib/logger';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -47,9 +46,7 @@ function assembleLayer(config: TierConfig): facade.NostrDataLayer | null {
 
   if (config.nagg.enabled) {
     const client = createNaggClient({
-      endpoint: backendConfig.nostrGraphqlEndpoint,
       appView: { baseUrl: config.nagg.appViewBaseUrl, version: 'v1' },
-      transport: 'appview',
     });
     tiers.push(facade.createNaggTier({ client }));
   }

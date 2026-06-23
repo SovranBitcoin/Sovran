@@ -5,16 +5,16 @@
  *
  * The conversation-list inbox (`fetchDmEnvelopes`) routes through the
  * tier-selecting facade (nagg DM index → raw-relay floor, gated by the Network
- * toggles). `fetchDmConversation` still hits nagg's GraphQL resolver directly.
- * Both are best-effort: an exhausted/disabled chain returns empty rather than
- * throwing, so the UI keeps working.
+ * toggles). `fetchDmConversation` hits nagg's REST app-view
+ * (`GET /nostr/dm/conversation`) directly. Both are best-effort: an exhausted/
+ * disabled chain returns empty rather than throwing, so the UI keeps working.
  */
 import {
   createNaggClient,
   type NaggEventConnection,
   NaggDmConversationDataSchema,
 } from '@sovranbitcoin/nagg-ts';
-import { DM_CONVERSATION_QUERY, dmConversationInput } from '@sovranbitcoin/nagg-ts/recipes';
+import { dmConversationAppView } from '@sovranbitcoin/nagg-ts/recipes';
 import { backendConfig } from '@/shared/config/backend';
 import { paymentLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
@@ -23,8 +23,6 @@ import { resolvedDmEnvelopesToPage, toFacadeDmEnvelopesRequest } from './facadeD
 const DM_TIMEOUT_MS = 12_000;
 
 const client = createNaggClient({
-  endpoint: backendConfig.nostrGraphqlEndpoint,
-  // REST app-view available alongside GraphQL; defaults to GraphQL until a query opts in.
   appView: { baseUrl: backendConfig.nostrAppViewBaseUrl, version: 'v1' },
   defaultTimeoutMs: DM_TIMEOUT_MS,
 });
@@ -126,19 +124,19 @@ export async function fetchDmConversation(args: {
   refresh?: boolean;
   signal?: AbortSignal;
 }): Promise<DmEnvelopePage> {
-  const result = await client.query({
-    query: DM_CONVERSATION_QUERY,
-    operationName: 'DmConversation',
-    variables: {
-      input: dmConversationInput({
-        viewer: args.viewer,
-        counterparty: args.counterparty,
-        kinds: args.kinds,
-        until: args.until,
-        limit: args.limit,
-      }),
-    },
-    dataSchema: NaggDmConversationDataSchema,
+  const binding = dmConversationAppView({
+    viewer: args.viewer,
+    counterparty: args.counterparty,
+    kinds: args.kinds,
+    until: args.until,
+    limit: args.limit,
+  });
+  const result = await client.rest({
+    path: binding.path,
+    method: binding.method,
+    searchParams: binding.searchParams,
+    responseSchema: NaggDmConversationDataSchema,
+    operationName: binding.operationName,
     refresh: args.refresh,
     signal: args.signal,
   });

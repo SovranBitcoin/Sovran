@@ -8,9 +8,6 @@ describe('backend config', () => {
       scoreApiBaseUrl: 'https://nagg.up.railway.app',
       nostrGraphqlEndpoint: 'https://nagg.up.railway.app/graphql',
       primalCacheUrl: 'wss://cache2.primal.net/v1',
-      nostrDmAppView: true,
-      nostrFeedAppView: true,
-      nostrNotificationsAppView: true,
     });
   });
 
@@ -28,40 +25,7 @@ describe('backend config', () => {
       scoreApiBaseUrl: 'http://localhost:8080',
       nostrGraphqlEndpoint: 'http://localhost:8081/graphql',
       primalCacheUrl: 'wss://cache2.primal.net/v1',
-      nostrDmAppView: true,
-      nostrFeedAppView: true,
-      nostrNotificationsAppView: true,
     });
-  });
-
-  it('uses the DM app-view by default; only "false" opts out to GraphQL', () => {
-    expect(parseBackendConfig({ EXPO_PUBLIC_NOSTR_DM_APPVIEW: 'true' }).nostrDmAppView).toBe(true);
-    expect(parseBackendConfig({ EXPO_PUBLIC_NOSTR_DM_APPVIEW: 'false' }).nostrDmAppView).toBe(
-      false
-    );
-    expect(parseBackendConfig({}).nostrDmAppView).toBe(true);
-  });
-
-  it('uses the feed app-view by default; only "false" opts out to GraphQL', () => {
-    expect(parseBackendConfig({ EXPO_PUBLIC_NOSTR_FEED_APPVIEW: 'true' }).nostrFeedAppView).toBe(
-      true
-    );
-    expect(parseBackendConfig({ EXPO_PUBLIC_NOSTR_FEED_APPVIEW: 'false' }).nostrFeedAppView).toBe(
-      false
-    );
-    expect(parseBackendConfig({}).nostrFeedAppView).toBe(true);
-  });
-
-  it('uses the notifications app-view by default; only "false" opts out to GraphQL', () => {
-    expect(
-      parseBackendConfig({ EXPO_PUBLIC_NOSTR_NOTIFICATIONS_APPVIEW: 'true' })
-        .nostrNotificationsAppView
-    ).toBe(true);
-    expect(
-      parseBackendConfig({ EXPO_PUBLIC_NOSTR_NOTIFICATIONS_APPVIEW: 'false' })
-        .nostrNotificationsAppView
-    ).toBe(false);
-    expect(parseBackendConfig({}).nostrNotificationsAppView).toBe(true);
   });
 
   it('keeps the legacy Nagg base URL env as an app-view fallback', () => {
