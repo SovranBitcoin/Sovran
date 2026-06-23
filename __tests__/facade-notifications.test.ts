@@ -152,6 +152,59 @@ describe('relay notifications — flat floor + ownership gate', () => {
     }
   });
 
+  test('MENTIONS keeps replies + quotes + @-mentions, drops reactions/zaps/reposts', async () => {
+    const reply: RawRelayEvent = {
+      id: '1'.repeat(64), pubkey: ACTOR, kind: 1, tags: [['e', MYEVENT, '', 'reply'], ['p', ME]], created_at: 400,
+    };
+    const quote: RawRelayEvent = {
+      id: '2'.repeat(64), pubkey: ACTOR, kind: 1, tags: [['q', MYEVENT]], created_at: 300,
+    };
+    const mention: RawRelayEvent = {
+      id: '3'.repeat(64), pubkey: ACTOR, kind: 1, tags: [['p', ME]], created_at: 200,
+    };
+    const reaction: RawRelayEvent = {
+      id: '4'.repeat(64), pubkey: ACTOR, kind: 7, tags: [['e', MYEVENT], ['p', ME]], created_at: 100,
+    };
+    const tier = createRelayTier({ connection: fakeRelay([reply, quote, mention, reaction]) });
+
+    const mentions = await tier.notifications!({ viewerPubkey: ME, ownEventIds: [MYEVENT], tab: 'MENTIONS' });
+    expect(mentions.kind).toBe('answered');
+    if (mentions.kind === 'answered') {
+      const reasons = [...mentions.value.itemsById.values()].map((n) => n.reason);
+      expect(new Set(reasons)).toEqual(new Set(['reply', 'quote', 'mention']));
+      expect(reasons).not.toContain('reaction');
+    }
+    // ALL keeps the reaction too.
+    const all = await tier.notifications!({ viewerPubkey: ME, ownEventIds: [MYEVENT], tab: 'ALL' });
+    if (all.kind === 'answered') {
+      expect([...all.value.itemsById.values()].map((n) => n.reason)).toContain('reaction');
+    }
+  });
+
+  test('replyScope DIRECT keeps only replies whose immediate parent is mine', async () => {
+    const directReply: RawRelayEvent = {
+      id: '6'.repeat(64), pubkey: ACTOR, kind: 1, tags: [['e', MYEVENT, '', 'reply'], ['p', ME]], created_at: 200,
+    };
+    const threadReply: RawRelayEvent = {
+      id: '5'.repeat(64), pubkey: ACTOR, kind: 1,
+      tags: [['e', MYEVENT, '', 'root'], ['e', OTHER, '', 'reply'], ['p', ME]], created_at: 100,
+    };
+    const tier = createRelayTier({ connection: fakeRelay([directReply, threadReply]) });
+
+    const direct = await tier.notifications!({
+      viewerPubkey: ME, ownEventIds: [MYEVENT], tab: 'MENTIONS', replyScope: 'DIRECT',
+    });
+    if (direct.kind === 'answered') {
+      expect([...direct.value.itemsById.keys()]).toEqual(['6'.repeat(64)]); // thread reply dropped
+    }
+    const thread = await tier.notifications!({
+      viewerPubkey: ME, ownEventIds: [MYEVENT], tab: 'MENTIONS', replyScope: 'THREAD',
+    });
+    if (thread.kind === 'answered') {
+      expect([...thread.value.itemsById.keys()].sort()).toEqual(['5'.repeat(64), '6'.repeat(64)]);
+    }
+  });
+
   // Bug 3 (Stage-F): the #e backstop filter must page with the same until as the
   // primary filter, or every page re-fetches the full backstop set from newest.
   test('the #e backstop filter carries the cursor until', async () => {

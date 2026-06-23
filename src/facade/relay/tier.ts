@@ -129,27 +129,24 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
 
     async notifications(request: NotificationsRequest): Promise<TierOutcome<NotificationsBundle>> {
       const limit = request.limit ?? 50;
+      const isMentions = request.tab === 'MENTIONS';
+      const bounds = {
+        ...(request.since ? { since: request.since } : {}),
+        ...(request.cursor?.createdAt ? { until: request.cursor.createdAt } : {}),
+      };
+      // MENTIONS is replies + quotes + @-mentions (all kind-1); ALL also carries
+      // reaction/repost/zap. The demux is the source of truth on tab semantics —
+      // these filters just avoid pulling engagement kinds we'd discard.
       const filters: NostrFilter[] = [
-        // engagement + mentions that p-tag me
-        {
-          kinds: [1, 6, 7, 9735],
-          '#p': [request.viewerPubkey],
-          limit,
-          ...(request.since ? { since: request.since } : {}),
-          ...(request.cursor?.createdAt ? { until: request.cursor.createdAt } : {}),
-        },
+        { kinds: isMentions ? [1] : [1, 6, 7, 9735], '#p': [request.viewerPubkey], limit, ...bounds },
       ];
       // The load-bearing #e backstop: replies/engagement that omit #p but reference
       // my events. It MUST page with the same since/until as the primary filter, or
       // every page re-fetches the full backstop set from newest (stale duplicates).
       if (request.ownEventIds && request.ownEventIds.length > 0) {
-        filters.push({
-          kinds: [1],
-          '#e': request.ownEventIds,
-          limit,
-          ...(request.since ? { since: request.since } : {}),
-          ...(request.cursor?.createdAt ? { until: request.cursor.createdAt } : {}),
-        });
+        filters.push({ kinds: [1], '#e': request.ownEventIds, limit, ...bounds });
+        // Quotes of my events that don't p-tag me (NIP-18 q reference).
+        filters.push({ kinds: [1], '#q': request.ownEventIds, limit, ...bounds });
       }
 
       const result = await config.connection.request(filters, {
@@ -163,6 +160,7 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
               withoutBoundary(events, request.cursor),
               request.viewerPubkey,
               request.ownEventIds,
+              { tab: request.tab, replyScope: request.replyScope },
             ),
           ),
         (error) => failed(error),
