@@ -83,6 +83,42 @@ describe('relay tier through the facade — three-tier fallback', () => {
     expect(captured?.[0]?.authors).toEqual([PUB]);
     expect(captured?.[0]?.kinds).toEqual([1]);
   });
+
+  test('thread fetches kind-0 for every author so relay-mode threads show pfp/name', async () => {
+    const REPLY_PUB = 'e'.repeat(64);
+    const root = note(ID_A, 100);
+    const reply: RawRelayEvent = {
+      id: ID_B,
+      pubkey: REPLY_PUB,
+      kind: 1,
+      content: 'a reply',
+      tags: [['e', ID_A]],
+      created_at: 101,
+    };
+    const profiles: RawRelayEvent[] = [
+      { pubkey: PUB, kind: 0, content: JSON.stringify({ name: 'alice', picture: 'http://x/a.png' }) },
+      { pubkey: REPLY_PUB, kind: 0, content: JSON.stringify({ name: 'bob' }) },
+    ];
+    let kind0Authors: string[] | undefined;
+    const connection: RelayConnection = {
+      request: (filters): Promise<Result<RawRelayEvent[], NaggError>> => {
+        const kind0 = filters.find((f) => f.kinds?.length === 1 && f.kinds[0] === 0);
+        if (kind0) {
+          kind0Authors = kind0.authors;
+          return Promise.resolve(ok(profiles));
+        }
+        return Promise.resolve(ok([root, reply]));
+      },
+    };
+    const layer = createNostrDataLayer({ tiers: [createRelayTier({ connection })] });
+    const result = await layer.getThread({ noteId: ID_A });
+    expect(result.isOk()).toBe(true);
+    const thread = result._unsafeUnwrap();
+    expect(thread.profiles[PUB]).toEqual({ name: 'alice', picture: 'http://x/a.png' });
+    expect(thread.profiles[REPLY_PUB]).toEqual({ name: 'bob' });
+    // both note authors were batched into the single kind-0 request
+    expect(new Set(kind0Authors)).toEqual(new Set([PUB, REPLY_PUB]));
+  });
 });
 
 describe('relay pool connection — dedup + EOSE quorum', () => {

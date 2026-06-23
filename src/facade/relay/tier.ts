@@ -116,13 +116,15 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
         signal: request.signal,
         timeoutMs: request.timeoutMs,
       });
-      return result.match<TierOutcome<ThreadBundle>>(
-        (events) => {
-          const bundle = demuxRelayThread(events, request.noteId);
-          return bundle ? answered(bundle) : unsupported();
-        },
-        (error) => failed(error),
-      );
+      if (result.isErr()) return failed(result.error);
+
+      // Second phase: batch kind-0 for every author in the thread, so relay-mode
+      // threads render pfp/name. The feed path already fetches profiles; the thread
+      // path omitted them, leaving every author blank on the floor. Tolerate a
+      // profile-fetch failure — render the notes rather than failing the thread.
+      const events = await withThreadAuthorProfiles(config.connection, result.value, request);
+      const bundle = demuxRelayThread(events, request.noteId);
+      return bundle ? answered(bundle) : unsupported();
     },
 
     async notifications(request: NotificationsRequest): Promise<TierOutcome<NotificationsBundle>> {
@@ -321,6 +323,35 @@ function withoutBoundary(
   cursor: NostrCursor | undefined,
 ): ReadonlyArray<RawRelayEvent> {
   return cursor ? events.filter((e) => e.id !== cursor.id) : events;
+}
+
+/**
+ * Batch a kind-0 fetch for every author in a thread's events and append the
+ * results, so the relay floor's thread path resolves pfp/name. A profile-fetch
+ * failure is tolerated — the notes still render, authors just stay unresolved.
+ */
+async function withThreadAuthorProfiles(
+  connection: RelayConnection,
+  events: ReadonlyArray<RawRelayEvent>,
+  request: ThreadRequest,
+): Promise<ReadonlyArray<RawRelayEvent>> {
+  const authors = [
+    ...new Set(
+      events
+        .filter((event) => event.kind !== 0)
+        .map((event) => event.pubkey)
+        .filter((pubkey): pubkey is string => typeof pubkey === 'string'),
+    ),
+  ];
+  if (authors.length === 0) return events;
+  const result = await connection.request([{ kinds: [0], authors }], {
+    signal: request.signal,
+    timeoutMs: request.timeoutMs,
+  });
+  return result.match(
+    (profiles) => [...events, ...profiles],
+    () => events,
+  );
 }
 
 function toFeedEvents(events: ReadonlyArray<RawRelayEvent>): NaggFeedEvent[] {
