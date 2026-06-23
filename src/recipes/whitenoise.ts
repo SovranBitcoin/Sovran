@@ -3,47 +3,8 @@
 // supply the group ids (the hex nostr group id from local MLS state).
 import type { EventQueryInput } from './rank';
 
-export const WHITENOISE_GROUP_MESSAGES_QUERY = `
-query WhitenoiseGroupMessages($input: EventQueryInput!) {
-  events(input: $input) {
-    nodes {
-      id
-      pubkey
-      kind
-      createdAt
-      content
-      tags
-      sig
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
-  }
-}
-`;
-
-// Welcome/invite events are delivered inside gift wraps (kind 1059) addressed to
-// the viewer, so invites reuse the gift-wrap inbox query.
-export const WHITENOISE_INVITES_QUERY = `
-query WhitenoiseInvites($input: EventQueryInput!) {
-  events(input: $input) {
-    nodes {
-      id
-      pubkey
-      kind
-      createdAt
-      content
-      tags
-      sig
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
-  }
-}
-`;
+// nagg indexes these events; the read goes through `eventsQueryAppView` (POST
+// /nostr/events/query). These builders produce the filter; the client decrypts.
 
 // MLS group message (kind 445), filtered by the `#h` nostr group id set.
 export function whitenoiseGroupMessagesInput(options: {

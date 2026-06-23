@@ -41,9 +41,7 @@ describe('getSocialGraph through the facade', () => {
   test('nagg serves the bundled response (follows + profiles + relays + mutes)', async () => {
     let lastUrl = '';
     const client = createNaggClient({
-      endpoint: 'https://nagg.test/graphql',
       appView: { baseUrl: 'https://nagg.test' },
-      transport: 'appview',
       fetchImpl: (async (url: string) => {
         lastUrl = String(url);
         return {
@@ -73,9 +71,7 @@ describe('getSocialGraph through the facade', () => {
 
   test('relay floor serves follows/relays/mutes when nagg is down', async () => {
     const client = createNaggClient({
-      endpoint: 'https://nagg.test/graphql',
       appView: { baseUrl: 'https://nagg.test' },
-      transport: 'appview',
       fetchImpl: (async () =>
         ({ ok: false, status: 503, statusText: 'x', json: async () => ({}) }) as unknown as Response) as unknown as typeof fetch,
     });

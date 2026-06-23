@@ -19,35 +19,6 @@ export type DmConversationInput = {
   limit?: number;
 };
 
-const DM_EVENT_SELECTION = `
-    nodes {
-      id
-      pubkey
-      kind
-      createdAt
-      content
-      tags
-      sig
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }`;
-
-export const DM_ENVELOPES_QUERY = `
-query DmEnvelopes($input: DmEnvelopesInput!) {
-  dmEnvelopes(input: $input) {${DM_EVENT_SELECTION}
-  }
-}
-`;
-
-export const DM_CONVERSATION_QUERY = `
-query DmConversation($input: DmConversationInput!) {
-  dmConversation(input: $input) {${DM_EVENT_SELECTION}
-  }
-}
-`;
-
 export function dmEnvelopesInput(options: DmEnvelopesInput): DmEnvelopesInput {
   return {
     viewer: options.viewer,

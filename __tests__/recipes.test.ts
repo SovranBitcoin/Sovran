@@ -8,10 +8,7 @@ import {
   followingRepliesEventsInput,
   forYouRankedEventsInput,
   globalTrendingRankedEventsInput,
-  mergeRelevantReplyNodes,
   notificationsInput,
-  PROFILE_EVENTS_SEARCH_QUERY,
-  PROFILE_SEARCH_QUERY,
   profileEventsSearchInput,
   profileSearchInput,
   recentNotesEventsInput,
@@ -43,15 +40,12 @@ function reply(idChar: string, parentId: string, pubkey = root.pubkey) {
 }
 
 describe("rank recipes", () => {
-  test("profile search query exposes separate search and profile scores", () => {
+  test("profile search input defaults limit and sort", () => {
     expect(profileSearchInput({ query: "jack" })).toEqual({
       query: "jack",
       limit: 10,
       sort: "globalPagerank",
     });
-    expect(PROFILE_SEARCH_QUERY).toContain("profileSearch");
-    expect(PROFILE_SEARCH_QUERY).toContain("searchScore");
-    expect(PROFILE_SEARCH_QUERY).toContain("profileScore");
   });
 
   test("profile events search recipe uses generic kind-0 events", () => {
@@ -60,8 +54,6 @@ describe("rank recipes", () => {
       search: "calle",
       limit: 7,
     });
-    expect(PROFILE_EVENTS_SEARCH_QUERY).toContain("events(input: $input)");
-    expect(PROFILE_EVENTS_SEARCH_QUERY).toContain("content");
   });
 
   test("profile search schema accepts sparse nullable GraphQL profile fields", () => {
@@ -290,44 +282,7 @@ describe("notification recipes", () => {
   });
 });
 
-describe("reply graph", () => {
-  test("orders author chain, followed tail, ranked rest, then fallback rest", () => {
-    type TestReply = ReturnType<typeof reply> & {
-      childAuthorReplies?: TestReply[];
-      childFollowedReplies?: TestReply[];
-    };
-    const authorTwo: TestReply = reply("3", "2".repeat(64));
-    const followedTail: TestReply = reply("4", authorTwo.id, "b".repeat(64));
-    const authorOne: TestReply = {
-      ...reply("2", root.id),
-      childAuthorReplies: [authorTwo],
-    };
-    authorTwo.childFollowedReplies = [followedTail];
-    const rankedOther: TestReply = reply("5", root.id, "c".repeat(64));
-    const fallbackOther: TestReply = reply("6", root.id, "d".repeat(64));
-
-    const merged = mergeRelevantReplyNodes({
-      sourceEvent: root,
-      authorNodes: [authorOne],
-      followedNodes: [],
-      rankedNodes: [rankedOther],
-      allNodes: [fallbackOther, rankedOther, authorOne],
-      limit: 10,
-      toEvent: (node) => node ?? undefined,
-      childAuthorNodesFor: (node) => node.childAuthorReplies ?? [],
-      childFollowedNodesFor: (node) => node.childFollowedReplies ?? [],
-    });
-
-    expect(merged.nodes.map((node) => node.id)).toEqual([
-      authorOne.id,
-      authorTwo.id,
-      followedTail.id,
-      rankedOther.id,
-      fallbackOther.id,
-    ]);
-    expect(merged.authorChainIds).toEqual([authorOne.id, authorTwo.id]);
-  });
-
+describe("appview bindings", () => {
   test("dmEnvelopesAppView builds the simplified REST binding (no normalize)", () => {
     const viewer = "a".repeat(64);
     const binding = dmEnvelopesAppView({ viewer, kinds: [1059], until: 1700, limit: 25 });

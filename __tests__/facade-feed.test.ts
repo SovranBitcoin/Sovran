@@ -37,9 +37,7 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
 function naggClientReturning(body: unknown, init?: { ok?: boolean; status?: number }) {
   let lastUrl = '';
   const client = createNaggClient({
-    endpoint: 'https://nagg.test/graphql',
     appView: { baseUrl: 'https://nagg.test' },
-    transport: 'appview',
     fetchImpl: (async (url: string) => {
       lastUrl = String(url);
       return jsonResponse(body, init);

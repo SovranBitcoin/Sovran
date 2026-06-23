@@ -22,9 +22,7 @@ describe('getOwnHistory — nagg tier', () => {
   test('lists my likes newest-first from /nostr/own/likes', async () => {
     let lastUrl = '';
     const client = createNaggClient({
-      endpoint: 'https://nagg.test/graphql',
       appView: { baseUrl: 'https://nagg.test' },
-      transport: 'appview',
       fetchImpl: (async (url: string) => {
         lastUrl = String(url);
         return jsonResponse({

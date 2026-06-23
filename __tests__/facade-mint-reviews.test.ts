@@ -83,9 +83,7 @@ describe('mint-reviews through the facade', () => {
   test('relay floor parses reviews when nagg has no aggregate', async () => {
     // nagg tier returns a 503 for the aggregate → falls through to relay
     const client = createNaggClient({
-      endpoint: 'https://nagg.test/graphql',
       appView: { baseUrl: 'https://nagg.test' },
-      transport: 'appview',
       fetchImpl: (async () =>
         ({ ok: false, status: 503, statusText: 'x', json: async () => ({}) }) as unknown as Response) as unknown as typeof fetch,
     });
@@ -109,9 +107,7 @@ describe('mint-reviews through the facade', () => {
   test('nagg serves the server-side aggregate when available', async () => {
     let lastUrl = '';
     const client = createNaggClient({
-      endpoint: 'https://nagg.test/graphql',
       appView: { baseUrl: 'https://nagg.test' },
-      transport: 'appview',
       fetchImpl: (async (url: string) => {
         lastUrl = String(url);
         return {

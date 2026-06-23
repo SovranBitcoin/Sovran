@@ -9,33 +9,9 @@ export type PostsSort = 'recent' | 'popular';
 
 const POST_KINDS = [1, 1111];
 
-const POST_EVENT_SELECTION = `
-    nodes {
-      id
-      pubkey
-      kind
-      createdAt
-      content
-      tags
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }`;
-
-export const POSTS_RECENT_QUERY = `
-query PostsByPubkeysRecent($input: EventQueryInput!) {
-  events(input: $input) {${POST_EVENT_SELECTION}
-  }
-}
-`;
-
-export const POSTS_POPULAR_QUERY = `
-query PostsByPubkeysPopular($input: RankedEventsInput!) {
-  rankedEvents(input: $input) {${POST_EVENT_SELECTION}
-  }
-}
-`;
+// Recent posts read via `eventsQueryAppView` (POST /nostr/events/query); popular
+// posts read via `rankedFeedAppView` (POST /nostr/feed/ranked). These builders
+// produce the respective inputs.
 
 export function postsByPubkeysRecentInput(options: {
   pubkeys: string[];
@@ -74,27 +50,5 @@ export function postsByPubkeysPopularInput(options: {
     metric: { name: 'actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
     terms: [...engagementRankTerms(), vertexAuthorScoreTerm(0.25), recencyTerm(0.9)],
     limit: options.limit ?? 30,
-  };
-}
-
-// postsByPubkeys selects the query + variables for the requested sort, so the
-// caller can issue a single typed request.
-export function postsByPubkeys(options: {
-  pubkeys: string[];
-  sort: PostsSort;
-  since?: number;
-  until?: number;
-  limit?: number;
-  offset?: number;
-}): { query: string; variables: { input: EventQueryInput | RankedEventsInput } } {
-  if (options.sort === 'popular') {
-    return {
-      query: POSTS_POPULAR_QUERY,
-      variables: { input: postsByPubkeysPopularInput(options) },
-    };
-  }
-  return {
-    query: POSTS_RECENT_QUERY,
-    variables: { input: postsByPubkeysRecentInput(options) },
   };
 }

@@ -32,9 +32,7 @@ describe('searchProfiles through the facade', () => {
   test('nagg serves ranked hits from /nostr/search', async () => {
     let lastUrl = '';
     const client = createNaggClient({
-      endpoint: 'https://nagg.test/graphql',
       appView: { baseUrl: 'https://nagg.test' },
-      transport: 'appview',
       fetchImpl: (async (url: string) => {
         lastUrl = String(url);
         return {

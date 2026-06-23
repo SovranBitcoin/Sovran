@@ -21,9 +21,7 @@ describe('getDmEnvelopes — nagg index', () => {
   test('returns opaque envelopes (no decryption) with an arrival-time cursor', async () => {
     let lastUrl = '';
     const client = createNaggClient({
-      endpoint: 'https://nagg.test/graphql',
       appView: { baseUrl: 'https://nagg.test' },
-      transport: 'appview',
       fetchImpl: (async (url: string) => {
         lastUrl = String(url);
         return {

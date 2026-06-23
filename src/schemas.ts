@@ -9,21 +9,6 @@ export const NaggOrderingSchema = z.object({
   elements: z.array(z.string()).max(5000),
 });
 
-export const NaggGraphqlErrorSchema = z
-  .object({
-    message: z.string().optional(),
-    path: z.array(z.unknown()).optional(),
-    extensions: z.record(z.string(), z.unknown()).optional(),
-  })
-  .passthrough();
-
-export const NaggGraphqlEnvelopeSchema = z
-  .object({
-    data: z.unknown().optional(),
-    errors: z.array(NaggGraphqlErrorSchema).optional(),
-  })
-  .passthrough();
-
 export const NaggUnknownDataSchema = z.unknown();
 
 export const NaggEventSchema = z
@@ -296,6 +281,13 @@ export const NaggNotificationsPageSchema = z.object({
 export const NaggNoteStatsSchema = z.record(z.string(), NaggNoteMetricsSchema);
 
 // DM envelope data (zero-knowledge — raw encrypted events for client decrypt).
+// Enrichment side-maps only (no events) — `/nostr/events` and `/nostr/profiles`.
+export const NaggEnrichmentSchema = z.object({
+  metrics: hydrationMap(NaggNoteMetricsSchema),
+  profiles: hydrationMap(NaggProfileInfoSchema),
+  quoted: hydrationMap(NaggFeedEventSchema),
+});
+
 export const NaggDmEnvelopesDataSchema = z.object({
   dmEnvelopes: NaggEventConnectionSchema,
 });
@@ -359,7 +351,6 @@ export const NaggWallpaperCatalogDataSchema = z.object({
   albums: NaggEventConnectionSchema,
 });
 
-export type NaggGraphqlEnvelope = z.infer<typeof NaggGraphqlEnvelopeSchema>;
 export type NaggEvent = z.infer<typeof NaggEventSchema>;
 export type NaggAggregateRow = z.infer<typeof NaggAggregateRowSchema>;
 export type NaggEventConnection = z.infer<typeof NaggEventConnectionSchema>;
