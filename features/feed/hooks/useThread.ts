@@ -12,7 +12,7 @@ import type {
   ThreadSeedBuckets,
 } from '@/features/feed/data/feedClient';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
-import { consumeThreadSeed, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
+import { consumeThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import {
   bucketsFromThreadResult,
@@ -31,7 +31,10 @@ import { ingestOwnContent, useOwnContentStore } from '@/shared/stores/profile/ow
  * posted (or other-client) note opens its thread instantly even before it has
  * round-tripped through relays/nagg. Scoped to the active viewer.
  */
-function ownContentSeed(eventId: string, viewerPubkey: string | undefined): ThreadSeed | undefined {
+function ownContentSeed(
+  eventId: string,
+  viewerPubkey: string | undefined
+): ThreadSeedBuckets | undefined {
   const entry = useOwnContentStore.getState().getOwn(eventId, viewerPubkey);
   if (!entry) return undefined;
   return {
@@ -46,11 +49,12 @@ function ownContentSeed(eventId: string, viewerPubkey: string | undefined): Thre
  * First-frame seed projected from the shared nagg-ts entity cache (populated by
  * every feed/notifications read). When the tapped note was already seen, this
  * paints the post + its cached ancestor chain + author profiles/metrics with NO
- * network — covering deep links and reply-taps that carry no nav snapshot. The
- * cache only walks ANCESTORS, so a feed nav seed (which also carries reply
- * previews) is preferred when present; this fills the gap otherwise.
+ * network. It carries the post + its cached ancestor chain + cached direct reply
+ * previews + author profiles/metrics, fully replacing the old transient nav
+ * snapshot. Returns undefined when the tapped note isn't cached (e.g. a cold deep
+ * link), so the network fetch drives the first frame instead.
  */
-function cachedThreadSeed(eventId: string): ThreadSeed | undefined {
+function cachedThreadSeed(eventId: string): ThreadSeedBuckets | undefined {
   const layer = buildNostrDataLayer();
   if (!layer) return undefined;
   const view = layer.readThread(eventId);
@@ -124,7 +128,6 @@ export function useThread(eventId: string): UseThreadResult {
   const hasMoreRepliesRef = useRef(false);
   const isInitialFetchingRef = useRef(false);
   const isLoadingMoreRepliesRef = useRef(false);
-  const currentEventIdRef = useRef<string | null>(null);
   const requestGenerationRef = useRef(0);
   const loadMoreAbortControllerRef = useRef<AbortController | null>(null);
 
@@ -244,9 +247,6 @@ export function useThread(eventId: string): UseThreadResult {
     if (!eventId) return;
 
     let cancelled = false;
-    const preservedSeed = threadSeedRef.current;
-    const eventChanged = currentEventIdRef.current !== eventId;
-    currentEventIdRef.current = eventId;
     const generation = requestGenerationRef.current + 1;
     requestGenerationRef.current = generation;
     const controller = new AbortController();
@@ -263,9 +263,12 @@ export function useThread(eventId: string): UseThreadResult {
     setIsLoadingMoreReplies(false);
     setHasMoreReplies(false);
 
+    // Cache first (authoritative, complete via readThread's ancestor walk + reply
+    // scan); the transient nav snapshot is a safety net for anything not yet
+    // ingested; own-content covers a just-posted note not yet round-tripped.
     const seed =
-      (eventChanged ? consumeThreadSeed(eventId) : (preservedSeed ?? consumeThreadSeed(eventId))) ??
       cachedThreadSeed(eventId) ??
+      consumeThreadSeed(eventId) ??
       ownContentSeed(eventId, viewerPubkey);
     if (seed) {
       threadSeedRef.current = seed;
