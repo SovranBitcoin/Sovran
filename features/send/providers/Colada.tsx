@@ -38,10 +38,8 @@ import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog } from '@/shared/lib/logger';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
-import {
-  createSovranHandlers,
-  createSovranScreenActionHandlers,
-} from '@/features/send/lib/sovranPaymentConfig';
+import { createSovranHandlers } from '@/features/send/lib/sovranPaymentConfig';
+import { createSovranScreenActionHandlers } from '@/features/send/lib/sovranScreenActions';
 import { createSovranNotifications } from '@/features/send/lib/sovranNotifications';
 import { createSovranScanSources } from '@/features/send/lib/sovranScanSources';
 import { mintUrlLogFields } from '@/features/send/lib/sovranPaymentLog';
