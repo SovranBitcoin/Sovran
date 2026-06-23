@@ -1,14 +1,11 @@
 /**
- * @fileoverview Sovran payment flow config — single source for colada glue
+ * @fileoverview Sovran payment-machine step handlers for colada.
  *
- * Factory functions that inject Sovran-specific behavior into colada:
- * - createSovranNotifications: error/notification popups + state updates
- * - createSovranHandlers: step handlers (navigation, popups, dismiss)
- * - createSovranScreenActionHandlers: post-terminal actions (NFC, emoji token picker)
- * - createSovranScanSources: scan input sources (clipboard, gallery, NFC)
- *
- * Operations (executeSend, executeMelt, buildMintListItems, etc.) are now built-in
- * via createColada in the library.
+ * createSovranHandlers maps colada step codes to Sovran behavior: navigation,
+ * popups, dismissals, Near Pay / Routstr / NFC delivery, scan-history + location
+ * stamping, and transaction-annotation linking. Sibling concerns live in
+ * sovranNotifications, sovranScreenActions, sovranScanSources, and
+ * sovranPaymentOperations.
  */
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';

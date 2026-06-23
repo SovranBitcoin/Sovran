@@ -38,7 +38,7 @@ import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog } from '@/shared/lib/logger';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
-import { createSovranHandlers } from '@/features/send/lib/sovranPaymentConfig';
+import { createSovranHandlers } from '@/features/send/lib/sovranHandlers';
 import { createSovranScreenActionHandlers } from '@/features/send/lib/sovranScreenActions';
 import { createSovranNotifications } from '@/features/send/lib/sovranNotifications';
 import { createSovranScanSources } from '@/features/send/lib/sovranScanSources';
