@@ -25,6 +25,7 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { ContactRow, nostrIdentity } from '@/shared/ui/composed/ContactRow';
 import { List } from '@/shared/ui/composed/List';
+import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -388,7 +389,16 @@ function MentionSearchResults({
       />
     );
   } else if (showSkeletons) {
-    content = <MentionSkeletonRows />;
+    content = (
+      <SkeletonContentCrossfade
+        loading
+        exit="none"
+        visualKey="mention-results"
+        visualSurface="send-memo"
+        renderSkeleton={() => <MentionSkeletonRows />}
+        renderContent={() => null}
+      />
+    );
   } else if (results.length === 0) {
     content = (
       <MentionEmptyState

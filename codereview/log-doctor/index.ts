@@ -42,12 +42,17 @@
  *   flows        Reconstruct cross-async traces using flowId in ctx
  *   ws           WebSocket connection health, subscription analysis, message rates
  *   gc           Hermes memory trend, GC pressure, JS thread blocks, leak detection
+ *   crypto       Crypto/cashu amount + proof operation breakdown
+ *   ops          Operation/span breakdown
+ *   perf         Per-event latency distribution (p50/p95/p99 + histogram) from params.ms
+ *   redaction    Read-side redaction audit: confirms secrets stripped, flags raw un-redacted values
  *   budget       Token cost meta-analysis — shows which modes fit in which context windows
  *   phone        Drive a real iPhone via WebDriverAgent (subcommands: tap, tap-id, tree, shot, …)
  *
  * OPTIONS:
  *   --threshold <ms>    Duration threshold for 'slow' mode (default: 500)
  *   --context <n>       Number of entries before/after errors (default: 3)
+ *   --all, --no-cluster errors mode: list every entry with context instead of clustering
  *   --limit <n>         Page size (default: 200)
  *   --offset <n>        Skip first N entries for pagination (default: 0)
  *   --no-device         Omit device info block
@@ -105,6 +110,17 @@ import {
   wdaRequest,
 } from './wda';
 
+// Pure deterministic analysis (clustering, percentiles, redaction audit). Lives
+// in its own module so it can be unit-tested without loading the CLI/WDA stack.
+import {
+  clusterErrorEntries,
+  percentile,
+  scanRedactionAudit,
+  sparkline,
+  summarizeDurations,
+  type RedactionAudit,
+} from './analysis';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface LogEntry {
@@ -142,6 +158,9 @@ interface Options {
   format: 'json' | 'yaml' | 'md';
   /** Max approximate token budget. Output is pruned to fit. null = unlimited. */
   tokenBudget: number | null;
+  /** errors mode: cluster near-identical errors into exemplars (default true).
+   *  Set false via --all / --no-cluster to list every entry with context. */
+  clusterErrors: boolean;
   /** Positional args after the mode name. Used by `phone` mode for subcommands. */
   restArgs: string[];
 }
@@ -171,6 +190,7 @@ export function parseArgs(argv: string[]): Options {
     latest: false,
     format: 'json',
     tokenBudget: null,
+    clusterErrors: true,
     restArgs: [],
   };
 
@@ -220,6 +240,9 @@ export function parseArgs(argv: string[]): Options {
       if (f === 'yaml' || f === 'md' || f === 'json') opts.format = f;
     } else if (arg === '--token-budget' && args[i + 1]) {
       opts.tokenBudget = parseInt(args[++i], 10);
+    } else if (arg === '--all' || arg === '--no-cluster') {
+      // errors mode: expand every entry with context instead of clustering.
+      opts.clusterErrors = false;
     } else {
       // Unknown flag — pass through to subcommand-style modes (phone test ...).
       opts.restArgs.push(arg);
@@ -619,7 +642,8 @@ function modeStats(entries: LogEntry[], opts: Options): string {
         .map((g) => Math.round(g) + 'ms')
         .join(', ')}`
     );
-    lines.push(`  Median gap: ${Math.round(gaps[Math.floor(gaps.length / 2)])}ms`);
+    lines.push(`  Median gap: ${Math.round(percentile(gaps, 50))}ms`);
+    lines.push(`  p95 gap: ${Math.round(percentile(gaps, 95))}ms`);
     lines.push('');
   }
 
@@ -735,6 +759,22 @@ function modeStats(entries: LogEntry[], opts: Options): string {
     if (highFreqTemplates.length > 15) lines.push(`  ... +${highFreqTemplates.length - 15} more`);
   } else {
     lines.push('  No events with 3+ occurrences.');
+  }
+
+  // Redaction at a glance — full breakdown lives in the `redaction` mode.
+  const audit = scanRedactionAudit(entries);
+  const brandTotal = Object.values(audit.brandCounts).reduce((a, b) => a + b, 0);
+  const highSignal = audit.suspicious.filter((s) => s.highSignal);
+  lines.push('');
+  lines.push('REDACTION:');
+  lines.push(
+    `  ${audit.totalRedactions} redacted values (${brandTotal} branded, ${audit.totalRedactions - brandTotal} inline)`
+  );
+  if (highSignal.length > 0) {
+    const total = highSignal.reduce((a, s) => a + s.count, 0);
+    lines.push(`  ⚠ ${total} possible un-redacted secret(s) — run "redaction" mode`);
+  } else {
+    lines.push('  No un-redacted high-signal secrets detected.');
   }
 
   return lines.join('\n');
@@ -1004,6 +1044,57 @@ function modeErrors(entries: LogEntry[], opts: Options): string {
 
   if (errorIndices.length === 0) return 'No warnings, errors, or fatal entries found.';
 
+  return opts.clusterErrors
+    ? renderErrorClusters(entries, errorIndices, opts)
+    : renderErrorEntriesWithContext(entries, errorIndices, opts);
+}
+
+// Default errors view: collapse near-identical errors to exemplars + counts.
+// Attacks the biggest token consumer; `--all` restores the full listing below.
+function renderErrorClusters(entries: LogEntry[], errorIndices: number[], opts: Options): string {
+  const clusters = clusterErrorEntries(
+    errorIndices.map((index) => ({ entry: entries[index], index }))
+  );
+  const lines: string[] = [];
+  lines.push(
+    `Found ${errorIndices.length} warning/error/fatal entries in ${clusters.length} cluster(s). ` +
+      `Showing exemplars — re-run with --all for every entry with context.\n`
+  );
+
+  const { page, footer } = paginate(clusters, opts);
+  for (const c of page) {
+    const e = c.exemplar;
+    lines.push(
+      `>>> ${String(c.count).padStart(4)}x ${levelIcon(e.level)} ${e.event}  ${shortParams(e.params)}`
+    );
+    const span =
+      c.lastT > c.firstT
+        ? `first +${(c.firstT / 1000).toFixed(1)}s, last +${(c.lastT / 1000).toFixed(1)}s`
+        : `at +${(c.firstT / 1000).toFixed(1)}s`;
+    lines.push(`       ${span}`);
+    if (e.error) {
+      lines.push(`       ERROR: ${e.error.name}: ${e.error.message}`);
+      if (e.error.stack?.length > 0) {
+        lines.push(`       STACK: ${e.error.stack.slice(0, 3).join(' -> ')}`);
+      }
+    }
+    lines.push('');
+  }
+
+  const suppressed = errorIndices.length - clusters.length;
+  lines.push(
+    `Clustered ${errorIndices.length} entries into ${clusters.length} exemplar(s) ` +
+      `(${suppressed} duplicate(s) suppressed; --all to expand).`
+  );
+  lines.push(footer);
+  return lines.join('\n');
+}
+
+function renderErrorEntriesWithContext(
+  entries: LogEntry[],
+  errorIndices: number[],
+  opts: Options
+): string {
   const lines: string[] = [];
   lines.push(`Found ${errorIndices.length} warning/error/fatal entries:\n`);
 
@@ -3478,17 +3569,22 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
   lines.push('BOTTLENECK RANKING (by total time):');
   lines.push('');
   lines.push(
-    '  Event                                  Count   Total ms   Avg ms   Min ms   Max ms   P95 ms'
+    '  Event                                  Count   Total ms   Avg ms   P50 ms   P95 ms   P99 ms'
   );
   lines.push('  ' + '-'.repeat(100));
 
   for (const [event, stats] of sorted) {
-    const avg = stats.totalMs / stats.count;
-    const sorted95 = [...stats.samples].sort((a, b) => a - b);
-    const p95 = sorted95[Math.floor(sorted95.length * 0.95)] ?? stats.maxMs;
+    const d = summarizeDurations(stats.samples);
     lines.push(
-      `  ${event.padEnd(40).slice(0, 40)} ${String(stats.count).padStart(5)}   ${stats.totalMs.toFixed(1).padStart(8)}   ${avg.toFixed(1).padStart(6)}   ${stats.minMs.toFixed(1).padStart(6)}   ${stats.maxMs.toFixed(1).padStart(6)}   ${p95.toFixed(1).padStart(6)}`
+      `  ${event.padEnd(40).slice(0, 40)} ${String(stats.count).padStart(5)}   ${stats.totalMs.toFixed(1).padStart(8)}   ${d.avg.toFixed(1).padStart(6)}   ${d.p50.toFixed(1).padStart(6)}   ${d.p95.toFixed(1).padStart(6)}   ${d.p99.toFixed(1).padStart(6)}`
     );
+  }
+  lines.push('');
+
+  // Per-event latency distribution for the worst offenders (token-cheap sparkline).
+  lines.push('LATENCY DISTRIBUTION (top 5 by total time):');
+  for (const [event, stats] of sorted.slice(0, 5)) {
+    lines.push(`  ${event.slice(0, 40).padEnd(40)} ${sparkline(stats.samples)}`);
   }
   lines.push('');
 
@@ -3541,6 +3637,65 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
 // ─── Mode: budget ───────────────────────────────────────────────────────────
 // Meta-analysis: shows token cost of each mode to help pick the right one.
 
+// ─── Mode: redaction ─────────────────────────────────────────────────────────
+// Read-side audit of an ALREADY-redacted log: confirms the logger stripped
+// secrets, and flags raw values that look un-redacted. Heuristic; never prints
+// values. Changes nothing about how the app logs.
+
+function renderRedactionAudit(audit: RedactionAudit): string[] {
+  const lines: string[] = [];
+
+  const brands = Object.entries(audit.brandCounts).sort((a, b) => b[1] - a[1]);
+  const brandTotal = brands.reduce((a, [, c]) => a + c, 0);
+  lines.push(`REDACTED SECRET BRANDS ({_kind}): ${brandTotal} total`);
+  if (brands.length === 0) lines.push('  none');
+  else for (const [kind, count] of brands) lines.push(`  ${String(count).padStart(5)}x  ${kind}`);
+  lines.push('');
+
+  const substr = Object.entries(audit.redactedSubstrCounts).sort((a, b) => b[1] - a[1]);
+  if (substr.length > 0) {
+    lines.push('INLINE <REDACTED:…> MARKERS:');
+    for (const [label, count] of substr) lines.push(`  ${String(count).padStart(5)}x  ${label}`);
+    lines.push('');
+  }
+
+  const high = audit.suspicious.filter((s) => s.highSignal);
+  const low = audit.suspicious.filter((s) => !s.highSignal);
+  lines.push('SUSPICIOUS RAW VALUES (heuristic — events named, values never shown):');
+  if (high.length > 0) {
+    lines.push('  ⚠ HIGH SIGNAL — likely secrets/PII that should have been redacted:');
+    for (const s of high) {
+      lines.push(
+        `     ${String(s.count).padStart(5)}x  ${s.category}  (events: ${s.sampleEvents.join(', ')})`
+      );
+    }
+  } else {
+    lines.push('  ⚠ HIGH SIGNAL: none — no raw nsec/xprv/cashu-token/jwt/email detected.');
+  }
+  if (low.length > 0) {
+    lines.push('  · LOW SIGNAL — usually public ids (npub/note/64-hex); investigate only if unexpected:');
+    for (const s of low) {
+      lines.push(
+        `     ${String(s.count).padStart(5)}x  ${s.category}  (events: ${s.sampleEvents.join(', ')})`
+      );
+    }
+  }
+
+  return lines;
+}
+
+function modeRedaction(entries: LogEntry[], _opts: Options): string {
+  const audit = scanRedactionAudit(entries);
+  const lines: string[] = [];
+  lines.push('=== REDACTION AUDIT ===');
+  lines.push('');
+  lines.push('Read-side scan of an already-redacted log. Confirms the logger stripped');
+  lines.push('secrets and flags raw values that look un-redacted. Heuristic; values never shown.');
+  lines.push('');
+  lines.push(...renderRedactionAudit(audit));
+  return lines.join('\n');
+}
+
 function modeBudget(entries: LogEntry[], opts: Options): string {
   const lines: string[] = [];
 
@@ -3557,6 +3712,7 @@ function modeBudget(entries: LogEntry[], opts: Options): string {
     { name: 'network', fn: modeNetwork },
     { name: 'feed', fn: modeFeed },
     { name: 'visual', fn: modeVisual },
+    { name: 'redaction', fn: modeRedaction },
     { name: 'full (json)', fn: (e, o) => modeFull(e, { ...o, format: 'json' }) },
     { name: 'full (md)', fn: (e, o) => modeFull(e, { ...o, format: 'md' }) },
     { name: 'full (yaml)', fn: (e, o) => modeFull(e, { ...o, format: 'yaml' }) },
@@ -4149,7 +4305,7 @@ async function main() {
     console.error('  2. Pipe logs: cat logs.jsonl | npm run log-doctor -- stats');
     console.error('');
     console.error(
-      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, phone'
+      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, redaction, phone'
     );
     process.exit(1);
   }
@@ -4245,10 +4401,13 @@ async function main() {
     case 'perf':
       output = modePerf(entries, opts);
       break;
+    case 'redaction':
+      output = modeRedaction(entries, opts);
+      break;
     default:
       console.error(`Unknown mode: ${opts.mode}`);
       console.error(
-        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, phone'
+        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, redaction, phone'
       );
       process.exit(1);
   }

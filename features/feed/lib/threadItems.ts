@@ -79,7 +79,12 @@ export function orderedReplyIdsForThreadResult(
     return [...existingOrder, ...nextPageReplyIds.filter((id) => !existingOrderSet.has(id))];
   }
 
-  return pageReplyIds.length > 0 ? pageReplyIds : fallbackReplyIds;
+  // Initial fetch: keep whatever was already on screen (the cache-seeded previews)
+  // as a stable prefix and APPEND the ranked delta, instead of replacing the order
+  // outright — so the replies don't visibly reshuffle when the network result lands.
+  // With no seed, existingOrder is empty and this is just the server's order.
+  const initialReplyIds = pageReplyIds.length > 0 ? pageReplyIds : fallbackReplyIds;
+  return [...existingOrder, ...initialReplyIds.filter((id) => !existingOrderSet.has(id))];
 }
 
 export function buildThreadItemsFromSeed(

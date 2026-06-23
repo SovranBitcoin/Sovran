@@ -30,6 +30,7 @@ import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
+import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -337,21 +338,28 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
         </View>
       )}
 
-      {!receiveEntryData ? (
-        <ReceiveHubPlaceholder />
-      ) : quickAccessP2PK && selectedTab === 'P2PK' ? (
-        <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
-      ) : (
-        <ReceiveLightningTab
-          data={receiveEntryData}
-          unit={unit}
-          mintInfo={mintInfo}
-          selectedMintUrl={mintUrl}
-          isNpcMintUpdating={isNpcMintUpdating}
-          actions={actions}
-          muted={muted}
-        />
-      )}
+      <SkeletonContentCrossfade
+        loading={!receiveEntryData}
+        visualKey="receive-hub"
+        visualSurface="receive"
+        renderSkeleton={() => <ReceiveHubPlaceholder />}
+        renderContent={() => {
+          if (!receiveEntryData) return null;
+          return quickAccessP2PK && selectedTab === 'P2PK' ? (
+            <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
+          ) : (
+            <ReceiveLightningTab
+              data={receiveEntryData}
+              unit={unit}
+              mintInfo={mintInfo}
+              selectedMintUrl={mintUrl}
+              isNpcMintUpdating={isNpcMintUpdating}
+              actions={actions}
+              muted={muted}
+            />
+          );
+        }}
+      />
     </ScreenWrapper>
   );
 }

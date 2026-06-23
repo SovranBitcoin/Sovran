@@ -14,6 +14,7 @@ import {
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
+import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Log, paymentLog } from '@/shared/lib/logger';
@@ -100,76 +101,84 @@ export function PaymentInfo({
     copyPopup(copyTarget);
   }, [link, selectedValue, copyTarget]);
 
-  if (!selectedValue) {
+  const loading = !selectedValue;
+  if (loading) {
     paymentLog.debug('ui.payment_info.empty', {
       dataType: typeof data,
       isArray: Array.isArray(data),
     });
-    return (
-      <HStack align="center" justify="center">
-        <Skeleton className="bg-surface-secondary h-64 w-64" />
-      </HStack>
-    );
+  } else {
+    paymentLog.debug('ui.payment_info.render', {
+      unit,
+      copyTarget,
+      animated: willAnimate,
+      variant,
+      dataLength: selectedValue.length,
+    });
   }
 
-  paymentLog.debug('ui.payment_info.render', {
-    unit,
-    copyTarget,
-    animated: willAnimate,
-    variant,
-    dataLength: selectedValue.length,
-  });
-
   return (
-    <Log name="PaymentInfo">
-      <View>
-        {/* Hidden Text node carrying the full payment value, so log-doctor's
+    <SkeletonContentCrossfade
+      loading={loading}
+      visualKey="payment-info"
+      visualSurface="payment"
+      renderSkeleton={() => (
+        <HStack align="center" justify="center">
+          <Skeleton className="bg-surface-secondary h-64 w-64" />
+        </HStack>
+      )}
+      renderContent={() => (
+        <Log name="PaymentInfo">
+          <View>
+            {/* Hidden Text node carrying the full payment value, so log-doctor's
             `capture-id-label` step can read the token/address straight from
             the AX tree without bouncing through the iOS pasteboard. Text
             elements are always included in the iOS AX tree (unlike Views
             with opacity:0, which iOS strips), and the visible content is
             what populates the WDA `name`/`label` fields — that's why the
             value is the Text child rather than `accessibilityLabel`. */}
-        <Text
-          testID={`payment-info-${kebabCase(copyTarget)}-data`}
-          numberOfLines={1}
-          style={{
-            position: 'absolute',
-            width: 1,
-            height: 1,
-            fontSize: 1,
-            color: 'transparent',
-            overflow: 'hidden',
-          }}>
-          {selectedValue}
-        </Text>
-        {/* QR code — tap to copy */}
-        <Pressable onPress={handleCopyPress}>
-          <ViewShot captureMode="mount" onCapture={setUri}>
-            <AnimatedQRCode
-              padding={32}
-              unit={unit}
-              address={selectedValue}
-              animate={animated}
-              variant={variant}
-              intervalMs={SPEED_PRESETS[speedIndex].intervalMs}
-              fragmentSize={DENSITY_PRESETS[densityIndex].fragmentSize}
-            />
-          </ViewShot>
-        </Pressable>
+            <Text
+              testID={`payment-info-${kebabCase(copyTarget)}-data`}
+              numberOfLines={1}
+              style={{
+                position: 'absolute',
+                width: 1,
+                height: 1,
+                fontSize: 1,
+                color: 'transparent',
+                overflow: 'hidden',
+              }}>
+              {selectedValue}
+            </Text>
+            {/* QR code — tap to copy */}
+            <Pressable onPress={handleCopyPress}>
+              <ViewShot captureMode="mount" onCapture={setUri}>
+                <AnimatedQRCode
+                  padding={32}
+                  unit={unit}
+                  address={selectedValue}
+                  animate={animated}
+                  variant={variant}
+                  intervalMs={SPEED_PRESETS[speedIndex].intervalMs}
+                  fragmentSize={DENSITY_PRESETS[densityIndex].fragmentSize}
+                />
+              </ViewShot>
+            </Pressable>
 
-        {/* Speed + Density controls — outside the copy pressable */}
-        {willAnimate && (
-          <View style={{ marginTop: 12 }}>
-            <QRSpeedControls
-              speedIndex={speedIndex}
-              densityIndex={densityIndex}
-              onCycleSpeed={cycleSpeed}
-              onCycleDensity={cycleDensity}
-            />
+            {/* Speed + Density controls — outside the copy pressable */}
+            {willAnimate && (
+              <View style={{ marginTop: 12 }}>
+                <QRSpeedControls
+                  speedIndex={speedIndex}
+                  densityIndex={densityIndex}
+                  onCycleSpeed={cycleSpeed}
+                  onCycleDensity={cycleDensity}
+                />
+              </View>
+            )}
           </View>
-        )}
-      </View>
-    </Log>
+        </Log>
+      )}
+    />
   );
 }

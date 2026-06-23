@@ -18,6 +18,7 @@ import { reviewMint, type MintRecommendation } from '@/shared/lib/apiClient';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { useIdentityName } from '@/shared/hooks/useIdentityName';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
+import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -412,12 +413,24 @@ export function MintReviewsScreen() {
   const ListFooter = useMemo(() => {
     if (!isLoading) return null;
     const skeletonCount = reviews.length > 0 ? 2 : 3;
+    // Footer-only skeletons: the real reviews populate the list body, so there's
+    // no in-place content to fade into. Route through the canonical helper for
+    // the region wave; `exit="none"` lets them unmount as the list fills.
     return (
-      <View>
-        {Array.from({ length: skeletonCount }).map((_, i) => (
-          <ReviewSkeleton key={`skeleton-${i}`} isLast={i === skeletonCount - 1} />
-        ))}
-      </View>
+      <SkeletonContentCrossfade
+        loading
+        exit="none"
+        visualKey="mint-reviews-list"
+        visualSurface="mint-reviews"
+        renderSkeleton={() => (
+          <View>
+            {Array.from({ length: skeletonCount }).map((_, i) => (
+              <ReviewSkeleton key={`skeleton-${i}`} isLast={i === skeletonCount - 1} />
+            ))}
+          </View>
+        )}
+        renderContent={() => null}
+      />
     );
   }, [isLoading, reviews.length]);
 

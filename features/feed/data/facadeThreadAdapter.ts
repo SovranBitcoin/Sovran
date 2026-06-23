@@ -93,6 +93,12 @@ export function resolvedThreadToResult(
 
   const root = feedItemEvent(thread.root);
   if (root) allEvents.set(root.id, root);
+  // Ancestors go into allEvents (NOT the reply list) so buildThreadStructure
+  // renders the parent chain — the relay/primal floor now fetches it.
+  for (const item of thread.parents) {
+    const event = feedItemEvent(item);
+    if (event) allEvents.set(event.id, event);
+  }
   for (const item of thread.replies) {
     const event = feedItemEvent(item);
     if (!event) continue;

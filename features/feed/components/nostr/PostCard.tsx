@@ -28,6 +28,7 @@ import { formatDate, formatRelative } from '@/shared/lib/date';
 import { tryNpubEncode } from './feedParse';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { NoteContent, NOTE_CONTENT_FONT_SIZE, NOTE_CONTENT_LINE_HEIGHT } from './NoteContent';
+import { useProfile } from '@/shared/lib/nostr/useEntityCache';
 import { MetricsFooter, POST_ACTION_ICON_SIZES } from './MetricsFooter';
 import {
   SkeletonExitReveal,
@@ -234,7 +235,12 @@ export const PostCard = React.memo(function PostCard({
 }: PostCardProps) {
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
 
-  const profile = profiles.get(event.pubkey);
+  // Author identity comes from the authoritative entity cache, reactively: the
+  // row re-renders in place when this pubkey's profile arrives (no manual re-key),
+  // and any surface that saw this author renders it here too. `status` tells a
+  // genuine loading skeleton apart from a fallback. (`profiles` is still passed to
+  // NoteContent for inline mention chips.)
+  const { profile, status: authorStatus } = useProfile(event.pubkey);
   // Real display name only. The abbreviated npub fallback is passed as Text's
   // `fallback` prop so the name never flashes through a pubkey placeholder.
   const displayName = profile?.name;
@@ -351,7 +357,9 @@ export const PostCard = React.memo(function PostCard({
               onPress={navigateToProfile}>
               <HStack align="center" gap={10} style={sharedStyles.mb6}>
                 <Avatar
-                  state={profile?.picture ? 'image' : 'fallback'}
+                  state={
+                    profile?.picture ? 'image' : authorStatus === 'loading' ? 'loading' : 'fallback'
+                  }
                   picture={profile?.picture}
                   seed={event.pubkey}
                   size={AVATAR_SIZE}

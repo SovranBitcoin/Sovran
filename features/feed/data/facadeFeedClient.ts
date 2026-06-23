@@ -1,3 +1,6 @@
+import { facade } from '@sovranbitcoin/nagg-ts';
+
+import type { FeedEvent, FeedItem } from '@/features/feed/components/nostr/feedTypes';
 import { feedLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
@@ -17,7 +20,53 @@ import {
   type FeedNotificationsResult,
   type FeedParseResult,
   type ThreadResult,
+  type ThreadSeedBuckets,
 } from './feedClient';
+
+// ---------------------------------------------------------------------------
+// Cache bridge: the nagg GraphQL fast-paths (thread, user feeds, posts-by-pubkey)
+// return app-shaped results WITHOUT writing to the shared entity cache the way
+// the facade reads do. These helpers write those results back into the singleton
+// cache, tagged 'nagg' (the source that served them), so a later read — opening a
+// reply as its own thread, revisiting a profile — serves them instantly. The
+// for-you/notifications facade paths already ingest; this closes the gap.
+// ---------------------------------------------------------------------------
+
+function eventsFromAppFeedItem(item: FeedItem): FeedEvent[] {
+  const out: FeedEvent[] = [];
+  if (item.type === 'note') {
+    out.push(item.event);
+    if (item.rootEvent) out.push(item.rootEvent);
+    if (item.replyPreviewEvents) out.push(...item.replyPreviewEvents);
+  } else {
+    out.push(item.repostEvent);
+    if (item.originalEvent) out.push(item.originalEvent);
+    if (item.rootEvent) out.push(item.rootEvent);
+    if (item.reposters) for (const reposter of item.reposters) out.push(reposter.event);
+  }
+  return out;
+}
+
+/** Write a thread result's notes/profiles/metrics into the shared cache. */
+function ingestThreadIntoCache(result: ThreadSeedBuckets): void {
+  const cache = buildNostrDataLayer()?.cache;
+  if (!cache) return;
+  cache.ingestNotes([...result.allEvents.values(), ...result.quotedEvents.values()]);
+  cache.ingestProfileInfos(Object.fromEntries(result.profiles), 'nagg');
+  cache.ingestNoteStats(facade.statsFromMetrics(Object.fromEntries(result.metrics)), 'nagg');
+}
+
+/** Write a parsed feed/user-feed page's notes/profiles/metrics into the shared cache. */
+function ingestFeedPageIntoCache(result: FeedParseResult): void {
+  const cache = buildNostrDataLayer()?.cache;
+  if (!cache) return;
+  const events: FeedEvent[] = [];
+  for (const item of result.orderedFeedItems) events.push(...eventsFromAppFeedItem(item));
+  events.push(...result.quotedEventsMap.values());
+  cache.ingestNotes(events);
+  cache.ingestProfileInfos(Object.fromEntries(result.profilesMap), 'nagg');
+  cache.ingestNoteStats(facade.statsFromMetrics(Object.fromEntries(result.metricsMap)), 'nagg');
+}
 
 // ---------------------------------------------------------------------------
 // Facade-backed feed client (local-dev tier validation).
@@ -37,7 +86,11 @@ export function createFacadeFeedClient(fallback: FeedClient): FeedClient {
     ...fallback,
     async getFeed(request): Promise<FeedParseResult> {
       const spec = mapAppSpecToFeedSpec(request.spec, request.userPubkey);
-      if (!spec) return fallback.getFeed(request);
+      if (!spec) {
+        const result = await fallback.getFeed(request);
+        ingestFeedPageIntoCache(result);
+        return result;
+      }
 
       const layer = buildNostrDataLayer();
       if (!layer) {
@@ -70,7 +123,11 @@ export function createFacadeFeedClient(fallback: FeedClient): FeedClient {
       // tier — can't reproduce that ranking. So keep the GraphQL path whenever
       // nagg is enabled, and only route threads through the facade (Primal →
       // relay) when nagg is toggled off, so the cache/relay tiers can serve them.
-      if (getNostrTierConfig().nagg.enabled) return fallback.getThread(request);
+      if (getNostrTierConfig().nagg.enabled) {
+        const result = await fallback.getThread(request);
+        ingestThreadIntoCache(result);
+        return result;
+      }
 
       // Never throw: useThread's seeded-error path keeps isLoading=true on a
       // throw (so a transient nagg error doesn't clobber a seeded render), which
@@ -96,6 +153,18 @@ export function createFacadeFeedClient(fallback: FeedClient): FeedClient {
         });
         return emptyThreadResult(request);
       }
+    },
+
+    async getUserFeed(request): Promise<FeedParseResult> {
+      const result = await fallback.getUserFeed(request);
+      ingestFeedPageIntoCache(result);
+      return result;
+    },
+
+    async getPostsByPubkeys(request): Promise<FeedParseResult> {
+      const result = await fallback.getPostsByPubkeys(request);
+      ingestFeedPageIntoCache(result);
+      return result;
     },
 
     async getNotifications(request): Promise<FeedNotificationsResult> {

@@ -24,6 +24,7 @@ import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import Icon from 'assets/icons';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
+import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import * as Clipboard from 'expo-clipboard';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
@@ -273,7 +274,9 @@ function StatsGridComponent({
 
   const showSkeleton = !hasValidData;
 
-  return (
+  // Same grid chrome for both branches (only the `loading` bars differ), so the
+  // crossfade swaps content under a fading skeleton with zero shift.
+  const renderGrid = (loading: boolean) => (
     <View style={styles.statsGrid}>
       {[0, 2].map((rowStart) => (
         <View key={rowStart} style={styles.statsRow}>
@@ -290,7 +293,7 @@ function StatsGridComponent({
                     },
                   ]}>
                   <Text
-                    loading={showSkeleton}
+                    loading={loading}
                     placeholder="SUCCESS RATE"
                     bold
                     size={12}
@@ -298,7 +301,7 @@ function StatsGridComponent({
                     {stat.label.toUpperCase()}
                   </Text>
                   <Text
-                    loading={showSkeleton}
+                    loading={loading}
                     placeholder="100%"
                     bold
                     size={stat.accent ? 24 : 20}
@@ -306,7 +309,7 @@ function StatsGridComponent({
                     {stat.value}
                   </Text>
                   <Text
-                    loading={showSkeleton}
+                    loading={loading}
                     placeholder="Completion rate"
                     bold
                     size={12}
@@ -320,6 +323,17 @@ function StatsGridComponent({
         </View>
       ))}
     </View>
+  );
+
+  return (
+    <SkeletonContentCrossfade
+      loading={showSkeleton}
+      surfaceColor={surfaceSecondary}
+      visualKey="mint-info-stats"
+      visualSurface="mint-info"
+      renderSkeleton={() => renderGrid(true)}
+      renderContent={() => renderGrid(false)}
+    />
   );
 }
 const StatsGrid = React.memo(StatsGridComponent);
@@ -370,33 +384,31 @@ function RatingBarChartComponent({ score }: { score: number }) {
     }
   }, [isValidScore, goldPercentage, fadeAnim, barScaleAnim]);
 
-  if (showSkeleton) {
-    return (
-      <HStack align="center" gap={16} className="w-full self-stretch px-4">
-        <VStack align="center" className="shrink-0">
-          <Skeleton className="bg-surface-tertiary h-8 w-12 rounded" />
-          <Skeleton className="bg-surface-tertiary mt-2 h-3.5 w-10 rounded" />
-        </VStack>
-        <VStack gap={4} className="min-w-0 flex-1" style={{ flex: 1 }}>
-          {[5, 4, 3, 2, 1].map((stars) => (
-            <HStack key={stars} align="center" gap={2} className="w-full min-w-0">
-              <HStack gap={2} className="shrink-0">
-                {Array.from({ length: stars }).map((_, i) => (
-                  <Icon key={i} name="ic:round-star" size={12} color={defaultColor} />
-                ))}
-              </HStack>
-              <View
-                className="bg-surface-tertiary min-w-0 flex-1 rounded"
-                style={{ height: 8, minWidth: 24 }}
-              />
+  const renderSkeleton = () => (
+    <HStack align="center" gap={16} className="w-full self-stretch px-4">
+      <VStack align="center" className="shrink-0">
+        <Skeleton className="bg-surface-tertiary h-8 w-12 rounded" />
+        <Skeleton className="bg-surface-tertiary mt-2 h-3.5 w-10 rounded" />
+      </VStack>
+      <VStack gap={4} className="min-w-0 flex-1" style={{ flex: 1 }}>
+        {[5, 4, 3, 2, 1].map((stars) => (
+          <HStack key={stars} align="center" gap={2} className="w-full min-w-0">
+            <HStack gap={2} className="shrink-0">
+              {Array.from({ length: stars }).map((_, i) => (
+                <Icon key={i} name="ic:round-star" size={12} color={defaultColor} />
+              ))}
             </HStack>
-          ))}
-        </VStack>
-      </HStack>
-    );
-  }
+            <View
+              className="bg-surface-tertiary min-w-0 flex-1 rounded"
+              style={{ height: 8, minWidth: 24 }}
+            />
+          </HStack>
+        ))}
+      </VStack>
+    </HStack>
+  );
 
-  return (
+  const renderContent = () => (
     <HStack align="center" gap={16} className="w-full self-stretch px-4">
       <VStack align="center" className="shrink-0">
         <Animated.View style={fadeStyle}>
@@ -444,6 +456,16 @@ function RatingBarChartComponent({ score }: { score: number }) {
         })}
       </VStack>
     </HStack>
+  );
+
+  return (
+    <SkeletonContentCrossfade
+      loading={showSkeleton}
+      visualKey="mint-info-rating"
+      visualSurface="mint-info"
+      renderSkeleton={renderSkeleton}
+      renderContent={renderContent}
+    />
   );
 }
 const RatingBarChart = React.memo(RatingBarChartComponent);
