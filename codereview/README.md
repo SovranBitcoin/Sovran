@@ -170,8 +170,10 @@ a typical session — your numbers will differ.
 | `startup`          | ~5K            | Initialization waterfall, gate sequence  |
 | `full --format md` | ~6K            | Pipe-delimited dense summary             |
 | `slow`             | ~18K           | Operations exceeding threshold           |
+| `perf`             | varies         | Per-event latency p50/p95/p99 + sparkline |
+| `redaction`        | ~1K            | Secret-redaction audit (brands + un-redacted flags) |
 | `screens`          | ~70K           | Screen flow + content snapshots          |
-| `errors`           | ~90K           | Errors with full context                 |
+| `errors`           | clustered      | Errors collapsed to exemplars (`--all` = full context) |
 
 ### Recipes
 
