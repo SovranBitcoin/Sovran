@@ -8,7 +8,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { paymentLog } from '@/shared/lib/logger';
-import { fetchDmEnvelopes, type DmEnvelopePage } from '../data/dmEnvelopeClient';
+import { fetchDmEnvelopes } from '../data/dmEnvelopeClient';
+import type { DmEnvelopePage } from '../data/dmEnvelopeTypes';
 import { decryptDmEnvelopes, type DmProtocol } from '../data/dmDecryptPipeline';
 import { CURSOR_SLACK_SECONDS, pageOldestWrapTs } from '../data/dmPagination';
 

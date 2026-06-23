@@ -29,9 +29,9 @@ import {
 import { withSkippedPersistWrites } from '@/shared/lib/cashu/profileScopedStorage';
 import { amountToNumber, toCocoAmount } from '@/shared/lib/cashu/amount';
 import type { HistoryEntry } from '@cashu/coco-core';
-// Type-only import — `useRecentContacts` does not import this file at runtime
-// (it reads mock state via getMockState() below), so there's no cycle.
-import type { RecentContact } from '@/features/payments/hooks/useNip17RecentContacts';
+// The row shape lives in its own type module so this store and the
+// `useNip17RecentContacts` hook can share it without importing each other.
+import type { RecentContact } from '@/features/payments/hooks/recentContactTypes';
 
 // ---------------------------------------------------------------------------
 // Demo row definition — single source of truth for all mock data.

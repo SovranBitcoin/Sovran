@@ -11,7 +11,7 @@ import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
 import { decryptNip04 } from '@/shared/lib/nostr/nip04';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
-import type { DmEnvelope } from './dmEnvelopeClient';
+import type { DmEnvelope } from './dmEnvelopeTypes';
 
 export type DmProtocol = 'nip04' | 'nip17';
 
