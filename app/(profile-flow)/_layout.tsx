@@ -6,7 +6,6 @@
  * side-slide profile stack used by Contacts, Feed, and similar surfaces.
  */
 
-import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
@@ -24,9 +23,9 @@ const BITCHAT_DM_OPTIONS = { headerShown: false };
 
 export default function ProfileFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
-    [foreground, background]
+  const screenOptions = createFlowLayoutScreenOptions(
+    { foreground, background },
+    { androidSheet: true }
   );
 
   return (

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 import type { MintInfo } from '@cashu/cashu-ts';
@@ -76,14 +76,11 @@ export function OnchainReceiveScreen({
     mempool.summary,
     requiredConfirmations
   );
-  const onchainConfirmationProgress = useMemo(
-    () =>
-      observedConfirmationProgress ??
-      (isPaid
-        ? buildSatisfiedOnchainConfirmationProgress(requiredConfirmations)
-        : buildOnchainRequiredConfirmationProgress(requiredConfirmations)),
-    [isPaid, observedConfirmationProgress, requiredConfirmations]
-  );
+  const onchainConfirmationProgress =
+    observedConfirmationProgress ??
+    (isPaid
+      ? buildSatisfiedOnchainConfirmationProgress(requiredConfirmations)
+      : buildOnchainRequiredConfirmationProgress(requiredConfirmations));
   const paymentInfoValue =
     getMintQuotePaymentValue(entry as unknown as HistoryEntry) ?? entry.paymentRequest;
 

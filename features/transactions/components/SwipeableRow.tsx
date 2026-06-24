@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { StyleSheet, View as RNView } from 'react-native';
 
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -55,41 +55,37 @@ export function SwipeableRow({
   const translateX = useSharedValue(0);
   const armed = useSharedValue(0);
 
-  const pan = useMemo(
-    () =>
-      Gesture.Pan()
-        // Activate only on right-leaning horizontal motion past 12 px;
-        // cede vertical drags > 8 px to the parent ScrollView.
-        .activeOffsetX([-9999, 12])
-        .failOffsetY([-8, 8])
-        .enabled(enabled)
-        .onUpdate((event) => {
-          'worklet';
-          const next = Math.max(0, event.translationX);
-          translateX.set(next);
-          const past = next >= COMMIT_PX ? 1 : 0;
-          if (past !== armed.get()) {
-            armed.set(past);
-            runOnJS(tickHaptic)();
-          }
-        })
-        .onEnd((event) => {
-          'worklet';
-          armed.set(0);
-          const past = event.translationX >= COMMIT_PX;
-          if (past) {
-            runOnJS(commitHaptic)();
-            // Spring the row back to rest — the spinner takes over visual
-            // feedback while reclaim runs. The list-item exit animation
-            // fires once reclaim completes and the row leaves the bucket.
-            translateX.set(withSpring(0, SPRING));
-            runOnJS(onCommit)();
-          } else {
-            translateX.set(withSpring(0, SPRING));
-          }
-        }),
-    [enabled, onCommit, translateX, armed]
-  );
+  const pan = Gesture.Pan()
+    // Activate only on right-leaning horizontal motion past 12 px;
+    // cede vertical drags > 8 px to the parent ScrollView.
+    .activeOffsetX([-9999, 12])
+    .failOffsetY([-8, 8])
+    .enabled(enabled)
+    .onUpdate((event) => {
+      'worklet';
+      const next = Math.max(0, event.translationX);
+      translateX.set(next);
+      const past = next >= COMMIT_PX ? 1 : 0;
+      if (past !== armed.get()) {
+        armed.set(past);
+        runOnJS(tickHaptic)();
+      }
+    })
+    .onEnd((event) => {
+      'worklet';
+      armed.set(0);
+      const past = event.translationX >= COMMIT_PX;
+      if (past) {
+        runOnJS(commitHaptic)();
+        // Spring the row back to rest — the spinner takes over visual
+        // feedback while reclaim runs. The list-item exit animation
+        // fires once reclaim completes and the row leaves the bucket.
+        translateX.set(withSpring(0, SPRING));
+        runOnJS(onCommit)();
+      } else {
+        translateX.set(withSpring(0, SPRING));
+      }
+    });
 
   const rowStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.get() }],

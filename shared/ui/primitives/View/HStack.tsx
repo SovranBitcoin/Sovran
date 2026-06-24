@@ -16,7 +16,7 @@ type HStackProps = ViewProps & {
   flexBasis?: DimensionValue;
 };
 
-const HStack = React.forwardRef<any, HStackProps>((props, ref) => {
+const HStack = React.forwardRef<React.ElementRef<typeof View>, HStackProps>((props, ref) => {
   const {
     spacing,
     gap,

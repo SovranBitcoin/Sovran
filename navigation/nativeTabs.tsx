@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
@@ -132,7 +133,7 @@ export function buildExpoRouterHeaderOptions({
   const nextOptions: NativeStackNavigationOptions = {
     ...(options || {}),
   };
-  const resolvedIconColor = iconColor ?? '#FFFFFF';
+  const resolvedIconColor = iconColor ?? INVARIANT_WHITE;
 
   if (Platform.OS === 'android') {
     nextOptions.headerShadowVisible = nextOptions.headerShadowVisible ?? false;

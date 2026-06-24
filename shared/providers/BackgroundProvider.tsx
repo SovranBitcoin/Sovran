@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 import { useSharedValue, withTiming, SharedValue, Easing } from 'react-native-reanimated';
 import { useFocusEffect } from 'expo-router';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
@@ -109,73 +109,61 @@ export function BackgroundProvider({ children }: BackgroundProviderProps) {
   const backgroundOpacity = useSharedValue(1);
   const backgroundColor = useSharedValue(''); // Empty string means use theme default (primary-900)
 
-  const setConfig = useCallback(
-    (config: BackgroundConfig) => {
-      // Map blur mode to number
-      const modeMap: Record<BlurMode, number> = {
-        none: 0,
-        partial: 1,
-        full: 2,
-        gradient: 3,
-      };
-      const targetMode = modeMap[config.blurMode];
-      const bgOpacity = config.backgroundOpacity ?? 1;
+  const setConfig = (config: BackgroundConfig) => {
+    // Map blur mode to number
+    const modeMap: Record<BlurMode, number> = {
+      none: 0,
+      partial: 1,
+      full: 2,
+      gradient: 3,
+    };
+    const targetMode = modeMap[config.blurMode];
+    const bgOpacity = config.backgroundOpacity ?? 1;
 
-      // Skip if mode and opacity haven't changed — avoids redundant animations on tab refocus
-      if (blurMode.value === targetMode && backgroundOpacity.value === bgOpacity) {
-        return;
-      }
+    // Skip if mode and opacity haven't changed — avoids redundant animations on tab refocus
+    if (blurMode.value === targetMode && backgroundOpacity.value === bgOpacity) {
+      return;
+    }
 
-      log.info('bg.blur.transition', {
-        blurMode: config.blurMode,
-        backgroundOpacity: bgOpacity,
-        animationMs: ANIMATION_CONFIG.duration,
-      });
-      const defaults = DEFAULT_CONFIGS[config.blurMode];
-      const intensity = config.blurIntensity ?? defaults.blurIntensity;
-      const gradientStart = config.blurGradientStart ?? defaults.blurGradientStart;
-      const gradientEnd = config.blurGradientEnd ?? defaults.blurGradientEnd;
-      const bgColor = config.backgroundColor ?? ''; // Empty string = use theme default
+    log.info('bg.blur.transition', {
+      blurMode: config.blurMode,
+      backgroundOpacity: bgOpacity,
+      animationMs: ANIMATION_CONFIG.duration,
+    });
+    const defaults = DEFAULT_CONFIGS[config.blurMode];
+    const intensity = config.blurIntensity ?? defaults.blurIntensity;
+    const gradientStart = config.blurGradientStart ?? defaults.blurGradientStart;
+    const gradientEnd = config.blurGradientEnd ?? defaults.blurGradientEnd;
+    const bgColor = config.backgroundColor ?? ''; // Empty string = use theme default
 
-      // Animate to new values
-      blurMode.value = targetMode;
-      blurIntensity.value = withTiming(intensity, ANIMATION_CONFIG);
-      blurGradientStart.value = withTiming(gradientStart, ANIMATION_CONFIG);
-      blurGradientEnd.value = withTiming(gradientEnd, ANIMATION_CONFIG);
-      backgroundOpacity.value = withTiming(bgOpacity, ANIMATION_CONFIG);
-      backgroundColor.value = bgColor; // Color changes instantly (no animation)
+    // Animate to new values
+    blurMode.value = targetMode;
+    blurIntensity.value = withTiming(intensity, ANIMATION_CONFIG);
+    blurGradientStart.value = withTiming(gradientStart, ANIMATION_CONFIG);
+    blurGradientEnd.value = withTiming(gradientEnd, ANIMATION_CONFIG);
+    backgroundOpacity.value = withTiming(bgOpacity, ANIMATION_CONFIG);
+    backgroundColor.value = bgColor; // Color changes instantly (no animation)
 
-      // Animate opacity based on mode
-      switch (config.blurMode) {
-        case 'none':
-          partialBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
-          fullBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
-          break;
-        case 'partial':
-          partialBlurOpacity.value = withTiming(1, ANIMATION_CONFIG);
-          fullBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
-          break;
-        case 'full':
-          partialBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
-          fullBlurOpacity.value = withTiming(1, ANIMATION_CONFIG);
-          break;
-        case 'gradient':
-          partialBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
-          fullBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
-          break;
-      }
-    },
-    [
-      blurMode,
-      blurIntensity,
-      blurGradientStart,
-      blurGradientEnd,
-      partialBlurOpacity,
-      fullBlurOpacity,
-      backgroundOpacity,
-      backgroundColor,
-    ]
-  );
+    // Animate opacity based on mode
+    switch (config.blurMode) {
+      case 'none':
+        partialBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
+        fullBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
+        break;
+      case 'partial':
+        partialBlurOpacity.value = withTiming(1, ANIMATION_CONFIG);
+        fullBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
+        break;
+      case 'full':
+        partialBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
+        fullBlurOpacity.value = withTiming(1, ANIMATION_CONFIG);
+        break;
+      case 'gradient':
+        partialBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
+        fullBlurOpacity.value = withTiming(0, ANIMATION_CONFIG);
+        break;
+    }
+  };
 
   const value: BackgroundContextValue = {
     blurMode,
@@ -210,19 +198,9 @@ export function useBackgroundContext() {
 export function useBackgroundConfig(config: BackgroundConfig) {
   const context = useContext(BackgroundContext);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (context) {
-        context.setConfig(config);
-      }
-    }, [
-      context,
-      config.blurMode,
-      config.blurIntensity,
-      config.blurGradientStart,
-      config.blurGradientEnd,
-      config.backgroundOpacity,
-      config.backgroundColor,
-    ])
-  );
+  useFocusEffect(() => {
+    if (context) {
+      context.setConfig(config);
+    }
+  });
 }

@@ -168,7 +168,7 @@ export function useBLEPeers(): UseBLEPeersResult {
     };
   }, [identityMaterial, nickname, profileScope, creq, refresh]);
 
-  const connectedCount = useMemo(() => peers.filter((p) => p.isConnected).length, [peers]);
+  const connectedCount = peers.filter((p) => p.isConnected).length;
 
   return { peers, connectedCount, refresh };
 }

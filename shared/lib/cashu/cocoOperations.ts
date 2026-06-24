@@ -1,13 +1,7 @@
 import type { Manager } from '@cashu/coco-core';
 
 import { cashuLog } from '@/shared/lib/logger';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 type PreparedBolt11MintOperation = Awaited<ReturnType<Manager['ops']['mint']['prepare']>>;
 type PreparedBolt11MeltOperation = Awaited<ReturnType<Manager['ops']['melt']['prepare']>>;

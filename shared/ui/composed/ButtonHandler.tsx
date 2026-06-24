@@ -54,7 +54,7 @@
  * @see {@link ./View}
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
 import { Menu, type MenuTriggerRef } from 'heroui-native';
 import { Log, log } from '@/shared/lib/logger';
@@ -152,6 +152,21 @@ export interface ButtonHandlerProps {
  *   ]}
  * />
  */
+// The Menu closes itself on select (shouldCloseOnSelect default); keep
+// async action failures contained so overflow actions do not surface as
+// unhandled promise rejections on Android.
+const handleMenuItemPress = async (button: ButtonHandlerActionButton): Promise<void> => {
+  if (button.disabled) return;
+  try {
+    await button.onPress?.();
+  } catch (error) {
+    log.error('ui.button_handler.menu_action_failed', {
+      testID: button.testID,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
 export function ButtonHandler({
   context: _context,
   buttons,
@@ -182,23 +197,8 @@ export function ButtonHandler({
   // invisible ref-backed Trigger + `.open()` from the visible button's
   // onPress.
   const moreMenuTriggerRef = useRef<MenuTriggerRef>(null);
-  const openMoreMenu = useCallback(() => {
+  const openMoreMenu = () => {
     setTimeout(() => moreMenuTriggerRef.current?.open(), 0);
-  }, []);
-
-  // The Menu closes itself on select (shouldCloseOnSelect default); keep
-  // async action failures contained so overflow actions do not surface as
-  // unhandled promise rejections on Android.
-  const handleMenuItemPress = async (button: ButtonHandlerActionButton): Promise<void> => {
-    if (button.disabled) return;
-    try {
-      await button.onPress?.();
-    } catch (error) {
-      log.error('ui.button_handler.menu_action_failed', {
-        testID: button.testID,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
   };
 
   // The inner shared `Button` already routes its onPress through

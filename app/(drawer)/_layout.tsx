@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import {
   GestureHandlerRootView,
@@ -188,38 +188,32 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
     prevStatusRef.current = drawerStatus;
   }, [drawerStatus]);
 
-  const isRouteActive = useCallback(
-    (route: MenuRoute) => {
-      const item = MENU_ITEMS.find((m) => m.route === route);
-      if (!item) return false;
-      return segmentsMatch(segments as string[], item.activeSegments);
-    },
-    [segments]
-  );
+  const isRouteActive = (route: MenuRoute) => {
+    const item = MENU_ITEMS.find((m) => m.route === route);
+    if (!item) return false;
+    return segmentsMatch(segments as string[], item.activeSegments);
+  };
 
-  const handleNavigation = useCallback(
-    (route: MenuRoute) => {
-      if (navInProgressRef.current) return;
-      const item = MENU_ITEMS.find((m) => m.route === route);
-      const active = item
-        ? segmentsMatch(segmentsRef.current as string[], item.activeSegments)
-        : false;
-      if (active) {
-        props.navigation.closeDrawer();
-        return;
-      }
-      navInProgressRef.current = true;
-      router.navigate(route);
+  const handleNavigation = (route: MenuRoute) => {
+    if (navInProgressRef.current) return;
+    const item = MENU_ITEMS.find((m) => m.route === route);
+    const active = item
+      ? segmentsMatch(segmentsRef.current as string[], item.activeSegments)
+      : false;
+    if (active) {
       props.navigation.closeDrawer();
-      setTimeout(() => {
-        navInProgressRef.current = false;
-      }, 400);
-    },
-    [props.navigation]
-  );
+      return;
+    }
+    navInProgressRef.current = true;
+    router.navigate(route);
+    props.navigation.closeDrawer();
+    setTimeout(() => {
+      navInProgressRef.current = false;
+    }, 400);
+  };
 
   const surface = useThemeColor('surface');
-  const closeDrawer = useCallback(() => props.navigation.closeDrawer(), [props.navigation]);
+  const closeDrawer = () => props.navigation.closeDrawer();
 
   return (
     <View style={{ flex: 1, backgroundColor: surface }}>

@@ -4,6 +4,7 @@ import type { Mint } from '@cashu/coco-core';
 import { useManager } from '@cashu/coco-react';
 import { log } from '@/shared/lib/logger';
 import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 // Module-level in-flight dedupe. Multiple components that use this hook
 // (ContactsScreen, settings recovery, mint screens) each kick off their
@@ -13,13 +14,6 @@ import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
 // down to one call; each consumer still gets its own React state, but
 // reads from the shared result.
 let inflightLoad: Promise<Mint[]> | null = null;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 /**
  * Subscribes to the trusted-mints list and re-exposes `getMintInfo` behind
@@ -68,21 +62,23 @@ export function useMintManagement() {
     [manager]
   );
 
+  // Kept as a useCallback (NOT removed by the React-Compiler memo sweep):
+  // `getMintInfo` is consumed as a useEffect dependency in CONSUMER hooks
+  // (useMintInfo.ts, useMintContacts.ts). A fresh identity each render would
+  // re-fire those effects every render, re-polling the SWR cache. This is the
+  // effect-dependency escape hatch React's compiler guidance says to keep.
   const getMintInfo = useCallback(
     async (mintUrl: string) => {
       try {
-        log.debug('mint.info.fetch.start', { ...mintUrlLogFields(mintUrl) });
         // SWR through `mintInfoCache`: cached fresh resolves instantly, stale
         // resolves with the prior value and refreshes in the background, miss
         // awaits coco's `getMintInfo` (which itself blocks on HTTP only when
-        // its own 5-minute window has expired).
-        const info = await getCachedMintInfo((url) => manager.mint.getMintInfo(url), mintUrl);
-        log.debug('mint.info.fetch.success', {
-          ...mintUrlLogFields(mintUrl),
-          hasName: typeof info.name === 'string' && info.name.length > 0,
-          hasNuts: !!info.nuts,
-        });
-        return info;
+        // its own 5-minute window has expired). The cache layer already logs
+        // the hit/miss/fetch outcome (`store.mint_info.*`); we don't re-log
+        // start/success per call here — across many mint rows it was ~31% of
+        // all log volume (a fresh cache read resolves instantly yet still
+        // logged "success"). Only a genuine failure is worth recording.
+        return await getCachedMintInfo((url) => manager.mint.getMintInfo(url), mintUrl);
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to get mint info');
         log.error('mint.info.fetch.error', { ...mintUrlLogFields(mintUrl), error });

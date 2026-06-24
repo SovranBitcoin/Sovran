@@ -7,7 +7,7 @@
  */
 import { tryNeventEncode } from '@/features/feed/components/nostr/feedParse';
 
-export interface ShareLinks {
+interface ShareLinks {
   nevent: string;
   /** NIP-21 `nostr:nevent…`. */
   nostrUri: string;

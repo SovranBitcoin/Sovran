@@ -133,7 +133,7 @@ export function lockableMintsFromCreq(
     return null;
   }
   const expected = `02${nostrPubkeyHex}`.toLowerCase();
-  if (!parsed.lockPubkey33 || parsed.lockPubkey33.toLowerCase() !== expected) {
+  if (parsed.lockPubkey33?.toLowerCase() !== expected) {
     cashuLog.debug('cashu.creq.lockable.rejected', {
       reason: 'lock-mismatch',
       creqLength: creq.length,

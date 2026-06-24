@@ -5,7 +5,7 @@
  * resolver) fetches their posts, rendered read-only with `PostCard` — tapping a
  * post opens its thread.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { List } from '@/shared/ui/composed/List';
@@ -102,47 +102,38 @@ export function SearchPostsList({ pubkeys }: { pubkeys: string[] }) {
     [metricsMap]
   );
 
-  const renderItem = useCallback(
-    ({ item }: { item: FeedItem }) => {
-      if (item.type !== 'note') return null;
-      return (
-        <PostCard
-          variant="feed"
-          event={item.event}
-          metrics={getMetrics(item.event.id)}
-          quotedEvents={quotedMap}
-          profiles={profilesMap}
-          getMetrics={getMetrics}
-          showFooterBorder
-        />
-      );
-    },
-    [getMetrics, profilesMap, quotedMap]
-  );
+  const renderItem = ({ item }: { item: FeedItem }) => {
+    if (item.type !== 'note') return null;
+    return (
+      <PostCard
+        variant="feed"
+        event={item.event}
+        metrics={getMetrics(item.event.id)}
+        quotedEvents={quotedMap}
+        profiles={profilesMap}
+        getMetrics={getMetrics}
+        showFooterBorder
+      />
+    );
+  };
 
-  const renderEmptyPeople = useMemo(
-    () => (
-      <View style={styles.center}>
-        <EmptyState
-          icon="mdi:magnify"
-          title="No people found"
-          subtitle="Search for people to see their recent posts."
-        />
-      </View>
-    ),
-    []
+  const renderEmptyPeople = (
+    <View style={styles.center}>
+      <EmptyState
+        icon="mdi:magnify"
+        title="No people found"
+        subtitle="Search for people to see their recent posts."
+      />
+    </View>
   );
-  const renderEmptyPosts = useMemo(
-    () => (
-      <View style={styles.center}>
-        <EmptyState
-          icon="mdi:message-text"
-          title="No posts"
-          subtitle="The people matching your search haven't posted recently."
-        />
-      </View>
-    ),
-    []
+  const renderEmptyPosts = (
+    <View style={styles.center}>
+      <EmptyState
+        icon="mdi:message-text"
+        title="No posts"
+        subtitle="The people matching your search haven't posted recently."
+      />
+    </View>
   );
 
   if (pubkeys.length === 0) {

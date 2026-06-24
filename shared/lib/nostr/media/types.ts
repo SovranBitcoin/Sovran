@@ -30,8 +30,3 @@ export interface MediaDescriptor {
   sensitive?: boolean;
   blurhash?: string;
 }
-
-export interface UploadProgress {
-  /** 0..1 fraction uploaded. */
-  fraction: number;
-}

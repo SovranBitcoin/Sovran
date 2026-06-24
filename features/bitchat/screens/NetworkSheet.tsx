@@ -6,7 +6,7 @@
  * same info density: nickname, connection state, last-seen, antenna icon.
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -63,6 +63,12 @@ function PeerRow({ peer }: PeerRowProps) {
   );
 }
 
+const handleClose = () => {
+  router.back();
+};
+const keyExtractor = (peer: BLEPeer) => peer.peerID;
+const renderPeerItem = ({ item }: { item: BLEPeer }) => <PeerRow peer={item} />;
+
 export default function NetworkSheet() {
   useLifecycleLogger('BitchatNetworkSheet', bitchatLog);
   const [foreground, surfaceSecondary] = useThemeColor([
@@ -78,24 +84,16 @@ export default function NetworkSheet() {
   // through the mesh-flood spool (which expires after 15s). Surface this
   // distinction in both the sort order and the header count so users don't
   // think "5 connected" means "5 reachable for DM".
-  const directLinkCount = useMemo(() => peers.filter((p) => p.hasDirectLink).length, [peers]);
+  const directLinkCount = peers.filter((p) => p.hasDirectLink).length;
 
   // Sort: direct-link first, then mesh-reachable, then offline; ties broken
   // by lastSeen desc. Matches upstream's MeshPeerList preference for "best
   // reachability first".
-  const sortedPeers = useMemo(() => {
-    return [...peers].sort((a, b) => {
-      if (a.hasDirectLink !== b.hasDirectLink) return a.hasDirectLink ? -1 : 1;
-      if (a.isConnected !== b.isConnected) return a.isConnected ? -1 : 1;
-      return b.lastSeen - a.lastSeen;
-    });
-  }, [peers]);
-
-  const handleClose = useCallback(() => {
-    router.back();
-  }, []);
-  const keyExtractor = useCallback((peer: BLEPeer) => peer.peerID, []);
-  const renderPeerItem = useCallback(({ item }: { item: BLEPeer }) => <PeerRow peer={item} />, []);
+  const sortedPeers = [...peers].sort((a, b) => {
+    if (a.hasDirectLink !== b.hasDirectLink) return a.hasDirectLink ? -1 : 1;
+    if (a.isConnected !== b.isConnected) return a.isConnected ? -1 : 1;
+    return b.lastSeen - a.lastSeen;
+  });
 
   const subtitleText = useMemo(() => {
     if (bluetoothBlocked) return 'Bluetooth unavailable';

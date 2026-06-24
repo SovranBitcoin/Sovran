@@ -9,7 +9,7 @@
  * profile still resolves.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useManager } from '@cashu/coco-react';
 import type { MintCatalogEntry } from '@sovranbitcoin/colada';
 
@@ -25,7 +25,7 @@ export function useMintCatalog(mintUrls: string[]): Record<string, MintCatalogEn
 
   // Stable key collapses array-identity churn so callers can pass a fresh
   // array reference each render without retriggering the fetch.
-  const key = useMemo(() => [...mintUrls].sort().join('|'), [mintUrls]);
+  const key = [...mintUrls].sort().join('|');
 
   useEffect(() => {
     if (mintUrls.length === 0 || !manager) {

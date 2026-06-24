@@ -26,7 +26,7 @@ export function selectFeedEmptyMode(signals: FeedEmptySignals): FeedEmptyMode {
   return 'empty';
 }
 
-export interface FeedEmptyCopy {
+interface FeedEmptyCopy {
   icon: string;
   title: string;
   subtitle: string;

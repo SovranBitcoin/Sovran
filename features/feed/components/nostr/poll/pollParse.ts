@@ -35,9 +35,13 @@ function tagsOf(event: EventLike): string[][] {
 /** Parses a kind:1068 event into a poll definition. */
 export function parsePoll(event: EventLike): PollDefinition {
   const tags = tagsOf(event);
-  const options = tags
-    .filter((t) => t[0] === 'option' && typeof t[1] === 'string')
-    .map((t) => ({ id: t[1], label: typeof t[2] === 'string' ? t[2] : '' }));
+  // Single pass: keep `option` tags with a string id and project to {id,label}.
+  const options: PollDefinition['options'] = [];
+  for (const t of tags) {
+    if (t[0] === 'option' && typeof t[1] === 'string') {
+      options.push({ id: t[1], label: typeof t[2] === 'string' ? t[2] : '' });
+    }
+  }
 
   const pollTypeTag = tags.find((t) => t[0] === 'polltype')?.[1];
   const pollType: PollType = pollTypeTag === 'multiplechoice' ? 'multiplechoice' : 'singlechoice';
@@ -45,7 +49,10 @@ export function parsePoll(event: EventLike): PollDefinition {
   const endsAtRaw = tags.find((t) => t[0] === 'endsAt')?.[1];
   const endsAt = endsAtRaw && /^\d+$/.test(endsAtRaw) ? Number(endsAtRaw) : undefined;
 
-  const relays = tags.filter((t) => t[0] === 'relay' && typeof t[1] === 'string').map((t) => t[1]);
+  const relays: string[] = [];
+  for (const t of tags) {
+    if (t[0] === 'relay' && typeof t[1] === 'string') relays.push(t[1]);
+  }
 
   return {
     id: event.id ?? '',

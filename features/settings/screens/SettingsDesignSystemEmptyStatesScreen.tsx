@@ -11,7 +11,7 @@ import { EmptyState } from '@/shared/ui/composed/EmptyState';
  * single `EmptyState` component so they stay visually consistent. Adding a new
  * empty surface? Add its variant here and reuse `EmptyState` on the screen.
  */
-const EMPTY_STATES: Array<{ section: string; icon: string; title: string; subtitle?: string }> = [
+const EMPTY_STATES: { section: string; icon: string; title: string; subtitle?: string }[] = [
   {
     section: 'Feed',
     icon: 'mdi:message-text',

@@ -29,6 +29,14 @@ import {
 } from 'react-native';
 
 import { feedLog, monotonicNow } from '@/shared/lib/logger';
+import {
+  type LayoutRect,
+  rectBottom,
+  rectOverlap,
+  rectRight,
+  validRect,
+  viewportFlags,
+} from './contentShiftGeometry';
 
 /** Sub-pixel layout deltas are noise from rounding, not a visible shift. */
 const SHIFT_EPSILON = 0.5;
@@ -88,13 +96,6 @@ export function visualLayoutScopePart(value: string | undefined): string {
   const normalized = (value ?? 'default').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 48);
   return normalized || 'default';
 }
-
-type LayoutRect = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
 
 type MeasureableNode = {
   measureInWindow?: (cb: (x: number, y: number, width: number, height: number) => void) => void;
@@ -233,7 +234,7 @@ type VisualScrollMetricsConfig = {
   extra?: VisualExtra;
 };
 
-type VisualScrollMetricsReporter = {
+export type VisualScrollMetricsReporter = {
   onContentSizeChange: (width: number, height: number) => void;
   onLayout: (event: LayoutChangeEvent) => void;
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
@@ -358,37 +359,6 @@ function resolveExtra(extra: VisualExtra | undefined): Record<string, unknown> {
   return extra;
 }
 
-function validRect(rect: LayoutRect): boolean {
-  return (
-    Number.isFinite(rect.x) &&
-    Number.isFinite(rect.y) &&
-    Number.isFinite(rect.width) &&
-    Number.isFinite(rect.height)
-  );
-}
-
-function rectBottom(rect: LayoutRect): number {
-  return rect.y + rect.height;
-}
-
-function rectRight(rect: LayoutRect): number {
-  return rect.x + rect.width;
-}
-
-function verticalOverlap(a: LayoutRect, b: LayoutRect): number {
-  return Math.min(rectBottom(a), rectBottom(b)) - Math.max(a.y, b.y);
-}
-
-function horizontalOverlap(a: LayoutRect, b: LayoutRect): number {
-  return Math.min(rectRight(a), rectRight(b)) - Math.max(a.x, b.x);
-}
-
-function rectOverlap(a: LayoutRect, b: LayoutRect): { x: number; y: number; area: number } {
-  const x = horizontalOverlap(a, b);
-  const y = verticalOverlap(a, b);
-  return { x, y, area: x > 0 && y > 0 ? x * y : 0 };
-}
-
 function findOverlaps(
   scope: string,
   itemKey: string,
@@ -485,35 +455,6 @@ function findContainerViolations(
   }
 
   return violations;
-}
-
-function viewportFlags(rect: LayoutRect, viewport: { width: number; height: number }) {
-  const bottom = rectBottom(rect);
-  const right = rectRight(rect);
-  const visible =
-    rect.width > 0 &&
-    rect.height > 0 &&
-    bottom >= 0 &&
-    rect.y <= viewport.height &&
-    right >= 0 &&
-    rect.x <= viewport.width;
-  const farOutsideY = rect.y < -viewport.height * 2 || rect.y > viewport.height * 3;
-  const farOutsideX = rect.x < -viewport.width * 2 || rect.x > viewport.width * 3;
-  const absurdHeight = rect.height > viewport.height * 3;
-  const absurdWidth = rect.width > viewport.width * 3;
-  const zeroArea = rect.width <= 0 || rect.height <= 0;
-  return {
-    visible,
-    offscreenTop: bottom < 0,
-    offscreenBottom: rect.y > viewport.height,
-    offscreenLeft: right < 0,
-    offscreenRight: rect.x > viewport.width,
-    farOutsideY,
-    farOutsideX,
-    absurdHeight,
-    absurdWidth,
-    zeroArea,
-  };
 }
 
 function scopeRecords(scope: string): Map<string, VisualRecord> {
@@ -1096,44 +1037,38 @@ export function useVisualListLogger<ItemT>(
     };
   }, []);
 
-  const onItemSizeChanged = useCallback(
-    (info: VisualListItemSizeInfo<ItemT>) => {
-      const current = configRef.current;
-      if (!visualLoggingEnabled(current.enabled)) return;
-      const itemKey = current.getItemKey?.(info.itemData, info.index, info.itemKey) ?? info.itemKey;
-      const state = current.getListState?.() ?? null;
-      const delta = info.size - info.previous;
-      const firstMeasure = info.previous <= 0;
-      const sizeJump = !firstMeasure && Math.abs(delta) >= VISUAL_LIST_SIZE_JUMP_WARN_PX;
-      const invalidSize = !Number.isFinite(info.size) || info.size <= 0;
-      const params = {
-        ...baseParams(),
-        key: safeLogKey(itemKey),
-        index: info.index,
-        itemSize: round(info.size),
-        previousItemSize: firstMeasure ? null : round(info.previous),
-        deltaItemSize: firstMeasure ? null : round(delta),
-        firstMeasure,
-        sizeJump,
-        invalidSize,
-        ...visualVirtualMetrics(state, itemKey, info.index),
-        ...current.getItemContext?.(info.itemData, info.index),
-      };
-      feedLog[sizeJump || invalidSize ? 'warn' : 'info']('visual.layout.item_size_changed', params);
-    },
-    [baseParams]
-  );
+  const onItemSizeChanged = (info: VisualListItemSizeInfo<ItemT>) => {
+    const current = configRef.current;
+    if (!visualLoggingEnabled(current.enabled)) return;
+    const itemKey = current.getItemKey?.(info.itemData, info.index, info.itemKey) ?? info.itemKey;
+    const state = current.getListState?.() ?? null;
+    const delta = info.size - info.previous;
+    const firstMeasure = info.previous <= 0;
+    const sizeJump = !firstMeasure && Math.abs(delta) >= VISUAL_LIST_SIZE_JUMP_WARN_PX;
+    const invalidSize = !Number.isFinite(info.size) || info.size <= 0;
+    const params = {
+      ...baseParams(),
+      key: safeLogKey(itemKey),
+      index: info.index,
+      itemSize: round(info.size),
+      previousItemSize: firstMeasure ? null : round(info.previous),
+      deltaItemSize: firstMeasure ? null : round(delta),
+      firstMeasure,
+      sizeJump,
+      invalidSize,
+      ...visualVirtualMetrics(state, itemKey, info.index),
+      ...current.getItemContext?.(info.itemData, info.index),
+    };
+    feedLog[sizeJump || invalidSize ? 'warn' : 'info']('visual.layout.item_size_changed', params);
+  };
 
-  const onLoad = useCallback(
-    (info: VisualListLoadInfo) => {
-      if (!visualLoggingEnabled(configRef.current.enabled)) return;
-      feedLog.info('visual.layout.list_load', {
-        ...baseParams(),
-        elapsedMs: round(info.elapsedTimeInMs),
-      });
-    },
-    [baseParams]
-  );
+  const onLoad = (info: VisualListLoadInfo) => {
+    if (!visualLoggingEnabled(configRef.current.enabled)) return;
+    feedLog.info('visual.layout.list_load', {
+      ...baseParams(),
+      elapsedMs: round(info.elapsedTimeInMs),
+    });
+  };
 
   const onMetricsChange = useCallback(
     (metrics: VisualListMetrics) => {
@@ -1185,80 +1120,74 @@ export function useVisualListLogger<ItemT>(
     [baseParams]
   );
 
-  const onStickyHeaderChange = useCallback(
-    (info: VisualStickyHeaderInfo<ItemT>) => {
-      const current = configRef.current;
-      if (!visualLoggingEnabled(current.enabled)) return;
-      const fallbackKey = `sticky:${info.index}`;
-      const itemContext = current.getItemContext?.(info.item, info.index) ?? {};
-      const itemKey =
-        current.getItemKey?.(info.item, info.index, fallbackKey) ??
-        contextRowKey(itemContext) ??
-        fallbackKey;
-      const state = current.getListState?.() ?? null;
-      const params = {
-        ...baseParams(),
-        index: info.index,
-        key: safeLogKey(itemKey),
-        ...visualListStateSnapshot(state),
-        ...visualVirtualMetrics(state, itemKey, info.index),
-        ...safeContextKeys(itemContext),
-      };
-      feedLog.info('visual.layout.sticky_header', params);
-      requestAnimationFrame(() => {
-        remeasureVisualLayoutScope(current.scope, 'sticky-header', {
-          minIntervalMs: 200,
-          maxItems: 40,
-          extra: {
-            stickyIndex: info.index,
-            stickyKey: itemKey,
-            stickyItemType: itemContext.itemType ?? null,
-          },
-        });
+  const onStickyHeaderChange = (info: VisualStickyHeaderInfo<ItemT>) => {
+    const current = configRef.current;
+    if (!visualLoggingEnabled(current.enabled)) return;
+    const fallbackKey = `sticky:${info.index}`;
+    const itemContext = current.getItemContext?.(info.item, info.index) ?? {};
+    const itemKey =
+      current.getItemKey?.(info.item, info.index, fallbackKey) ??
+      contextRowKey(itemContext) ??
+      fallbackKey;
+    const state = current.getListState?.() ?? null;
+    const params = {
+      ...baseParams(),
+      index: info.index,
+      key: safeLogKey(itemKey),
+      ...visualListStateSnapshot(state),
+      ...visualVirtualMetrics(state, itemKey, info.index),
+      ...safeContextKeys(itemContext),
+    };
+    feedLog.info('visual.layout.sticky_header', params);
+    requestAnimationFrame(() => {
+      remeasureVisualLayoutScope(current.scope, 'sticky-header', {
+        minIntervalMs: 200,
+        maxItems: 40,
+        extra: {
+          stickyIndex: info.index,
+          stickyKey: itemKey,
+          stickyItemType: itemContext.itemType ?? null,
+        },
       });
-    },
-    [baseParams]
-  );
+    });
+  };
 
-  const onViewableItemsChanged = useCallback(
-    (info: VisualViewabilityInfo<ItemT>) => {
-      const nowMs = monotonicNow();
-      if (nowMs - lastViewabilityLogAtRef.current < VISUAL_LIST_VIEWABILITY_LOG_INTERVAL_MS) return;
-      lastViewabilityLogAtRef.current = nowMs;
-      const current = configRef.current;
-      if (!visualLoggingEnabled(current.enabled)) return;
-      const state = current.getListState?.() ?? null;
-      const buffered = visualBufferedRangeSummary(state, current, current.scope);
-      const virtualPositionChunks = visualVirtualPositionChunks(state, current, current.scope);
-      feedLog.info('visual.layout.viewability', {
+  const onViewableItemsChanged = (info: VisualViewabilityInfo<ItemT>) => {
+    const nowMs = monotonicNow();
+    if (nowMs - lastViewabilityLogAtRef.current < VISUAL_LIST_VIEWABILITY_LOG_INTERVAL_MS) return;
+    lastViewabilityLogAtRef.current = nowMs;
+    const current = configRef.current;
+    if (!visualLoggingEnabled(current.enabled)) return;
+    const state = current.getListState?.() ?? null;
+    const buffered = visualBufferedRangeSummary(state, current, current.scope);
+    const virtualPositionChunks = visualVirtualPositionChunks(state, current, current.scope);
+    feedLog.info('visual.layout.viewability', {
+      ...baseParams(),
+      ...visualListStateSnapshot(state),
+      start: info.start,
+      end: info.end,
+      startBuffered: info.startBuffered,
+      endBuffered: info.endBuffered,
+      viewableCount: info.viewableItems.length,
+      changedCount: info.changed.length,
+      bufferedCount: buffered.length,
+      viewable: viewTokenSummary(info.viewableItems, current, state),
+      changed: viewTokenSummary(info.changed, current, state),
+      buffered,
+    });
+    for (const chunk of virtualPositionChunks) {
+      feedLog[chunk.summary.virtualAnomaly ? 'warn' : 'info']('visual.layout.virtual_positions', {
         ...baseParams(),
         ...visualListStateSnapshot(state),
-        start: info.start,
-        end: info.end,
-        startBuffered: info.startBuffered,
-        endBuffered: info.endBuffered,
-        viewableCount: info.viewableItems.length,
-        changedCount: info.changed.length,
-        bufferedCount: buffered.length,
-        viewable: viewTokenSummary(info.viewableItems, current, state),
-        changed: viewTokenSummary(info.changed, current, state),
-        buffered,
+        totalRows: chunk.totalRows,
+        chunkIndex: chunk.chunkIndex,
+        chunkCount: chunk.chunkCount,
+        rowCount: chunk.rows.length,
+        ...chunk.summary,
+        rows: chunk.rows,
       });
-      for (const chunk of virtualPositionChunks) {
-        feedLog[chunk.summary.virtualAnomaly ? 'warn' : 'info']('visual.layout.virtual_positions', {
-          ...baseParams(),
-          ...visualListStateSnapshot(state),
-          totalRows: chunk.totalRows,
-          chunkIndex: chunk.chunkIndex,
-          chunkCount: chunk.chunkCount,
-          rowCount: chunk.rows.length,
-          ...chunk.summary,
-          rows: chunk.rows,
-        });
-      }
-    },
-    [baseParams]
-  );
+    }
+  };
 
   return {
     onItemSizeChanged,
@@ -1323,39 +1252,30 @@ export function useVisualScrollMetricsLogger(
     [onMetricsChange]
   );
 
-  const onContentSizeChange = useCallback(
-    (width: number, height: number) => {
-      metricsRef.current.contentWidth = width;
-      metricsRef.current.contentHeight = height;
-      reportNow('content-size');
-    },
-    [reportNow]
-  );
+  const onContentSizeChange = (width: number, height: number) => {
+    metricsRef.current.contentWidth = width;
+    metricsRef.current.contentHeight = height;
+    reportNow('content-size');
+  };
 
-  const onLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      metricsRef.current.viewportWidth = event.nativeEvent.layout.width;
-      metricsRef.current.viewportHeight = event.nativeEvent.layout.height;
-      reportNow('layout');
-    },
-    [reportNow]
-  );
+  const onLayout = (event: LayoutChangeEvent) => {
+    metricsRef.current.viewportWidth = event.nativeEvent.layout.width;
+    metricsRef.current.viewportHeight = event.nativeEvent.layout.height;
+    reportNow('layout');
+  };
 
-  const onScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-      metricsRef.current = {
-        contentHeight: contentSize.height,
-        contentWidth: contentSize.width,
-        offsetX: contentOffset.x,
-        offsetY: contentOffset.y,
-        viewportHeight: layoutMeasurement.height,
-        viewportWidth: layoutMeasurement.width,
-      };
-      reportNow('scroll');
-    },
-    [reportNow]
-  );
+  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    metricsRef.current = {
+      contentHeight: contentSize.height,
+      contentWidth: contentSize.width,
+      offsetX: contentOffset.x,
+      offsetY: contentOffset.y,
+      viewportHeight: layoutMeasurement.height,
+      viewportWidth: layoutMeasurement.width,
+    };
+    reportNow('scroll');
+  };
 
   return { onContentSizeChange, onLayout, onScroll, reportNow };
 }
@@ -1375,9 +1295,9 @@ export function useVisualLayoutLogger(config: VisualLayoutConfig): VisualLayoutR
   configRef.current = config;
   viewportRef.current = viewport;
 
-  const setRef = useCallback((node: MeasureableNode | null) => {
+  const setRef = (node: MeasureableNode | null) => {
     nodeRef.current = node;
-  }, []);
+  };
 
   const measureNow = useCallback((reason: string, extraOverride?: Record<string, unknown>) => {
     const node = nodeRef.current;
@@ -1521,15 +1441,12 @@ export function useVisualLayoutLogger(config: VisualLayoutConfig): VisualLayoutR
     });
   }, []);
 
-  const onLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      if (!visualLoggingEnabled(configRef.current.enabled)) return;
-      const { x, y, width, height } = event.nativeEvent.layout;
-      localRectRef.current = { x, y, width, height };
-      measureNow('layout');
-    },
-    [measureNow]
-  );
+  const onLayout = (event: LayoutChangeEvent) => {
+    if (!visualLoggingEnabled(configRef.current.enabled)) return;
+    const { x, y, width, height } = event.nativeEvent.layout;
+    localRectRef.current = { x, y, width, height };
+    measureNow('layout');
+  };
 
   useEffect(() => {
     const current = configRef.current;

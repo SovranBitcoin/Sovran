@@ -10,7 +10,7 @@ import type {
 } from './feedTypes';
 import { DEFAULT_METRICS } from './feedTypes';
 import type { ImageOverlayPost } from './image-overlay/types';
-import { URL_REGEX, VIDEO_EXT, normalizeFeedEvent, parseContent, parseJson } from './feedParse';
+import { URL_REGEX, VIDEO_EXT, parseContent } from './feedParse';
 
 export const MAX_VIDEO_FEED_PAGES = 20;
 
@@ -42,17 +42,6 @@ export function buildDedupedVideoPosts(events: FeedEvent[]): VideoPostRecord[] {
     });
   }
   return result;
-}
-
-export function getEmbeddedRepostEvent(
-  repostEvent: FeedEvent,
-  expectedEventId?: string
-): FeedEvent | undefined {
-  if (!repostEvent.content) return undefined;
-  const parsed = normalizeFeedEvent(parseJson<unknown>(repostEvent.content));
-  if (!parsed) return undefined;
-  if (expectedEventId && parsed.id !== expectedEventId) return undefined;
-  return parsed;
 }
 
 /**

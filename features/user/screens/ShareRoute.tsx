@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 
@@ -36,7 +36,7 @@ export default function ShareRoute() {
   const [headerTitle, setHeaderTitle] = useState<string>(
     SHARE_CONFIGS[type]?.title ?? 'Share Profile'
   );
-  const handleTitleChange = useCallback((title: string) => setHeaderTitle(title), []);
+  const handleTitleChange = (title: string) => setHeaderTitle(title);
 
   if (!parsed) return null;
 

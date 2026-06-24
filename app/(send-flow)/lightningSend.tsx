@@ -3,7 +3,7 @@
  */
 
 import { LightningSendRoute } from '@/features/send';
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { cashuLog } from '@/shared/lib/logger';
@@ -19,10 +19,10 @@ export default function LightningSendRouteWrapper() {
     });
   }, [walletContext.mintBalances, walletContext.trustedMintUrls.length]);
 
-  const handleRequestMintList = useCallback(() => {
+  const handleRequestMintList = () => {
     cashuLog.info('send.lightning.mint_list.requested', { source: 'pill' });
     void machine.requestMintSelector();
-  }, [machine]);
+  };
 
   return (
     <LightningSendRoute where="send-flow.lightningSend" onRequestMintList={handleRequestMintList} />

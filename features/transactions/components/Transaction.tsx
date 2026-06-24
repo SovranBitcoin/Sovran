@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import Animated, { Easing, LinearTransition } from 'react-native-reanimated';
 
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
@@ -119,7 +119,7 @@ const useTransactionRow = (historyEntry: HistoryEntry) => {
     { displayAs: 'usd' }
   );
 
-  const handlePress = useCallback((): void => {
+  const handlePress = (): void => {
     log.debug('transaction.press', { type: historyEntry.type, id: historyEntry.id });
     const serializedHistoryEntry = JSON.stringify(historyEntry);
     const entryState =
@@ -193,7 +193,7 @@ const useTransactionRow = (historyEntry: HistoryEntry) => {
         return;
       }
     }
-  }, [historyEntry]);
+  };
 
   return {
     isSend,

@@ -66,6 +66,7 @@ export const StyledText = ({
   secondary,
   negative,
   custom,
+  // eslint-disable-next-line no-restricted-syntax -- decorative default gradient for the optional `custom` gradient-text variant; callers override via the `colors` prop. Theme-invariant by design.
   colors = ['#4c669f', '#3b5998', '#192f6a'],
   style,
   children,
@@ -358,20 +359,14 @@ function TextLoadingPlaceholder({
       ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
     }),
   });
-  const handleLayout = React.useCallback(
-    (event: LayoutChangeEvent) => {
-      layout.onLayout(event);
-    },
-    [layout]
-  );
+  const handleLayout = (event: LayoutChangeEvent) => {
+    layout.onLayout(event);
+  };
   const loadingBarStyle = React.useMemo<StyleProp<ViewStyle>>(
     () => [loadingInsetStyle, { borderRadius: 4, backgroundColor: loadingColor }],
     [loadingColor]
   );
-  const hiddenTextCompositeStyle = React.useMemo(
-    () => [textProps.style, hiddenTextStyle],
-    [textProps.style]
-  );
+  const hiddenTextCompositeStyle = [textProps.style, hiddenTextStyle];
 
   return (
     <View

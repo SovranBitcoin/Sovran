@@ -143,7 +143,7 @@ function measureWithTimeout(
   });
 }
 
-export type ImageOverlayProviderProps = {
+type ImageOverlayProviderProps = {
   children: React.ReactNode;
   /** When provided, overlay panel shows live metrics (optimistic counts) for the active post. */
   getDisplayMetrics?: (eventId: string) => NoteMetrics;
@@ -441,7 +441,7 @@ export function ImageOverlayProvider({
 
       const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
       const types =
-        layout.mediaTypes && layout.mediaTypes.length === urls.length
+        layout.mediaTypes?.length === urls.length
           ? layout.mediaTypes
           : urls.map((u) => inferMediaType(u));
       // Videos render at natural aspect via contentFit=contain inside the
@@ -631,7 +631,7 @@ export function ImageOverlayProvider({
 
       const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
       const types =
-        layout.mediaTypes && layout.mediaTypes.length === urls.length
+        layout.mediaTypes?.length === urls.length
           ? layout.mediaTypes
           : urls.map((u) => inferMediaType(u));
       // See open() above — a multi-item pager (video, or more than one image)

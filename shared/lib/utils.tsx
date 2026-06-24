@@ -196,47 +196,55 @@ export function cn(...inputs: ClassValue[]) {
 export const compose = (
   providers: (
     | React.FC<{ children: React.ReactNode }>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic provider composition: provider components/props are heterogeneous
     | React.ComponentType<any>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic provider composition: provider components/props are heterogeneous
     | [React.ComponentType<any>, Record<string, any>]
   )[]
 ): React.FC<{ children: React.ReactNode }> => {
-  const ComposedProvider = providers.reduce((Prev, Curr) => {
-    const ProviderComponent = ({ children }: { children: React.ReactNode }) => {
-      let CurrentProvider: React.FC<{ children: React.ReactNode }>;
+  const ComposedProvider = providers.reduce(
+    (Prev, Curr) => {
+      const ProviderComponent = ({ children }: { children: React.ReactNode }) => {
+        let CurrentProvider: React.FC<{ children: React.ReactNode }>;
 
-      // Handle tuple syntax [Component, props]
-      if (Array.isArray(Curr) && Curr.length === 2) {
-        const [Component, props] = Curr;
-        const ConfiguredProvider = ({ children }: { children: React.ReactNode }) => {
-          const wrappedChildren = React.Children.count(children) > 1 ? <>{children}</> : children;
-          return <Component {...props}>{wrappedChildren}</Component>;
-        };
-        ConfiguredProvider.displayName = `ConfiguredProvider(${Component.displayName || Component.name || 'Unknown'})`;
-        CurrentProvider = ConfiguredProvider;
-      }
-      // Handle direct component reference
-      else if (typeof Curr === 'function' && Curr.length === 1) {
-        CurrentProvider = Curr as React.FC<{ children: React.ReactNode }>;
-      }
-      // Handle configured component (arrow function)
-      else {
-        CurrentProvider = Curr as React.FC<{ children: React.ReactNode }>;
-      }
+        // Handle tuple syntax [Component, props]
+        if (Array.isArray(Curr) && Curr.length === 2) {
+          const [Component, props] = Curr;
+          const ConfiguredProvider = ({ children }: { children: React.ReactNode }) => {
+            const wrappedChildren = React.Children.count(children) > 1 ? <>{children}</> : children;
+            return <Component {...props}>{wrappedChildren}</Component>;
+          };
+          ConfiguredProvider.displayName = `ConfiguredProvider(${Component.displayName || Component.name || 'Unknown'})`;
+          CurrentProvider = ConfiguredProvider;
+        }
+        // Handle direct component reference
+        else if (typeof Curr === 'function' && Curr.length === 1) {
+          CurrentProvider = Curr as React.FC<{ children: React.ReactNode }>;
+        }
+        // Handle configured component (arrow function)
+        else {
+          CurrentProvider = Curr as React.FC<{ children: React.ReactNode }>;
+        }
 
-      if (!Prev) return <CurrentProvider>{children}</CurrentProvider>;
-      return (
-        <Prev>
-          <CurrentProvider>{children}</CurrentProvider>
-        </Prev>
-      );
-    };
-    const componentName = Array.isArray(Curr)
-      ? Curr[0].displayName || Curr[0].name
-      : Curr.displayName || Curr.name;
-    ProviderComponent.displayName = `ProviderWrapper(${componentName || 'Unknown'})`;
-    return ProviderComponent;
-  }, undefined as any);
+        if (!Prev) return <CurrentProvider>{children}</CurrentProvider>;
+        return (
+          <Prev>
+            <CurrentProvider>{children}</CurrentProvider>
+          </Prev>
+        );
+      };
+      const componentName = Array.isArray(Curr)
+        ? Curr[0].displayName || Curr[0].name
+        : Curr.displayName || Curr.name;
+      ProviderComponent.displayName = `ProviderWrapper(${componentName || 'Unknown'})`;
+      return ProviderComponent;
+    },
+    undefined as React.FC<{ children: React.ReactNode }> | undefined
+  );
 
+  if (!ComposedProvider) {
+    throw new Error('compose() requires at least one provider');
+  }
   ComposedProvider.displayName = 'ComposedProvider';
   return ComposedProvider;
 };

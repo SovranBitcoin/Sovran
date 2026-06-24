@@ -9,7 +9,7 @@
  * (and the "(kind N)" disambiguation jargon) lives on the Advanced screen.
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { ListGroup, PressableFeedback, Switch as HeroSwitch } from 'heroui-native';
 
 import Icon from 'assets/icons';
@@ -81,7 +81,7 @@ export function PermissionSwitchRow({
   const [danger, muted] = useThemeColor(['danger', 'muted'] as const);
   const blocked = state === 'block';
 
-  const openMenu = useCallback(() => {
+  const openMenu = () => {
     const checkSuffix = <Icon name="mdi:check" size={18} color={muted} />;
     actionMenuPopup({
       title: label,
@@ -122,9 +122,9 @@ export function PermissionSwitchRow({
         },
       ],
     });
-  }, [label, state, allowEligible, onChange, muted]);
+  };
 
-  const onTap = useCallback(() => {
+  const onTap = () => {
     if (state === 'block') {
       onChange('ask');
       return;
@@ -134,7 +134,7 @@ export function PermissionSwitchRow({
       return;
     }
     onChange(state === 'allow' ? 'ask' : 'allow');
-  }, [state, allowEligible, onChange, openMenu]);
+  };
 
   const status =
     state === 'ask' && sessionStatus !== undefined

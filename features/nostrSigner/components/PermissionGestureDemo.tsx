@@ -20,7 +20,7 @@
  * starts at all under Reduce Motion (the t=0 idle frame + caption stand in).
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useFocusEffect } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import Animated, {
@@ -311,21 +311,19 @@ export function PermissionGestureDemo(): React.ReactElement {
   const reducedMotion = useReducedMotion();
   const t = useSharedValue(0);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (reducedMotion) return undefined;
+  useFocusEffect(() => {
+    if (reducedMotion) return undefined;
+    t.value = 0;
+    t.value = withRepeat(
+      withTiming(CYCLE_MS, { duration: CYCLE_MS, easing: Easing.linear }),
+      -1,
+      false
+    );
+    return () => {
+      cancelAnimation(t);
       t.value = 0;
-      t.value = withRepeat(
-        withTiming(CYCLE_MS, { duration: CYCLE_MS, easing: Easing.linear }),
-        -1,
-        false
-      );
-      return () => {
-        cancelAnimation(t);
-        t.value = 0;
-      };
-    }, [reducedMotion, t])
-  );
+    };
+  });
 
   // Theme-derived plain strings, captured by the worklets below.
   const rowFill = opacity(foreground, 0.06);
@@ -450,55 +448,36 @@ export function PermissionGestureDemo(): React.ReactElement {
     () => [ROW_PLANE_BASE, { backgroundColor: rowFill }, rowPlaneStyle],
     [rowFill, rowPlaneStyle]
   );
-  const rowContentComposed = useMemo(() => [ROW_CONTENT_STYLE, rowContentStyle], [rowContentStyle]);
-  const titleDangerComposed = useMemo(
-    () => [STATUS_ABS_STYLE, titleDangerStyle],
-    [titleDangerStyle]
-  );
-  const statusAskComposed = useMemo(() => [STATUS_ABS_STYLE, statusAskStyle], [statusAskStyle]);
-  const statusAlwaysComposed = useMemo(
-    () => [STATUS_ABS_STYLE, statusAlwaysStyle],
-    [statusAlwaysStyle]
-  );
-  const statusBlockedComposed = useMemo(
-    () => [STATUS_ABS_STYLE, statusBlockedStyle],
-    [statusBlockedStyle]
-  );
-  const switchTrackComposed = useMemo(
-    () => [SWITCH_TRACK_STYLE, switchTrackStyle],
-    [switchTrackStyle]
-  );
-  const knobComposed = useMemo(
-    () => [SWITCH_KNOB_BASE, { backgroundColor: background, borderColor: knobBorder }, knobStyle],
-    [background, knobBorder, knobStyle]
-  );
-  const shadowComposed = useMemo(
-    () => [SHADOW_BASE, { backgroundColor: foreground }, shadowStyle],
-    [foreground, shadowStyle]
-  );
-  const ringWrapComposed = useMemo(() => [RING_WRAP_BASE, ringWrapStyle], [ringWrapStyle]);
-  const menuComposed = useMemo(
-    () => [MENU_BASE, { backgroundColor: background, borderColor: menuBorder }, menuStyle],
-    [background, menuBorder, menuStyle]
-  );
-  const menuRowComposed = useMemo(
-    () => [
-      [MENU_ROW_STYLE, menuRow0],
-      [MENU_ROW_STYLE, menuRow1],
-      [MENU_ROW_STYLE, menuRow2],
-    ],
-    [menuRow0, menuRow1, menuRow2]
-  );
-  const menuBarComposed = useMemo(() => [MENU_BAR_STYLE, { backgroundColor: menuBar }], [menuBar]);
-  const blockFlashComposed = useMemo(
-    () => [BLOCK_FLASH_BASE, { backgroundColor: danger }, blockFlashStyle],
-    [danger, blockFlashStyle]
-  );
-  const gloveComposed = useMemo(() => [GLOVE_BASE, gloveStyle], [gloveStyle]);
-  const wordTap1Composed = useMemo(() => [WORD_BASE, wordTap1Style], [wordTap1Style]);
-  const wordTap2Composed = useMemo(() => [WORD_BASE, wordTap2Style], [wordTap2Style]);
-  const wordHoldComposed = useMemo(() => [WORD_BASE, wordHoldStyle], [wordHoldStyle]);
-  const wordBlockComposed = useMemo(() => [WORD_BASE, wordBlockStyle], [wordBlockStyle]);
+  const rowContentComposed = [ROW_CONTENT_STYLE, rowContentStyle];
+  const titleDangerComposed = [STATUS_ABS_STYLE, titleDangerStyle];
+  const statusAskComposed = [STATUS_ABS_STYLE, statusAskStyle];
+  const statusAlwaysComposed = [STATUS_ABS_STYLE, statusAlwaysStyle];
+  const statusBlockedComposed = [STATUS_ABS_STYLE, statusBlockedStyle];
+  const switchTrackComposed = [SWITCH_TRACK_STYLE, switchTrackStyle];
+  const knobComposed = [
+    SWITCH_KNOB_BASE,
+    { backgroundColor: background, borderColor: knobBorder },
+    knobStyle,
+  ];
+  const shadowComposed = [SHADOW_BASE, { backgroundColor: foreground }, shadowStyle];
+  const ringWrapComposed = [RING_WRAP_BASE, ringWrapStyle];
+  const menuComposed = [
+    MENU_BASE,
+    { backgroundColor: background, borderColor: menuBorder },
+    menuStyle,
+  ];
+  const menuRowComposed = [
+    [MENU_ROW_STYLE, menuRow0],
+    [MENU_ROW_STYLE, menuRow1],
+    [MENU_ROW_STYLE, menuRow2],
+  ];
+  const menuBarComposed = [MENU_BAR_STYLE, { backgroundColor: menuBar }];
+  const blockFlashComposed = [BLOCK_FLASH_BASE, { backgroundColor: danger }, blockFlashStyle];
+  const gloveComposed = [GLOVE_BASE, gloveStyle];
+  const wordTap1Composed = [WORD_BASE, wordTap1Style];
+  const wordTap2Composed = [WORD_BASE, wordTap2Style];
+  const wordHoldComposed = [WORD_BASE, wordHoldStyle];
+  const wordBlockComposed = [WORD_BASE, wordBlockStyle];
 
   return (
     <View

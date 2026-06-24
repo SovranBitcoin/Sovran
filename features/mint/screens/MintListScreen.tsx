@@ -31,6 +31,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { zIndex } from '@/shared/styles/tokens';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 // Inspect-button shape mirrors QRButton (rounded-square with continuous border
 // curve, borderRadius ≈ size × 0.18), but in a neutral surface color so it
@@ -40,13 +41,6 @@ const INSPECT_BUTTON_SIZE = 44;
 const INSPECT_BUTTON_RADIUS = Math.round(INSPECT_BUTTON_SIZE * 0.18);
 
 const CURRENCY_TABS_HEIGHT = 48;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 interface MintListScreenProps {
   /** Pre-built mint rows from buildMintListItems(). Already sorted and availability-annotated. */

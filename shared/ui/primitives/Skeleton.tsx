@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useRef } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 
 import {
@@ -53,24 +53,18 @@ const Skeleton = React.forwardRef<View, SkeletonProps>(function Skeleton(
     extra: visualExtra,
   });
 
-  const setRef = useCallback(
-    (node: View | null) => {
-      layout.ref(node);
-      if (typeof forwardedRef === 'function') {
-        forwardedRef(node);
-      } else if (forwardedRef) {
-        forwardedRef.current = node;
-      }
-    },
-    [forwardedRef, layout]
-  );
-  const handleLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      onLayout?.(event);
-      layout.onLayout(event);
-    },
-    [layout, onLayout]
-  );
+  const setRef = (node: View | null) => {
+    layout.ref(node);
+    if (typeof forwardedRef === 'function') {
+      forwardedRef(node);
+    } else if (forwardedRef) {
+      forwardedRef.current = node;
+    }
+  };
+  const handleLayout = (event: LayoutChangeEvent) => {
+    onLayout?.(event);
+    layout.onLayout(event);
+  };
 
   return (
     <View

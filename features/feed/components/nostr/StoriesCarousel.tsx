@@ -6,6 +6,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState, type FC } from 'react';
+import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import {
   FlatList,
   Platform,
@@ -170,13 +171,10 @@ export const StoriesCarousel: FC<CarouselProps> = ({
     },
     [onVisualListMetricsChange]
   );
-  const reportCarouselScrollFromUI = useCallback(
-    (scroll: number, size: number, contentLength: number) => {
-      metricsRef.current = { contentLength, scroll, size };
-      reportCarouselMetrics('scroll');
-    },
-    [reportCarouselMetrics]
-  );
+  const reportCarouselScrollFromUI = (scroll: number, size: number, contentLength: number) => {
+    metricsRef.current = { contentLength, scroll, size };
+    reportCarouselMetrics('scroll');
+  };
 
   const scrollHandler = useAnimatedScrollHandler({
     onBeginDrag: () => {
@@ -205,54 +203,48 @@ export const StoriesCarousel: FC<CarouselProps> = ({
     pointerEvents: Platform.OS === 'android' ? 'auto' : carouselPointerEvents.get(),
   }));
 
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems, changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
-      if (viewableItems.length > 0 && viewableItems[0]?.index !== null) {
-        setListCurrentIndex(viewableItems[0].index!);
-      }
-      onVisualViewableItemsChanged({
-        ...storyViewabilityRange([...viewableItems, ...changed]),
-        viewableItems: viewableItems.map(storyVisualToken),
-        changed: changed.map(storyVisualToken),
-      });
-    },
-    [onVisualViewableItemsChanged]
-  );
-  const handleCarouselLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const size = event.nativeEvent.layout.width;
-      metricsRef.current.size = size;
-      metricsRef.current.contentLength = storyUsers.length * size;
-      reportCarouselMetrics('layout');
-    },
-    [reportCarouselMetrics, storyUsers.length]
-  );
-  const handleCarouselContentSizeChange = useCallback(
-    (contentWidth: number) => {
-      metricsRef.current.contentLength = contentWidth;
-      reportCarouselMetrics('content-size');
-    },
-    [reportCarouselMetrics]
-  );
-  const handleCarouselScrollSettled = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-      metricsRef.current = {
-        contentLength: contentSize.width,
-        scroll: contentOffset.x,
-        size: layoutMeasurement.width,
-      };
-      reportCarouselMetrics('settled');
-      remeasureVisualLayoutScope(STORIES_VISUAL_SCOPE, 'scroll-settled', {
-        extra: {
-          userCount: storyUsers.length,
-          listCurrentIndex,
-          isClosing,
-        },
-      });
-    },
-    [isClosing, listCurrentIndex, reportCarouselMetrics, storyUsers.length]
-  );
+  const onViewableItemsChanged = ({
+    viewableItems,
+    changed,
+  }: {
+    viewableItems: ViewToken[];
+    changed: ViewToken[];
+  }) => {
+    if (viewableItems.length > 0 && viewableItems[0]?.index !== null) {
+      setListCurrentIndex(viewableItems[0].index!);
+    }
+    onVisualViewableItemsChanged({
+      ...storyViewabilityRange([...viewableItems, ...changed]),
+      viewableItems: viewableItems.map(storyVisualToken),
+      changed: changed.map(storyVisualToken),
+    });
+  };
+  const handleCarouselLayout = (event: LayoutChangeEvent) => {
+    const size = event.nativeEvent.layout.width;
+    metricsRef.current.size = size;
+    metricsRef.current.contentLength = storyUsers.length * size;
+    reportCarouselMetrics('layout');
+  };
+  const handleCarouselContentSizeChange = (contentWidth: number) => {
+    metricsRef.current.contentLength = contentWidth;
+    reportCarouselMetrics('content-size');
+  };
+  const handleCarouselScrollSettled = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    metricsRef.current = {
+      contentLength: contentSize.width,
+      scroll: contentOffset.x,
+      size: layoutMeasurement.width,
+    };
+    reportCarouselMetrics('settled');
+    remeasureVisualLayoutScope(STORIES_VISUAL_SCOPE, 'scroll-settled', {
+      extra: {
+        userCount: storyUsers.length,
+        listCurrentIndex,
+        isClosing,
+      },
+    });
+  };
 
   useEffect(() => {
     metricsRef.current = {
@@ -280,6 +272,7 @@ export const StoriesCarousel: FC<CarouselProps> = ({
           width,
         }}>
         <Animated.FlatList
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Animated.FlatList's ref type does not unify with the scroll ref threaded through here; the cast bridges a known RN typing gap.
           ref={scrollRef as any}
           data={storyUsers}
           keyExtractor={(item) => item.pubkey}
@@ -418,13 +411,13 @@ const UserStoriesItem: FC<UserItemProps> = ({
     }
   });
 
-  const pausePlayer = useCallback(() => {
+  const pausePlayer = () => {
     safePlayerCall(player, (p) => p.pause());
-  }, [player]);
+  };
 
-  const resumePlayer = useCallback(() => {
+  const resumePlayer = () => {
     safePlayerCall(player, (p) => p.play());
-  }, [player]);
+  };
 
   useAnimatedReaction(
     () => isDragging.get(),
@@ -437,55 +430,44 @@ const UserStoriesItem: FC<UserItemProps> = ({
     }
   );
 
-  const onStoryPress = useCallback(
-    (e: GestureResponderEvent) => {
-      const isLeft = e.nativeEvent.pageX < screenWidth / 2;
-      const isLastStory = currentStoryIndex === user.videoPosts.length - 1;
-      const isFirstStory = currentStoryIndex === 0;
+  const onStoryPress = (e: GestureResponderEvent) => {
+    const isLeft = e.nativeEvent.pageX < screenWidth / 2;
+    const isLastStory = currentStoryIndex === user.videoPosts.length - 1;
+    const isFirstStory = currentStoryIndex === 0;
 
-      if (isLeft) {
-        if (userIndex === 0 && isFirstStory) return;
-        if (isFirstStory) {
-          scrollRef.current?.scrollToIndex({ index: userIndex - 1, animated: true });
-        } else {
-          setCurrentStoryIndex(currentStoryIndex - 1);
-        }
+    if (isLeft) {
+      if (userIndex === 0 && isFirstStory) return;
+      if (isFirstStory) {
+        scrollRef.current?.scrollToIndex({ index: userIndex - 1, animated: true });
       } else {
-        if (userIndex === totalUsers - 1 && isLastStory) {
-          onClose?.();
-          return;
-        }
-        if (isLastStory) {
-          scrollRef.current?.scrollToIndex({ index: userIndex + 1, animated: true });
-        } else {
-          setCurrentStoryIndex(currentStoryIndex + 1);
-        }
+        setCurrentStoryIndex(currentStoryIndex - 1);
       }
-    },
-    [
-      currentStoryIndex,
-      userIndex,
-      totalUsers,
-      scrollRef,
-      screenWidth,
-      user.videoPosts.length,
-      onClose,
-    ]
-  );
+    } else {
+      if (userIndex === totalUsers - 1 && isLastStory) {
+        onClose?.();
+        return;
+      }
+      if (isLastStory) {
+        scrollRef.current?.scrollToIndex({ index: userIndex + 1, animated: true });
+      } else {
+        setCurrentStoryIndex(currentStoryIndex + 1);
+      }
+    }
+  };
 
-  const onStoryLongPress = useCallback(() => {
+  const onStoryLongPress = () => {
     safePlayerCall(player, (p) => p.pause());
-  }, [player]);
+  };
 
-  const onStoryPressOut = useCallback(() => {
+  const onStoryPressOut = () => {
     if (isDragging.get()) return;
     safePlayerCall(player, (p) => p.play());
-  }, [isDragging, player]);
+  };
 
-  const handleClose = useCallback(() => {
+  const handleClose = () => {
     safePlayerCall(player, (p) => p.pause());
     onClose?.();
-  }, [player, onClose]);
+  };
 
   const profileName = user.profile?.name || user.pubkey.slice(0, 12) + '…';
   const profilePicture = user.profile?.picture;
@@ -563,7 +545,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
               {profileName}
             </Text>
             <Pressable onPress={handleClose} hitSlop={12} style={styles.closeButton}>
-              <Icon name="mdi:close" size={22} color="#fff" />
+              <Icon name="mdi:close" size={22} color={INVARIANT_WHITE} />
             </Pressable>
           </View>
         </View>
@@ -579,7 +561,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
 const styles = StyleSheet.create({
   flex1: { flex: 1 },
   videoRadius: { borderRadius: 16 },
-  closingPlaceholder: { backgroundColor: '#000' },
+  closingPlaceholder: { backgroundColor: INVARIANT_BLACK },
   topGradient: {
     position: 'absolute',
     top: 0,
@@ -607,7 +589,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   profileName: {
-    color: '#fff',
+    color: INVARIANT_WHITE,
   },
   closeButton: {
     width: 32,

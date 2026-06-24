@@ -7,10 +7,8 @@ import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintManagement } from '@/features/mint';
-import {
-  useNip17RecentContacts,
-  type RecentContact,
-} from '@/features/payments/hooks/useNip17RecentContacts';
+import { useNip17RecentContacts } from '@/features/payments/hooks/useNip17RecentContacts';
+import type { RecentContact } from '@/features/payments/hooks/recentContactTypes';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { useMintContacts, type MintContact } from '@/features/payments/hooks/useMintContacts';
 import { prefetchImages } from '@/shared/lib/imageCache';

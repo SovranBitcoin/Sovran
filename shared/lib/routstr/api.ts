@@ -118,6 +118,12 @@ interface ParsedErrorData {
 
 // ── Error Handling ───────────────────────────────────────────────────────
 
+/** Build a typed RoutstrError. Factory exists so the throw sites don't need an
+ * object-literal `as RoutstrError` cast (banned by consistent-type-assertions). */
+function makeRoutstrError(status: number, error: RoutstrError['error']): RoutstrError {
+  return { status, error };
+}
+
 async function parseErrorResponse(response: Response): Promise<ParsedErrorData> {
   const contentType = response.headers.get('content-type') || '';
   if (contentType.includes('text/html')) {
@@ -220,28 +226,22 @@ async function throwResponseError(response: Response): Promise<never> {
     useRoutstrStore.getState().clearBalance();
   }
 
-  throw {
-    status,
-    error: {
-      message: getUserFriendlyErrorMessage(status, errorData),
-      type: errorData.type || 'unknown_error',
-      details: errorData.details,
-    },
-  } as RoutstrError;
+  throw makeRoutstrError(status, {
+    message: getUserFriendlyErrorMessage(status, errorData),
+    type: errorData.type || 'unknown_error',
+    details: errorData.details,
+  });
 }
 
 /** Wrap a caught unknown into a RoutstrError (re-throws if already one). */
 function toRoutstrError(error: unknown): never {
   if (error && typeof error === 'object' && 'status' in error) throw error;
   if (isAbortError(error)) {
-    throw {
-      status: 0,
-      error: { message: 'Request cancelled', type: 'aborted' },
-    } as RoutstrError;
+    throw makeRoutstrError(0, { message: 'Request cancelled', type: 'aborted' });
   }
   const message =
     error instanceof Error ? error.message : typeof error === 'string' ? error : 'Network error';
-  throw { status: 0, error: { message, type: 'network_error' } } as RoutstrError;
+  throw makeRoutstrError(0, { message, type: 'network_error' });
 }
 
 export interface RoutstrModel {
@@ -279,7 +279,7 @@ export interface RoutstrModel {
     max_completion_cost: number;
     max_cost: number;
   };
-  per_request_limits: any;
+  per_request_limits: unknown;
   top_provider: {
     context_length: number;
     max_completion_tokens: number | null;
@@ -451,7 +451,7 @@ async function* parseSSEStream(response: Response): AsyncGenerator<ChatCompletio
 
 function tryParseSSELine(line: string): ChatCompletionChunk | 'done' | null {
   const trimmed = line.trim();
-  if (!trimmed || !trimmed.startsWith('data: ')) return null;
+  if (!trimmed?.startsWith('data: ')) return null;
   const data = trimmed.slice(6).trim();
   if (data === '[DONE]') return 'done';
   if (!data) return null;

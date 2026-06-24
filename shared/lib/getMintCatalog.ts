@@ -40,6 +40,7 @@ import {
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 type MintCatalogNetworkMode = 'cache-only' | 'cache-first' | 'network-first';
 
@@ -59,13 +60,6 @@ function isMintInfoObject(value: unknown): value is Record<string, unknown> {
 
 function hasCatalogFields(entry: MintCatalogEntry): boolean {
   return Object.values(entry).some((value) => value !== undefined);
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 function readCachedEntry(mintUrl: string): { entry: MintCatalogEntry; info: unknown } {
@@ -129,7 +123,7 @@ async function resolveNostrProfile(
     });
     return null;
   });
-  if (profile && profile.isOk()) {
+  if (profile?.isOk()) {
     const { followers, score } = profile.value;
     useMintProfileStore.getState().setCached(mintUrl, followers, score);
     log.info('mint.catalog.profile.fetch_success', {
@@ -182,7 +176,7 @@ async function fetchEntry(
   let info: unknown = isMintInfoObject(cached.info) ? cached.info : null;
 
   // Audit data + info from the audit endpoint when available …
-  if (auditRes && auditRes.isOk()) {
+  if (auditRes?.isOk()) {
     const audit = auditRes.value;
     const { score } = transformAuditData(audit);
     entry.auditScore = score;
@@ -231,7 +225,7 @@ async function fetchEntry(
     });
   }
 
-  if (reviewRes && reviewRes.isOk()) {
+  if (reviewRes?.isOk()) {
     const review = reviewRes.value;
     if (review.score !== null) {
       entry.kymScore = review.score;

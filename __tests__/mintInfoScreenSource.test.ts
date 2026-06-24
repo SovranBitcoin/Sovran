@@ -23,9 +23,7 @@ describe('mint info screen source', () => {
   });
 
   it('uses Nostr profile data to pretty-display the first Nostr contact', () => {
-    expect(source).toContain(
-      'const contactRows = useMemo(() => getSortedMintInfoContacts(contact), [contact]);'
-    );
+    expect(source).toContain('const contactRows = getSortedMintInfoContacts(contact);');
     expect(source).toContain('useNostrProfile(');
     expect(source).toContain('getMintInfoNostrDisplayName(rowProfile, fallbackNpub ?? c.info)');
     expect(source).toContain('picture={rowPicture}');

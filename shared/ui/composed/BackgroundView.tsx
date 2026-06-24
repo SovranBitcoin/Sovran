@@ -3,7 +3,7 @@ import { MeshGradientView } from 'expo-mesh-gradient';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBackgroundContext } from '@/shared/providers/BackgroundProvider';
-import React, { memo, ReactNode, useMemo } from 'react';
+import React, { ReactNode, useMemo } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useTheme } from '@/shared/providers/ThemeProvider';
@@ -145,19 +145,15 @@ function ScrollableGradientOverlayComponent({
   }, [viewportHeight, contentHeight, blurGradientStart, blurGradientEnd]);
 
   const overlayHeight = contentHeight || viewportHeight;
-  const androidMeshPoints = useMemo(
-    () => getScrollableOverlayMeshPoints(overlayLocations[0], overlayLocations[1]),
-    [overlayLocations]
+  const androidMeshPoints = getScrollableOverlayMeshPoints(
+    overlayLocations[0],
+    overlayLocations[1]
   );
-  const androidBackgroundMeshColors = useMemo(
-    () =>
-      getScrollableOverlayMeshColors({
-        top: opacity(screenBackgroundColor, 0),
-        mid: screenBackgroundColor,
-        bottom: screenBackgroundColor,
-      }),
-    [screenBackgroundColor]
-  );
+  const androidBackgroundMeshColors = getScrollableOverlayMeshColors({
+    top: opacity(screenBackgroundColor, 0),
+    mid: screenBackgroundColor,
+    bottom: screenBackgroundColor,
+  });
   return (
     <Log name="ScrollableGradientOverlay">
       <View
@@ -197,7 +193,7 @@ function ScrollableGradientOverlayComponent({
   );
 }
 
-export const ScrollableGradientOverlay = memo(ScrollableGradientOverlayComponent);
+export const ScrollableGradientOverlay = React.memo(ScrollableGradientOverlayComponent);
 
 // ============================================================================
 // AnimatedBackgroundView - Layout-level background with animated blur transitions
@@ -270,10 +266,7 @@ function AnimatedBackgroundViewComponent({
     }
     return null;
   }, [currentTheme]);
-  const meshGradientColors = useMemo(
-    () => getMeshGradientColors(gradientColors, gradientColor || surface),
-    [gradientColors, gradientColor, surface]
-  );
+  const meshGradientColors = getMeshGradientColors(gradientColors, gradientColor || surface);
 
   log.debug('bg.view.render', {
     theme: currentTheme,
@@ -349,4 +342,4 @@ function AnimatedBackgroundViewComponent({
   );
 }
 
-export const AnimatedBackgroundView = memo(AnimatedBackgroundViewComponent);
+export const AnimatedBackgroundView = React.memo(AnimatedBackgroundViewComponent);

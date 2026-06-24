@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useColadaTransactions } from '@sovranbitcoin/colada/react';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
@@ -18,5 +17,8 @@ export function useHistoryWithMelts(pageSize = 100) {
 
   const history = mockMode ? mockHistory : result.history;
 
-  return useMemo(() => ({ ...result, history }), [result, history]);
+  return {
+    ...result,
+    history,
+  };
 }

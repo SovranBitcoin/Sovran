@@ -14,7 +14,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { COMMENT_ACCENT } from '@/shared/lib/brandColors';
+import { COMMENT_ACCENT, LIKE_ACCENT } from '@/shared/lib/brandColors';
 import { openRepostMenu } from '@/features/feed/lib/repostMenu';
 import type { NoteMetrics } from './feedTypes';
 import { formatCount, formatSats } from './feedFormat';
@@ -145,7 +145,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   const repliedColor = COMMENT_ACCENT;
   const iconColor = opacity(borderColor, alpha.disabled);
   const textColor = opacity(borderColor, alpha.disabled);
-  const likedColor = '#ff5a7a';
+  const likedColor = LIKE_ACCENT;
   const iconSizes = compact ? POST_ACTION_ICON_SIZES.compact : POST_ACTION_ICON_SIZES.regular;
   const textSize = compact ? 11 : 13;
 

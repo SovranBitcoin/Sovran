@@ -225,8 +225,8 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     return machine.subscribe(log);
   }, [machine]);
 
-  const emptyEntryStyle = useMemo(() => ({ flex: 1, backgroundColor: background }), [background]);
-  const amountBodyStyle = useMemo(() => ({ flex: 1 }), []);
+  const emptyEntryStyle = { flex: 1, backgroundColor: background };
+  const amountBodyStyle = { flex: 1 };
   const isSendOperation = entry?.destination !== 'mintQuote';
   const offlineIconStyle = useMemo(
     () => ({ opacity: canSendOffline === null ? 0.3 : 1 }),
@@ -272,19 +272,16 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     ),
     [canSendOffline, offlineIconStyle]
   );
-  const stackOptions = useMemo(
-    () => ({
-      title: 'Select amount',
-      headerTitleAlign: 'center' as const,
-      headerTitle: renderHeaderTitle,
-      headerTintColor: foreground,
-      headerRight: isSendOperation && mintUrl ? renderHeaderRight : undefined,
-    }),
-    [foreground, isSendOperation, mintUrl, renderHeaderRight, renderHeaderTitle]
-  );
-  const handleErrorGoBack = useCallback(() => {
+  const stackOptions = {
+    title: 'Select amount',
+    headerTitleAlign: 'center' as const,
+    headerTitle: renderHeaderTitle,
+    headerTintColor: foreground,
+    headerRight: isSendOperation && mintUrl ? renderHeaderRight : undefined,
+  };
+  const handleErrorGoBack = () => {
     void actions.back.execute();
-  }, [actions.back]);
+  };
 
   if (error) {
     return <ScreenErrorState message={error} onGoBack={handleErrorGoBack} />;

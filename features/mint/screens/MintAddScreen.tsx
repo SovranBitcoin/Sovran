@@ -42,18 +42,12 @@ import opacity from 'hex-color-opacity';
 import { log, cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 // Height constant for currency tabs (same as MintListScreen)
 const CURRENCY_TABS_HEIGHT = 48;
 
 // MintStatCell removed — stats now rendered inline
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 interface PseudoMint {
   url: string;
@@ -243,7 +237,7 @@ const MintItem = memo(function MintItem({
   loading?: boolean;
 }) {
   const mintInfo = 'mintInfo' in mint ? mint.mintInfo : undefined;
-  const displayName = useMemo(() => getMintDisplayName(mint.url, mintInfo), [mint.url, mintInfo]);
+  const displayName = getMintDisplayName(mint.url, mintInfo);
 
   // Search-result preview only: the search endpoint returns `serverStats`
   // (`n_mints`/`n_melts`/`n_errors`) without the per-swap array, so we can't
@@ -674,55 +668,46 @@ export function MintAddScreen() {
     [isSearching, onCloseSearch, onOpenSearch, foreground]
   );
 
-  const screenOptions = useMemo(
-    () => ({
-      headerTransparent: true as const,
-      // Declares the page background (bgColor={surface} below) so the Android
-      // sheet header's scrim fades from the page's color, not the darker
-      // theme background. FlowSheetHeader reads this; iOS ignores it under a
-      // transparent header.
-      headerStyle: { backgroundColor: surface },
-      headerTitle: renderHeaderTitle,
-      headerRight: renderHeaderRight,
-    }),
-    [renderHeaderTitle, renderHeaderRight, surface]
-  );
+  const screenOptions = {
+    headerTransparent: true as const,
+    // Declares the page background (bgColor={surface} below) so the Android
+    // sheet header's scrim fades from the page's color, not the darker
+    // theme background. FlowSheetHeader reads this; iOS ignores it under a
+    // transparent header.
+    headerStyle: { backgroundColor: surface },
+    headerTitle: renderHeaderTitle,
+    headerRight: renderHeaderRight,
+  };
 
   // ── Sticky content & bottom ────────────────────────────────────────────
 
-  const currencyTabs = useMemo(
-    () => (
-      <MintCurrencyTabs
-        currencies={availableCurrencies}
-        selectedCurrency={selectedCurrency}
-        onCurrencyChange={setSelectedCurrency}
-        scrollY={scrollY}
-      />
-    ),
-    [availableCurrencies, selectedCurrency, setSelectedCurrency, scrollY]
+  const currencyTabs = (
+    <MintCurrencyTabs
+      currencies={availableCurrencies}
+      selectedCurrency={selectedCurrency}
+      onCurrencyChange={setSelectedCurrency}
+      scrollY={scrollY}
+    />
   );
 
-  const bottomButtons = useMemo(
-    () => (
-      <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            {
-              text: isAdding ? 'Adding...' : `Add (${selectedMints.size})`,
-              variant: 'primary',
-              onPress: handleSave,
-              disabled: selectedMints.size === 0 || isAdding,
-            },
-            {
-              text: 'Cancel',
-              variant: 'secondary',
-              onPress: async () => router.back(),
-            },
-          ]}
-        />
-      </BottomButtons>
-    ),
-    [isAdding, selectedMints.size, handleSave]
+  const bottomButtons = (
+    <BottomButtons>
+      <ButtonHandler
+        buttons={[
+          {
+            text: isAdding ? 'Adding...' : `Add (${selectedMints.size})`,
+            variant: 'primary',
+            onPress: handleSave,
+            disabled: selectedMints.size === 0 || isAdding,
+          },
+          {
+            text: 'Cancel',
+            variant: 'secondary',
+            onPress: async () => router.back(),
+          },
+        ]}
+      />
+    </BottomButtons>
   );
 
   const listHeader = useMemo(

@@ -30,6 +30,7 @@
 import type { CoreProof, Manager } from '@cashu/coco-core';
 import type { Wallet } from '@cashu/cashu-ts';
 import { cashuLog } from '@/shared/lib/logger';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 interface ManagerInternals {
   proofRepository: {
@@ -64,13 +65,6 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
-
 /** Ready (UNSPENT, unreserved) proofs for one mint, via the private ProofService. */
 export async function getReadyProofs(manager: Manager, mintUrl: string): Promise<CoreProof[]> {
   cashuLog.debug('cashu.manager_internals.ready_proofs.start', {
@@ -102,21 +96,6 @@ export async function getWallet(manager: Manager, mintUrl: string): Promise<Wall
   } catch (error) {
     cashuLog.warn('cashu.manager_internals.wallet.failed', {
       ...mintUrlLogFields(mintUrl),
-      error: errorMessage(error),
-    });
-    throw error;
-  }
-}
-
-/** All proofs reserved by an in-flight operation (have `usedByOperationId`). */
-export async function getReservedProofs(manager: Manager): Promise<CoreProof[]> {
-  cashuLog.debug('cashu.manager_internals.reserved_proofs.start');
-  try {
-    const proofs = await internals(manager).proofRepository.getReservedProofs();
-    cashuLog.debug('cashu.manager_internals.reserved_proofs.done', { count: proofs.length });
-    return proofs;
-  } catch (error) {
-    cashuLog.warn('cashu.manager_internals.reserved_proofs.failed', {
       error: errorMessage(error),
     });
     throw error;

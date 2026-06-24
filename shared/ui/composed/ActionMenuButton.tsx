@@ -23,7 +23,7 @@
  * colada.
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useRef } from 'react';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
 import { Menu, type MenuTriggerRef } from 'heroui-native';
 
@@ -134,13 +134,13 @@ export function ActionMenuButton({
   // imperatively via ref from the Button's onPress. The same pattern is used
   // by SendTokenScreen's Copy menu.
   const menuTriggerRef = useRef<MenuTriggerRef>(null);
-  const openMenu = useCallback(() => {
+  const openMenu = () => {
     // Defer to the next tick so the Button's press animation doesn't race
     // with the Trigger's `measure()` call inside heroui's `.open()`.
     setTimeout(() => menuTriggerRef.current?.open(), 0);
-  }, []);
+  };
 
-  const handlePrimaryPress = useCallback(async () => {
+  const handlePrimaryPress = async () => {
     if (!defaultVariant || primaryDisabled) return;
     try {
       await defaultVariant.onPress();
@@ -151,7 +151,7 @@ export function ActionMenuButton({
         error: error instanceof Error ? error.message : String(error),
       });
     }
-  }, [defaultVariant, primaryDisabled, testID]);
+  };
 
   const primaryIconNode = icon ? <Icon name={icon} size={18} /> : undefined;
 

@@ -25,7 +25,7 @@
  * retry toast; the sheet only closes once the intent write is durable.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import {
@@ -281,7 +281,9 @@ function ReviewSwitchRow({
   selected: boolean;
   onToggle: () => void;
 }) {
-  const switchA11yState = useMemo(() => ({ checked: selected }), [selected]);
+  const switchA11yState = {
+    checked: selected,
+  };
   return (
     <PressableFeedback
       animation={false}
@@ -322,7 +324,7 @@ function reconnectRowsFor(uriRows: readonly PermRow[], previous: Nip46Connection
   const covered = new Set<string>(eligibleUriRows.map((row) => row.grantKey));
   const extra: PermRow[] = [];
   for (const [grantKey, grant] of Object.entries(previous.grants)) {
-    if (!grant || grant.verdict !== 'always') continue;
+    if (grant?.verdict !== 'always') continue;
     if (covered.has(grantKey)) continue;
     if (!isGrantKey(grantKey)) continue;
     const lookup = parseGrantKey(grantKey);
@@ -444,7 +446,7 @@ interface SignerConnectContentProps extends CustomSheetSharedProps {
 }
 
 export function SignerConnectSheetContent(props: SignerConnectContentProps): React.ReactElement {
-  const parsedResult = useMemo(() => parseNostrconnectUri(props.payload.uri), [props.payload.uri]);
+  const parsedResult = parseNostrconnectUri(props.payload.uri);
   if (parsedResult.isErr()) {
     return <InvalidLinkBody close={props.close} />;
   }
@@ -503,10 +505,7 @@ function ConnectReview({
   const isUpdate = connection !== undefined;
   // Same app, NEW ephemeral client key? (Exact-pubkey update takes precedence;
   // the matcher is only a UX offer — the engine re-validates it at completion.)
-  const match = useMemo(
-    () => (isUpdate ? ({ kind: 'none' } as const) : findPreviousConnection(apps, parsed)),
-    [apps, isUpdate, parsed]
-  );
+  const match = isUpdate ? ({ kind: 'none' } as const) : findPreviousConnection(apps, parsed);
   const variant: 'update' | 'reconnect' | 'blocked-fresh' | 'fresh' = isUpdate
     ? 'update'
     : match.kind === 'active'
@@ -519,19 +518,13 @@ function ConnectReview({
   const appName = appDisplayName({ ...(parsed.name !== undefined && { name: parsed.name }) });
   const appDomain = parsed.url !== undefined ? safeHostname(parsed.url).unwrapOr(null) : null;
 
-  const permRows = useMemo(() => permRowsFor(parsed), [parsed]);
+  const permRows = permRowsFor(parsed);
   // Reconnect hides the preset (the previous config replaces preset defaults).
-  const presetRows = useMemo(
-    () => (variant === 'reconnect' ? [] : presetRowsFor(permRows)),
-    [variant, permRows]
-  );
-  const reviewRows = useMemo(
-    () =>
-      variant === 'reconnect' && previousConnection !== undefined
-        ? reconnectRowsFor(permRows, previousConnection)
-        : permRows,
-    [variant, previousConnection, permRows]
-  );
+  const presetRows = variant === 'reconnect' ? [] : presetRowsFor(permRows);
+  const reviewRows =
+    variant === 'reconnect' && previousConnection !== undefined
+      ? reconnectRowsFor(permRows, previousConnection)
+      : permRows;
   const cacheKey = checkedCacheKey(parsed);
   const [checked, setChecked] = useState<Record<string, boolean>>(() => {
     const cached = checkedStateCache.get(cacheKey);
@@ -551,17 +544,19 @@ function ConnectReview({
   const [isConnecting, setIsConnecting] = useState(false);
   const [failure, setFailure] = useState<ConnectFailure | null>(null);
 
-  const reviewToggleA11yState = useMemo(() => ({ expanded: reviewExpanded }), [reviewExpanded]);
-  const togglePresetExpanded = useCallback(() => setPresetExpanded((value) => !value), []);
+  const reviewToggleA11yState = {
+    expanded: reviewExpanded,
+  };
+  const togglePresetExpanded = () => setPresetExpanded((value) => !value);
 
-  const toggleReview = useCallback(() => {
+  const toggleReview = () => {
     setReviewExpanded((value) => !value);
     setReviewPresented(true);
     setChecked((current) => {
       checkedStateCache.set(cacheKey, { checked: current, reviewPresented: true });
       return current;
     });
-  }, [cacheKey]);
+  };
 
   // Hot + awaited pairing for the life of the SHEET. Registration is
   // idempotent, so the resumed-pairing path (already registered at boot) and
@@ -577,28 +572,22 @@ function ConnectReview({
     return () => releaseIfSheetClosed(parsed);
   }, [parsed]);
 
-  const cacheChecked = useCallback(
-    (next: Record<string, boolean>) => {
-      const cached = checkedStateCache.get(cacheKey);
-      checkedStateCache.set(cacheKey, {
-        checked: next,
-        reviewPresented: cached?.reviewPresented ?? false,
-      });
-    },
-    [cacheKey]
-  );
+  const cacheChecked = (next: Record<string, boolean>) => {
+    const cached = checkedStateCache.get(cacheKey);
+    checkedStateCache.set(cacheKey, {
+      checked: next,
+      reviewPresented: cached?.reviewPresented ?? false,
+    });
+  };
 
-  const toggleRow = useCallback(
-    (row: PermRow) => {
-      if (!row.eligible) return;
-      setChecked((current) => {
-        const next = { ...current, [row.grantKey]: !current[row.grantKey] };
-        cacheChecked(next);
-        return next;
-      });
-    },
-    [cacheChecked]
-  );
+  const toggleRow = (row: PermRow) => {
+    if (!row.eligible) return;
+    setChecked((current) => {
+      const next = { ...current, [row.grantKey]: !current[row.grantKey] };
+      cacheChecked(next);
+      return next;
+    });
+  };
 
   // Review list speaks the editor's bundle vocabulary: one switch per
   // capability bundle (toggling covers every member key in the review set),
@@ -616,22 +605,21 @@ function ConnectReview({
     return { bundles, others };
   }, [reviewRows]);
 
-  const toggleReviewBundle = useCallback(
-    (rows: readonly PermRow[]) => {
-      setChecked((current) => {
-        const allOn = rows.every((row) => current[row.grantKey] === true);
-        const next = { ...current };
-        for (const row of rows) next[row.grantKey] = !allOn;
-        cacheChecked(next);
-        return next;
-      });
-    },
-    [cacheChecked]
-  );
+  const toggleReviewBundle = (rows: readonly PermRow[]) => {
+    setChecked((current) => {
+      const allOn = rows.every((row) => current[row.grantKey] === true);
+      const next = { ...current };
+      for (const row of rows) next[row.grantKey] = !allOn;
+      cacheChecked(next);
+      return next;
+    });
+  };
 
   const presetAllChecked = presetRows.every((row) => checked[row.grantKey] === true);
-  const presetA11yState = useMemo(() => ({ checked: presetAllChecked }), [presetAllChecked]);
-  const togglePresetAll = useCallback(() => {
+  const presetA11yState = {
+    checked: presetAllChecked,
+  };
+  const togglePresetAll = () => {
     setChecked((current) => {
       const allOn = presetRows.every((row) => current[row.grantKey] === true);
       const next = { ...current };
@@ -639,65 +627,51 @@ function ConnectReview({
       cacheChecked(next);
       return next;
     });
-  }, [cacheChecked, presetRows]);
+  };
 
-  const connect = useSingleFlight(
-    useCallback(async () => {
-      setFailure(null);
-      setIsConnecting(true);
-      // Reconnect: grants arrive via ADOPTION, so a never-opened checklist
-      // presents/accepts nothing (nothing can downgrade). Once the user has
-      // opened "Review permissions" (sticky), the reviewed rows are the
-      // contract — unchecking an inherited grant downgrades it post-adoption.
-      // Other variants: URI rows + preset rows, one accepted/presented union.
-      const eligibleRows =
-        variant === 'reconnect'
-          ? reviewPresented
-            ? reviewRows
-            : []
-          : [...permRows.filter((row) => row.eligible), ...presetRows];
-      const acceptedGrantKeys = eligibleRows
-        .filter((row) => checked[row.grantKey] === true)
-        .map((row) => row.grantKey);
-      const presentedGrantKeys = eligibleRows.map((row) => row.grantKey);
-      const outcome = await completePairingWhenHot({
-        parsed,
-        acceptedGrantKeys,
-        presentedGrantKeys,
-        ...(previousConnection !== undefined && {
-          replacesClientPubkey: previousConnection.clientPubkey,
-        }),
-      });
-      setIsConnecting(false);
-      if (outcome.isErr()) {
-        nostrLog.warn('nostr.signer.connect_sheet_pairing_failed', {
-          error: outcome.error.type,
-        });
-        setFailure(failureFor(outcome.error));
-        return;
-      }
-      checkedStateCache.delete(cacheKey);
-      const toast = connectedToastCopy(appName);
-      popup({ message: toast.label, text: toast.description, type: 'success' });
-      close();
-    }, [
-      appName,
-      cacheKey,
-      checked,
-      close,
+  const connect = useSingleFlight(async () => {
+    setFailure(null);
+    setIsConnecting(true);
+    // Reconnect: grants arrive via ADOPTION, so a never-opened checklist
+    // presents/accepts nothing (nothing can downgrade). Once the user has
+    // opened "Review permissions" (sticky), the reviewed rows are the
+    // contract — unchecking an inherited grant downgrades it post-adoption.
+    // Other variants: URI rows + preset rows, one accepted/presented union.
+    const eligibleRows =
+      variant === 'reconnect'
+        ? reviewPresented
+          ? reviewRows
+          : []
+        : [...permRows.filter((row) => row.eligible), ...presetRows];
+    const acceptedGrantKeys = eligibleRows
+      .filter((row) => checked[row.grantKey] === true)
+      .map((row) => row.grantKey);
+    const presentedGrantKeys = eligibleRows.map((row) => row.grantKey);
+    const outcome = await completePairingWhenHot({
       parsed,
-      permRows,
-      presetRows,
-      previousConnection,
-      reviewPresented,
-      reviewRows,
-      variant,
-    ])
-  );
+      acceptedGrantKeys,
+      presentedGrantKeys,
+      ...(previousConnection !== undefined && {
+        replacesClientPubkey: previousConnection.clientPubkey,
+      }),
+    });
+    setIsConnecting(false);
+    if (outcome.isErr()) {
+      nostrLog.warn('nostr.signer.connect_sheet_pairing_failed', {
+        error: outcome.error.type,
+      });
+      setFailure(failureFor(outcome.error));
+      return;
+    }
+    checkedStateCache.delete(cacheKey);
+    const toast = connectedToastCopy(appName);
+    popup({ message: toast.label, text: toast.description, type: 'success' });
+    close();
+  });
 
-  const openProfilePicker = useCallback(() => {
+  const openProfilePicker = () => {
     pushCustomPage('signer-profile-picker', { parsed });
-  }, [parsed, pushCustomPage]);
+  };
 
   const profileDisplayName = resolveIdentityName({
     pubkey: activeProfile?.pubkey ?? keys?.pubkey ?? null,
@@ -1050,37 +1024,32 @@ export function SignerProfilePickerContent({
   // a real close (including after Switch & Connect) releases it.
   useEffect(() => () => releaseIfSheetClosed(parsed), [parsed]);
 
-  const selectProfile = useCallback(
-    (profile: ProfileEntry) => {
-      if (profile.accountIndex === activeIndex) {
-        // Picking the current profile is "never mind" — back to the review.
-        setSelectedIndex(activeIndex);
-        popCustomPage();
-        return;
-      }
-      setSelectedIndex(profile.accountIndex);
-    },
-    [activeIndex, popCustomPage]
-  );
+  const selectProfile = (profile: ProfileEntry) => {
+    if (profile.accountIndex === activeIndex) {
+      // Picking the current profile is "never mind" — back to the review.
+      setSelectedIndex(activeIndex);
+      popCustomPage();
+      return;
+    }
+    setSelectedIndex(profile.accountIndex);
+  };
 
-  const switchAndConnect = useSingleFlight(
-    useCallback(async () => {
-      const target = profiles.find((profile) => profile.accountIndex === selectedIndex);
-      if (target === undefined || target.accountIndex === activeIndex) return;
-      // The seam orders the teardown: intent persisted (awaited) → sheet
-      // closed → restart-based switch. On an abort it shows the retry toast
-      // and the sheet stays open for another attempt.
-      await switchProfileAndPair(
-        parsed,
-        { accountIndex: target.accountIndex, pubkey: target.pubkey },
-        close
-      );
-    }, [activeIndex, close, parsed, profiles, selectedIndex])
-  );
+  const switchAndConnect = useSingleFlight(async () => {
+    const target = profiles.find((profile) => profile.accountIndex === selectedIndex);
+    if (target === undefined || target.accountIndex === activeIndex) return;
+    // The seam orders the teardown: intent persisted (awaited) → sheet
+    // closed → restart-based switch. On an abort it shows the retry toast
+    // and the sheet stays open for another attempt.
+    await switchProfileAndPair(
+      parsed,
+      { accountIndex: target.accountIndex, pubkey: target.pubkey },
+      close
+    );
+  });
 
-  const onSwitchAndConnect = useCallback(() => {
+  const onSwitchAndConnect = () => {
     void switchAndConnect();
-  }, [switchAndConnect]);
+  };
 
   const showRestartWarning = selectedIndex !== activeIndex;
 

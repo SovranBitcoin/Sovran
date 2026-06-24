@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -63,12 +63,9 @@ export function Spinner({
       ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
     }),
   });
-  const handleLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      layout.onLayout(event);
-    },
-    [layout]
-  );
+  const handleLayout = (event: LayoutChangeEvent) => {
+    layout.onLayout(event);
+  };
 
   return (
     <View

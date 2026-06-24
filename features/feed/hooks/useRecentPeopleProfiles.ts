@@ -74,13 +74,9 @@ export function useRecentPeopleProfiles(pubkeys: readonly string[]): RecentPeopl
     [loadingKey]
   );
 
-  return useMemo(
-    () =>
-      normalizedPubkeys.map((pubkey) => ({
-        pubkey,
-        metadata: byPubkey[pubkey],
-        isLoading: loadingPubkeys.has(pubkey),
-      })),
-    [normalizedPubkeys, byPubkey, loadingPubkeys]
-  );
+  return normalizedPubkeys.map((pubkey) => ({
+    pubkey,
+    metadata: byPubkey[pubkey],
+    isLoading: loadingPubkeys.has(pubkey),
+  }));
 }

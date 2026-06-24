@@ -167,7 +167,7 @@ export function ThreadReplyBar({
     }),
   });
 
-  const handlePost = useCallback(async () => {
+  const handlePost = async () => {
     if (!ndk || !canPost || !replyTarget) return;
     setPosting(true);
     const blocks: ComposerBlock[] = [{ id: 'reply-text', kind: 'text', text }, ...mediaBlocks];
@@ -180,9 +180,9 @@ export function ThreadReplyBar({
       inputRef.current?.blur();
       Keyboard.dismiss();
     }
-  }, [ndk, canPost, text, mediaBlocks, replyTarget]);
+  };
 
-  const handleAddMedia = useCallback(async () => {
+  const handleAddMedia = async () => {
     if (!ndk) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images', 'videos'],
@@ -208,7 +208,7 @@ export function ThreadReplyBar({
         b.id === id ? { ...b, descriptor: upload.value, uploadProgress: undefined } : b
       );
     });
-  }, [ndk]);
+  };
 
   // Hand the current draft + reply context to the full composer.
   const expandToFull = useCallback(

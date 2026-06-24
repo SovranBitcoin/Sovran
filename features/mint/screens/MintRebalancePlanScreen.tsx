@@ -91,7 +91,7 @@ export function MintRebalancePlanScreen() {
     });
   }, [trustedMints, unit]);
 
-  const mintUrls = useMemo(() => mintsForUnit.map((m) => m.mintUrl), [mintsForUnit]);
+  const mintUrls = mintsForUnit.map((m) => m.mintUrl);
 
   useEffect(() => {
     let cancelled = false;

@@ -20,7 +20,12 @@ describe('resolvedFeedPageToParseResult', () => {
       tier: 'relay' as const,
       items: [
         { type: 'note' as const, event: event(NOTE, 200, [['q', QUOTED]]) },
-        { type: 'repost' as const, repostEvent: event(REPOST, 150), originalEvent: event(ORIG, 100), originalEventId: ORIG },
+        {
+          type: 'repost' as const,
+          repostEvent: event(REPOST, 150),
+          originalEvent: event(ORIG, 100),
+          originalEventId: ORIG,
+        },
       ],
       stats: { [NOTE]: { likes: 5, reposts: 2, replies: 1, zaps: 3, satsZapped: 2100 } },
       profiles: { [PUB]: { name: 'alice', picture: 'http://x/a.png' } },
@@ -40,7 +45,12 @@ describe('resolvedFeedPageToParseResult', () => {
     expect(repost.type === 'repost' && repost.originalEventId).toBe(ORIG);
     expect(repost.timestamp).toBe(150);
     // stats → NoteMetrics field rename
-    expect(result.metricsMap.get(NOTE)).toEqual({ likeCount: 5, repostCount: 2, replyCount: 1, satsZapped: 2100 });
+    expect(result.metricsMap.get(NOTE)).toEqual({
+      likeCount: 5,
+      repostCount: 2,
+      replyCount: 1,
+      satsZapped: 2100,
+    });
     // profiles + cursor
     expect(result.profilesMap.get(PUB)).toEqual({ name: 'alice', picture: 'http://x/a.png' });
     expect(result.paginationUntil).toBe(100);

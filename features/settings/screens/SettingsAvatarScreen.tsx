@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { ScrollView } from 'react-native';
 import { Card, Radio, RadioGroup, Separator } from 'heroui-native';
 
@@ -24,14 +24,11 @@ export function SettingsAvatarScreen() {
   const avatarFallbackVariant = useSettingsStore((state) => state.avatarFallbackVariant);
   const setAvatarFallbackVariant = useSettingsStore((state) => state.setAvatarFallbackVariant);
 
-  const handleVariantChange = useCallback(
-    (value: string) => {
-      if (!isAvatarFallbackVariant(value)) return;
-      log.info('settings.avatar_fallback.change', { variant: value });
-      setAvatarFallbackVariant(value);
-    },
-    [setAvatarFallbackVariant]
-  );
+  const handleVariantChange = (value: string) => {
+    if (!isAvatarFallbackVariant(value)) return;
+    log.info('settings.avatar_fallback.change', { variant: value });
+    setAvatarFallbackVariant(value);
+  };
 
   return (
     <ScreenWrapper name="SettingsAvatarScreen" scroll="custom" safeArea>

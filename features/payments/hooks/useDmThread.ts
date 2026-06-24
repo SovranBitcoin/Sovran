@@ -10,7 +10,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { paymentLog } from '@/shared/lib/logger';
-import { fetchDmConversation, type DmEnvelopePage } from '../data/dmEnvelopeClient';
+import { fetchDmConversation } from '../data/dmEnvelopeClient';
+import type { DmEnvelopePage } from '../data/dmEnvelopeTypes';
 import { decryptDmEnvelopes, type DecryptedDm, type DmProtocol } from '../data/dmDecryptPipeline';
 import { CURSOR_SLACK_SECONDS, pageOldestWrapTs } from '../data/dmPagination';
 
@@ -138,7 +139,7 @@ export function useDmThread(
     ingestMessages,
   ]);
 
-  const loadMore = useCallback(async () => {
+  const loadMore = async () => {
     if (
       loadingMoreRef.current ||
       !hasMore ||
@@ -169,17 +170,9 @@ export function useDmThread(
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [
-    hasMore,
-    viewerPubkey,
-    viewerPrivateKey,
-    counterparty,
-    protocol,
-    trackEnvelopes,
-    ingestMessages,
-  ]);
+  };
 
-  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const refresh = () => setRefreshKey((k) => k + 1);
 
   return { messages, loading, hasMore, loadMore, refresh, error };
 }

@@ -80,6 +80,7 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useVisualStateLogger } from '@/shared/lib/contentShiftLog';
 import { Log, nostrLog, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 const BANNER_HEIGHT = 150;
 const AVATAR_SIZE = 90;
@@ -95,13 +96,6 @@ const UserProfileParamsSchema = z
     message: 'either npub or pubkey is required',
     path: ['pubkey'],
   });
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 function buildUpdatedContactTags(
   existingTags: string[][],
@@ -480,10 +474,7 @@ function BannerWithAvatarComponent({
   }));
   const [bannerStatus, setBannerStatus] = useState<'loading' | 'loaded' | 'failed'>('loading');
 
-  const fallbackIndex = useMemo(
-    () => (pubkey ? parseInt(pubkey.slice(0, 8), 16) % 8 : 0),
-    [pubkey]
-  );
+  const fallbackIndex = pubkey ? parseInt(pubkey.slice(0, 8), 16) % 8 : 0;
   const bannerError = bannerStatus === 'failed';
   const hasBannerImage = Boolean(bannerUrl && !bannerError);
   // Mirror Avatar's state model for the banner:
@@ -503,10 +494,7 @@ function BannerWithAvatarComponent({
     fallbackIndex
   );
 
-  const bannerGradientTheme = useMemo(
-    () => generateSeededGradient(`${pubkey || 'default'}`),
-    [pubkey]
-  );
+  const bannerGradientTheme = generateSeededGradient(`${pubkey || 'default'}`);
 
   const gradientSource = useMemo(() => {
     if (pictureUrl && pfpColors.hasExtractedColors) return 'pfp';
@@ -786,10 +774,7 @@ export function UserProfileScreen() {
     if (npubParam) return npubToPubkey(npubParam);
     return '';
   }, [npubParam, pubkeyParam]);
-  const profileHeaderVisualScope = useMemo(
-    () => `profile.${pubkey ? pubkey.slice(0, 12) : 'unknown'}.header`,
-    [pubkey]
-  );
+  const profileHeaderVisualScope = `profile.${pubkey ? pubkey.slice(0, 12) : 'unknown'}.header`;
   const addRecentPerson = useRecentPeopleStore((state) => state.addRecentPerson);
 
   useEffect(() => {
@@ -930,9 +915,7 @@ export function UserProfileScreen() {
   const followingCount = isOwnProfile
     ? (profileData?.follows ?? ownFollowingCount)
     : profileData?.follows;
-  const isFollowingProfile = useNostrSocialStore(
-    useMemo(() => selectIsFollowingPubkey(pubkey || ''), [pubkey])
-  );
+  const isFollowingProfile = useNostrSocialStore(selectIsFollowingPubkey(pubkey || ''));
   const followInFlight = !!followOptimisticEntry?.pending;
 
   // ===========================
@@ -942,11 +925,11 @@ export function UserProfileScreen() {
   const [userVideoPosts, setUserVideoPosts] = useState<VideoPostRecord[]>([]);
   const hasStories = userVideoPosts.length > 0;
 
-  const handleVideoPostsReady = useCallback((videoPosts: VideoPostRecord[]) => {
+  const handleVideoPostsReady = (videoPosts: VideoPostRecord[]) => {
     setUserVideoPosts(videoPosts);
-  }, []);
+  };
 
-  const handleAvatarStoryPress = useCallback(() => {
+  const handleAvatarStoryPress = () => {
     if (userVideoPosts.length === 0) return;
     nostrLog.info('user.profile.story.view', { pubkey, videoCount: userVideoPosts.length });
     const storyUser: StoryUser = {
@@ -961,7 +944,7 @@ export function UserProfileScreen() {
         storyUsersJson: JSON.stringify([storyUser]),
       },
     });
-  }, [userVideoPosts, pubkey, cachedProfile, displayName]);
+  };
 
   // ===========================
   // HANDLERS
@@ -1053,14 +1036,14 @@ export function UserProfileScreen() {
   // a second kind-3 publish with the first's `clearFollowOptimistic`.
   const handleToggleFollow = useSingleFlight(handleToggleFollowInner);
 
-  const handleMintInfoPress = useCallback(() => {
+  const handleMintInfoPress = () => {
     if (!profileMintUrl) return;
     paymentLog.info('user.profile.mint_info.open', {
       ...mintUrlLogFields(profileMintUrl),
       source: mintUrlParam ? 'route_param' : 'profile_api',
     });
     router.navigate(buildMintInfoHref(profileMintUrl));
-  }, [mintUrlParam, profileMintUrl]);
+  };
 
   // ===========================
   // PROFILE INFO ITEMS (data-driven)

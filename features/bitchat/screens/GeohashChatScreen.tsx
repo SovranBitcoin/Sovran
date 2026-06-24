@@ -7,7 +7,7 @@
  * DM modes mount the shared `<DmChatHeader>`.
  */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
@@ -90,11 +90,8 @@ export function GeohashChatScreen({
   // the reachability banner above the BLE-DM composer.
   const { peers: blePeers, connectedCount: bleConnectedCount } = useBLEPeers();
   const bluetooth = useBluetoothState();
-  const dmPeerSnapshot = useMemo(
-    () =>
-      transport === 'ble-dm' && dmPeerID ? blePeers.find((p) => p.peerID === dmPeerID) : undefined,
-    [blePeers, transport, dmPeerID]
-  );
+  const dmPeerSnapshot =
+    transport === 'ble-dm' && dmPeerID ? blePeers.find((p) => p.peerID === dmPeerID) : undefined;
 
   useEffect(() => {
     bitchatLog.debug('bitchat.screen.messages', {
@@ -123,31 +120,27 @@ export function GeohashChatScreen({
 
   const handleBack = onBack ?? (() => router.back());
 
-  const bubbleMessages = useMemo<ChatBubbleMessage[]>(
-    () =>
-      messages.map((m: ChatMessage) => {
-        // `ble-dm` messages carry a richer `deliveryStatus` from the global
-        // store; all other transports just have `isPending`. Cast to read
-        // the optional field without forcing every ChatMessage shape to
-        // declare it.
-        const richStatus = (m as { deliveryStatus?: ChatBubbleMessage['deliveryStatus'] })
-          .deliveryStatus;
-        const deliveryStatus: ChatBubbleMessage['deliveryStatus'] | undefined = m.isOwn
-          ? (richStatus ?? (m.isPending ? 'sending' : 'sent'))
-          : undefined;
-        return {
-          id: m.id,
-          content: m.content,
-          senderId: m.senderId,
-          sender: m.sender,
-          timestamp: m.timestamp,
-          isOwn: m.isOwn,
-          deliveryStatus,
-          cashuToken: extractCashuToken(m.content) ?? undefined,
-        };
-      }),
-    [messages]
-  );
+  const bubbleMessages = messages.map((m: ChatMessage) => {
+    // `ble-dm` messages carry a richer `deliveryStatus` from the global
+    // store; all other transports just have `isPending`. Cast to read
+    // the optional field without forcing every ChatMessage shape to
+    // declare it.
+    const richStatus = (m as { deliveryStatus?: ChatBubbleMessage['deliveryStatus'] })
+      .deliveryStatus;
+    const deliveryStatus: ChatBubbleMessage['deliveryStatus'] | undefined = m.isOwn
+      ? (richStatus ?? (m.isPending ? 'sending' : 'sent'))
+      : undefined;
+    return {
+      id: m.id,
+      content: m.content,
+      senderId: m.senderId,
+      sender: m.sender,
+      timestamp: m.timestamp,
+      isOwn: m.isOwn,
+      deliveryStatus,
+      cashuToken: extractCashuToken(m.content) ?? undefined,
+    };
+  });
 
   const header = isDM ? (
     <DmChatHeader
@@ -245,7 +238,7 @@ export function GeohashChatScreen({
   } else if (transport === 'ble-dm') {
     const isMeshOnly =
       !!dmPeerSnapshot && dmPeerSnapshot.isConnected && dmPeerSnapshot.hasDirectLink === false;
-    const isUnknownOrOffline = !dmPeerSnapshot || !dmPeerSnapshot.isConnected;
+    const isUnknownOrOffline = !dmPeerSnapshot?.isConnected;
     if (isMeshOnly) {
       bleDmBanner = (
         <HStack

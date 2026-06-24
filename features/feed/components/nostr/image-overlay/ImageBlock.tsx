@@ -4,7 +4,7 @@
  * Applies blur to thumbnail when overlay is displaced.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Platform, StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Reanimated, {
@@ -135,24 +135,21 @@ export const ImageBlock = React.memo(function ImageBlock({
       overlayActive: imageOverlay?.activeUrl === url,
     }),
   });
-  const setContainerRef = useCallback(
-    (node: React.ComponentRef<typeof View> | null) => {
-      containerRef.current = node;
-      visualLayout.ref(node);
-    },
-    [visualLayout]
-  );
+  const setContainerRef = (node: React.ComponentRef<typeof View> | null) => {
+    containerRef.current = node;
+    visualLayout.ref(node);
+  };
 
   type Measureable = {
     measureInWindow: (cb: (x: number, y: number, w: number, h: number) => void) => void;
   };
-  const measureSourceRef = useCallback((): Measureable | null => {
+  const measureSourceRef = (): Measureable | null => {
     const imageNode = imageRef.current as Measureable | null;
     const containerNode = containerRef.current as Measureable | null;
     if (imageNode && typeof imageNode.measureInWindow === 'function') return imageNode;
     if (containerNode && typeof containerNode.measureInWindow === 'function') return containerNode;
     return null;
-  }, []);
+  };
 
   /**
    * measureInWindow + the provider's tap-calibrated measure-space correction.
@@ -163,19 +160,19 @@ export const ImageBlock = React.memo(function ImageBlock({
    * through here so tap-time, onLayout, and JIT-close rects share one space.
    */
   const correctionRef = imageOverlay?.measureSpaceCorrection;
-  const measureCorrected = useCallback(
-    (node: Measureable, cb: (x: number, y: number, w: number, h: number) => void) => {
-      node.measureInWindow((pageX, pageY, width, height) => {
-        const corr = correctionRef?.current;
-        if (Platform.OS === 'android' && corr) {
-          cb(pageX + corr.dx, pageY + corr.dy, width, height);
-        } else {
-          cb(pageX, pageY, width, height);
-        }
-      });
-    },
-    [correctionRef]
-  );
+  const measureCorrected = (
+    node: Measureable,
+    cb: (x: number, y: number, w: number, h: number) => void
+  ) => {
+    node.measureInWindow((pageX, pageY, width, height) => {
+      const corr = correctionRef?.current;
+      if (Platform.OS === 'android' && corr) {
+        cb(pageX + corr.dx, pageY + corr.dy, width, height);
+      } else {
+        cb(pageX, pageY, width, height);
+      }
+    });
+  };
 
   /**
    * Just-in-time re-measure for dismiss targeting. Recycled FlashList rows
@@ -183,7 +180,7 @@ export const ImageBlock = React.memo(function ImageBlock({
    * onLayout can be stale by close time; close() calls this to re-measure the
    * live node. Resolves null when the node is unmounted/unmeasurable.
    */
-  const measureNow = useCallback((): Promise<ThumbnailLayout | null> => {
+  const measureNow = (): Promise<ThumbnailLayout | null> => {
     return new Promise((resolve) => {
       const node = measureSourceRef();
       if (!node) {
@@ -198,9 +195,9 @@ export const ImageBlock = React.memo(function ImageBlock({
         resolve({ pageX, pageY, width, height });
       });
     });
-  }, [measureSourceRef, measureCorrected]);
+  };
 
-  const registerLayout = useCallback(() => {
+  const registerLayout = () => {
     const node = measureSourceRef();
     if (!node) return;
     measureCorrected(node, (pageX: number, pageY: number, width: number, height: number) => {
@@ -212,151 +209,110 @@ export const ImageBlock = React.memo(function ImageBlock({
           : { measureNow }
       );
     });
-  }, [
-    imageOverlay,
-    url,
-    overlayEvent?.id,
-    layoutIndex,
-    measureSourceRef,
-    measureCorrected,
-    measureNow,
-  ]);
+  };
 
-  const handlePress = useCallback(
-    (event?: { nativeEvent?: GestureTouchPoint }) => {
-      if (!imageOverlay?.open) return;
-      onBeforeOpen?.();
-      const node = measureSourceRef();
-      if (!node) return;
-      // Capture the touch's native-truth coordinates synchronously: pageX/Y is
-      // root-window space from the NATIVE view hierarchy (includes every
-      // native-only displacement); locationX/Y is within the pressed view
-      // (which shares the measured node's origin — the Pressable absolute-fills
-      // the container, and the image fills the container). The difference
-      // against measureInWindow's raw answer IS the systematic shadow-tree
-      // error for this surface — ~statusBar+toolbar when RNS drops its
-      // contentOffset state, ~0 when the pipeline works.
-      const touch = event?.nativeEvent;
-      const trueX = touch != null ? touch.pageX - touch.locationX : null;
-      const trueY = touch != null ? touch.pageY - touch.locationY : null;
-      node.measureInWindow((rawPageX: number, rawPageY: number, width: number, height: number) => {
-        if (
-          Platform.OS === 'android' &&
-          correctionRef &&
-          trueX != null &&
-          trueY != null &&
-          Number.isFinite(trueX) &&
-          Number.isFinite(trueY)
-        ) {
-          const dx = trueX - rawPageX;
-          const dy = trueY - rawPageY;
-          // Sanity gates: x should match almost exactly; y can be off by up to
-          // a native header (~120dp) or a sheet's top offset. Anything wilder
-          // means locationX/Y was unreliable for this event — keep the last
-          // good calibration instead.
-          if (Math.abs(dx) <= 4 && dy >= -4 && dy <= 240) {
-            if (Math.abs(correctionRef.current.dy - dy) > 1) {
-              feedLog.debug('image_overlay.measure_correction', { dx, dy });
-            }
-            correctionRef.current = { dx: Math.abs(dx) <= 1 ? 0 : dx, dy };
+  const handlePress = (event?: { nativeEvent?: GestureTouchPoint }) => {
+    if (!imageOverlay?.open) return;
+    onBeforeOpen?.();
+    const node = measureSourceRef();
+    if (!node) return;
+    // Capture the touch's native-truth coordinates synchronously: pageX/Y is
+    // root-window space from the NATIVE view hierarchy (includes every
+    // native-only displacement); locationX/Y is within the pressed view
+    // (which shares the measured node's origin — the Pressable absolute-fills
+    // the container, and the image fills the container). The difference
+    // against measureInWindow's raw answer IS the systematic shadow-tree
+    // error for this surface — ~statusBar+toolbar when RNS drops its
+    // contentOffset state, ~0 when the pipeline works.
+    const touch = event?.nativeEvent;
+    const trueX = touch != null ? touch.pageX - touch.locationX : null;
+    const trueY = touch != null ? touch.pageY - touch.locationY : null;
+    node.measureInWindow((rawPageX: number, rawPageY: number, width: number, height: number) => {
+      if (
+        Platform.OS === 'android' &&
+        correctionRef &&
+        trueX != null &&
+        trueY != null &&
+        Number.isFinite(trueX) &&
+        Number.isFinite(trueY)
+      ) {
+        const dx = trueX - rawPageX;
+        const dy = trueY - rawPageY;
+        // Sanity gates: x should match almost exactly; y can be off by up to
+        // a native header (~120dp) or a sheet's top offset. Anything wilder
+        // means locationX/Y was unreliable for this event — keep the last
+        // good calibration instead.
+        if (Math.abs(dx) <= 4 && dy >= -4 && dy <= 240) {
+          if (Math.abs(correctionRef.current.dy - dy) > 1) {
+            feedLog.debug('image_overlay.measure_correction', { dx, dy });
           }
+          correctionRef.current = { dx: Math.abs(dx) <= 1 ? 0 : dx, dy };
         }
-        const corr = Platform.OS === 'android' && correctionRef ? correctionRef.current : null;
-        const pageX = rawPageX + (corr?.dx ?? 0);
-        const pageY = rawPageY + (corr?.dy ?? 0);
-        // Tap-time registration so close() has a measureNow for this key even
-        // when the row was recycled and onLayout never re-fired.
-        imageOverlay.registerThumbnailLayout(
-          url,
-          { pageX, pageY, width, height },
-          overlayEvent?.id != null
-            ? { eventId: overlayEvent.id, imageIndex: layoutIndex, measureNow }
-            : { measureNow }
-        );
-        const post: ImageOverlayPost | undefined =
-          overlayEvent && overlayMetrics
-            ? {
-                event: {
-                  id: overlayEvent.id,
-                  kind: overlayEvent.kind,
-                  pubkey: overlayEvent.pubkey,
-                  content: overlayEvent.content,
-                  tags: overlayEvent.tags,
-                  created_at: overlayEvent.created_at,
-                },
-                metrics: {
-                  replyCount: overlayMetrics.replyCount,
-                  repostCount: overlayMetrics.repostCount,
-                  likeCount: overlayMetrics.likeCount,
-                  satsZapped: overlayMetrics.satsZapped,
-                },
-                profile: overlayProfile ?? null,
-                reposted,
-                liked,
-                replied,
-                repostPending,
-                likePending,
-                repostPendingDirection,
-                likePendingDirection,
-                onCommentPress,
-                onRepostPress,
-                onLikePress,
-                onActionPressIn,
-                onActionPressOut,
-              }
+      }
+      const corr = Platform.OS === 'android' && correctionRef ? correctionRef.current : null;
+      const pageX = rawPageX + (corr?.dx ?? 0);
+      const pageY = rawPageY + (corr?.dy ?? 0);
+      // Tap-time registration so close() has a measureNow for this key even
+      // when the row was recycled and onLayout never re-fired.
+      imageOverlay.registerThumbnailLayout(
+        url,
+        { pageX, pageY, width, height },
+        overlayEvent?.id != null
+          ? { eventId: overlayEvent.id, imageIndex: layoutIndex, measureNow }
+          : { measureNow }
+      );
+      const post: ImageOverlayPost | undefined =
+        overlayEvent && overlayMetrics
+          ? {
+              event: {
+                id: overlayEvent.id,
+                kind: overlayEvent.kind,
+                pubkey: overlayEvent.pubkey,
+                content: overlayEvent.content,
+                tags: overlayEvent.tags,
+                created_at: overlayEvent.created_at,
+              },
+              metrics: {
+                replyCount: overlayMetrics.replyCount,
+                repostCount: overlayMetrics.repostCount,
+                likeCount: overlayMetrics.likeCount,
+                satsZapped: overlayMetrics.satsZapped,
+              },
+              profile: overlayProfile ?? null,
+              reposted,
+              liked,
+              replied,
+              repostPending,
+              likePending,
+              repostPendingDirection,
+              likePendingDirection,
+              onCommentPress,
+              onRepostPress,
+              onLikePress,
+              onActionPressIn,
+              onActionPressOut,
+            }
+          : undefined;
+      const urls =
+        allMediaUrls && allMediaUrls.length > 0
+          ? allMediaUrls
+          : allImageUrls && allImageUrls.length > 1
+            ? allImageUrls
             : undefined;
-        const urls =
-          allMediaUrls && allMediaUrls.length > 0
-            ? allMediaUrls
-            : allImageUrls && allImageUrls.length > 1
-              ? allImageUrls
-              : undefined;
-        imageOverlay.open({
-          url,
-          aspectRatio,
-          pageX,
-          pageY,
-          width,
-          height,
-          urls: urls && urls.length > 1 ? urls : undefined,
-          mediaTypes:
-            mediaTypes && urls && mediaTypes.length === urls.length ? mediaTypes : undefined,
-          initialIndex: mediaIndex ?? imageIndex ?? 0,
-          post: post ?? null,
-        });
+      imageOverlay.open({
+        url,
+        aspectRatio,
+        pageX,
+        pageY,
+        width,
+        height,
+        urls: urls && urls.length > 1 ? urls : undefined,
+        mediaTypes: mediaTypes && mediaTypes.length === urls?.length ? mediaTypes : undefined,
+        initialIndex: mediaIndex ?? imageIndex ?? 0,
+        post: post ?? null,
       });
-    },
-    [
-      imageOverlay,
-      measureSourceRef,
-      measureNow,
-      correctionRef,
-      url,
-      aspectRatio,
-      allImageUrls,
-      allMediaUrls,
-      mediaTypes,
-      mediaIndex,
-      imageIndex,
-      layoutIndex,
-      onBeforeOpen,
-      overlayEvent,
-      overlayMetrics,
-      overlayProfile,
-      reposted,
-      liked,
-      replied,
-      repostPending,
-      likePending,
-      repostPendingDirection,
-      likePendingDirection,
-      onCommentPress,
-      onRepostPress,
-      onLikePress,
-      onActionPressIn,
-      onActionPressOut,
-    ]
-  );
+    });
+  };
 
   const fallbackBlur = useSharedValue(0);
   const thumbnailBlur = imageOverlay?.thumbnailBlurIntensity ?? fallbackBlur;

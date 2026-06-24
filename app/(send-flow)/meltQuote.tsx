@@ -5,7 +5,7 @@
  * `Stack.Screen` title comes from `(send-flow)/_layout.tsx`.
  */
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useEffect } from 'react';
 
 import { MeltQuoteRoute } from '@/features/send';
 import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
@@ -24,10 +24,10 @@ export default function ModalScreen() {
     });
   }, [walletContext.mintBalances, walletContext.trustedMintUrls.length]);
 
-  const handleRequestMintList = useCallback(() => {
+  const handleRequestMintList = () => {
     cashuLog.info('melt.mint_list.requested', { source: 'pill' });
     void machine.requestMintSelector();
-  }, [machine]);
+  };
 
   return <MeltQuoteRoute where="send-flow.meltQuote" onRequestMintList={handleRequestMintList} />;
 }

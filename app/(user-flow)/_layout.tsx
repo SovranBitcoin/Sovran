@@ -11,7 +11,6 @@
  * The first screen shows a close button, subsequent screens show a back button.
  */
 
-import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
@@ -32,18 +31,12 @@ export default function UserFlowLayout() {
     'background',
     'surface',
   ] as const);
-  const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }),
-    [foreground, background]
-  );
-  const threadOptions = useMemo(
-    () => ({
-      title: 'Thread',
-      contentStyle: { backgroundColor: surface },
-      ...androidHeaderScrimOptions(surface),
-    }),
-    [surface]
-  );
+  const screenOptions = createFlowLayoutScreenOptions({ foreground, background });
+  const threadOptions = {
+    title: 'Thread',
+    contentStyle: { backgroundColor: surface },
+    ...androidHeaderScrimOptions(surface),
+  };
 
   return (
     <Stack screenOptions={screenOptions}>

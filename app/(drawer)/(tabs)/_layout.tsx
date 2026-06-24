@@ -11,6 +11,16 @@ export const unstable_settings = {
   initialRouteName: 'index',
 };
 
+/* eslint-disable no-restricted-syntax -- native tab-bar theme palette (Expo
+   default Colors), resolved per-appearance by DynamicColorIOS; these are colour
+   definitions for the iOS native tab bar, intentionally fixed per light/dark
+   appearance rather than app-theme tokens. */
+const TAB_LABEL_DARK = '#ECEDEE';
+const TAB_LABEL_LIGHT = '#11181C';
+const TAB_TINT_DARK = '#fff';
+const TAB_TINT_LIGHT = '#0a7ea4';
+/* eslint-enable no-restricted-syntax */
+
 type TabName = 'feed' | 'index' | 'contacts' | 'notifications' | 'ai';
 
 type TabDef = {
@@ -66,15 +76,15 @@ export default function TabLayout() {
             labelStyle={{
               color: Platform.select({
                 ios: DynamicColorIOS({
-                  dark: '#ECEDEE',
-                  light: '#11181C',
+                  dark: TAB_LABEL_DARK,
+                  light: TAB_LABEL_LIGHT,
                 }),
               }),
             }}
             tintColor={Platform.select({
               ios: DynamicColorIOS({
-                dark: '#fff',
-                light: '#0a7ea4',
+                dark: TAB_TINT_DARK,
+                light: TAB_TINT_LIGHT,
               }),
             })}
             disableTransparentOnScrollEdge>

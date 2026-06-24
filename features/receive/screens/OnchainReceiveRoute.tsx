@@ -6,7 +6,7 @@
  * rail-specific screen.
  */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 import { useScreenActions, type BoundAction } from '@sovranbitcoin/colada/react';
@@ -64,7 +64,9 @@ function OnchainReceiveRouteContent({
   extraButtons: ButtonHandlerButton[];
   onRequestMintList?: () => void;
 }) {
-  const screenOptions = useMemo(() => ({ title: 'Receive onchain' }), []);
+  const screenOptions = {
+    title: 'Receive onchain',
+  };
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'mintQuote',
     mintHistoryEntry

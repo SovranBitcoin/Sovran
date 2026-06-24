@@ -14,7 +14,7 @@ import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStor
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 /** Default Blossom server (BUD-02). */
-export const DEFAULT_BLOSSOM_SERVER = 'https://blossom.primal.net';
+const DEFAULT_BLOSSOM_SERVER = 'https://blossom.primal.net';
 
 interface MediaServerState {
   server: string;
@@ -31,7 +31,7 @@ function normalizeServer(server: string): string {
   return /^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
-export const useMediaServerStore = create<MediaServerState>()(
+const useMediaServerStore = create<MediaServerState>()(
   persist(
     (set) => ({
       server: DEFAULT_BLOSSOM_SERVER,

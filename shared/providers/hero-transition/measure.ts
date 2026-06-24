@@ -1,6 +1,14 @@
 import type { Rect } from './types';
 
-export async function measureInWindowAsync(ref: any): Promise<Rect | null> {
+export type Measurable = {
+  measureInWindow?: (
+    callback: (x: number, y: number, width: number, height: number) => void
+  ) => void;
+};
+
+export async function measureInWindowAsync(
+  ref: Measurable | null | undefined
+): Promise<Rect | null> {
   return await new Promise((resolve) => {
     try {
       if (!ref?.measureInWindow) return resolve(null);

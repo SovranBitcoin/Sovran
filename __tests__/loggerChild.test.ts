@@ -315,7 +315,7 @@ describe('logger redaction safety (audit 56.json F-001 / F-008 / F-012)', () => 
       dedupWindowMs: 1000,
     });
     log.debug('evt');
-    const firstSnapshot = JSON.parse(JSON.stringify(log.getRecentLogs()));
+    const firstSnapshot = structuredClone(log.getRecentLogs());
     log.debug('evt');
     log.debug('evt');
     log.debug('evt');

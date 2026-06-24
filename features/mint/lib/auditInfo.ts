@@ -1,6 +1,6 @@
 import type { AuditMintResponse } from '@/shared/lib/apiClient';
 
-export interface AuditInfo {
+interface AuditInfo {
   url: string;
   name: string;
   state: string;

@@ -7,7 +7,7 @@
  * and a consistent empty-query recents view. A single `selectedScope` value
  * drives the highlight, so two tabs can never read as selected at once.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -39,7 +39,7 @@ export function UnifiedSearch({
 
   // Visible scopes: All always; the rest only when they have results for the
   // current query. Empty query → show the full row (recents render below).
-  const visibleScopes = useMemo(() => computeVisibleScopes(trimmed, counts), [trimmed, counts]);
+  const visibleScopes = computeVisibleScopes(trimmed, counts);
 
   // Single-selection invariant: if the active scope's tab disappears, fall back
   // to All. This is the only reset path — there is no second selection axis.

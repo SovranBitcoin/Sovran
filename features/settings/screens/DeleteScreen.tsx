@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { ScrollView } from 'react-native';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
@@ -14,16 +14,16 @@ import Icon from 'assets/icons';
 import { Button, Card } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
+const handleDelete = async () => {
+  log.warn('settings.delete.confirmed', { reason: 'user_initiated_slide_to_delete' });
+  await deleteAllProfiles();
+  log.info('settings.delete.complete');
+};
+
 export function DeleteScreen() {
   useLifecycleLogger('DeleteScreen');
   const foreground = useThemeColor('foreground');
   const [danger, red400] = useThemeColor(['danger', 'red-400'] as const);
-
-  const handleDelete = useCallback(async () => {
-    log.warn('settings.delete.confirmed', { reason: 'user_initiated_slide_to_delete' });
-    await deleteAllProfiles();
-    log.info('settings.delete.complete');
-  }, []);
 
   return (
     <ScreenWrapper name="DeleteScreen" scroll="custom" safeArea>

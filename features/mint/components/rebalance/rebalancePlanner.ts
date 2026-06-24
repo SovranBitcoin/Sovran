@@ -68,13 +68,10 @@ function computeTargetBalances(
 
   if (total === 0) {
     // No balance to distribute
-    return mintUrls.reduce(
-      (acc, url) => {
-        acc[url] = 0;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
+    return mintUrls.reduce<Record<string, number>>((acc, url) => {
+      acc[url] = 0;
+      return acc;
+    }, {});
   }
 
   // Calculate raw targets and track remainders for rounding

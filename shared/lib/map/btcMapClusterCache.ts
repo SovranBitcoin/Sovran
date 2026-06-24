@@ -35,10 +35,11 @@ function evictIfNeeded() {
 export function getOrBuildBTCMapClusterManager(
   cacheKey: string,
   points: GeoPoint[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supercluster point/cluster prop generics; this cache is prop-agnostic
   options?: Supercluster.Options<any, any>
 ): ClusterManager {
   const existing = CACHE.get(cacheKey);
-  if (existing && existing.pointsCount === points.length && existing.manager.isLoaded()) {
+  if (existing?.pointsCount === points.length && existing.manager.isLoaded()) {
     // Touch on hit so the LRU eviction in `evictIfNeeded` actually drops
     // the least-recently-used entry, not the oldest-built one.
     existing.createdAt = Date.now();

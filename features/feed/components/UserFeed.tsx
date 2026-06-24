@@ -699,7 +699,7 @@ export function UserFeed({
     onVideoPostsReady?.(videoPosts);
   }, [videoPosts, onVideoPostsReady]);
 
-  const feedIndicesWithVideo = useMemo(() => computeFeedIndicesWithVideo(feedItems), [feedItems]);
+  const feedIndicesWithVideo = computeFeedIndicesWithVideo(feedItems);
 
   const onOverlayOpenedFromIndex = useCallback((index: number) => {
     overlaySourceIndexRef.current = index;

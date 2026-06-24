@@ -180,7 +180,7 @@ export function createPubkeyScopedCache<T>(opts: PubkeyScopedCacheOpts<T>): Pubk
           }
         }
 
-        if (negRes && negRes.status === 'fulfilled' && negRes.value) {
+        if (negRes?.status === 'fulfilled' && negRes.value) {
           try {
             const parsed = JSON.parse(negRes.value) as Record<string, number>;
             for (const [key, cachedAt] of Object.entries(parsed)) {

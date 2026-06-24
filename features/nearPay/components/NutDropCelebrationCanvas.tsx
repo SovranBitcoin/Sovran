@@ -93,19 +93,15 @@ export function NutDropCelebrationCanvas({
   palette: LightningPalette;
 }) {
   const { core, innerGlow, outerGlow } = LIGHTNING_PALETTES[palette];
-  const bolts = useMemo(
-    () =>
-      generateSkyBolts(seed, {
-        width: fieldSize.width,
-        height: fieldSize.height,
-        targetX,
-        targetY,
-        targetRadius: avatarRadius + 6,
-        count: SKY_BOLT_COUNT,
-      }),
-    [avatarRadius, fieldSize.height, fieldSize.width, seed, targetX, targetY]
-  );
-  const paths = useMemo(() => bolts.map(variantToSkPath), [bolts]);
+  const bolts = generateSkyBolts(seed, {
+    width: fieldSize.width,
+    height: fieldSize.height,
+    targetX,
+    targetY,
+    targetRadius: avatarRadius + 6,
+    count: SKY_BOLT_COUNT,
+  });
+  const paths = bolts.map(variantToSkPath);
   const faceClip = useMemo(() => {
     const clip = Skia.Path.Make();
     clip.addCircle(targetX, targetY, avatarRadius - 1);
@@ -232,10 +228,7 @@ export function NutDropCelebrationCanvas({
 
   const boltOpacities = [boltPrimary, boltSecondary];
   const bloomRadius = Math.max(fieldSize.width, fieldSize.height) * 0.75;
-  const bloomGradientColors = useMemo(
-    () => [opacity(outerGlow, op(0.5)), opacity(outerGlow, 0)],
-    [outerGlow]
-  );
+  const bloomGradientColors = [opacity(outerGlow, op(0.5)), opacity(outerGlow, 0)];
 
   if (fieldSize.width <= 0 || fieldSize.height <= 0) return null;
 

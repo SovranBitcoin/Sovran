@@ -1,13 +1,7 @@
 import { extractDomain } from '@/shared/lib/url';
 import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
 import { cashuLog } from '@/shared/lib/logger';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 type BalanceMap = Record<string, { total?: AmountValue } | undefined>;
 
@@ -16,12 +10,12 @@ interface ManagerLike {
   mint: { untrustMint: (url: string) => Promise<void> };
 }
 
-export interface StrandedMint {
+interface StrandedMint {
   url: string;
   balance: number;
 }
 
-export interface ReleaseTrustWindowResult {
+interface ReleaseTrustWindowResult {
   stranded: StrandedMint[];
   untrustErrors: { url: string; error: unknown }[];
 }
@@ -51,12 +45,12 @@ export async function releaseTrustWindow(
     temporarilyTrustedCount: temporarilyTrusted.length,
     mintDomains: temporarilyTrusted.map(extractDomain),
   });
-  const balances = await manager.wallet.balances.byMint().catch((error) => {
+  const balances = await manager.wallet.balances.byMint().catch((error): BalanceMap => {
     cashuLog.warn('mint.rebalance.trust_window.balance_failed', {
       temporarilyTrustedCount: temporarilyTrusted.length,
       errorName: error instanceof Error ? error.name : typeof error,
     });
-    return {} as BalanceMap;
+    return {};
   });
   const stranded: StrandedMint[] = [];
   const untrustErrors: { url: string; error: unknown }[] = [];

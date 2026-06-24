@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Text, StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
@@ -29,8 +29,8 @@ function FilterItem<F extends string>({
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
 
   // Pre-compute colors on JS thread so they can be used safely in worklets
-  const pressedBg = useMemo(() => opacity(surfaceTertiary, 0.6), [surfaceTertiary]);
-  const activeBg = useMemo(() => opacity(surfaceTertiary, 0.5), [surfaceTertiary]);
+  const pressedBg = opacity(surfaceTertiary, 0.6);
+  const activeBg = opacity(surfaceTertiary, 0.5);
 
   const rStyle = useAnimatedStyle(() => {
     return {

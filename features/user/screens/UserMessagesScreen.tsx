@@ -10,7 +10,7 @@
  * boundary. Legacy NIP-04 conversations are no longer surfaced.
  */
 
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useFocusEffect } from '@react-navigation/native';
 import { staticPopup } from '@/shared/lib/popup';
@@ -128,16 +128,14 @@ export function UserMessagesScreen({
   // next index, not via a live sub). Skip the first focus — the hook already
   // fetched on mount — and only re-fetch on RE-focus.
   const focusedOnceRef = useRef(false);
-  useFocusEffect(
-    useCallback(() => {
-      if (isMockThread) return;
-      if (!focusedOnceRef.current) {
-        focusedOnceRef.current = true;
-        return;
-      }
-      refresh();
-    }, [isMockThread, refresh])
-  );
+  useFocusEffect(() => {
+    if (isMockThread) return;
+    if (!focusedOnceRef.current) {
+      focusedOnceRef.current = true;
+      return;
+    }
+    refresh();
+  });
 
   // Merge server history with optimistic echoes (deduped by id). Once nagg
   // returns the self-copy of an echoed message (same wrap id), the echo drops.
@@ -180,137 +178,78 @@ export function UserMessagesScreen({
     [messages, displayName]
   );
 
-  const counterpartyAvatar = useMemo(
-    () => (
-      <Avatar
-        state={userPicture ? 'image' : 'fallback'}
-        size={32}
-        picture={userPicture}
-        seed={pubkey}
-        name={displayName}
-      />
-    ),
-    [userPicture, pubkey, displayName]
+  const counterpartyAvatar = (
+    <Avatar
+      state={userPicture ? 'image' : 'fallback'}
+      size={32}
+      picture={userPicture}
+      seed={pubkey}
+      name={displayName}
+    />
   );
 
-  const handleBack = useCallback(() => {
+  const handleBack = () => {
     if (onBack) {
       onBack();
     } else {
       router.back();
     }
-  }, [onBack]);
+  };
 
-  const handleNostrDMSend = useCallback(
-    async (text: string) => {
-      // Mock thread: append locally and stop. Publishing here would broadcast
-      // actual DMs to the real npubs seeded as demo contacts.
-      if (isMockThread) {
-        const timestamp = Math.floor(Date.now() / 1000);
-        setLocalMessages((prev) => [
-          ...prev,
-          {
-            id: `demo-dm-local-${timestamp}`,
-            content: text,
-            isOwn: true,
-            created_at: timestamp,
-            pubkey: '',
-          },
-        ]);
-        return;
-      }
-      const dmStart = performance.now();
-      log.info('dm.send.start', {
-        messageLength: text.length,
+  const handleNostrDMSend = async (text: string) => {
+    // Mock thread: append locally and stop. Publishing here would broadcast
+    // actual DMs to the real npubs seeded as demo contacts.
+    if (isMockThread) {
+      const timestamp = Math.floor(Date.now() / 1000);
+      setLocalMessages((prev) => [
+        ...prev,
+        {
+          id: `demo-dm-local-${timestamp}`,
+          content: text,
+          isOwn: true,
+          created_at: timestamp,
+          pubkey: '',
+        },
+      ]);
+      return;
+    }
+    const dmStart = performance.now();
+    log.info('dm.send.start', {
+      messageLength: text.length,
+      hasNdk: !!ndk,
+      hasPubkey: !!pubkey,
+    });
+    const myPubkey = nostrKeys?.pubkey;
+    const myPrivateKey = nostrKeys?.privateKey;
+    if (!ndk || !myPrivateKey || !myPubkey || !pubkey) {
+      log.error('dm.send.missing_data', {
         hasNdk: !!ndk,
+        hasPrivateKey: !!myPrivateKey,
         hasPubkey: !!pubkey,
       });
-      const myPubkey = nostrKeys?.pubkey;
-      const myPrivateKey = nostrKeys?.privateKey;
-      if (!ndk || !myPrivateKey || !myPubkey || !pubkey) {
-        log.error('dm.send.missing_data', {
-          hasNdk: !!ndk,
-          hasPrivateKey: !!myPrivateKey,
-          hasPubkey: !!pubkey,
-        });
-        staticPopup('send-message-failed');
-        return;
-      }
+      staticPopup('send-message-failed');
+      return;
+    }
 
-      const timestamp = Math.floor(Date.now() / 1000);
+    const timestamp = Math.floor(Date.now() / 1000);
 
-      // NIP-04 (legacy): a single signed kind-4 event authored by us and
-      // addressed to the recipient via a `p` tag. No gift wrap / self-copy —
-      // nagg re-fetches our sent copy via the `authors` filter, so the echo
-      // dedups on its event id.
-      if (protocol === 'nip04') {
-        let nip04EchoId: string | undefined;
-        try {
-          const dm = buildNip04DM({
-            content: text,
-            senderPrivateKey: myPrivateKey,
-            recipientPublicKey: pubkey,
-          });
-          nip04EchoId = dm.id;
-          setLocalMessages((prev) => [
-            ...prev,
-            {
-              id: dm.id,
-              content: text,
-              isOwn: true,
-              isSending: true,
-              created_at: timestamp,
-              pubkey: myPubkey,
-            },
-          ]);
-
-          const event = new NDKEvent(ndk);
-          event.kind = dm.kind;
-          event.content = dm.content;
-          event.tags = dm.tags;
-          event.created_at = dm.created_at;
-          event.pubkey = dm.pubkey;
-          event.id = dm.id;
-          event.sig = dm.sig;
-          await event.publish();
-
-          log.info('dm.send.complete', {
-            eventId: dm.id,
-            protocol: 'nip04',
-            total_ms: Math.round(performance.now() - dmStart),
-          });
-          setLocalMessages((prev) =>
-            prev.map((msg) => (msg.id === nip04EchoId ? { ...msg, isSending: false } : msg))
-          );
-        } catch (error) {
-          log.error('dm.send.failed', {
-            error,
-            protocol: 'nip04',
-            total_ms: Math.round(performance.now() - dmStart),
-          });
-          setLocalMessages((prev) => prev.filter((msg) => msg.id !== nip04EchoId));
-          staticPopup('send-message-failed');
-        }
-        return;
-      }
-
-      let echoId: string | undefined;
+    // NIP-04 (legacy): a single signed kind-4 event authored by us and
+    // addressed to the recipient via a `p` tag. No gift wrap / self-copy —
+    // nagg re-fetches our sent copy via the `authors` filter, so the echo
+    // dedups on its event id.
+    if (protocol === 'nip04') {
+      let nip04EchoId: string | undefined;
       try {
-        // Build NIP-17 gift-wrapped DM pair: one for the recipient, one self-copy.
-        const { recipientWrap, senderWrap } = buildGiftWrappedDMPair({
+        const dm = buildNip04DM({
           content: text,
           senderPrivateKey: myPrivateKey,
           recipientPublicKey: pubkey,
         });
-
-        // Optimistic echo keyed on the SELF-COPY wrap id — that's the id nagg
-        // returns for our own sent message (the self-copy lands in our inbox),
-        // so the server copy dedups this echo on the next fetch with no double.
-        echoId = senderWrap.id;
+        nip04EchoId = dm.id;
         setLocalMessages((prev) => [
           ...prev,
           {
-            id: senderWrap.id,
+            id: dm.id,
             content: text,
             isOwn: true,
             isSending: true,
@@ -319,54 +258,107 @@ export function UserMessagesScreen({
           },
         ]);
 
-        const wrapEvent = new NDKEvent(ndk);
-        wrapEvent.kind = recipientWrap.kind;
-        wrapEvent.content = recipientWrap.content;
-        wrapEvent.tags = recipientWrap.tags;
-        wrapEvent.created_at = recipientWrap.created_at;
-        wrapEvent.pubkey = recipientWrap.pubkey;
-        wrapEvent.id = recipientWrap.id;
-        wrapEvent.sig = recipientWrap.sig;
-
-        await wrapEvent.publish();
-
-        log.info('dm.send.published', {
-          eventId: wrapEvent.id,
-          duration_ms: Math.round(performance.now() - dmStart),
-        });
-
-        // Publish the self-copy so we can retrieve our own sent messages later.
-        const selfWrapEvent = new NDKEvent(ndk);
-        selfWrapEvent.kind = senderWrap.kind;
-        selfWrapEvent.content = senderWrap.content;
-        selfWrapEvent.tags = senderWrap.tags;
-        selfWrapEvent.created_at = senderWrap.created_at;
-        selfWrapEvent.pubkey = senderWrap.pubkey;
-        selfWrapEvent.id = senderWrap.id;
-        selfWrapEvent.sig = senderWrap.sig;
-
-        await selfWrapEvent.publish().catch((err: unknown) => {
-          log.warn('dm.send.self_copy_failed', { error: err });
-        });
+        const event = new NDKEvent(ndk);
+        event.kind = dm.kind;
+        event.content = dm.content;
+        event.tags = dm.tags;
+        event.created_at = dm.created_at;
+        event.pubkey = dm.pubkey;
+        event.id = dm.id;
+        event.sig = dm.sig;
+        await event.publish();
 
         log.info('dm.send.complete', {
-          eventId: wrapEvent.id,
+          eventId: dm.id,
+          protocol: 'nip04',
           total_ms: Math.round(performance.now() - dmStart),
         });
-
         setLocalMessages((prev) =>
-          prev.map((msg) => (msg.id === echoId ? { ...msg, isSending: false } : msg))
+          prev.map((msg) => (msg.id === nip04EchoId ? { ...msg, isSending: false } : msg))
         );
       } catch (error) {
-        log.error('dm.send.failed', { error, total_ms: Math.round(performance.now() - dmStart) });
-        setLocalMessages((prev) => prev.filter((msg) => msg.id !== echoId));
+        log.error('dm.send.failed', {
+          error,
+          protocol: 'nip04',
+          total_ms: Math.round(performance.now() - dmStart),
+        });
+        setLocalMessages((prev) => prev.filter((msg) => msg.id !== nip04EchoId));
         staticPopup('send-message-failed');
       }
-    },
-    [ndk, nostrKeys?.privateKey, nostrKeys?.pubkey, pubkey, isMockThread, protocol]
-  );
+      return;
+    }
 
-  const handleSendMoney = useCallback(() => {
+    let echoId: string | undefined;
+    try {
+      // Build NIP-17 gift-wrapped DM pair: one for the recipient, one self-copy.
+      const { recipientWrap, senderWrap } = buildGiftWrappedDMPair({
+        content: text,
+        senderPrivateKey: myPrivateKey,
+        recipientPublicKey: pubkey,
+      });
+
+      // Optimistic echo keyed on the SELF-COPY wrap id — that's the id nagg
+      // returns for our own sent message (the self-copy lands in our inbox),
+      // so the server copy dedups this echo on the next fetch with no double.
+      echoId = senderWrap.id;
+      setLocalMessages((prev) => [
+        ...prev,
+        {
+          id: senderWrap.id,
+          content: text,
+          isOwn: true,
+          isSending: true,
+          created_at: timestamp,
+          pubkey: myPubkey,
+        },
+      ]);
+
+      const wrapEvent = new NDKEvent(ndk);
+      wrapEvent.kind = recipientWrap.kind;
+      wrapEvent.content = recipientWrap.content;
+      wrapEvent.tags = recipientWrap.tags;
+      wrapEvent.created_at = recipientWrap.created_at;
+      wrapEvent.pubkey = recipientWrap.pubkey;
+      wrapEvent.id = recipientWrap.id;
+      wrapEvent.sig = recipientWrap.sig;
+
+      await wrapEvent.publish();
+
+      log.info('dm.send.published', {
+        eventId: wrapEvent.id,
+        duration_ms: Math.round(performance.now() - dmStart),
+      });
+
+      // Publish the self-copy so we can retrieve our own sent messages later.
+      const selfWrapEvent = new NDKEvent(ndk);
+      selfWrapEvent.kind = senderWrap.kind;
+      selfWrapEvent.content = senderWrap.content;
+      selfWrapEvent.tags = senderWrap.tags;
+      selfWrapEvent.created_at = senderWrap.created_at;
+      selfWrapEvent.pubkey = senderWrap.pubkey;
+      selfWrapEvent.id = senderWrap.id;
+      selfWrapEvent.sig = senderWrap.sig;
+
+      await selfWrapEvent.publish().catch((err: unknown) => {
+        log.warn('dm.send.self_copy_failed', { error: err });
+      });
+
+      log.info('dm.send.complete', {
+        eventId: wrapEvent.id,
+        total_ms: Math.round(performance.now() - dmStart),
+      });
+
+      setLocalMessages((prev) =>
+        prev.map((msg) => (msg.id === echoId ? { ...msg, isSending: false } : msg))
+      );
+    } catch (error) {
+      log.error('dm.send.failed', { error, total_ms: Math.round(performance.now() - dmStart) });
+      setLocalMessages((prev) => prev.filter((msg) => msg.id !== echoId));
+      staticPopup('send-message-failed');
+    }
+  };
+
+  const handleSendMoney = () => {
     log.debug('user.messages.send_money', {
       lud16,
       userName: counterpartyMetadata?.name,
@@ -380,7 +372,7 @@ export function UserMessagesScreen({
       meltTarget: lud16,
       recipientPubkey: pubkey,
     });
-  }, [counterpartyMetadata, lud16, machine, pubkey]);
+  };
 
   return (
     <Screen name="UserMessagesScreen" scroll="none">

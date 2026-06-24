@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import Icon from 'assets/icons';
@@ -25,7 +25,7 @@ export function AiHeaderTitle() {
   const balance = useRoutstrStore((s) => s.balance);
   const { keys: nostrKeys } = useNostrKeysContext();
 
-  const onPress = useCallback(() => {
+  const onPress = () => {
     if (!nostrKeys?.pubkey) {
       staticPopup('no-wallet-available');
       return;
@@ -42,7 +42,7 @@ export function AiHeaderTitle() {
         }),
       },
     });
-  }, [nostrKeys?.pubkey]);
+  };
 
   // Routstr stores msats — floor to whole sats for display.
   const sats = balance != null ? Math.floor(balance / 1000) : 0;

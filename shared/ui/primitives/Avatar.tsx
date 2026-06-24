@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import BoringAvatar from '@mealection/react-native-boring-avatars';
 import { Image as ExpoImage } from 'expo-image';
@@ -61,7 +61,7 @@ function GradientFallbackContent({
   fallbackSeed: string;
   borderRadius: number;
 }) {
-  const gradientTheme = useMemo(() => generateSeededGradient(fallbackSeed), [fallbackSeed]);
+  const gradientTheme = generateSeededGradient(fallbackSeed);
 
   return (
     <View
@@ -198,7 +198,7 @@ export const Avatar = ({
   const foreground = useThemeColor('foreground');
   // Match the skeleton fill used by `Text` — low-opacity foreground reads
   // as ambient "loading" rather than a solid silhouette.
-  const loadingColor = useMemo(() => opacity(foreground, 0.07), [foreground]);
+  const loadingColor = opacity(foreground, 0.07);
 
   useEffect(() => {
     void prefetchImage(picture);
@@ -211,11 +211,11 @@ export const Avatar = ({
     setImageStatus('loading');
   }, [picture]);
 
-  const handleImageLoad = useCallback(() => {
+  const handleImageLoad = () => {
     if (picture) setLoadedPicture(picture);
     setImageStatus('loaded');
-  }, [picture]);
-  const handleImageError = useCallback(() => setImageStatus('failed'), []);
+  };
+  const handleImageError = () => setImageStatus('failed');
 
   const borderRadius = size / 2;
   const statusIconSize = size * 0.33;
@@ -223,19 +223,13 @@ export const Avatar = ({
     () => ({ width: size, height: size, borderRadius, overflow: 'hidden' as const }),
     [borderRadius, size]
   );
-  const containerStyle = useMemo(
-    () => ({
-      ...avatarStyle,
-      justifyContent: 'center' as const,
-      alignItems: 'center' as const,
-    }),
-    [avatarStyle]
-  );
+  const containerStyle = {
+    ...avatarStyle,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  };
 
-  const fallbackSeed = useMemo(
-    () => sanitizeAvatarFallbackSeed(seed ?? name ?? alt ?? 'avatar'),
-    [alt, name, seed]
-  );
+  const fallbackSeed = sanitizeAvatarFallbackSeed(seed ?? name ?? alt ?? 'avatar');
 
   const statusBadge = useMemo(() => {
     if (!status) return null;
@@ -270,15 +264,9 @@ export const Avatar = ({
   const defaultAlt = 'Avatar';
   const imageAlt = alt || defaultAlt;
   const previousPicture = loadedPicture && loadedPicture !== picture ? loadedPicture : null;
-  const pictureSource = useMemo(() => ({ uri: picture }), [picture]);
-  const previousPictureSource = useMemo(
-    () => (previousPicture ? { uri: previousPicture } : null),
-    [previousPicture]
-  );
-  const overlayImageStyle = useMemo(
-    () => [StyleSheet.absoluteFillObject, avatarStyle],
-    [avatarStyle]
-  );
+  const pictureSource = { uri: picture };
+  const previousPictureSource = previousPicture ? { uri: previousPicture } : null;
+  const overlayImageStyle = [StyleSheet.absoluteFillObject, avatarStyle];
   const showsLoadingPlaceholder =
     state === 'loading' ||
     (state === 'image' && !!picture && imageStatus !== 'loaded' && !previousPicture);
@@ -304,12 +292,9 @@ export const Avatar = ({
       ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
     }),
   });
-  const handleVisualLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      visualLayout.onLayout(event);
-    },
-    [visualLayout]
-  );
+  const handleVisualLayout = (event: LayoutChangeEvent) => {
+    visualLayout.onLayout(event);
+  };
 
   // 1. Loading state — 50% foreground fill, no image, no gradient.
   if (state === 'loading') {

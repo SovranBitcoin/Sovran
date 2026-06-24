@@ -24,6 +24,7 @@ import { LoadingIndicator } from '@/shared/blocks/status';
 import { staticPopup, paramPopup } from '@/shared/lib/popup';
 import { fetchJson } from '@/shared/lib/apiClient';
 import { MintListResponse, parseWith } from '@sovranbitcoin/schemas';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 // ─── Deep probe: discover mints from audit API ─────────────────────────────
 
@@ -31,13 +32,6 @@ const SOVRAN_MINTS_API = 'https://api.sovran.money/api/cashu/mints';
 const MAX_DISCOVERED_MINTS = 100;
 
 const parseMintList = parseWith(MintListResponse, 'cashu/mints');
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 function normalizeMintUrl(url: string): string {
   return url.replace(/\/$/, '').toLowerCase();
@@ -253,7 +247,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         // Check if funds were actually recovered regardless of whether restore threw
         const balances = await manager.wallet.balances
           .byMint()
-          .catch(() => ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>);
+          .catch((): Awaited<ReturnType<typeof manager.wallet.balances.byMint>> => ({}));
         const mintBalance = amountToNumber(balances[mintUrl]?.total);
         const fundsFound = mintBalance > 0;
         const mintMs = Math.round((performance.now() - mintT0) * 100) / 100;

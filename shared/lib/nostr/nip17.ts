@@ -206,7 +206,7 @@ export function buildRecipientGiftWrap(params: {
  * (setTimeout, InteractionManager, microtask) so the Schnorr + NIP-44 work
  * doesn't delay the caller's primary delivery.
  */
-export function buildSenderSelfCopyWrap(params: {
+function buildSenderSelfCopyWrap(params: {
   rumor: Rumor;
   senderPrivateKey: Uint8Array;
 }): VerifiedEvent {

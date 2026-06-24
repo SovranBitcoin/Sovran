@@ -7,6 +7,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { INVARIANT_WHITE, WALLPAPER_PLACEHOLDER } from '@/shared/lib/brandColors';
 import { StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,22 +20,13 @@ import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import type { WallpaperCatalogEntry } from '@/shared/stores/global/wallpaperStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
+import { describeImageLoadError } from '@/shared/lib/imageLoadError';
 
 /** A thumbUrl is only usable if it's a real http(s) URL — empty strings,
  *  whitespace, or junk like "null" must fall through to the gradient rather
  *  than render a blank `<Image>`. */
 function isLikelyImageUrl(url: string | undefined | null): url is string {
   return typeof url === 'string' && /^https?:\/\/\S+/i.test(url.trim());
-}
-
-function describeImageLoadError(event: unknown): string {
-  if (event && typeof event === 'object') {
-    const directError = (event as { error?: unknown }).error;
-    if (typeof directError === 'string') return directError;
-    const nativeEvent = (event as { nativeEvent?: { error?: unknown } }).nativeEvent;
-    if (typeof nativeEvent?.error === 'string') return nativeEvent.error;
-  }
-  return String(event ?? 'unknown');
 }
 
 interface WallpaperThumbnailProps {
@@ -147,21 +139,26 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
           ) : paletteColors ? (
             <LinearGradient
               colors={[
-                paletteColors['800'] || '#1a1a1a',
-                paletteColors['900'] || '#0d0d0d',
-                paletteColors['950'] || '#000000',
+                paletteColors['800'] || WALLPAPER_PLACEHOLDER.d800,
+                paletteColors['900'] || WALLPAPER_PLACEHOLDER.d900,
+                paletteColors['950'] || WALLPAPER_PLACEHOLDER.d950,
               ]}
               style={StyleSheet.absoluteFillObject}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             />
           ) : (
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1a1a1a' }]} />
+            <View
+              style={[
+                StyleSheet.absoluteFillObject,
+                { backgroundColor: WALLPAPER_PLACEHOLDER.d800 },
+              ]}
+            />
           )}
 
           {inProgress && (
             <View className="absolute inset-0 items-center justify-center bg-black/60">
-              <Text size={14} bold style={{ color: '#fff' }}>
+              <Text size={14} bold style={{ color: INVARIANT_WHITE }}>
                 {Math.round((activeDownloadProgress ?? 0) * 100)}%
               </Text>
             </View>
@@ -169,13 +166,13 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
 
           {showPlayBadge && !inProgress && (
             <View className="absolute bottom-2 right-2 h-7 w-7 items-center justify-center rounded-[14px] bg-black/55">
-              <Icon name="mdi:play" size={16} color="#fff" />
+              <Icon name="mdi:play" size={16} color={INVARIANT_WHITE} />
             </View>
           )}
 
           {!downloaded && entry && !inProgress && (
             <View className="absolute right-2 top-2 h-6 w-6 items-center justify-center rounded-xl bg-black/50">
-              <Icon name="mdi:cloud-download-outline" size={12} color="#fff" />
+              <Icon name="mdi:cloud-download-outline" size={12} color={INVARIANT_WHITE} />
             </View>
           )}
         </View>
