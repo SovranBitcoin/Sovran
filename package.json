@@ -37,6 +37,7 @@
     }
   },
   "devDependencies": {
+    "@sovranbitcoin/schemas": "^2.1.0",
     "@types/bun": "^1.3.5",
     "typescript": "^5.0.0",
     "vitest": "^3.0.0",
