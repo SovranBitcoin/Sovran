@@ -66,7 +66,7 @@ export function orderedReplyIdsForThreadResult(
   const pageReplyIds = uniqueIds(result.replyPageEventIds.filter((id) => replyIds.has(id)));
   const pageReplyIdSet = new Set(pageReplyIds);
   const fallbackReplyIds = uniqueIds(
-    result.thread.replies.map((event) => event.id).filter((id) => !pageReplyIdSet.has(id))
+    result.thread.replies.flatMap((event) => (pageReplyIdSet.has(event.id) ? [] : [event.id]))
   );
   const existingOrder = uniqueIds(existingReplyOrder.filter((id) => replyIds.has(id)));
   const existingOrderSet = new Set(existingOrder);

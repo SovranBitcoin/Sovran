@@ -298,9 +298,10 @@ export function NotificationsScreen() {
       });
       if (!page || controller.signal.aborted || sequence !== loadSequenceRef.current) return;
 
-      const newKeys = page.notifications
-        .map(notificationDedupeKey)
-        .filter((key) => !seenKeysRef.current.has(key));
+      const newKeys = page.notifications.flatMap((notification) => {
+        const key = notificationDedupeKey(notification);
+        return seenKeysRef.current.has(key) ? [] : [key];
+      });
       const advanced = page.paginationUntil > 0 && page.paginationUntil < cursor;
       // Stop only when a page adds nothing new or the cursor can't advance —
       // grouping makes the raw item count an unreliable "has more" signal.
