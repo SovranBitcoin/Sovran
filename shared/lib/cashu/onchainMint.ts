@@ -41,7 +41,7 @@ function getBip321OnchainAddress(value: string): string | null {
 }
 
 export function getOnchainMintAddress(entry: HistoryEntry | null | undefined): string | null {
-  if (!entry || entry.type !== 'mint') {
+  if (entry?.type !== 'mint') {
     cashuLog.debug('onchain.mint.address.result', {
       reason: !entry ? 'missing-entry' : 'wrong-type',
       type: entry?.type ?? null,

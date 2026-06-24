@@ -566,7 +566,7 @@ function buildStats(
         }
         break;
       case 'connection':
-        if (ble && ble.isConnected !== undefined) {
+        if (ble?.isConnected !== undefined) {
           // Three-state badge: direct link (green), mesh-only (warning), offline.
           // The mesh-only state is the one users find confusing — peer shows
           // up but DMs are flaky. Calling it out by icon + word avoids that.
@@ -856,7 +856,7 @@ export function ContactRow({
   //  - mesh    → warning lan-disconnect icon ("DM may stall")
   //  - offline → faded clock ("last seen…")
   const bleConnectionNode =
-    ble && ble.isConnected !== undefined ? (
+    ble?.isConnected !== undefined ? (
       !ble.isConnected ? (
         <Icon name="mdi:clock-outline" size={20} color={opacity(foreground, 0.3)} />
       ) : ble.hasDirectLink === false ? (

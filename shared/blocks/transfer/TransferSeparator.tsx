@@ -11,6 +11,7 @@
  */
 
 import React from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { StyleSheet } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -26,7 +27,7 @@ interface TransferSeparatorProps {
   status?: 'idle' | 'running' | 'done' | 'failed';
 }
 
-export const TransferSeparator = ({ failed, status }: TransferSeparatorProps) => {
+export const TransferSeparator = React.memo(({ failed, status }: TransferSeparatorProps) => {
   const [accent, green500, red500] = useThemeColor(['accent', 'green-500', 'red-500'] as const);
 
   const effectiveStatus = status ?? (failed ? 'failed' : 'idle');
@@ -39,11 +40,11 @@ export const TransferSeparator = ({ failed, status }: TransferSeparatorProps) =>
       case 'running':
         return <Spinner size={14} />;
       case 'done':
-        return <Icon name="mdi:check" size={14} color="#fff" />;
+        return <Icon name="mdi:check" size={14} color={INVARIANT_WHITE} />;
       case 'failed':
-        return <Icon name="mdi:alert-circle" size={14} color="#fff" />;
+        return <Icon name="mdi:alert-circle" size={14} color={INVARIANT_WHITE} />;
       default:
-        return <Icon name="mdi:arrow-down" size={14} color="#fff" />;
+        return <Icon name="mdi:arrow-down" size={14} color={INVARIANT_WHITE} />;
     }
   };
 
@@ -52,7 +53,7 @@ export const TransferSeparator = ({ failed, status }: TransferSeparatorProps) =>
       <View style={[styles.separator, { backgroundColor: bgColor }]}>{renderIcon()}</View>
     </Log>
   );
-};
+});
 TransferSeparator.displayName = 'TransferSeparator';
 
 const styles = StyleSheet.create({

@@ -39,8 +39,9 @@ function toastAndGoToHub(body: string): void {
   router.replace('/(signer-flow)' as never);
 }
 
+const onInvalid = () => toastAndGoToHub(PAIRING_ERROR_INVALID_LINK);
+
 export default function SignerConnectRoute() {
-  const onInvalid = () => toastAndGoToHub(PAIRING_ERROR_INVALID_LINK);
   const params = useRouteParams(ParamsSchema, { where: 'signer-flow.connect', onInvalid });
   const uri = params?.uri;
   const openedRef = useRef(false);

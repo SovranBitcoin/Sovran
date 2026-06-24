@@ -247,7 +247,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         // Check if funds were actually recovered regardless of whether restore threw
         const balances = await manager.wallet.balances
           .byMint()
-          .catch(() => ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>);
+          .catch((): Awaited<ReturnType<typeof manager.wallet.balances.byMint>> => ({}));
         const mintBalance = amountToNumber(balances[mintUrl]?.total);
         const fundsFound = mintBalance > 0;
         const mintMs = Math.round((performance.now() - mintT0) * 100) / 100;

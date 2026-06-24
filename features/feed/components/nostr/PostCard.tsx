@@ -577,8 +577,8 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
   exiting?: boolean;
 }) {
   const [foreground, loadingShimmerSurface] = useThemeColor(['foreground', 'surface'] as const);
-  const textMuted = useMemo(() => ({ color: opacity(foreground, alpha.muted) }), [foreground]);
-  const targetDateStyle = useMemo(() => [textMuted, pcStyles.targetDate], [textMuted]);
+  const textMuted = { color: opacity(foreground, alpha.muted) };
+  const targetDateStyle = [textMuted, pcStyles.targetDate];
   const replyVariant = REPLY_SKELETON_VARIANTS[index % REPLY_SKELETON_VARIANTS.length];
 
   // Render invisible, then fade in once the row has laid out ("settled") so the
@@ -715,7 +715,7 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
   // size (via a `Text loading` placeholder) — a hardcoded label rectangle was ~7px
   // shorter, which made the reply row grow when real text replaced the skeleton.
   const labelTextSize = compact ? 11 : 13;
-  const skeletonFill = useMemo(() => opacity(borderColor, 0.07), [borderColor]);
+  const skeletonFill = opacity(borderColor, 0.07);
   const footerStyle = useMemo(
     () => [
       sharedStyles.noteFooter,
@@ -733,7 +733,7 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
     }),
     [glyph, skeletonFill]
   );
-  const labelStyle = useMemo(() => ({ width: labelWidth }), [labelWidth]);
+  const labelStyle = { width: labelWidth };
 
   return (
     <View style={footerStyle} pointerEvents="none">

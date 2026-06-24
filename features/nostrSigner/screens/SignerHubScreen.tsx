@@ -100,6 +100,65 @@ function connectionSubtitle(connection: Nip46Connection): string {
 
 // ── Screen ──────────────────────────────────────────────────────
 
+// ── Navigation ────────────────────────────────────────────────
+
+const openRequests = () => {
+  router.push('/(signer-flow)/requests' as never);
+};
+
+const openAppDetail = (clientPubkey: string) => {
+  // Hex pubkey — URL-safe by construction, no encoding needed.
+  router.push(`/(signer-flow)/app?clientPubkey=${clientPubkey}` as never);
+};
+
+const openScan = () => {
+  // signer-pair mode: the standalone camera only accepts NIP-46 URIs.
+  router.navigate({ pathname: '/camera', params: { action: 'signer-pair' } });
+};
+
+const openShare = () => {
+  router.push('/(signer-flow)/share' as never);
+};
+
+const openActivity = () => {
+  router.push('/(signer-flow)/activity' as never);
+};
+
+// ── Paste Connection Link ─────────────────────────────────────
+
+const openPasteLink = () => {
+  actionMenuPopup({
+    title: PASTE_LINK_LABEL,
+    inputs: [
+      {
+        id: 'uri',
+        placeholder: 'nostrconnect://…',
+        description: PASTE_PROMPT_BODY,
+        autoCapitalize: 'none',
+        autoCorrect: false,
+      },
+    ],
+    primaryAction: {
+      text: PASTE_CONNECT_LABEL,
+      isDisabled: (values) => !values.uri || values.uri.trim().length === 0,
+      onPress: (values, { setError, close }) => {
+        const raw = (values.uri ?? '').trim();
+        // The URI embeds the pairing secret — never log it. Shared Layer-4
+        // dispatch: validate → hot flag → engine pairing → close the menu
+        // (beforeOpen) → connect sheet.
+        const opened = openPairingFromUri(raw, { beforeOpen: close });
+        if (opened.isErr()) {
+          setError(
+            opened.error.type === 'bunker-unsupported'
+              ? PAIRING_ERROR_BUNKER
+              : PAIRING_ERROR_INVALID_LINK
+          );
+        }
+      },
+    },
+  });
+};
+
 export function SignerHubScreen(): React.ReactElement {
   useLifecycleLogger('SignerHubScreen');
   const pendingCount = useNip46RequestsStore((s) => s.pending.length);
@@ -118,65 +177,6 @@ export function SignerHubScreen(): React.ReactElement {
   const connections = Object.values(apps).sort(
     (a, b) => (b.lastUsedAt ?? b.pairedAt) - (a.lastUsedAt ?? a.pairedAt)
   );
-
-  // ── Navigation ────────────────────────────────────────────────
-
-  const openRequests = () => {
-    router.push('/(signer-flow)/requests' as never);
-  };
-
-  const openAppDetail = (clientPubkey: string) => {
-    // Hex pubkey — URL-safe by construction, no encoding needed.
-    router.push(`/(signer-flow)/app?clientPubkey=${clientPubkey}` as never);
-  };
-
-  const openScan = () => {
-    // signer-pair mode: the standalone camera only accepts NIP-46 URIs.
-    router.navigate({ pathname: '/camera', params: { action: 'signer-pair' } });
-  };
-
-  const openShare = () => {
-    router.push('/(signer-flow)/share' as never);
-  };
-
-  const openActivity = () => {
-    router.push('/(signer-flow)/activity' as never);
-  };
-
-  // ── Paste Connection Link ─────────────────────────────────────
-
-  const openPasteLink = () => {
-    actionMenuPopup({
-      title: PASTE_LINK_LABEL,
-      inputs: [
-        {
-          id: 'uri',
-          placeholder: 'nostrconnect://…',
-          description: PASTE_PROMPT_BODY,
-          autoCapitalize: 'none',
-          autoCorrect: false,
-        },
-      ],
-      primaryAction: {
-        text: PASTE_CONNECT_LABEL,
-        isDisabled: (values) => !values.uri || values.uri.trim().length === 0,
-        onPress: (values, { setError, close }) => {
-          const raw = (values.uri ?? '').trim();
-          // The URI embeds the pairing secret — never log it. Shared Layer-4
-          // dispatch: validate → hot flag → engine pairing → close the menu
-          // (beforeOpen) → connect sheet.
-          const opened = openPairingFromUri(raw, { beforeOpen: close });
-          if (opened.isErr()) {
-            setError(
-              opened.error.type === 'bunker-unsupported'
-                ? PAIRING_ERROR_BUNKER
-                : PAIRING_ERROR_INVALID_LINK
-            );
-          }
-        },
-      },
-    });
-  };
 
   // ── Reset Remote Login ────────────────────────────────────────
 

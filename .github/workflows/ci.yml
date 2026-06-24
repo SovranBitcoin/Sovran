@@ -75,6 +75,15 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: bun run knip
 
+      # Fails when any component bails out of the React Compiler. The compiler
+      # is the source of truth for memoization (ADR 0006); a bailout means a
+      # component renders unmemoized and a "redundant" manual memo we removed is
+      # now actually missing. The eslint-plugin-react-compiler rule that would
+      # catch this is dead under the repo's zod@4 override, so this is the gate.
+      - name: React Compiler coverage
+        working-directory: ${{ env.APP_DIR }}
+        run: bun run check:react-compiler
+
       - name: Test
         working-directory: ${{ env.APP_DIR }}
         run: bun run test

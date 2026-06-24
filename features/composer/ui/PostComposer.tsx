@@ -7,7 +7,7 @@
  * `ComposeConfig`; the char meter enforces the relay-sourced budget; send goes
  * through the outbox-aware publish seam.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -127,7 +127,7 @@ export function PostComposer() {
     return map;
   }, [parentEvent, parentProfile]);
   const textBlock = blocks.find((b) => b.kind === 'text');
-  const mediaBlocks = useMemo(() => blocks.filter((b) => b.kind === 'media'), [blocks]);
+  const mediaBlocks = blocks.filter((b) => b.kind === 'media');
   const textLength = textBlock?.kind === 'text' ? textBlock.text.length : 0;
   const hasPostContent =
     (textBlock?.kind === 'text' && textBlock.text.trim().length > 0) || mediaBlocks.length > 0;
@@ -198,12 +198,12 @@ export function PostComposer() {
     },
   });
 
-  const handleCancel = useCallback(() => {
+  const handleCancel = () => {
     close();
     router.back();
-  }, [close]);
+  };
 
-  const handlePost = useCallback(async () => {
+  const handlePost = async () => {
     if (!canPost) return;
     setBusy(true);
     setError(null);
@@ -214,9 +214,9 @@ export function PostComposer() {
       return;
     }
     setError(OUTCOME_MESSAGE[outcome] ?? 'Something went wrong.');
-  }, [canPost, publish]);
+  };
 
-  const handleAddMedia = useCallback(async () => {
+  const handleAddMedia = async () => {
     if (!ndk || mediaBlocks.length >= config.maxMedia) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images', 'videos'],
@@ -244,7 +244,7 @@ export function PostComposer() {
       removeBlock(id);
       setError('Media upload failed. Try a different file.');
     }
-  }, [ndk, mediaBlocks.length, config.maxMedia, addMediaBlock, updateBlock, removeBlock]);
+  };
 
   return (
     <KeyboardAvoidingView

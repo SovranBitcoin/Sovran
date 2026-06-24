@@ -45,12 +45,12 @@ export async function releaseTrustWindow(
     temporarilyTrustedCount: temporarilyTrusted.length,
     mintDomains: temporarilyTrusted.map(extractDomain),
   });
-  const balances = await manager.wallet.balances.byMint().catch((error) => {
+  const balances = await manager.wallet.balances.byMint().catch((error): BalanceMap => {
     cashuLog.warn('mint.rebalance.trust_window.balance_failed', {
       temporarilyTrustedCount: temporarilyTrusted.length,
       errorName: error instanceof Error ? error.name : typeof error,
     });
-    return {} as BalanceMap;
+    return {};
   });
   const stranded: StrandedMint[] = [];
   const untrustErrors: { url: string; error: unknown }[] = [];

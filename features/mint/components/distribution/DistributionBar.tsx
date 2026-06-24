@@ -57,7 +57,7 @@ const AnimatedSegment: React.FC<SegmentProps> = ({
       };
     }
     const mainColor = baseColors[1] || baseColor;
-    if (FALLBACK_COLORS.includes(mainColor as any)) {
+    if ((FALLBACK_COLORS as readonly string[]).includes(mainColor)) {
       return {
         gradientColors: [defaultColor, surfaceTertiary] as const,
         borderColor: surfaceTertiary,

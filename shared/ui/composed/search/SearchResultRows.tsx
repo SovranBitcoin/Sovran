@@ -111,6 +111,30 @@ function MintRow({ mint }: { mint: Extract<AllSearchResult, { type: 'mint' }>['m
   );
 }
 
+const renderItem = ({ item }: { item: AllSearchResult }) => renderSearchResult(item);
+
+const renderSearchResult = (item: AllSearchResult) => {
+  switch (item.type) {
+    case 'geohash':
+      return <GeohashJumpRow geohash={item.geohash} />;
+    case 'tier':
+      return <TierRow tier={item.tier} />;
+    case 'mint':
+      return <MintRow mint={item.mint} />;
+    case 'contact':
+      return (
+        <ContactRow
+          identity={nostrIdentity(item.pubkey, item.profile, {
+            isLoadingProfile: item.isLoadingProfile,
+          })}
+          titleTrailing={<FollowBadge pubkey={item.pubkey} />}
+          onPress={() => navigateToProfile(item.pubkey)}
+          testID={`contact-row:nostr:${item.pubkey}`}
+        />
+      );
+  }
+};
+
 export function SearchResultRows({
   results,
   loading,
@@ -127,28 +151,6 @@ export function SearchResultRows({
     if (loading) return false;
     return results.length === 0;
   }, [results.length, loading, searchQuery]);
-
-  const renderSearchResult = (item: AllSearchResult) => {
-    switch (item.type) {
-      case 'geohash':
-        return <GeohashJumpRow geohash={item.geohash} />;
-      case 'tier':
-        return <TierRow tier={item.tier} />;
-      case 'mint':
-        return <MintRow mint={item.mint} />;
-      case 'contact':
-        return (
-          <ContactRow
-            identity={nostrIdentity(item.pubkey, item.profile, {
-              isLoadingProfile: item.isLoadingProfile,
-            })}
-            titleTrailing={<FollowBadge pubkey={item.pubkey} />}
-            onPress={() => navigateToProfile(item.pubkey)}
-            testID={`contact-row:nostr:${item.pubkey}`}
-          />
-        );
-    }
-  };
 
   const renderEmpty = () => {
     if (showNoResults) return <ListEmptyComponent />;
@@ -169,8 +171,6 @@ export function SearchResultRows({
     score: 0,
   }));
   const listData = showPlaceholders ? placeholderData : showNoResults ? [] : results;
-
-  const renderItem = ({ item }: { item: AllSearchResult }) => renderSearchResult(item);
 
   return (
     <View style={styles.container}>

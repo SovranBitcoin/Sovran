@@ -12,7 +12,7 @@ import { StyleSheet } from 'react-native';
 import Animated, { type SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { WebView, type WebViewProps } from 'react-native-webview';
 
-export const LinkEmbedView = function LinkEmbedView({
+export const LinkEmbedView = React.memo(function LinkEmbedView({
   url,
   opacity: embedOpacity,
   onScroll,
@@ -46,7 +46,7 @@ export const LinkEmbedView = function LinkEmbedView({
       />
     </Animated.View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   webview: {

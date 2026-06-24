@@ -137,7 +137,7 @@ export const useOwnContentStore = create<OwnContentStore>()(
       confirmOwn: (id) =>
         set((state) => {
           const cur = state.byId[id];
-          if (!cur || cur.status !== 'pending') return state;
+          if (cur?.status !== 'pending') return state;
           return {
             byId: { ...state.byId, [id]: { ...cur, status: 'local', updatedAt: Date.now() } },
           };
@@ -154,7 +154,7 @@ export const useOwnContentStore = create<OwnContentStore>()(
       ingestSeen: (event) =>
         set((state) => {
           const cur = state.byId[event.id];
-          if (cur && cur.status === 'confirmed') return state; // already settled
+          if (cur?.status === 'confirmed') return state; // already settled
           const entry: OwnContentEntry = {
             event: feedEventFrom(event),
             authorPubkey: event.pubkey,

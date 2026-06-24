@@ -106,6 +106,7 @@ function MintListRoute() {
           if (onSelectAction === 'continue' && params?.continuePathname) {
             const continueParams = params.continueParams ? JSON.parse(params.continueParams) : {};
             router.navigate({
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic persisted route string cannot be statically typed against expo-router's route union
               pathname: params.continuePathname as any,
               params: {
                 ...continueParams,

@@ -18,7 +18,6 @@ import React, {
   ReactNode,
   useCallback,
   useContext,
-  useMemo,
   useRef,
   useState,
   useLayoutEffect,
@@ -135,10 +134,7 @@ export function Screen({
     setMeasuredFooterHeight(rounded);
   }, []);
 
-  const footerContextValue = useMemo(
-    () => ({ setFooterHeight: updateFooterHeight }),
-    [updateFooterHeight]
-  );
+  const footerContextValue = { setFooterHeight: updateFooterHeight };
 
   // Defer the content subtree so the modal present starts on a cheap frame.
   // The Log boundary + ModalLayoutWrapper background stay mounted immediately,

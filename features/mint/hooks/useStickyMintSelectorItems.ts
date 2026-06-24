@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { MintListItem } from '@sovranbitcoin/colada';
 
 import { cashuLog } from '@/shared/lib/logger';
@@ -71,13 +71,9 @@ export function useStickyMintSelectorItems(
     }
   }, [liveItems]);
 
-  return useMemo(
-    () =>
-      resolveStickyMintSelectorItems({
-        liveItems,
-        entryItems,
-        previousLiveItems: previousLiveItemsRef.current,
-      }),
-    [entryItems, liveItems]
-  );
+  return resolveStickyMintSelectorItems({
+    liveItems,
+    entryItems,
+    previousLiveItems: previousLiveItemsRef.current,
+  });
 }

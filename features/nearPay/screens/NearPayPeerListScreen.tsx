@@ -86,6 +86,8 @@ function NearPayPeerRow({ peer, onSelect }: NearPayPeerRowProps) {
   );
 }
 
+const keyExtractor = (peer: BLEPeer) => peer.peerID;
+
 export function NearPayPeerListScreen() {
   useLifecycleLogger('NearPayPeerListScreen', paymentLog);
   const headerHeight = useHeaderHeight();
@@ -217,7 +219,6 @@ export function NearPayPeerListScreen() {
       });
   };
 
-  const keyExtractor = (peer: BLEPeer) => peer.peerID;
   const renderItem = ({ item }: { item: BLEPeer }) => (
     <NearPayPeerRow peer={item} onSelect={handleSelectPeer} />
   );

@@ -136,7 +136,7 @@ export function PaymentStatusToast({
   const hide = toastProps.hide as (ids?: string | string[] | 'all') => void;
   const toastDebugFieldsRef = React.useRef(toastDebugFields);
   const paymentCopy = usePaymentCopyResolver();
-  const cases = React.useMemo(() => createPaymentStatusToastCases(paymentCopy), [paymentCopy]);
+  const cases = createPaymentStatusToastCases(paymentCopy);
   const config = cases[variant];
   const active = usePaymentStatusStore((s) => s.active);
   const activeForPayment = active?.id === paymentId ? active : null;
@@ -325,16 +325,13 @@ export function PaymentStatusToast({
   const onNutDropRadar = variant === 'receive-ecash' && radarVisible;
   const title =
     effectiveActive?.titleOverride ?? (onNutDropRadar ? 'Received payment' : config.message);
-  const statusToastDebugFields = React.useMemo(
-    () => ({
-      toastId: toastId ?? null,
-      debugLabel: debugLabel ?? null,
-      variant,
-      paymentId,
-      status,
-    }),
-    [debugLabel, paymentId, status, toastId, variant]
-  );
+  const statusToastDebugFields = {
+    toastId: toastId ?? null,
+    debugLabel: debugLabel ?? null,
+    variant,
+    paymentId,
+    status,
+  };
 
   return (
     <StatusToast

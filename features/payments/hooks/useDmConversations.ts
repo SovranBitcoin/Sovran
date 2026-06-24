@@ -131,7 +131,7 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
     return () => controller.abort();
   }, [viewerPubkey, viewerPrivateKey, refreshKey, ingest]);
 
-  const loadMore = useCallback(async () => {
+  const loadMore = async () => {
     if (
       loadingMoreRef.current ||
       !hasMore ||
@@ -159,9 +159,9 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [hasMore, viewerPubkey, viewerPrivateKey, ingest]);
+  };
 
-  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const refresh = () => setRefreshKey((k) => k + 1);
 
   return { conversations, loading, hasLoadedOnce, hasMore, loadMore, refresh, error };
 }

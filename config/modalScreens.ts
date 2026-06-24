@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { INVARIANT_BLACK } from '@/shared/lib/brandColors';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 
 export interface ModalConfig {
@@ -176,7 +177,7 @@ const standaloneScreens: ModalConfig[] = [
   slideFromRight('(settings-flow)'),
   slideFromRight('(signer-flow)'),
   slideFromRight('(user-flow)'),
-  fullScreenModal('(stories-flow)', { contentStyle: { backgroundColor: '#000' } }),
+  fullScreenModal('(stories-flow)', { contentStyle: { backgroundColor: INVARIANT_BLACK } }),
   modalTransparent('camera', 'Scan QR'),
   modalWithBlur('share', 'formSheet'),
   modalWithBlur('lightningSend', 'modal', 'Send Lightning'),

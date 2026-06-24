@@ -495,7 +495,7 @@ export function MintInfoScreen() {
   const contact = entry?.contact as
     | { method: string; info: import('@sovranbitcoin/colada').FormattedString }[]
     | undefined;
-  const contactRows = useMemo(() => getSortedMintInfoContacts(contact), [contact]);
+  const contactRows = getSortedMintInfoContacts(contact);
   const nostrContactPubkey = useMemo(
     () => getMintInfoNostrContactPubkey(contactRows),
     [contactRows]

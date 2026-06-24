@@ -106,7 +106,7 @@ export function swapStatusPopup(): void {
       });
       // Mid-flight swipe leaves the gate engaged; clear only after the
       // toast unmounts in a terminal state (or the store is already empty).
-      if (!cur || cur.state !== 'running') {
+      if (cur?.state !== 'running') {
         useSwapStatusStore.getState().clear();
       }
     },

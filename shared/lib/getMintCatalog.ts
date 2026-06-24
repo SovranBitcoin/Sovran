@@ -123,7 +123,7 @@ async function resolveNostrProfile(
     });
     return null;
   });
-  if (profile && profile.isOk()) {
+  if (profile?.isOk()) {
     const { followers, score } = profile.value;
     useMintProfileStore.getState().setCached(mintUrl, followers, score);
     log.info('mint.catalog.profile.fetch_success', {
@@ -176,7 +176,7 @@ async function fetchEntry(
   let info: unknown = isMintInfoObject(cached.info) ? cached.info : null;
 
   // Audit data + info from the audit endpoint when available …
-  if (auditRes && auditRes.isOk()) {
+  if (auditRes?.isOk()) {
     const audit = auditRes.value;
     const { score } = transformAuditData(audit);
     entry.auditScore = score;
@@ -225,7 +225,7 @@ async function fetchEntry(
     });
   }
 
-  if (reviewRes && reviewRes.isOk()) {
+  if (reviewRes?.isOk()) {
     const review = reviewRes.value;
     if (review.score !== null) {
       entry.kymScore = review.score;

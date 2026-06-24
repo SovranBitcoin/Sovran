@@ -152,23 +152,17 @@ export function LightningStrike({
 }: LightningStrikeProps) {
   const { core, innerGlow, outerGlow, rim } = LIGHTNING_PALETTES[palette];
   const frameScale = frameSize / AVATAR_FRAME_SIZE;
-  const canvasStyle = useMemo(
-    () => ({
-      position: 'absolute' as const,
-      width: BOLT_CANVAS_SIZE * frameScale,
-      height: BOLT_CANVAS_SIZE * frameScale,
-      left: -CANVAS_OFFSET * frameScale,
-      top: -CANVAS_OFFSET * frameScale,
-    }),
-    [frameScale]
-  );
-  const frameTransform = useMemo(() => [{ scale: frameScale }], [frameScale]);
-  const haloGradientColors = useMemo(
-    () => [opacity(outerGlow, op(0.45)), opacity(outerGlow, 0)],
-    [outerGlow]
-  );
+  const canvasStyle = {
+    position: 'absolute' as const,
+    width: BOLT_CANVAS_SIZE * frameScale,
+    height: BOLT_CANVAS_SIZE * frameScale,
+    left: -CANVAS_OFFSET * frameScale,
+    top: -CANVAS_OFFSET * frameScale,
+  };
+  const frameTransform = [{ scale: frameScale }];
+  const haloGradientColors = [opacity(outerGlow, op(0.45)), opacity(outerGlow, 0)];
   const variants = useMemo(() => generateStrikeVariants(seed), [seed]);
-  const paths = useMemo(() => variants.map(variantToSkPath), [variants]);
+  const paths = variants.map(variantToSkPath);
   const faceClip = useMemo(() => {
     const clip = Skia.Path.Make();
     clip.addCircle(BOLT_CANVAS_CENTER, BOLT_CANVAS_CENTER, FACE_CLIP_RADIUS);

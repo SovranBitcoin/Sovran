@@ -114,7 +114,7 @@ export function buildNostrDataLayer(): facade.NostrDataLayer | null {
   const configKey = JSON.stringify(config);
   const pubkey = activeViewerPubkey();
 
-  if (memo && memo.configKey === configKey && memo.pubkey === pubkey) return memo.layer;
+  if (memo?.configKey === configKey && memo.pubkey === pubkey) return memo.layer;
 
   // Identity switch: drop the prior profile's cache before serving the new one.
   if (memo && memo.pubkey !== pubkey) {

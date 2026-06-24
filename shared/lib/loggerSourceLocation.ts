@@ -23,7 +23,7 @@ function simplifyPath(fullPath: string): string {
 export function getCallerLocation(stackOffset: number = 3): SourceLocation {
   const fallback: SourceLocation = { file: 'unknown', func: 'unknown', line: 0 };
   try {
-    const stack = new Error().stack;
+    const stack = new Error('source-location probe').stack;
     if (!stack) return fallback;
     const lines = stack.split('\n');
     const target = lines[stackOffset];

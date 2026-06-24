@@ -121,6 +121,11 @@ function FilterChip({
   );
 }
 
+const openDetail = (entryId: string) => {
+  router.push(`/(signer-flow)/activity-detail?id=${encodeURIComponent(entryId)}` as never);
+};
+const keyExtractor = (item: Nip46ActivityEntry) => item.id;
+
 export function SignerActivityScreen(): React.ReactElement {
   const params = useLocalSearchParams<{ clientPubkey?: string }>();
   const entries = useNip46ActivityStore((s) => s.entries);
@@ -162,11 +167,6 @@ export function SignerActivityScreen(): React.ReactElement {
   const indicatorInsets = {
     top: headerHeight,
   };
-
-  const openDetail = (entryId: string) => {
-    router.push(`/(signer-flow)/activity-detail?id=${encodeURIComponent(entryId)}` as never);
-  };
-  const keyExtractor = (item: Nip46ActivityEntry) => item.id;
 
   const renderItem = ({ item }: { item: Nip46ActivityEntry }) => {
     const display = ACTIVITY_VERDICT_DISPLAY[item.verdict];

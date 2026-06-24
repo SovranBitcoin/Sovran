@@ -6,7 +6,7 @@
  * the selected pill; tapping a pill animates to that page.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, useWindowDimensions } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -77,37 +77,31 @@ export function BackgroundScreen() {
     }
   }, [albums, activeIndex]);
 
-  const tabLabels = useMemo(() => albums.map((a) => a.displayName), [albums]);
+  const tabLabels = albums.map((a) => a.displayName);
   const selectedTabLabel = tabLabels[activeIndex] ?? '';
 
-  const handleTabSelect = useCallback(
-    (label: string) => {
-      const idx = tabLabels.indexOf(label);
-      if (idx < 0) return;
-      setActiveIndex(idx);
-      pagerRef.current?.setPage(idx);
-    },
-    [tabLabels]
-  );
+  const handleTabSelect = (label: string) => {
+    const idx = tabLabels.indexOf(label);
+    if (idx < 0) return;
+    setActiveIndex(idx);
+    pagerRef.current?.setPage(idx);
+  };
 
-  const onPageSelected = useCallback((event: { nativeEvent: { position: number } }) => {
+  const onPageSelected = (event: { nativeEvent: { position: number } }) => {
     const idx = event.nativeEvent.position;
     setActiveIndex(idx);
-  }, []);
+  };
 
   const cardWidth = Math.floor(
     (screenWidth - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS
   );
   const cardHeight = Math.round(cardWidth * 1.55);
 
-  const handlePickWallpaper = useCallback(
-    (themeName: string) => {
-      log.info('theme.background.pick', { themeName, unitId });
-      setUnitWallpaper(unitId, themeName);
-      router.back();
-    },
-    [setUnitWallpaper, unitId]
-  );
+  const handlePickWallpaper = (themeName: string) => {
+    log.info('theme.background.pick', { themeName, unitId });
+    setUnitWallpaper(unitId, themeName);
+    router.back();
+  };
 
   // Pager needs explicit height; carve out the space between tabs and the
   // bottom safe area so each page's grid can scroll vertically inside its
@@ -179,26 +173,23 @@ const AlbumPage = React.memo(function AlbumPage({
   cardHeight: number;
   onPick: (themeName: string) => void;
 }) {
-  const renderWallpaper = useCallback(
-    ({ item: themeName }: { item: string }) => {
-      const entry = catalog.find((w) => w.themeName === themeName);
-      const selected = draftUnitTheme === themeName;
-      return (
-        <View style={{ width: cardWidth, marginRight: GRID_GAP, marginBottom: GRID_GAP }}>
-          <WallpaperThumbnail
-            themeName={themeName}
-            entry={entry}
-            selected={selected}
-            width={cardWidth}
-            height={cardHeight}
-            showPlayBadge={!!entry}
-            onPress={() => onPick(themeName)}
-          />
-        </View>
-      );
-    },
-    [catalog, draftUnitTheme, cardWidth, cardHeight, onPick]
-  );
+  const renderWallpaper = ({ item: themeName }: { item: string }) => {
+    const entry = catalog.find((w) => w.themeName === themeName);
+    const selected = draftUnitTheme === themeName;
+    return (
+      <View style={{ width: cardWidth, marginRight: GRID_GAP, marginBottom: GRID_GAP }}>
+        <WallpaperThumbnail
+          themeName={themeName}
+          entry={entry}
+          selected={selected}
+          width={cardWidth}
+          height={cardHeight}
+          showPlayBadge={!!entry}
+          onPress={() => onPick(themeName)}
+        />
+      </View>
+    );
+  };
 
   return (
     <View key={slug} className="flex-1">

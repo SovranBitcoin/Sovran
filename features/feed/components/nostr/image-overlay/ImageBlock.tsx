@@ -54,7 +54,7 @@ interface ImageBlockOverlayPostProps {
   onActionPressOut?: () => void;
 }
 
-export const ImageBlock = function ImageBlock({
+export const ImageBlock = React.memo(function ImageBlock({
   url,
   alt,
   allImageUrls,
@@ -307,8 +307,7 @@ export const ImageBlock = function ImageBlock({
         width,
         height,
         urls: urls && urls.length > 1 ? urls : undefined,
-        mediaTypes:
-          mediaTypes && urls && mediaTypes.length === urls.length ? mediaTypes : undefined,
+        mediaTypes: mediaTypes && mediaTypes.length === urls?.length ? mediaTypes : undefined,
         initialIndex: mediaIndex ?? imageIndex ?? 0,
         post: post ?? null,
       });
@@ -431,7 +430,7 @@ export const ImageBlock = function ImageBlock({
       </View>
     </Log>
   );
-};
+});
 
 const styles = StyleSheet.create({
   imageBlockOuter: {

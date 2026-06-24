@@ -13,6 +13,7 @@
  */
 
 import React from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { StyleSheet } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
@@ -51,102 +52,104 @@ interface TransferEntryRowProps {
   statusIcon?: React.ReactNode;
 }
 
-export const TransferEntryRow = ({
-  type,
-  mintIconUrl,
-  mintName,
-  amount,
-  unit,
-  subtitle,
-  subtitleColor,
-  secondarySubtitle,
-  secondarySubtitleColor,
-  onPress,
-  statusIcon,
-}: TransferEntryRowProps) => {
-  const [foreground, surfaceSecondary, danger, success] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'danger',
-    'success',
-  ] as const);
+export const TransferEntryRow = React.memo(
+  ({
+    type,
+    mintIconUrl,
+    mintName,
+    amount,
+    unit,
+    subtitle,
+    subtitleColor,
+    secondarySubtitle,
+    secondarySubtitleColor,
+    onPress,
+    statusIcon,
+  }: TransferEntryRowProps) => {
+    const [foreground, surfaceSecondary, danger, success] = useThemeColor([
+      'foreground',
+      'surface-secondary',
+      'danger',
+      'success',
+    ] as const);
 
-  const isSend = type === 'send';
-  const amountColor = isSend ? danger : success;
-  const defaultSubtitleColor = opacity(foreground, 0.8);
+    const isSend = type === 'send';
+    const amountColor = isSend ? danger : success;
+    const defaultSubtitleColor = opacity(foreground, 0.8);
 
-  const content = (
-    <HStack spacing={12} flex={1}>
-      {/* Avatar with small arrow overlay */}
-      <View style={styles.avatarWrapper}>
-        <MintIcon iconUrl={mintIconUrl} size={36} name={mintName} />
-        <View style={[styles.arrowBadge, { backgroundColor: surfaceSecondary }]}>
-          <Icon
-            name={isSend ? 'fluent:arrow-upload-16-filled' : 'fluent:arrow-download-16-filled'}
-            size={10}
-            color="#fff"
-          />
-        </View>
-      </View>
-
-      <VStack spacing={0} flex={1}>
-        <HStack justify="space-between" align="flex-end">
-          <UntranslatedText color={foreground} bold size={14} numberOfLines={1}>
-            {mintName}
-          </UntranslatedText>
-          <HStack align="center" spacing={0}>
-            <AmountFormatter
-              amount={amount}
-              unit={unit}
-              size={16}
-              weight="heavy"
-              color={amountColor}
-              sign={isSend ? '-' : '+'}
+    const content = (
+      <HStack spacing={12} flex={1}>
+        {/* Avatar with small arrow overlay */}
+        <View style={styles.avatarWrapper}>
+          <MintIcon iconUrl={mintIconUrl} size={36} name={mintName} />
+          <View style={[styles.arrowBadge, { backgroundColor: surfaceSecondary }]}>
+            <Icon
+              name={isSend ? 'fluent:arrow-upload-16-filled' : 'fluent:arrow-download-16-filled'}
+              size={10}
+              color={INVARIANT_WHITE}
             />
-            {statusIcon ? <View style={styles.statusIconSlot}>{statusIcon}</View> : null}
-          </HStack>
-        </HStack>
+          </View>
+        </View>
 
-        {(subtitle || secondarySubtitle) && (
-          <HStack justify="space-between" align="center">
-            {subtitle ? (
-              <UntranslatedText size={10} color={subtitleColor ?? defaultSubtitleColor}>
-                {subtitle}
-              </UntranslatedText>
-            ) : (
-              <View />
-            )}
-            {secondarySubtitle ? (
-              <UntranslatedText
-                overpass
-                bold
-                size={10}
-                color={secondarySubtitleColor ?? defaultSubtitleColor}>
-                {secondarySubtitle}
-              </UntranslatedText>
-            ) : null}
+        <VStack spacing={0} flex={1}>
+          <HStack justify="space-between" align="flex-end">
+            <UntranslatedText color={foreground} bold size={14} numberOfLines={1}>
+              {mintName}
+            </UntranslatedText>
+            <HStack align="center" spacing={0}>
+              <AmountFormatter
+                amount={amount}
+                unit={unit}
+                size={16}
+                weight="heavy"
+                color={amountColor}
+                sign={isSend ? '-' : '+'}
+              />
+              {statusIcon ? <View style={styles.statusIconSlot}>{statusIcon}</View> : null}
+            </HStack>
           </HStack>
-        )}
-      </VStack>
-    </HStack>
-  );
 
-  if (onPress) {
+          {(subtitle || secondarySubtitle) && (
+            <HStack justify="space-between" align="center">
+              {subtitle ? (
+                <UntranslatedText size={10} color={subtitleColor ?? defaultSubtitleColor}>
+                  {subtitle}
+                </UntranslatedText>
+              ) : (
+                <View />
+              )}
+              {secondarySubtitle ? (
+                <UntranslatedText
+                  overpass
+                  bold
+                  size={10}
+                  color={secondarySubtitleColor ?? defaultSubtitleColor}>
+                  {secondarySubtitle}
+                </UntranslatedText>
+              ) : null}
+            </HStack>
+          )}
+        </VStack>
+      </HStack>
+    );
+
+    if (onPress) {
+      return (
+        <Log name="TransferEntryRow">
+          <Pressable style={styles.entryRow} onPress={onPress}>
+            {content}
+          </Pressable>
+        </Log>
+      );
+    }
+
     return (
       <Log name="TransferEntryRow">
-        <Pressable style={styles.entryRow} onPress={onPress}>
-          {content}
-        </Pressable>
+        <View style={styles.entryRow}>{content}</View>
       </Log>
     );
   }
-
-  return (
-    <Log name="TransferEntryRow">
-      <View style={styles.entryRow}>{content}</View>
-    </Log>
-  );
-};
+);
 TransferEntryRow.displayName = 'TransferEntryRow';
 
 const styles = StyleSheet.create({

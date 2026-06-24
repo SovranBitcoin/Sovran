@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { PressableFeedback } from 'heroui-native';
@@ -110,12 +110,12 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     },
   });
 
-  const handleScrollToIndex = useCallback((index: number) => {
+  const handleScrollToIndex = (index: number) => {
     horizontalListRef.current?.scrollToIndex({
       index,
       animated: true,
     });
-  }, []);
+  };
 
   const singleTap = Gesture.Tap()
     .maxDuration(250)

@@ -73,61 +73,52 @@ export function useChatSurfacePerfLogger<TMessage extends ChatSurfaceMessage>(
   }, [kbState.isVisible, kbState.height, headerHeight, log, surface]);
 
   const listLayoutRef = useRef<{ height: number; width: number } | null>(null);
-  const handleListLayout = useCallback(
-    (e: LayoutChangeEvent | unknown) => {
-      const { width, height } = (e as LayoutChangeEvent).nativeEvent.layout;
-      const last = listLayoutRef.current;
-      if (last && Math.abs(last.width - width) < 0.5 && Math.abs(last.height - height) < 0.5) {
-        return;
-      }
-      listLayoutRef.current = { width, height };
-      log.info('chat.list.layout', {
-        surface,
-        width: Math.round(width),
-        height: Math.round(height),
-      });
-    },
-    [log, surface]
-  );
+  const handleListLayout = (e: LayoutChangeEvent | unknown) => {
+    const { width, height } = (e as LayoutChangeEvent).nativeEvent.layout;
+    const last = listLayoutRef.current;
+    if (last && Math.abs(last.width - width) < 0.5 && Math.abs(last.height - height) < 0.5) {
+      return;
+    }
+    listLayoutRef.current = { width, height };
+    log.info('chat.list.layout', {
+      surface,
+      width: Math.round(width),
+      height: Math.round(height),
+    });
+  };
 
   const listContentSizeRef = useRef<{ w: number; h: number } | null>(null);
-  const handleListContentSize = useCallback(
-    (w: number, h: number) => {
-      const last = listContentSizeRef.current;
-      if (last && Math.abs(last.w - w) < 0.5 && Math.abs(last.h - h) < 0.5) return;
-      const viewportH = listLayoutRef.current?.height ?? 0;
-      listContentSizeRef.current = { w, h };
-      log.debug('chat.list.content_size', {
-        surface,
-        contentW: Math.round(w),
-        contentH: Math.round(h),
-        viewportH: Math.round(viewportH),
-        overflow: Math.round(h - viewportH),
-        msgsCount: messages.length,
-      });
-    },
-    [log, surface, messages.length]
-  );
+  const handleListContentSize = (w: number, h: number) => {
+    const last = listContentSizeRef.current;
+    if (last && Math.abs(last.w - w) < 0.5 && Math.abs(last.h - h) < 0.5) return;
+    const viewportH = listLayoutRef.current?.height ?? 0;
+    listContentSizeRef.current = { w, h };
+    log.debug('chat.list.content_size', {
+      surface,
+      contentW: Math.round(w),
+      contentH: Math.round(h),
+      viewportH: Math.round(viewportH),
+      overflow: Math.round(h - viewportH),
+      msgsCount: messages.length,
+    });
+  };
 
   const lastScrollLogRef = useRef(0);
-  const handleListScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent> | unknown) => {
-      const now = Date.now();
-      if (now - lastScrollLogRef.current < 120) return;
-      lastScrollLogRef.current = now;
-      const { contentOffset, contentSize, layoutMeasurement } = (
-        e as NativeSyntheticEvent<NativeScrollEvent>
-      ).nativeEvent;
-      log.debug('chat.list.scroll', {
-        surface,
-        offsetY: Math.round(contentOffset.y),
-        contentH: Math.round(contentSize.height),
-        viewportH: Math.round(layoutMeasurement.height),
-        distFromEnd: Math.round(contentSize.height - (contentOffset.y + layoutMeasurement.height)),
-      });
-    },
-    [log, surface]
-  );
+  const handleListScroll = (e: NativeSyntheticEvent<NativeScrollEvent> | unknown) => {
+    const now = Date.now();
+    if (now - lastScrollLogRef.current < 120) return;
+    lastScrollLogRef.current = now;
+    const { contentOffset, contentSize, layoutMeasurement } = (
+      e as NativeSyntheticEvent<NativeScrollEvent>
+    ).nativeEvent;
+    log.debug('chat.list.scroll', {
+      surface,
+      offsetY: Math.round(contentOffset.y),
+      contentH: Math.round(contentSize.height),
+      viewportH: Math.round(layoutMeasurement.height),
+      distFromEnd: Math.round(contentSize.height - (contentOffset.y + layoutMeasurement.height)),
+    });
+  };
 
   const prevMsgRef = useRef({ count: 0, lastId: '' });
   useEffect(() => {
@@ -234,7 +225,7 @@ export function useChatKeyboardAnimationLogger({
     (curr, prev) => {
       'worklet';
       if (cycleActive.value === 0) return;
-      if (prev && curr.p === prev.p && curr.h === prev.h) return;
+      if (curr.p === prev?.p && curr.h === prev.h) return;
       progressTickCount.value += 1;
       if (curr.p < progressMin.value) progressMin.value = curr.p;
       if (curr.p > progressMax.value) progressMax.value = curr.p;

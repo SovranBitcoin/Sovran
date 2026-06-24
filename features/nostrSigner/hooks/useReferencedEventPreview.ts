@@ -115,7 +115,7 @@ export function useReferencedEventPreview(eventId: string | undefined): Referenc
   const { metadata } = useNostrProfileMetadata(fallbackAuthorPubkey);
 
   if (eventId === undefined) return { status: 'idle' };
-  if (resolved === null || resolved.id !== eventId) return { status: 'loading' };
+  if (resolved?.id !== eventId) return { status: 'loading' };
   if (resolved.entry === 'missing') return { status: 'unavailable' };
   const author =
     resolved.entry.author ??

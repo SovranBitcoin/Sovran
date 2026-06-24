@@ -241,10 +241,10 @@ export const TransferStepChain = React.memo(
       'warning',
     ] as const);
 
-    const labelColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
-    const dimLabelColor = useMemo(() => opacity(foreground, 0.25), [foreground]);
+    const labelColor = opacity(foreground, 0.5);
+    const dimLabelColor = opacity(foreground, 0.25);
 
-    const chain = useMemo(() => buildChain(status, middleLabel), [middleLabel, status]);
+    const chain = buildChain(status, middleLabel);
     const currentIdx = statusToCurrentIdx(status);
 
     // ── Stagger delay computation ──

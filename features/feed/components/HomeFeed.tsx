@@ -145,13 +145,13 @@ function FeedThreadPair({
   const foreground = useThemeColor('foreground');
   const [firstHeight, setFirstHeight] = useState(0);
 
-  const handleFirstLayout = useCallback((event: LayoutChangeEvent) => {
+  const handleFirstLayout = (event: LayoutChangeEvent) => {
     const nextHeight = Math.round(event.nativeEvent.layout.height);
     // The first post's height drives the connector line length AND the
     // second (reply) post's vertical offset. When it changes after async
     // content settles, the whole pair reflows below it.
     setFirstHeight((currentHeight) => (currentHeight === nextHeight ? currentHeight : nextHeight));
-  }, []);
+  };
 
   const connectorStyle = useMemo(() => {
     const secondAvatarTop = firstHeight + secondAvatarCenterY - FEED_AVATAR_SIZE / 2;
@@ -472,11 +472,11 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     void loadFeed(activeSpecIndex);
   }, [activeSpecIndex, currentSpec, userPubkey, preferenceKey, loadFeed]);
 
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = () => {
     if (!currentSpec || isRefreshing) return;
     setIsRefreshing(true);
     void loadFeed(activeSpecIndex, true);
-  }, [activeSpecIndex, currentSpec, isRefreshing, loadFeed]);
+  };
 
   // ── Pagination: load older items ──
 
@@ -619,13 +619,13 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     }
   }, [beginNetworkLoad, currentSpec, isActiveLoad, userPubkey, startTransition]);
 
-  const handleEndReached = useCallback(() => {
+  const handleEndReached = () => {
     // Don't start pagination while the first page is still loading or a refresh
     // is in flight — otherwise the footer spinner stacks on top of the
     // empty-state / refresh spinner (duplicate spinners).
     if (isLoading || isRefreshing) return;
     void loadMoreItems();
-  }, [loadMoreItems, isLoading, isRefreshing]);
+  };
 
   // ── Derived data ──
 
@@ -666,7 +666,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const toggleRepostRef = useLatestRef(toggleRepost);
 
   const overlaySourceIndexRef = useRef(-1);
-  const feedIndicesWithVideo = useMemo(() => computeFeedIndicesWithVideo(feedItems), [feedItems]);
+  const feedIndicesWithVideo = computeFeedIndicesWithVideo(feedItems);
 
   const onOverlayOpenedFromIndex = useCallback((index: number) => {
     overlaySourceIndexRef.current = index;
@@ -686,7 +686,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     [feedItems, getDisplayMetrics, getEngagementState, toggleLike, toggleRepost]
   );
 
-  const getVideoFeedLayoutsAndIndex = useCallback((): {
+  const getVideoFeedLayoutsAndIndex = (): {
     layouts: ImageOverlayReplaceLayout[];
     initialIndex: number;
   } | null => {
@@ -696,52 +696,46 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       .map((i) => buildLayoutForVideoIndex(i))
       .filter((l): l is ImageOverlayReplaceLayout => l != null);
     return layouts.length ? { layouts, initialIndex: 0 } : null;
-  }, [feedIndicesWithVideo, buildLayoutForVideoIndex]);
+  };
 
-  const onSwipeUpToNextPost = useCallback(
-    (openNext: (layout: ImageOverlayReplaceLayout) => void) => {
-      const current = overlaySourceIndexRef.current;
-      const nextVideoIndex = feedIndicesWithVideo.find((i) => i > current);
-      if (typeof nextVideoIndex !== 'number') return;
-      const layout = buildLayoutForVideoIndex(nextVideoIndex);
-      if (!layout) return;
-      overlaySourceIndexRef.current = nextVideoIndex;
-      openNext(layout);
-    },
-    [feedIndicesWithVideo, buildLayoutForVideoIndex]
-  );
+  const onSwipeUpToNextPost = (openNext: (layout: ImageOverlayReplaceLayout) => void) => {
+    const current = overlaySourceIndexRef.current;
+    const nextVideoIndex = feedIndicesWithVideo.find((i) => i > current);
+    if (typeof nextVideoIndex !== 'number') return;
+    const layout = buildLayoutForVideoIndex(nextVideoIndex);
+    if (!layout) return;
+    overlaySourceIndexRef.current = nextVideoIndex;
+    openNext(layout);
+  };
 
   // ── Render ──
 
-  const getThreadContext = useCallback(
-    (replyPreviewEvents?: readonly FeedEvent[]) => {
-      const allEvents = new Map<string, FeedEvent>();
-      for (const it of feedItems) {
-        if (it.rootEvent) {
-          allEvents.set(it.rootEvent.id, it.rootEvent);
-        }
-        if (it.type === 'note') {
-          allEvents.set(it.event.id, it.event);
-          for (const replyPreviewEvent of it.replyPreviewEvents ?? []) {
-            allEvents.set(replyPreviewEvent.id, replyPreviewEvent);
-          }
-        } else if (it.originalEvent) {
-          allEvents.set(it.originalEvent.id, it.originalEvent);
-        }
+  const getThreadContext = (replyPreviewEvents?: readonly FeedEvent[]) => {
+    const allEvents = new Map<string, FeedEvent>();
+    for (const it of feedItems) {
+      if (it.rootEvent) {
+        allEvents.set(it.rootEvent.id, it.rootEvent);
       }
-      for (const replyPreviewEvent of replyPreviewEvents ?? []) {
-        allEvents.set(replyPreviewEvent.id, replyPreviewEvent);
+      if (it.type === 'note') {
+        allEvents.set(it.event.id, it.event);
+        for (const replyPreviewEvent of it.replyPreviewEvents ?? []) {
+          allEvents.set(replyPreviewEvent.id, replyPreviewEvent);
+        }
+      } else if (it.originalEvent) {
+        allEvents.set(it.originalEvent.id, it.originalEvent);
       }
-      return {
-        allEvents,
-        profiles: profilesRef.current,
-        metrics: metricsRef.current,
-        quotedEvents: quotedRef.current,
-        replyPreviewEventIds: replyPreviewEvents?.map((event) => event.id),
-      };
-    },
-    [feedItems, profilesRef, metricsRef, quotedRef]
-  );
+    }
+    for (const replyPreviewEvent of replyPreviewEvents ?? []) {
+      allEvents.set(replyPreviewEvent.id, replyPreviewEvent);
+    }
+    return {
+      allEvents,
+      profiles: profilesRef.current,
+      metrics: metricsRef.current,
+      quotedEvents: quotedRef.current,
+      replyPreviewEventIds: replyPreviewEvents?.map((event) => event.id),
+    };
+  };
   const getThreadContextRef = useLatestRef(getThreadContext);
 
   const resolveReposter = useCallback(
@@ -797,183 +791,89 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     });
   }, [feedItems.length, feedRows.length, isLoading, activeSpecIndex, feedSpecs]);
 
-  const renderFeedItem = useCallback(
-    ({ item: row, index }: { item: FeedRow; index: number }) => {
-      const item = row.item;
-      const feedIndex = index;
-      if (item.type === 'note') {
-        const metrics = row.metrics;
-        const engagement = row.engagement;
-        const contextRootEvent = row.rootEvent;
-        const replyPreviewEvents = item.replyPreviewEvents ?? [];
-        if (!contextRootEvent && replyPreviewEvents.length > 0) {
-          return (
-            <FeedThreadPair
-              first={
-                <PostCard
-                  variant="feed"
-                  event={item.event}
-                  metrics={metrics}
-                  index={index}
-                  feedIndex={feedIndex}
-                  onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-                  quotedEvents={row.quotedEvents}
-                  profiles={row.profiles}
-                  getMetrics={getMetrics}
-                  liked={engagement.liked}
-                  replied={engagement.replied}
-                  reposted={engagement.reposted}
-                  likePending={engagement.likePending}
-                  repostPending={engagement.repostPending}
-                  likePendingDirection={engagement.likePendingDirection}
-                  repostPendingDirection={engagement.repostPendingDirection}
-                  onLikePress={() => toggleLikeRef.current(item.event)}
-                  onMorePress={() => openPostActions(item.event)}
-                  onRepostPress={() => toggleRepostRef.current(item.event)}
-                  skipAnimation={!isFirstRender.current}
-                  getThreadContext={() => getThreadContextRef.current(replyPreviewEvents)}
-                  showFooterBorder={false}
-                  fullBleedFooterBorder
-                />
-              }
-              second={
-                <>
-                  {replyPreviewEvents.map((replyEvent, replyIndex) => {
-                    const replyMetrics = getDisplayMetrics(replyEvent.id);
-                    const replyEngagement = getEngagementState(replyEvent.id);
-                    const isLastReply = replyIndex === replyPreviewEvents.length - 1;
-                    return (
-                      <PostCard
-                        key={replyEvent.id}
-                        variant="feed"
-                        event={replyEvent}
-                        metrics={replyMetrics}
-                        index={index}
-                        feedIndex={feedIndex}
-                        onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-                        quotedEvents={row.quotedEvents}
-                        profiles={row.profiles}
-                        getMetrics={getMetrics}
-                        liked={replyEngagement.liked}
-                        replied={replyEngagement.replied}
-                        reposted={replyEngagement.reposted}
-                        likePending={replyEngagement.likePending}
-                        repostPending={replyEngagement.repostPending}
-                        likePendingDirection={replyEngagement.likePendingDirection}
-                        repostPendingDirection={replyEngagement.repostPendingDirection}
-                        onLikePress={() => toggleLikeRef.current(replyEvent)}
-                        onMorePress={() => openPostActions(replyEvent)}
-                        onRepostPress={() => toggleRepostRef.current(replyEvent)}
-                        getThreadContext={() => getThreadContextRef.current()}
-                        showFooterBorder={isLastReply}
-                        fullBleedFooterBorder
-                      />
-                    );
-                  })}
-                </>
-              }
-            />
-          );
-        }
-        if (contextRootEvent) {
-          const rootEvent = contextRootEvent;
-          const rootMetrics = row.rootMetrics ?? DEFAULT_METRICS;
-          const rootEngagement = row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE;
-          return (
-            <FeedThreadPair
-              first={
-                <PostCard
-                  variant="feed"
-                  event={rootEvent}
-                  metrics={rootMetrics}
-                  index={index}
-                  feedIndex={feedIndex}
-                  onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-                  quotedEvents={row.quotedEvents}
-                  profiles={row.profiles}
-                  getMetrics={getMetrics}
-                  liked={rootEngagement.liked}
-                  replied={rootEngagement.replied}
-                  reposted={rootEngagement.reposted}
-                  likePending={rootEngagement.likePending}
-                  repostPending={rootEngagement.repostPending}
-                  likePendingDirection={rootEngagement.likePendingDirection}
-                  repostPendingDirection={rootEngagement.repostPendingDirection}
-                  onLikePress={() => toggleLikeRef.current(rootEvent)}
-                  onMorePress={() => openPostActions(rootEvent)}
-                  onRepostPress={() => toggleRepostRef.current(rootEvent)}
-                  skipAnimation={!isFirstRender.current}
-                  getThreadContext={() => getThreadContextRef.current()}
-                  showFooterBorder={false}
-                  fullBleedFooterBorder
-                />
-              }
-              second={
-                <PostCard
-                  variant="feed"
-                  event={item.event}
-                  metrics={metrics}
-                  index={index}
-                  feedIndex={feedIndex}
-                  onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-                  quotedEvents={row.quotedEvents}
-                  profiles={row.profiles}
-                  getMetrics={getMetrics}
-                  liked={engagement.liked}
-                  replied={engagement.replied}
-                  reposted={engagement.reposted}
-                  likePending={engagement.likePending}
-                  repostPending={engagement.repostPending}
-                  likePendingDirection={engagement.likePendingDirection}
-                  repostPendingDirection={engagement.repostPendingDirection}
-                  onLikePress={() => toggleLikeRef.current(item.event)}
-                  onMorePress={() => openPostActions(item.event)}
-                  onRepostPress={() => toggleRepostRef.current(item.event)}
-                  getThreadContext={() => getThreadContextRef.current()}
-                  fullBleedFooterBorder
-                />
-              }
-            />
-          );
-        }
+  const renderFeedItem = ({ item: row, index }: { item: FeedRow; index: number }) => {
+    const item = row.item;
+    const feedIndex = index;
+    if (item.type === 'note') {
+      const metrics = row.metrics;
+      const engagement = row.engagement;
+      const contextRootEvent = row.rootEvent;
+      const replyPreviewEvents = item.replyPreviewEvents ?? [];
+      if (!contextRootEvent && replyPreviewEvents.length > 0) {
         return (
-          <PostCard
-            variant="feed"
-            event={item.event}
-            metrics={metrics}
-            index={index}
-            feedIndex={feedIndex}
-            onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-            quotedEvents={row.quotedEvents}
-            profiles={row.profiles}
-            getMetrics={getMetrics}
-            liked={engagement.liked}
-            replied={engagement.replied}
-            reposted={engagement.reposted}
-            likePending={engagement.likePending}
-            repostPending={engagement.repostPending}
-            likePendingDirection={engagement.likePendingDirection}
-            repostPendingDirection={engagement.repostPendingDirection}
-            onLikePress={() => toggleLikeRef.current(item.event)}
-            onMorePress={() => openPostActions(item.event)}
-            onRepostPress={() => toggleRepostRef.current(item.event)}
-            skipAnimation={!isFirstRender.current}
-            getThreadContext={() => getThreadContextRef.current()}
-            fullBleedFooterBorder
+          <FeedThreadPair
+            first={
+              <PostCard
+                variant="feed"
+                event={item.event}
+                metrics={metrics}
+                index={index}
+                feedIndex={feedIndex}
+                onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+                quotedEvents={row.quotedEvents}
+                profiles={row.profiles}
+                getMetrics={getMetrics}
+                liked={engagement.liked}
+                replied={engagement.replied}
+                reposted={engagement.reposted}
+                likePending={engagement.likePending}
+                repostPending={engagement.repostPending}
+                likePendingDirection={engagement.likePendingDirection}
+                repostPendingDirection={engagement.repostPendingDirection}
+                onLikePress={() => toggleLikeRef.current(item.event)}
+                onMorePress={() => openPostActions(item.event)}
+                onRepostPress={() => toggleRepostRef.current(item.event)}
+                skipAnimation={!isFirstRender.current}
+                getThreadContext={() => getThreadContextRef.current(replyPreviewEvents)}
+                showFooterBorder={false}
+                fullBleedFooterBorder
+              />
+            }
+            second={
+              <>
+                {replyPreviewEvents.map((replyEvent, replyIndex) => {
+                  const replyMetrics = getDisplayMetrics(replyEvent.id);
+                  const replyEngagement = getEngagementState(replyEvent.id);
+                  const isLastReply = replyIndex === replyPreviewEvents.length - 1;
+                  return (
+                    <PostCard
+                      key={replyEvent.id}
+                      variant="feed"
+                      event={replyEvent}
+                      metrics={replyMetrics}
+                      index={index}
+                      feedIndex={feedIndex}
+                      onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+                      quotedEvents={row.quotedEvents}
+                      profiles={row.profiles}
+                      getMetrics={getMetrics}
+                      liked={replyEngagement.liked}
+                      replied={replyEngagement.replied}
+                      reposted={replyEngagement.reposted}
+                      likePending={replyEngagement.likePending}
+                      repostPending={replyEngagement.repostPending}
+                      likePendingDirection={replyEngagement.likePendingDirection}
+                      repostPendingDirection={replyEngagement.repostPendingDirection}
+                      onLikePress={() => toggleLikeRef.current(replyEvent)}
+                      onMorePress={() => openPostActions(replyEvent)}
+                      onRepostPress={() => toggleRepostRef.current(replyEvent)}
+                      getThreadContext={() => getThreadContextRef.current()}
+                      showFooterBorder={isLastReply}
+                      fullBleedFooterBorder
+                    />
+                  );
+                })}
+              </>
+            }
           />
         );
       }
-
-      const originalEvent = item.originalEvent;
-      const repostEngagement = row.engagement;
-      const contextRootEvent = row.rootEvent;
-      if (contextRootEvent && originalEvent) {
+      if (contextRootEvent) {
         const rootEvent = contextRootEvent;
         const rootMetrics = row.rootMetrics ?? DEFAULT_METRICS;
         const rootEngagement = row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE;
         return (
           <FeedThreadPair
-            secondAvatarCenterY={FEED_REPOST_ORIGINAL_AVATAR_CENTER_Y}
             first={
               <PostCard
                 variant="feed"
@@ -1002,30 +902,26 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
               />
             }
             second={
-              <RepostCard
-                repostEvent={item.repostEvent}
-                originalEvent={item.originalEvent}
-                originalMetrics={row.metrics}
+              <PostCard
+                variant="feed"
+                event={item.event}
+                metrics={metrics}
                 index={index}
                 feedIndex={feedIndex}
                 onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
                 quotedEvents={row.quotedEvents}
                 profiles={row.profiles}
                 getMetrics={getMetrics}
-                reposterName={row.reposterName ?? ''}
-                reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
-                reposters={row.reposters}
-                liked={repostEngagement.liked}
-                replied={repostEngagement.replied}
-                reposted={repostEngagement.reposted}
-                likePending={repostEngagement.likePending}
-                repostPending={repostEngagement.repostPending}
-                likePendingDirection={repostEngagement.likePendingDirection}
-                repostPendingDirection={repostEngagement.repostPendingDirection}
-                onLikePress={() => toggleLikeRef.current(originalEvent)}
-                onMorePress={() => openPostActions(originalEvent)}
-                onRepostPress={() => toggleRepostRef.current(originalEvent)}
-                skipAnimation={!isFirstRender.current}
+                liked={engagement.liked}
+                replied={engagement.replied}
+                reposted={engagement.reposted}
+                likePending={engagement.likePending}
+                repostPending={engagement.repostPending}
+                likePendingDirection={engagement.likePendingDirection}
+                repostPendingDirection={engagement.repostPendingDirection}
+                onLikePress={() => toggleLikeRef.current(item.event)}
+                onMorePress={() => openPostActions(item.event)}
+                onRepostPress={() => toggleRepostRef.current(item.event)}
                 getThreadContext={() => getThreadContextRef.current()}
                 fullBleedFooterBorder
               />
@@ -1034,47 +930,133 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         );
       }
       return (
-        <RepostCard
-          repostEvent={item.repostEvent}
-          originalEvent={item.originalEvent}
-          originalMetrics={row.metrics}
+        <PostCard
+          variant="feed"
+          event={item.event}
+          metrics={metrics}
           index={index}
           feedIndex={feedIndex}
           onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
           quotedEvents={row.quotedEvents}
           profiles={row.profiles}
           getMetrics={getMetrics}
-          reposterName={row.reposterName ?? ''}
-          reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
-          reposters={row.reposters}
-          liked={repostEngagement.liked}
-          replied={repostEngagement.replied}
-          reposted={repostEngagement.reposted}
-          likePending={repostEngagement.likePending}
-          repostPending={repostEngagement.repostPending}
-          likePendingDirection={repostEngagement.likePendingDirection}
-          repostPendingDirection={repostEngagement.repostPendingDirection}
-          onLikePress={originalEvent ? () => toggleLikeRef.current(originalEvent) : undefined}
-          onRepostPress={originalEvent ? () => toggleRepostRef.current(originalEvent) : undefined}
+          liked={engagement.liked}
+          replied={engagement.replied}
+          reposted={engagement.reposted}
+          likePending={engagement.likePending}
+          repostPending={engagement.repostPending}
+          likePendingDirection={engagement.likePendingDirection}
+          repostPendingDirection={engagement.repostPendingDirection}
+          onLikePress={() => toggleLikeRef.current(item.event)}
+          onMorePress={() => openPostActions(item.event)}
+          onRepostPress={() => toggleRepostRef.current(item.event)}
           skipAnimation={!isFirstRender.current}
           getThreadContext={() => getThreadContextRef.current()}
           fullBleedFooterBorder
         />
       );
-    },
-    [
-      getMetrics,
-      getDisplayMetrics,
-      getEngagementState,
-      onOverlayOpenedFromIndex,
-      toggleLikeRef,
-      toggleRepostRef,
-      getThreadContextRef,
-      openPostActions,
-    ]
-  );
+    }
 
-  const refreshTintColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
+    const originalEvent = item.originalEvent;
+    const repostEngagement = row.engagement;
+    const contextRootEvent = row.rootEvent;
+    if (contextRootEvent && originalEvent) {
+      const rootEvent = contextRootEvent;
+      const rootMetrics = row.rootMetrics ?? DEFAULT_METRICS;
+      const rootEngagement = row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE;
+      return (
+        <FeedThreadPair
+          secondAvatarCenterY={FEED_REPOST_ORIGINAL_AVATAR_CENTER_Y}
+          first={
+            <PostCard
+              variant="feed"
+              event={rootEvent}
+              metrics={rootMetrics}
+              index={index}
+              feedIndex={feedIndex}
+              onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+              quotedEvents={row.quotedEvents}
+              profiles={row.profiles}
+              getMetrics={getMetrics}
+              liked={rootEngagement.liked}
+              replied={rootEngagement.replied}
+              reposted={rootEngagement.reposted}
+              likePending={rootEngagement.likePending}
+              repostPending={rootEngagement.repostPending}
+              likePendingDirection={rootEngagement.likePendingDirection}
+              repostPendingDirection={rootEngagement.repostPendingDirection}
+              onLikePress={() => toggleLikeRef.current(rootEvent)}
+              onMorePress={() => openPostActions(rootEvent)}
+              onRepostPress={() => toggleRepostRef.current(rootEvent)}
+              skipAnimation={!isFirstRender.current}
+              getThreadContext={() => getThreadContextRef.current()}
+              showFooterBorder={false}
+              fullBleedFooterBorder
+            />
+          }
+          second={
+            <RepostCard
+              repostEvent={item.repostEvent}
+              originalEvent={item.originalEvent}
+              originalMetrics={row.metrics}
+              index={index}
+              feedIndex={feedIndex}
+              onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+              quotedEvents={row.quotedEvents}
+              profiles={row.profiles}
+              getMetrics={getMetrics}
+              reposterName={row.reposterName ?? ''}
+              reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
+              reposters={row.reposters}
+              liked={repostEngagement.liked}
+              replied={repostEngagement.replied}
+              reposted={repostEngagement.reposted}
+              likePending={repostEngagement.likePending}
+              repostPending={repostEngagement.repostPending}
+              likePendingDirection={repostEngagement.likePendingDirection}
+              repostPendingDirection={repostEngagement.repostPendingDirection}
+              onLikePress={() => toggleLikeRef.current(originalEvent)}
+              onMorePress={() => openPostActions(originalEvent)}
+              onRepostPress={() => toggleRepostRef.current(originalEvent)}
+              skipAnimation={!isFirstRender.current}
+              getThreadContext={() => getThreadContextRef.current()}
+              fullBleedFooterBorder
+            />
+          }
+        />
+      );
+    }
+    return (
+      <RepostCard
+        repostEvent={item.repostEvent}
+        originalEvent={item.originalEvent}
+        originalMetrics={row.metrics}
+        index={index}
+        feedIndex={feedIndex}
+        onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+        quotedEvents={row.quotedEvents}
+        profiles={row.profiles}
+        getMetrics={getMetrics}
+        reposterName={row.reposterName ?? ''}
+        reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
+        reposters={row.reposters}
+        liked={repostEngagement.liked}
+        replied={repostEngagement.replied}
+        reposted={repostEngagement.reposted}
+        likePending={repostEngagement.likePending}
+        repostPending={repostEngagement.repostPending}
+        likePendingDirection={repostEngagement.likePendingDirection}
+        repostPendingDirection={repostEngagement.repostPendingDirection}
+        onLikePress={originalEvent ? () => toggleLikeRef.current(originalEvent) : undefined}
+        onRepostPress={originalEvent ? () => toggleRepostRef.current(originalEvent) : undefined}
+        skipAnimation={!isFirstRender.current}
+        getThreadContext={() => getThreadContextRef.current()}
+        fullBleedFooterBorder
+      />
+    );
+  };
+
+  const refreshTintColor = opacity(foreground, 0.5);
 
   const pullToAi = usePullToAiRefreshControl({
     // Suppress the pull-to-refresh spinner during the initial (cold-start) load
@@ -1084,15 +1066,12 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     tintColor: refreshTintColor,
   });
 
-  const onScroll = useCallback(
-    (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-      scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
-      if (imageOverlay?.scrollOffsetY != null) {
-        imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
-      }
-    },
-    [imageOverlay]
-  );
+  const onScroll = (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+    scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
+    if (imageOverlay?.scrollOffsetY != null) {
+      imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
+    }
+  };
 
   return (
     <Log name="HomeFeed">

@@ -5,7 +5,7 @@
  * open an action menu without needing a local Trigger in scope.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -256,19 +256,19 @@ export function ActionMenuHost() {
     };
   }, []);
 
-  const handleSearchChange = useCallback((text: string) => {
+  const handleSearchChange = (text: string) => {
     setInputText(text);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => setSearchQuery(text), 150);
-  }, []);
+  };
 
-  const handleSearchClear = useCallback(() => {
+  const handleSearchClear = () => {
     setInputText('');
     setSearchQuery('');
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-  }, []);
+  };
 
-  const handleOpenChange = useCallback((open: boolean): void => {
+  const handleOpenChange = (open: boolean): void => {
     hostLog.info('actionMenuHost.openChange', {
       open,
       stayOpen: stayOpenRef.current,
@@ -287,9 +287,9 @@ export function ActionMenuHost() {
     activeDismissRef.current = null;
     dismissActionMenuPopup();
     if (!picked && onDismiss) onDismiss();
-  }, []);
+  };
 
-  const handleItemPress = useCallback((button: ActionMenuItem): void => {
+  const handleItemPress = (button: ActionMenuItem): void => {
     if (button.disabled || button.isFailed) return;
     selectedRef.current = true;
     if (button.keepOpen) {
@@ -298,27 +298,24 @@ export function ActionMenuHost() {
       dismissActionMenuPopup();
     }
     void button.onPress?.(() => dismissActionMenuPopup());
-  }, []);
+  };
 
-  const handlePrimaryPressInner = useCallback(
-    async (action: ActionMenuPrimaryAction): Promise<void> => {
-      if (isSubmitting) return;
-      setError(null);
-      setIsSubmitting(true);
-      try {
-        await action.onPress(inputValues, {
-          setError,
-          close: () => {
-            selectedRef.current = true;
-            dismissActionMenuPopup();
-          },
-        });
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [inputValues, isSubmitting]
-  );
+  const handlePrimaryPressInner = async (action: ActionMenuPrimaryAction): Promise<void> => {
+    if (isSubmitting) return;
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await action.onPress(inputValues, {
+        setError,
+        close: () => {
+          selectedRef.current = true;
+          dismissActionMenuPopup();
+        },
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // `isSubmitting` is React state — a rapid double-tap on the primary
   // action button (Import-Nsec, Claim Username, etc.) lands twice into
@@ -359,10 +356,10 @@ export function ActionMenuHost() {
   // row clears the absolutely-positioned footer. Two Menu.Items + safe
   // area easily exceed any hardcoded value, so we measure dynamically.
   const [footerHeight, setFooterHeight] = useState(0);
-  const handleFooterLayout = useCallback((e: LayoutChangeEvent) => {
+  const handleFooterLayout = (e: LayoutChangeEvent) => {
     const h = Math.round(e.nativeEvent.layout.height);
     setFooterHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
-  }, []);
+  };
   useEffect(() => {
     if (!hasFooter) setFooterHeight(0);
   }, [hasFooter]);
@@ -622,6 +619,7 @@ export function ActionMenuHost() {
           // overrides the scrollable type to `VIEW` on mount and pan
           // gestures dismiss the sheet instead of scrolling the list.
           // Only needed when there *is* a nested scroll container.
+          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- `useDirectView` is an undocumented gorhom internal not in the public contentContainerProps type; `as never` forces it through (see comment above).
           contentContainerProps={useScrollBody ? ({ useDirectView: true } as never) : undefined}
           // gorhom's `BottomSheetFooter` slot — pinned absolute at the
           // sheet's animated bottom edge AND auto-tracks the keyboard

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 
 import { facade } from '@sovranbitcoin/nagg-ts';
 
@@ -24,11 +24,9 @@ function useCachedRecord<T>(
   store: facade.NormalizingStore<T> | undefined,
   key: string | undefined
 ): T | undefined {
-  const subscribe = useCallback(
-    (onChange: () => void) => (store && key ? store.subscribeKey(key, onChange) : NOOP_UNSUB),
-    [store, key]
-  );
-  const getSnapshot = useCallback(() => (store && key ? store.get(key) : undefined), [store, key]);
+  const subscribe = (onChange: () => void) =>
+    store && key ? store.subscribeKey(key, onChange) : NOOP_UNSUB;
+  const getSnapshot = () => (store && key ? store.get(key) : undefined);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
@@ -36,14 +34,9 @@ function usePendingProfile(
   pending: facade.PendingSet | undefined,
   key: string | undefined
 ): boolean {
-  const subscribe = useCallback(
-    (onChange: () => void) => (pending && key ? pending.subscribeKey(key, onChange) : NOOP_UNSUB),
-    [pending, key]
-  );
-  const getSnapshot = useCallback(
-    () => (pending && key ? pending.has(key) : false),
-    [pending, key]
-  );
+  const subscribe = (onChange: () => void) =>
+    pending && key ? pending.subscribeKey(key, onChange) : NOOP_UNSUB;
+  const getSnapshot = () => (pending && key ? pending.has(key) : false);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 

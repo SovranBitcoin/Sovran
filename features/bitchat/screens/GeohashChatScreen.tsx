@@ -238,7 +238,7 @@ export function GeohashChatScreen({
   } else if (transport === 'ble-dm') {
     const isMeshOnly =
       !!dmPeerSnapshot && dmPeerSnapshot.isConnected && dmPeerSnapshot.hasDirectLink === false;
-    const isUnknownOrOffline = !dmPeerSnapshot || !dmPeerSnapshot.isConnected;
+    const isUnknownOrOffline = !dmPeerSnapshot?.isConnected;
     if (isMeshOnly) {
       bleDmBanner = (
         <HStack

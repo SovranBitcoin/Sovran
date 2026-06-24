@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image as ExpoImage } from 'expo-image';
 import opacity from 'hex-color-opacity';
 import { StyleSheet, type StyleProp, View, type ViewStyle } from 'react-native';
@@ -53,34 +53,28 @@ export function MintIcon({
     setFailedUrl(null);
   }, [normalizedIconUrl]);
 
-  const loadingColor = useMemo(() => opacity(foreground, 0.07), [foreground]);
+  const loadingColor = opacity(foreground, 0.07);
   const fallbackBackground = muted;
   const borderRadius = size / 2;
   const imageAlt = alt ?? `${name || 'Mint'} icon`;
   const iconSize = Math.round(size * 0.72);
 
-  const containerStyle = useMemo(
-    () => [
-      styles.container,
-      {
-        width: size,
-        height: size,
-        borderRadius,
-        backgroundColor: isLoading ? loadingColor : fallbackBackground,
-      },
-      style,
-    ],
-    [borderRadius, fallbackBackground, isLoading, loadingColor, size, style]
-  );
-  const imageSource = useMemo(
-    () => (normalizedIconUrl ? { uri: normalizedIconUrl } : undefined),
-    [normalizedIconUrl]
-  );
-  const handleImageError = useCallback(() => {
+  const containerStyle = [
+    styles.container,
+    {
+      width: size,
+      height: size,
+      borderRadius,
+      backgroundColor: isLoading ? loadingColor : fallbackBackground,
+    },
+    style,
+  ];
+  const imageSource = normalizedIconUrl ? { uri: normalizedIconUrl } : undefined;
+  const handleImageError = () => {
     if (normalizedIconUrl) {
       setFailedUrl(normalizedIconUrl);
     }
-  }, [normalizedIconUrl]);
+  };
 
   if (isLoading) {
     return <View style={containerStyle} accessibilityRole="image" accessibilityLabel={imageAlt} />;

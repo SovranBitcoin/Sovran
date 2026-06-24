@@ -18,10 +18,7 @@ const TIMELINE_COMPLETE_HOLD_STEPS = 2;
 export function SettingsDesignSystemTimelineScreen() {
   // Fixed createdAt so the simulated timestamps don't churn on re-render.
   const timelineCreatedAt = useMemo(() => Date.now() - 5 * 60 * 1000, []);
-  const timelineScenarios = useMemo(
-    () => buildTimelineScenarios(timelineCreatedAt),
-    [timelineCreatedAt]
-  );
+  const timelineScenarios = buildTimelineScenarios(timelineCreatedAt);
   const [selectedScenarioId, setSelectedScenarioId] = useState(timelineScenarios[0].id);
   const [frameIndex, setFrameIndex] = useState(0);
   const [timelineAuto, setTimelineAuto] = useState(true);

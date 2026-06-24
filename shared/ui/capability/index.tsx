@@ -13,7 +13,7 @@
  * the sync helpers in `shared/lib/version.ts`.
  */
 
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext } from 'react';
 
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
@@ -35,10 +35,7 @@ export function CapabilityProvider({
   children,
 }: CapabilityProviderProps): React.ReactElement {
   const mockNoGlass = useSettingsStore((s) => s.mockNoGlass);
-  const detected = useMemo(
-    () => value ?? detectCapabilities({ mockNoGlass }),
-    [value, mockNoGlass]
-  );
+  const detected = value ?? detectCapabilities({ mockNoGlass });
   return <CapabilityContext.Provider value={detected}>{children}</CapabilityContext.Provider>;
 }
 

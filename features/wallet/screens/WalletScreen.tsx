@@ -57,6 +57,17 @@ const WALLET_HEADER_TO_BALANCE_GAP = Platform.select({ android: 12, default: 24 
 const RECEIVE_SYSTEM_ICON = Platform.OS === 'ios' ? 'arrow.down.left' : undefined;
 const SEND_SYSTEM_ICON = Platform.OS === 'ios' ? 'arrow.up.right' : undefined;
 
+const handleTheme = () => {
+  walletLog.info('wallet.theme.tap');
+  router.push('/(theme-flow)/preview');
+};
+
+const handleNearPay = () => {
+  walletLog.info('wallet.near_pay.tap', { unit: ACCOUNT.unit });
+  clearPaymentContext('wallet.near_pay');
+  router.push('/(send-flow)/nearPay');
+};
+
 export function WalletScreen() {
   useLifecycleLogger('WalletScreen');
   useBackgroundConfig({ blurMode: 'partial' });
@@ -122,17 +133,6 @@ export function WalletScreen() {
     walletLog.info('wallet.action.send', { unit: ACCOUNT.unit });
     clearPaymentContext('wallet.send');
     await machine.startSendEcash({ reset: true });
-  };
-
-  const handleTheme = () => {
-    walletLog.info('wallet.theme.tap');
-    router.push('/(theme-flow)/preview');
-  };
-
-  const handleNearPay = () => {
-    walletLog.info('wallet.near_pay.tap', { unit: ACCOUNT.unit });
-    clearPaymentContext('wallet.near_pay');
-    router.push('/(send-flow)/nearPay');
   };
 
   const nfcSupported = useNfcSupported();

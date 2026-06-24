@@ -448,7 +448,7 @@ export function NotificationsScreen() {
     for (const [pk, meta] of cachedProfiles) {
       const existing = profilesMap.get(pk);
       // Fill a missing actor, or upgrade a name-only tier entry that lacks a picture.
-      if (existing && existing.picture) continue;
+      if (existing?.picture) continue;
       const name = meta.displayName || meta.name || existing?.name;
       const picture = meta.picture ?? existing?.picture;
       if (!name && !picture) continue;
@@ -1220,6 +1220,10 @@ function notificationIcon(reason: string): string {
 }
 
 function notificationTone(reason: string): string {
+  /* eslint-disable no-restricted-syntax -- fixed notification-type accent palette
+     (Twitter/X-derived), intentionally theme-invariant so each reason reads with the
+     same colour on every theme; a named palette home isn't warranted for a
+     single-consumer switch. */
   switch (reason) {
     case 'follow':
     case 'reply':
@@ -1235,6 +1239,7 @@ function notificationTone(reason: string): string {
     default:
       return '#71767B';
   }
+  /* eslint-enable no-restricted-syntax */
 }
 
 function EmptyNotifications({

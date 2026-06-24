@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -44,20 +44,20 @@ function TabButton({
     transform: [{ scale: scale.value }],
   }));
 
-  const onPressIn = useCallback(() => {
+  const onPressIn = () => {
     scale.value = withTiming(0.88, {
       duration: 70,
       easing: Easing.out(Easing.cubic),
     });
-  }, [scale]);
+  };
 
-  const onPressOut = useCallback(() => {
+  const onPressOut = () => {
     scale.value = withSpring(1, {
       damping: 12,
       stiffness: 380,
       mass: 0.6,
     });
-  }, [scale]);
+  };
 
   return (
     <Pressable

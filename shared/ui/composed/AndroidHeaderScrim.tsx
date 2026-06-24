@@ -28,7 +28,7 @@
  * can import it without an import cycle — flowLayoutOptions already imports
  * FlowSheetHeader.
  */
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { easeGradient } from 'react-native-easing-gradient';
 import opacity from 'hex-color-opacity';
@@ -37,7 +37,7 @@ import opacity from 'hex-color-opacity';
  *  bottom ~45% of the taller native bar). */
 const NATIVE_BAR_ANCHOR = 0.55;
 
-export const AndroidHeaderScrim = function AndroidHeaderScrim({
+export const AndroidHeaderScrim = memo(function AndroidHeaderScrim({
   backgroundColor,
   height,
   anchor,
@@ -70,4 +70,4 @@ export const AndroidHeaderScrim = function AndroidHeaderScrim({
       style={height != null ? { height } : { flex: 1 }}
     />
   );
-};
+});

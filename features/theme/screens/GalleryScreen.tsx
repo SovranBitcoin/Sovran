@@ -63,14 +63,11 @@ export function GalleryScreen() {
   const cardWidth = Math.round(screenWidth * 0.44);
   const cardHeight = cardWidth * CARD_RATIO;
 
-  const handlePickAlbum = useCallback(
-    (slug: string) => {
-      log.info('theme.gallery.pick_album', { slug });
-      setAlbum(slug, PREVIEW_UNIT_IDS);
-      router.back();
-    },
-    [setAlbum]
-  );
+  const handlePickAlbum = (slug: string) => {
+    log.info('theme.gallery.pick_album', { slug });
+    setAlbum(slug, PREVIEW_UNIT_IDS);
+    router.back();
+  };
 
   return (
     <>
@@ -132,6 +129,7 @@ function SectionHeader({ topic, author }: { topic: string; author: AlbumAuthor |
             <PressableFeedback.Scale>
               <Image
                 source={{ uri: author.picture }}
+                // eslint-disable-next-line no-restricted-syntax -- neutral placeholder fill shown behind the avatar image while it loads; theme-invariant by design.
                 style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#333' }}
                 contentFit="cover"
               />

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, type ReactNode } from 'react';
+import React, { useMemo, type ReactNode } from 'react';
 import {
   StyleSheet,
   View,
@@ -63,13 +63,10 @@ export function VisualLayoutProbe({
     [extra, pointerEvents, style]
   );
   const layout = useVisualLayoutLogger({ ...config, extra: visualExtra });
-  const handleLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      onLayout?.(event);
-      layout.onLayout(event);
-    },
-    [layout, onLayout]
-  );
+  const handleLayout = (event: LayoutChangeEvent) => {
+    onLayout?.(event);
+    layout.onLayout(event);
+  };
 
   return (
     <View

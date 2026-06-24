@@ -73,6 +73,84 @@ function FilterButton() {
   );
 }
 
+const handleTransactionPress = (historyEntry: HistoryEntry) => {
+  const serializedHistoryEntry = JSON.stringify(historyEntry);
+  const entryState =
+    typeof (historyEntry as Record<string, unknown>).state === 'string'
+      ? (historyEntry as Record<string, unknown>).state
+      : null;
+
+  switch (historyEntry.type) {
+    case 'mint': {
+      const pathname = getMintDetailPathname(historyEntry);
+      cashuLog.info('transactions.route.open_detail', {
+        type: historyEntry.type,
+        state: entryState,
+        pathname,
+        serializedLength: serializedHistoryEntry.length,
+      });
+      router.navigate({
+        pathname,
+        params: {
+          mintHistoryEntry: serializedHistoryEntry,
+        },
+      });
+      return;
+    }
+    case 'melt': {
+      const pathname = getMeltDetailPathname(historyEntry);
+      cashuLog.info('transactions.route.open_detail', {
+        type: historyEntry.type,
+        state: entryState,
+        pathname,
+        serializedLength: serializedHistoryEntry.length,
+      });
+      router.navigate({
+        pathname,
+        params: {
+          meltHistoryEntry: serializedHistoryEntry,
+        },
+      });
+      return;
+    }
+    case 'send': {
+      cashuLog.info('transactions.route.open_detail', {
+        type: historyEntry.type,
+        state: entryState,
+        pathname: '/sendToken',
+        serializedLength: serializedHistoryEntry.length,
+      });
+      router.navigate({
+        pathname: '/sendToken',
+        params: {
+          sendHistoryEntry: serializedHistoryEntry,
+        },
+      });
+      return;
+    }
+    case 'receive': {
+      cashuLog.info('transactions.route.open_detail', {
+        type: historyEntry.type,
+        state: entryState,
+        pathname: '/receiveToken',
+        serializedLength: serializedHistoryEntry.length,
+      });
+      router.navigate({
+        pathname: '/receiveToken',
+        params: {
+          receiveHistoryEntry: serializedHistoryEntry,
+        },
+      });
+      return;
+    }
+    default:
+      cashuLog.warn('transactions.route.open_detail.unsupported', {
+        type: (historyEntry as Record<string, unknown>).type,
+        state: entryState,
+      });
+  }
+};
+
 function TransactionsRoute() {
   const params = useRouteParams(ParamsSchema, { where: 'transactions-flow.transactions' });
   const {
@@ -150,86 +228,6 @@ function TransactionsRoute() {
     setLock,
     setCounterparty,
   ]);
-
-  // Handle transaction press — declared before the early-return so the hook
-  // order stays stable across renders.
-  const handleTransactionPress = (historyEntry: HistoryEntry) => {
-    const serializedHistoryEntry = JSON.stringify(historyEntry);
-    const entryState =
-      typeof (historyEntry as Record<string, unknown>).state === 'string'
-        ? (historyEntry as Record<string, unknown>).state
-        : null;
-
-    switch (historyEntry.type) {
-      case 'mint': {
-        const pathname = getMintDetailPathname(historyEntry);
-        cashuLog.info('transactions.route.open_detail', {
-          type: historyEntry.type,
-          state: entryState,
-          pathname,
-          serializedLength: serializedHistoryEntry.length,
-        });
-        router.navigate({
-          pathname,
-          params: {
-            mintHistoryEntry: serializedHistoryEntry,
-          },
-        });
-        return;
-      }
-      case 'melt': {
-        const pathname = getMeltDetailPathname(historyEntry);
-        cashuLog.info('transactions.route.open_detail', {
-          type: historyEntry.type,
-          state: entryState,
-          pathname,
-          serializedLength: serializedHistoryEntry.length,
-        });
-        router.navigate({
-          pathname,
-          params: {
-            meltHistoryEntry: serializedHistoryEntry,
-          },
-        });
-        return;
-      }
-      case 'send': {
-        cashuLog.info('transactions.route.open_detail', {
-          type: historyEntry.type,
-          state: entryState,
-          pathname: '/sendToken',
-          serializedLength: serializedHistoryEntry.length,
-        });
-        router.navigate({
-          pathname: '/sendToken',
-          params: {
-            sendHistoryEntry: serializedHistoryEntry,
-          },
-        });
-        return;
-      }
-      case 'receive': {
-        cashuLog.info('transactions.route.open_detail', {
-          type: historyEntry.type,
-          state: entryState,
-          pathname: '/receiveToken',
-          serializedLength: serializedHistoryEntry.length,
-        });
-        router.navigate({
-          pathname: '/receiveToken',
-          params: {
-            receiveHistoryEntry: serializedHistoryEntry,
-          },
-        });
-        return;
-      }
-      default:
-        cashuLog.warn('transactions.route.open_detail.unsupported', {
-          type: (historyEntry as Record<string, unknown>).type,
-          state: entryState,
-        });
-    }
-  };
 
   if (!params) return null;
 

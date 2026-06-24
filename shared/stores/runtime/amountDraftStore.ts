@@ -46,7 +46,7 @@ export const useAmountDraftStore = create<AmountDraftStore>((set, get) => ({
   },
   take: (scope) => {
     const p = get().pending;
-    if (!p || p.scope !== scope) {
+    if (p?.scope !== scope) {
       paymentLog.info('amount_draft.take_miss', {
         scope,
         hasPending: !!p,

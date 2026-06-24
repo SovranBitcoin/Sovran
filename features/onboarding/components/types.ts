@@ -1,4 +1,4 @@
-import { SharedValue } from 'react-native-reanimated';
+import { SharedValue, useAnimatedScrollHandler } from 'react-native-reanimated';
 import { FlatList } from 'react-native-gesture-handler';
 
 export type OnboardingSlide = {
@@ -16,7 +16,7 @@ export type OnboardingCarouselProps = {
   currentSlideIndex: number;
   setCurrentSlideIndex: (index: number) => void;
   horizontalListRef: React.RefObject<FlatList<OnboardingSlide> | null>;
-  scrollHandler: (event: any) => void;
+  scrollHandler: ReturnType<typeof useAnimatedScrollHandler>;
   translateY: SharedValue<number>;
   scrollOffsetX: SharedValue<number>;
   isDragging: SharedValue<boolean>;

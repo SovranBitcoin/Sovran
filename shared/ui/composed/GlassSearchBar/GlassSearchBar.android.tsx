@@ -8,7 +8,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { radius } from '@/shared/styles/tokens';
 import type { GlassSearchBarProps } from './types';
 
-export const GlassSearchBar = function GlassSearchBar({
+export const GlassSearchBar = React.memo(function GlassSearchBar({
   clearKey,
   onChangeText,
   placeholder,
@@ -95,4 +95,4 @@ export const GlassSearchBar = function GlassSearchBar({
       </View>
     </Log>
   );
-};
+});

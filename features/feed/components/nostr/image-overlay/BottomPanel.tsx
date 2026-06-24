@@ -9,7 +9,7 @@
  * - InlinePanelImage: image with blurred letterbox for aspect ratio mismatch
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BlurView } from 'expo-blur';
@@ -25,7 +25,7 @@ import type { ContentSegment } from '../feedTypes';
 import type { ImageOverlayPost } from './types';
 import { BOTTOM_PANEL_PADDING_HORIZONTAL, BOTTOM_PANEL_PADDING_TOP } from './config';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { COMMENT_ACCENT } from '@/shared/lib/brandColors';
+import { COMMENT_ACCENT, LIKE_ACCENT } from '@/shared/lib/brandColors';
 import { openRepostMenu } from '@/features/feed/lib/repostMenu';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { Log } from '@/shared/lib/logger';
@@ -42,7 +42,7 @@ const OVERLAY_CLOSE_BEFORE_MENU_MS = 240;
  */
 function useOverlayRepostMenu(post: ImageOverlayPost, onRequestClose?: () => void) {
   const quotePost = useQuotePost();
-  return useCallback(() => {
+  return () => {
     onRequestClose?.();
     setTimeout(() => {
       openRepostMenu({
@@ -51,13 +51,13 @@ function useOverlayRepostMenu(post: ImageOverlayPost, onRequestClose?: () => voi
         onQuote: () => quotePost(post.event, post.profile ?? undefined),
       });
     }, OVERLAY_CLOSE_BEFORE_MENU_MS);
-  }, [post, onRequestClose, quotePost]);
+  };
 }
 // Absolute bar text stays white — it floats over the dark, blurred image, not
 // over the sheet's `surface` background.
 const PANEL_TEXT = 'rgba(255,255,255,0.95)';
 const PANEL_TEXT_MUTED = 'rgba(255,255,255,0.6)';
-const LIKED_COLOR = '#ff5a7a';
+const LIKED_COLOR = LIKE_ACCENT;
 
 const PANEL_CONTENT_TRUNCATE_LIMIT = 120;
 const PANEL_INLINE_IMAGE_MAX_HEIGHT = 200;
@@ -139,14 +139,14 @@ function extractPanelText(content: string): string {
 function InlinePanelImage({ uri }: { uri: string }) {
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [layoutWidth, setLayoutWidth] = useState<number>(0);
-  const onLoad = useCallback((e: { source: { width: number; height: number } }) => {
+  const onLoad = (e: { source: { width: number; height: number } }) => {
     const { width, height } = e.source;
     if (!width || !height) return;
     setNaturalSize({ w: width, h: height });
-  }, []);
-  const onLayout = useCallback((e: { nativeEvent: { layout: { width: number } } }) => {
+  };
+  const onLayout = (e: { nativeEvent: { layout: { width: number } } }) => {
     setLayoutWidth(e.nativeEvent.layout.width);
-  }, []);
+  };
   const { boxHeight, imageStyle } = useMemo(() => {
     const placeholderHeight = 120;
     if (!layoutWidth) {
@@ -435,17 +435,17 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
-  const textContent = useMemo(() => extractPanelText(fullContent), [fullContent]);
+  const textContent = extractPanelText(fullContent);
   const contentPreview = textContent.slice(0, 120);
   const contentTruncated = textContent.length > 120;
 
-  const handleCommentPress = useCallback(() => {
+  const handleCommentPress = () => {
     onOpenSheet();
-  }, [onOpenSheet]);
+  };
 
-  const handleShowMorePress = useCallback(() => {
+  const handleShowMorePress = () => {
     onOpenSheet({ expandContent: true });
-  }, [onOpenSheet]);
+  };
 
   return (
     <Log name="ImageOverlayAbsoluteBar">

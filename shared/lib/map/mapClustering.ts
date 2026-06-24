@@ -57,6 +57,7 @@ export class ClusterManager {
   private cluster: Supercluster;
   private loaded: boolean = false;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supercluster point/cluster prop generics; this manager is prop-agnostic
   constructor(options?: Supercluster.Options<any, any>) {
     this.cluster = new Supercluster({
       radius: 60, // Cluster radius in pixels
@@ -114,7 +115,7 @@ export class ClusterManager {
 
     return clusters.map((feature): MapMarker => {
       const [lon, lat] = feature.geometry.coordinates;
-      const props = feature.properties as any;
+      const props = feature.properties;
 
       if (props.cluster) {
         // Cluster marker

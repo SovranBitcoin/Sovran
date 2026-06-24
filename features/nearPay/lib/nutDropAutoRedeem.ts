@@ -1,6 +1,9 @@
 import { AppState } from 'react-native';
-import { createMeshRedeemOrchestrator, type MeshRedeemOrchestrator } from '@sovranbitcoin/colada';
-import type { TransactionAnnotation } from '@sovranbitcoin/colada';
+import {
+  createMeshRedeemOrchestrator,
+  type MeshRedeemOrchestrator,
+  TransactionAnnotation,
+} from '@sovranbitcoin/colada';
 import { createDefaultOperations } from '@sovranbitcoin/colada/operations';
 import { getBLEPeers } from 'bitchat-module';
 

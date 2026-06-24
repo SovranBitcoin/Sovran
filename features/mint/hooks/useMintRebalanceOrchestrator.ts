@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GetInfoResponse, Proof } from '@cashu/cashu-ts';
 import { useManager } from '@cashu/coco-react';
 
@@ -106,7 +106,7 @@ export function useMintRebalanceOrchestrator({
     cashuLog.debug('mint.rebalance.step', entry);
   }, []);
 
-  const plan = useMemo(() => runPlan ?? computedPlan, [runPlan, computedPlan]);
+  const plan = runPlan ?? computedPlan;
 
   useEffect(() => {
     stepStatesRef.current = stepStates;
@@ -1220,7 +1220,7 @@ export function useMintRebalanceOrchestrator({
     [executeStep]
   );
 
-  const handleStart = useCallback(() => {
+  const handleStart = () => {
     // Per-instance ref-based guard (this screen mount).
     if (isRunningRef.current) return;
     if (runStatus === 'running') return;
@@ -1273,44 +1273,38 @@ export function useMintRebalanceOrchestrator({
     // Kick off the runner (do not await; keep UI responsive)
     // Use the snapshot steps (stable), not any live recomputed list.
     void runStepsSequentially(snapshot.steps, runId);
-  }, [computedPlan, runStatus, runStepsSequentially, unit]);
+  };
 
-  const handleRetry = useCallback(
-    async (step: TransferStep) => {
-      // Use ref-based guard to prevent race conditions
-      if (isRunningRef.current) return;
-      if (runStatus === 'running') return;
+  const handleRetry = async (step: TransferStep) => {
+    // Use ref-based guard to prevent race conditions
+    if (isRunningRef.current) return;
+    if (runStatus === 'running') return;
 
-      isRunningRef.current = true;
-      abortRef.current = false;
-      const runId = (runIdRef.current += 1);
-      setRunStatus('running');
-      setCurrentStepId(step.id);
-      updateStepState(step.id, {
-        status: 'pending',
-        errorMessage: undefined,
-        routeSuggestion: undefined,
-      });
-      try {
-        await executeStep(step, runId);
-      } finally {
-        isRunningRef.current = false;
-      }
-      setCurrentStepId(null);
-      setRunStatus('finished');
-    },
-    [executeStep, updateStepState, runStatus]
-  );
+    isRunningRef.current = true;
+    abortRef.current = false;
+    const runId = (runIdRef.current += 1);
+    setRunStatus('running');
+    setCurrentStepId(step.id);
+    updateStepState(step.id, {
+      status: 'pending',
+      errorMessage: undefined,
+      routeSuggestion: undefined,
+    });
+    try {
+      await executeStep(step, runId);
+    } finally {
+      isRunningRef.current = false;
+    }
+    setCurrentStepId(null);
+    setRunStatus('finished');
+  };
 
-  const handleSkip = useCallback(
-    (step: TransferStep) => {
-      if (runStatus === 'running') return;
-      updateStepState(step.id, { status: 'skipped' });
-    },
-    [updateStepState, runStatus]
-  );
+  const handleSkip = (step: TransferStep) => {
+    if (runStatus === 'running') return;
+    updateStepState(step.id, { status: 'skipped' });
+  };
 
-  const handleRetryFailed = useCallback(async () => {
+  const handleRetryFailed = async () => {
     if (!runPlan) return;
     // Use ref-based guard to prevent race conditions
     if (isRunningRef.current) return;
@@ -1325,88 +1319,85 @@ export function useMintRebalanceOrchestrator({
     setStepStates((prev) => resetFailedStepStates(prev, runPlan.steps));
 
     await runStepsSequentially(runPlan.steps, runId);
-  }, [runPlan, runStatus, runStepsSequentially]);
+  };
 
-  const handleRouteThrough = useCallback(
-    async (step: TransferStep) => {
-      if (!runPlan) return;
-      // Use ref-based guard to prevent race conditions
-      if (isRunningRef.current) return;
-      if (runStatus === 'running') return;
+  const handleRouteThrough = async (step: TransferStep) => {
+    if (!runPlan) return;
+    // Use ref-based guard to prevent race conditions
+    if (isRunningRef.current) return;
+    if (runStatus === 'running') return;
 
-      const suggestion = stepStatesRef.current[step.id]?.routeSuggestion;
-      if (!suggestion || suggestion.status !== 'found' || !suggestion.path) return;
+    const suggestion = stepStatesRef.current[step.id]?.routeSuggestion;
+    if (suggestion?.status !== 'found' || !suggestion.path) return;
 
-      const chainPath = suggestion.path;
-      if (chainPath.length < 3) return; // Need at least A → via → B
+    const chainPath = suggestion.path;
+    if (chainPath.length < 3) return; // Need at least A → via → B
 
-      isRunningRef.current = true;
+    isRunningRef.current = true;
 
-      // ── Temporary trust for untrusted intermediary mints ──
-      // In `allow_untrusted` mode, coco requires mints to be trusted for wallet
-      // operations.  We temporarily trust any intermediary mint the user hasn't
-      // explicitly trusted, then untrust it after the chain finishes.
-      const trustedUrls = new Set(trustedMints.map((m) => m.mintUrl));
-      const intermediaries = chainPath.slice(1, -1);
-      const temporarilyTrusted: string[] = [];
+    // ── Temporary trust for untrusted intermediary mints ──
+    // In `allow_untrusted` mode, coco requires mints to be trusted for wallet
+    // operations.  We temporarily trust any intermediary mint the user hasn't
+    // explicitly trusted, then untrust it after the chain finishes.
+    const trustedUrls = new Set(trustedMints.map((m) => m.mintUrl));
+    const intermediaries = chainPath.slice(1, -1);
+    const temporarilyTrusted: string[] = [];
 
-      for (const url of intermediaries) {
-        if (!trustedUrls.has(url)) {
-          try {
-            await manager.mint.addMint(url, { trusted: true });
-            temporarilyTrusted.push(url);
-          } catch (err) {
-            cashuLog.warn('mint.rebalance.trust_failed', { ...mintUrlLogFields(url), error: err });
-          }
+    for (const url of intermediaries) {
+      if (!trustedUrls.has(url)) {
+        try {
+          await manager.mint.addMint(url, { trusted: true });
+          temporarilyTrusted.push(url);
+        } catch (err) {
+          cashuLog.warn('mint.rebalance.trust_failed', { ...mintUrlLogFields(url), error: err });
         }
       }
+    }
 
-      const afterId = step.id;
-      const chainId = mintLocalId('chain');
+    const afterId = step.id;
+    const chainId = mintLocalId('chain');
 
-      const rerouteSteps = createChainSteps({
-        baseStep: step,
-        chainPath,
-        chainId,
-        idPrefix: `reroute-${afterId}`,
-        makeId: mintLocalId,
-      });
+    const rerouteSteps = createChainSteps({
+      baseStep: step,
+      chainPath,
+      chainId,
+      idPrefix: `reroute-${afterId}`,
+      makeId: mintLocalId,
+    });
 
-      const nextSteps = insertStepsAfter(runPlan.steps, afterId, rerouteSteps);
-      setRunPlan((prev) => (prev ? { ...prev, steps: nextSteps } : prev));
+    const nextSteps = insertStepsAfter(runPlan.steps, afterId, rerouteSteps);
+    setRunPlan((prev) => (prev ? { ...prev, steps: nextSteps } : prev));
 
-      /**
-       * We keep the original step visible (marked skipped) so the user can see what happened.
-       * New chain steps are inserted immediately after it.
-       *
-       * Important: update `stepStatesRef` immediately so the runner (which reads the ref) sees the new steps.
-       */
-      const nextStates = applyInsertedChainStates(stepStatesRef.current, afterId, rerouteSteps);
-      stepStatesRef.current = nextStates;
-      setStepStates(nextStates);
+    /**
+     * We keep the original step visible (marked skipped) so the user can see what happened.
+     * New chain steps are inserted immediately after it.
+     *
+     * Important: update `stepStatesRef` immediately so the runner (which reads the ref) sees the new steps.
+     */
+    const nextStates = applyInsertedChainStates(stepStatesRef.current, afterId, rerouteSteps);
+    stepStatesRef.current = nextStates;
+    setStepStates(nextStates);
 
-      // Immediately execute pending steps (Start once behavior)
-      abortRef.current = false;
-      const runId = (runIdRef.current += 1);
-      setRunStatus('running');
-      setCurrentStepId(null);
+    // Immediately execute pending steps (Start once behavior)
+    abortRef.current = false;
+    const runId = (runIdRef.current += 1);
+    setRunStatus('running');
+    setCurrentStepId(null);
 
-      try {
-        await runStepsSequentially(nextSteps, runId);
-      } finally {
-        // Always revoke temporary trust we acquired for intermediaries — the
-        // trust window must not outlive the operation. If funds remain on an
-        // intermediary after a mid-chain failure, surface that to the user via
-        // the step's routingDetail and a louder log; the mint URL stays in the
-        // wallet (untrust does not delete proofs), and the user can re-trust
-        // manually to recover.
-        await releaseTemporaryTrust(temporarilyTrusted, rerouteSteps[rerouteSteps.length - 1]?.id);
-      }
-    },
-    [runPlan, runStatus, runStepsSequentially, trustedMints, manager, releaseTemporaryTrust]
-  );
+    try {
+      await runStepsSequentially(nextSteps, runId);
+    } finally {
+      // Always revoke temporary trust we acquired for intermediaries — the
+      // trust window must not outlive the operation. If funds remain on an
+      // intermediary after a mid-chain failure, surface that to the user via
+      // the step's routingDetail and a louder log; the mint URL stays in the
+      // wallet (untrust does not delete proofs), and the user can re-trust
+      // manually to recover.
+      await releaseTemporaryTrust(temporarilyTrusted, rerouteSteps[rerouteSteps.length - 1]?.id);
+    }
+  };
 
-  const handleCancelRun = useCallback(() => {
+  const handleCancelRun = () => {
     // Best-effort abort: we can't cancel an in-flight melt, but we can stop scheduling new steps.
     abortRef.current = true;
     runIdRef.current += 1;
@@ -1422,7 +1413,7 @@ export function useMintRebalanceOrchestrator({
     // own — the runner's tail at runStepsSequentially returns early on
     // abortRef so its complete()/fail() never fires either.
     useSwapStatusStore.getState().cancel();
-  }, []);
+  };
 
   return {
     plan,
