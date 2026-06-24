@@ -74,7 +74,7 @@ describe('normalizeImageAsset', () => {
     expect(mockManipulate).toHaveBeenCalledTimes(1);
   });
 
-  it('passes a JPEG through untouched without invoking the manipulator', async () => {
+  it('re-encodes a JPEG in place to strip EXIF (stays image/jpeg)', async () => {
     const asset: PickedAsset = {
       uri: 'file:///shot.jpg',
       mimeType: 'image/jpeg',
@@ -83,12 +83,21 @@ describe('normalizeImageAsset', () => {
     };
     const result = await normalizeImageAsset(asset);
 
-    expect(result._unsafeUnwrap()).toBe(asset);
-    expect(mockManipulate).not.toHaveBeenCalled();
+    expect(result._unsafeUnwrap().mimeType).toBe('image/jpeg');
+    expect(mockManipulate).toHaveBeenCalledWith('file:///shot.jpg');
+    expect(mockSaveAsync).toHaveBeenCalledWith({ format: 'jpeg', compress: 0.9 });
   });
 
-  it('passes a video through untouched', async () => {
-    const asset: PickedAsset = { uri: 'file:///clip.mp4', mimeType: 'video/mp4' };
+  it('re-encodes a PNG as PNG (preserves transparency) to strip EXIF', async () => {
+    const asset: PickedAsset = { uri: 'file:///screenshot.png', mimeType: 'image/png' };
+    const result = await normalizeImageAsset(asset);
+
+    expect(result._unsafeUnwrap().mimeType).toBe('image/png');
+    expect(mockSaveAsync).toHaveBeenCalledWith({ format: 'png', compress: 0.9 });
+  });
+
+  it('passes an animated format (GIF) through untouched to keep animation', async () => {
+    const asset: PickedAsset = { uri: 'file:///loop.gif', mimeType: 'image/gif' };
     const result = await normalizeImageAsset(asset);
 
     expect(result._unsafeUnwrap()).toBe(asset);

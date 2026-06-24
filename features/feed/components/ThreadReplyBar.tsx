@@ -185,8 +185,9 @@ export function ThreadReplyBar({
   const handleAddMedia = useCallback(async () => {
     if (!ndk) return;
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
+      mediaTypes: ['images'],
       quality: 1,
+      exif: false,
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
