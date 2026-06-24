@@ -401,6 +401,20 @@ module.exports = defineConfig([
       'no-restricted-globals': 'off',
     },
   },
+  // routstr/api.ts legitimately uses raw `fetch` throughout: every endpoint
+  // funnels failures through `throwResponseError`, which needs the raw
+  // `Response` to read `response.status`, parse HTML/JSON error bodies, extract
+  // 402 insufficient-balance details, and clear the stored API key on 401 — plus
+  // `sendMessage` consumes the response as an SSE `ReadableStream`. `fetchJson`
+  // collapses non-ok responses into a generic Error and never exposes the
+  // Response, so it cannot carry this status-aware error contract. Raw fetch is
+  // the right tool here, not a wrapper bypass.
+  {
+    files: ['shared/lib/routstr/api.ts'],
+    rules: {
+      'no-restricted-globals': 'off',
+    },
+  },
   // `no-console` exemptions — three legitimate sites:
   //   - shared/lib/loggerCore.ts: transport-fallback escape hatch. When
   //     the logger's own transport throws, it falls through to
@@ -447,6 +461,36 @@ module.exports = defineConfig([
     ],
     rules: {
       'no-restricted-syntax': 'off',
+    },
+  },
+  // Legacy persisted-Redux migration scaffolding. These `*.deprecated.ts`
+  // files are still live — `app/_layout.tsx`, `shared/blocks/MigrationGate.tsx`,
+  // and the `shared/lib/migrations` / `shared/lib/cashu/migration.ts` paths
+  // import them to read and migrate OLD on-disk Redux blobs whose shapes
+  // predate the current stores. `any` here is reading genuinely-unknown
+  // historical input, not application-domain types, and the whole subsystem is
+  // slated for deletion once the migration window closes — typing it would be
+  // churn on soon-dead code. Scope the exemption to these files only.
+  {
+    files: ['redux/**/*.deprecated.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  // TODO(reanimated-migration): these three files still use the legacy RN
+  // `Animated` API for self-contained effects (Button ripple, SpriteView
+  // parallax, AmountFormatter digit roll). Migrating them to Reanimated v4
+  // changes animation behaviour and is deferred to its own PR. Until then the
+  // raw `Animated` import is intentional here — scoped off rather than buried
+  // as an opaque count in eslint-suppressions.json.
+  {
+    files: [
+      'shared/ui/primitives/Button.tsx',
+      'shared/ui/composed/SpriteView.tsx',
+      'shared/ui/composed/AmountFormatter.tsx',
+    ],
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
 ]);

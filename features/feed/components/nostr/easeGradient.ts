@@ -4,6 +4,10 @@
  * Adapted from https://github.com/phamfoo/react-native-easing-gradient (MIT)
  */
 
+// eslint-disable-next-line no-restricted-imports -- This MIT adaptation drives RN's
+// internal `Animated.Interpolation.__createInterpolation` color-interpolation API
+// (used below for gradient color stops); Reanimated has no equivalent, so the raw
+// `Animated`/`Easing` imports are load-bearing here, not a legacy-animation smell.
 import { Animated, Easing, type EasingFunction } from 'react-native';
 
 // @ts-expect-error - internal RN API for color interpolation
