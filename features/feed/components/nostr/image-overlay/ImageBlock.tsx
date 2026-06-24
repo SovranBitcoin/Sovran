@@ -26,6 +26,7 @@ import { ANDROID_THUMB_DIM_MAX_OPACITY, THUMB_BLUR_MAX_INTENSITY } from './confi
 import { Log, feedLog } from '@/shared/lib/logger';
 import { useShiftLogger, useVisualLayoutLogger, urlHost } from '@/shared/lib/contentShiftLog';
 import { getCachedAspect, rememberAspect } from './imageAspectCache';
+import { openExternalUrl } from '@/shared/lib/url';
 
 /** Aspect ratio reserved before the image's intrinsic size is known. */
 const DEFAULT_IMAGE_ASPECT = 16 / 9;
@@ -382,15 +383,19 @@ export const ImageBlock = React.memo(function ImageBlock({
 
   if (error) {
     return (
-      <View
+      <Pressable
         accessible
-        accessibilityLabel={alt ? `Image unavailable: ${alt}` : 'Image unavailable'}
+        accessibilityRole="button"
+        accessibilityLabel={
+          alt ? `Image unavailable: ${alt}. Tap to open.` : 'Image unavailable. Tap to open.'
+        }
+        onPress={() => void openExternalUrl(url)}
         style={[styles.unavailable, { backgroundColor: opacity(foreground, 0.06) }]}>
         <Icon name="mdi:image-broken-variant" size={22} color={opacity(foreground, 0.4)} />
         <Text size={12} style={{ color: opacity(foreground, 0.4), marginTop: 4 }}>
-          Image unavailable
+          Image unavailable — tap to open
         </Text>
-      </View>
+      </Pressable>
     );
   }
 

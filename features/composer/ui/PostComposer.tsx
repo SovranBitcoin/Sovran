@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -110,6 +111,8 @@ export function PostComposer() {
   }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Media block whose alt text is being edited, with its in-progress value.
+  const [altEdit, setAltEdit] = useState<{ id: string; value: string } | null>(null);
   const [surface, foreground, mutedColor, accentColor, dangerColor, lineColor] = useThemeColor([
     'surface',
     'foreground',
@@ -425,7 +428,31 @@ export function PostComposer() {
                           }}>
                           <ActivityIndicator color={INVARIANT_WHITE} />
                         </VisualLayoutProbe>
+                        {block.uploadProgress > 0 ? (
+                          <Text
+                            size={11}
+                            style={{
+                              color: INVARIANT_WHITE,
+                              marginTop: 4,
+                              fontVariant: ['tabular-nums'],
+                            }}>
+                            {Math.round(block.uploadProgress * 100)}%
+                          </Text>
+                        ) : null}
                       </View>
+                    ) : null}
+                    {config.allowAltText && block.descriptor ? (
+                      <Pressable
+                        onPress={() => setAltEdit({ id: block.id, value: block.alt ?? '' })}
+                        accessibilityLabel={block.alt ? 'Edit alt text' : 'Add alt text'}
+                        style={[
+                          styles.altBadge,
+                          block.alt ? { backgroundColor: accentColor } : null,
+                        ]}>
+                        <Text size={10} style={{ color: INVARIANT_WHITE, fontWeight: '700' }}>
+                          {block.alt ? 'ALT ✓' : 'ALT'}
+                        </Text>
+                      </Pressable>
                     ) : null}
                     <Button
                       variant="ghost"
@@ -504,6 +531,53 @@ export function PostComposer() {
           {remaining}
         </Text>
       </VisualLayoutProbe>
+
+      <Modal
+        visible={!!altEdit}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAltEdit(null)}>
+        <Pressable style={styles.altBackdrop} onPress={() => setAltEdit(null)}>
+          <Pressable style={[styles.altCard, { backgroundColor: surface }]}>
+            <Text size={15} style={{ color: foreground, fontWeight: '600', marginBottom: 6 }}>
+              Describe this image
+            </Text>
+            <Text size={12} style={{ color: mutedColor, marginBottom: 12 }}>
+              Alt text helps people using screen readers understand the image.
+            </Text>
+            <TextInput
+              value={altEdit?.value ?? ''}
+              onChangeText={(text) =>
+                setAltEdit((prev) => (prev ? { ...prev, value: text } : prev))
+              }
+              placeholder="e.g. A dog running on a beach at sunset"
+              placeholderTextColor={mutedColor}
+              multiline
+              autoFocus
+              style={[styles.altInput, { color: foreground, borderColor: lineColor }]}
+            />
+            <View style={styles.altActions}>
+              <Pressable onPress={() => setAltEdit(null)} accessibilityLabel="Cancel alt text">
+                <Text size={14} style={{ color: mutedColor, fontWeight: '600' }}>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (!altEdit) return;
+                  const trimmed = altEdit.value.trim();
+                  updateBlock(altEdit.id, { alt: trimmed.length > 0 ? trimmed : undefined });
+                  setAltEdit(null);
+                }}
+                accessibilityLabel="Save alt text">
+                <Text size={14} style={{ color: accentColor, fontWeight: '700' }}>
+                  Save
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -631,5 +705,40 @@ const styles = StyleSheet.create({
   },
   flex1: {
     flex: 1,
+  },
+  altBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  altBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  altCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 16,
+    padding: 20,
+  },
+  altInput: {
+    minHeight: 72,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    padding: 10,
+    textAlignVertical: 'top',
+  },
+  altActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 24,
+    marginTop: 16,
   },
 });
