@@ -3,7 +3,7 @@ import NDK, { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { EventDeletion } from 'nostr-tools/kinds';
 
 import { nostrLog } from '@/shared/lib/logger';
-import { deleteStatusPopup } from '@/shared/lib/popup';
+import { deleteStatusPopup, popup } from '@/shared/lib/popup';
 import { deleteFromBlossom } from '@/shared/lib/nostr/media/blossomClient';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { getOwnWriteRelays, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
@@ -171,7 +171,23 @@ export function useDeletePost() {
   return useCallback(
     async (event: FeedEvent): Promise<void> => {
       const pubkey = keys?.pubkey;
-      if (!ndk || !pubkey) return;
+      // Always log the entry: a "nothing happened" report must never be a black
+      // box. `executeDeletePost` logs from `nostr.delete.start` onward.
+      nostrLog.info('nostr.delete.invoked', {
+        eventId: event.id.slice(0, 8),
+        hasNdk: !!ndk,
+        hasPubkey: !!pubkey,
+      });
+      if (!ndk || !pubkey) {
+        // The signer/NDK isn't ready — surface it instead of silently no-op'ing.
+        nostrLog.warn('nostr.delete.unavailable', { hasNdk: !!ndk, hasPubkey: !!pubkey });
+        popup({
+          message: 'Could not start deletion',
+          text: 'Your signing key is still loading — try again in a moment.',
+          type: 'error',
+        });
+        return;
+      }
       await executeDeletePost({ ndk, pubkey, event });
     },
     [ndk, keys]
