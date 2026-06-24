@@ -73,7 +73,44 @@ de-memoized despite feeding `useEffect` deps in *consumer* files (`useMintInfo.t
   value-compared regardless. These are not regressions.
 - The `npub_to_pubkey` / `mint.info.fetch.success` log volume is `debug`-level and
   largely over-logging on hot pure-function / SWR-cache-read paths — a logging-noise
-  question, not a memoization regression, and out of scope here.
+  question, not a memoization regression. **Addressed in the second pass (below).**
+
+## Second pass — deeper diff audit
+
+A follow-up pass systematically scanned the sweep for *classes* of corner the
+first pass found only ad-hoc. Clean: no `"use no memo"` opt-out files, no
+side-effecting `useMemo` factories removed, no dependency arrays edited in place.
+Three actions taken:
+
+1. **Gesture memos restored (3).** Pass 3 (`8bd4f743`) stripped `useMemo` from
+   `ThreadEmbedSheet` `panGesture`, `DistributionSlider` `gesture`, and
+   `NearPayScreen` `panGesture` — **despite the earlier passes explicitly excluding
+   gesture/animation memos as load-bearing**. A fresh `Gesture.Pan()` each render
+   re-registers the `GestureDetector` (a footgun the render-count log wouldn't
+   show). Re-wrapped with their original dependency arrays.
+2. **Over-logging gated.** `mint.info.fetch.success` (useMintManagement, 31% of a
+   sample log) and `nostr.client.npub_to_pubkey` (30%) — together 61% of log
+   volume, the user-reported "repeated logs." Both are `debug` logs on hot paths
+   (every SWR cache read; every per-row npub decode). Removed the redundant
+   hook-level logs (the SWR cache layer already records hit/miss/fetch; only decode
+   FAILURE is kept for npub). This is logging hygiene, **not** a memo regression —
+   `mint.info.fetch` was confirmed over-logging, not effect re-fire.
+3. **`addQuery` `useCallback` restored** (`useRecentSearches`) — a callback consumed
+   as a cross-file `useEffect` dep; deps (`[addSearch, surface]`) are stable, so no
+   exhaustive-deps fallout.
+
+**Context-provider `value` memos: investigated, deliberately left to the compiler.**
+The sweep de-memoized ~7 context `value` memos (`OfflineProvider`,
+`PricelistProvider`, `NostrNDKProvider`, `HeroTransitionProvider`,
+`TransactionsFilterContext`, `SearchLayout`, `Screen`). Restoring them was tried
+and **reverted**: it introduced 7 net-new `react-hooks/exhaustive-deps` warnings
+because the values' callback dependencies aren't manually memoized — a hand-restored
+context memo is *ineffective* unless its entire dependency graph is also manually
+memoized, which is precisely the manual-memo-graph the compiler exists to replace.
+The compiler stabilizes context values (all 7 providers are in the 596/596 that
+compile), the runtime log showed no app-wide re-render storm, and the coverage gate
+now enforces that. So context values stay compiler-owned (consistent with the
+ADR-0006 thesis); re-introducing the manual memos would be redundant and lint-noisy.
 
 ## Consequences
 

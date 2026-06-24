@@ -70,18 +70,15 @@ export function useMintManagement() {
   const getMintInfo = useCallback(
     async (mintUrl: string) => {
       try {
-        log.debug('mint.info.fetch.start', { ...mintUrlLogFields(mintUrl) });
         // SWR through `mintInfoCache`: cached fresh resolves instantly, stale
         // resolves with the prior value and refreshes in the background, miss
         // awaits coco's `getMintInfo` (which itself blocks on HTTP only when
-        // its own 5-minute window has expired).
-        const info = await getCachedMintInfo((url) => manager.mint.getMintInfo(url), mintUrl);
-        log.debug('mint.info.fetch.success', {
-          ...mintUrlLogFields(mintUrl),
-          hasName: typeof info.name === 'string' && info.name.length > 0,
-          hasNuts: !!info.nuts,
-        });
-        return info;
+        // its own 5-minute window has expired). The cache layer already logs
+        // the hit/miss/fetch outcome (`store.mint_info.*`); we don't re-log
+        // start/success per call here — across many mint rows it was ~31% of
+        // all log volume (a fresh cache read resolves instantly yet still
+        // logged "success"). Only a genuine failure is worth recording.
+        return await getCachedMintInfo((url) => manager.mint.getMintInfo(url), mintUrl);
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to get mint info');
         log.error('mint.info.fetch.error', { ...mintUrlLogFields(mintUrl), error });

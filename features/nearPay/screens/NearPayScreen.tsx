@@ -1241,110 +1241,128 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     paymentLog.debug('near_pay.perf.pan_end', payload);
   }, []);
 
-  const panGesture = Gesture.Pan()
-    .minDistance(6)
-    .onBegin(() => {
-      'worklet';
-      isPanning.set(true);
-      isPanSettling.set(false);
-      panSettleRemaining.set(0);
-      cancelAnimation(panX);
-      cancelAnimation(panY);
-      panStartX.set(panX.get());
-      panStartY.set(panY.get());
-    })
-    .onUpdate((event) => {
-      'worklet';
-      const rawX = panStartX.get() + event.translationX;
-      const rawY = panStartY.get() + event.translationY;
-      const minX = minPanX.get();
-      const maxX = maxPanX.get();
-      const minY = minPanY.get();
-      const maxY = maxPanY.get();
-      const nextX =
-        rawX < minX
-          ? minX + (rawX - minX) * PEER_PAN_RUBBER_BAND_FACTOR
-          : rawX > maxX
-            ? maxX + (rawX - maxX) * PEER_PAN_RUBBER_BAND_FACTOR
-            : rawX;
-      const nextY =
-        rawY < minY
-          ? minY + (rawY - minY) * PEER_PAN_RUBBER_BAND_FACTOR
-          : rawY > maxY
-            ? maxY + (rawY - maxY) * PEER_PAN_RUBBER_BAND_FACTOR
-            : rawY;
-      panX.set(nextX);
-      panY.set(nextY);
-    })
-    .onEnd((event) => {
-      'worklet';
-      isPanSettling.set(true);
-      panSettleRemaining.set(2);
-      const minX = minPanX.get();
-      const maxX = maxPanX.get();
-      const minY = minPanY.get();
-      const maxY = maxPanY.get();
-      const finalX = Math.min(
-        Math.max(panX.get() + event.velocityX * PEER_PAN_MOMENTUM_SECONDS, minX),
-        maxX
-      );
-      const finalY = Math.min(
-        Math.max(panY.get() + event.velocityY * PEER_PAN_MOMENTUM_SECONDS, minY),
-        maxY
-      );
-      scheduleOnRN(logPanEnd, {
-        targetCount,
-        translationX: event.translationX,
-        translationY: event.translationY,
-        velocityX: event.velocityX,
-        velocityY: event.velocityY,
-        finalX,
-        finalY,
-        minX,
-        maxX,
-        minY,
-        maxY,
-      });
-      panX.set(
-        withSpring(
-          finalX,
-          {
-            ...PEER_PAN_SETTLE_SPRING,
-            velocity: event.velocityX,
-          },
-          (finished) => {
-            if (!finished) return;
-            const remaining = panSettleRemaining.get() - 1;
-            panSettleRemaining.set(remaining);
-            if (remaining > 0) return;
-            isPanSettling.set(false);
-            isPanning.set(false);
-          }
-        )
-      );
-      panY.set(
-        withSpring(
-          finalY,
-          {
-            ...PEER_PAN_SETTLE_SPRING,
-            velocity: event.velocityY,
-          },
-          (finished) => {
-            if (!finished) return;
-            const remaining = panSettleRemaining.get() - 1;
-            panSettleRemaining.set(remaining);
-            if (remaining > 0) return;
-            isPanSettling.set(false);
-            isPanning.set(false);
-          }
-        )
-      );
-    })
-    .onFinalize(() => {
-      'worklet';
-      if (isPanSettling.get()) return;
-      isPanning.set(false);
-    });
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .minDistance(6)
+        .onBegin(() => {
+          'worklet';
+          isPanning.set(true);
+          isPanSettling.set(false);
+          panSettleRemaining.set(0);
+          cancelAnimation(panX);
+          cancelAnimation(panY);
+          panStartX.set(panX.get());
+          panStartY.set(panY.get());
+        })
+        .onUpdate((event) => {
+          'worklet';
+          const rawX = panStartX.get() + event.translationX;
+          const rawY = panStartY.get() + event.translationY;
+          const minX = minPanX.get();
+          const maxX = maxPanX.get();
+          const minY = minPanY.get();
+          const maxY = maxPanY.get();
+          const nextX =
+            rawX < minX
+              ? minX + (rawX - minX) * PEER_PAN_RUBBER_BAND_FACTOR
+              : rawX > maxX
+                ? maxX + (rawX - maxX) * PEER_PAN_RUBBER_BAND_FACTOR
+                : rawX;
+          const nextY =
+            rawY < minY
+              ? minY + (rawY - minY) * PEER_PAN_RUBBER_BAND_FACTOR
+              : rawY > maxY
+                ? maxY + (rawY - maxY) * PEER_PAN_RUBBER_BAND_FACTOR
+                : rawY;
+          panX.set(nextX);
+          panY.set(nextY);
+        })
+        .onEnd((event) => {
+          'worklet';
+          isPanSettling.set(true);
+          panSettleRemaining.set(2);
+          const minX = minPanX.get();
+          const maxX = maxPanX.get();
+          const minY = minPanY.get();
+          const maxY = maxPanY.get();
+          const finalX = Math.min(
+            Math.max(panX.get() + event.velocityX * PEER_PAN_MOMENTUM_SECONDS, minX),
+            maxX
+          );
+          const finalY = Math.min(
+            Math.max(panY.get() + event.velocityY * PEER_PAN_MOMENTUM_SECONDS, minY),
+            maxY
+          );
+          scheduleOnRN(logPanEnd, {
+            targetCount,
+            translationX: event.translationX,
+            translationY: event.translationY,
+            velocityX: event.velocityX,
+            velocityY: event.velocityY,
+            finalX,
+            finalY,
+            minX,
+            maxX,
+            minY,
+            maxY,
+          });
+          panX.set(
+            withSpring(
+              finalX,
+              {
+                ...PEER_PAN_SETTLE_SPRING,
+                velocity: event.velocityX,
+              },
+              (finished) => {
+                if (!finished) return;
+                const remaining = panSettleRemaining.get() - 1;
+                panSettleRemaining.set(remaining);
+                if (remaining > 0) return;
+                isPanSettling.set(false);
+                isPanning.set(false);
+              }
+            )
+          );
+          panY.set(
+            withSpring(
+              finalY,
+              {
+                ...PEER_PAN_SETTLE_SPRING,
+                velocity: event.velocityY,
+              },
+              (finished) => {
+                if (!finished) return;
+                const remaining = panSettleRemaining.get() - 1;
+                panSettleRemaining.set(remaining);
+                if (remaining > 0) return;
+                isPanSettling.set(false);
+                isPanning.set(false);
+              }
+            )
+          );
+        })
+        .onFinalize(() => {
+          'worklet';
+          if (isPanSettling.get()) return;
+          isPanning.set(false);
+        }),
+    [
+      isPanSettling,
+      isPanning,
+      logPanEnd,
+      maxPanX,
+      maxPanY,
+      minPanX,
+      minPanY,
+      panSettleRemaining,
+      panStartX,
+      panStartY,
+      panX,
+      panY,
+      targetCount,
+    ]
+  );
 
   return (
     <View onLayout={handleLayout} style={styles.field}>

@@ -69,35 +69,39 @@ export function ThreadEmbedSheet({
   // Native gesture standing in for the list's scroll, so pan + scroll coexist.
   const nativeGesture = useMemo(() => Gesture.Native(), []);
 
-  const panGesture = Gesture.Pan()
-    .enabled(embedActive)
-    .activeOffsetY([-SHEET_PAN_ACTIVATION, SHEET_PAN_ACTIVATION])
-    .simultaneousWithExternalGesture(nativeGesture)
-    .onStart(() => {
-      'worklet';
-      if (!sheetTranslateY) return;
-      startY.value = sheetTranslateY.value;
-    })
-    .onUpdate((e) => {
-      'worklet';
-      if (!sheetTranslateY || !scrollY) return;
-      const expandedAtStart = startY.value <= 1;
-      const atTop = scrollY.value <= 1;
-      // Drag started while collapsed/mid → it controls the sheet directly.
-      // Drag started expanded, at the top, pulling down → begin the collapse.
-      // Otherwise the list scrolls (the provider keeps it scrollable only
-      // while expanded, so the two never move together).
-      if (!expandedAtStart || (atTop && e.translationY > 0)) {
-        sheetTranslateY.value = clamp(startY.value + e.translationY, 0, snapInline);
-      }
-    })
-    .onEnd((e) => {
-      'worklet';
-      if (!sheetTranslateY) return;
-      const target = nearestSnap(sheetTranslateY.value, e.velocityY, snapMiddle, snapInline);
-      if (Math.abs(target - startY.value) > 1) runOnJS(embedHaptic)();
-      sheetTranslateY.value = withSpring(target, SHEET_SPRING);
-    });
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(embedActive)
+        .activeOffsetY([-SHEET_PAN_ACTIVATION, SHEET_PAN_ACTIVATION])
+        .simultaneousWithExternalGesture(nativeGesture)
+        .onStart(() => {
+          'worklet';
+          if (!sheetTranslateY) return;
+          startY.value = sheetTranslateY.value;
+        })
+        .onUpdate((e) => {
+          'worklet';
+          if (!sheetTranslateY || !scrollY) return;
+          const expandedAtStart = startY.value <= 1;
+          const atTop = scrollY.value <= 1;
+          // Drag started while collapsed/mid → it controls the sheet directly.
+          // Drag started expanded, at the top, pulling down → begin the collapse.
+          // Otherwise the list scrolls (the provider keeps it scrollable only
+          // while expanded, so the two never move together).
+          if (!expandedAtStart || (atTop && e.translationY > 0)) {
+            sheetTranslateY.value = clamp(startY.value + e.translationY, 0, snapInline);
+          }
+        })
+        .onEnd((e) => {
+          'worklet';
+          if (!sheetTranslateY) return;
+          const target = nearestSnap(sheetTranslateY.value, e.velocityY, snapMiddle, snapInline);
+          if (Math.abs(target - startY.value) > 1) runOnJS(embedHaptic)();
+          sheetTranslateY.value = withSpring(target, SHEET_SPRING);
+        }),
+    [embedActive, nativeGesture, sheetTranslateY, scrollY, snapMiddle, snapInline, startY]
+  );
 
   const sheetStyle = useAnimatedStyle(() => {
     const ty = sheetTranslateY?.value ?? 0;

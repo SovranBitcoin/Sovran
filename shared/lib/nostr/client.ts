@@ -13,7 +13,9 @@ export function npubToPubkey(npub: string): string {
     try {
       const data = nip19.decode(npub);
       if (data.type === 'npub') {
-        nostrLog.debug('nostr.client.npub_to_pubkey', { inputLen: npub.length, type: data.type });
+        // No success log here: this pure decode is called per-row across
+        // follower/contact lists, and a per-call debug log was ~30% of all log
+        // volume. Only the decode FAILURE (below) is worth recording.
         return data.data;
       }
     } catch (err) {
