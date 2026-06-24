@@ -108,7 +108,7 @@ function MediaPageAnimated({
     <Log name="MediaPageAnimated">
       <Animated.View style={animatedStyle} pointerEvents="none">
         <Image
-          source={{ uri: url }}
+          source={{ uri: url, isAnimated: /\.(gif|webp)(\?.*)?$/i.test(url) }}
           style={StyleSheet.absoluteFill}
           contentFit="contain"
           cachePolicy="disk"

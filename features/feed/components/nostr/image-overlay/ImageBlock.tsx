@@ -30,6 +30,9 @@ import { getCachedAspect, rememberAspect } from './imageAspectCache';
 /** Aspect ratio reserved before the image's intrinsic size is known. */
 const DEFAULT_IMAGE_ASPECT = 16 / 9;
 
+/** Extensions expo-image should decode as animated. */
+const ANIMATED_IMAGE_EXT = /\.(gif|webp)(\?.*)?$/i;
+
 /** The subset of GestureResponderEvent.nativeEvent the calibration reads. */
 type GestureTouchPoint = { pageX: number; pageY: number; locationX: number; locationY: number };
 
@@ -57,6 +60,7 @@ interface ImageBlockOverlayPostProps {
 export const ImageBlock = React.memo(function ImageBlock({
   url,
   alt,
+  blurhash,
   allImageUrls,
   allMediaUrls,
   mediaTypes,
@@ -85,6 +89,8 @@ export const ImageBlock = React.memo(function ImageBlock({
   url: string;
   /** NIP-92 imeta alt text, used as the image's accessibility label. */
   alt?: string;
+  /** NIP-92 imeta blurhash, shown as a placeholder while the image loads. */
+  blurhash?: string;
   /**
    * Aspect ratio (width / height) known ahead of load — e.g. from the post's
    * NIP-92 imeta `dim`. Used as the initial reserved size so the image lays out
@@ -391,7 +397,9 @@ export const ImageBlock = React.memo(function ImageBlock({
   const image = (
     <Image
       ref={imageRef}
-      source={{ uri: url }}
+      source={{ uri: url, isAnimated: ANIMATED_IMAGE_EXT.test(url) }}
+      placeholder={blurhash}
+      placeholderContentFit="cover"
       style={{ width: '100%', aspectRatio, borderRadius: 12 }}
       contentFit="cover"
       cachePolicy="disk"
