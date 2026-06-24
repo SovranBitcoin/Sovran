@@ -62,29 +62,26 @@ export function useMintManagement() {
     [manager]
   );
 
-  const getMintInfo = useCallback(
-    async (mintUrl: string) => {
-      try {
-        log.debug('mint.info.fetch.start', { ...mintUrlLogFields(mintUrl) });
-        // SWR through `mintInfoCache`: cached fresh resolves instantly, stale
-        // resolves with the prior value and refreshes in the background, miss
-        // awaits coco's `getMintInfo` (which itself blocks on HTTP only when
-        // its own 5-minute window has expired).
-        const info = await getCachedMintInfo((url) => manager.mint.getMintInfo(url), mintUrl);
-        log.debug('mint.info.fetch.success', {
-          ...mintUrlLogFields(mintUrl),
-          hasName: typeof info.name === 'string' && info.name.length > 0,
-          hasNuts: !!info.nuts,
-        });
-        return info;
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error('Failed to get mint info');
-        log.error('mint.info.fetch.error', { ...mintUrlLogFields(mintUrl), error });
-        throw error;
-      }
-    },
-    [manager]
-  );
+  const getMintInfo = async (mintUrl: string) => {
+    try {
+      log.debug('mint.info.fetch.start', { ...mintUrlLogFields(mintUrl) });
+      // SWR through `mintInfoCache`: cached fresh resolves instantly, stale
+      // resolves with the prior value and refreshes in the background, miss
+      // awaits coco's `getMintInfo` (which itself blocks on HTTP only when
+      // its own 5-minute window has expired).
+      const info = await getCachedMintInfo((url) => manager.mint.getMintInfo(url), mintUrl);
+      log.debug('mint.info.fetch.success', {
+        ...mintUrlLogFields(mintUrl),
+        hasName: typeof info.name === 'string' && info.name.length > 0,
+        hasNuts: !!info.nuts,
+      });
+      return info;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to get mint info');
+      log.error('mint.info.fetch.error', { ...mintUrlLogFields(mintUrl), error });
+      throw error;
+    }
+  };
 
   useEffect(() => {
     if (!manager) return;

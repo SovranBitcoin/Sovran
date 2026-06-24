@@ -6,7 +6,7 @@
  * viewer has voted or the poll has closed. Voting publishes a kind:1018 through
  * the central seam and works with the local signer (no key gating).
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 
@@ -40,7 +40,7 @@ export function PollCard({ event }: { event: FeedEvent }) {
 
   const poll = parsePoll(event);
   const votes = usePollVotes(poll.id);
-  const tally = useMemo(() => tallyPoll(poll, votes, viewerPubkey), [poll, votes, viewerPubkey]);
+  const tally = tallyPoll(poll, votes, viewerPubkey);
   const [selected, setSelected] = useState<string[]>([]);
   const [voting, setVoting] = useState(false);
 
@@ -49,17 +49,14 @@ export function PollCard({ event }: { event: FeedEvent }) {
   const showResults = voted || closed;
   const isMulti = poll.pollType === 'multiplechoice';
 
-  const toggleSelect = useCallback(
-    (id: string) => {
-      if (showResults) return;
-      setSelected((prev) =>
-        isMulti ? (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]) : [id]
-      );
-    },
-    [isMulti, showResults]
-  );
+  const toggleSelect = (id: string) => {
+    if (showResults) return;
+    setSelected((prev) =>
+      isMulti ? (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]) : [id]
+    );
+  };
 
-  const submitVote = useCallback(async () => {
+  const submitVote = async () => {
     if (!ndk || selected.length === 0) return;
     setVoting(true);
     const unsigned = buildVoteEvent({
@@ -79,7 +76,7 @@ export function PollCard({ event }: { event: FeedEvent }) {
       resolveOn: 'first-ok',
     });
     setVoting(false);
-  }, [ndk, selected, poll.id, poll.relays]);
+  };
 
   return (
     <View style={[styles.card, { borderColor: opacity(foreground, 0.12) }]}>

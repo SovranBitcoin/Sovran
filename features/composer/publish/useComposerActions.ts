@@ -6,7 +6,6 @@
  * serialization). `usePublishNote` uploads any pending media, serializes the
  * block model to kind:1, and publishes through the outbox-aware seam.
  */
-import { useCallback } from 'react';
 
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
@@ -33,13 +32,10 @@ type ComposerSnapshot = ReturnType<typeof useComposerStore.getState>;
 /** Returns a function that opens the composer for a given target. */
 export function useOpenComposer(): (target: ComposerTarget, context?: ComposerOpenContext) => void {
   const open = useComposerStore((s) => s.open);
-  return useCallback(
-    (target, context) => {
-      open(target, context);
-      router.navigate('/composer');
-    },
-    [open]
-  );
+  return (target, context) => {
+    open(target, context);
+    router.navigate('/composer');
+  };
 }
 
 export type PublishOutcome =
@@ -187,7 +183,7 @@ export async function publishComposed(ndk: NDK, draft: ComposedDraft): Promise<P
 export function usePublishNote(): () => Promise<PublishOutcome> {
   const { ndk } = useNDK();
 
-  return useCallback(async (): Promise<PublishOutcome> => {
+  return async (): Promise<PublishOutcome> => {
     if (!ndk?.signer) return 'no-key';
     const state = useComposerStore.getState();
 
@@ -206,5 +202,5 @@ export function usePublishNote(): () => Promise<PublishOutcome> {
     });
     if (outcome === 'ok') useComposerStore.getState().close();
     return outcome;
-  }, [ndk]);
+  };
 }

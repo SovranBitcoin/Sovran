@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Platform, useWindowDimensions, ViewToken } from 'react-native';
 
 import Animated, {
@@ -38,33 +38,27 @@ const OnboardingInnerCarousel: React.FC<OnboardingCarouselProps> = ({
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0) {
-        const viewableItem = viewableItems[0];
-        if (viewableItem && viewableItem.index !== null) {
-          log.info('onboarding.slide.change', { slideIndex: viewableItem.index });
-          setCurrentSlideIndex(viewableItem.index);
-        }
+  const onViewableItemsChanged = ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    if (viewableItems.length > 0) {
+      const viewableItem = viewableItems[0];
+      if (viewableItem && viewableItem.index !== null) {
+        log.info('onboarding.slide.change', { slideIndex: viewableItem.index });
+        setCurrentSlideIndex(viewableItem.index);
       }
-    },
-    [setCurrentSlideIndex]
-  );
+    }
+  };
 
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 100,
     minimumViewTime: 0,
   }).current;
 
-  const handleScrollToIndex = useCallback(
-    (index: number) => {
-      horizontalListRef.current?.scrollToIndex({
-        index,
-        animated: true,
-      });
-    },
-    [horizontalListRef]
-  );
+  const handleScrollToIndex = (index: number) => {
+    horizontalListRef.current?.scrollToIndex({
+      index,
+      animated: true,
+    });
+  };
 
   const containerStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.get() }],

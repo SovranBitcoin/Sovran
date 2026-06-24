@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StyleSheet, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
@@ -85,10 +85,7 @@ export function BootEntrance({ children, style }: BootEntranceProps): React.Reac
     opacity: opacity.get(),
     transform: [{ scale: scale.get() }],
   }));
-  const containerStyle = useMemo(
-    () => [styles.container, style, animatedStyle],
-    [animatedStyle, style]
-  );
+  const containerStyle = [styles.container, style, animatedStyle];
 
   return (
     <Animated.View style={containerStyle} collapsable={false}>

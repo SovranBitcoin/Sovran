@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useRef } from 'react';
 import { Menu, type MenuTriggerRef } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
@@ -34,9 +34,9 @@ export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React
   const [success] = useThemeColor(['success'] as const);
   const menuTriggerRef = useRef<MenuTriggerRef>(null);
 
-  const openCurrencyMenu = useCallback(() => {
+  const openCurrencyMenu = () => {
     setTimeout(() => menuTriggerRef.current?.open(), 0);
-  }, []);
+  };
 
   const primaryHandler = enableCurrencyMenu && !onPress ? openCurrencyMenu : onPress;
   const longPressHandler = enableCurrencyMenu && onPress ? openCurrencyMenu : undefined;

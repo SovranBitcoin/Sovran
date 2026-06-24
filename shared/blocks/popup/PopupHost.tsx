@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Log } from '@/shared/lib/logger';
 import {
   Keyboard,
@@ -594,18 +594,18 @@ function SheetPopup() {
   );
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
-  const pushCustomPage = useCallback(
-    <K extends keyof ActionSheetPayloads>(sheetId: K, pagePayload: ActionSheetPayloads[K]) => {
-      setCustomNavDirection('forward');
-      setCustomStack((prev) => [...prev, { sheetId, payload: pagePayload }]);
-    },
-    []
-  );
+  const pushCustomPage = <K extends keyof ActionSheetPayloads>(
+    sheetId: K,
+    pagePayload: ActionSheetPayloads[K]
+  ) => {
+    setCustomNavDirection('forward');
+    setCustomStack((prev) => [...prev, { sheetId, payload: pagePayload }]);
+  };
 
-  const popCustomPage = useCallback(() => {
+  const popCustomPage = () => {
     setCustomNavDirection('back');
     setCustomStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
-  }, []);
+  };
 
   const activeCustomPage = useMemo(() => {
     if (!isCustom || !payload) return null;
@@ -697,17 +697,12 @@ function SheetPopup() {
     };
   }, []);
 
-  const customSnapPoints = useMemo(
-    () => (layoutConfig?.mode === 'snapPoints' ? [...layoutConfig.snapPoints] : undefined),
-    [layoutConfig]
-  );
-  const customMaxDynamicContentSize = useMemo(
-    () =>
-      isCustom && layoutConfig?.mode === 'contentHeight'
-        ? Math.max(0, windowHeight - insets.top)
-        : undefined,
-    [insets.top, isCustom, layoutConfig?.mode, windowHeight]
-  );
+  const customSnapPoints =
+    layoutConfig?.mode === 'snapPoints' ? [...layoutConfig.snapPoints] : undefined;
+  const customMaxDynamicContentSize =
+    isCustom && layoutConfig?.mode === 'contentHeight'
+      ? Math.max(0, windowHeight - insets.top)
+      : undefined;
 
   // Pinned-footer clearance for scrollable sheets: the gorhom footer overlays
   // the scroll content, so the content needs bottom padding to scroll fully
@@ -777,58 +772,57 @@ function SheetPopup() {
   // alongside heroui's path is safe.
   const handleNativeSheetClose = () => handleOpenChange(false);
 
-  const renderCustomFooter = useCallback(
+  const renderCustomFooter = (props: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- gorhom BottomSheetFooter render-prop: animatedFooterPosition is a SharedValue the lib does not export a usable name for here
-    (props: { animatedFooterPosition: any }) => {
-      if (!isCustom) return null;
-      if (!customFooterConfig || customFooterConfig.buttons.length === 0) return null;
-      return (
-        <BottomSheetFooter {...props}>
+    animatedFooterPosition: any;
+  }) => {
+    if (!isCustom) return null;
+    if (!customFooterConfig || customFooterConfig.buttons.length === 0) return null;
+    return (
+      <BottomSheetFooter {...props}>
+        <View
+          // Pinned footers over a scrollable body match the sheet surface
+          // (bg-overlay + the content's px-3) so the body scrolls "under"
+          // the sheet's own bottom; snapPoints footers keep their bar look.
+          className={
+            isScrollableContentHeight
+              ? 'bg-overlay pb-safe-offset-4 px-3 pt-3'
+              : getStickyFooterClass(layoutConfig?.mode)
+          }
+          onLayout={
+            isScrollableContentHeight
+              ? (event) => setPinnedFooterHeight(event.nativeEvent.layout.height)
+              : undefined
+          }>
           <View
-            // Pinned footers over a scrollable body match the sheet surface
-            // (bg-overlay + the content's px-3) so the body scrolls "under"
-            // the sheet's own bottom; snapPoints footers keep their bar look.
-            className={
-              isScrollableContentHeight
-                ? 'bg-overlay pb-safe-offset-4 px-3 pt-3'
-                : getStickyFooterClass(layoutConfig?.mode)
-            }
-            onLayout={
-              isScrollableContentHeight
-                ? (event) => setPinnedFooterHeight(event.nativeEvent.layout.height)
-                : undefined
-            }>
-            <View
-              className={customFooterConfig.layout === 'row' ? 'flex-row' : undefined}
-              style={{ gap: 10 }}>
-              {customFooterConfig.buttons.map((button, index) => {
-                const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
-                const buttonClassName = getSheetButtonClassName(variant);
-                const className =
-                  customFooterConfig.layout === 'row'
-                    ? [buttonClassName, 'flex-1'].filter(Boolean).join(' ')
-                    : buttonClassName;
+            className={customFooterConfig.layout === 'row' ? 'flex-row' : undefined}
+            style={{ gap: 10 }}>
+            {customFooterConfig.buttons.map((button, index) => {
+              const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
+              const buttonClassName = getSheetButtonClassName(variant);
+              const className =
+                customFooterConfig.layout === 'row'
+                  ? [buttonClassName, 'flex-1'].filter(Boolean).join(' ')
+                  : buttonClassName;
 
-                return (
-                  <Button
-                    key={`${button.label}-${index}`}
-                    variant={variant}
-                    onPress={button.onPress}
-                    className={className}
-                    isDisabled={button.isDisabled}>
-                    <Button.Label className={getSheetButtonLabelClassName(variant)}>
-                      {button.label}
-                    </Button.Label>
-                  </Button>
-                );
-              })}
-            </View>
+              return (
+                <Button
+                  key={`${button.label}-${index}`}
+                  variant={variant}
+                  onPress={button.onPress}
+                  className={className}
+                  isDisabled={button.isDisabled}>
+                  <Button.Label className={getSheetButtonLabelClassName(variant)}>
+                    {button.label}
+                  </Button.Label>
+                </Button>
+              );
+            })}
           </View>
-        </BottomSheetFooter>
-      );
-    },
-    [isCustom, customFooterConfig, isScrollableContentHeight, layoutConfig?.mode]
-  );
+        </View>
+      </BottomSheetFooter>
+    );
+  };
 
   if (destroyed) return null;
 

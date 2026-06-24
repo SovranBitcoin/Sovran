@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -45,9 +45,9 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
   const translateX = useSharedValue(0);
   const isComplete = useSharedValue(false);
 
-  const handleComplete = useCallback(() => {
+  const handleComplete = () => {
     onConfirm();
-  }, [onConfirm]);
+  };
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {

@@ -1,11 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PropsWithChildren,
-} from 'react';
+import React, { useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -149,14 +142,11 @@ export function SkeletonExitReveal({
     return () => cancelAnimation(progress);
   }, [active, progress]);
 
-  const handleLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const w = Math.round(event.nativeEvent.layout.width);
-      setContainerWidth((prev) => (prev === w ? prev : w));
-      visualLayout.onLayout(event);
-    },
-    [visualLayout]
-  );
+  const handleLayout = (event: LayoutChangeEvent) => {
+    const w = Math.round(event.nativeEvent.layout.width);
+    setContainerWidth((prev) => (prev === w ? prev : w));
+    visualLayout.onLayout(event);
+  };
 
   const sweepWidth = containerWidth > 0 ? containerWidth : screenWidth;
 
@@ -177,10 +167,7 @@ export function SkeletonExitReveal({
     return shimmerColors(highlightColor, opacity(foreground, 0.55));
   }, [foreground, highlightColor]);
 
-  const shimmerBarStyle = useMemo(
-    () => [styles.shimmerBar, EXIT_SHIMMER_BAR_BASE, shimmerStyle],
-    [shimmerStyle]
-  );
+  const shimmerBarStyle = [styles.shimmerBar, EXIT_SHIMMER_BAR_BASE, shimmerStyle];
 
   return (
     <View
@@ -264,14 +251,11 @@ export function SkeletonLoadingShimmer({
     return () => cancelAnimation(progress);
   }, [active, progress]);
 
-  const handleLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const w = Math.round(event.nativeEvent.layout.width);
-      setContainerWidth((prev) => (prev === w ? prev : w));
-      visualLayout.onLayout(event);
-    },
-    [visualLayout]
-  );
+  const handleLayout = (event: LayoutChangeEvent) => {
+    const w = Math.round(event.nativeEvent.layout.width);
+    setContainerWidth((prev) => (prev === w ? prev : w));
+    visualLayout.onLayout(event);
+  };
 
   const sweepWidth = containerWidth > 0 ? containerWidth : screenWidth;
   const highlightWidth = Math.max(40, Math.round(sweepWidth * LOADING_HIGHLIGHT_WIDTH_RATIO));
@@ -290,10 +274,7 @@ export function SkeletonLoadingShimmer({
   }, [background, highlightColor]);
 
   const widthStyle = useMemo(() => ({ width: highlightWidth }), [highlightWidth]);
-  const shimmerBarStyle = useMemo(
-    () => [styles.shimmerBar, widthStyle, shimmerStyle],
-    [shimmerStyle, widthStyle]
-  );
+  const shimmerBarStyle = [styles.shimmerBar, widthStyle, shimmerStyle];
 
   if (!active)
     return (

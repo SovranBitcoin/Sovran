@@ -292,78 +292,56 @@ export function useNostrEngagement(
 
   // ---- toggle actions (unified via toggleEngagement) ----
 
-  const toggleLikeInner = useCallback(
-    async (target: FeedEvent) => {
-      if (!nostrKeys?.pubkey || !ndk) {
-        paramPopup('engagement-update-failed', 'like');
-        return;
-      }
-      const state = getEngagementState(target.id);
-      const { setLikeOptimistic, clearLikeOptimistic } = useNostrSocialStore.getState();
-      await toggleEngagement({
-        target,
-        ndk,
-        kind: Reaction,
-        currentState: state.liked,
-        isPending: state.likePending,
-        previousOptimistic: optimisticLikesByEventId[target.id],
-        relatedEventIdFromStore: engagementByEventId[target.id]?.liked?.ownEventId,
-        displayedCount: getDisplayMetrics(target.id).likeCount,
-        baseCount: getBaseMetrics(target.id).likeCount,
-        setOptimistic: setLikeOptimistic,
-        clearOptimistic: clearLikeOptimistic,
-        buildContent: () => '+',
-        label: 'like',
-      });
-    },
-    [
-      getBaseMetrics,
-      getDisplayMetrics,
-      getEngagementState,
-      engagementByEventId,
+  const toggleLikeInner = async (target: FeedEvent) => {
+    if (!nostrKeys?.pubkey || !ndk) {
+      paramPopup('engagement-update-failed', 'like');
+      return;
+    }
+    const state = getEngagementState(target.id);
+    const { setLikeOptimistic, clearLikeOptimistic } = useNostrSocialStore.getState();
+    await toggleEngagement({
+      target,
       ndk,
-      nostrKeys?.pubkey,
-      optimisticLikesByEventId,
-    ]
-  );
+      kind: Reaction,
+      currentState: state.liked,
+      isPending: state.likePending,
+      previousOptimistic: optimisticLikesByEventId[target.id],
+      relatedEventIdFromStore: engagementByEventId[target.id]?.liked?.ownEventId,
+      displayedCount: getDisplayMetrics(target.id).likeCount,
+      baseCount: getBaseMetrics(target.id).likeCount,
+      setOptimistic: setLikeOptimistic,
+      clearOptimistic: clearLikeOptimistic,
+      buildContent: () => '+',
+      label: 'like',
+    });
+  };
 
-  const toggleRepostInner = useCallback(
-    async (target: FeedEvent) => {
-      if (!nostrKeys?.pubkey || !ndk) {
-        paramPopup('engagement-update-failed', 'repost');
-        return;
-      }
-      const state = getEngagementState(target.id);
-      const { setRepostOptimistic, clearRepostOptimistic, unmarkRepostDeleted, markRepostDeleted } =
-        useNostrSocialStore.getState();
-      await toggleEngagement({
-        target,
-        ndk,
-        kind: Repost,
-        currentState: state.reposted,
-        isPending: state.repostPending,
-        previousOptimistic: optimisticRepostsByEventId[target.id],
-        relatedEventIdFromStore: engagementByEventId[target.id]?.reposted?.ownEventId,
-        displayedCount: getDisplayMetrics(target.id).repostCount,
-        baseCount: getBaseMetrics(target.id).repostCount,
-        setOptimistic: setRepostOptimistic,
-        clearOptimistic: clearRepostOptimistic,
-        buildContent: (t) => JSON.stringify(t),
-        onActivated: () => unmarkRepostDeleted(target.id),
-        onDeactivated: () => markRepostDeleted(target.id),
-        label: 'repost',
-      });
-    },
-    [
-      getBaseMetrics,
-      getDisplayMetrics,
-      getEngagementState,
-      engagementByEventId,
+  const toggleRepostInner = async (target: FeedEvent) => {
+    if (!nostrKeys?.pubkey || !ndk) {
+      paramPopup('engagement-update-failed', 'repost');
+      return;
+    }
+    const state = getEngagementState(target.id);
+    const { setRepostOptimistic, clearRepostOptimistic, unmarkRepostDeleted, markRepostDeleted } =
+      useNostrSocialStore.getState();
+    await toggleEngagement({
+      target,
       ndk,
-      nostrKeys?.pubkey,
-      optimisticRepostsByEventId,
-    ]
-  );
+      kind: Repost,
+      currentState: state.reposted,
+      isPending: state.repostPending,
+      previousOptimistic: optimisticRepostsByEventId[target.id],
+      relatedEventIdFromStore: engagementByEventId[target.id]?.reposted?.ownEventId,
+      displayedCount: getDisplayMetrics(target.id).repostCount,
+      baseCount: getBaseMetrics(target.id).repostCount,
+      setOptimistic: setRepostOptimistic,
+      clearOptimistic: clearRepostOptimistic,
+      buildContent: (t) => JSON.stringify(t),
+      onActivated: () => unmarkRepostDeleted(target.id),
+      onDeactivated: () => markRepostDeleted(target.id),
+      label: 'repost',
+    });
+  };
 
   // Per-target single-flight: tapping like on post A while post B is still
   // publishing must not block — use the target id as the key so concurrent

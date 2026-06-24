@@ -409,15 +409,11 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     [deepLinkUrl, keys?.pubkey]
   );
 
-  const screenActionsBridge = useMemo(
-    () =>
-      createSovranScreenActionsBridge({
-        manager,
-        requestCameraPermission,
-        p2pkKeyRefreshedSubscribers,
-      }),
-    [manager, requestCameraPermission]
-  );
+  const screenActionsBridge = createSovranScreenActionsBridge({
+    manager,
+    requestCameraPermission,
+    p2pkKeyRefreshedSubscribers,
+  });
 
   const handlers = useCallback<ColadaProviderProps['handlers']>(
     (machine, refs) =>

@@ -272,19 +272,16 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     ),
     [canSendOffline, offlineIconStyle]
   );
-  const stackOptions = useMemo(
-    () => ({
-      title: 'Select amount',
-      headerTitleAlign: 'center' as const,
-      headerTitle: renderHeaderTitle,
-      headerTintColor: foreground,
-      headerRight: isSendOperation && mintUrl ? renderHeaderRight : undefined,
-    }),
-    [foreground, isSendOperation, mintUrl, renderHeaderRight, renderHeaderTitle]
-  );
-  const handleErrorGoBack = useCallback(() => {
+  const stackOptions = {
+    title: 'Select amount',
+    headerTitleAlign: 'center' as const,
+    headerTitle: renderHeaderTitle,
+    headerTintColor: foreground,
+    headerRight: isSendOperation && mintUrl ? renderHeaderRight : undefined,
+  };
+  const handleErrorGoBack = () => {
     void actions.back.execute();
-  }, [actions.back]);
+  };
 
   if (error) {
     return <ScreenErrorState message={error} onGoBack={handleErrorGoBack} />;

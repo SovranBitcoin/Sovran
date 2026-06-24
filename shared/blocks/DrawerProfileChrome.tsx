@@ -113,13 +113,13 @@ function useProfileSwitcher(closeDrawer: () => void) {
     [closeDrawer, activeAccountIndex]
   );
 
-  const openSheet = useCallback(() => {
+  const openSheet = () => {
     profileSwitcherPopup({
       onRequestAction: (action) => {
         void executeProfileAction(action);
       },
     });
-  }, [executeProfileAction]);
+  };
 
   return { executeProfileAction, openSheet };
 }
@@ -221,14 +221,14 @@ export const DrawerProfileChrome = React.memo(function DrawerProfileChrome({
 
   const mutedColor = opacity(foreground, alpha.disabled);
 
-  const handleAvatarPress = useCallback(() => {
+  const handleAvatarPress = () => {
     if (!nostrKeys?.pubkey) return;
     closeDrawer();
     router.navigate({
       pathname: '/(user-flow)/profile',
       params: { pubkey: nostrKeys.pubkey },
     });
-  }, [nostrKeys, closeDrawer]);
+  };
 
   if (!nostrKeys?.pubkey) {
     return <View style={{ paddingTop: isOffline ? 0 : insets.top }} />;

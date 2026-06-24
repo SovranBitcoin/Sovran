@@ -1,4 +1,4 @@
-import React, { FC, useCallback, useMemo, useState } from 'react';
+import React, { FC, useMemo, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
@@ -108,9 +108,9 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
   const [previewBp, setPreviewBp] = useState<number | null>(null);
   const [sliderWidth, setSliderWidth] = useState(0);
 
-  const handleSliderLayout = useCallback((event: LayoutChangeEvent) => {
+  const handleSliderLayout = (event: LayoutChangeEvent) => {
     setSliderWidth(event.nativeEvent.layout.width);
-  }, []);
+  };
 
   // Sync slider shared value when prop changes (only when not previewing)
   React.useEffect(() => {
@@ -119,25 +119,22 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
     }
   }, [distributionBp, sliderValue, previewBp]);
 
-  const handleSliderChange = useCallback((bp: number) => {
+  const handleSliderChange = (bp: number) => {
     setPreviewBp(bp);
-  }, []);
+  };
 
-  const handleSliderCommit = useCallback(
-    (bp: number) => {
-      setPreviewBp(null);
-      onDistributionChange(mintUrl, bp);
-    },
-    [mintUrl, onDistributionChange]
-  );
+  const handleSliderCommit = (bp: number) => {
+    setPreviewBp(null);
+    onDistributionChange(mintUrl, bp);
+  };
 
-  const handleMax = useCallback(() => {
+  const handleMax = () => {
     onMax(mintUrl);
-  }, [mintUrl, onMax]);
+  };
 
-  const handleMin = useCallback(() => {
+  const handleMin = () => {
     onMin(mintUrl);
-  }, [mintUrl, onMin]);
+  };
 
   const displayName = mintInfo?.name || extractDomain(mintUrl) || 'Unknown Mint';
 

@@ -63,14 +63,11 @@ export function GalleryScreen() {
   const cardWidth = Math.round(screenWidth * 0.44);
   const cardHeight = cardWidth * CARD_RATIO;
 
-  const handlePickAlbum = useCallback(
-    (slug: string) => {
-      log.info('theme.gallery.pick_album', { slug });
-      setAlbum(slug, PREVIEW_UNIT_IDS);
-      router.back();
-    },
-    [setAlbum]
-  );
+  const handlePickAlbum = (slug: string) => {
+    log.info('theme.gallery.pick_album', { slug });
+    setAlbum(slug, PREVIEW_UNIT_IDS);
+    router.back();
+  };
 
   return (
     <>

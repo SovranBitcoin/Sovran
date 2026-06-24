@@ -300,23 +300,17 @@ export function useInitializationStage(stageId: string, config: StageConfig = {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stageId]);
 
-  const log = useCallback(
-    (message: string) => {
-      updateStage(stageId, { message, status: 'loading' });
-    },
-    [stageId, updateStage]
-  );
+  const log = (message: string) => {
+    updateStage(stageId, { message, status: 'loading' });
+  };
 
-  const complete = useCallback(() => {
+  const complete = () => {
     updateStage(stageId, { status: 'complete' });
-  }, [stageId, updateStage]);
+  };
 
-  const error = useCallback(
-    (errorMessage: string) => {
-      updateStage(stageId, { status: 'error', error: errorMessage });
-    },
-    [stageId, updateStage]
-  );
+  const error = (errorMessage: string) => {
+    updateStage(stageId, { status: 'error', error: errorMessage });
+  };
 
   const canStart = canStageStart(stageId);
 

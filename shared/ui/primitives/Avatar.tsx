@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import BoringAvatar from '@mealection/react-native-boring-avatars';
 import { Image as ExpoImage } from 'expo-image';
@@ -211,11 +211,11 @@ export const Avatar = ({
     setImageStatus('loading');
   }, [picture]);
 
-  const handleImageLoad = useCallback(() => {
+  const handleImageLoad = () => {
     if (picture) setLoadedPicture(picture);
     setImageStatus('loaded');
-  }, [picture]);
-  const handleImageError = useCallback(() => setImageStatus('failed'), []);
+  };
+  const handleImageError = () => setImageStatus('failed');
 
   const borderRadius = size / 2;
   const statusIconSize = size * 0.33;
@@ -223,19 +223,13 @@ export const Avatar = ({
     () => ({ width: size, height: size, borderRadius, overflow: 'hidden' as const }),
     [borderRadius, size]
   );
-  const containerStyle = useMemo(
-    () => ({
-      ...avatarStyle,
-      justifyContent: 'center' as const,
-      alignItems: 'center' as const,
-    }),
-    [avatarStyle]
-  );
+  const containerStyle = {
+    ...avatarStyle,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  };
 
-  const fallbackSeed = useMemo(
-    () => sanitizeAvatarFallbackSeed(seed ?? name ?? alt ?? 'avatar'),
-    [alt, name, seed]
-  );
+  const fallbackSeed = sanitizeAvatarFallbackSeed(seed ?? name ?? alt ?? 'avatar');
 
   const statusBadge = useMemo(() => {
     if (!status) return null;
@@ -271,14 +265,8 @@ export const Avatar = ({
   const imageAlt = alt || defaultAlt;
   const previousPicture = loadedPicture && loadedPicture !== picture ? loadedPicture : null;
   const pictureSource = { uri: picture };
-  const previousPictureSource = useMemo(
-    () => (previousPicture ? { uri: previousPicture } : null),
-    [previousPicture]
-  );
-  const overlayImageStyle = useMemo(
-    () => [StyleSheet.absoluteFillObject, avatarStyle],
-    [avatarStyle]
-  );
+  const previousPictureSource = previousPicture ? { uri: previousPicture } : null;
+  const overlayImageStyle = [StyleSheet.absoluteFillObject, avatarStyle];
   const showsLoadingPlaceholder =
     state === 'loading' ||
     (state === 'image' && !!picture && imageStatus !== 'loaded' && !previousPicture);
@@ -304,12 +292,9 @@ export const Avatar = ({
       ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
     }),
   });
-  const handleVisualLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      visualLayout.onLayout(event);
-    },
-    [visualLayout]
-  );
+  const handleVisualLayout = (event: LayoutChangeEvent) => {
+    visualLayout.onLayout(event);
+  };
 
   // 1. Loading state — 50% foreground fill, no image, no gradient.
   if (state === 'loading') {

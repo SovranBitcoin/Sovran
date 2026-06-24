@@ -178,7 +178,7 @@ function ReplySortPicker({
   const selectedOption =
     REPLY_SORT_OPTIONS.find((option) => option.id === selected) ?? REPLY_SORT_OPTIONS[0];
 
-  const openSortMenu = useCallback(() => {
+  const openSortMenu = () => {
     actionMenuPopup({
       title: 'Replies',
       buttons: REPLY_SORT_OPTIONS.map((option) => ({
@@ -193,7 +193,7 @@ function ReplySortPicker({
         },
       })),
     });
-  }, [onSelect, selected]);
+  };
 
   return (
     <View style={styles.replySortContainer}>
@@ -266,7 +266,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const openPostActions = usePostActions({ getProfileName });
   const openComposer = useOpenComposer();
 
-  const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
+  const targetItem = items.find((item) => item.type === 'target');
   const hasParents = items.some((i) => i.type === 'parent');
 
   const displayItems = useMemo<ThreadListItem[]>(() => {
@@ -389,106 +389,85 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     };
   }, [items, profilesRef, metricsRef, quotedEventsRef]);
 
-  const renderThreadItem = useCallback(
-    ({ item, index }: { item: ThreadListItem; index: number }) => {
-      if (item.type === 'target-skeleton') {
-        return <PostCardSkeleton variant="thread-target" index={index} />;
-      }
+  const renderThreadItem = ({ item, index }: { item: ThreadListItem; index: number }) => {
+    if (item.type === 'target-skeleton') {
+      return <PostCardSkeleton variant="thread-target" index={index} />;
+    }
 
-      if (item.type === 'reply-skeleton') {
-        // FlashList recycles cells, which fights reanimated exit animations — an
-        // exiting skeleton renders in a recycled cell's position for a frame (the
-        // "skeleton in the wrong place" glitch), so the skeleton simply unmounts
-        // and the real reply fades IN over it (see REPLY_FADE_IN below).
-        return <PostCardSkeleton variant="thread-reply" index={item.skeletonIndex} />;
-      }
+    if (item.type === 'reply-skeleton') {
+      // FlashList recycles cells, which fights reanimated exit animations — an
+      // exiting skeleton renders in a recycled cell's position for a frame (the
+      // "skeleton in the wrong place" glitch), so the skeleton simply unmounts
+      // and the real reply fades IN over it (see REPLY_FADE_IN below).
+      return <PostCardSkeleton variant="thread-reply" index={item.skeletonIndex} />;
+    }
 
-      if (item.type === 'reply-sort-tabs') {
-        return (
-          <ReplySortPicker
-            selected={replySort}
-            onSelect={setReplySort}
-            foreground={foreground}
-            surfaceTertiary={surfaceTertiary}
-          />
-        );
-      }
-
-      const isParent = item.type === 'parent';
-      const isTarget = item.type === 'target';
-
-      const metrics = getDisplayMetrics(item.event.id);
-      const engagement = getEngagementState(item.event.id);
-
-      const card = (
-        <PostCard
-          variant={isTarget ? 'thread-target' : 'thread-reply'}
-          event={item.event}
-          metrics={metrics}
-          quotedEvents={quotedEventsRef.current}
-          profiles={profilesRef.current}
-          getMetrics={getMetrics}
-          onLinkPress={isTarget ? embedOpen : undefined}
-          footerOpacity={isTarget ? targetFooterOpacity : undefined}
-          showLineAbove={isParent ? index > 0 : isTarget ? hasParents : false}
-          showLineBelow={isParent}
-          liked={engagement.liked}
-          replied={engagement.replied}
-          reposted={engagement.reposted}
-          likePending={engagement.likePending}
-          repostPending={engagement.repostPending}
-          likePendingDirection={engagement.likePendingDirection}
-          repostPendingDirection={engagement.repostPendingDirection}
-          onLikePress={() => toggleLike(item.event)}
-          onRepostPress={() => toggleRepost(item.event)}
-          onCommentPress={() =>
-            openComposer(deriveReplyTarget(item.event), {
-              parentEvent: item.event,
-              parentProfile: profilesRef.current.get(item.event.pubkey),
-            })
-          }
-          onMorePress={() => openPostActions(item.event)}
-          getThreadContext={getThreadContext}
+    if (item.type === 'reply-sort-tabs') {
+      return (
+        <ReplySortPicker
+          selected={replySort}
+          onSelect={setReplySort}
+          foreground={foreground}
+          surfaceTertiary={surfaceTertiary}
         />
       );
+    }
 
-      // Each reply fades its real content in as it loads. The ENTER animation is
-      // recycling-tolerant on FlashList (it plays at the cell's correct spot and
-      // doesn't re-fire on scroll, since recycled cells reuse the instance) — unlike
-      // a skeleton EXIT, which lingered in a recycled cell's slot (the "wrong
-      // place" glitch), so the reply only ever fades IN.
-      if (item.type === 'reply') {
-        return <Animated.View entering={REPLY_FADE_IN}>{card}</Animated.View>;
-      }
-      return card;
-    },
-    [
-      openPostActions,
-      openComposer,
-      embedOpen,
-      targetFooterOpacity,
-      getDisplayMetrics,
-      getEngagementState,
-      getMetrics,
-      hasParents,
-      profilesRef,
-      quotedEventsRef,
-      replySort,
-      setReplySort,
-      foreground,
-      surfaceTertiary,
-      toggleLike,
-      toggleRepost,
-      getThreadContext,
-    ]
-  );
+    const isParent = item.type === 'parent';
+    const isTarget = item.type === 'target';
 
-  const handleEndReached = useCallback(() => {
+    const metrics = getDisplayMetrics(item.event.id);
+    const engagement = getEngagementState(item.event.id);
+
+    const card = (
+      <PostCard
+        variant={isTarget ? 'thread-target' : 'thread-reply'}
+        event={item.event}
+        metrics={metrics}
+        quotedEvents={quotedEventsRef.current}
+        profiles={profilesRef.current}
+        getMetrics={getMetrics}
+        onLinkPress={isTarget ? embedOpen : undefined}
+        footerOpacity={isTarget ? targetFooterOpacity : undefined}
+        showLineAbove={isParent ? index > 0 : isTarget ? hasParents : false}
+        showLineBelow={isParent}
+        liked={engagement.liked}
+        replied={engagement.replied}
+        reposted={engagement.reposted}
+        likePending={engagement.likePending}
+        repostPending={engagement.repostPending}
+        likePendingDirection={engagement.likePendingDirection}
+        repostPendingDirection={engagement.repostPendingDirection}
+        onLikePress={() => toggleLike(item.event)}
+        onRepostPress={() => toggleRepost(item.event)}
+        onCommentPress={() =>
+          openComposer(deriveReplyTarget(item.event), {
+            parentEvent: item.event,
+            parentProfile: profilesRef.current.get(item.event.pubkey),
+          })
+        }
+        onMorePress={() => openPostActions(item.event)}
+        getThreadContext={getThreadContext}
+      />
+    );
+
+    // Each reply fades its real content in as it loads. The ENTER animation is
+    // recycling-tolerant on FlashList (it plays at the cell's correct spot and
+    // doesn't re-fire on scroll, since recycled cells reuse the instance) — unlike
+    // a skeleton EXIT, which lingered in a recycled cell's slot (the "wrong
+    // place" glitch), so the reply only ever fades IN.
+    if (item.type === 'reply') {
+      return <Animated.View entering={REPLY_FADE_IN}>{card}</Animated.View>;
+    }
+    return card;
+  };
+
+  const handleEndReached = () => {
     // Don't start reply pagination while the initial fetch is running — the
     // footer spinner would otherwise overlap the loading skeletons.
     if (isFetching) return;
     void loadMoreReplies();
-  }, [loadMoreReplies, isFetching]);
+  };
 
   // FlashList re-renders rows when `data` changes by reference or when `extraData`
   // changes. Engagement (likes/reposts), pagination flags and the sort live outside
@@ -510,23 +489,23 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   // target PostCard's MetricsFooter wiring). Hooks stay above the early
   // return below.
   const targetEvent = targetItem?.event;
-  const onTargetComment = useCallback(() => {
+  const onTargetComment = () => {
     if (!targetEvent) return;
     openComposer(deriveReplyTarget(targetEvent), {
       parentEvent: targetEvent,
       parentProfile: profilesRef.current.get(targetEvent.pubkey),
     });
-  }, [targetEvent, openComposer, profilesRef]);
-  const onTargetLike = useCallback(() => {
+  };
+  const onTargetLike = () => {
     if (targetEvent) void toggleLike(targetEvent);
-  }, [targetEvent, toggleLike]);
-  const onTargetRepost = useCallback(() => {
+  };
+  const onTargetRepost = () => {
     if (targetEvent) void toggleRepost(targetEvent);
-  }, [targetEvent, toggleRepost]);
+  };
   const quotePost = useQuotePost();
-  const onTargetQuote = useCallback(() => {
+  const onTargetQuote = () => {
     if (targetEvent) quotePost(targetEvent, profilesRef.current.get(targetEvent.pubkey));
-  }, [targetEvent, quotePost, profilesRef]);
+  };
 
   if (error && items.length === 0) {
     return (

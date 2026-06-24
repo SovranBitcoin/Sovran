@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -235,27 +235,20 @@ export function NutDropCelebrationOverlay({
     transform: [{ translateY: labelTranslateY.get() }],
   }));
 
-  const scrimCombinedStyle = useMemo(
-    () => [styles.scrim, { backgroundColor: background }, scrimStyle],
-    [background, scrimStyle]
-  );
+  const scrimCombinedStyle = [styles.scrim, { backgroundColor: background }, scrimStyle];
   const avatarCombinedStyle = [styles.avatar, avatarStyle];
-  const labelContainerStyle = useMemo(
-    () =>
-      centerRect
-        ? [
-            styles.labelContainer,
-            { top: centerRect.y + CELEBRATION_AVATAR_SIZE + spacing.lg },
-            labelStyle,
-          ]
-        : null,
-    [centerRect, labelStyle]
-  );
+  const labelContainerStyle = centerRect
+    ? [
+        styles.labelContainer,
+        { top: centerRect.y + CELEBRATION_AVATAR_SIZE + spacing.lg },
+        labelStyle,
+      ]
+    : null;
   const receivedTextStyle = { color: foreground };
   const fromTextStyle = { color: opacity(foreground, alpha.muted) };
-  const handleSkip = useCallback(() => {
+  const handleSkip = () => {
     onSkip();
-  }, [onSkip]);
+  };
 
   if (!centerRect) return null;
 

@@ -105,33 +105,6 @@ module.exports = defineConfig([
       ],
     },
   },
-  // React-perf rules — catch inline `{}`, `[]`, and `() => ...` passed
-  // as JSX props. Every render creates a fresh reference, defeating
-  // `React.memo` / `useMemo` downstream and re-firing
-  // `useEffect`/`useCallback` deps. Direct payoff for the perf-slice
-  // cluster (`stabilize derived collections in mintSelect`, `stabilise
-  // relay-flush re-fire`, `scope useAiSend stream + balance to a hook
-  // controller`, `perf(chat): stabilise chat-surface render lifecycle`).
-  //
-  // Set at `warn` initially — the rules are precise but historically
-  // noisy in codebases that haven't been pass-optimised. Surfaces in PR
-  // review without failing CI. Pairs with the react-compiler rule
-  // above: react-compiler flags compiler bailouts, react-perf flags
-  // the props that *would* prevent memoisation even with the compiler
-  // active.
-  //
-  // `jsx-no-jsx-as-prop` (passing a `<Component />` as a prop) is also
-  // available but commonly used in real patterns (slot props, list
-  // renderers); skipped to keep noise low.
-  {
-    files: ['**/*.tsx'],
-    plugins: { 'react-perf': require('eslint-plugin-react-perf') },
-    rules: {
-      'react-perf/jsx-no-new-object-as-prop': 'warn',
-      'react-perf/jsx-no-new-array-as-prop': 'warn',
-      'react-perf/jsx-no-new-function-as-prop': 'warn',
-    },
-  },
   // React Compiler ESLint rule. Flags components and effects that the
   // compiler can't auto-memoize: render-body mutations, prop mutations,
   // refs misuse, conditional hooks, derived collections that aren't

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import * as Clipboard from 'expo-clipboard';
 import { Stack } from 'expo-router';
@@ -64,9 +64,9 @@ const CurrentKeyItem: React.FC<{
   const activeData = isNpubTab ? npubValue! : keypair.publicKeyHex;
   const displayKey = isDerived ? keypair.publicKeyHex : activeData;
 
-  const handleTabPress = useCallback((tab: string) => {
+  const handleTabPress = (tab: string) => {
     setSelectedTab(tab);
-  }, []);
+  };
 
   const handleShowQR = () => {
     router.navigate({
@@ -79,9 +79,9 @@ const CurrentKeyItem: React.FC<{
     });
   };
 
-  const handleCopy = useCallback(() => {
+  const handleCopy = () => {
     onCopy(activeData);
-  }, [activeData, onCopy]);
+  };
 
   return (
     <View className="p-4">
@@ -461,14 +461,11 @@ export const SettingsKeyringScreen: React.FC = () => {
     ),
     [foreground, handleGenerateKey, handleImportNsec, isGenerating, isKeyringActionPending]
   );
-  const stackOptions = useMemo(
-    () => ({
-      title: 'P2PK Keys',
-      headerLeft: renderHeaderLeft,
-      headerRight: renderHeaderRight,
-    }),
-    [renderHeaderLeft, renderHeaderRight]
-  );
+  const stackOptions = {
+    title: 'P2PK Keys',
+    headerLeft: renderHeaderLeft,
+    headerRight: renderHeaderRight,
+  };
 
   return (
     <Screen name="SettingsKeyringScreen">

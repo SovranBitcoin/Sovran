@@ -60,7 +60,7 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
     };
   }, [client, refresh]);
 
-  const bootstrapInner = useCallback(async () => {
+  const bootstrapInner = async () => {
     if (!client) {
       setError('White Noise client not ready');
       return;
@@ -93,7 +93,7 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
     } finally {
       setIsBootstrapping(false);
     }
-  }, [client, relays]);
+  };
 
   // Key-package creation is finite-resource work — a duplicate concurrent
   // bootstrap would publish two key packages per slot and burn relay

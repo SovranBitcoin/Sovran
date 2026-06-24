@@ -9,7 +9,7 @@
  * - InlinePanelImage: image with blurred letterbox for aspect ratio mismatch
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BlurView } from 'expo-blur';
@@ -42,7 +42,7 @@ const OVERLAY_CLOSE_BEFORE_MENU_MS = 240;
  */
 function useOverlayRepostMenu(post: ImageOverlayPost, onRequestClose?: () => void) {
   const quotePost = useQuotePost();
-  return useCallback(() => {
+  return () => {
     onRequestClose?.();
     setTimeout(() => {
       openRepostMenu({
@@ -51,7 +51,7 @@ function useOverlayRepostMenu(post: ImageOverlayPost, onRequestClose?: () => voi
         onQuote: () => quotePost(post.event, post.profile ?? undefined),
       });
     }, OVERLAY_CLOSE_BEFORE_MENU_MS);
-  }, [post, onRequestClose, quotePost]);
+  };
 }
 // Absolute bar text stays white — it floats over the dark, blurred image, not
 // over the sheet's `surface` background.
@@ -139,14 +139,14 @@ function extractPanelText(content: string): string {
 function InlinePanelImage({ uri }: { uri: string }) {
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [layoutWidth, setLayoutWidth] = useState<number>(0);
-  const onLoad = useCallback((e: { source: { width: number; height: number } }) => {
+  const onLoad = (e: { source: { width: number; height: number } }) => {
     const { width, height } = e.source;
     if (!width || !height) return;
     setNaturalSize({ w: width, h: height });
-  }, []);
-  const onLayout = useCallback((e: { nativeEvent: { layout: { width: number } } }) => {
+  };
+  const onLayout = (e: { nativeEvent: { layout: { width: number } } }) => {
     setLayoutWidth(e.nativeEvent.layout.width);
-  }, []);
+  };
   const { boxHeight, imageStyle } = useMemo(() => {
     const placeholderHeight = 120;
     if (!layoutWidth) {
@@ -439,13 +439,13 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
   const contentPreview = textContent.slice(0, 120);
   const contentTruncated = textContent.length > 120;
 
-  const handleCommentPress = useCallback(() => {
+  const handleCommentPress = () => {
     onOpenSheet();
-  }, [onOpenSheet]);
+  };
 
-  const handleShowMorePress = useCallback(() => {
+  const handleShowMorePress = () => {
     onOpenSheet({ expandContent: true });
-  }, [onOpenSheet]);
+  };
 
   return (
     <Log name="ImageOverlayAbsoluteBar">

@@ -112,9 +112,9 @@ export function useNostrProfile(pubkey: string | null): UseNostrProfileResult {
     return () => controller.abort();
   }, [fetchProfile]);
 
-  const refetch = useCallback(() => {
+  const refetch = () => {
     void fetchProfile();
-  }, [fetchProfile]);
+  };
 
   return { data, isLoading, error, refetch };
 }

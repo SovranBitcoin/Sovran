@@ -300,10 +300,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
   // header height instead of framing the whole screen below it.
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
-  const scrollContentStyle = useMemo(
-    () => ({ paddingTop: headerHeight, paddingBottom: 32 + insets.bottom }),
-    [headerHeight, insets.bottom]
-  );
+  const scrollContentStyle = { paddingTop: headerHeight, paddingBottom: 32 + insets.bottom };
   const indicatorInsets = { top: headerHeight };
 
   // ── Scroll-linked identity handoff (content ↔ header) ────────
@@ -324,10 +321,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
   const contentIdentityFade = useAnimatedStyle(() => ({
     opacity: interpolate(flipProgress.value, CONTENT_FADE_PHASE, [1, 0], Extrapolation.CLAMP),
   }));
-  const contentIdentityComposed = useMemo(
-    () => [CONTENT_IDENTITY_STYLE, contentIdentityFade],
-    [contentIdentityFade]
-  );
+  const contentIdentityComposed = [CONTENT_IDENTITY_STYLE, contentIdentityFade];
   const appImage = app?.image;
   useScreenOptions(
     () =>
@@ -379,13 +373,10 @@ export function SignerAppDetailScreen(): React.ReactElement {
   // hides session affordances on strict apps), so the persisted labels are
   // the truthful ones.
   const sessionAllows = useNip46RequestsStore((s) => s.sessionAllows);
-  const appSessionAllows = useMemo(
-    () =>
-      clientPubkey === undefined
-        ? []
-        : sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey),
-    [sessionAllows, clientPubkey]
-  );
+  const appSessionAllows =
+    clientPubkey === undefined
+      ? []
+      : sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey);
 
   const decryptAccessRows = useMemo(() => {
     const rows = new Map<string, { peer: string; sublabel: string; session: boolean }>();
@@ -416,25 +407,19 @@ export function SignerAppDetailScreen(): React.ReactElement {
     return [...rows.values()].sort((a, b) => a.peer.localeCompare(b.peer));
   }, [app?.peerDecryptGrants, appSessionGrants]);
 
-  const openPerson = useCallback(
-    (peer: string) => {
-      if (clientPubkey === undefined) return;
-      router.push(`/(signer-flow)/app-person?clientPubkey=${clientPubkey}&peer=${peer}` as never);
-    },
-    [clientPubkey]
-  );
+  const openPerson = (peer: string) => {
+    if (clientPubkey === undefined) return;
+    router.push(`/(signer-flow)/app-person?clientPubkey=${clientPubkey}&peer=${peer}` as never);
+  };
 
   // Master switch over the whole people list — confirmed before applying,
   // because the change cascades to everyone below.
   const everyoneAllowed =
     decryptAccessRows.length > 0 &&
     decryptAccessRows.every((row) => app?.peerDecryptGrants[row.peer] !== undefined);
-  const everyoneA11yValue = useMemo(
-    () => ({ text: everyoneAllowed ? 'Always' : 'Ask' }),
-    [everyoneAllowed]
-  );
+  const everyoneA11yValue = { text: everyoneAllowed ? 'Always' : 'Ask' };
 
-  const onToggleEveryone = useCallback(() => {
+  const onToggleEveryone = () => {
     if (clientPubkey === undefined) return;
     const peers = decryptAccessRows.map((row) => row.peer);
     const count = peers.length;
@@ -516,16 +501,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
         { text: 'Cancel', variant: 'secondary', onPress: (close) => close() },
       ],
     });
-  }, [
-    clientPubkey,
-    decryptAccessRows,
-    everyoneAllowed,
-    appName,
-    app?.peerDecryptGrants,
-    setPeerDecryptGrant,
-    revokePeerDecryptGrant,
-    revokeSessionGrant,
-  ]);
+  };
 
   // Back to the SAME defaults the connect sheet applies: clear everything,
   // then re-grant the common-social-actions preset.
@@ -565,7 +541,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
     setMode(clientPubkey, strictModeOn ? 'standard' : 'strict');
   }, [clientPubkey, setMode, strictModeOn]);
   const strictA11yState = { checked: strictModeOn };
-  const openStrictMenu = useCallback(() => {
+  const openStrictMenu = () => {
     if (clientPubkey === undefined) return;
     const checkSuffix = <Icon name="mdi:check" size={18} color={muted} />;
     actionMenuPopup({
@@ -594,19 +570,16 @@ export function SignerAppDetailScreen(): React.ReactElement {
         },
       ],
     });
-  }, [clientPubkey, muted, setMode, strictModeOn]);
+  };
 
-  const onSelectTriState = useCallback(
-    (grantKey: GrantKey, state: TriState) => {
-      if (clientPubkey === undefined) return;
-      const verdict = state === 'ask' ? null : state === 'allow' ? 'always' : 'deny';
-      const result = setGrant(clientPubkey, grantKey, verdict);
-      if (result.isErr()) {
-        nostrLog.warn('nostr.signer.app_detail.set_grant_failed', { error: result.error });
-      }
-    },
-    [clientPubkey, setGrant]
-  );
+  const onSelectTriState = (grantKey: GrantKey, state: TriState) => {
+    if (clientPubkey === undefined) return;
+    const verdict = state === 'ask' ? null : state === 'allow' ? 'always' : 'deny';
+    const result = setGrant(clientPubkey, grantKey, verdict);
+    if (result.isErr()) {
+      nostrLog.warn('nostr.signer.app_detail.set_grant_failed', { error: result.error });
+    }
+  };
 
   // One tap covers the whole bundle; a mixed bundle self-heals to the choice.
   const onSelectBundleState = useCallback(
@@ -628,17 +601,14 @@ export function SignerAppDetailScreen(): React.ReactElement {
     [clientPubkey, setGrant]
   );
 
-  const openFineGrained = useCallback(
-    (group: PermissionEditorGroup) => {
-      if (clientPubkey === undefined) return;
-      router.push(
-        `/(signer-flow)/app-permissions?clientPubkey=${clientPubkey}&group=${group}` as never
-      );
-    },
-    [clientPubkey]
-  );
+  const openFineGrained = (group: PermissionEditorGroup) => {
+    if (clientPubkey === undefined) return;
+    router.push(
+      `/(signer-flow)/app-permissions?clientPubkey=${clientPubkey}&group=${group}` as never
+    );
+  };
 
-  const openRename = useCallback(() => {
+  const openRename = () => {
     if (clientPubkey === undefined) return;
     actionMenuPopup({
       title: 'Rename App',
@@ -660,14 +630,14 @@ export function SignerAppDetailScreen(): React.ReactElement {
         },
       },
     });
-  }, [app?.name, appName, clientPubkey, renameApp]);
+  };
 
-  const openActivity = useCallback(() => {
+  const openActivity = () => {
     if (clientPubkey === undefined) return;
     router.push(`/(signer-flow)/activity?clientPubkey=${clientPubkey}` as never);
-  }, [clientPubkey]);
+  };
 
-  const confirmDisconnect = useCallback(() => {
+  const confirmDisconnect = () => {
     if (clientPubkey === undefined) return;
     const nameAtConfirm = appName;
     actionMenuPopup({
@@ -700,7 +670,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
         { text: 'Cancel', variant: 'secondary', onPress: (close) => close() },
       ],
     });
-  }, [appName, clientPubkey, disconnectApp, revokeSessionGrant, revokeSessionAllows]);
+  };
 
   // Unknown pubkey, or the app was just disconnected — transient empty frame.
   if (clientPubkey === undefined || app === undefined) {

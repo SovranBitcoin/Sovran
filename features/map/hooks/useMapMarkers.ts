@@ -180,10 +180,7 @@ export function useMapMarkers({
     return () => handle.cancel();
   }, [isMapReady, filteredPoints, clusterCacheKey, getCamera, updateMarkersForCamera]);
 
-  const resolveMarker = useCallback(
-    (id: string) => markersRef.current.find((m) => m.id === id),
-    []
-  );
+  const resolveMarker = (id: string) => markersRef.current.find((m) => m.id === id);
 
   return {
     markers,

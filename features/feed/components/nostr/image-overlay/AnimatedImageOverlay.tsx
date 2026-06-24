@@ -202,13 +202,10 @@ function AnimatedImageOverlayContent({
   // before the collapsing drawer gets shorter than the bar (no poke-out).
   const [replyBarHeight, setReplyBarHeight] = useState(0);
   const replyBarHeightSv = useSharedValue(0);
-  const handleReplyBarHeight = useCallback(
-    (height: number) => {
-      setReplyBarHeight(height);
-      replyBarHeightSv.value = height;
-    },
-    [replyBarHeightSv]
-  );
+  const handleReplyBarHeight = (height: number) => {
+    setReplyBarHeight(height);
+    replyBarHeightSv.value = height;
+  };
   useEffect(() => {
     if (!activeOverlayPost) setSheetOpen(false);
   }, [activeOverlayPost]);
@@ -634,12 +631,9 @@ function AnimatedImageOverlayContent({
   /** When touch is in scroll area we delay activate/fail until onTouchesMove to detect drag direction. */
   const panelTouchStartYSv = useSharedValue(-1);
 
-  const panelScrollHandler = useCallback(
-    (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-      scrollOffsetYInPanel.value = e.nativeEvent.contentOffset.y;
-    },
-    [scrollOffsetYInPanel]
-  );
+  const panelScrollHandler = (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+    scrollOffsetYInPanel.value = e.nativeEvent.contentOffset.y;
+  };
 
   /** Min movement (px) in scroll area before we activate/fail. */
   const PANEL_DRAG_THRESHOLD = 10;
@@ -703,108 +697,94 @@ function AnimatedImageOverlayContent({
    */
   const scrollAreaPanRef = useRef<GestureType | undefined>(undefined);
   const dismissPanRef = useRef<GestureType | undefined>(undefined);
-  const scrollAreaPan = useMemo(
-    () =>
-      Gesture.Pan()
-        .manualActivation(true)
-        .onTouchesDown((e, stateManager) => {
-          'worklet';
-          if (e.numberOfTouches !== 1) {
-            stateManager.fail();
-            return;
-          }
-          panelTouchStartYSv.value = e.allTouches[0]?.y ?? 0;
-        })
-        .onTouchesMove((e, stateManager) => {
-          'worklet';
-          if (panelTouchStartYSv.value < 0) return;
-          if (e.numberOfTouches !== 1) {
-            panelTouchStartYSv.value = -1;
-            stateManager.fail();
-            return;
-          }
-          const touchY = e.allTouches[0]?.y ?? 0;
-          const deltaY = touchY - panelTouchStartYSv.value;
-          const sheetAtSmallSnap = panelHeightSv.value < scrollVsDragMidHeight;
-          const draggedDown = deltaY >= PANEL_DRAG_THRESHOLD;
-          const draggedUp = deltaY <= -PANEL_DRAG_THRESHOLD;
-          if (draggedDown || draggedUp) {
-            panelTouchStartYSv.value = -1;
-            if (sheetAtSmallSnap) {
-              stateManager.activate();
-            } else {
-              const scrollAtTop = scrollOffsetYInPanel.value <= SCROLL_AT_TOP_THRESHOLD;
-              if (scrollAtTop && draggedDown) {
-                stateManager.activate();
-              } else {
-                stateManager.fail();
-              }
-            }
-          }
-        })
-        .onTouchesUp((_e, stateManager) => {
-          'worklet';
-          if (panelTouchStartYSv.value >= 0) {
-            panelTouchStartYSv.value = -1;
+  const scrollAreaPan = Gesture.Pan()
+    .manualActivation(true)
+    .onTouchesDown((e, stateManager) => {
+      'worklet';
+      if (e.numberOfTouches !== 1) {
+        stateManager.fail();
+        return;
+      }
+      panelTouchStartYSv.value = e.allTouches[0]?.y ?? 0;
+    })
+    .onTouchesMove((e, stateManager) => {
+      'worklet';
+      if (panelTouchStartYSv.value < 0) return;
+      if (e.numberOfTouches !== 1) {
+        panelTouchStartYSv.value = -1;
+        stateManager.fail();
+        return;
+      }
+      const touchY = e.allTouches[0]?.y ?? 0;
+      const deltaY = touchY - panelTouchStartYSv.value;
+      const sheetAtSmallSnap = panelHeightSv.value < scrollVsDragMidHeight;
+      const draggedDown = deltaY >= PANEL_DRAG_THRESHOLD;
+      const draggedUp = deltaY <= -PANEL_DRAG_THRESHOLD;
+      if (draggedDown || draggedUp) {
+        panelTouchStartYSv.value = -1;
+        if (sheetAtSmallSnap) {
+          stateManager.activate();
+        } else {
+          const scrollAtTop = scrollOffsetYInPanel.value <= SCROLL_AT_TOP_THRESHOLD;
+          if (scrollAtTop && draggedDown) {
+            stateManager.activate();
+          } else {
             stateManager.fail();
           }
-        })
-        .onTouchesCancelled((_e, stateManager) => {
+        }
+      }
+    })
+    .onTouchesUp((_e, stateManager) => {
+      'worklet';
+      if (panelTouchStartYSv.value >= 0) {
+        panelTouchStartYSv.value = -1;
+        stateManager.fail();
+      }
+    })
+    .onTouchesCancelled((_e, stateManager) => {
+      'worklet';
+      if (panelTouchStartYSv.value >= 0) {
+        panelTouchStartYSv.value = -1;
+        stateManager.fail();
+      }
+    })
+    .onStart(() => {
+      panelDragStartSv.value = panelHeightSv.value;
+    })
+    .onChange((e) => {
+      const maxH = panelMaxHeight;
+      const next = panelDragStartSv.value - e.translationY;
+      panelHeightSv.value = Math.max(0, Math.min(maxH, next));
+    })
+    .onEnd((e) => {
+      'worklet';
+      const current = panelHeightSv.value;
+      const velocityY = -e.velocityY;
+      const SNAP_0 = 0;
+      const SNAP_60 = snap60Height;
+      const SNAP_100 = panelMaxHeight;
+      const t30 = screenHeight * 0.3;
+      const t80 = screenHeight * 0.8;
+      let snapTo: number;
+      if (velocityY > 250) snapTo = SNAP_100;
+      else if (velocityY < -250) snapTo = current < screenHeight * 0.5 ? SNAP_0 : SNAP_60;
+      else if (current < t30) snapTo = SNAP_0;
+      else if (current < t80) snapTo = SNAP_60;
+      else snapTo = SNAP_100;
+      const closeSheet = snapTo <= 0;
+      panelHeightSv.value = withTiming(
+        snapTo,
+        {
+          duration: BOTTOM_PANEL_STIFF_DURATION_MS,
+          easing: Easing.out(Easing.cubic),
+        },
+        (finished) => {
           'worklet';
-          if (panelTouchStartYSv.value >= 0) {
-            panelTouchStartYSv.value = -1;
-            stateManager.fail();
-          }
-        })
-        .onStart(() => {
-          panelDragStartSv.value = panelHeightSv.value;
-        })
-        .onChange((e) => {
-          const maxH = panelMaxHeight;
-          const next = panelDragStartSv.value - e.translationY;
-          panelHeightSv.value = Math.max(0, Math.min(maxH, next));
-        })
-        .onEnd((e) => {
-          'worklet';
-          const current = panelHeightSv.value;
-          const velocityY = -e.velocityY;
-          const SNAP_0 = 0;
-          const SNAP_60 = snap60Height;
-          const SNAP_100 = panelMaxHeight;
-          const t30 = screenHeight * 0.3;
-          const t80 = screenHeight * 0.8;
-          let snapTo: number;
-          if (velocityY > 250) snapTo = SNAP_100;
-          else if (velocityY < -250) snapTo = current < screenHeight * 0.5 ? SNAP_0 : SNAP_60;
-          else if (current < t30) snapTo = SNAP_0;
-          else if (current < t80) snapTo = SNAP_60;
-          else snapTo = SNAP_100;
-          const closeSheet = snapTo <= 0;
-          panelHeightSv.value = withTiming(
-            snapTo,
-            {
-              duration: BOTTOM_PANEL_STIFF_DURATION_MS,
-              easing: Easing.out(Easing.cubic),
-            },
-            (finished) => {
-              'worklet';
-              if (finished && closeSheet) scheduleOnRN(setSheetOpenFromReaction, false);
-            }
-          );
-        })
-        .withRef(scrollAreaPanRef),
-    [
-      panelHeightSv,
-      panelDragStartSv,
-      panelMaxHeight,
-      snap60Height,
-      screenHeight,
-      scrollVsDragMidHeight,
-      panelTouchStartYSv,
-      scrollOffsetYInPanel,
-      setSheetOpenFromReaction,
-    ]
-  );
+          if (finished && closeSheet) scheduleOnRN(setSheetOpenFromReaction, false);
+        }
+      );
+    })
+    .withRef(scrollAreaPanRef);
 
   const triggerSwipeUpToNext = useCallback(() => {
     if (onSwipeUpToNextPost && openReplace) {

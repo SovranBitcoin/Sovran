@@ -668,55 +668,46 @@ export function MintAddScreen() {
     [isSearching, onCloseSearch, onOpenSearch, foreground]
   );
 
-  const screenOptions = useMemo(
-    () => ({
-      headerTransparent: true as const,
-      // Declares the page background (bgColor={surface} below) so the Android
-      // sheet header's scrim fades from the page's color, not the darker
-      // theme background. FlowSheetHeader reads this; iOS ignores it under a
-      // transparent header.
-      headerStyle: { backgroundColor: surface },
-      headerTitle: renderHeaderTitle,
-      headerRight: renderHeaderRight,
-    }),
-    [renderHeaderTitle, renderHeaderRight, surface]
-  );
+  const screenOptions = {
+    headerTransparent: true as const,
+    // Declares the page background (bgColor={surface} below) so the Android
+    // sheet header's scrim fades from the page's color, not the darker
+    // theme background. FlowSheetHeader reads this; iOS ignores it under a
+    // transparent header.
+    headerStyle: { backgroundColor: surface },
+    headerTitle: renderHeaderTitle,
+    headerRight: renderHeaderRight,
+  };
 
   // ── Sticky content & bottom ────────────────────────────────────────────
 
-  const currencyTabs = useMemo(
-    () => (
-      <MintCurrencyTabs
-        currencies={availableCurrencies}
-        selectedCurrency={selectedCurrency}
-        onCurrencyChange={setSelectedCurrency}
-        scrollY={scrollY}
-      />
-    ),
-    [availableCurrencies, selectedCurrency, setSelectedCurrency, scrollY]
+  const currencyTabs = (
+    <MintCurrencyTabs
+      currencies={availableCurrencies}
+      selectedCurrency={selectedCurrency}
+      onCurrencyChange={setSelectedCurrency}
+      scrollY={scrollY}
+    />
   );
 
-  const bottomButtons = useMemo(
-    () => (
-      <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            {
-              text: isAdding ? 'Adding...' : `Add (${selectedMints.size})`,
-              variant: 'primary',
-              onPress: handleSave,
-              disabled: selectedMints.size === 0 || isAdding,
-            },
-            {
-              text: 'Cancel',
-              variant: 'secondary',
-              onPress: async () => router.back(),
-            },
-          ]}
-        />
-      </BottomButtons>
-    ),
-    [isAdding, selectedMints.size, handleSave]
+  const bottomButtons = (
+    <BottomButtons>
+      <ButtonHandler
+        buttons={[
+          {
+            text: isAdding ? 'Adding...' : `Add (${selectedMints.size})`,
+            variant: 'primary',
+            onPress: handleSave,
+            disabled: selectedMints.size === 0 || isAdding,
+          },
+          {
+            text: 'Cancel',
+            variant: 'secondary',
+            onPress: async () => router.back(),
+          },
+        ]}
+      />
+    </BottomButtons>
   );
 
   const listHeader = useMemo(

@@ -359,20 +359,14 @@ function TextLoadingPlaceholder({
       ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
     }),
   });
-  const handleLayout = React.useCallback(
-    (event: LayoutChangeEvent) => {
-      layout.onLayout(event);
-    },
-    [layout]
-  );
+  const handleLayout = (event: LayoutChangeEvent) => {
+    layout.onLayout(event);
+  };
   const loadingBarStyle = React.useMemo<StyleProp<ViewStyle>>(
     () => [loadingInsetStyle, { borderRadius: 4, backgroundColor: loadingColor }],
     [loadingColor]
   );
-  const hiddenTextCompositeStyle = React.useMemo(
-    () => [textProps.style, hiddenTextStyle],
-    [textProps.style]
-  );
+  const hiddenTextCompositeStyle = [textProps.style, hiddenTextStyle];
 
   return (
     <View

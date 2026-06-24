@@ -78,10 +78,7 @@ function MapPreview({
   const useChrome = Platform.OS === 'ios';
   const isDark = scheme === 'dark';
 
-  const cameraPosition = useMemo(
-    () => ({ coordinates: { latitude, longitude }, zoom: MAP_ZOOM }),
-    [latitude, longitude]
-  );
+  const cameraPosition = { coordinates: { latitude, longitude }, zoom: MAP_ZOOM };
 
   return (
     <RNView className="h-[140px] overflow-hidden" pointerEvents="none">

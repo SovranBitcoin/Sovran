@@ -57,7 +57,7 @@
  * @see {@link ./Text}
  */
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleProp,
   ViewStyle,
@@ -153,60 +153,51 @@ const useRipple = ({ enabled, config }: UseRippleOptions) => {
     centered = true,
   } = config;
 
-  const handleLayout = useCallback(
-    (e: LayoutChangeEvent) => {
-      if (!enabled) return;
-      const { width, height } = e.nativeEvent.layout;
-      setButtonSize({ width, height });
-      setRippleSize(Math.max(width, height) * 2);
-    },
-    [enabled]
-  );
+  const handleLayout = (e: LayoutChangeEvent) => {
+    if (!enabled) return;
+    const { width, height } = e.nativeEvent.layout;
+    setButtonSize({ width, height });
+    setRippleSize(Math.max(width, height) * 2);
+  };
 
-  const handlePressIn = useCallback(
-    (event: GestureResponderEvent) => {
-      if (!enabled) return;
+  const handlePressIn = (event: GestureResponderEvent) => {
+    if (!enabled) return;
 
-      // Calculate ripple position
-      if (!centered && event.nativeEvent) {
-        const { locationX, locationY } = event.nativeEvent;
-        setRipplePosition({ x: locationX, y: locationY });
-      } else {
-        setRipplePosition({ x: buttonSize.width / 2, y: buttonSize.height / 2 });
-      }
+    // Calculate ripple position
+    if (!centered && event.nativeEvent) {
+      const { locationX, locationY } = event.nativeEvent;
+      setRipplePosition({ x: locationX, y: locationY });
+    } else {
+      setRipplePosition({ x: buttonSize.width / 2, y: buttonSize.height / 2 });
+    }
 
-      rippleScale.setValue(0);
-      rippleOpacity.setValue(opacity);
-      Animated.parallel([
-        Animated.timing(rippleScale, {
-          toValue: 1,
-          duration,
-          useNativeDriver: true,
-        }),
-        Animated.timing(rippleOpacity, {
-          toValue: 0,
-          duration,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    },
-    [enabled, centered, buttonSize, rippleScale, rippleOpacity, opacity, duration]
-  );
+    rippleScale.setValue(0);
+    rippleOpacity.setValue(opacity);
+    Animated.parallel([
+      Animated.timing(rippleScale, {
+        toValue: 1,
+        duration,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rippleOpacity, {
+        toValue: 0,
+        duration,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
-  const getRippleStyle = useCallback(
-    () => ({
-      position: 'absolute' as const,
-      top: ripplePosition.y - rippleSize / 2,
-      left: ripplePosition.x - rippleSize / 2,
-      width: rippleSize,
-      height: rippleSize,
-      borderRadius: rippleSize / 2,
-      backgroundColor: color,
-      transform: [{ scale: rippleScale }],
-      opacity: rippleOpacity,
-    }),
-    [ripplePosition, rippleSize, color, rippleScale, rippleOpacity]
-  );
+  const getRippleStyle = () => ({
+    position: 'absolute' as const,
+    top: ripplePosition.y - rippleSize / 2,
+    left: ripplePosition.x - rippleSize / 2,
+    width: rippleSize,
+    height: rippleSize,
+    borderRadius: rippleSize / 2,
+    backgroundColor: color,
+    transform: [{ scale: rippleScale }],
+    opacity: rippleOpacity,
+  });
 
   return {
     handleLayout,

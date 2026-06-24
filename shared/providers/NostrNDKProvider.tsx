@@ -1,12 +1,4 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  ReactNode,
-} from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { relays } from '@/shared/ndk';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
@@ -50,10 +42,8 @@ export function NostrNDKProvider({
   const activeAccountIndex = accountIndexProp ?? 0;
   const hasInitialized = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const cacheAdapter = useMemo(
-    () =>
-      new NDKCacheAdapterSqlite(activeAccountIndex === 0 ? 'nostr' : `nostr-${activeAccountIndex}`),
-    [activeAccountIndex]
+  const cacheAdapter = new NDKCacheAdapterSqlite(
+    activeAccountIndex === 0 ? 'nostr' : `nostr-${activeAccountIndex}`
   );
 
   // Non-blocking: starts after all blocking stages complete so it doesn't

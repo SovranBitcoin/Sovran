@@ -150,10 +150,7 @@ const UNDERLINE_TEXT_STYLE = { textDecorationLine: 'underline' } as const;
 /** Bounded content preview + the shared JSON inspector, in a card. */
 function EventPreviewCard({ event }: { event: UnsignedEvent }) {
   const [foreground] = useThemeColor(['foreground'] as const);
-  const contentPreview = useMemo(
-    () => boundDisplay(event.content.trim(), CONTENT_PREVIEW_MAX_CHARS),
-    [event.content]
-  );
+  const contentPreview = boundDisplay(event.content.trim(), CONTENT_PREVIEW_MAX_CHARS);
 
   return (
     <View className="bg-surface rounded-2xl p-3" style={PREVIEW_CARD_STYLE}>
@@ -253,56 +250,51 @@ export function SignerApprovalSheetContent({
     if (head === null && expiredNotice === null) finish();
   }, [head, expiredNotice, finish]);
 
-  const submitVerdict = useSingleFlight(
-    useCallback(
-      async (action: Nip46DecisionAction) => {
-        if (headGroup === null) return;
-        // Snapshot ids + mark resolved + tally BEFORE the first await, so the
-        // departure effect (which fires as the store updates mid-loop) reads
-        // a fully-resolved group and never flashes the expired notice.
-        const ids = verdictIdsForGroup(action, headGroup);
-        if (action === 'block') {
-          // The engine flushes EVERY pending request from this app — mark
-          // them all resolved so no sibling group flashes "expired".
-          const appPubkey = headGroup.requests[0]!.clientPubkey;
-          const flushed = useNip46RequestsStore
-            .getState()
-            .pending.filter((request) => request.clientPubkey === appPubkey);
-          for (const request of flushed) resolvedIdsRef.current.add(request.id);
-          tallyRef.current.denied += flushed.length;
+  const submitVerdict = useSingleFlight(async (action: Nip46DecisionAction) => {
+    if (headGroup === null) return;
+    // Snapshot ids + mark resolved + tally BEFORE the first await, so the
+    // departure effect (which fires as the store updates mid-loop) reads
+    // a fully-resolved group and never flashes the expired notice.
+    const ids = verdictIdsForGroup(action, headGroup);
+    if (action === 'block') {
+      // The engine flushes EVERY pending request from this app — mark
+      // them all resolved so no sibling group flashes "expired".
+      const appPubkey = headGroup.requests[0]!.clientPubkey;
+      const flushed = useNip46RequestsStore
+        .getState()
+        .pending.filter((request) => request.clientPubkey === appPubkey);
+      for (const request of flushed) resolvedIdsRef.current.add(request.id);
+      tallyRef.current.denied += flushed.length;
+    } else {
+      for (const request of headGroup.requests) resolvedIdsRef.current.add(request.id);
+      if (action === 'deny_once') {
+        tallyRef.current.denied += headGroup.requests.length;
+      } else {
+        tallyRef.current.allowed += headGroup.requests.length;
+      }
+    }
+    for (const id of ids) {
+      const resolved = await nip46Engine.resolveRequest(id, { action });
+      if (resolved.isErr()) {
+        if (resolved.error.type === 'unknown-request') {
+          // A member expired (sweep) or was flushed (block) mid-loop.
+          nostrLog.debug('nostr.signer.approval_resolve_raced');
         } else {
-          for (const request of headGroup.requests) resolvedIdsRef.current.add(request.id);
-          if (action === 'deny_once') {
-            tallyRef.current.denied += headGroup.requests.length;
-          } else {
-            tallyRef.current.allowed += headGroup.requests.length;
-          }
+          nostrLog.warn('nostr.signer.approval_resolve_failed', {
+            error: resolved.error.type,
+          });
         }
-        for (const id of ids) {
-          const resolved = await nip46Engine.resolveRequest(id, { action });
-          if (resolved.isErr()) {
-            if (resolved.error.type === 'unknown-request') {
-              // A member expired (sweep) or was flushed (block) mid-loop.
-              nostrLog.debug('nostr.signer.approval_resolve_raced');
-            } else {
-              nostrLog.warn('nostr.signer.approval_resolve_failed', {
-                error: resolved.error.type,
-              });
-            }
-          }
-        }
-      },
-      [headGroup]
-    )
-  );
+      }
+    }
+  });
 
-  const viewAll = useCallback(() => {
+  const viewAll = () => {
     // Navigating to the queue is not a dismissal — skip the deferred-batch
     // toast (the controller still parks the batch so it won't auto-reopen).
     suppressSignerDeferToastOnce();
     close();
     router.push('/(signer-flow)/requests' as never);
-  }, [close]);
+  };
 
   // ── Derived presentation ──────────────────────────────────────
   const preview = head?.paramsPreview ?? NONE_PREVIEW;
@@ -406,7 +398,7 @@ export function SignerApprovalSheetContent({
       ? peerLabel !== undefined
       : lookupForAlways !== null && alwaysAllowEligible(lookupForAlways));
 
-  const confirmBlock = useCallback(() => {
+  const confirmBlock = () => {
     actionMenuPopup({
       title: blockAppConfirmTitle(appName),
       buttons: [
@@ -421,20 +413,20 @@ export function SignerApprovalSheetContent({
         { text: 'Cancel', variant: 'secondary', onPress: (menuClose) => menuClose() },
       ],
     });
-  }, [appName, submitVerdict]);
+  };
 
   // Strict mode approves once, like self-decrypt — a session grant would be
   // inert under strict and the label would overpromise.
   const approveOnceOnly = isSelfDecrypt || strictMode;
-  const approvePrimary = useCallback(() => {
+  const approvePrimary = () => {
     void submitVerdict(approveOnceOnly ? 'approve_once' : 'approve_session');
-  }, [approveOnceOnly, submitVerdict]);
-  const approveAlways = useCallback(() => {
+  };
+  const approveAlways = () => {
     void submitVerdict('always');
-  }, [submitVerdict]);
-  const denyOnce = useCallback(() => {
+  };
+  const denyOnce = () => {
     void submitVerdict('deny_once');
-  }, [submitVerdict]);
+  };
 
   // Counts DECISIONS (consolidated groups), not raw spam requests.
   const totalInBatch = advanceCount + groups.length;

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { INVARIANT_BLACK } from '@/shared/lib/brandColors';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -74,12 +74,12 @@ export function WhitenoiseSetupBanner({ testID }: { testID?: string }) {
     return () => clearTimeout(id);
   }, [phase]);
 
-  const onPress = useCallback(async () => {
+  const onPress = async () => {
     if (phase !== 'idle') return;
     setPhase('running');
     await bootstrap();
     setPhase('success');
-  }, [phase, bootstrap]);
+  };
 
   // Render gates — idle state hides when there's nothing to set up.
   // Once the user starts, we keep rendering through the full sequence

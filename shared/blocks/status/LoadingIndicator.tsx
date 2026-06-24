@@ -417,12 +417,9 @@ export function LoadingIndicator({
       ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
     }),
   });
-  const handleVisualLayout = React.useCallback(
-    (event: LayoutChangeEvent) => {
-      visualLayout.onLayout(event);
-    },
-    [visualLayout]
-  );
+  const handleVisualLayout = (event: LayoutChangeEvent) => {
+    visualLayout.onLayout(event);
+  };
 
   // Mount in terminal state when phase='done': skip the ring/fill/icon
   // choreography and render the resolved frame immediately. Matches

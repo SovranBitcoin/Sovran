@@ -59,23 +59,16 @@ export function useWalletContext(): WalletContext {
  */
 export function useWalletContextWithOverride(preferredMintUrl?: string): WalletContext {
   const ctx = useWalletContext();
-  return useMemo(
-    () => (preferredMintUrl != null ? { ...ctx, preferredMintUrl } : ctx),
-    [ctx, preferredMintUrl]
-  );
+  return preferredMintUrl != null ? { ...ctx, preferredMintUrl } : ctx;
 }
 
 export function WalletContextProvider({ children }: { children: React.ReactNode }) {
   useInitMount('WalletContextProvider');
   const { trustedMints: rawTrustedMints } = useMints();
   const { balances: rawBalanceCtx } = useBalanceContext();
-  const rawMintBalances = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.entries(rawBalanceCtx.byMint).map(([url, snap]) => [url, amountToNumber(snap.total)])
-      ) as Record<string, number>,
-    [rawBalanceCtx]
-  );
+  const rawMintBalances = Object.fromEntries(
+    Object.entries(rawBalanceCtx.byMint).map(([url, snap]) => [url, amountToNumber(snap.total)])
+  ) as Record<string, number>;
   const manager = useManager();
   const preferredMintUrl = useMintStore((state) => state.selectedMint);
 

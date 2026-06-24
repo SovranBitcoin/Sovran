@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import * as Clipboard from 'expo-clipboard';
@@ -320,21 +320,21 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
     if (isLive) userToggledRef.current = false;
   }, [isLive]);
 
-  const handleToggleReasoning = useCallback(() => {
+  const handleToggleReasoning = () => {
     userToggledRef.current = true;
     setReasoningExpanded((v) => !v);
-  }, []);
+  };
 
-  const handleCopy = useCallback(async () => {
+  const handleCopy = async () => {
     if (!displayedContent) return;
     await Clipboard.setStringAsync(displayedContent);
     popup({ message: 'Copied', icon: 'icon:lets-icons:copy', type: 'success' });
-  }, [displayedContent]);
+  };
 
-  const handleRetry = useCallback(() => {
+  const handleRetry = () => {
     if (!onRetry) return;
     onRetry(message.id);
-  }, [onRetry, message.id]);
+  };
 
   const showActions = hasContent && !isStreaming;
 

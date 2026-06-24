@@ -228,7 +228,6 @@
     "eslint-plugin-no-secrets": "^2.3.3",
     "eslint-plugin-prettier": "^5.5.0",
     "eslint-plugin-react-compiler": "19.1.0-rc.2",
-    "eslint-plugin-react-perf": "^3.3.3",
     "eslint-plugin-security": "^4.0.1",
     "eslint-plugin-sonarjs": "^4.1.0",
     "eslint-plugin-unicorn": "^68.0.0",

@@ -9,7 +9,7 @@
  * the like/repost/comment buttons pass through; only a real vertical drag moves
  * the sheet.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -102,10 +102,8 @@ export const EmbedActionBar = React.memo(function EmbedActionBar({
     [interactive, sheetTranslateY, snapMiddle, snapInline, startY]
   );
 
-  const handleLayout = useCallback(
-    (e: LayoutChangeEvent) => setActionBarHeight?.(Math.round(e.nativeEvent.layout.height)),
-    [setActionBarHeight]
-  );
+  const handleLayout = (e: LayoutChangeEvent) =>
+    setActionBarHeight?.(Math.round(e.nativeEvent.layout.height));
 
   return (
     <GestureDetector gesture={panGesture}>

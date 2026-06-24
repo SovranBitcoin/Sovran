@@ -139,7 +139,7 @@ export function useDmThread(
     ingestMessages,
   ]);
 
-  const loadMore = useCallback(async () => {
+  const loadMore = async () => {
     if (
       loadingMoreRef.current ||
       !hasMore ||
@@ -170,17 +170,9 @@ export function useDmThread(
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [
-    hasMore,
-    viewerPubkey,
-    viewerPrivateKey,
-    counterparty,
-    protocol,
-    trackEnvelopes,
-    ingestMessages,
-  ]);
+  };
 
-  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const refresh = () => setRefreshKey((k) => k + 1);
 
   return { messages, loading, hasMore, loadMore, refresh, error };
 }
