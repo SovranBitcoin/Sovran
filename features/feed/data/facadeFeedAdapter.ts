@@ -2,6 +2,7 @@ import { facade } from '@sovranbitcoin/nagg-ts';
 
 import { parseJson } from '../components/nostr/feedParse';
 import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
+import { recordDebugTiers } from '../stores/debugTierStore';
 import type { FeedParseResult } from './feedClient';
 
 // Pure shape bridge between the tier-selecting facade and the app's feed UI.
@@ -28,6 +29,21 @@ export function mapAppSpecToFeedSpec(
 /** Adapt the facade's ResolvedFeedPage to the app's FeedParseResult. */
 export function resolvedFeedPageToParseResult(page: facade.ResolvedFeedPage): FeedParseResult {
   const orderedFeedItems = page.items.map(toAppFeedItem);
+
+  // Dev-only: stamp each note with the tier that served this page so PostCard can
+  // badge its source (n/c/r). No-op in production. Cover both the visible event and
+  // the original of a repost so whichever id PostCard renders resolves a tier.
+  if (__DEV__) {
+    const ids: string[] = [];
+    for (const item of orderedFeedItems) {
+      if (item.type === 'note') ids.push(item.event.id);
+      else {
+        ids.push(item.repostEvent.id);
+        if (item.originalEvent) ids.push(item.originalEvent.id);
+      }
+    }
+    recordDebugTiers(ids, page.tier);
+  }
 
   const metricsMap = new Map<string, NoteMetrics>();
   for (const [id, s] of Object.entries(page.stats)) {
