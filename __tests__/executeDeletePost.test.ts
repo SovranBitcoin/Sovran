@@ -80,7 +80,10 @@ const deleteStore = (
 const SHA = 'a'.repeat(64);
 const ndk = Object.create(null) as never;
 
-const okResult = (anyAccepted: boolean) => ({ isOk: () => true, value: { anyAccepted } });
+const okResult = (anyAccepted: boolean) => ({
+  isOk: () => true,
+  value: { anyAccepted, accepted: [], failed: [] },
+});
 
 function makeEvent(over: Partial<FeedEvent> = {}): FeedEvent {
   return {

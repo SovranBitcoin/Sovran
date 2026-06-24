@@ -267,14 +267,25 @@ async function runDelete(opts: DeleteOptions): Promise<Result<void, BlossomDelet
       signal: controller.signal,
     });
     if (response.status >= 200 && response.status < 300) {
-      nostrLog.info('nostr.media.deleted', {});
+      nostrLog.info('nostr.media.deleted', {
+        server: opts.server,
+        sha256: opts.sha256.slice(0, 12),
+        status: response.status,
+      });
       return ok(undefined);
     }
-    nostrLog.warn('nostr.media.delete_failed', { status: response.status });
+    nostrLog.warn('nostr.media.delete_failed', {
+      server: opts.server,
+      sha256: opts.sha256.slice(0, 12),
+      status: response.status,
+    });
     return err({ type: 'delete-failed', status: response.status });
   } catch {
     if (opts.signal?.aborted) return err({ type: 'canceled' });
-    nostrLog.warn('nostr.media.delete_failed', {});
+    nostrLog.warn('nostr.media.delete_failed', {
+      server: opts.server,
+      sha256: opts.sha256.slice(0, 12),
+    });
     return err({ type: 'delete-failed' });
   } finally {
     clearTimeout(timer);

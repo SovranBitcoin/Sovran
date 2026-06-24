@@ -75,9 +75,17 @@ export async function executeDeletePost({
   try {
     // 1. Deletable blobs — only those THIS note declared via imeta `x`. We
     //    never parse arbitrary content URLs (they may be others' blobs).
+    const imeta = parseImetaTags(event.tags);
     const blobs: { sha256: string; origin: string }[] = [];
-    for (const info of parseImetaTags(event.tags).values()) {
-      if (!info.sha256) continue;
+    let imetaMissingHash = 0;
+    for (const info of imeta.values()) {
+      if (!info.sha256) {
+        // An image with no imeta `x` can't be content-addressed for delete
+        // (e.g. posted by another client). Counted so a "0 images deleted" on
+        // an image post is explainable rather than mysterious.
+        imetaMissingHash += 1;
+        continue;
+      }
       const origin = blobOrigin(info.url);
       if (!origin) continue;
       blobs.push({ sha256: info.sha256, origin });
@@ -93,6 +101,9 @@ export async function executeDeletePost({
 
     nostrLog.info('nostr.delete.start', {
       eventId: event.id.slice(0, 8),
+      imetaMediaCount: imeta.size,
+      imetaMissingHash,
+      deletableBlobs: blobs.length,
       imageCount: blobs.length,
       relayCount: relayUrls.length,
     });
@@ -105,6 +116,8 @@ export async function executeDeletePost({
     deleteStatusPopup();
 
     // 4. Delete blobs sequentially — a fresh delete auth is signed per blob.
+    let imagesDeleted = 0;
+    let imagesFailed = 0;
     for (let idx = 0; idx < blobs.length; idx += 1) {
       const legId = `img-${idx}`;
       store.setActiveLeg(legId);
@@ -114,9 +127,29 @@ export async function executeDeletePost({
         sha256: blobs[idx].sha256,
       });
       // A blob we don't own (403) or one already gone (404) is non-fatal —
-      // the note deletion is the action that matters.
-      if (res.isErr()) store.setLegFailed(legId, res.error.type);
-      else store.setLegDone(legId);
+      // the note deletion is the action that matters. `deleteFromBlossom` logs
+      // the HTTP-level result (server + sha256 + status); this records the
+      // per-segment outcome so the toast's image legs are traceable.
+      if (res.isErr()) {
+        imagesFailed += 1;
+        store.setLegFailed(legId, res.error.type);
+        nostrLog.warn('nostr.delete.image', {
+          index: idx,
+          host: blobs[idx].origin,
+          sha256: blobs[idx].sha256.slice(0, 12),
+          ok: false,
+          error: res.error.type,
+        });
+      } else {
+        imagesDeleted += 1;
+        store.setLegDone(legId);
+        nostrLog.info('nostr.delete.image', {
+          index: idx,
+          host: blobs[idx].origin,
+          sha256: blobs[idx].sha256.slice(0, 12),
+          ok: true,
+        });
+      }
     }
 
     // 5. NIP-09 kind:5 — signed ONCE, published to every relay. The seam
@@ -145,19 +178,42 @@ export async function executeDeletePost({
       retry: { attempts: 0 },
       onRelayResult: (r) => {
         const legId = `relay-${r.url}`;
-        if (r.ok) store.setLegDone(legId);
-        else store.setLegFailed(legId, r.reason);
+        if (r.ok) {
+          store.setLegDone(legId);
+          nostrLog.info('nostr.delete.relay', { url: r.url, ok: true, durationMs: r.durationMs });
+        } else {
+          store.setLegFailed(legId, r.reason);
+          nostrLog.warn('nostr.delete.relay', {
+            url: r.url,
+            ok: false,
+            reason: r.reason,
+            durationMs: r.durationMs,
+          });
+        }
       },
     });
 
+    const relaysAccepted = result.isOk() ? result.value.accepted.length : 0;
+    const relaysFailed = result.isOk() ? result.value.failed.length : 0;
     const anyAccepted = result.isOk() && result.value.anyAccepted;
     if (anyAccepted) {
       // Only now is it really "delete requested" — show the tombstone.
       useNostrSocialStore.getState().markDeleteRequested(event.id);
-      nostrLog.info('nostr.delete.requested', { eventId: event.id.slice(0, 8) });
+      nostrLog.info('nostr.delete.requested', {
+        eventId: event.id.slice(0, 8),
+        imagesDeleted,
+        imagesFailed,
+        relaysAccepted,
+        relaysFailed,
+      });
       store.complete();
     } else {
-      nostrLog.warn('nostr.delete.no_relay_accepted', { eventId: event.id.slice(0, 8) });
+      nostrLog.warn('nostr.delete.no_relay_accepted', {
+        eventId: event.id.slice(0, 8),
+        imagesDeleted,
+        imagesFailed,
+        relaysFailed,
+      });
       store.fail('No relay accepted the deletion');
     }
   } catch (e) {
