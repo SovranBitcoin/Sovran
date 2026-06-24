@@ -46,7 +46,11 @@ jobs:
       - name: Install dependencies
         if: steps.check.outputs.should_publish == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # @sovranbitcoin/schemas is a private package owned by a different
+          # repo; the default GITHUB_TOKEN can't read it (403). SOVRAN_CI_TOKEN
+          # is the org PAT with cross-repo read:packages (same fallback the
+          # sovran-app gate workflows use).
+          GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
         run: bun install --frozen-lockfile
 
       - name: Type-check
