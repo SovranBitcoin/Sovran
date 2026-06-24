@@ -455,6 +455,9 @@ export const useSettingsStore = create<SettingsStore>()(
           avatarFallbackVariant: state.avatarFallbackVariant,
           minTransferThreshold: state.minTransferThreshold,
           middlemanRouting: state.middlemanRouting,
+          naggTierEnabled: state.naggTierEnabled,
+          primalTierEnabled: state.primalTierEnabled,
+          relayTierEnabled: state.relayTierEnabled,
         }),
         afterHydrate: (state, error) => {
           if (error) return;

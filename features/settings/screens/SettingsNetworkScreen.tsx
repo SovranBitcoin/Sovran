@@ -1,24 +1,25 @@
 /**
  * @fileoverview Network configuration — the three tiers of the resilient Nostr
- * data layer: aggregators (nagg), caching (Primal), and relays.
+ * data layer (nagg → Primal cache → raw relays) with live health, plus the
+ * active profile's NIP-65 relay list (add/remove, read/write markers, publish).
  *
  * Each tier has an enable/disable switch (a disabled tier drops out of the
- * facade's nagg → Primal → relays fallback chain — handy for simulating a tier
- * being down). The relays section additionally manages the active profile's
- * NIP-65 list (kind:10002): connection health, read/write markers, add/remove,
- * restore defaults, and publish.
+ * facade's fallback chain) and a live Online/Offline badge from
+ * `useNostrTierHealth`. Toggling a tier does not change the fallback logic — it
+ * only sets the persisted preference the data layer reads.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { RefreshControl, ScrollView, View } from 'react-native';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Button, Card, Input, ListGroup, Separator, Switch, TextField } from 'heroui-native';
 
 import Icon from 'assets/icons';
-import { backendConfig } from '@/shared/config/backend';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRelayHealth, type RelayHealth } from '@/shared/hooks/useRelayHealth';
-import { log } from '@/shared/lib/logger';
+import { useNostrTierHealth } from '@/shared/hooks/useNostrTierHealth';
+import { type TierStatus } from '@/shared/lib/nostr/tierHealth';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { DEFAULT_RELAYS, safeNormalizeRelay } from '@/shared/lib/nostr/outbox/defaults';
 import { RELAY_LIST_KIND, serializeRelayList } from '@/shared/lib/nostr/outbox/nip65';
@@ -26,9 +27,11 @@ import { getOwnWriteRelays, useRelayListStore } from '@/shared/lib/nostr/outbox/
 import { Section } from '@/shared/ui/composed/Section';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
+import { Badge } from '@/shared/ui/primitives/Badge';
 import { Text } from '@/shared/ui/primitives/Text';
 
 export function SettingsNetworkScreen() {
+  useLifecycleLogger('SettingsNetworkScreen');
   const { ndk } = useNDK();
   const naggTierEnabled = useSettingsStore((s) => s.naggTierEnabled);
   const setNaggTierEnabled = useSettingsStore((s) => s.setNaggTierEnabled);
@@ -44,6 +47,7 @@ export function SettingsNetworkScreen() {
   const restoreDefaults = useRelayListStore((s) => s.restoreDefaults);
   const markPublished = useRelayListStore((s) => s.markPublished);
   const health = useRelayHealth();
+  const tierHealth = useNostrTierHealth();
 
   const [draftUrl, setDraftUrl] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
@@ -64,6 +68,43 @@ export function SettingsNetworkScreen() {
       failed: dangerColor,
     }),
     [successColor, accentColor, mutedColor, dangerColor]
+  );
+
+  const tiers = useMemo(
+    () => [
+      {
+        name: 'nagg',
+        description: 'App-view. Ranked, fully bundled feeds.',
+        status: tierHealth.nagg,
+        enabled: naggTierEnabled,
+        onToggle: setNaggTierEnabled,
+      },
+      {
+        name: 'Primal cache',
+        description: 'Public fallback cache.',
+        status: tierHealth.primal,
+        enabled: primalTierEnabled,
+        onToggle: setPrimalTierEnabled,
+      },
+      {
+        name: 'Raw relays',
+        description: 'Decentralized floor. Direct relay reads.',
+        status: tierHealth.relay,
+        enabled: relayTierEnabled,
+        onToggle: setRelayTierEnabled,
+      },
+    ],
+    [
+      tierHealth.nagg,
+      tierHealth.primal,
+      tierHealth.relay,
+      naggTierEnabled,
+      primalTierEnabled,
+      relayTierEnabled,
+      setNaggTierEnabled,
+      setPrimalTierEnabled,
+      setRelayTierEnabled,
+    ]
   );
 
   const hasUnpublished = source === 'local';
@@ -96,7 +137,7 @@ export function SettingsNetworkScreen() {
         log.info('settings.relays.published', { accepted: result.value.accepted.length });
         setPublishMsg(`Published to ${result.value.accepted.length} relays.`);
       } else {
-        setPublishMsg('Could not publish to any relay. Check your connection and try again.');
+        setPublishMsg('Could not publish. Check your connection and try again.');
       }
     } finally {
       setPublishing(false);
@@ -113,46 +154,37 @@ export function SettingsNetworkScreen() {
       <ScrollView
         className="px-4"
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingBottom: 32 }}>
-        <Text size={13} className="mb-3 px-1" style={{ color: mutedColor }}>
-          Sovran reads Nostr nagg-first, then falls back to Primal&apos;s cache, then raw relays.
-          Turn a source off to skip it (e.g. to test the fallback).
-        </Text>
-
-        <Section title="Aggregator">
-          <TierToggleCard
-            name="nagg"
-            description="Our app-view — fully bundled, ranked"
-            url={backendConfig.nostrAppViewBaseUrl}
-            enabled={naggTierEnabled}
-            onToggle={setNaggTierEnabled}
-          />
-        </Section>
-
-        <Section title="Caching">
-          <TierToggleCard
-            name="Primal cache"
-            description="Primal's public cache server"
-            url={backendConfig.primalCacheUrl}
-            enabled={primalTierEnabled}
-            onToggle={setPrimalTierEnabled}
-          />
-        </Section>
-
-        <Section title="Relays">
-          <TierToggleCard
-            name="Raw relays"
-            description="The decentralised floor — a bit rough but functional"
-            enabled={relayTierEnabled}
-            onToggle={setRelayTierEnabled}
-          />
+        contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={
+          <RefreshControl refreshing={tierHealth.isRefreshing} onRefresh={tierHealth.refresh} />
+        }>
+        <Section title="Data layer">
+          <ListGroup variant="secondary">
+            {tiers.map((tier, index) => (
+              <React.Fragment key={tier.name}>
+                {index > 0 ? <Separator className="mx-4" /> : null}
+                <ListGroup.Item className={tier.enabled ? undefined : 'opacity-40'}>
+                  <ListGroup.ItemContent>
+                    <View className="flex-row items-center gap-2">
+                      <ListGroup.ItemTitle>{tier.name}</ListGroup.ItemTitle>
+                      <TierHealthBadge status={tier.status} checkingColor={mutedColor} />
+                    </View>
+                    <ListGroup.ItemDescription>{tier.description}</ListGroup.ItemDescription>
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix>
+                    <Switch isSelected={tier.enabled} onSelectedChange={tier.onToggle} />
+                  </ListGroup.ItemSuffix>
+                </ListGroup.Item>
+              </React.Fragment>
+            ))}
+          </ListGroup>
         </Section>
 
         {sortedEntries.length === 0 ? (
           <EmptyState
             icon="mdi:server-network-off"
             title="No relays"
-            subtitle="Add a relay or restore the defaults to start publishing."
+            subtitle="Add one or restore defaults."
           />
         ) : (
           <Section title="Your relays">
@@ -230,8 +262,7 @@ export function SettingsNetworkScreen() {
         <Section title="Publish">
           {hasUnpublished ? (
             <Text size={13} className="mb-2 px-1" style={{ color: mutedColor }}>
-              You have unpublished relay changes. Publish so other apps and your followers can find
-              your posts.
+              Unpublished changes. Publish so others can find your posts.
             </Text>
           ) : null}
           <View className="gap-2">
@@ -253,37 +284,29 @@ export function SettingsNetworkScreen() {
   );
 }
 
-function TierToggleCard({
-  name,
-  description,
-  url,
-  enabled,
-  onToggle,
-}: {
-  name: string;
-  description: string;
-  url?: string;
-  enabled: boolean;
-  onToggle: (next: boolean) => void;
-}) {
-  return (
-    <ListGroup variant="secondary">
-      <View className="flex-row items-center gap-3 px-4 py-3">
-        <View className="flex-1">
-          <Text size={15}>{name}</Text>
-          <Text size={12} className="text-muted mt-0.5">
-            {description}
-          </Text>
-          {url ? (
-            <Text size={12} className="text-muted mt-1" numberOfLines={1}>
-              {url}
-            </Text>
-          ) : null}
-        </View>
-        <Switch isSelected={enabled} onSelectedChange={onToggle} />
-      </View>
-    </ListGroup>
-  );
+function TierHealthBadge({ status, checkingColor }: { status: TierStatus; checkingColor: string }) {
+  switch (status) {
+    case 'online':
+      return (
+        <Badge variant="success" icon="mdi:check-circle" size={11}>
+          Online
+        </Badge>
+      );
+    case 'offline':
+      return (
+        <Badge variant="error" icon="mdi:close-circle" size={11}>
+          Offline
+        </Badge>
+      );
+    case 'checking':
+      return (
+        <Badge variant="secondary" color={checkingColor} icon="mdi:loading" size={11}>
+          Checking
+        </Badge>
+      );
+    case 'disabled':
+      return null;
+  }
 }
 
 function RelayMarkerToggle({
