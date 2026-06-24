@@ -137,6 +137,12 @@ export async function executeDeletePost({
       event: deleteEvent,
       relays: relayUrls,
       resolveOn: 'all-settled',
+      // Best-effort scrub: cap each relay at ~8s with no retries so one dead
+      // relay can't hold the toast for the full retry budget (~30s). Reachable
+      // relays accept in well under a second; the deletion is idempotent and
+      // re-broadcastable later (see deletedNoteIds), so we don't hammer.
+      timeoutMs: 8000,
+      retry: { attempts: 0 },
       onRelayResult: (r) => {
         const legId = `relay-${r.url}`;
         if (r.ok) store.setLegDone(legId);
