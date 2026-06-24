@@ -49,7 +49,7 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
  * intentionally distinct from the inbound `ScanSource` ('qr' | 'nfc' |
  * 'paste' | 'deeplink') so the row can render a different icon for each.
  */
-export type DistributionSource = 'copy' | 'share' | 'airdrop' | 'displayed';
+type DistributionSource = 'copy' | 'share' | 'airdrop' | 'displayed';
 
 interface DistributionEntry {
   source: DistributionSource;

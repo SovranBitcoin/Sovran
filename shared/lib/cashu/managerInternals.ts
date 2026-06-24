@@ -108,21 +108,6 @@ export async function getWallet(manager: Manager, mintUrl: string): Promise<Wall
   }
 }
 
-/** All proofs reserved by an in-flight operation (have `usedByOperationId`). */
-export async function getReservedProofs(manager: Manager): Promise<CoreProof[]> {
-  cashuLog.debug('cashu.manager_internals.reserved_proofs.start');
-  try {
-    const proofs = await internals(manager).proofRepository.getReservedProofs();
-    cashuLog.debug('cashu.manager_internals.reserved_proofs.done', { count: proofs.length });
-    return proofs;
-  } catch (error) {
-    cashuLog.warn('cashu.manager_internals.reserved_proofs.failed', {
-      error: errorMessage(error),
-    });
-    throw error;
-  }
-}
-
 /**
  * Inflight proofs (transient state during mint/melt), optionally filtered by mint.
  * Used by the per-mint rebalance recovery to clear leftovers after a melt failure.

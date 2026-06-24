@@ -3673,7 +3673,9 @@ function renderRedactionAudit(audit: RedactionAudit): string[] {
     lines.push('  ⚠ HIGH SIGNAL: none — no raw nsec/xprv/cashu-token/jwt/email detected.');
   }
   if (low.length > 0) {
-    lines.push('  · LOW SIGNAL — usually public ids (npub/note/64-hex); investigate only if unexpected:');
+    lines.push(
+      '  · LOW SIGNAL — usually public ids (npub/note/64-hex); investigate only if unexpected:'
+    );
     for (const s of low) {
       lines.push(
         `     ${String(s.count).padStart(5)}x  ${s.category}  (events: ${s.sampleEvents.join(', ')})`

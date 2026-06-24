@@ -1,7 +1,7 @@
 import type { HistoryEntry } from '@cashu/coco-core';
 
-export type TransactionActionDirection = 'send' | 'receive';
-export type TransactionActionLabel = 'Send' | 'Receive';
+type TransactionActionDirection = 'send' | 'receive';
+type TransactionActionLabel = 'Send' | 'Receive';
 
 const TRANSACTION_ACTION_DIRECTION_BY_TYPE = {
   melt: 'send',

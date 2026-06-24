@@ -43,7 +43,7 @@ const PersistedTransactionAnnotationStore = z.object({
   _migratedLegacy: z.boolean().default(false),
 });
 
-export const useTransactionAnnotationStore = create<TransactionAnnotationState>()(
+const useTransactionAnnotationStore = create<TransactionAnnotationState>()(
   subscribeWithSelector(
     persist(
       (): TransactionAnnotationState => ({
