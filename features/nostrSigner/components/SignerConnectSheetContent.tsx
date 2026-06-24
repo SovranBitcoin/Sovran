@@ -324,7 +324,7 @@ function reconnectRowsFor(uriRows: readonly PermRow[], previous: Nip46Connection
   const covered = new Set<string>(eligibleUriRows.map((row) => row.grantKey));
   const extra: PermRow[] = [];
   for (const [grantKey, grant] of Object.entries(previous.grants)) {
-    if (!grant || grant.verdict !== 'always') continue;
+    if (grant?.verdict !== 'always') continue;
     if (covered.has(grantKey)) continue;
     if (!isGrantKey(grantKey)) continue;
     const lookup = parseGrantKey(grantKey);

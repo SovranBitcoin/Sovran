@@ -451,7 +451,7 @@ async function* parseSSEStream(response: Response): AsyncGenerator<ChatCompletio
 
 function tryParseSSELine(line: string): ChatCompletionChunk | 'done' | null {
   const trimmed = line.trim();
-  if (!trimmed || !trimmed.startsWith('data: ')) return null;
+  if (!trimmed?.startsWith('data: ')) return null;
   const data = trimmed.slice(6).trim();
   if (data === '[DONE]') return 'done';
   if (!data) return null;

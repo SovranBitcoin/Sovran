@@ -1335,7 +1335,7 @@ export function useMintRebalanceOrchestrator({
       if (runStatus === 'running') return;
 
       const suggestion = stepStatesRef.current[step.id]?.routeSuggestion;
-      if (!suggestion || suggestion.status !== 'found' || !suggestion.path) return;
+      if (suggestion?.status !== 'found' || !suggestion.path) return;
 
       const chainPath = suggestion.path;
       if (chainPath.length < 3) return; // Need at least A → via → B

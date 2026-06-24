@@ -234,7 +234,7 @@ export function useChatKeyboardAnimationLogger({
     (curr, prev) => {
       'worklet';
       if (cycleActive.value === 0) return;
-      if (prev && curr.p === prev.p && curr.h === prev.h) return;
+      if (curr.p === prev?.p && curr.h === prev.h) return;
       progressTickCount.value += 1;
       if (curr.p < progressMin.value) progressMin.value = curr.p;
       if (curr.p > progressMax.value) progressMax.value = curr.p;

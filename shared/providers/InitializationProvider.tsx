@@ -193,7 +193,7 @@ export function InitializationProvider({ children }: InitializationProviderProps
 
       const result = stage.dependsOn.every((depId) => {
         const depStage = stages.get(depId);
-        return depStage && depStage.status === 'complete';
+        return depStage?.status === 'complete';
       });
 
       if (result && stage.status === 'pending') {

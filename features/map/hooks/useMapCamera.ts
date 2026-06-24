@@ -88,8 +88,7 @@ export function useMapCamera({
     const latThreshold = span * 0.12;
     const lonThreshold = span * aspectRatio * 0.12;
     const shouldSkip =
-      last &&
-      last.zoomFloor === zoomFloor &&
+      last?.zoomFloor === zoomFloor &&
       Math.abs(newLat - last.lat) < latThreshold &&
       Math.abs(newLon - last.lon) < lonThreshold;
 

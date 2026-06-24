@@ -59,13 +59,13 @@ export function buildThreadStructure(
 
     const eTags = eTagsOf(ev);
     const replyTag = eTags.find((t) => t[3] === 'reply');
-    if (replyTag && replyTag[1] === eventId) {
+    if (replyTag?.[1] === eventId) {
       replies.push(ev);
       continue;
     }
     if (!replyTag) {
       const rootTag = eTags.find((t) => t[3] === 'root');
-      if (rootTag && rootTag[1] === eventId) {
+      if (rootTag?.[1] === eventId) {
         replies.push(ev);
         continue;
       }

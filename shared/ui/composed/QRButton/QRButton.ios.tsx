@@ -71,7 +71,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
     runOnUI(() => {
       'worklet';
       const m = measure(animatedRef);
-      if (m === null || !m.width || !m.height) return;
+      if (!m?.width || !m.height) return;
       runOnJS(setQRButtonAnchor)({
         x: m.pageX,
         y: m.pageY,

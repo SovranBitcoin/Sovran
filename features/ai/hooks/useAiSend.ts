@@ -348,8 +348,7 @@ export function useAiSend() {
         }
 
         const delta = chunk.choices?.[0]?.delta;
-        const content =
-          delta?.content || delta?.message?.content || delta?.text || null;
+        const content = delta?.content || delta?.message?.content || delta?.text || null;
         const reasoning = delta?.reasoning_content || delta?.reasoning || null;
 
         if (reasoning) {
@@ -682,7 +681,7 @@ export function useAiSend() {
     }
     const stateNow = useRoutstrStore.getState();
     const original = stateNow.conversationHistory.find((m) => m.id === messageId);
-    if (!original || original.role !== 'assistant') {
+    if (original?.role !== 'assistant') {
       aiLog.warn('ai.retry.invalid_target', { messageId, role: original?.role });
       return;
     }

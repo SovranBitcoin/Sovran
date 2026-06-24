@@ -448,7 +448,7 @@ export function NotificationsScreen() {
     for (const [pk, meta] of cachedProfiles) {
       const existing = profilesMap.get(pk);
       // Fill a missing actor, or upgrade a name-only tier entry that lacks a picture.
-      if (existing && existing.picture) continue;
+      if (existing?.picture) continue;
       const name = meta.displayName || meta.name || existing?.name;
       const picture = meta.picture ?? existing?.picture;
       if (!name && !picture) continue;

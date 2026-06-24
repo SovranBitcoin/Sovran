@@ -287,7 +287,11 @@ export function LiquidChatComposer({
                     modifiers={[
                       frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
                     ]}>
-                    <SwiftUIImage systemName={'plus' as never} size={ICON_SIZE} color={INVARIANT_WHITE} />
+                    <SwiftUIImage
+                      systemName={'plus' as never}
+                      size={ICON_SIZE}
+                      color={INVARIANT_WHITE}
+                    />
                   </SwiftUIHStack>
                 </SwiftUIButton>
 

@@ -248,7 +248,7 @@ export class CocoManager {
             load: async ({ mnemonic }) => {
               const mnemonicHash = hashMnemonic(mnemonic);
               const cached = await retrieveCashuSeed(accountIndex);
-              if (cached && cached.mnemonicHash === mnemonicHash) {
+              if (cached?.mnemonicHash === mnemonicHash) {
                 initLog('CocoManager', 'seed loaded from SecureStore cache (skipped PBKDF2)');
                 cashuLog.debug('cashu.manager.seed_cache.hit', { accountIndex });
                 return cached.seed;

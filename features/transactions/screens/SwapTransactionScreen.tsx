@@ -87,7 +87,7 @@ function groupLegs(legs: SwapLeg[]): LegGroup[] {
     if (leg.chainId) {
       // Try to append to the last group if it shares the same chainId
       const last = groups[groups.length - 1];
-      if (last && last.chainId === leg.chainId) {
+      if (last?.chainId === leg.chainId) {
         last.legs.push(leg);
         continue;
       }
@@ -291,7 +291,9 @@ export function SwapTransactionScreen({ groupId }: Props) {
       for (const url of mintUrls) {
         try {
           const info = await getMintInfo(url);
-          map[url] = info ? { name: info.name, icon_url: (info as { icon_url?: string }).icon_url } : null;
+          map[url] = info
+            ? { name: info.name, icon_url: (info as { icon_url?: string }).icon_url }
+            : null;
         } catch {
           map[url] = null;
         }
@@ -510,8 +512,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
                       // Skip the separator between chained legs when the previous
                       // leg's destination is the same mint as this leg's source
                       const prevLeg = legIdx > 0 ? legGroup.legs[legIdx - 1] : null;
-                      const sameMintAsPrev =
-                        prevLeg != null && prevLeg.toMintUrl === leg.fromMintUrl;
+                      const sameMintAsPrev = prevLeg?.toMintUrl === leg.fromMintUrl;
 
                       return (
                         <View key={leg.id}>

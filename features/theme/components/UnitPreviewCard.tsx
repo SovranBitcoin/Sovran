@@ -160,7 +160,9 @@ export const UnitPreviewCard = function UnitPreviewCard({
           end={{ x: 1, y: 1 }}
         />
       ) : (
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: WALLPAPER_PLACEHOLDER.d800 }]} />
+        <View
+          style={[StyleSheet.absoluteFillObject, { backgroundColor: WALLPAPER_PLACEHOLDER.d800 }]}
+        />
       )}
 
       {/* Phone-frame chrome mocks */}

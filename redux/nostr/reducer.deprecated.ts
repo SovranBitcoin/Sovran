@@ -78,7 +78,6 @@ const initialState: NostrState = {
   ...(nostrState.contacts ? { contacts: nostrState.contacts as any[] } : {}),
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const nostrReducer: Reducer<NostrState, any> = (
   state = initialState,
   _action

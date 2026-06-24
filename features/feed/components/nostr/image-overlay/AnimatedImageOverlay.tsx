@@ -259,7 +259,7 @@ function AnimatedImageOverlayContent({
 
   const onVerticalPagerSnap = useCallback(
     (index: number) => {
-      if (!videoFeedLayouts || !videoFeedLayouts.length) return;
+      if (!videoFeedLayouts?.length) return;
       const clamped = Math.max(0, Math.min(index, videoFeedLayouts.length - 1));
       const layout = videoFeedLayouts[clamped];
       if (layout) setVideoFeedIndex(clamped, layout);

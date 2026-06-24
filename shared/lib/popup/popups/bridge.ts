@@ -11,7 +11,7 @@ import type { LiveSheetConfig } from '../liveSheetTypes';
 
 /** Best-effort first stack frame outside the popup module — gives "where did this come from" without a full trace. */
 function getCallerFrame(): string | undefined {
-  const stack = new Error().stack;
+  const stack = new Error('caller-frame probe').stack;
   if (!stack) return undefined;
   const lines = stack.split('\n');
   for (let i = 1; i < lines.length; i++) {

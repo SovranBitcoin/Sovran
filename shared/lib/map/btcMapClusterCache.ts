@@ -38,7 +38,7 @@ export function getOrBuildBTCMapClusterManager(
   options?: Supercluster.Options
 ): ClusterManager {
   const existing = CACHE.get(cacheKey);
-  if (existing && existing.pointsCount === points.length && existing.manager.isLoaded()) {
+  if (existing?.pointsCount === points.length && existing.manager.isLoaded()) {
     // Touch on hit so the LRU eviction in `evictIfNeeded` actually drops
     // the least-recently-used entry, not the oldest-built one.
     existing.createdAt = Date.now();

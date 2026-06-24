@@ -307,8 +307,7 @@ export const ImageBlock = function ImageBlock({
         width,
         height,
         urls: urls && urls.length > 1 ? urls : undefined,
-        mediaTypes:
-          mediaTypes && urls && mediaTypes.length === urls.length ? mediaTypes : undefined,
+        mediaTypes: mediaTypes && mediaTypes.length === urls?.length ? mediaTypes : undefined,
         initialIndex: mediaIndex ?? imageIndex ?? 0,
         post: post ?? null,
       });

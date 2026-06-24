@@ -52,7 +52,9 @@ export function MintDistributionScreen() {
   const { balances: liveBalanceCtx } = useBalanceContext();
   const liveBalances = liveBalanceCtx.byMint;
   const { getMintInfo } = useMintManagement();
-  const [mintInfoMap, setMintInfoMap] = useState<Record<string, Awaited<ReturnType<typeof getMintInfo>> | null>>({});
+  const [mintInfoMap, setMintInfoMap] = useState<
+    Record<string, Awaited<ReturnType<typeof getMintInfo>> | null>
+  >({});
 
   const routeCurrency = useMemo(() => {
     const raw = params?.unit;
@@ -146,7 +148,7 @@ export function MintDistributionScreen() {
       const infoMap: Record<string, Awaited<ReturnType<typeof getMintInfo>> | null> = {};
       trustedMints.forEach((mint, i) => {
         const r = settled[i];
-        infoMap[mint.mintUrl] = r && r.status === 'fulfilled' ? r.value : mint.mintInfo || null;
+        infoMap[mint.mintUrl] = r?.status === 'fulfilled' ? r.value : mint.mintInfo || null;
       });
       setMintInfoMap(infoMap);
     };

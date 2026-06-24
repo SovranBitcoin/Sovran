@@ -156,7 +156,7 @@ export function buildReceiveHistoryEntry(
 export async function attemptRollback(mgr: Manager, operationId: string): Promise<boolean> {
   try {
     const operation = await mgr.ops.send.get(operationId);
-    if (operation && operation.state === 'prepared') {
+    if (operation?.state === 'prepared') {
       await mgr.ops.send.cancel(operationId);
     } else if (operation && (operation.state === 'pending' || operation.state === 'executing')) {
       await mgr.ops.send.reclaim(operationId);

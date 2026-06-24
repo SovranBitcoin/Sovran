@@ -42,7 +42,9 @@ export function SelectableCheckCircle({
         justifyContent: 'center',
         opacity: disabled ? 0.5 : 1,
       }}>
-      {selected ? <Icon name="mdi:check" size={Math.round(size * 0.65)} color={INVARIANT_WHITE} /> : null}
+      {selected ? (
+        <Icon name="mdi:check" size={Math.round(size * 0.65)} color={INVARIANT_WHITE} />
+      ) : null}
     </View>
   );
 

@@ -80,7 +80,7 @@ export function useMapMarkers({
   const updateMarkersForCamera = useCallback(
     (lat: number, lon: number, z: number) => {
       const manager = clusterManagerRef.current;
-      if (!manager || !manager.isLoaded()) {
+      if (!manager?.isLoaded()) {
         setMarkers([]);
         setVisibleCount(0);
         lastRenderedMarkersRef.current = [];

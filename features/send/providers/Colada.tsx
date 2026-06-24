@@ -283,81 +283,80 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   // See sovranPaymentConfig.createSovranExecuteReceive / createSovranExecuteMintQuote
   // for the full rationale. Spreading instance.operations preserves all other defaults.
   const operationsOverride = useMemo<MachineOperations>(
-    () =>
-      ({
-        ...instance.operations,
-        executeReceive: createSovranExecuteReceive(() => manager),
-        executeMintQuote: createSovranExecuteMintQuote(() => manager),
-        // Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
-        // Stage 1 (NIP-05 → pubkey) is shipped by colada's default
-        // operation set; this one has no default because NDK / cache wiring
-        // is app-specific. Returning null on any failure is the contract:
-        // the machine's resolver treats it as best-effort cosmetic data and
-        // does not block the flow.
-        resolveRecipientProfile: async (pubkey, signal): Promise<RecipientProfile | null> => {
-          paymentLog.debug('colada.adapter.resolve_recipient_profile.start', {
-            pubkeyLength: pubkey.length,
+    () => ({
+      ...instance.operations,
+      executeReceive: createSovranExecuteReceive(() => manager),
+      executeMintQuote: createSovranExecuteMintQuote(() => manager),
+      // Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
+      // Stage 1 (NIP-05 → pubkey) is shipped by colada's default
+      // operation set; this one has no default because NDK / cache wiring
+      // is app-specific. Returning null on any failure is the contract:
+      // the machine's resolver treats it as best-effort cosmetic data and
+      // does not block the flow.
+      resolveRecipientProfile: async (pubkey, signal): Promise<RecipientProfile | null> => {
+        paymentLog.debug('colada.adapter.resolve_recipient_profile.start', {
+          pubkeyLength: pubkey.length,
+        });
+        const currentNdk = ndkRef.current;
+        if (!currentNdk) {
+          paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
+            reason: 'no_ndk',
           });
-          const currentNdk = ndkRef.current;
-          if (!currentNdk) {
+          return null;
+        }
+        if (signal?.aborted) {
+          paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
+            reason: 'aborted_before_fetch',
+          });
+          return null;
+        }
+        try {
+          const event = await currentNdk.fetchEvent({
+            kinds: [Metadata as number],
+            authors: [pubkey],
+            limit: 1,
+          });
+          if (!event) {
             paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
-              reason: 'no_ndk',
+              reason: 'not_found',
             });
             return null;
           }
-          if (signal?.aborted) {
+          const parsed = parseRawMetadata(event.content);
+          if (!parsed) {
             paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
-              reason: 'aborted_before_fetch',
+              reason: 'invalid_metadata',
             });
             return null;
           }
-          try {
-            const event = await currentNdk.fetchEvent({
-              kinds: [Metadata as number],
-              authors: [pubkey],
-              limit: 1,
-            });
-            if (!event) {
-              paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
-                reason: 'not_found',
-              });
-              return null;
-            }
-            const parsed = parseRawMetadata(event.content);
-            if (!parsed) {
-              paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
-                reason: 'invalid_metadata',
-              });
-              return null;
-            }
-            // Warm the shared SWR cache so other surfaces (ContactRow,
-            // DmChatHeader, profile screens, HistoryEntryHeader) hit warm
-            // cache for this pubkey on next render without re-fetching.
-            useNostrMetadataCache.getState().setProfile(pubkey, parsed);
-            const displayName = resolveIdentityName({ pubkey, nostrProfile: parsed });
-            if (!displayName) {
-              paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
-                reason: 'no_display_name',
-              });
-              return null;
-            }
-            paymentLog.debug('colada.adapter.resolve_recipient_profile.done', {
-              hasAvatar: !!parsed.picture,
-              hasNip05: !!parsed.nip05,
-            });
-            return {
-              displayName,
-              avatarUrl: parsed.picture ?? null,
-              nip05: parsed.nip05 ?? null,
-            };
-          } catch (err) {
-            paymentLog.warn('recipient.resolveProfile.threw', {
-              error: err instanceof Error ? err.message : String(err),
+          // Warm the shared SWR cache so other surfaces (ContactRow,
+          // DmChatHeader, profile screens, HistoryEntryHeader) hit warm
+          // cache for this pubkey on next render without re-fetching.
+          useNostrMetadataCache.getState().setProfile(pubkey, parsed);
+          const displayName = resolveIdentityName({ pubkey, nostrProfile: parsed });
+          if (!displayName) {
+            paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
+              reason: 'no_display_name',
             });
             return null;
           }
-        },
-      }),
+          paymentLog.debug('colada.adapter.resolve_recipient_profile.done', {
+            hasAvatar: !!parsed.picture,
+            hasNip05: !!parsed.nip05,
+          });
+          return {
+            displayName,
+            avatarUrl: parsed.picture ?? null,
+            nip05: parsed.nip05 ?? null,
+          };
+        } catch (err) {
+          paymentLog.warn('recipient.resolveProfile.threw', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        }
+      },
+    }),
     [instance, manager, ndkRef]
   );
 

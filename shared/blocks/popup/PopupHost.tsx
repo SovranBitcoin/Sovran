@@ -623,7 +623,9 @@ function SheetPopup() {
       return;
     }
 
-    setCustomStack([{ sheetId: current.sheetId, payload: current.payload } satisfies CustomSheetPage]);
+    setCustomStack([
+      { sheetId: current.sheetId, payload: current.payload } satisfies CustomSheetPage,
+    ]);
     setCustomNavDirection('forward');
     setCustomFooterConfig(null);
   }, [isOpen, current]);
@@ -776,7 +778,8 @@ function SheetPopup() {
   const handleNativeSheetClose = () => handleOpenChange(false);
 
   const renderCustomFooter = useCallback(
-    (props: { animatedFooterPosition: any }) => { // eslint-disable-line @typescript-eslint/no-explicit-any -- gorhom/bottom-sheet render-prop; injected props lack an exported type that unifies with our {...props} spread
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- gorhom BottomSheetFooter render-prop: animatedFooterPosition is a SharedValue the lib does not export a usable name for here
+    (props: { animatedFooterPosition: any }) => {
       if (!isCustom) return null;
       if (!customFooterConfig || customFooterConfig.buttons.length === 0) return null;
       return (
@@ -868,9 +871,9 @@ function SheetPopup() {
                   // contentHeight modes show the default handle.
                   undefined
                 : hasLiveStatus
-                  ? (props: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any -- gorhom/bottom-sheet render-prop; injected props lack an exported type that unifies with our {...props} spread
-                      <LiveSheetHandle {...props} animatedStyle={liveBackgroundStyle} />
-                    )
+                  ? (
+                      props: any // eslint-disable-line @typescript-eslint/no-explicit-any -- gorhom/bottom-sheet render-prop; injected props lack an exported type that unifies with our {...props} spread
+                    ) => <LiveSheetHandle {...props} animatedStyle={liveBackgroundStyle} />
                   : undefined
             }
             className={isCustom ? undefined : 'mx-4'}
@@ -883,9 +886,9 @@ function SheetPopup() {
             backgroundClassName={isCustom ? 'bg-overlay' : 'bg-surface rounded-[32px]'}
             backgroundComponent={
               hasLiveStatus
-                ? (props: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any -- gorhom/bottom-sheet render-prop; injected props lack an exported type that unifies with our {...props} spread
-                    <LiveSheetBackground {...props} animatedStyle={liveBackgroundStyle} />
-                  )
+                ? (
+                    props: any // eslint-disable-line @typescript-eslint/no-explicit-any -- gorhom/bottom-sheet render-prop; injected props lack an exported type that unifies with our {...props} spread
+                  ) => <LiveSheetBackground {...props} animatedStyle={liveBackgroundStyle} />
                 : undefined
             }
             contentContainerClassName={

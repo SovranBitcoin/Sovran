@@ -257,8 +257,7 @@ export function usePaymentStatusListener(): void {
       const active = store.active;
       const amount = amountToNumber(entry.amount);
       if (
-        !active ||
-        active.variant !== 'receive-ecash' ||
+        active?.variant !== 'receive-ecash' ||
         active.mintUrl !== mintUrl ||
         active.amount !== amount ||
         active.receiveEntryId ||
