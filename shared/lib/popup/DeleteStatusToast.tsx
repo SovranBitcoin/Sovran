@@ -32,7 +32,10 @@ type DeleteStatusToastProps = {
  * `useDeletePost` drives the legs.
  */
 export function DeleteStatusToast({ hide, ...toastProps }: DeleteStatusToastProps) {
-  const danger = useThemeColor('danger');
+  // Completing a deletion is a success — fill the ring + tick green. A total
+  // failure (every relay rejected) flips StatusToast to its own red error
+  // state, so the red lives there, not in the progress ring.
+  const [success, muted] = useThemeColor(['success', 'muted'] as const);
 
   const view = useDeleteStatusStore(
     useShallow((s) =>
@@ -73,8 +76,8 @@ export function DeleteStatusToast({ hide, ...toastProps }: DeleteStatusToastProp
       subtitle={subtitle}
       indicatorSize={RING_SIZE}
       segmentedProgress={{ completedSegments: view.settled, segmentCount: view.total }}
-      ringColor={opacity(danger, 0.3)}
-      ringSuccessColor={danger}
+      ringColor={opacity(muted, 0.3)}
+      ringSuccessColor={success}
       toastProps={{ ...toastProps, hide }}
     />
   );
