@@ -1,0 +1,32 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  APP_DIR: sovran-app
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout app
+        uses: actions/checkout@v6
+        with:
+          path: ${{ env.APP_DIR }}
+
+      - name: Setup Sovran
+        uses: ./sovran-app/.github/actions/setup-sovran
+        with:
+          app-dir: ${{ env.APP_DIR }}
+          github-token: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Lint
+        working-directory: ${{ env.APP_DIR }}
+        run: bun run lint
