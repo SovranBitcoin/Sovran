@@ -12,7 +12,7 @@ type IconProps = {
   name: string;
   color?: string;
   size?: number;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
   className?: string;
 };
 

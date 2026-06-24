@@ -14,7 +14,7 @@ import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { router } from 'expo-router';
 import { ClaimUsernameCardFrame } from '@/shared/blocks/claim/ClaimUsernameCardFrame';
-import { measureInWindowAsync, rafAsync } from './measure';
+import { measureInWindowAsync, rafAsync, type Measurable } from './measure';
 import type { HeroId, Rect, HeroRole } from './types';
 import { zIndex } from '@/shared/styles/tokens';
 
@@ -26,7 +26,7 @@ type HeroTransitionPhase =
   | { state: 'back_animating'; id: HeroId; params?: Record<string, string> };
 
 type Ctx = {
-  registerRef: (id: HeroId, role: HeroRole, ref: any) => void;
+  registerRef: (id: HeroId, role: HeroRole, ref: Measurable | null) => void;
   startClaimUsername: () => void;
   closeClaimUsername: () => void;
   isHidden: (id: HeroId, role: HeroRole) => boolean;
@@ -48,7 +48,7 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
   const gold = AMBER_ACCENT;
   const overlayBorderColor = opacity(gold, 0.3);
 
-  const refs = useRef<Record<HeroId, Partial<Record<HeroRole, any>>>>({
+  const refs = useRef<Record<HeroId, Partial<Record<HeroRole, Measurable | null>>>>({
     claimUsername: {},
   });
 
@@ -65,7 +65,7 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
   const toW = useSharedValue(0);
   const toH = useSharedValue(0);
 
-  const registerRef = (id: HeroId, role: HeroRole, ref: any) => {
+  const registerRef = (id: HeroId, role: HeroRole, ref: Measurable | null) => {
     refs.current[id] = refs.current[id] || {};
     refs.current[id][role] = ref;
   };

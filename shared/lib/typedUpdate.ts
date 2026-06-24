@@ -50,15 +50,15 @@ type PathArray<T> = T extends Primitive
           : [K];
     }[Extract<keyof T, string>];
 
-type PathArrayValue<T, P extends readonly any[]> = P extends [infer K, ...infer Rest]
+type PathArrayValue<T, P extends readonly unknown[]> = P extends [infer K, ...infer Rest]
   ? K extends keyof T
     ? Rest extends [number, ...infer Sub]
       ? T[K] extends (infer U)[]
-        ? Sub extends readonly any[]
+        ? Sub extends readonly unknown[]
           ? PathArrayValue<U, Sub>
           : U
         : never
-      : Rest extends readonly any[]
+      : Rest extends readonly unknown[]
         ? PathArrayValue<T[K], Rest>
         : T[K]
     : never
@@ -83,6 +83,7 @@ export function typedUpdate<T, P extends PathArray<T>>(
 ): T;
 
 /** Implementation */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- implementation signature behind the two strongly-typed overloads above; it handles both string and tuple paths generically, so the loose impl types are intentional (callers get full safety from the overloads).
 export function typedUpdate(path: any, updater: any, obj: any): any {
   return update(path, updater, obj);
 }

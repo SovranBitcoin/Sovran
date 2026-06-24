@@ -281,6 +281,7 @@ export const StoriesCarousel: FC<CarouselProps> = ({
           width,
         }}>
         <Animated.FlatList
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Animated.FlatList's ref type does not unify with the scroll ref threaded through here; the cast bridges a known RN typing gap.
           ref={scrollRef as any}
           data={storyUsers}
           keyExtractor={(item) => item.pubkey}

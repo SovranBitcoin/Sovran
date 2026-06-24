@@ -33,7 +33,7 @@ const OPTIMISTIC_STALE_WARN_MS = 30_000;
 
 interface ToggleEngagementOpts {
   target: FeedEvent;
-  ndk: any;
+  ndk: NonNullable<ReturnType<typeof useNDK>['ndk']>;
   kind: typeof Reaction | typeof Repost;
   currentState: boolean;
   isPending: boolean;

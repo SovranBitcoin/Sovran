@@ -188,7 +188,7 @@ const MonthlyChart = function MonthlyChart({ history, unit = 'sat', mode }: Mont
         if (entry.unit !== unit) return false;
         if (entry.createdAt < monthStart || entry.createdAt > monthEnd) return false;
         if (entry.type === 'mint' || entry.type === 'melt') {
-          const quoteId = (entry as any).quoteId as string | undefined;
+          const quoteId = (entry as { quoteId?: string }).quoteId;
           if (quoteId && quoteIdToGroup[quoteId]) return false;
         }
         return config.filter(entry);

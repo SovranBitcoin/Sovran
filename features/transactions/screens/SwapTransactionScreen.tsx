@@ -291,7 +291,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
       for (const url of mintUrls) {
         try {
           const info = await getMintInfo(url);
-          map[url] = info ? { name: info.name, icon_url: (info as any).icon_url } : null;
+          map[url] = info ? { name: info.name, icon_url: (info as { icon_url?: string }).icon_url } : null;
         } catch {
           map[url] = null;
         }
@@ -308,7 +308,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
     const map = new Map<string, HistoryEntry>();
     for (const entry of history) {
       if (entry.type !== 'mint' && entry.type !== 'melt') continue;
-      const quoteId = (entry as any).quoteId as string | undefined;
+      const quoteId = (entry as { quoteId?: string }).quoteId;
       if (!quoteId) continue;
       map.set(quoteId, entry);
     }

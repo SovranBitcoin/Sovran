@@ -154,7 +154,7 @@ function clampColor(hex: string): string {
 // Platform-aware candidate extraction (shared by both hooks)
 // ---------------------------------------------------------------------------
 
-function extractCandidates(res: any): (string | undefined)[] {
+function extractCandidates(res: any): (string | undefined)[] { // eslint-disable-line @typescript-eslint/no-explicit-any -- react-native-image-colors returns a platform-tagged union read behind a runtime Platform.OS check TS cannot narrow
   if (Platform.OS === 'android') {
     return [res.vibrant, res.dominant, res.lightVibrant, res.muted, res.average];
   }
@@ -204,7 +204,7 @@ export function useExtractedColors(
     let mounted = true;
 
     getColors(imageUrl, { fallback, cache: true, key: imageUrl })
-      .then((res: any) => {
+      .then((res: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any -- react-native-image-colors returns a platform-tagged union read behind a runtime Platform.OS check TS cannot narrow
         if (!mounted || !res) return;
 
         const candidates = extractCandidates(res);
@@ -279,7 +279,7 @@ export function useDominantColor(
     let mounted = true;
 
     getColors(imageUrl, { fallback, cache: true, key: imageUrl })
-      .then((res: any) => {
+      .then((res: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any -- react-native-image-colors returns a platform-tagged union read behind a runtime Platform.OS check TS cannot narrow
         if (!mounted || !res) return;
 
         const candidates = extractCandidates(res);

@@ -261,7 +261,7 @@ export function useAiSend() {
         candidates: candidateSnapshots,
       });
 
-      let stream: AsyncIterable<any> | undefined;
+      let stream: Awaited<ReturnType<typeof sendMessage>>['stream'] | undefined;
       let lastConnectErr: unknown = null;
       for (let i = 0; i < candidateChain.length; i++) {
         const candidate = candidateChain[i];
@@ -349,8 +349,8 @@ export function useAiSend() {
 
         const delta = chunk.choices?.[0]?.delta;
         const content =
-          delta?.content || (delta as any)?.message?.content || (delta as any)?.text || null;
-        const reasoning = (delta as any)?.reasoning_content || (delta as any)?.reasoning || null;
+          delta?.content || delta?.message?.content || delta?.text || null;
+        const reasoning = delta?.reasoning_content || delta?.reasoning || null;
 
         if (reasoning) {
           if (firstReasoningAt === 0) {
@@ -526,7 +526,7 @@ export function useAiSend() {
       balancePromiseRef.current = balancePromise;
 
       span.end({ outcome: 'ok', chunks: chunkCount, chars: fullContent.length });
-    } catch (err: any) {
+    } catch (err) {
       if (isAbortError(err)) {
         aiLog.info('ai.send.aborted', { flowId });
         removeMessages(new Set([assistantMessageId]));

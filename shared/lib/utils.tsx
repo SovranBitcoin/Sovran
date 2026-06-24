@@ -196,7 +196,9 @@ export function cn(...inputs: ClassValue[]) {
 export const compose = (
   providers: (
     | React.FC<{ children: React.ReactNode }>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic provider composition: provider components/props are heterogeneous
     | React.ComponentType<any>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic provider composition: provider components/props are heterogeneous
     | [React.ComponentType<any>, Record<string, any>]
   )[]
 ): React.FC<{ children: React.ReactNode }> => {
@@ -235,7 +237,7 @@ export const compose = (
       : Curr.displayName || Curr.name;
     ProviderComponent.displayName = `ProviderWrapper(${componentName || 'Unknown'})`;
     return ProviderComponent;
-  }, undefined as any);
+  }, undefined as React.FC<{ children: React.ReactNode }> | undefined);
 
   ComposedProvider.displayName = 'ComposedProvider';
   return ComposedProvider;

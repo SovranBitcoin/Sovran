@@ -12,6 +12,7 @@
  */
 
 import React, { useState } from 'react';
+import type { Href } from 'expo-router';
 import { Stack, Link } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useFocusEffect } from '@react-navigation/native';
@@ -106,7 +107,7 @@ function MintListRoute() {
           if (onSelectAction === 'continue' && params?.continuePathname) {
             const continueParams = params.continueParams ? JSON.parse(params.continueParams) : {};
             router.navigate({
-              pathname: params.continuePathname as any,
+              pathname: params.continuePathname as Href,
               params: {
                 ...continueParams,
                 unit: item.unit,

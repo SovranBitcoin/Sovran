@@ -16,7 +16,7 @@ type VStackProps = ViewProps & {
   flexBasis?: DimensionValue;
 };
 
-const VStack = React.forwardRef<any, VStackProps>((props, ref) => {
+const VStack = React.forwardRef<React.ElementRef<typeof View>, VStackProps>((props, ref) => {
   const {
     spacing,
     gap,

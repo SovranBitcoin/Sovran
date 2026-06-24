@@ -57,7 +57,7 @@ export class ClusterManager {
   private cluster: Supercluster;
   private loaded: boolean = false;
 
-  constructor(options?: Supercluster.Options<any, any>) {
+  constructor(options?: Supercluster.Options) {
     this.cluster = new Supercluster({
       radius: 60, // Cluster radius in pixels
       maxZoom: 16, // Max zoom to cluster points
@@ -114,7 +114,7 @@ export class ClusterManager {
 
     return clusters.map((feature): MapMarker => {
       const [lon, lat] = feature.geometry.coordinates;
-      const props = feature.properties as any;
+      const props = feature.properties;
 
       if (props.cluster) {
         // Cluster marker
