@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   RefreshControl,
@@ -142,48 +142,42 @@ export function NotificationsScreen() {
     'muted',
     'surface-tertiary',
   ] as const);
-  const notificationsVisualScope = useMemo(
-    () => `feed.notifications.${activeTab.toLowerCase()}.list`,
-    [activeTab]
-  );
+  const notificationsVisualScope = `feed.notifications.${activeTab.toLowerCase()}.list`;
   const notificationListMetricsRef = useRef<VisualFlatListMetrics>({
     contentLength: null,
     scroll: 0,
     size: null,
   });
 
-  const fetchNotificationsPage = useCallback(
-    async ({
-      signal,
-      until,
-      refresh,
-    }: {
-      signal: AbortSignal;
-      until?: number;
-      refresh?: boolean;
-    }) => {
-      // The App tab is client-only (synthetic announcements) — never fetch.
-      if (!viewerPubkey || activeTab === 'APP') return null;
-      const client = getFeedClient();
-      try {
-        return await client.getNotifications({
-          viewerPubkey,
-          tab: activeTab,
-          policy,
-          replyScope,
-          limit: NOTIFICATIONS_PAGE_SIZE,
-          until,
-          refresh,
-          signal,
-        });
-      } finally {
-        client.dispose?.();
-      }
-    },
-    [activeTab, policy, replyScope, viewerPubkey]
-  );
+  const fetchNotificationsPage = async ({
+    signal,
+    until,
+    refresh,
+  }: {
+    signal: AbortSignal;
+    until?: number;
+    refresh?: boolean;
+  }) => {
+    // The App tab is client-only (synthetic announcements) — never fetch.
+    if (!viewerPubkey || activeTab === 'APP') return null;
+    const client = getFeedClient();
+    try {
+      return await client.getNotifications({
+        viewerPubkey,
+        tab: activeTab,
+        policy,
+        replyScope,
+        limit: NOTIFICATIONS_PAGE_SIZE,
+        until,
+        refresh,
+        signal,
+      });
+    } finally {
+      client.dispose?.();
+    }
+  };
 
-  const applyFirstPage = useCallback((page: FeedNotificationsResult | null) => {
+  const applyFirstPage = (page: FeedNotificationsResult | null) => {
     paginationUntilRef.current = page?.paginationUntil ?? 0;
     seenKeysRef.current = new Set((page?.notifications ?? []).map(notificationDedupeKey));
     // Optimistic: as long as there's a cursor, try to page. load-more stops as
@@ -195,95 +189,90 @@ export function NotificationsScreen() {
       paginationUntil: page?.paginationUntil ?? 0,
     });
     setResult(page);
-  }, []);
+  };
 
-  const loadFirstPage = useCallback(
-    (signal: AbortSignal, mode: LoadMode) => {
-      const sequence = ++loadSequenceRef.current;
-      // No viewer, or the client-only App tab → nothing to fetch; the synthetic
-      // items (welcome card) render without a server round-trip.
-      if (!viewerPubkey || activeTab === 'APP') {
-        applyFirstPage(null);
-        setErrorMessage(null);
-        setIsInitialLoading(false);
-        setIsRefreshing(false);
-        setIsLoadingMore(false);
-        return;
-      }
-
-      const cacheKey = notificationsPageKey({ viewerPubkey, tab: activeTab, policy, replyScope });
-
-      // Warm navigation (key touched earlier this session): paint the cached
-      // page instantly and revalidate. Cold start (first focus this session):
-      // show loading, never a stale first paint.
-      let paintedFromCache = false;
-      if (mode === 'initial') {
-        const cached = notificationsPageCache.isColdStart(cacheKey)
-          ? undefined
-          : notificationsPageCache.getEntry(cacheKey);
-        if (cached) {
-          applyFirstPage(cached.data);
-          setIsInitialLoading(false);
-          paintedFromCache = true;
-        } else {
-          setResult(null);
-          setIsInitialLoading(true);
-        }
-      } else {
-        setIsRefreshing(true);
-      }
+  const loadFirstPage = (signal: AbortSignal, mode: LoadMode) => {
+    const sequence = ++loadSequenceRef.current;
+    // No viewer, or the client-only App tab → nothing to fetch; the synthetic
+    // items (welcome card) render without a server round-trip.
+    if (!viewerPubkey || activeTab === 'APP') {
+      applyFirstPage(null);
       setErrorMessage(null);
+      setIsInitialLoading(false);
+      setIsRefreshing(false);
+      setIsLoadingMore(false);
+      return;
+    }
 
-      // Only an explicit pull-to-refresh forces nagg to revalidate. An initial
-      // focus reads the shared response cache (which auto-revalidates a stale
-      // entry in the background), so opening the screen no longer pays the full
-      // recompute cost on every mount.
-      void fetchNotificationsPage({ signal, refresh: mode === 'refresh' })
-        .then((page) => {
-          if (signal.aborted || sequence !== loadSequenceRef.current) return;
-          applyFirstPage(page);
-          if (page) notificationsPageCache.setEntry(cacheKey, page, { viewerKey: viewerPubkey });
-          notificationsPageCache.markTouched(cacheKey);
-        })
-        .catch((error) => {
-          if (signal.aborted || sequence !== loadSequenceRef.current) return;
-          const message = error instanceof Error ? error.message : String(error);
-          feedLog.warn('feed.notifications.load_failed', { message });
-          setErrorMessage(message);
-          // Keep the warm-painted page on a transient failure.
-          if (mode === 'initial' && !paintedFromCache) applyFirstPage(null);
-        })
-        .finally(() => {
-          if (signal.aborted || sequence !== loadSequenceRef.current) return;
-          if (mode === 'initial') setIsInitialLoading(false);
-          else setIsRefreshing(false);
-        });
-    },
-    [applyFirstPage, fetchNotificationsPage, viewerPubkey, activeTab, policy, replyScope]
-  );
+    const cacheKey = notificationsPageKey({ viewerPubkey, tab: activeTab, policy, replyScope });
 
-  useFocusEffect(
-    useCallback(() => {
-      const controller = new AbortController();
-      loadFirstPage(controller.signal, 'initial');
-      return () => {
-        controller.abort();
-        refreshControllerRef.current?.abort();
-        refreshControllerRef.current = null;
-        loadSequenceRef.current += 1;
-      };
-    }, [loadFirstPage])
-  );
+    // Warm navigation (key touched earlier this session): paint the cached
+    // page instantly and revalidate. Cold start (first focus this session):
+    // show loading, never a stale first paint.
+    let paintedFromCache = false;
+    if (mode === 'initial') {
+      const cached = notificationsPageCache.isColdStart(cacheKey)
+        ? undefined
+        : notificationsPageCache.getEntry(cacheKey);
+      if (cached) {
+        applyFirstPage(cached.data);
+        setIsInitialLoading(false);
+        paintedFromCache = true;
+      } else {
+        setResult(null);
+        setIsInitialLoading(true);
+      }
+    } else {
+      setIsRefreshing(true);
+    }
+    setErrorMessage(null);
 
-  const handleRefresh = useCallback(() => {
+    // Only an explicit pull-to-refresh forces nagg to revalidate. An initial
+    // focus reads the shared response cache (which auto-revalidates a stale
+    // entry in the background), so opening the screen no longer pays the full
+    // recompute cost on every mount.
+    void fetchNotificationsPage({ signal, refresh: mode === 'refresh' })
+      .then((page) => {
+        if (signal.aborted || sequence !== loadSequenceRef.current) return;
+        applyFirstPage(page);
+        if (page) notificationsPageCache.setEntry(cacheKey, page, { viewerKey: viewerPubkey });
+        notificationsPageCache.markTouched(cacheKey);
+      })
+      .catch((error) => {
+        if (signal.aborted || sequence !== loadSequenceRef.current) return;
+        const message = error instanceof Error ? error.message : String(error);
+        feedLog.warn('feed.notifications.load_failed', { message });
+        setErrorMessage(message);
+        // Keep the warm-painted page on a transient failure.
+        if (mode === 'initial' && !paintedFromCache) applyFirstPage(null);
+      })
+      .finally(() => {
+        if (signal.aborted || sequence !== loadSequenceRef.current) return;
+        if (mode === 'initial') setIsInitialLoading(false);
+        else setIsRefreshing(false);
+      });
+  };
+
+  useFocusEffect(() => {
+    const controller = new AbortController();
+    loadFirstPage(controller.signal, 'initial');
+    return () => {
+      controller.abort();
+      refreshControllerRef.current?.abort();
+      refreshControllerRef.current = null;
+      loadSequenceRef.current += 1;
+    };
+  });
+
+  const handleRefresh = () => {
     if (isRefreshing) return;
     refreshControllerRef.current?.abort();
     const controller = new AbortController();
     refreshControllerRef.current = controller;
     loadFirstPage(controller.signal, 'refresh');
-  }, [isRefreshing, loadFirstPage]);
+  };
 
-  const loadMoreNotifications = useCallback(async () => {
+  const loadMoreNotifications = async () => {
     if (
       loadingMoreRef.current ||
       isInitialLoading ||
@@ -329,26 +318,23 @@ export function NotificationsScreen() {
       loadingMoreRef.current = false;
       setIsLoadingMore(false);
     }
-  }, [fetchNotificationsPage, isInitialLoading, isRefreshing, viewerPubkey]);
+  };
 
-  const selectTab = useCallback(
-    (tab: NotificationTab) => {
-      if (tab === activeTab) return;
-      paginationUntilRef.current = 0;
-      hasMoreRef.current = false;
-      seenKeysRef.current = new Set();
-      setResult(null);
-      setErrorMessage(null);
-      setIsLoadingMore(false);
-      setIsInitialLoading(true);
-      setActiveTab(tab);
-    },
-    [activeTab]
-  );
+  const selectTab = (tab: NotificationTab) => {
+    if (tab === activeTab) return;
+    paginationUntilRef.current = 0;
+    hasMoreRef.current = false;
+    seenKeysRef.current = new Set();
+    setResult(null);
+    setErrorMessage(null);
+    setIsLoadingMore(false);
+    setIsInitialLoading(true);
+    setActiveTab(tab);
+  };
 
   // Direct/Thread reply-scope picker for the Mentions tab. Mirrors the Following
   // feed tab: the Mentions pill shows a chevron and opens this popup when active.
-  const openReplyScopeMenu = useCallback(() => {
+  const openReplyScopeMenu = () => {
     actionMenuPopup({
       title: 'Mentions',
       buttons: (['DIRECT', 'THREAD'] as const).map((scope) => ({
@@ -360,67 +346,55 @@ export function NotificationsScreen() {
         },
       })),
     });
-  }, [replyScope, setReplyScope]);
+  };
 
   // Tapping Mentions when it's already active opens the scope popup (like
   // Following); otherwise it just switches tabs.
-  const handleNotificationTabPress = useCallback(
-    (tab: NotificationTab) => {
-      if (tab === 'MENTIONS' && activeTab === 'MENTIONS') {
-        openReplyScopeMenu();
-        return;
-      }
-      selectTab(tab);
-    },
-    [activeTab, openReplyScopeMenu, selectTab]
-  );
+  const handleNotificationTabPress = (tab: NotificationTab) => {
+    if (tab === 'MENTIONS' && activeTab === 'MENTIONS') {
+      openReplyScopeMenu();
+      return;
+    }
+    selectTab(tab);
+  };
 
-  const threadContext = useMemo(
-    () => ({
-      profiles: result?.profilesMap ?? new Map(),
-      metrics: result?.metricsMap ?? new Map(),
-      quotedEvents: result?.quotedEventsMap ?? new Map(),
-    }),
-    [result]
-  );
+  const threadContext = {
+    profiles: result?.profilesMap ?? new Map(),
+    metrics: result?.metricsMap ?? new Map(),
+    quotedEvents: result?.quotedEventsMap ?? new Map(),
+  };
 
-  const openNotification = useCallback(
-    (notification: FeedNotification) => {
-      if (notification.reason === 'follow') {
-        router.push({
-          pathname: '/(user-flow)/profile',
-          params: { pubkey: notification.event.pubkey },
-        });
-        return;
-      }
-      const openEventId = notificationOpenEventId(notification);
-      const allEvents = new Map([[notification.event.id, notification.event]]);
-      if (notification.targetEvent)
-        allEvents.set(notification.targetEvent.id, notification.targetEvent);
-      seedThread(openEventId, {
-        allEvents,
-        profiles: threadContext.profiles,
-        metrics: threadContext.metrics,
-        quotedEvents: threadContext.quotedEvents,
-      });
+  const openNotification = (notification: FeedNotification) => {
+    if (notification.reason === 'follow') {
       router.push({
-        pathname: '/(user-flow)/thread',
-        params: { eventId: openEventId },
+        pathname: '/(user-flow)/profile',
+        params: { pubkey: notification.event.pubkey },
       });
-    },
-    [threadContext]
-  );
+      return;
+    }
+    const openEventId = notificationOpenEventId(notification);
+    const allEvents = new Map([[notification.event.id, notification.event]]);
+    if (notification.targetEvent)
+      allEvents.set(notification.targetEvent.id, notification.targetEvent);
+    seedThread(openEventId, {
+      allEvents,
+      profiles: threadContext.profiles,
+      metrics: threadContext.metrics,
+      quotedEvents: threadContext.quotedEvents,
+    });
+    router.push({
+      pathname: '/(user-flow)/thread',
+      params: { eventId: openEventId },
+    });
+  };
 
-  const openFollowGroup = useCallback(
-    (notifications: FeedNotification[]) => {
-      const seedId = seedNotificationFollowers({ notifications, result });
-      router.push({
-        pathname: '/(drawer)/(tabs)/notifications/followers',
-        params: { seedId },
-      });
-    },
-    [result]
-  );
+  const openFollowGroup = (notifications: FeedNotification[]) => {
+    const seedId = seedNotificationFollowers({ notifications, result });
+    router.push({
+      pathname: '/(drawer)/(tabs)/notifications/followers',
+      params: { seedId },
+    });
+  };
 
   const seedCreatedAt = useWalletLifecycleStore((s) => s.seedCreatedAt);
   const termsDate = useSettingsStore((s) => s.termsAccepted?.date ?? null);
@@ -512,70 +486,54 @@ export function NotificationsScreen() {
       rowLabel: item.type,
     }),
   });
-  const reportNotificationListMetrics = useCallback(
-    (reason: string) => {
-      const metrics = notificationListMetricsRef.current;
-      onVisualListMetricsChange({
-        reason,
-        size: metrics.size,
-        scroll: metrics.scroll,
-        scrollLength: metrics.size,
-        contentLength: metrics.contentLength,
-      });
-    },
-    [onVisualListMetricsChange]
-  );
-  const handleListLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      notificationListMetricsRef.current.size = event.nativeEvent.layout.height;
-      reportNotificationListMetrics('layout');
-    },
-    [reportNotificationListMetrics]
-  );
-  const handleContentSizeChange = useCallback(
-    (_width: number, height: number) => {
-      notificationListMetricsRef.current.contentLength = height;
-      reportNotificationListMetrics('content-size');
-    },
-    [reportNotificationListMetrics]
-  );
-  const handleListViewableItemsChanged = useCallback(
-    ({ viewableItems, changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
-      onVisualViewableItemsChanged({
-        ...visualViewabilityRange([...viewableItems, ...changed]),
-        viewableItems: viewableItems.map(notificationVisualToken),
-        changed: changed.map(notificationVisualToken),
-      });
-    },
-    [onVisualViewableItemsChanged]
-  );
-  const handleListScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-      notificationListMetricsRef.current = {
-        contentLength: contentSize.height,
-        scroll: contentOffset.y,
-        size: layoutMeasurement.height,
-      };
-      reportNotificationListMetrics('scroll');
-      remeasureVisualLayoutScope(notificationsVisualScope, 'scroll', {
-        extra: {
-          tab: activeTab,
-          phase: visualPhase,
-          items: notificationItems.length,
-          loadingMore: isLoadingMore,
-        },
-      });
-    },
-    [
-      activeTab,
-      isLoadingMore,
-      notificationItems.length,
-      notificationsVisualScope,
-      reportNotificationListMetrics,
-      visualPhase,
-    ]
-  );
+  const reportNotificationListMetrics = (reason: string) => {
+    const metrics = notificationListMetricsRef.current;
+    onVisualListMetricsChange({
+      reason,
+      size: metrics.size,
+      scroll: metrics.scroll,
+      scrollLength: metrics.size,
+      contentLength: metrics.contentLength,
+    });
+  };
+  const handleListLayout = (event: LayoutChangeEvent) => {
+    notificationListMetricsRef.current.size = event.nativeEvent.layout.height;
+    reportNotificationListMetrics('layout');
+  };
+  const handleContentSizeChange = (_width: number, height: number) => {
+    notificationListMetricsRef.current.contentLength = height;
+    reportNotificationListMetrics('content-size');
+  };
+  const handleListViewableItemsChanged = ({
+    viewableItems,
+    changed,
+  }: {
+    viewableItems: ViewToken[];
+    changed: ViewToken[];
+  }) => {
+    onVisualViewableItemsChanged({
+      ...visualViewabilityRange([...viewableItems, ...changed]),
+      viewableItems: viewableItems.map(notificationVisualToken),
+      changed: changed.map(notificationVisualToken),
+    });
+  };
+  const handleListScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    notificationListMetricsRef.current = {
+      contentLength: contentSize.height,
+      scroll: contentOffset.y,
+      size: layoutMeasurement.height,
+    };
+    reportNotificationListMetrics('scroll');
+    remeasureVisualLayoutScope(notificationsVisualScope, 'scroll', {
+      extra: {
+        tab: activeTab,
+        phase: visualPhase,
+        items: notificationItems.length,
+        loadingMore: isLoadingMore,
+      },
+    });
+  };
 
   // Render boundary for notifications: result rows → rendered list items, and
   // whether the screen is empty. Cross-check with feed.notifications.fetch.done

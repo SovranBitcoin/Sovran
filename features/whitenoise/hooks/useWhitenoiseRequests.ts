@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import type { UnreadInvite } from '@internet-privacy/marmot-ts';
@@ -70,66 +70,60 @@ export function useWhitenoiseRequests(): UseWhitenoiseRequestsState {
     };
   }, [inviteReader]);
 
-  const acceptInner = useCallback(
-    async (request: WhitenoiseRequest) => {
-      if (!client || !inviteReader) {
-        setError('White Noise client not ready');
-        return;
-      }
-      setBusyId(request.id);
-      setError(null);
-      try {
-        const { group } = await client.joinGroupFromWelcome({
-          welcomeRumor: request.rumor as Parameters<
-            typeof client.joinGroupFromWelcome
-          >[0]['welcomeRumor'],
-        });
-        const index = new WhitenoiseDmIndex(accountIndex);
-        await index.set(request.fromPubkey, bytesToHex(group.id));
-        await inviteReader.markAsRead(request.id);
-        wnLog.info('whitenoise.requests.accepted', {
-          inviteId: request.id.slice(0, 8),
-          groupId: bytesToHex(group.id),
-          from: request.fromPubkey.slice(0, 16),
-        });
-        // Open the new chat so the user lands directly in the conversation
-        // instead of staring at an empty Requests pill.
-        router.push({
-          pathname: '/(user-flow)/whitenoiseDM' as never,
-          params: { pubkey: request.fromPubkey },
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        setError(message);
-        wnLog.error('whitenoise.requests.accept_failed', { error: message });
-      } finally {
-        setBusyId(null);
-      }
-    },
-    [accountIndex, client, inviteReader]
-  );
+  const acceptInner = async (request: WhitenoiseRequest) => {
+    if (!client || !inviteReader) {
+      setError('White Noise client not ready');
+      return;
+    }
+    setBusyId(request.id);
+    setError(null);
+    try {
+      const { group } = await client.joinGroupFromWelcome({
+        welcomeRumor: request.rumor as Parameters<
+          typeof client.joinGroupFromWelcome
+        >[0]['welcomeRumor'],
+      });
+      const index = new WhitenoiseDmIndex(accountIndex);
+      await index.set(request.fromPubkey, bytesToHex(group.id));
+      await inviteReader.markAsRead(request.id);
+      wnLog.info('whitenoise.requests.accepted', {
+        inviteId: request.id.slice(0, 8),
+        groupId: bytesToHex(group.id),
+        from: request.fromPubkey.slice(0, 16),
+      });
+      // Open the new chat so the user lands directly in the conversation
+      // instead of staring at an empty Requests pill.
+      router.push({
+        pathname: '/(user-flow)/whitenoiseDM' as never,
+        params: { pubkey: request.fromPubkey },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      wnLog.error('whitenoise.requests.accept_failed', { error: message });
+    } finally {
+      setBusyId(null);
+    }
+  };
 
-  const declineInner = useCallback(
-    async (request: WhitenoiseRequest) => {
-      if (!inviteReader) return;
-      setBusyId(request.id);
-      setError(null);
-      try {
-        await inviteReader.markAsRead(request.id);
-        wnLog.info('whitenoise.requests.declined', {
-          inviteId: request.id.slice(0, 8),
-          from: request.fromPubkey.slice(0, 16),
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        setError(message);
-        wnLog.error('whitenoise.requests.decline_failed', { error: message });
-      } finally {
-        setBusyId(null);
-      }
-    },
-    [inviteReader]
-  );
+  const declineInner = async (request: WhitenoiseRequest) => {
+    if (!inviteReader) return;
+    setBusyId(request.id);
+    setError(null);
+    try {
+      await inviteReader.markAsRead(request.id);
+      wnLog.info('whitenoise.requests.declined', {
+        inviteId: request.id.slice(0, 8),
+        from: request.fromPubkey.slice(0, 16),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      wnLog.error('whitenoise.requests.decline_failed', { error: message });
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   // `busyId` is React state and lands too late to block a rapid second tap.
   // The single-flight guard drops the duplicate before it reaches

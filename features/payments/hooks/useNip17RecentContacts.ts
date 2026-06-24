@@ -67,10 +67,7 @@ export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
     return [...mocks.filter((m) => !realKeys.has(m.pubkey)), ...allowlistRows, ...base];
   }, [conversations, mockMode]);
 
-  const contactPubkeys = useMemo(
-    () => displayContacts.map((c) => c.pubkey).filter(Boolean),
-    [displayContacts]
-  );
+  const contactPubkeys = displayContacts.map((c) => c.pubkey).filter(Boolean);
 
   return {
     displayContacts,

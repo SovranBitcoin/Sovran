@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
@@ -67,14 +67,14 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
     };
   }, [auto]);
 
-  const toggle = useCallback(() => {
+  const toggle = () => {
     setAuto(false);
     setLoading((prev) => {
       const next = !prev;
       if (!next) setImageSeed((s) => s + 1);
       return next;
     });
-  }, []);
+  };
 
   const pictureUrl = loading ? undefined : `https://picsum.photos/seed/sovran-${imageSeed}/88`;
 

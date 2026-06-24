@@ -12,7 +12,7 @@
  * Consecutive entries on the same mint omit the redundant arrow separator.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { MeltQuoteState } from '@cashu/cashu-ts';
 import Animated, {
@@ -182,7 +182,7 @@ interface CollapsedLegGroupProps {
   mintInfoMap: Record<string, { name?: string; icon_url?: string } | null>;
 }
 
-const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGroupProps) => {
+const CollapsedLegGroup = ({ legGroup, mintInfoMap }: CollapsedLegGroupProps) => {
   const foreground = useThemeColor('foreground');
 
   // Source = first leg's from, Destination = last leg's to
@@ -227,7 +227,7 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
       </HStack>
     </View>
   );
-});
+};
 CollapsedLegGroup.displayName = 'CollapsedLegGroup';
 
 // -----------------------------------------------------------------------
@@ -249,7 +249,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
   const [expanded, setExpanded] = useState(false);
   const chevronRotation = useSharedValue(0);
 
-  const toggleExpanded = useCallback(() => {
+  const toggleExpanded = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     log.debug('tx.swap.toggle_expanded', { groupId });
     setExpanded((prev) => {
@@ -259,7 +259,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
       });
       return !prev;
     });
-  }, [chevronRotation]);
+  };
 
   const chevronAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${chevronRotation.value}deg` }],

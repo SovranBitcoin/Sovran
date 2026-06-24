@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { ScrollView } from 'react-native';
 import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
 
@@ -29,13 +29,10 @@ export function SettingsNotificationPolicyScreen() {
   const policy = useNotificationPolicyStore((state) => state.policy);
   const setPolicy = useNotificationPolicyStore((state) => state.setPolicy);
 
-  const handlePolicyChange = useCallback(
-    (value: FeedNotificationPolicy) => {
-      log.info('settings.notification_policy.change', { policy: value });
-      setPolicy(value);
-    },
-    [setPolicy]
-  );
+  const handlePolicyChange = (value: FeedNotificationPolicy) => {
+    log.info('settings.notification_policy.change', { policy: value });
+    setPolicy(value);
+  };
 
   return (
     <ScreenWrapper name="SettingsNotificationPolicyScreen" scroll="custom" safeArea>

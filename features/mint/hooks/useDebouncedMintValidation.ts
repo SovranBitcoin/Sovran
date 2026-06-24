@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 
@@ -31,7 +31,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
   // can't overwrite the result for the current URL.
   const inFlightRef = useRef<AbortController | null>(null);
 
-  const validateUrl = useCallback(async (mintUrl: string) => {
+  const validateUrl = async (mintUrl: string) => {
     if (!mintUrl.trim()) {
       setValidationState({ isValid: null, isLoading: false, error: null });
       setMintInfo(null);
@@ -80,32 +80,29 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
       });
       setMintInfo(mintInfoResult.value);
     }
-  }, []);
+  };
 
-  const debouncedValidate = useCallback(
-    (mintUrl: string) => {
-      setUrl(mintUrl);
+  const debouncedValidate = (mintUrl: string) => {
+    setUrl(mintUrl);
 
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
 
-      if (!mintUrl.trim()) {
-        inFlightRef.current?.abort();
-        inFlightRef.current = null;
-        setValidationState({ isValid: null, isLoading: false, error: null });
-        setMintInfo(null);
-        return;
-      }
+    if (!mintUrl.trim()) {
+      inFlightRef.current?.abort();
+      inFlightRef.current = null;
+      setValidationState({ isValid: null, isLoading: false, error: null });
+      setMintInfo(null);
+      return;
+    }
 
-      setValidationState((prev) => ({ ...prev, isLoading: true, error: null }));
+    setValidationState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-      debounceTimeoutRef.current = setTimeout(() => {
-        void validateUrl(mintUrl);
-      }, debounceMs);
-    },
-    [validateUrl, debounceMs]
-  );
+    debounceTimeoutRef.current = setTimeout(() => {
+      void validateUrl(mintUrl);
+    }, debounceMs);
+  };
 
   useEffect(() => {
     return () => {
@@ -116,7 +113,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
     };
   }, []);
 
-  const reset = useCallback(() => {
+  const reset = () => {
     setUrl('');
     setValidationState({ isValid: null, isLoading: false, error: null });
     setMintInfo(null);
@@ -125,7 +122,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
     }
     inFlightRef.current?.abort();
     inFlightRef.current = null;
-  }, []);
+  };
 
   return {
     url,

@@ -5,7 +5,7 @@
  * into a single API surface for the TransactionLocationSection component.
  */
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 
 import { log } from '@/shared/lib/logger';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -43,23 +43,20 @@ export function useTransactionLocationSection(
     (state) => state.setTransactionLocation
   );
 
-  const reveal = useCallback(() => {
+  const reveal = () => {
     setIsRevealed(true);
-  }, []);
+  };
 
-  const hide = useCallback(() => {
+  const hide = () => {
     setIsRevealed(false);
-  }, []);
+  };
 
-  const setLocationEnabled = useCallback(
-    (enabled: boolean) => {
-      setSendLocationEnabled(enabled);
-      setJustEnabled(enabled);
-    },
-    [setSendLocationEnabled]
-  );
+  const setLocationEnabled = (enabled: boolean) => {
+    setSendLocationEnabled(enabled);
+    setJustEnabled(enabled);
+  };
 
-  const attachCurrentLocation = useCallback(async (): Promise<boolean> => {
+  const attachCurrentLocation = async (): Promise<boolean> => {
     if (!transactionId) return false;
 
     setIsCapturing(true);
@@ -83,7 +80,7 @@ export function useTransactionLocationSection(
     } finally {
       setIsCapturing(false);
     }
-  }, [transactionId, setTransactionLocation]);
+  };
 
   return {
     location,

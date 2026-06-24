@@ -7,12 +7,12 @@
  * web view must never receive nsec / seed / profile data. See
  * `sovran-security-keys` / `critical-failures`.
  */
-import React, { useCallback } from 'react';
+import React from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, { type SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { WebView, type WebViewProps } from 'react-native-webview';
 
-export const LinkEmbedView = React.memo(function LinkEmbedView({
+export const LinkEmbedView = function LinkEmbedView({
   url,
   opacity: embedOpacity,
   onScroll,
@@ -28,12 +28,9 @@ export const LinkEmbedView = React.memo(function LinkEmbedView({
 }) {
   const fadeStyle = useAnimatedStyle(() => ({ opacity: embedOpacity.value }));
 
-  const handleScroll = useCallback<NonNullable<WebViewProps['onScroll']>>(
-    (e) => {
-      onScroll(e.nativeEvent.contentOffset.y);
-    },
-    [onScroll]
-  );
+  const handleScroll = (e: Parameters<NonNullable<WebViewProps['onScroll']>>[0]) => {
+    onScroll(e.nativeEvent.contentOffset.y);
+  };
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, fadeStyle]}>
@@ -49,7 +46,7 @@ export const LinkEmbedView = React.memo(function LinkEmbedView({
       />
     </Animated.View>
   );
-});
+};
 
 const styles = StyleSheet.create({
   webview: {

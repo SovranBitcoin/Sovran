@@ -5,7 +5,7 @@
  * large (expanded) and small (compact) sizes based on scroll position.
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { ScrollView } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -217,13 +217,10 @@ export function MintCurrencyTabs({
     'surface',
   ] as const);
 
-  const handleCurrencyChange = useCallback(
-    (currency: string) => {
-      cashuLog.info('mint.currency.tab.select', { currency });
-      onCurrencyChange(currency);
-    },
-    [onCurrencyChange]
-  );
+  const handleCurrencyChange = (currency: string) => {
+    cashuLog.info('mint.currency.tab.select', { currency });
+    onCurrencyChange(currency);
+  };
 
   // Animated gap between items
   const animatedListGapStyle = useAnimatedStyle(() => {

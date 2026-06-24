@@ -11,7 +11,6 @@
  * The first screen shows a close button, subsequent screens show a back button.
  */
 
-import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
@@ -28,9 +27,9 @@ const USER_MESSAGES_OPTIONS = { headerShown: false };
 
 export default function MintFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
-    [foreground, background]
+  const screenOptions = createFlowLayoutScreenOptions(
+    { foreground, background },
+    { androidSheet: true }
   );
 
   return (

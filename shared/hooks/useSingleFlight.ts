@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useRef } from 'react';
 
 /**
  * Wraps an async callback so that calls made while a previous call is still
@@ -22,21 +22,18 @@ export function useSingleFlight<TArgs extends unknown[], TResult>(
 ): (...args: TArgs) => Promise<TResult | undefined> {
   const inFlightRef = useRef<Promise<TResult> | null>(null);
 
-  return useCallback(
-    async (...args: TArgs) => {
-      if (inFlightRef.current) return undefined;
-      const promise = fn(...args);
-      inFlightRef.current = promise;
-      try {
-        return await promise;
-      } finally {
-        if (inFlightRef.current === promise) {
-          inFlightRef.current = null;
-        }
+  return async (...args: TArgs) => {
+    if (inFlightRef.current) return undefined;
+    const promise = fn(...args);
+    inFlightRef.current = promise;
+    try {
+      return await promise;
+    } finally {
+      if (inFlightRef.current === promise) {
+        inFlightRef.current = null;
       }
-    },
-    [fn]
-  );
+    }
+  };
 }
 
 /**
@@ -55,20 +52,17 @@ export function useKeyedSingleFlight<TArgs extends unknown[], TResult>(
 ): (...args: TArgs) => Promise<TResult | undefined> {
   const inFlightRef = useRef<Map<string, Promise<TResult>>>(new Map());
 
-  return useCallback(
-    async (...args: TArgs) => {
-      const key = keyOf(...args);
-      if (inFlightRef.current.has(key)) return undefined;
-      const promise = fn(...args);
-      inFlightRef.current.set(key, promise);
-      try {
-        return await promise;
-      } finally {
-        if (inFlightRef.current.get(key) === promise) {
-          inFlightRef.current.delete(key);
-        }
+  return async (...args: TArgs) => {
+    const key = keyOf(...args);
+    if (inFlightRef.current.has(key)) return undefined;
+    const promise = fn(...args);
+    inFlightRef.current.set(key, promise);
+    try {
+      return await promise;
+    } finally {
+      if (inFlightRef.current.get(key) === promise) {
+        inFlightRef.current.delete(key);
       }
-    },
-    [fn, keyOf]
-  );
+    }
+  };
 }

@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import { DisplayCurrency, useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
@@ -39,16 +38,13 @@ export function useFiatCurrencyPill({
   const [success] = useThemeColor(['success'] as const);
   const setDisplayCurrency = useSettingsStore((state) => state.setDisplayCurrency);
 
-  const handleSelectCurrency = useCallback(
-    (currency: DisplayCurrency) => {
-      if (onSelectCurrency) {
-        onSelectCurrency(currency);
-        return;
-      }
-      setDisplayCurrency(currency);
-    },
-    [onSelectCurrency, setDisplayCurrency]
-  );
+  const handleSelectCurrency = (currency: DisplayCurrency) => {
+    if (onSelectCurrency) {
+      onSelectCurrency(currency);
+      return;
+    }
+    setDisplayCurrency(currency);
+  };
 
   const text = showToggleGlyph ? `${displayText}  ⇄` : displayText;
   const iosHeight = 34;

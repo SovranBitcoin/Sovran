@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Keyboard,
   ScrollView,
@@ -176,10 +176,10 @@ export function ChatScreen({
   // slide *under* the composer's translucent glass on scroll-up (the
   // iMessage / Telegram bleed-under-input look).
   const [composerHeight, setComposerHeight] = useState(0);
-  const handleComposerLayout = useCallback((e: LayoutChangeEvent) => {
+  const handleComposerLayout = (e: LayoutChangeEvent) => {
     const next = e.nativeEvent.layout.height;
     setComposerHeight((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
-  }, []);
+  };
 
   // Keyboard avoidance split across two mechanisms:
   //
@@ -258,7 +258,7 @@ export function ChatScreen({
     }
   });
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = () => {
     const text = draft.trim();
     if (!text) return;
     setDraft('');
@@ -266,49 +266,42 @@ export function ChatScreen({
       // Errors already logged by dispatchSend; consumer's onSend is
       // expected to surface user-visible feedback (popups/banners).
     });
-  }, [draft, dispatchSend]);
+  };
 
-  const renderItem = useCallback(
-    ({ item }: { item: ChatBubbleMessage; index: number }) => {
-      const group = groupingMap.get(item.id);
-      const isFirstInGroup = group?.isFirst ?? true;
-      const isLastInGroup = group?.isLast ?? true;
-      return (
-        <RNView style={MESSAGE_ROW_STYLE}>
-          {renderBubble ? (
-            renderBubble({ message: item, isFirstInGroup, isLastInGroup })
-          ) : (
-            <ChatMessageBubble
-              message={item}
-              isFirstInGroup={isFirstInGroup}
-              isLastInGroup={isLastInGroup}
-              counterpartyAvatar={counterpartyAvatar}
-            />
-          )}
-        </RNView>
-      );
-    },
-    [counterpartyAvatar, groupingMap, renderBubble]
-  );
+  const renderItem = ({ item }: { item: ChatBubbleMessage; index: number }) => {
+    const group = groupingMap.get(item.id);
+    const isFirstInGroup = group?.isFirst ?? true;
+    const isLastInGroup = group?.isLast ?? true;
+    return (
+      <RNView style={MESSAGE_ROW_STYLE}>
+        {renderBubble ? (
+          renderBubble({ message: item, isFirstInGroup, isLastInGroup })
+        ) : (
+          <ChatMessageBubble
+            message={item}
+            isFirstInGroup={isFirstInGroup}
+            isLastInGroup={isLastInGroup}
+            counterpartyAvatar={counterpartyAvatar}
+          />
+        )}
+      </RNView>
+    );
+  };
 
-  const keyExtractor = useCallback((m: ChatBubbleMessage) => m.id, []);
+  const keyExtractor = (m: ChatBubbleMessage) => m.id;
 
   // Tap-to-dismiss-keyboard wrapper around the consumer-provided empty
   // placeholder. Mounted in place of the list when there are no messages;
   // the composer stays mounted on top, ready to accept the first send.
-  const wrappedEmptyContent = useMemo(
-    () =>
-      emptyContent ? (
-        <Pressable
-          onPress={Keyboard.dismiss}
-          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}
-          accessible={false}
-          importantForAccessibility="no">
-          {emptyContent}
-        </Pressable>
-      ) : null,
-    [emptyContent]
-  );
+  const wrappedEmptyContent = emptyContent ? (
+    <Pressable
+      onPress={Keyboard.dismiss}
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      accessible={false}
+      importantForAccessibility="no">
+      {emptyContent}
+    </Pressable>
+  ) : null;
 
   // Pad bottom of the list so the newest bubble rests just above the
   // composer's top edge. No `paddingTop` here: adding one breaks
@@ -319,12 +312,9 @@ export function ChatScreen({
   // `resolvedTopInset` clearance against a transparent floating header is
   // already accounted for at the screen level by consumers that need it
   // (Screen primitive's `safeArea` / header inset handling).
-  const listContentContainerStyle = useMemo(
-    () => ({
-      paddingBottom: composerHeight + resolvedBottomInset + 16,
-    }),
-    [composerHeight, resolvedBottomInset]
-  );
+  const listContentContainerStyle = {
+    paddingBottom: composerHeight + resolvedBottomInset + 16,
+  };
 
   return (
     <View style={{ backgroundColor: surfaceColor, flex: 1 }}>

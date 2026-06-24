@@ -11,7 +11,7 @@
  *                  ("don't ask again").
  * - unsupported  → text only (emulators / BLE-less hardware).
  */
-import React, { useCallback } from 'react';
+import React from 'react';
 import { Platform } from 'react-native';
 import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
@@ -74,7 +74,7 @@ export function BluetoothNotice({ bluetooth: bluetoothProp }: BluetoothNoticePro
   const bluetooth = bluetoothProp ?? ownBluetooth;
   const copy = COPY[bluetooth.status];
   const action = noticeAction(bluetooth);
-  const handlePress = useCallback(() => action?.onPress(), [action]);
+  const handlePress = () => action?.onPress();
 
   if (!copy) return null;
 
@@ -106,7 +106,7 @@ export function BluetoothInlineNotice({ bluetooth: bluetoothProp }: BluetoothNot
   ] as const);
   const copy = COPY[bluetooth.status];
   const action = noticeAction(bluetooth);
-  const handlePress = useCallback(() => action?.onPress(), [action]);
+  const handlePress = () => action?.onPress();
 
   if (!copy) return null;
 

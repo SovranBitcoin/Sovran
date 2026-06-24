@@ -10,7 +10,7 @@
  * Route params: `clientPubkey` + `peer` (both 64-hex).
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ListGroup, PressableFeedback, Switch as HeroSwitch } from 'heroui-native';
 import { z } from 'zod';
@@ -63,44 +63,38 @@ export function SignerAppPersonScreen(): React.ReactElement {
   const person = useNostrPersonDisplay(peer);
   const [foreground, muted, danger] = useThemeColor(['foreground', 'muted', 'danger'] as const);
 
-  const hasSessionAccess = useMemo(
-    () =>
-      clientPubkey !== undefined &&
-      peer !== undefined &&
-      sessionGrants.some((g) => g.clientPubkey === clientPubkey && g.peerPubkey === peer),
-    [sessionGrants, clientPubkey, peer]
-  );
+  const hasSessionAccess =
+    clientPubkey !== undefined &&
+    peer !== undefined &&
+    sessionGrants.some((g) => g.clientPubkey === clientPubkey && g.peerPubkey === peer);
 
   const hasPersistentGrant = peer !== undefined && app?.peerDecryptGrants[peer] !== undefined;
   const allowDescription =
     !hasPersistentGrant && hasSessionAccess ? SESSION_DESCRIPTION : ALLOW_DESCRIPTION;
 
-  const onToggleAllow = useCallback(
-    (selected: boolean) => {
-      if (clientPubkey === undefined || peer === undefined) return;
-      if (!selected) {
-        revokePeerDecryptGrant(clientPubkey, peer);
-        return;
-      }
-      let failed = 0;
-      for (const method of ['nip04_decrypt', 'nip44_decrypt'] as const) {
-        const result = setPeerDecryptGrant(clientPubkey, peer, method, { peerIsSelf: false });
-        if (result.isErr()) failed += 1;
-      }
-      if (failed > 0) {
-        nostrLog.warn('nostr.signer.app_person.grant_failed', { failed });
-      }
-    },
-    [clientPubkey, peer, setPeerDecryptGrant, revokePeerDecryptGrant]
-  );
+  const onToggleAllow = (selected: boolean) => {
+    if (clientPubkey === undefined || peer === undefined) return;
+    if (!selected) {
+      revokePeerDecryptGrant(clientPubkey, peer);
+      return;
+    }
+    let failed = 0;
+    for (const method of ['nip04_decrypt', 'nip44_decrypt'] as const) {
+      const result = setPeerDecryptGrant(clientPubkey, peer, method, { peerIsSelf: false });
+      if (result.isErr()) failed += 1;
+    }
+    if (failed > 0) {
+      nostrLog.warn('nostr.signer.app_person.grant_failed', { failed });
+    }
+  };
 
-  const revokeAll = useCallback(() => {
+  const revokeAll = () => {
     if (clientPubkey === undefined || peer === undefined) return;
     revokePeerDecryptGrant(clientPubkey, peer);
     revokeSessionGrant(clientPubkey, undefined, peer);
     popup({ message: REVOKED_TOAST, type: 'success', variant: 'toast', duration: 1500 });
     router.back();
-  }, [clientPubkey, peer, revokePeerDecryptGrant, revokeSessionGrant]);
+  };
 
   if (clientPubkey === undefined || peer === undefined || app === undefined) {
     return (

@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import {
   Easing,
@@ -26,25 +25,19 @@ export function useQRButtonPressFeedback() {
     transform: [{ scale: scale.get() }],
   }));
 
-  const onPressIn = useCallback(
-    (_event: GestureResponderEvent) => {
-      void EnhancedHaptics.buttonHaptic();
-      scale.set(
-        withTiming(PRESSED_SCALE, {
-          duration: duration.instant,
-          easing: Easing.out(Easing.cubic),
-        })
-      );
-    },
-    [scale]
-  );
+  const onPressIn = (_event: GestureResponderEvent) => {
+    void EnhancedHaptics.buttonHaptic();
+    scale.set(
+      withTiming(PRESSED_SCALE, {
+        duration: duration.instant,
+        easing: Easing.out(Easing.cubic),
+      })
+    );
+  };
 
-  const onPressOut = useCallback(
-    (_event: GestureResponderEvent) => {
-      scale.set(withSpring(REST_SCALE, RETURN_SPRING));
-    },
-    [scale]
-  );
+  const onPressOut = (_event: GestureResponderEvent) => {
+    scale.set(withSpring(REST_SCALE, RETURN_SPRING));
+  };
 
   return { animatedStyle, onPressIn, onPressOut };
 }

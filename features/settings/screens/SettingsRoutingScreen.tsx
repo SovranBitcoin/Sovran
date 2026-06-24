@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { ScrollView, View } from 'react-native';
 import {
   useSettingsStore,
@@ -31,13 +31,10 @@ export function SettingsRoutingScreen() {
   const minTransferThreshold = useSettingsStore((state) => state.minTransferThreshold);
   const setMinTransferThreshold = useSettingsStore((state) => state.setMinTransferThreshold);
 
-  const update = useCallback(
-    (partial: Partial<MiddlemanRoutingSettings>) => {
-      log.info('settings.routing.change', { ...partial });
-      setMiddlemanRouting(partial);
-    },
-    [setMiddlemanRouting]
-  );
+  const update = (partial: Partial<MiddlemanRoutingSettings>) => {
+    log.info('settings.routing.change', { ...partial });
+    setMiddlemanRouting(partial);
+  };
 
   const asNumber = (value: number | number[]) => (Array.isArray(value) ? (value[0] ?? 0) : value);
   // Snap to slider step so a stored rate that isn't a multiple of 5 doesn't

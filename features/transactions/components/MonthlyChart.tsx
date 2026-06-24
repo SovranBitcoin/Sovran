@@ -125,11 +125,7 @@ const MODE_CONFIG: Record<
 // Component
 // ---------------------------------------------------------------------------
 
-const MonthlyChart = React.memo(function MonthlyChart({
-  history,
-  unit = 'sat',
-  mode,
-}: MonthlyChartProps) {
+const MonthlyChart = function MonthlyChart({ history, unit = 'sat', mode }: MonthlyChartProps) {
   const [muted, foreground, dangerColor, successColor] = useThemeColor([
     'muted',
     'foreground',
@@ -142,11 +138,11 @@ const MonthlyChart = React.memo(function MonthlyChart({
 
   const config = MODE_CONFIG[mode];
 
-  const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
+  const borderColor = opacity(muted, 0.3);
 
   const actualLineColor = mode === 'spent' ? dangerColor : successColor;
-  const projectedLineColor = useMemo(() => opacity(foreground, 0.3), [foreground]);
-  const labelColor = useMemo(() => opacity(foreground, 0.66), [foreground]);
+  const projectedLineColor = opacity(foreground, 0.3);
+  const labelColor = opacity(foreground, 0.66);
 
   // Use a unique gradient ID per mode to avoid SVG collisions when both charts render
   const gradientId = `monthlyGradient-${mode}`;
@@ -253,15 +249,11 @@ const MonthlyChart = React.memo(function MonthlyChart({
   // Build SVG paths
   // ---------------------------------------------------------------------------
 
-  const actualPath = useMemo(() => buildSmoothPath(actualPoints), [actualPoints]);
-  const projectedPath = useMemo(() => buildSmoothPath(projectedPoints), [projectedPoints]);
-  const projectedAreaPath = useMemo(
-    () =>
-      buildAreaPath(
-        [...actualPoints, ...projectedPoints.slice(1)],
-        CHART_PADDING_TOP + drawableHeight
-      ),
-    [actualPoints, projectedPoints, drawableHeight]
+  const actualPath = buildSmoothPath(actualPoints);
+  const projectedPath = buildSmoothPath(projectedPoints);
+  const projectedAreaPath = buildAreaPath(
+    [...actualPoints, ...projectedPoints.slice(1)],
+    CHART_PADDING_TOP + drawableHeight
   );
 
   const xTickPositions = useMemo(() => {
@@ -413,7 +405,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
       </SquircleView>
     </Log>
   );
-});
+};
 
 MonthlyChart.displayName = 'MonthlyChart';
 
@@ -426,14 +418,14 @@ interface ChartWrapperProps {
   unit?: string;
 }
 
-export const SpentThisMonth = React.memo(function SpentThisMonth(props: ChartWrapperProps) {
+export const SpentThisMonth = function SpentThisMonth(props: ChartWrapperProps) {
   return <MonthlyChart {...props} mode="spent" />;
-});
+};
 SpentThisMonth.displayName = 'SpentThisMonth';
 
-export const ReceivedThisMonth = React.memo(function ReceivedThisMonth(props: ChartWrapperProps) {
+export const ReceivedThisMonth = function ReceivedThisMonth(props: ChartWrapperProps) {
   return <MonthlyChart {...props} mode="received" />;
-});
+};
 ReceivedThisMonth.displayName = 'ReceivedThisMonth';
 
 // ---------------------------------------------------------------------------

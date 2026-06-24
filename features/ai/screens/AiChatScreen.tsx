@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Keyboard, ScrollView, View as RNView, type LayoutChangeEvent } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -126,10 +126,7 @@ export function AiChatScreen() {
 
   const { send, retry, isSending, streamingMessageId } = useAiSend();
 
-  const activeMessages = useMemo(
-    () => deriveActivePath(conversationHistory, activeChildren),
-    [conversationHistory, activeChildren]
-  );
+  const activeMessages = deriveActivePath(conversationHistory, activeChildren);
 
   // Mount visibility — narrow set, fires once. No imperative scroll-chase
   // plumbing: FlashList's `maintainVisibleContentPosition` with
@@ -171,21 +168,18 @@ export function AiChatScreen() {
     return map;
   }, [activeMessages, conversationHistory, setActiveBranch]);
 
-  const handleRetry = useCallback(
-    (messageId: string) => {
-      aiLog.info('ai.retry.dispatch', { messageId });
-      void retry(messageId);
-    },
-    [retry]
-  );
+  const handleRetry = (messageId: string) => {
+    aiLog.info('ai.retry.dispatch', { messageId });
+    void retry(messageId);
+  };
 
   // Composer state (draft + measured height for list bottom padding).
   const [draft, setDraft] = useState('');
   const [composerHeight, setComposerHeight] = useState(0);
-  const handleComposerLayout = useCallback((e: LayoutChangeEvent) => {
+  const handleComposerLayout = (e: LayoutChangeEvent) => {
     const next = e.nativeEvent.layout.height;
     setComposerHeight((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
-  }, []);
+  };
 
   // Composer + list both ride the keyboard via a single shared translate
   // (UI thread, no Yoga re-layout per frame). The math:
@@ -247,7 +241,7 @@ export function AiChatScreen() {
     }
   });
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = () => {
     const text = draft.trim();
     if (!text) return;
     setDraft('');
@@ -255,7 +249,7 @@ export function AiChatScreen() {
       // Errors already logged; consumer's onSend is expected to surface
       // user-visible feedback (popups/banners).
     });
-  }, [draft, dispatchSend]);
+  };
 
   // Perf loggers — same canonical emits the shared ChatScreen produces, so
   // the AI surface stays observable in chat.kav.* and chat.list.history_change
@@ -269,36 +263,30 @@ export function AiChatScreen() {
   });
   useChatKeyboardAnimationLogger({ log: aiLog, surface: SURFACE });
 
-  const renderItem = useCallback(
-    ({ item }: { item: RoutstrMessage; index: number }) => (
-      <RNView style={MESSAGE_ROW_STYLE}>
-        <AiMessageBubble
-          message={item}
-          isStreaming={item.id === streamingMessageId}
-          onRetry={isSending ? undefined : handleRetry}
-          branchNav={branchNavById.get(item.id)}
-        />
-      </RNView>
-    ),
-    [branchNavById, handleRetry, isSending, streamingMessageId]
+  const renderItem = ({ item }: { item: RoutstrMessage; index: number }) => (
+    <RNView style={MESSAGE_ROW_STYLE}>
+      <AiMessageBubble
+        message={item}
+        isStreaming={item.id === streamingMessageId}
+        onRetry={isSending ? undefined : handleRetry}
+        branchNav={branchNavById.get(item.id)}
+      />
+    </RNView>
   );
 
-  const keyExtractor = useCallback((m: RoutstrMessage) => m.id, []);
+  const keyExtractor = (m: RoutstrMessage) => m.id;
 
   // Tap-to-dismiss-keyboard on the empty placeholder mirrors the previous
   // behaviour. Mounted in place of the list when there are no messages; the
   // composer stays mounted over the top, ready to accept the first message.
-  const emptyContent = useMemo(
-    () => (
-      <Pressable
-        onPress={Keyboard.dismiss}
-        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-        accessible={false}
-        importantForAccessibility="no">
-        <AiEmptyState />
-      </Pressable>
-    ),
-    []
+  const emptyContent = (
+    <Pressable
+      onPress={Keyboard.dismiss}
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+      accessible={false}
+      importantForAccessibility="no">
+      <AiEmptyState />
+    </Pressable>
   );
 
   // Pad bottom of the list so the newest bubble rests just above the
@@ -312,12 +300,9 @@ export function AiChatScreen() {
   // padding it would otherwise insert). The AI Stack header is its own
   // opaque/translucent surface above the screen scene; content sliding
   // under it on scroll is the intended chat UX.
-  const listContentContainerStyle = useMemo(
-    () => ({
-      paddingBottom: composerHeight + bottomInset + 16,
-    }),
-    [composerHeight, bottomInset]
-  );
+  const listContentContainerStyle = {
+    paddingBottom: composerHeight + bottomInset + 16,
+  };
 
   return (
     <RNView style={{ flex: 1, backgroundColor: surfaceColor }}>

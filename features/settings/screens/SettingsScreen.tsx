@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef } from 'react';
 import { ScrollView, Alert } from 'react-native';
 import { openExternalUrl } from '@/shared/lib/url';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -167,7 +167,7 @@ export const SettingsScreen = () => {
   const tapCountRef = useRef(0);
   const lastTapRef = useRef(0);
 
-  const handleVersionPress = useCallback(() => {
+  const handleVersionPress = () => {
     const now = Date.now();
     if (now - lastTapRef.current > TRIPLE_TAP_WINDOW_MS) {
       tapCountRef.current = 0;
@@ -182,7 +182,7 @@ export const SettingsScreen = () => {
       setDevMode(newMode);
       paramPopup('dev-mode', newMode);
     }
-  }, [devMode, setDevMode]);
+  };
 
   const handleExportDatabase = async () => {
     log.info('settings.export_database.start');

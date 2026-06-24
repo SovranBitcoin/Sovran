@@ -10,7 +10,7 @@
  * Used by both SwapTransactionScreen and RebalanceStepRow.
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -27,26 +27,24 @@ interface TransferCardProps {
   children: React.ReactNode;
 }
 
-export const TransferCard = React.memo(
-  ({ accentColor: accentColorProp, children }: TransferCardProps) => {
-    const muted = useThemeColor('muted');
+export const TransferCard = ({ accentColor: accentColorProp, children }: TransferCardProps) => {
+  const muted = useThemeColor('muted');
 
-    const accentColor = useMemo(() => accentColorProp ?? muted, [accentColorProp, muted]);
+  const accentColor = accentColorProp ?? muted;
 
-    // Always show the tinted border — matches Transactions component exactly.
-    const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
+  // Always show the tinted border — matches Transactions component exactly.
+  const borderColor = opacity(accentColor, 0.3);
 
-    return (
-      <Log name="TransferCard">
-        <SquircleView style={[styles.card, { borderColor }]}>
-          <BlurCardFrame accentColor={accentColor}>
-            <View style={styles.content}>{children}</View>
-          </BlurCardFrame>
-        </SquircleView>
-      </Log>
-    );
-  }
-);
+  return (
+    <Log name="TransferCard">
+      <SquircleView style={[styles.card, { borderColor }]}>
+        <BlurCardFrame accentColor={accentColor}>
+          <View style={styles.content}>{children}</View>
+        </BlurCardFrame>
+      </SquircleView>
+    </Log>
+  );
+};
 TransferCard.displayName = 'TransferCard';
 
 const styles = StyleSheet.create({

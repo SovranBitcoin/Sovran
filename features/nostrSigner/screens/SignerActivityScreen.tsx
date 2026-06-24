@@ -15,7 +15,7 @@
  * the app-detail screen's "View Activity" link.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -141,67 +141,60 @@ export function SignerActivityScreen(): React.ReactElement {
   }, [params.clientPubkey]);
   const [filter, setFilter] = useState<ActivityFilter>(initialFilter);
 
-  const toneColors = useMemo(
-    () => ({ success, danger, warning }) as const,
-    [success, danger, warning]
-  );
+  const toneColors = { success, danger, warning } as const;
 
-  const clientPubkeys = useMemo(() => distinctClients(entries, apps), [entries, apps]);
+  const clientPubkeys = distinctClients(entries, apps);
   // Per-app filter allowed set: the live key plus every key it replaced.
   const appFilterKeys = useMemo(() => {
     if (filter.kind !== 'app') return null;
     const live = apps[filter.clientPubkey];
     return new Set<string>([filter.clientPubkey, ...(live?.previousClientPubkeys ?? [])]);
   }, [filter, apps]);
-  const filtered = useMemo(
-    () => entries.filter((entry) => entryMatchesFilter(entry, filter, appFilterKeys)),
-    [entries, filter, appFilterKeys]
-  );
+  const filtered = entries.filter((entry) => entryMatchesFilter(entry, filter, appFilterKeys));
 
   // Content scrolls UNDER the transparent blur header (thread-page style).
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
-  const listContentStyle = useMemo(
-    () => ({ paddingTop: headerHeight, paddingBottom: insets.bottom }),
-    [headerHeight, insets.bottom]
-  );
-  const indicatorInsets = useMemo(() => ({ top: headerHeight }), [headerHeight]);
+  const listContentStyle = {
+    paddingTop: headerHeight,
+    paddingBottom: insets.bottom,
+  };
+  const indicatorInsets = {
+    top: headerHeight,
+  };
 
-  const openDetail = useCallback((entryId: string) => {
+  const openDetail = (entryId: string) => {
     router.push(`/(signer-flow)/activity-detail?id=${encodeURIComponent(entryId)}` as never);
-  }, []);
-  const keyExtractor = useCallback((item: Nip46ActivityEntry) => item.id, []);
+  };
+  const keyExtractor = (item: Nip46ActivityEntry) => item.id;
 
-  const renderItem = useCallback(
-    ({ item }: { item: Nip46ActivityEntry }) => {
-      const display = ACTIVITY_VERDICT_DISPLAY[item.verdict];
-      const entry = permissionEntryFor({
-        method: item.method,
-        ...(item.kind !== undefined && { kind: item.kind }),
-      });
-      const appName = appDisplayName(connectionForClient(apps, item.clientPubkey));
-      return (
-        <ListRow
-          padding="compact"
-          iconCircle={{ icon: display.icon, color: toneColors[display.tone], size: 40 }}
-          title={item.summary?.headline ?? entry.headline}
-          subtitle={`${appName} · ${formatRelative(item.at, 'chat-bubble')}`}
-          wrapSubtitle
-          accent={
-            display.accentLine !== undefined ? (
-              <Text size={12} color={toneColors[display.tone]} numberOfLines={1}>
-                {display.accentLine}
-              </Text>
-            ) : undefined
-          }
-          trailing={<Icon name="mdi:chevron-right" size={20} color={muted} />}
-          onPress={() => openDetail(item.id)}
-          accessibilityHint="Opens the request details"
-        />
-      );
-    },
-    [apps, muted, openDetail, toneColors]
-  );
+  const renderItem = ({ item }: { item: Nip46ActivityEntry }) => {
+    const display = ACTIVITY_VERDICT_DISPLAY[item.verdict];
+    const entry = permissionEntryFor({
+      method: item.method,
+      ...(item.kind !== undefined && { kind: item.kind }),
+    });
+    const appName = appDisplayName(connectionForClient(apps, item.clientPubkey));
+    return (
+      <ListRow
+        padding="compact"
+        iconCircle={{ icon: display.icon, color: toneColors[display.tone], size: 40 }}
+        title={item.summary?.headline ?? entry.headline}
+        subtitle={`${appName} · ${formatRelative(item.at, 'chat-bubble')}`}
+        wrapSubtitle
+        accent={
+          display.accentLine !== undefined ? (
+            <Text size={12} color={toneColors[display.tone]} numberOfLines={1}>
+              {display.accentLine}
+            </Text>
+          ) : undefined
+        }
+        trailing={<Icon name="mdi:chevron-right" size={20} color={muted} />}
+        onPress={() => openDetail(item.id)}
+        accessibilityHint="Opens the request details"
+      />
+    );
+  };
 
   const chips = (
     <ScrollView

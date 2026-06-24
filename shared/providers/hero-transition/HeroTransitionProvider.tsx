@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { FullWindowOverlay } from 'react-native-screens';
 import Animated, {
@@ -64,40 +64,37 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
   const toW = useSharedValue(0);
   const toH = useSharedValue(0);
 
-  const registerRef = useCallback((id: HeroId, role: HeroRole, ref: any) => {
+  const registerRef = (id: HeroId, role: HeroRole, ref: any) => {
     refs.current[id] = refs.current[id] || {};
     refs.current[id][role] = ref;
-  }, []);
+  };
 
-  const animateOverlay = useCallback(
-    (fromRect: Rect, toRect: Rect, onDone: () => void) => {
-      // Set geometry synchronously so the overlay never mounts "empty/invisible".
-      fromX.set(fromRect.x);
-      fromY.set(fromRect.y);
-      fromW.set(fromRect.width);
-      fromH.set(fromRect.height);
-      toX.set(toRect.x);
-      toY.set(toRect.y);
-      toW.set(toRect.width);
-      toH.set(toRect.height);
+  const animateOverlay = (fromRect: Rect, toRect: Rect, onDone: () => void) => {
+    // Set geometry synchronously so the overlay never mounts "empty/invisible".
+    fromX.set(fromRect.x);
+    fromY.set(fromRect.y);
+    fromW.set(fromRect.width);
+    fromH.set(fromRect.height);
+    toX.set(toRect.x);
+    toY.set(toRect.y);
+    toW.set(toRect.width);
+    toH.set(toRect.height);
 
-      // Drive animation directly from JS thread — reanimated handles the UI-thread
-      // transition internally. On completion, bounce back to JS via runOnJS.
-      // (Previously used scheduleOnUI/scheduleOnRN from react-native-worklets which
-      // caused SIGABRT crashes when combined with navigation transitions.)
-      cancelAnimation(progress);
-      progress.set(0);
-      progress.set(
-        withTiming(1, { duration: DURATION_MS, easing: Easing.out(Easing.cubic) }, (finished) => {
-          'worklet';
-          if (finished) {
-            runOnJS(onDone)();
-          }
-        })
-      );
-    },
-    [fromH, fromW, fromX, fromY, progress, toH, toW, toX, toY]
-  );
+    // Drive animation directly from JS thread — reanimated handles the UI-thread
+    // transition internally. On completion, bounce back to JS via runOnJS.
+    // (Previously used scheduleOnUI/scheduleOnRN from react-native-worklets which
+    // caused SIGABRT crashes when combined with navigation transitions.)
+    cancelAnimation(progress);
+    progress.set(0);
+    progress.set(
+      withTiming(1, { duration: DURATION_MS, easing: Easing.out(Easing.cubic) }, (finished) => {
+        'worklet';
+        if (finished) {
+          runOnJS(onDone)();
+        }
+      })
+    );
+  };
 
   const overlayStyle = useAnimatedStyle(() => {
     const p = progress.get();
@@ -138,31 +135,23 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
     };
   });
 
-  const isAnimating = useCallback(
-    (id: HeroId) =>
-      (phase.state === 'forward_animating' || phase.state === 'back_animating') && phase.id === id,
-    [phase]
-  );
+  const isAnimating = (id: HeroId) =>
+    (phase.state === 'forward_animating' || phase.state === 'back_animating') && phase.id === id;
 
-  const isTransitioning = useCallback(
-    (id: HeroId) => overlayVisible && phase.state !== 'idle' && 'id' in phase && phase.id === id,
-    [overlayVisible, phase]
-  );
+  const isTransitioning = (id: HeroId) =>
+    overlayVisible && phase.state !== 'idle' && 'id' in phase && phase.id === id;
 
-  const isHidden = useCallback(
-    (id: HeroId, role: HeroRole) => {
-      // While overlay is visible, hide both source and destination nodes to avoid double-render flicker.
-      // (The overlay is the "one true" element during the morph.)
-      if (!overlayVisible) return false;
-      if (phase.state === 'idle') return false;
-      if (!('id' in phase)) return false;
-      if (phase.id !== id) return false;
-      return role === 'source' || role === 'destination';
-    },
-    [overlayVisible, phase]
-  );
+  const isHidden = (id: HeroId, role: HeroRole) => {
+    // While overlay is visible, hide both source and destination nodes to avoid double-render flicker.
+    // (The overlay is the "one true" element during the morph.)
+    if (!overlayVisible) return false;
+    if (phase.state === 'idle') return false;
+    if (!('id' in phase)) return false;
+    if (phase.id !== id) return false;
+    return role === 'source' || role === 'destination';
+  };
 
-  const startClaimUsername = useCallback(async () => {
+  const startClaimUsername = async () => {
     if (phase.state !== 'idle') return;
 
     const sourceRef = refs.current.claimUsername?.source;
@@ -206,9 +195,9 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
 
     setOverlayVisible(false);
     setPhase({ state: 'idle' });
-  }, [animateOverlay, fromH, fromW, fromX, fromY, phase.state, progress, toH, toW, toX, toY]);
+  };
 
-  const closeClaimUsername = useCallback(async () => {
+  const closeClaimUsername = async () => {
     if (phase.state !== 'idle') return;
 
     const destRef = refs.current.claimUsername?.destination;
@@ -250,23 +239,23 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
 
     setOverlayVisible(false);
     setPhase({ state: 'idle' });
-  }, [animateOverlay, fromH, fromW, fromX, fromY, phase.state, progress, toH, toW, toX, toY]);
+  };
 
-  const value = useMemo<Ctx>(
-    () => ({
-      registerRef,
-      startClaimUsername: () => {
-        void startClaimUsername();
-      },
-      closeClaimUsername: () => {
-        void closeClaimUsername();
-      },
-      isHidden,
-      isAnimating,
-      isTransitioning,
-    }),
-    [registerRef, startClaimUsername, closeClaimUsername, isHidden, isAnimating, isTransitioning]
-  );
+  const value = {
+    registerRef,
+
+    startClaimUsername: () => {
+      void startClaimUsername();
+    },
+
+    closeClaimUsername: () => {
+      void closeClaimUsername();
+    },
+
+    isHidden,
+    isAnimating,
+    isTransitioning,
+  };
 
   return (
     <HeroTransitionContext.Provider value={value}>

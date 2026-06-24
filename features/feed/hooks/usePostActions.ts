@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 
@@ -28,54 +27,51 @@ export function usePostActions(options?: {
   const ignorePubkey = useFeedIgnoreStore((s) => s.ignorePubkey);
   const getProfileName = options?.getProfileName;
 
-  return useCallback(
-    (event: FeedEvent) => {
-      const fallback = tryNpubEncode(event.pubkey).slice(0, 12) + '…';
-      const links = buildShareLinks(event, getOwnWriteRelays()[0]);
-      const shareButtons: MenuButton[] = links
-        ? [
-            {
-              text: 'Share',
-              icon: 'mdi:share-variant-outline',
-              onPress: (close) => {
-                close();
-                void Share.share({ message: links.njumpUrl });
-              },
+  return (event: FeedEvent) => {
+    const fallback = tryNpubEncode(event.pubkey).slice(0, 12) + '…';
+    const links = buildShareLinks(event, getOwnWriteRelays()[0]);
+    const shareButtons: MenuButton[] = links
+      ? [
+          {
+            text: 'Share',
+            icon: 'mdi:share-variant-outline',
+            onPress: (close) => {
+              close();
+              void Share.share({ message: links.njumpUrl });
             },
-            {
-              text: 'Copy link',
-              icon: 'mdi:link-variant',
-              onPress: (close) => {
-                close();
-                void Clipboard.setStringAsync(links.njumpUrl);
-              },
+          },
+          {
+            text: 'Copy link',
+            icon: 'mdi:link-variant',
+            onPress: (close) => {
+              close();
+              void Clipboard.setStringAsync(links.njumpUrl);
             },
-          ]
-        : [];
-      const buttons: MenuButton[] = [
-        ...shareButtons,
-        {
-          text: 'Ignore post',
-          icon: 'mdi:eye-off-outline',
-          testID: 'thread-ignore-post',
-          onPress: (close) => {
-            close();
-            ignoreEvent(event.id);
           },
+        ]
+      : [];
+    const buttons: MenuButton[] = [
+      ...shareButtons,
+      {
+        text: 'Ignore post',
+        icon: 'mdi:eye-off-outline',
+        testID: 'thread-ignore-post',
+        onPress: (close) => {
+          close();
+          ignoreEvent(event.id);
         },
-        {
-          text: 'Ignore person',
-          description: getProfileName?.(event.pubkey) ?? fallback,
-          icon: 'mdi:account-cancel-outline',
-          testID: 'thread-ignore-person',
-          onPress: (close) => {
-            close();
-            ignorePubkey(event.pubkey);
-          },
+      },
+      {
+        text: 'Ignore person',
+        description: getProfileName?.(event.pubkey) ?? fallback,
+        icon: 'mdi:account-cancel-outline',
+        testID: 'thread-ignore-person',
+        onPress: (close) => {
+          close();
+          ignorePubkey(event.pubkey);
         },
-      ];
-      actionMenuPopup({ title: 'Post', buttons });
-    },
-    [ignoreEvent, ignorePubkey, getProfileName]
-  );
+      },
+    ];
+    actionMenuPopup({ title: 'Post', buttons });
+  };
 }

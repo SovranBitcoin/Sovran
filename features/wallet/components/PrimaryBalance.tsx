@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -129,10 +129,10 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   const breakdown = useColadaBalance();
   const btcPrice = useBtcPrice(displayCurrency);
 
-  const toggleUnit = useCallback(async () => {
+  const toggleUnit = async () => {
     await EnhancedHaptics.successHaptic();
     setDisplayBtc(((displayBtc + 1) % 4) as DisplayBtcMode);
-  }, [displayBtc, setDisplayBtc]);
+  };
 
   const balance = mockMode ? mockBalance : breakdown.total;
   const reservedTotal = breakdown.reserved;
@@ -158,7 +158,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   }, [account.unit, mockMode, pendingTotal, reservedTotal, lockedTotal]);
 
   const displayText = `≈ ${currencyConfig.symbol}${fiatValue}`;
-  const handlePendingPress = useCallback(() => {
+  const handlePendingPress = () => {
     walletLog.info('wallet.pending.press', {
       pendingTotal,
       unit: pendingUnit,
@@ -173,11 +173,11 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         filterMintUrl: 'all',
       },
     });
-  }, [router, account.unit, pendingTotal, pendingUnit]);
+  };
 
   // Wrap the menu in a promise so a rapid second tap on the Reserved pill is
   // dropped by `useSingleFlight` until the first interaction settles.
-  const handleReservedPressInner = useCallback(async () => {
+  const handleReservedPressInner = async () => {
     const recoverPending = async () => {
       walletLog.info('wallet.reserved.recovery_start', { reservedTotal });
       try {
@@ -233,14 +233,14 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         ],
       });
     });
-  }, [reservedTotal]);
+  };
 
   const handleReservedPress = useSingleFlight(handleReservedPressInner);
 
   // REDEEMING pill: retry redeeming received-but-unswapped ecash. Tapping runs
   // coco's receive recovery sweep, which swaps any `executing` receives once
   // the mint is reachable; on success they leave limbo and join the balance.
-  const handleRedeemingPressInner = useCallback(async () => {
+  const handleRedeemingPressInner = async () => {
     walletLog.info('wallet.redeeming.recovery_start', { lockedTotal });
     try {
       const manager = CocoManager.getInstance();
@@ -260,7 +260,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         text: error instanceof Error ? error.message : 'Unknown error',
       });
     }
-  }, [lockedTotal]);
+  };
 
   const handleRedeemingPress = useSingleFlight(handleRedeemingPressInner);
 

@@ -18,7 +18,6 @@
  * The first screen shows a close button, subsequent screens show a back button.
  */
 
-import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
@@ -64,9 +63,9 @@ const CAMERA_OPTIONS = {
 
 export default function SendFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
-    [foreground, background]
+  const screenOptions = createFlowLayoutScreenOptions(
+    { foreground, background },
+    { androidSheet: true }
   );
 
   return (

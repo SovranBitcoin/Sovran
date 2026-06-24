@@ -18,7 +18,7 @@
  * green "Connected" badge there would be misleading exactly when it matters.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from 'expo-router';
 import { Button as HerouiButton, ListGroup, Separator } from 'heroui-native';
@@ -69,64 +69,57 @@ export function ShareSignerScreen(): React.ReactElement {
   const { keys } = useNostrKeysContext();
   const [state, setState] = useState<ShareState>({ status: 'loading' });
 
-  const regenerate = useCallback(
-    (rotate: boolean) => {
-      const pubkey = keys?.pubkey;
-      if (pubkey === undefined) return; // keys still deriving — refires below
-      setState({ status: 'loading' });
-      const minted = rotate
-        ? clearSecrets(pubkey).andThen(() => mintSecret(pubkey))
-        : mintSecret(pubkey);
-      void minted.match(
-        (secret) => {
-          setState({
-            status: 'ready',
-            uri: buildBunkerUri({
-              signerPubkey: pubkey,
-              relays: [...defaultSignerRelays],
-              secret,
-            }),
-          });
-        },
-        (error) => {
-          // Error type only — the secret is a bearer credential.
-          nostrLog.error('nostr.signer.share_mint_failed', { error: error.type });
-          setState({ status: 'error' });
-        }
-      );
-    },
-    [keys?.pubkey]
-  );
+  const regenerate = (rotate: boolean) => {
+    const pubkey = keys?.pubkey;
+    if (pubkey === undefined) return; // keys still deriving — refires below
+    setState({ status: 'loading' });
+    const minted = rotate
+      ? clearSecrets(pubkey).andThen(() => mintSecret(pubkey))
+      : mintSecret(pubkey);
+    void minted.match(
+      (secret) => {
+        setState({
+          status: 'ready',
+          uri: buildBunkerUri({
+            signerPubkey: pubkey,
+            relays: [...defaultSignerRelays],
+            secret,
+          }),
+        });
+      },
+      (error) => {
+        // Error type only — the secret is a bearer credential.
+        nostrLog.error('nostr.signer.share_mint_failed', { error: error.type });
+        setState({ status: 'error' });
+      }
+    );
+  };
 
   // Fresh secret on every focus; hot engine while visible so the incoming
   // `connect` is answered without a cold start. The callback identity changes
   // when keys finish deriving, which re-runs the focus effect — that is the
   // keys-arrived-while-focused path.
-  useFocusEffect(
-    useCallback(() => {
-      useNip46RequestsStore.getState().setServiceHotRequested(true);
-      regenerate(false);
-      return () => {
-        useNip46RequestsStore.getState().setServiceHotRequested(false);
-      };
-    }, [regenerate])
-  );
+  useFocusEffect(() => {
+    useNip46RequestsStore.getState().setServiceHotRequested(true);
+    regenerate(false);
+    return () => {
+      useNip46RequestsStore.getState().setServiceHotRequested(false);
+    };
+  });
 
-  const copyLink = useSingleFlight(
-    useCallback(async () => {
-      if (state.status !== 'ready') return;
-      await Clipboard.setStringAsync(state.uri);
-      popup({ message: 'Copied', type: 'success', variant: 'toast', duration: 1500 });
-    }, [state])
-  );
+  const copyLink = useSingleFlight(async () => {
+    if (state.status !== 'ready') return;
+    await Clipboard.setStringAsync(state.uri);
+    popup({ message: 'Copied', type: 'success', variant: 'toast', duration: 1500 });
+  });
 
-  const confirmRotate = useCallback(() => {
+  const confirmRotate = () => {
     popup({
       message: ROTATE_CONFIRM_TITLE,
       text: ROTATE_CONFIRM_BODY,
       buttons: [{ text: ROTATE_SECRET_LABEL, onPress: () => regenerate(true) }, { text: 'Cancel' }],
     });
-  }, [regenerate]);
+  };
 
   return (
     <Screen name="ShareSignerScreen">
@@ -166,7 +159,6 @@ export function ShareSignerScreen(): React.ReactElement {
           )}
         </View>
       </View>
-
       {state.status === 'error' ? (
         <VStack align="center" spacing={10} className="px-5 pt-4">
           <Text size={14} color={danger} style={{ textAlign: 'center' }}>
@@ -193,7 +185,6 @@ export function ShareSignerScreen(): React.ReactElement {
           </HerouiButton>
         </View>
       )}
-
       <Section title={RELAYS_SECTION_TITLE}>
         <ListGroup variant="secondary">
           {defaultSignerRelays.map((relay, index) => (
@@ -208,7 +199,6 @@ export function ShareSignerScreen(): React.ReactElement {
           ))}
         </ListGroup>
       </Section>
-
       <Section title={SECRET_SECTION_TITLE}>
         <ListGroup variant="secondary">
           <View className="p-4" style={{ gap: 12 }}>
@@ -227,7 +217,6 @@ export function ShareSignerScreen(): React.ReactElement {
           </View>
         </ListGroup>
       </Section>
-
       <Spacer size={32} />
     </Screen>
   );

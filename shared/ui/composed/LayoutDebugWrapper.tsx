@@ -1,4 +1,4 @@
-import React, { ReactNode, useCallback, useState } from 'react';
+import React, { ReactNode, useState } from 'react';
 import {
   LayoutChangeEvent,
   NativeScrollEvent,
@@ -116,7 +116,7 @@ export function LayoutDebugWrapper({
     right: 0,
   });
 
-  const handleScroll = useCallback((event: { nativeEvent: NativeScrollEvent }) => {
+  const handleScroll = (event: { nativeEvent: NativeScrollEvent }) => {
     const { contentInset } = event.nativeEvent;
     if (contentInset) {
       setAdjustedInsets({
@@ -126,7 +126,7 @@ export function LayoutDebugWrapper({
         right: contentInset.right,
       });
     }
-  }, []);
+  };
 
   const actualBottomInset = adjustedInsets.bottom;
   const estimatedBottomArea = TAB_BAR_HEIGHT + insets.bottom;

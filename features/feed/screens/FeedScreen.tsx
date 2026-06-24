@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { ScreenContainer } from '@/features/contacts/components/ScreenContainer';
@@ -39,7 +39,7 @@ function FeedFilters({
   onSelectForYou,
   onSelectFollowingMode,
 }: FeedFiltersProps) {
-  const openFollowingMenu = useCallback(() => {
+  const openFollowingMenu = () => {
     actionMenuPopup({
       title: 'Following',
       buttons: [
@@ -67,18 +67,15 @@ function FeedFilters({
         },
       ],
     });
-  }, [followingMode, onSelectFollowingMode]);
+  };
 
-  const handleTabPress = useCallback(
-    (tab: FeedTabId) => {
-      if (tab === FEED_TAB_FOR_YOU) {
-        onSelectForYou();
-        return;
-      }
-      openFollowingMenu();
-    },
-    [onSelectForYou, openFollowingMenu]
-  );
+  const handleTabPress = (tab: FeedTabId) => {
+    if (tab === FEED_TAB_FOR_YOU) {
+      onSelectForYou();
+      return;
+    }
+    openFollowingMenu();
+  };
 
   return (
     <Log name="FeedFilters">
@@ -126,18 +123,18 @@ export function FeedScreen() {
       ? FEED_FILTER_FOLLOWING_POPULAR
       : FEED_FILTER_FOLLOWING_RECENT;
   }, [activeTab, followingMode]);
-  const handleSelectForYou = useCallback(() => {
+  const handleSelectForYou = () => {
     feedLog.info('feed.filter.change', { filter: FEED_FILTER_FOR_YOU });
     setActiveTab(FEED_TAB_FOR_YOU);
-  }, []);
+  };
 
-  const handleSelectFollowingMode = useCallback((mode: FollowingMode) => {
+  const handleSelectFollowingMode = (mode: FollowingMode) => {
     const filter =
       mode === 'Popular' ? FEED_FILTER_FOLLOWING_POPULAR : FEED_FILTER_FOLLOWING_RECENT;
     feedLog.info('feed.filter.change', { filter, mode });
     setFollowingMode(mode);
     setActiveTab(FEED_TAB_FOLLOWING);
-  }, []);
+  };
 
   return (
     <Log name="FeedScreen" style={[styles.root, { backgroundColor: surface }]}>

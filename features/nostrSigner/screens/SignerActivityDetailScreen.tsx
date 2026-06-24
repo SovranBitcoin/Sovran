@@ -15,7 +15,7 @@
  * Route params: `id` — the activity entry id.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams } from 'expo-router';
 import { ListGroup, Separator } from 'heroui-native';
@@ -83,10 +83,10 @@ function isEncryptionMethod(method: Nip46Method): boolean {
 function CopyableEventId({ eventId }: { eventId: string }) {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
 
-  const copy = useCallback(() => {
+  const copy = () => {
     void Clipboard.setStringAsync(eventId);
     popup({ message: 'Copied', type: 'success', variant: 'toast', duration: 1500 });
-  }, [eventId]);
+  };
 
   return (
     <Pressable

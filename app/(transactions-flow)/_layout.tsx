@@ -17,7 +17,6 @@
  * Uses native header for liquid glass button animations.
  */
 
-import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
@@ -47,21 +46,19 @@ const SWAP_OPTIONS = { title: 'Swap' };
 
 function TransactionsFlowContent() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
-    [foreground, background]
+  const screenOptions = createFlowLayoutScreenOptions(
+    { foreground, background },
+    { androidSheet: true }
   );
-  const transactionsOptions = useMemo(
-    () => ({
-      title: 'Transactions',
-      headerTransparent: true,
-      headerStyle: TRANSPARENT_HEADER_STYLE,
-      contentStyle: {
-        backgroundColor: background,
-      },
-    }),
-    [background]
-  );
+  const transactionsOptions = {
+    title: 'Transactions',
+    headerTransparent: true,
+    headerStyle: TRANSPARENT_HEADER_STYLE,
+
+    contentStyle: {
+      backgroundColor: background,
+    },
+  };
 
   return (
     <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>

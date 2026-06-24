@@ -3,7 +3,7 @@
  *
  * The feed's only write entry point — opens the composer for a fresh post.
  */
-import React, { useCallback } from 'react';
+import React from 'react';
 import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -31,7 +31,7 @@ export function ComposeFab() {
   // so `0` is flush. Adding the tab-bar height (as a list padding would) here
   // double-counts it and floats the FAB too high.
   const bottom = (isExpo55NativeTabsSupported() ? insets.bottom : 0) + FAB_TAB_BAR_GAP;
-  const onPress = useCallback(() => openComposer({ mode: 'new' }), [openComposer]);
+  const onPress = () => openComposer({ mode: 'new' });
 
   return (
     <Pressable

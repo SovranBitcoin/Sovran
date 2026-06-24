@@ -26,7 +26,7 @@ interface TransferSeparatorProps {
   status?: 'idle' | 'running' | 'done' | 'failed';
 }
 
-export const TransferSeparator = React.memo(({ failed, status }: TransferSeparatorProps) => {
+export const TransferSeparator = ({ failed, status }: TransferSeparatorProps) => {
   const [accent, green500, red500] = useThemeColor(['accent', 'green-500', 'red-500'] as const);
 
   const effectiveStatus = status ?? (failed ? 'failed' : 'idle');
@@ -52,7 +52,7 @@ export const TransferSeparator = React.memo(({ failed, status }: TransferSeparat
       <View style={[styles.separator, { backgroundColor: bgColor }]}>{renderIcon()}</View>
     </Log>
   );
-});
+};
 TransferSeparator.displayName = 'TransferSeparator';
 
 const styles = StyleSheet.create({

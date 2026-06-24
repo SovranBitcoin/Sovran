@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useNostrProfileMetadata } from './useNostrProfileMetadata';
 import { resolveIdentityName, type IdentityNameInputs } from '@/shared/lib/identity';
 
@@ -30,15 +29,11 @@ export function useIdentityName(
 ): { displayName: string; isLoading: boolean } {
   const { metadata, isLoading } = useNostrProfileMetadata(pubkey ?? undefined);
 
-  const displayName = useMemo(
-    () =>
-      resolveIdentityName({
-        pubkey: pubkey ?? undefined,
-        nostrProfile: metadata,
-        ...extra,
-      }),
-    [pubkey, metadata, extra]
-  );
+  const displayName = resolveIdentityName({
+    pubkey: pubkey ?? undefined,
+    nostrProfile: metadata,
+    ...extra,
+  });
 
   return { displayName, isLoading };
 }
