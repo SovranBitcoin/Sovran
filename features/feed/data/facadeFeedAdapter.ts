@@ -9,7 +9,10 @@ import type { FeedParseResult } from './feedClient';
 // without the facade-builder's React-Native chain.
 
 /** Map the app's JSON feed spec to the facade FeedSpec (ranked home feeds only). */
-export function mapAppSpecToFeedSpec(specJson: string, userPubkey?: string): facade.FeedSpec | null {
+export function mapAppSpecToFeedSpec(
+  specJson: string,
+  userPubkey?: string
+): facade.FeedSpec | null {
   const parsed = parseJson<Record<string, unknown>>(specJson);
   if (!parsed || parsed.kind !== 'notes') return null;
   switch (parsed.id) {
