@@ -228,7 +228,6 @@ export function PostComposer() {
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
     const mediaKind = asset.type === 'video' ? 'video' : 'image';
-    const mimeType = asset.mimeType ?? (mediaKind === 'video' ? 'video/mp4' : 'image/jpeg');
 
     const id = addMediaBlock({
       kind: 'media',
@@ -239,7 +238,14 @@ export function PostComposer() {
 
     const upload = await uploadMedia({
       ndk,
-      asset: { uri: asset.uri, mimeType, width: asset.width, height: asset.height },
+      asset: {
+        uri: asset.uri,
+        mimeType: asset.mimeType,
+        fileName: asset.fileName ?? undefined,
+        kind: mediaKind,
+        width: asset.width,
+        height: asset.height,
+      },
     });
     if (upload.isOk()) {
       updateBlock(id, { descriptor: upload.value, uploadProgress: undefined });
