@@ -157,6 +157,28 @@ function timelineStepTypeToCheckpointStatus(stepType: TimelineStepType): Checkpo
   return stepType === 'expired' ? 'failed' : stepType;
 }
 
+const getLineType = (currentItem: TimelineItem, nextItem: TimelineItem): TimelineLineType => {
+  if (nextItem.stepType === 'expired') return 'expired-gradient';
+  if (nextItem.stepType === 'already-spent') return 'rolled-back-gradient';
+  if (nextItem.stepType === 'rolled-back') return 'rolled-back-gradient';
+  if (
+    currentItem.stepType === 'complete' ||
+    currentItem.stepType === 'current' ||
+    currentItem.stepType === 'waiting' ||
+    currentItem.stepType === 'success'
+  ) {
+    if (
+      nextItem.stepType === 'complete' ||
+      nextItem.stepType === 'current' ||
+      nextItem.stepType === 'waiting' ||
+      nextItem.stepType === 'success'
+    ) {
+      return 'complete';
+    }
+  }
+  return 'future';
+};
+
 export function HistoryEntryTimeline({
   historyEntry,
   meltQuote,
@@ -290,28 +312,6 @@ export function HistoryEntryTimeline({
   };
 
   const expiryBadge = getExpiryBadge();
-
-  const getLineType = (currentItem: TimelineItem, nextItem: TimelineItem): TimelineLineType => {
-    if (nextItem.stepType === 'expired') return 'expired-gradient';
-    if (nextItem.stepType === 'already-spent') return 'rolled-back-gradient';
-    if (nextItem.stepType === 'rolled-back') return 'rolled-back-gradient';
-    if (
-      currentItem.stepType === 'complete' ||
-      currentItem.stepType === 'current' ||
-      currentItem.stepType === 'waiting' ||
-      currentItem.stepType === 'success'
-    ) {
-      if (
-        nextItem.stepType === 'complete' ||
-        nextItem.stepType === 'current' ||
-        nextItem.stepType === 'waiting' ||
-        nextItem.stepType === 'success'
-      ) {
-        return 'complete';
-      }
-    }
-    return 'future';
-  };
 
   const getStatusHeaderColor = () => {
     switch (statusColorType) {

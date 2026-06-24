@@ -107,6 +107,8 @@ type SearchLayoutProps = {
   transparent?: boolean;
 };
 
+const headerRight = () => <SearchHeaderRight />;
+
 export function SearchLayout({
   title,
   placeholder,
@@ -123,7 +125,6 @@ export function SearchLayout({
   // When not searching, let React Navigation render the native title
   // so it picks up the correct tintColor / Liquid Glass styling.
   const searchBarTitle = () => <SearchBarTitle placeholder={placeholder} />;
-  const headerRight = () => <SearchHeaderRight />;
   const headerLeft = () => <HeaderProfileButton onPress={openDrawer} />;
 
   const screenOptions = buildExpoRouterHeaderOptions({

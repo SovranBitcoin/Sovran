@@ -218,6 +218,11 @@ const KeyItem: React.FC<{
 /**
  * KeyringSettings - P2PK key management page
  */
+const handleCopyKey = async (publicKey: string) => {
+  await Clipboard.setStringAsync(publicKey);
+  copyPopup('publicKey');
+};
+
 export const SettingsKeyringScreen: React.FC = () => {
   useLifecycleLogger('SettingsKeyringScreen');
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
@@ -412,11 +417,6 @@ export const SettingsKeyringScreen: React.FC = () => {
       setIsImportingCurrentNsec(false);
     }
   });
-
-  const handleCopyKey = async (publicKey: string) => {
-    await Clipboard.setStringAsync(publicKey);
-    copyPopup('publicKey');
-  };
 
   const canImportCurrentNsec = !!manager && nostrKeysReady && !!nostrKeys?.privateKey;
   const isKeyringActionPending = isGenerating || isImportingCurrentNsec;

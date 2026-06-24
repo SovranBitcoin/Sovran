@@ -25,6 +25,11 @@ import { log, useLifecycleLogger } from '@/shared/lib/logger';
 // Main screen
 // ---------------------------------------------------------------------------
 
+const asNumber = (value: number | number[]) => (Array.isArray(value) ? (value[0] ?? 0) : value);
+// Snap to slider step so a stored rate that isn't a multiple of 5 doesn't
+// display as e.g. "73%" while the thumb sits between stops.
+const snapSuccessRate = (rate: number) => Math.round((rate * 100) / 5) * 5;
+
 export function SettingsRoutingScreen() {
   useLifecycleLogger('SettingsRoutingScreen');
   const middlemanRouting = useSettingsStore((state) => state.middlemanRouting);
@@ -36,11 +41,6 @@ export function SettingsRoutingScreen() {
     log.info('settings.routing.change', { ...partial });
     setMiddlemanRouting(partial);
   };
-
-  const asNumber = (value: number | number[]) => (Array.isArray(value) ? (value[0] ?? 0) : value);
-  // Snap to slider step so a stored rate that isn't a multiple of 5 doesn't
-  // display as e.g. "73%" while the thumb sits between stops.
-  const snapSuccessRate = (rate: number) => Math.round((rate * 100) / 5) * 5;
 
   return (
     <ScreenWrapper name="SettingsRoutingScreen" scroll="custom" safeArea>

@@ -64,6 +64,8 @@ const ESTIMATED_BUBBLE_HEIGHT = 80;
  * a visible band where the list meets the composer, and FlashList's
  * separate virtualization sidesteps it cleanly.
  */
+const keyExtractor = (m: RoutstrMessage) => m.id;
+
 export function AiChatScreen() {
   useLifecycleLogger('AiChatScreen');
 
@@ -273,8 +275,6 @@ export function AiChatScreen() {
       />
     </RNView>
   );
-
-  const keyExtractor = (m: RoutstrMessage) => m.id;
 
   // Tap-to-dismiss-keyboard on the empty placeholder mirrors the previous
   // behaviour. Mounted in place of the list when there are no messages; the

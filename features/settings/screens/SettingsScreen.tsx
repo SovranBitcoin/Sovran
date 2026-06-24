@@ -140,6 +140,19 @@ const BelowFold = ({ children }: { children: React.ReactNode }) => {
   return ready ? <>{children}</> : null;
 };
 
+const handleExportDatabase = async () => {
+  log.info('settings.export_database.start');
+  try {
+    await CocoManager.exportDatabase();
+    log.info('settings.export_database.success');
+  } catch (error) {
+    log.error('settings.export_database.error', {
+      error: error instanceof Error ? error : new Error(String(error)),
+    });
+    Alert.alert('Export Failed', error instanceof Error ? error.message : 'Unknown error');
+  }
+};
+
 export const SettingsScreen = () => {
   useLifecycleLogger('SettingsScreen');
   const sendLocationEnabled = useSettingsStore((state) => state.sendLocationEnabled);
@@ -181,19 +194,6 @@ export const SettingsScreen = () => {
       log.info('settings.dev_mode.toggle', { enabled: newMode });
       setDevMode(newMode);
       paramPopup('dev-mode', newMode);
-    }
-  };
-
-  const handleExportDatabase = async () => {
-    log.info('settings.export_database.start');
-    try {
-      await CocoManager.exportDatabase();
-      log.info('settings.export_database.success');
-    } catch (error) {
-      log.error('settings.export_database.error', {
-        error: error instanceof Error ? error : new Error(String(error)),
-      });
-      Alert.alert('Export Failed', error instanceof Error ? error.message : 'Unknown error');
     }
   };
 

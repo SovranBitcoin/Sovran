@@ -127,6 +127,8 @@ const MESSAGE_ROW_STYLE = { paddingHorizontal: 16 } as const;
  * Each consumer is responsible for mapping its native event into
  * `ChatBubbleMessage[]`; everything below that is shared.
  */
+const keyExtractor = (m: ChatBubbleMessage) => m.id;
+
 export function ChatScreen({
   surface,
   log,
@@ -287,8 +289,6 @@ export function ChatScreen({
       </RNView>
     );
   };
-
-  const keyExtractor = (m: ChatBubbleMessage) => m.id;
 
   // Tap-to-dismiss-keyboard wrapper around the consumer-provided empty
   // placeholder. Mounted in place of the list when there are no messages;

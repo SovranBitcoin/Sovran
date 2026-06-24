@@ -63,6 +63,12 @@ function PeerRow({ peer }: PeerRowProps) {
   );
 }
 
+const handleClose = () => {
+  router.back();
+};
+const keyExtractor = (peer: BLEPeer) => peer.peerID;
+const renderPeerItem = ({ item }: { item: BLEPeer }) => <PeerRow peer={item} />;
+
 export default function NetworkSheet() {
   useLifecycleLogger('BitchatNetworkSheet', bitchatLog);
   const [foreground, surfaceSecondary] = useThemeColor([
@@ -88,12 +94,6 @@ export default function NetworkSheet() {
     if (a.isConnected !== b.isConnected) return a.isConnected ? -1 : 1;
     return b.lastSeen - a.lastSeen;
   });
-
-  const handleClose = () => {
-    router.back();
-  };
-  const keyExtractor = (peer: BLEPeer) => peer.peerID;
-  const renderPeerItem = ({ item }: { item: BLEPeer }) => <PeerRow peer={item} />;
 
   const subtitleText = useMemo(() => {
     if (bluetoothBlocked) return 'Bluetooth unavailable';

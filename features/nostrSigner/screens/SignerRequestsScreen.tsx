@@ -170,6 +170,11 @@ function tierIconColor(
 
 // ── Screen ──────────────────────────────────────────────────────
 
+const reviewRequest = (id: string) => {
+  useNip46RequestsStore.getState().promote(id);
+  showActionSheet('signer-approval', {});
+};
+
 export function SignerRequestsScreen(): React.ReactElement {
   useLifecycleLogger('SignerRequestsScreen');
   const pending = useNip46RequestsStore((s) => s.pending);
@@ -193,11 +198,6 @@ export function SignerRequestsScreen(): React.ReactElement {
   const groups = groupByApp(pending.filter((request) => request.expiresAt > now));
 
   // ── Verdict plumbing ──────────────────────────────────────────
-
-  const reviewRequest = (id: string) => {
-    useNip46RequestsStore.getState().promote(id);
-    showActionSheet('signer-approval', {});
-  };
 
   const resolveBatch = useSingleFlight(
     async (clientPubkey: string, action: 'approve_once' | 'deny_once') => {

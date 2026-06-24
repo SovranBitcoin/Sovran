@@ -31,6 +31,14 @@ const DebugRow: React.FC<{ label: string; value: string }> = ({ label, value }) 
   );
 };
 
+const handleCopy = async (text: string, target: CopyTarget) => {
+  if (text) {
+    log.info('settings.profile.copy', { target });
+    await Clipboard.setStringAsync(text);
+    copyPopup(target, { duration: 1000 });
+  }
+};
+
 export const SettingsProfileScreen = () => {
   useLifecycleLogger('SettingsProfileScreen');
   const { value: mnemonic, loading: mnemonicLoading } = useMnemonic();
@@ -43,14 +51,6 @@ export const SettingsProfileScreen = () => {
     nsec: false,
     cashuMnemonic: false,
   });
-
-  const handleCopy = async (text: string, target: CopyTarget) => {
-    if (text) {
-      log.info('settings.profile.copy', { target });
-      await Clipboard.setStringAsync(text);
-      copyPopup(target, { duration: 1000 });
-    }
-  };
 
   const toggleFieldVisibility = (field: keyof typeof visibleFields) => {
     log.debug('settings.profile.toggle_visibility', { field });
