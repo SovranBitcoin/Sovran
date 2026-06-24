@@ -1,9 +1,4 @@
 {
-  "__tests__/naggFeedClient.test.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
   "app/(drawer)/(tabs)/_layout.tsx": {
     "no-restricted-syntax": {
       "count": 4
@@ -137,11 +132,6 @@
       "count": 2
     }
   },
-  "features/splitBill/components/ParticipantCard.tsx": {
-    "no-restricted-syntax": {
-      "count": 10
-    }
-  },
   "features/theme/components/UnitPreviewCard.tsx": {
     "no-restricted-syntax": {
       "count": 6
@@ -164,11 +154,6 @@
   },
   "features/transactions/components/TransactionLocationSection.tsx": {
     "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "features/transactions/screens/FiltersScreen.tsx": {
-    "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
   },
@@ -281,9 +266,6 @@
   "shared/lib/popup/ToastSlab.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
-    },
-    "no-restricted-syntax": {
-      "count": 2
     }
   },
   "shared/lib/routstr/api.ts": {
