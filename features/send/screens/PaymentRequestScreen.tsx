@@ -64,7 +64,7 @@ export function PaymentRequestScreen({
 
   const tokenCreated = entry.metadata?.tokenCreated === 'true';
   const nostrSent = entry.metadata?.nostrSent === 'true';
-  const isPreview = isPaymentRequestPreview({ ...entry } as Record<string, unknown>);
+  const isPreview = isPaymentRequestPreview(entry as Record<string, unknown>);
   log.debug('send.payment_request.render', {
     isPreview,
     amount: entry.amount,

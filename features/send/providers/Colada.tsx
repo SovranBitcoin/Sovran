@@ -357,7 +357,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
             return null;
           }
         },
-      }) as MachineOperations,
+      }),
     [instance, manager, ndkRef]
   );
 

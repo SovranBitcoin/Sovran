@@ -622,6 +622,7 @@ export function ActionMenuHost() {
           // overrides the scrollable type to `VIEW` on mount and pan
           // gestures dismiss the sheet instead of scrolling the list.
           // Only needed when there *is* a nested scroll container.
+          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- `useDirectView` is an undocumented gorhom internal not in the public contentContainerProps type; `as never` forces it through (see comment above).
           contentContainerProps={useScrollBody ? ({ useDirectView: true } as never) : undefined}
           // gorhom's `BottomSheetFooter` slot — pinned absolute at the
           // sheet's animated bottom edge AND auto-tracks the keyboard

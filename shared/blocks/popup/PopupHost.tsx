@@ -610,7 +610,7 @@ function SheetPopup() {
   const activeCustomPage = useMemo(() => {
     if (!isCustom || !payload) return null;
     if (customStack.length > 0) return customStack[customStack.length - 1];
-    return { sheetId: payload.sheetId, payload: payload.payload } as CustomSheetPage;
+    return { sheetId: payload.sheetId, payload: payload.payload } satisfies CustomSheetPage;
   }, [customStack, isCustom, payload]);
 
   const canPopCustomPage = customStack.length > 1;
@@ -623,7 +623,7 @@ function SheetPopup() {
       return;
     }
 
-    setCustomStack([{ sheetId: current.sheetId, payload: current.payload } as CustomSheetPage]);
+    setCustomStack([{ sheetId: current.sheetId, payload: current.payload } satisfies CustomSheetPage]);
     setCustomNavDirection('forward');
     setCustomFooterConfig(null);
   }, [isOpen, current]);

@@ -26,5 +26,6 @@ export function restoreActiveSessionView<TMessage, TActiveChildren extends Recor
   const session = state.sessions.find((s) => s.id === state.currentSessionId);
   if (!session) return;
   state.conversationHistory = session.messages;
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- empty default for the generic TActiveChildren (extends Record<string,string>): {} is the no-children case but isn't structurally assignable to an arbitrary TActiveChildren.
   state.activeChildren = session.activeChildren ?? ({} as TActiveChildren);
 }
