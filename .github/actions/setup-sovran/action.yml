@@ -1,0 +1,74 @@
+name: Setup Sovran
+description: >-
+  Bun setup + dependency install shared by the Sovran CI gate workflows.
+  Installs against the latest published @sovranbitcoin/* packages
+  (deps:sovran-latest) using the secret-boundary two-phase install, and caches
+  the Bun store so the latest-resolve re-install hits warm downloads across the
+  per-check workflows.
+
+# The repo is checked out into ${APP_DIR} (sovran-app) by the calling workflow
+# before this action runs, so steps set working-directory: ${{ inputs.app-dir }}.
+inputs:
+  app-dir:
+    description: Path the repo was checked out into.
+    required: false
+    default: sovran-app
+  github-token:
+    description: >-
+      Token used ONLY to auth the @sovranbitcoin/* GitHub Packages fetch. It is
+      scoped to the install step alone — install scripts run with no secret.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version-file: ${{ inputs.app-dir }}/package.json
+
+    # Warm download cache keyed on the lockfile. deps:sovran-latest re-resolves
+    # the @sovranbitcoin/* packages so the lock can drift between runs; the
+    # restore-keys fallback still reuses the cached tarballs for everything else.
+    - name: Cache Bun store
+      uses: actions/cache@v4
+      with:
+        path: ~/.bun/install/cache
+        key: bun-store-${{ runner.os }}-${{ hashFiles(format('{0}/bun.lock', inputs.app-dir)) }}
+        restore-keys: |
+          bun-store-${{ runner.os }}-
+
+    # The gates run entirely against published packages — @cashu/coco-* from
+    # npm, @sovranbitcoin/* from GitHub Packages. SOVRAN_CI_TOKEN carries
+    # cross-repo GitHub Packages read; GITHUB_TOKEN is the fallback. (No
+    # coco/colada/schemas source checkout: nothing links it.)
+    #
+    # `deps:sovran-latest` re-resolves the @sovranbitcoin/* packages to their
+    # newest published versions before install, so CI always validates against
+    # the latest colada/nagg-ts/schemas without a manual bump. This is a
+    # deliberate trade of lockfile determinism for always-on compatibility
+    # signal: a breaking publish can red CI with no code change here — that is
+    # the early warning, by design.
+    - name: Install dependencies (latest Sovran packages)
+      working-directory: ${{ inputs.app-dir }}
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        bun run deps:sovran-latest
+        # --ignore-scripts: the token is needed only to AUTH the
+        # @sovranbitcoin/* registry fetch, not to run lifecycle code, so no
+        # package install script executes while the secret is in scope
+        # (build-pipeline-secret-boundary).
+        bun install --ignore-scripts
+
+    # Run the deferred install scripts with NO secret in scope: trusted
+    # dependency scripts (e.g. @shopify/react-native-skia's install-skia) via
+    # `bun pm trust`, then the first-party postinstall (patch-package, bitchat
+    # patching, local-sibling linking). None of these need the registry token.
+    - name: Run install scripts (no secrets in scope)
+      working-directory: ${{ inputs.app-dir }}
+      shell: bash
+      run: |
+        bun pm trust --all
+        bun run postinstall

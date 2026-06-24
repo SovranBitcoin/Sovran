@@ -1,5 +1,11 @@
 # Sovran
 
+[![Lint](https://github.com/SovranBitcoin/Sovran/actions/workflows/lint.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/lint.yml)
+[![Type Check](https://github.com/SovranBitcoin/Sovran/actions/workflows/type-check.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/type-check.yml)
+[![Knip](https://github.com/SovranBitcoin/Sovran/actions/workflows/knip.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/knip.yml)
+[![React Compiler](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-compiler.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-compiler.yml)
+[![React Doctor](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-doctor.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/react-doctor.yml)
+
 <!-- code: app.json; app.config.js; package.json; shared/lib/cashu/manager.ts; modules/bitchat-module/src/BitChatModule.ts; features/whitenoise/WhitenoiseProvider.tsx; shared/lib/routstr/api.ts -->
 
 A Bitcoin wallet for Cashu ecash, Lightning, and offline payments. The current app is built with Expo and React Native, ships first on iOS, and combines Coco wallet state, Nostr identity, NFC tag handoffs, BitChat BLE mesh, Whitenoise MLS groups, and Routstr AI payments. Android configuration and fallbacks exist in the codebase, but the production target is still iOS-first.
