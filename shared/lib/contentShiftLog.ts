@@ -234,7 +234,7 @@ type VisualScrollMetricsConfig = {
   extra?: VisualExtra;
 };
 
-type VisualScrollMetricsReporter = {
+export type VisualScrollMetricsReporter = {
   onContentSizeChange: (width: number, height: number) => void;
   onLayout: (event: LayoutChangeEvent) => void;
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;

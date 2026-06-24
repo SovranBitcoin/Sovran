@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
@@ -8,17 +7,19 @@ import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 
+// Closure-free, so it lives at module scope rather than being reallocated each
+// render (prefer-module-scope-pure-function).
+function openNotificationSettings() {
+  router.push('/(settings-flow)/notification-policy');
+}
+
 export default function NotificationsLayout() {
   const [iconColor, surface] = useThemeColor(['foreground', 'surface'] as const);
   const navigation = useNavigation();
 
-  const openDrawer = useCallback(() => {
+  const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
-  }, [navigation]);
-
-  const openNotificationSettings = useCallback(() => {
-    router.push('/(settings-flow)/notification-policy');
-  }, []);
+  };
 
   return (
     <Stack screenOptions={{ contentStyle: { backgroundColor: surface } }}>

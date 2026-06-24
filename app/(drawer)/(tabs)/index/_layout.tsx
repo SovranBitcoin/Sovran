@@ -1,5 +1,3 @@
-import { useCallback } from 'react';
-
 import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { MintSelector } from '@/features/wallet';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
@@ -13,7 +11,7 @@ export default function HomeLayout() {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
 
-  const handleRequestMintList = useCallback(() => {
+  const handleRequestMintList = () => {
     cashuLog.info('wallet.header.mint_selector.request', {
       source: 'wallet-header',
       trustedMintCount: walletContext.trustedMintUrls.length,
@@ -21,7 +19,7 @@ export default function HomeLayout() {
     });
     clearPaymentContext('wallet.mint_selector');
     void machine.requestMintSelector({ reset: true });
-  }, [machine, walletContext.preferredMintUrl, walletContext.trustedMintUrls.length]);
+  };
 
   // Shared inline header search, like Feed/Contacts. `transparent` keeps the
   // wallpaper showing through the header; the wallet's MintSelector stays as the

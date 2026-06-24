@@ -68,13 +68,14 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
   // immediately; missing/stale entries trigger a relay subscription. This
   // mirrors the same overlay the split-bill picker does for its
   // `useContactSearch` hits.
-  const realPubkeys = useMemo(
-    () =>
-      displayResults
-        .filter((r) => !!r.profile && !r.pubkey.startsWith('placeholder-'))
-        .map((r) => r.pubkey),
-    [displayResults]
-  );
+  const realPubkeys = useMemo(() => {
+    // Single pass: filter (has profile, not a placeholder) + project to pubkey.
+    const pubkeys: string[] = [];
+    for (const r of displayResults) {
+      if (r.profile && !r.pubkey.startsWith('placeholder-')) pubkeys.push(r.pubkey);
+    }
+    return pubkeys;
+  }, [displayResults]);
   const { metadata: cachedMetadata } = useNostrProfileMetadataMany(realPubkeys);
 
   return useMemo(() => {
