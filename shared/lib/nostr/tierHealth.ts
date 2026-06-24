@@ -61,11 +61,11 @@ export function probeNaggHealth(
  */
 export function probePrimalHealth(
   url: string,
-  options: { timeoutMs?: number; WebSocketImpl?: typeof WebSocket } = {}
+  options: { timeoutMs?: number; signal?: AbortSignal; WebSocketImpl?: typeof WebSocket } = {}
 ): ResultAsync<boolean, RedactedError> {
   const timeoutMs = options.timeoutMs ?? PRIMAL_HEALTH_TIMEOUT_MS;
   const WebSocketCtor = options.WebSocketImpl ?? WebSocket;
-  return ResultAsync.fromPromise(
+  return ResultAsync.fromSafePromise(
     new Promise<boolean>((resolve) => {
       const subId = `health-${Math.random().toString(36).slice(2, 10)}`;
       let settled = false;
@@ -74,11 +74,16 @@ export function probePrimalHealth(
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        // Close in its own try so a throwing `send` (socket not OPEN) can't skip it.
         try {
-          ws?.send(JSON.stringify(['CLOSE', subId]));
+          if (ws && ws.readyState === 1 /* OPEN */) ws.send(JSON.stringify(['CLOSE', subId]));
+        } catch {
+          // Socket changed state mid-call; close() below still runs.
+        }
+        try {
           ws?.close();
         } catch {
-          // Socket already closing/closed — nothing left to clean up.
+          // Already closing/closed — nothing left to clean up.
         }
         resolve(online);
       };
@@ -99,8 +104,9 @@ export function probePrimalHealth(
       ws.onmessage = () => finish(true);
       ws.onerror = () => finish(false);
       ws.onclose = () => finish(false);
-    }),
-    redactError
+      if (options.signal?.aborted) finish(false);
+      else options.signal?.addEventListener('abort', () => finish(false), { once: true });
+    })
   );
 }
 

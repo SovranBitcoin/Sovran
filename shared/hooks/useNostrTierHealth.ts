@@ -3,16 +3,20 @@
  * the Network settings screen.
  *
  * Composes an HTTP probe (nagg), a WebSocket round-trip probe (Primal), and the
- * existing NDK-pool relay health (`useRelayHealth`) into one uniform per-tier
- * status. Active probes run only while the screen is focused — on focus and then
- * every `POLL_INTERVAL_MS` — to bound battery/network cost; a disabled tier is
- * not probed (its status is `disabled`). A monotonic run id guards against a
- * slow probe from an earlier run overwriting a newer result.
+ * caller-supplied NDK-pool relay health map into one uniform per-tier status.
+ * The relay map is passed in (rather than calling `useRelayHealth` here) so the
+ * screen runs a single relay poll for both the per-relay dots and this tier fold.
+ *
+ * Active probes run only while the screen is focused — on focus and then every
+ * `POLL_INTERVAL_MS` — to bound battery/network cost; a disabled tier is not
+ * probed (status `disabled`). Each run gets a fresh `AbortController`; starting a
+ * new run (or blurring/unmounting) aborts the previous one, and a monotonic run
+ * id drops any late result so it can't update state after the screen is gone.
  */
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
-import { useRelayHealth } from '@/shared/hooks/useRelayHealth';
+import type { RelayHealth } from '@/shared/hooks/useRelayHealth';
 import { log } from '@/shared/lib/logger';
 import { useNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import {
@@ -38,14 +42,14 @@ function toChecking(prev: TierStatus): TierStatus {
   return prev === 'disabled' ? 'checking' : prev;
 }
 
-export function useNostrTierHealth(): NostrTierHealth {
+export function useNostrTierHealth(relayMap: Record<string, RelayHealth>): NostrTierHealth {
   const config = useNostrTierConfig();
-  const relayMap = useRelayHealth();
 
   const [nagg, setNagg] = useState<TierStatus>('checking');
   const [primal, setPrimal] = useState<TierStatus>('checking');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const runIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   const relay: TierStatus = config.relay.enabled ? foldRelayStatus(relayMap) : 'disabled';
 
@@ -56,6 +60,9 @@ export function useNostrTierHealth(): NostrTierHealth {
 
   const runProbes = useCallback(
     (trigger: 'focus' | 'interval' | 'pull') => {
+      abortRef.current?.abort(); // cancel any still-running probe from a prior run
+      const controller = new AbortController();
+      abortRef.current = controller;
       const runId = ++runIdRef.current;
       log.debug('settings.network.health.refresh', { trigger });
       setIsRefreshing(true);
@@ -64,20 +71,20 @@ export function useNostrTierHealth(): NostrTierHealth {
       setPrimal((prev) => (primalEnabled ? toChecking(prev) : 'disabled'));
 
       const naggTask: Promise<TierStatus> = naggEnabled
-        ? probeNaggHealth(naggUrl).match(
+        ? probeNaggHealth(naggUrl, { signal: controller.signal }).match(
             (online) => (online ? 'online' : 'offline'),
             () => 'offline'
           )
         : Promise.resolve('disabled');
       const primalTask: Promise<TierStatus> = primalEnabled
-        ? probePrimalHealth(primalUrl).match(
+        ? probePrimalHealth(primalUrl, { signal: controller.signal }).match(
             (online) => (online ? 'online' : 'offline'),
             () => 'offline'
           )
         : Promise.resolve('disabled');
 
       void Promise.all([naggTask, primalTask]).then(([naggStatus, primalStatus]) => {
-        if (runId !== runIdRef.current) return; // a newer run superseded this one
+        if (runId !== runIdRef.current) return; // a newer run (or cleanup) superseded this one
         setNagg(naggStatus);
         setPrimal(primalStatus);
         setIsRefreshing(false);
@@ -92,7 +99,11 @@ export function useNostrTierHealth(): NostrTierHealth {
     useCallback(() => {
       runProbes('focus');
       const interval = setInterval(() => runProbes('interval'), POLL_INTERVAL_MS);
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        runIdRef.current++; // drop any in-flight result so it can't update state after blur
+        abortRef.current?.abort();
+      };
     }, [runProbes])
   );
 

@@ -49,6 +49,12 @@ describe('probeNaggHealth', () => {
     expect(result._unsafeUnwrap()).toBe(false);
   });
 
+  it('is offline (ok false) for a body of { ok: false } (boolean)', async () => {
+    mockFetchJson.mockResolvedValue(ok({ ok: false }));
+    const result = await probeNaggHealth('https://nagg.example');
+    expect(result._unsafeUnwrap()).toBe(false);
+  });
+
   it('errors (offline) when the fetch fails — non-2xx, malformed, or unreachable', async () => {
     mockFetchJson.mockResolvedValue(err(new Error('Fetch error: 503')));
     const result = await probeNaggHealth('https://nagg.example');
@@ -76,6 +82,7 @@ class FakeWebSocket {
   onclose: (() => void) | null = null;
   sent: string[] = [];
   closed = false;
+  readyState = 1; // OPEN
   constructor(public url: string) {}
   send(data: string) {
     this.sent.push(data);
@@ -142,6 +149,40 @@ describe('probePrimalHealth', () => {
     } as unknown as typeof WebSocket;
     const result = await probePrimalHealth('wss://cache.example', { WebSocketImpl: Ctor });
     expect(result._unsafeUnwrap()).toBe(false);
+  });
+
+  it('is offline and closes the socket when aborted via signal', async () => {
+    let socket: FakeWebSocket | null = null;
+    const Ctor = function (this: unknown, url: string) {
+      socket = new FakeWebSocket(url);
+      return socket;
+    } as unknown as typeof WebSocket;
+    const controller = new AbortController();
+
+    const promise = probePrimalHealth('wss://cache.example', {
+      WebSocketImpl: Ctor,
+      signal: controller.signal,
+    });
+    socket!.onopen?.();
+    controller.abort();
+    const result = await promise;
+    expect(result._unsafeUnwrap()).toBe(false);
+    expect(socket!.closed).toBe(true);
+  });
+
+  it('resolves once: a late onclose after onmessage does not change the verdict', async () => {
+    let socket: FakeWebSocket | null = null;
+    const Ctor = function (this: unknown, url: string) {
+      socket = new FakeWebSocket(url);
+      return socket;
+    } as unknown as typeof WebSocket;
+
+    const promise = probePrimalHealth('wss://cache.example', { WebSocketImpl: Ctor });
+    socket!.onopen?.();
+    socket!.onmessage?.();
+    socket!.onclose?.(); // late event — must be ignored by the settled guard
+    const result = await promise;
+    expect(result._unsafeUnwrap()).toBe(true);
   });
 });
 

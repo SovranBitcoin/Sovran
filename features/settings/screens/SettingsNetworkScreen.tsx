@@ -47,7 +47,7 @@ export function SettingsNetworkScreen() {
   const restoreDefaults = useRelayListStore((s) => s.restoreDefaults);
   const markPublished = useRelayListStore((s) => s.markPublished);
   const health = useRelayHealth();
-  const tierHealth = useNostrTierHealth();
+  const tierHealth = useNostrTierHealth(health);
 
   const [draftUrl, setDraftUrl] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
