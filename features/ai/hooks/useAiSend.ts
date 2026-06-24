@@ -525,7 +525,8 @@ export function useAiSend() {
       balancePromiseRef.current = balancePromise;
 
       span.end({ outcome: 'ok', chunks: chunkCount, chars: fullContent.length });
-    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- caught value is an arbitrary thrown error (RoutstrError or Error); the handler reads .status/.error
+    } catch (err: any) {
       if (isAbortError(err)) {
         aiLog.info('ai.send.aborted', { flowId });
         removeMessages(new Set([assistantMessageId]));

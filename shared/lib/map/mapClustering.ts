@@ -57,7 +57,8 @@ export class ClusterManager {
   private cluster: Supercluster;
   private loaded: boolean = false;
 
-  constructor(options?: Supercluster.Options) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supercluster point/cluster prop generics; this manager is prop-agnostic
+  constructor(options?: Supercluster.Options<any, any>) {
     this.cluster = new Supercluster({
       radius: 60, // Cluster radius in pixels
       maxZoom: 16, // Max zoom to cluster points

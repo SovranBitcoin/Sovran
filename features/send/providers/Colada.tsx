@@ -282,8 +282,8 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   // so reopening the transaction from the list resolves them correctly.
   // See sovranPaymentConfig.createSovranExecuteReceive / createSovranExecuteMintQuote
   // for the full rationale. Spreading instance.operations preserves all other defaults.
-  const operationsOverride = useMemo<MachineOperations>(
-    () => ({
+  const operationsOverride = useMemo<MachineOperations>(() => {
+    const ops = {
       ...instance.operations,
       executeReceive: createSovranExecuteReceive(() => manager),
       executeMintQuote: createSovranExecuteMintQuote(() => manager),
@@ -293,7 +293,10 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       // is app-specific. Returning null on any failure is the contract:
       // the machine's resolver treats it as best-effort cosmetic data and
       // does not block the flow.
-      resolveRecipientProfile: async (pubkey, signal): Promise<RecipientProfile | null> => {
+      resolveRecipientProfile: async (
+        pubkey: string,
+        signal?: AbortSignal
+      ): Promise<RecipientProfile | null> => {
         paymentLog.debug('colada.adapter.resolve_recipient_profile.start', {
           pubkeyLength: pubkey.length,
         });
@@ -356,9 +359,9 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
           return null;
         }
       },
-    }),
-    [instance, manager, ndkRef]
-  );
+    };
+    return ops as MachineOperations;
+  }, [instance, manager, ndkRef]);
 
   const actions = useMemo(() => createSovranScreenActionHandlers(), []);
 

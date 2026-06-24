@@ -35,7 +35,8 @@ function evictIfNeeded() {
 export function getOrBuildBTCMapClusterManager(
   cacheKey: string,
   points: GeoPoint[],
-  options?: Supercluster.Options
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supercluster point/cluster prop generics; this cache is prop-agnostic
+  options?: Supercluster.Options<any, any>
 ): ClusterManager {
   const existing = CACHE.get(cacheKey);
   if (existing?.pointsCount === points.length && existing.manager.isLoaded()) {

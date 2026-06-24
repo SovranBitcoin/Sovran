@@ -242,6 +242,9 @@ export const compose = (
     undefined as React.FC<{ children: React.ReactNode }> | undefined
   );
 
+  if (!ComposedProvider) {
+    throw new Error('compose() requires at least one provider');
+  }
   ComposedProvider.displayName = 'ComposedProvider';
   return ComposedProvider;
 };

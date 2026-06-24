@@ -12,7 +12,6 @@
  */
 
 import React, { useState } from 'react';
-import type { Href } from 'expo-router';
 import { Stack, Link } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useFocusEffect } from '@react-navigation/native';
@@ -107,7 +106,8 @@ function MintListRoute() {
           if (onSelectAction === 'continue' && params?.continuePathname) {
             const continueParams = params.continueParams ? JSON.parse(params.continueParams) : {};
             router.navigate({
-              pathname: params.continuePathname as Href,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic persisted route string cannot be statically typed against expo-router's route union
+              pathname: params.continuePathname as any,
               params: {
                 ...continueParams,
                 unit: item.unit,
