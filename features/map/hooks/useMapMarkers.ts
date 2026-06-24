@@ -50,7 +50,7 @@ export function useMapMarkers({
       setError: s.setError,
     }))
   );
-  const places = useMemo(() => placesCache?.data ?? [], [placesCache]);
+  const places = placesCache?.data ?? [];
 
   const [isClusteringReady, setIsClusteringReady] = useState(false);
   const [markers, setMarkers] = useState<RenderedMarker[]>([]);

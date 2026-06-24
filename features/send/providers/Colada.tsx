@@ -102,8 +102,8 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   const privateKeyRef = useLatestRef(keys?.privateKey);
 
   const [nfcAdapter] = useState(() => createNfcAdapter());
-  const chainAdapter = useMemo(() => createMempoolSpaceChainAdapter(), []);
-  const scanSources = useMemo(() => createSovranScanSources(nfcAdapter), [nfcAdapter]);
+  const chainAdapter = createMempoolSpaceChainAdapter();
+  const scanSources = createSovranScanSources(nfcAdapter);
   const clipboardAdapter = useMemo<NonNullable<ColadaProviderProps['clipboardAdapter']>>(
     () => ({
       writeText: (text) => Clipboard.setStringAsync(text).then(() => {}),
@@ -363,7 +363,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     return ops as MachineOperations;
   }, [instance, manager, ndkRef]);
 
-  const actions = useMemo(() => createSovranScreenActionHandlers(), []);
+  const actions = createSovranScreenActionHandlers();
 
   const navigation = useMemo<NavigationCallbacks>(
     () => ({

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GetInfoResponse, Proof } from '@cashu/cashu-ts';
 import { useManager } from '@cashu/coco-react';
 
@@ -106,7 +106,7 @@ export function useMintRebalanceOrchestrator({
     cashuLog.debug('mint.rebalance.step', entry);
   }, []);
 
-  const plan = useMemo(() => runPlan ?? computedPlan, [runPlan, computedPlan]);
+  const plan = runPlan ?? computedPlan;
 
   useEffect(() => {
     stepStatesRef.current = stepStates;

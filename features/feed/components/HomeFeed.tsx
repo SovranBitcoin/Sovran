@@ -666,7 +666,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const toggleRepostRef = useLatestRef(toggleRepost);
 
   const overlaySourceIndexRef = useRef(-1);
-  const feedIndicesWithVideo = useMemo(() => computeFeedIndicesWithVideo(feedItems), [feedItems]);
+  const feedIndicesWithVideo = computeFeedIndicesWithVideo(feedItems);
 
   const onOverlayOpenedFromIndex = useCallback((index: number) => {
     overlaySourceIndexRef.current = index;
@@ -1074,7 +1074,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     ]
   );
 
-  const refreshTintColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
+  const refreshTintColor = opacity(foreground, 0.5);
 
   const pullToAi = usePullToAiRefreshControl({
     // Suppress the pull-to-refresh spinner during the initial (cold-start) load

@@ -53,7 +53,7 @@ export function MintIcon({
     setFailedUrl(null);
   }, [normalizedIconUrl]);
 
-  const loadingColor = useMemo(() => opacity(foreground, 0.07), [foreground]);
+  const loadingColor = opacity(foreground, 0.07);
   const fallbackBackground = muted;
   const borderRadius = size / 2;
   const imageAlt = alt ?? `${name || 'Mint'} icon`;

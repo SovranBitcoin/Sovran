@@ -105,7 +105,7 @@ export function NutDropCelebrationCanvas({
       }),
     [avatarRadius, fieldSize.height, fieldSize.width, seed, targetX, targetY]
   );
-  const paths = useMemo(() => bolts.map(variantToSkPath), [bolts]);
+  const paths = bolts.map(variantToSkPath);
   const faceClip = useMemo(() => {
     const clip = Skia.Path.Make();
     clip.addCircle(targetX, targetY, avatarRadius - 1);

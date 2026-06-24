@@ -450,12 +450,12 @@ export function PermissionGestureDemo(): React.ReactElement {
     () => [ROW_PLANE_BASE, { backgroundColor: rowFill }, rowPlaneStyle],
     [rowFill, rowPlaneStyle]
   );
-  const rowContentComposed = useMemo(() => [ROW_CONTENT_STYLE, rowContentStyle], [rowContentStyle]);
+  const rowContentComposed = [ROW_CONTENT_STYLE, rowContentStyle];
   const titleDangerComposed = useMemo(
     () => [STATUS_ABS_STYLE, titleDangerStyle],
     [titleDangerStyle]
   );
-  const statusAskComposed = useMemo(() => [STATUS_ABS_STYLE, statusAskStyle], [statusAskStyle]);
+  const statusAskComposed = [STATUS_ABS_STYLE, statusAskStyle];
   const statusAlwaysComposed = useMemo(
     () => [STATUS_ABS_STYLE, statusAlwaysStyle],
     [statusAlwaysStyle]
@@ -476,7 +476,7 @@ export function PermissionGestureDemo(): React.ReactElement {
     () => [SHADOW_BASE, { backgroundColor: foreground }, shadowStyle],
     [foreground, shadowStyle]
   );
-  const ringWrapComposed = useMemo(() => [RING_WRAP_BASE, ringWrapStyle], [ringWrapStyle]);
+  const ringWrapComposed = [RING_WRAP_BASE, ringWrapStyle];
   const menuComposed = useMemo(
     () => [MENU_BASE, { backgroundColor: background, borderColor: menuBorder }, menuStyle],
     [background, menuBorder, menuStyle]
@@ -489,16 +489,16 @@ export function PermissionGestureDemo(): React.ReactElement {
     ],
     [menuRow0, menuRow1, menuRow2]
   );
-  const menuBarComposed = useMemo(() => [MENU_BAR_STYLE, { backgroundColor: menuBar }], [menuBar]);
+  const menuBarComposed = [MENU_BAR_STYLE, { backgroundColor: menuBar }];
   const blockFlashComposed = useMemo(
     () => [BLOCK_FLASH_BASE, { backgroundColor: danger }, blockFlashStyle],
     [danger, blockFlashStyle]
   );
-  const gloveComposed = useMemo(() => [GLOVE_BASE, gloveStyle], [gloveStyle]);
-  const wordTap1Composed = useMemo(() => [WORD_BASE, wordTap1Style], [wordTap1Style]);
-  const wordTap2Composed = useMemo(() => [WORD_BASE, wordTap2Style], [wordTap2Style]);
-  const wordHoldComposed = useMemo(() => [WORD_BASE, wordHoldStyle], [wordHoldStyle]);
-  const wordBlockComposed = useMemo(() => [WORD_BASE, wordBlockStyle], [wordBlockStyle]);
+  const gloveComposed = [GLOVE_BASE, gloveStyle];
+  const wordTap1Composed = [WORD_BASE, wordTap1Style];
+  const wordTap2Composed = [WORD_BASE, wordTap2Style];
+  const wordHoldComposed = [WORD_BASE, wordHoldStyle];
+  const wordBlockComposed = [WORD_BASE, wordBlockStyle];
 
   return (
     <View

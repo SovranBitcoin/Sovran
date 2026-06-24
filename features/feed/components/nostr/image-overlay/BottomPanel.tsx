@@ -435,7 +435,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
-  const textContent = useMemo(() => extractPanelText(fullContent), [fullContent]);
+  const textContent = extractPanelText(fullContent);
   const contentPreview = textContent.slice(0, 120);
   const contentTruncated = textContent.length > 120;
 

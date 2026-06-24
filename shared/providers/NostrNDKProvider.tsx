@@ -147,7 +147,7 @@ export function NostrNDKProvider({
 
   // Memoized so context consumers (e.g. the NIP-46 signer service) only
   // re-render when readiness actually flips, not on every provider render.
-  const contextValue = useMemo(() => ({ isInitialized }), [isInitialized]);
+  const contextValue = { isInitialized };
 
   return <NostrNDKContext.Provider value={contextValue}>{children}</NostrNDKContext.Provider>;
 }

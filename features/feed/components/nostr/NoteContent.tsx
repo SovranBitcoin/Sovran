@@ -239,7 +239,7 @@ const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { melt
   ] as const);
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
-  const decoded = useMemo(() => decodeFeedInvoice(meltTarget), [meltTarget]);
+  const decoded = decodeFeedInvoice(meltTarget);
 
   if (!decoded) {
     return (
@@ -529,7 +529,7 @@ export const NoteContent = React.memo(function NoteContent({
   }, [content]);
 
   // NIP-92 imeta metadata (alt text / dimensions) keyed by media url.
-  const imetaByUrl = useMemo(() => parseImetaTags(overlayEvent?.tags ?? []), [overlayEvent]);
+  const imetaByUrl = parseImetaTags(overlayEvent?.tags ?? []);
 
   const { mediaSegments, allMediaUrls, allMediaTypes, overlayPost } = useMemo(() => {
     const media = blockSegments.filter(

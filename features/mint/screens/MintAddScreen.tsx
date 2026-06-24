@@ -237,7 +237,7 @@ const MintItem = memo(function MintItem({
   loading?: boolean;
 }) {
   const mintInfo = 'mintInfo' in mint ? mint.mintInfo : undefined;
-  const displayName = useMemo(() => getMintDisplayName(mint.url, mintInfo), [mint.url, mintInfo]);
+  const displayName = getMintDisplayName(mint.url, mintInfo);
 
   // Search-result preview only: the search endpoint returns `serverStats`
   // (`n_mints`/`n_melts`/`n_errors`) without the per-swap array, so we can't

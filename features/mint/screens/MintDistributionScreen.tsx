@@ -123,7 +123,7 @@ export function MintDistributionScreen() {
     });
   }, [trustedMints, selectedCurrency]);
 
-  const mintUrls = useMemo(() => mintsForCurrency.map((m) => m.mintUrl), [mintsForCurrency]);
+  const mintUrls = mintsForCurrency.map((m) => m.mintUrl);
 
   useEffect(() => {
     if (mintUrls.length > 0) {

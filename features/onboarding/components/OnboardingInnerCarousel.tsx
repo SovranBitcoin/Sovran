@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Platform, useWindowDimensions, ViewToken } from 'react-native';
 
 import Animated, {
@@ -33,7 +33,7 @@ const OnboardingInnerCarousel: React.FC<OnboardingCarouselProps> = ({
 }) => {
   const [isHorizontalScrollEnabled, setIsHorizontalScrollEnabled] = useState(true);
 
-  const data = useMemo(() => [...slides, slides[0]], [slides]);
+  const data = [...slides, slides[0]];
 
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();

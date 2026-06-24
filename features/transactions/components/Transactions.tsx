@@ -162,7 +162,7 @@ export const Transactions = React.memo(
     // its state flips to `rolledBack`, killing the animation mid-frame.
     const collapsing = useRollbackStore((s) => s.collapsing);
 
-    const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
+    const borderColor = opacity(muted, 0.3);
     const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
 
     const swapGroups = useMemo(() => {

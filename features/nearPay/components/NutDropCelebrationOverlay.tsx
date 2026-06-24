@@ -239,7 +239,7 @@ export function NutDropCelebrationOverlay({
     () => [styles.scrim, { backgroundColor: background }, scrimStyle],
     [background, scrimStyle]
   );
-  const avatarCombinedStyle = useMemo(() => [styles.avatar, avatarStyle], [avatarStyle]);
+  const avatarCombinedStyle = [styles.avatar, avatarStyle];
   const labelContainerStyle = useMemo(
     () =>
       centerRect
@@ -251,8 +251,8 @@ export function NutDropCelebrationOverlay({
         : null,
     [centerRect, labelStyle]
   );
-  const receivedTextStyle = useMemo(() => ({ color: foreground }), [foreground]);
-  const fromTextStyle = useMemo(() => ({ color: opacity(foreground, alpha.muted) }), [foreground]);
+  const receivedTextStyle = { color: foreground };
+  const fromTextStyle = { color: opacity(foreground, alpha.muted) };
   const handleSkip = useCallback(() => {
     onSkip();
   }, [onSkip]);

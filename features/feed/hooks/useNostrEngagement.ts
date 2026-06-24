@@ -188,7 +188,7 @@ export function useNostrEngagement(
     return map;
   }, [events]);
 
-  const eventIds = useMemo(() => Array.from(eventsById.keys()), [eventsById]);
+  const eventIds = Array.from(eventsById.keys());
 
   // ---- settle optimistic entries when the global sync catches up ----
 

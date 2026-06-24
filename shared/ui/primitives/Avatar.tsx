@@ -61,7 +61,7 @@ function GradientFallbackContent({
   fallbackSeed: string;
   borderRadius: number;
 }) {
-  const gradientTheme = useMemo(() => generateSeededGradient(fallbackSeed), [fallbackSeed]);
+  const gradientTheme = generateSeededGradient(fallbackSeed);
 
   return (
     <View
@@ -198,7 +198,7 @@ export const Avatar = ({
   const foreground = useThemeColor('foreground');
   // Match the skeleton fill used by `Text` — low-opacity foreground reads
   // as ambient "loading" rather than a solid silhouette.
-  const loadingColor = useMemo(() => opacity(foreground, 0.07), [foreground]);
+  const loadingColor = opacity(foreground, 0.07);
 
   useEffect(() => {
     void prefetchImage(picture);
@@ -270,7 +270,7 @@ export const Avatar = ({
   const defaultAlt = 'Avatar';
   const imageAlt = alt || defaultAlt;
   const previousPicture = loadedPicture && loadedPicture !== picture ? loadedPicture : null;
-  const pictureSource = useMemo(() => ({ uri: picture }), [picture]);
+  const pictureSource = { uri: picture };
   const previousPictureSource = useMemo(
     () => (previousPicture ? { uri: previousPicture } : null),
     [previousPicture]

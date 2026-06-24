@@ -94,7 +94,7 @@ function AnimatedImageOverlayContent({
 }) {
   const rawInsets = useSafeAreaInsets();
   // Override the unreliable in-overlay bottom inset with the correct one.
-  const insets = useMemo(() => ({ ...rawInsets, bottom: safeBottom }), [rawInsets, safeBottom]);
+  const insets = { ...rawInsets, bottom: safeBottom };
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   // The sheet is a true bottom drawer (not an overlay on the image), so it reads
   // like the feed it came from: same `surface` background, with the handle and

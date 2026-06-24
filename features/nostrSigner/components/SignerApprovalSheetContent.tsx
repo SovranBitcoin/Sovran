@@ -186,7 +186,7 @@ export function SignerApprovalSheetContent({
   ] as const);
 
   // Consolidated view: one DECISION per group of identical spam requests.
-  const groups = useMemo(() => consolidatePending(pending), [pending]);
+  const groups = consolidatePending(pending);
   const headGroup: Nip46RequestGroup | null = groups.length > 0 ? groups[0] : null;
   const head: Nip46PendingRequest | null = headGroup?.requests[0] ?? null;
   const headGroupKey = headGroup?.key ?? null;

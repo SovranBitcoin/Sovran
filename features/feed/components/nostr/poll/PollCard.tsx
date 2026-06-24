@@ -38,7 +38,7 @@ export function PollCard({ event }: { event: FeedEvent }) {
     'success',
   ] as const);
 
-  const poll = useMemo(() => parsePoll(event), [event]);
+  const poll = parsePoll(event);
   const votes = usePollVotes(poll.id);
   const tally = useMemo(() => tallyPoll(poll, votes, viewerPubkey), [poll, votes, viewerPubkey]);
   const [selected, setSelected] = useState<string[]>([]);

@@ -127,7 +127,7 @@ export function PostComposer() {
     return map;
   }, [parentEvent, parentProfile]);
   const textBlock = blocks.find((b) => b.kind === 'text');
-  const mediaBlocks = useMemo(() => blocks.filter((b) => b.kind === 'media'), [blocks]);
+  const mediaBlocks = blocks.filter((b) => b.kind === 'media');
   const textLength = textBlock?.kind === 'text' ? textBlock.text.length : 0;
   const hasPostContent =
     (textBlock?.kind === 'text' && textBlock.text.trim().length > 0) || mediaBlocks.length > 0;

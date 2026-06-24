@@ -58,8 +58,8 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
     'surface-secondary',
   ] as const);
   const primaryColor0 = foreground;
-  const primaryColor50 = useMemo(() => opacity(foreground, 0.9), [foreground]);
-  const primaryColor300 = useMemo(() => opacity(foreground, 0.5), [foreground]);
+  const primaryColor50 = opacity(foreground, 0.9);
+  const primaryColor300 = opacity(foreground, 0.5);
 
   const extractedColors = useExtractedColors(mintInfo?.icon_url);
 

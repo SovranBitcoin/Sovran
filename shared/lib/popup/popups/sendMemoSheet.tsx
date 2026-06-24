@@ -325,8 +325,8 @@ function MentionSearchResults({
   const [foreground] = useThemeColor(['foreground'] as const);
   const { displayResults, searchLoading, hasSearched } = useContactSearch(query);
   const trimmedQuery = query.trim();
-  const rawResults = useMemo(() => displayResults.filter(isMentionSearchResult), [displayResults]);
-  const resultPubkeys = useMemo(() => rawResults.map((result) => result.pubkey), [rawResults]);
+  const rawResults = displayResults.filter(isMentionSearchResult);
+  const resultPubkeys = rawResults.map((result) => result.pubkey);
   const { metadata: cachedMetadata } = useNostrProfileMetadataMany(resultPubkeys);
   const results = useMemo(
     () =>

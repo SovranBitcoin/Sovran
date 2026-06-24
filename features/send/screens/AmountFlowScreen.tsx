@@ -225,8 +225,8 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     return machine.subscribe(log);
   }, [machine]);
 
-  const emptyEntryStyle = useMemo(() => ({ flex: 1, backgroundColor: background }), [background]);
-  const amountBodyStyle = useMemo(() => ({ flex: 1 }), []);
+  const emptyEntryStyle = { flex: 1, backgroundColor: background };
+  const amountBodyStyle = { flex: 1 };
   const isSendOperation = entry?.destination !== 'mintQuote';
   const offlineIconStyle = useMemo(
     () => ({ opacity: canSendOffline === null ? 0.3 : 1 }),

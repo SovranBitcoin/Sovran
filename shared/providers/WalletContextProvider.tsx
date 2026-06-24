@@ -85,7 +85,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   const mintBalances = useShallowMemo(rawMintBalances);
 
   // Stabilise trustedMintUrls by comparing the serialised URL list
-  const trustedMintUrls = useMemo(() => rawTrustedMints.map((m) => m.mintUrl), [rawTrustedMints]);
+  const trustedMintUrls = rawTrustedMints.map((m) => m.mintUrl);
   const mintMethodCapabilities = useMemo(
     () =>
       deriveMintMethodCapabilityMapFromTrustedMints(

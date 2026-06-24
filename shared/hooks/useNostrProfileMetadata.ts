@@ -123,7 +123,7 @@ export function useNostrProfileMetadataMany(
 
   // Stable key from sorted pubkeys so a fresh array reference with
   // identical contents doesn't re-trigger memos / subscriptions.
-  const stableKey = useMemo(() => [...pubkeys].sort().join(','), [pubkeys]);
+  const stableKey = [...pubkeys].sort().join(',');
 
   const metadata = useMemo(() => {
     const map = new Map<string, NostrProfileMetadata>();

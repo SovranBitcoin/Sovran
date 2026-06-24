@@ -220,7 +220,7 @@ function AppHeaderIdentity({
       { translateY: interpolate(progress.value, HEADER_FADE_PHASE, [6, 0], Extrapolation.CLAMP) },
     ],
   }));
-  const composed = useMemo(() => [HEADER_IDENTITY_ROW_STYLE, fadeStyle], [fadeStyle]);
+  const composed = [HEADER_IDENTITY_ROW_STYLE, fadeStyle];
   return (
     <Animated.View style={composed}>
       <Avatar
@@ -304,7 +304,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
     () => ({ paddingTop: headerHeight, paddingBottom: 32 + insets.bottom }),
     [headerHeight, insets.bottom]
   );
-  const indicatorInsets = useMemo(() => ({ top: headerHeight }), [headerHeight]);
+  const indicatorInsets = { top: headerHeight };
 
   // ── Scroll-linked identity handoff (content ↔ header) ────────
   const flipProgress = useSharedValue(0);
@@ -346,7 +346,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
     // flipProgress is a stable shared-value ref; app presence tracked via appImage/appName.
     [appName, appImage, clientPubkey, app === undefined]
   );
-  const dangerTextStyle = useMemo(() => ({ color: danger }), [danger]);
+  const dangerTextStyle = { color: danger };
 
   // Top-level groups: capability bundles (one human concept per row) plus
   // the locked per-key rows (deletion / decrypt / wallet). Per-action
@@ -564,7 +564,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
     if (clientPubkey === undefined) return;
     setMode(clientPubkey, strictModeOn ? 'standard' : 'strict');
   }, [clientPubkey, setMode, strictModeOn]);
-  const strictA11yState = useMemo(() => ({ checked: strictModeOn }), [strictModeOn]);
+  const strictA11yState = { checked: strictModeOn };
   const openStrictMenu = useCallback(() => {
     if (clientPubkey === undefined) return;
     const checkSuffix = <Icon name="mdi:check" size={18} color={muted} />;

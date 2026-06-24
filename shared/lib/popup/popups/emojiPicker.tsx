@@ -335,7 +335,7 @@ export function EmojiPickerContent({
   // Pre-chunk search results so the override `List` virtualizes
   // per row (not per cell) — matches the rowChunkSize=6 layout of the
   // sectioned mode, so cells stay on the same x-grid as the search bar.
-  const searchRows = useMemo(() => chunkEmojis(searchResults), [searchResults]);
+  const searchRows = chunkEmojis(searchResults);
 
   const renderEmojiRow = useCallback(
     (items: EmojiEntry[]) => <EmojiRow emojis={items} onSelect={handleEmojiSelect} />,

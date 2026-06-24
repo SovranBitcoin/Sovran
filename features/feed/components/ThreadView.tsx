@@ -173,8 +173,8 @@ function ReplySortPicker({
   foreground: string;
   surfaceTertiary: string;
 }) {
-  const activeBg = useMemo(() => opacity(surfaceTertiary, 0.5), [surfaceTertiary]);
-  const pressedBg = useMemo(() => opacity(surfaceTertiary, 0.65), [surfaceTertiary]);
+  const activeBg = opacity(surfaceTertiary, 0.5);
+  const pressedBg = opacity(surfaceTertiary, 0.65);
   const selectedOption =
     REPLY_SORT_OPTIONS.find((option) => option.id === selected) ?? REPLY_SORT_OPTIONS[0];
 
@@ -267,7 +267,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const openComposer = useOpenComposer();
 
   const targetItem = useMemo(() => items.find((item) => item.type === 'target'), [items]);
-  const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
+  const hasParents = items.some((i) => i.type === 'parent');
 
   const displayItems = useMemo<ThreadListItem[]>(() => {
     if (isLoading && items.length === 0) {
@@ -374,7 +374,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     [metricsRef]
   );
 
-  const actionableEvents = useMemo(() => items.map((item) => item.event), [items]);
+  const actionableEvents = items.map((item) => item.event);
   const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
     useNostrEngagement(actionableEvents, getMetrics);
 

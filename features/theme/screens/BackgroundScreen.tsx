@@ -77,7 +77,7 @@ export function BackgroundScreen() {
     }
   }, [albums, activeIndex]);
 
-  const tabLabels = useMemo(() => albums.map((a) => a.displayName), [albums]);
+  const tabLabels = albums.map((a) => a.displayName);
   const selectedTabLabel = tabLabels[activeIndex] ?? '';
 
   const handleTabSelect = useCallback(
