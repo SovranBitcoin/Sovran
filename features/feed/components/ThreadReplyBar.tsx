@@ -129,6 +129,9 @@ export function ThreadReplyBar({
   ] as const);
   const ownProfile = useProfileStore((s) => s.getActiveProfile());
   const inputRef = useRef<TextInput>(null);
+  // AbortControllers for in-flight uploads, keyed by media-block id, so removing
+  // a block cancels its upload instead of orphaning a blob on the server.
+  const uploadsRef = useRef<Map<string, AbortController>>(new Map());
   const shift = useShiftLogger('ThreadReplyBar');
 
   const [text, setText] = useState('');
@@ -191,25 +194,42 @@ export function ThreadReplyBar({
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
-    const mediaKind = asset.type === 'video' ? 'video' : 'image';
-    const mimeType = asset.mimeType ?? (mediaKind === 'video' ? 'video/mp4' : 'image/jpeg');
+    const mimeType = asset.mimeType ?? 'image/jpeg';
     const id = `m${(mediaSeq += 1)}`;
     setMediaBlocks((prev) => [
       ...prev,
-      { id, kind: 'media', mediaKind, localUri: asset.uri, uploadProgress: 0 },
+      { id, kind: 'media', mediaKind: 'image', localUri: asset.uri, uploadProgress: 0 },
     ]);
 
+    const controller = new AbortController();
+    uploadsRef.current.set(id, controller);
     const upload = await uploadMedia({
       ndk,
       asset: { uri: asset.uri, mimeType, width: asset.width, height: asset.height },
+      signal: controller.signal,
+      onProgress: (fraction) =>
+        setMediaBlocks((prev) =>
+          prev.map((b) => (b.id === id ? { ...b, uploadProgress: fraction } : b))
+        ),
     });
+    uploadsRef.current.delete(id);
     setMediaBlocks((prev) => {
-      if (upload.isErr()) return prev.filter((b) => b.id !== id);
+      // A cancel already removed the block; leave the list as-is.
+      if (upload.isErr()) {
+        return upload.error.type === 'canceled' ? prev : prev.filter((b) => b.id !== id);
+      }
       return prev.map((b) =>
         b.id === id ? { ...b, descriptor: upload.value, uploadProgress: undefined } : b
       );
     });
   }, [ndk]);
+
+  // Cancel any in-flight upload before dropping the block.
+  const handleRemoveMedia = useCallback((id: string) => {
+    uploadsRef.current.get(id)?.abort();
+    uploadsRef.current.delete(id);
+    setMediaBlocks((prev) => prev.filter((b) => b.id !== id));
+  }, []);
 
   // Hand the current draft + reply context to the full composer.
   const expandToFull = useCallback(
@@ -325,7 +345,7 @@ export function ThreadReplyBar({
                 </View>
               ) : null}
               <Pressable
-                onPress={() => setMediaBlocks((prev) => prev.filter((b) => b.id !== block.id))}
+                onPress={() => handleRemoveMedia(block.id)}
                 hitSlop={8}
                 style={styles.thumbRemove}
                 accessibilityLabel="Remove media">

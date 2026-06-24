@@ -7,7 +7,7 @@
  * `ComposeConfig`; the char meter enforces the relay-sourced budget; send goes
  * through the outbox-aware publish seam.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -219,6 +219,10 @@ export function PostComposer() {
     setError(OUTCOME_MESSAGE[outcome] ?? 'Something went wrong.');
   }, [canPost, publish]);
 
+  // AbortControllers for in-flight uploads, keyed by media-block id, so removing
+  // a block cancels its upload instead of leaving an orphaned blob on the server.
+  const uploadsRef = useRef<Map<string, AbortController>>(new Map());
+
   const handleAddMedia = useCallback(async () => {
     if (!ndk || mediaBlocks.length >= config.maxMedia) return;
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -228,27 +232,47 @@ export function PostComposer() {
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
-    const mediaKind = asset.type === 'video' ? 'video' : 'image';
-    const mimeType = asset.mimeType ?? (mediaKind === 'video' ? 'video/mp4' : 'image/jpeg');
+    const mimeType = asset.mimeType ?? 'image/jpeg';
 
     const id = addMediaBlock({
       kind: 'media',
-      mediaKind,
+      mediaKind: 'image',
       localUri: asset.uri,
       uploadProgress: 0,
     });
 
+    const controller = new AbortController();
+    uploadsRef.current.set(id, controller);
     const upload = await uploadMedia({
       ndk,
       asset: { uri: asset.uri, mimeType, width: asset.width, height: asset.height },
+      signal: controller.signal,
+      onProgress: (fraction) => updateBlock(id, { uploadProgress: fraction }),
     });
+    uploadsRef.current.delete(id);
+
     if (upload.isOk()) {
       updateBlock(id, { descriptor: upload.value, uploadProgress: undefined });
-    } else {
+    } else if (upload.error.type !== 'canceled') {
+      // A cancel already removed the block; only surface real failures.
       removeBlock(id);
-      setError('Media upload failed. Try a different file.');
+      setError(
+        upload.error.type === 'too-large'
+          ? 'That file is too large to upload.'
+          : 'Media upload failed. Try a different file.'
+      );
     }
   }, [ndk, mediaBlocks.length, config.maxMedia, addMediaBlock, updateBlock, removeBlock]);
+
+  // Cancel any in-flight upload before dropping the block.
+  const handleRemoveMedia = useCallback(
+    (id: string) => {
+      uploadsRef.current.get(id)?.abort();
+      uploadsRef.current.delete(id);
+      removeBlock(id);
+    },
+    [removeBlock]
+  );
 
   return (
     <KeyboardAvoidingView
@@ -406,7 +430,7 @@ export function PostComposer() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onPress={() => removeBlock(block.id)}
+                      onPress={() => handleRemoveMedia(block.id)}
                       accessibilityLabel="Remove media">
                       <Icon name="mdi:close-circle" size={18} color={mutedColor} />
                     </Button>

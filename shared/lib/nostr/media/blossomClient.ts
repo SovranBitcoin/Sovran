@@ -23,7 +23,16 @@ export type BlossomError =
   | { type: 'read-failed' }
   | { type: 'sign-failed' }
   | { type: 'upload-failed'; status?: number }
-  | { type: 'bad-response' };
+  | { type: 'bad-response' }
+  | { type: 'too-large'; size: number }
+  | { type: 'canceled' };
+
+/** Hard ceiling on upload size; photos are re-encoded well under this. */
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+/** Per-attempt upload timeout. */
+const UPLOAD_TIMEOUT_MS = 60_000;
+/** Total attempts (1 initial + retries) for transient network failures. */
+const MAX_ATTEMPTS = 3;
 
 function base64ToBytes(base64: string): Uint8Array {
   const binary =
@@ -54,6 +63,10 @@ export interface UploadOptions {
   server: string;
   fileUri: string;
   mimeType: string;
+  /** Receives upload progress as a 0–1 fraction. */
+  onProgress?: (fraction: number) => void;
+  /** Aborts the upload (e.g. when the user removes the media block). */
+  signal?: AbortSignal;
 }
 
 /** Uploads `fileUri` to `server` and returns the blob descriptor. */
@@ -61,8 +74,24 @@ export function uploadToBlossom(opts: UploadOptions): ResultAsync<BlobDescriptor
   return new ResultAsync(run(opts));
 }
 
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomError>> {
-  // 1. Hash the bytes (Blossom content address + imeta `x`).
+  if (opts.signal?.aborted) return err({ type: 'canceled' });
+
+  // 1. Reject oversized files before reading them into memory.
+  try {
+    const info = await FileSystem.getInfoAsync(opts.fileUri);
+    if (info.exists && info.size > MAX_UPLOAD_BYTES) {
+      nostrLog.warn('nostr.media.too_large', { size: info.size });
+      return err({ type: 'too-large', size: info.size });
+    }
+  } catch {
+    nostrLog.warn('nostr.media.read_failed');
+    return err({ type: 'read-failed' });
+  }
+
+  // 2. Hash the bytes (Blossom content address + imeta `x`).
   let sha256: string;
   try {
     const base64 = await FileSystem.readAsStringAsync(opts.fileUri, {
@@ -73,8 +102,9 @@ async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomE
     nostrLog.warn('nostr.media.read_failed');
     return err({ type: 'read-failed' });
   }
+  if (opts.signal?.aborted) return err({ type: 'canceled' });
 
-  // 2. Sign the kind:24242 authorization event.
+  // 3. Sign the kind:24242 authorization event.
   let authHeader: string;
   try {
     const unsigned = buildBlossomAuthEvent({
@@ -94,13 +124,60 @@ async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomE
     return err({ type: 'sign-failed' });
   }
 
-  // 3. PUT the file.
-  try {
-    const response = await FileSystem.uploadAsync(`${opts.server}/upload`, opts.fileUri, {
+  // 4. PUT the file, retrying transient failures with backoff.
+  let last: Result<BlobDescriptor, BlossomError> = err({ type: 'upload-failed' });
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    if (opts.signal?.aborted) return err({ type: 'canceled' });
+    last = await putOnce(opts, authHeader);
+    if (last.isOk()) return last;
+
+    const e = last.error;
+    // Don't retry cancellation, oversize, or client (4xx) responses.
+    if (e.type === 'canceled' || e.type === 'too-large') return last;
+    if (e.type === 'upload-failed' && e.status && e.status >= 400 && e.status < 500) return last;
+    if (attempt < MAX_ATTEMPTS) await delay(500 * 2 ** (attempt - 1));
+  }
+  return last;
+}
+
+/** One PUT attempt: progress callbacks, timeout, and abort all wired to the task. */
+async function putOnce(
+  opts: UploadOptions,
+  authHeader: string
+): Promise<Result<BlobDescriptor, BlossomError>> {
+  const task = FileSystem.createUploadTask(
+    `${opts.server}/upload`,
+    opts.fileUri,
+    {
       httpMethod: 'PUT',
       uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
       headers: { Authorization: authHeader, 'Content-Type': opts.mimeType },
-    });
+    },
+    (data) => {
+      if (opts.onProgress && data.totalBytesExpectedToSend > 0) {
+        opts.onProgress(data.totalBytesSent / data.totalBytesExpectedToSend);
+      }
+    }
+  );
+
+  const onAbort = (): void => void task.cancelAsync();
+  opts.signal?.addEventListener('abort', onAbort);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    const response = await Promise.race([
+      task.uploadAsync(),
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => {
+          void task.cancelAsync();
+          resolve(undefined);
+        }, UPLOAD_TIMEOUT_MS);
+      }),
+    ]);
+
+    // cancelAsync resolves uploadAsync to null/undefined (abort or timeout).
+    if (!response)
+      return err(opts.signal?.aborted ? { type: 'canceled' } : { type: 'upload-failed' });
     if (response.status < 200 || response.status >= 300) {
       nostrLog.warn('nostr.media.upload_failed', { status: response.status });
       return err({ type: 'upload-failed', status: response.status });
@@ -110,7 +187,11 @@ async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomE
     nostrLog.info('nostr.media.uploaded', { size: descriptor.size });
     return ok(descriptor);
   } catch {
+    if (opts.signal?.aborted) return err({ type: 'canceled' });
     nostrLog.warn('nostr.media.upload_failed', {});
     return err({ type: 'upload-failed' });
+  } finally {
+    if (timer) clearTimeout(timer);
+    opts.signal?.removeEventListener('abort', onAbort);
   }
 }

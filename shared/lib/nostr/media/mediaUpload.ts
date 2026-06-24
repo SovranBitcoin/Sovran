@@ -30,6 +30,10 @@ export interface UploadMediaOptions {
   sensitive?: boolean;
   /** Override the configured server (e.g. for a one-off). */
   server?: string;
+  /** Receives upload progress as a 0–1 fraction. */
+  onProgress?: (fraction: number) => void;
+  /** Aborts the in-flight upload (e.g. when the media block is removed). */
+  signal?: AbortSignal;
 }
 
 /**
@@ -47,6 +51,8 @@ export function uploadMedia(
       server: opts.server ?? getMediaServer(),
       fileUri: asset.uri,
       mimeType: asset.mimeType,
+      onProgress: opts.onProgress,
+      signal: opts.signal,
     }).map((descriptor) => ({
       url: descriptor.url,
       sha256: descriptor.sha256,
