@@ -61,10 +61,12 @@ export function usePostActions(options?: {
               icon: 'mdi:trash-can-outline',
               variant: 'dangerous',
               testID: 'post-delete',
-              onPress: (close) => {
-                close();
-                confirmDelete();
-              },
+              // Chain to the confirm by swapping the sheet content in place
+              // (`keepOpen`, no `close()`). Calling close() first dismisses the
+              // host, which then drops the re-opened confirm's button dispatch —
+              // proven via logs: the confirm was tapped but deletePost never ran.
+              keepOpen: true,
+              onPress: () => confirmDelete(),
             },
           ]
         : [];
