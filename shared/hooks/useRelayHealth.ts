@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 
 import { NDKRelayStatus, useNDK } from '@nostr-dev-kit/ndk-mobile';
 
-export type RelayHealth = 'connected' | 'connecting' | 'disconnected' | 'failed';
+type RelayHealth = 'connected' | 'connecting' | 'disconnected' | 'failed';
 
 const POLL_MS = 2_000;
 

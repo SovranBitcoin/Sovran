@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -77,16 +77,12 @@ export function DmChatHeader({
 
   const { metadata, isLoading } = useNostrProfileMetadata(pubkey);
 
-  const displayName = useMemo(
-    () =>
-      resolveIdentityName({
-        pubkey,
-        nostrProfile: metadata,
-        bleNickname: nickname,
-        overrideName: displayNameOverride,
-      }),
-    [displayNameOverride, metadata, nickname, pubkey]
-  );
+  const displayName = resolveIdentityName({
+    pubkey,
+    nostrProfile: metadata,
+    bleNickname: nickname,
+    overrideName: displayNameOverride,
+  });
 
   const userPicture = metadata?.picture;
   const shouldShowAvatarLoading = !!pubkey && isLoading && !metadata;
@@ -100,13 +96,13 @@ export function DmChatHeader({
     }
   }, [pubkey]);
 
-  const handleShareQr = useCallback(() => {
+  const handleShareQr = () => {
     if (!npub) return;
     router.navigate({
       pathname: '/share',
       params: { type: 'profile', data: npub },
     });
-  }, [npub]);
+  };
 
   const trailingNode =
     trailing ??

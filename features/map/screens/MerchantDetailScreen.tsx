@@ -3,7 +3,7 @@
  * Used from map flow when a marker is tapped.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +25,7 @@ import opacity from 'hex-color-opacity';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { getMarkerColor } from '@/shared/lib/map/categories';
-import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
+import { BITCOIN_ACCENT, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { isAbortError } from '@/shared/lib/apiClient';
 import { openExternalUrl } from '@/shared/lib/url';
 import { staticPopup } from '@/shared/lib/popup';
@@ -34,6 +34,44 @@ import { formatDate } from '@/shared/lib/date';
 const ParamsSchema = z.object({
   placeId: z.string().regex(/^\d{1,15}$/, 'placeId must be a positive integer'),
 });
+
+const handleOpenURL = async (url: string) => {
+  const result = await openExternalUrl(url);
+  if (result.isErr()) {
+    log.warn('map.merchant.open_link.failed', { url, reason: result.error.type });
+    staticPopup('open-link-failed');
+  }
+};
+
+const handleCall = async (phone: string) => {
+  // Strip everything but digits and a leading + so user-supplied formatting
+  // (spaces, dashes, parens) doesn't fail URL parsing.
+  const sanitized = phone.replace(/[^\d+]/g, '');
+  await handleOpenURL(`tel:${sanitized}`);
+};
+
+const handleEmail = async (email: string) => handleOpenURL(`mailto:${email.trim()}`);
+
+const handleContactPress = (method: string, info: string, fullInfo?: string) => {
+  switch (method) {
+    case 'phone':
+      void handleCall(info);
+      break;
+    case 'website':
+      const url = fullInfo || info;
+      void handleOpenURL(url.startsWith('http') ? url : `https://${url}`);
+      break;
+    case 'email':
+      void handleEmail(info);
+      break;
+    case 'instagram':
+      void handleOpenURL(`https://instagram.com/${info.replace('@', '')}`);
+      break;
+    case 'twitter':
+      void handleOpenURL(`https://x.com/${info.replace('@', '')}`);
+      break;
+  }
+};
 
 export function MerchantDetailScreen() {
   useLifecycleLogger('MerchantDetailScreen');
@@ -101,29 +139,6 @@ export function MerchantDetailScreen() {
     }
   }, [place?.name, navigation]);
 
-  const handleOpenURL = useCallback(async (url: string) => {
-    const result = await openExternalUrl(url);
-    if (result.isErr()) {
-      log.warn('map.merchant.open_link.failed', { url, reason: result.error.type });
-      staticPopup('open-link-failed');
-    }
-  }, []);
-
-  const handleCall = useCallback(
-    async (phone: string) => {
-      // Strip everything but digits and a leading + so user-supplied formatting
-      // (spaces, dashes, parens) doesn't fail URL parsing.
-      const sanitized = phone.replace(/[^\d+]/g, '');
-      await handleOpenURL(`tel:${sanitized}`);
-    },
-    [handleOpenURL]
-  );
-
-  const handleEmail = useCallback(
-    async (email: string) => handleOpenURL(`mailto:${email.trim()}`),
-    [handleOpenURL]
-  );
-
   const supportsOnchain = place?.['osm:payment:onchain'] === 'yes';
   const supportsLightning = place?.['osm:payment:lightning'] === 'yes';
   const supportsContactless = place?.['osm:payment:lightning_contactless'] === 'yes';
@@ -150,30 +165,6 @@ export function MerchantDetailScreen() {
 
     return items;
   }, [phone, website, email, instagram, twitter]);
-
-  const handleContactPress = useCallback(
-    (method: string, info: string, fullInfo?: string) => {
-      switch (method) {
-        case 'phone':
-          void handleCall(info);
-          break;
-        case 'website':
-          const url = fullInfo || info;
-          void handleOpenURL(url.startsWith('http') ? url : `https://${url}`);
-          break;
-        case 'email':
-          void handleEmail(info);
-          break;
-        case 'instagram':
-          void handleOpenURL(`https://instagram.com/${info.replace('@', '')}`);
-          break;
-        case 'twitter':
-          void handleOpenURL(`https://x.com/${info.replace('@', '')}`);
-          break;
-      }
-    },
-    [handleCall, handleOpenURL, handleEmail]
-  );
 
   if (isLoading) {
     return (
@@ -213,7 +204,7 @@ export function MerchantDetailScreen() {
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={[styles.merchantIcon, { backgroundColor: getMarkerColor(place.icon) }]}>
-            <Icon name="mdi:store" size={28} color="#fff" />
+            <Icon name="mdi:store" size={28} color={INVARIANT_WHITE} />
           </View>
           <VStack style={{ flex: 1, marginLeft: 16 }}>
             <Text size={20} heavy style={{ color: opacity(foreground, 0.9) }}>

@@ -2,7 +2,7 @@
  * @fileoverview Receive-flow Lightning receive route.
  */
 
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 
 import { LightningReceiveRoute } from '@/features/receive';
 import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
@@ -35,10 +35,10 @@ export default function LightningReceiveRouteWrapper() {
     walletContext.mintBalances,
     walletContext.trustedMintUrls.length,
   ]);
-  const handleRequestMintList = useCallback(() => {
+  const handleRequestMintList = () => {
     cashuLog.info('receive.lightning.mint_list.requested', { source: 'pill' });
     void machine.requestMintSelector();
-  }, [machine]);
+  };
 
   return (
     <LightningReceiveRoute

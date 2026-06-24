@@ -12,14 +12,14 @@
 /** NIP-37 draft event kind (parameterized replaceable). */
 export const DRAFT_KIND = 31234;
 
-export interface UnsignedTargetEvent {
+interface UnsignedTargetEvent {
   kind: number;
   content: string;
   created_at: number;
   tags: string[][];
 }
 
-export interface UnsignedDraftEvent {
+interface UnsignedDraftEvent {
   kind: number;
   content: string;
   created_at: number;

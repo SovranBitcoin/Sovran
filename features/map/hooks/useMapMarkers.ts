@@ -50,7 +50,7 @@ export function useMapMarkers({
       setError: s.setError,
     }))
   );
-  const places = useMemo(() => placesCache?.data ?? [], [placesCache]);
+  const places = placesCache?.data ?? [];
 
   const [isClusteringReady, setIsClusteringReady] = useState(false);
   const [markers, setMarkers] = useState<RenderedMarker[]>([]);
@@ -80,7 +80,7 @@ export function useMapMarkers({
   const updateMarkersForCamera = useCallback(
     (lat: number, lon: number, z: number) => {
       const manager = clusterManagerRef.current;
-      if (!manager || !manager.isLoaded()) {
+      if (!manager?.isLoaded()) {
         setMarkers([]);
         setVisibleCount(0);
         lastRenderedMarkersRef.current = [];
@@ -180,10 +180,7 @@ export function useMapMarkers({
     return () => handle.cancel();
   }, [isMapReady, filteredPoints, clusterCacheKey, getCamera, updateMarkersForCamera]);
 
-  const resolveMarker = useCallback(
-    (id: string) => markersRef.current.find((m) => m.id === id),
-    []
-  );
+  const resolveMarker = (id: string) => markersRef.current.find((m) => m.id === id);
 
   return {
     markers,

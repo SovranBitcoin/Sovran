@@ -32,7 +32,7 @@ function ndkEventToNostr(event: NDKEvent): ApplesauceEvent {
     tags: event.tags,
     created_at: event.created_at ?? 0,
     sig: event.sig ?? '',
-  } as ApplesauceEvent;
+  } satisfies ApplesauceEvent;
 }
 
 function nostrEventToNdk(event: ApplesauceEvent, ndk: NDK): NDKEvent {

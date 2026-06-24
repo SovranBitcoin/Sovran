@@ -14,11 +14,6 @@ type Props = Omit<RefreshControlProps, 'onRefresh' | 'refreshing'> & {
  * `onRefresh`. The previous AI-tab navigation behaviour has been removed —
  * the gesture is now a plain refresh.
  */
-export function PullToAiRefreshControl({ onRefresh, refreshing = false, ...rest }: Props) {
-  const { refreshControl } = usePullToAiRefreshControl({ onRefresh, refreshing, ...rest });
-  return refreshControl;
-}
-
 export function usePullToAiRefreshControl({ onRefresh, refreshing = false, ...rest }: Props = {}) {
   return {
     refreshControl: <RefreshControl {...rest} refreshing={refreshing} onRefresh={onRefresh} />,

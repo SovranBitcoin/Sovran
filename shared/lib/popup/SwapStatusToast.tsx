@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
@@ -43,14 +43,14 @@ export function SwapStatusToast({ hide, ...toastProps }: SwapStatusToastProps) {
   // `swapStatusPopup`'s `onHide` clears `useSwapStatusStore.active` after the
   // dismiss animation, so the action only needs to navigate + hide.
   const groupId = view.present ? view.groupId : undefined;
-  const onPressView = useCallback(() => {
+  const onPressView = () => {
     if (!groupId) {
       hide();
       return;
     }
     guardedRouter.push({ pathname: '/swap', params: { groupId } });
     hide();
-  }, [groupId, hide]);
+  };
 
   if (!view.present) return null;
 

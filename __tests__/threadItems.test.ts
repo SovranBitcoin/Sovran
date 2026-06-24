@@ -177,10 +177,16 @@ describe('thread item builders', () => {
   it('initial fetch keeps the seeded reply order as a stable prefix (no reshuffle)', () => {
     const root = note({ id: 'root', content: 'root', tags: [], createdAt: 100 });
     const seededReply = note({
-      id: 'seeded-reply', content: 'seeded', tags: [['e', 'root', '', 'reply']], createdAt: 101,
+      id: 'seeded-reply',
+      content: 'seeded',
+      tags: [['e', 'root', '', 'reply']],
+      createdAt: 101,
     });
     const rankedFirst = note({
-      id: 'ranked-first', content: 'ranked higher by the server', tags: [['e', 'root', '', 'reply']], createdAt: 102,
+      id: 'ranked-first',
+      content: 'ranked higher by the server',
+      tags: [['e', 'root', '', 'reply']],
+      createdAt: 102,
     });
     const result: ThreadResult = {
       allEvents: mapEvents([root, seededReply, rankedFirst]),

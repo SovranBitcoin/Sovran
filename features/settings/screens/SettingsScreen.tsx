@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef } from 'react';
 import { ScrollView, Alert } from 'react-native';
 import { openExternalUrl } from '@/shared/lib/url';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -26,9 +26,9 @@ import { useNotificationPolicyStore } from '@/features/feed/stores/notificationP
 import { notificationPolicyLabel } from '@/features/feed/lib/notificationCopy';
 import { useNip46RequestsStore } from '@/features/nostrSigner';
 
-export const name = Application.applicationName;
-export const version = Application.nativeApplicationVersion;
-export const buildNumber = Application.nativeBuildVersion;
+const name = Application.applicationName;
+const version = Application.nativeApplicationVersion;
+const buildNumber = Application.nativeBuildVersion;
 
 const ProfileButton = () => {
   const { keys: nostrKeys } = useNostrKeysContext();
@@ -140,6 +140,19 @@ const BelowFold = ({ children }: { children: React.ReactNode }) => {
   return ready ? <>{children}</> : null;
 };
 
+const handleExportDatabase = async () => {
+  log.info('settings.export_database.start');
+  try {
+    await CocoManager.exportDatabase();
+    log.info('settings.export_database.success');
+  } catch (error) {
+    log.error('settings.export_database.error', {
+      error: error instanceof Error ? error : new Error(String(error)),
+    });
+    Alert.alert('Export Failed', error instanceof Error ? error.message : 'Unknown error');
+  }
+};
+
 export const SettingsScreen = () => {
   useLifecycleLogger('SettingsScreen');
   const sendLocationEnabled = useSettingsStore((state) => state.sendLocationEnabled);
@@ -167,7 +180,7 @@ export const SettingsScreen = () => {
   const tapCountRef = useRef(0);
   const lastTapRef = useRef(0);
 
-  const handleVersionPress = useCallback(() => {
+  const handleVersionPress = () => {
     const now = Date.now();
     if (now - lastTapRef.current > TRIPLE_TAP_WINDOW_MS) {
       tapCountRef.current = 0;
@@ -181,19 +194,6 @@ export const SettingsScreen = () => {
       log.info('settings.dev_mode.toggle', { enabled: newMode });
       setDevMode(newMode);
       paramPopup('dev-mode', newMode);
-    }
-  }, [devMode, setDevMode]);
-
-  const handleExportDatabase = async () => {
-    log.info('settings.export_database.start');
-    try {
-      await CocoManager.exportDatabase();
-      log.info('settings.export_database.success');
-    } catch (error) {
-      log.error('settings.export_database.error', {
-        error: error instanceof Error ? error : new Error(String(error)),
-      });
-      Alert.alert('Export Failed', error instanceof Error ? error.message : 'Unknown error');
     }
   };
 

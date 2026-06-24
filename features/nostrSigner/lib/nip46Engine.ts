@@ -62,6 +62,7 @@ import {
   type BunkerSecretsError,
 } from '@/features/nostrSigner/lib/bunkerSecrets';
 import { safeJsonParse } from '@/features/nostrSigner/lib/json';
+import { parseMethodParams } from '@/features/nostrSigner/lib/nip46RequestParse';
 import {
   extractSignedEventId,
   isExecutableMethod,
@@ -78,7 +79,6 @@ import {
   REQUEST_TTL_MS,
   RpcRequestSchema,
   SUMMARY_MAX_LENGTH,
-  UnsignedEventSchema,
   type ActivityVerdict,
   type GrantKey,
   type Nip46Method,
@@ -212,12 +212,6 @@ class LruSet {
 interface EngineState {
   userPubkey: string;
   signer: NDKPrivateKeySigner;
-}
-
-interface ParsedSignParams {
-  unsigned: UnsignedEvent | null;
-  kind: number | undefined;
-  preview: Nip46ParamsPreview;
 }
 
 export interface Nip46Engine {
@@ -512,51 +506,6 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
         error: rebuilt.error.type,
       });
     }
-  }
-
-  // ── Request-shape validation (per-method params → kind/preview) ─
-
-  function parseMethodParams(request: RpcRequest): Result<ParsedSignParams, 'malformed'> {
-    if (request.method === 'sign_event') {
-      const raw = request.params[0];
-      if (raw === undefined) return err('malformed');
-      const json = safeJsonParse(raw);
-      if (json.isErr()) return err('malformed');
-      const unsigned = UnsignedEventSchema.safeParse(json.value);
-      if (!unsigned.success) return err('malformed');
-      return ok({
-        unsigned: unsigned.data,
-        kind: unsigned.data.kind,
-        preview: { type: 'sign_event', event: unsigned.data },
-      });
-    }
-    if (request.method === 'nip04_encrypt' || request.method === 'nip44_encrypt') {
-      const [peer, plaintext] = request.params;
-      if (peer === undefined || plaintext === undefined || !isNostrPubkeyHex(peer)) {
-        return err('malformed');
-      }
-      return ok({
-        unsigned: null,
-        kind: undefined,
-        preview: { type: 'encrypt', peerPubkey: peer.toLowerCase(), plaintext },
-      });
-    }
-    if (request.method === 'nip04_decrypt' || request.method === 'nip44_decrypt') {
-      const [peer, ciphertext] = request.params;
-      if (peer === undefined || ciphertext === undefined || !isNostrPubkeyHex(peer)) {
-        return err('malformed');
-      }
-      return ok({
-        unsigned: null,
-        kind: undefined,
-        preview: {
-          type: 'decrypt',
-          peerPubkey: peer.toLowerCase(),
-          ciphertextLength: ciphertext.length,
-        },
-      });
-    }
-    return ok({ unsigned: null, kind: undefined, preview: { type: 'none' } });
   }
 
   // ── Inbound pipeline ──────────────────────────────────────────

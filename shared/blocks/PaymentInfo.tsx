@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Text } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import ViewShot from 'react-native-view-shot';
@@ -66,7 +66,7 @@ export function PaymentInfo({
 
   const willAnimate = animated && selectedValue.length >= ANIMATE_THRESHOLD;
 
-  const cycleSpeed = useCallback(() => {
+  const cycleSpeed = () => {
     setSpeedIndex((prev) => {
       const next = (prev + 1) % SPEED_PRESETS.length;
       paymentLog.info('ui.qrcode.speed_changed', {
@@ -76,9 +76,9 @@ export function PaymentInfo({
       });
       return next;
     });
-  }, []);
+  };
 
-  const cycleDensity = useCallback(() => {
+  const cycleDensity = () => {
     setDensityIndex((prev) => {
       const next = (prev + 1) % DENSITY_PRESETS.length;
       paymentLog.info('ui.qrcode.density_changed', {
@@ -88,9 +88,9 @@ export function PaymentInfo({
       });
       return next;
     });
-  }, []);
+  };
 
-  const handleCopyPress = useCallback(async () => {
+  const handleCopyPress = async () => {
     paymentLog.info('ui.payment_info.copy', {
       copyTarget,
       hasLink: Boolean(link),
@@ -99,7 +99,7 @@ export function PaymentInfo({
     await EnhancedHaptics.copyHaptic();
     await Clipboard.setStringAsync(link || selectedValue);
     copyPopup(copyTarget);
-  }, [link, selectedValue, copyTarget]);
+  };
 
   const loading = !selectedValue;
   if (loading) {

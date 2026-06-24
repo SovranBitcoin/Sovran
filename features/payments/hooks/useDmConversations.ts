@@ -8,7 +8,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { paymentLog } from '@/shared/lib/logger';
-import { fetchDmEnvelopes, type DmEnvelopePage } from '../data/dmEnvelopeClient';
+import { fetchDmEnvelopes } from '../data/dmEnvelopeClient';
+import type { DmEnvelopePage } from '../data/dmEnvelopeTypes';
 import { decryptDmEnvelopes, type DmProtocol } from '../data/dmDecryptPipeline';
 import { CURSOR_SLACK_SECONDS, pageOldestWrapTs } from '../data/dmPagination';
 
@@ -130,7 +131,7 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
     return () => controller.abort();
   }, [viewerPubkey, viewerPrivateKey, refreshKey, ingest]);
 
-  const loadMore = useCallback(async () => {
+  const loadMore = async () => {
     if (
       loadingMoreRef.current ||
       !hasMore ||
@@ -158,9 +159,9 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [hasMore, viewerPubkey, viewerPrivateKey, ingest]);
+  };
 
-  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const refresh = () => setRefreshKey((k) => k + 1);
 
   return { conversations, loading, hasLoadedOnce, hasMore, loadMore, refresh, error };
 }

@@ -171,7 +171,7 @@ export function useThread(eventId: string): UseThreadResult {
     [eventId, replySort, viewerPubkey]
   );
 
-  const loadMoreReplies = useCallback(async () => {
+  const loadMoreReplies = async () => {
     if (
       !eventId ||
       isInitialFetchingRef.current ||
@@ -241,7 +241,7 @@ export function useThread(eventId: string): UseThreadResult {
         setIsLoadingMoreReplies(false);
       }
     }
-  }, [applyThreadResult, eventId, replySort, viewerPubkey]);
+  };
 
   useEffect(() => {
     if (!eventId) return;

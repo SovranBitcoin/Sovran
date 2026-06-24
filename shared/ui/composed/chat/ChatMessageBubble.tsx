@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { View } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -175,7 +176,7 @@ export function ChatMessageBubble({
               <Text
                 size={16}
                 style={{
-                  color: message.isOwn ? '#FFFFFF' : foreground,
+                  color: message.isOwn ? INVARIANT_WHITE : foreground,
                   lineHeight: 22,
                 }}>
                 {displayContent}

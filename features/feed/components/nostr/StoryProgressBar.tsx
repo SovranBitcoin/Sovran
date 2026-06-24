@@ -6,6 +6,7 @@
  */
 
 import React, { FC } from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Extrapolation,
@@ -53,6 +54,6 @@ const styles = StyleSheet.create({
   fill: {
     height: '100%',
     borderRadius: 999,
-    backgroundColor: '#fff',
+    backgroundColor: INVARIANT_WHITE,
   },
 });

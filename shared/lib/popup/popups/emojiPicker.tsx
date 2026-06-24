@@ -68,7 +68,7 @@ const EmojiCell = React.memo(function EmojiCell({
   entry: EmojiEntry;
   onSelect: (emoji: string) => void;
 }) {
-  const handlePress = useCallback(() => onSelect(entry.emoji), [entry.emoji, onSelect]);
+  const handlePress = () => onSelect(entry.emoji);
   return (
     <Pressable
       testID={`emoji-${entry.keywords[0]}`}
@@ -292,21 +292,21 @@ export function EmojiPickerContent({
     [payload.token, close, searchQuery]
   );
 
-  const handleSearchChange = useCallback((text: string) => {
+  const handleSearchChange = (text: string) => {
     setInputText(text);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       emojiLog.debug('emojiPicker.search.debounced', { queryLen: text.length });
       setSearchQuery(text);
     }, 150);
-  }, []);
+  };
 
-  const handleSearchClear = useCallback(() => {
+  const handleSearchClear = () => {
     emojiLog.debug('emojiPicker.search.clear', {});
     setInputText('');
     setSearchQuery('');
     if (debounceRef.current) clearTimeout(debounceRef.current);
-  }, []);
+  };
 
   // Each category becomes a virtualized section. `data` is the flat
   // emoji array — `SectionAnchorList` chunks it into rows of `COLS`
@@ -335,11 +335,10 @@ export function EmojiPickerContent({
   // Pre-chunk search results so the override `List` virtualizes
   // per row (not per cell) — matches the rowChunkSize=6 layout of the
   // sectioned mode, so cells stay on the same x-grid as the search bar.
-  const searchRows = useMemo(() => chunkEmojis(searchResults), [searchResults]);
+  const searchRows = chunkEmojis(searchResults);
 
-  const renderEmojiRow = useCallback(
-    (items: EmojiEntry[]) => <EmojiRow emojis={items} onSelect={handleEmojiSelect} />,
-    [handleEmojiSelect]
+  const renderEmojiRow = (items: EmojiEntry[]) => (
+    <EmojiRow emojis={items} onSelect={handleEmojiSelect} />
   );
   const renderEmojiSearchRow = useCallback(
     ({ item }: { item: EmojiEntry[] }) => <EmojiRow emojis={item} onSelect={handleEmojiSelect} />,

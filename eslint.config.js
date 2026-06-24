@@ -3,6 +3,15 @@ const { defineConfig } = require('eslint/config');
 const expoConfig = require('eslint-config-expo/flat');
 const eslintPluginPrettierRecommended = require('eslint-plugin-prettier/recommended');
 
+// High-value bad-pattern rule plugins adopted alongside the suppression cleanup.
+const neverthrowPlugin = require('@okee-tech/eslint-plugin-neverthrow');
+const noSecretsPlugin = require('eslint-plugin-no-secrets');
+const securityPlugin = require('eslint-plugin-security');
+// eslint-plugin-unicorn v68 is ESM-only — its CJS interop exposes the plugin on
+// `.default`. Fall back to the namespace for older/other resolutions.
+const unicornPlugin = require('eslint-plugin-unicorn').default ?? require('eslint-plugin-unicorn');
+const sonarjsPlugin = require('eslint-plugin-sonarjs');
+
 // eslint-plugin-react-compiler@19.1.0-rc.2 calls zod@3's `z.function().args()`,
 // which the repo-wide `zod@4` override (package.json `overrides`) removes — so
 // `require`-ing it throws at config-load and crashes the ENTIRE lint run. Load
@@ -96,33 +105,6 @@ module.exports = defineConfig([
       ],
     },
   },
-  // React-perf rules — catch inline `{}`, `[]`, and `() => ...` passed
-  // as JSX props. Every render creates a fresh reference, defeating
-  // `React.memo` / `useMemo` downstream and re-firing
-  // `useEffect`/`useCallback` deps. Direct payoff for the perf-slice
-  // cluster (`stabilize derived collections in mintSelect`, `stabilise
-  // relay-flush re-fire`, `scope useAiSend stream + balance to a hook
-  // controller`, `perf(chat): stabilise chat-surface render lifecycle`).
-  //
-  // Set at `warn` initially — the rules are precise but historically
-  // noisy in codebases that haven't been pass-optimised. Surfaces in PR
-  // review without failing CI. Pairs with the react-compiler rule
-  // above: react-compiler flags compiler bailouts, react-perf flags
-  // the props that *would* prevent memoisation even with the compiler
-  // active.
-  //
-  // `jsx-no-jsx-as-prop` (passing a `<Component />` as a prop) is also
-  // available but commonly used in real patterns (slot props, list
-  // renderers); skipped to keep noise low.
-  {
-    files: ['**/*.tsx'],
-    plugins: { 'react-perf': require('eslint-plugin-react-perf') },
-    rules: {
-      'react-perf/jsx-no-new-object-as-prop': 'warn',
-      'react-perf/jsx-no-new-array-as-prop': 'warn',
-      'react-perf/jsx-no-new-function-as-prop': 'warn',
-    },
-  },
   // React Compiler ESLint rule. Flags components and effects that the
   // compiler can't auto-memoize: render-body mutations, prop mutations,
   // refs misuse, conditional hooks, derived collections that aren't
@@ -149,6 +131,110 @@ module.exports = defineConfig([
         },
       ]
     : []),
+  // ── High-value bad-pattern rules (adopted with the suppression cleanup) ──
+  // Type-aware correctness rules — this block sits in the TS/TSX project so it
+  // picks up the `projectService` type info configured above.
+  // (`prefer-nullish-coalescing` is intentionally NOT here yet: its `||`->`??`
+  // autofix is behaviour-changing for legitimate falsy `0`/`''` values, so it
+  // lands at `warn` in its own block below, pending a dedicated audit.)
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    plugins: { neverthrow: neverthrowPlugin },
+    rules: {
+      // A created Result/ResultAsync that is never consumed is a silently
+      // dropped error — in a wallet, a swallowed funds/key failure. Staged at
+      // `warn` (like react-compiler); promote to `error` once the floor is zero.
+      'neverthrow/must-consume-result': 'warn',
+      // `await` on a non-thenable (a neverthrow Result, a sync value) is an
+      // async-correctness bug. Near-zero false positives.
+      '@typescript-eslint/await-thenable': 'error',
+      // A missing variant in a Cashu/Zod discriminated-union switch is a real
+      // wallet bug; non-union switches must carry a default. Staged at `warn`:
+      // the initial sweep surfaced ~18 genuine gaps (missing union members /
+      // absent defaults) whose correct handling is per-switch semantic work — a
+      // focused follow-up, not part of this lint cleanup. Promote to `error`
+      // once that floor is zero.
+      '@typescript-eslint/switch-exhaustiveness-check': [
+        'warn',
+        { requireDefaultForNonUnion: true },
+      ],
+      // Cheap, safe autofix for the deep event.tags / profile access in feed code.
+      '@typescript-eslint/prefer-optional-chain': 'error',
+      // `amountSats || fallback` silently discards a legitimate `0`; `memo || x`
+      // clobbers an intentional empty string — `??` is what we mean. Staged at
+      // `warn`: the `||`->`??` autofix is behaviour-changing, so each site needs
+      // a falsy-`0`/`''`-intent audit. Surfaced now; promote to `error` after
+      // that dedicated audit pass. NOT auto-fixed here for that reason.
+      '@typescript-eslint/prefer-nullish-coalescing': 'warn',
+    },
+  },
+  // Non-type-aware bug catchers — cherry-picked from unicorn + sonarjs (NOT
+  // their recommended presets, which are materially noisier). Plus import
+  // hygiene (the `import` plugin is already registered by eslint-config-expo).
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    plugins: { unicorn: unicornPlugin, sonarjs: sonarjsPlugin },
+    rules: {
+      'unicorn/no-thenable': 'error', // an object with a `then` prop silently breaks `await`
+      'unicorn/no-instanceof-array': 'error',
+      'unicorn/error-message': 'error',
+      'unicorn/throw-new-error': 'error',
+      'sonarjs/no-identical-expressions': 'error',
+      'sonarjs/no-all-duplicated-branches': 'error',
+      'sonarjs/no-element-overwrite': 'error',
+      'sonarjs/no-collection-size-mischeck': 'error',
+      'sonarjs/non-existent-operator': 'error', // `=+` / `=!` typo detection
+      'import/no-duplicates': 'error',
+      'import/no-self-import': 'error',
+      // no-cycle is the expensive rule (graph traversal) and circular-dep
+      // backlog is its own cleanup — gate the depth and keep it at `warn`.
+      'import/no-cycle': ['warn', { maxDepth: 3, ignoreExternal: true }],
+    },
+  },
+  // Wallet-relevant security rules. eslint-plugin-security's `recommended` is a
+  // documented false-positive firehose, so cherry-pick only the high-signal,
+  // low-FP ones (detect-object-injection deliberately omitted).
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    plugins: { security: securityPlugin, 'no-secrets': noSecretsPlugin },
+    rules: {
+      'security/detect-pseudoRandomBytes': 'error', // non-CSPRNG -> mnemonic/key risk
+      'security/detect-eval-with-expression': 'error',
+      'security/detect-bidi-characters': 'error', // Trojan-source attacks
+      // Entropy-based secret detector — the single most wallet-relevant guard
+      // (an accidentally committed nsec/API key). Staged at `warn` while the
+      // tolerance is tuned; public Nostr/Cashu encodings are ignored so they
+      // don't trip it. Promote to `error` once the floor is zero.
+      'no-secrets/no-secrets': [
+        'warn',
+        {
+          tolerance: 4.2,
+          ignoreContent: [
+            '^npub1',
+            '^nsec1',
+            '^nprofile1',
+            '^note1',
+            '^cashu[AB]',
+            '^[0-9a-f]{64}$',
+          ],
+        },
+      ],
+    },
+  },
+  // no-secrets off in tests/fixtures/vectors: BIP-39 vectors, sample cashu
+  // tokens, and crypto test vectors are high-entropy by design, not leaks.
+  {
+    files: [
+      '**/__tests__/**',
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/*.spec.ts',
+      '**/*.spec.tsx',
+      '**/*.vectors.*',
+      '**/fixtures/**',
+    ],
+    rules: { 'no-secrets/no-secrets': 'off' },
+  },
   {
     plugins: {
       'unused-imports': require('eslint-plugin-unused-imports'),
@@ -401,6 +487,20 @@ module.exports = defineConfig([
       'no-restricted-globals': 'off',
     },
   },
+  // routstr/api.ts legitimately uses raw `fetch` throughout: every endpoint
+  // funnels failures through `throwResponseError`, which needs the raw
+  // `Response` to read `response.status`, parse HTML/JSON error bodies, extract
+  // 402 insufficient-balance details, and clear the stored API key on 401 — plus
+  // `sendMessage` consumes the response as an SSE `ReadableStream`. `fetchJson`
+  // collapses non-ok responses into a generic Error and never exposes the
+  // Response, so it cannot carry this status-aware error contract. Raw fetch is
+  // the right tool here, not a wrapper bypass.
+  {
+    files: ['shared/lib/routstr/api.ts'],
+    rules: {
+      'no-restricted-globals': 'off',
+    },
+  },
   // `no-console` exemptions — three legitimate sites:
   //   - shared/lib/loggerCore.ts: transport-fallback escape hatch. When
   //     the logger's own transport throws, it falls through to
@@ -444,9 +544,48 @@ module.exports = defineConfig([
       'shared/lib/brandColors.ts',
       'shared/lib/colorExtraction.ts',
       'config/backgroundImageThemes.ts',
+      // useThemeColor IS the theme resolver — its last-resort `#000000` fallback
+      // is the answer, not a stray literal.
+      'shared/hooks/useThemeColor.ts',
+      // categories.ts owns the fixed BTCMap category-marker palette (a data
+      // table consumed by the map; not a component, so `useThemeColor` can't
+      // apply and the colours are intentionally theme-invariant).
+      'shared/lib/map/categories.ts',
+      // RowStatsAccent exports the canonical STAT_COLOR_* accent constants.
+      'shared/ui/composed/RowStatsAccent.tsx',
     ],
     rules: {
       'no-restricted-syntax': 'off',
+    },
+  },
+  // Legacy persisted-Redux migration scaffolding. These `*.deprecated.ts`
+  // files are still live — `app/_layout.tsx`, `shared/blocks/MigrationGate.tsx`,
+  // and the `shared/lib/migrations` / `shared/lib/cashu/migration.ts` paths
+  // import them to read and migrate OLD on-disk Redux blobs whose shapes
+  // predate the current stores. `any` here is reading genuinely-unknown
+  // historical input, not application-domain types, and the whole subsystem is
+  // slated for deletion once the migration window closes — typing it would be
+  // churn on soon-dead code. Scope the exemption to these files only.
+  {
+    files: ['redux/**/*.deprecated.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  // TODO(reanimated-migration): these three files still use the legacy RN
+  // `Animated` API for self-contained effects (Button ripple, SpriteView
+  // parallax, AmountFormatter digit roll). Migrating them to Reanimated v4
+  // changes animation behaviour and is deferred to its own PR. Until then the
+  // raw `Animated` import is intentional here — scoped off rather than buried
+  // as an opaque count in eslint-suppressions.json.
+  {
+    files: [
+      'shared/ui/primitives/Button.tsx',
+      'shared/ui/composed/SpriteView.tsx',
+      'shared/ui/composed/AmountFormatter.tsx',
+    ],
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
 ]);

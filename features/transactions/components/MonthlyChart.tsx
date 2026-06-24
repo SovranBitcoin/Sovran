@@ -142,11 +142,11 @@ const MonthlyChart = React.memo(function MonthlyChart({
 
   const config = MODE_CONFIG[mode];
 
-  const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
+  const borderColor = opacity(muted, 0.3);
 
   const actualLineColor = mode === 'spent' ? dangerColor : successColor;
-  const projectedLineColor = useMemo(() => opacity(foreground, 0.3), [foreground]);
-  const labelColor = useMemo(() => opacity(foreground, 0.66), [foreground]);
+  const projectedLineColor = opacity(foreground, 0.3);
+  const labelColor = opacity(foreground, 0.66);
 
   // Use a unique gradient ID per mode to avoid SVG collisions when both charts render
   const gradientId = `monthlyGradient-${mode}`;
@@ -192,7 +192,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
         if (entry.unit !== unit) return false;
         if (entry.createdAt < monthStart || entry.createdAt > monthEnd) return false;
         if (entry.type === 'mint' || entry.type === 'melt') {
-          const quoteId = (entry as any).quoteId as string | undefined;
+          const quoteId = (entry as { quoteId?: string }).quoteId;
           if (quoteId && quoteIdToGroup[quoteId]) return false;
         }
         return config.filter(entry);
@@ -253,15 +253,11 @@ const MonthlyChart = React.memo(function MonthlyChart({
   // Build SVG paths
   // ---------------------------------------------------------------------------
 
-  const actualPath = useMemo(() => buildSmoothPath(actualPoints), [actualPoints]);
-  const projectedPath = useMemo(() => buildSmoothPath(projectedPoints), [projectedPoints]);
-  const projectedAreaPath = useMemo(
-    () =>
-      buildAreaPath(
-        [...actualPoints, ...projectedPoints.slice(1)],
-        CHART_PADDING_TOP + drawableHeight
-      ),
-    [actualPoints, projectedPoints, drawableHeight]
+  const actualPath = buildSmoothPath(actualPoints);
+  const projectedPath = buildSmoothPath(projectedPoints);
+  const projectedAreaPath = buildAreaPath(
+    [...actualPoints, ...projectedPoints.slice(1)],
+    CHART_PADDING_TOP + drawableHeight
   );
 
   const xTickPositions = useMemo(() => {

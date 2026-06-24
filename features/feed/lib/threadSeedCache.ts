@@ -41,10 +41,6 @@ export function seedThread(eventId: string, seed: ThreadSeed): void {
   }
 }
 
-export function readThreadSeed(eventId: string): ThreadSeed | undefined {
-  return cache.get(eventId);
-}
-
 export function consumeThreadSeed(eventId: string): ThreadSeed | undefined {
   const seed = cache.get(eventId);
   if (seed) cache.delete(eventId);

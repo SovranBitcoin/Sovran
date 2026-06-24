@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { InteractionManager, Platform } from 'react-native';
 import type { CameraPosition } from 'expo-maps';
 
@@ -48,7 +48,7 @@ export function useMapCamera({
     };
   }, []);
 
-  const setCamera = useCallback((next: MapCamera) => {
+  const setCamera = (next: MapCamera) => {
     cameraRef.current = next;
 
     // Android's GoogleMaps.View.setCameraPosition accepts an optional `duration`
@@ -66,48 +66,47 @@ export function useMapCamera({
         zoom: next.zoom,
       });
     }
-  }, []);
+  };
 
-  const getCamera = useCallback(() => cameraRef.current, []);
+  const getCamera = () => cameraRef.current;
 
-  const handleCameraChange = useCallback(
-    (event: { coordinates: { latitude?: number; longitude?: number }; zoom: number }) => {
-      const prev = cameraRef.current;
-      const newLat = event.coordinates.latitude ?? prev.lat;
-      const newLon = event.coordinates.longitude ?? prev.lon;
-      const newZoom = event.zoom;
+  const handleCameraChange = (event: {
+    coordinates: { latitude?: number; longitude?: number };
+    zoom: number;
+  }) => {
+    const prev = cameraRef.current;
+    const newLat = event.coordinates.latitude ?? prev.lat;
+    const newLon = event.coordinates.longitude ?? prev.lon;
+    const newZoom = event.zoom;
 
-      cameraRef.current = { lat: newLat, lon: newLon, zoom: newZoom };
+    cameraRef.current = { lat: newLat, lon: newLon, zoom: newZoom };
 
-      // Debounce marker queries and skip tiny movements within the current zoom bucket
-      const zoomFloor = Math.floor(newZoom);
-      const last = lastMarkerQueryRef.current;
-      const span = 360 / Math.pow(2, Math.max(newZoom, 0));
-      const latThreshold = span * 0.12;
-      const lonThreshold = span * aspectRatio * 0.12;
-      const shouldSkip =
-        last &&
-        last.zoomFloor === zoomFloor &&
-        Math.abs(newLat - last.lat) < latThreshold &&
-        Math.abs(newLon - last.lon) < lonThreshold;
+    // Debounce marker queries and skip tiny movements within the current zoom bucket
+    const zoomFloor = Math.floor(newZoom);
+    const last = lastMarkerQueryRef.current;
+    const span = 360 / Math.pow(2, Math.max(newZoom, 0));
+    const latThreshold = span * 0.12;
+    const lonThreshold = span * aspectRatio * 0.12;
+    const shouldSkip =
+      last?.zoomFloor === zoomFloor &&
+      Math.abs(newLat - last.lat) < latThreshold &&
+      Math.abs(newLon - last.lon) < lonThreshold;
 
-      if (shouldSkip) return;
+    if (shouldSkip) return;
 
-      if (markerUpdateTimerRef.current) {
-        clearTimeout(markerUpdateTimerRef.current);
-      }
+    if (markerUpdateTimerRef.current) {
+      clearTimeout(markerUpdateTimerRef.current);
+    }
 
-      markerUpdateTimerRef.current = setTimeout(() => {
-        lastMarkerQueryRef.current = { lat: newLat, lon: newLon, zoomFloor };
-        // Ensure marker recalculation doesn't compete with gestures/animations
-        if (markerUpdateTaskRef.current) markerUpdateTaskRef.current.cancel();
-        markerUpdateTaskRef.current = InteractionManager.runAfterInteractions(() => {
-          onCameraSettle(newLat, newLon, newZoom);
-        });
-      }, 250);
-    },
-    [aspectRatio, onCameraSettle]
-  );
+    markerUpdateTimerRef.current = setTimeout(() => {
+      lastMarkerQueryRef.current = { lat: newLat, lon: newLon, zoomFloor };
+      // Ensure marker recalculation doesn't compete with gestures/animations
+      if (markerUpdateTaskRef.current) markerUpdateTaskRef.current.cancel();
+      markerUpdateTaskRef.current = InteractionManager.runAfterInteractions(() => {
+        onCameraSettle(newLat, newLon, newZoom);
+      });
+    }, 250);
+  };
 
   return { mapRef, getCamera, setCamera, handleCameraChange };
 }

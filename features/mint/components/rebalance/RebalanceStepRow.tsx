@@ -110,8 +110,8 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
 }) => {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
   const primaryColor0 = foreground;
-  const primaryColor300 = useMemo(() => opacity(foreground, 0.5), [foreground]);
-  const primaryColor400 = useMemo(() => opacity(foreground, 0.4), [foreground]);
+  const primaryColor300 = opacity(foreground, 0.5);
+  const primaryColor400 = opacity(foreground, 0.4);
   const primaryColor700 = surfaceTertiary;
 
   const fromName = getMintDisplayName(fromMintUrl, fromMintInfo);

@@ -5,7 +5,7 @@
  * Wallet, Feed, or Contacts surface mounted while search is active, so closing
  * search returns to the exact same tab/list state.
  */
-import React, { useMemo } from 'react';
+import React from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -33,10 +33,7 @@ export function SearchOverlay({
 }: SearchOverlayProps) {
   const { isSearching } = useSearchContext();
   const surface = useThemeColor('surface');
-  const overlayStyle = useMemo<StyleProp<ViewStyle>>(
-    () => [styles.overlay, { backgroundColor: surface, paddingTop: topInset }, style],
-    [surface, style, topInset]
-  );
+  const overlayStyle = [styles.overlay, { backgroundColor: surface, paddingTop: topInset }, style];
 
   if (!isSearching) return null;
 

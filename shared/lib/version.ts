@@ -88,16 +88,3 @@ export const supportsLiquidGlass = (): boolean => {
     device.platform('macos').gte(26)
   );
 };
-
-/**
- * Conditionally include SwiftUI glass modifiers when liquid glass is
- * enabled. Returns `[]` if either the build-time flag or the runtime
- * `mockNoGlass` toggle is set, so callers spreading the result get
- * an empty modifier list and the SwiftUI view falls back to its
- * default appearance.
- */
-export function liquidGlassModifiers<T>(...modifiers: T[]): T[] {
-  if (!LIQUID_GLASS_ENABLED) return [];
-  if (useSettingsStore.getState().mockNoGlass) return [];
-  return modifiers;
-}

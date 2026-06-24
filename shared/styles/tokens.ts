@@ -49,8 +49,6 @@ export const spacing = {
   '4xl': 48,
 } as const;
 
-export type Spacing = (typeof spacing)[keyof typeof spacing];
-
 // ─── Border radius ────────────────────────────────────────────────────────
 // Outliers (6, 10, 14, 18) snap to nearest scale step. Use `pill` for fully
 // rounded buttons / circles instead of `borderRadius: 999` magic number.
@@ -69,8 +67,6 @@ export const radius = {
   /** Fully rounded — circles, pill buttons, avatars. */
   pill: 999,
 } as const;
-
-export type Radius = (typeof radius)[keyof typeof radius];
 
 // ─── Alpha (opacity values) ───────────────────────────────────────────────
 // The big consolidation. Audit found 32 unique stops in `opacity(color, x)`
@@ -96,8 +92,6 @@ export const alpha = {
   prominent: 0.85,
 } as const;
 
-export type Alpha = (typeof alpha)[keyof typeof alpha];
-
 // ─── Animation timing ─────────────────────────────────────────────────────
 // In milliseconds. Pass to Reanimated's `withTiming(target, { duration })`.
 // Outliers (150, 180, 220, 350, 600, 1000) all map to one of these.
@@ -118,8 +112,6 @@ export const duration = {
   /** 1500ms — slow full rotation for ambient spinners and breathing loops. */
   loop: 1500,
 } as const;
-
-export type Duration = (typeof duration)[keyof typeof duration];
 
 // ─── Z-index hierarchy ───────────────────────────────────────────────────
 // Replaces the freeform 1 / 10 / 50 / 99 / 1000 / 9999 sprawl with a
@@ -143,8 +135,6 @@ export const zIndex = {
   overlay: 9999,
 } as const;
 
-export type ZIndex = (typeof zIndex)[keyof typeof zIndex];
-
 // ─── Icon size ────────────────────────────────────────────────────────────
 // For `<Icon size={...} />`. The audit found 20+ unique sizes in use; this
 // scale covers every meaningful tier without tempting another off-grid pick.
@@ -166,8 +156,6 @@ export const iconSize = {
   '3xl': 48,
 } as const;
 
-export type IconSize = (typeof iconSize)[keyof typeof iconSize];
-
 // ─── Hit slop / minimum touch target ─────────────────────────────────────
 // Apple HIG and Material both recommend ≥ 44pt. Anything smaller needs
 // explicit hit slop to remain accessible.
@@ -182,7 +170,7 @@ export const hitSlop = {
 /** Minimum interactive element height. iOS HIG: 44pt. Material: 48pt.
  *  Use 44 by default; bump to 48 only when the parent has dense vertical
  *  packing that hides the difference. */
-export const minTouchTarget = 44;
+const minTouchTarget = 44;
 
 // ─── Shadows ──────────────────────────────────────────────────────────────
 // Cross-platform pairs: iOS shadow* props + Android elevation. Apply with

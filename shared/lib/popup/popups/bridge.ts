@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { popupLog } from '../../logger';
 import type { PopupIcon } from '../icons';
 import type { PopupTextSegment } from '../format';
-import { isCustomSheetPayload, usePopupStore } from '@/shared/stores/runtime/popupStore';
+import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import type { SheetCloseEvent } from '@/shared/stores/runtime/popupStore';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
 import { CompactToast } from '../CompactToast';
@@ -11,7 +11,7 @@ import type { LiveSheetConfig } from '../liveSheetTypes';
 
 /** Best-effort first stack frame outside the popup module — gives "where did this come from" without a full trace. */
 function getCallerFrame(): string | undefined {
-  const stack = new Error().stack;
+  const stack = new Error('caller-frame probe').stack;
   if (!stack) return undefined;
   const lines = stack.split('\n');
   for (let i = 1; i < lines.length; i++) {
@@ -213,19 +213,6 @@ export function showSheet(config: SheetConfig) {
     caller,
   });
   usePopupStore.getState().open(config);
-}
-
-/** Set duration (ms) on the current sheet. Starts auto-close timer. Call anytime while sheet is open. */
-export function setPopupDuration(ms: number): void {
-  const { current, update } = usePopupStore.getState();
-  if (!current || isCustomSheetPayload(current)) {
-    popupLog.warn('popup.set_duration_ignored', {
-      ms,
-      reason: current ? 'custom_sheet' : 'no_current',
-    });
-    return;
-  }
-  update({ duration: ms });
 }
 
 export function showActionSheet<K extends keyof ActionSheetPayloads>(

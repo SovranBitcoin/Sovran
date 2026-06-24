@@ -5,7 +5,7 @@
  * picker. The composer's text becomes the poll question; this edits the
  * `PollDraft` on the composer store.
  */
-import React, { useCallback } from 'react';
+import React from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import Icon from 'assets/icons';
@@ -47,7 +47,7 @@ export function PollComposeForm() {
   const setPoll = useComposerStore((s) => s.setPoll);
   const [foreground, muted, accent] = useThemeColor(['foreground', 'muted', 'accent'] as const);
 
-  const update = useCallback((next: PollDraft) => setPoll(next), [setPoll]);
+  const update = (next: PollDraft) => setPoll(next);
 
   if (!poll) return null;
 

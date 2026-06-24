@@ -18,6 +18,7 @@ import { dmConversationAppView } from '@sovranbitcoin/nagg-ts/recipes';
 import { backendConfig } from '@/shared/config/backend';
 import { paymentLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
+import type { DmEnvelopePage } from './dmEnvelopeTypes';
 import { resolvedDmEnvelopesToPage, toFacadeDmEnvelopesRequest } from './facadeDmAdapter';
 
 const DM_TIMEOUT_MS = 12_000;
@@ -26,23 +27,6 @@ const client = createNaggClient({
   appView: { baseUrl: backendConfig.nostrAppViewBaseUrl, version: 'v1' },
   defaultTimeoutMs: DM_TIMEOUT_MS,
 });
-
-/** Raw DM envelope event as returned by nagg (still encrypted). */
-export interface DmEnvelope {
-  id: string;
-  pubkey: string;
-  kind: number;
-  createdAt: string | number | Date;
-  content: string;
-  tags: string[][];
-  sig?: string;
-}
-
-export interface DmEnvelopePage {
-  envelopes: DmEnvelope[];
-  endCursor?: string;
-  hasNextPage: boolean;
-}
 
 const EMPTY_PAGE: DmEnvelopePage = { envelopes: [], hasNextPage: false };
 

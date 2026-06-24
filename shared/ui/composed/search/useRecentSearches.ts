@@ -23,10 +23,7 @@ export function useRecentSearches(surface: RecentSearchSurface) {
   const clearSearchHistory = useSearchHistoryStore((s) => s.clearSearchHistory);
 
   const addQuery = useCallback((q: string) => addSearch(q, surface), [addSearch, surface]);
-  const clearQueries = useCallback(
-    () => clearSearchHistory(surface),
-    [clearSearchHistory, surface]
-  );
+  const clearQueries = () => clearSearchHistory(surface);
 
   return { queries, addQuery, clearQueries };
 }

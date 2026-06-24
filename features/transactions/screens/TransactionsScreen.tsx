@@ -44,17 +44,11 @@ import type {
   TransactionLockFilter,
   TransactionCounterpartyFilter,
 } from '../components/TransactionsFilterContext';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 
 const MONTH_SELECTOR_HEIGHT = 48;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 interface TransactionsScreenProps {
   initialTab?: StatusTab;
@@ -124,21 +118,18 @@ export function TransactionsScreen({
     [manager]
   );
 
-  const handleCancelOne = useCallback(
-    async (entry: SendHistoryEntry) => {
-      if (useRollbackStore.getState().inFlight.has(entry.operationId)) return;
-      if (isOffline) {
-        staticPopup('cancel-transaction-offline');
-        return;
-      }
-      log.info('transactions.pending.cancel.one', {
-        operationId: entry.operationId,
-        ...mintUrlLogFields(entry.mintUrl),
-      });
-      await reclaimOne(entry.operationId);
-    },
-    [isOffline, reclaimOne]
-  );
+  const handleCancelOne = async (entry: SendHistoryEntry) => {
+    if (useRollbackStore.getState().inFlight.has(entry.operationId)) return;
+    if (isOffline) {
+      staticPopup('cancel-transaction-offline');
+      return;
+    }
+    log.info('transactions.pending.cancel.one', {
+      operationId: entry.operationId,
+      ...mintUrlLogFields(entry.mintUrl),
+    });
+    await reclaimOne(entry.operationId);
+  };
 
   const handleSweepVisible = useCallback(async () => {
     if (isSweeping || visiblePendingEcash.length === 0) return;
@@ -233,30 +224,17 @@ export function TransactionsScreen({
     [handleMonthChange, months]
   );
 
-  const handlePageSelected = useCallback(
-    (event: { nativeEvent: { position: number } }) => {
-      const idx = event.nativeEvent.position;
-      const next = months[idx];
-      if (next) handleMonthChange(next.key);
-    },
-    [months, handleMonthChange]
+  const handlePageSelected = (event: { nativeEvent: { position: number } }) => {
+    const idx = event.nativeEvent.position;
+    const next = months[idx];
+    if (next) handleMonthChange(next.key);
+  };
+
+  const monthSelectorContent = (
+    <MonthSelector months={months} selectedMonth={selectedMonth} onMonthChange={handlePillSelect} />
   );
 
-  const monthSelectorContent = useMemo(
-    () => (
-      <MonthSelector
-        months={months}
-        selectedMonth={selectedMonth}
-        onMonthChange={handlePillSelect}
-      />
-    ),
-    [months, selectedMonth, handlePillSelect]
-  );
-
-  const listHeader = useMemo(
-    () => <View style={{ height: totalHeaderHeight }} />,
-    [totalHeaderHeight]
-  );
+  const listHeader = <View style={{ height: totalHeaderHeight }} />;
 
   // Footer: cancel-all-visible button. Only on the Pending tab — surfacing
   // a sweep action while the user browses 'All' (mostly historical) mixes

@@ -241,7 +241,9 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
     };
   }, []);
 
-  const contextValue = useMemo(() => ({ isOffline }), [isOffline]);
+  const contextValue = {
+    isOffline,
+  };
 
   return <OfflineContext.Provider value={contextValue}>{children}</OfflineContext.Provider>;
 }
@@ -257,33 +259,22 @@ export function OfflineShell({ children }: { children: React.ReactNode }) {
   const frame = useSafeAreaFrame();
   const offlineAccentColor = info;
   const offlineTextColor = foreground;
-  const screenCornerRadius = useMemo(
-    () => getIosCornerRadius(frame.width, frame.height),
-    [frame.height, frame.width]
-  );
-  const shellCornerStyle = useMemo(
-    () => ({
-      borderRadius: screenCornerRadius,
-      ...(Platform.OS === 'ios'
-        ? ({
-            borderCurve: 'continuous',
-          } as const)
-        : null),
-    }),
-    [screenCornerRadius]
-  );
-  const outerShellStyle = useMemo(
-    () => ({
-      backgroundColor: isOffline ? offlineAccentColor : 'transparent',
-    }),
-    [isOffline, offlineAccentColor]
-  );
-  const topSectionStyle = useMemo(
-    () => ({
-      height: isOffline ? BANNER_HEIGHT + insets.top : 0,
-    }),
-    [insets.top, isOffline]
-  );
+  const screenCornerRadius = getIosCornerRadius(frame.width, frame.height);
+  const shellCornerStyle = {
+    borderRadius: screenCornerRadius,
+
+    ...(Platform.OS === 'ios'
+      ? ({
+          borderCurve: 'continuous',
+        } as const)
+      : null),
+  };
+  const outerShellStyle = {
+    backgroundColor: isOffline ? offlineAccentColor : 'transparent',
+  };
+  const topSectionStyle = {
+    height: isOffline ? BANNER_HEIGHT + insets.top : 0,
+  };
   const contentShellStyle = useMemo(() => {
     const inset = isOffline ? BORDER_WIDTH : 0;
     const contentRadius = Math.max(0, screenCornerRadius - inset);

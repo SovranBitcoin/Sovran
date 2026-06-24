@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import {
   Platform,
   TextInput,
@@ -170,70 +171,63 @@ export function LiquidChatComposer({
       setResetKey((k) => k + 1);
     }
   }, [value]);
-  const handleSwiftValueChange = useCallback(
-    (text: string) => {
-      lastSwiftValueRef.current = text;
-      onChangeText(text);
-    },
-    [onChangeText]
-  );
+  const handleSwiftValueChange = (text: string) => {
+    lastSwiftValueRef.current = text;
+    onChangeText(text);
+  };
 
   // Imperative ref so taps on the capsule's padding edges (outside the
   // TextField's intrinsic content rect) can focus the field — see the
   // `onTapGesture(focusTextField)` on the bubble below.
   const textFieldRef = useRef<TextFieldRef>(null);
-  const focusTextField = useCallback(() => {
+  const focusTextField = () => {
     void textFieldRef.current?.focus();
-  }, []);
+  };
 
   // Fallback-only state: the RN multiline `TextInput` reports its intrinsic
   // height via `onContentSizeChange`. We clamp to `MIN_ROW_HEIGHT` so the
   // bubble matches the buttons when empty / single-line, and cap at
   // `MAX_ROW_HEIGHT` for very long input. The SwiftUI path doesn't use this.
   const [contentHeight, setContentHeight] = useState(0);
-  const handleContentSizeChange = useCallback(
-    (e: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
-      setContentHeight(Math.round(e.nativeEvent.contentSize.height));
-    },
-    []
-  );
+  const handleContentSizeChange = (
+    e: NativeSyntheticEvent<TextInputContentSizeChangeEventData>
+  ) => {
+    setContentHeight(Math.round(e.nativeEvent.contentSize.height));
+  };
   const fallbackRowHeight = Math.min(
     Math.max(contentHeight + INPUT_VPAD, MIN_ROW_HEIGHT),
     MAX_ROW_HEIGHT
   );
 
   const lastLayoutRef = useRef<{ height: number; width: number } | null>(null);
-  const handleLayout = useCallback(
-    (e: LayoutChangeEvent) => {
-      const { width, height } = e.nativeEvent.layout;
-      const last = lastLayoutRef.current;
-      const changed =
-        !last || Math.abs(last.height - height) >= 0.5 || Math.abs(last.width - width) >= 0.5;
-      if (!changed) return;
-      lastLayoutRef.current = { height, width };
-      chatLog.debug('chat.composer.layout', {
-        surface: surface ?? 'unknown',
-        width: Math.round(width),
-        height: Math.round(height),
-        hasText: trimmedHasText,
-      });
-    },
-    [surface, trimmedHasText]
-  );
+  const handleLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    const last = lastLayoutRef.current;
+    const changed =
+      !last || Math.abs(last.height - height) >= 0.5 || Math.abs(last.width - width) >= 0.5;
+    if (!changed) return;
+    lastLayoutRef.current = { height, width };
+    chatLog.debug('chat.composer.layout', {
+      surface: surface ?? 'unknown',
+      width: Math.round(width),
+      height: Math.round(height),
+      hasText: trimmedHasText,
+    });
+  };
 
-  const handleSendPress = useCallback(() => {
+  const handleSendPress = () => {
     chatLog.info('chat.composer.send_tap', {
       surface: surface ?? 'unknown',
       textLen: value.length,
       disabled,
     });
     onSend();
-  }, [surface, value.length, disabled, onSend]);
+  };
 
-  const handlePlusPress = useCallback(() => {
+  const handlePlusPress = () => {
     chatLog.info('chat.composer.plus_tap', { surface: surface ?? 'unknown' });
     onPlusPress?.();
-  }, [surface, onPlusPress]);
+  };
 
   if (useNativeGlass) {
     return (
@@ -286,7 +280,11 @@ export function LiquidChatComposer({
                     modifiers={[
                       frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
                     ]}>
-                    <SwiftUIImage systemName={'plus' as never} size={ICON_SIZE} color="#FFFFFF" />
+                    <SwiftUIImage
+                      systemName={'plus' as never}
+                      size={ICON_SIZE}
+                      color={INVARIANT_WHITE}
+                    />
                   </SwiftUIHStack>
                 </SwiftUIButton>
 
@@ -391,7 +389,7 @@ export function LiquidChatComposer({
                     <SwiftUIImage
                       systemName={'arrow.up' as never}
                       size={ICON_SIZE}
-                      color="#FFFFFF"
+                      color={INVARIANT_WHITE}
                     />
                   </SwiftUIHStack>
                 </SwiftUIButton>
@@ -448,7 +446,7 @@ export function LiquidChatComposer({
               overflow: 'hidden',
               backgroundColor: useBlur ? undefined : surfaceSecondary,
             }}>
-            <Icon name="mdi:plus" size={ICON_SIZE} color={useBlur ? '#FFFFFF' : foreground} />
+            <Icon name="mdi:plus" size={ICON_SIZE} color={useBlur ? INVARIANT_WHITE : foreground} />
           </View>
         </Pressable>
 
@@ -526,7 +524,7 @@ export function LiquidChatComposer({
                 <Icon
                   name="iconamoon:send-fill"
                   size={ICON_SIZE}
-                  color={useBlur ? '#FFFFFF' : background}
+                  color={useBlur ? INVARIANT_WHITE : background}
                 />
               </View>
             </Pressable>

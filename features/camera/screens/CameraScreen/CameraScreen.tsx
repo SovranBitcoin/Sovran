@@ -2,7 +2,7 @@
  * @fileoverview Camera screen — scan QR, paste, gallery. Uses machine.scan directly.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from 'expo-router';
@@ -109,10 +109,10 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
   const appStateRef = useRef(AppState.currentState);
   const isProcessingRef = useRef(false);
 
-  const onOptionDismiss = useCallback(() => {
+  const onOptionDismiss = () => {
     isProcessingRef.current = false;
     setLoading(false);
-  }, []);
+  };
 
   const machine = usePaymentFlowMachine({
     walletContext,
@@ -127,16 +127,14 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
     return () => sub?.remove();
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      setIsFocused(true);
-      setProgress(0);
-      setLoading(false);
-      isProcessingRef.current = false;
-      machine.reset();
-      return () => setIsFocused(false);
-    }, [machine])
-  );
+  useFocusEffect(() => {
+    setIsFocused(true);
+    setProgress(0);
+    setLoading(false);
+    isProcessingRef.current = false;
+    machine.reset();
+    return () => setIsFocused(false);
+  });
 
   // Auto-disengage the flashlight one second after the camera reports ready.
   // Effect-scoped so unmounting before the timer fires cancels the late
@@ -152,10 +150,7 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
 
   /** Common gate for every scan source. iOS can deliver taps during the
    * inactive→background transition; AppState/isFocused must be live. */
-  const shouldAcceptScan = useCallback(
-    () => appStateRef.current === 'active' && isFocused,
-    [isFocused]
-  );
+  const shouldAcceptScan = () => appStateRef.current === 'active' && isFocused;
 
   /**
    * NIP-46 pairing entry. Hands the raw value to the shared
@@ -163,7 +158,7 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
    * failures surface as the plan's error toast. The value embeds a pairing
    * bearer secret — never logged.
    */
-  const handleSignerScan = useCallback((raw: string, invalidBody: string) => {
+  const handleSignerScan = (raw: string, invalidBody: string) => {
     const now = Date.now();
     if (
       raw === lastSignerScanRef.current.data &&
@@ -181,56 +176,50 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
         type: 'error',
       });
     }
-  }, []);
+  };
 
-  const handleScan = useCallback(
-    async (data: ScanningData) => {
-      const isUr = data.data.toLowerCase().startsWith('ur:');
-      if (!shouldAcceptScan()) return;
-      if (!isUr && isProcessingRef.current) return;
+  const handleScan = async (data: ScanningData) => {
+    const isUr = data.data.toLowerCase().startsWith('ur:');
+    if (!shouldAcceptScan()) return;
+    if (!isUr && isProcessingRef.current) return;
 
-      // Debounce: skip identical scans within 500ms
-      const now = Date.now();
-      if (data.data === lastScanRef.current.data && now - lastScanRef.current.t < 500) return;
-      lastScanRef.current = { data: data.data, t: now };
+    // Debounce: skip identical scans within 500ms
+    const now = Date.now();
+    if (data.data === lastScanRef.current.data && now - lastScanRef.current.t < 500) return;
+    lastScanRef.current = { data: data.data, t: now };
 
-      // NIP-46 pairing intercept — BEFORE the payment machine sees the value.
-      // In signer-pair mode EVERY scan routes here: no payment fallback.
-      if (NIP46_SCHEME_RE.test(data.data.trim()) || signerPairOnly) {
-        handleSignerScan(data.data.trim(), PAIRING_ERROR_INVALID_QR);
-        return;
-      }
+    // NIP-46 pairing intercept — BEFORE the payment machine sees the value.
+    // In signer-pair mode EVERY scan routes here: no payment fallback.
+    if (NIP46_SCHEME_RE.test(data.data.trim()) || signerPairOnly) {
+      handleSignerScan(data.data.trim(), PAIRING_ERROR_INVALID_QR);
+      return;
+    }
 
-      log.info('camera.scan.detected', {
-        type: data.type ?? 'qr',
-        isUr,
-        dataLength: data.data.length,
+    log.info('camera.scan.detected', {
+      type: data.type ?? 'qr',
+      isUr,
+      dataLength: data.data.length,
+    });
+    isProcessingRef.current = true;
+    setLoading(true);
+    try {
+      const result = await machine.scan?.(data.data, { source: data.type ?? 'qr' });
+      applyScanResult(result, setProgress, setLoading, isProcessingRef);
+    } catch (err) {
+      log.error('camera.scan.failed', {
+        error: err instanceof Error ? err : new Error(String(err)),
       });
-      isProcessingRef.current = true;
-      setLoading(true);
-      try {
-        const result = await machine.scan?.(data.data, { source: data.type ?? 'qr' });
-        applyScanResult(result, setProgress, setLoading, isProcessingRef);
-      } catch (err) {
-        log.error('camera.scan.failed', {
-          error: err instanceof Error ? err : new Error(String(err)),
-        });
-        setLoading(false);
-        setProgress(0);
-        isProcessingRef.current = false;
-      }
-    },
-    [handleSignerScan, machine, shouldAcceptScan, signerPairOnly]
-  );
+      setLoading(false);
+      setProgress(0);
+      isProcessingRef.current = false;
+    }
+  };
 
-  const handleBarcodeScanned = useCallback(
-    (result: { data?: string }) => {
-      if (result?.data) void handleScan({ data: result.data, type: 'qr' });
-    },
-    [handleScan]
-  );
+  const handleBarcodeScanned = (result: { data?: string }) => {
+    if (result?.data) void handleScan({ data: result.data, type: 'qr' });
+  };
 
-  const handleClipboardPress = useCallback(async () => {
+  const handleClipboardPress = async () => {
     if (!shouldAcceptScan()) return;
     log.info('camera.scan.clipboard');
     // Clipboard paste honors the same NIP-46 intercept as live scans — a
@@ -257,9 +246,9 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
       setProgress(0);
       isProcessingRef.current = false;
     }
-  }, [handleSignerScan, machine, shouldAcceptScan, signerPairOnly]);
+  };
 
-  const handleGalleryPress = useCallback(async () => {
+  const handleGalleryPress = async () => {
     if (!shouldAcceptScan()) return;
     log.info('camera.scan.gallery');
     isProcessingRef.current = true;
@@ -275,19 +264,19 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
       setProgress(0);
       isProcessingRef.current = false;
     }
-  }, [machine, shouldAcceptScan]);
+  };
 
-  const handleCameraReady = useCallback(() => {
+  const handleCameraReady = () => {
     setCameraReady(true);
-  }, []);
+  };
 
-  const toggleFlashlight = useCallback(() => {
+  const toggleFlashlight = () => {
     setFlashlightOn((p) => !p);
-  }, []);
+  };
 
-  const requestPermission = useCallback(() => {
+  const requestPermission = () => {
     void handlePermission();
-  }, [handlePermission]);
+  };
 
   const shared = {
     foreground,

@@ -8,7 +8,7 @@
  * the user.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 
@@ -45,9 +45,9 @@ function ShareRoute() {
   const type = (parsed?.type ?? 'profile') as ShareType;
   const [headerTitle, setHeaderTitle] = useState<string>(SHARE_CONFIGS[type]?.title ?? 'Share');
 
-  const handleTitleChange = useCallback((title: string) => {
+  const handleTitleChange = (title: string) => {
     setHeaderTitle(title);
-  }, []);
+  };
 
   useScreenOptions(
     () => ({

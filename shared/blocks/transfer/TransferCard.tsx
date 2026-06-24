@@ -10,7 +10,7 @@
  * Used by both SwapTransactionScreen and RebalanceStepRow.
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -31,10 +31,10 @@ export const TransferCard = React.memo(
   ({ accentColor: accentColorProp, children }: TransferCardProps) => {
     const muted = useThemeColor('muted');
 
-    const accentColor = useMemo(() => accentColorProp ?? muted, [accentColorProp, muted]);
+    const accentColor = accentColorProp ?? muted;
 
     // Always show the tinted border — matches Transactions component exactly.
-    const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
+    const borderColor = opacity(accentColor, 0.3);
 
     return (
       <Log name="TransferCard">

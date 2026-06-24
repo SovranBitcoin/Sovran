@@ -30,7 +30,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 type DateInput = Date | number | string;
 
-export type AbsoluteDateStyle =
+type AbsoluteDateStyle =
   /** Time of day. en-US: `3:42 PM`. en-GB / de-DE: `15:42`. */
   | 'time'
   /** Compact short date. en-US: `Mar 16, 2026`. en-GB: `16 Mar 2026`. */
@@ -45,7 +45,7 @@ export type AbsoluteDateStyle =
    *  round-trip identically across devices. */
   | 'iso';
 
-export type RelativeDateStyle =
+type RelativeDateStyle =
   /** `Intl.RelativeTimeFormat` verbose form: `5 minutes ago`, `yesterday`,
    *  `in 3 days`. Use for presence indicators and one-shot timestamps
    *  where the label has room to breathe. */

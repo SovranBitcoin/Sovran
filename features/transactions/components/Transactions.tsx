@@ -162,7 +162,7 @@ export const Transactions = React.memo(
     // its state flips to `rolledBack`, killing the animation mid-frame.
     const collapsing = useRollbackStore((s) => s.collapsing);
 
-    const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
+    const borderColor = opacity(muted, 0.3);
     const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
 
     const swapGroups = useMemo(() => {
@@ -260,12 +260,9 @@ export const Transactions = React.memo(
         return date.getFullYear() === filterYear && date.getMonth() === filterMonthNum;
       };
 
-      const swapItems: TimelineItem[] = swapGroups
-        .filter((group) => monthFilter(group.createdAt))
-        .map((group) => ({
-          kind: 'swap' as const,
-          data: group,
-        }));
+      const swapItems: TimelineItem[] = swapGroups.flatMap((group) =>
+        monthFilter(group.createdAt) ? [{ kind: 'swap' as const, data: group }] : []
+      );
 
       return [...txItems, ...swapItems];
     }, [filteredHistory, swapGroups, filter, type, selectedMonth, embedded]);
@@ -275,23 +272,19 @@ export const Transactions = React.memo(
       [timelineItems]
     );
 
-    const { pending, confirmed, expired } = useMemo(
-      () =>
-        groupBy(sortedTimeline, (item: TimelineItem) => {
-          // Swap items are always "confirmed"
-          if (item.kind === 'swap') return 'confirmed';
+    const { pending, confirmed, expired } = groupBy(sortedTimeline, (item: TimelineItem) => {
+      // Swap items are always "confirmed"
+      if (item.kind === 'swap') return 'confirmed';
 
-          const historyEntry = item.data;
-          const isCollapsingGhost =
-            historyEntry.type === 'send' &&
-            collapsing.has((historyEntry as SendHistoryEntry).operationId);
+      const historyEntry = item.data;
+      const isCollapsingGhost =
+        historyEntry.type === 'send' &&
+        collapsing.has((historyEntry as SendHistoryEntry).operationId);
 
-          // Single colada classifier: handles expired mint quotes, pending
-          // sends, and unredeemed (executing) receives in one place.
-          return bucketTransaction(historyEntry, { isCollapsingGhost });
-        }),
-      [sortedTimeline, collapsing]
-    );
+      // Single colada classifier: handles expired mint quotes, pending
+      // sends, and unredeemed (executing) receives in one place.
+      return bucketTransaction(historyEntry, { isCollapsingGhost });
+    });
 
     const sections = useMemo(() => {
       const t0 = performance.now();
@@ -426,66 +419,52 @@ export const Transactions = React.memo(
       [onCancelPendingEcash, onTransactionPress]
     );
 
-    const renderSection = useCallback(
-      ({ item: section }: { item: Section; index?: number }) => (
-        <VStack spacing={4} className="mb-4">
-          <Text size={14} heavy color={opacity(foreground, 0.33)} style={styles.dateHeader}>
-            {section.title}
-          </Text>
-          <View style={[styles.card, { borderColor }]}>
-            <BlurCardFrame accentColor={muted}>
-              <View style={styles.content}>
-                {section.data.map((item, rowIndex) => renderTimelineItem(item, rowIndex))}
-              </View>
-            </BlurCardFrame>
-          </View>
-        </VStack>
-      ),
-      [borderColor, foreground, muted, renderTimelineItem]
-    );
-
-    const resolvedHeader = useMemo(
-      () => <View>{typeof header === 'function' ? header() : header}</View>,
-      [header]
-    );
-
-    const emptyComponent = useMemo(
-      () =>
-        // While the first page is in flight the list is empty, so this renders
-        // in place of the rows. Match the feed's loading affordance (a centered
-        // spinner) instead of flashing the "No transactions found" card, which
-        // reads as "you have none" when we simply haven't loaded yet.
-        isFetching ? (
-          <Spinner size={22} style={{ alignSelf: 'center', marginTop: 48 }} />
-        ) : (
-          <View className="pt-8">
-            <View style={[styles.card, { borderColor }]}>
-              <BlurCardFrame accentColor={muted}>
-                <View style={styles.emptyState}>
-                  <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
-                  <Text
-                    size={16}
-                    style={{
-                      color: opacity(foreground, 0.66),
-                      fontFamily: 'OxygenBold',
-                      textAlign: 'center',
-                    }}>
-                    No transactions found
-                  </Text>
-                  <Text
-                    size={14}
-                    style={{
-                      color: opacity(foreground, 0.4),
-                      textAlign: 'center',
-                    }}>
-                    Try adjusting your filters or check back later
-                  </Text>
-                </View>
-              </BlurCardFrame>
+    const renderSection = ({ item: section }: { item: Section; index?: number }) => (
+      <VStack spacing={4} className="mb-4">
+        <Text size={14} heavy color={opacity(foreground, 0.33)} style={styles.dateHeader}>
+          {section.title}
+        </Text>
+        <View style={[styles.card, { borderColor }]}>
+          <BlurCardFrame accentColor={muted}>
+            <View style={styles.content}>
+              {section.data.map((item, rowIndex) => renderTimelineItem(item, rowIndex))}
             </View>
-          </View>
-        ),
-      [borderColor, foreground, isFetching, muted]
+          </BlurCardFrame>
+        </View>
+      </VStack>
+    );
+
+    const resolvedHeader = <View>{typeof header === 'function' ? header() : header}</View>;
+
+    const emptyComponent = isFetching ? (
+      <Spinner size={22} style={{ alignSelf: 'center', marginTop: 48 }} />
+    ) : (
+      <View className="pt-8">
+        <View style={[styles.card, { borderColor }]}>
+          <BlurCardFrame accentColor={muted}>
+            <View style={styles.emptyState}>
+              <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
+              <Text
+                size={16}
+                style={{
+                  color: opacity(foreground, 0.66),
+                  fontFamily: 'OxygenBold',
+                  textAlign: 'center',
+                }}>
+                No transactions found
+              </Text>
+              <Text
+                size={14}
+                style={{
+                  color: opacity(foreground, 0.4),
+                  textAlign: 'center',
+                }}>
+                Try adjusting your filters or check back later
+              </Text>
+            </View>
+          </BlurCardFrame>
+        </View>
+      </View>
     );
 
     if (embedded) {

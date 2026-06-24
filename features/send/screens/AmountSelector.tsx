@@ -4,7 +4,7 @@
  * typed contract and wires the bound actions through.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import {
   PixelRatio,
   type StyleProp,
@@ -102,35 +102,29 @@ export function AmountSelector({
   useLifecycleLogger('AmountSelector', walletLog);
 
   const { rawInput, inputMode, numericValue, keyboardUnit, unit, secondaryDisplay, fiatSymbol } =
-    useMemo(() => readAmountEntryFields(entry), [entry]);
+    readAmountEntryFields(entry);
 
-  const handleKeyPress = useCallback(
-    (value: string) => {
-      walletLog.debug('amount.input.key', { value, inputMode });
-      void actions.setInput.execute({ input: value });
-    },
-    [actions.setInput, inputMode]
-  );
+  const handleKeyPress = (value: string) => {
+    walletLog.debug('amount.input.key', { value, inputMode });
+    void actions.setInput.execute({ input: value });
+  };
 
-  const handleSuggestionTap = useCallback(
-    (suggestion: QuickSendSuggestion) => {
-      walletLog.info('amount.suggestion.tap', {
-        satoshis: suggestion.satoshis,
-        label: suggestion.label,
-        mode: suggestion.inputMode,
-      });
-      void actions.setInput.execute({
-        input: suggestion.inputValue,
-        mode: suggestion.inputMode,
-      });
-    },
-    [actions.setInput]
-  );
+  const handleSuggestionTap = (suggestion: QuickSendSuggestion) => {
+    walletLog.info('amount.suggestion.tap', {
+      satoshis: suggestion.satoshis,
+      label: suggestion.label,
+      mode: suggestion.inputMode,
+    });
+    void actions.setInput.execute({
+      input: suggestion.inputValue,
+      mode: suggestion.inputMode,
+    });
+  };
 
-  const handleToggle = useCallback(() => {
+  const handleToggle = () => {
     walletLog.info('amount.input.toggle', { fromMode: inputMode });
     void actions.toggle.execute();
-  }, [actions.toggle, inputMode]);
+  };
 
   // Pack recipient identity into the execute params on every `next` call.
   // Spread by the action manager into `ctx`, then read by colada's
@@ -144,7 +138,7 @@ export function AmountSelector({
     [recipientPubkey, recipientProfile]
   );
 
-  const handleNext = useCallback(async () => {
+  const handleNext = async () => {
     walletLog.info('amount.next', {
       numericValue,
       inputMode,
@@ -157,7 +151,7 @@ export function AmountSelector({
           ?.displayName ?? null,
     });
     await actions.next.execute(nextExecuteParams);
-  }, [actions.next, numericValue, inputMode, unit, transactionType, nextExecuteParams]);
+  };
 
   // Map the colada availability variants (ecash/lightning/onchain on
   // send-money flows) into ActionMenuButton's variant shape. Each variant

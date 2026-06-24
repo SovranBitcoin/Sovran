@@ -308,7 +308,7 @@ export function evaluate(input: EvaluateInput): PolicyDecision {
       };
     }
     const peerGrant = connection.peerDecryptGrants?.[decryptPeer];
-    if (peerGrant !== undefined && peerGrant.methods.includes(request.method)) {
+    if (peerGrant?.methods.includes(request.method)) {
       return {
         verdict: 'allow',
         reason: 'peer_grant_always',

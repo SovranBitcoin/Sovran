@@ -1,7 +1,7 @@
 import { nip19 } from 'nostr-tools';
 import type { ContentSegment, FeedEvent } from './feedTypes';
 
-export const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i;
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i;
 export const VIDEO_EXT = /\.(mp4|webm|mov|m4v|avi)(\?.*)?$/i;
 
 // Bounded quantifiers protect parseContent against adversarial relay content
@@ -190,7 +190,7 @@ export function tryNpubEncode(hex: string): string {
 }
 
 /** NIP-92 imeta metadata for a media url. */
-export interface ImetaInfo {
+interface ImetaInfo {
   url: string;
   mimeType?: string;
   alt?: string;
@@ -260,44 +260,10 @@ export function prettifyUrl(raw: string): string {
   }
 }
 
-export function normalizeFeedEvent(value: unknown): FeedEvent | null {
-  if (!value || typeof value !== 'object') return null;
-  const input = value as Record<string, unknown>;
-  if (
-    typeof input.id !== 'string' ||
-    typeof input.kind !== 'number' ||
-    typeof input.pubkey !== 'string' ||
-    typeof input.content !== 'string' ||
-    typeof input.created_at !== 'number' ||
-    !Array.isArray(input.tags)
-  ) {
-    return null;
-  }
-
-  const content =
-    input.content.length > MAX_FEED_CONTENT_LEN
-      ? input.content.slice(0, MAX_FEED_CONTENT_LEN) + '…'
-      : input.content;
-
-  return {
-    id: input.id,
-    kind: input.kind,
-    pubkey: input.pubkey,
-    content,
-    created_at: input.created_at,
-    tags: input.tags.filter(Array.isArray) as string[][],
-  };
-}
-
 export function parseJson<T>(raw: string): T | null {
   try {
     return JSON.parse(raw) as T;
   } catch {
     return null;
   }
-}
-
-export function getFirstTagValue(event: FeedEvent, tagName: string): string | undefined {
-  const tag = event.tags.find((t) => t[0] === tagName);
-  return tag?.[1];
 }

@@ -6,7 +6,7 @@
  * serialized entry.
  */
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { z } from 'zod';
 
 import { MintQuoteRoute } from '@/features/receive';
@@ -40,10 +40,10 @@ export default function ModalScreen() {
     });
   }, [params, unit, walletContext.mintBalances, walletContext.trustedMintUrls.length]);
 
-  const handleRequestMintList = useCallback(() => {
+  const handleRequestMintList = () => {
     cashuLog.info('receive.mint_quote.mint_list.requested', { source: 'pill' });
     void machine.requestMintSelector();
-  }, [machine]);
+  };
 
   if (!params) return null;
 

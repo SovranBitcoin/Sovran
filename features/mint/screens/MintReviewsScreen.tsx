@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
 import { cashuLog, Log, redactError, useLifecycleLogger } from '@/shared/lib/logger';
 import { formatDate } from '@/shared/lib/date';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 const ParamsSchema = z.object({
   mintUrl: z
@@ -33,13 +34,6 @@ const ParamsSchema = z.object({
     .max(2048)
     .regex(/^https?:\/\//, 'mintUrl must be http(s)'),
 });
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 const StarRating = React.memo(function StarRating({
   score,

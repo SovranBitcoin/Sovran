@@ -1,4 +1,4 @@
-import React, { ReactNode, useCallback, useMemo } from 'react';
+import React, { ReactNode } from 'react';
 import { LayoutChangeEvent, Platform, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView, BlurTint } from 'expo-blur';
@@ -95,24 +95,17 @@ export function BottomButtons({
     gradientColor === null ? null : (gradientColor ?? screenBackground ?? themeBackground);
   const { setFooterHeight } = useScreenFooter();
   const shouldRenderBlur = blur && Platform.OS !== 'android';
-  const handleLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      setFooterHeight(event.nativeEvent.layout.height);
-      onLayout?.(event);
-    },
-    [setFooterHeight, onLayout]
-  );
-  const colorGradientColors = useMemo(
-    () =>
-      resolvedGradientColor
-        ? ([
-            opacity(resolvedGradientColor, 0),
-            opacity(resolvedGradientColor, 0.75),
-            opacity(resolvedGradientColor, 1),
-          ] as const)
-        : null,
-    [resolvedGradientColor]
-  );
+  const handleLayout = (event: LayoutChangeEvent) => {
+    setFooterHeight(event.nativeEvent.layout.height);
+    onLayout?.(event);
+  };
+  const colorGradientColors = resolvedGradientColor
+    ? ([
+        opacity(resolvedGradientColor, 0),
+        opacity(resolvedGradientColor, 0.75),
+        opacity(resolvedGradientColor, 1),
+      ] as const)
+    : null;
   return (
     <Log name="BottomButtons">
       <View

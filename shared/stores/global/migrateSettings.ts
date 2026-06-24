@@ -6,6 +6,7 @@ import { useSettingsStore } from './settingsStore';
  * Migration script to move settings from Redux to Zustand
  * This should be run once during app startup
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- reads the legacy persisted Redux blob whose historical shape predates the current stores (cf. redux/*.deprecated.ts); typing it would be churn on migration scaffolding slated for removal.
 export const migrateSettingsFromRedux = async (reduxState?: any) => {
   try {
     storeLog.info('settings.migration.start');

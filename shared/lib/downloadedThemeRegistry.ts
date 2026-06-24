@@ -56,7 +56,7 @@ export function registerDownloadedTheme(data: DownloadedThemeData): boolean {
   }
 
   // 4. Set image source (file:// URI for downloaded images)
-  (backgroundImageThemes as Record<string, any>)[themeName] = { uri: localUri };
+  (backgroundImageThemes as Record<string, { uri: string }>)[themeName] = { uri: localUri };
 
   // 5. Set display name
   (backgroundThemeDisplayNames as Record<string, string>)[themeName] = displayName;
@@ -90,7 +90,7 @@ export function unregisterDownloadedTheme(themeName: string): void {
   const idx = BACKGROUND_THEME_NAMES.indexOf(themeName);
   if (idx !== -1) BACKGROUND_THEME_NAMES.splice(idx, 1);
 
-  delete (backgroundImageThemes as Record<string, any>)[themeName];
+  delete (backgroundImageThemes as Record<string, { uri: string }>)[themeName];
   delete (backgroundThemeDisplayNames as Record<string, string>)[themeName];
   delete (backgroundThemeDominantColors as Record<string, DominantColor[]>)[themeName];
   delete (backgroundThemeGradientColors as Record<string, GradientColor[]>)[themeName];

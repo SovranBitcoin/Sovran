@@ -13,15 +13,13 @@
  * the sync helpers in `shared/lib/version.ts`.
  */
 
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext } from 'react';
 
-import { liquidGlassModifiers as syncLiquidGlassModifiers } from '@/shared/lib/version';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 import { detectCapabilities } from './detect';
 import type { Capabilities } from './types';
 
-export type { Capabilities, IconSource } from './types';
 export { defineVariants } from './defineVariants';
 
 const CapabilityContext = createContext<Capabilities | null>(null);
@@ -37,10 +35,7 @@ export function CapabilityProvider({
   children,
 }: CapabilityProviderProps): React.ReactElement {
   const mockNoGlass = useSettingsStore((s) => s.mockNoGlass);
-  const detected = useMemo(
-    () => value ?? detectCapabilities({ mockNoGlass }),
-    [value, mockNoGlass]
-  );
+  const detected = value ?? detectCapabilities({ mockNoGlass });
   return <CapabilityContext.Provider value={detected}>{children}</CapabilityContext.Provider>;
 }
 
@@ -57,18 +52,3 @@ export function useCapabilities(): Capabilities {
   }
   return v;
 }
-
-/**
- * Hook variant of `liquidGlassModifiers()`. Use this from inside React render
- * so the consumer re-renders when `mockNoGlass` flips. Module-scope callers
- * (worklets, native tabs) should keep using the sync helper from `version.ts`.
- */
-export function useLiquidGlassModifiers<T>(...modifiers: T[]): T[] {
-  const { liquidGlass } = useCapabilities();
-  return liquidGlass ? modifiers : [];
-}
-
-// Re-export the sync helper here too so component code only needs one import
-// path. The sync version reads `useSettingsStore.getState()` directly and is
-// safe to call from worklets / module scope.
-export { syncLiquidGlassModifiers as liquidGlassModifiers };

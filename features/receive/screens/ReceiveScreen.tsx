@@ -7,7 +7,7 @@
  * usePaymentFlowMachine after entry is available).
  */
 
-import React, { memo, useEffect, useMemo, useState } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
@@ -180,10 +180,7 @@ const QR_PLACEHOLDER_HORIZONTAL_INSET = 32;
 function ReceiveHubPlaceholder() {
   const { width } = useWindowDimensions();
   const qrFrameSize = Math.max(0, Math.min(width, 600) - QR_PLACEHOLDER_HORIZONTAL_INSET);
-  const qrPlaceholderStyle = useMemo(
-    () => [styles.qrPlaceholder, { width: qrFrameSize, height: qrFrameSize }],
-    [qrFrameSize]
-  );
+  const qrPlaceholderStyle = [styles.qrPlaceholder, { width: qrFrameSize, height: qrFrameSize }];
 
   return (
     <>

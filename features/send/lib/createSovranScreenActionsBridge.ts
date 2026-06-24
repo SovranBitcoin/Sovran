@@ -28,15 +28,9 @@ import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import { useTransactionDistributionStore } from '@/shared/stores/profile/transactionDistributionStore';
 import { setDistributionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 type EntryRecord = Record<string, unknown>;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 const HISTORY_TYPE_BY_SCREEN: Partial<Record<ScreenType, string>> = {
   meltQuote: 'melt',

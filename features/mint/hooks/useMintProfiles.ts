@@ -16,17 +16,11 @@ import {
 import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { cashuLog } from '@/shared/lib/logger';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 interface MintWithInfo {
   url: string;
   mintInfo?: MintInfoForNostr;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 /**

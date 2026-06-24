@@ -145,30 +145,26 @@ function AccountScopedProviders({
       cashuLog.info('app.account_scoped_providers.unmount', { accountIndex });
     };
   }, [accountIndex]);
-  const InnerProviders = useMemo(
-    () =>
-      compose([
-        MigrationGate,
-        [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
-        [NostrNDKProvider, { accountIndex }],
-        // NIP-46 signer service — stays cold (no sockets) until the user has
-        // ≥1 connected app or an in-flight pairing. Must sit directly after
-        // NostrNDKProvider: it gates on its isInitialized flag.
-        NostrSignerProvider,
-        [WhitenoiseProvider, { accountIndex }],
-        CocoProvider,
-        WalletContextProvider,
-        SovranColadaProvider,
-        ActionSheetProvider,
-        PricelistProvider,
-        // Mounts BitChat DM listeners once per account scope without
-        // starting BLE on app launch. BLE discovery announces to nearby
-        // bitchat clients, so explicit peer-list/chat surfaces own startup.
-        BitchatBLEProvider,
-        AppGate,
-      ]),
-    [accountIndex]
-  );
+  const InnerProviders = compose([
+    MigrationGate,
+    [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
+    [NostrNDKProvider, { accountIndex }],
+    // NIP-46 signer service — stays cold (no sockets) until the user has
+    // ≥1 connected app or an in-flight pairing. Must sit directly after
+    // NostrNDKProvider: it gates on its isInitialized flag.
+    NostrSignerProvider,
+    [WhitenoiseProvider, { accountIndex }],
+    CocoProvider,
+    WalletContextProvider,
+    SovranColadaProvider,
+    ActionSheetProvider,
+    PricelistProvider,
+    // Mounts BitChat DM listeners once per account scope without
+    // starting BLE on app launch. BLE discovery announces to nearby
+    // bitchat clients, so explicit peer-list/chat surfaces own startup.
+    BitchatBLEProvider,
+    AppGate,
+  ]);
 
   return <InnerProviders>{children}</InnerProviders>;
 }
@@ -470,13 +466,13 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
     return unsub;
   }, []);
 
-  const onLayoutRootView = useCallback(() => {
+  const onLayoutRootView = () => {
     setHasRootLaidOut(true);
     rootViewRef.current?.measureInWindow((x, y) => {
       setParentOffset((prev) => (prev.x === x && prev.y === y ? prev : { x, y }));
       initLog('SplashMorph', `parent offset measured — x=${x} y=${y}`);
     });
-  }, []);
+  };
 
   // Reset the machine on a profile switch. Only honored AFTER we've unmounted
   // from a prior cycle — during boot the same `isInitializing=true` signal
@@ -705,19 +701,16 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
     [isMorphing]
   );
 
-  const qrIconLayerStyle = useMemo(
-    () => ({
-      ...StyleSheet.absoluteFillObject,
-      justifyContent: 'center' as const,
-      alignItems: 'center' as const,
-      opacity: isMorphing ? 1 : 0,
-      transitionProperty: ['opacity'],
-      transitionDuration: `${MORPH_DURATION_MS * 0.6}ms`,
-      transitionDelay: `${MORPH_DURATION_MS * 0.35}ms`,
-      transitionTimingFunction: MORPH_TIMING,
-    }),
-    [isMorphing]
-  );
+  const qrIconLayerStyle = {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    opacity: isMorphing ? 1 : 0,
+    transitionProperty: ['opacity'],
+    transitionDuration: `${MORPH_DURATION_MS * 0.6}ms`,
+    transitionDelay: `${MORPH_DURATION_MS * 0.35}ms`,
+    transitionTimingFunction: MORPH_TIMING,
+  };
 
   return (
     <View

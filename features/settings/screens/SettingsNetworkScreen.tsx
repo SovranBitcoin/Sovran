@@ -8,7 +8,7 @@
  * NIP-65 list (kind:10002): connection health, read/write markers, add/remove,
  * restore defaults, and publish.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Button, Card, Input, ListGroup, Separator, Switch, TextField } from 'heroui-native';
@@ -17,7 +17,7 @@ import Icon from 'assets/icons';
 import { backendConfig } from '@/shared/config/backend';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useRelayHealth, type RelayHealth } from '@/shared/hooks/useRelayHealth';
+import { useRelayHealth } from '@/shared/hooks/useRelayHealth';
 import { log } from '@/shared/lib/logger';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { DEFAULT_RELAYS, safeNormalizeRelay } from '@/shared/lib/nostr/outbox/defaults';
@@ -56,19 +56,16 @@ export function SettingsNetworkScreen() {
     'danger',
   ] as const);
 
-  const healthColor = useMemo<Record<RelayHealth, string>>(
-    () => ({
-      connected: successColor,
-      connecting: accentColor,
-      disconnected: mutedColor,
-      failed: dangerColor,
-    }),
-    [successColor, accentColor, mutedColor, dangerColor]
-  );
+  const healthColor = {
+    connected: successColor,
+    connecting: accentColor,
+    disconnected: mutedColor,
+    failed: dangerColor,
+  };
 
   const hasUnpublished = source === 'local';
 
-  const handleAdd = useCallback(() => {
+  const handleAdd = () => {
     const normalized = safeNormalizeRelay(draftUrl.trim());
     if (!normalized || !/^wss?:\/\//.test(normalized)) {
       setAddError('Enter a valid relay URL (wss://…).');
@@ -77,9 +74,9 @@ export function SettingsNetworkScreen() {
     setAddError(null);
     addRelay(normalized, { read: true, write: true });
     setDraftUrl('');
-  }, [draftUrl, addRelay]);
+  };
 
-  const handlePublish = useCallback(async () => {
+  const handlePublish = async () => {
     if (!ndk) return;
     setPublishing(true);
     setPublishMsg(null);
@@ -101,12 +98,9 @@ export function SettingsNetworkScreen() {
     } finally {
       setPublishing(false);
     }
-  }, [ndk, entries, markPublished]);
+  };
 
-  const sortedEntries = useMemo(
-    () => [...entries].sort((a, b) => a.url.localeCompare(b.url)),
-    [entries]
-  );
+  const sortedEntries = [...entries].sort((a, b) => a.url.localeCompare(b.url));
 
   return (
     <ScreenWrapper name="SettingsNetworkScreen" scroll="custom" safeArea>

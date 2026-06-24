@@ -274,11 +274,8 @@ const HeaderBadge = React.memo(function HeaderBadge({
   onPress: () => void;
 }) {
   const [foreground, shade400, accent, accentForeground] = useThemeColor(HEADER_BADGE_THEME_KEYS);
-  const badgeStyle = useMemo(() => [styles.headerBadge, { backgroundColor: accent }], [accent]);
-  const badgeTextStyle = useMemo(
-    () => [styles.headerBadgeText, { color: accentForeground }],
-    [accentForeground]
-  );
+  const badgeStyle = [styles.headerBadge, { backgroundColor: accent }];
+  const badgeTextStyle = [styles.headerBadgeText, { color: accentForeground }];
 
   return (
     <ScreenHeaderAction
@@ -614,27 +611,18 @@ const PeerNode = React.memo(function PeerNode({
         viewportPresentation.get().avatarOpacity,
     };
   });
-  const nodeStyle = useMemo(
-    () => [nodeStyles.peerNode, animatedStyle],
-    [animatedStyle, nodeStyles]
-  );
-  const peerAvatarNameLabelStyle = useMemo(
-    () => [nodeStyles.peerAvatarNameLabel, labelAnimatedStyle],
-    [labelAnimatedStyle, nodeStyles]
-  );
+  const nodeStyle = [nodeStyles.peerNode, animatedStyle];
+  const peerAvatarNameLabelStyle = [nodeStyles.peerAvatarNameLabel, labelAnimatedStyle];
   const peerPressableStyle = hideSharedElementSource
     ? nodeStyles.peerPressableHidden
     : nodeStyles.peerPressable;
-  const peerAvatarNameStyle = useMemo(
-    () => [styles.peerAvatarName, { color: opacity(foreground, alpha.prominent) }],
-    [foreground]
-  );
-  const bearerBadgeStyle = useMemo(
-    () => [nodeStyles.bearerBadge, { backgroundColor: surface }],
-    [nodeStyles, surface]
-  );
+  const peerAvatarNameStyle = [
+    styles.peerAvatarName,
+    { color: opacity(foreground, alpha.prominent) },
+  ];
+  const bearerBadgeStyle = [nodeStyles.bearerBadge, { backgroundColor: surface }];
 
-  const handlePress = useCallback(() => {
+  const handlePress = () => {
     if (target.phase === 'exiting') return;
     const presentation = getPeerViewportPresentation(target, fieldSize, layoutConfig, {
       x: panX.get(),
@@ -645,7 +633,7 @@ const PeerNode = React.memo(function PeerNode({
       target.peer,
       getScaledAvatarRect(target, fieldSize, { x: panX.get(), y: panY.get() }, layoutConfig)
     );
-  }, [fieldSize, layoutConfig, onSelect, panX, panY, target]);
+  };
 
   return (
     <Animated.View style={nodeStyle}>
@@ -799,11 +787,11 @@ const NearPayAmountHeader = React.memo(function NearPayAmountHeader({
   hideAvatar: boolean;
 }) {
   const foreground = useThemeColor('foreground');
-  const titleStyle = useMemo(() => ({ color: foreground }), [foreground]);
-  const avatarSlotStyle = useMemo(
-    () => [styles.amountHeaderAvatarSlot, hideAvatar ? styles.sharedElementHidden : null],
-    [hideAvatar]
-  );
+  const titleStyle = { color: foreground };
+  const avatarSlotStyle = [
+    styles.amountHeaderAvatarSlot,
+    hideAvatar ? styles.sharedElementHidden : null,
+  ];
 
   return (
     <VStack align="center" gap={spacing.xs} style={styles.inlineAmountHeader}>
@@ -867,10 +855,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
   // placement/zoom-fit avoidance must grow by the same amount.
   const insets = useSafeAreaInsets();
   const actionRowBottom = NEAR_PAY_ACTION_ROW_BOTTOM + insets.bottom;
-  const actionRowStyle = useMemo(
-    () => [styles.nearPayActionRow, { bottom: actionRowBottom }],
-    [actionRowBottom]
-  );
+  const actionRowStyle = [styles.nearPayActionRow, { bottom: actionRowBottom }];
   const actionAvoidance =
     NEAR_PAY_ACTION_ROW_HEIGHT + NEAR_PAY_ACTION_ROW_BOTTOM + spacing.lg + insets.bottom;
   const peerLayoutConfig = useMemo(
@@ -905,19 +890,16 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
       ],
     };
   }, [overviewScale, overviewTranslateX, overviewTranslateY, panX, panY]);
-  const dotFieldLayerStyle = useMemo(
-    () => [styles.dotFieldLayer, dotFieldAnimatedStyle],
-    [dotFieldAnimatedStyle]
-  );
+  const dotFieldLayerStyle = [styles.dotFieldLayer, dotFieldAnimatedStyle];
 
-  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+  const handleLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setFieldSize((current) =>
       Math.abs(current.width - width) < 1 && Math.abs(current.height - height) < 1
         ? current
         : { width, height }
     );
-  }, []);
+  };
 
   // Resolve real Nostr profiles for every Sovran peer (those announcing a
   // P2PK key) so the radar shows real faces/names BEFORE any tap. The x-only
@@ -1131,7 +1113,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
 
   const targetCount = targets.length;
 
-  const handleFocus = useCallback(() => {
+  const handleFocus = () => {
     paymentLog.debug('near_pay.perf.focus_start', {
       targetCount,
       panX: roundMetric(panX.get()),
@@ -1166,22 +1148,11 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
         isPanning.set(false);
       })
     );
-  }, [
-    isPanSettling,
-    isPanning,
-    panBounds.maxX,
-    panBounds.maxY,
-    panBounds.minX,
-    panBounds.minY,
-    panSettleRemaining,
-    panX,
-    panY,
-    targetCount,
-  ]);
+  };
 
   const hasSelectablePeer = targets.some((target) => target.phase !== 'exiting');
 
-  const handleOverviewPressIn = useCallback(() => {
+  const handleOverviewPressIn = () => {
     const startedAt = nowMs();
     const pan = { x: panX.get(), y: panY.get() };
     const overview = getPeerLayoutOverviewTransform(
@@ -1214,29 +1185,18 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     overviewScale.set(withTiming(overview.scale, PEER_OVERVIEW_TIMING));
     overviewTranslateX.set(withTiming(overview.translateX, PEER_OVERVIEW_TIMING));
     overviewTranslateY.set(withTiming(overview.translateY, PEER_OVERVIEW_TIMING));
-  }, [
-    actionAvoidance,
-    fieldSize,
-    overviewScale,
-    overviewTranslateX,
-    overviewTranslateY,
-    panX,
-    panY,
-    peerLayoutConfig,
-    targetCount,
-    targets,
-  ]);
+  };
 
-  const handleOverviewPressOut = useCallback(() => {
+  const handleOverviewPressOut = () => {
     cancelAnimation(overviewScale);
     cancelAnimation(overviewTranslateX);
     cancelAnimation(overviewTranslateY);
     overviewScale.set(withTiming(1, PEER_OVERVIEW_TIMING));
     overviewTranslateX.set(withTiming(0, PEER_OVERVIEW_TIMING));
     overviewTranslateY.set(withTiming(0, PEER_OVERVIEW_TIMING));
-  }, [overviewScale, overviewTranslateX, overviewTranslateY]);
+  };
 
-  const handleRandomPeer = useCallback(() => {
+  const handleRandomPeer = () => {
     const startedAt = nowMs();
     const pan = { x: panX.get(), y: panY.get() };
     const selectableTargets = targets.filter((target) => {
@@ -1275,7 +1235,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     });
 
     onSelect(target.peer, getScaledAvatarRect(target, fieldSize, pan, peerLayoutConfig));
-  }, [fieldSize, onSelect, panX, panY, peerLayoutConfig, targetCount, targets]);
+  };
 
   const logPanEnd = useCallback((payload: Record<string, number>) => {
     paymentLog.debug('near_pay.perf.pan_end', payload);
@@ -1521,10 +1481,7 @@ export function NearPayScreen() {
   const sharedAvatarTransitionSpanRef = useRef<NearPayPerfSpan | null>(null);
   const sharedAvatarStartFrameRef = useRef<number | null>(null);
   const sharedAvatarStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reachableCount = useMemo(
-    () => peers.filter((peer) => peer.hasDirectLink || peer.isConnected).length,
-    [peers]
-  );
+  const reachableCount = peers.filter((peer) => peer.hasDirectLink || peer.isConnected).length;
   const pickerPeersRef = useRef(peers);
 
   useEffect(() => {
@@ -1609,9 +1566,9 @@ export function NearPayScreen() {
     celebration.current
   );
 
-  const handleRegistryCountChange = useCallback((count: number) => {
+  const handleRegistryCountChange = (count: number) => {
     setRadarRegistryCount(count);
-  }, []);
+  };
 
   useEffect(() => {
     paymentLog.debug('near_pay.perf.session_state', {
@@ -1681,14 +1638,14 @@ export function NearPayScreen() {
     });
   }, [containerSize.width]);
 
-  const handleContainerLayout = useCallback((event: LayoutChangeEvent) => {
+  const handleContainerLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setContainerSize((current) =>
       Math.abs(current.width - width) < 1 && Math.abs(current.height - height) < 1
         ? current
         : { width, height }
     );
-  }, []);
+  };
 
   const endSharedAvatarTransitionSpan = useCallback((params: Record<string, unknown>) => {
     sharedAvatarTransitionSpanRef.current?.end(params);
@@ -1796,153 +1753,136 @@ export function NearPayScreen() {
     stopSharedElementAnimations,
   ]);
 
-  const handleSelectPeer = useCallback(
-    async (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => {
-      // Decide lock vs offline bearer from the peer's creq (accepted mints +
-      // lock key), our trusted mints, and online status. Delivery is always a
-      // private DM, but only after a valid creq proved the peer is patched.
-      const plan = planNearPaySend({
-        peer,
-        ourMints: walletContext.trustedMintUrls,
-        isOffline,
-      });
-      paymentLog.info('near_pay.peer.tap', {
-        peerID: peer.peerID,
-        mode: plan.mode,
-        // Did we decode the receiver's creq, and which mints did we get?
-        ...creqParseDiagnostics(peer),
-        ourMints: walletContext.trustedMintUrls,
-        allowedMints: plan.mode === 'block' ? null : plan.allowedMints,
-        isOffline,
-        hasDirectLink: peer.hasDirectLink,
-        isConnected: peer.isConnected,
-      });
-      // No valid creq ⇒ not confirmed patched; no mint in common ⇒ the
-      // recipient couldn't redeem. Block BEFORE any session/transition state
-      // (leaves the radar exactly as it was; also covers the Random button).
-      if (plan.mode === 'block') {
-        paymentLog.info(
-          plan.reason === 'no-shared-mint'
-            ? 'near_pay.peer.no_shared_mint'
-            : 'near_pay.peer.not_ready',
-          { peerID: peer.peerID, reason: plan.reason }
-        );
-        if (plan.reason === 'no-shared-mint') {
-          await notifyNoSharedMint(peer.name);
-        } else {
-          await notifyNutDropPeerNotReady(peer.name);
-        }
-        return;
+  const handleSelectPeer = async (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => {
+    // Decide lock vs offline bearer from the peer's creq (accepted mints +
+    // lock key), our trusted mints, and online status. Delivery is always a
+    // private DM, but only after a valid creq proved the peer is patched.
+    const plan = planNearPaySend({
+      peer,
+      ourMints: walletContext.trustedMintUrls,
+      isOffline,
+    });
+    paymentLog.info('near_pay.peer.tap', {
+      peerID: peer.peerID,
+      mode: plan.mode,
+      // Did we decode the receiver's creq, and which mints did we get?
+      ...creqParseDiagnostics(peer),
+      ourMints: walletContext.trustedMintUrls,
+      allowedMints: plan.mode === 'block' ? null : plan.allowedMints,
+      isOffline,
+      hasDirectLink: peer.hasDirectLink,
+      isConnected: peer.isConnected,
+    });
+    // No valid creq ⇒ not confirmed patched; no mint in common ⇒ the
+    // recipient couldn't redeem. Block BEFORE any session/transition state
+    // (leaves the radar exactly as it was; also covers the Random button).
+    if (plan.mode === 'block') {
+      paymentLog.info(
+        plan.reason === 'no-shared-mint'
+          ? 'near_pay.peer.no_shared_mint'
+          : 'near_pay.peer.not_ready',
+        { peerID: peer.peerID, reason: plan.reason }
+      );
+      if (plan.reason === 'no-shared-mint') {
+        await notifyNoSharedMint(peer.name);
+      } else {
+        await notifyNutDropPeerNotReady(peer.name);
       }
-      const delivery: NearPayDelivery = { locked: plan.mode === 'lock' };
-      paymentLog.info('near_pay.peer.select', {
+      return;
+    }
+    const delivery: NearPayDelivery = { locked: plan.mode === 'lock' };
+    paymentLog.info('near_pay.peer.select', {
+      peerID: peer.peerID,
+      hasDirectLink: peer.hasDirectLink,
+      isConnected: peer.isConnected,
+      locked: delivery.locked,
+    });
+    setSelectedPeer(peer);
+    setSelectedPeerRect(avatarRect);
+    stopSharedElementAnimations();
+    amountContentOpacity.set(0);
+    amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
+    setSharedAvatarPeer(peer);
+    amountPanelTranslateX.set(0);
+    amountPanelTranslateY.set(0);
+    const sharedAvatarStart = getSharedAvatarTransform(avatarRect, fieldSizing.avatarSize);
+    sharedAvatarX.set(sharedAvatarStart.x);
+    sharedAvatarY.set(sharedAvatarStart.y);
+    sharedAvatarScale.set(sharedAvatarStart.scale);
+    sharedAvatarOpacity.set(1);
+    useNearPaySessionStore.getState().start({
+      peerID: peer.peerID,
+      nickname: peer.name,
+      hasDirectLink: peer.hasDirectLink,
+      lastSeen: peer.lastSeen,
+      creq: peer.creq,
+      delivery,
+    });
+    // Failure paths must only unwind THIS selection — the radar stays
+    // tappable while a send is in flight, so the session-id guard ensures a
+    // slow attempt's failure can't clear a newer session started meanwhile.
+    const sessionId = useNearPaySessionStore.getState().active?.id ?? null;
+    const startSendSpan = paymentLog
+      .child({ flowId: `near-pay-start-send-${Date.now()}` })
+      .startSpan(
+        'near_pay.perf.start_send_ecash',
+        {
+          peerID: peer.peerID,
+          hasAvatar: !!peer.avatarUrl,
+          hasDirectLink: peer.hasDirectLink,
+          isConnected: peer.isConnected,
+        },
+        {
+          warnAtMs: 250,
+          errorAtMs: 1000,
+        }
+      );
+    try {
+      // One path for every peer: enter the amount flow, then the
+      // sendComplete handler delivers the finished token as a private Noise
+      // DM to the recipient peer (no public mesh). A locked token is
+      // P2PK-locked to the peer's key + minted from a mint they accept;
+      // offline fallback is bearer from a shared mint. `allowedMints`
+      // constrains the source mint. recipientPubkey seeds their real profile.
+      paymentLog.info('near_pay.start_send', {
         peerID: peer.peerID,
-        hasDirectLink: peer.hasDirectLink,
-        isConnected: peer.isConnected,
         locked: delivery.locked,
       });
-      setSelectedPeer(peer);
-      setSelectedPeerRect(avatarRect);
-      stopSharedElementAnimations();
-      amountContentOpacity.set(0);
-      amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
-      setSharedAvatarPeer(peer);
+      await machine.startSendEcash({
+        reset: true,
+        ...(plan.mode === 'lock'
+          ? { p2pkLockPubkey: plan.lockPubkey, recipientPubkey: plan.recipientPubkey }
+          : {}),
+        ...(plan.allowedMints ? { allowedMints: plan.allowedMints } : {}),
+        recipientProfile: {
+          displayName: peer.name,
+          avatarUrl: peer.avatarUrl ?? null,
+          nip05: null,
+        },
+      });
+      startSendSpan.end({
+        completed: true,
+      });
+    } catch (err) {
+      startSendSpan.end({
+        completed: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      setSelectedPeer(null);
+      setSelectedPeerRect(null);
+      setSharedAvatarPeer(null);
       amountPanelTranslateX.set(0);
       amountPanelTranslateY.set(0);
-      const sharedAvatarStart = getSharedAvatarTransform(avatarRect, fieldSizing.avatarSize);
-      sharedAvatarX.set(sharedAvatarStart.x);
-      sharedAvatarY.set(sharedAvatarStart.y);
-      sharedAvatarScale.set(sharedAvatarStart.scale);
-      sharedAvatarOpacity.set(1);
-      useNearPaySessionStore.getState().start({
-        peerID: peer.peerID,
-        nickname: peer.name,
-        hasDirectLink: peer.hasDirectLink,
-        lastSeen: peer.lastSeen,
-        creq: peer.creq,
-        delivery,
-      });
-      // Failure paths must only unwind THIS selection — the radar stays
-      // tappable while a send is in flight, so the session-id guard ensures a
-      // slow attempt's failure can't clear a newer session started meanwhile.
-      const sessionId = useNearPaySessionStore.getState().active?.id ?? null;
-      const startSendSpan = paymentLog
-        .child({ flowId: `near-pay-start-send-${Date.now()}` })
-        .startSpan(
-          'near_pay.perf.start_send_ecash',
-          {
-            peerID: peer.peerID,
-            hasAvatar: !!peer.avatarUrl,
-            hasDirectLink: peer.hasDirectLink,
-            isConnected: peer.isConnected,
-          },
-          {
-            warnAtMs: 250,
-            errorAtMs: 1000,
-          }
-        );
-      try {
-        // One path for every peer: enter the amount flow, then the
-        // sendComplete handler delivers the finished token as a private Noise
-        // DM to the recipient peer (no public mesh). A locked token is
-        // P2PK-locked to the peer's key + minted from a mint they accept;
-        // offline fallback is bearer from a shared mint. `allowedMints`
-        // constrains the source mint. recipientPubkey seeds their real profile.
-        paymentLog.info('near_pay.start_send', {
-          peerID: peer.peerID,
-          locked: delivery.locked,
-        });
-        await machine.startSendEcash({
-          reset: true,
-          ...(plan.mode === 'lock'
-            ? { p2pkLockPubkey: plan.lockPubkey, recipientPubkey: plan.recipientPubkey }
-            : {}),
-          ...(plan.allowedMints ? { allowedMints: plan.allowedMints } : {}),
-          recipientProfile: {
-            displayName: peer.name,
-            avatarUrl: peer.avatarUrl ?? null,
-            nip05: null,
-          },
-        });
-        startSendSpan.end({
-          completed: true,
-        });
-      } catch (err) {
-        startSendSpan.end({
-          completed: false,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        setSelectedPeer(null);
-        setSelectedPeerRect(null);
-        setSharedAvatarPeer(null);
-        amountPanelTranslateX.set(0);
-        amountPanelTranslateY.set(0);
-        amountContentOpacity.set(0);
-        amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
-        if (useNearPaySessionStore.getState().active?.id === sessionId) {
-          useNearPaySessionStore.getState().clear();
-        }
-        paymentLog.error('near_pay.peer.start_send_failed', {
-          error: err instanceof Error ? err.message : String(err),
-        });
+      amountContentOpacity.set(0);
+      amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
+      if (useNearPaySessionStore.getState().active?.id === sessionId) {
+        useNearPaySessionStore.getState().clear();
       }
-    },
-    [
-      machine,
-      walletContext.trustedMintUrls,
-      isOffline,
-      amountContentOpacity,
-      amountContentTranslateY,
-      amountPanelTranslateX,
-      amountPanelTranslateY,
-      fieldSizing.avatarSize,
-      sharedAvatarOpacity,
-      sharedAvatarScale,
-      sharedAvatarX,
-      sharedAvatarY,
-      stopSharedElementAnimations,
-    ]
-  );
+      paymentLog.error('near_pay.peer.start_send_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
 
   useEffect(() => {
     if (!inlineAmountEntry) {
@@ -2097,18 +2037,9 @@ export function NearPayScreen() {
       { scale: sharedAvatarScale.get() },
     ],
   }));
-  const pickerPanelCombinedStyle = useMemo(
-    () => [styles.panel, pickerPanelStyle],
-    [pickerPanelStyle]
-  );
-  const amountPanelCombinedStyle = useMemo(
-    () => [styles.panel, styles.amountPanel, amountPanelStyle],
-    [amountPanelStyle]
-  );
-  const amountContentCombinedStyle = useMemo(
-    () => [styles.inlineAmountBody, amountContentStyle],
-    [amountContentStyle]
-  );
+  const pickerPanelCombinedStyle = [styles.panel, pickerPanelStyle];
+  const amountPanelCombinedStyle = [styles.panel, styles.amountPanel, amountPanelStyle];
+  const amountContentCombinedStyle = [styles.inlineAmountBody, amountContentStyle];
   const sharedAvatarBaseStyle = useMemo(
     () => ({
       position: 'absolute' as const,
@@ -2120,18 +2051,12 @@ export function NearPayScreen() {
     }),
     [fieldSizing.avatarSize]
   );
-  const sharedAvatarFrameStyle = useMemo(
-    () => ({
-      position: 'relative' as const,
-      width: fieldSizing.avatarSize,
-      height: fieldSizing.avatarSize,
-    }),
-    [fieldSizing.avatarSize]
-  );
-  const sharedAvatarCombinedStyle = useMemo(
-    () => [sharedAvatarBaseStyle, sharedAvatarStyle],
-    [sharedAvatarBaseStyle, sharedAvatarStyle]
-  );
+  const sharedAvatarFrameStyle = {
+    position: 'relative' as const,
+    width: fieldSizing.avatarSize,
+    height: fieldSizing.avatarSize,
+  };
+  const sharedAvatarCombinedStyle = [sharedAvatarBaseStyle, sharedAvatarStyle];
 
   const bluetooth = useBluetoothState();
   // 'unknown' stays on the scanning path — iOS reports a real state only after
@@ -2147,19 +2072,16 @@ export function NearPayScreen() {
     () => [styles.emptyText, { color: foregroundMuted }],
     [foregroundMuted]
   );
-  const emptyContent = useMemo(
-    () => (
-      <VStack align="center" justify="center" gap={spacing.md} style={styles.emptyState}>
-        <Icon name="mdi:bluetooth" size={iconSize['3xl']} color={foregroundSoft} />
-        <Text size={17} weight="bold" style={emptyTitleStyle}>
-          Scanning nearby
-        </Text>
-        <Text size={13} style={emptyTextStyle}>
-          Keep Sovran open and nearby BitChat users will appear as fallback avatars.
-        </Text>
-      </VStack>
-    ),
-    [emptyTextStyle, emptyTitleStyle, foregroundSoft]
+  const emptyContent = (
+    <VStack align="center" justify="center" gap={spacing.md} style={styles.emptyState}>
+      <Icon name="mdi:bluetooth" size={iconSize['3xl']} color={foregroundSoft} />
+      <Text size={17} weight="bold" style={emptyTitleStyle}>
+        Scanning nearby
+      </Text>
+      <Text size={13} style={emptyTextStyle}>
+        Keep Sovran open and nearby BitChat users will appear as fallback avatars.
+      </Text>
+    </VStack>
   );
   const renderHeaderLeft = useCallback(
     () => <ScreenHeaderAction icon="material-symbols:arrow-back-rounded" onPress={resetToPicker} />,
@@ -2173,24 +2095,21 @@ export function NearPayScreen() {
     () => <HeaderBadge count={headerBadgeCount} onPress={openPeerList} />,
     [headerBadgeCount, openPeerList]
   );
-  const stackOptions = useMemo(
-    () => ({
-      title: amountActive ? '' : 'Nut Drop',
-      headerShadowVisible: false,
-      headerTransparent: true,
-      headerTitle: amountActive ? renderEmptyHeader : undefined,
-      headerBackVisible: false,
-      headerLeft: amountActive ? renderHeaderLeft : renderEmptyHeader,
-      headerRight: amountActive ? renderEmptyHeader : renderHeaderRight,
-      // The send flow's shared-element avatar lands inside the header band,
-      // and Android's sheet header (FlowSheetHeader) composites its scrim
-      // gradient ABOVE screen content — the avatar ended up underneath it.
-      // A null headerBackground is the sanctioned per-screen scrim opt-out;
-      // the radar's faint dot field doesn't need the legibility fade.
-      ...(Platform.OS === 'android' ? { headerBackground: renderNullHeaderBackground } : {}),
-    }),
-    [amountActive, renderEmptyHeader, renderHeaderLeft, renderHeaderRight]
-  );
+  const stackOptions = {
+    title: amountActive ? '' : 'Nut Drop',
+    headerShadowVisible: false,
+    headerTransparent: true,
+    headerTitle: amountActive ? renderEmptyHeader : undefined,
+    headerBackVisible: false,
+    headerLeft: amountActive ? renderHeaderLeft : renderEmptyHeader,
+    headerRight: amountActive ? renderEmptyHeader : renderHeaderRight,
+    // The send flow's shared-element avatar lands inside the header band,
+    // and Android's sheet header (FlowSheetHeader) composites its scrim
+    // gradient ABOVE screen content — the avatar ended up underneath it.
+    // A null headerBackground is the sanctioned per-screen scrim opt-out;
+    // the radar's faint dot field doesn't need the legibility fade.
+    ...(Platform.OS === 'android' ? { headerBackground: renderNullHeaderBackground } : {}),
+  };
 
   return (
     <>

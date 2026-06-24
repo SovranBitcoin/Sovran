@@ -1,4 +1,5 @@
 import React from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 
 import opacity from 'hex-color-opacity';
 
@@ -41,7 +42,9 @@ export function SelectableCheckCircle({
         justifyContent: 'center',
         opacity: disabled ? 0.5 : 1,
       }}>
-      {selected ? <Icon name="mdi:check" size={Math.round(size * 0.65)} color="#FFFFFF" /> : null}
+      {selected ? (
+        <Icon name="mdi:check" size={Math.round(size * 0.65)} color={INVARIANT_WHITE} />
+      ) : null}
     </View>
   );
 

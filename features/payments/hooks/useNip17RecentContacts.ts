@@ -10,7 +10,7 @@ import { useMemo } from 'react';
 import { PUBLIC_KEYS } from '@/shared/lib/constants';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { getMockContacts, MOCK_ALLOWED_PUBKEYS_HEX } from '@/shared/stores/runtime/mockDataStore';
-import type { DmProtocol } from '../data/dmDecryptPipeline';
+import type { RecentContact } from './recentContactTypes';
 import { useDmConversations } from './useDmConversations';
 
 const DEFAULT_CONTACTS = [{ pubkey: PUBLIC_KEYS.SUPPORT, label: 'Sovran' }] as const;
@@ -18,19 +18,6 @@ const DEFAULT_CONTACTS = [{ pubkey: PUBLIC_KEYS.SUPPORT, label: 'Sovran' }] as c
 interface NostrKeys {
   pubkey?: string;
   privateKey?: Uint8Array;
-}
-
-/** Unified recent-contact row shape (kept identical to the legacy hook so
- *  `ContactsScreen`, the split-bill picker, and `mockDataStore` are unaffected). */
-export interface RecentContact {
-  type: 'contact';
-  dmEvent: { content: string } | null | undefined;
-  nip17Content: string | undefined;
-  pubkey: string;
-  timestamp: number;
-  isDefault?: boolean;
-  /** Which protocol this conversation is on. Absent rows default to NIP-17. */
-  protocol?: DmProtocol | 'whitenoise';
 }
 
 export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
@@ -80,10 +67,7 @@ export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
     return [...mocks.filter((m) => !realKeys.has(m.pubkey)), ...allowlistRows, ...base];
   }, [conversations, mockMode]);
 
-  const contactPubkeys = useMemo(
-    () => displayContacts.map((c) => c.pubkey).filter(Boolean),
-    [displayContacts]
-  );
+  const contactPubkeys = displayContacts.map((c) => c.pubkey).filter(Boolean);
 
   return {
     displayContacts,

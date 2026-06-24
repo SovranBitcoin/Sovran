@@ -12,14 +12,14 @@ import { uploadToBlossom, type BlossomError } from '@/shared/lib/nostr/media/blo
 import { getMediaServer } from '@/shared/lib/nostr/media/mediaServerStore';
 import type { MediaDescriptor } from '@/shared/lib/nostr/media/types';
 
-export interface PickedAsset {
+interface PickedAsset {
   uri: string;
   mimeType: string;
   width?: number;
   height?: number;
 }
 
-export interface UploadMediaOptions {
+interface UploadMediaOptions {
   ndk: NDK;
   asset: PickedAsset;
   alt?: string;

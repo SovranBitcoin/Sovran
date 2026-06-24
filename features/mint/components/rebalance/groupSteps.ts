@@ -57,7 +57,7 @@ export function groupStepsForDisplay(
 
     if (step.chainId) {
       const last = groups[groups.length - 1];
-      if (last && last.chainId === step.chainId) {
+      if (last?.chainId === step.chainId) {
         last.steps.push(step);
         continue;
       }

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Keyboard } from 'react-native';
 import { log } from '@/shared/lib/logger';
 
@@ -18,13 +18,13 @@ export function useHeaderSearch() {
   const [seedText, setSeedText] = useState('');
   const openedAtRef = useRef<number>(0);
 
-  const onOpenSearch = useCallback(() => {
+  const onOpenSearch = () => {
     openedAtRef.current = Date.now();
     log.debug('header_search.open');
     setIsSearching(true);
-  }, []);
+  };
 
-  const onCloseSearch = useCallback(() => {
+  const onCloseSearch = () => {
     const duration = openedAtRef.current ? Date.now() - openedAtRef.current : 0;
     log.debug('header_search.close', {
       duration_ms: duration,
@@ -36,19 +36,19 @@ export function useHeaderSearch() {
     setSeedText('');
     setClearKey((prev) => prev + 1);
     Keyboard.dismiss();
-  }, [searchQuery]);
+  };
 
-  const onSearchChange = useCallback((query: string) => {
+  const onSearchChange = (query: string) => {
     setSearchQuery(query);
-  }, []);
+  };
 
   // Programmatically run a query (e.g. tapping a recent-search chip): set the
   // results immediately and remount the input seeded with the text.
-  const setQuery = useCallback((query: string) => {
+  const setQuery = (query: string) => {
     setSearchQuery(query);
     setSeedText(query);
     setClearKey((prev) => prev + 1);
-  }, []);
+  };
 
   return {
     isSearching,

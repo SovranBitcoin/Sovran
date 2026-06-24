@@ -6,7 +6,6 @@
  * Screens within push horizontally with close/back header.
  */
 
-import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
@@ -19,9 +18,9 @@ const GALLERY_OPTIONS = { title: 'Gallery' };
 
 export default function ThemeFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
-    [foreground, background]
+  const screenOptions = createFlowLayoutScreenOptions(
+    { foreground, background },
+    { androidSheet: true }
   );
 
   return (

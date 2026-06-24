@@ -1,4 +1,5 @@
-import React, { useCallback } from 'react';
+import React from 'react';
+import { AMBER_ACCENT } from '@/shared/lib/brandColors';
 import { ScrollView, View } from 'react-native';
 import {
   useSettingsStore,
@@ -24,6 +25,11 @@ import { log, useLifecycleLogger } from '@/shared/lib/logger';
 // Main screen
 // ---------------------------------------------------------------------------
 
+const asNumber = (value: number | number[]) => (Array.isArray(value) ? (value[0] ?? 0) : value);
+// Snap to slider step so a stored rate that isn't a multiple of 5 doesn't
+// display as e.g. "73%" while the thumb sits between stops.
+const snapSuccessRate = (rate: number) => Math.round((rate * 100) / 5) * 5;
+
 export function SettingsRoutingScreen() {
   useLifecycleLogger('SettingsRoutingScreen');
   const middlemanRouting = useSettingsStore((state) => state.middlemanRouting);
@@ -31,18 +37,10 @@ export function SettingsRoutingScreen() {
   const minTransferThreshold = useSettingsStore((state) => state.minTransferThreshold);
   const setMinTransferThreshold = useSettingsStore((state) => state.setMinTransferThreshold);
 
-  const update = useCallback(
-    (partial: Partial<MiddlemanRoutingSettings>) => {
-      log.info('settings.routing.change', { ...partial });
-      setMiddlemanRouting(partial);
-    },
-    [setMiddlemanRouting]
-  );
-
-  const asNumber = (value: number | number[]) => (Array.isArray(value) ? (value[0] ?? 0) : value);
-  // Snap to slider step so a stored rate that isn't a multiple of 5 doesn't
-  // display as e.g. "73%" while the thumb sits between stops.
-  const snapSuccessRate = (rate: number) => Math.round((rate * 100) / 5) * 5;
+  const update = (partial: Partial<MiddlemanRoutingSettings>) => {
+    log.info('settings.routing.change', { ...partial });
+    setMiddlemanRouting(partial);
+  };
 
   return (
     <ScreenWrapper name="SettingsRoutingScreen" scroll="custom" safeArea>
@@ -197,10 +195,10 @@ export function SettingsRoutingScreen() {
                     <Icon
                       name="mdi:alert-circle-outline"
                       size={16}
-                      color="#f59e0b"
+                      color={AMBER_ACCENT}
                       style={{ marginTop: 2 }}
                     />
-                    <Text size={12} className="flex-1" style={{ color: '#f59e0b' }}>
+                    <Text size={12} className="flex-1" style={{ color: AMBER_ACCENT }}>
                       Untrusted mints will be temporarily trusted for the swap and untrusted
                       afterward. Your ecash passes through mints you have not verified. Only use
                       this with small amounts.

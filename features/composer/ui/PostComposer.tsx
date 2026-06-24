@@ -7,9 +7,8 @@
  * `ComposeConfig`; the char meter enforces the relay-sourced budget; send goes
  * through the outbox-aware publish seam.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -18,16 +17,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { router } from 'expo-router';
-import { Button } from 'heroui-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import Icon from 'assets/icons';
-import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { uploadMedia } from '@/shared/lib/nostr/media/mediaUpload';
 import { useComposeConfig } from '@/features/composer/config/useComposeConfig';
@@ -37,6 +31,9 @@ import {
   type PublishOutcome,
 } from '@/features/composer/publish/useComposerActions';
 import { PollComposeForm, emptyPollDraft } from '@/features/composer/ui/PollComposeForm';
+import { PostComposerHeader } from '@/features/composer/ui/PostComposerHeader';
+import { PostComposerMediaTray } from '@/features/composer/ui/PostComposerMediaTray';
+import { PostComposerToolbar } from '@/features/composer/ui/PostComposerToolbar';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -55,7 +52,7 @@ import {
   type NoteMetrics,
   type ProfileInfo,
 } from '@/features/feed/components/nostr/feedTypes';
-import { alpha, spacing } from '@/shared/styles/tokens';
+import { spacing } from '@/shared/styles/tokens';
 
 const AVATAR_SIZE = 36;
 const EMPTY_EVENTS = new Map<string, FeedEvent>();
@@ -130,7 +127,7 @@ export function PostComposer() {
     return map;
   }, [parentEvent, parentProfile]);
   const textBlock = blocks.find((b) => b.kind === 'text');
-  const mediaBlocks = useMemo(() => blocks.filter((b) => b.kind === 'media'), [blocks]);
+  const mediaBlocks = blocks.filter((b) => b.kind === 'media');
   const textLength = textBlock?.kind === 'text' ? textBlock.text.length : 0;
   const hasPostContent =
     (textBlock?.kind === 'text' && textBlock.text.trim().length > 0) || mediaBlocks.length > 0;
@@ -201,12 +198,12 @@ export function PostComposer() {
     },
   });
 
-  const handleCancel = useCallback(() => {
+  const handleCancel = () => {
     close();
     router.back();
-  }, [close]);
+  };
 
-  const handlePost = useCallback(async () => {
+  const handlePost = async () => {
     if (!canPost) return;
     setBusy(true);
     setError(null);
@@ -217,9 +214,9 @@ export function PostComposer() {
       return;
     }
     setError(OUTCOME_MESSAGE[outcome] ?? 'Something went wrong.');
-  }, [canPost, publish]);
+  };
 
-  const handleAddMedia = useCallback(async () => {
+  const handleAddMedia = async () => {
     if (!ndk || mediaBlocks.length >= config.maxMedia) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images', 'videos'],
@@ -247,41 +244,22 @@ export function PostComposer() {
       removeBlock(id);
       setError('Media upload failed. Try a different file.');
     }
-  }, [ndk, mediaBlocks.length, config.maxMedia, addMediaBlock, updateBlock, removeBlock]);
+  };
 
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: surface }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <VisualLayoutProbe
+      <PostComposerHeader
         scope={COMPOSER_VISUAL_SCOPE}
-        surface="composer"
-        component="PostComposerHeader"
-        itemKey="header"
-        itemType="header"
-        style={[
-          styles.headerRow,
-          {
-            paddingTop: insets.top + spacing.md,
-          },
-        ]}
-        extra={{
-          mode: target?.mode ?? 'new',
-          keyboardVisible,
-          busy,
-        }}>
-        <Button variant="ghost" size="md" onPress={handleCancel}>
-          <Button.Label>Cancel</Button.Label>
-        </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          onPress={handlePost}
-          isDisabled={!canPost}
-          style={!canPost ? styles.disabledPostButton : undefined}>
-          <Button.Label>{busy ? 'Posting…' : 'Post'}</Button.Label>
-        </Button>
-      </VisualLayoutProbe>
+        mode={target?.mode ?? 'new'}
+        keyboardVisible={keyboardVisible}
+        busy={busy}
+        canPost={canPost}
+        paddingTop={insets.top + spacing.md}
+        onCancel={handleCancel}
+        onPost={handlePost}
+      />
 
       <VisualLayoutProbe
         scope={COMPOSER_VISUAL_SCOPE}
@@ -356,63 +334,13 @@ export function PostComposer() {
           ) : null}
 
           {mediaBlocks.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              className="mt-3"
-              onLayout={mediaTrayScrollMetrics.onLayout}
-              onContentSizeChange={mediaTrayScrollMetrics.onContentSizeChange}
-              onScroll={mediaTrayScrollMetrics.onScroll}
-              scrollEventThrottle={250}>
-              {mediaBlocks.map((block) =>
-                block.kind === 'media' ? (
-                  <VisualLayoutProbe
-                    key={block.id}
-                    scope={COMPOSER_VISUAL_SCOPE}
-                    surface="composer"
-                    component="PostComposerMediaBlock"
-                    itemKey={block.id}
-                    itemType={block.mediaKind}
-                    className="mr-2"
-                    extra={{
-                      uploading: block.uploadProgress !== undefined,
-                      uploadProgress: block.uploadProgress ?? null,
-                    }}>
-                    <Image
-                      source={{ uri: block.localUri ?? block.descriptor?.url }}
-                      style={{ width: 96, height: 96, borderRadius: 12 }}
-                      contentFit="cover"
-                    />
-                    {block.uploadProgress !== undefined ? (
-                      <View
-                        className="absolute inset-0 items-center justify-center"
-                        style={styles.uploadScrim}>
-                        <VisualLayoutProbe
-                          scope={COMPOSER_VISUAL_SCOPE}
-                          surface="composer"
-                          component="PostComposerMediaUploadIndicator"
-                          itemKey={`media-upload:${block.id}`}
-                          itemType="activity-indicator"
-                          phase="uploading"
-                          extra={{
-                            mediaKind: block.mediaKind,
-                            uploadProgress: block.uploadProgress ?? null,
-                          }}>
-                          <ActivityIndicator color={INVARIANT_WHITE} />
-                        </VisualLayoutProbe>
-                      </View>
-                    ) : null}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onPress={() => removeBlock(block.id)}
-                      accessibilityLabel="Remove media">
-                      <Icon name="mdi:close-circle" size={18} color={mutedColor} />
-                    </Button>
-                  </VisualLayoutProbe>
-                ) : null
-              )}
-            </ScrollView>
+            <PostComposerMediaTray
+              scope={COMPOSER_VISUAL_SCOPE}
+              mediaBlocks={mediaBlocks}
+              scrollMetrics={mediaTrayScrollMetrics}
+              mutedColor={mutedColor}
+              onRemove={removeBlock}
+            />
           ) : null}
 
           {!showPollBeforeQuote && poll ? <PollComposeForm /> : null}
@@ -425,60 +353,24 @@ export function PostComposer() {
         </ScrollView>
       </VisualLayoutProbe>
 
-      <VisualLayoutProbe
+      <PostComposerToolbar
         scope={COMPOSER_VISUAL_SCOPE}
-        surface="composer"
-        component="PostComposerToolbar"
-        itemKey="toolbar"
-        itemType="toolbar"
-        className="flex-row items-center gap-5 px-4 py-2"
-        style={{
-          paddingBottom: keyboardVisible ? 10 : insets.bottom + 10,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: mutedColor,
-        }}
-        extra={{
-          mode: target?.mode ?? 'new',
-          keyboardVisible,
-          mediaCount: mediaBlocks.length,
-          hasPoll: !!poll,
-          canPost,
-        }}>
-        <Pressable
-          onPress={handleAddMedia}
-          disabled={!!poll || mediaBlocks.length >= config.maxMedia}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel="Add photo or video">
-          <Icon
-            name="mdi:image-plus"
-            size={24}
-            color={poll || mediaBlocks.length >= config.maxMedia ? mutedColor : accentColor}
-          />
-        </Pressable>
-        <Pressable
-          onPress={() => setPoll(poll ? undefined : emptyPollDraft())}
-          disabled={!config.allowPoll || mediaBlocks.length > 0}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={poll ? 'Remove poll' : 'Add poll'}>
-          <Icon
-            name="mdi:poll"
-            size={24}
-            color={
-              !config.allowPoll || mediaBlocks.length > 0
-                ? mutedColor
-                : poll
-                  ? accentColor
-                  : mutedColor
-            }
-          />
-        </Pressable>
-        <View className="flex-1" />
-        <Text size={13} style={{ color: overBudget ? dangerColor : mutedColor }}>
-          {remaining}
-        </Text>
-      </VisualLayoutProbe>
+        mode={target?.mode ?? 'new'}
+        keyboardVisible={keyboardVisible}
+        mediaCount={mediaBlocks.length}
+        canPost={canPost}
+        paddingBottom={keyboardVisible ? 10 : insets.bottom + 10}
+        mutedColor={mutedColor}
+        accentColor={accentColor}
+        dangerColor={dangerColor}
+        remaining={remaining}
+        overBudget={overBudget}
+        addMediaDisabled={!!poll || mediaBlocks.length >= config.maxMedia}
+        pollDisabled={!config.allowPoll || mediaBlocks.length > 0}
+        pollActive={!!poll}
+        onAddMedia={handleAddMedia}
+        onTogglePoll={() => setPoll(poll ? undefined : emptyPollDraft())}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -557,14 +449,6 @@ function ReplyOriginalPost({
 }
 
 const styles = StyleSheet.create({
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingLeft: spacing.sm,
-    paddingRight: spacing.lg,
-    paddingBottom: spacing.md,
-  },
   ogRow: { flexDirection: 'row', gap: 12, paddingTop: 12 },
   ogContent: { flex: 1 },
   gutterCol: { width: AVATAR_SIZE, alignItems: 'center' },
@@ -591,18 +475,6 @@ const styles = StyleSheet.create({
     minHeight: 72,
     paddingBottom: spacing['2xl'],
     marginBottom: spacing.md,
-  },
-  disabledPostButton: { opacity: alpha.disabled },
-  uploadScrim: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   flex1: {
     flex: 1,

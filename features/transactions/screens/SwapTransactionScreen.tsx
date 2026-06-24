@@ -12,7 +12,8 @@
  * Consecutive entries on the same mint omit the redundant arrow separator.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { StyleSheet } from 'react-native';
 import { MeltQuoteState } from '@cashu/cashu-ts';
 import Animated, {
@@ -86,7 +87,7 @@ function groupLegs(legs: SwapLeg[]): LegGroup[] {
     if (leg.chainId) {
       // Try to append to the last group if it shares the same chainId
       const last = groups[groups.length - 1];
-      if (last && last.chainId === leg.chainId) {
+      if (last?.chainId === leg.chainId) {
         last.legs.push(leg);
         continue;
       }
@@ -211,7 +212,7 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
           </UntranslatedText>
         </HStack>
         <View style={[styles.collapsedArrow, { backgroundColor: opacity(foreground, 0.33) }]}>
-          <Icon name="mdi:arrow-right" size={10} color="#fff" />
+          <Icon name="mdi:arrow-right" size={10} color={INVARIANT_WHITE} />
         </View>
         <HStack spacing={8} align="center" flex={1}>
           <MintIcon iconUrl={dstInfo?.icon_url} size={28} name={dstName} />
@@ -249,7 +250,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
   const [expanded, setExpanded] = useState(false);
   const chevronRotation = useSharedValue(0);
 
-  const toggleExpanded = useCallback(() => {
+  const toggleExpanded = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     log.debug('tx.swap.toggle_expanded', { groupId });
     setExpanded((prev) => {
@@ -259,7 +260,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
       });
       return !prev;
     });
-  }, [chevronRotation]);
+  };
 
   const chevronAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${chevronRotation.value}deg` }],
@@ -290,7 +291,9 @@ export function SwapTransactionScreen({ groupId }: Props) {
       for (const url of mintUrls) {
         try {
           const info = await getMintInfo(url);
-          map[url] = info ? { name: info.name, icon_url: (info as any).icon_url } : null;
+          map[url] = info
+            ? { name: info.name, icon_url: (info as { icon_url?: string }).icon_url }
+            : null;
         } catch {
           map[url] = null;
         }
@@ -307,7 +310,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
     const map = new Map<string, HistoryEntry>();
     for (const entry of history) {
       if (entry.type !== 'mint' && entry.type !== 'melt') continue;
-      const quoteId = (entry as any).quoteId as string | undefined;
+      const quoteId = (entry as { quoteId?: string }).quoteId;
       if (!quoteId) continue;
       map.set(quoteId, entry);
     }
@@ -509,8 +512,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
                       // Skip the separator between chained legs when the previous
                       // leg's destination is the same mint as this leg's source
                       const prevLeg = legIdx > 0 ? legGroup.legs[legIdx - 1] : null;
-                      const sameMintAsPrev =
-                        prevLeg != null && prevLeg.toMintUrl === leg.fromMintUrl;
+                      const sameMintAsPrev = prevLeg?.toMintUrl === leg.fromMintUrl;
 
                       return (
                         <View key={leg.id}>

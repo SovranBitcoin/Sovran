@@ -71,28 +71,25 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
     [onKeyPress, unit]
   );
 
-  const renderButton = useCallback(
-    (value: KeyboardValue) => (
-      <Pressable
-        key={String(value)}
-        className="mx-0.5 w-1/3 items-center justify-center overflow-hidden"
-        style={{ opacity: loading ? 0.5 : 1 }}
-        disabled={loading}
-        onPress={() => handlePress(value)}>
-        {value === '<' ? (
-          <Icon name="lucide:delete" size={compact ? 22 : 24} color={foreground} />
-        ) : (
-          <Text
-            size={compact ? 22 : 24}
-            bold
-            color={foreground}
-            style={{ padding: compact ? 14 : 16, paddingHorizontal: compact ? 22 : 24 }}>
-            {value}
-          </Text>
-        )}
-      </Pressable>
-    ),
-    [compact, foreground, handlePress, loading]
+  const renderButton = (value: KeyboardValue) => (
+    <Pressable
+      key={String(value)}
+      className="mx-0.5 w-1/3 items-center justify-center overflow-hidden"
+      style={{ opacity: loading ? 0.5 : 1 }}
+      disabled={loading}
+      onPress={() => handlePress(value)}>
+      {value === '<' ? (
+        <Icon name="lucide:delete" size={compact ? 22 : 24} color={foreground} />
+      ) : (
+        <Text
+          size={compact ? 22 : 24}
+          bold
+          color={foreground}
+          style={{ padding: compact ? 14 : 16, paddingHorizontal: compact ? 22 : 24 }}>
+          {value}
+        </Text>
+      )}
+    </Pressable>
   );
 
   const buttons: KeyboardValue[][] = [

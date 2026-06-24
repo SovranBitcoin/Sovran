@@ -15,6 +15,7 @@ import { getMintDisplayName } from '@/shared/lib/url';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { walletLog } from '@/shared/lib/logger';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 export interface MintSelectorProps {
   /** Mint URL to display. When omitted, reads preferredMintUrl from store. */
@@ -50,13 +51,6 @@ interface MintSelectorShared {
   };
 }
 
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
-
 export function useMintSelector({
   selectedMintUrl,
   onRequestMintList,
@@ -69,10 +63,7 @@ export function useMintSelector({
   const storedSelectedMint = useMintStore((state) => state.selectedMint);
   const mintUrl = selectedMintUrl ?? storedSelectedMint;
   const balance = mintUrl ? amountToNumber(liveBalances.byMint[mintUrl]?.total) : 0;
-  const mintData = useMemo(
-    () => (mintUrl ? mints.find((m) => m.mintUrl === mintUrl) : undefined),
-    [mints, mintUrl]
-  );
+  const mintData = mintUrl ? mints.find((m) => m.mintUrl === mintUrl) : undefined;
 
   const mintInfo = useMemo(() => {
     if (!mintData) return null;

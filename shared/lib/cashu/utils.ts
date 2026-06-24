@@ -17,13 +17,7 @@ import { getTokenMetadata } from '@cashu/cashu-ts';
 import { log } from '../logger';
 import { mintLocalId } from '../id';
 import { amountToNumber } from './amount';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 /**
  * Validates if a string is a valid ecash token by attempting to decode it
@@ -162,7 +156,7 @@ export function buildReceiveHistoryEntry(
 export async function attemptRollback(mgr: Manager, operationId: string): Promise<boolean> {
   try {
     const operation = await mgr.ops.send.get(operationId);
-    if (operation && operation.state === 'prepared') {
+    if (operation?.state === 'prepared') {
       await mgr.ops.send.cancel(operationId);
     } else if (operation && (operation.state === 'pending' || operation.state === 'executing')) {
       await mgr.ops.send.reclaim(operationId);

@@ -168,7 +168,7 @@ export function celebrationReducer(
       // Same sender mid-ceremony: confirm/extend the displayed amount. From
       // 'awaiting' the impact fires immediately; from 'centering' it fires
       // on arrival (the beat clock sees the amount and goes to 'held').
-      if (state.current && state.current.peerID === event.peerID) {
+      if (state.current?.peerID === event.peerID) {
         if (state.phase === 'centering' || state.phase === 'awaiting' || state.phase === 'held') {
           return {
             ...state,
@@ -200,7 +200,7 @@ export function celebrationReducer(
     }
 
     case 'strike-waiting': {
-      if (state.current && state.current.peerID === event.peerID) {
+      if (state.current?.peerID === event.peerID) {
         if (state.phase === 'centering' || state.phase === 'awaiting' || state.phase === 'held') {
           return {
             ...state,

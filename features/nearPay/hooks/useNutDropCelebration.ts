@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import {
@@ -190,13 +190,13 @@ export function useNutDropCelebration({
     return () => clearTimeout(timer);
   }, [abbreviated, celebration.phase]);
 
-  const skip = useCallback(() => {
+  const skip = () => {
     paymentLog.info('near_pay.celebration.skipped', {
       phase: celebration.phase,
       peerID: celebration.current?.peerID ?? null,
     });
     dispatch({ type: 'skip', now: Date.now() });
-  }, [celebration.current?.peerID, celebration.phase]);
+  };
 
   return { celebration, skip };
 }

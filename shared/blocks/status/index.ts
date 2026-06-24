@@ -1,11 +1,4 @@
-export { LoadingIndicator, default } from './LoadingIndicator';
-export type {
-  Phase,
-  Result,
-  LoadingIndicatorProps,
-  ConfirmationProgress,
-  SegmentedProgress,
-  NormalizedSegmentedProgress,
-} from './LoadingIndicator';
+export { LoadingIndicator } from './LoadingIndicator';
+export type { Phase, Result } from './LoadingIndicator';
 export { mapCheckpointStatusToIndicator } from './mapCheckpointStatus';
-export type { CheckpointStatus, IndicatorTuple } from './mapCheckpointStatus';
+export type { CheckpointStatus } from './mapCheckpointStatus';

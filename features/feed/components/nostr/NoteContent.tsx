@@ -239,7 +239,7 @@ const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { melt
   ] as const);
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
-  const decoded = useMemo(() => decodeFeedInvoice(meltTarget), [meltTarget]);
+  const decoded = decodeFeedInvoice(meltTarget);
 
   if (!decoded) {
     return (
@@ -311,21 +311,21 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
     'surface-tertiary',
   ] as const);
 
-  const suppressQuotedTapStart = useCallback(() => {
+  const suppressQuotedTapStart = () => {
     onPressIn?.();
-  }, [onPressIn]);
+  };
 
-  const suppressQuotedTapEnd = useCallback(() => {
+  const suppressQuotedTapEnd = () => {
     onPressOut?.();
-  }, [onPressOut]);
+  };
 
-  const handleOpenQuotedThread = useCallback(() => {
+  const handleOpenQuotedThread = () => {
     if (!event) return;
     router.navigate({
       pathname: '/(user-flow)/thread',
       params: { eventId: event.id },
     });
-  }, [event]);
+  };
 
   if (!event) {
     return (
@@ -483,18 +483,15 @@ export const NoteContent = React.memo(function NoteContent({
   const shift = useShiftLogger('NoteContent');
   const noteKey = overlayEvent?.id ?? 'inline-note';
 
-  const toggleExpanded = useCallback(
-    (next: boolean) => {
-      feedLog.info('feed.shift.note.expand', {
-        component: 'NoteContent',
-        key: noteKey,
-        expanded: next,
-        contentLength: content.length,
-      });
-      setExpanded(next);
-    },
-    [noteKey, content.length]
-  );
+  const toggleExpanded = (next: boolean) => {
+    feedLog.info('feed.shift.note.expand', {
+      component: 'NoteContent',
+      key: noteKey,
+      expanded: next,
+      contentLength: content.length,
+    });
+    setExpanded(next);
+  };
 
   const onBeforeOpen = useCallback(() => {
     if (typeof feedIndex === 'number' && onOverlayOpenedFromIndex) {
@@ -529,7 +526,7 @@ export const NoteContent = React.memo(function NoteContent({
   }, [content]);
 
   // NIP-92 imeta metadata (alt text / dimensions) keyed by media url.
-  const imetaByUrl = useMemo(() => parseImetaTags(overlayEvent?.tags ?? []), [overlayEvent]);
+  const imetaByUrl = parseImetaTags(overlayEvent?.tags ?? []);
 
   const { mediaSegments, allMediaUrls, allMediaTypes, overlayPost } = useMemo(() => {
     const media = blockSegments.filter(

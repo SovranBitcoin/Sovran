@@ -23,7 +23,7 @@
  *   modelPickerPopup({});
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BottomSheet, Menu } from 'heroui-native';
@@ -194,23 +194,17 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
 
   const balanceSats = balanceMsats != null ? Math.floor(balanceMsats / 1000) : 0;
   const models = cachedModels ?? [];
-  const activeProvider = useMemo(
-    () => AI_PROVIDERS.find((p) => p.id === activeProviderTab) ?? AI_PROVIDERS[0],
-    [activeProviderTab]
-  );
+  const activeProvider = AI_PROVIDERS.find((p) => p.id === activeProviderTab) ?? AI_PROVIDERS[0];
 
-  const handleSelect = useCallback(
-    (tier: AiTier) => {
-      pickerLog.info('modelPicker.select', {
-        provider: activeProvider.id,
-        tier: tier.id,
-      });
-      setSelectedSlot({ provider: activeProvider.id, tier: tier.id });
-      paramPopup('model-switched', { modelName: `${activeProvider.label} ${tier.label}` });
-      close();
-    },
-    [activeProvider.id, activeProvider.label, setSelectedSlot, close]
-  );
+  const handleSelect = (tier: AiTier) => {
+    pickerLog.info('modelPicker.select', {
+      provider: activeProvider.id,
+      tier: tier.id,
+    });
+    setSelectedSlot({ provider: activeProvider.id, tier: tier.id });
+    paramPopup('model-switched', { modelName: `${activeProvider.label} ${tier.label}` });
+    close();
+  };
 
   return (
     <View style={{ flex: 1 }}>

@@ -181,88 +181,85 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
     };
   }, [client, group, relays, selfPubkey, upsertMessage]);
 
-  const sendInner = useCallback(
-    async (text: string) => {
-      if (!text.trim()) return;
-      if (!client) {
-        setError('White Noise client not ready');
-        return;
-      }
-      if (!selfPubkey) {
-        setError('No active Nostr key');
-        return;
-      }
-      setError(null);
+  const sendInner = async (text: string) => {
+    if (!text.trim()) return;
+    if (!client) {
+      setError('White Noise client not ready');
+      return;
+    }
+    if (!selfPubkey) {
+      setError('No active Nostr key');
+      return;
+    }
+    setError(null);
 
-      let activeGroup = groupRef.current;
+    let activeGroup = groupRef.current;
 
-      // Lazy-create the group on first send.
-      if (!activeGroup) {
-        setIsCreatingGroup(true);
-        try {
-          const fallbackRelays = relays.length > 0 ? [...relays] : [];
-          const lookupRelays = await resolveInboxRelays(
-            client.network,
-            counterpartyPubkey,
-            fallbackRelays
-          );
-          const events = await client.network.request(lookupRelays, [
-            { kinds: [KEY_PACKAGE_KIND], authors: [counterpartyPubkey], limit: 1 },
-          ]);
-          if (events.length === 0) {
-            throw new Error("Recipient hasn't published a White Noise key package yet.");
-          }
-          const keyPackageEvent = events[0];
-
-          const created = (await client.createGroup(`dm:${counterpartyPubkey.slice(0, 16)}`, {
-            description: 'White Noise 1:1 DM',
-            relays: fallbackRelays,
-          })) as WnGroup;
-          await created.inviteByKeyPackageEvent(keyPackageEvent);
-
-          await dmIndex.set(counterpartyPubkey, bytesToHex(created.id));
-          activeGroup = created;
-          groupRef.current = created;
-          setGroup(created);
-          wnLog.info('whitenoise.dm.group_created', {
-            groupId: bytesToHex(created.id),
-            counterparty: counterpartyPubkey.slice(0, 16),
-          });
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          setError(message);
-          wnLog.error('whitenoise.dm.group_create_failed', { error: message });
-          setIsCreatingGroup(false);
-          return;
-        }
-        setIsCreatingGroup(false);
-      }
-
-      const optimisticId = mintLocalId('pending');
-      const nowSec = Math.floor(Date.now() / 1000);
-      upsertMessage({
-        id: optimisticId,
-        authorPubkey: selfPubkey,
-        content: text,
-        createdAt: nowSec,
-        isSelf: true,
-        isPending: true,
-      });
-
+    // Lazy-create the group on first send.
+    if (!activeGroup) {
+      setIsCreatingGroup(true);
       try {
-        await activeGroup!.sendChatMessage(text);
-        setMessages((prev) =>
-          prev.map((m) => (m.id === optimisticId ? { ...m, isPending: false } : m))
+        const fallbackRelays = relays.length > 0 ? [...relays] : [];
+        const lookupRelays = await resolveInboxRelays(
+          client.network,
+          counterpartyPubkey,
+          fallbackRelays
         );
+        const events = await client.network.request(lookupRelays, [
+          { kinds: [KEY_PACKAGE_KIND], authors: [counterpartyPubkey], limit: 1 },
+        ]);
+        if (events.length === 0) {
+          throw new Error("Recipient hasn't published a White Noise key package yet.");
+        }
+        const keyPackageEvent = events[0];
+
+        const created = (await client.createGroup(`dm:${counterpartyPubkey.slice(0, 16)}`, {
+          description: 'White Noise 1:1 DM',
+          relays: fallbackRelays,
+        })) as WnGroup;
+        await created.inviteByKeyPackageEvent(keyPackageEvent);
+
+        await dmIndex.set(counterpartyPubkey, bytesToHex(created.id));
+        activeGroup = created;
+        groupRef.current = created;
+        setGroup(created);
+        wnLog.info('whitenoise.dm.group_created', {
+          groupId: bytesToHex(created.id),
+          counterparty: counterpartyPubkey.slice(0, 16),
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         setError(message);
-        wnLog.error('whitenoise.dm.send_failed', { error: message });
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        wnLog.error('whitenoise.dm.group_create_failed', { error: message });
+        setIsCreatingGroup(false);
+        return;
       }
-    },
-    [client, counterpartyPubkey, relays, selfPubkey, upsertMessage, dmIndex]
-  );
+      setIsCreatingGroup(false);
+    }
+
+    const optimisticId = mintLocalId('pending');
+    const nowSec = Math.floor(Date.now() / 1000);
+    upsertMessage({
+      id: optimisticId,
+      authorPubkey: selfPubkey,
+      content: text,
+      createdAt: nowSec,
+      isSelf: true,
+      isPending: true,
+    });
+
+    try {
+      await activeGroup!.sendChatMessage(text);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === optimisticId ? { ...m, isPending: false } : m))
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      wnLog.error('whitenoise.dm.send_failed', { error: message });
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+    }
+  };
 
   // The lazy group-creation path is the high-cost double-tap target: a
   // second concurrent call before `groupRef.current` is set re-enters the

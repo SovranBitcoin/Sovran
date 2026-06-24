@@ -2,7 +2,7 @@
  * @fileoverview Receive-flow Onchain receive route.
  */
 
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 
 import { OnchainReceiveRoute } from '@/features/receive';
 import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
@@ -35,10 +35,10 @@ export default function OnchainReceiveRouteWrapper() {
     walletContext.mintBalances,
     walletContext.trustedMintUrls.length,
   ]);
-  const handleRequestMintList = useCallback(() => {
+  const handleRequestMintList = () => {
     cashuLog.info('receive.onchain.mint_list.requested', { source: 'pill' });
     void machine.requestMintSelector();
-  }, [machine]);
+  };
 
   return (
     <OnchainReceiveRoute

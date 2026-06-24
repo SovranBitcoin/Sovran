@@ -4,13 +4,7 @@ import type { MintInfo } from '@cashu/cashu-ts';
 
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { cashuLog } from '@/shared/lib/logger';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 /**
  * Loads mint info for a given mint URL.

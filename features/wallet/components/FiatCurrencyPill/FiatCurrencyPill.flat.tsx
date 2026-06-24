@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React from 'react';
 import { ActionSheetIOS, StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 
@@ -21,19 +21,16 @@ export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactE
     'surface-secondary',
     'muted',
   ] as const);
-  const pillStyle = useMemo(
-    () => [
-      styles.pill,
-      {
-        backgroundColor: surfaceSecondary,
-        borderColor: opacity(muted, 0.3),
-        minHeight: iosHeight,
-      },
-    ],
-    [iosHeight, muted, surfaceSecondary]
-  );
+  const pillStyle = [
+    styles.pill,
+    {
+      backgroundColor: surfaceSecondary,
+      borderColor: opacity(muted, 0.3),
+      minHeight: iosHeight,
+    },
+  ];
 
-  const openCurrencySheet = useCallback(() => {
+  const openCurrencySheet = () => {
     ActionSheetIOS.showActionSheetWithOptions(
       {
         options: CURRENCY_SHEET_OPTIONS,
@@ -46,7 +43,7 @@ export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactE
         if (buttonIndex === 2) handleSelectCurrency('gbp');
       }
     );
-  }, [handleSelectCurrency, colorScheme]);
+  };
 
   const primaryHandler = enableCurrencyMenu && !onPress ? openCurrencySheet : onPress;
   const longPressHandler = enableCurrencyMenu && onPress ? openCurrencySheet : undefined;

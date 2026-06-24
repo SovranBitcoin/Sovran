@@ -31,6 +31,10 @@ export function createMergeWithSchema<TPartial>(name: string, schema: ZodType<TP
       });
       return current;
     }
-    return { ...current, ...r.data } as TFull;
+    // The merge of persisted `current` with validated `r.data` produces the full
+    // shape; TS can't prove completeness against the generic `TFull`, so assert
+    // the merged value (not the object literal, per consistent-type-assertions).
+    const merged = { ...current, ...r.data };
+    return merged as TFull;
   };
 }

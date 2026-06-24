@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -34,7 +34,7 @@ export function RecentPeopleSearchStrip({
 }) {
   const entries = useRecentPeopleStore((state) => state.entries);
   const clearRecentPeople = useRecentPeopleStore((state) => state.clearRecentPeople);
-  const pubkeys = useMemo(() => entries.map((entry) => entry.pubkey), [entries]);
+  const pubkeys = entries.map((entry) => entry.pubkey);
   const rows = useRecentPeopleProfiles(pubkeys);
   const [foreground, muted, accent] = useThemeColor(['foreground', 'muted', 'accent'] as const);
   const stripScrollMetrics = useVisualScrollMetricsLogger({
@@ -54,18 +54,15 @@ export function RecentPeopleSearchStrip({
     onLayout: handleStripLayout,
     onScroll: reportStripScroll,
   } = stripScrollMetrics;
-  const handleStripScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      reportStripScroll(event);
-      remeasureVisualLayoutScope(RECENT_PEOPLE_VISUAL_SCOPE, 'horizontal_scroll', {
-        extra: {
-          rows: rows.length,
-          title,
-        },
-      });
-    },
-    [reportStripScroll, rows.length, title]
-  );
+  const handleStripScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    reportStripScroll(event);
+    remeasureVisualLayoutScope(RECENT_PEOPLE_VISUAL_SCOPE, 'horizontal_scroll', {
+      extra: {
+        rows: rows.length,
+        title,
+      },
+    });
+  };
 
   if (rows.length === 0) return null;
 
@@ -149,7 +146,7 @@ function RecentPersonCard({
   foreground: string;
   muted: string;
 }) {
-  const handlePress = useCallback(() => navigateToProfile(pubkey), [pubkey]);
+  const handlePress = () => navigateToProfile(pubkey);
   return (
     <Pressable
       accessibilityRole="button"

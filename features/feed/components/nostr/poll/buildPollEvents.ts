@@ -5,14 +5,14 @@
 import { POLL_KIND, POLL_VOTE_KIND } from '@/features/feed/components/nostr/poll/pollParse';
 import type { PollOption, PollType } from '@/features/feed/components/nostr/poll/pollTypes';
 
-export interface UnsignedPollEvent {
+interface UnsignedPollEvent {
   kind: number;
   content: string;
   created_at: number;
   tags: string[][];
 }
 
-export interface PollQuoteReference {
+interface PollQuoteReference {
   eventId: string;
   pubkey: string;
   relayHint?: string;

@@ -10,7 +10,7 @@ function getMetadata(entry: HistoryEntry | null | undefined): EntryRecord | unde
 }
 
 export function getOnchainMeltAddress(entry: HistoryEntry | null | undefined): string | null {
-  if (!entry || entry.type !== 'melt') {
+  if (entry?.type !== 'melt') {
     cashuLog.debug('onchain.melt.address.result', {
       reason: !entry ? 'missing-entry' : 'wrong-type',
       type: entry?.type ?? null,

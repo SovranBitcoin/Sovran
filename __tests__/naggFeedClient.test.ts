@@ -170,7 +170,13 @@ describe('createNaggFeedClient (app-view REST)', () => {
     mockFetch.mockResolvedValueOnce(
       restResponse({
         notifications: {
-          nodes: [{ event: note({ id: 'n1', pubkey: 'carol' }), reason: 'mention', actorVertexScore: 0.5 }],
+          nodes: [
+            {
+              event: note({ id: 'n1', pubkey: 'carol' }),
+              reason: 'mention',
+              actorVertexScore: 0.5,
+            },
+          ],
           pageInfo: { hasNextPage: false, endCursor: null },
         },
         metrics: { n1: emptyStats },
@@ -253,7 +259,11 @@ describe('createNaggFeedClient (app-view REST)', () => {
       })
     );
 
-    await loadClient().getFeed({ spec: JSON.stringify({ id: 'feed' }), userPubkey: 'viewer', limit: 5 });
+    await loadClient().getFeed({
+      spec: JSON.stringify({ id: 'feed' }),
+      userPubkey: 'viewer',
+      limit: 5,
+    });
 
     for (const call of mockFetch.mock.calls) {
       expect(String(call[0])).not.toContain('/graphql');

@@ -5,6 +5,7 @@ import { paymentLog } from '@/shared/lib/logger';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { prefetchImages } from '@/shared/lib/imageCache';
 import type { DmConversation } from './useDmConversations';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 interface NostrKeys {
   pubkey?: string;
@@ -14,13 +15,6 @@ interface NostrKeys {
 interface MintWithInfo {
   mint: Mint;
   mintInfo: GetInfoResponse;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 export interface MintContact {
@@ -47,14 +41,10 @@ export function useMintContacts(
   // event (mint:added / mint:updated / mint:trusted / mint:untrusted), even
   // when the trusted-set is unchanged. Key the load on the sorted url-set so a
   // no-op refresh does not retrigger the Promise.all(getMintInfo) waterfall.
-  const mintUrlsKey = useMemo(
-    () =>
-      mints
-        .map((m) => m.mintUrl)
-        .sort()
-        .join('|'),
-    [mints]
-  );
+  const mintUrlsKey = mints
+    .map((m) => m.mintUrl)
+    .sort()
+    .join('|');
 
   // Load mint info and filter for those with nostr contacts
   useEffect(() => {
@@ -150,10 +140,7 @@ export function useMintContacts(
     });
   }, [mintsWithInfo, conversations]);
 
-  const mintPubkeys = useMemo(
-    () => displayMints.map((m) => m.pubkey).filter((p): p is string => !!p),
-    [displayMints]
-  );
+  const mintPubkeys = displayMints.map((m) => m.pubkey).filter((p): p is string => !!p);
 
   return { displayMints, mintPubkeys, mintInfoLoading };
 }

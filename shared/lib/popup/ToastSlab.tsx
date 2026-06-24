@@ -77,6 +77,7 @@ export function ToastSlab({ toastProps, variant, tint, children }: ToastSlabProp
       isAnimatedStyleActive={false}
       // toastProps carries manager-injected props (index, total, heights,
       // show, hide) that aren't part of the public Toast type.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- toastProps carries manager-injected props (index, total, heights, show, hide) absent from the public Toast type; see comment above.
       {...(toastProps as any)}>
       {frosted && (
         <BlurView intensity={BLUR_INTENSITY} tint="dark" style={StyleSheet.absoluteFill} />

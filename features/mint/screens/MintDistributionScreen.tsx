@@ -29,6 +29,7 @@ import {
 } from '@/shared/stores/profile/mintDistributionStore';
 import opacity from 'hex-color-opacity';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 const DISTRIBUTION_BAR_HEIGHT = 48;
 const CURRENCY_TABS_HEIGHT = 48;
@@ -37,13 +38,6 @@ const STICKY_CONTENT_HEIGHT = DISTRIBUTION_BAR_HEIGHT + CURRENCY_TABS_HEIGHT;
 const ParamsSchema = z.object({
   unit: z.string().max(16).optional(),
 });
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 export function MintDistributionScreen() {
   useLifecycleLogger('MintDistributionScreen');
@@ -58,7 +52,9 @@ export function MintDistributionScreen() {
   const { balances: liveBalanceCtx } = useBalanceContext();
   const liveBalances = liveBalanceCtx.byMint;
   const { getMintInfo } = useMintManagement();
-  const [mintInfoMap, setMintInfoMap] = useState<Record<string, any>>({});
+  const [mintInfoMap, setMintInfoMap] = useState<
+    Record<string, Awaited<ReturnType<typeof getMintInfo>> | null>
+  >({});
 
   const routeCurrency = useMemo(() => {
     const raw = params?.unit;
@@ -127,7 +123,7 @@ export function MintDistributionScreen() {
     });
   }, [trustedMints, selectedCurrency]);
 
-  const mintUrls = useMemo(() => mintsForCurrency.map((m) => m.mintUrl), [mintsForCurrency]);
+  const mintUrls = mintsForCurrency.map((m) => m.mintUrl);
 
   useEffect(() => {
     if (mintUrls.length > 0) {
@@ -149,10 +145,10 @@ export function MintDistributionScreen() {
         trustedMints.map((mint) => getMintInfo(mint.mintUrl))
       );
       if (!mountedRef.current) return;
-      const infoMap: Record<string, any> = {};
+      const infoMap: Record<string, Awaited<ReturnType<typeof getMintInfo>> | null> = {};
       trustedMints.forEach((mint, i) => {
         const r = settled[i];
-        infoMap[mint.mintUrl] = r && r.status === 'fulfilled' ? r.value : mint.mintInfo || null;
+        infoMap[mint.mintUrl] = r?.status === 'fulfilled' ? r.value : mint.mintInfo || null;
       });
       setMintInfoMap(infoMap);
     };

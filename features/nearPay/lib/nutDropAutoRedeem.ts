@@ -1,6 +1,9 @@
 import { AppState } from 'react-native';
-import { createMeshRedeemOrchestrator, type MeshRedeemOrchestrator } from '@sovranbitcoin/colada';
-import type { TransactionAnnotation } from '@sovranbitcoin/colada';
+import {
+  createMeshRedeemOrchestrator,
+  type MeshRedeemOrchestrator,
+  TransactionAnnotation,
+} from '@sovranbitcoin/colada';
 import { createDefaultOperations } from '@sovranbitcoin/colada/operations';
 import { getBLEPeers } from 'bitchat-module';
 
@@ -14,6 +17,7 @@ import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnn
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { paymentLog } from '@/shared/lib/logger';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 /**
  * Drains the persisted Nut Drop redeem queue through colada's mesh redeem
@@ -34,13 +38,6 @@ function restoreSettled(): boolean {
 
 function getManager() {
   return CocoManager.isInitialized() ? CocoManager.getInstance() : null;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 let orchestrator: MeshRedeemOrchestrator | null = null;

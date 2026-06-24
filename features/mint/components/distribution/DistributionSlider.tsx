@@ -101,38 +101,17 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
     [onValueCommit]
   );
 
-  const gesture = useMemo(() => {
-    return Gesture.Pan()
-      .enabled(!disabled)
-      .onBegin((event) => {
-        'worklet';
-        isActive.value = true;
-        const tapX = event.x;
+  const gesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(!disabled)
+        .onBegin((event) => {
+          'worklet';
+          isActive.value = true;
+          const tapX = event.x;
 
-        const tappedStepIndex = Math.round(tapX / stepWidth);
-        const clampedStepIndex = Math.max(0, Math.min(tappedStepIndex, TOTAL_STEPS - 1));
-
-        const newProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
-        progress.value = newProgress;
-
-        const newBp = Math.round(clampedStepIndex * BP_PER_STEP);
-        value.value = newBp;
-
-        lastStepIndex.value = clampedStepIndex;
-
-        runOnJS(fireHaptic)();
-        runOnJS(notifyValueChange)(newBp);
-        runOnJS(notifyValueCommit)(newBp);
-      })
-      .onChange((event) => {
-        'worklet';
-        const currentX = event.x;
-
-        const currentStepIndex = Math.round(currentX / stepWidth);
-        const clampedStepIndex = Math.max(0, Math.min(currentStepIndex, TOTAL_STEPS - 1));
-
-        if (clampedStepIndex !== lastStepIndex.value) {
-          lastStepIndex.value = clampedStepIndex;
+          const tappedStepIndex = Math.round(tapX / stepWidth);
+          const clampedStepIndex = Math.max(0, Math.min(tappedStepIndex, TOTAL_STEPS - 1));
 
           const newProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
           progress.value = newProgress;
@@ -140,33 +119,56 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
           const newBp = Math.round(clampedStepIndex * BP_PER_STEP);
           value.value = newBp;
 
+          lastStepIndex.value = clampedStepIndex;
+
           runOnJS(fireHaptic)();
           runOnJS(notifyValueChange)(newBp);
-        }
-      })
-      .onFinalize(() => {
-        'worklet';
-        isActive.value = false;
+          runOnJS(notifyValueCommit)(newBp);
+        })
+        .onChange((event) => {
+          'worklet';
+          const currentX = event.x;
 
-        const stepIndex = Math.round(value.value / BP_PER_STEP);
-        const clampedStepIndex = Math.max(0, Math.min(stepIndex, TOTAL_STEPS - 1));
-        const finalProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
-        progress.value = finalProgress;
+          const currentStepIndex = Math.round(currentX / stepWidth);
+          const clampedStepIndex = Math.max(0, Math.min(currentStepIndex, TOTAL_STEPS - 1));
 
-        runOnJS(notifyValueCommit)(value.value);
-      });
-  }, [
-    disabled,
-    stepWidth,
-    width,
-    progress,
-    value,
-    lastStepIndex,
-    isActive,
-    fireHaptic,
-    notifyValueChange,
-    notifyValueCommit,
-  ]);
+          if (clampedStepIndex !== lastStepIndex.value) {
+            lastStepIndex.value = clampedStepIndex;
+
+            const newProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
+            progress.value = newProgress;
+
+            const newBp = Math.round(clampedStepIndex * BP_PER_STEP);
+            value.value = newBp;
+
+            runOnJS(fireHaptic)();
+            runOnJS(notifyValueChange)(newBp);
+          }
+        })
+        .onFinalize(() => {
+          'worklet';
+          isActive.value = false;
+
+          const stepIndex = Math.round(value.value / BP_PER_STEP);
+          const clampedStepIndex = Math.max(0, Math.min(stepIndex, TOTAL_STEPS - 1));
+          const finalProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
+          progress.value = finalProgress;
+
+          runOnJS(notifyValueCommit)(value.value);
+        }),
+    [
+      disabled,
+      stepWidth,
+      width,
+      progress,
+      value,
+      lastStepIndex,
+      isActive,
+      fireHaptic,
+      notifyValueChange,
+      notifyValueCommit,
+    ]
+  );
 
   useAnimatedReaction(
     () => value.value,

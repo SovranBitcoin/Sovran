@@ -30,17 +30,11 @@ import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
 import { walletLog, initLog, useInitMount } from '@/shared/lib/logger';
+import { mintUrlLogFields } from '@/shared/lib/mintUrlLog';
 
 initLog('Module', 'WalletContextProvider loaded');
 
 const WalletContextCtx = createContext<WalletContext | null>(null);
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 function preferredMintLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
   return {
@@ -65,23 +59,16 @@ export function useWalletContext(): WalletContext {
  */
 export function useWalletContextWithOverride(preferredMintUrl?: string): WalletContext {
   const ctx = useWalletContext();
-  return useMemo(
-    () => (preferredMintUrl != null ? { ...ctx, preferredMintUrl } : ctx),
-    [ctx, preferredMintUrl]
-  );
+  return preferredMintUrl != null ? { ...ctx, preferredMintUrl } : ctx;
 }
 
 export function WalletContextProvider({ children }: { children: React.ReactNode }) {
   useInitMount('WalletContextProvider');
   const { trustedMints: rawTrustedMints } = useMints();
   const { balances: rawBalanceCtx } = useBalanceContext();
-  const rawMintBalances = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.entries(rawBalanceCtx.byMint).map(([url, snap]) => [url, amountToNumber(snap.total)])
-      ) as Record<string, number>,
-    [rawBalanceCtx]
-  );
+  const rawMintBalances = Object.fromEntries(
+    Object.entries(rawBalanceCtx.byMint).map(([url, snap]) => [url, amountToNumber(snap.total)])
+  ) as Record<string, number>;
   const manager = useManager();
   const preferredMintUrl = useMintStore((state) => state.selectedMint);
 
@@ -91,7 +78,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   const mintBalances = useShallowMemo(rawMintBalances);
 
   // Stabilise trustedMintUrls by comparing the serialised URL list
-  const trustedMintUrls = useMemo(() => rawTrustedMints.map((m) => m.mintUrl), [rawTrustedMints]);
+  const trustedMintUrls = rawTrustedMints.map((m) => m.mintUrl);
   const mintMethodCapabilities = useMemo(
     () =>
       deriveMintMethodCapabilityMapFromTrustedMints(

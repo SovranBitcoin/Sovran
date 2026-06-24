@@ -896,6 +896,39 @@ function extractImports(src) {
     }
   }
 
+  // ── Dynamic imports & CommonJS require ──────────────────────────────────────
+  // The static `import … from` / `export … from` forms above miss runtime-lazy
+  // edges: `await import('…')`, `void import('…')`, and `require('…')`. A module
+  // reached ONLY this way (a lazy route, a deferred side-effect import, or a
+  // `require()` the bundler resolves) otherwise reports as a dead orphan, and a
+  // symbol pulled only via `const { x } = await import('…')` reports as an unused
+  // export. Record the module edge in every case, plus the destructured binding
+  // names when the call site binds them. These are tagged `isDynamic` so they
+  // feed fan-in (orphan detection) and imported-names (unused-export detection)
+  // WITHOUT participating in static-coupling metrics — a lazy import is precisely
+  // how a static cycle is broken, so it must not count as a cycle/fanout edge.
+  const recordDynamic = (mod, namesRaw) => {
+    const isExternal = !mod.startsWith('.') && !mod.startsWith('@/');
+    if (!byModule.has(mod)) {
+      byModule.set(mod, { module: mod, names: [], isExternal, isDynamic: true });
+    }
+    const entry = byModule.get(mod);
+    if (!namesRaw) return;
+    for (const chunk of namesRaw.split(',')) {
+      const parts = chunk.trim().split(/\s+as\s+/);
+      const name = (parts[0] || '').trim().replace(/^type\s+/, '');
+      if (name && /^\w+$/.test(name)) entry.names.push(name);
+    }
+  };
+  // `const { a, b } = await import('mod')` / `… = require('mod')` — names + edge.
+  const DYNAMIC_DESTRUCTURE =
+    /(?:const|let|var)\s*\{([^}]*)\}\s*=\s*(?:await\s+)?(?:import|require)\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+  for (const m of stripped.matchAll(DYNAMIC_DESTRUCTURE)) recordDynamic(m[2], m[1]);
+  // Any remaining `import('mod')` / `require('mod')` — side-effect or
+  // member-accessed; edge only (bound names are not recoverable from the form).
+  const DYNAMIC_BARE = /(?<![\w$.])(?:import|require)\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+  for (const m of stripped.matchAll(DYNAMIC_BARE)) recordDynamic(m[1], null);
+
   return [...byModule.values()];
 }
 
@@ -1247,12 +1280,15 @@ function buildDependencyGraph(allFiles) {
         importer: f.fullPath,
         names: imp.names,
         isReexport: !!imp.isReexport,
+        isDynamic: !!imp.isDynamic,
       });
 
       // Re-exports inflate fanout for barrels (`features/foo/index.ts` re-exports
       // from every screen in the folder). Counting them makes every barrel look
-      // like a hub-spoke god module. Keep fanout to value-imports only.
-      if (!imp.isReexport) {
+      // like a hub-spoke god module. Keep fanout to value-imports only. Dynamic
+      // edges are excluded too — a lazy import is deferred, not a static
+      // dependency, so it must not inflate fanout/reach or forge a cycle.
+      if (!imp.isReexport && !imp.isDynamic) {
         if (!fanoutMap.has(f.fullPath)) fanoutMap.set(f.fullPath, new Set());
         fanoutMap.get(f.fullPath).add(resolved);
       }
@@ -1265,12 +1301,17 @@ function buildDependencyGraph(allFiles) {
         else set.add(n);
       }
 
-      edges.push({
-        source: f.fullPath,
-        target: resolved,
-        names: imp.names,
-        isReexport: !!imp.isReexport,
-      });
+      // Dynamic edges stay out of edges[] entirely: cycles, instability, and
+      // importer-reach are all static-coupling views and a deferred import is
+      // not static coupling. fan-in and imported-names (above) already carry it.
+      if (!imp.isDynamic) {
+        edges.push({
+          source: f.fullPath,
+          target: resolved,
+          names: imp.names,
+          isReexport: !!imp.isReexport,
+        });
+      }
     }
   }
 
@@ -1808,7 +1849,8 @@ function computePassThrough(allFiles, faninMap, fanoutMap) {
     // Re-export edges don't make a file a pass-through — barrels routinely
     // re-export every leaf, so counting that fanin here would flag every
     // small leaf with `isPassThrough` as a pass-through suspect.
-    const fanin = (faninMap.get(f.fullPath) || []).filter((e) => !e.isReexport).length;
+    const fanin = (faninMap.get(f.fullPath) || []).filter((e) => !e.isReexport && !e.isDynamic)
+      .length;
     const fanout = fanoutMap.get(f.fullPath)?.size || 0;
     if (fanin === 0) continue; // also an orphan — covered by the Orphans report
     rows.push({
@@ -2009,7 +2051,9 @@ function renderComponent(allFiles) {
 function computeHubSpoke(allFiles, faninMap, fanoutMap) {
   return allFiles
     .map((f) => {
-      const fanin = faninMap.get(f.fullPath)?.length || 0;
+      // Dynamic edges are deferred, not static coupling — a hub is a static
+      // coordination point, so count only static (non-dynamic) fan-in here.
+      const fanin = (faninMap.get(f.fullPath) || []).filter((e) => !e.isDynamic).length;
       const fanout = fanoutMap.get(f.fullPath)?.size || 0;
       return {
         file: relative(targetDir, f.fullPath),

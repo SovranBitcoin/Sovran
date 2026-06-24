@@ -49,7 +49,7 @@ function parseDescriptor(body: string): BlobDescriptor | null {
   }
 }
 
-export interface UploadOptions {
+interface UploadOptions {
   ndk: NDK;
   server: string;
   fileUri: string;

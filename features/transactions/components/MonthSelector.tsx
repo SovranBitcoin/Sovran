@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { ScrollView, LayoutChangeEvent } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -9,7 +9,7 @@ import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
 
-export interface MonthItem {
+interface MonthItem {
   key: string;
   label: string;
   fullLabel: string;
@@ -45,10 +45,10 @@ function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
     'surface-secondary',
   ] as const);
 
-  const handlePress = useCallback(() => {
+  const handlePress = () => {
     log.info('transaction.month.select', { monthKey: item.key, label: item.label });
     onPress(item.key);
-  }, [item.key, item.label, onPress]);
+  };
 
   return (
     <Pressable onPress={handlePress}>
@@ -131,12 +131,9 @@ export function MonthSelector({
     return years.size > 1;
   }, [months, showYearProp]);
 
-  const handleItemLayout = useCallback(
-    (monthKey: string) => (event: LayoutChangeEvent) => {
-      itemPositions.current.set(monthKey, event.nativeEvent.layout.x);
-    },
-    []
-  );
+  const handleItemLayout = (monthKey: string) => (event: LayoutChangeEvent) => {
+    itemPositions.current.set(monthKey, event.nativeEvent.layout.x);
+  };
 
   useEffect(() => {
     if (selectedMonth && scrollViewRef.current) {
