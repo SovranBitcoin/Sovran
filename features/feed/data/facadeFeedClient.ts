@@ -5,6 +5,7 @@ import { feedLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import { mapAppSpecToFeedSpec, resolvedFeedPageToParseResult } from './facadeFeedAdapter';
+import { recordDebugTiers } from '../stores/debugTierStore';
 import {
   resolvedNotificationsToResult,
   toFacadeNotificationsRequest,
@@ -49,6 +50,9 @@ function eventsFromAppFeedItem(item: FeedItem): FeedEvent[] {
 
 /** Write a thread result's notes/profiles/metrics into the shared cache. */
 function ingestThreadIntoCache(result: ThreadSeedBuckets): void {
+  // Dev-only: this is the nagg GraphQL thread path, so every note here was served
+  // by nagg — badge it as such on PostCard. No-op in production.
+  if (__DEV__) recordDebugTiers([...result.allEvents.keys()], 'nagg');
   const cache = buildNostrDataLayer()?.cache;
   if (!cache) return;
   cache.ingestNotes([...result.allEvents.values(), ...result.quotedEvents.values()]);
@@ -58,6 +62,15 @@ function ingestThreadIntoCache(result: ThreadSeedBuckets): void {
 
 /** Write a parsed feed/user-feed page's notes/profiles/metrics into the shared cache. */
 function ingestFeedPageIntoCache(result: FeedParseResult): void {
+  // Dev-only: the nagg GraphQL feed paths (home fallback, profile feed, search)
+  // funnel through here, so badge every rendered note as 'nagg'. No-op in prod.
+  if (__DEV__) {
+    const ids: string[] = [];
+    for (const item of result.orderedFeedItems) {
+      for (const event of eventsFromAppFeedItem(item)) ids.push(event.id);
+    }
+    recordDebugTiers(ids, 'nagg');
+  }
   const cache = buildNostrDataLayer()?.cache;
   if (!cache) return;
   const events: FeedEvent[] = [];

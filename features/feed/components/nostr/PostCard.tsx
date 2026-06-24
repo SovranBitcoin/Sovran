@@ -24,6 +24,7 @@ import Reanimated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import type { FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
+import { TierBadge } from './TierBadge';
 import { formatDate, formatRelative } from '@/shared/lib/date';
 import { tryNpubEncode } from './feedParse';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
@@ -68,6 +69,7 @@ function PostCardGutterHeader({
   shortTime,
   placeholderAuthor,
   placeholderTimestamp,
+  tierBadge,
   onProfilePress,
   onMorePress,
   onNestedPressIn,
@@ -82,6 +84,8 @@ function PostCardGutterHeader({
   shortTime?: string;
   placeholderAuthor?: string;
   placeholderTimestamp?: string;
+  // Dev-only source-tier chip rendered after the timestamp; never set in production.
+  tierBadge?: React.ReactNode;
   onProfilePress?: () => void;
   onMorePress?: () => void;
   onNestedPressIn?: () => void;
@@ -128,6 +132,7 @@ function PostCardGutterHeader({
             </Text>
           </>
         ) : null}
+        {tierBadge}
       </HStack>
       {hasMore ? (
         loading ? (
@@ -474,6 +479,7 @@ export const PostCard = React.memo(function PostCard({
           displayName={displayName}
           nameFallback={nameFallback}
           shortTime={shortTime}
+          tierBadge={<TierBadge eventId={event.id} />}
           onProfilePress={navigateToProfile}
           onMorePress={handleMorePress}
           onNestedPressIn={handleNestedPressIn}

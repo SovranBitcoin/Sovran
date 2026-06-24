@@ -2,6 +2,7 @@ import { facade } from '@sovranbitcoin/nagg-ts';
 
 import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
+import { recordDebugTiers } from '../stores/debugTierStore';
 import type { ThreadRequest, ThreadResult } from './feedClient';
 
 // Pure shape bridge: facade ResolvedThread → the app's ThreadResult. Used only
@@ -105,6 +106,10 @@ export function resolvedThreadToResult(
     allEvents.set(event.id, event);
     replyEvents.push(event);
   }
+
+  // Dev-only: stamp every note in the thread (root + parents + replies) with the
+  // tier that served it so PostCard can badge its source. No-op in production.
+  if (__DEV__) recordDebugTiers([...allEvents.keys()], thread.tier);
 
   const quotedEvents = new Map<string, FeedEvent>(
     Object.entries(thread.quoted) as [string, FeedEvent][]
