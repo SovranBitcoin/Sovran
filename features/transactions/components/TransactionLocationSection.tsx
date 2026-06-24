@@ -14,6 +14,7 @@
  */
 
 import React from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { Platform, StyleSheet } from 'react-native';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -197,7 +198,7 @@ function TransactionLocationMap({
     {
       id: 'transaction-location',
       coordinates: { latitude, longitude },
-      tintColor: grayscale ? '#FFFFFF' : shade300,
+      tintColor: grayscale ? INVARIANT_WHITE : shade300,
       title: 'Transaction location',
     },
   ];

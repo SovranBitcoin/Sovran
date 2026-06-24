@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import {
   Platform,
   TextInput,
@@ -286,7 +287,7 @@ export function LiquidChatComposer({
                     modifiers={[
                       frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
                     ]}>
-                    <SwiftUIImage systemName={'plus' as never} size={ICON_SIZE} color="#FFFFFF" />
+                    <SwiftUIImage systemName={'plus' as never} size={ICON_SIZE} color={INVARIANT_WHITE} />
                   </SwiftUIHStack>
                 </SwiftUIButton>
 
@@ -391,7 +392,7 @@ export function LiquidChatComposer({
                     <SwiftUIImage
                       systemName={'arrow.up' as never}
                       size={ICON_SIZE}
-                      color="#FFFFFF"
+                      color={INVARIANT_WHITE}
                     />
                   </SwiftUIHStack>
                 </SwiftUIButton>
@@ -448,7 +449,7 @@ export function LiquidChatComposer({
               overflow: 'hidden',
               backgroundColor: useBlur ? undefined : surfaceSecondary,
             }}>
-            <Icon name="mdi:plus" size={ICON_SIZE} color={useBlur ? '#FFFFFF' : foreground} />
+            <Icon name="mdi:plus" size={ICON_SIZE} color={useBlur ? INVARIANT_WHITE : foreground} />
           </View>
         </Pressable>
 
@@ -526,7 +527,7 @@ export function LiquidChatComposer({
                 <Icon
                   name="iconamoon:send-fill"
                   size={ICON_SIZE}
-                  color={useBlur ? '#FFFFFF' : background}
+                  color={useBlur ? INVARIANT_WHITE : background}
                 />
               </View>
             </Pressable>

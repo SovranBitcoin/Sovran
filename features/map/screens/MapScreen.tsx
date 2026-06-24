@@ -24,7 +24,7 @@ import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { InteractionManager, Platform, StyleSheet, useWindowDimensions } from 'react-native';
-import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
+import { BITCOIN_ACCENT, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
@@ -213,7 +213,7 @@ export function MapScreen() {
           <Pressable
             onPress={mapUnavailableOnAndroid ? () => router.back() : () => setError(null)}
             style={[styles.retryButton, { backgroundColor: accent }]}>
-            <Text size={14} heavy style={{ color: '#fff' }}>
+            <Text size={14} heavy style={{ color: INVARIANT_WHITE }}>
               {mapUnavailableOnAndroid ? 'Go back' : 'Retry'}
             </Text>
           </Pressable>

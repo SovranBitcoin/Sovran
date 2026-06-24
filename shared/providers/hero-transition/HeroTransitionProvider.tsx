@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useRef, useState } from 'react';
+import { AMBER_ACCENT } from '@/shared/lib/brandColors';
 import { Platform } from 'react-native';
 import { FullWindowOverlay } from 'react-native-screens';
 import Animated, {
@@ -44,7 +45,7 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
   ] as const);
   const primary950 = background;
   const primary50 = surfaceForeground;
-  const gold = '#f59e0b';
+  const gold = AMBER_ACCENT;
   const overlayBorderColor = opacity(gold, 0.3);
 
   const refs = useRef<Record<HeroId, Partial<Record<HeroRole, any>>>>({

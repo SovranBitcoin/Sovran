@@ -5,6 +5,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { INVARIANT_WHITE, WALLPAPER_PLACEHOLDER } from '@/shared/lib/brandColors';
 import { StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -150,16 +151,16 @@ export const UnitPreviewCard = function UnitPreviewCard({
       ) : palette ? (
         <LinearGradient
           colors={[
-            palette['800'] || '#1a1a1a',
-            palette['900'] || '#0d0d0d',
-            palette['950'] || '#000000',
+            palette['800'] || WALLPAPER_PLACEHOLDER.d800,
+            palette['900'] || WALLPAPER_PLACEHOLDER.d900,
+            palette['950'] || WALLPAPER_PLACEHOLDER.d950,
           ]}
           style={StyleSheet.absoluteFillObject}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         />
       ) : (
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1a1a1a' }]} />
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: WALLPAPER_PLACEHOLDER.d800 }]} />
       )}
 
       {/* Phone-frame chrome mocks */}
@@ -167,7 +168,7 @@ export const UnitPreviewCard = function UnitPreviewCard({
         <View className="h-[10px] w-[72px] rounded-[5px] bg-white/35" />
         {label ? (
           <View className="items-center gap-0.5">
-            <Text size={13} bold style={{ color: '#fff' }}>
+            <Text size={13} bold style={{ color: INVARIANT_WHITE }}>
               {label}
             </Text>
             {sublabel ? (
@@ -183,7 +184,7 @@ export const UnitPreviewCard = function UnitPreviewCard({
 
       {badge ? (
         <View className="absolute right-2.5 top-2.5 rounded-[10px] bg-[#EF4444] px-2 py-[3px]">
-          <Text size={10} bold style={{ color: '#fff' }}>
+          <Text size={10} bold style={{ color: INVARIANT_WHITE }}>
             {badge}
           </Text>
         </View>

@@ -13,6 +13,7 @@
  */
 
 import React from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { StyleSheet } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
@@ -84,7 +85,7 @@ export const TransferEntryRow = ({
           <Icon
             name={isSend ? 'fluent:arrow-upload-16-filled' : 'fluent:arrow-download-16-filled'}
             size={10}
-            color="#fff"
+            color={INVARIANT_WHITE}
           />
         </View>
       </View>

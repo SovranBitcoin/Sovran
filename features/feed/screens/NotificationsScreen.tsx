@@ -1220,6 +1220,10 @@ function notificationIcon(reason: string): string {
 }
 
 function notificationTone(reason: string): string {
+  /* eslint-disable no-restricted-syntax -- fixed notification-type accent palette
+     (Twitter/X-derived), intentionally theme-invariant so each reason reads with the
+     same colour on every theme; a named palette home isn't warranted for a
+     single-consumer switch. */
   switch (reason) {
     case 'follow':
     case 'reply':
@@ -1235,6 +1239,7 @@ function notificationTone(reason: string): string {
     default:
       return '#71767B';
   }
+  /* eslint-enable no-restricted-syntax */
 }
 
 function EmptyNotifications({

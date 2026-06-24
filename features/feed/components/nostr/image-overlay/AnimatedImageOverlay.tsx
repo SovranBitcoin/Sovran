@@ -4,6 +4,7 @@
  */
 
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { BackHandler, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import {
@@ -1158,7 +1159,7 @@ function AnimatedImageOverlayContent({
                 rCloseBtnStyle,
               ]}>
               <Pressable onPress={() => triggerClose()} style={StyleSheet.absoluteFill}>
-                <Icon name="material-symbols:close-rounded" size={22} color="#fff" />
+                <Icon name="material-symbols:close-rounded" size={22} color={INVARIANT_WHITE} />
               </Pressable>
             </Animated.View>
             {activeUrl ? (

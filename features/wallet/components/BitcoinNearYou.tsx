@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { Platform, StyleSheet, View as RNView } from 'react-native';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import * as Location from 'expo-location';
@@ -272,7 +273,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
       nearby.push({
         id: String(place.id),
         coordinates: { latitude: place.lat, longitude: place.lon },
-        tintColor: '#FFFFFF',
+        tintColor: INVARIANT_WHITE,
         title: `Place #${place.id}`,
       });
     }

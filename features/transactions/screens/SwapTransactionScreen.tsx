@@ -13,6 +13,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { StyleSheet } from 'react-native';
 import { MeltQuoteState } from '@cashu/cashu-ts';
 import Animated, {
@@ -211,7 +212,7 @@ const CollapsedLegGroup = ({ legGroup, mintInfoMap }: CollapsedLegGroupProps) =>
           </UntranslatedText>
         </HStack>
         <View style={[styles.collapsedArrow, { backgroundColor: opacity(foreground, 0.33) }]}>
-          <Icon name="mdi:arrow-right" size={10} color="#fff" />
+          <Icon name="mdi:arrow-right" size={10} color={INVARIANT_WHITE} />
         </View>
         <HStack spacing={8} align="center" flex={1}>
           <MintIcon iconUrl={dstInfo?.icon_url} size={28} name={dstName} />

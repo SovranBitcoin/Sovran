@@ -1,4 +1,5 @@
 import React from 'react';
+import { AMBER_ACCENT } from '@/shared/lib/brandColors';
 import { ScrollView, View } from 'react-native';
 import {
   useSettingsStore,
@@ -194,10 +195,10 @@ export function SettingsRoutingScreen() {
                     <Icon
                       name="mdi:alert-circle-outline"
                       size={16}
-                      color="#f59e0b"
+                      color={AMBER_ACCENT}
                       style={{ marginTop: 2 }}
                     />
-                    <Text size={12} className="flex-1" style={{ color: '#f59e0b' }}>
+                    <Text size={12} className="flex-1" style={{ color: AMBER_ACCENT }}>
                       Untrusted mints will be temporarily trusted for the swap and untrusted
                       afterward. Your ecash passes through mints you have not verified. Only use
                       this with small amounts.

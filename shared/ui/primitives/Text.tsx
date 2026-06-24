@@ -66,6 +66,7 @@ export const StyledText = ({
   secondary,
   negative,
   custom,
+  // eslint-disable-next-line no-restricted-syntax -- decorative default gradient for the optional `custom` gradient-text variant; callers override via the `colors` prop. Theme-invariant by design.
   colors = ['#4c669f', '#3b5998', '#192f6a'],
   style,
   children,

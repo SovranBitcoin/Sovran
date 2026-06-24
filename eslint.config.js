@@ -458,6 +458,15 @@ module.exports = defineConfig([
       'shared/lib/brandColors.ts',
       'shared/lib/colorExtraction.ts',
       'config/backgroundImageThemes.ts',
+      // useThemeColor IS the theme resolver — its last-resort `#000000` fallback
+      // is the answer, not a stray literal.
+      'shared/hooks/useThemeColor.ts',
+      // categories.ts owns the fixed BTCMap category-marker palette (a data
+      // table consumed by the map; not a component, so `useThemeColor` can't
+      // apply and the colours are intentionally theme-invariant).
+      'shared/lib/map/categories.ts',
+      // RowStatsAccent exports the canonical STAT_COLOR_* accent constants.
+      'shared/ui/composed/RowStatsAccent.tsx',
     ],
     rules: {
       'no-restricted-syntax': 'off',

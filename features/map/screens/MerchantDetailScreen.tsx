@@ -25,7 +25,7 @@ import opacity from 'hex-color-opacity';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { getMarkerColor } from '@/shared/lib/map/categories';
-import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
+import { BITCOIN_ACCENT, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { isAbortError } from '@/shared/lib/apiClient';
 import { openExternalUrl } from '@/shared/lib/url';
 import { staticPopup } from '@/shared/lib/popup';
@@ -204,7 +204,7 @@ export function MerchantDetailScreen() {
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={[styles.merchantIcon, { backgroundColor: getMarkerColor(place.icon) }]}>
-            <Icon name="mdi:store" size={28} color="#fff" />
+            <Icon name="mdi:store" size={28} color={INVARIANT_WHITE} />
           </View>
           <VStack style={{ flex: 1, marginLeft: 16 }}>
             <Text size={20} heavy style={{ color: opacity(foreground, 0.9) }}>

@@ -11,6 +11,7 @@
  */
 
 import React from 'react';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { StyleSheet } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -39,11 +40,11 @@ export const TransferSeparator = ({ failed, status }: TransferSeparatorProps) =>
       case 'running':
         return <Spinner size={14} />;
       case 'done':
-        return <Icon name="mdi:check" size={14} color="#fff" />;
+        return <Icon name="mdi:check" size={14} color={INVARIANT_WHITE} />;
       case 'failed':
-        return <Icon name="mdi:alert-circle" size={14} color="#fff" />;
+        return <Icon name="mdi:alert-circle" size={14} color={INVARIANT_WHITE} />;
       default:
-        return <Icon name="mdi:arrow-down" size={14} color="#fff" />;
+        return <Icon name="mdi:arrow-down" size={14} color={INVARIANT_WHITE} />;
     }
   };
 

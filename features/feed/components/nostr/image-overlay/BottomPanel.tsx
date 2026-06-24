@@ -25,7 +25,7 @@ import type { ContentSegment } from '../feedTypes';
 import type { ImageOverlayPost } from './types';
 import { BOTTOM_PANEL_PADDING_HORIZONTAL, BOTTOM_PANEL_PADDING_TOP } from './config';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { COMMENT_ACCENT } from '@/shared/lib/brandColors';
+import { COMMENT_ACCENT, LIKE_ACCENT } from '@/shared/lib/brandColors';
 import { openRepostMenu } from '@/features/feed/lib/repostMenu';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { Log } from '@/shared/lib/logger';
@@ -57,7 +57,7 @@ function useOverlayRepostMenu(post: ImageOverlayPost, onRequestClose?: () => voi
 // over the sheet's `surface` background.
 const PANEL_TEXT = 'rgba(255,255,255,0.95)';
 const PANEL_TEXT_MUTED = 'rgba(255,255,255,0.6)';
-const LIKED_COLOR = '#ff5a7a';
+const LIKED_COLOR = LIKE_ACCENT;
 
 const PANEL_CONTENT_TRUNCATE_LIMIT = 120;
 const PANEL_INLINE_IMAGE_MAX_HEIGHT = 200;

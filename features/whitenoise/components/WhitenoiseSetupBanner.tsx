@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { INVARIANT_BLACK } from '@/shared/lib/brandColors';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { usePathname } from 'expo-router';
@@ -200,7 +201,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 18,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: INVARIANT_BLACK,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
     shadowRadius: 12,

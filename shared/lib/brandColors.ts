@@ -65,3 +65,23 @@ export const TOAST_DANGER_DARK_BG = '#9A082E';
 
 /** Theme-invariant dark warning tint for animated frosted payment toasts. */
 export const TOAST_WARNING_DARK_BG = '#9A6A08';
+
+/** Fixed pink "like" accent (#ff5a7a). Used wherever a liked/favourited cue is
+ *  rendered cross-theme (feed MetricsFooter, image-overlay BottomPanel) so the
+ *  cue reads identically on every theme — sibling to COMMENT_ACCENT. */
+export const LIKE_ACCENT = '#ff5a7a';
+
+/** Amber/gold accent (#f59e0b, Tailwind amber-500). Fixed cross-theme warning
+ *  and highlight colour: routing-warning text/icon (SettingsRoutingScreen) and
+ *  the hero-transition gold highlight. */
+export const AMBER_ACCENT = '#f59e0b';
+
+/** Theme-invariant dark gradient shown as a wallpaper preview placeholder
+ *  before (or in place of) a resolved palette. Used by UnitPreviewCard and
+ *  WallpaperThumbnail for the `palette[shade] || …` fallback and the solid
+ *  loading background (`.d800`). */
+export const WALLPAPER_PLACEHOLDER = {
+  d800: '#1a1a1a',
+  d900: '#0d0d0d',
+  d950: INVARIANT_BLACK,
+} as const;

@@ -6,6 +6,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState, type FC } from 'react';
+import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import {
   FlatList,
   Platform,
@@ -563,7 +564,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
               {profileName}
             </Text>
             <Pressable onPress={handleClose} hitSlop={12} style={styles.closeButton}>
-              <Icon name="mdi:close" size={22} color="#fff" />
+              <Icon name="mdi:close" size={22} color={INVARIANT_WHITE} />
             </Pressable>
           </View>
         </View>
@@ -579,7 +580,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
 const styles = StyleSheet.create({
   flex1: { flex: 1 },
   videoRadius: { borderRadius: 16 },
-  closingPlaceholder: { backgroundColor: '#000' },
+  closingPlaceholder: { backgroundColor: INVARIANT_BLACK },
   topGradient: {
     position: 'absolute',
     top: 0,
@@ -607,7 +608,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   profileName: {
-    color: '#fff',
+    color: INVARIANT_WHITE,
   },
   closeButton: {
     width: 32,
