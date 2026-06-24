@@ -212,6 +212,8 @@ export interface ImetaInfo {
   width?: number;
   height?: number;
   blurhash?: string;
+  /** Blossom content address (`x` field) — the authoritative blob hash to delete. */
+  sha256?: string;
 }
 
 /**
@@ -234,6 +236,7 @@ export function parseImetaTags(tags: readonly string[][]): Map<string, ImetaInfo
       const value = field.slice(sp + 1);
       if (key === 'url') info.url = value;
       else if (key === 'm') info.mimeType = value;
+      else if (key === 'x') info.sha256 = value;
       else if (key === 'alt') info.alt = value;
       else if (key === 'blurhash') info.blurhash = value;
       else if (key === 'dim') {

@@ -24,6 +24,11 @@ import Reanimated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import type { FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
+import { DeletedTombstone } from './DeletedTombstone';
+import {
+  selectIsDeleteRequested,
+  useNostrSocialStore,
+} from '@/shared/stores/profile/nostrSocialStore';
 import { TierBadge } from './TierBadge';
 import { formatDate, formatRelative } from '@/shared/lib/date';
 import { tryNpubEncode } from './feedParse';
@@ -240,6 +245,12 @@ export const PostCard = React.memo(function PostCard({
 }: PostCardProps) {
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
 
+  // We requested deletion of this note (kind:5 sent) — show the greyed
+  // tombstone instead of the post. `deletedNoteIds` only ever holds our own
+  // notes, so a hit means "you deleted this". The gutter variants inset the
+  // tombstone to line up with the text column; the stacked target does not.
+  const deleteRequested = useNostrSocialStore(selectIsDeleteRequested(event.id));
+
   // Author identity comes from the authoritative entity cache, reactively: the
   // row re-renders in place when this pubkey's profile arrives (no manual re-key),
   // and any surface that saw this author renders it here too. `status` tells a
@@ -346,6 +357,12 @@ export const PostCard = React.memo(function PostCard({
       }),
     [handleThreadPress]
   );
+
+  // Delete-requested: replace the whole card with the tombstone. Placed after
+  // all hooks so rules-of-hooks hold across the flip.
+  if (deleteRequested) {
+    return <DeletedTombstone inset={!isTarget} />;
+  }
 
   // ── Thread target: stacked layout (no gutter) ──
   if (isTarget) {

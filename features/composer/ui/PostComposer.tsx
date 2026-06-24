@@ -38,6 +38,8 @@ import {
   type PublishOutcome,
 } from '@/features/composer/publish/useComposerActions';
 import { PollComposeForm, emptyPollDraft } from '@/features/composer/ui/PollComposeForm';
+import { PostProgressBar } from '@/features/composer/ui/PostProgressBar';
+import type { ComposerBlock } from '@/features/composer/config/types';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -111,6 +113,13 @@ export function PostComposer() {
   }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Segmented posting progress (image legs + the final post leg). Null when not
+  // mid-post or when there are no images to upload.
+  const [postProgress, setPostProgress] = useState<{ done: number; total: number } | null>(null);
+  // Synchronous re-entrancy guard: `busy` is async state, so a fast double-tap
+  // can clear the `if (!canPost)` check twice before the first render disables
+  // the button. This blocks the second invocation immediately.
+  const postingRef = useRef(false);
   // Media block whose alt text is being edited, with its in-progress value.
   const [altEdit, setAltEdit] = useState<{ id: string; value: string } | null>(null);
   const [surface, foreground, mutedColor, accentColor, dangerColor, lineColor] = useThemeColor([
@@ -209,25 +218,95 @@ export function PostComposer() {
     router.back();
   }, [close]);
 
+  // AbortControllers for in-flight uploads, keyed by media-block id, so removing
+  // a block (or unmounting the composer) cancels its upload instead of leaving
+  // an orphaned blob on the server.
+  const uploadsRef = useRef<Map<string, AbortController>>(new Map());
+
+  // Abort any upload still running if the composer unmounts mid-post.
+  useEffect(() => {
+    const uploads = uploadsRef.current;
+    return () => {
+      uploads.forEach((controller) => controller.abort());
+      uploads.clear();
+    };
+  }, []);
+
   const handlePost = useCallback(async () => {
-    if (!canPost) return;
+    if (postingRef.current || !canPost) return;
+    postingRef.current = true;
     setBusy(true);
     setError(null);
+
+    // Upload is deferred to here: re-encode + PUT every media block that has no
+    // descriptor yet, then publish. Abort the whole post if any upload fails so
+    // we never publish a note missing one of its images.
+    const pending = mediaBlocks.filter(
+      (b): b is Extract<ComposerBlock, { kind: 'media' }> =>
+        b.kind === 'media' && !b.descriptor && !!b.localUri
+    );
+    const imageCount = pending.length;
+    if (imageCount > 0) setPostProgress({ done: 0, total: imageCount + 1 });
+
+    let done = 0;
+    const uploadOne = async (block: Extract<ComposerBlock, { kind: 'media' }>): Promise<void> => {
+      const controller = new AbortController();
+      uploadsRef.current.set(block.id, controller);
+      updateBlock(block.id, { uploadProgress: 0 });
+      const upload = await uploadMedia({
+        ndk: ndk!,
+        asset: {
+          uri: block.localUri!,
+          mimeType: block.mimeType ?? 'image/jpeg',
+          width: block.width,
+          height: block.height,
+        },
+        signal: controller.signal,
+        onProgress: (fraction) => updateBlock(block.id, { uploadProgress: fraction }),
+      });
+      uploadsRef.current.delete(block.id);
+      if (upload.isErr()) {
+        if (upload.error.type !== 'canceled') updateBlock(block.id, { uploadProgress: undefined });
+        throw upload.error;
+      }
+      updateBlock(block.id, { descriptor: upload.value, uploadProgress: undefined });
+      done += 1;
+      if (imageCount > 0) setPostProgress({ done, total: imageCount + 1 });
+    };
+
+    try {
+      if (!ndk) throw { type: 'no-ndk' };
+      await Promise.all(pending.map(uploadOne));
+    } catch (e) {
+      postingRef.current = false;
+      setBusy(false);
+      setPostProgress(null);
+      const type = (e as { type?: string }).type;
+      // A cancel (block removed mid-upload) is silent; everything else surfaces.
+      setError(
+        type === 'canceled'
+          ? null
+          : type === 'too-large'
+            ? 'That file is too large to upload.'
+            : 'Media upload failed. Try again.'
+      );
+      return;
+    }
+
     const outcome = await publish();
+    postingRef.current = false;
     setBusy(false);
     if (outcome === 'ok') {
+      if (imageCount > 0) setPostProgress({ done: imageCount + 1, total: imageCount + 1 });
       router.back();
       return;
     }
+    setPostProgress(null);
     setError(OUTCOME_MESSAGE[outcome] ?? 'Something went wrong.');
-  }, [canPost, publish]);
-
-  // AbortControllers for in-flight uploads, keyed by media-block id, so removing
-  // a block cancels its upload instead of leaving an orphaned blob on the server.
-  const uploadsRef = useRef<Map<string, AbortController>>(new Map());
+  }, [canPost, publish, mediaBlocks, ndk, updateBlock]);
 
   const handleAddMedia = useCallback(async () => {
-    if (!ndk || mediaBlocks.length >= config.maxMedia) return;
+    if (mediaBlocks.length >= config.maxMedia) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 1,
@@ -235,37 +314,17 @@ export function PostComposer() {
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
-    const mimeType = asset.mimeType ?? 'image/jpeg';
-
-    const id = addMediaBlock({
+    // Defer the upload to Post: store the local asset only. A mis-pick costs no
+    // network work, and the user can remove it before anything is uploaded.
+    addMediaBlock({
       kind: 'media',
       mediaKind: 'image',
       localUri: asset.uri,
-      uploadProgress: 0,
+      mimeType: asset.mimeType ?? 'image/jpeg',
+      width: asset.width,
+      height: asset.height,
     });
-
-    const controller = new AbortController();
-    uploadsRef.current.set(id, controller);
-    const upload = await uploadMedia({
-      ndk,
-      asset: { uri: asset.uri, mimeType, width: asset.width, height: asset.height },
-      signal: controller.signal,
-      onProgress: (fraction) => updateBlock(id, { uploadProgress: fraction }),
-    });
-    uploadsRef.current.delete(id);
-
-    if (upload.isOk()) {
-      updateBlock(id, { descriptor: upload.value, uploadProgress: undefined });
-    } else if (upload.error.type !== 'canceled') {
-      // A cancel already removed the block; only surface real failures.
-      removeBlock(id);
-      setError(
-        upload.error.type === 'too-large'
-          ? 'That file is too large to upload.'
-          : 'Media upload failed. Try a different file.'
-      );
-    }
-  }, [ndk, mediaBlocks.length, config.maxMedia, addMediaBlock, updateBlock, removeBlock]);
+  }, [mediaBlocks.length, config.maxMedia, addMediaBlock]);
 
   // Cancel any in-flight upload before dropping the block.
   const handleRemoveMedia = useCallback(
@@ -476,6 +535,10 @@ export function PostComposer() {
           ) : null}
         </ScrollView>
       </VisualLayoutProbe>
+
+      {postProgress ? (
+        <PostProgressBar done={postProgress.done} total={postProgress.total} failed={!!error} />
+      ) : null}
 
       <VisualLayoutProbe
         scope={COMPOSER_VISUAL_SCOPE}

@@ -64,6 +64,14 @@ interface NostrSocialState {
    */
   engagementByEventId: Record<string, EngagementRecord>;
   deletedRepostOriginalIds: Record<string, number>;
+  /**
+   * Note ids for which WE published a kind:5 deletion request (value =
+   * requestedAt ms). Drives the greyed "Delete requested" tombstone in our own
+   * feed — NIP-09 is a request, not a guarantee, so the note may still be
+   * served by some relays and we keep showing the placeholder rather than
+   * silently hiding it.
+   */
+  deletedNoteIds: Record<string, number>;
 
   optimisticFollowsByPubkey: Record<string, FollowOptimisticState>;
   optimisticLikesByEventId: Record<string, EngagementOptimisticState>;
@@ -88,6 +96,11 @@ interface NostrSocialActions {
 
   markRepostDeleted: (originalEventId: string) => void;
   unmarkRepostDeleted: (originalEventId: string) => void;
+
+  /** Record that we requested deletion of our own note (NIP-09 kind:5 sent). */
+  markDeleteRequested: (noteId: string) => void;
+  /** Undo a delete-requested mark (e.g. every relay rejected the kind:5). */
+  unmarkDeleteRequested: (noteId: string) => void;
 
   /**
    * Global upsert of our own likes from the own-events sync. Unlike the legacy
@@ -212,6 +225,7 @@ const INITIAL_STATE: NostrSocialState = {
   followingPubkeys: {},
   engagementByEventId: {},
   deletedRepostOriginalIds: {},
+  deletedNoteIds: {},
   optimisticFollowsByPubkey: {},
   optimisticLikesByEventId: {},
   optimisticRepostsByEventId: {},
@@ -256,6 +270,7 @@ const PersistedNostrSocialStore = z.object({
   deletedRepostOriginalIds: z
     .record(z.string().max(128), z.number().int().nonnegative())
     .default({}),
+  deletedNoteIds: z.record(z.string().max(128), z.number().int().nonnegative()).default({}),
   optimisticFollowsByPubkey: z.record(z.string().max(128), PersistedFollowOptimistic).default({}),
   optimisticLikesByEventId: z
     .record(z.string().max(128), PersistedEngagementOptimistic)
@@ -377,6 +392,20 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         });
         set((state) => ({
           deletedRepostOriginalIds: omitKey(state.deletedRepostOriginalIds, originalEventId),
+        }));
+      },
+
+      markDeleteRequested: (noteId) => {
+        storeLog.info('social.note.markDeleteRequested', { noteId: noteId.slice(0, 8) });
+        set((state) => ({
+          deletedNoteIds: { ...state.deletedNoteIds, [noteId]: Date.now() },
+        }));
+      },
+
+      unmarkDeleteRequested: (noteId) => {
+        storeLog.debug('social.note.unmarkDeleteRequested', { noteId: noteId.slice(0, 8) });
+        set((state) => ({
+          deletedNoteIds: omitKey(state.deletedNoteIds, noteId),
         }));
       },
 
@@ -518,6 +547,7 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         followingPubkeys: state.followingPubkeys,
         engagementByEventId: state.engagementByEventId,
         deletedRepostOriginalIds: state.deletedRepostOriginalIds,
+        deletedNoteIds: state.deletedNoteIds,
         optimisticFollowsByPubkey: state.optimisticFollowsByPubkey,
         optimisticLikesByEventId: state.optimisticLikesByEventId,
         optimisticRepostsByEventId: state.optimisticRepostsByEventId,
@@ -535,3 +565,7 @@ export const selectIsFollowingPubkey = (pubkey: string) => (state: NostrSocialSt
   if (optimistic) return optimistic.value;
   return !!state.followingPubkeys[pubkey];
 };
+
+/** True when we've requested deletion of `noteId` — drives the tombstone. */
+export const selectIsDeleteRequested = (noteId: string) => (state: NostrSocialStore) =>
+  state.deletedNoteIds[noteId] !== undefined;

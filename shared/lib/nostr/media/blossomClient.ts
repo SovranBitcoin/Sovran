@@ -27,6 +27,14 @@ export type BlossomError =
   | { type: 'too-large'; size: number }
   | { type: 'canceled' };
 
+export type BlossomDeleteError =
+  | { type: 'sign-failed' }
+  | { type: 'delete-failed'; status?: number }
+  | { type: 'canceled' };
+
+/** A DELETE that hangs would stall the whole multi-image delete flow. */
+const DELETE_TIMEOUT_MS = 15_000;
+
 /** Hard ceiling on upload size; photos are re-encoded well under this. */
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 /** Per-attempt upload timeout. */
@@ -192,6 +200,84 @@ async function putOnce(
     return err({ type: 'upload-failed' });
   } finally {
     if (timer) clearTimeout(timer);
+    opts.signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+export interface DeleteOptions {
+  ndk: NDK;
+  /**
+   * Origin the blob lives on (scheme + host of the blob URL), e.g.
+   * `https://blossom.primal.net`. A blob can only be deleted from the server it
+   * was uploaded to, so this is derived from the URL host — NOT from the
+   * currently-configured media server (which may since have changed).
+   */
+  server: string;
+  /** Blob content address; `DELETE /<sha256>` per BUD-11. */
+  sha256: string;
+  signal?: AbortSignal;
+}
+
+/**
+ * Deletes a blob from its Blossom server (BUD-11): signs a fresh `kind:24242`
+ * authorization event with `["t","delete"]` + `["x",<sha256>]` and sends
+ * `DELETE /<sha256>` with `Authorization: Nostr …` and `X-SHA-256`.
+ *
+ * The auth event is signed per call (not reused) so its short expiration can't
+ * lapse partway through a slow multi-image delete. The server only honours the
+ * delete when the signer owns the blob; a 401/403/404 is therefore expected and
+ * left non-fatal for the caller to fold into its progress UI.
+ */
+export function deleteFromBlossom(opts: DeleteOptions): ResultAsync<void, BlossomDeleteError> {
+  return new ResultAsync(runDelete(opts));
+}
+
+async function runDelete(opts: DeleteOptions): Promise<Result<void, BlossomDeleteError>> {
+  if (opts.signal?.aborted) return err({ type: 'canceled' });
+
+  // Fresh delete auth (5-min expiry) signed for THIS blob.
+  let authHeader: string;
+  try {
+    const unsigned = buildBlossomAuthEvent({
+      action: 'delete',
+      sha256: opts.sha256,
+      createdAt: Math.floor(Date.now() / 1000),
+    });
+    const authEvent = new NDKEvent(opts.ndk);
+    authEvent.kind = unsigned.kind;
+    authEvent.content = unsigned.content;
+    authEvent.created_at = unsigned.created_at;
+    authEvent.tags = unsigned.tags;
+    await authEvent.sign();
+    authHeader = encodeAuthHeader(JSON.stringify(authEvent.rawEvent()));
+  } catch {
+    nostrLog.warn('nostr.media.delete_auth_sign_failed');
+    return err({ type: 'sign-failed' });
+  }
+
+  const controller = new AbortController();
+  const onAbort = (): void => controller.abort();
+  opts.signal?.addEventListener('abort', onAbort);
+  const timer = setTimeout(() => controller.abort(), DELETE_TIMEOUT_MS);
+  try {
+    // eslint-disable-next-line no-restricted-globals -- Blossom DELETE returns a bare status (BUD-11), not a JSON envelope; needs raw fetch + AbortSignal.
+    const response = await fetch(`${opts.server}/${opts.sha256}`, {
+      method: 'DELETE',
+      headers: { Authorization: authHeader, 'X-SHA-256': opts.sha256 },
+      signal: controller.signal,
+    });
+    if (response.status >= 200 && response.status < 300) {
+      nostrLog.info('nostr.media.deleted', {});
+      return ok(undefined);
+    }
+    nostrLog.warn('nostr.media.delete_failed', { status: response.status });
+    return err({ type: 'delete-failed', status: response.status });
+  } catch {
+    if (opts.signal?.aborted) return err({ type: 'canceled' });
+    nostrLog.warn('nostr.media.delete_failed', {});
+    return err({ type: 'delete-failed' });
+  } finally {
+    clearTimeout(timer);
     opts.signal?.removeEventListener('abort', onAbort);
   }
 }

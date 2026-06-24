@@ -72,8 +72,8 @@ function lastOnHide(): () => void {
 function startRunningSwap() {
   useSwapStatusStore.getState().start({
     id: 'swap-1',
-    unit: 'sat',
     legs: [{ id: 'leg-1' }, { id: 'leg-2' }],
+    meta: { unit: 'sat' },
   });
 }
 

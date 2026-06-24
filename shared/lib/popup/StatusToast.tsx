@@ -45,6 +45,19 @@ type StatusToastProps = {
   subtitle?: React.ReactNode;
   /** Right-aligned action pill. Hidden when omitted. */
   action?: { label: string; onPress: () => void };
+  /**
+   * Optional segmented ring. When set, the indicator fills `completedSegments`
+   * of `segmentCount` arcs instead of an indeterminate spinner — used by the
+   * post Delete toast to show per-image + per-relay progress. Omitted by the
+   * swap/payment toasts, which keep the plain spinner.
+   */
+  segmentedProgress?: { completedSegments: number | null; segmentCount: number };
+  /** Override the indicator stroke (pending segments / spinner). */
+  ringColor?: string;
+  /** Override the filled-segment / success color (e.g. red for delete). */
+  ringSuccessColor?: string;
+  /** Indicator diameter; defaults to ICON_SIZE (32). */
+  indicatorSize?: number;
   /** Structured lifecycle context for log-doctor toast audits. */
   debugFields?: Record<string, unknown>;
   /**
@@ -71,6 +84,10 @@ export function StatusToast({
   title,
   subtitle,
   action,
+  segmentedProgress,
+  ringColor,
+  ringSuccessColor,
+  indicatorSize,
   debugFields,
   toastProps,
 }: StatusToastProps) {
@@ -135,10 +152,12 @@ export function StatusToast({
       toastProps={toastProps}
       tint={<Animated.View style={[StyleSheet.absoluteFill, backgroundStyle]} />}>
       <LoadingIndicator
-        size={ICON_SIZE}
+        size={indicatorSize ?? ICON_SIZE}
         phase={indicatorPhase}
         result={indicatorResult}
-        color={surfaceFg}
+        color={ringColor ?? surfaceFg}
+        {...(ringSuccessColor ? { successColor: ringSuccessColor } : {})}
+        {...(segmentedProgress ? { segmentedProgress } : {})}
       />
       <View style={{ flex: 1, gap: 2 }}>
         <RNText

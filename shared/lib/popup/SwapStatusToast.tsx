@@ -33,7 +33,7 @@ export function SwapStatusToast({ hide, ...toastProps }: SwapStatusToastProps) {
             present: true as const,
             state: s.active.state,
             errorMessage: s.active.errorMessage,
-            groupId: s.active.groupId,
+            groupId: s.active.meta.groupId,
             ...legSummary(s.active.legs),
           }
         : { present: false as const }
