@@ -20,7 +20,7 @@ interface TransferErrorBannerProps {
   message: string;
 }
 
-export const TransferErrorBanner = React.memo(({ message }: TransferErrorBannerProps) => {
+export const TransferErrorBanner = ({ message }: TransferErrorBannerProps) => {
   const dangerColor = useThemeColor('danger');
 
   return (
@@ -35,7 +35,7 @@ export const TransferErrorBanner = React.memo(({ message }: TransferErrorBannerP
       </View>
     </Log>
   );
-});
+};
 TransferErrorBanner.displayName = 'TransferErrorBanner';
 
 const styles = StyleSheet.create({

@@ -14,7 +14,7 @@
  * via `useScreenActions`.
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 import { LightningReceiveScreen } from './LightningReceiveScreen';
@@ -39,7 +39,9 @@ interface LightningReceiveRouteProps {
 
 export function LightningReceiveRoute({ where, onRequestMintList }: LightningReceiveRouteProps) {
   const params = useRouteParams(ParamsSchema, { where });
-  const screenOptions = useMemo(() => ({ title: 'Receive Lightning' }), []);
+  const screenOptions = {
+    title: 'Receive Lightning',
+  };
   if (!params) return null;
   paymentLog.info('receive.lightning.route_ready', {
     where,

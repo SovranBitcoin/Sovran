@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -125,4 +125,4 @@ function PatternBackgroundComponent({
   );
 }
 
-export const PatternBackground = memo(PatternBackgroundComponent);
+export const PatternBackground = PatternBackgroundComponent;

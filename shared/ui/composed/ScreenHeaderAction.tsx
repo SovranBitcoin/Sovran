@@ -63,14 +63,11 @@ export function ScreenHeaderAction({
       <Icon name={icon} size={size} color={color ?? opacity(foreground, alpha.prominent)} />
     ) : null);
 
-  const circleStyle = React.useMemo(
-    () => [
-      styles.circle,
-      { backgroundColor: surfaceSecondary, borderColor: opacity(muted, 0.3) },
-      { opacity: disabled ? 0.4 : 1 },
-    ],
-    [disabled, muted, surfaceSecondary]
-  );
+  const circleStyle = [
+    styles.circle,
+    { backgroundColor: surfaceSecondary, borderColor: opacity(muted, 0.3) },
+    { opacity: disabled ? 0.4 : 1 },
+  ];
 
   if (supportsLiquidGlass()) {
     return (

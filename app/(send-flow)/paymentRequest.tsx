@@ -11,7 +11,7 @@
  * previously forwarded raw to the screen.
  */
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 
@@ -45,19 +45,19 @@ function ModalScreen() {
     walletContext.trustedMintUrls.length,
   ]);
 
-  const handleRequestMintList = useCallback(() => {
+  const handleRequestMintList = () => {
     cashuLog.info('payment_request.mint_list.requested', { source: 'pill' });
     void machine.requestMintSelector();
-  }, [machine]);
+  };
 
-  const handleCancel = useCallback(() => {
+  const handleCancel = () => {
     cashuLog.info('payment_request.route.cancel', {
       where: 'send-flow.paymentRequest',
       hasEntry: !!params?.paymentRequestEntry,
       entryLength: params?.paymentRequestEntry?.length ?? 0,
     });
     router.dismissTo('/');
-  }, [params?.paymentRequestEntry]);
+  };
 
   if (!params) return null;
 

@@ -63,10 +63,7 @@ export function useMintSelector({
   const storedSelectedMint = useMintStore((state) => state.selectedMint);
   const mintUrl = selectedMintUrl ?? storedSelectedMint;
   const balance = mintUrl ? amountToNumber(liveBalances.byMint[mintUrl]?.total) : 0;
-  const mintData = useMemo(
-    () => (mintUrl ? mints.find((m) => m.mintUrl === mintUrl) : undefined),
-    [mints, mintUrl]
-  );
+  const mintData = mintUrl ? mints.find((m) => m.mintUrl === mintUrl) : undefined;
 
   const mintInfo = useMemo(() => {
     if (!mintData) return null;

@@ -7,7 +7,7 @@
  * create cycles, so any local-state caller can reuse it without the machine.
  */
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, Text as RNText, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -317,50 +317,33 @@ export function AmountEntryView({
     );
   }, [transactionType, suggestions, onSuggestionTap, foreground, background]);
 
-  const logNextPress = useCallback(
-    (source: 'plain' | 'leading-row') => {
-      cashuLog.info('amount_entry.next.press', {
-        source,
-        transactionType,
-        inputMode,
-        rawInputLength: rawInput.length,
-        numericValue,
-        unit,
-        nextDisabled,
-        nextLoading,
-        hasNextVariants: !!nextVariants?.length,
-        extraButtonCount: extraButtons?.length ?? 0,
-        hasLeadingBottomButton: !!leadingBottomButton,
-      });
-    },
-    [
-      extraButtons?.length,
+  const logNextPress = (source: 'plain' | 'leading-row') => {
+    cashuLog.info('amount_entry.next.press', {
+      source,
+      transactionType,
       inputMode,
-      leadingBottomButton,
+      rawInputLength: rawInput.length,
+      numericValue,
+      unit,
       nextDisabled,
       nextLoading,
-      nextVariants?.length,
-      numericValue,
-      rawInput.length,
+      hasNextVariants: !!nextVariants?.length,
+      extraButtonCount: extraButtons?.length ?? 0,
+      hasLeadingBottomButton: !!leadingBottomButton,
+    });
+  };
+  const handleKeyPress = (value: string) => {
+    cashuLog.debug('amount_entry.keyboard.input', {
       transactionType,
+      inputMode,
+      previousLength: rawInput.length,
+      nextLength: value.length,
+      numericValue,
       unit,
-    ]
-  );
-  const handleKeyPress = useCallback(
-    (value: string) => {
-      cashuLog.debug('amount_entry.keyboard.input', {
-        transactionType,
-        inputMode,
-        previousLength: rawInput.length,
-        nextLength: value.length,
-        numericValue,
-        unit,
-      });
-      onKeyPress(value);
-    },
-    [inputMode, numericValue, onKeyPress, rawInput.length, transactionType, unit]
-  );
-  const handleToggleMode = useCallback(() => {
+    });
+    onKeyPress(value);
+  };
+  const handleToggleMode = () => {
     cashuLog.info('amount_entry.mode.toggle', {
       transactionType,
       inputMode,
@@ -369,7 +352,7 @@ export function AmountEntryView({
       hasToggleHandler: !!onToggleMode,
     });
     onToggleMode?.();
-  }, [inputMode, numericValue, onToggleMode, rawInput.length, transactionType]);
+  };
 
   useEffect(() => {
     cashuLog.debug('amount_entry.render_state', {
@@ -451,7 +434,6 @@ export function AmountEntryView({
           </VStack>
         </View>
       </View>
-
       <BottomButtons style={styles.bottomButtons} paddingBottom={0}>
         {suggestionsRow}
         <CustomKeyboard

@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { TextInput } from 'react-native';
 import opacity from 'hex-color-opacity';
 
@@ -8,7 +8,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { radius } from '@/shared/styles/tokens';
 import type { GlassSearchBarProps } from './types';
 
-export const GlassSearchBar = memo(function GlassSearchBar({
+export const GlassSearchBar = function GlassSearchBar({
   clearKey,
   onChangeText,
   placeholder,
@@ -44,20 +44,17 @@ export const GlassSearchBar = memo(function GlassSearchBar({
     };
   }, []);
 
-  const handleTextChange = useCallback(
-    (text: string) => {
-      if (!debounceMs) {
-        onChangeTextRef.current(text);
-        return;
-      }
-      latestTextRef.current = text;
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        onChangeTextRef.current(latestTextRef.current);
-      }, debounceMs);
-    },
-    [debounceMs]
-  );
+  const handleTextChange = (text: string) => {
+    if (!debounceMs) {
+      onChangeTextRef.current(text);
+      return;
+    }
+    latestTextRef.current = text;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onChangeTextRef.current(latestTextRef.current);
+    }, debounceMs);
+  };
 
   return (
     <Log name="GlassSearchBar">
@@ -98,4 +95,4 @@ export const GlassSearchBar = memo(function GlassSearchBar({
       </View>
     </Log>
   );
-});
+};

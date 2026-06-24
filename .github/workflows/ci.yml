@@ -43,7 +43,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           bun run deps:sovran-latest
-          bun install
+          # --ignore-scripts: the token is needed only to AUTH the
+          # @sovranbitcoin/* registry fetch, not to run lifecycle code, so no
+          # package install script executes while the secret is in scope
+          # (build-pipeline-secret-boundary).
+          bun install --ignore-scripts
+
+      # Run the deferred install scripts with NO secret in scope: trusted
+      # dependency scripts (e.g. @shopify/react-native-skia's install-skia) via
+      # `bun pm trust`, then the first-party postinstall (patch-package, bitchat
+      # patching, local-sibling linking). None of these need the registry token.
+      - name: Run install scripts (no secrets in scope)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          bun pm trust --all
+          bun run postinstall
 
       - name: Lint
         working-directory: ${{ env.APP_DIR }}
@@ -99,7 +113,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           bun run deps:sovran-latest
-          bun install
+          # --ignore-scripts: the token is needed only to AUTH the
+          # @sovranbitcoin/* registry fetch, not to run lifecycle code, so no
+          # package install script executes while the secret is in scope
+          # (build-pipeline-secret-boundary).
+          bun install --ignore-scripts
+
+      # Run the deferred install scripts with NO secret in scope: trusted
+      # dependency scripts (e.g. @shopify/react-native-skia's install-skia) via
+      # `bun pm trust`, then the first-party postinstall (patch-package, bitchat
+      # patching, local-sibling linking). None of these need the registry token.
+      - name: Run install scripts (no secrets in scope)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          bun pm trust --all
+          bun run postinstall
 
       - name: Run analyze-structure
         working-directory: ${{ env.APP_DIR }}

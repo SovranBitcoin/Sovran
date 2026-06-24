@@ -41,14 +41,10 @@ export function useMintContacts(
   // event (mint:added / mint:updated / mint:trusted / mint:untrusted), even
   // when the trusted-set is unchanged. Key the load on the sorted url-set so a
   // no-op refresh does not retrigger the Promise.all(getMintInfo) waterfall.
-  const mintUrlsKey = useMemo(
-    () =>
-      mints
-        .map((m) => m.mintUrl)
-        .sort()
-        .join('|'),
-    [mints]
-  );
+  const mintUrlsKey = mints
+    .map((m) => m.mintUrl)
+    .sort()
+    .join('|');
 
   // Load mint info and filter for those with nostr contacts
   useEffect(() => {
@@ -144,10 +140,7 @@ export function useMintContacts(
     });
   }, [mintsWithInfo, conversations]);
 
-  const mintPubkeys = useMemo(
-    () => displayMints.map((m) => m.pubkey).filter((p): p is string => !!p),
-    [displayMints]
-  );
+  const mintPubkeys = displayMints.map((m) => m.pubkey).filter((p): p is string => !!p);
 
   return { displayMints, mintPubkeys, mintInfoLoading };
 }

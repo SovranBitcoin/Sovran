@@ -1,5 +1,3 @@
-import { useState, useEffect } from 'react';
-
 import { useCameraPermissions } from 'expo-camera';
 import { Linking } from 'react-native';
 
@@ -8,11 +6,10 @@ import { log } from '@/shared/lib/logger';
 
 export function useHandleCameraPermission() {
   const [permission, requestPermission] = useCameraPermissions();
-  const [isChecking, setIsChecking] = useState(true);
-
-  useEffect(() => {
-    if (permission) setIsChecking(false);
-  }, [permission]);
+  // `isChecking` is just "permission not resolved yet": expo-camera returns null
+  // until the permission state loads, then a PermissionResponse object. Derive it
+  // rather than mirror it into state through an effect (set-state-in-effect).
+  const isChecking = !permission;
 
   const handlePermission = async (): Promise<boolean> => {
     if (!permission) {

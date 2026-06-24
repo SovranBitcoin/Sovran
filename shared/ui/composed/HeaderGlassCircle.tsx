@@ -36,22 +36,16 @@ export function HeaderGlassCircle({
   const colorScheme = useColorScheme();
   const size = headerButtonSize;
   const interactive = !!onPress && !disabled;
-  const containerStyle = React.useMemo(
-    () => [styles.box, { opacity: disabled ? 0.4 : 1 }],
-    [disabled]
-  );
+  const containerStyle = [styles.box, { opacity: disabled ? 0.4 : 1 }];
 
-  const buttonModifiers = React.useMemo(
-    () => [
-      environment('colorScheme', colorScheme),
-      frame({ height: size, width: size, alignment: 'center' as const }),
-      glassEffect({
-        shape: 'circle' as const,
-        glass: { variant: 'regular' as const, interactive },
-      }),
-    ],
-    [colorScheme, interactive, size]
-  );
+  const buttonModifiers = [
+    environment('colorScheme', colorScheme),
+    frame({ height: size, width: size, alignment: 'center' as const }),
+    glassEffect({
+      shape: 'circle' as const,
+      glass: { variant: 'regular' as const, interactive },
+    }),
+  ];
 
   return (
     <View

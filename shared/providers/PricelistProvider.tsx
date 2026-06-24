@@ -1,4 +1,4 @@
-import React, { useEffect, createContext, useMemo } from 'react';
+import React, { useEffect, createContext } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { usePricelistStore, BitcoinPrices } from '@/shared/stores/global/pricelistStore';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
@@ -128,15 +128,14 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
     };
   }, [setBtcPrices, setLoading, setError]);
 
-  const contextValue = useMemo<PricelistContextType>(
-    () => ({
-      btcPrice: pricelist?.usd?.btc,
-      isLoading,
-      error,
-      isStale: isDataStale(5), // Consider data stale after 5 minutes
-    }),
-    [pricelist, isLoading, error, isDataStale]
-  );
+  const contextValue = {
+    btcPrice: pricelist?.usd?.btc,
+    isLoading,
+    error,
+
+    // Consider data stale after 5 minutes
+    isStale: isDataStale(5),
+  };
 
   return <PricelistContext.Provider value={contextValue}>{children}</PricelistContext.Provider>;
 };

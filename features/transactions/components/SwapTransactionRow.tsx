@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import opacity from 'hex-color-opacity';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -17,7 +17,7 @@ interface Props {
   group: SwapGroup;
 }
 
-export const SwapTransactionRow = React.memo(({ group }: Props) => {
+export const SwapTransactionRow = ({ group }: Props) => {
   const [foreground, danger, success] = useThemeColor(['foreground', 'danger', 'success'] as const);
 
   const aggregate = useMemo(() => {
@@ -27,7 +27,7 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
     return { text: 'Completed', color: success };
   }, [group.legs, group.state, foreground, danger, success]);
 
-  const handlePress = useCallback(() => {
+  const handlePress = () => {
     log.info('transaction.swap.press', {
       groupId: group.id,
       state: group.state,
@@ -37,7 +37,7 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
       pathname: '/swap',
       params: { groupId: group.id },
     });
-  }, [group.id, group.state, group.legs.length]);
+  };
 
   return (
     <Log name="SwapTransactionRow">
@@ -72,6 +72,6 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
       </Pressable>
     </Log>
   );
-});
+};
 
 SwapTransactionRow.displayName = 'SwapTransactionRow';

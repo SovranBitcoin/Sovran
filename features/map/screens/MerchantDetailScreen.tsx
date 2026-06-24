@@ -3,7 +3,7 @@
  * Used from map flow when a marker is tapped.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -101,28 +101,22 @@ export function MerchantDetailScreen() {
     }
   }, [place?.name, navigation]);
 
-  const handleOpenURL = useCallback(async (url: string) => {
+  const handleOpenURL = async (url: string) => {
     const result = await openExternalUrl(url);
     if (result.isErr()) {
       log.warn('map.merchant.open_link.failed', { url, reason: result.error.type });
       staticPopup('open-link-failed');
     }
-  }, []);
+  };
 
-  const handleCall = useCallback(
-    async (phone: string) => {
-      // Strip everything but digits and a leading + so user-supplied formatting
-      // (spaces, dashes, parens) doesn't fail URL parsing.
-      const sanitized = phone.replace(/[^\d+]/g, '');
-      await handleOpenURL(`tel:${sanitized}`);
-    },
-    [handleOpenURL]
-  );
+  const handleCall = async (phone: string) => {
+    // Strip everything but digits and a leading + so user-supplied formatting
+    // (spaces, dashes, parens) doesn't fail URL parsing.
+    const sanitized = phone.replace(/[^\d+]/g, '');
+    await handleOpenURL(`tel:${sanitized}`);
+  };
 
-  const handleEmail = useCallback(
-    async (email: string) => handleOpenURL(`mailto:${email.trim()}`),
-    [handleOpenURL]
-  );
+  const handleEmail = async (email: string) => handleOpenURL(`mailto:${email.trim()}`);
 
   const supportsOnchain = place?.['osm:payment:onchain'] === 'yes';
   const supportsLightning = place?.['osm:payment:lightning'] === 'yes';
@@ -151,29 +145,26 @@ export function MerchantDetailScreen() {
     return items;
   }, [phone, website, email, instagram, twitter]);
 
-  const handleContactPress = useCallback(
-    (method: string, info: string, fullInfo?: string) => {
-      switch (method) {
-        case 'phone':
-          void handleCall(info);
-          break;
-        case 'website':
-          const url = fullInfo || info;
-          void handleOpenURL(url.startsWith('http') ? url : `https://${url}`);
-          break;
-        case 'email':
-          void handleEmail(info);
-          break;
-        case 'instagram':
-          void handleOpenURL(`https://instagram.com/${info.replace('@', '')}`);
-          break;
-        case 'twitter':
-          void handleOpenURL(`https://x.com/${info.replace('@', '')}`);
-          break;
-      }
-    },
-    [handleCall, handleOpenURL, handleEmail]
-  );
+  const handleContactPress = (method: string, info: string, fullInfo?: string) => {
+    switch (method) {
+      case 'phone':
+        void handleCall(info);
+        break;
+      case 'website':
+        const url = fullInfo || info;
+        void handleOpenURL(url.startsWith('http') ? url : `https://${url}`);
+        break;
+      case 'email':
+        void handleEmail(info);
+        break;
+      case 'instagram':
+        void handleOpenURL(`https://instagram.com/${info.replace('@', '')}`);
+        break;
+      case 'twitter':
+        void handleOpenURL(`https://x.com/${info.replace('@', '')}`);
+        break;
+    }
+  };
 
   if (isLoading) {
     return (

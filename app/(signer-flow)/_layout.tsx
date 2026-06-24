@@ -17,7 +17,6 @@
  * padding scroll content with `useHeaderHeight()` instead of `safeArea`.
  */
 
-import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
@@ -35,10 +34,7 @@ const CONNECT_OPTIONS = { title: 'Connect App' };
 
 export default function SignerFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }),
-    [foreground, background]
-  );
+  const screenOptions = createFlowLayoutScreenOptions({ foreground, background });
 
   return (
     <Stack screenOptions={screenOptions}>

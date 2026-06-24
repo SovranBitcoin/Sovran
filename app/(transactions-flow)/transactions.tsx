@@ -10,7 +10,7 @@
  * AUDIT.md dim-5 — strings are downcast to closed unions.
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
@@ -153,7 +153,7 @@ function TransactionsRoute() {
 
   // Handle transaction press — declared before the early-return so the hook
   // order stays stable across renders.
-  const handleTransactionPress = useCallback((historyEntry: HistoryEntry) => {
+  const handleTransactionPress = (historyEntry: HistoryEntry) => {
     const serializedHistoryEntry = JSON.stringify(historyEntry);
     const entryState =
       typeof (historyEntry as Record<string, unknown>).state === 'string'
@@ -229,7 +229,7 @@ function TransactionsRoute() {
           state: entryState,
         });
     }
-  }, []);
+  };
 
   if (!params) return null;
 

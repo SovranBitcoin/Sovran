@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { ScrollView } from 'react-native';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
@@ -19,11 +19,11 @@ export function DeleteScreen() {
   const foreground = useThemeColor('foreground');
   const [danger, red400] = useThemeColor(['danger', 'red-400'] as const);
 
-  const handleDelete = useCallback(async () => {
+  const handleDelete = async () => {
     log.warn('settings.delete.confirmed', { reason: 'user_initiated_slide_to_delete' });
     await deleteAllProfiles();
     log.info('settings.delete.complete');
-  }, []);
+  };
 
   return (
     <ScreenWrapper name="DeleteScreen" scroll="custom" safeArea>

@@ -3,7 +3,7 @@
  * mint, and the annotation-driven filters (source, P2PK lock, counterparty).
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -192,19 +192,16 @@ export function FiltersScreen() {
     params?.counterparty || 'all'
   );
 
-  const mintOptions = useMemo(
-    () => [
-      { mintUrl: 'all', name: 'All Mints', icon_url: undefined as string | undefined },
-      ...trustedMints.map((mint) => ({
-        mintUrl: mint.mintUrl,
-        name: mint.mintInfo?.name || extractDomain(mint.mintUrl) || 'Unknown',
-        icon_url: mint.mintInfo?.icon_url,
-      })),
-    ],
-    [trustedMints]
-  );
+  const mintOptions = [
+    { mintUrl: 'all', name: 'All Mints', icon_url: undefined as string | undefined },
+    ...trustedMints.map((mint) => ({
+      mintUrl: mint.mintUrl,
+      name: mint.mintInfo?.name || extractDomain(mint.mintUrl) || 'Unknown',
+      icon_url: mint.mintInfo?.icon_url,
+    })),
+  ];
 
-  const handleApply = useCallback(() => {
+  const handleApply = () => {
     log.info('tx.filters.apply', {
       currency,
       paymentType,
@@ -228,9 +225,9 @@ export function FiltersScreen() {
         filterCounterparty: counterparty,
       },
     });
-  }, [currency, paymentType, direction, status, mintUrl, source, lock, counterparty]);
+  };
 
-  const handleReset = useCallback(() => {
+  const handleReset = () => {
     log.info('tx.filters.reset');
     setCurrency('sat');
     setPaymentType('all');
@@ -240,20 +237,17 @@ export function FiltersScreen() {
     setSource('all');
     setLock('all');
     setCounterparty('all');
-  }, []);
+  };
 
-  const hasActiveFilters = useMemo(
-    () =>
-      currency.toLowerCase() !== 'sat' ||
-      paymentType !== 'all' ||
-      direction !== 'all' ||
-      status !== 'All' ||
-      mintUrl !== 'all' ||
-      source !== 'all' ||
-      lock !== 'all' ||
-      counterparty !== 'all',
-    [currency, paymentType, direction, status, mintUrl, source, lock, counterparty]
-  );
+  const hasActiveFilters =
+    currency.toLowerCase() !== 'sat' ||
+    paymentType !== 'all' ||
+    direction !== 'all' ||
+    status !== 'All' ||
+    mintUrl !== 'all' ||
+    source !== 'all' ||
+    lock !== 'all' ||
+    counterparty !== 'all';
 
   const resultCount = useMemo(() => {
     const normalizedCurrency = currency.toLowerCase();

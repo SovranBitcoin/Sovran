@@ -6,7 +6,7 @@
  * embedded mode, filtered to every other transaction with the same pubkey.
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,13 +43,12 @@ export function CounterpartyTransactions({ pubkey, excludeId }: CounterpartyTran
   const name = resolveIdentityName({ pubkey, nostrProfile: metadata });
   const ruleStrong = opacity(foreground, alpha.soft);
   const ruleFaint = opacity(foreground, alpha.faint);
-  const leftRuleColors = useMemo(() => [ruleFaint, ruleStrong] as const, [ruleFaint, ruleStrong]);
-  const rightRuleColors = useMemo(() => [ruleStrong, ruleFaint] as const, [ruleFaint, ruleStrong]);
-  const headingStyle = useMemo(() => [styles.heading, { color: ruleStrong }], [ruleStrong]);
+  const leftRuleColors = [ruleFaint, ruleStrong] as const;
+  const rightRuleColors = [ruleStrong, ruleFaint] as const;
+  const headingStyle = [styles.heading, { color: ruleStrong }];
 
-  const related = useMemo(
-    () => history.filter((e) => getCounterparty(e)?.pubkey === pubkey && e.id !== excludeId),
-    [history, pubkey, excludeId]
+  const related = history.filter(
+    (e) => getCounterparty(e)?.pubkey === pubkey && e.id !== excludeId
   );
 
   if (related.length === 0) return null;

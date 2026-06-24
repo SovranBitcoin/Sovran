@@ -6,7 +6,7 @@
  * only renders UI and wires buttons.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Platform, StyleSheet } from 'react-native';
 
 import { Alert, Menu, type MenuTriggerRef } from 'heroui-native';
@@ -131,39 +131,32 @@ export function SendTokenScreen({
   // Hooks — before this, `entry` flipping from undefined → defined would
   // add new hook calls mid-lifecycle and trigger "Rendered more hooks than
   // during the previous render".
-  const copyVariants: ActionVariant[] = useMemo(
-    () =>
-      actions.copy.variants ?? [
-        {
-          id: 'text',
-          label: 'as Text',
-          description: 'Copy the token as plain text',
-          icon: 'lets-icons:copy',
-          available: actions.copy.available,
-        },
-        {
-          id: 'emoji',
-          label: 'as Emoji',
-          description: 'Copy the token as emoji',
-          icon: 'fluent:emoji-24-filled',
-          available: actions.copy.available,
-        },
-      ],
-    [actions.copy.variants, actions.copy.available]
-  );
+  const copyVariants: ActionVariant[] = actions.copy.variants ?? [
+    {
+      id: 'text',
+      label: 'as Text',
+      description: 'Copy the token as plain text',
+      icon: 'lets-icons:copy',
+      available: actions.copy.available,
+    },
+    {
+      id: 'emoji',
+      label: 'as Emoji',
+      description: 'Copy the token as emoji',
+      icon: 'fluent:emoji-24-filled',
+      available: actions.copy.available,
+    },
+  ];
 
   const copyMenuTriggerRef = useRef<MenuTriggerRef>(null);
-  const handleCopyVariant = useCallback(
-    (variantId: string) => {
-      void actions.copy.execute({ variantId });
-    },
-    [actions.copy]
-  );
-  const openCopyMenu = useCallback(() => {
+  const handleCopyVariant = (variantId: string) => {
+    void actions.copy.execute({ variantId });
+  };
+  const openCopyMenu = () => {
     // Defer to the next tick so the ButtonHandler's sheet-close / press-in
     // animation doesn't race with the menu's trigger-position measure call.
     setTimeout(() => copyMenuTriggerRef.current?.open(), 0);
-  }, []);
+  };
   if (error) {
     log.warn('send.token.error', { error });
     return <ScreenErrorState message={error} onGoBack={onNavigateBack} />;
@@ -366,21 +359,14 @@ export function SendTokenScreen({
 }
 
 function SendTokenMemoText({ memo }: { memo: string }): React.ReactElement {
-  const references = useMemo(() => extractMemoNprofileReferences(memo), [memo]);
-  const pubkeys = useMemo(
-    () => [...new Set(references.map((reference) => reference.pubkey))],
-    [references]
-  );
+  const references = extractMemoNprofileReferences(memo);
+  const pubkeys = [...new Set(references.map((reference) => reference.pubkey))];
   const { metadata } = useNostrProfileMetadataMany(pubkeys);
-  const displayMemo = useMemo(
-    () =>
-      formatMemoForDisplay(memo, (pubkey) =>
-        resolveIdentityName({
-          pubkey,
-          nostrProfile: metadata.get(pubkey),
-        })
-      ),
-    [memo, metadata]
+  const displayMemo = formatMemoForDisplay(memo, (pubkey) =>
+    resolveIdentityName({
+      pubkey,
+      nostrProfile: metadata.get(pubkey),
+    })
   );
 
   return (

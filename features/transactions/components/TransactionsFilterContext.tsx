@@ -5,7 +5,7 @@
  * and the TransactionsScreen component.
  */
 
-import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useMemo, ReactNode } from 'react';
 import type {
   ScanMethod,
   TransactionDirection,
@@ -78,7 +78,7 @@ export function TransactionsFilterProvider({
   const [counterparty, setCounterparty] = useState<TransactionCounterpartyFilter>('all');
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
-  const openFilterSheet = useCallback(() => {
+  const openFilterSheet = () => {
     cashuLog.info('transactions.filters.open', {
       currency,
       paymentType,
@@ -100,29 +100,16 @@ export function TransactionsFilterProvider({
         counterparty,
       },
     });
-  }, [
-    currency,
-    paymentType,
-    direction,
-    status,
-    mintUrl,
-    source,
-    lock,
-    counterparty,
-    selectedMonth,
-  ]);
+  };
 
-  const hasActiveFilters = useMemo(() => {
-    return (
-      paymentType !== 'all' ||
-      direction !== 'all' ||
-      status !== 'All' ||
-      mintUrl !== 'all' ||
-      source !== 'all' ||
-      lock !== 'all' ||
-      counterparty !== 'all'
-    );
-  }, [paymentType, direction, status, mintUrl, source, lock, counterparty]);
+  const hasActiveFilters =
+    paymentType !== 'all' ||
+    direction !== 'all' ||
+    status !== 'All' ||
+    mintUrl !== 'all' ||
+    source !== 'all' ||
+    lock !== 'all' ||
+    counterparty !== 'all';
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -136,45 +123,29 @@ export function TransactionsFilterProvider({
     return count;
   }, [paymentType, direction, status, mintUrl, source, lock, counterparty]);
 
-  const value = useMemo(
-    () => ({
-      currency,
-      paymentType,
-      direction,
-      status,
-      mintUrl,
-      source,
-      lock,
-      counterparty,
-      selectedMonth,
-      setCurrency,
-      setPaymentType,
-      setDirection,
-      setStatus,
-      setMintUrl,
-      setSource,
-      setLock,
-      setCounterparty,
-      setSelectedMonth,
-      openFilterSheet,
-      hasActiveFilters,
-      activeFilterCount,
-    }),
-    [
-      currency,
-      paymentType,
-      direction,
-      status,
-      mintUrl,
-      source,
-      lock,
-      counterparty,
-      selectedMonth,
-      openFilterSheet,
-      hasActiveFilters,
-      activeFilterCount,
-    ]
-  );
+  const value = {
+    currency,
+    paymentType,
+    direction,
+    status,
+    mintUrl,
+    source,
+    lock,
+    counterparty,
+    selectedMonth,
+    setCurrency,
+    setPaymentType,
+    setDirection,
+    setStatus,
+    setMintUrl,
+    setSource,
+    setLock,
+    setCounterparty,
+    setSelectedMonth,
+    openFilterSheet,
+    hasActiveFilters,
+    activeFilterCount,
+  };
 
   return (
     <TransactionsFilterContext.Provider value={value}>

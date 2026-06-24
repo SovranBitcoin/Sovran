@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { TextInput, StyleSheet } from 'react-native';
 
 import { GlassView } from 'expo-glass-effect';
@@ -10,7 +10,7 @@ import { supportsLiquidGlass } from '@/shared/lib/version';
 import opacity from 'hex-color-opacity';
 import type { GlassSearchBarProps } from './types';
 
-export const GlassSearchBar = memo(function GlassSearchBar({
+export const GlassSearchBar = function GlassSearchBar({
   width,
   height = 44,
   clearKey,
@@ -45,20 +45,17 @@ export const GlassSearchBar = memo(function GlassSearchBar({
     };
   }, []);
 
-  const handleTextChange = useCallback(
-    (text: string) => {
-      if (!debounceMs) {
-        onChangeTextRef.current(text);
-        return;
-      }
-      latestTextRef.current = text;
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        onChangeTextRef.current(latestTextRef.current);
-      }, debounceMs);
-    },
-    [debounceMs]
-  );
+  const handleTextChange = (text: string) => {
+    if (!debounceMs) {
+      onChangeTextRef.current(text);
+      return;
+    }
+    latestTextRef.current = text;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onChangeTextRef.current(latestTextRef.current);
+    }, debounceMs);
+  };
 
   // Liquid devices get a real glass capsule (the component's namesake);
   // everywhere else keeps the flat surface-secondary field.
@@ -100,7 +97,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
       </View>
     </Log>
   );
-});
+};
 
 const styles = StyleSheet.create({
   // Capsule (radius = height/2 applied inline) matching the liquid design

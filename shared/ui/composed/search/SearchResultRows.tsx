@@ -7,7 +7,7 @@
  * the unified search surface can feed it different buckets (All, People, Groups,
  * Mints) from one `useSearchAggregates` call without duplicating queries.
  */
-import React, { useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 
 import { List } from '@/shared/ui/composed/List';
@@ -128,7 +128,7 @@ export function SearchResultRows({
     return results.length === 0;
   }, [results.length, loading, searchQuery]);
 
-  const renderSearchResult = useCallback((item: AllSearchResult) => {
+  const renderSearchResult = (item: AllSearchResult) => {
     switch (item.type) {
       case 'geohash':
         return <GeohashJumpRow geohash={item.geohash} />;
@@ -148,36 +148,29 @@ export function SearchResultRows({
           />
         );
     }
-  }, []);
+  };
 
-  const renderEmpty = useCallback(() => {
+  const renderEmpty = () => {
     if (showNoResults) return <ListEmptyComponent />;
     return null;
-  }, [showNoResults, ListEmptyComponent]);
+  };
 
   // While the search is in flight and we have nothing yet, render skeleton
   // placeholder rows so the feed doesn't look empty. `ContactRow` treats
   // `isLoadingProfile: true` as the skeleton trigger, so we reuse the regular
   // render path instead of a parallel loader component.
   const showPlaceholders = loading && results.length === 0 && searchQuery.trim().length >= 2;
-  const placeholderData = useMemo<AllSearchResult[]>(
-    () =>
-      Array.from({ length: 4 }, (_, i) => ({
-        type: 'contact' as const,
-        id: `placeholder-${i}`,
-        pubkey: `placeholder-${i}`,
-        profile: undefined,
-        isLoadingProfile: true,
-        score: 0,
-      })),
-    []
-  );
+  const placeholderData = Array.from({ length: 4 }, (_, i) => ({
+    type: 'contact' as const,
+    id: `placeholder-${i}`,
+    pubkey: `placeholder-${i}`,
+    profile: undefined,
+    isLoadingProfile: true,
+    score: 0,
+  }));
   const listData = showPlaceholders ? placeholderData : showNoResults ? [] : results;
 
-  const renderItem = useCallback(
-    ({ item }: { item: AllSearchResult }) => renderSearchResult(item),
-    [renderSearchResult]
-  );
+  const renderItem = ({ item }: { item: AllSearchResult }) => renderSearchResult(item);
 
   return (
     <View style={styles.container}>

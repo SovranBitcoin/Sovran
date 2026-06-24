@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { Menu, type MenuTriggerRef } from 'heroui-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
@@ -72,14 +72,14 @@ export function WalletScreen() {
 
   const [contentHeight, setContentHeight] = useState(0);
 
-  const onContentSizeChange = useCallback((_width: number, height: number) => {
+  const onContentSizeChange = (_width: number, height: number) => {
     setContentHeight(height);
-  }, []);
+  };
 
   const { history, refresh } = useHistoryWithMelts();
-  const handlePullToAiRefresh = useCallback(() => {
+  const handlePullToAiRefresh = () => {
     void refresh();
-  }, [refresh]);
+  };
   const pullToAi = usePullToAiRefreshControl({ onRefresh: handlePullToAiRefresh });
   useVersionCheck();
 
@@ -87,9 +87,9 @@ export function WalletScreen() {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: ACCOUNT.unit });
   const moreMenuTriggerRef = useRef<MenuTriggerRef>(null);
-  const openMoreMenu = useCallback(() => {
+  const openMoreMenu = () => {
     setTimeout(() => moreMenuTriggerRef.current?.open(), 0);
-  }, []);
+  };
 
   // While a multi-leg swap is running, every payment-initiating button on
   // this screen is gated. Coco's mint/melt services serialize through a
@@ -98,13 +98,13 @@ export function WalletScreen() {
   // progress" errors. Greying out is the cheapest user-visible indicator.
   const isSwapping = useSwapStatusStore((s) => s.active?.state === 'running');
 
-  const handleReceive = useCallback(() => {
+  const handleReceive = () => {
     walletLog.info('wallet.action.receive', { unit: ACCOUNT.unit });
     clearPaymentContext('wallet.receive');
     void machine.startReceive({ reset: true });
-  }, [machine]);
+  };
 
-  const handleScanQR = useCallback(async () => {
+  const handleScanQR = async () => {
     walletLog.info('wallet.action.scan_qr', { unit: ACCOUNT.unit });
     const granted = await handlePermission();
     if (!granted) {
@@ -116,24 +116,24 @@ export function WalletScreen() {
       pathname: '/camera',
       params: { to: 'sendToken', unit: ACCOUNT.unit },
     });
-  }, [handlePermission]);
+  };
 
-  const handleSend = useCallback(async () => {
+  const handleSend = async () => {
     walletLog.info('wallet.action.send', { unit: ACCOUNT.unit });
     clearPaymentContext('wallet.send');
     await machine.startSendEcash({ reset: true });
-  }, [machine]);
+  };
 
-  const handleTheme = useCallback(() => {
+  const handleTheme = () => {
     walletLog.info('wallet.theme.tap');
     router.push('/(theme-flow)/preview');
-  }, []);
+  };
 
-  const handleNearPay = useCallback(() => {
+  const handleNearPay = () => {
     walletLog.info('wallet.near_pay.tap', { unit: ACCOUNT.unit });
     clearPaymentContext('wallet.near_pay');
     router.push('/(send-flow)/nearPay');
-  }, []);
+  };
 
   const nfcSupported = useNfcSupported();
   // Android hybrid tap-to-pay: the ambient focus loop owns NFC scanning, so
@@ -142,7 +142,7 @@ export function WalletScreen() {
   // iOS cannot listen ambiently.
   useAmbientNfcArm(machine);
   const nfcArmed = useNfcTapStore((s) => s.armed);
-  const handleNfc = useCallback(() => {
+  const handleNfc = () => {
     walletLog.info('wallet.action.nfc', { unit: ACCOUNT.unit, armed: nfcArmed });
     if (Platform.OS === 'android' && nfcArmed) {
       showActionSheet('nfc-tap', {});
@@ -154,7 +154,7 @@ export function WalletScreen() {
     // be listening.
     clearPaymentContext('wallet.nfc');
     void machine.scan?.(undefined, { source: 'nfc' });
-  }, [machine, nfcArmed]);
+  };
 
   // Keep BootEntrance and the wallet body mounted across the search toggle so
   // the splash→QR morph never replays and closing search restores this screen.

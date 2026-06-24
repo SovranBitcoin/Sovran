@@ -57,16 +57,12 @@ export function useSearchAggregates(query: string): SearchAggregates {
     enabled: mintEnabled,
   });
 
-  const mints = useMemo<AllSearchResult[]>(
-    () =>
-      mintResults.map((mint, i) => ({
-        type: 'mint' as const,
-        id: `mint:${mint.url}`,
-        mint,
-        score: SCORE_MINT_BASE - i,
-      })),
-    [mintResults]
-  );
+  const mints = mintResults.map((mint, i) => ({
+    type: 'mint' as const,
+    id: `mint:${mint.url}`,
+    mint,
+    score: SCORE_MINT_BASE - i,
+  }));
 
   const all = useMemo<AllSearchResult[]>(() => {
     const combined = [...results, ...mints];
@@ -74,27 +70,26 @@ export function useSearchAggregates(query: string): SearchAggregates {
     return combined;
   }, [results, mints]);
 
-  return useMemo(
-    () => ({
-      query: trimmed,
-      all,
-      people,
-      groups,
-      mints,
-      postsAuthors,
-      counts: {
-        // People/Posts gate on *real* matched authors (not the placeholder
-        // skeleton rows present mid-load), so their tabs don't flicker in and
-        // back out while a search is in flight.
-        people: postsAuthors.length,
-        groups: groups.length,
-        mints: mints.length,
-        posts: postsAuthors.length,
-      },
-      loading: loading || (mintEnabled && mintLoading),
-      peopleLoading: loading,
-      mintsLoading: mintEnabled && mintLoading,
-    }),
-    [trimmed, all, people, groups, mints, postsAuthors, loading, mintEnabled, mintLoading]
-  );
+  return {
+    query: trimmed,
+    all,
+    people,
+    groups,
+    mints,
+    postsAuthors,
+
+    counts: {
+      // People/Posts gate on *real* matched authors (not the placeholder
+      // skeleton rows present mid-load), so their tabs don't flicker in and
+      // back out while a search is in flight.
+      people: postsAuthors.length,
+      groups: groups.length,
+      mints: mints.length,
+      posts: postsAuthors.length,
+    },
+
+    loading: loading || (mintEnabled && mintLoading),
+    peopleLoading: loading,
+    mintsLoading: mintEnabled && mintLoading,
+  };
 }

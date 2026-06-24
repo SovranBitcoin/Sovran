@@ -11,7 +11,7 @@
  * never log it.
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { z } from 'zod';
 
 import {
@@ -40,7 +40,7 @@ function toastAndGoToHub(body: string): void {
 }
 
 export default function SignerConnectRoute() {
-  const onInvalid = useCallback(() => toastAndGoToHub(PAIRING_ERROR_INVALID_LINK), []);
+  const onInvalid = () => toastAndGoToHub(PAIRING_ERROR_INVALID_LINK);
   const params = useRouteParams(ParamsSchema, { where: 'signer-flow.connect', onInvalid });
   const uri = params?.uri;
   const openedRef = useRef(false);

@@ -260,12 +260,9 @@ export const Transactions = React.memo(
         return date.getFullYear() === filterYear && date.getMonth() === filterMonthNum;
       };
 
-      const swapItems: TimelineItem[] = swapGroups
-        .filter((group) => monthFilter(group.createdAt))
-        .map((group) => ({
-          kind: 'swap' as const,
-          data: group,
-        }));
+      const swapItems: TimelineItem[] = swapGroups.flatMap((group) =>
+        monthFilter(group.createdAt) ? [{ kind: 'swap' as const, data: group }] : []
+      );
 
       return [...txItems, ...swapItems];
     }, [filteredHistory, swapGroups, filter, type, selectedMonth, embedded]);

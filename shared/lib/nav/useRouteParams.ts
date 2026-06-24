@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import type { ZodType, infer as zInfer } from 'zod';
 import { loggableIssues } from '@sovranbitcoin/schemas';
@@ -38,7 +38,7 @@ export function useRouteParams<S extends ZodType>(
   options: UseRouteParamsOptions
 ): zInfer<S> | null {
   const raw = useLocalSearchParams();
-  const parsed = useMemo(() => schema.safeParse(raw), [schema, raw]);
+  const parsed = schema.safeParse(raw);
 
   useEffect(() => {
     if (parsed.success) return;

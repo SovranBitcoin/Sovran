@@ -23,7 +23,7 @@
  * logged.
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React from 'react';
 import { ListGroup, Separator } from 'heroui-native';
 
 import Icon from 'assets/icons';
@@ -111,43 +111,41 @@ export function SignerHubScreen(): React.ReactElement {
     'danger',
     'muted',
   ] as const);
-  const dangerTextStyle = useMemo(() => ({ color: danger }), [danger]);
+  const dangerTextStyle = {
+    color: danger,
+  };
 
-  const connections = useMemo(
-    () =>
-      Object.values(apps).sort(
-        (a, b) => (b.lastUsedAt ?? b.pairedAt) - (a.lastUsedAt ?? a.pairedAt)
-      ),
-    [apps]
+  const connections = Object.values(apps).sort(
+    (a, b) => (b.lastUsedAt ?? b.pairedAt) - (a.lastUsedAt ?? a.pairedAt)
   );
 
   // ── Navigation ────────────────────────────────────────────────
 
-  const openRequests = useCallback(() => {
+  const openRequests = () => {
     router.push('/(signer-flow)/requests' as never);
-  }, []);
+  };
 
-  const openAppDetail = useCallback((clientPubkey: string) => {
+  const openAppDetail = (clientPubkey: string) => {
     // Hex pubkey — URL-safe by construction, no encoding needed.
     router.push(`/(signer-flow)/app?clientPubkey=${clientPubkey}` as never);
-  }, []);
+  };
 
-  const openScan = useCallback(() => {
+  const openScan = () => {
     // signer-pair mode: the standalone camera only accepts NIP-46 URIs.
     router.navigate({ pathname: '/camera', params: { action: 'signer-pair' } });
-  }, []);
+  };
 
-  const openShare = useCallback(() => {
+  const openShare = () => {
     router.push('/(signer-flow)/share' as never);
-  }, []);
+  };
 
-  const openActivity = useCallback(() => {
+  const openActivity = () => {
     router.push('/(signer-flow)/activity' as never);
-  }, []);
+  };
 
   // ── Paste Connection Link ─────────────────────────────────────
 
-  const openPasteLink = useCallback(() => {
+  const openPasteLink = () => {
     actionMenuPopup({
       title: PASTE_LINK_LABEL,
       inputs: [
@@ -178,11 +176,11 @@ export function SignerHubScreen(): React.ReactElement {
         },
       },
     });
-  }, []);
+  };
 
   // ── Reset Remote Login ────────────────────────────────────────
 
-  const confirmReset = useCallback(() => {
+  const confirmReset = () => {
     const activePubkey = keys?.pubkey;
     actionMenuPopup({
       title: RESET_SIGNER_LABEL,
@@ -208,7 +206,7 @@ export function SignerHubScreen(): React.ReactElement {
         { text: 'Cancel', variant: 'secondary', onPress: (close) => close() },
       ],
     });
-  }, [keys?.pubkey]);
+  };
 
   // ── Render ────────────────────────────────────────────────────
 

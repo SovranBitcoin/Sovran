@@ -4,7 +4,7 @@
  * Used in the Background modal to filter the wallpaper grid by album.
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { ScrollView } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -25,13 +25,10 @@ export function AlbumPillTabs({ tabs, selectedTab, onSelect }: AlbumPillTabsProp
     'surface',
   ] as const);
 
-  const handlePress = useCallback(
-    (tab: string) => {
-      log.info('theme.background.album.tab', { album: tab });
-      onSelect(tab);
-    },
-    [onSelect]
-  );
+  const handlePress = (tab: string) => {
+    log.info('theme.background.album.tab', { album: tab });
+    onSelect(tab);
+  };
 
   return (
     <Log name="AlbumPillTabs">

@@ -5,7 +5,7 @@
  * via QR code. Can be used standalone or within flow navigators.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { Section } from '@/shared/ui/composed/Section';
 import Icon, { CurrencyIcon } from 'assets/icons';
@@ -91,7 +91,7 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
   const [selectedTab, setSelectedTab] = useState(showP2pkTabs ? 'P2PK' : 'NPUB');
 
   // Get the config based on current selection
-  const getActiveConfig = useCallback(() => {
+  const getActiveConfig = () => {
     if (showP2pkTabs && selectedTab === 'NPUB') {
       return SHARE_CONFIGS.npub;
     }
@@ -99,10 +99,10 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
       return SHARE_CONFIGS.lud16;
     }
     return SHARE_CONFIGS[type];
-  }, [showP2pkTabs, showNpubTabs, selectedTab, type]);
+  };
 
   // Get the active data based on current selection
-  const getActiveData = useCallback(() => {
+  const getActiveData = () => {
     if (showP2pkTabs && selectedTab === 'NPUB') {
       return npub || '';
     }
@@ -110,38 +110,35 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
       return lud16 || '';
     }
     return data;
-  }, [showP2pkTabs, showNpubTabs, selectedTab, npub, lud16, data]);
+  };
 
   const config = getActiveConfig();
   const activeData = getActiveData();
 
-  const handleTabPress = useCallback(
-    (tab: string) => {
-      nostrLog.info('share.tab.change', { tab });
-      setSelectedTab(tab);
-      // Notify parent of title change
-      if (onTitleChange) {
-        let newConfig;
-        if (tab === 'NPUB') {
-          newConfig = SHARE_CONFIGS.npub;
-        } else if (tab === 'LIGHTNING') {
-          newConfig = SHARE_CONFIGS.lud16;
-        } else if (tab === 'P2PK') {
-          newConfig = SHARE_CONFIGS.p2pk;
-        } else {
-          newConfig = SHARE_CONFIGS[type];
-        }
-        onTitleChange(newConfig.title);
+  const handleTabPress = (tab: string) => {
+    nostrLog.info('share.tab.change', { tab });
+    setSelectedTab(tab);
+    // Notify parent of title change
+    if (onTitleChange) {
+      let newConfig;
+      if (tab === 'NPUB') {
+        newConfig = SHARE_CONFIGS.npub;
+      } else if (tab === 'LIGHTNING') {
+        newConfig = SHARE_CONFIGS.lud16;
+      } else if (tab === 'P2PK') {
+        newConfig = SHARE_CONFIGS.p2pk;
+      } else {
+        newConfig = SHARE_CONFIGS[type];
       }
-    },
-    [onTitleChange, type]
-  );
+      onTitleChange(newConfig.title);
+    }
+  };
 
-  const handleCopy = useCallback(async () => {
+  const handleCopy = async () => {
     nostrLog.info('share.copy', { target: config.copyTarget });
     await Clipboard.setStringAsync(activeData);
     copyPopup(config.copyTarget);
-  }, [activeData, config.copyTarget]);
+  };
 
   return (
     <Screen name="ShareScreen">

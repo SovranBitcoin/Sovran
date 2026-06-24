@@ -22,7 +22,7 @@
  * none of it is ever logged.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { Button as HerouiButton } from 'heroui-native';
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -184,28 +184,23 @@ export function SignerRequestsScreen(): React.ReactElement {
   // 1s ticker, focused-only: drives the countdowns and the local "hide at
   // expiry" filter (the engine sweep deletes for real within 10s).
   const [now, setNow] = useState(() => Date.now());
-  useFocusEffect(
-    useCallback(() => {
-      setNow(Date.now());
-      const timer = setInterval(() => setNow(Date.now()), TICK_MS);
-      return () => clearInterval(timer);
-    }, [])
-  );
+  useFocusEffect(() => {
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), TICK_MS);
+    return () => clearInterval(timer);
+  });
 
-  const groups = useMemo(
-    () => groupByApp(pending.filter((request) => request.expiresAt > now)),
-    [pending, now]
-  );
+  const groups = groupByApp(pending.filter((request) => request.expiresAt > now));
 
   // ── Verdict plumbing ──────────────────────────────────────────
 
-  const reviewRequest = useCallback((id: string) => {
+  const reviewRequest = (id: string) => {
     useNip46RequestsStore.getState().promote(id);
     showActionSheet('signer-approval', {});
-  }, []);
+  };
 
   const resolveBatch = useSingleFlight(
-    useCallback(async (clientPubkey: string, action: 'approve_once' | 'deny_once') => {
+    async (clientPubkey: string, action: 'approve_once' | 'deny_once') => {
       // Re-derive from live state: requests may have resolved/expired since
       // the chip was tapped, and approvals stay fail-closed to the standard
       // tier even if a sensitive request slipped in after the confirm.
@@ -224,34 +219,31 @@ export function SignerRequestsScreen(): React.ReactElement {
           });
         }
       }
-    }, [])
+    }
   );
 
-  const confirmAllowAll = useCallback(
-    (clientPubkey: string, appName: string, count: number) => {
-      actionMenuPopup({
-        title: batchConfirmTitle(count, appName),
-        header: (
-          <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
-            <Text size={14} color={muted}>
-              {BATCH_CONFIRM_BODY}
-            </Text>
-          </View>
-        ),
-        buttons: [
-          {
-            text: allowAllLabel(count),
-            onPress: (close) => {
-              close();
-              void resolveBatch(clientPubkey, 'approve_once');
-            },
+  const confirmAllowAll = (clientPubkey: string, appName: string, count: number) => {
+    actionMenuPopup({
+      title: batchConfirmTitle(count, appName),
+      header: (
+        <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
+          <Text size={14} color={muted}>
+            {BATCH_CONFIRM_BODY}
+          </Text>
+        </View>
+      ),
+      buttons: [
+        {
+          text: allowAllLabel(count),
+          onPress: (close) => {
+            close();
+            void resolveBatch(clientPubkey, 'approve_once');
           },
-          { text: BATCH_CANCEL_LABEL, variant: 'secondary' },
-        ],
-      });
-    },
-    [muted, resolveBatch]
-  );
+        },
+        { text: BATCH_CANCEL_LABEL, variant: 'secondary' },
+      ],
+    });
+  };
 
   // ── Render ────────────────────────────────────────────────────
 
