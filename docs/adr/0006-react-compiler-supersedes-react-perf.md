@@ -1,6 +1,6 @@
 # 0006 — React Compiler supersedes the react-perf eslint rules; verified manual-memoization sweep
 
-Status: accepted
+Status: accepted (corrected in part by [0007](0007-react-compiler-coverage-gate.md))
 Date: 2026-06-24
 
 ## Context
@@ -42,7 +42,10 @@ and were left untouched (recorded here so they are not "re-fixed" later):
 2. **Sweep manual memoization, but only where the compiler provably covers it.** The
    removal set was bounded by what `react-compiler-no-manual-memoization` flagged,
    minus everything load-bearing:
-   - **Kept**: every `React.memo`/`memo()` render-bailout wrapper (57), every
+   - **Kept**: every `React.memo`/`memo()` render-bailout wrapper (57) — *but see
+     [0007](0007-react-compiler-coverage-gate.md): the FIRST pass (`584186b4`),
+     predating this policy, had already stripped 20 wrappers; 0007 restores them* —
+     every
      `preserve-manual-memoization` site (the compiler's own "cannot auto-memoize"
      signal), every memo with an explanatory comment above it, and every
      generic-typed `useMemo<T>`/`useCallback<T>` (dropping the type arg breaks

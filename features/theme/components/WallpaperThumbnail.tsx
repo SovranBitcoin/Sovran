@@ -39,7 +39,7 @@ interface WallpaperThumbnailProps {
   showPlayBadge?: boolean;
 }
 
-export const WallpaperThumbnail = function WallpaperThumbnail({
+export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
   themeName,
   entry,
   selected,
@@ -179,4 +179,4 @@ export const WallpaperThumbnail = function WallpaperThumbnail({
       </PressableFeedback.Scale>
     </PressableFeedback>
   );
-};
+});

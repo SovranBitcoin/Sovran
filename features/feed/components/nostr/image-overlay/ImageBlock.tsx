@@ -54,7 +54,7 @@ interface ImageBlockOverlayPostProps {
   onActionPressOut?: () => void;
 }
 
-export const ImageBlock = function ImageBlock({
+export const ImageBlock = React.memo(function ImageBlock({
   url,
   alt,
   allImageUrls,
@@ -430,7 +430,7 @@ export const ImageBlock = function ImageBlock({
       </View>
     </Log>
   );
-};
+});
 
 const styles = StyleSheet.create({
   imageBlockOuter: {

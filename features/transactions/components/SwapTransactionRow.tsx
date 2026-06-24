@@ -17,7 +17,7 @@ interface Props {
   group: SwapGroup;
 }
 
-export const SwapTransactionRow = ({ group }: Props) => {
+export const SwapTransactionRow = React.memo(({ group }: Props) => {
   const [foreground, danger, success] = useThemeColor(['foreground', 'danger', 'success'] as const);
 
   const aggregate = useMemo(() => {
@@ -72,6 +72,6 @@ export const SwapTransactionRow = ({ group }: Props) => {
       </Pressable>
     </Log>
   );
-};
+});
 
 SwapTransactionRow.displayName = 'SwapTransactionRow';

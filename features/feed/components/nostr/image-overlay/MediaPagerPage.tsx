@@ -118,4 +118,4 @@ function MediaPageAnimated({
   );
 }
 
-export const MemoizedMediaPagerPage = MediaPageAnimated;
+export const MemoizedMediaPagerPage = React.memo(MediaPageAnimated);

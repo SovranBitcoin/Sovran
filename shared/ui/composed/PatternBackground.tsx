@@ -125,4 +125,4 @@ function PatternBackgroundComponent({
   );
 }
 
-export const PatternBackground = PatternBackgroundComponent;
+export const PatternBackground = React.memo(PatternBackgroundComponent);

@@ -183,7 +183,7 @@ interface CollapsedLegGroupProps {
   mintInfoMap: Record<string, { name?: string; icon_url?: string } | null>;
 }
 
-const CollapsedLegGroup = ({ legGroup, mintInfoMap }: CollapsedLegGroupProps) => {
+const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGroupProps) => {
   const foreground = useThemeColor('foreground');
 
   // Source = first leg's from, Destination = last leg's to
@@ -228,7 +228,7 @@ const CollapsedLegGroup = ({ legGroup, mintInfoMap }: CollapsedLegGroupProps) =>
       </HStack>
     </View>
   );
-};
+});
 CollapsedLegGroup.displayName = 'CollapsedLegGroup';
 
 // -----------------------------------------------------------------------

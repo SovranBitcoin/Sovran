@@ -125,7 +125,11 @@ const MODE_CONFIG: Record<
 // Component
 // ---------------------------------------------------------------------------
 
-const MonthlyChart = function MonthlyChart({ history, unit = 'sat', mode }: MonthlyChartProps) {
+const MonthlyChart = React.memo(function MonthlyChart({
+  history,
+  unit = 'sat',
+  mode,
+}: MonthlyChartProps) {
   const [muted, foreground, dangerColor, successColor] = useThemeColor([
     'muted',
     'foreground',
@@ -405,7 +409,7 @@ const MonthlyChart = function MonthlyChart({ history, unit = 'sat', mode }: Mont
       </SquircleView>
     </Log>
   );
-};
+});
 
 MonthlyChart.displayName = 'MonthlyChart';
 
@@ -418,14 +422,14 @@ interface ChartWrapperProps {
   unit?: string;
 }
 
-export const SpentThisMonth = function SpentThisMonth(props: ChartWrapperProps) {
+export const SpentThisMonth = React.memo(function SpentThisMonth(props: ChartWrapperProps) {
   return <MonthlyChart {...props} mode="spent" />;
-};
+});
 SpentThisMonth.displayName = 'SpentThisMonth';
 
-export const ReceivedThisMonth = function ReceivedThisMonth(props: ChartWrapperProps) {
+export const ReceivedThisMonth = React.memo(function ReceivedThisMonth(props: ChartWrapperProps) {
   return <MonthlyChart {...props} mode="received" />;
-};
+});
 ReceivedThisMonth.displayName = 'ReceivedThisMonth';
 
 // ---------------------------------------------------------------------------

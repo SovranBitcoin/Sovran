@@ -38,7 +38,7 @@ interface UnitPreviewCardProps {
   testID?: string;
 }
 
-export const UnitPreviewCard = function UnitPreviewCard({
+export const UnitPreviewCard = React.memo(function UnitPreviewCard({
   themeName,
   label,
   sublabel,
@@ -201,4 +201,4 @@ export const UnitPreviewCard = function UnitPreviewCard({
       <PressableFeedback.Scale>{card}</PressableFeedback.Scale>
     </PressableFeedback>
   );
-};
+});

@@ -27,24 +27,26 @@ interface TransferCardProps {
   children: React.ReactNode;
 }
 
-export const TransferCard = ({ accentColor: accentColorProp, children }: TransferCardProps) => {
-  const muted = useThemeColor('muted');
+export const TransferCard = React.memo(
+  ({ accentColor: accentColorProp, children }: TransferCardProps) => {
+    const muted = useThemeColor('muted');
 
-  const accentColor = accentColorProp ?? muted;
+    const accentColor = accentColorProp ?? muted;
 
-  // Always show the tinted border — matches Transactions component exactly.
-  const borderColor = opacity(accentColor, 0.3);
+    // Always show the tinted border — matches Transactions component exactly.
+    const borderColor = opacity(accentColor, 0.3);
 
-  return (
-    <Log name="TransferCard">
-      <SquircleView style={[styles.card, { borderColor }]}>
-        <BlurCardFrame accentColor={accentColor}>
-          <View style={styles.content}>{children}</View>
-        </BlurCardFrame>
-      </SquircleView>
-    </Log>
-  );
-};
+    return (
+      <Log name="TransferCard">
+        <SquircleView style={[styles.card, { borderColor }]}>
+          <BlurCardFrame accentColor={accentColor}>
+            <View style={styles.content}>{children}</View>
+          </BlurCardFrame>
+        </SquircleView>
+      </Log>
+    );
+  }
+);
 TransferCard.displayName = 'TransferCard';
 
 const styles = StyleSheet.create({

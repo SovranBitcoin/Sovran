@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { memo, useRef } from 'react';
 import { LiquidGlassMenu } from 'liquid-glass-menu';
 import { Menu as HeroMenu, type MenuTriggerRef } from 'heroui-native';
 import { ActionSheetIOS, Platform, StyleSheet, Text } from 'react-native';
@@ -38,7 +38,7 @@ type StatsCardProps = {
   cardWidth: number;
 };
 
-export const StatsCard = function StatsCard({
+export const StatsCard = memo(function StatsCard({
   visibleCount,
   totalCount,
   loading,
@@ -179,7 +179,7 @@ export const StatsCard = function StatsCard({
       />
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   statsContainer: {

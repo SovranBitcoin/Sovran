@@ -193,7 +193,7 @@ function ScrollableGradientOverlayComponent({
   );
 }
 
-export const ScrollableGradientOverlay = ScrollableGradientOverlayComponent;
+export const ScrollableGradientOverlay = React.memo(ScrollableGradientOverlayComponent);
 
 // ============================================================================
 // AnimatedBackgroundView - Layout-level background with animated blur transitions
@@ -342,4 +342,4 @@ function AnimatedBackgroundViewComponent({
   );
 }
 
-export const AnimatedBackgroundView = AnimatedBackgroundViewComponent;
+export const AnimatedBackgroundView = React.memo(AnimatedBackgroundViewComponent);
