@@ -33,6 +33,7 @@ interface PopupConfig {
   dismissable?: boolean;
   duration?: number;
   buttons?: PopupButton[];
+  buttonLayout?: 'row' | 'stack';
   onOpen?: () => void;
   onClose?: (event: SheetCloseEvent) => void;
   type?: PopupSeverity;
@@ -64,6 +65,7 @@ export const popup = (config: PopupConfig) => {
       dismissable: options.dismissable ?? true,
       duration: options.duration,
       buttons: resolvedButtons,
+      buttonLayout: options.buttonLayout,
       onClose: options.onClose,
       live: options.live,
     };

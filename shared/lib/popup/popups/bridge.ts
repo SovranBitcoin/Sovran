@@ -83,6 +83,7 @@ export type SheetConfig = {
   dismissable?: boolean;
   duration?: number;
   buttons?: { text: string; page?: string; onPress?: () => void }[];
+  buttonLayout?: 'row' | 'stack';
   onClose?: (event: SheetCloseEvent) => void;
   live?: LiveSheetConfig;
 };

@@ -51,8 +51,9 @@ export const useVersionCheck = () => {
         log.info('hook.version_check.update_available', {
           currentVersion,
           latestVersion: payload.version,
+          hasMessage: !!payload.message,
         });
-        paramPopup('new-version', { version: payload.version });
+        paramPopup('new-version', { version: payload.version, message: payload.message });
       } else {
         log.debug('hook.version_check.up_to_date', { currentVersion });
       }

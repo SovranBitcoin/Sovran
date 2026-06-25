@@ -479,13 +479,17 @@ function SheetContent({
       <SubmessageRenderer submessage={standardPayload?.submessage} animation={confirmedAnimation} />
 
       {(standardPayload?.buttons?.length ?? 0) > 0 ? (
-        <View className="mt-4 gap-2">
+        <View
+          className={
+            standardPayload?.buttonLayout === 'row' ? 'mt-4 w-full flex-row gap-2' : 'mt-4 gap-2'
+          }>
           {standardPayload?.buttons?.map((button, index) => (
             <SheetActionButton
               key={`${button.text}-${index}`}
               button={button}
               variant={index === 0 ? 'primary' : 'tertiary'}
               feedbackVariant={hasLiveStatus ? 'scale' : undefined}
+              row={standardPayload?.buttonLayout === 'row'}
               close={close}
             />
           ))}
@@ -506,11 +510,20 @@ type SheetActionButtonProps = {
   button: { text: string; page?: string; onPress?: () => void | Promise<void> };
   variant: 'primary' | 'tertiary';
   feedbackVariant: 'scale' | undefined;
+  /** In a row layout each button takes an equal share of the width. */
+  row?: boolean;
   close: () => void;
 };
 
-function SheetActionButton({ button, variant, feedbackVariant, close }: SheetActionButtonProps) {
-  const className = getSheetButtonClassName(variant);
+function SheetActionButton({
+  button,
+  variant,
+  feedbackVariant,
+  row,
+  close,
+}: SheetActionButtonProps) {
+  const baseClassName = getSheetButtonClassName(variant);
+  const className = row ? `${baseClassName ?? ''} flex-1`.trim() : baseClassName;
   const labelClassName = getSheetButtonLabelClassName(variant);
   const handlePress = useSingleFlight(async () => {
     if (button.onPress) {
