@@ -4,7 +4,7 @@ import { EventDeletion } from 'nostr-tools/kinds';
 
 import { nostrLog } from '@/shared/lib/logger';
 import { deleteStatusPopup, popup } from '@/shared/lib/popup';
-import { checkBlobExists, deleteFromBlossom } from '@/shared/lib/nostr/media/blossomClient';
+import { deleteOwnedBlob } from '@/shared/lib/nostr/media/deleteOwnedBlob';
 import { extractOwnedBlobs } from '@/shared/lib/nostr/media/ownedBlobs';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { safeNormalizeRelay } from '@/shared/lib/nostr/outbox/defaults';
@@ -118,44 +118,21 @@ export async function executeDeletePost({
       const blob = blobs[idx];
       const legId = `img-${idx}`;
       store.setActiveLeg(legId);
-      ownedMedia.setDeleteState(blob.host, blob.sha256, 'delete-requested');
-      const res = await deleteFromBlossom({ ndk, server: blob.host, sha256: blob.sha256 });
-
-      // Primal returns 404 for "already gone" AND "not owned" — a HEAD probe of
-      // the URL disambiguates so we don't mark a blob we can't actually delete
-      // as deleted. A non-404 failure is left as delete-failed.
-      let deleted = res.isOk();
-      if (
-        !deleted &&
-        res.isErr() &&
-        res.error.type === 'delete-failed' &&
-        res.error.status === 404
-      ) {
-        if ((await checkBlobExists(blob.url)) === false) deleted = true;
-      }
-
+      // deleteOwnedBlob owns the BUD-11 delete, Primal's 404 HEAD
+      // disambiguation, and the owned-media state transition (→ deleted /
+      // delete-failed). The loop only drives this blob's progress-ring leg.
+      const { deleted, error } = await deleteOwnedBlob({
+        ndk,
+        host: blob.host,
+        sha256: blob.sha256,
+        url: blob.url,
+      });
       if (deleted) {
         imagesDeleted += 1;
         store.setLegDone(legId);
-        ownedMedia.setDeleteState(blob.host, blob.sha256, 'deleted');
-        nostrLog.info('nostr.delete.image', {
-          index: idx,
-          host: blob.host,
-          sha256: blob.sha256.slice(0, 12),
-          ok: true,
-        });
       } else {
         imagesFailed += 1;
-        const error = res.isErr() ? res.error.type : 'unknown';
-        store.setLegFailed(legId, error);
-        ownedMedia.setDeleteState(blob.host, blob.sha256, 'delete-failed');
-        nostrLog.warn('nostr.delete.image', {
-          index: idx,
-          host: blob.host,
-          sha256: blob.sha256.slice(0, 12),
-          ok: false,
-          error,
-        });
+        store.setLegFailed(legId, error ?? 'unknown');
       }
     }
 

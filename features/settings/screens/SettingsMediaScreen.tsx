@@ -1,16 +1,21 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Image } from 'expo-image';
 import { Button, Card } from 'heroui-native';
 import opacity from 'hex-color-opacity';
+import Icon from 'assets/icons';
 
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useLifecycleLogger } from '@/shared/lib/logger';
+import { actionMenuPopup, popup } from '@/shared/lib/popup';
 import { checkBlobExists } from '@/shared/lib/nostr/media/blossomClient';
+import { deleteOwnedBlob } from '@/shared/lib/nostr/media/deleteOwnedBlob';
 import {
   selectOwnedBlobs,
   useOwnedMediaStore,
@@ -62,7 +67,18 @@ function StatusPill({ state, colors }: { state: BlobDeleteState; colors: StatusC
   );
 }
 
-function BlobRow({ blob, colors }: { blob: OwnedBlobEntry; colors: StatusColors }) {
+function BlobRow({
+  blob,
+  colors,
+  onDelete,
+}: {
+  blob: OwnedBlobEntry;
+  colors: StatusColors;
+  onDelete?: (blob: OwnedBlobEntry) => void;
+}) {
+  // A delete is in flight while the state is 'delete-requested' — show only the
+  // spinning pill then, never a tappable trash that could re-fire the request.
+  const canDelete = !!onDelete && blob.deleteState !== 'delete-requested';
   return (
     <HStack align="center" gap={12} style={styles.row}>
       <Image
@@ -83,6 +99,17 @@ function BlobRow({ blob, colors }: { blob: OwnedBlobEntry; colors: StatusColors 
         </Text>
       </View>
       <StatusPill state={blob.deleteState} colors={colors} />
+      {canDelete ? (
+        <Pressable
+          haptics
+          hitSlop={10}
+          onPress={() => onDelete?.(blob)}
+          style={styles.deleteButton}
+          accessibilityRole="button"
+          accessibilityLabel="Delete image">
+          <Icon name="mdi:trash-can-outline" size={20} color={colors.danger} />
+        </Pressable>
+      ) : null}
     </HStack>
   );
 }
@@ -92,11 +119,13 @@ function Section({
   description,
   blobs,
   colors,
+  onDelete,
 }: {
   title: string;
   description: string;
   blobs: OwnedBlobEntry[];
   colors: StatusColors;
+  onDelete?: (blob: OwnedBlobEntry) => void;
 }) {
   if (blobs.length === 0) return null;
   return (
@@ -115,7 +144,7 @@ function Section({
             {description}
           </Text>
           {blobs.map((blob) => (
-            <BlobRow key={blob.sha256} blob={blob} colors={colors} />
+            <BlobRow key={blob.sha256} blob={blob} colors={colors} onDelete={onDelete} />
           ))}
         </Card.Body>
       </Card>
@@ -127,10 +156,13 @@ function Section({
  * Settings → "My media": the durable owned-blob ledger, split into "Still
  * online" and "Deleted" sections so the state is obvious at a glance. Refresh
  * HEAD-probes each URL to verify — disambiguating Primal's 404 ("gone" vs "not
- * owned"). View-only; deletion itself happens from a post's menu.
+ * owned"). Each still-online row can be deleted directly here (BUD-11), the
+ * same reconciliation a post deletion runs, so a blob can be removed or retried
+ * without finding the original post.
  */
 export const SettingsMediaScreen = () => {
   useLifecycleLogger('SettingsMediaScreen');
+  const { ndk } = useNDK();
   const [foreground, muted, success, danger] = useThemeColor([
     'foreground',
     'muted',
@@ -140,6 +172,57 @@ export const SettingsMediaScreen = () => {
   const colors: StatusColors = useMemo(
     () => ({ foreground, muted, success, danger }),
     [foreground, muted, success, danger]
+  );
+
+  const runDelete = useCallback(
+    async (blob: OwnedBlobEntry) => {
+      if (!ndk) {
+        // The signer/NDK isn't ready — surface it instead of silently no-op'ing.
+        popup({
+          message: 'Could not delete',
+          text: 'Your signing key is still loading — try again in a moment.',
+          type: 'error',
+        });
+        return;
+      }
+      const { deleted } = await deleteOwnedBlob({
+        ndk,
+        host: blob.host,
+        sha256: blob.sha256,
+        url: blob.url,
+      });
+      if (deleted) {
+        popup({ message: 'Image deleted', type: 'success', variant: 'toast', duration: 1500 });
+      } else {
+        popup({
+          message: "Couldn't delete image",
+          text: 'The server kept it or rejected the request. Pull to refresh to re-check.',
+          type: 'error',
+        });
+      }
+    },
+    [ndk]
+  );
+
+  const confirmDelete = useCallback(
+    (blob: OwnedBlobEntry) => {
+      actionMenuPopup({
+        title: 'Delete image?',
+        buttons: [
+          {
+            text: 'Delete',
+            icon: 'mdi:trash-can-outline',
+            variant: 'dangerous',
+            description: 'Removes it from the media server. This cannot be undone.',
+            onPress: (close) => {
+              close();
+              void runDelete(blob);
+            },
+          },
+        ],
+      });
+    },
+    [runDelete]
   );
 
   const byBlob = useOwnedMediaStore((s) => s.byBlob);
@@ -207,6 +290,7 @@ export const SettingsMediaScreen = () => {
               description="These images are still hosted and can be deleted."
               blobs={online}
               colors={colors}
+              onDelete={confirmDelete}
             />
             <Section
               title="Deleted"
@@ -229,5 +313,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 999,
+  },
+  deleteButton: {
+    padding: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
