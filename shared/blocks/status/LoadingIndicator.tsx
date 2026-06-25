@@ -24,6 +24,7 @@ import Animated, {
   useFrameCallback,
   useSharedValue,
   withDelay,
+  withRepeat,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
@@ -119,6 +120,9 @@ const MAX_SEGMENT_COUNT = 24;
 const SEGMENT_ANIM_MS = 340;
 const SEGMENT_STAGGER_MS = 55;
 const SEGMENT_PULSE_MS = 180;
+// The next-to-complete segment breathes a subtle colour/opacity pulse to signal
+// "this step is in progress". One half-cycle duration; loops (reversing).
+const SEGMENT_ACTIVE_PULSE_MS = 760;
 
 // Idle ring reads as a handful of discrete arc segments (echoing the
 // segmented confirmation ring) rather than a fine dotted hairline. Six
@@ -242,6 +246,8 @@ interface ConfirmationSegmentProps {
   index: number;
   segmentCount: number;
   completed: boolean;
+  /** The next-to-complete segment — breathes a subtle pulse to read "in progress". */
+  active: boolean;
   pendingColor: string;
   successColor: string;
   delayMs: number;
@@ -251,12 +257,15 @@ function ConfirmationSegment({
   index,
   segmentCount,
   completed,
+  active,
   pendingColor,
   successColor,
   delayMs,
 }: ConfirmationSegmentProps): React.ReactElement {
   const progress = useSharedValue(completed ? 1 : 0);
   const pulse = useSharedValue(0);
+  // Looping breathe for the active (next) segment; 0 when inactive/completed.
+  const activePulse = useSharedValue(0);
   const wasCompletedRef = React.useRef(completed);
   const mountedRef = React.useRef(false);
   // Read the latest delay at flip time without making it an effect dependency:
@@ -313,13 +322,37 @@ function ConfirmationSegment({
     }
   }, [completed, progress, pulse]);
 
-  const animatedProps = useAnimatedProps(() => ({
-    opacity: 0.45 + progress.get() * 0.55,
-    stroke: interpolateColor(progress.get(), [0, 1], [pendingColor, successColor]),
-    // Grow from a thinner pending arc to the full thickness as it fills, with
-    // a brief pulse-thicken at the moment of completion.
-    strokeWidth: stroke * (0.72 + progress.get() * 0.28) + pulse.get() * 1.6,
-  }));
+  useEffect(() => {
+    if (active && !completed) {
+      activePulse.set(
+        withRepeat(
+          withTiming(1, { duration: SEGMENT_ACTIVE_PULSE_MS, easing: Easing.inOut(Easing.ease) }),
+          -1,
+          true
+        )
+      );
+    } else {
+      activePulse.set(
+        withTiming(0, { duration: SEGMENT_PULSE_MS, easing: Easing.inOut(Easing.ease) })
+      );
+    }
+  }, [active, completed, activePulse]);
+
+  const animatedProps = useAnimatedProps(() => {
+    const p = progress.get();
+    // The breathe only applies to a not-yet-filled segment; it fades out as the
+    // segment fills (`1 - p`) so a completing segment hands off cleanly.
+    const breathe = (1 - p) * activePulse.get();
+    return {
+      opacity: 0.45 + p * 0.55 + breathe * 0.32,
+      // Push the pending colour partway toward success while breathing — a subtle
+      // tint, not a full fill (which is reserved for actual completion).
+      stroke: interpolateColor(p + breathe * 0.5, [0, 1], [pendingColor, successColor]),
+      // Grow from a thinner pending arc to the full thickness as it fills, with
+      // a brief pulse-thicken at completion and a gentle swell while active.
+      strokeWidth: stroke * (0.72 + p * 0.28) + pulse.get() * 1.6 + breathe * 0.7,
+    };
+  });
 
   return (
     <AnimatedCircle
@@ -727,6 +760,9 @@ export function LoadingIndicator({
                     index={index}
                     segmentCount={normalizedSegmentedProgress.segmentCount}
                     completed={index < normalizedSegmentedProgress.completedSegments}
+                    // The first not-yet-filled segment breathes to show the step
+                    // in progress; nothing breathes once the ring is complete.
+                    active={index === normalizedSegmentedProgress.completedSegments}
                     pendingColor={ringColor}
                     successColor={okColor}
                     delayMs={transitionDelayMs + cascadeOrder * SEGMENT_STAGGER_MS}
