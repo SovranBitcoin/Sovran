@@ -193,7 +193,8 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         getBtcPrice,
         getDisplayCurrency,
         getPreferredMintUrl: () => useMintStore.getState().selectedMint,
-        nostrGraphqlEndpoint: backendConfig.nostrGraphqlEndpoint,
+        nostrAppViewBaseUrl: backendConfig.nostrAppViewBaseUrl,
+        nostrAppViewVersion: 'v1',
         // Per-mint audit + KYM + operator Nostr profile. Reads existing
         // source caches first so offline Select Mint rows keep the rich data
         // the app has already seen; online opens refresh those caches behind

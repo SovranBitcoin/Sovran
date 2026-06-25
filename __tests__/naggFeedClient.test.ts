@@ -1,7 +1,7 @@
 jest.mock('@sovranbitcoin/colada', () => ({
   combineSignals: (...signals: (AbortSignal | undefined)[]) =>
     signals.find((signal): signal is AbortSignal => !!signal) ?? new AbortController().signal,
-  createNostrGraphqlMintEnrichment: jest.fn(() => ({
+  createNostrMintEnrichment: jest.fn(() => ({
     fetchMintReviews: jest.fn(),
     resolveMintContactProfile: jest.fn(),
   })),

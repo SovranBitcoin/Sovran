@@ -1,5 +1,5 @@
 const mockFetchMintReviews = jest.fn();
-const mockCreateNostrGraphqlMintEnrichment = jest.fn(() => ({
+const mockCreateNostrMintEnrichment = jest.fn(() => ({
   fetchMintReviews: mockFetchMintReviews,
   resolveMintContactProfile: jest.fn(),
 }));
@@ -7,7 +7,7 @@ const mockCreateNostrGraphqlMintEnrichment = jest.fn(() => ({
 jest.mock('@sovranbitcoin/colada', () => ({
   combineSignals: (...signals: (AbortSignal | undefined)[]) =>
     signals.find((signal): signal is AbortSignal => !!signal) ?? new AbortController().signal,
-  createNostrGraphqlMintEnrichment: mockCreateNostrGraphqlMintEnrichment,
+  createNostrMintEnrichment: mockCreateNostrMintEnrichment,
   isAbortError: () => false,
   timeoutSignal: () => new AbortController().signal,
 }));
@@ -29,7 +29,7 @@ describe('apiClient backend config routing', () => {
   beforeEach(() => {
     jest.resetModules();
     mockFetch.mockReset();
-    mockCreateNostrGraphqlMintEnrichment.mockClear();
+    mockCreateNostrMintEnrichment.mockClear();
     mockFetchMintReviews.mockReset();
     mockFetch.mockResolvedValue({
       ok: false,
@@ -79,7 +79,7 @@ describe('apiClient backend config routing', () => {
     ]);
   });
 
-  it('routes mint reviews through the Nostr GraphQL endpoint', async () => {
+  it('routes mint reviews through the REST app-view', async () => {
     process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.example.test/api/';
     process.env.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL = 'http://localhost:8080/';
     mockFetchMintReviews.mockResolvedValueOnce({
@@ -105,8 +105,9 @@ describe('apiClient backend config routing', () => {
 
     const result = await reviewMint({ mintUrl: 'https://mint.example.test' });
 
-    expect(mockCreateNostrGraphqlMintEnrichment).toHaveBeenCalledWith({
-      endpoint: 'http://localhost:8080/graphql',
+    expect(mockCreateNostrMintEnrichment).toHaveBeenCalledWith({
+      appViewBaseUrl: 'http://localhost:8080',
+      appViewVersion: 'v1',
       timeoutMs: 10_000,
     });
     expect(mockFetchMintReviews).toHaveBeenCalledWith('https://mint.example.test', {

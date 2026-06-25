@@ -1,7 +1,7 @@
 import { GetInfoResponse } from '@cashu/cashu-ts';
 import {
   combineSignals,
-  createNostrGraphqlMintEnrichment,
+  createNostrMintEnrichment,
   isAbortError,
   timeoutSignal,
   type MintReviewRecommendation,
@@ -75,8 +75,9 @@ const SCORE_API_BASE_URL = backendConfig.scoreApiBaseUrl;
  * `DEFAULT_TIMEOUT_MS` (15s, tuned for arbitrary LNURL endpoints).
  */
 const DEFAULT_TIMEOUT_MS = 10_000;
-const mintReviewsEnrichment = createNostrGraphqlMintEnrichment({
-  endpoint: backendConfig.nostrGraphqlEndpoint,
+const mintReviewsEnrichment = createNostrMintEnrichment({
+  appViewBaseUrl: backendConfig.nostrAppViewBaseUrl,
+  appViewVersion: 'v1',
   timeoutMs: DEFAULT_TIMEOUT_MS,
 });
 // Re-export schema-derived types for callers that previously imported them
