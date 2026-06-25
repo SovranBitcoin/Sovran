@@ -48,6 +48,13 @@ export type ComposerBlock =
       kind: 'media';
       mediaKind: 'image' | 'video';
       localUri?: string;
+      /**
+       * Picked-asset metadata retained at selection time so the upload can be
+       * deferred to the Post action (re-encode + Blossom PUT need the mime/dims).
+       */
+      mimeType?: string;
+      width?: number;
+      height?: number;
       descriptor?: MediaDescriptor;
       alt?: string;
       sensitive?: boolean;

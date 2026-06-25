@@ -57,6 +57,7 @@ jest.mock('react-native-reanimated', () => {
       };
     },
     withDelay: <T,>(_delayMs: number, value: T) => value,
+    withRepeat: <T,>(value: T) => value,
     withSequence: <T,>(...values: T[]) => values[values.length - 1],
     withTiming: <T,>(value: T) => value,
   };

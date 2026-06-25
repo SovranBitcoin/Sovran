@@ -1,8 +1,23 @@
 import { nip19 } from 'nostr-tools';
 import type { ContentSegment, FeedEvent } from './feedTypes';
 
-export const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i;
+// SVG is intentionally absent: expo-image can't render remote SVGs, so an svg
+// url renders as a tappable link rather than a blank image box.
+export const IMAGE_EXT = /\.(jpe?g|png|gif|webp|avif)(\?.*)?$/i;
 export const VIDEO_EXT = /\.(mp4|webm|mov|m4v|avi)(\?.*)?$/i;
+
+/**
+ * Maps a NIP-92 imeta `m` mime type to how the renderer should treat its url,
+ * or `undefined` to leave classification to the url extension. Lets an
+ * extensionless media url (common with content-addressed Blossom blobs from
+ * other clients) still render as media. SVG is excluded — see `IMAGE_EXT`.
+ */
+export function mediaKindForMime(mime: string | undefined): 'image' | 'video' | undefined {
+  if (!mime || mime === 'image/svg+xml') return undefined;
+  if (mime.startsWith('image/')) return 'image';
+  if (mime.startsWith('video/')) return 'video';
+  return undefined;
+}
 
 // Bounded quantifiers protect parseContent against adversarial relay content
 // allocating arbitrarily large match strings: bolt11 invoices never exceed
@@ -197,6 +212,8 @@ export interface ImetaInfo {
   width?: number;
   height?: number;
   blurhash?: string;
+  /** Blossom content address (`x` field) — the authoritative blob hash to delete. */
+  sha256?: string;
 }
 
 /**
@@ -219,6 +236,7 @@ export function parseImetaTags(tags: readonly string[][]): Map<string, ImetaInfo
       const value = field.slice(sp + 1);
       if (key === 'url') info.url = value;
       else if (key === 'm') info.mimeType = value;
+      else if (key === 'x') info.sha256 = value;
       else if (key === 'alt') info.alt = value;
       else if (key === 'blurhash') info.blurhash = value;
       else if (key === 'dim') {

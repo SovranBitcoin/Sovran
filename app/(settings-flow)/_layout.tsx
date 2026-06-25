@@ -21,6 +21,7 @@ const ROUTING_OPTIONS = { title: 'Swap routing' };
 const NETWORK_OPTIONS = { title: 'Network' };
 const KEYRING_OPTIONS = { title: 'P2PK Keys' };
 const STORAGE_OPTIONS = { title: 'Storage inventory' };
+const MEDIA_OPTIONS = { title: 'My media' };
 const DESIGN_SYSTEM_OPTIONS = { title: 'Design system' };
 const DESIGN_SYSTEM_LOADING_OPTIONS = { title: 'Loading indicator' };
 const DESIGN_SYSTEM_SEGMENTED_OPTIONS = { title: 'Segmented progress' };
@@ -49,6 +50,7 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="network" options={NETWORK_OPTIONS} />
       <Stack.Screen name="keyring" options={KEYRING_OPTIONS} />
       <Stack.Screen name="storage" options={STORAGE_OPTIONS} />
+      <Stack.Screen name="media" options={MEDIA_OPTIONS} />
       <Stack.Screen name="design-system" options={DESIGN_SYSTEM_OPTIONS} />
       <Stack.Screen name="design-system-loading" options={DESIGN_SYSTEM_LOADING_OPTIONS} />
       <Stack.Screen name="design-system-segmented" options={DESIGN_SYSTEM_SEGMENTED_OPTIONS} />

@@ -24,6 +24,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
+import { ingestOwnMediaBlobs } from '@/shared/stores/profile/ownedMediaStore';
 
 import { OWN_EVENT_KINDS, partitionOwnEvents, type OwnSyncEvent } from './partitionOwnEvents';
 
@@ -113,6 +114,7 @@ export function useOwnEventsSync(): void {
     if (part.ownNotes.length > 0) {
       const own = useOwnContentStore.getState();
       for (const note of part.ownNotes) own.ingestSeen(note);
+      ingestOwnMediaBlobs(part.ownNotes, pubkey);
     }
     if (part.latestContacts) {
       social.setContactsFromRelay({

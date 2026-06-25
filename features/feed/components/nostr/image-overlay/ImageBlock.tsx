@@ -26,9 +26,13 @@ import { ANDROID_THUMB_DIM_MAX_OPACITY, THUMB_BLUR_MAX_INTENSITY } from './confi
 import { Log, feedLog } from '@/shared/lib/logger';
 import { useShiftLogger, useVisualLayoutLogger, urlHost } from '@/shared/lib/contentShiftLog';
 import { getCachedAspect, rememberAspect } from './imageAspectCache';
+import { openExternalUrl } from '@/shared/lib/url';
 
 /** Aspect ratio reserved before the image's intrinsic size is known. */
 const DEFAULT_IMAGE_ASPECT = 16 / 9;
+
+/** Extensions expo-image should decode as animated. */
+const ANIMATED_IMAGE_EXT = /\.(gif|webp)(\?.*)?$/i;
 
 /** The subset of GestureResponderEvent.nativeEvent the calibration reads. */
 type GestureTouchPoint = { pageX: number; pageY: number; locationX: number; locationY: number };
@@ -57,6 +61,7 @@ interface ImageBlockOverlayPostProps {
 export const ImageBlock = React.memo(function ImageBlock({
   url,
   alt,
+  blurhash,
   allImageUrls,
   allMediaUrls,
   mediaTypes,
@@ -85,6 +90,8 @@ export const ImageBlock = React.memo(function ImageBlock({
   url: string;
   /** NIP-92 imeta alt text, used as the image's accessibility label. */
   alt?: string;
+  /** NIP-92 imeta blurhash, shown as a placeholder while the image loads. */
+  blurhash?: string;
   /**
    * Aspect ratio (width / height) known ahead of load — e.g. from the post's
    * NIP-92 imeta `dim`. Used as the initial reserved size so the image lays out
@@ -376,22 +383,28 @@ export const ImageBlock = React.memo(function ImageBlock({
 
   if (error) {
     return (
-      <View
+      <Pressable
         accessible
-        accessibilityLabel={alt ? `Image unavailable: ${alt}` : 'Image unavailable'}
+        accessibilityRole="button"
+        accessibilityLabel={
+          alt ? `Image unavailable: ${alt}. Tap to open.` : 'Image unavailable. Tap to open.'
+        }
+        onPress={() => void openExternalUrl(url)}
         style={[styles.unavailable, { backgroundColor: opacity(foreground, 0.06) }]}>
         <Icon name="mdi:image-broken-variant" size={22} color={opacity(foreground, 0.4)} />
         <Text size={12} style={{ color: opacity(foreground, 0.4), marginTop: 4 }}>
-          Image unavailable
+          Image unavailable — tap to open
         </Text>
-      </View>
+      </Pressable>
     );
   }
 
   const image = (
     <Image
       ref={imageRef}
-      source={{ uri: url }}
+      source={{ uri: url, isAnimated: ANIMATED_IMAGE_EXT.test(url) }}
+      placeholder={blurhash}
+      placeholderContentFit="cover"
       style={{ width: '100%', aspectRatio, borderRadius: 12 }}
       contentFit="cover"
       cachePolicy="disk"

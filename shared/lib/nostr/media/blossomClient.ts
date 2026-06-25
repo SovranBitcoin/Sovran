@@ -23,7 +23,53 @@ export type BlossomError =
   | { type: 'read-failed' }
   | { type: 'sign-failed' }
   | { type: 'upload-failed'; status?: number }
-  | { type: 'bad-response' };
+  | { type: 'bad-response' }
+  | { type: 'too-large'; size: number }
+  | { type: 'canceled' };
+
+export type BlossomDeleteError =
+  | { type: 'sign-failed' }
+  | { type: 'delete-failed'; status?: number }
+  | { type: 'canceled' };
+
+// Primal's DELETE runs a synchronous server-side media purge that can take
+// >15s; too short a cap aborts a delete that actually succeeds (the client logs
+// failure while the blob is really gone). 30s gives the purge room to return a
+// clean 2xx. A delete that still times out is recovered by the HEAD-probe in
+// `deleteOwnedBlob`.
+const DELETE_TIMEOUT_MS = 30_000;
+/** Existence probe timeout (settings refresh / post-delete verification). */
+const CHECK_TIMEOUT_MS = 10_000;
+
+/**
+ * Checks whether a blob still exists at `url` (BUD-01 HEAD existence check).
+ * `true` = present (2xx), `false` = gone (404/410), `null` = indeterminate
+ * (HEAD unsupported, network error, timeout) so the caller can leave state
+ * unchanged. Unauthenticated — used to verify a deletion actually took, and to
+ * disambiguate Primal's 404 (which means "gone" OR "not owned").
+ */
+export async function checkBlobExists(url: string): Promise<boolean | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
+  try {
+    // eslint-disable-next-line no-restricted-globals -- Blossom HEAD existence check (BUD-01); bare status, no JSON envelope.
+    const res = await fetch(url, { method: 'HEAD', signal: controller.signal });
+    if (res.status === 404 || res.status === 410) return false;
+    if (res.status >= 200 && res.status < 300) return true;
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Hard ceiling on upload size; photos are re-encoded well under this. */
+export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+/** Per-attempt upload timeout. */
+const UPLOAD_TIMEOUT_MS = 60_000;
+/** Total attempts (1 initial + retries) for transient network failures. */
+const MAX_ATTEMPTS = 3;
 
 function base64ToBytes(base64: string): Uint8Array {
   const binary =
@@ -54,6 +100,10 @@ export interface UploadOptions {
   server: string;
   fileUri: string;
   mimeType: string;
+  /** Receives upload progress as a 0–1 fraction. */
+  onProgress?: (fraction: number) => void;
+  /** Aborts the upload (e.g. when the user removes the media block). */
+  signal?: AbortSignal;
 }
 
 /** Uploads `fileUri` to `server` and returns the blob descriptor. */
@@ -61,8 +111,29 @@ export function uploadToBlossom(opts: UploadOptions): ResultAsync<BlobDescriptor
   return new ResultAsync(run(opts));
 }
 
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomError>> {
-  // 1. Hash the bytes (Blossom content address + imeta `x`).
+  if (opts.signal?.aborted) return err({ type: 'canceled' });
+
+  // 1. Reject oversized files before reading them into memory. Fail closed: if
+  //    we can't read the size, refuse rather than load an unbounded blob.
+  try {
+    const info = await FileSystem.getInfoAsync(opts.fileUri);
+    if (!info.exists || typeof info.size !== 'number') {
+      nostrLog.warn('nostr.media.read_failed');
+      return err({ type: 'read-failed' });
+    }
+    if (info.size > MAX_UPLOAD_BYTES) {
+      nostrLog.warn('nostr.media.too_large', { size: info.size });
+      return err({ type: 'too-large', size: info.size });
+    }
+  } catch {
+    nostrLog.warn('nostr.media.read_failed');
+    return err({ type: 'read-failed' });
+  }
+
+  // 2. Hash the bytes (Blossom content address + imeta `x`).
   let sha256: string;
   try {
     const base64 = await FileSystem.readAsStringAsync(opts.fileUri, {
@@ -73,8 +144,9 @@ async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomE
     nostrLog.warn('nostr.media.read_failed');
     return err({ type: 'read-failed' });
   }
+  if (opts.signal?.aborted) return err({ type: 'canceled' });
 
-  // 2. Sign the kind:24242 authorization event.
+  // 3. Sign the kind:24242 authorization event.
   let authHeader: string;
   try {
     const unsigned = buildBlossomAuthEvent({
@@ -94,13 +166,60 @@ async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomE
     return err({ type: 'sign-failed' });
   }
 
-  // 3. PUT the file.
-  try {
-    const response = await FileSystem.uploadAsync(`${opts.server}/upload`, opts.fileUri, {
+  // 4. PUT the file, retrying transient failures with backoff.
+  let last: Result<BlobDescriptor, BlossomError> = err({ type: 'upload-failed' });
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    if (opts.signal?.aborted) return err({ type: 'canceled' });
+    last = await putOnce(opts, authHeader);
+    if (last.isOk()) return last;
+
+    const e = last.error;
+    // Don't retry cancellation, oversize, or client (4xx) responses.
+    if (e.type === 'canceled' || e.type === 'too-large') return last;
+    if (e.type === 'upload-failed' && e.status && e.status >= 400 && e.status < 500) return last;
+    if (attempt < MAX_ATTEMPTS) await delay(500 * 2 ** (attempt - 1));
+  }
+  return last;
+}
+
+/** One PUT attempt: progress callbacks, timeout, and abort all wired to the task. */
+async function putOnce(
+  opts: UploadOptions,
+  authHeader: string
+): Promise<Result<BlobDescriptor, BlossomError>> {
+  const task = FileSystem.createUploadTask(
+    `${opts.server}/upload`,
+    opts.fileUri,
+    {
       httpMethod: 'PUT',
       uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
       headers: { Authorization: authHeader, 'Content-Type': opts.mimeType },
-    });
+    },
+    (data) => {
+      if (opts.onProgress && data.totalBytesExpectedToSend > 0) {
+        opts.onProgress(data.totalBytesSent / data.totalBytesExpectedToSend);
+      }
+    }
+  );
+
+  const onAbort = (): void => void task.cancelAsync();
+  opts.signal?.addEventListener('abort', onAbort);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    const response = await Promise.race([
+      task.uploadAsync(),
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => {
+          void task.cancelAsync();
+          resolve(undefined);
+        }, UPLOAD_TIMEOUT_MS);
+      }),
+    ]);
+
+    // cancelAsync resolves uploadAsync to null/undefined (abort or timeout).
+    if (!response)
+      return err(opts.signal?.aborted ? { type: 'canceled' } : { type: 'upload-failed' });
     if (response.status < 200 || response.status >= 300) {
       nostrLog.warn('nostr.media.upload_failed', { status: response.status });
       return err({ type: 'upload-failed', status: response.status });
@@ -110,7 +229,100 @@ async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomE
     nostrLog.info('nostr.media.uploaded', { size: descriptor.size });
     return ok(descriptor);
   } catch {
+    if (opts.signal?.aborted) return err({ type: 'canceled' });
     nostrLog.warn('nostr.media.upload_failed', {});
     return err({ type: 'upload-failed' });
+  } finally {
+    if (timer) clearTimeout(timer);
+    opts.signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+export interface DeleteOptions {
+  ndk: NDK;
+  /**
+   * Origin the blob lives on (scheme + host of the blob URL), e.g.
+   * `https://blossom.primal.net`. A blob can only be deleted from the server it
+   * was uploaded to, so this is derived from the URL host — NOT from the
+   * currently-configured media server (which may since have changed).
+   */
+  server: string;
+  /** Blob content address; `DELETE /<sha256>` per BUD-11. */
+  sha256: string;
+  signal?: AbortSignal;
+}
+
+/**
+ * Deletes a blob from its Blossom server (BUD-11): signs a fresh `kind:24242`
+ * authorization event with `["t","delete"]` + `["x",<sha256>]` and sends
+ * `DELETE /<sha256>` with `Authorization: Nostr …` and `X-SHA-256`.
+ *
+ * The auth event is signed per call (not reused) so its short expiration can't
+ * lapse partway through a slow multi-image delete. The server only honours the
+ * delete when the signer owns the blob; a 401/403/404 is therefore expected and
+ * left non-fatal for the caller to fold into its progress UI.
+ */
+export function deleteFromBlossom(opts: DeleteOptions): ResultAsync<void, BlossomDeleteError> {
+  return new ResultAsync(runDelete(opts));
+}
+
+async function runDelete(opts: DeleteOptions): Promise<Result<void, BlossomDeleteError>> {
+  if (opts.signal?.aborted) return err({ type: 'canceled' });
+
+  // Fresh delete auth (5-min expiry) signed for THIS blob.
+  let authHeader: string;
+  try {
+    const unsigned = buildBlossomAuthEvent({
+      action: 'delete',
+      sha256: opts.sha256,
+      createdAt: Math.floor(Date.now() / 1000),
+    });
+    const authEvent = new NDKEvent(opts.ndk);
+    authEvent.kind = unsigned.kind;
+    authEvent.content = unsigned.content;
+    authEvent.created_at = unsigned.created_at;
+    authEvent.tags = unsigned.tags;
+    await authEvent.sign();
+    authHeader = encodeAuthHeader(JSON.stringify(authEvent.rawEvent()));
+  } catch {
+    nostrLog.warn('nostr.media.delete_auth_sign_failed');
+    return err({ type: 'sign-failed' });
+  }
+
+  const controller = new AbortController();
+  const onAbort = (): void => controller.abort();
+  opts.signal?.addEventListener('abort', onAbort);
+  const timer = setTimeout(() => controller.abort(), DELETE_TIMEOUT_MS);
+  try {
+    // eslint-disable-next-line no-restricted-globals -- Blossom DELETE returns a bare status (BUD-11), not a JSON envelope; needs raw fetch + AbortSignal.
+    const response = await fetch(`${opts.server}/${opts.sha256}`, {
+      method: 'DELETE',
+      headers: { Authorization: authHeader, 'X-SHA-256': opts.sha256 },
+      signal: controller.signal,
+    });
+    if (response.status >= 200 && response.status < 300) {
+      nostrLog.info('nostr.media.deleted', {
+        server: opts.server,
+        sha256: opts.sha256.slice(0, 12),
+        status: response.status,
+      });
+      return ok(undefined);
+    }
+    nostrLog.warn('nostr.media.delete_failed', {
+      server: opts.server,
+      sha256: opts.sha256.slice(0, 12),
+      status: response.status,
+    });
+    return err({ type: 'delete-failed', status: response.status });
+  } catch {
+    if (opts.signal?.aborted) return err({ type: 'canceled' });
+    nostrLog.warn('nostr.media.delete_failed', {
+      server: opts.server,
+      sha256: opts.sha256.slice(0, 12),
+    });
+    return err({ type: 'delete-failed' });
+  } finally {
+    clearTimeout(timer);
+    opts.signal?.removeEventListener('abort', onAbort);
   }
 }

@@ -1,10 +1,15 @@
 import { useEffect } from 'react';
 
 import { isSwapStatusToastMounted, swapStatusPopup } from '@/shared/lib/popup';
-import { useSwapStatusStore, type SwapState } from '@/shared/stores/runtime/swapStatusStore';
+import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
+import type { ProgressState } from '@/shared/stores/runtime/legProgress';
 import { paymentLog } from '@/shared/lib/logger';
 
-const TERMINAL_STATES: ReadonlySet<SwapState> = new Set<SwapState>(['done', 'failed', 'cancelled']);
+const TERMINAL_STATES: ReadonlySet<ProgressState> = new Set<ProgressState>([
+  'done',
+  'failed',
+  'cancelled',
+]);
 
 /**
  * Re-pops the unified Swap toast when the swap reaches a terminal state with
@@ -20,7 +25,7 @@ const TERMINAL_STATES: ReadonlySet<SwapState> = new Set<SwapState>(['done', 'fai
  */
 export function useSwapStatusListener(): void {
   useEffect(() => {
-    let prevState: SwapState | undefined = useSwapStatusStore.getState().active?.state;
+    let prevState: ProgressState | undefined = useSwapStatusStore.getState().active?.state;
     return useSwapStatusStore.subscribe((s) => {
       const nextState = s.active?.state;
       const transitionedToTerminal =

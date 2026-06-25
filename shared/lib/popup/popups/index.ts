@@ -15,6 +15,7 @@ export { emojiPickerPopup } from './emojiPicker';
 export { modelPickerPopup } from './modelPicker';
 export type { ProfileSwitcherAction } from '../actionSheetTypes';
 export { actionMenuPopup, dismissActionMenuPopup } from './actionMenu';
+export { deleteStatusPopup } from './deleteStatus';
 export {
   paymentStatusPopup,
   swapStatusPopup,

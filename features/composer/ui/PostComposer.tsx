@@ -7,11 +7,12 @@
  * `ComposeConfig`; the char meter enforces the relay-sourced budget; send goes
  * through the outbox-aware publish seam.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -30,6 +31,9 @@ import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { uploadMedia } from '@/shared/lib/nostr/media/mediaUpload';
+import { extractOwnedBlobsFromDescriptors } from '@/shared/lib/nostr/media/ownedBlobs';
+import type { MediaDescriptor } from '@/shared/lib/nostr/media/types';
+import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import { useComposeConfig } from '@/features/composer/config/useComposeConfig';
 import { useComposerStore } from '@/features/composer/state/composerStore';
 import {
@@ -37,6 +41,8 @@ import {
   type PublishOutcome,
 } from '@/features/composer/publish/useComposerActions';
 import { PollComposeForm, emptyPollDraft } from '@/features/composer/ui/PollComposeForm';
+import { PostProgressBar } from '@/features/composer/ui/PostProgressBar';
+import type { ComposerBlock } from '@/features/composer/config/types';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -110,6 +116,15 @@ export function PostComposer() {
   }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Segmented posting progress (image legs + the final post leg). Null when not
+  // mid-post or when there are no images to upload.
+  const [postProgress, setPostProgress] = useState<{ done: number; total: number } | null>(null);
+  // Synchronous re-entrancy guard: `busy` is async state, so a fast double-tap
+  // can clear the `if (!canPost)` check twice before the first render disables
+  // the button. This blocks the second invocation immediately.
+  const postingRef = useRef(false);
+  // Media block whose alt text is being edited, with its in-progress value.
+  const [altEdit, setAltEdit] = useState<{ id: string; value: string } | null>(null);
   const [surface, foreground, mutedColor, accentColor, dangerColor, lineColor] = useThemeColor([
     'surface',
     'foreground',
@@ -206,48 +221,140 @@ export function PostComposer() {
     router.back();
   }, [close]);
 
+  // AbortControllers for in-flight uploads, keyed by media-block id, so removing
+  // a block (or unmounting the composer) cancels its upload instead of leaving
+  // an orphaned blob on the server.
+  const uploadsRef = useRef<Map<string, AbortController>>(new Map());
+
+  // Abort any upload still running if the composer unmounts mid-post.
+  useEffect(() => {
+    const uploads = uploadsRef.current;
+    return () => {
+      uploads.forEach((controller) => controller.abort());
+      uploads.clear();
+    };
+  }, []);
+
   const handlePost = useCallback(async () => {
-    if (!canPost) return;
+    if (postingRef.current || !canPost) return;
+    postingRef.current = true;
     setBusy(true);
     setError(null);
+
+    // Upload is deferred to here: re-encode + PUT every media block that has no
+    // descriptor yet, then publish. Abort the whole post if any upload fails so
+    // we never publish a note missing one of its images.
+    const pending = mediaBlocks.filter(
+      (b): b is Extract<ComposerBlock, { kind: 'media' }> =>
+        b.kind === 'media' && !b.descriptor && !!b.localUri
+    );
+    const imageCount = pending.length;
+    if (imageCount > 0) setPostProgress({ done: 0, total: imageCount + 1 });
+
+    let done = 0;
+    // Descriptors that finished uploading before any sibling failed. If the post
+    // aborts, these blobs are already on the server with no note referencing
+    // them — record them so "My media" can clean them up later.
+    const uploaded: MediaDescriptor[] = [];
+    const uploadOne = async (block: Extract<ComposerBlock, { kind: 'media' }>): Promise<void> => {
+      const controller = new AbortController();
+      uploadsRef.current.set(block.id, controller);
+      updateBlock(block.id, { uploadProgress: 0 });
+      const upload = await uploadMedia({
+        ndk: ndk!,
+        asset: {
+          uri: block.localUri!,
+          mimeType: block.mimeType ?? 'image/jpeg',
+          width: block.width,
+          height: block.height,
+        },
+        signal: controller.signal,
+        onProgress: (fraction) => updateBlock(block.id, { uploadProgress: fraction }),
+      });
+      uploadsRef.current.delete(block.id);
+      if (upload.isErr()) {
+        if (upload.error.type !== 'canceled') updateBlock(block.id, { uploadProgress: undefined });
+        throw upload.error;
+      }
+      uploaded.push(upload.value);
+      updateBlock(block.id, { descriptor: upload.value, uploadProgress: undefined });
+      done += 1;
+      if (imageCount > 0) setPostProgress({ done, total: imageCount + 1 });
+    };
+
+    let tasks: Promise<void>[] = [];
+    try {
+      if (!ndk) throw { type: 'no-ndk' };
+      tasks = pending.map(uploadOne);
+      await Promise.all(tasks);
+    } catch (e) {
+      // One upload failed/cancelled: abort the siblings still in flight (don't
+      // leave them running for a post we're abandoning), then wait for every
+      // task to settle so a sibling that finished around the failure boundary
+      // has pushed its descriptor before we record orphans — so any blob that
+      // did land stays deletable from "My media".
+      uploadsRef.current.forEach((controller) => controller.abort());
+      uploadsRef.current.clear();
+      await Promise.allSettled(tasks);
+      const orphans = extractOwnedBlobsFromDescriptors(uploaded);
+      if (orphans.length > 0) useOwnedMediaStore.getState().recordBlobs(orphans);
+      postingRef.current = false;
+      setBusy(false);
+      setPostProgress(null);
+      const type = (e as { type?: string }).type;
+      // A cancel (block removed mid-upload) is silent; everything else surfaces.
+      setError(
+        type === 'canceled'
+          ? null
+          : type === 'too-large'
+            ? 'That file is too large to upload.'
+            : 'Media upload failed. Try again.'
+      );
+      return;
+    }
+
     const outcome = await publish();
+    postingRef.current = false;
     setBusy(false);
     if (outcome === 'ok') {
+      if (imageCount > 0) setPostProgress({ done: imageCount + 1, total: imageCount + 1 });
       router.back();
       return;
     }
+    setPostProgress(null);
     setError(OUTCOME_MESSAGE[outcome] ?? 'Something went wrong.');
-  }, [canPost, publish]);
+  }, [canPost, publish, mediaBlocks, ndk, updateBlock]);
 
   const handleAddMedia = useCallback(async () => {
-    if (!ndk || mediaBlocks.length >= config.maxMedia) return;
+    if (mediaBlocks.length >= config.maxMedia) return;
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
+      mediaTypes: ['images'],
       quality: 1,
+      exif: false,
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
-    const mediaKind = asset.type === 'video' ? 'video' : 'image';
-    const mimeType = asset.mimeType ?? (mediaKind === 'video' ? 'video/mp4' : 'image/jpeg');
-
-    const id = addMediaBlock({
+    // Defer the upload to Post: store the local asset only. A mis-pick costs no
+    // network work, and the user can remove it before anything is uploaded.
+    addMediaBlock({
       kind: 'media',
-      mediaKind,
+      mediaKind: 'image',
       localUri: asset.uri,
-      uploadProgress: 0,
+      mimeType: asset.mimeType ?? 'image/jpeg',
+      width: asset.width,
+      height: asset.height,
     });
+  }, [mediaBlocks.length, config.maxMedia, addMediaBlock]);
 
-    const upload = await uploadMedia({
-      ndk,
-      asset: { uri: asset.uri, mimeType, width: asset.width, height: asset.height },
-    });
-    if (upload.isOk()) {
-      updateBlock(id, { descriptor: upload.value, uploadProgress: undefined });
-    } else {
+  // Cancel any in-flight upload before dropping the block.
+  const handleRemoveMedia = useCallback(
+    (id: string) => {
+      uploadsRef.current.get(id)?.abort();
+      uploadsRef.current.delete(id);
       removeBlock(id);
-      setError('Media upload failed. Try a different file.');
-    }
-  }, [ndk, mediaBlocks.length, config.maxMedia, addMediaBlock, updateBlock, removeBlock]);
+    },
+    [removeBlock]
+  );
 
   return (
     <KeyboardAvoidingView
@@ -400,12 +507,36 @@ export function PostComposer() {
                           }}>
                           <ActivityIndicator color={INVARIANT_WHITE} />
                         </VisualLayoutProbe>
+                        {block.uploadProgress > 0 ? (
+                          <Text
+                            size={11}
+                            style={{
+                              color: INVARIANT_WHITE,
+                              marginTop: 4,
+                              fontVariant: ['tabular-nums'],
+                            }}>
+                            {Math.round(block.uploadProgress * 100)}%
+                          </Text>
+                        ) : null}
                       </View>
+                    ) : null}
+                    {config.allowAltText && block.uploadProgress === undefined ? (
+                      <Pressable
+                        onPress={() => setAltEdit({ id: block.id, value: block.alt ?? '' })}
+                        accessibilityLabel={block.alt ? 'Edit alt text' : 'Add alt text'}
+                        style={[
+                          styles.altBadge,
+                          block.alt ? { backgroundColor: accentColor } : null,
+                        ]}>
+                        <Text size={10} style={{ color: INVARIANT_WHITE, fontWeight: '700' }}>
+                          {block.alt ? 'ALT ✓' : 'ALT'}
+                        </Text>
+                      </Pressable>
                     ) : null}
                     <Button
                       variant="ghost"
                       size="sm"
-                      onPress={() => removeBlock(block.id)}
+                      onPress={() => handleRemoveMedia(block.id)}
                       accessibilityLabel="Remove media">
                       <Icon name="mdi:close-circle" size={18} color={mutedColor} />
                     </Button>
@@ -424,6 +555,10 @@ export function PostComposer() {
           ) : null}
         </ScrollView>
       </VisualLayoutProbe>
+
+      {postProgress ? (
+        <PostProgressBar done={postProgress.done} total={postProgress.total} failed={!!error} />
+      ) : null}
 
       <VisualLayoutProbe
         scope={COMPOSER_VISUAL_SCOPE}
@@ -479,6 +614,53 @@ export function PostComposer() {
           {remaining}
         </Text>
       </VisualLayoutProbe>
+
+      <Modal
+        visible={!!altEdit}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAltEdit(null)}>
+        <Pressable style={styles.altBackdrop} onPress={() => setAltEdit(null)}>
+          <Pressable style={[styles.altCard, { backgroundColor: surface }]}>
+            <Text size={15} style={{ color: foreground, fontWeight: '600', marginBottom: 6 }}>
+              Describe this image
+            </Text>
+            <Text size={12} style={{ color: mutedColor, marginBottom: 12 }}>
+              Alt text helps people using screen readers understand the image.
+            </Text>
+            <TextInput
+              value={altEdit?.value ?? ''}
+              onChangeText={(text) =>
+                setAltEdit((prev) => (prev ? { ...prev, value: text } : prev))
+              }
+              placeholder="e.g. A dog running on a beach at sunset"
+              placeholderTextColor={mutedColor}
+              multiline
+              autoFocus
+              style={[styles.altInput, { color: foreground, borderColor: lineColor }]}
+            />
+            <View style={styles.altActions}>
+              <Pressable onPress={() => setAltEdit(null)} accessibilityLabel="Cancel alt text">
+                <Text size={14} style={{ color: mutedColor, fontWeight: '600' }}>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (!altEdit) return;
+                  const trimmed = altEdit.value.trim();
+                  updateBlock(altEdit.id, { alt: trimmed.length > 0 ? trimmed : undefined });
+                  setAltEdit(null);
+                }}
+                accessibilityLabel="Save alt text">
+                <Text size={14} style={{ color: accentColor, fontWeight: '700' }}>
+                  Save
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -606,5 +788,40 @@ const styles = StyleSheet.create({
   },
   flex1: {
     flex: 1,
+  },
+  altBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  altBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  altCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 16,
+    padding: 20,
+  },
+  altInput: {
+    minHeight: 72,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    padding: 10,
+    textAlignVertical: 'top',
+  },
+  altActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 24,
+    marginTop: 16,
   },
 });

@@ -25,6 +25,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { ContentSegment, FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
 import {
   collectQuoteTagIds,
+  mediaKindForMime,
   parseContent,
   parseImetaTags,
   prettifyUrl,
@@ -502,22 +503,33 @@ export const NoteContent = React.memo(function NoteContent({
     }
   }, [feedIndex, onOverlayOpenedFromIndex]);
 
+  // NIP-92 imeta metadata (mime / alt / dimensions / blurhash) keyed by media url.
+  const imetaByUrl = useMemo(() => parseImetaTags(overlayEvent?.tags ?? []), [overlayEvent]);
+
   const { inlineSegments, blockSegments } = useMemo(() => {
     const segments = parseContent(content);
     const inline: ContentSegment[] = [];
     const blocks: ContentSegment[] = [];
 
     for (const seg of segments) {
-      switch (seg.kind) {
+      // A url the parser couldn't classify by extension may still be media if an
+      // imeta tag declares its mime (e.g. an extensionless Blossom blob).
+      let resolved: ContentSegment = seg;
+      if (seg.kind === 'url') {
+        const kind = mediaKindForMime(imetaByUrl.get(seg.url)?.mimeType);
+        if (kind === 'image') resolved = { kind: 'image', url: seg.url };
+        else if (kind === 'video') resolved = { kind: 'video', url: seg.url };
+      }
+      switch (resolved.kind) {
         case 'image':
         case 'video':
         case 'lightning':
         case 'nevent':
         case 'note':
-          blocks.push(seg);
+          blocks.push(resolved);
           break;
         default:
-          inline.push(seg);
+          inline.push(resolved);
       }
     }
 
@@ -526,10 +538,7 @@ export const NoteContent = React.memo(function NoteContent({
     }
 
     return { inlineSegments: inline, blockSegments: blocks };
-  }, [content]);
-
-  // NIP-92 imeta metadata (alt text / dimensions) keyed by media url.
-  const imetaByUrl = useMemo(() => parseImetaTags(overlayEvent?.tags ?? []), [overlayEvent]);
+  }, [content, imetaByUrl]);
 
   const { mediaSegments, allMediaUrls, allMediaTypes, overlayPost } = useMemo(() => {
     const media = blockSegments.filter(
@@ -792,6 +801,7 @@ export const NoteContent = React.memo(function NoteContent({
                     key={`b${i}`}
                     url={seg.url}
                     alt={imageImeta?.alt}
+                    blurhash={imageImeta?.blurhash}
                     initialAspectRatio={imetaAspect}
                     allImageUrls={imageUrls.length > 1 ? imageUrls : undefined}
                     imageIndex={imageIndex >= 0 ? imageIndex : 0}

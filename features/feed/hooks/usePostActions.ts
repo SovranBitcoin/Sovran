@@ -5,8 +5,10 @@ import * as Clipboard from 'expo-clipboard';
 import { actionMenuPopup } from '@/shared/lib/popup';
 import { buildShareLinks } from '@/shared/lib/nostr/njump';
 import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
 
+import { useDeletePost } from './useDeletePost';
 import { tryNpubEncode } from '../components/nostr/feedParse';
 import type { FeedEvent } from '../components/nostr/feedTypes';
 
@@ -27,10 +29,47 @@ export function usePostActions(options?: {
   const ignoreEvent = useFeedIgnoreStore((s) => s.ignoreEvent);
   const ignorePubkey = useFeedIgnoreStore((s) => s.ignorePubkey);
   const getProfileName = options?.getProfileName;
+  const deletePost = useDeletePost();
+  const myPubkey = useNostrKeysContext().keys?.pubkey;
 
   return useCallback(
     (event: FeedEvent) => {
       const fallback = tryNpubEncode(event.pubkey).slice(0, 12) + '…';
+      const isAuthor = !!myPubkey && event.pubkey.toLowerCase() === myPubkey.toLowerCase();
+      // Confirm before the irreversible kind:5 broadcast.
+      const confirmDelete = (): void => {
+        actionMenuPopup({
+          title: 'Delete post?',
+          buttons: [
+            {
+              text: 'Delete',
+              icon: 'mdi:trash-can-outline',
+              variant: 'dangerous',
+              description: 'Requests deletion from all relays. Some may keep a copy.',
+              onPress: (close) => {
+                close();
+                void deletePost(event);
+              },
+            },
+          ],
+        });
+      };
+      const deleteButtons: MenuButton[] = isAuthor
+        ? [
+            {
+              text: 'Delete post',
+              icon: 'mdi:trash-can-outline',
+              variant: 'dangerous',
+              testID: 'post-delete',
+              // Chain to the confirm by swapping the sheet content in place
+              // (`keepOpen`, no `close()`). Calling close() first dismisses the
+              // host, which then drops the re-opened confirm's button dispatch —
+              // proven via logs: the confirm was tapped but deletePost never ran.
+              keepOpen: true,
+              onPress: () => confirmDelete(),
+            },
+          ]
+        : [];
       const links = buildShareLinks(event, getOwnWriteRelays()[0]);
       const shareButtons: MenuButton[] = links
         ? [
@@ -73,9 +112,10 @@ export function usePostActions(options?: {
             ignorePubkey(event.pubkey);
           },
         },
+        ...deleteButtons,
       ];
       actionMenuPopup({ title: 'Post', buttons });
     },
-    [ignoreEvent, ignorePubkey, getProfileName]
+    [ignoreEvent, ignorePubkey, getProfileName, deletePost, myPubkey]
   );
 }

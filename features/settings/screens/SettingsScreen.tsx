@@ -286,6 +286,12 @@ export const SettingsScreen = () => {
                 </PressableFeedback.Scale>
                 <PressableFeedback.Ripple />
               </PressableFeedback>
+              <Separator className="mx-4" />
+              <SettingsListLinkItem
+                href="/(settings-flow)/media"
+                title="My media"
+                description="Images you've posted and their deletion status"
+              />
             </ListGroup>
           </Section>
 

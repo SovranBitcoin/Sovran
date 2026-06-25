@@ -8,7 +8,7 @@
  * full composer (carrying the typed draft + the original post for context).
  * Sticks above the keyboard via `KeyboardStickyView`, like the chat composer.
  */
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Keyboard, StyleSheet, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -40,6 +40,9 @@ import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { uploadMedia } from '@/shared/lib/nostr/media/mediaUpload';
+import { extractOwnedBlobsFromDescriptors } from '@/shared/lib/nostr/media/ownedBlobs';
+import type { MediaDescriptor } from '@/shared/lib/nostr/media/types';
+import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import type { ComposerBlock } from '@/features/composer/config/types';
 import { useComposerStore } from '@/features/composer/state/composerStore';
 import { publishComposed } from '@/features/composer/publish/useComposerActions';
@@ -129,12 +132,26 @@ export function ThreadReplyBar({
   ] as const);
   const ownProfile = useProfileStore((s) => s.getActiveProfile());
   const inputRef = useRef<TextInput>(null);
+  // AbortControllers for in-flight uploads, keyed by media-block id, so removing
+  // a block cancels its upload instead of orphaning a blob on the server.
+  const uploadsRef = useRef<Map<string, AbortController>>(new Map());
   const shift = useShiftLogger('ThreadReplyBar');
 
   const [text, setText] = useState('');
   const [mediaBlocks, setMediaBlocks] = useState<MediaBlock[]>([]);
   const [focused, setFocused] = useState(false);
   const [posting, setPosting] = useState(false);
+  // Synchronous re-entrancy guard for the upload-then-publish post action.
+  const postingRef = useRef(false);
+
+  // Abort any upload still running if the bar unmounts mid-post.
+  useEffect(() => {
+    const uploads = uploadsRef.current;
+    return () => {
+      uploads.forEach((controller) => controller.abort());
+      uploads.clear();
+    };
+  }, []);
 
   const replyTarget = useMemo(
     () => (targetEvent ? deriveReplyTarget(targetEvent) : null),
@@ -168,10 +185,75 @@ export function ThreadReplyBar({
   });
 
   const handlePost = useCallback(async () => {
-    if (!ndk || !canPost || !replyTarget) return;
+    if (postingRef.current || !ndk || !canPost || !replyTarget) return;
+    postingRef.current = true;
     setPosting(true);
-    const blocks: ComposerBlock[] = [{ id: 'reply-text', kind: 'text', text }, ...mediaBlocks];
+
+    // Upload is deferred to here: PUT any media block without a descriptor, then
+    // publish with the resolved descriptors. Abort the reply if any upload fails
+    // so we never post a reply missing one of its images.
+    let uploaded: MediaBlock[];
+    // Descriptors that uploaded before any sibling failed — recorded as orphans
+    // if the reply aborts, so the already-uploaded blobs stay deletable.
+    const uploadedDescriptors: MediaDescriptor[] = [];
+    const tasks = mediaBlocks.map(async (block): Promise<MediaBlock> => {
+      if (block.descriptor || !block.localUri) return block;
+      const controller = new AbortController();
+      uploadsRef.current.set(block.id, controller);
+      setMediaBlocks((prev) =>
+        prev.map((b) => (b.id === block.id ? { ...b, uploadProgress: 0 } : b))
+      );
+      const upload = await uploadMedia({
+        ndk,
+        asset: {
+          uri: block.localUri,
+          mimeType: block.mimeType ?? 'image/jpeg',
+          width: block.width,
+          height: block.height,
+        },
+        signal: controller.signal,
+        onProgress: (fraction) =>
+          setMediaBlocks((prev) =>
+            prev.map((b) => (b.id === block.id ? { ...b, uploadProgress: fraction } : b))
+          ),
+      });
+      uploadsRef.current.delete(block.id);
+      if (upload.isErr()) {
+        if (upload.error.type !== 'canceled') {
+          setMediaBlocks((prev) =>
+            prev.map((b) => (b.id === block.id ? { ...b, uploadProgress: undefined } : b))
+          );
+        }
+        throw upload.error;
+      }
+      uploadedDescriptors.push(upload.value);
+      const next: MediaBlock = {
+        ...block,
+        descriptor: upload.value,
+        uploadProgress: undefined,
+      };
+      setMediaBlocks((prev) => prev.map((b) => (b.id === block.id ? next : b)));
+      return next;
+    });
+    try {
+      uploaded = await Promise.all(tasks);
+    } catch {
+      // Abort siblings still in flight, then wait for every task to settle so a
+      // sibling that finished around the failure boundary has pushed its
+      // descriptor before we record orphans.
+      uploadsRef.current.forEach((controller) => controller.abort());
+      uploadsRef.current.clear();
+      await Promise.allSettled(tasks);
+      const orphans = extractOwnedBlobsFromDescriptors(uploadedDescriptors);
+      if (orphans.length > 0) useOwnedMediaStore.getState().recordBlobs(orphans);
+      postingRef.current = false;
+      setPosting(false);
+      return;
+    }
+
+    const blocks: ComposerBlock[] = [{ id: 'reply-text', kind: 'text', text }, ...uploaded];
     const outcome = await publishComposed(ndk, { blocks, target: replyTarget });
+    postingRef.current = false;
     setPosting(false);
     if (outcome === 'ok') {
       setText('');
@@ -183,32 +265,35 @@ export function ThreadReplyBar({
   }, [ndk, canPost, text, mediaBlocks, replyTarget]);
 
   const handleAddMedia = useCallback(async () => {
-    if (!ndk) return;
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
+      mediaTypes: ['images'],
       quality: 1,
+      exif: false,
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
-    const mediaKind = asset.type === 'video' ? 'video' : 'image';
-    const mimeType = asset.mimeType ?? (mediaKind === 'video' ? 'video/mp4' : 'image/jpeg');
     const id = `m${(mediaSeq += 1)}`;
+    // Defer upload to Post — store the local asset only.
     setMediaBlocks((prev) => [
       ...prev,
-      { id, kind: 'media', mediaKind, localUri: asset.uri, uploadProgress: 0 },
+      {
+        id,
+        kind: 'media',
+        mediaKind: 'image',
+        localUri: asset.uri,
+        mimeType: asset.mimeType ?? 'image/jpeg',
+        width: asset.width,
+        height: asset.height,
+      },
     ]);
+  }, []);
 
-    const upload = await uploadMedia({
-      ndk,
-      asset: { uri: asset.uri, mimeType, width: asset.width, height: asset.height },
-    });
-    setMediaBlocks((prev) => {
-      if (upload.isErr()) return prev.filter((b) => b.id !== id);
-      return prev.map((b) =>
-        b.id === id ? { ...b, descriptor: upload.value, uploadProgress: undefined } : b
-      );
-    });
-  }, [ndk]);
+  // Cancel any in-flight upload before dropping the block.
+  const handleRemoveMedia = useCallback((id: string) => {
+    uploadsRef.current.get(id)?.abort();
+    uploadsRef.current.delete(id);
+    setMediaBlocks((prev) => prev.filter((b) => b.id !== id));
+  }, []);
 
   // Hand the current draft + reply context to the full composer.
   const expandToFull = useCallback(
@@ -223,6 +308,9 @@ export function ThreadReplyBar({
           kind: 'media',
           mediaKind: block.mediaKind,
           localUri: block.localUri,
+          mimeType: block.mimeType,
+          width: block.width,
+          height: block.height,
           descriptor: block.descriptor,
           alt: block.alt,
           sensitive: block.sensitive,
@@ -324,7 +412,7 @@ export function ThreadReplyBar({
                 </View>
               ) : null}
               <Pressable
-                onPress={() => setMediaBlocks((prev) => prev.filter((b) => b.id !== block.id))}
+                onPress={() => handleRemoveMedia(block.id)}
                 hitSlop={8}
                 style={styles.thumbRemove}
                 accessibilityLabel="Remove media">

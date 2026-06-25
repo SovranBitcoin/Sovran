@@ -1304,14 +1304,16 @@ export function useMintRebalanceOrchestrator({
     const totalAmount = snapshot.steps.reduce((sum, s) => sum + (s.amount ?? 0), 0);
     useSwapStatusStore.getState().start({
       id: `swap-${runId}-${Date.now()}`,
-      unit,
-      totalAmount,
-      // Backs the toast's "View" button so completion → tap → SwapTransactionScreen.
-      groupId: swapGroupIdRef.current ?? undefined,
       legs: snapshot.steps.map((s) => ({
         id: s.id,
         label: `${extractDomain(s.fromMintUrl)} → ${extractDomain(s.toMintUrl)}`,
       })),
+      meta: {
+        unit,
+        totalAmount,
+        // Backs the toast's "View" button so completion → tap → SwapTransactionScreen.
+        groupId: swapGroupIdRef.current ?? undefined,
+      },
     });
     swapStatusPopup();
 

@@ -3,10 +3,10 @@ import { useShallow } from 'zustand/react/shallow';
 
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
-import type { SwapStatusLeg } from '@/shared/stores/runtime/swapStatusStore';
+import type { ProgressLeg } from '@/shared/stores/runtime/legProgress';
 import { StatusToast, type StatusToastStatus } from './StatusToast';
 
-function legSummary(legs: SwapStatusLeg[] | undefined): { doneCount: number; total: number } {
+function legSummary(legs: ProgressLeg[] | undefined): { doneCount: number; total: number } {
   if (!legs) return { doneCount: 0, total: 0 };
   let doneCount = 0;
   for (const l of legs) {
@@ -33,7 +33,7 @@ export function SwapStatusToast({ hide, ...toastProps }: SwapStatusToastProps) {
             present: true as const,
             state: s.active.state,
             errorMessage: s.active.errorMessage,
-            groupId: s.active.groupId,
+            groupId: s.active.meta.groupId,
             ...legSummary(s.active.legs),
           }
         : { present: false as const }
