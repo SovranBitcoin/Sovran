@@ -34,7 +34,7 @@ import {
   createWalletContextTracker,
   type WalletContextTracker,
 } from "./walletContextTracker";
-import { createNostrGraphqlMintEnrichment } from "../nostr-graphql";
+import { createNostrMintEnrichment } from "../nostr-mint-enrichment";
 
 // NUT-06 mint info as returned by coco's `Manager`. Re-derived here (rather than
 // imported from cashu-ts) so the type tracks whatever shape `mgr.mint.getMintInfo`
@@ -83,11 +83,13 @@ export interface ColadaConfig {
   /** Per-mint enrichment for the trust-review screen. Read from local caches. */
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
   /**
-   * Optional generic Nostr GraphQL endpoint. When set, Colada can resolve mint
-   * contact profiles and mint reviews from indexed Nostr events without
-   * knowing which backend serves the GraphQL schema.
+   * Optional nagg REST app-view base URL (e.g. `https://nagg.example`). When
+   * set, Colada can resolve mint contact profiles and mint reviews from the
+   * indexed Nostr app-view without knowing which backend serves it.
    */
-  nostrGraphqlEndpoint?: string;
+  nostrAppViewBaseUrl?: string;
+  /** App-view route version prefix: `''` → `/nostr/*`, `'v1'` → `/v1/nostr/*`. Default `'v1'`. */
+  nostrAppViewVersion?: '' | 'v1';
   /** Resolve a mint operator Nostr pubkey from NUT-06 contact metadata. */
   resolveMintContactProfile?: MintContactProfileResolver;
   /** Fetch aggregated Nostr reviews for a mint. */
@@ -150,7 +152,7 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     hasFetchMintCatalog: !!config.fetchMintCatalog,
     hasFetchMintInfo: !!config.fetchMintInfo,
     hasEnrichMintReviewInfo: !!enrichMintReviewInfo,
-    hasNostrGraphqlEndpoint: !!config.nostrGraphqlEndpoint,
+    hasNostrAppViewBaseUrl: !!config.nostrAppViewBaseUrl,
     hasResolveMintContactProfile: !!config.resolveMintContactProfile,
     hasFetchMintReviews: !!config.fetchMintReviews,
     hasSendNostrDM: !!sendNostrDM,
@@ -164,13 +166,14 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     getPreferredMintUrl: config.getPreferredMintUrl,
   });
 
-  const graphqlEnrichment = config.nostrGraphqlEndpoint
-    ? createNostrGraphqlMintEnrichment({
-        endpoint: config.nostrGraphqlEndpoint,
+  const appViewEnrichment = config.nostrAppViewBaseUrl
+    ? createNostrMintEnrichment({
+        appViewBaseUrl: config.nostrAppViewBaseUrl,
+        appViewVersion: config.nostrAppViewVersion,
       })
     : null;
   logger.info("core.createColada.enrichment", {
-    graphqlEnabled: !!graphqlEnrichment,
+    appViewEnabled: !!appViewEnrichment,
     explicitContactResolver: !!config.resolveMintContactProfile,
     explicitReviewsFetcher: !!config.fetchMintReviews,
   });
@@ -185,9 +188,9 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     fetchMintInfo: config.fetchMintInfo,
     resolveMintContactProfile:
       config.resolveMintContactProfile ??
-      graphqlEnrichment?.resolveMintContactProfile,
+      appViewEnrichment?.resolveMintContactProfile,
     fetchMintReviews:
-      config.fetchMintReviews ?? graphqlEnrichment?.fetchMintReviews,
+      config.fetchMintReviews ?? appViewEnrichment?.fetchMintReviews,
     shouldMockFailPaymentRequest: config.shouldMockFailPaymentRequest,
     shouldMockFailMelt: config.shouldMockFailMelt,
     shouldMockFailSend: config.shouldMockFailSend,

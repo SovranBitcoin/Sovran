@@ -12,8 +12,8 @@
 //                           injected via fetchMintCatalog
 //   Mint review detail    — local per-mint trust metrics injected via
 //                           enrichMintReviewInfo; Nostr profile/review event
-//                           enrichment can default to generic GraphQL via
-//                           createColada({ nostrGraphqlEndpoint })
+//                           enrichment can default to the nagg REST app-view via
+//                           createColada({ nostrAppViewBaseUrl })
 // ---------------------------------------------------------------------------
 
 import { getTokenMetadata } from "@cashu/cashu-ts";

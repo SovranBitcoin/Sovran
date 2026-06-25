@@ -413,11 +413,11 @@ export {
   type RequestControls,
 } from "./safeFetch";
 
-export { createNostrGraphqlMintEnrichment } from "./nostr-graphql";
+export { createNostrMintEnrichment } from "./nostr-mint-enrichment";
 export type {
-  NostrGraphqlMintEnrichment,
-  NostrGraphqlMintEnrichmentConfig,
-} from "./nostr-graphql";
+  NostrMintEnrichment,
+  NostrMintEnrichmentConfig,
+} from "./nostr-mint-enrichment";
 
 // Domain types
 export type {
