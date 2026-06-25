@@ -8,8 +8,10 @@
  * kind:5 makes relays drop it — so its blob URLs would be lost, and a failed
  * blob deletion could never be retried. This store therefore NEVER prunes: a
  * blob entry is the only durable record of a URL we may still need to delete or
- * verify. Keyed by sha256 (content address) so the same blob dedups across URLs
- * and across clients posting with our key.
+ * verify. Keyed by `host|sha256`: the sha dedups the same bytes across URLs and
+ * clients, but the host is part of the key because the same bytes uploaded to
+ * two Blossom servers are two independent blobs — deleting from one must not
+ * mark the copy on the other as gone (deleteState is per-host).
  *
  * Blobs arrive from: the create hook (`recordBlobs` in publishComposed) and the
  * passive ingest seams (`ingestOwnMediaBlobs`, mirroring `ingestOwnContent`).
@@ -29,6 +31,11 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 /** `deleted` is the only ✓ state; everything else renders ✗ on the media page. */
 export type BlobDeleteState = 'live' | 'delete-requested' | 'deleted' | 'delete-failed';
 
+/** Ledger key: a blob is identified by the host it lives on AND its content hash. */
+function blobKey(host: string, sha256: string): string {
+  return `${host}|${sha256}`;
+}
+
 export interface OwnedBlobEntry {
   sha256: string;
   url: string;
@@ -44,16 +51,16 @@ export interface OwnedBlobEntry {
 }
 
 interface OwnedMediaStore {
-  bySha: Record<string, OwnedBlobEntry>;
+  byBlob: Record<string, OwnedBlobEntry>;
   /** Upsert blobs; merges note ids + refreshes lastSeen, never downgrades deleteState. */
   recordBlobs: (blobs: OwnedBlob[], sourceNoteId?: string) => void;
-  setDeleteState: (sha256: string, state: BlobDeleteState) => void;
+  setDeleteState: (host: string, sha256: string, state: BlobDeleteState) => void;
   /** Fold an on-demand existence probe: gone → deleted; still-there after a
    *  delete attempt → delete-failed; a live blob stays live. */
-  markChecked: (sha256: string, exists: boolean) => void;
+  markChecked: (host: string, sha256: string, exists: boolean) => void;
 }
 
-const INITIAL: { bySha: Record<string, OwnedBlobEntry> } = { bySha: {} };
+const INITIAL: { byBlob: Record<string, OwnedBlobEntry> } = { byBlob: {} };
 
 const PersistedEntry = z.looseObject({
   sha256: z.string().max(64),
@@ -68,7 +75,7 @@ const PersistedEntry = z.looseObject({
 });
 
 const PersistedOwnedMediaStore = z.object({
-  bySha: z.record(z.string().max(64), PersistedEntry).default({}),
+  byBlob: z.record(z.string().max(600), PersistedEntry).default({}),
 });
 
 export const useOwnedMediaStore = create<OwnedMediaStore>()(
@@ -80,16 +87,17 @@ export const useOwnedMediaStore = create<OwnedMediaStore>()(
         if (blobs.length === 0) return;
         set((state) => {
           const now = Date.now();
-          const bySha = { ...state.bySha };
+          const byBlob = { ...state.byBlob };
           let added = 0;
           for (const blob of blobs) {
-            const existing = bySha[blob.sha256];
+            const key = blobKey(blob.host, blob.sha256);
+            const existing = byBlob[key];
             if (existing) {
               const sourceNoteIds =
                 sourceNoteId && !existing.sourceNoteIds.includes(sourceNoteId)
                   ? [...existing.sourceNoteIds, sourceNoteId]
                   : existing.sourceNoteIds;
-              bySha[blob.sha256] = {
+              byBlob[key] = {
                 ...existing,
                 // Prefer a known mime / url if we now have a richer one.
                 url: blob.url || existing.url,
@@ -99,7 +107,7 @@ export const useOwnedMediaStore = create<OwnedMediaStore>()(
               };
             } else {
               added += 1;
-              bySha[blob.sha256] = {
+              byBlob[key] = {
                 sha256: blob.sha256,
                 url: blob.url,
                 host: blob.host,
@@ -112,21 +120,23 @@ export const useOwnedMediaStore = create<OwnedMediaStore>()(
             }
           }
           if (added > 0) storeLog.info('ownedmedia.recorded', { added, total: blobs.length });
-          return { bySha };
+          return { byBlob };
         });
       },
 
-      setDeleteState: (sha256, deleteState) =>
+      setDeleteState: (host, sha256, deleteState) =>
         set((state) => {
-          const cur = state.bySha[sha256];
+          const key = blobKey(host, sha256);
+          const cur = state.byBlob[key];
           if (!cur) return state;
           storeLog.info('ownedmedia.delete_state', { sha256: sha256.slice(0, 12), deleteState });
-          return { bySha: { ...state.bySha, [sha256]: { ...cur, deleteState } } };
+          return { byBlob: { ...state.byBlob, [key]: { ...cur, deleteState } } };
         }),
 
-      markChecked: (sha256, exists) =>
+      markChecked: (host, sha256, exists) =>
         set((state) => {
-          const cur = state.bySha[sha256];
+          const key = blobKey(host, sha256);
+          const cur = state.byBlob[key];
           if (!cur) return state;
           const deleteState: BlobDeleteState = exists
             ? cur.deleteState === 'live'
@@ -135,9 +145,9 @@ export const useOwnedMediaStore = create<OwnedMediaStore>()(
             : 'deleted';
           storeLog.info('ownedmedia.check', { sha256: sha256.slice(0, 12), exists, deleteState });
           return {
-            bySha: {
-              ...state.bySha,
-              [sha256]: { ...cur, deleteState, lastCheckedAt: Date.now() },
+            byBlob: {
+              ...state.byBlob,
+              [key]: { ...cur, deleteState, lastCheckedAt: Date.now() },
             },
           };
         }),
@@ -147,7 +157,7 @@ export const useOwnedMediaStore = create<OwnedMediaStore>()(
       storage: createProfileScopedStorage(),
       schema: PersistedOwnedMediaStore,
       logKey: 'owned_media',
-      partialize: (state) => ({ bySha: state.bySha }),
+      partialize: (state) => ({ byBlob: state.byBlob }),
     })
   )
 );
@@ -173,4 +183,4 @@ export function ingestOwnMediaBlobs(
 
 /** All owned blobs, newest-seen first — backs the settings "My media" page. */
 export const selectOwnedBlobs = (state: OwnedMediaStore): OwnedBlobEntry[] =>
-  Object.values(state.bySha).sort((a, b) => b.lastSeen - a.lastSeen);
+  Object.values(state.byBlob).sort((a, b) => b.lastSeen - a.lastSeen);

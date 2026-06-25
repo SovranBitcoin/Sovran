@@ -1,7 +1,6 @@
 /**
- * Delete-requested suppression in nostrSocialStore: mark/unmark our own deleted
- * note ids (drives the greyed tombstone) and the `selectIsDeleteRequested`
- * selector.
+ * Delete-requested suppression in nostrSocialStore: mark our own deleted note
+ * ids (drives the greyed tombstone) and the `selectIsDeleteRequested` selector.
  */
 import {
   selectIsDeleteRequested,
@@ -34,13 +33,6 @@ describe('nostrSocialStore delete-requested tracking', () => {
 
     expect(selectIsDeleteRequested('n1')(useNostrSocialStore.getState())).toBe(true);
     expect(useNostrSocialStore.getState().deletedNoteIds.n1).toEqual(expect.any(Number));
-  });
-
-  it('unmark removes the note (e.g. every relay rejected the kind:5)', () => {
-    useNostrSocialStore.getState().markDeleteRequested('n2');
-    useNostrSocialStore.getState().unmarkDeleteRequested('n2');
-
-    expect(selectIsDeleteRequested('n2')(useNostrSocialStore.getState())).toBe(false);
   });
 
   it('keeps delete-requested ids separate from deleted reposts', () => {

@@ -7,6 +7,7 @@ import { deleteStatusPopup, popup } from '@/shared/lib/popup';
 import { checkBlobExists, deleteFromBlossom } from '@/shared/lib/nostr/media/blossomClient';
 import { extractOwnedBlobs } from '@/shared/lib/nostr/media/ownedBlobs';
 import { publishEvent } from '@/shared/lib/nostr/publish';
+import { safeNormalizeRelay } from '@/shared/lib/nostr/outbox/defaults';
 import { getOwnWriteRelays, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
@@ -31,8 +32,8 @@ const inFlight = new Set<string>();
 /**
  * Deletes one of OUR OWN posts: best-effort BUD-11 delete of each image blob it
  * declared (imeta `x`), then a NIP-09 kind:5 deletion request fanned across
- * every configured relay — including disabled ones, since the note may have
- * been published there too. Drives the red segmented Delete toast: one segment
+ * every relay currently in the user's relay list, since the note may have been
+ * published to any of them. Drives the red segmented Delete toast: one segment
  * per image + one per relay.
  *
  * Deletion is a *request*: we only mark the note "delete requested" (→ greyed
@@ -81,9 +82,13 @@ export async function executeDeletePost({
     const ownedMedia = useOwnedMediaStore.getState();
     ownedMedia.recordBlobs(blobs, event.id);
 
-    // 2. Every relay, including disabled ones (uploaded-there guard).
-    const allEntries = useRelayListStore.getState().entries.map((e) => e.url);
-    const relayUrls = allEntries.length ? Array.from(new Set(allEntries)) : getOwnWriteRelays();
+    // 2. Every relay currently in the list. Normalize + dedup so each
+    //    `relay-${url}` leg id matches the (normalized) URL `publishEvent`
+    //    reports back via onRelayResult — otherwise legs never settle on the
+    //    common default relays (raw `wss://x` vs normalized `wss://x/`).
+    const rawEntries = useRelayListStore.getState().entries.map((e) => e.url);
+    const rawUrls = rawEntries.length ? rawEntries : getOwnWriteRelays();
+    const relayUrls = Array.from(new Set(rawUrls.map((u) => safeNormalizeRelay(u) ?? u)));
 
     // 3. Legs: images first, then relays.
     const imageLegs = blobs.map((_, idx) => ({ id: `img-${idx}`, label: `Image ${idx + 1}` }));
@@ -113,7 +118,7 @@ export async function executeDeletePost({
       const blob = blobs[idx];
       const legId = `img-${idx}`;
       store.setActiveLeg(legId);
-      ownedMedia.setDeleteState(blob.sha256, 'delete-requested');
+      ownedMedia.setDeleteState(blob.host, blob.sha256, 'delete-requested');
       const res = await deleteFromBlossom({ ndk, server: blob.host, sha256: blob.sha256 });
 
       // Primal returns 404 for "already gone" AND "not owned" — a HEAD probe of
@@ -132,7 +137,7 @@ export async function executeDeletePost({
       if (deleted) {
         imagesDeleted += 1;
         store.setLegDone(legId);
-        ownedMedia.setDeleteState(blob.sha256, 'deleted');
+        ownedMedia.setDeleteState(blob.host, blob.sha256, 'deleted');
         nostrLog.info('nostr.delete.image', {
           index: idx,
           host: blob.host,
@@ -143,7 +148,7 @@ export async function executeDeletePost({
         imagesFailed += 1;
         const error = res.isErr() ? res.error.type : 'unknown';
         store.setLegFailed(legId, error);
-        ownedMedia.setDeleteState(blob.sha256, 'delete-failed');
+        ownedMedia.setDeleteState(blob.host, blob.sha256, 'delete-failed');
         nostrLog.warn('nostr.delete.image', {
           index: idx,
           host: blob.host,

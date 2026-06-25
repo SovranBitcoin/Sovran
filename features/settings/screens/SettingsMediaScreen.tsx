@@ -142,14 +142,14 @@ export const SettingsMediaScreen = () => {
     [foreground, muted, success, danger]
   );
 
-  const bySha = useOwnedMediaStore((s) => s.bySha);
+  const byBlob = useOwnedMediaStore((s) => s.byBlob);
   const { online, deleted } = useMemo(() => {
-    const all = Object.values(bySha).sort((a, b) => b.lastSeen - a.lastSeen);
+    const all = Object.values(byBlob).sort((a, b) => b.lastSeen - a.lastSeen);
     return {
       online: all.filter((b) => b.deleteState !== 'deleted'),
       deleted: all.filter((b) => b.deleteState === 'deleted'),
     };
-  }, [bySha]);
+  }, [byBlob]);
   const total = online.length + deleted.length;
 
   const [refreshing, setRefreshing] = useState(false);
@@ -160,7 +160,7 @@ export const SettingsMediaScreen = () => {
       // Snapshot via getState so the probe loop isn't tied to a render closure.
       for (const blob of selectOwnedBlobs(useOwnedMediaStore.getState())) {
         const exists = await checkBlobExists(blob.url);
-        if (exists !== null) markChecked(blob.sha256, exists);
+        if (exists !== null) markChecked(blob.host, blob.sha256, exists);
       }
     } finally {
       setRefreshing(false);

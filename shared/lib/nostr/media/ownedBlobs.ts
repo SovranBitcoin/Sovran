@@ -49,45 +49,48 @@ export function blossomSha256FromUrl(url: string): string | null {
   }
 }
 
+/** Dedup key matching `ownedMediaStore`: the same bytes on two hosts are two blobs. */
+const blobKey = (host: string, sha256: string): string => `${host}|${sha256}`;
+
 /**
  * Blobs a note declares: imeta entries (with mime) plus blossom-shaped content
- * URLs. Deduped by sha256 — the imeta entry wins (it carries the mime).
+ * URLs. Deduped by host+sha256 — the imeta entry wins (it carries the mime).
  */
 export function extractOwnedBlobs(event: FeedEvent): OwnedBlob[] {
-  const bySha = new Map<string, OwnedBlob>();
+  const byBlob = new Map<string, OwnedBlob>();
 
   for (const info of parseImetaTags(event.tags).values()) {
     if (!info.sha256) continue;
     const host = originOf(info.url);
     if (!host) continue;
     const sha = info.sha256.toLowerCase();
-    bySha.set(sha, { sha256: sha, url: info.url, host, mimeType: info.mimeType });
+    byBlob.set(blobKey(host, sha), { sha256: sha, url: info.url, host, mimeType: info.mimeType });
   }
 
   for (const raw of event.content.match(URL_RE) ?? []) {
     // Trim trailing sentence punctuation a URL regex tends to swallow.
     const url = raw.replace(/[.,);]+$/, '');
     const sha = blossomSha256FromUrl(url);
-    if (!sha || bySha.has(sha)) continue;
+    if (!sha) continue;
     const host = originOf(url);
-    if (!host) continue;
-    bySha.set(sha, { sha256: sha, url, host });
+    if (!host || byBlob.has(blobKey(host, sha))) continue;
+    byBlob.set(blobKey(host, sha), { sha256: sha, url, host });
   }
 
-  return [...bySha.values()];
+  return [...byBlob.values()];
 }
 
 /** Blobs from composer media descriptors (the richest create-time source). */
 export function extractOwnedBlobsFromDescriptors(
   descriptors: readonly MediaDescriptor[]
 ): OwnedBlob[] {
-  const bySha = new Map<string, OwnedBlob>();
+  const byBlob = new Map<string, OwnedBlob>();
   for (const d of descriptors) {
     if (!d.sha256 || !d.url) continue;
     const host = originOf(d.url);
     if (!host) continue;
     const sha = d.sha256.toLowerCase();
-    bySha.set(sha, { sha256: sha, url: d.url, host, mimeType: d.mimeType });
+    byBlob.set(blobKey(host, sha), { sha256: sha, url: d.url, host, mimeType: d.mimeType });
   }
-  return [...bySha.values()];
+  return [...byBlob.values()];
 }

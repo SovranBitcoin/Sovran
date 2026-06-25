@@ -73,6 +73,8 @@ import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
 const publishEvent = jest.requireMock('@/shared/lib/nostr/publish').publishEvent as jest.Mock;
 const deleteFromBlossom = jest.requireMock('@/shared/lib/nostr/media/blossomClient')
   .deleteFromBlossom as jest.Mock;
+const checkBlobExists = jest.requireMock('@/shared/lib/nostr/media/blossomClient')
+  .checkBlobExists as jest.Mock;
 const markDeleteRequested = (
   jest.requireMock('@/shared/stores/profile/nostrSocialStore') as {
     __mock: { markDeleteRequested: jest.Mock };
@@ -127,10 +129,45 @@ describe('executeDeletePost', () => {
       expect.objectContaining({ server: 'https://blossom.example', sha256: SHA })
     );
     expect(publishEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ relays: ['wss://r1', 'wss://r2'], resolveOn: 'all-settled' })
+      expect.objectContaining({
+        relays: ['wss://r1', 'wss://r2'],
+        resolveOn: 'all-settled',
+        // Best-effort scrub: 8s/relay, no retries — a dead relay can't hang the toast.
+        timeoutMs: 8000,
+        retry: { attempts: 0 },
+      })
     );
     expect(markDeleteRequested).toHaveBeenCalledWith(event.id);
     expect(deleteStore.complete).toHaveBeenCalled();
+  });
+
+  it('treats a Primal 404 as deleted when the HEAD probe confirms the blob is gone', async () => {
+    deleteFromBlossom.mockReturnValue({
+      isOk: () => false,
+      isErr: () => true,
+      error: { type: 'delete-failed', status: 404 },
+    });
+    checkBlobExists.mockResolvedValue(false); // gone
+
+    await executeDeletePost({ ndk, pubkey: 'abc', event: makeEvent() });
+
+    expect(checkBlobExists).toHaveBeenCalled();
+    expect(deleteStore.setLegDone).toHaveBeenCalledWith('img-0');
+    expect(deleteStore.setLegFailed).not.toHaveBeenCalledWith('img-0', expect.anything());
+  });
+
+  it('leaves a 404 blob failed when the HEAD probe still finds it (not-owned, not gone)', async () => {
+    deleteFromBlossom.mockReturnValue({
+      isOk: () => false,
+      isErr: () => true,
+      error: { type: 'delete-failed', status: 404 },
+    });
+    checkBlobExists.mockResolvedValue(true); // still there → we don't own it
+
+    await executeDeletePost({ ndk, pubkey: 'abc', event: makeEvent() });
+
+    expect(deleteStore.setLegFailed).toHaveBeenCalledWith('img-0', 'delete-failed');
+    expect(deleteStore.setLegDone).not.toHaveBeenCalledWith('img-0');
   });
 
   it('does NOT mark delete-requested when every relay rejects', async () => {

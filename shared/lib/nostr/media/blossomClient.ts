@@ -61,7 +61,7 @@ export async function checkBlobExists(url: string): Promise<boolean | null> {
 }
 
 /** Hard ceiling on upload size; photos are re-encoded well under this. */
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 /** Per-attempt upload timeout. */
 const UPLOAD_TIMEOUT_MS = 60_000;
 /** Total attempts (1 initial + retries) for transient network failures. */
@@ -112,10 +112,15 @@ const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomError>> {
   if (opts.signal?.aborted) return err({ type: 'canceled' });
 
-  // 1. Reject oversized files before reading them into memory.
+  // 1. Reject oversized files before reading them into memory. Fail closed: if
+  //    we can't read the size, refuse rather than load an unbounded blob.
   try {
     const info = await FileSystem.getInfoAsync(opts.fileUri);
-    if (info.exists && info.size > MAX_UPLOAD_BYTES) {
+    if (!info.exists || typeof info.size !== 'number') {
+      nostrLog.warn('nostr.media.read_failed');
+      return err({ type: 'read-failed' });
+    }
+    if (info.size > MAX_UPLOAD_BYTES) {
       nostrLog.warn('nostr.media.too_large', { size: info.size });
       return err({ type: 'too-large', size: info.size });
     }

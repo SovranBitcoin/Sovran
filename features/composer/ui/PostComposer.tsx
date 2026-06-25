@@ -31,6 +31,9 @@ import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { uploadMedia } from '@/shared/lib/nostr/media/mediaUpload';
+import { extractOwnedBlobsFromDescriptors } from '@/shared/lib/nostr/media/ownedBlobs';
+import type { MediaDescriptor } from '@/shared/lib/nostr/media/types';
+import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import { useComposeConfig } from '@/features/composer/config/useComposeConfig';
 import { useComposerStore } from '@/features/composer/state/composerStore';
 import {
@@ -249,6 +252,10 @@ export function PostComposer() {
     if (imageCount > 0) setPostProgress({ done: 0, total: imageCount + 1 });
 
     let done = 0;
+    // Descriptors that finished uploading before any sibling failed. If the post
+    // aborts, these blobs are already on the server with no note referencing
+    // them — record them so "My media" can clean them up later.
+    const uploaded: MediaDescriptor[] = [];
     const uploadOne = async (block: Extract<ComposerBlock, { kind: 'media' }>): Promise<void> => {
       const controller = new AbortController();
       uploadsRef.current.set(block.id, controller);
@@ -269,15 +276,28 @@ export function PostComposer() {
         if (upload.error.type !== 'canceled') updateBlock(block.id, { uploadProgress: undefined });
         throw upload.error;
       }
+      uploaded.push(upload.value);
       updateBlock(block.id, { descriptor: upload.value, uploadProgress: undefined });
       done += 1;
       if (imageCount > 0) setPostProgress({ done, total: imageCount + 1 });
     };
 
+    let tasks: Promise<void>[] = [];
     try {
       if (!ndk) throw { type: 'no-ndk' };
-      await Promise.all(pending.map(uploadOne));
+      tasks = pending.map(uploadOne);
+      await Promise.all(tasks);
     } catch (e) {
+      // One upload failed/cancelled: abort the siblings still in flight (don't
+      // leave them running for a post we're abandoning), then wait for every
+      // task to settle so a sibling that finished around the failure boundary
+      // has pushed its descriptor before we record orphans — so any blob that
+      // did land stays deletable from "My media".
+      uploadsRef.current.forEach((controller) => controller.abort());
+      uploadsRef.current.clear();
+      await Promise.allSettled(tasks);
+      const orphans = extractOwnedBlobsFromDescriptors(uploaded);
+      if (orphans.length > 0) useOwnedMediaStore.getState().recordBlobs(orphans);
       postingRef.current = false;
       setBusy(false);
       setPostProgress(null);
@@ -500,7 +520,7 @@ export function PostComposer() {
                         ) : null}
                       </View>
                     ) : null}
-                    {config.allowAltText && block.descriptor ? (
+                    {config.allowAltText && block.uploadProgress === undefined ? (
                       <Pressable
                         onPress={() => setAltEdit({ id: block.id, value: block.alt ?? '' })}
                         accessibilityLabel={block.alt ? 'Edit alt text' : 'Add alt text'}

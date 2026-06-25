@@ -18,12 +18,7 @@
 
 import { paymentLog } from '@/shared/lib/logger';
 
-import { createLegProgressStore, type ProgressLeg, type ProgressState } from './legProgress';
-
-/** @deprecated use `ProgressState`. Retained for existing swap call sites. */
-export type SwapState = ProgressState;
-/** @deprecated use `ProgressLeg`. Retained for existing swap call sites. */
-export type SwapStatusLeg = ProgressLeg;
+import { createLegProgressStore } from './legProgress';
 
 interface SwapMeta {
   unit: string;

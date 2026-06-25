@@ -99,8 +99,6 @@ interface NostrSocialActions {
 
   /** Record that we requested deletion of our own note (NIP-09 kind:5 sent). */
   markDeleteRequested: (noteId: string) => void;
-  /** Undo a delete-requested mark (e.g. every relay rejected the kind:5). */
-  unmarkDeleteRequested: (noteId: string) => void;
 
   /**
    * Global upsert of our own likes from the own-events sync. Unlike the legacy
@@ -399,13 +397,6 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         storeLog.info('social.note.markDeleteRequested', { noteId: noteId.slice(0, 8) });
         set((state) => ({
           deletedNoteIds: { ...state.deletedNoteIds, [noteId]: Date.now() },
-        }));
-      },
-
-      unmarkDeleteRequested: (noteId) => {
-        storeLog.debug('social.note.unmarkDeleteRequested', { noteId: noteId.slice(0, 8) });
-        set((state) => ({
-          deletedNoteIds: omitKey(state.deletedNoteIds, noteId),
         }));
       },
 

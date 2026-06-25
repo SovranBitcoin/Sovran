@@ -22,42 +22,65 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
 }));
 
 const SHA = 'a'.repeat(64);
-const blob = { sha256: SHA, url: `https://b/${SHA}`, host: 'https://b' };
+const HOST = 'https://b';
+const blob = { sha256: SHA, url: `${HOST}/${SHA}`, host: HOST };
 
-beforeEach(() => useOwnedMediaStore.setState({ bySha: {} }));
+/** The single entry for the canonical test blob. */
+const entry = () => selectOwnedBlobs(useOwnedMediaStore.getState()).find((b) => b.host === HOST);
+
+beforeEach(() => useOwnedMediaStore.setState({ byBlob: {} }));
 
 describe('ownedMediaStore', () => {
   it('records new blobs as live and merges sourceNoteIds on re-record', () => {
     const s = useOwnedMediaStore.getState();
     s.recordBlobs([blob], 'note1');
-    expect(useOwnedMediaStore.getState().bySha[SHA].deleteState).toBe('live');
-    expect(useOwnedMediaStore.getState().bySha[SHA].sourceNoteIds).toEqual(['note1']);
+    expect(entry()?.deleteState).toBe('live');
+    expect(entry()?.sourceNoteIds).toEqual(['note1']);
 
     s.recordBlobs([blob], 'note2');
-    expect(useOwnedMediaStore.getState().bySha[SHA].sourceNoteIds).toEqual(['note1', 'note2']);
+    expect(entry()?.sourceNoteIds).toEqual(['note1', 'note2']);
   });
 
   it('never downgrades a deleted blob back to live on re-record', () => {
     const s = useOwnedMediaStore.getState();
     s.recordBlobs([blob]);
-    s.setDeleteState(SHA, 'deleted');
+    s.setDeleteState(HOST, SHA, 'deleted');
     s.recordBlobs([blob], 'note3');
-    expect(useOwnedMediaStore.getState().bySha[SHA].deleteState).toBe('deleted');
+    expect(entry()?.deleteState).toBe('deleted');
   });
 
   it('markChecked: gone→deleted, still-there-after-attempt→delete-failed, live stays live', () => {
     const s = useOwnedMediaStore.getState();
     s.recordBlobs([blob]);
 
-    s.markChecked(SHA, true); // live + exists → still live
-    expect(useOwnedMediaStore.getState().bySha[SHA].deleteState).toBe('live');
+    s.markChecked(HOST, SHA, true); // live + exists → still live
+    expect(entry()?.deleteState).toBe('live');
 
-    s.setDeleteState(SHA, 'delete-requested');
-    s.markChecked(SHA, true); // attempted + still there → delete-failed
-    expect(useOwnedMediaStore.getState().bySha[SHA].deleteState).toBe('delete-failed');
+    s.setDeleteState(HOST, SHA, 'delete-requested');
+    s.markChecked(HOST, SHA, true); // attempted + still there → delete-failed
+    expect(entry()?.deleteState).toBe('delete-failed');
 
-    s.markChecked(SHA, false); // gone → deleted
-    expect(useOwnedMediaStore.getState().bySha[SHA].deleteState).toBe('deleted');
+    s.markChecked(HOST, SHA, false); // gone → deleted
+    expect(entry()?.deleteState).toBe('deleted');
+  });
+
+  it('tracks the same sha on two hosts independently (deleting one keeps the other live)', () => {
+    const s = useOwnedMediaStore.getState();
+    const hostA = 'https://a';
+    const hostB = 'https://b';
+    s.recordBlobs([
+      { sha256: SHA, url: `${hostA}/${SHA}`, host: hostA },
+      { sha256: SHA, url: `${hostB}/${SHA}`, host: hostB },
+    ]);
+    const all = selectOwnedBlobs(useOwnedMediaStore.getState());
+    expect(all).toHaveLength(2);
+
+    s.setDeleteState(hostA, SHA, 'deleted');
+    const byHost = Object.fromEntries(
+      selectOwnedBlobs(useOwnedMediaStore.getState()).map((b) => [b.host, b.deleteState])
+    );
+    expect(byHost[hostA]).toBe('deleted');
+    expect(byHost[hostB]).toBe('live'); // the copy on B is untouched
   });
 });
 

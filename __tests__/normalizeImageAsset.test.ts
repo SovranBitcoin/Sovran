@@ -96,6 +96,15 @@ describe('normalizeImageAsset', () => {
     expect(mockSaveAsync).toHaveBeenCalledWith({ format: 'png', compress: 0.9 });
   });
 
+  it('re-encodes WebP to JPEG to strip EXIF (WebP is an Android camera format)', async () => {
+    const asset: PickedAsset = { uri: 'file:///pixel.webp', mimeType: 'image/webp' };
+    const result = await normalizeImageAsset(asset);
+
+    expect(result._unsafeUnwrap().mimeType).toBe('image/jpeg');
+    expect(mockManipulate).toHaveBeenCalledWith('file:///pixel.webp');
+    expect(mockSaveAsync).toHaveBeenCalledWith({ format: 'jpeg', compress: 0.9 });
+  });
+
   it('passes an animated format (GIF) through untouched to keep animation', async () => {
     const asset: PickedAsset = { uri: 'file:///loop.gif', mimeType: 'image/gif' };
     const result = await normalizeImageAsset(asset);

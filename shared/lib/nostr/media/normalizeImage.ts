@@ -9,10 +9,12 @@
  *     it is transcoded to JPEG. Re-encoding also bakes in EXIF orientation, so
  *     the `imeta` `dim` we publish matches how the image actually displays.
  *
- * Photographic raster formats (JPEG/PNG/HEIC/HEIF) are re-encoded in place
- * (HEIC/HEIF → JPEG, JPEG → JPEG, PNG → PNG to preserve transparency).
- * Animated/other formats (GIF/WebP) pass through untouched — they do not come
- * from a camera with location data, and re-encoding would flatten animation.
+ * Raster formats that can carry EXIF/GPS are re-encoded (HEIC/HEIF → JPEG,
+ * JPEG → JPEG, PNG → PNG to preserve transparency, WebP → JPEG). WebP is a
+ * common Android camera/screenshot output and supports an EXIF chunk, so it is
+ * re-encoded too (which flattens animated WebP — an acceptable trade for not
+ * leaking GPS). GIF passes through untouched: it is not a camera format and
+ * re-encoding would flatten its animation.
  */
 import { ImageManipulator, SaveFormat, type ImageResult } from 'expo-image-manipulator';
 import { ResultAsync, okAsync } from 'neverthrow';
@@ -36,16 +38,19 @@ const PNG_TARGET: Target = { format: SaveFormat.PNG, mimeType: 'image/png' };
 const HEIC = { mime: /^image\/hei[cf](-sequence)?$/i, ext: /\.hei[cf](\?.*)?$/i };
 const JPEG = { mime: /^image\/jpe?g$/i, ext: /\.jpe?g(\?.*)?$/i };
 const PNG = { mime: /^image\/png$/i, ext: /\.png(\?.*)?$/i };
+const WEBP = { mime: /^image\/webp$/i, ext: /\.webp(\?.*)?$/i };
 
 /**
  * The format to re-encode `asset` into, or `null` to pass it through. HEIC/HEIF
- * become JPEG (interop); JPEG/PNG re-encode in place purely to strip metadata.
+ * and WebP become JPEG (interop + metadata strip); JPEG/PNG re-encode in place
+ * purely to strip metadata. Anything else (e.g. GIF) passes through.
  */
 function reencodeTarget(asset: PickedAsset): Target | null {
   const { mimeType: m, uri } = asset;
   if (HEIC.mime.test(m) || HEIC.ext.test(uri)) return JPEG_TARGET;
   if (JPEG.mime.test(m) || JPEG.ext.test(uri)) return JPEG_TARGET;
   if (PNG.mime.test(m) || PNG.ext.test(uri)) return PNG_TARGET;
+  if (WEBP.mime.test(m) || WEBP.ext.test(uri)) return JPEG_TARGET;
   return null;
 }
 
