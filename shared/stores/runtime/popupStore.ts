@@ -28,6 +28,8 @@ export type StandardSheetPayload = {
   dismissable?: boolean;
   duration?: number;
   buttons?: SheetButton[];
+  /** Lay buttons side by side ('row') instead of the default vertical stack. */
+  buttonLayout?: 'row' | 'stack';
   onClose?: (event: SheetCloseEvent) => void;
   live?: LiveSheetConfig;
   /** Set by live.get() for styling (e.g. animate to green when confirmed). */
