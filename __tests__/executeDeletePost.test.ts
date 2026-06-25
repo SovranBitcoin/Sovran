@@ -9,6 +9,13 @@ jest.mock('@/shared/lib/nostr/publish', () => ({ __esModule: true, publishEvent:
 jest.mock('@/shared/lib/nostr/media/blossomClient', () => ({
   __esModule: true,
   deleteFromBlossom: jest.fn(),
+  checkBlobExists: jest.fn(),
+}));
+jest.mock('@/shared/stores/profile/ownedMediaStore', () => ({
+  __esModule: true,
+  useOwnedMediaStore: {
+    getState: () => ({ recordBlobs: jest.fn(), setDeleteState: jest.fn() }),
+  },
 }));
 jest.mock('@/shared/lib/popup', () => ({ __esModule: true, deleteStatusPopup: jest.fn() }));
 jest.mock('@/shared/lib/nostr/outbox/relayListStore', () => ({
@@ -99,7 +106,7 @@ function makeEvent(over: Partial<FeedEvent> = {}): FeedEvent {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  deleteFromBlossom.mockReturnValue({ isErr: () => false });
+  deleteFromBlossom.mockReturnValue({ isOk: () => true, isErr: () => false });
   publishEvent.mockResolvedValue(okResult(true));
 });
 

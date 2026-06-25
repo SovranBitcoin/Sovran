@@ -34,6 +34,31 @@ export type BlossomDeleteError =
 
 /** A DELETE that hangs would stall the whole multi-image delete flow. */
 const DELETE_TIMEOUT_MS = 15_000;
+/** Existence probe timeout (settings refresh / post-delete verification). */
+const CHECK_TIMEOUT_MS = 10_000;
+
+/**
+ * Checks whether a blob still exists at `url` (BUD-01 HEAD existence check).
+ * `true` = present (2xx), `false` = gone (404/410), `null` = indeterminate
+ * (HEAD unsupported, network error, timeout) so the caller can leave state
+ * unchanged. Unauthenticated — used to verify a deletion actually took, and to
+ * disambiguate Primal's 404 (which means "gone" OR "not owned").
+ */
+export async function checkBlobExists(url: string): Promise<boolean | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
+  try {
+    // eslint-disable-next-line no-restricted-globals -- Blossom HEAD existence check (BUD-01); bare status, no JSON envelope.
+    const res = await fetch(url, { method: 'HEAD', signal: controller.signal });
+    if (res.status === 404 || res.status === 410) return false;
+    if (res.status >= 200 && res.status < 300) return true;
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** Hard ceiling on upload size; photos are re-encoded well under this. */
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;

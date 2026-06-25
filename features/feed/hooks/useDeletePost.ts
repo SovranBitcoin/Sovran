@@ -4,24 +4,17 @@ import { EventDeletion } from 'nostr-tools/kinds';
 
 import { nostrLog } from '@/shared/lib/logger';
 import { deleteStatusPopup, popup } from '@/shared/lib/popup';
-import { deleteFromBlossom } from '@/shared/lib/nostr/media/blossomClient';
+import { checkBlobExists, deleteFromBlossom } from '@/shared/lib/nostr/media/blossomClient';
+import { extractOwnedBlobs } from '@/shared/lib/nostr/media/ownedBlobs';
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { getOwnWriteRelays, useRelayListStore } from '@/shared/lib/nostr/outbox/relayListStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
+import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 import { useDeleteStatusStore } from '@/shared/stores/runtime/deleteStatusStore';
 
 import { parseImetaTags } from '../components/nostr/feedParse';
 import type { FeedEvent } from '../components/nostr/feedTypes';
-
-/** scheme+host the blob lives on; deletion must target the URL's own origin. */
-function blobOrigin(url: string): string | null {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return null;
-  }
-}
 
 function relayDomain(url: string): string {
   try {
@@ -73,23 +66,20 @@ export async function executeDeletePost({
 
   const store = useDeleteStatusStore.getState();
   try {
-    // 1. Deletable blobs — only those THIS note declared via imeta `x`. We
-    //    never parse arbitrary content URLs (they may be others' blobs).
+    // 1. Deletable blobs — imeta (authoritative) plus blossom-shaped content
+    //    URLs, the same set the owned-media store tracks. Record them durably
+    //    first so the delete state is reflected even for a blob not yet ingested.
     const imeta = parseImetaTags(event.tags);
-    const blobs: { sha256: string; origin: string }[] = [];
     let imetaMissingHash = 0;
     for (const info of imeta.values()) {
-      if (!info.sha256) {
-        // An image with no imeta `x` can't be content-addressed for delete
-        // (e.g. posted by another client). Counted so a "0 images deleted" on
-        // an image post is explainable rather than mysterious.
-        imetaMissingHash += 1;
-        continue;
-      }
-      const origin = blobOrigin(info.url);
-      if (!origin) continue;
-      blobs.push({ sha256: info.sha256, origin });
+      // An imeta image with no `x` can't be content-addressed for delete
+      // (e.g. posted by another client). Counted so a "0 images deleted" on an
+      // image post is explainable rather than mysterious.
+      if (!info.sha256) imetaMissingHash += 1;
     }
+    const blobs = extractOwnedBlobs(event);
+    const ownedMedia = useOwnedMediaStore.getState();
+    ownedMedia.recordBlobs(blobs, event.id);
 
     // 2. Every relay, including disabled ones (uploaded-there guard).
     const allEntries = useRelayListStore.getState().entries.map((e) => e.url);
@@ -116,38 +106,50 @@ export async function executeDeletePost({
     deleteStatusPopup();
 
     // 4. Delete blobs sequentially — a fresh delete auth is signed per blob.
+    //    Each blob's owned-media state moves requested → deleted/delete-failed.
     let imagesDeleted = 0;
     let imagesFailed = 0;
     for (let idx = 0; idx < blobs.length; idx += 1) {
+      const blob = blobs[idx];
       const legId = `img-${idx}`;
       store.setActiveLeg(legId);
-      const res = await deleteFromBlossom({
-        ndk,
-        server: blobs[idx].origin,
-        sha256: blobs[idx].sha256,
-      });
-      // A blob we don't own (403) or one already gone (404) is non-fatal —
-      // the note deletion is the action that matters. `deleteFromBlossom` logs
-      // the HTTP-level result (server + sha256 + status); this records the
-      // per-segment outcome so the toast's image legs are traceable.
-      if (res.isErr()) {
-        imagesFailed += 1;
-        store.setLegFailed(legId, res.error.type);
-        nostrLog.warn('nostr.delete.image', {
-          index: idx,
-          host: blobs[idx].origin,
-          sha256: blobs[idx].sha256.slice(0, 12),
-          ok: false,
-          error: res.error.type,
-        });
-      } else {
+      ownedMedia.setDeleteState(blob.sha256, 'delete-requested');
+      const res = await deleteFromBlossom({ ndk, server: blob.host, sha256: blob.sha256 });
+
+      // Primal returns 404 for "already gone" AND "not owned" — a HEAD probe of
+      // the URL disambiguates so we don't mark a blob we can't actually delete
+      // as deleted. A non-404 failure is left as delete-failed.
+      let deleted = res.isOk();
+      if (
+        !deleted &&
+        res.isErr() &&
+        res.error.type === 'delete-failed' &&
+        res.error.status === 404
+      ) {
+        if ((await checkBlobExists(blob.url)) === false) deleted = true;
+      }
+
+      if (deleted) {
         imagesDeleted += 1;
         store.setLegDone(legId);
+        ownedMedia.setDeleteState(blob.sha256, 'deleted');
         nostrLog.info('nostr.delete.image', {
           index: idx,
-          host: blobs[idx].origin,
-          sha256: blobs[idx].sha256.slice(0, 12),
+          host: blob.host,
+          sha256: blob.sha256.slice(0, 12),
           ok: true,
+        });
+      } else {
+        imagesFailed += 1;
+        const error = res.isErr() ? res.error.type : 'unknown';
+        store.setLegFailed(legId, error);
+        ownedMedia.setDeleteState(blob.sha256, 'delete-failed');
+        nostrLog.warn('nostr.delete.image', {
+          index: idx,
+          host: blob.host,
+          sha256: blob.sha256.slice(0, 12),
+          ok: false,
+          error,
         });
       }
     }

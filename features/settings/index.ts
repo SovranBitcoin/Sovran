@@ -7,6 +7,7 @@ export { SettingsRecoveryScreen } from './screens/SettingsRecoveryScreen';
 export { SettingsRoutingScreen } from './screens/SettingsRoutingScreen';
 export { SettingsNetworkScreen } from './screens/SettingsNetworkScreen';
 export { SettingsStorageScreen } from './screens/SettingsStorageScreen';
+export { SettingsMediaScreen } from './screens/SettingsMediaScreen';
 export { SettingsDesignSystemScreen } from './screens/SettingsDesignSystemScreen';
 export { SettingsDesignSystemLoadingScreen } from './screens/SettingsDesignSystemLoadingScreen';
 export { SettingsDesignSystemSegmentedScreen } from './screens/SettingsDesignSystemSegmentedScreen';

@@ -19,6 +19,8 @@ import { resolveWriteRelays } from '@/shared/lib/nostr/outbox/resolveWriteRelays
 import { publishEvent } from '@/shared/lib/nostr/publish';
 import { notePublishedPopup } from '@/shared/lib/popup/popups/notePublished';
 import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
+import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
+import { extractOwnedBlobsFromDescriptors } from '@/shared/lib/nostr/media/ownedBlobs';
 import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
 import { buildPollEvent } from '@/features/feed/components/nostr/poll/buildPollEvents';
 import {
@@ -161,6 +163,17 @@ export async function publishComposed(ndk: NDK, draft: ComposedDraft): Promise<P
   };
   const ownContent = useOwnContentStore.getState();
   ownContent.recordOwn(ownNote, 'pending');
+
+  // Durable record of the blobs this post uploaded, keyed by sha256 — so a
+  // later (possibly failed) blob deletion can always find the URL to retry or
+  // verify, even after the note ages out of ownContentStore. Descriptors are
+  // the richest source (url + sha256 + mime).
+  const ownedBlobs = extractOwnedBlobsFromDescriptors(
+    draft.blocks.flatMap((b) => (b.kind === 'media' && b.descriptor ? [b.descriptor] : []))
+  );
+  if (ownedBlobs.length > 0) {
+    useOwnedMediaStore.getState().recordBlobs(ownedBlobs, ownNote.id);
+  }
 
   const result = await publishEvent({
     ndk,

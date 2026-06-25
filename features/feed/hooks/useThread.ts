@@ -25,6 +25,7 @@ import {
 import { feedLog } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { ingestOwnContent, useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
+import { ingestOwnMediaBlobs } from '@/shared/stores/profile/ownedMediaStore';
 
 /**
  * Build a single-note thread seed from a locally-stored own note, so a just-
@@ -143,6 +144,7 @@ export function useThread(eventId: string): UseThreadResult {
       threadSeedRef.current = bucketsFromThreadResult(result);
       // Passive convergence: settle any own notes this thread surfaced.
       ingestOwnContent(threadSeedRef.current.allEvents.values(), viewerPubkey);
+      ingestOwnMediaBlobs(threadSeedRef.current.allEvents.values(), viewerPubkey);
       profilesRef.current = result.profiles;
       metricsRef.current = result.metrics;
       quotedEventsRef.current = result.quotedEvents;

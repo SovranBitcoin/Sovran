@@ -38,6 +38,11 @@ jest.mock('@/shared/stores/profile/ownContentStore', () => ({
   useOwnContentStore: { getState: () => mockOwnContent },
 }));
 
+const mockOwnedMedia = { recordBlobs: jest.fn() };
+jest.mock('@/shared/stores/profile/ownedMediaStore', () => ({
+  useOwnedMediaStore: { getState: () => mockOwnedMedia },
+}));
+
 jest.mock('@/shared/lib/popup/popups/notePublished', () => ({
   notePublishedPopup: jest.fn(),
 }));
