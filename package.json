@@ -28,7 +28,7 @@
     "@gandlaf21/bolt11-decode": "^3.1.1",
     "@noble/hashes": "^2.0.0",
     "@scure/bip39": "2.0.1",
-    "@sovranbitcoin/nagg-ts": "^0.3.0",
+    "@sovranbitcoin/nagg-ts": "^0.6.0",
     "@sovranbitcoin/schemas": "^2.0.6",
     "neverthrow": "^8.2.0",
     "nostr-tools": "^2.0.0",
