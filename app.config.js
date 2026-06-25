@@ -19,7 +19,7 @@ module.exports = ({ config }) => {
   }
 
   const appIcon = './assets/images/light.png';
-  const adaptiveIcon = './assets/images/light-t.png';
+  const adaptiveIcon = './assets/images/dark-t.png';
   const androidGoogleMapsApiKey =
     process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
 
