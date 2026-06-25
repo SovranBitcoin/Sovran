@@ -170,6 +170,23 @@ describe('executeDeletePost', () => {
     expect(deleteStore.setLegDone).not.toHaveBeenCalledWith('img-0');
   });
 
+  it('recovers a timed-out delete (no status) when the HEAD probe confirms it gone', async () => {
+    // Primal's slow purge can abort our request (no HTTP status) even though the
+    // blob is really deleted — the probe must still flip it to done.
+    deleteFromBlossom.mockReturnValue({
+      isOk: () => false,
+      isErr: () => true,
+      error: { type: 'delete-failed' }, // timeout/network: no `status`
+    });
+    checkBlobExists.mockResolvedValue(false); // gone
+
+    await executeDeletePost({ ndk, pubkey: 'abc', event: makeEvent() });
+
+    expect(checkBlobExists).toHaveBeenCalled();
+    expect(deleteStore.setLegDone).toHaveBeenCalledWith('img-0');
+    expect(deleteStore.setLegFailed).not.toHaveBeenCalledWith('img-0', expect.anything());
+  });
+
   it('does NOT mark delete-requested when every relay rejects', async () => {
     publishEvent.mockResolvedValueOnce(okResult(false));
     await executeDeletePost({ ndk, pubkey: 'abc', event: makeEvent() });

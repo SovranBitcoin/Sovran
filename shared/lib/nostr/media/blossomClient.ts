@@ -32,8 +32,12 @@ export type BlossomDeleteError =
   | { type: 'delete-failed'; status?: number }
   | { type: 'canceled' };
 
-/** A DELETE that hangs would stall the whole multi-image delete flow. */
-const DELETE_TIMEOUT_MS = 15_000;
+// Primal's DELETE runs a synchronous server-side media purge that can take
+// >15s; too short a cap aborts a delete that actually succeeds (the client logs
+// failure while the blob is really gone). 30s gives the purge room to return a
+// clean 2xx. A delete that still times out is recovered by the HEAD-probe in
+// `deleteOwnedBlob`.
+const DELETE_TIMEOUT_MS = 30_000;
 /** Existence probe timeout (settings refresh / post-delete verification). */
 const CHECK_TIMEOUT_MS = 10_000;
 
