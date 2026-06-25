@@ -831,18 +831,6 @@ export function UserProfileScreen() {
   const followOptimisticEntry = useNostrSocialStore((state) =>
     pubkey ? state.optimisticFollowsByPubkey[pubkey] : undefined
   );
-  const ownFollowingCount = useNostrSocialStore((state) => {
-    let count = Object.keys(state.followingPubkeys).length;
-
-    for (const [followedPubkey, optimistic] of Object.entries(state.optimisticFollowsByPubkey)) {
-      const baseIsFollowing = !!state.followingPubkeys[followedPubkey];
-      if (optimistic.value === baseIsFollowing) continue;
-      count += optimistic.value ? 1 : -1;
-    }
-
-    return Math.max(0, count);
-  });
-
   const { data: profileData, isLoading: isProfileApiLoading } = useNostrProfile(pubkey || null);
   const profileMintUrl = getProfileMintInfoUrl(profileData?.mintUrl, mintUrlParam);
 
@@ -923,13 +911,14 @@ export function UserProfileScreen() {
   // settles follow optimism); no per-screen contact subscription needed.
 
   // Displayed aggregation counts come from Vertex (nagg) everywhere for
-  // consistency — both follower and following. On the own profile we fall back
-  // to the local kind-3 count only while Vertex is still loading, so the number
-  // never flashes blank. The local `followingPubkeys` set still drives
-  // follow/unfollow membership logic; only the displayed total uses Vertex.
-  const followingCount = isOwnProfile
-    ? (profileData?.follows ?? ownFollowingCount)
-    : profileData?.follows;
+  // consistency — follower and following alike, own profile included. Using a
+  // single source keeps the stats grid's skeleton decision identical for every
+  // profile: a cold load shows the unified whole-pill skeleton rather than the
+  // own-profile-only path where a local kind-3 fallback made `followingCount`
+  // present and collapsed the grid into per-text placeholders. The local
+  // `followingPubkeys` set still drives follow/unfollow membership logic; only
+  // the displayed total uses Vertex.
+  const followingCount = profileData?.follows;
   const isFollowingProfile = useNostrSocialStore(
     useMemo(() => selectIsFollowingPubkey(pubkey || ''), [pubkey])
   );
