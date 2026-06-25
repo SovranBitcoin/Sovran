@@ -361,7 +361,7 @@ export const PostCard = React.memo(function PostCard({
   // Delete-requested: replace the whole card with the tombstone. Placed after
   // all hooks so rules-of-hooks hold across the flip.
   if (deleteRequested) {
-    return <DeletedTombstone inset={!isTarget} />;
+    return <DeletedTombstone />;
   }
 
   // ── Thread target: stacked layout (no gutter) ──
