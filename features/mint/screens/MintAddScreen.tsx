@@ -260,9 +260,15 @@ const MintItem = memo(function MintItem({
     if (!('serverStats' in mint) || !mint.serverStats)
       return { auditScore: undefined, auditTotalOps: undefined };
     const { n_mints, n_melts, n_errors } = mint.serverStats;
-    const totalOps = n_mints + n_melts;
+    // n_errors is a SEPARATE count of failed operations, not a subset of
+    // n_mints/n_melts (which count successes). So the success rate is
+    // successes / (successes + errors) — bounded 0..1. The old
+    // `1 - errors/successes` went deeply negative for error-heavy mints
+    // (e.g. coinos: 39 successes vs 235 errors → -503%).
+    const successOps = n_mints + n_melts;
+    const totalOps = successOps + n_errors;
     if (totalOps <= 0) return { auditScore: undefined, auditTotalOps: undefined };
-    const successRate = 1 - n_errors / totalOps; // 0..1
+    const successRate = Math.max(0, Math.min(1, successOps / totalOps)); // 0..1
     return { auditScore: successRate * 5, auditTotalOps: totalOps };
   }, [mint]);
 
