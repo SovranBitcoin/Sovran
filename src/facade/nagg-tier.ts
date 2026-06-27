@@ -35,6 +35,7 @@ import {
   DiscoverMintsResponseSchema,
   type DiscoverMintsRequest,
   type DiscoveredMint,
+  type MintReview,
   type MintReviewsRequest,
   type MintReviewsSummary,
 } from './mint-reviews';
@@ -200,13 +201,28 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
         timeoutMs: request.timeoutMs,
       });
       return result.match<TierOutcome<MintReviewsSummary>>(
-        (page) =>
-          answered({
+        (page) => {
+          const profiles = page.profiles ?? {};
+          const reviews: MintReview[] = (page.reviews ?? []).map((item) => {
+            const profile = profiles[item.reviewerPubkey];
+            return {
+              eventId: item.eventId,
+              reviewerPubkey: item.reviewerPubkey,
+              mintUrl: item.mintUrl,
+              score: item.score,
+              content: item.content,
+              createdAt: item.createdAt,
+              ...(profile?.name ? { name: profile.name } : {}),
+              ...(profile?.picture ? { picture: profile.picture } : {}),
+            };
+          });
+          return answered({
             mintUrl: page.summary.mintUrl,
             averageScore: page.summary.averageScore,
             reviewCount: page.summary.reviewCount,
-            reviews: [], // the aggregate gives avg+count; individual reviews come from a lower tier
-          }),
+            reviews,
+          });
+        },
         (error) => failed(error),
       );
     },
@@ -227,7 +243,36 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
         timeoutMs: request.timeoutMs,
       });
       return result.match<TierOutcome<DiscoveredMint[]>>(
-        (page) => answered(page.mints),
+        (page) => {
+          const profiles = page.profiles ?? {};
+          const mints: DiscoveredMint[] = page.mints.map((m) => {
+            const operator = m.operatorPubkey ? profiles[m.operatorPubkey] : undefined;
+            return {
+              mintUrl: m.mintUrl,
+              averageScore: m.averageScore,
+              reviewCount: m.reviewCount,
+              favouriteCount: m.favouriteCount ?? 0,
+              ...(m.name ? { name: m.name } : {}),
+              ...(m.iconUrl ? { iconUrl: m.iconUrl } : {}),
+              ...(m.description ? { description: m.description } : {}),
+              ...(m.supportedUnits ? { supportedUnits: m.supportedUnits } : {}),
+              ...(m.hasAudit != null ? { hasAudit: m.hasAudit } : {}),
+              ...(m.state ? { state: m.state } : {}),
+              ...(m.nMints != null ? { nMints: m.nMints } : {}),
+              ...(m.nMelts != null ? { nMelts: m.nMelts } : {}),
+              ...(m.nErrors != null ? { nErrors: m.nErrors } : {}),
+              ...(m.operatorPubkey ? { operatorPubkey: m.operatorPubkey } : {}),
+              ...(m.operatorNpub ? { operatorNpub: m.operatorNpub } : {}),
+              ...(operator?.name ? { operatorName: operator.name } : {}),
+              ...(operator?.picture ? { operatorPicture: operator.picture } : {}),
+              ...(m.followers != null ? { followers: m.followers } : {}),
+              ...(m.follows != null ? { follows: m.follows } : {}),
+              ...(m.vertexRank != null ? { vertexRank: m.vertexRank } : {}),
+              ...(m.vertexScore !== undefined ? { vertexScore: m.vertexScore } : {}),
+            };
+          });
+          return answered(mints);
+        },
         (error) => failed(error),
       );
     },

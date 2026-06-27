@@ -29,6 +29,9 @@ export type MintReview = {
   score: number | null;
   content: string;
   createdAt: number;
+  /** Reviewer kind-0 identity, bundled by nagg's profiles map (nagg tier only). */
+  name?: string;
+  picture?: string;
 };
 
 export type MintReviewsSummary = {
@@ -38,10 +41,36 @@ export type MintReviewsSummary = {
   reviews: MintReview[];
 };
 
+/**
+ * A discovered mint card. The nagg tier fills the full shape (audit state,
+ * supported units, operator Nostr identity + Vertex reputation, favourite vs
+ * scored split); the relay/Primal fallback can only supply the review-derived
+ * fields, so audit/social fields are optional.
+ */
 export type DiscoveredMint = {
   mintUrl: string;
   averageScore: number | null;
   reviewCount: number;
+  /** NIP-87 recommendations posted WITHOUT a [n/5] score. */
+  favouriteCount: number;
+  // --- nagg-tier enrichment (optional; absent on the relay fallback) ---
+  name?: string;
+  iconUrl?: string;
+  description?: string;
+  supportedUnits?: string[];
+  hasAudit?: boolean;
+  state?: string;
+  nMints?: number;
+  nMelts?: number;
+  nErrors?: number;
+  operatorPubkey?: string;
+  operatorNpub?: string;
+  operatorName?: string;
+  operatorPicture?: string;
+  followers?: number;
+  follows?: number;
+  vertexRank?: number;
+  vertexScore?: number | null;
 };
 
 export type MintReviewsRequest = RequestControls & {
@@ -67,18 +96,58 @@ export interface MintReviewsTier {
 }
 
 // The nagg server-side aggregate response (`GroupBy:["u"]` over kind 38000).
-// Pins the contract PR-2 implements.
 const MintAggregateSchema = z.object({
   mintUrl: z.string(),
   averageScore: z.number().nullable(),
   reviewCount: z.number(),
 });
+
+// Bundled kind-0 identity (reviewer or operator), keyed by pubkey.
+const ProfileInfoSchema = z
+  .object({ name: z.string().optional(), picture: z.string().optional() })
+  .passthrough();
+
+const MintReviewItemSchema = z.object({
+  eventId: z.string(),
+  reviewerPubkey: z.string(),
+  mintUrl: z.string(),
+  score: z.number().nullable(),
+  content: z.string(),
+  createdAt: z.number(),
+});
+
 export const MintReviewsResponseSchema = z.object({
   summary: MintAggregateSchema,
-  reviews: z.array(z.unknown()).optional(),
+  reviews: z.array(MintReviewItemSchema).optional(),
+  profiles: z.record(z.string(), ProfileInfoSchema).optional(),
 });
+
+// The nagg rich discovery row (per-mint card data merged from auditor + Nostr).
+const DiscoverMintSchema = z.object({
+  mintUrl: z.string(),
+  name: z.string().optional(),
+  iconUrl: z.string().optional(),
+  description: z.string().optional(),
+  supportedUnits: z.array(z.string()).optional(),
+  averageScore: z.number().nullable(),
+  reviewCount: z.number(),
+  favouriteCount: z.number().optional(),
+  hasAudit: z.boolean().optional(),
+  state: z.string().optional(),
+  nMints: z.number().optional(),
+  nMelts: z.number().optional(),
+  nErrors: z.number().optional(),
+  operatorPubkey: z.string().optional(),
+  operatorNpub: z.string().optional(),
+  followers: z.number().optional(),
+  follows: z.number().optional(),
+  vertexRank: z.number().optional(),
+  vertexScore: z.number().nullable().optional(),
+});
+
 export const DiscoverMintsResponseSchema = z.object({
-  mints: z.array(MintAggregateSchema),
+  mints: z.array(DiscoverMintSchema),
+  profiles: z.record(z.string(), ProfileInfoSchema).optional(),
 });
 
 // --- NIP-87 parsing ---------------------------------------------------------
@@ -164,6 +233,7 @@ export function discoverFromReviews(events: ReadonlyArray<NaggFeedEvent>): Disco
       mintUrl: deduped[0]?.mintUrl ?? list[0].mintUrl,
       averageScore: averageOf(deduped),
       reviewCount: deduped.length,
+      favouriteCount: deduped.filter((r) => r.score == null).length,
     });
   }
   // Most-reviewed first, then highest average — surface well-attested mints.
