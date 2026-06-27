@@ -15,6 +15,7 @@ import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import Icon from 'assets/icons';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { HeaderGlassCircle } from '@/shared/ui/composed/HeaderGlassCircle';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { headerButtonSize } from '@/shared/styles/tokens';
 
@@ -179,7 +180,7 @@ export function buildExpoRouterHeaderOptions({
     );
   }
 
-  return nextOptions;
+  return withGlassHeaderItems(nextOptions);
 }
 
 /**

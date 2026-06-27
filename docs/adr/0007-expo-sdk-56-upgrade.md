@@ -42,11 +42,9 @@ renders. Therefore:
   patch threads the per-screen `overlayStyle` option through and adds it to
   `DrawerNavigationOptions`.
 - **native-stack `hidesSharedBackground`** (iOS 26 liquid-glass double-chrome
-  workaround for custom `headerLeft`/`headerRight`): **dropped**. The fork has no
-  equivalent `useHeaderConfigProps`/`ScreenStackHeader*View` anchor, and SDK 56 is
-  the iOS-26-era SDK where react-native-screens may handle this itself. **Requires
-  device re-verification** — if custom header items show doubled chrome on iOS 26,
-  a fork-targeted patch must be re-introduced.
+  workaround for custom `headerLeft`/`headerRight`): the patch was dropped, and
+  device testing confirmed the regression (doubled glass + swallowed taps). The
+  correct SDK 56 replacement is **not a patch** — see the addendum below.
 - The `expo-router+55.0.12.patch` native-tabs crash bridge is **obsolete** —
   SDK 56 rewrote `NativeTabsView`; deleted.
 - `react-native-screens` (4.25.2, unchanged in SDK 56), `@gorhom/bottom-sheet`
@@ -89,3 +87,45 @@ renders. Therefore:
   the drawer rounded scrim, the chat composer text seed/reset, and the heavy
   native modules (skia 2.6.2, reanimated 4.3.1 + worklets 0.8.3, view-shot 5,
   quick-crypto, bitchat, liquid-glass).
+
+## Addendum (2026-06-27): iOS 26 header items + glass-touch fixes
+
+Device testing surfaced three regressions; all fixed on the same branch.
+
+1. **Header buttons: doubled glass + intermittent taps.** Custom header buttons
+   (`HeaderGlassCircle`, via `@expo/ui` glass) were passed through the legacy
+   `headerLeft`/`headerRight` functions. On iOS 26, react-native-screens wraps
+   those slots in the system Liquid Glass shared-background capsule — on by
+   default, undisableable via the legacy form, and it intercepts touches. Result:
+   the app glass + system capsule both render, and `onPress` fires unreliably.
+   **Fix:** a shared helper `navigation/headerItems.tsx::withGlassHeaderItems`
+   mirrors `headerLeft`/`headerRight` into the SDK 56 (iOS, `unstable_`)
+   `unstable_headerLeftItems`/`unstable_headerRightItems` API as
+   `{ type: 'custom', element, hidesSharedBackground: true }`. This suppresses the
+   system capsule (single glass) and removes the intercepting container (taps
+   land). Android keeps the legacy `headerLeft`/`headerRight` (the items API is
+   iOS-only). Applied via the two header builders
+   (`buildExpoRouterHeaderOptions`, `createFlowLayoutScreenOptions`) plus the
+   per-screen header sites. The API is `unstable_`/alpha — accepted risk.
+
+2. **Send/Receive open inconsistently.** `CapsuleButton.liquid.tsx` wrapped a
+   `PressableFeedback` in an `expo-glass-effect` `<GlassView isInteractive>`; the
+   interactive glass layer contended with the pressable for touches. **Fix:**
+   dropped `isInteractive` so the glass is decorative and the pressable owns the
+   tap.
+
+3. **Wallet QR button intermittently missing.** Its opacity was gated solely by
+   the boot-morph completion flag (`useBootMorphCompleted`); a racing/timed-out
+   anchor poll left it at opacity 0. **Fix:** a fail-safe in `QRButton.ios.tsx`
+   and `QRButton.android.tsx` reveals the button ~1.5s after mount if the morph
+   hasn't completed (the morph stays a visual enhancement, not a gate), with a
+   `QRButton` boot log.
+
+### eslint-config-expo held at ~55
+The SDK-56 hygiene bump of `eslint-config-expo` to ~56 pulled
+`eslint-plugin-react-hooks@7` (React-Compiler-era rules), which (a) imports
+`zod-validation-error/v4` while allowing a 3.x that lacks it, breaking config
+load, and (b) flags ~500 pre-existing violations across the app. As that is a
+dev-only lint config not required by SDK 56, it is **held at ~55**
+(`expo.install.exclude`). Adopting `eslint-config-expo@56` + the React Compiler
+hook rules is a deliberate separate follow-up.

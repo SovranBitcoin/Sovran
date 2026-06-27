@@ -13,6 +13,7 @@ import { router } from 'expo-router';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { FlowSheetHeader } from '@/shared/ui/composed/FlowSheetHeader';
 import { AndroidHeaderScrim } from '@/shared/ui/composed/AndroidHeaderScrim';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 
 interface FlowColors {
   foreground: string;
@@ -108,7 +109,7 @@ export const createFlowLayoutScreenOptions = (
     const state = navigation.getState();
     const isFirstScreen = state.index === 0;
 
-    return {
+    return withGlassHeaderItems({
       ...getBaseFlowScreenOptions(colors),
       // Sheet flows render the scrim INSIDE FlowSheetHeader and must strip the
       // headerBackground option: native-stack renders that option ITSELF in an
@@ -120,7 +121,7 @@ export const createFlowLayoutScreenOptions = (
       ...(sheetHeader ? { header: renderFlowSheetHeader, headerBackground: undefined } : {}),
       // Dynamic back/close button based on stack depth
       headerLeft: () => <FlowHeaderButton isFirstScreen={isFirstScreen} />,
-    };
+    });
   };
 };
 

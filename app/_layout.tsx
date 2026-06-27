@@ -41,6 +41,7 @@ import { persistor, store } from '@/redux/store/store.deprecated';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { androidHeaderScrimOptions, getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
 import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
 import { WhitenoiseProvider } from '@/features/whitenoise/WhitenoiseProvider';
@@ -299,7 +300,7 @@ function RootLayoutContent() {
             }
           : {};
 
-        return {
+        return withGlassHeaderItems({
           ...baseHeaderOptions,
           ...screen.options,
           headerShown: true,
@@ -309,7 +310,7 @@ function RootLayoutContent() {
           ...(isModalPresentation
             ? { headerLeft: () => <CloseButton foreground={foreground} /> }
             : {}),
-        };
+        });
       }
 
       // Default options for screens with titles (non-modal screens).

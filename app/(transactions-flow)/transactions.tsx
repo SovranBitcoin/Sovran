@@ -16,6 +16,7 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 import { TransactionsScreen, useTransactionsFilter } from '@/features/transactions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { HistoryEntry } from '@cashu/coco-core';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -237,12 +238,12 @@ function TransactionsRoute() {
     <>
       {/* Native header - transparent with filter button */}
       <Stack.Screen
-        options={{
+        options={withGlassHeaderItems({
           title: 'Transactions',
           headerTransparent: true,
           headerStyle: { backgroundColor: 'transparent' },
           headerRight: () => <FilterButton />,
-        }}
+        })}
       />
 
       <TransactionsScreen

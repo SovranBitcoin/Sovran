@@ -27,6 +27,7 @@ import { useBLEPeers } from '../hooks/useBLEPeers';
 import { useBluetoothState } from '../hooks/useBluetoothState';
 import { BluetoothInlineNotice } from '../components/BluetoothNotice';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import {
   ChatMessageBubble,
   ChatScreen,
@@ -159,7 +160,7 @@ export function GeohashChatScreen({
     />
   ) : (
     <Stack.Screen
-      options={{
+      options={withGlassHeaderItems({
         headerShown: true,
         headerTransparent: false,
         headerStyle: { backgroundColor: surfaceSecondary },
@@ -221,7 +222,7 @@ export function GeohashChatScreen({
               </Text>
             </HStack>
           ),
-      }}
+      })}
     />
   );
 

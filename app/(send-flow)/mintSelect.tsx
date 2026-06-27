@@ -27,6 +27,7 @@ import type { MintListItem, StepDataMap } from '@sovranbitcoin/colada';
 import { MintListScreen, useStickyMintSelectorItems } from '@/features/mint';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
@@ -77,7 +78,7 @@ function MintSelectRoute() {
   return (
     <>
       <Stack.Screen
-        options={{
+        options={withGlassHeaderItems({
           title: 'Select Mint',
           headerRight: () =>
             actions.addMint.available ? (
@@ -86,7 +87,7 @@ function MintSelectRoute() {
                 onPress={() => actions.addMint.execute()}
               />
             ) : null,
-        }}
+        })}
       />
       <MintListScreen
         items={items}

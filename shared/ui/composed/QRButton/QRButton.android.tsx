@@ -82,6 +82,20 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
     visibility.set(withTiming(morphCompleted ? 1 : 0, { duration: 180 }));
   }, [morphCompleted, visibility]);
 
+  // Fail-safe: the boot-morph anchor poll can race / time out, leaving
+  // `morphCompleted` false so the button never fades in. Reveal it anyway after
+  // a short delay — the morph is a splash→button handoff, not a gate on the
+  // primary scan affordance. If the morph completes first, the cleanup cancels
+  // this and the effect above does the reveal.
+  useEffect(() => {
+    if (morphCompleted) return;
+    const t = setTimeout(() => {
+      initLog('QRButton', 'boot-morph failsafe reveal — morph did not complete in time');
+      visibility.set(withTiming(1, { duration: 180 }));
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [morphCompleted, visibility]);
+
   useEffect(() => {
     const unregister = registerQRButtonRemeasure(publishAnchor);
     return () => {
