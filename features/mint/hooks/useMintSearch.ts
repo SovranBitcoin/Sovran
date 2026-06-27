@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { reviewMint, searchMints, type MintSearchResult } from '@/shared/lib/apiClient';
+import { discoverMints, type DiscoverMint, type MintSearchResult } from '@/shared/lib/apiClient';
 import { cashuLog } from '@/shared/lib/logger';
+import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
 
 interface UseMintSearchReturn {
   results: MintSearchResult[];
@@ -9,64 +10,57 @@ interface UseMintSearchReturn {
   error: string | null;
 }
 
-function hasMintIconUrl(result: MintSearchResult): boolean {
-  const { info } = result;
-  if (typeof info !== 'object' || info === null) return false;
-  if (!('icon_url' in info)) return false;
-
-  const iconUrl = (info as { icon_url?: unknown }).icon_url;
-  return typeof iconUrl === 'string' && iconUrl.trim().length > 0;
+/**
+ * Map a nagg discovery row to the screen's MintSearchResult shape. Review score
+ * + count come inline (no per-mint fan-out); the operator's Nostr pubkey is
+ * surfaced as a NUT-06 `contact` entry so the existing operator-profile path
+ * still resolves. Exported for testing.
+ */
+export function discoverMintToSearchResult(m: DiscoverMint): MintSearchResult {
+  const contact = m.operatorPubkey ? [{ method: 'nostr', info: m.operatorPubkey }] : [];
+  return {
+    url: m.mintUrl,
+    name: m.name || m.mintUrl,
+    supported_units: m.supportedUnits ?? [],
+    state: m.state ?? 'unknown',
+    n_mints: m.nMints ?? 0,
+    n_melts: m.nMelts ?? 0,
+    n_errors: m.nErrors ?? 0,
+    review_score: m.averageScore,
+    review_count: m.reviewCount,
+    info: {
+      ...(m.iconUrl ? { icon_url: m.iconUrl } : {}),
+      ...(m.description ? { description: m.description } : {}),
+      contact,
+    },
+  };
 }
 
-const REVIEW_HYDRATION_CONCURRENCY = 8;
+function matchesQuery(result: MintSearchResult, q: string): boolean {
+  if (!q) return true;
+  const needle = q.toLowerCase();
+  return result.name.toLowerCase().includes(needle) || result.url.toLowerCase().includes(needle);
+}
 
-async function hydrateReviewFields(
-  results: MintSearchResult[],
-  signal: AbortSignal
-): Promise<MintSearchResult[]> {
-  const hydrated: MintSearchResult[] = results.map((result) => ({
-    ...result,
-    review_score: null,
-    review_count: 0,
-  }));
-  let index = 0;
-
-  const hydrateNext = async (): Promise<void> => {
-    if (signal.aborted) return;
-    const currentIndex = index++;
-    const result = hydrated[currentIndex];
-    if (!result) return;
-
-    const reviews = await reviewMint({ mintUrl: result.url, signal }).catch(() => null);
-    if (signal.aborted) return;
-    if (reviews?.isOk()) {
-      hydrated[currentIndex] = {
-        ...result,
-        review_score: reviews.value.score,
-        review_count: reviews.value.recommendations.length,
-      };
-    }
-
-    await hydrateNext();
-  };
-
-  await Promise.all(
-    Array.from({ length: Math.min(REVIEW_HYDRATION_CONCURRENCY, hydrated.length) }, () =>
-      hydrateNext()
-    )
-  );
-
-  return hydrated;
+function matchesCurrency(result: MintSearchResult, currency: string): boolean {
+  if (!currency || currency === 'ALL') return true;
+  const units = currency
+    .split(',')
+    .map((u) => u.trim().toLowerCase())
+    .filter(Boolean);
+  if (units.length === 0) return true;
+  return result.supported_units.some((u) => units.includes(u.toLowerCase()));
 }
 
 /**
- * Server-backed mint search hook.
+ * Mint discovery hook, backed by nagg's single `/nostr/mint/discover` app-view.
  *
- * Calls GET /api/cashu/mints/search with optional query and currency filter,
- * then hydrates review score/count through the Nagg-backed reviewMint()
- * wrapper. The search API can discover mints; Nagg owns review display data.
- * Debounces the query by 300ms to avoid excessive API calls during typing.
- * On empty query, fetches the default list (all mints sorted by reliability).
+ * One network call returns every mint with audit state, units, review/favourite
+ * aggregates and the operator's Vertex reputation — so query + currency
+ * filtering happen client-side (instant, no per-keystroke request) and the old
+ * api.sovran.money search + per-mint review N+1 fan-out are gone. Inline
+ * operator follower/score is seeded into the mint-profile cache so the
+ * operator-profile lookup is a cache hit, not another round-trip.
  */
 export function useMintSearch(
   query: string,
@@ -74,117 +68,70 @@ export function useMintSearch(
   options?: { enabled?: boolean }
 ): UseMintSearchReturn {
   const enabled = options?.enabled ?? true;
-  const [results, setResults] = useState<MintSearchResult[]>([]);
+  const [allMints, setAllMints] = useState<MintSearchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const fetchCountRef = useRef(0);
 
   useEffect(() => {
-    // Gated off (e.g. query too short to bother the mint search API): clear any
-    // prior results and skip the network entirely. An empty query would
-    // otherwise fetch the *default* mint catalog, which is wrong for an
-    // aggregated search surface.
     if (!enabled) {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      setResults([]);
+      setAllMints([]);
       setLoading(false);
       setError(null);
       return;
     }
-
-    // Debounce search queries (300ms), but fire immediately for empty/currency-only changes
-    const delay = query.trim() ? 300 : 0;
-
-    if (timerRef.current) {
-      cashuLog.debug('mint.search.debounce.cancel', { query, delay });
-      clearTimeout(timerRef.current);
-    }
-
-    if (delay > 0) {
-      cashuLog.debug('mint.search.debounce.start', { query, delay });
-    }
-
-    // One AbortController per debounced fire — cancelled when the query
-    // changes again, the currency flips, or the component unmounts. Means
-    // every keystroke in a burst no longer stays in flight after the next
-    // keystroke supersedes it.
     const controller = new AbortController();
+    const fetchId = ++fetchCountRef.current;
+    const t0 = performance.now();
+    setLoading(true);
+    setError(null);
+    cashuLog.info('mint.discover.fetch', { fetchId });
 
-    timerRef.current = setTimeout(() => {
-      const fetchId = ++fetchCountRef.current;
-      const t0 = performance.now();
-      setLoading(true);
-      setError(null);
-
-      cashuLog.info('mint.search.fetch', { fetchId, query, currency });
-
-      searchMints({
-        query: query.trim() || undefined,
-        currency: currency !== 'ALL' ? currency : undefined,
-        fields: 'name,icon_url,description,contact',
-        signal: controller.signal,
-      })
-        .then(async (res) => {
-          if (controller.signal.aborted) {
-            cashuLog.debug('mint.search.cancelled', {
-              fetchId,
-              duration_ms: Math.round(performance.now() - t0),
-            });
-            return;
+    discoverMints({ signal: controller.signal })
+      .then((res) => {
+        if (controller.signal.aborted) return;
+        const duration = Math.round(performance.now() - t0);
+        if (res.isErr()) {
+          cashuLog.warn('mint.discover.api_error', { fetchId, duration_ms: duration });
+          setError('Failed to load mints');
+          return;
+        }
+        const mapped = res.value.mints.map(discoverMintToSearchResult);
+        // Seed operator follower/reputation so useMintProfiles short-circuits.
+        for (const m of res.value.mints) {
+          if (m.followers != null) {
+            useMintProfileStore
+              .getState()
+              .setCached(m.mintUrl, m.followers, m.vertexScore ?? null);
           }
-          const duration = Math.round(performance.now() - t0);
-          if (res.isOk()) {
-            const results = await hydrateReviewFields(res.value.results, controller.signal);
-            if (controller.signal.aborted) return;
-
-            const withIcons = results.filter(hasMintIconUrl).length;
-            const withReviews = results.filter((r) => r.review_score !== null).length;
-            cashuLog.info('mint.search.results', {
-              fetchId,
-              query,
-              currency,
-              count: results.length,
-              total: res.value.total,
-              withIcons,
-              withReviews,
-              duration_ms: duration,
-            });
-            if (duration > 2000) {
-              cashuLog.warn('mint.search.slow', { fetchId, duration_ms: duration, query });
-            }
-            setResults(results);
-          } else {
-            cashuLog.warn('mint.search.api_error', {
-              fetchId,
-              query,
-              currency,
-              duration_ms: duration,
-            });
-            setError('Failed to search mints');
-          }
-        })
-        .catch((err) => {
-          if (controller.signal.aborted) return;
-          cashuLog.error('mint.search.network_error', {
-            fetchId,
-            query,
-            currency,
-            duration_ms: Math.round(performance.now() - t0),
-            error: err instanceof Error ? err.message : String(err),
-          });
-          setError('Failed to search mints');
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setLoading(false);
+        }
+        cashuLog.info('mint.discover.results', {
+          fetchId,
+          count: mapped.length,
+          withReviews: mapped.filter((r) => r.review_score !== null).length,
+          duration_ms: duration,
         });
-    }, delay);
+        setAllMints(mapped);
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        cashuLog.error('mint.discover.network_error', {
+          fetchId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        setError('Failed to load mints');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
 
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      controller.abort();
-    };
-  }, [query, currency, enabled]);
+    return () => controller.abort();
+  }, [enabled, currency]);
+
+  const results = useMemo(() => {
+    const q = query.trim();
+    return allMints.filter((m) => matchesQuery(m, q) && matchesCurrency(m, currency));
+  }, [allMints, query, currency]);
 
   return { results, loading, error };
 }

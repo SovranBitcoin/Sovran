@@ -15,7 +15,6 @@ import {
   AuditMintResponse as AuditMintResponseStrict,
   CatalogResponse,
   LatestVersionResponse,
-  MintSearchResponse,
   NostrProfileFull as NostrProfileFullStrict,
   TopFollower as TopFollowerStrict,
   loggableIssues,
@@ -67,6 +66,43 @@ type MintReviewsResponseType = {
   lastUpdated: number | null;
   fromCache: boolean;
 };
+// nagg's rich discovery row — one call returns every mint card field (audit
+// state, units, reviews + favourite split, operator Nostr identity + Vertex
+// reputation), replacing the api.sovran.money search + per-mint review/profile
+// N+1 fan-outs. Lenient (passthrough) so a nagg field addition needs no release.
+const DiscoverMint = z
+  .object({
+    mintUrl: z.string().max(2048),
+    name: z.string().max(256).optional(),
+    iconUrl: z.string().max(2048).optional(),
+    description: z.string().max(4096).optional(),
+    supportedUnits: z.array(z.string().max(16)).max(64).optional(),
+    averageScore: z.number().nullable(),
+    reviewCount: z.number().int().nonnegative(),
+    favouriteCount: z.number().int().nonnegative().optional(),
+    hasAudit: z.boolean().optional(),
+    state: z.string().max(32).optional(),
+    nMints: z.number().int().optional(),
+    nMelts: z.number().int().optional(),
+    nErrors: z.number().int().optional(),
+    operatorPubkey: z.string().max(128).optional(),
+    operatorNpub: z.string().max(128).optional(),
+    followers: z.number().int().optional(),
+    follows: z.number().int().optional(),
+    vertexRank: z.number().optional(),
+    vertexScore: z.number().nullable().optional(),
+  })
+  .passthrough();
+export type DiscoverMint = z.infer<typeof DiscoverMint>;
+const ReviewerProfileInfo = z
+  .object({ name: z.string().optional(), picture: z.string().optional() })
+  .passthrough();
+const DiscoverMintsResponse = z.object({
+  mints: z.array(DiscoverMint).max(10_000),
+  profiles: z.record(z.string(), ReviewerProfileInfo).optional(),
+});
+export type DiscoverMintsResponseType = z.infer<typeof DiscoverMintsResponse>;
+
 const API_BASE_URL = backendConfig.apiBaseUrl;
 const SCORE_API_BASE_URL = backendConfig.scoreApiBaseUrl;
 
@@ -243,9 +279,9 @@ function describeRoute(url: string): { host: string; path: string } {
 // ---------------------------------------------------------------------------
 
 const parseAuditMint = parseWith(AuditMintResponse, 'cashu/mint/audit');
-const parseMintSearch = parseWith(MintSearchResponse, 'cashu/mints/search');
 const parseNostrProfile = parseWith(NostrProfileFull, 'nostr/profile');
 const parseLatestVersion = parseWith(LatestVersionResponse, 'app/latest-version');
+const parseDiscoverMints = parseWith(DiscoverMintsResponse, 'nostr/mint/discover');
 const parseCatalog = parseWith(CatalogResponse, 'wallpapers/catalog');
 
 /**
@@ -279,6 +315,25 @@ const parseMintInfo = (input: unknown): Result<GetInfoResponse, ParseError> => {
 // Public API client functions
 // ---------------------------------------------------------------------------
 
+/**
+ * nagg mint discovery: one app-view call returning every known mint with audit
+ * state, supported units, review + favourite aggregates, and the operator's
+ * Nostr identity + Vertex reputation. Served by nagg (SCORE_API_BASE_URL), so
+ * the app no longer needs api.sovran.money's /cashu/mints/search + per-mint
+ * review/profile fan-outs for discovery.
+ */
+export const discoverMints = ({
+  limit,
+  signal,
+}: { limit?: number; signal?: AbortSignal } = {}) =>
+  fetchJson(
+    `${SCORE_API_BASE_URL}/nostr/mint/discover${limit ? `?limit=${limit}` : ''}`,
+    parseDiscoverMints,
+    'nostr/mint/discover',
+    undefined,
+    { signal }
+  );
+
 export const auditMint = ({ mintUrl, signal }: { mintUrl: string; signal?: AbortSignal }) =>
   fetchJson(
     `${API_BASE_URL}/cashu/mint/audit?mintUrl=${encodeURIComponent(mintUrl)}`,
@@ -302,33 +357,6 @@ export const reviewMint = async ({
   return result.map((summary) => normalizeMintReviewsSummary(mintUrl, summary));
 };
 
-export const searchMints = ({
-  query,
-  currency,
-  limit,
-  fields,
-  signal,
-}: {
-  query?: string;
-  currency?: string;
-  limit?: number;
-  /** Comma-separated dot paths for /v1/info projection, e.g. "nuts.4,contact" or "*" */
-  fields?: string;
-  signal?: AbortSignal;
-}) =>
-  fetchJson(
-    `${API_BASE_URL}/cashu/mints/search?${new URLSearchParams({
-      ...(query && { q: query }),
-      ...(currency && currency !== 'ALL' && { currency }),
-      ...(limit && { limit: String(limit) }),
-      ...(fields && { fields }),
-    })}`,
-    parseMintSearch,
-    'cashu/mints/search',
-    undefined,
-    { signal }
-  );
-
 export const getLatestVersion = ({
   storage,
   signal,
@@ -337,7 +365,8 @@ export const getLatestVersion = ({
   signal?: AbortSignal;
 }) =>
   fetchJson(
-    `${API_BASE_URL}/app/latest-version`,
+    // Served by nagg (SCORE_API_BASE_URL), not api.sovran.money.
+    `${SCORE_API_BASE_URL}/app/latest-version`,
     parseLatestVersion,
     'app/latest-version',
     {
