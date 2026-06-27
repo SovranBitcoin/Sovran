@@ -183,6 +183,11 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       gestureEnabled: !isLocked,
       headerBackVisible: !isLocked,
       headerLeft: isLocked ? () => null : undefined,
+      // Clear the flow's wrapped left item (unstable_headerLeftItems set by
+      // withGlassHeaderItems). Recovery uses the NATIVE back button (for its
+      // beforeRemove guard) when unlocked, so the custom item must be removed —
+      // otherwise it renders alongside the native back (two backs).
+      unstable_headerLeftItems: () => [],
     });
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
       if (isLocked) e.preventDefault();

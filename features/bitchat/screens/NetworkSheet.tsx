@@ -12,6 +12,7 @@ import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log, useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -112,7 +113,7 @@ export default function NetworkSheet() {
   return (
     <Log name="BitchatNetworkSheet" style={{ flex: 1 }}>
       <Stack.Screen
-        options={{
+        options={withGlassHeaderItems({
           headerShown: true,
           // Parent user-flow stack defaults to headerTransparent: true, which
           // makes the content render under the header and hides our subheader
@@ -126,7 +127,7 @@ export default function NetworkSheet() {
           headerLeft: () => (
             <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={handleClose} />
           ),
-        }}
+        })}
       />
 
       <HStack

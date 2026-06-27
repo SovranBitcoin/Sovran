@@ -19,6 +19,7 @@ import { MintDistributionItem, DistributionBar } from '@/features/mint/component
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Card } from '@/shared/ui/composed/Card';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useMints, useBalanceContext } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
@@ -314,7 +315,7 @@ export function MintDistributionScreen() {
         footer={bottomButtons}
         contentPadding={0}>
         <Stack.Screen
-          options={{
+          options={withGlassHeaderItems({
             title: 'Balance split',
             headerRight: () => (
               <ScreenHeaderAction
@@ -333,7 +334,7 @@ export function MintDistributionScreen() {
                 }}
               />
             ),
-          }}
+          })}
         />
         <View className="mb-1 py-1.5">
           <HStack justify="space-between" align="center" className="px-4">

@@ -40,6 +40,12 @@ export function withGlassHeaderItems(
     next.unstable_headerLeftItems = (props) => [
       { type: 'custom', element: <>{left(props)}</>, hidesSharedBackground: true },
     ];
+    // A custom left item is the back/close affordance, so suppress the native
+    // back button — otherwise it renders ALONGSIDE the item (two backs). The
+    // legacy `headerLeft` form did this implicitly. Screens that genuinely want
+    // the native back (e.g. SettingsRecoveryScreen) must clear the items and set
+    // `headerBackVisible: true` themselves.
+    next.headerBackVisible = options.headerBackVisible ?? false;
   }
   if (right && !options.unstable_headerRightItems) {
     next.unstable_headerRightItems = (props) => [

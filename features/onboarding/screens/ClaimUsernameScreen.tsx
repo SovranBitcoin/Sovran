@@ -21,6 +21,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import Icon from 'assets/icons';
@@ -533,7 +534,7 @@ export function ClaimUsernameScreen() {
   return (
     <>
       <Stack.Screen
-        options={{
+        options={withGlassHeaderItems({
           presentation: 'card',
           animation: 'fade',
           headerShown: true,
@@ -544,7 +545,7 @@ export function ClaimUsernameScreen() {
           headerBlurEffect: 'none',
           headerBackground: () => null,
           headerShadowVisible: false,
-        }}
+        })}
       />
       <Screen
         name="ClaimUsernameScreen"

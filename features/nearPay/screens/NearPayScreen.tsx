@@ -60,6 +60,7 @@ import { normalizeRecentPersonPubkey } from '@/shared/stores/profile/recentPeopl
 import { useBluetoothState } from '@/features/bitchat/hooks/useBluetoothState';
 import { BluetoothNotice } from '@/features/bitchat/components/BluetoothNotice';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { AmountFlowContent } from '@/features/send/screens/AmountFlowScreen';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { paymentLog, useLifecycleLogger, useRenderLogger } from '@/shared/lib/logger';
@@ -2174,21 +2175,22 @@ export function NearPayScreen() {
     [headerBadgeCount, openPeerList]
   );
   const stackOptions = useMemo(
-    () => ({
-      title: amountActive ? '' : 'Nut Drop',
-      headerShadowVisible: false,
-      headerTransparent: true,
-      headerTitle: amountActive ? renderEmptyHeader : undefined,
-      headerBackVisible: false,
-      headerLeft: amountActive ? renderHeaderLeft : renderEmptyHeader,
-      headerRight: amountActive ? renderEmptyHeader : renderHeaderRight,
-      // The send flow's shared-element avatar lands inside the header band,
-      // and Android's sheet header (FlowSheetHeader) composites its scrim
-      // gradient ABOVE screen content — the avatar ended up underneath it.
-      // A null headerBackground is the sanctioned per-screen scrim opt-out;
-      // the radar's faint dot field doesn't need the legibility fade.
-      ...(Platform.OS === 'android' ? { headerBackground: renderNullHeaderBackground } : {}),
-    }),
+    () =>
+      withGlassHeaderItems({
+        title: amountActive ? '' : 'Nut Drop',
+        headerShadowVisible: false,
+        headerTransparent: true,
+        headerTitle: amountActive ? renderEmptyHeader : undefined,
+        headerBackVisible: false,
+        headerLeft: amountActive ? renderHeaderLeft : renderEmptyHeader,
+        headerRight: amountActive ? renderEmptyHeader : renderHeaderRight,
+        // The send flow's shared-element avatar lands inside the header band,
+        // and Android's sheet header (FlowSheetHeader) composites its scrim
+        // gradient ABOVE screen content — the avatar ended up underneath it.
+        // A null headerBackground is the sanctioned per-screen scrim opt-out;
+        // the radar's faint dot field doesn't need the legibility fade.
+        ...(Platform.OS === 'android' ? { headerBackground: renderNullHeaderBackground } : {}),
+      }),
     [amountActive, renderEmptyHeader, renderHeaderLeft, renderHeaderRight]
   );
 
