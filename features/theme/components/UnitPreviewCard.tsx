@@ -141,7 +141,7 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
       {imageSource ? (
         <Image
           source={imageSource}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           contentFit="cover"
           onLoad={() => {
             log.info('wallpaper.preview.loaded', { themeName, sourceKind, sourceUri: uriSource });
@@ -163,12 +163,12 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
             palette['900'] || '#0d0d0d',
             palette['950'] || '#000000',
           ]}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         />
       ) : (
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1a1a1a' }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#1a1a1a' }]} />
       )}
 
       {/* Phone-frame chrome mocks */}

@@ -7,11 +7,8 @@
 
 import { memo } from 'react';
 import { Platform } from 'react-native';
-import type {
-  NativeStackHeaderProps,
-  NativeStackNavigationOptions,
-} from '@react-navigation/native-stack';
-import type { ParamListBase, NavigationProp } from '@react-navigation/native';
+import type { NativeStackHeaderProps, NativeStackNavigationOptions } from 'expo-router';
+import type { ParamListBase, NavigationProp } from 'expo-router/react-navigation';
 import { router } from 'expo-router';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { FlowSheetHeader } from '@/shared/ui/composed/FlowSheetHeader';

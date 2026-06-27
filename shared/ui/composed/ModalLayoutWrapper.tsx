@@ -19,7 +19,7 @@ import Animated, {
   useSharedValue,
   SharedValue,
 } from 'react-native-reanimated';
-import { HeaderHeightContext } from '@react-navigation/elements';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
 import { SheetHeaderHeightContext } from '@/shared/ui/composed/AndroidSheetRoot';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

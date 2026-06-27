@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Drawer } from 'expo-router/drawer';
+import { Drawer, DrawerContentComponentProps, useDrawerStatus } from 'expo-router/drawer';
 import {
   GestureHandlerRootView,
   Pressable as GesturePressable,
 } from 'react-native-gesture-handler';
 import { StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { router, useSegments } from 'expo-router';
-import { DrawerContentComponentProps, useDrawerStatus } from '@react-navigation/drawer';
 import { getScreenCornerRadius } from '@/shared/lib/screenCornerRadius';
 
 import Icon from 'assets/icons';

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import * as Clipboard from 'expo-clipboard';
 import { Stack } from 'expo-router';
-import { useNavigationState } from '@react-navigation/native';
+import { useNavigationState } from 'expo-router/react-navigation';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';

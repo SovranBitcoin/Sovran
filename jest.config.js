@@ -1,6 +1,16 @@
+const expoNodePreset = require('jest-expo/node/jest-preset');
+
 /** @type {import('jest').Config} */
 module.exports = {
   preset: 'jest-expo/node',
+  // RN 0.85 eagerly resolves native modules (NativeSourceCode, feature flags,
+  // NativeComponentRegistry) when a component is required. The jest-expo/node
+  // preset doesn't install React Native's native-module mocks, so add RN's own
+  // jest setup on top of the preset's to stub them out.
+  setupFiles: [
+    ...(expoNodePreset.setupFiles || []),
+    require.resolve('@react-native/jest-preset/jest/setup.js'),
+  ],
   moduleNameMapper: {
     '^@babel/runtime/(.*)$': '<rootDir>/node_modules/@babel/runtime/$1',
     '^@cashu/coco-core$': '<rootDir>/node_modules/@cashu/coco-core/dist/index.js',
@@ -24,6 +34,6 @@ module.exports = {
   ],
   modulePathIgnorePatterns: ['/coco-cashu-plugin-p2pk-import/'],
   transformIgnorePatterns: [
-    'node_modules/(?!(?:\\.bun/[^/]+/node_modules/)?(?:(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@shopify/react-native-skia|nostr-tools|@scure|@noble|coco-cashu-core|@cashu/cashu-ts|@cashu/coco-core|@cashu/coco-expo-sqlite|@cashu/coco-react|@sovranbitcoin/.*|bitchat-module))',
+    'node_modules/(?!(?:\\.bun/[^/]+/node_modules/)?(?:(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@shopify/react-native-skia|nostr-tools|@scure|@noble|coco-cashu-core|@cashu/cashu-ts|@cashu/coco-core|@cashu/coco-expo-sqlite|@cashu/coco-react|@sovranbitcoin/.*|bitchat-module|standard-navigation))',
   ],
 };

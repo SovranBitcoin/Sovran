@@ -49,7 +49,7 @@ export function SearchOverlay({
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: zIndex.overlay,
   },
 });

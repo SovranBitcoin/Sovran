@@ -21,6 +21,7 @@
  */
 
 import React, { useEffect } from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
 import { Menu, useMenu } from 'heroui-native';
 import { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
@@ -44,5 +45,9 @@ export function MenuScrim() {
     opacity: opacity.value,
   }));
 
-  return <Menu.Overlay isAnimatedStyleActive={false} style={animatedStyle} />;
+  // SDK 56 / reanimated 4.3: useAnimatedStyle returns an AnimatedStyleHandle;
+  // Menu.Overlay forwards it to an Animated view but types style as StyleProp.
+  return (
+    <Menu.Overlay isAnimatedStyleActive={false} style={animatedStyle as StyleProp<ViewStyle>} />
+  );
 }

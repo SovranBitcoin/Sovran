@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   markersContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     flexDirection: 'row',
     alignItems: 'center',
   },

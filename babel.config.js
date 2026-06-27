@@ -21,7 +21,9 @@ module.exports = function (api) {
     },
   ]);
 
-  plugins.push('react-native-reanimated/plugin');
+  // SDK 56: babel-preset-expo auto-includes react-native-worklets/plugin when
+  // react-native-worklets is installed, so an explicit reanimated/worklets
+  // plugin entry here would double-apply the worklet transform.
 
   return {
     presets: ['babel-preset-expo'],

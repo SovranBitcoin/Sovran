@@ -126,6 +126,9 @@
       "expo-secure-store",
       "expo-sqlite",
       "expo-image",
+      "expo-asset",
+      "expo-sharing",
+      "expo-status-bar",
       ["@bacons/apple-targets", { "appleTeamId": "2ZTL7KLN2V" }]
     ],
     "extra": {

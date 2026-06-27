@@ -7,7 +7,7 @@ import React from 'react';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
+import type { NativeStackNavigationOptions } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import opacity from 'hex-color-opacity';

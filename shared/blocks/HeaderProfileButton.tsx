@@ -9,7 +9,7 @@
 import React from 'react';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, interpolate } from 'react-native-reanimated';
-import { useDrawerProgress } from '@react-navigation/drawer';
+import { useDrawerProgress } from 'expo-router/drawer';
 
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';

@@ -185,7 +185,7 @@ function AnimatedChainLine({
   return (
     <View style={[styles.line, { backgroundColor: mutedColor }]}>
       <Animated.View
-        style={[StyleSheet.absoluteFillObject, { backgroundColor: successColor }, fillStyle]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: successColor }, fillStyle]}
       />
     </View>
   );

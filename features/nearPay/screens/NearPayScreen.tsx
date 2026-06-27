@@ -334,8 +334,8 @@ const DotField = React.memo(function DotField({
   if (width <= 0 || height <= 0 || buckets.length === 0) return null;
 
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-      <Svg width={width} height={height} style={StyleSheet.absoluteFillObject}>
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
         {buckets.map((bucket) => (
           <Path key={bucket.key} d={bucket.d} fill={foreground} opacity={bucket.opacity} />
         ))}
@@ -2284,7 +2284,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   panel: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   amountPanel: {
     zIndex: zIndex.raised,
@@ -2294,10 +2294,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fieldCanvas: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   dotFieldLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   nearPayActionRow: {
     alignItems: 'flex-start',

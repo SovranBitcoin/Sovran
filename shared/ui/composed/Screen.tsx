@@ -27,9 +27,9 @@ import { Platform, View } from 'react-native';
 import type { SharedValue } from 'react-native-reanimated';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HeaderHeightContext } from '@react-navigation/elements';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
 import { SheetHeaderHeightContext } from '@/shared/ui/composed/AndroidSheetRoot';
-import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
+import type { NativeStackNavigationOptions } from 'expo-router';
 
 import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

@@ -72,7 +72,7 @@ export function BlurCardFrame({
   if (Platform.OS === 'android') {
     return (
       <Log name="BlurCardFrame">
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: androidSurface }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: androidSurface }]} />
         {children}
       </Log>
     );
@@ -81,7 +81,7 @@ export function BlurCardFrame({
   return (
     <Log name="BlurCardFrame">
       {/* Base blur background */}
-      <View blur style={StyleSheet.absoluteFillObject} />
+      <View blur style={StyleSheet.absoluteFill} />
 
       {/* Render gradients based on variant - fixed size boxes with pixel-based fade */}
       {glow && (variant === 'topLeft' || variant === 'diagonal') && (

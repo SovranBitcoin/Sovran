@@ -86,7 +86,7 @@ function MapPreview({
     <RNView className="h-[140px] overflow-hidden" pointerEvents="none">
       {Platform.OS === 'ios' ? (
         <AppleMaps.View
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           cameraPosition={cameraPosition}
           properties={{ isMyLocationEnabled: false, pointsOfInterest: { including: [] } }}
           uiSettings={DISABLED_MAP_UI_SETTINGS}
@@ -94,7 +94,7 @@ function MapPreview({
         />
       ) : HAS_ANDROID_GOOGLE_MAPS_KEY ? (
         <GoogleMaps.View
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           cameraPosition={cameraPosition}
           colorScheme={
             scheme === 'dark' ? GoogleMaps.MapColorScheme.DARK : GoogleMaps.MapColorScheme.LIGHT
@@ -107,7 +107,7 @@ function MapPreview({
           markers={markers}
         />
       ) : (
-        <RNView style={StyleSheet.absoluteFillObject} />
+        <RNView style={StyleSheet.absoluteFill} />
       )}
 
       {useChrome && (
@@ -127,7 +127,7 @@ function MapPreview({
           )}
           <RNView
             style={[
-              StyleSheet.absoluteFillObject,
+              StyleSheet.absoluteFill,
               {
                 backgroundColor: opacity(surfaceSecondary, 0.35),
                 // @ts-ignore - mixBlendMode works on iOS
@@ -138,7 +138,7 @@ function MapPreview({
           />
           <RNView
             style={[
-              StyleSheet.absoluteFillObject,
+              StyleSheet.absoluteFill,
               {
                 backgroundColor: opacity(surfaceSecondary, 1),
                 // @ts-ignore - mixBlendMode works on iOS
@@ -158,7 +158,7 @@ function MapPreview({
             locations={[0, 0.3, 0.7, 1]}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
             pointerEvents="none"
           />
           <LinearGradient
@@ -171,7 +171,7 @@ function MapPreview({
             locations={[0, 0.25, 0.75, 1]}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
             pointerEvents="none"
           />
         </>
@@ -342,18 +342,18 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
 
 const overlayStyles = StyleSheet.create({
   grayscaleOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'black',
     opacity: 1,
     // @ts-ignore - mixBlendMode supported on iOS
     mixBlendMode: 'saturation',
   },
   darkVeilOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.15)',
   },
   lightLiftOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'white',
     opacity: 0.55,
     // @ts-ignore - mixBlendMode supported on iOS

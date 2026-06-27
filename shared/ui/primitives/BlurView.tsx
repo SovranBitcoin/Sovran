@@ -40,7 +40,7 @@ type BlurViewProps = ExpoBlurViewProps;
  * @returns {JSX.Element | null} BlurView on supported devices, null otherwise
  *
  * @example
- * <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFillObject} />
+ * <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
  */
 export function BlurView(props: BlurViewProps): React.ReactElement | null {
   if (!supportsBlur()) {

@@ -92,7 +92,8 @@ function rotateIfNeeded(fs: ExpoFileSystem, incomingBytes: number): void {
   if (active.size + incomingBytes <= MAX_BYTES) return;
   const prev = getPrevFile(fs);
   if (prev.exists) prev.delete();
-  active.move(prev);
+  // SDK 56: File.move() is now async; rotateIfNeeded is a sync path, so use moveSync().
+  active.moveSync(prev);
 }
 
 function clearFlushTimer(): void {

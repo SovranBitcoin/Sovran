@@ -1,6 +1,6 @@
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Stack } from 'expo-router';
-import { DrawerActions, useNavigation } from '@react-navigation/native';
+import { DrawerActions, useNavigation } from 'expo-router/react-navigation';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 import { AiHeaderTitle, openAiSessionsMenu } from '@/features/ai';
 import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';

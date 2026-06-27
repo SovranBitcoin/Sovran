@@ -63,7 +63,9 @@ jest.mock('@/shared/ui/primitives/Avatar', () => {
 
 jest.mock('@/shared/ui/primitives/Text', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
+  // RN 0.85: requireActual Text pulls Pressability → Platform.OS, which throws
+  // under the node test env. Use the jest-mocked Text instead.
+  const { Text } = jest.requireMock<typeof import('react-native')>('react-native');
 
   return {
     __esModule: true,

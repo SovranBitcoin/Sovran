@@ -185,6 +185,13 @@ export function LiquidChatComposer({
   const focusTextField = useCallback(() => {
     void textFieldRef.current?.focus();
   }, []);
+  // SDK 56 @expo/ui dropped TextField `defaultValue`. The field is still
+  // uncontrolled (manages its own internal state), so seed it imperatively on
+  // (re)mount — `resetKey` bumps remount the field with the latest `value`.
+  useEffect(() => {
+    if (value) void textFieldRef.current?.setText(value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
 
   // Fallback-only state: the RN multiline `TextInput` reports its intrinsic
   // height via `onContentSizeChange`. We clamp to `MIN_ROW_HEIGHT` so the
@@ -321,9 +328,8 @@ export function LiquidChatComposer({
                   <SwiftUITextField
                     key={resetKey}
                     ref={textFieldRef}
-                    defaultValue={value}
                     placeholder={placeholder}
-                    onValueChange={handleSwiftValueChange}
+                    onTextChange={handleSwiftValueChange}
                     axis="horizontal"
                     modifiers={[
                       frame({ maxWidth: Infinity, alignment: 'leading' }),

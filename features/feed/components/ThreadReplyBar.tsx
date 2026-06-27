@@ -14,7 +14,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { router } from 'expo-router';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused } from 'expo-router/react-navigation';
 import { Button } from 'heroui-native';
 import {
   KeyboardStickyView,

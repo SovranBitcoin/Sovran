@@ -19,7 +19,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';

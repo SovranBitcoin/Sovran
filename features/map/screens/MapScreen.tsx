@@ -226,12 +226,7 @@ export function MapScreen() {
     <Log name="MapScreen" style={styles.container}>
       {/* Show a placeholder background immediately while map loads */}
       {!isMapReady && (
-        <View
-          style={[
-            StyleSheet.absoluteFillObject,
-            styles.mapSkeleton,
-            { backgroundColor: skeleton },
-          ]}>
+        <View style={[StyleSheet.absoluteFill, styles.mapSkeleton, { backgroundColor: skeleton }]}>
           <Spinner size={32} color={BITCOIN_ACCENT} />
           <Text size={14} style={{ color: opacity(foreground, 0.8), marginTop: 16 }}>
             Loading map...
@@ -247,7 +242,7 @@ export function MapScreen() {
           ref={(instance) => {
             mapCamera.mapRef.current = instance;
           }}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           cameraPosition={{
             coordinates: { latitude: DEFAULT_LAT, longitude: DEFAULT_LON },
             zoom: DEFAULT_ZOOM,
@@ -264,7 +259,7 @@ export function MapScreen() {
           ref={(instance) => {
             mapCamera.mapRef.current = instance;
           }}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           cameraPosition={{
             coordinates: { latitude: DEFAULT_LAT, longitude: DEFAULT_LON },
             zoom: DEFAULT_ZOOM,

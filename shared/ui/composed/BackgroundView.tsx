@@ -177,7 +177,7 @@ function ScrollableGradientOverlayComponent({
             points={androidMeshPoints}
             resolution={SCROLL_OVERLAY_MESH_RESOLUTION}
             smoothsColors
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
         ) : (
           <LinearGradient
@@ -189,7 +189,7 @@ function ScrollableGradientOverlayComponent({
             ]}
             locations={[0, overlayLocations[0], overlayLocations[1], 1]}
             dither
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
         )}
       </View>
@@ -302,10 +302,10 @@ function AnimatedBackgroundViewComponent({
     <Log name="AnimatedBackgroundView">
       <View style={[styles.container, style]}>
         {/* Base background color */}
-        <Animated.View style={[StyleSheet.absoluteFillObject, backgroundColorAnimatedStyle]} />
+        <Animated.View style={[StyleSheet.absoluteFill, backgroundColorAnimatedStyle]} />
 
         {/* Animated background image plus optional theme fade */}
-        <Animated.View style={[StyleSheet.absoluteFillObject, backgroundAnimatedStyle]}>
+        <Animated.View style={[StyleSheet.absoluteFill, backgroundAnimatedStyle]}>
           {showBackgroundImage && <AnimatedSpriteBackground backgroundColor={surface} />}
 
           {useMeshGradient ? (
@@ -316,7 +316,7 @@ function AnimatedBackgroundViewComponent({
               points={BACKGROUND_MESH_POINTS}
               resolution={BACKGROUND_MESH_RESOLUTION}
               smoothsColors
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
             />
           ) : (
             /* Gradient overlay for image themes */
@@ -328,7 +328,7 @@ function AnimatedBackgroundViewComponent({
                 ]}
                 locations={[0, 1]}
                 dither
-                style={StyleSheet.absoluteFillObject}
+                style={StyleSheet.absoluteFill}
                 pointerEvents="none"
               />
             )
@@ -337,9 +337,9 @@ function AnimatedBackgroundViewComponent({
 
         {blurSupported && (
           <Animated.View
-            style={[StyleSheet.absoluteFillObject, fullBlurAnimatedStyle]}
+            style={[StyleSheet.absoluteFill, fullBlurAnimatedStyle]}
             pointerEvents="none">
-            <BlurView intensity={200} tint={blurTint} style={StyleSheet.absoluteFillObject} />
+            <BlurView intensity={200} tint={blurTint} style={StyleSheet.absoluteFill} />
           </Animated.View>
         )}
 

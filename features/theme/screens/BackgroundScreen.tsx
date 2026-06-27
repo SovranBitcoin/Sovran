@@ -10,7 +10,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, useWindowDimensions } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PagerView from 'react-native-pager-view';
 import { z } from 'zod';

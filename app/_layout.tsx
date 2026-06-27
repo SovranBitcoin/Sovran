@@ -1,4 +1,4 @@
-import { DarkTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import { DarkTheme, ThemeProvider as NavigationThemeProvider } from 'expo-router/react-navigation';
 import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -356,10 +356,8 @@ function RootLayoutContent() {
       <SwapStatusListener />
       <ProfileBalanceSync />
       <OwnEventsSync />
-      <StatusBar
-        backgroundColor={background}
-        style={currentTheme.includes('light') ? 'dark' : 'light'}
-      />
+      {/* SDK 56: expo-status-bar removed the (Android-only) backgroundColor prop. */}
+      <StatusBar style={currentTheme.includes('light') ? 'dark' : 'light'} />
       <OfflineShell>
         <Stack
           // NOTE: keyed on the theme so a theme/wallpaper change re-applies
@@ -696,7 +694,7 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
   // is invisible.
   const gradientLayerStyle = useMemo(
     () => ({
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       opacity: isMorphing ? 1 : 0,
       transitionProperty: ['opacity'],
       transitionDuration: `${MORPH_DURATION_MS * 0.85}ms`,
@@ -707,7 +705,7 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
 
   const qrIconLayerStyle = useMemo(
     () => ({
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       justifyContent: 'center' as const,
       alignItems: 'center' as const,
       opacity: isMorphing ? 1 : 0,
@@ -736,9 +734,9 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
               Boot state: opacity 0 (the container's solid white shows through);
               morph state: opacity 1 (matches the QR gradient). */}
           <Animated.View pointerEvents="none" style={gradientLayerStyle}>
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0f0f12' }]} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0f0f12' }]} />
             <View
-              style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(255,255,255,0.35)' }]}
+              style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.35)' }]}
             />
             <LinearGradient
               colors={[
@@ -750,11 +748,11 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
               locations={[0, 0.35, 0.6, 1]}
               start={{ x: 0.5, y: 0 }}
               end={{ x: 0.5, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
             />
             <View
               style={[
-                StyleSheet.absoluteFillObject,
+                StyleSheet.absoluteFill,
                 { borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
               ]}
             />

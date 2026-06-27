@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Keyboard, ScrollView, View as RNView, type LayoutChangeEvent } from 'react-native';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
