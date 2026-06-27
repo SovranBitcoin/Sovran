@@ -225,6 +225,7 @@
     "@iconify-json/solar": "^1.2.5",
     "@iconify-json/stash": "^1.2.4",
     "@iconify-json/tabler": "^1.2.33",
+    "@react-native/jest-preset": "0.85.3",
     "@types/jest": "^30.0.0",
     "@types/lodash": "^4.17.20",
     "@types/react": "~19.2.2",
