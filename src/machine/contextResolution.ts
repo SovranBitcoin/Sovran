@@ -5,7 +5,11 @@ import {
   getMintMethodCapability,
 } from "../mint-capabilities";
 import { logger, mintUrlFields } from "../logger";
-import { getValidMintCandidates, selectMint } from "../mint-selection";
+import {
+  getValidMintCandidates,
+  pickPreferredCandidate,
+  selectMint,
+} from "../mint-selection";
 import type {
   MintCandidate,
   MintMethodRequirement,
@@ -393,19 +397,28 @@ function revalidateMintForAmount(
       (candidate) => candidate.status !== "disabled",
     );
     if (availableCandidates.length > 0) {
-      if (
-        requirement.method === "bolt11" &&
-        availableCandidates.length === 1 &&
-        !currentMint
-      ) {
-        logger.info("contextResolution.revalidate.ok", {
-          reason: "single_method_candidate",
-          destination,
-          amount,
-          ...mintUrlFields(availableCandidates[0].mintUrl),
-          method: requirement.method,
-        });
-        return { kind: "ok", mintUrl: availableCandidates[0].mintUrl };
+      // Lightning melts auto-pick the preferred mint (else highest balance)
+      // across all eligible mints instead of forcing the selector; the user
+      // can still change it via the mint pill on the confirm screen.
+      if (requirement.method === "bolt11" && !currentMint) {
+        const picked = pickPreferredCandidate(
+          availableCandidates,
+          walletCtx.preferredMintUrl,
+        );
+        if (picked) {
+          logger.info("contextResolution.revalidate.ok", {
+            reason:
+              picked.mintUrl === walletCtx.preferredMintUrl
+                ? "preferred_melt_candidate"
+                : "highest_balance_melt_candidate",
+            destination,
+            amount,
+            ...mintUrlFields(picked.mintUrl),
+            method: requirement.method,
+            candidateCount: availableCandidates.length,
+          });
+          return { kind: "ok", mintUrl: picked.mintUrl };
+        }
       }
       logger.info("contextResolution.revalidate.redirect", {
         reason: "method_candidates_need_selection",

@@ -8,7 +8,7 @@ import {
   hasMintSupportingMethod,
   isMethodImplemented,
 } from '../mint-capabilities';
-import { selectMint } from '../mint-selection';
+import { pickPreferredCandidate, selectMint } from '../mint-selection';
 import type {
   MintCandidate,
   MintMethodRequirement,
@@ -832,12 +832,45 @@ export function resolveNext(
       : needsSpendableBalance(destination)
         ? findFullAmountCandidates(walletCtx, amount, supportedMintUrls)
         : [];
-    const selection = needsSpendableBalance(destination)
-      ? fullAmountCandidates.length === 1 && !ctx.mintUrl
+    // When a mint hasn't been chosen yet, auto-pick rather than forcing the
+    // selector. For Lightning melts, honor the preferred mint (else highest
+    // balance) across ALL eligible mints — the user can still change it via
+    // the mint pill on the confirm screen. Ecash sends keep the stricter
+    // single-candidate shortcut, since the chosen mint determines which mint's
+    // tokens are handed out.
+    let autoPick: MintCandidate | undefined;
+    if (
+      needsSpendableBalance(destination) &&
+      !ctx.mintUrl &&
+      fullAmountCandidates.length > 0
+    ) {
+      if (requirement?.method === 'bolt11') {
+        autoPick = pickPreferredCandidate(
+          fullAmountCandidates,
+          walletCtx.preferredMintUrl,
+        );
+        logger.info('resolveNext.mint.meltAutoPick', {
+          destination,
+          amount,
+          unit,
+          candidateCount: fullAmountCandidates.length,
+          reason:
+            autoPick?.mintUrl === walletCtx.preferredMintUrl
+              ? 'preferred'
+              : 'highest_balance',
+          mintUrlLength: autoPick?.mintUrl.length ?? 0,
+        });
+      } else if (fullAmountCandidates.length === 1) {
+        autoPick = fullAmountCandidates[0];
+      }
+    }
+    const selection = !needsSpendableBalance(destination)
+      ? selectMint(walletCtx, { allowedMints: supportedMintUrls })
+      : autoPick
         ? {
             type: 'selected' as const,
-            mintUrl: fullAmountCandidates[0].mintUrl,
-            balance: fullAmountCandidates[0].balance,
+            mintUrl: autoPick.mintUrl,
+            balance: autoPick.balance,
           }
         : fullAmountCandidates.length > 0
           ? {
@@ -847,8 +880,7 @@ export function resolveNext(
           : selectMint(walletCtx, {
               allowedMints: supportedMintUrls,
               minAmount: amount,
-            })
-      : selectMint(walletCtx, { allowedMints: supportedMintUrls });
+            });
 
     switch (selection.type) {
       case 'selected':
