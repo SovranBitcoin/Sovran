@@ -78,7 +78,9 @@ const ReviewItem = React.memo(function ReviewItem({
   ] as const);
 
   const reviewText = review.comment?.trim() || '';
-  const reviewScore = review.score ?? 0;
+  // null score = a NIP-87 recommendation without a [n/5] marker; show it as an
+  // endorsement (no misleading 0-star rating), just the reviewer + comment.
+  const reviewScore = review.score;
   // Reviewer names: prefer Nostr metadata (cached in the shared SWR
   // store, populated by other surfaces), fall back to the deterministic
   // word pair so reviews never render anonymous-looking hex.
@@ -130,9 +132,11 @@ const ReviewItem = React.memo(function ReviewItem({
             )}
           </View>
 
-          <View style={{ marginTop: 4 }}>
-            <StarRating score={reviewScore} size={14} />
-          </View>
+          {reviewScore !== null && (
+            <View style={{ marginTop: 4 }}>
+              <StarRating score={reviewScore} size={14} />
+            </View>
+          )}
 
           {reviewText.length > 0 && (
             <Text
@@ -360,7 +364,9 @@ export function MintReviewsScreen() {
           hasScore: result.isOk() && result.value.score !== null,
           recommendationCount: result.isOk() ? result.value.recommendations.length : 0,
         });
-        if (result.isOk() && result.value.score !== null) {
+        // Always overwrite with the fresh successful result (even a null score /
+        // empty list) so a stale snapshot can't outlive the source. (audit F3)
+        if (result.isOk()) {
           useKYMMintStore
             .getState()
             .setCached(mintUrl, result.value.score, result.value.recommendations);

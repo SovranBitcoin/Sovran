@@ -54,8 +54,12 @@ const NostrProfileFull = NostrProfileFullStrict.extend({
   topFollowers: z.array(TopFollower).max(500),
 });
 type NostrProfileFullType = z.infer<typeof NostrProfileFull>;
-export type MintRecommendation = SchemaMintRecommendation &
-  Partial<Pick<MintReviewRecommendation, 'name' | 'displayName' | 'picture' | 'image'>>;
+// `score` is nullable: nagg/colada now surface NIP-87 recommendations posted
+// without a [n/5] marker (score-less endorsements) instead of dropping them, so
+// the list stays 1:1 with the server's reviewCount.
+export type MintRecommendation = Omit<SchemaMintRecommendation, 'score'> & {
+  score: number | null;
+} & Partial<Pick<MintReviewRecommendation, 'name' | 'displayName' | 'picture' | 'image'>>;
 type MintReviewsResponseType = {
   mintUrl: string;
   score: number | null;

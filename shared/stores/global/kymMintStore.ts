@@ -9,7 +9,8 @@ import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 interface CachedKYMData {
-  score: number;
+  // null when the mint has reviews but none carry a [n/5] score.
+  score: number | null;
   recommendations: MintRecommendation[];
   timestamp: number;
 }
@@ -20,7 +21,7 @@ interface KYMMintState {
 
 interface KYMMintActions {
   getCached: (mintUrl: string) => CachedKYMData | undefined;
-  setCached: (mintUrl: string, score: number, recommendations: MintRecommendation[]) => void;
+  setCached: (mintUrl: string, score: number | null, recommendations: MintRecommendation[]) => void;
   clearCache: () => void;
   clearMintCache: (mintUrl: string) => void;
   isStale: (mintUrl: string, maxAgeMinutes?: number) => boolean;
@@ -33,7 +34,7 @@ const PersistedKymMintStore = z.object({
     .record(
       z.string().max(2048),
       z.looseObject({
-        score: z.number(),
+        score: z.number().nullable(),
         recommendations: z.array(z.unknown()).max(1024),
         timestamp: z.number().int().nonnegative(),
       })
@@ -55,7 +56,7 @@ export const useKYMMintStore = create<KYMMintStore>()(
           return currentState.cache[normalized];
         },
 
-        setCached: (mintUrl: string, score: number, recommendations: MintRecommendation[]) => {
+        setCached: (mintUrl: string, score: number | null, recommendations: MintRecommendation[]) => {
           const normalized = normalizeMintUrlKey(mintUrl);
           storeLog.debug('store.kym_mint.set_cached', {
             mintUrl: normalized,

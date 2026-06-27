@@ -147,6 +147,29 @@ describe('getMintCatalog cache-first behavior', () => {
     expect(getMintInfo).not.toHaveBeenCalled();
   });
 
+  it('overwrites a stale cached entry when the fresh review score is null (audit F3)', async () => {
+    // Populated device: an old snapshot with a score is cached…
+    seedCatalogCaches();
+    expect(useKYMMintStore.getState().getCached(MINT_URL)?.score).toBe(4.2);
+
+    // …then the live mint's reviews lose their score (e.g. all current reviews
+    // are score-less endorsements). The fresh result MUST replace the snapshot.
+    (auditMint as jest.Mock).mockResolvedValue(ok(auditData()));
+    (reviewMint as jest.Mock).mockResolvedValue(
+      ok({
+        score: null,
+        recommendations: [{ score: null, comment: 'still recommend it' }],
+      })
+    );
+    (fetchNostrProfile as jest.Mock).mockResolvedValue(ok({ followers: 55, score: null }));
+
+    await getMintCatalog([MINT_URL], jest.fn(), { networkMode: 'network-first' });
+
+    const cached = useKYMMintStore.getState().getCached(MINT_URL);
+    expect(cached?.score).toBeNull(); // not the stale 4.2
+    expect(cached?.recommendations).toHaveLength(1);
+  });
+
   it('keeps operator followers when Vertex reputation is null', async () => {
     (auditMint as jest.Mock).mockResolvedValue(ok(auditData()));
     (fetchNostrProfile as jest.Mock).mockResolvedValue(ok({ followers: 55, score: null }));

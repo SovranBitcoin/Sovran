@@ -52,10 +52,12 @@ function appendMintIfNew(
   });
 }
 
-/** Calculates average score from a list of recommendations */
+/** Calculates average score over the scored recommendations (ignores score-less ones). */
 function averageScore(recommendations: MintRecommendation[]): number {
-  const sum = recommendations.reduce((acc, r) => acc + r.score, 0);
-  return Number((sum / recommendations.length).toFixed(2));
+  const scored = recommendations.filter((r): r is MintRecommendation & { score: number } => r.score !== null);
+  if (scored.length === 0) return 0;
+  const sum = scored.reduce((acc, r) => acc + r.score, 0);
+  return Number((sum / scored.length).toFixed(2));
 }
 
 /**

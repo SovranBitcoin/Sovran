@@ -178,7 +178,7 @@ export function getSovranMintEnrichment(mintUrl: string): Partial<MintReviewInfo
 
   const enrichment: Partial<MintReviewInfo> = {};
   if (kym) {
-    enrichment.kymScore = kym.score;
+    if (kym.score !== null) enrichment.kymScore = kym.score;
     enrichment.reviewCount = kym.recommendations?.length;
   }
 

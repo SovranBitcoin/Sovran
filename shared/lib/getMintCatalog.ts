@@ -85,7 +85,7 @@ function readCachedEntry(mintUrl: string): { entry: MintCatalogEntry; info: unkn
   }
 
   if (kym) {
-    entry.kymScore = kym.score;
+    if (kym.score !== null) entry.kymScore = kym.score;
     entry.reviewCount = kym.recommendations.length;
   }
 
@@ -235,11 +235,16 @@ async function fetchEntry(
     const review = reviewRes.value;
     if (review.score !== null) {
       entry.kymScore = review.score;
-      useKYMMintStore.getState().setCached(mintUrl, review.score, review.recommendations);
     }
     // `recommendations` is the authoritative source for the count regardless
     // of whether `score` was computable — keep it visible either way.
     entry.reviewCount = review.recommendations.length;
+    // ALWAYS overwrite the persisted cache with the fresh successful result —
+    // including a null score / empty list. The old `score !== null` guard let a
+    // stale snapshot outlive the source: once a mint's live score went null, the
+    // cache was never overwritten, so a populated device kept showing old
+    // reviews while a fresh device showed the live (empty/null) state. (audit F3)
+    useKYMMintStore.getState().setCached(mintUrl, review.score, review.recommendations);
     log.info('mint.catalog.entry.review_ok', {
       ...mintUrlLogFields(mintUrl),
       hasScore: review.score !== null,
