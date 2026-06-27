@@ -82,7 +82,7 @@ function ingestFeedPageIntoCache(result: FeedParseResult): void {
 }
 
 // ---------------------------------------------------------------------------
-// Facade-backed feed client (local-dev tier validation).
+// Facade-backed feed client.
 //
 // Routes the for-you / following-popular home feeds through the tier-selecting
 // nagg-ts facade so the Settings → Network toggles actually change which source
@@ -90,8 +90,7 @@ function ingestFeedPageIntoCache(result: FeedParseResult): void {
 // Every other read (threads, user feeds, following-replies, enrichment,
 // notifications) delegates to the existing client unchanged.
 //
-// The pure shape bridge lives in facadeFeedAdapter; see buildNostrDataLayer for
-// the published-nagg-ts caveat (local-dev only).
+// The pure shape bridge lives in facadeFeedAdapter.
 // ---------------------------------------------------------------------------
 
 export function createFacadeFeedClient(fallback: FeedClient): FeedClient {

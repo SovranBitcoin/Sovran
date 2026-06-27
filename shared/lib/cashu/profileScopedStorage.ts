@@ -139,6 +139,9 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'notification-policy-store',
   'nip46-connections-store',
   'nip46-activity-store',
+  'transaction-annotation-store',
+  'owned-media-store',
+  'data-migration-store',
   // Generic query caches (createQueryCacheStore). Profile-scoped because their
   // entries are keyed by the viewer pubkey.
   'feed-cache',

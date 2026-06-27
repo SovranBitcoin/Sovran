@@ -51,6 +51,20 @@ function deriveLogKey(name: string): string {
 }
 
 /**
+ * Registry of every persisted store's `{name, version, schema}`, populated as
+ * stores are imported. A golden-snapshot test diffs the schema shape per
+ * version so a non-additive schema edit without a `version` bump fails CI —
+ * the one thing standing between a routine schema change and silent data loss
+ * on the durable stores (createMergeWithSchema drops a whole blob it can't parse).
+ */
+export interface PersistRegistryEntry {
+  name: string;
+  version: number;
+  schema: ZodType<unknown>;
+}
+export const persistRegistry: PersistRegistryEntry[] = [];
+
+/**
  * Standard Zustand `persist` options for a Sovran store.
  *
  * Bundles the conventions every store currently re-implements:
@@ -67,11 +81,16 @@ export function persistConfig<TFull, TPartial>(
 ): PersistOptions<TFull, TPartial> {
   const logKey = opts.logKey ?? deriveLogKey(opts.name);
   const migrate = opts.migrate ?? ((state) => state as TPartial);
+  const version = opts.version ?? DEFAULT_VERSION;
+
+  if (!persistRegistry.some((e) => e.name === opts.name)) {
+    persistRegistry.push({ name: opts.name, version, schema: opts.schema });
+  }
 
   return {
     name: opts.name,
     storage: createJSONStorage(() => opts.storage),
-    version: opts.version ?? DEFAULT_VERSION,
+    version,
     partialize: opts.partialize,
     migrate,
     merge: createMergeWithSchema(logKey, opts.schema),

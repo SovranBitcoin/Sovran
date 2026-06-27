@@ -56,10 +56,8 @@ import { staticPopup } from '@/shared/lib/popup';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import {
-  migrateLegacyTransactionAnnotations,
-  transactionAnnotationAdapter,
-} from '@/shared/stores/profile/transactionAnnotationStore';
+import { transactionAnnotationAdapter } from '@/shared/stores/profile/transactionAnnotationStore';
+import { runDataMigrations } from '@/shared/lib/migrations/dataMigrations';
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
 import { backendConfig } from '@/shared/config/backend';
 import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
@@ -275,10 +273,11 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     return () => instance.dispose();
   }, [instance]);
 
-  // Import legacy scan/distribution/location side-data into the annotation store
-  // once per profile (no-op after the first run). Runs after hydration.
+  // Run pending cross-store data migrations for this profile (level-gated, so
+  // a no-op once caught up). Adding the next migration is one appended step in
+  // shared/lib/migrations/dataMigrations.ts — no new flag here.
   useEffect(() => {
-    void migrateLegacyTransactionAnnotations();
+    void runDataMigrations();
   }, []);
 
   // Override colada's default executeReceive and executeMintQuote so

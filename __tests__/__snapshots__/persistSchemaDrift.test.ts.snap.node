@@ -1,0 +1,570 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`persisted schema drift data-migration-store schema matches the golden snapshot for its version: data-migration-store 1`] = `
+{
+  "name": "data-migration-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "level": {
+        "default": 0,
+        "maximum": 9007199254740991,
+        "minimum": 0,
+        "type": "integer",
+      },
+    },
+    "required": [
+      "level",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift kym-mint-store schema matches the golden snapshot for its version: kym-mint-store 1`] = `
+{
+  "name": "kym-mint-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "cache": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "recommendations": {
+              "items": {},
+              "maxItems": 1024,
+              "type": "array",
+            },
+            "score": {
+              "anyOf": [
+                {
+                  "type": "number",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "timestamp": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "score",
+            "recommendations",
+            "timestamp",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 2048,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "cache",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift mint-store schema matches the golden snapshot for its version: mint-store 1`] = `
+{
+  "name": "mint-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "selectedMint": {
+        "maxLength": 2048,
+        "type": "string",
+      },
+    },
+    "type": "object",
+  },
+  "version": 2,
+}
+`;
+
+exports[`persisted schema drift nostr-social-store schema matches the golden snapshot for its version: nostr-social-store 1`] = `
+{
+  "name": "nostr-social-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "contactsContent": {
+        "default": "",
+        "maxLength": 65536,
+        "type": "string",
+      },
+      "contactsTags": {
+        "default": [],
+        "items": {
+          "items": {
+            "maxLength": 2048,
+            "type": "string",
+          },
+          "maxItems": 16,
+          "type": "array",
+        },
+        "maxItems": 50000,
+        "type": "array",
+      },
+      "contactsUpdatedAt": {
+        "default": 0,
+        "maximum": 9007199254740991,
+        "minimum": 0,
+        "type": "integer",
+      },
+      "deletedNoteIds": {
+        "additionalProperties": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 128,
+          "type": "string",
+        },
+        "type": "object",
+      },
+      "deletedRepostOriginalIds": {
+        "additionalProperties": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 128,
+          "type": "string",
+        },
+        "type": "object",
+      },
+      "engagementByEventId": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "liked": {
+              "additionalProperties": {},
+              "properties": {
+                "ownEventId": {
+                  "maxLength": 128,
+                  "type": "string",
+                },
+              },
+              "type": "object",
+            },
+            "replied": {
+              "additionalProperties": {},
+              "properties": {
+                "ownEventId": {
+                  "maxLength": 128,
+                  "type": "string",
+                },
+              },
+              "type": "object",
+            },
+            "reposted": {
+              "additionalProperties": {},
+              "properties": {
+                "ownEventId": {
+                  "maxLength": 128,
+                  "type": "string",
+                },
+              },
+              "type": "object",
+            },
+            "updatedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "updatedAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 128,
+          "type": "string",
+        },
+        "type": "object",
+      },
+      "followingPubkeys": {
+        "additionalProperties": {
+          "const": true,
+          "type": "boolean",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 128,
+          "type": "string",
+        },
+        "type": "object",
+      },
+      "optimisticFollowsByPubkey": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "pending": {
+              "type": "boolean",
+            },
+            "updatedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "value": {
+              "type": "boolean",
+            },
+          },
+          "required": [
+            "value",
+            "pending",
+            "updatedAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 128,
+          "type": "string",
+        },
+        "type": "object",
+      },
+      "optimisticLikesByEventId": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "delta": {
+              "type": "number",
+            },
+            "expectedCount": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "pending": {
+              "type": "boolean",
+            },
+            "relatedEventId": {
+              "maxLength": 128,
+              "type": "string",
+            },
+            "updatedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "value": {
+              "type": "boolean",
+            },
+          },
+          "required": [
+            "value",
+            "pending",
+            "delta",
+            "updatedAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 128,
+          "type": "string",
+        },
+        "type": "object",
+      },
+      "optimisticRepostsByEventId": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "delta": {
+              "type": "number",
+            },
+            "expectedCount": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "pending": {
+              "type": "boolean",
+            },
+            "relatedEventId": {
+              "maxLength": 128,
+              "type": "string",
+            },
+            "updatedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "value": {
+              "type": "boolean",
+            },
+          },
+          "required": [
+            "value",
+            "pending",
+            "delta",
+            "updatedAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 128,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "contactsTags",
+      "contactsContent",
+      "contactsUpdatedAt",
+      "followingPubkeys",
+      "engagementByEventId",
+      "deletedRepostOriginalIds",
+      "deletedNoteIds",
+      "optimisticFollowsByPubkey",
+      "optimisticLikesByEventId",
+      "optimisticRepostsByEventId",
+    ],
+    "type": "object",
+  },
+  "version": 2,
+}
+`;
+
+exports[`persisted schema drift owned-media-store schema matches the golden snapshot for its version: owned-media-store 1`] = `
+{
+  "name": "owned-media-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "byBlob": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "deleteState": {
+              "enum": [
+                "live",
+                "delete-requested",
+                "deleted",
+                "delete-failed",
+              ],
+              "type": "string",
+            },
+            "firstSeen": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "host": {
+              "maxLength": 512,
+              "type": "string",
+            },
+            "lastCheckedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "lastSeen": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "mimeType": {
+              "maxLength": 256,
+              "type": "string",
+            },
+            "sha256": {
+              "maxLength": 64,
+              "type": "string",
+            },
+            "sourceNoteIds": {
+              "default": [],
+              "items": {
+                "maxLength": 128,
+                "type": "string",
+              },
+              "maxItems": 2000,
+              "type": "array",
+            },
+            "url": {
+              "maxLength": 2048,
+              "type": "string",
+            },
+          },
+          "required": [
+            "sha256",
+            "url",
+            "host",
+            "sourceNoteIds",
+            "firstSeen",
+            "lastSeen",
+            "deleteState",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 600,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "byBlob",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift profile-store schema matches the golden snapshot for its version: profile-store 1`] = `
+{
+  "name": "profile-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "activeAccountIndex": {
+        "default": 0,
+        "maximum": 9007199254740991,
+        "minimum": -9007199254740991,
+        "type": "integer",
+      },
+      "cocoMigrationComplete": {
+        "additionalProperties": {
+          "type": "boolean",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 32,
+          "type": "string",
+        },
+        "type": "object",
+      },
+      "profiles": {
+        "default": [],
+        "items": {
+          "additionalProperties": {},
+          "properties": {
+            "accountIndex": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "addedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "cachedBalanceSats": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "cachedDisplayName": {
+              "maxLength": 512,
+              "type": "string",
+            },
+            "cachedPicture": {
+              "maxLength": 2048,
+              "type": "string",
+            },
+            "externalChain": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "pubkey": {
+              "maxLength": 128,
+              "type": "string",
+            },
+            "source": {
+              "enum": [
+                "derived",
+                "imported",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "accountIndex",
+            "pubkey",
+            "addedAt",
+          ],
+          "type": "object",
+        },
+        "maxItems": 64,
+        "type": "array",
+      },
+    },
+    "required": [
+      "activeAccountIndex",
+      "profiles",
+      "cocoMigrationComplete",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift transaction-annotation-store schema matches the golden snapshot for its version: transaction-annotation-store 1`] = `
+{
+  "name": "transaction-annotation-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "annotations": {
+        "additionalProperties": {
+          "additionalProperties": {
+            "maxLength": 16384,
+            "type": "string",
+          },
+          "propertyNames": {
+            "maxLength": 64,
+            "type": "string",
+          },
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 256,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "annotations",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;

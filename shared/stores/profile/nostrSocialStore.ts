@@ -195,6 +195,64 @@ type EngagementActionKind = 'liked' | 'reposted' | 'replied';
  * advance `updatedAt`. Recency-caps by record. Replaces the former per-map
  * `upsertByTarget` — the merge is now additive across action types.
  */
+// --- persisted-shape migration (v1 → v2) -----------------------------------
+
+type LegacyEngagementAction = {
+  reactionEventId?: string;
+  repostEventId?: string;
+  replyEventId?: string;
+  updatedAt?: number;
+};
+type LegacyV1 = {
+  likesByEventId?: Record<string, LegacyEngagementAction>;
+  repostsByEventId?: Record<string, LegacyEngagementAction>;
+  repliedByEventId?: Record<string, LegacyEngagementAction>;
+  engagementByEventId?: Record<string, EngagementRecord>;
+  [k: string]: unknown;
+};
+
+/**
+ * v1 → v2: fold the three legacy parallel maps (likes/reposts/repliedByEventId)
+ * into the unified `engagementByEventId`. Without this, the v1 blob's old keys
+ * are stripped by the schema merge and engagement state silently resets until a
+ * slow relay backfill re-derives it (dropping anything older than the backfill
+ * window). The values are 1:1 field-compatible, so the fold is lossless.
+ */
+function v1ToV2(state: unknown): unknown {
+  const s = (state ?? {}) as LegacyV1;
+  if (!s.likesByEventId && !s.repostsByEventId && !s.repliedByEventId) return s; // already v2 / fresh
+
+  const merged: Record<string, EngagementRecord> = { ...(s.engagementByEventId ?? {}) };
+  const fold = (
+    map: Record<string, LegacyEngagementAction> | undefined,
+    field: 'liked' | 'reposted' | 'replied',
+    idKey: 'reactionEventId' | 'repostEventId' | 'replyEventId'
+  ) => {
+    for (const [target, entry] of Object.entries(map ?? {})) {
+      const at = entry.updatedAt ?? 0;
+      const rec = merged[target] ?? { updatedAt: 0 };
+      merged[target] = {
+        ...rec,
+        [field]: entry[idKey] ? { ownEventId: entry[idKey] } : {},
+        updatedAt: Math.max(rec.updatedAt, at),
+      };
+    }
+  };
+  fold(s.likesByEventId, 'liked', 'reactionEventId');
+  fold(s.repostsByEventId, 'reposted', 'repostEventId');
+  fold(s.repliedByEventId, 'replied', 'replyEventId');
+
+  const { likesByEventId, repostsByEventId, repliedByEventId, ...rest } = s;
+  return { ...rest, engagementByEventId: capByRecency(merged, MAX_ENGAGEMENT_ENTRIES) };
+}
+
+/** Per-store SHAPE migration (vs the cross-store dataMigrations registry). */
+export function migrateNostrSocialStore(state: unknown, version: number): unknown {
+  let s = state;
+  if (version < 2) s = v1ToV2(s);
+  return s;
+}
+
 function ingestEngagementAction(
   base: Record<string, EngagementRecord>,
   action: EngagementActionKind,
@@ -531,6 +589,8 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
       storage: createProfileScopedStorage(),
       schema: PersistedNostrSocialStore,
       logKey: 'nostr_social',
+      version: 2,
+      migrate: migrateNostrSocialStore,
       partialize: (state) => ({
         contactsTags: state.contactsTags,
         contactsContent: state.contactsContent,

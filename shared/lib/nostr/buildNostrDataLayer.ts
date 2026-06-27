@@ -18,10 +18,6 @@ import { useProfileStore } from '@/shared/stores/global/profileStore';
 // profile-scoped cache is cleared and replaced — one account never serves
 // another's cached data (ADR-0002). Tier toggles (Settings → Network) likewise
 // rebuild, so a disabled tier drops out of the nagg → Primal → relay chain.
-//
-// NOTE (local-dev proof): the facade only exists in the LOCAL (symlinked)
-// nagg-ts; the published registry 0.5.0 predates it, so an EAS/release build
-// fails to resolve these symbols until nagg-ts is published. Local dev is fine.
 // ---------------------------------------------------------------------------
 
 let loggerBridged = false;

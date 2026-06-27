@@ -11,7 +11,8 @@
  * store + adapter are recreated per profile — no cross-profile bleed.
  *
  * Legacy data (scan-history transaction links, distribution, location) is
- * imported once per profile by `migrateLegacyTransactionAnnotations`.
+ * imported per profile by the `dataMigrations` registry, which calls
+ * `importLegacyTransactionSideData` and tracks completion via a numeric level.
  */
 
 import { create } from 'zustand';
@@ -32,15 +33,15 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 interface TransactionAnnotationState {
   /** colada annotation key -> flat annotation record. */
   annotations: Record<string, AnnotationRecord>;
-  /** True once legacy scan/distribution/location data was imported (per profile). */
-  _migratedLegacy: boolean;
 }
 
 const PersistedTransactionAnnotationStore = z.object({
   annotations: z
     .record(z.string().max(256), z.record(z.string().max(64), z.string().max(16_384)))
     .default({}),
-  _migratedLegacy: z.boolean().default(false),
+  // (legacy `_migratedLegacy` flag removed — the cross-store import is now
+  // tracked by dataMigrationStore's level. Old blobs carrying the field still
+  // validate via the loose record and it simply ages out.)
 });
 
 const useTransactionAnnotationStore = create<TransactionAnnotationState>()(
@@ -48,7 +49,6 @@ const useTransactionAnnotationStore = create<TransactionAnnotationState>()(
     persist(
       (): TransactionAnnotationState => ({
         annotations: {},
-        _migratedLegacy: false,
       }),
       persistConfig({
         name: 'transaction-annotation-store',
@@ -57,7 +57,6 @@ const useTransactionAnnotationStore = create<TransactionAnnotationState>()(
         logKey: 'tx_annotation',
         partialize: (state) => ({
           annotations: state.annotations,
-          _migratedLegacy: state._migratedLegacy,
         }),
       })
     )
@@ -126,7 +125,7 @@ export function setDistributionAnnotation(
 // One-time legacy migration
 // ---------------------------------------------------------------------------
 
-async function whenHydrated(store: {
+export async function whenHydrated(store: {
   persist: { hasHydrated: () => boolean; onFinishHydration: (cb: () => void) => () => void };
 }): Promise<void> {
   if (store.persist.hasHydrated()) return;
@@ -139,13 +138,17 @@ async function whenHydrated(store: {
 }
 
 /**
- * Import legacy per-transaction side-data into annotation keys, once per
- * profile. Distribution rows are written under both `quote:` and `id:` (the old
- * store keyed mint quotes by quoteId, others by entry id); scan + location rows
- * key by `id:<transactionId>`. colada's `mergeAnnotationRecords` recombines them
- * across an entry's candidate keys at read time.
+ * Import legacy per-transaction side-data into annotation keys. Distribution
+ * rows are written under both `quote:` and `id:` (the old store keyed mint
+ * quotes by quoteId, others by entry id); scan + location rows key by
+ * `id:<transactionId>`. colada's `mergeAnnotationRecords` recombines them across
+ * an entry's candidate keys at read time.
+ *
+ * Idempotent + additive (first-write-wins for distribution): safe to re-run, so
+ * the dataMigrations registry can drive it via a level rather than a one-shot
+ * flag, and a future "retire legacy stores" step can re-sweep before deleting.
  */
-export async function migrateLegacyTransactionAnnotations(): Promise<void> {
+export async function importLegacyTransactionSideData(): Promise<void> {
   try {
     const [
       { useScanHistoryStore },
@@ -166,8 +169,6 @@ export async function migrateLegacyTransactionAnnotations(): Promise<void> {
       whenHydrated(useTransactionLocationStore),
       whenHydrated(useSwapTransactionsStore),
     ]);
-
-    if (useTransactionAnnotationStore.getState()._migratedLegacy) return;
 
     const next: Record<string, AnnotationRecord> = {
       ...useTransactionAnnotationStore.getState().annotations,
@@ -227,7 +228,7 @@ export async function migrateLegacyTransactionAnnotations(): Promise<void> {
       swaps += 1;
     }
 
-    useTransactionAnnotationStore.setState({ annotations: next, _migratedLegacy: true });
+    useTransactionAnnotationStore.setState({ annotations: next });
     storeLog.info('store.tx_annotation.migrated_legacy', {
       scans,
       distributions,

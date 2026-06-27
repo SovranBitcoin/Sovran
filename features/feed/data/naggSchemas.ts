@@ -89,20 +89,6 @@ export const NaggThreadResponse = z
   })
   .passthrough();
 
-const NaggGraphqlError = z
-  .object({
-    message: z.string().optional(),
-  })
-  .passthrough();
-
-export const NaggGraphqlEnvelope = z
-  .object({
-    data: z.unknown().optional(),
-    errors: z.array(NaggGraphqlError).optional(),
-  })
-  .passthrough();
-
 export type NaggFeedResponseData = z.infer<typeof NaggFeedResponse>;
 export type NaggEnrichmentResponseData = z.infer<typeof NaggEnrichmentResponse>;
 export type NaggThreadResponseData = z.infer<typeof NaggThreadResponse>;
-export type NaggGraphqlEnvelopeData = z.infer<typeof NaggGraphqlEnvelope>;
