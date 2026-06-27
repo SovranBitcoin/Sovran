@@ -34,7 +34,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createTestMachine, runScenario } from '../_harness';
-import { WALLETS, MINT1, MINT2, INPUTS } from '../_harness/fixtures';
+import { WALLETS, MINT1, MINT2, MINT3, INPUTS } from '../_harness/fixtures';
 import type { FlowScenario } from '../_harness/types';
 
 const USER_LIGHTNING_INVOICE =
@@ -228,6 +228,62 @@ describe('lightning melt — pasted invoice mint selection', () => {
         amount: 1000,
         meltTarget: USER_LIGHTNING_INVOICE,
       },
+    });
+  });
+
+  it('auto-picks the preferred mint when several mints can each cover the invoice', async () => {
+    // Regression: with 2+ funded mints the machine used to force the mint
+    // selector. It should now auto-pick the preferred mint and land on the
+    // confirm screen (the user can still change via the mint pill).
+    const tm = createTestMachine({
+      wallet: {
+        trustedMintUrls: [MINT1, MINT2],
+        mintBalances: { [MINT1]: 1500, [MINT2]: 2000 },
+        mintMethodCapabilities: WALLETS.default.mintMethodCapabilities,
+        preferredMintUrl: MINT1,
+        proofAmounts: {
+          [MINT1]: [1024, 256, 128, 64, 16, 8, 4],
+          [MINT2]: [1024, 512, 256, 128, 64, 16],
+        },
+      },
+    });
+
+    await tm.machine.execute(USER_LIGHTNING_INVOICE, { reset: true });
+
+    tm.assertStep('navigateToMeltPreview');
+    tm.assertContext({
+      amount: 1000,
+      mintUrl: MINT1,
+      destination: 'meltQuote',
+      meltTarget: USER_LIGHTNING_INVOICE,
+    });
+  });
+
+  it('falls back to the highest-balance mint when the preferred mint cannot cover the invoice', async () => {
+    const tm = createTestMachine({
+      wallet: {
+        trustedMintUrls: [MINT1, MINT2, MINT3],
+        // Preferred MINT3 is funded but below the 1000-sat invoice amount, so
+        // it is not an eligible candidate; pick the richest eligible mint.
+        mintBalances: { [MINT1]: 1500, [MINT2]: 3000, [MINT3]: 200 },
+        mintMethodCapabilities: WALLETS.default.mintMethodCapabilities,
+        preferredMintUrl: MINT3,
+        proofAmounts: {
+          [MINT1]: [1024, 256, 128, 64, 16, 8, 4],
+          [MINT2]: [2048, 512, 256, 128, 32, 16, 8],
+          [MINT3]: [128, 64, 8],
+        },
+      },
+    });
+
+    await tm.machine.execute(USER_LIGHTNING_INVOICE, { reset: true });
+
+    tm.assertStep('navigateToMeltPreview');
+    tm.assertContext({
+      amount: 1000,
+      mintUrl: MINT2,
+      destination: 'meltQuote',
+      meltTarget: USER_LIGHTNING_INVOICE,
     });
   });
 

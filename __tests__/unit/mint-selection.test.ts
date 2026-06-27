@@ -44,7 +44,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getValidMintCandidates, selectMint, selectMintForMelt } from '../../src/mint-selection';
+import {
+  getValidMintCandidates,
+  pickPreferredCandidate,
+  selectMint,
+  selectMintForMelt,
+} from '../../src/mint-selection';
 import { WALLETS, MINT1, MINT2, UNTRUSTED_MINT } from '../_harness/fixtures';
 
 // ---------------------------------------------------------------------------
@@ -272,5 +277,50 @@ describe('selectMintForMelt', () => {
     if (result.type === 'selected') {
       expect(result.mintUrl).toBe(MINT1);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pickPreferredCandidate
+// ---------------------------------------------------------------------------
+
+/**
+ * pickPreferredCandidate chooses one mint from a caller-supplied, already
+ * eligible candidate list (e.g. method-aware full-amount melt candidates).
+ * It honors the preferred mint when present, else the highest balance.
+ */
+describe('pickPreferredCandidate', () => {
+  it('returns the preferred mint when it is among the candidates', () => {
+    const picked = pickPreferredCandidate(
+      [
+        { mintUrl: MINT1, balance: 1500 },
+        { mintUrl: MINT2, balance: 2000 },
+      ],
+      MINT1,
+    );
+    expect(picked?.mintUrl).toBe(MINT1);
+  });
+
+  it('returns the highest-balance candidate when the preferred mint is absent', () => {
+    const picked = pickPreferredCandidate(
+      [
+        { mintUrl: MINT1, balance: 1500 },
+        { mintUrl: MINT2, balance: 2000 },
+      ],
+      UNTRUSTED_MINT,
+    );
+    expect(picked?.mintUrl).toBe(MINT2);
+  });
+
+  it('returns the highest-balance candidate when no preferred mint is given', () => {
+    const picked = pickPreferredCandidate([
+      { mintUrl: MINT1, balance: 1500 },
+      { mintUrl: MINT2, balance: 2000 },
+    ]);
+    expect(picked?.mintUrl).toBe(MINT2);
+  });
+
+  it('returns undefined for an empty candidate list', () => {
+    expect(pickPreferredCandidate([], MINT1)).toBeUndefined();
   });
 });

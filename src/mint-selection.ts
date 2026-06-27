@@ -178,6 +178,30 @@ export function selectMint(
 }
 
 /**
+ * Pick a single mint from an already-filtered candidate set, honoring the
+ * user's preferred mint.
+ *
+ * Unlike {@link selectMint}, this operates on a caller-supplied candidate list
+ * (e.g. the method-aware, full-amount melt candidates) rather than deriving one
+ * from balances alone, so it stays method-aware: the caller has already
+ * narrowed to mints that support the operation and can cover the amount.
+ *
+ * Returns the preferred mint when it is among the candidates, otherwise the
+ * highest-balance candidate. Returns `undefined` for an empty list.
+ */
+export function pickPreferredCandidate(
+  candidates: MintCandidate[],
+  preferredMintUrl?: string,
+): MintCandidate | undefined {
+  if (candidates.length === 0) return undefined;
+  if (preferredMintUrl) {
+    const preferred = candidates.find((c) => c.mintUrl === preferredMintUrl);
+    if (preferred) return preferred;
+  }
+  return candidates.reduce((best, c) => (c.balance > best.balance ? c : best));
+}
+
+/**
  * Select the best mint for a Lightning melt operation.
  * Lightning melts can use any trusted mint with balance.
  * Prefers the wallet's preferred mint if it has sufficient balance.
