@@ -29,14 +29,30 @@
         "EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL": "https://nagg.up.railway.app",
         "EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT": "https://nagg.up.railway.app/graphql"
       },
+      "android": {
+        "credentialsSource": "remote"
+      },
       "ios": {
         "credentialsSource": "remote"
       },
       "autoIncrement": true
+    },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": {
+        "credentialsSource": "remote",
+        "buildType": "apk"
+      },
+      "autoIncrement": false
     }
   },
   "submit": {
     "production": {
+      "android": {
+        "applicationId": "com.sovranbitcoin",
+        "track": "internal"
+      },
       "ios": {
         "appleId": "business@sovranbitcoin.com",
         "ascAppId": "6499554529",

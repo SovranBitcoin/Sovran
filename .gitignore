@@ -102,3 +102,5 @@ sovran.money/
 targets/widget/generated.entitlements
 targets/widget/Assets.xcassets/AppIcon.appiconset/
 targets/widget/Assets.xcassets/$*.colorset/
+
+credentials.json
