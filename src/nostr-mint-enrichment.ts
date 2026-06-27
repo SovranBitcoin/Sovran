@@ -55,6 +55,16 @@ const MintReviewItem = z.object({
   createdAt: z.number(),
 });
 
+// nagg bundles each reviewer's kind-0 (name/picture) in a profiles map keyed by
+// pubkey, exactly like the feed responses, so the client renders reviewer
+// identity without a second round-trip per reviewer.
+const ReviewerProfile = z
+  .object({
+    name: z.string().max(256).optional(),
+    picture: z.string().max(2048).optional(),
+  })
+  .passthrough();
+
 const MintReviewsResponse = z.object({
   summary: z.object({
     mintUrl: z.string(),
@@ -62,6 +72,7 @@ const MintReviewsResponse = z.object({
     reviewCount: z.number(),
   }),
   reviews: z.array(MintReviewItem).optional(),
+  profiles: z.record(z.string(), ReviewerProfile).optional(),
 });
 
 function summarizeControls(controls: RequestControls): Record<string, unknown> {
@@ -164,9 +175,14 @@ export function createNostrMintEnrichment(
         throw errorFromNaggError(result.error);
       }
       const data = result.value;
+      const profiles = data.profiles ?? {};
+      // Trust nagg's server-side parse + dedupe: keep every returned review
+      // (scored or score-less), use the server score verbatim, and attach the
+      // bundled reviewer identity. This keeps the list 1:1 with summary.reviewCount
+      // instead of re-filtering with a stricter regex (the old new-device vs API
+      // discrepancy).
       const recommendations = (data.reviews ?? [])
-        .map(reviewFromItem)
-        .filter((review): review is MintReviewRecommendation => review !== null)
+        .map((item) => reviewFromItem(item, profiles[item.reviewerPubkey]))
         .sort((a, b) => b.created_at - a.created_at);
       const lastUpdated =
         recommendations.length > 0
@@ -178,6 +194,7 @@ export function createNostrMintEnrichment(
         reviewCount: data.summary.reviewCount,
         returnedReviews: data.reviews?.length ?? 0,
         recommendationCount: recommendations.length,
+        profileCount: Object.keys(profiles).length,
         score: data.summary.averageScore,
         lastUpdated,
       });
@@ -187,7 +204,9 @@ export function createNostrMintEnrichment(
         score: data.summary.averageScore,
         recommendations,
         lastUpdated,
-        fromCache: true,
+        // This is a fresh network fetch; nagg's own response cache is opaque to
+        // us, so report not-from-our-cache rather than hardcoding true.
+        fromCache: false,
       };
     },
   };
@@ -218,34 +237,23 @@ function profileFields(profile: {
 
 function reviewFromItem(
   item: z.infer<typeof MintReviewItem>,
-): MintReviewRecommendation | null {
-  const parsed = parseMintReviewContent(item.content);
-  if (!parsed) {
-    logger.debug('nostrMint.review.skipped', {
-      eventIdPresent: item.eventId.length > 0,
-      pubkeyLength: item.reviewerPubkey.length,
-      reason: 'no_score_marker',
-      contentLength: item.content.length,
-    });
-    return null;
-  }
+  profile?: z.infer<typeof ReviewerProfile>,
+): MintReviewRecommendation {
   return {
-    score: parsed.score,
-    comment: parsed.comment,
+    score: item.score,
+    comment: stripScoreMarker(item.content),
     pubkey: item.reviewerPubkey,
     eventId: item.eventId,
     created_at: item.createdAt,
+    ...(profile?.name ? { name: profile.name } : {}),
+    ...(profile?.picture ? { picture: profile.picture } : {}),
   };
 }
 
-function parseMintReviewContent(
-  raw: string,
-): { score: number; comment: string } | null {
-  const match = raw.match(/^\s*\[(\d+)\/(\d+)\]\s*(.*)$/);
-  if (!match) return null;
-  const score = Number.parseInt(match[1] ?? '', 10);
-  const outOf = Number.parseInt(match[2] ?? '', 10);
-  if (!Number.isFinite(score) || score < 0 || score > 5 || outOf !== 5)
-    return null;
-  return { score, comment: match[3]?.trim() ?? '' };
+// nagg keeps the [n/5] marker in the review content; strip the first occurrence
+// so the comment shown to the user is just their prose. Mirrors nagg's score
+// regex (decimals allowed, marker anywhere) rather than the old strict form.
+const SCORE_MARKER = /\[\d+(?:\.\d+)?\/5\]/;
+function stripScoreMarker(content: string): string {
+  return content.replace(SCORE_MARKER, '').trim();
 }

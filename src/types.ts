@@ -221,7 +221,13 @@ export interface MintContactProfile {
 }
 
 export interface MintReviewRecommendation {
-  score: number;
+  /**
+   * The reviewer's [n/5] score, or null for a NIP-87 recommendation posted
+   * without one (a score-less endorsement). Mirrors nagg's server-side parse —
+   * colada no longer re-parses or drops these, so the recommendation list stays
+   * 1:1 with the server's reviewCount.
+   */
+  score: number | null;
   comment: string;
   pubkey: string;
   eventId: string;

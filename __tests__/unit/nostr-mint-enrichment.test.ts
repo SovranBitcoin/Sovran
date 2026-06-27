@@ -49,8 +49,9 @@ describe('createNostrMintEnrichment', () => {
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'GET' });
   });
 
-  it('fetches mint reviews and recommendations from the REST aggregate', async () => {
+  it('keeps every server review (scored + score-less), trusts the server score, and attaches reviewer identity', async () => {
     const mintUrl = 'https://mint.example.com';
+    const reviewerB = 'd'.repeat(64);
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({
         summary: { mintUrl, averageScore: 4.5, reviewCount: 2 },
@@ -59,19 +60,22 @@ describe('createNostrMintEnrichment', () => {
             eventId: EVENT_ID,
             reviewerPubkey: REVIEWER,
             mintUrl,
-            score: 5,
-            content: '[5/5] fast and reliable',
+            score: 4, // decimal/loose forms are parsed server-side; trust it
+            content: '[4/5] fast and reliable',
             createdAt: 1780000000,
           },
           {
-            eventId: 'not-a-review',
-            reviewerPubkey: REVIEWER,
+            eventId: 'e'.repeat(64),
+            reviewerPubkey: reviewerB,
             mintUrl,
-            score: null,
+            score: null, // a score-less recommendation — must NOT be dropped
             content: 'great mint',
             createdAt: 1780000100,
           },
         ],
+        profiles: {
+          [REVIEWER]: { name: 'Alice', picture: 'https://a/pic.png' },
+        },
       }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -80,20 +84,26 @@ describe('createNostrMintEnrichment', () => {
     const reviews = await enrichment.fetchMintReviews(mintUrl);
 
     expect(reviews?.score).toBe(4.5);
-    expect(reviews?.mintUrl).toBe(mintUrl);
-    expect(reviews?.recommendations).toHaveLength(1);
+    // both reviews kept → list is 1:1 with summary.reviewCount (no re-filtering)
+    expect(reviews?.recommendations).toHaveLength(2);
+    // newest first: the score-less recommendation
     expect(reviews?.recommendations[0]).toMatchObject({
-      score: 5,
+      score: null,
+      comment: 'great mint',
+      pubkey: reviewerB,
+    });
+    // scored review: server score used, [n/5] marker stripped, identity attached
+    expect(reviews?.recommendations[1]).toMatchObject({
+      score: 4,
       comment: 'fast and reliable',
       pubkey: REVIEWER,
-      eventId: EVENT_ID,
-      created_at: 1780000000,
+      name: 'Alice',
+      picture: 'https://a/pic.png',
     });
-    expect(reviews?.lastUpdated).toBe(1780000000);
+    expect(reviews?.lastUpdated).toBe(1780000100);
 
     const url = new URL(fetchMock.mock.calls[0][0]);
     expect(url.pathname).toBe('/v1/nostr/mint/reviews');
     expect(url.searchParams.get('u')).toBe(mintUrl);
-    expect(url.searchParams.get('limit')).toBe('100');
   });
 });
