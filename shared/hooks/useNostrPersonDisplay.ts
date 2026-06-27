@@ -18,7 +18,7 @@ import { useEffect } from 'react';
 import { profileToMetadataPartial } from '@/shared/hooks/nostrPersonMapping';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { fetchNostrProfile } from '@/shared/lib/apiClient';
-import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
+import { seedLowConfidenceProfiles } from '@/shared/lib/nostr/useEntityCache';
 
 /** Pubkeys already looked up (in flight, succeeded, or failed) this session. */
 const attempted = new Set<string>();
@@ -42,9 +42,17 @@ export function useNostrPersonDisplay(pubkey: string | undefined): NostrPersonDi
     attempted.add(pubkey);
     void fetchNostrProfile(pubkey).then((result) => {
       if (result.isErr()) return;
-      useNostrMetadataCache
-        .getState()
-        .seedFromSearchResults([{ pubkey, profile: profileToMetadataPartial(result.value) }]);
+      const partial = profileToMetadataPartial(result.value);
+      // Low-confidence (fill-missing, seenAt 0) so a later authoritative kind-0
+      // still overrides — preserving the original seedFromSearchResults intent.
+      seedLowConfidenceProfiles({
+        [pubkey]: {
+          ...(partial.displayName || partial.name
+            ? { name: partial.displayName ?? partial.name }
+            : {}),
+          ...(partial.picture ? { picture: partial.picture } : {}),
+        },
+      });
     });
   }, [pubkey, isLoading, cacheEmpty]);
 

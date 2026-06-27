@@ -100,9 +100,7 @@ export function useMintSearch(
         // Seed operator follower/reputation so useMintProfiles short-circuits.
         for (const m of res.value.mints) {
           if (m.followers != null) {
-            useMintProfileStore
-              .getState()
-              .setCached(m.mintUrl, m.followers, m.vertexScore ?? null);
+            useMintProfileStore.getState().setCached(m.mintUrl, m.followers, m.vertexScore ?? null);
           }
         }
         cashuLog.info('mint.discover.results', {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 
 import { facade } from '@sovranbitcoin/nagg-ts';
 
@@ -8,6 +8,11 @@ import type {
   ProfileInfo,
 } from '@/features/feed/components/nostr/feedTypes';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
+import {
+  NOSTR_METADATA_STALE_TTL_MS,
+  cachedProfileToMetadata,
+  type NostrProfileMetadata,
+} from '@/shared/stores/global/nostrMetadataCache';
 
 // ---------------------------------------------------------------------------
 // Reactive bindings over the authoritative nagg-ts entity cache.
@@ -70,6 +75,120 @@ export function useProfile(pubkey: string | undefined): {
     const status: ProfileStatus = record ? 'cached' : pending ? 'loading' : 'absent';
     return { profile, status };
   }, [record, pending]);
+}
+
+/**
+ * The FULL cached profile record (name/displayName/picture/banner/nip05/lud16/
+ * website/about) for a pubkey, read reactively from the single owner (the
+ * nagg-ts entity cache). This is the seam the non-feed profile hooks
+ * (`useCachedNostrProfile`, `useNostrProfileMetadata*`) read through, so every
+ * surface — feed rows and DMs/contacts/signer alike — renders the same record.
+ */
+export function useProfileRecord(pubkey: string | undefined): facade.CachedProfile | undefined {
+  const cache = buildNostrDataLayer()?.cache;
+  return useCachedRecord(cache?.profiles, pubkey);
+}
+
+/**
+ * Full cached profile records for many pubkeys, read reactively from the single
+ * owner. Returns a referentially-stable Map that only changes when one of the
+ * requested keys' records change or the requested set changes — safe for
+ * `useSyncExternalStore` and cheap to depend on.
+ */
+export function useProfileRecordsMany(
+  pubkeys: readonly string[]
+): ReadonlyMap<string, facade.CachedProfile> {
+  const store = buildNostrDataLayer()?.cache?.profiles;
+  const stableKey = useMemo(() => [...pubkeys].sort().join(','), [pubkeys]);
+  const versionRef = useRef(0);
+  const snapRef = useRef<{
+    key: string;
+    version: number;
+    map: ReadonlyMap<string, facade.CachedProfile>;
+  } | null>(null);
+
+  const subscribe = useCallback(
+    (onChange: () => void) =>
+      store
+        ? store.subscribe(() => {
+            versionRef.current += 1;
+            onChange();
+          })
+        : NOOP_UNSUB,
+    [store]
+  );
+
+  const getSnapshot = useCallback(() => {
+    const cached = snapRef.current;
+    if (cached && cached.key === stableKey && cached.version === versionRef.current) {
+      return cached.map;
+    }
+    const map = new Map<string, facade.CachedProfile>();
+    if (store) {
+      for (const pk of pubkeys) {
+        const record = store.get(pk);
+        if (record) map.set(pk, record);
+      }
+    }
+    snapRef.current = { key: stableKey, version: versionRef.current, map };
+    return map;
+    // pubkeys is captured via stableKey; rebuild only on key/version change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, stableKey]);
+
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+/** Non-reactive read of one full profile record (for getState-style callers). */
+export function readProfileRecord(pubkey: string): facade.CachedProfile | undefined {
+  return buildNostrDataLayer()?.cache.getProfile(pubkey);
+}
+
+/**
+ * Counterparty kind-0 for a pubkey, read from the single owner (entity cache)
+ * and mapped to NostrProfileMetadata, with SWR staleness flags. The hub
+ * `useNostrProfileMetadata` reads through this; a `seenAt: 0` (feed-seeded or
+ * boot-seeded) record is "stale" so a real kind-0 fetch still runs.
+ */
+export function useCachedNostrProfile(pubkey: string): {
+  metadata: NostrProfileMetadata | undefined;
+  isStale: boolean;
+  isMissing: boolean;
+} {
+  const record = useProfileRecord(pubkey || undefined);
+  const metadata = useMemo(() => cachedProfileToMetadata(record), [record]);
+  const isMissing = !metadata;
+  const isStale = !!metadata && Date.now() - metadata.fetchedAt > NOSTR_METADATA_STALE_TTL_MS;
+  return { metadata, isStale, isMissing };
+}
+
+/**
+ * Write authoritative kind-0 metadata into the single owner (relay-fresh, so it
+ * wins the merge and isn't immediately re-fetched). Use for resolved profiles
+ * (own accounts, recipient resolution, recent-people, mock data).
+ */
+export function ingestResolvedProfiles(metadata: Record<string, facade.ProfileMetadata>): void {
+  if (Object.keys(metadata).length === 0) return;
+  buildNostrDataLayer()?.cache.ingestProfileMetadata(metadata, Date.now(), 'relay');
+}
+
+/**
+ * Seed low-confidence name/picture into the single owner (seenAt 0 → fills gaps
+ * only and stays "stale" so a real kind-0 fetch still runs). Use for search /
+ * recommendation snapshots — a first-paint hint, not authority.
+ */
+export function seedLowConfidenceProfiles(
+  infos: Record<string, { name?: string; picture?: string }>
+): void {
+  if (Object.keys(infos).length === 0) return;
+  const normalized: Record<string, { name: string; picture?: string }> = {};
+  for (const [pubkey, info] of Object.entries(infos)) {
+    normalized[pubkey] = {
+      name: info.name ?? '',
+      ...(info.picture ? { picture: info.picture } : {}),
+    };
+  }
+  buildNostrDataLayer()?.cache.ingestProfileInfos(normalized, 'cache');
 }
 
 /** A cached note body by id (structurally a FeedEvent). */

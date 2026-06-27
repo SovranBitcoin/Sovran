@@ -10,7 +10,7 @@
 import { fetchNostrProfile } from '@/shared/lib/apiClient';
 import { log } from '@/shared/lib/logger';
 import { ownProfileStatsCache } from '@/shared/lib/profile/ownProfileStatsStore';
-import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
+import { ingestResolvedProfiles } from '@/shared/lib/nostr/useEntityCache';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 
 export async function syncOwnProfiles(signal?: AbortSignal): Promise<void> {
@@ -54,7 +54,7 @@ export async function syncOwnProfiles(signal?: AbortSignal): Promise<void> {
   );
 
   if (Object.keys(metadataEntries).length > 0) {
-    useNostrMetadataCache.getState().setManyProfiles(metadataEntries);
+    ingestResolvedProfiles(metadataEntries);
   }
   log.info('own_profile_sync.done', { accounts: profiles.length, synced });
 }

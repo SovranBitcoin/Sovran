@@ -54,7 +54,9 @@ function appendMintIfNew(
 
 /** Calculates average score over the scored recommendations (ignores score-less ones). */
 function averageScore(recommendations: MintRecommendation[]): number {
-  const scored = recommendations.filter((r): r is MintRecommendation & { score: number } => r.score !== null);
+  const scored = recommendations.filter(
+    (r): r is MintRecommendation & { score: number } => r.score !== null
+  );
   if (scored.length === 0) return 0;
   const sum = scored.reduce((acc, r) => acc + r.score, 0);
   return Number((sum / scored.length).toFixed(2));

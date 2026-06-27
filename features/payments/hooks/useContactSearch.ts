@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { type NostrSearchResult } from '@/shared/lib/apiClient';
 import { searchProfilesViaFacade } from '@/shared/lib/nostr/searchProfiles';
 import { paymentLog, redactError } from '@/shared/lib/logger';
-import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
+import { seedLowConfidenceProfiles } from '@/shared/lib/nostr/useEntityCache';
 
 interface SearchResultData {
   pubkey: string;
@@ -30,7 +30,6 @@ const SEARCH_DEBOUNCE_MS = 250;
 export const CONTACT_SEARCH_MIN_LENGTH = 3;
 
 export function useContactSearch(searchQuery: string) {
-  const seedFromSearchResults = useNostrMetadataCache((s) => s.seedFromSearchResults);
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
   const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -87,7 +86,16 @@ export function useContactSearch(searchQuery: string) {
             });
             setSearchResults(formatted);
             if (formatted.length > 0) {
-              seedFromSearchResults(formatted);
+              const seeds: Record<string, { name?: string; picture?: string }> = {};
+              for (const r of formatted) {
+                seeds[r.pubkey] = {
+                  ...(r.profile.displayName || r.profile.name
+                    ? { name: r.profile.displayName ?? r.profile.name }
+                    : {}),
+                  ...(r.profile.picture ? { picture: r.profile.picture } : {}),
+                };
+              }
+              seedLowConfidenceProfiles(seeds);
             }
           } else {
             setSearchResults([]);
@@ -113,7 +121,7 @@ export function useContactSearch(searchQuery: string) {
 
     void search();
     return () => controller.abort();
-  }, [debouncedQuery, seedFromSearchResults]);
+  }, [debouncedQuery]);
 
   // Stale-while-revalidate: once the first response has landed we keep
   // showing those results while the next query is in flight. Skeletons

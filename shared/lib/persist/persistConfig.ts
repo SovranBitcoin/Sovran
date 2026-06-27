@@ -57,7 +57,7 @@ function deriveLogKey(name: string): string {
  * the one thing standing between a routine schema change and silent data loss
  * on the durable stores (createMergeWithSchema drops a whole blob it can't parse).
  */
-export interface PersistRegistryEntry {
+interface PersistRegistryEntry {
   name: string;
   version: number;
   schema: ZodType<unknown>;

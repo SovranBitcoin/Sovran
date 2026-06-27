@@ -6,7 +6,7 @@ import Icon from 'assets/icons';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
+import { useCachedNostrProfile } from '@/shared/lib/nostr/useEntityCache';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Log, paymentLog } from '@/shared/lib/logger';
 
@@ -35,9 +35,7 @@ export default function TransactionIcon({
   const counterpartyPubkey = counterparty?.pubkey;
   // Reactive but fetch-free read of the warm kind-0 cache, so the avatar fills
   // in if the profile is already cached and updates without per-row fetches.
-  const cachedProfile = useNostrMetadataCache((s) =>
-    counterpartyPubkey ? s.byPubkey[counterpartyPubkey] : undefined
-  );
+  const { metadata: cachedProfile } = useCachedNostrProfile(counterpartyPubkey ?? '');
   const showAvatar = !isLoading && !!counterpartyPubkey;
   const avatarPicture = counterparty?.avatarUrl ?? cachedProfile?.picture;
   const avatarName =

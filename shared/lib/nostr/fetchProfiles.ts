@@ -10,12 +10,20 @@ type ProfileMetadata = facade.ProfileMetadata;
  * tier resolved; never throws. Empty when every tier is disabled or exhausted.
  */
 export async function fetchProfilesViaFacade(
-  pubkeys: string[]
+  pubkeys: string[],
+  options: { refresh?: boolean } = {}
 ): Promise<Record<string, ProfileMetadata>> {
   if (pubkeys.length === 0) return {};
   const layer = buildNostrDataLayer();
   if (!layer) return {};
-  const result = await layer.getProfiles({ pubkeys });
+  // getProfiles write-throughs resolved profiles into the shared entity cache
+  // (the single owner) and marks them pending while in flight. `refresh: true`
+  // forces a network fetch past a cache hit — needed to revalidate a stale or
+  // boot-seeded (seenAt 0) record rather than serve it back unchanged.
+  const result = await layer.getProfiles({
+    pubkeys,
+    ...(options.refresh ? { refresh: true } : {}),
+  });
   return result.match(
     (resolved) => resolved.profiles,
     () => ({})

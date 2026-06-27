@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Kind0MetadataSchema,
-  useCachedNostrProfile,
-  useNostrMetadataCache,
+  cachedProfileToMetadata,
   type NostrProfileMetadata,
 } from '@/shared/stores/global/nostrMetadataCache';
+import { useCachedNostrProfile, useProfileRecordsMany } from '@/shared/lib/nostr/useEntityCache';
 import { fetchProfilesViaFacade } from '@/shared/lib/nostr/fetchProfiles';
 
 const STALE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -18,7 +18,8 @@ const MAX_FETCH_ATTEMPTS = 3;
 const RETRY_BACKOFF_MS = 4_000;
 
 export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrProfileMetadataResult {
-  const setProfile = useNostrMetadataCache((s) => s.setProfile);
+  // Reads the single owner (entity cache) via useCachedNostrProfile; a fetch
+  // write-throughs there (getProfiles), so no explicit cache write here.
   const { metadata, isStale, isMissing } = useCachedNostrProfile(pubkey ?? '');
   const [isFetching, setIsFetching] = useState(false);
 
@@ -39,13 +40,15 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     setIsFetching(true);
-    void fetchProfilesViaFacade([pubkey])
+    // refresh:true so a stale/boot-seeded record is revalidated, not served back.
+    void fetchProfilesViaFacade([pubkey], { refresh: true })
       .then((profiles) => {
         if (cancelled) return;
-        const found = profiles[pubkey];
-        if (found) {
+        // getProfiles already ingested any resolved profile into the entity cache
+        // (the single owner), so the reactive read updates itself — we only track
+        // resolution here to stop / schedule retries.
+        if (profiles[pubkey]) {
           attempts.current.set(pubkey, MAX_FETCH_ATTEMPTS); // resolved → stop retrying
-          setProfile(pubkey, found);
           return;
         }
         // Nothing resolved this round — schedule a bounded retry.
@@ -62,7 +65,7 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
     };
     // retryNonce drives the bounded retry: bumping it re-runs the effect, which
     // re-reads the (now-incremented) attempt count through `needsFetch`.
-  }, [pubkey, needsFetch, retryNonce, setProfile]);
+  }, [pubkey, needsFetch, retryNonce]);
 
   const isLoading = isMissing && isFetching;
   return { metadata, isLoading };
@@ -118,22 +121,18 @@ interface UseNostrProfileMetadataManyResult {
 export function useNostrProfileMetadataMany(
   pubkeys: readonly string[]
 ): UseNostrProfileMetadataManyResult {
-  const setManyProfiles = useNostrMetadataCache((s) => s.setManyProfiles);
-  const byPubkey = useNostrMetadataCache((s) => s.byPubkey);
-
-  // Stable key from sorted pubkeys so a fresh array reference with
-  // identical contents doesn't re-trigger memos / subscriptions.
-  const stableKey = useMemo(() => [...pubkeys].sort().join(','), [pubkeys]);
+  // Read the single owner (entity cache) for this set; the returned Map is
+  // referentially stable across renders that don't change these keys' records.
+  const records = useProfileRecordsMany(pubkeys);
 
   const metadata = useMemo(() => {
     const map = new Map<string, NostrProfileMetadata>();
-    for (const pk of pubkeys) {
-      const entry = byPubkey[pk];
-      if (entry) map.set(pk, entry);
+    for (const [pk, record] of records) {
+      const mapped = cachedProfileToMetadata(record);
+      if (mapped) map.set(pk, mapped);
     }
     return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stableKey, byPubkey]);
+  }, [records]);
 
   // Pubkeys missing or stale in the cache and not yet attempted this lifetime.
   const attempted = useRef<Set<string>>(new Set());
@@ -143,12 +142,12 @@ export function useNostrProfileMetadataMany(
     const out: string[] = [];
     for (const pk of pubkeys) {
       if (attempted.current.has(pk)) continue;
-      const entry = byPubkey[pk];
-      if (!entry || now - entry.fetchedAt > STALE_TTL_MS) out.push(pk);
+      const record = records.get(pk);
+      if (!record || now - (record.seenAt ?? 0) > STALE_TTL_MS) out.push(pk);
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stableKey, byPubkey]);
+  }, [pubkeys, records]);
 
   const [isFetching, setIsFetching] = useState(false);
   const toFetchKey = toFetch.join(',');
@@ -157,19 +156,16 @@ export function useNostrProfileMetadataMany(
     for (const pk of toFetch) attempted.current.add(pk);
     let cancelled = false;
     setIsFetching(true);
-    void fetchProfilesViaFacade(toFetch)
-      .then((profiles) => {
-        if (cancelled || Object.keys(profiles).length === 0) return;
-        setManyProfiles(profiles);
-      })
-      .finally(() => {
-        if (!cancelled) setIsFetching(false);
-      });
+    // getProfiles write-throughs into the entity cache; the reactive read above
+    // picks up resolved profiles, so no explicit cache write here.
+    void fetchProfilesViaFacade(toFetch, { refresh: true }).finally(() => {
+      if (!cancelled) setIsFetching(false);
+    });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toFetchKey, setManyProfiles]);
+  }, [toFetchKey]);
 
   const isLoading = isFetching;
   return { metadata, isLoading };

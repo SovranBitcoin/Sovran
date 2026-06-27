@@ -53,7 +53,7 @@ export function confirmBearerDowngrade(displayName: string): Promise<boolean> {
       resolve(value);
     };
     actionMenuPopup({
-      title: "Send unlocked while offline?",
+      title: 'Send unlocked while offline?',
       buttons: [
         {
           testID: 'near-pay-bearer-consent-send',

@@ -101,7 +101,6 @@ const DiscoverMintsResponse = z.object({
   mints: z.array(DiscoverMint).max(10_000),
   profiles: z.record(z.string(), ReviewerProfileInfo).optional(),
 });
-export type DiscoverMintsResponseType = z.infer<typeof DiscoverMintsResponse>;
 
 const API_BASE_URL = backendConfig.apiBaseUrl;
 const SCORE_API_BASE_URL = backendConfig.scoreApiBaseUrl;
@@ -322,10 +321,7 @@ const parseMintInfo = (input: unknown): Result<GetInfoResponse, ParseError> => {
  * the app no longer needs api.sovran.money's /cashu/mints/search + per-mint
  * review/profile fan-outs for discovery.
  */
-export const discoverMints = ({
-  limit,
-  signal,
-}: { limit?: number; signal?: AbortSignal } = {}) =>
+export const discoverMints = ({ limit, signal }: { limit?: number; signal?: AbortSignal } = {}) =>
   fetchJson(
     `${SCORE_API_BASE_URL}/nostr/mint/discover${limit ? `?limit=${limit}` : ''}`,
     parseDiscoverMints,

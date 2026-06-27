@@ -22,6 +22,7 @@ import {
   type SwapGroup,
 } from '@/shared/stores/profile/swapTransactionsStore';
 import { useTransactionLocationStore } from '@/shared/stores/profile/transactionLocationStore';
+import { ingestResolvedProfiles } from '@/shared/lib/nostr/useEntityCache';
 import {
   useNostrMetadataCache,
   type NostrProfileMetadata,
@@ -493,6 +494,9 @@ function injectNostrMetadata() {
       return { byPubkey: next };
     });
   });
+  // Render path now reads the entity cache (the single owner), so seed mock
+  // identities there too (relay-fresh so the SWR hook doesn't refetch them).
+  ingestResolvedProfiles(MOCK_DM.metadataByPubkey);
 }
 
 function removeNostrMetadata() {

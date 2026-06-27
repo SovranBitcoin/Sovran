@@ -8,7 +8,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
-import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
+import { readProfileRecord } from '@/shared/lib/nostr/useEntityCache';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
@@ -160,7 +160,7 @@ function getOrchestrator(): MeshRedeemOrchestrator {
         : undefined;
       const pubkey = peer ? peerNostrPubkey(peer) : null;
       if (pubkey) {
-        const cached = useNostrMetadataCache.getState().byPubkey[pubkey];
+        const cached = readProfileRecord(pubkey);
         patch.counterparty = {
           pubkey,
           direction: 'sender',

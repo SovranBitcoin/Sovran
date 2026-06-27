@@ -3,6 +3,16 @@ import { createNaggClient, setNostrLogger, facade, type NostrLogger } from '@sov
 import { log } from '@/shared/lib/logger';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
+import {
+  cachedProfileToMetadata,
+  useNostrMetadataCache,
+  type NostrProfileMetadata,
+} from '@/shared/stores/global/nostrMetadataCache';
+
+// Debounce window for mirroring the entity cache to durable storage. Coarse
+// enough that active browsing doesn't thrash AsyncStorage; fine enough that a
+// freshly-seen contact persists well before the next cold start.
+const WRITE_BEHIND_DEBOUNCE_MS = 5_000;
 
 // ---------------------------------------------------------------------------
 // The tier-selecting Nostr data-layer facade — a PROFILE-SCOPED SINGLETON.
@@ -68,9 +78,59 @@ type LayerMemo = {
   layer: facade.NostrDataLayer;
   configKey: string;
   pubkey: string | undefined;
+  /** Tears down the profile-cache write-behind subscription on rebuild/switch. */
+  teardownPersistence: () => void;
 };
 
 let memo: LayerMemo | null = null;
+
+/**
+ * Boot-seed the entity cache (the single profile owner) from the persisted
+ * mirror at low confidence (seenAt 0), so non-feed surfaces (DMs, contacts,
+ * signer) render cached names/avatars instantly on cold start — before any
+ * fetch — exactly as the old separate persisted cache did. A real kind-0 from
+ * any tier overrides it (higher seenAt wins the merge).
+ */
+function seedPersistedProfiles(layer: facade.NostrDataLayer): void {
+  const byPubkey = useNostrMetadataCache.getState().byPubkey;
+  const metadata: Record<string, facade.ProfileMetadata> = {};
+  let count = 0;
+  for (const [pubkey, entry] of Object.entries(byPubkey)) {
+    const { fetchedAt: _fetchedAt, ...rest } = entry;
+    metadata[pubkey] = rest;
+    count += 1;
+  }
+  if (count === 0) return;
+  layer.cache.ingestProfileMetadata(metadata, 0, 'cache');
+  log.debug('nostr.facade.profiles_boot_seeded', { count });
+}
+
+/**
+ * Mirror the entity cache's profile snapshot to durable storage (write-behind,
+ * debounced) so the boot-seed above has data next launch. The entity cache is
+ * the single owner; this store is purely its persistent tail. Returns a
+ * teardown that cancels the subscription + any pending flush.
+ */
+function startProfilePersistence(layer: facade.NostrDataLayer): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const flush = () => {
+    timer = undefined;
+    const records: Record<string, NostrProfileMetadata> = {};
+    for (const record of layer.cache.profiles.values()) {
+      const mapped = cachedProfileToMetadata(record);
+      if (mapped && record.pubkey) records[record.pubkey] = mapped;
+    }
+    useNostrMetadataCache.getState().persistOwnerSnapshot(records);
+  };
+  const unsub = layer.cache.profiles.subscribe(() => {
+    if (timer) return; // a flush is already scheduled
+    timer = setTimeout(flush, WRITE_BEHIND_DEBOUNCE_MS);
+  });
+  return () => {
+    if (timer) clearTimeout(timer);
+    unsub();
+  };
+}
 
 function activeViewerPubkey(): string | undefined {
   return useProfileStore.getState().getActiveProfile()?.pubkey;
@@ -112,14 +172,24 @@ export function buildNostrDataLayer(): facade.NostrDataLayer | null {
 
   if (memo && memo.configKey === configKey && memo.pubkey === pubkey) return memo.layer;
 
-  // Identity switch: drop the prior profile's cache before serving the new one.
-  if (memo && memo.pubkey !== pubkey) {
-    memo.layer.cache.clear();
-    log.info('nostr.facade.profile_switch_cleared');
+  // Rebuild (identity switch or tier-toggle change): tear down the prior
+  // write-behind, and on an identity switch drop the prior profile's cache.
+  if (memo) {
+    memo.teardownPersistence();
+    if (memo.pubkey !== pubkey) {
+      memo.layer.cache.clear();
+      log.info('nostr.facade.profile_switch_cleared');
+    }
   }
 
   const layer = assembleLayer(config);
-  if (layer) seedOwnProfile(layer);
-  memo = layer ? { layer, configKey, pubkey } : null;
+  if (layer) {
+    seedOwnProfile(layer);
+    seedPersistedProfiles(layer);
+    const teardownPersistence = startProfilePersistence(layer);
+    memo = { layer, configKey, pubkey, teardownPersistence };
+  } else {
+    memo = null;
+  }
   return layer;
 }

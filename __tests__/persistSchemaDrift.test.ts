@@ -34,7 +34,9 @@ describe('persisted schema drift', () => {
   });
 
   it.each(
-    [...persistRegistry].sort((a, b) => a.name.localeCompare(b.name)).map((e) => [e.name, e] as const)
+    [...persistRegistry]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((e) => [e.name, e] as const)
   )('%s schema matches the golden snapshot for its version', (_name, entry) => {
     const shape = z.toJSONSchema(entry.schema, { unrepresentable: 'any' });
     expect({ name: entry.name, version: entry.version, shape }).toMatchSnapshot(entry.name);

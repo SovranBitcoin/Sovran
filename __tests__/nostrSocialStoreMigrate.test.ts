@@ -19,7 +19,15 @@ describe('migrateNostrSocialStore v1 → v2', () => {
 
     const out = migrateNostrSocialStore(v1, 1) as {
       contactsContent: string;
-      engagementByEventId: Record<string, { liked?: { ownEventId?: string }; reposted?: { ownEventId?: string }; replied?: { ownEventId?: string }; updatedAt: number }>;
+      engagementByEventId: Record<
+        string,
+        {
+          liked?: { ownEventId?: string };
+          reposted?: { ownEventId?: string };
+          replied?: { ownEventId?: string };
+          updatedAt: number;
+        }
+      >;
       likesByEventId?: unknown;
     };
 

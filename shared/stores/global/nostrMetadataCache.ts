@@ -14,6 +14,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
+import type { facade } from '@sovranbitcoin/nagg-ts';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
@@ -31,37 +32,8 @@ export interface NostrProfileMetadata {
   fetchedAt: number;
 }
 
-/** All optional metadata fields. One source of truth so adding a new
- *  field is a single-line edit instead of synchronized changes across
- *  setProfile / seedManyProfilesLowConfidence equality + merge logic. */
-const METADATA_FIELDS = [
-  'displayName',
-  'name',
-  'picture',
-  'banner',
-  'nip05',
-  'lud16',
-  'website',
-  'about',
-] as const;
-
-type MetadataPartial = Partial<Omit<NostrProfileMetadata, 'fetchedAt'>>;
-
 export const NOSTR_METADATA_STALE_TTL_MS = 24 * 60 * 60 * 1000;
-/** Once an entry is this fresh, identical kind-0 events skip the write. */
-const FETCHED_AT_GRACE_MS = 60 * 60 * 1000;
 const MAX_ENTRIES = 500;
-
-function fieldsEqual(a: MetadataPartial, b: MetadataPartial): boolean {
-  for (const k of METADATA_FIELDS) if (a[k] !== b[k]) return false;
-  return true;
-}
-
-function fillMissing(existing: MetadataPartial, partial: MetadataPartial): MetadataPartial {
-  const out: MetadataPartial = {};
-  for (const k of METADATA_FIELDS) out[k] = existing[k] ?? partial[k];
-  return out;
-}
 
 function evictIfOverCap(byPubkey: Record<string, NostrProfileMetadata>): void {
   if (Object.keys(byPubkey).length <= MAX_ENTRIES) return;
@@ -74,41 +46,17 @@ function evictIfOverCap(byPubkey: Record<string, NostrProfileMetadata>): void {
   });
 }
 
-/** Subset of `NostrSearchResult` from `@sovranbitcoin/schemas` we read off
- *  search results. Declared narrowly here to keep the store decoupled
- *  from the API client's full schema. */
-interface SearchResultLike {
-  pubkey: string;
-  profile: MetadataPartial;
-}
-
 interface NostrMetadataCacheState {
+  /**
+   * Durable mirror of the single owner (the nagg-ts entity cache). NOT read for
+   * rendering — surfaces read the owner via `useCachedNostrProfile` /
+   * `useProfileRecord`. This store only persists the owner's snapshot
+   * (`persistOwnerSnapshot`, write-behind) so cold-start can boot-seed it back.
+   */
   byPubkey: Record<string, NostrProfileMetadata>;
 
-  setProfile: (pubkey: string, metadata: MetadataPartial) => void;
-
-  setManyProfiles: (entries: Record<string, MetadataPartial>) => void;
-
-  /**
-   * Low-confidence bulk seed (pubkey → partial metadata). Two invariants vs
-   * `setManyProfiles`:
-   *   - Never overwrites existing fields — relay-sourced kind-0 always wins
-   *     because it's authoritative; only fills gaps.
-   *   - New entries get `fetchedAt: 0` so the next consumer treats them as
-   *     immediately stale and triggers a real kind-0 fetch. The seed is a
-   *     first-paint hint, not a substitute.
-   *
-   * Fed by any non-authoritative source — server search/recommendation
-   * snapshots AND the nagg feed's inline profiles — so the metadata cache is
-   * the SINGLE profile store instead of nagg profiles being a separate
-   * ephemeral map that the relay layer then re-fetches.
-   */
-  seedManyProfilesLowConfidence: (entries: Record<string, MetadataPartial>) => void;
-
-  /** Convenience over {@link seedManyProfilesLowConfidence} for search results. */
-  seedFromSearchResults: (results: SearchResultLike[]) => void;
-
-  removeProfile: (pubkey: string) => void;
+  /** Replace the persisted mirror with the owner's current snapshot (capped). */
+  persistOwnerSnapshot: (records: Record<string, NostrProfileMetadata>) => void;
 
   clear: () => void;
 }
@@ -154,82 +102,13 @@ const PersistedNostrMetadataCache = z.object({
 
 export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       byPubkey: {},
 
-      setProfile: (pubkey, metadata) => {
-        set((state) => {
-          const existing = state.byPubkey[pubkey];
-          if (
-            existing &&
-            fieldsEqual(existing, metadata) &&
-            Date.now() - existing.fetchedAt < FETCHED_AT_GRACE_MS
-          ) {
-            return state;
-          }
-          const next = {
-            ...state.byPubkey,
-            [pubkey]: { ...metadata, fetchedAt: Date.now() },
-          };
-          evictIfOverCap(next);
-          return { byPubkey: next };
-        });
-      },
-
-      setManyProfiles: (entries) => {
-        set((state) => {
-          const now = Date.now();
-          const next = { ...state.byPubkey };
-          for (const [pubkey, metadata] of Object.entries(entries)) {
-            next[pubkey] = { ...metadata, fetchedAt: now };
-          }
-          evictIfOverCap(next);
-          return { byPubkey: next };
-        });
-      },
-
-      seedManyProfilesLowConfidence: (entries) => {
-        set((state) => {
-          const next = { ...state.byPubkey };
-          let changed = 0;
-          let inserted = 0;
-          for (const [pubkey, profile] of Object.entries(entries)) {
-            if (!pubkey) continue;
-            const existing = next[pubkey];
-            if (existing) {
-              const filled = fillMissing(existing, profile);
-              if (!fieldsEqual(filled, existing)) {
-                next[pubkey] = { ...filled, fetchedAt: existing.fetchedAt };
-                changed++;
-              }
-            } else {
-              next[pubkey] = { ...profile, fetchedAt: 0 };
-              inserted++;
-            }
-          }
-          if (changed === 0 && inserted === 0) return state;
-          evictIfOverCap(next);
-          storeLog.debug('store.nostr_metadata.seeded_low_confidence', {
-            inserted,
-            filled: changed,
-          });
-          return { byPubkey: next };
-        });
-      },
-
-      seedFromSearchResults: (results) => {
-        const entries: Record<string, MetadataPartial> = {};
-        for (const r of results) if (r.pubkey) entries[r.pubkey] = r.profile;
-        get().seedManyProfilesLowConfidence(entries);
-      },
-
-      removeProfile: (pubkey) => {
-        set((state) => {
-          if (!state.byPubkey[pubkey]) return state;
-          const next = { ...state.byPubkey };
-          delete next[pubkey];
-          return { byPubkey: next };
-        });
+      persistOwnerSnapshot: (records) => {
+        const next = { ...records };
+        evictIfOverCap(next);
+        set({ byPubkey: next });
       },
 
       clear: () => set({ byPubkey: {} }),
@@ -244,13 +123,28 @@ export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
   )
 );
 
-export function useCachedNostrProfile(pubkey: string): {
-  metadata: NostrProfileMetadata | undefined;
-  isStale: boolean;
-  isMissing: boolean;
-} {
-  const metadata = useNostrMetadataCache((s) => s.byPubkey[pubkey]);
-  const isMissing = !metadata;
-  const isStale = !!metadata && Date.now() - metadata.fetchedAt > NOSTR_METADATA_STALE_TTL_MS;
-  return { metadata, isStale, isMissing };
+/**
+ * Map the single owner's CachedProfile (nagg-ts entity cache) to this module's
+ * NostrProfileMetadata. `seenAt` plays `fetchedAt`'s staleness role. One place,
+ * so the non-feed hooks and the persistence sidecar agree on the shape.
+ */
+export function cachedProfileToMetadata(
+  record: facade.CachedProfile | undefined
+): NostrProfileMetadata | undefined {
+  if (!record) return undefined;
+  return {
+    name: record.name,
+    displayName: record.displayName,
+    picture: record.picture,
+    banner: record.banner,
+    nip05: record.nip05,
+    lud16: record.lud16,
+    website: record.website,
+    about: record.about,
+    fetchedAt: record.seenAt ?? 0,
+  };
 }
+
+// `useCachedNostrProfile` lives in `useEntityCache` (it reads the entity-cache
+// owner) so this store stays a light, dependency-free leaf — importing the
+// data-layer graph here would drag it into every store consumer.

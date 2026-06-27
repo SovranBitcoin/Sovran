@@ -44,7 +44,6 @@ import type {
 import { emptyFeedParseResult } from './feedClient';
 import { ingestOwnContent } from '@/shared/stores/profile/ownContentStore';
 import { ingestOwnMediaBlobs } from '@/shared/stores/profile/ownedMediaStore';
-import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 import { hasEmptyExplicitPubkeys, hydrateSpecWithPubkey } from './feedSpec';
 import { parseJson } from '../components/nostr/feedParse';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
@@ -382,18 +381,6 @@ function ownNoteCandidatesFromFeed(result: FeedParseResult): FeedEvent[] {
   return events;
 }
 
-function seedFeedProfilesIntoCache(profilesMap: Map<string, ProfileInfo>): void {
-  if (profilesMap.size === 0) return;
-  const entries: Record<string, { name?: string; picture?: string }> = {};
-  for (const [pubkey, profile] of profilesMap) {
-    entries[pubkey] = {
-      ...(profile.name ? { name: profile.name } : {}),
-      ...(profile.picture ? { picture: profile.picture } : {}),
-    };
-  }
-  useNostrMetadataCache.getState().seedManyProfilesLowConfidence(entries);
-}
-
 /**
  * Map a {@link NaggFeedPage} through the shared mapper.
  * Pagination fields ride on the page itself, so ranked and events feeds paginate
@@ -496,9 +483,9 @@ export function createNaggFeedClient(): FeedClient {
         // Passive convergence: settle any of our own notes this page surfaced.
         ingestOwnContent(ownNoteCandidatesFromFeed(result), userPubkey);
         ingestOwnMediaBlobs(ownNoteCandidatesFromFeed(result), userPubkey);
-        // Single profile cache: low-confidence-seed this page's inline (nagg)
-        // profiles so they're not an ephemeral map the relay layer re-fetches.
-        seedFeedProfilesIntoCache(result.profilesMap);
+        // (No profile fan-out: the facade already ingests this page's inline
+        // profiles into the single owner — the entity cache — that every surface
+        // now reads. A separate copy here would be pure duplication.)
         return logFeedPageResult(source, result, {
           limit,
           until,

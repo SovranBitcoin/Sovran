@@ -37,7 +37,7 @@ import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog } from '@/shared/lib/logger';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
-import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
+import { ingestResolvedProfiles } from '@/shared/lib/nostr/useEntityCache';
 import {
   createSovranExecuteMintQuote,
   createSovranExecuteReceive,
@@ -336,10 +336,10 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
               });
               return null;
             }
-            // Warm the shared SWR cache so other surfaces (ContactRow,
-            // DmChatHeader, profile screens, HistoryEntryHeader) hit warm
-            // cache for this pubkey on next render without re-fetching.
-            useNostrMetadataCache.getState().setProfile(pubkey, parsed);
+            // Warm the single owner (entity cache) so other surfaces (ContactRow,
+            // DmChatHeader, profile screens, HistoryEntryHeader) hit warm cache
+            // for this pubkey on next render without re-fetching.
+            ingestResolvedProfiles({ [pubkey]: parsed });
             const displayName = resolveIdentityName({ pubkey, nostrProfile: parsed });
             if (!displayName) {
               paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {

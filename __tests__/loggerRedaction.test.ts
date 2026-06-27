@@ -69,16 +69,14 @@ describe('logger redaction — private key material is never shown', () => {
   });
 
   it('brands a BIP39 mnemonic under a neutral field as a secret, no value', () => {
-    const mnemonic =
-      'legal winner thank year wave sausage worth useful legal winner thank yellow';
+    const mnemonic = 'legal winner thank year wave sausage worth useful legal winner thank yellow';
     const { brand, json } = logValue(mnemonic);
     expect(brand).toEqual({ _kind: 'mnemonic', len: mnemonic.length });
     expect(json).not.toContain('winner');
   });
 
   it('redacts a mnemonic embedded inside a larger error string', () => {
-    const mnemonic =
-      'legal winner thank year wave sausage worth useful legal winner thank yellow';
+    const mnemonic = 'legal winner thank year wave sausage worth useful legal winner thank yellow';
     const { brand } = logValue(`restore failed for seed: ${mnemonic} (aborting)`);
     expect(String(brand)).toContain('<REDACTED:mnemonic>');
     expect(String(brand)).not.toContain('sausage');

@@ -4,9 +4,10 @@ import { fetchRecentPeopleProfiles } from '@/features/feed/data/recentPeopleProf
 import { feedLog } from '@/shared/lib/logger';
 import {
   NOSTR_METADATA_STALE_TTL_MS,
-  useNostrMetadataCache,
+  cachedProfileToMetadata,
   type NostrProfileMetadata,
 } from '@/shared/stores/global/nostrMetadataCache';
+import { ingestResolvedProfiles, useProfileRecordsMany } from '@/shared/lib/nostr/useEntityCache';
 import { normalizeRecentPersonPubkey } from '@/shared/stores/profile/recentPeopleStore';
 
 export type RecentPeopleProfileRow = {
@@ -16,8 +17,6 @@ export type RecentPeopleProfileRow = {
 };
 
 export function useRecentPeopleProfiles(pubkeys: readonly string[]): RecentPeopleProfileRow[] {
-  const byPubkey = useNostrMetadataCache((state) => state.byPubkey);
-  const setManyProfiles = useNostrMetadataCache((state) => state.setManyProfiles);
   const [loadingKey, setLoadingKey] = useState('');
 
   const stableInputKey = pubkeys.join(',');
@@ -33,12 +32,15 @@ export function useRecentPeopleProfiles(pubkeys: readonly string[]): RecentPeopl
     return out;
   }, [stableInputKey]);
 
+  // Read the single owner (entity cache) for this set.
+  const records = useProfileRecordsMany(normalizedPubkeys);
+
   useEffect(() => {
     if (normalizedPubkeys.length === 0) return;
     const now = Date.now();
     const missingOrStale = normalizedPubkeys.filter((pubkey) => {
-      const cached = byPubkey[pubkey];
-      return !cached || now - cached.fetchedAt > NOSTR_METADATA_STALE_TTL_MS;
+      const record = records.get(pubkey);
+      return !record || now - (record.seenAt ?? 0) > NOSTR_METADATA_STALE_TTL_MS;
     });
     if (missingOrStale.length === 0) {
       setLoadingKey('');
@@ -54,7 +56,7 @@ export function useRecentPeopleProfiles(pubkeys: readonly string[]): RecentPeopl
       .then((result) => {
         if (!active || controller.signal.aborted) return;
         if (result.isOk()) {
-          setManyProfiles(result.value);
+          ingestResolvedProfiles(result.value);
           return;
         }
         feedLog.warn('feed.recent_people_profiles.fetch_failed', { error: result.error });
@@ -67,7 +69,8 @@ export function useRecentPeopleProfiles(pubkeys: readonly string[]): RecentPeopl
       active = false;
       controller.abort();
     };
-  }, [normalizedPubkeys, byPubkey, setManyProfiles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedPubkeys, records]);
 
   const loadingPubkeys = useMemo(
     () => new Set(loadingKey ? loadingKey.split(',') : []),
@@ -78,9 +81,9 @@ export function useRecentPeopleProfiles(pubkeys: readonly string[]): RecentPeopl
     () =>
       normalizedPubkeys.map((pubkey) => ({
         pubkey,
-        metadata: byPubkey[pubkey],
+        metadata: cachedProfileToMetadata(records.get(pubkey)),
         isLoading: loadingPubkeys.has(pubkey),
       })),
-    [normalizedPubkeys, byPubkey, loadingPubkeys]
+    [normalizedPubkeys, records, loadingPubkeys]
   );
 }
