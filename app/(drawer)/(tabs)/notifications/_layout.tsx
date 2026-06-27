@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useNavigation } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { DrawerActions, useNavigation } from 'expo-router/react-navigation';
+import { DrawerActions } from 'expo-router/react-navigation';
 
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';

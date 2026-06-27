@@ -16,7 +16,8 @@ import { headerButtonSize, zIndex } from '@/shared/styles/tokens';
  * (monicon glyphs, SF symbols, badges) in the same `glassEffect` material
  * the BalancePill/CircleActionButton liquid variants use, at a fixed
  * `headerButtonSize` circle — one glass language everywhere. The system
- * capsule is suppressed via the native-stack `hidesSharedBackground` patch.
+ * capsule is suppressed per-screen via withGlassHeaderItems'
+ * `hidesSharedBackground` (SDK 56 header-items API).
  *
  * Same RN-content-inside-SwiftUIButton pattern as BalancePill.liquid.
  */

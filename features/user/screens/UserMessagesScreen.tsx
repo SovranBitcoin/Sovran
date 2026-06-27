@@ -12,7 +12,7 @@
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { useFocusEffect } from 'expo-router/react-navigation';
+import { useFocusEffect } from 'expo-router';
 import { staticPopup } from '@/shared/lib/popup';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { buildGiftWrappedDMPair } from '@/shared/lib/nostr/nip17';

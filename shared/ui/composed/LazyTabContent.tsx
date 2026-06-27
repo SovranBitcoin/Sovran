@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useIsFocused } from 'expo-router/react-navigation';
+import { useIsFocused } from 'expo-router';
 
 import { initLog } from '@/shared/lib/logger';
 

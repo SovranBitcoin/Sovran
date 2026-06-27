@@ -83,7 +83,9 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
   const pill = (
     <GlassView
       glassEffectStyle="regular"
-      isInteractive
+      // NOT `isInteractive`: on iOS 26 the interactive glass layer contends for
+      // touches with the wrapping Pressable/MenuView, making taps flaky. Keep
+      // the glass decorative; the pressable/menu owns the tap.
       tintColor={opacity(INVARIANT_WHITE, 0.15)}
       style={{
         borderRadius: 999,

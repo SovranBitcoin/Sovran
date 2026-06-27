@@ -1,7 +1,7 @@
-import { DarkTheme, ThemeProvider as NavigationThemeProvider } from 'expo-router/react-navigation';
-import { Stack, router } from 'expo-router';
+import { Stack, router, DarkTheme, ThemeProvider as NavigationThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { setBackgroundColorAsync } from 'expo-system-ui';
 import { HeroUINativeProvider } from 'heroui-native/provider';
 import 'global.css';
 import 'intl';
@@ -266,6 +266,15 @@ const CloseButton = React.memo(function CloseButton({ foreground }: { foreground
 function RootLayoutContent() {
   const { currentTheme } = useTheme();
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+
+  // SDK 56: Android is edge-to-edge and expo-status-bar dropped the
+  // backgroundColor prop. Set the window background (shown THROUGH the
+  // translucent status bar) to the theme background so the status-bar area
+  // matches the app and doesn't flash on theme/profile switch. No-op on iOS.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    void setBackgroundColorAsync(background);
+  }, [background]);
   const { keys: nostrKeys } = useNostrKeysContext();
 
   // Screen options builder. Memoized so unrelated root re-renders don't rebuild

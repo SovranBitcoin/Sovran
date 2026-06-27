@@ -1,7 +1,7 @@
 import { createContext, useContext, useCallback, useMemo, type ReactNode } from 'react';
 import { useWindowDimensions, View as RNView } from 'react-native';
-import { Stack } from 'expo-router';
-import { DrawerActions, useNavigation } from 'expo-router/react-navigation';
+import { Stack, useNavigation } from 'expo-router';
+import { DrawerActions } from 'expo-router/react-navigation';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
 import { supportsLiquidGlass } from '@/shared/lib/version';
