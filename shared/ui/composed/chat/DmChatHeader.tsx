@@ -8,6 +8,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
@@ -121,7 +122,7 @@ export function DmChatHeader({
 
   return (
     <Stack.Screen
-      options={{
+      options={withGlassHeaderItems({
         headerShown: true,
         headerTransparent: false,
         headerStyle: { backgroundColor: surfaceSecondary },
@@ -187,7 +188,7 @@ export function DmChatHeader({
           </View>
         ),
         headerRight: () => trailingNode,
-      }}
+      })}
     />
   );
 }

@@ -76,7 +76,7 @@ interface PatternBackgroundProps {
  * source has hundreds of paths, the cost is paid one time per mount, not
  * per repeat.
  *
- * Absolutely positioned over its parent (`StyleSheet.absoluteFillObject`)
+ * Absolutely positioned over its parent (`StyleSheet.absoluteFill`)
  * and non-interactive (`pointerEvents="none"`), so the consumer just
  * mounts it as the first child of a relatively-positioned container and
  * lays its real content on top.
@@ -110,11 +110,11 @@ function PatternBackgroundComponent({
   }, []);
 
   if (!innerXml) {
-    return <View style={StyleSheet.absoluteFillObject} pointerEvents="none" />;
+    return <View style={StyleSheet.absoluteFill} pointerEvents="none" />;
   }
 
   return (
-    <View style={[StyleSheet.absoluteFillObject, { opacity }]} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFill, { opacity }]} pointerEvents="none">
       <SvgXml
         xml={buildWrapperXml(innerXml, tileSize)}
         width="100%"

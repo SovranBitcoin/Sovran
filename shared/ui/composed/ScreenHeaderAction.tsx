@@ -19,7 +19,7 @@ import { alpha, headerButtonSize, hitSlop } from '@/shared/styles/tokens';
  * On liquid-glass devices (iOS 26+) the button renders inside the
  * app-owned HeaderGlassCircle: the system bar-item capsule is squat and
  * content-width (a pill, shorter than the mint selector), so we suppress
- * it (native-stack hidesSharedBackground patch) and draw the same
+ * it (withGlassHeaderItems' hidesSharedBackground) and draw the same
  * glassEffect circle the rest of the design system uses, at
  * headerButtonSize — header buttons and the mint selector share one glass
  * geometry.

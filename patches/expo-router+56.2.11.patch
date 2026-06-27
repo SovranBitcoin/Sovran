@@ -1,0 +1,32 @@
+diff --git a/node_modules/expo-router/build/react-navigation/drawer/views/DrawerView.js b/node_modules/expo-router/build/react-navigation/drawer/views/DrawerView.js
+--- a/node_modules/expo-router/build/react-navigation/drawer/views/DrawerView.js
++++ b/node_modules/expo-router/build/react-navigation/drawer/views/DrawerView.js
+@@ -59,7 +59,7 @@
+     react_native_1.Platform.OS === 'ios', }) {
+     const { direction } = (0, native_1.useLocale)();
+     const focusedRouteKey = state.routes[state.index].key;
+-    const { drawerHideStatusBarOnOpen, drawerPosition = direction === 'rtl' ? 'right' : 'left', drawerStatusBarAnimation, drawerStyle, drawerType = react_native_1.Platform.select({ ios: 'slide', default: 'front' }), configureGestureHandler, keyboardDismissMode, overlayColor = 'rgba(0, 0, 0, 0.5)', swipeEdgeWidth, swipeEnabled = react_native_1.Platform.OS !== 'web' && react_native_1.Platform.OS !== 'windows' && react_native_1.Platform.OS !== 'macos', swipeMinDistance, overlayAccessibilityLabel, } = descriptors[focusedRouteKey].options;
++    const { drawerHideStatusBarOnOpen, drawerPosition = direction === 'rtl' ? 'right' : 'left', drawerStatusBarAnimation, drawerStyle, drawerType = react_native_1.Platform.select({ ios: 'slide', default: 'front' }), configureGestureHandler, keyboardDismissMode, overlayColor = 'rgba(0, 0, 0, 0.5)', overlayStyle, swipeEdgeWidth, swipeEnabled = react_native_1.Platform.OS !== 'web' && react_native_1.Platform.OS !== 'windows' && react_native_1.Platform.OS !== 'macos', swipeMinDistance, overlayAccessibilityLabel, } = descriptors[focusedRouteKey].options;
+     const [loaded, setLoaded] = React.useState([focusedRouteKey]);
+     if (!loaded.includes(focusedRouteKey)) {
+         setLoaded([...loaded, focusedRouteKey]);
+@@ -205,7 +205,7 @@
+                             borderBottomLeftRadius: DRAWER_BORDER_RADIUS,
+                         }),
+                 drawerStyle,
+-            ], overlayStyle: { backgroundColor: overlayColor }, renderDrawerContent: renderDrawerContent, children: renderSceneContent() }) }));
++            ], overlayStyle: [{ backgroundColor: overlayColor }, overlayStyle], renderDrawerContent: renderDrawerContent, children: renderSceneContent() }) }));
+ }
+ function DrawerView({ navigation, ...rest }) {
+     return ((0, jsx_runtime_1.jsx)(elements_1.SafeAreaProviderCompat, { children: (0, jsx_runtime_1.jsx)(DrawerViewBase, { navigation: navigation, ...rest }) }));
+diff --git a/node_modules/expo-router/build/react-navigation/drawer/types.d.ts b/node_modules/expo-router/build/react-navigation/drawer/types.d.ts
+--- a/node_modules/expo-router/build/react-navigation/drawer/types.d.ts
++++ b/node_modules/expo-router/build/react-navigation/drawer/types.d.ts
+@@ -128,6 +128,7 @@
+      * The opacity is animated from `0` to `1` when the drawer opens.
+      */
+     overlayColor?: ColorValue;
++    overlayStyle?: StyleProp<ViewStyle>;
+     /**
+      * Accessibility label for the overlay. This is read by the screen reader when the user taps the overlay.
+      * Defaults to "Close drawer".

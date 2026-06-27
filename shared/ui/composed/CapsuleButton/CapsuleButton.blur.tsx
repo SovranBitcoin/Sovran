@@ -64,7 +64,7 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
         {isActive ? (
           <View
             pointerEvents="none"
-            style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(foreground, 0.12) }]}
+            style={[StyleSheet.absoluteFill, { backgroundColor: opacity(foreground, 0.12) }]}
           />
         ) : null}
         <PressableFeedback
@@ -93,7 +93,7 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
       <View
         pointerEvents="none"
         style={[
-          StyleSheet.absoluteFillObject,
+          StyleSheet.absoluteFill,
           cornerStyle,
           styles.borderOverlay,
           { borderColor: opacity(borderColor, 0.3) },

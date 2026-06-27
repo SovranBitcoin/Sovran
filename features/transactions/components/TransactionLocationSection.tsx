@@ -74,7 +74,7 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
 
       {/* Blur stays iOS-only — Android keeps flat surfaces by design. */}
       {withBlur && Platform.OS === 'ios' && (
-        <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
       )}
 
       <View
@@ -107,7 +107,7 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
         locations={[0, 0.3, 0.7, 1]}
         start={{ x: 0, y: 0.5 }}
         end={{ x: 1, y: 0.5 }}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
       <LinearGradient
@@ -120,7 +120,7 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
         locations={[0, 0.25, 0.75, 1]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
     </>
@@ -155,7 +155,7 @@ function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
         {Platform.OS === 'ios' ? (
           <View className="absolute inset-0" pointerEvents="none">
             <AppleMaps.View
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
               cameraPosition={previewCameraPosition}
               properties={{ isMyLocationEnabled: false, pointsOfInterest: { including: [] } }}
               uiSettings={DISABLED_MAP_UI_SETTINGS}
@@ -211,7 +211,7 @@ function TransactionLocationMap({
     <View className={MAP_CONTAINER_CN} pointerEvents="none">
       {isIOS ? (
         <AppleMaps.View
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           cameraPosition={cameraPosition}
           properties={{ isMyLocationEnabled: false }}
           uiSettings={DISABLED_MAP_UI_SETTINGS}
@@ -219,7 +219,7 @@ function TransactionLocationMap({
         />
       ) : HAS_ANDROID_GOOGLE_MAPS_KEY ? (
         <GoogleMaps.View
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           cameraPosition={cameraPosition}
           colorScheme={GoogleMaps.MapColorScheme.DARK}
           properties={{ isMyLocationEnabled: false }}

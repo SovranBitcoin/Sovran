@@ -10,7 +10,7 @@ diff --git a/node_modules/heroui-native/lib/module/helpers/internal/components/b
  import { useAnimatedReaction } from 'react-native-reanimated';
  import { scheduleOnRN } from 'react-native-worklets';
  import GorhomBottomSheetPackage from "../../../optional/gorhom-bottom-sheet.js";
-@@ -38,8 +38,14 @@ export function BottomSheetContentContainer({
+@@ -38,8 +38,14 @@
    const closeBottomSheet = () => {
      onOpenChange(false);
    };
@@ -27,7 +27,7 @@ diff --git a/node_modules/heroui-native/lib/module/helpers/internal/components/b
        isClosingOnSwipe.set(true);
        scheduleOnRN(closeBottomSheet);
      }
-@@ -81,9 +87,38 @@ export function BottomSheetContentContainer({
+@@ -81,9 +87,38 @@
      // We only want to snap when isOpen or initialIndex changes.
      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [isOpen, initialIndex]);
@@ -78,7 +78,7 @@ diff --git a/node_modules/heroui-native/src/helpers/internal/components/bottom-s
  import { useAnimatedReaction } from 'react-native-reanimated';
  import { scheduleOnRN } from 'react-native-worklets';
  import GorhomBottomSheetPackage from '../../../optional/gorhom-bottom-sheet';
-@@ -36,10 +36,16 @@ export function BottomSheetContentContainer({
+@@ -36,10 +36,16 @@
      onOpenChange(false);
    };
  
@@ -98,7 +98,7 @@ diff --git a/node_modules/heroui-native/src/helpers/internal/components/bottom-s
          isClosingOnSwipe.set(true);
          scheduleOnRN(closeBottomSheet);
        }
-@@ -90,12 +96,40 @@ export function BottomSheetContentContainer({
+@@ -90,12 +96,40 @@
      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [isOpen, initialIndex]);
  

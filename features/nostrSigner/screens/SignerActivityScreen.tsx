@@ -17,7 +17,7 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView } from 'react-native';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Button as HerouiButton } from 'heroui-native';
@@ -142,7 +142,12 @@ export function SignerActivityScreen(): React.ReactElement {
   const [filter, setFilter] = useState<ActivityFilter>(initialFilter);
 
   const toneColors = useMemo(
-    () => ({ success, danger, warning }) as const,
+    () =>
+      ({
+        success,
+        danger,
+        warning,
+      }) as const,
     [success, danger, warning]
   );
 

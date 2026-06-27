@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
+import { clearGlassHeaderLeftItems } from '@/navigation/headerItems';
 import { SlideToConfirm } from '@/shared/ui/composed/SlideToConfirm';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -183,6 +184,10 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       gestureEnabled: !isLocked,
       headerBackVisible: !isLocked,
       headerLeft: isLocked ? () => null : undefined,
+      // Clear the flow's wrapped left item so recovery uses the NATIVE back
+      // button (its beforeRemove guard depends on it) instead of rendering the
+      // custom item alongside the native back (two backs).
+      ...clearGlassHeaderLeftItems(),
     });
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
       if (isLocked) e.preventDefault();

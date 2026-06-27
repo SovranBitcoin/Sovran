@@ -9,7 +9,7 @@
 import React from 'react';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, interpolate } from 'react-native-reanimated';
-import { useDrawerProgress } from '@react-navigation/drawer';
+import { useDrawerProgress } from 'expo-router/drawer';
 
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -73,8 +73,8 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
   );
 
   // Liquid devices: the same app-owned glass circle as every other header
-  // button (the system bar-item capsule is suppressed app-wide via the
-  // native-stack hidesSharedBackground patch — without this wrapper the
+  // button (the system bar-item capsule is suppressed per-screen via
+  // withGlassHeaderItems' hidesSharedBackground — without this wrapper the
   // avatar would sit glass-less next to glass-circled siblings).
   if (supportsLiquidGlass()) {
     return (

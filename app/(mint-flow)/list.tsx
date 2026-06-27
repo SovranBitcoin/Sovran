@@ -12,9 +12,8 @@
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
-import { Stack, Link } from 'expo-router';
+import { Stack, Link, useFocusEffect } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { useFocusEffect } from '@react-navigation/native';
 import { z } from 'zod';
 
 import { useBalanceContext, useMints } from '@cashu/coco-react';
@@ -24,6 +23,7 @@ import { MintListScreen } from '@/features/mint';
 import { useMintCatalog } from '@/features/mint/hooks/useMintCatalog';
 import { buildMintListItems } from '@/features/send';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { cashuLog } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -96,7 +96,7 @@ function MintListRoute() {
   return (
     <>
       <Stack.Screen
-        options={{
+        options={withGlassHeaderItems({
           title: 'Select Mint',
           headerTransparent: true,
           headerStyle: { backgroundColor: 'transparent' },
@@ -106,7 +106,7 @@ function MintListRoute() {
                 <ScreenHeaderAction icon="fluent:add-24-filled" onPress={() => {}} />
               </Link>
             ) : null,
-        }}
+        })}
       />
 
       <MintListScreen

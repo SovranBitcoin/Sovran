@@ -7,7 +7,7 @@ import React from 'react';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
+import type { NativeStackNavigationOptions } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import opacity from 'hex-color-opacity';
@@ -15,6 +15,7 @@ import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import Icon from 'assets/icons';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { HeaderGlassCircle } from '@/shared/ui/composed/HeaderGlassCircle';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { headerButtonSize } from '@/shared/styles/tokens';
 
@@ -179,7 +180,7 @@ export function buildExpoRouterHeaderOptions({
     );
   }
 
-  return nextOptions;
+  return withGlassHeaderItems(nextOptions);
 }
 
 /**

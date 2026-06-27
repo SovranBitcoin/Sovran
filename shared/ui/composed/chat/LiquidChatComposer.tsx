@@ -108,11 +108,11 @@ const MAX_ROW_HEIGHT = 140;
  * focus, and submit. Padding-edge taps focus the field via a capsule
  * `contentShape` + `onTapGesture` on the bubble.
  *
- * The SwiftUI `TextField` is *uncontrolled* (it reads `defaultValue`
- * only at mount). To keep it in sync with the parent's `value` prop we
- * watch for divergence between the prop and the last value SwiftUI
- * reported, and bump a `key` to remount the field on external clears
- * (typically: parent calls `onSend` then resets `value` to `''`).
+ * The SwiftUI `TextField` is *uncontrolled* (SDK 56 dropped `defaultValue`;
+ * we seed it imperatively via `ref.setText` on mount). To keep it in sync
+ * with the parent's `value` prop we watch for divergence between the prop and
+ * the last value SwiftUI reported, and bump a `key` to remount the field on
+ * external clears (typically: parent calls `onSend` then resets `value` to `''`).
  *
  * **Older iOS / Android** fall back to an RN multiline `TextInput`
  * overlaid on a `View blur` capsule. No glass morph; [→] simply
@@ -154,12 +154,12 @@ export function LiquidChatComposer({
   // behavior (no morph carry-over between mounts).
   const namespaceId = useId();
 
-  // SwiftUI `TextField` sync. The native field is uncontrolled — it reads
-  // `defaultValue` only at mount and reports edits via `onValueChange`. We
-  // mirror its current text in a ref and bump `resetKey` whenever the prop
-  // diverges from the last reported value, which remounts the field with a
-  // fresh `defaultValue`. Internal keystrokes update the ref synchronously
-  // before the `onChangeText` round-trip lands, so the resulting prop
+  // SwiftUI `TextField` sync. The native field is uncontrolled — SDK 56's
+  // @expo/ui dropped `defaultValue`, so it's seeded via `ref.setText` on mount
+  // and reports edits via `onTextChange`. We mirror its current text in a ref
+  // and bump `resetKey` whenever the prop diverges from the last reported
+  // value, which remounts + re-seeds the field. Internal keystrokes update the
+  // ref synchronously before the `onTextChange` round-trip lands, so the prop
   // change is a no-op (`value === lastSwiftValueRef.current`) and the key
   // doesn't bump on every character.
   const lastSwiftValueRef = useRef(value);
@@ -185,6 +185,13 @@ export function LiquidChatComposer({
   const focusTextField = useCallback(() => {
     void textFieldRef.current?.focus();
   }, []);
+  // SDK 56 @expo/ui dropped TextField `defaultValue`. The field is still
+  // uncontrolled (manages its own internal state), so seed it imperatively on
+  // (re)mount — `resetKey` bumps remount the field with the latest `value`.
+  useEffect(() => {
+    if (value) void textFieldRef.current?.setText(value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
 
   // Fallback-only state: the RN multiline `TextInput` reports its intrinsic
   // height via `onContentSizeChange`. We clamp to `MIN_ROW_HEIGHT` so the
@@ -321,9 +328,8 @@ export function LiquidChatComposer({
                   <SwiftUITextField
                     key={resetKey}
                     ref={textFieldRef}
-                    defaultValue={value}
                     placeholder={placeholder}
-                    onValueChange={handleSwiftValueChange}
+                    onTextChange={handleSwiftValueChange}
                     axis="horizontal"
                     modifiers={[
                       frame({ maxWidth: Infinity, alignment: 'leading' }),

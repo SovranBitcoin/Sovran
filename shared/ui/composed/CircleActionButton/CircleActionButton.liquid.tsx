@@ -33,7 +33,9 @@ export function CircleActionButtonLiquid(props: CircleActionButtonProps): React.
         hitSlop={6}>
         <GlassView
           glassEffectStyle="regular"
-          isInteractive={interactive}
+          // NOT `isInteractive`: on iOS 26 the interactive glass layer contends
+          // for touches with the wrapping Pressable, so onPress fires only
+          // intermittently. Keep the glass decorative; the Pressable owns the tap.
           style={[
             styles.circle,
             { width: CIRCLE_SIZE, height: CIRCLE_SIZE, borderRadius: CIRCLE_SIZE / 2 },

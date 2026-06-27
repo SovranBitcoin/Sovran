@@ -46,6 +46,7 @@ import { LightningAddress } from '@sovranbitcoin/schemas';
 import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { SendMessageMenu } from '@/features/user/components/SendMessageMenu';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts } from 'nostr-tools/kinds';
@@ -1164,7 +1165,7 @@ export function UserProfileScreen() {
   return (
     <Log name="UserProfileScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
-        options={{
+        options={withGlassHeaderItems({
           title: isMetadataLoading ? 'Profile' : displayName,
           // The profile renders its own full-bleed banner at the top — the
           // default Android header scrim painted a theme-background band
@@ -1201,7 +1202,7 @@ export function UserProfileScreen() {
               />
             </HStack>
           ),
-        }}
+        })}
       />
 
       {pubkey ? (

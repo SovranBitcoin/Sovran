@@ -1,7 +1,7 @@
-import { DarkTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, DarkTheme, ThemeProvider as NavigationThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { setBackgroundColorAsync } from 'expo-system-ui';
 import { HeroUINativeProvider } from 'heroui-native/provider';
 import 'global.css';
 import 'intl';
@@ -41,6 +41,7 @@ import { persistor, store } from '@/redux/store/store.deprecated';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { androidHeaderScrimOptions, getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
 import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
 import { WhitenoiseProvider } from '@/features/whitenoise/WhitenoiseProvider';
@@ -265,6 +266,15 @@ const CloseButton = React.memo(function CloseButton({ foreground }: { foreground
 function RootLayoutContent() {
   const { currentTheme } = useTheme();
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+
+  // SDK 56: Android is edge-to-edge and expo-status-bar dropped the
+  // backgroundColor prop. Set the window background (shown THROUGH the
+  // translucent status bar) to the theme background so the status-bar area
+  // matches the app and doesn't flash on theme/profile switch. No-op on iOS.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    void setBackgroundColorAsync(background);
+  }, [background]);
   const { keys: nostrKeys } = useNostrKeysContext();
 
   // Screen options builder. Memoized so unrelated root re-renders don't rebuild
@@ -299,7 +309,7 @@ function RootLayoutContent() {
             }
           : {};
 
-        return {
+        return withGlassHeaderItems({
           ...baseHeaderOptions,
           ...screen.options,
           headerShown: true,
@@ -309,7 +319,7 @@ function RootLayoutContent() {
           ...(isModalPresentation
             ? { headerLeft: () => <CloseButton foreground={foreground} /> }
             : {}),
-        };
+        });
       }
 
       // Default options for screens with titles (non-modal screens).
@@ -356,10 +366,8 @@ function RootLayoutContent() {
       <SwapStatusListener />
       <ProfileBalanceSync />
       <OwnEventsSync />
-      <StatusBar
-        backgroundColor={background}
-        style={currentTheme.includes('light') ? 'dark' : 'light'}
-      />
+      {/* SDK 56: expo-status-bar removed the (Android-only) backgroundColor prop. */}
+      <StatusBar style={currentTheme.includes('light') ? 'dark' : 'light'} />
       <OfflineShell>
         <Stack
           // NOTE: keyed on the theme so a theme/wallpaper change re-applies
@@ -696,7 +704,7 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
   // is invisible.
   const gradientLayerStyle = useMemo(
     () => ({
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       opacity: isMorphing ? 1 : 0,
       transitionProperty: ['opacity'],
       transitionDuration: `${MORPH_DURATION_MS * 0.85}ms`,
@@ -707,7 +715,7 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
 
   const qrIconLayerStyle = useMemo(
     () => ({
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       justifyContent: 'center' as const,
       alignItems: 'center' as const,
       opacity: isMorphing ? 1 : 0,
@@ -736,9 +744,9 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
               Boot state: opacity 0 (the container's solid white shows through);
               morph state: opacity 1 (matches the QR gradient). */}
           <Animated.View pointerEvents="none" style={gradientLayerStyle}>
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0f0f12' }]} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0f0f12' }]} />
             <View
-              style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(255,255,255,0.35)' }]}
+              style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.35)' }]}
             />
             <LinearGradient
               colors={[
@@ -750,11 +758,11 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
               locations={[0, 0.35, 0.6, 1]}
               start={{ x: 0.5, y: 0 }}
               end={{ x: 0.5, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
             />
             <View
               style={[
-                StyleSheet.absoluteFillObject,
+                StyleSheet.absoluteFill,
                 { borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
               ]}
             />

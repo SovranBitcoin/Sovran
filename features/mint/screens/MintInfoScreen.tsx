@@ -21,6 +21,7 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Card } from '@/shared/ui/composed/Card';
 import { Section } from '@/shared/ui/composed/Section';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import Icon from 'assets/icons';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
@@ -543,7 +544,7 @@ export function MintInfoScreen() {
   return (
     <Log name="MintInfoScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
-        options={{
+        options={withGlassHeaderItems({
           title: entry?.fromAccepter ? 'Verify Mint' : displayName || 'Mint Details',
           headerRight:
             entry?.fromAccepter || !(typeof entry?.kymScore === 'number' && entry.kymScore >= 0)
@@ -562,7 +563,7 @@ export function MintInfoScreen() {
                     />
                   </Link>
                 ),
-        }}
+        })}
       />
 
       <ScrollView

@@ -127,7 +127,7 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
     });
     return (
       <Log name="SpriteView">
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor }]}></View>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor }]}></View>
       </Log>
     );
   }
@@ -142,14 +142,14 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
     <Log name="SpriteView">
       <Animated.View
         style={[
-          StyleSheet.absoluteFillObject,
+          StyleSheet.absoluteFill,
           {
             transform: motion.getTranslateTransform(),
           },
         ]}>
         <Image
           source={backgroundImageSource}
-          style={[StyleSheet.absoluteFillObject, { transform: [{ scale: 1.18 }] }]}
+          style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.18 }] }]}
           onLoad={() => {
             log.info('bg.sprite.image_loaded', {
               theme: activeTheme,

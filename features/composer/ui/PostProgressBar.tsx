@@ -27,10 +27,7 @@ export function PostProgressBar({
   return (
     <View style={styles.row} accessibilityLabel={`Posting ${done} of ${total}`}>
       {Array.from({ length: total }).map((_, i) => (
-        <View
-          key={i}
-          style={[styles.seg, { backgroundColor: i < done ? fill : pending }]}
-        />
+        <View key={i} style={[styles.seg, { backgroundColor: i < done ? fill : pending }]} />
       ))}
     </View>
   );

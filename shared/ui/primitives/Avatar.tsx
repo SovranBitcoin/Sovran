@@ -66,7 +66,7 @@ function GradientFallbackContent({
   return (
     <View
       pointerEvents="none"
-      style={[StyleSheet.absoluteFillObject, { borderRadius, overflow: 'hidden' }]}>
+      style={[StyleSheet.absoluteFill, { borderRadius, overflow: 'hidden' }]}>
       <LinearGradient
         colors={gradientTheme.primaryColors}
         start={gradientTheme.primaryStart}
@@ -95,7 +95,7 @@ function FlatFallbackContent({ borderRadius, size }: { borderRadius: number; siz
     <View
       pointerEvents="none"
       style={[
-        StyleSheet.absoluteFillObject,
+        StyleSheet.absoluteFill,
         {
           borderRadius,
           overflow: 'hidden',
@@ -140,7 +140,7 @@ function AvatarFallbackContent({
   return (
     <View
       pointerEvents="none"
-      style={[StyleSheet.absoluteFillObject, { borderRadius, overflow: 'hidden' }]}>
+      style={[StyleSheet.absoluteFill, { borderRadius, overflow: 'hidden' }]}>
       {fallbackVariant === WHITE_FACE_AVATAR_FALLBACK_VARIANT ? (
         <WhiteFaceBeamAvatar name={fallbackSeed} size={size} colors={variantColors} />
       ) : (
@@ -159,7 +159,7 @@ function LoadingContent({ borderRadius, color }: { borderRadius: number; color: 
   return (
     <View
       pointerEvents="none"
-      style={[StyleSheet.absoluteFillObject, { borderRadius, backgroundColor: color }]}
+      style={[StyleSheet.absoluteFill, { borderRadius, backgroundColor: color }]}
     />
   );
 }
@@ -275,10 +275,7 @@ export const Avatar = ({
     () => (previousPicture ? { uri: previousPicture } : null),
     [previousPicture]
   );
-  const overlayImageStyle = useMemo(
-    () => [StyleSheet.absoluteFillObject, avatarStyle],
-    [avatarStyle]
-  );
+  const overlayImageStyle = useMemo(() => [StyleSheet.absoluteFill, avatarStyle], [avatarStyle]);
   const showsLoadingPlaceholder =
     state === 'loading' ||
     (state === 'image' && !!picture && imageStatus !== 'loaded' && !previousPicture);

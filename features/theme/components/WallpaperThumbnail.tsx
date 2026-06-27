@@ -129,7 +129,7 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
           {imageSource ? (
             <Image
               source={imageSource}
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
               contentFit="cover"
               onLoad={() => {
                 log.info('wallpaper.thumb.loaded', { themeName, sourceKind, sourceUri });
@@ -151,12 +151,12 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
                 paletteColors['900'] || '#0d0d0d',
                 paletteColors['950'] || '#000000',
               ]}
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             />
           ) : (
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1a1a1a' }]} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#1a1a1a' }]} />
           )}
 
           {inProgress && (

@@ -15,6 +15,7 @@ import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { Log, initLog } from '@/shared/lib/logger';
+import { useBootMorphFailsafe } from './useBootMorphFailsafe';
 import {
   registerQRButtonRemeasure,
   setQRButtonAnchor,
@@ -102,6 +103,8 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
     visibility.set(withTiming(morphCompleted ? 1 : 0, { duration: 180 }));
   }, [morphCompleted, visibility]);
 
+  useBootMorphFailsafe(morphCompleted, visibility);
+
   useEffect(() => {
     const unregister = registerQRButtonRemeasure(publishAnchor);
     return () => {
@@ -128,12 +131,9 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
             style={[styles.pressable, pressableStyle]}>
             <PressableFeedback.Ripple />
             <View style={[styles.container, containerStyle]} pointerEvents="none">
-              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: background }]} />
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: background }]} />
               <View
-                style={[
-                  StyleSheet.absoluteFillObject,
-                  { backgroundColor: opacity(foreground, 0.65) },
-                ]}
+                style={[StyleSheet.absoluteFill, { backgroundColor: opacity(foreground, 0.65) }]}
               />
               <LinearGradient
                 colors={[
@@ -145,20 +145,17 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
                 locations={[0, 0.35, 0.6, 1]}
                 start={{ x: 0.5, y: 0 }}
                 end={{ x: 0.5, y: 1 }}
-                style={StyleSheet.absoluteFillObject}
+                style={StyleSheet.absoluteFill}
               />
               <View
                 style={[
-                  StyleSheet.absoluteFillObject,
+                  StyleSheet.absoluteFill,
                   { borderWidth: 1, borderColor: opacity(foreground, 0.4) },
                 ]}
               />
             </View>
             <View
-              style={[
-                StyleSheet.absoluteFillObject,
-                { justifyContent: 'center', alignItems: 'center' },
-              ]}
+              style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center' }]}
               pointerEvents="none">
               <Icon name="stash:qr-code" size={38} color={background} />
             </View>

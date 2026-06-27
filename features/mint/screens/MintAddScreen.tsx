@@ -13,6 +13,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Text } from '@/shared/ui/primitives/Text';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
 import { useDebouncedMintValidation } from '@/features/mint/hooks/useDebouncedMintValidation';
@@ -675,16 +676,17 @@ export function MintAddScreen() {
   );
 
   const screenOptions = useMemo(
-    () => ({
-      headerTransparent: true as const,
-      // Declares the page background (bgColor={surface} below) so the Android
-      // sheet header's scrim fades from the page's color, not the darker
-      // theme background. FlowSheetHeader reads this; iOS ignores it under a
-      // transparent header.
-      headerStyle: { backgroundColor: surface },
-      headerTitle: renderHeaderTitle,
-      headerRight: renderHeaderRight,
-    }),
+    () =>
+      withGlassHeaderItems({
+        headerTransparent: true as const,
+        // Declares the page background (bgColor={surface} below) so the Android
+        // sheet header's scrim fades from the page's color, not the darker
+        // theme background. FlowSheetHeader reads this; iOS ignores it under a
+        // transparent header.
+        headerStyle: { backgroundColor: surface },
+        headerTitle: renderHeaderTitle,
+        headerRight: renderHeaderRight,
+      }),
     [renderHeaderTitle, renderHeaderRight, surface]
   );
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import * as Clipboard from 'expo-clipboard';
 import { Stack } from 'expo-router';
-import { useNavigationState } from '@react-navigation/native';
+import { useNavigationState } from 'expo-router/react-navigation';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -26,6 +26,7 @@ import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import QRCode from 'react-native-qrcode-svg';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import opacity from 'hex-color-opacity';
 import {
   Button,
@@ -462,11 +463,12 @@ export const SettingsKeyringScreen: React.FC = () => {
     [foreground, handleGenerateKey, handleImportNsec, isGenerating, isKeyringActionPending]
   );
   const stackOptions = useMemo(
-    () => ({
-      title: 'P2PK Keys',
-      headerLeft: renderHeaderLeft,
-      headerRight: renderHeaderRight,
-    }),
+    () =>
+      withGlassHeaderItems({
+        title: 'P2PK Keys',
+        headerLeft: renderHeaderLeft,
+        headerRight: renderHeaderRight,
+      }),
     [renderHeaderLeft, renderHeaderRight]
   );
 

@@ -23,6 +23,7 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { View } from '@/shared/ui/primitives/View/View';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
@@ -273,13 +274,14 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     [canSendOffline, offlineIconStyle]
   );
   const stackOptions = useMemo(
-    () => ({
-      title: 'Select amount',
-      headerTitleAlign: 'center' as const,
-      headerTitle: renderHeaderTitle,
-      headerTintColor: foreground,
-      headerRight: isSendOperation && mintUrl ? renderHeaderRight : undefined,
-    }),
+    () =>
+      withGlassHeaderItems({
+        title: 'Select amount',
+        headerTitleAlign: 'center' as const,
+        headerTitle: renderHeaderTitle,
+        headerTintColor: foreground,
+        headerRight: isSendOperation && mintUrl ? renderHeaderRight : undefined,
+      }),
     [foreground, isSendOperation, mintUrl, renderHeaderRight, renderHeaderTitle]
   );
   const handleErrorGoBack = useCallback(() => {

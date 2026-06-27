@@ -16,6 +16,7 @@ import { ShareScreen, SHARE_CONFIGS, ShareType } from '@/features/user';
 import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 import { useScreenOptions } from '@/shared/ui/composed/Screen';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { CompressedPubkey, Hex64, LightningAddress, Npub } from '@/shared/lib/nav/routeSchemas';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
@@ -50,12 +51,13 @@ function ShareRoute() {
   }, []);
 
   useScreenOptions(
-    () => ({
-      headerTitle,
-      headerLeft: () => (
-        <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={() => router.back()} />
-      ),
-    }),
+    () =>
+      withGlassHeaderItems({
+        headerTitle,
+        headerLeft: () => (
+          <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={() => router.back()} />
+        ),
+      }),
     [headerTitle]
   );
 

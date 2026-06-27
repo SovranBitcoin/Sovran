@@ -109,7 +109,7 @@ export default function TabLayout() {
                 tabBarIcon: ({ focused, color }) => (
                   <Icon
                     name={focused ? tab.monicon.selected : tab.monicon.default}
-                    color={color}
+                    color={color as string}
                     size={26}
                   />
                 ),

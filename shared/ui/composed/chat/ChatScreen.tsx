@@ -6,7 +6,7 @@ import {
   View as RNView,
   type LayoutChangeEvent,
 } from 'react-native';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   KeyboardStickyView,
@@ -330,7 +330,7 @@ export function ChatScreen({
     <View style={{ backgroundColor: surfaceColor, flex: 1 }}>
       {/* Static absolute-fill backdrop behind every transformed child.
           AiChatScreen mounts a `<PatternBackground />` with the same
-          `StyleSheet.absoluteFillObject` shape — without this sibling, the
+          `StyleSheet.absoluteFill` shape — without this sibling, the
           transformed Reanimated.View below was leaving an iOS 26 backdrop
           material snapshot after keyboard dismissal (visible as a
           keyboard-height blur band). Putting `backgroundColor` on the
@@ -338,7 +338,7 @@ export function ChatScreen({
           transformed layer as "translucent moving content." A static
           absolute-fill sibling is what suppresses the snapshot. */}
       <RNView
-        style={[StyleSheet.absoluteFillObject, { backgroundColor: surfaceColor }]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: surfaceColor }]}
         pointerEvents="none"
       />
       {banner}

@@ -13,8 +13,7 @@ import { ActivityIndicator, Keyboard, StyleSheet, TextInput, View } from 'react-
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
-import { router } from 'expo-router';
-import { useIsFocused } from '@react-navigation/native';
+import { router, useIsFocused } from 'expo-router';
 import { Button } from 'heroui-native';
 import {
   KeyboardStickyView,

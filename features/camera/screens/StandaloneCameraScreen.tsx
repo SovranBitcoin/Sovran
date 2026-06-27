@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { CameraScreen } from '@/features/camera';
 import { cameraRouteParamsSchema } from './CameraScreen/CameraScreen';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useColadaContext } from '@sovranbitcoin/colada/react';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
@@ -55,7 +56,7 @@ export function StandaloneCameraScreen() {
     <Log name="StandaloneCameraScreen">
       <>
         <Stack.Screen
-          options={{
+          options={withGlassHeaderItems({
             title: isSignerPair ? 'Connect App' : 'Scan QR',
             headerTransparent: true,
             headerStyle: { backgroundColor: 'transparent' },
@@ -73,7 +74,7 @@ export function StandaloneCameraScreen() {
                 }}
               />
             ),
-          }}
+          })}
         />
         <CameraScreen signerPairOnly={isSignerPair} />
       </>

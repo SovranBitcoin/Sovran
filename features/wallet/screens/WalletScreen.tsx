@@ -35,7 +35,7 @@ import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
 import { showActionSheet } from '@/shared/lib/popup';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 
 const ACCOUNT = { unit: 'sat' } as const;

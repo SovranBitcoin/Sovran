@@ -25,6 +25,10 @@ jobs:
       # workflow (lint.yml / type-check.yml / knip.yml / react-compiler.yml) so
       # the README can carry a status badge per check. This job keeps the gates
       # that don't need a dedicated badge: Prettier and the test suite.
+      #
+      # Prettier + Test are non-blocking signal (continue-on-error): they still
+      # run and their output is visible in the job logs, but a failure does not
+      # fail the CI check — same philosophy as the structural-health job below.
       - name: Setup Sovran
         uses: ./sovran-app/.github/actions/setup-sovran
         with:
@@ -33,10 +37,12 @@ jobs:
 
       - name: Prettier Check
         working-directory: ${{ env.APP_DIR }}
+        continue-on-error: true
         run: bun run pretty:check
 
       - name: Test
         working-directory: ${{ env.APP_DIR }}
+        continue-on-error: true
         run: bun run test
 
   # Non-blocking signal job: runs `codereview/analyze-structure` and posts

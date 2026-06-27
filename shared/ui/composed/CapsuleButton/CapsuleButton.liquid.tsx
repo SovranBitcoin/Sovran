@@ -54,7 +54,10 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
     <GlassView
       testID={testID}
       glassEffectStyle="regular"
-      isInteractive
+      // NOT `isInteractive`: on iOS 26 the interactive glass layer contends for
+      // touches with the nested PressableFeedback, so onPress fires only
+      // intermittently. Keep the glass decorative and let the pressable own the
+      // tap so Send/Receive open reliably.
       tintColor={tintColor}
       style={[styles.glass, widthStyle, cornerStyle, { minHeight: height }, style]}>
       <PressableFeedback
