@@ -18,8 +18,21 @@ import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';
  * only decide the token's lock + source mint.
  */
 type NearPaySendPlan =
-  | { mode: 'lock'; lockPubkey: string; recipientPubkey: string; allowedMints: string[] }
-  | { mode: 'bearer'; allowedMints: string[] | null }
+  | {
+      mode: 'lock';
+      lockPubkey: string;
+      recipientPubkey: string;
+      allowedMints: string[];
+      /**
+       * The lock target is the peer's SELF-ASSERTED npub (from its creq /
+       * bitchat favorite) — nothing proves the nearby device controls that key.
+       * A spoofer could advertise someone else's npub; funds would then lock to
+       * a key the receiver can't redeem (no theft, but unrecoverable without a
+       * refund path). Callers should surface this as "unverified". (audit ND-1)
+       */
+      identityVerified: false;
+    }
+  | { mode: 'bearer'; allowedMints: string[] | null; requiresConsent: boolean }
   | { mode: 'block'; reason: 'no-creq' | 'invalid-creq' | 'no-shared-mint' };
 
 export function planNearPaySend(args: {
@@ -69,14 +82,16 @@ export function planNearPaySend(args: {
     return { mode: 'block', reason: 'no-shared-mint' };
   }
   if (isOffline) {
-    // Offline: P2PK locking needs a mint swap → bearer from a shared mint
-    // (still redeemable, and the DM keeps it private).
+    // Offline: P2PK locking needs a mint swap, so we can only send bearer from a
+    // shared mint. A bearer token is redeemable by anyone who gets the bytes, so
+    // this downgrade requires explicit user consent — never silent. (audit ND-2)
     paymentLog.info('near_pay.send.plan', {
       ...logBase,
       mode: 'bearer',
+      requiresConsent: true,
       sharedMintCount: shared.length,
     });
-    return { mode: 'bearer', allowedMints: shared };
+    return { mode: 'bearer', allowedMints: shared, requiresConsent: true };
   }
   paymentLog.info('near_pay.send.plan', {
     ...logBase,
@@ -88,5 +103,6 @@ export function planNearPaySend(args: {
     lockPubkey: `02${peer.nostrPubkeyHex}`,
     recipientPubkey: peer.nostrPubkeyHex,
     allowedMints: shared,
+    identityVerified: false,
   };
 }

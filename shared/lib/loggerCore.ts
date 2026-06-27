@@ -275,6 +275,11 @@ const SECRET_STRING_PATTERNS: { name: string; test: (s: string) => boolean }[] =
   { name: 'data_uri', test: (s) => /^data:[^;]+;base64,/.test(s) },
   { name: 'connection_str', test: (s) => /^(postgres|mysql|mongodb|redis|wss?):\/\//.test(s) },
   { name: 'nsec', test: (s) => /^nsec1[023456789acdefghjklmnpqrstuvwxyz]{58}$/.test(s) },
+  // BIP39 mnemonic: 12-24 space-separated lowercase words (BIP39 words are
+  // 3-8 chars). The master secret — without this a seed logged under any field
+  // name other than seed/mnemonic, or embedded in an error, would log verbatim.
+  // Runs before the long-string patterns so it's classified as the secret it is.
+  { name: 'mnemonic', test: (s) => /^([a-z]{3,8}\s+){11,23}[a-z]{3,8}$/.test(s.trim()) },
   { name: 'cashu_token', test: (s) => s.startsWith('cashuA') || s.startsWith('cashuB') },
   { name: 'lightning_invoice', test: (s) => /^ln(bc|tb|tbs)[0-9a-z]{50,}/i.test(s) },
   // A bare 32-byte hex string is the secp256k1 private-key length. A private
@@ -324,6 +329,13 @@ const EMBEDDED_SECRET_PATTERNS: { replacement: string; pattern: RegExp }[] = [
   {
     replacement: '<REDACTED:jwt>',
     pattern: /\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
+  },
+  // BIP39 mnemonic embedded in a larger string (e.g. an error message): a run
+  // of 12+ space-separated 3-8 char lowercase words. The length floor keeps
+  // ordinary structured log prose from matching.
+  {
+    replacement: '<REDACTED:mnemonic>',
+    pattern: /\b([a-z]{3,8}\s+){11,}[a-z]{3,8}\b/g,
   },
 ];
 

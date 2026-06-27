@@ -26,6 +26,7 @@ describe('planNearPaySend', () => {
       lockPubkey: PUBKEY_33,
       recipientPubkey: NOSTR_HEX,
       allowedMints: [MINT_B],
+      identityVerified: false, // self-asserted npub (audit ND-1)
     });
   });
 
@@ -46,7 +47,7 @@ describe('planNearPaySend', () => {
       isOffline: true,
     });
 
-    expect(plan).toEqual({ mode: 'bearer', allowedMints: [MINT_B] });
+    expect(plan).toEqual({ mode: 'bearer', allowedMints: [MINT_B], requiresConsent: true });
   });
 
   it('blocks when the peer has not advertised a creq capability', () => {

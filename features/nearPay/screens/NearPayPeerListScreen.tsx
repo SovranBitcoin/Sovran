@@ -18,6 +18,7 @@ import { peerDisplayName, peerIdentitySeed } from '@/features/nearPay/lib/peerPr
 import { planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
 import { creqParseDiagnostics, lockableMintsFromCreq } from '@/shared/lib/nutCreq';
 import {
+  confirmBearerDowngrade,
   notifyNoSharedMint,
   notifyNutDropPeerNotReady,
 } from '@/features/nearPay/lib/startNearPaySend';
@@ -194,6 +195,15 @@ export function NearPayPeerListScreen() {
           await notifyNutDropPeerNotReady(displayName);
         }
         return;
+      }
+      // Offline bearer downgrade is never silent: confirm before sending an
+      // unlocked (bearer) token. (audit ND-2)
+      if (plan.mode === 'bearer' && plan.requiresConsent) {
+        const proceed = await confirmBearerDowngrade(displayName);
+        if (!proceed) {
+          paymentLog.info('near_pay.peer.bearer_downgrade_declined', { isOffline });
+          return;
+        }
       }
       const delivery: NearPayDelivery = { locked: plan.mode === 'lock' };
       useNearPaySessionStore.getState().start({
