@@ -1,0 +1,29 @@
+name: Glass Headers
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  APP_DIR: sovran-app
+
+jobs:
+  glass-headers:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout app
+        uses: actions/checkout@v6
+        with:
+          path: ${{ env.APP_DIR }}
+
+      # Pure source scan (no dependencies needed). Guards against a screen
+      # putting a glass headerLeft/headerRight into Stack.Screen options without
+      # routing through withGlassHeaderItems — which silently re-introduces the
+      # iOS 26 doubled-glass + swallowed-tap regression this branch fixed.
+      - name: Check glass headers
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/check-glass-headers.mjs

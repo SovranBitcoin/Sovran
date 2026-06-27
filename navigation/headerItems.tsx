@@ -55,3 +55,17 @@ export function withGlassHeaderItems(
 
   return next;
 }
+
+/**
+ * Options fragment that restores the NATIVE back button on a screen whose
+ * parent flow injected a glass left item via {@link withGlassHeaderItems}.
+ * Spread into the screen's options / `navigation.setOptions`. Encapsulates the
+ * `unstable_headerLeftItems` representation so consumers don't reach into the
+ * helper's internals. Pair with `headerBackVisible: true` + `headerLeft: undefined`.
+ */
+export function clearGlassHeaderLeftItems(): Pick<
+  NativeStackNavigationOptions,
+  'unstable_headerLeftItems'
+> {
+  return { unstable_headerLeftItems: () => [] };
+}

@@ -29,7 +29,8 @@
   "overrides": {
     "@cashu/cashu-ts": "3.5.0",
     "zod": "4.4.3",
-    "neverthrow": "8.2.0"
+    "neverthrow": "8.2.0",
+    "react-native-quick-base64": "^3.0.0"
   },
   "scripts": {
     "start": "expo start --clear 2>&1 | tee log.txt",
@@ -55,6 +56,7 @@
     "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
     "pretty:check": "prettier --check \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
     "knip": "npx knip",
+    "check:glass-headers": "node scripts/check-glass-headers.mjs",
     "check:react-compiler": "react-compiler-healthcheck --src './{app,features,shared,components}/**/*.{ts,tsx,js,jsx}' | node scripts/check-react-compiler.mjs",
     "react-doctor": "bunx react-doctor@latest --verbose",
     "vendor:marmot-ts": "bash scripts/vendor-marmot-ts.sh",
@@ -171,7 +173,7 @@
     "react-native-nitro-modules": "^0.35.10",
     "react-native-pager-view": "8.0.1",
     "react-native-qrcode-svg": "^6.3.14",
-    "react-native-quick-crypto": "^1.1.0",
+    "react-native-quick-crypto": "^1.1.5",
     "react-native-reanimated": "4.3.1",
     "react-native-restart": "^0.0.27",
     "react-native-safe-area-context": "^5.6.0",

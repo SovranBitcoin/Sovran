@@ -129,3 +129,30 @@ load, and (b) flags ~500 pre-existing violations across the app. As that is a
 dev-only lint config not required by SDK 56, it is **held at ~55**
 (`expo.install.exclude`). Adopting `eslint-config-expo@56` + the React Compiler
 hook rules is a deliberate separate follow-up.
+
+## Addendum (2026-06-27): post-implementation audit of PR #244
+
+A multi-agent audit (web-research validation + uniformity sweep + Codex critique)
+confirmed the upgrade's approaches are the recommended SDK 56 patterns
+(`unstable_header*Items`+`hidesSharedBackground`, dropping `GlassView isInteractive`,
+`absoluteFill`, `moveSync`, babel-worklets) and that each was applied uniformly
+(zero stragglers). Follow-up changes from the audit:
+
+- **react-native-quick-crypto 1.1.0 → 1.1.5** (+ `react-native-quick-base64` `^3.0.0`
+  override): 1.1.0 skipped 1.1.1's security-audit fixes ("actively exploitable
+  findings") — material for a cashu/nostr wallet. The override satisfies 1.1.5's
+  quick-base64 `>=3.0.0` peer (the lock previously resolved 2.2.2). **Native crypto
+  send/receive/mint/melt/P2PK must be device-verified.**
+- **QR boot-morph fail-safe hoisted** to `useBootMorphFailsafe` (shared by
+  QRButton.ios/android; named const instead of an inline 1500ms).
+- **`clearGlassHeaderLeftItems()`** added to `navigation/headerItems.tsx` so
+  `SettingsRecoveryScreen` no longer reaches into the helper's internal
+  `unstable_headerLeftItems` key to get the native back button.
+- **Glass-header guard**: `scripts/check-glass-headers.mjs` + `Glass Headers` CI
+  workflow flag any screen that puts a glass `headerLeft`/`headerRight` into
+  `Stack.Screen` options without routing through `withGlassHeaderItems` —
+  preventing future re-introduction of the doubled-glass + swallowed-tap bug.
+- **CI `code-quality` (Prettier + Test) kept non-blocking** (`continue-on-error`):
+  accepted trade-off. NOTE: this makes the jest suite — including security/privacy
+  regression tests — advisory-only as a merge gate; the dedicated
+  lint/type-check/knip/react-compiler/glass-headers workflows remain blocking.
