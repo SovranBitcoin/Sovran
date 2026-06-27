@@ -246,8 +246,10 @@ export const icons: string[] = [
   'mdi:pound',
   'mdi:home',
 
+  // Network settings — tier health "checking" state
+  'mdi:loading',
+
   // Wallpaper screens
-  'mdi:download',
   'mdi:cloud-download-outline',
 
   // Drawer and bottom tab bar route icons — selected/unselected pairs

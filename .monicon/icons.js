@@ -955,8 +955,8 @@ module.exports = {
     "width": 16,
     "height": 16
   },
-  "mdi:download": {
-    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M5 20h14v-2H5m14-9h-4V3H9v6H5l7 7z\"/></svg>",
+  "mdi:loading": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8\"/></svg>",
     "width": 16,
     "height": 16
   },
