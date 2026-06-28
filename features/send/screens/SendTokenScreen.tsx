@@ -6,10 +6,10 @@
  * only renders UI and wires buttons.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { StyleSheet } from 'react-native';
 
-import { Alert, Menu, type MenuTriggerRef } from 'heroui-native';
+import { Alert, Menu } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from '@sovranbitcoin/colada/react';
 import {
@@ -40,7 +40,7 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { fetchMintInfo } from '@/shared/lib/apiClient';
 import Icon from 'assets/icons';
-import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
+import { BottomSheetMenu } from '@/shared/blocks/popup/BottomSheetMenu';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import {
   useSendReachability,
@@ -152,18 +152,12 @@ export function SendTokenScreen({
     [actions.copy.variants, actions.copy.available]
   );
 
-  const copyMenuTriggerRef = useRef<MenuTriggerRef>(null);
   const handleCopyVariant = useCallback(
     (variantId: string) => {
       void actions.copy.execute({ variantId });
     },
     [actions.copy]
   );
-  const openCopyMenu = useCallback(() => {
-    // Defer to the next tick so the ButtonHandler's sheet-close / press-in
-    // animation doesn't race with the menu's trigger-position measure call.
-    setTimeout(() => copyMenuTriggerRef.current?.open(), 0);
-  }, []);
   if (error) {
     log.warn('send.token.error', { error });
     return <ScreenErrorState message={error} onGoBack={onNavigateBack} />;
@@ -194,101 +188,91 @@ export function SendTokenScreen({
   const bottomButtons = (
     <BottomButtons>
       {/*
-       * Bottom-sheet Menu opened imperatively from the Copy button's onPress
-       * via the trigger ref's `.open()`. We keep the Trigger because heroui's
-       * imperative API requires one, but its position is irrelevant for
-       * bottom-sheet presentation — the sheet slides up from the bottom
-       * regardless.
+       * The Copy button opens a bottom-sheet Menu of copy variants. The sheet
+       * only mounts while open (BottomSheetMenu), so on Android it never paints
+       * its closed state at rest. The button row is the trigger.
        */}
-      <Menu presentation="bottom-sheet">
-        <Menu.Trigger
-          ref={copyMenuTriggerRef}
-          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-          <View style={{ width: 1, height: 1 }} />
-        </Menu.Trigger>
-        <Menu.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
-          <MenuScrim />
-          <Menu.Content presentation="bottom-sheet">
-            <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-              Copy token
-            </Menu.Label>
-            {copyVariants.map((v) => (
-              <Menu.Item
-                key={v.id}
-                testID={`send-token-copy-menu-${v.id}`}
-                isDisabled={!v.available}
-                onPress={() => handleCopyVariant(v.id)}>
-                <HStack align="center" gap={10} style={{ flex: 1 }}>
-                  {v.icon ? <Icon name={v.icon} size={18} /> : null}
-                  <View style={{ flex: 1 }}>
-                    <Menu.ItemTitle>{v.label}</Menu.ItemTitle>
-                    {(v.description || (!v.available && v.reason)) && (
-                      <Menu.ItemDescription>
-                        {!v.available && v.reason ? v.reason : v.description}
-                      </Menu.ItemDescription>
-                    )}
-                  </View>
-                </HStack>
-              </Menu.Item>
-            ))}
-          </Menu.Content>
-        </Menu.Portal>
-      </Menu>
-
-      <HStack justify="center" align="center">
-        <ButtonHandler
-          buttons={[
-            {
-              testID: 'send-token-copy',
-              text: 'Copy',
-              icon: 'lets-icons:copy',
-              variant: 'primary',
-              onPress: () => {
-                openCopyMenu();
-              },
-              condition: actions.copy.available,
-            },
-            {
-              testID: 'send-token-share',
-              text: 'Share',
-              icon: 'mdi:share-variant',
-              variant: 'secondary',
-              onPress: () => actions.share.execute(),
-              condition: actions.share.available,
-            },
-            {
-              testID: 'send-token-nfc',
-              text: 'NFC',
-              description: 'Transmit to a nearby phone',
-              icon: 'lucide:nfc',
-              variant: 'secondary',
-              onPress: async () => {
-                await new Promise((r) => setTimeout(r, 400));
-                await actions.nfc.execute();
-              },
-              condition: actions.nfc.available,
-            },
-            {
-              testID: 'send-token-check-status',
-              text: actions.checkStatus.loading ? 'Checking...' : 'Check Status',
-              description: 'Refresh the pending state',
-              icon: 'mdi:refresh',
-              variant: 'secondary',
-              onPress: () => actions.checkStatus.execute(),
-              condition: actions.checkStatus.available,
-            },
-            {
-              testID: 'send-token-cancel-transaction',
-              text: 'Cancel transaction',
-              description: 'Return the funds to your balance',
-              icon: 'mdi:cancel',
-              variant: 'dangerous',
-              onPress: () => actions.cancel.execute(),
-              condition: actions.cancel.available,
-            },
-          ]}
-        />
-      </HStack>
+      <BottomSheetMenu
+        name="send-token-copy"
+        renderTrigger={({ open }) => (
+          <HStack justify="center" align="center">
+            <ButtonHandler
+              buttons={[
+                {
+                  testID: 'send-token-copy',
+                  text: 'Copy',
+                  icon: 'lets-icons:copy',
+                  variant: 'primary',
+                  onPress: () => {
+                    open();
+                  },
+                  condition: actions.copy.available,
+                },
+                {
+                  testID: 'send-token-share',
+                  text: 'Share',
+                  icon: 'mdi:share-variant',
+                  variant: 'secondary',
+                  onPress: () => actions.share.execute(),
+                  condition: actions.share.available,
+                },
+                {
+                  testID: 'send-token-nfc',
+                  text: 'NFC',
+                  description: 'Transmit to a nearby phone',
+                  icon: 'lucide:nfc',
+                  variant: 'secondary',
+                  onPress: async () => {
+                    await new Promise((r) => setTimeout(r, 400));
+                    await actions.nfc.execute();
+                  },
+                  condition: actions.nfc.available,
+                },
+                {
+                  testID: 'send-token-check-status',
+                  text: actions.checkStatus.loading ? 'Checking...' : 'Check Status',
+                  description: 'Refresh the pending state',
+                  icon: 'mdi:refresh',
+                  variant: 'secondary',
+                  onPress: () => actions.checkStatus.execute(),
+                  condition: actions.checkStatus.available,
+                },
+                {
+                  testID: 'send-token-cancel-transaction',
+                  text: 'Cancel transaction',
+                  description: 'Return the funds to your balance',
+                  icon: 'mdi:cancel',
+                  variant: 'dangerous',
+                  onPress: () => actions.cancel.execute(),
+                  condition: actions.cancel.available,
+                },
+              ]}
+            />
+          </HStack>
+        )}>
+        <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
+          Copy token
+        </Menu.Label>
+        {copyVariants.map((v) => (
+          <Menu.Item
+            key={v.id}
+            testID={`send-token-copy-menu-${v.id}`}
+            isDisabled={!v.available}
+            onPress={() => handleCopyVariant(v.id)}>
+            <HStack align="center" gap={10} style={{ flex: 1 }}>
+              {v.icon ? <Icon name={v.icon} size={18} /> : null}
+              <View style={{ flex: 1 }}>
+                <Menu.ItemTitle>{v.label}</Menu.ItemTitle>
+                {(v.description || (!v.available && v.reason)) && (
+                  <Menu.ItemDescription>
+                    {!v.available && v.reason ? v.reason : v.description}
+                  </Menu.ItemDescription>
+                )}
+              </View>
+            </HStack>
+          </Menu.Item>
+        ))}
+      </BottomSheetMenu>
     </BottomButtons>
   );
 

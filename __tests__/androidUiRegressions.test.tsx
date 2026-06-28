@@ -36,6 +36,8 @@ jest.mock('@/shared/hooks/useTransactionLocationSection', () => ({
 jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   log: {
+    debug: jest.fn(),
+    info: jest.fn(),
     error: jest.fn(),
     warn: jest.fn(),
   },
@@ -169,13 +171,28 @@ describe('Android UI regressions', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('renders the Android fiat selector as a HeroUI bottom-sheet menu', () => {
+  it('keeps the Android fiat sheet unmounted until opened, then selects a currency', () => {
+    jest.useFakeTimers();
     let renderer: TestRenderer.ReactTestRenderer;
 
     act(() => {
       renderer = TestRenderer.create(
         <FiatCurrencyPillAndroidMenu displayText="≈ $12.34" enableCurrencyMenu />
       );
+    });
+
+    // Regression: the closed bottom-sheet menu renders NOTHING at rest. Before
+    // BottomSheetMenu, heroui's force-mounted sheet painted its closed state on
+    // Android, leaving the currency menu permanently visible on first load.
+    expect(findAllByType(renderer!, 'Menu.Portal')).toHaveLength(0);
+    expect(findAllByType(renderer!, 'Menu.Content')).toHaveLength(0);
+
+    // The pill is the trigger — pressing it opens (and mounts) the sheet.
+    act(() => {
+      findAllByType(renderer!, 'Pressable')[0].props.onPress();
+    });
+    act(() => {
+      jest.runOnlyPendingTimers();
     });
 
     const portals = findAllByType(renderer!, 'Menu.Portal');
@@ -191,6 +208,7 @@ describe('Android UI regressions', () => {
 
     expect(mockSetDisplayCurrency).toHaveBeenCalledWith('eur');
     expect(findByTestID(renderer!, 'icon-mdi:check')).toBeTruthy();
+    jest.useRealTimers();
   });
 
   it('does not mount map previews, blur, or gradients for Android location privacy placeholder', () => {

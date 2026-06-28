@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
-import { Menu, type MenuTriggerRef } from 'heroui-native';
+import { Menu } from 'heroui-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 
 import Icon from 'assets/icons';
@@ -20,7 +20,7 @@ import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { zIndex } from '@/shared/styles/tokens';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { QRButton } from '@/shared/ui/composed/QRButton';
-import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
+import { BottomSheetMenu } from '@/shared/blocks/popup/BottomSheetMenu';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -86,10 +86,6 @@ export function WalletScreen() {
   const { handlePermission } = useHandleCameraPermission();
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: ACCOUNT.unit });
-  const moreMenuTriggerRef = useRef<MenuTriggerRef>(null);
-  const openMoreMenu = useCallback(() => {
-    setTimeout(() => moreMenuTriggerRef.current?.open(), 0);
-  }, []);
 
   // While a multi-leg swap is running, every payment-initiating button on
   // this screen is gated. Coco's mint/melt services serialize through a
@@ -195,49 +191,42 @@ export function WalletScreen() {
                   onPress={handleNfc}
                 />
               ) : null}
-              <Menu presentation="bottom-sheet">
-                <Menu.Trigger
-                  ref={moreMenuTriggerRef}
-                  style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-                  <View style={{ width: 1, height: 1 }} />
-                </Menu.Trigger>
-                <CircleActionButton
-                  icon="tabler:dots"
-                  systemIcon="ellipsis"
-                  label="More"
-                  testID="wallet-more"
-                  onPress={openMoreMenu}
-                />
-                <Menu.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
-                  <MenuScrim />
-                  <Menu.Content presentation="bottom-sheet">
-                    <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-                      Select option
-                    </Menu.Label>
-                    <Menu.Item testID="wallet-action-theme" onPress={handleTheme}>
-                      <HStack align="center" gap={10} style={{ flex: 1 }}>
-                        <Icon name="mdi:palette" size={20} />
-                        <View style={{ flex: 1 }}>
-                          <Menu.ItemTitle>Theme</Menu.ItemTitle>
-                          <Menu.ItemDescription>Change wallet appearance</Menu.ItemDescription>
-                        </View>
-                      </HStack>
-                    </Menu.Item>
-                    <Menu.Item
-                      testID="wallet-action-near-pay"
-                      isDisabled={isSwapping}
-                      onPress={handleNearPay}>
-                      <HStack align="center" gap={10} style={{ flex: 1 }}>
-                        <Icon name="mdi:bluetooth" size={20} />
-                        <View style={{ flex: 1 }}>
-                          <Menu.ItemTitle>Nut Drop</Menu.ItemTitle>
-                          <Menu.ItemDescription>Pay a nearby BitChat user</Menu.ItemDescription>
-                        </View>
-                      </HStack>
-                    </Menu.Item>
-                  </Menu.Content>
-                </Menu.Portal>
-              </Menu>
+              <BottomSheetMenu
+                name="wallet-more"
+                renderTrigger={({ open }) => (
+                  <CircleActionButton
+                    icon="tabler:dots"
+                    systemIcon="ellipsis"
+                    label="More"
+                    testID="wallet-more"
+                    onPress={open}
+                  />
+                )}>
+                <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
+                  Select option
+                </Menu.Label>
+                <Menu.Item testID="wallet-action-theme" onPress={handleTheme}>
+                  <HStack align="center" gap={10} style={{ flex: 1 }}>
+                    <Icon name="mdi:palette" size={20} />
+                    <View style={{ flex: 1 }}>
+                      <Menu.ItemTitle>Theme</Menu.ItemTitle>
+                      <Menu.ItemDescription>Change wallet appearance</Menu.ItemDescription>
+                    </View>
+                  </HStack>
+                </Menu.Item>
+                <Menu.Item
+                  testID="wallet-action-near-pay"
+                  isDisabled={isSwapping}
+                  onPress={handleNearPay}>
+                  <HStack align="center" gap={10} style={{ flex: 1 }}>
+                    <Icon name="mdi:bluetooth" size={20} />
+                    <View style={{ flex: 1 }}>
+                      <Menu.ItemTitle>Nut Drop</Menu.ItemTitle>
+                      <Menu.ItemDescription>Pay a nearby BitChat user</Menu.ItemDescription>
+                    </View>
+                  </HStack>
+                </Menu.Item>
+              </BottomSheetMenu>
             </HStack>
 
             {/* Wrap the Receive / Send / QR row in a single pointerEvents=none

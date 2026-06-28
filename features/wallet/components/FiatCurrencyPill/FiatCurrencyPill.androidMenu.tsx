@@ -1,9 +1,9 @@
-import React, { useCallback, useRef } from 'react';
-import { Menu, type MenuTriggerRef } from 'heroui-native';
+import React from 'react';
+import { Menu } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
-import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
+import { BottomSheetMenu } from '@/shared/blocks/popup/BottomSheetMenu';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -32,16 +32,8 @@ export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React
     'muted',
   ] as const);
   const [success] = useThemeColor(['success'] as const);
-  const menuTriggerRef = useRef<MenuTriggerRef>(null);
 
-  const openCurrencyMenu = useCallback(() => {
-    setTimeout(() => menuTriggerRef.current?.open(), 0);
-  }, []);
-
-  const primaryHandler = enableCurrencyMenu && !onPress ? openCurrencyMenu : onPress;
-  const longPressHandler = enableCurrencyMenu && onPress ? openCurrencyMenu : undefined;
-
-  const pill = (
+  const renderPill = (primaryHandler?: () => void, longPressHandler?: () => void) => (
     <Pressable
       disabled={!primaryHandler && !longPressHandler}
       onPress={primaryHandler}
@@ -69,42 +61,37 @@ export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React
   );
 
   if (!enableCurrencyMenu) {
-    return pill;
+    return renderPill(onPress, undefined);
   }
 
   return (
-    <Menu presentation="bottom-sheet">
-      <Menu.Trigger
-        ref={menuTriggerRef}
-        style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-        <View style={{ width: 1, height: 1 }} />
-      </Menu.Trigger>
-      {pill}
-      <Menu.Portal disableFullWindowOverlay>
-        <MenuScrim />
-        <Menu.Content presentation="bottom-sheet">
-          <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-            Display currency
-          </Menu.Label>
-          {CURRENCY_OPTIONS.map((option) => {
-            const isSelected = option.currency === displayCurrency;
-            return (
-              <Menu.Item
-                key={option.currency}
-                testID={`fiat-currency-menu-${option.currency}`}
-                onPress={() => handleSelectCurrency(option.currency)}>
-                <HStack align="center" gap={10} style={{ flex: 1 }}>
-                  <Icon name={option.icon} size={20} />
-                  <View style={{ flex: 1 }}>
-                    <Menu.ItemTitle>{option.label}</Menu.ItemTitle>
-                  </View>
-                  {isSelected ? <Icon name="mdi:check" size={20} color={success} /> : null}
-                </HStack>
-              </Menu.Item>
-            );
-          })}
-        </Menu.Content>
-      </Menu.Portal>
-    </Menu>
+    <BottomSheetMenu
+      name="fiat-currency"
+      renderTrigger={({ open }) =>
+        // With an external onPress, tap toggles sats/fiat and long-press opens
+        // the currency menu; otherwise tap opens it. Mirrors useFiatCurrencyPill.
+        onPress ? renderPill(onPress, open) : renderPill(open, undefined)
+      }>
+      <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
+        Display currency
+      </Menu.Label>
+      {CURRENCY_OPTIONS.map((option) => {
+        const isSelected = option.currency === displayCurrency;
+        return (
+          <Menu.Item
+            key={option.currency}
+            testID={`fiat-currency-menu-${option.currency}`}
+            onPress={() => handleSelectCurrency(option.currency)}>
+            <HStack align="center" gap={10} style={{ flex: 1 }}>
+              <Icon name={option.icon} size={20} />
+              <View style={{ flex: 1 }}>
+                <Menu.ItemTitle>{option.label}</Menu.ItemTitle>
+              </View>
+              {isSelected ? <Icon name="mdi:check" size={20} color={success} /> : null}
+            </HStack>
+          </Menu.Item>
+        );
+      })}
+    </BottomSheetMenu>
   );
 }

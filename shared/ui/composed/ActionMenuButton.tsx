@@ -21,18 +21,22 @@
  * Disabled variants remain visible in the menu with their `reason` rendered as a
  * `Menu.ItemDescription`, matching the pattern used by availability.ts in
  * colada.
+ *
+ * The Menu lifecycle (controlled open, mount-while-open, Portal/scrim, the
+ * hidden-trigger anchoring workaround) lives in `BottomSheetMenu` — this
+ * component only supplies the trigger layout and the menu items.
  */
 
-import React, { useCallback, useRef } from 'react';
-import { Platform, StyleProp, ViewStyle } from 'react-native';
-import { Menu, type MenuTriggerRef } from 'heroui-native';
+import React, { useCallback } from 'react';
+import { StyleProp, ViewStyle } from 'react-native';
+import { Menu } from 'heroui-native';
 
 import { Button } from '@/shared/ui/primitives/Button';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import Icon from 'assets/icons';
-import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
+import { BottomSheetMenu } from '@/shared/blocks/popup/BottomSheetMenu';
 import { log } from '@/shared/lib/logger';
 
 export interface ActionMenuVariant {
@@ -125,21 +129,6 @@ export function ActionMenuButton({
 
   const primaryDisabled = disabled || !hasVariants || defaultVariant?.isDisabled;
 
-  // heroui-native `Menu.Trigger asChild` routes through `Slot.Pressable`, which
-  // only composes onPress cleanly with children that are themselves a
-  // `Pressable`. Our `Button` primitive wraps a custom `TouchableOpacity`, so
-  // the Slot can't inject the "open the menu" handler and taps fall through
-  // to the Button's own onPress (bypassing the menu entirely). To work around
-  // this we render an invisible absolute-positioned Trigger + open it
-  // imperatively via ref from the Button's onPress. The same pattern is used
-  // by SendTokenScreen's Copy menu.
-  const menuTriggerRef = useRef<MenuTriggerRef>(null);
-  const openMenu = useCallback(() => {
-    // Defer to the next tick so the Button's press animation doesn't race
-    // with the Trigger's `measure()` call inside heroui's `.open()`.
-    setTimeout(() => menuTriggerRef.current?.open(), 0);
-  }, []);
-
   const handlePrimaryPress = useCallback(async () => {
     if (!defaultVariant || primaryDisabled) return;
     try {
@@ -154,8 +143,9 @@ export function ActionMenuButton({
   }, [defaultVariant, primaryDisabled, testID]);
 
   const primaryIconNode = icon ? <Icon name={icon} size={18} /> : undefined;
+  const popoverWidth = presentation === 'popover' ? MENU_WIDTH : undefined;
 
-  // When there are no variants, render a disabled primary button. No chevron.
+  // When there are no variants, render a disabled primary button. No menu.
   if (!hasVariants) {
     return (
       <View style={[{ flex: 1 }, style]}>
@@ -173,26 +163,25 @@ export function ActionMenuButton({
   }
 
   // Circle trigger — render the icon button in a row of CircleActionButtons.
-  // Tapping always opens the menu (same hidden-trigger-ref pattern the
-  // WalletScreen "More" button uses), since there is no sensible default.
+  // Tapping always opens the menu, since there is no sensible default.
   if (circle) {
     return (
-      <Menu presentation={presentation}>
-        <Menu.Trigger
-          ref={menuTriggerRef}
-          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-          <View style={{ width: 1, height: 1 }} />
-        </Menu.Trigger>
-        <CircleActionButton
-          icon={circle.icon}
-          systemIcon={circle.systemIcon}
-          label={circle.label}
-          testID={testID}
-          disabled={disabled}
-          onPress={openMenu}
-        />
-        {renderMenuPortal(variants, testID, presentation, menuTitle)}
-      </Menu>
+      <BottomSheetMenu
+        presentation={presentation}
+        width={popoverWidth}
+        name={testID ?? 'action-menu'}
+        renderTrigger={({ open }) => (
+          <CircleActionButton
+            icon={circle.icon}
+            systemIcon={circle.systemIcon}
+            label={circle.label}
+            testID={testID}
+            disabled={disabled}
+            onPress={open}
+          />
+        )}>
+        {renderMenuItems(variants, testID, menuTitle)}
+      </BottomSheetMenu>
     );
   }
 
@@ -200,23 +189,23 @@ export function ActionMenuButton({
   if (collapsedPressOpensMenu) {
     return (
       <View style={[{ flex: 1 }, style]}>
-        <Menu presentation={presentation}>
-          <Menu.Trigger
-            ref={menuTriggerRef}
-            style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-            <View style={{ width: 1, height: 1 }} />
-          </Menu.Trigger>
-          <Button
-            testID={testID}
-            text={label}
-            icon={primaryIconNode}
-            variant={variant}
-            loading={loading}
-            disabled={disabled}
-            onPress={openMenu}
-          />
-          {renderMenuPortal(variants, testID, presentation, menuTitle)}
-        </Menu>
+        <BottomSheetMenu
+          presentation={presentation}
+          width={popoverWidth}
+          name={testID ?? 'action-menu'}
+          renderTrigger={({ open }) => (
+            <Button
+              testID={testID}
+              text={label}
+              icon={primaryIconNode}
+              variant={variant}
+              loading={loading}
+              disabled={disabled}
+              onPress={open}
+            />
+          )}>
+          {renderMenuItems(variants, testID, menuTitle)}
+        </BottomSheetMenu>
       </View>
     );
   }
@@ -240,96 +229,82 @@ export function ActionMenuButton({
 
   // Default — split button (primary + chevron Menu trigger).
   return (
-    <HStack align="center" gap={0} style={[{ flex: 1 }, style]}>
-      <View style={{ flex: 1 }}>
-        <Button
-          testID={testID}
-          text={label}
-          icon={primaryIconNode}
-          variant={variant}
-          loading={loading}
-          disabled={primaryDisabled}
-          onPress={handlePrimaryPress}
-        />
-      </View>
-      <Menu presentation={presentation}>
-        <Menu.Trigger
-          ref={menuTriggerRef}
-          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-          <View style={{ width: 1, height: 1 }} />
-        </Menu.Trigger>
-        <Button
-          testID={testID ? `${testID}-menu` : undefined}
-          icon={<Icon name="mdi:chevron-down" size={20} />}
-          variant={variant}
-          disabled={disabled}
-          onPress={openMenu}
-        />
-        {renderMenuPortal(variants, testID, presentation, menuTitle)}
-      </Menu>
-    </HStack>
+    <BottomSheetMenu
+      presentation={presentation}
+      width={popoverWidth}
+      name={testID ?? 'action-menu'}
+      renderTrigger={({ open }) => (
+        <HStack align="center" gap={0} style={[{ flex: 1 }, style]}>
+          <View style={{ flex: 1 }}>
+            <Button
+              testID={testID}
+              text={label}
+              icon={primaryIconNode}
+              variant={variant}
+              loading={loading}
+              disabled={primaryDisabled}
+              onPress={handlePrimaryPress}
+            />
+          </View>
+          <Button
+            testID={testID ? `${testID}-menu` : undefined}
+            icon={<Icon name="mdi:chevron-down" size={20} />}
+            variant={variant}
+            disabled={disabled}
+            onPress={open}
+          />
+        </HStack>
+      )}>
+      {renderMenuItems(variants, testID, menuTitle)}
+    </BottomSheetMenu>
   );
 }
 
-function renderMenuPortal(
+function renderMenuItems(
   variants: ActionMenuVariant[],
   rootTestID: string | undefined,
-  presentation: 'popover' | 'bottom-sheet',
   title: string | undefined
 ) {
-  const contentProps =
-    presentation === 'bottom-sheet'
-      ? ({ presentation: 'bottom-sheet' as const } as const)
-      : ({
-          presentation: 'popover' as const,
-          placement: 'top' as const,
-          align: 'end' as const,
-          width: MENU_WIDTH,
-        } as const);
-
   return (
-    <Menu.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
-      <MenuScrim />
-      <Menu.Content {...contentProps}>
-        {title ? (
-          <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-            {title}
-          </Menu.Label>
-        ) : null}
-        {variants.map((v) => (
-          <Menu.Item
-            key={v.id}
-            testID={v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined)}
-            isDisabled={v.isDisabled}
-            variant={v.isDestructive ? 'danger' : 'default'}
-            onPress={() => {
-              if (v.isDisabled) return;
-              void (async () => {
-                try {
-                  await v.onPress();
-                } catch (error) {
-                  log.error('ui.action_menu.menu_action_failed', {
-                    testID: v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined),
-                    variantId: v.id,
-                    error: error instanceof Error ? error.message : String(error),
-                  });
-                }
-              })();
-            }}>
-            <HStack align="center" gap={10} style={{ flex: 1 }}>
-              {v.iconNode ?? (v.icon ? <Icon name={v.icon} size={18} /> : null)}
-              <View style={{ flex: 1 }}>
-                <Menu.ItemTitle>{v.label}</Menu.ItemTitle>
-                {(v.description || (v.isDisabled && v.reason)) && (
-                  <Menu.ItemDescription>
-                    {v.isDisabled && v.reason ? v.reason : v.description}
-                  </Menu.ItemDescription>
-                )}
-              </View>
-            </HStack>
-          </Menu.Item>
-        ))}
-      </Menu.Content>
-    </Menu.Portal>
+    <>
+      {title ? (
+        <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
+          {title}
+        </Menu.Label>
+      ) : null}
+      {variants.map((v) => (
+        <Menu.Item
+          key={v.id}
+          testID={v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined)}
+          isDisabled={v.isDisabled}
+          variant={v.isDestructive ? 'danger' : 'default'}
+          onPress={() => {
+            if (v.isDisabled) return;
+            void (async () => {
+              try {
+                await v.onPress();
+              } catch (error) {
+                log.error('ui.action_menu.menu_action_failed', {
+                  testID: v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined),
+                  variantId: v.id,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
+            })();
+          }}>
+          <HStack align="center" gap={10} style={{ flex: 1 }}>
+            {v.iconNode ?? (v.icon ? <Icon name={v.icon} size={18} /> : null)}
+            <View style={{ flex: 1 }}>
+              <Menu.ItemTitle>{v.label}</Menu.ItemTitle>
+              {(v.description || (v.isDisabled && v.reason)) && (
+                <Menu.ItemDescription>
+                  {v.isDisabled && v.reason ? v.reason : v.description}
+                </Menu.ItemDescription>
+              )}
+            </View>
+          </HStack>
+        </Menu.Item>
+      ))}
+    </>
   );
 }

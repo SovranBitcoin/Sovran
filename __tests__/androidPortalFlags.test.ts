@@ -4,6 +4,11 @@ import { relative, resolve } from 'path';
 const ROOT = resolve(__dirname, '..');
 
 const PORTAL_FILES = [
+  // BottomSheetMenu now owns the Menu.Portal for the currency / map-category /
+  // wallet-more / copy-token / action menus; the per-site files below no longer
+  // render a portal directly but are kept so a regression that reintroduces one
+  // is still caught.
+  'shared/blocks/popup/BottomSheetMenu.tsx',
   'features/send/screens/SendTokenScreen.tsx',
   'features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.androidMenu.tsx',
   'features/wallet/screens/WalletScreen.tsx',
