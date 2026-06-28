@@ -307,6 +307,144 @@ describe('buildMintReviewInfo — social enrichment', () => {
     expect(info.reviewCount).toBe(1);
   });
 
+  it('skips the redundant review + profile fetches when the row already carries them', async () => {
+    const contactPubkey = 'a'.repeat(64);
+    const mockManager = createMockManager({
+      mint: {
+        getMintInfo: vi.fn().mockResolvedValue({
+          name: 'Mint One',
+          icon_url: 'https://mint.example.com/icon.png',
+          contact: [{ method: 'nostr', info: contactPubkey }],
+        }),
+      },
+      wallet: {
+        balances: {
+          byMint: vi.fn().mockResolvedValue({ [MINT1]: { total: 12 } }),
+        },
+      },
+    });
+    const resolveMintContactProfile = vi.fn().mockResolvedValue(undefined);
+    const fetchMintReviews = vi.fn().mockResolvedValue(undefined);
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      resolveMintContactProfile,
+      fetchMintReviews,
+    });
+
+    // The selector hands the catalog-enriched row straight through, so the
+    // operator-profile + reviews fetches must NOT fire — the screen opens from
+    // this data instead of waiting on two Nostr round-trips.
+    const info = await ops.buildMintReviewInfo!(MINT1, {
+      mintUrl: MINT1,
+      displayName: 'Mint One',
+      balance: 12,
+      unit: 'sat',
+      status: 'available',
+      reason: null,
+      isPreferred: false,
+      kymScore: 4.2,
+      reviewCount: 7,
+      auditScore: 3.5,
+      auditState: 'OK',
+      contactFollowers: 99,
+      contactReputation: 88,
+    });
+
+    expect(resolveMintContactProfile).not.toHaveBeenCalled();
+    expect(fetchMintReviews).not.toHaveBeenCalled();
+    expect(info.kymScore).toBe(4.2);
+    expect(info.reviewCount).toBe(7);
+    expect(info.contactFollowers).toBe(99);
+    expect(info.contactReputation).toBe(88);
+    expect(info.reviews).toBeUndefined();
+  });
+
+  it('still fetches reviews when the row has a kym score but no review count', async () => {
+    const contactPubkey = 'a'.repeat(64);
+    const mockManager = createMockManager({
+      mint: {
+        getMintInfo: vi.fn().mockResolvedValue({
+          name: 'Mint One',
+          icon_url: 'https://mint.example.com/icon.png',
+          contact: [{ method: 'nostr', info: contactPubkey }],
+        }),
+      },
+      wallet: {
+        balances: { byMint: vi.fn().mockResolvedValue({ [MINT1]: { total: 12 } }) },
+      },
+    });
+    const resolveMintContactProfile = vi.fn().mockResolvedValue(undefined);
+    const fetchMintReviews = vi.fn().mockResolvedValue(undefined);
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      resolveMintContactProfile,
+      fetchMintReviews,
+    });
+
+    // A kym score WITHOUT a review count is an incomplete review aggregate — the
+    // fetch (which fills reviewCount + the list) must still run. Social is
+    // complete here, so only the profile fetch is skipped.
+    await ops.buildMintReviewInfo!(MINT1, {
+      mintUrl: MINT1,
+      displayName: 'Mint One',
+      balance: 12,
+      unit: 'sat',
+      status: 'available',
+      reason: null,
+      isPreferred: false,
+      kymScore: 4.2,
+      contactFollowers: 99,
+      contactReputation: 88,
+    });
+
+    expect(fetchMintReviews).toHaveBeenCalledWith(MINT1);
+    expect(resolveMintContactProfile).not.toHaveBeenCalled();
+  });
+
+  it('still fetches the operator profile when the row has followers but no reputation', async () => {
+    const contactPubkey = 'a'.repeat(64);
+    const mockManager = createMockManager({
+      mint: {
+        getMintInfo: vi.fn().mockResolvedValue({
+          name: 'Mint One',
+          icon_url: 'https://mint.example.com/icon.png',
+          contact: [{ method: 'nostr', info: contactPubkey }],
+        }),
+      },
+      wallet: {
+        balances: { byMint: vi.fn().mockResolvedValue({ [MINT1]: { total: 12 } }) },
+      },
+    });
+    const resolveMintContactProfile = vi.fn().mockResolvedValue(undefined);
+    const fetchMintReviews = vi.fn().mockResolvedValue(undefined);
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      resolveMintContactProfile,
+      fetchMintReviews,
+    });
+
+    // Followers WITHOUT reputation is an incomplete social aggregate — the
+    // operator-profile fetch (which yields reputation) must still run. Reviews
+    // are complete here, so only the review fetch is skipped.
+    await ops.buildMintReviewInfo!(MINT1, {
+      mintUrl: MINT1,
+      displayName: 'Mint One',
+      balance: 12,
+      unit: 'sat',
+      status: 'available',
+      reason: null,
+      isPreferred: false,
+      reviewCount: 7,
+      contactFollowers: 99,
+    });
+
+    expect(resolveMintContactProfile).toHaveBeenCalledWith(contactPubkey, MINT1);
+    expect(fetchMintReviews).not.toHaveBeenCalled();
+  });
+
   it('still returns mint info when enrichment callbacks fail', async () => {
     const contactPubkey = 'a'.repeat(64);
     const mockManager = createMockManager({

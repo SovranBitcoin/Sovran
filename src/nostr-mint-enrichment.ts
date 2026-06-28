@@ -201,7 +201,9 @@ export function createNostrMintEnrichment(
 
       return {
         mintUrl: data.summary.mintUrl,
-        score: data.summary.averageScore,
+        score: clampScore(data.summary.averageScore),
+        // Authoritative full-set count from the server, not the page length.
+        reviewCount: data.summary.reviewCount,
         recommendations,
         lastUpdated,
         // This is a fresh network fetch; nagg's own response cache is opaque to
@@ -240,7 +242,7 @@ function reviewFromItem(
   profile?: z.infer<typeof ReviewerProfile>,
 ): MintReviewRecommendation {
   return {
-    score: item.score,
+    score: clampScore(item.score),
     comment: stripScoreMarker(item.content),
     pubkey: item.reviewerPubkey,
     eventId: item.eventId,
@@ -248,6 +250,14 @@ function reviewFromItem(
     ...(profile?.name ? { name: profile.name } : {}),
     ...(profile?.picture ? { picture: profile.picture } : {}),
   };
+}
+
+// "Trust nagg's parse" still keeps one guard at the network boundary: a score
+// is a 0–5 rating, so clamp anything outside that range (a server bug or a
+// malformed upstream event must never render a 42/5 mint). `null` = unscored.
+function clampScore(score: number | null): number | null {
+  if (score === null) return null;
+  return Math.min(5, Math.max(0, score));
 }
 
 // nagg keeps the [n/5] marker in the review content; strip the first occurrence

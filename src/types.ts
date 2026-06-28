@@ -241,6 +241,12 @@ export interface MintReviewRecommendation {
 export interface MintReviewsSummary {
   mintUrl?: string;
   score: number | null;
+  /**
+   * Server's authoritative total review count (over the full review set, not
+   * just the returned page). Consumers should prefer this over
+   * `recommendations.length`, which is capped by the page limit.
+   */
+  reviewCount?: number;
   recommendations: MintReviewRecommendation[];
   lastUpdated?: number | null;
   fromCache?: boolean;

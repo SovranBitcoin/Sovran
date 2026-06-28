@@ -1087,15 +1087,38 @@ export function createDefaultOperations(
       const rowCatalog: Partial<MintReviewInfo> = {};
       if (item) {
         if (item.kymScore !== undefined) rowCatalog.kymScore = item.kymScore;
+        if (item.reviewCount !== undefined)
+          rowCatalog.reviewCount = item.reviewCount;
         if (item.auditScore !== undefined)
           rowCatalog.auditScore = item.auditScore;
         if (item.auditState !== undefined)
           rowCatalog.auditState = item.auditState;
+        if (item.contactFollowers !== undefined)
+          rowCatalog.contactFollowers = item.contactFollowers;
+        if (item.contactReputation !== undefined)
+          rowCatalog.contactReputation = item.contactReputation;
       }
+
+      // The selector row carries list-level aggregates from `fetchMintCatalog`
+      // (kym/review counts, follower/reputation numbers) — NOT the full
+      // recommendation list or the operator's kind-0 profile object. When the
+      // specific aggregate a fetch would fill is already present we skip that
+      // round-trip so the screen opens from context instead of blocking
+      // navigation; the reviews screen fetches its own full list separately.
+      //
+      // Gate each skip on the EXACT field it backfills, and require ALL of a
+      // group's fields — a partial row (e.g. a kym score without a review count,
+      // or followers without reputation) must still fetch to fill the hole.
+      const itemHasReviewAggregate = item?.reviewCount !== undefined;
+      const itemHasContactProfile =
+        item?.contactFollowers !== undefined &&
+        item?.contactReputation !== undefined;
 
       const contactPubkey = extractMintNostrContactPubkey(mintInfo);
       const [contactProfile, reviews] = await Promise.all([
-        contactPubkey && config.resolveMintContactProfile
+        contactPubkey &&
+        config.resolveMintContactProfile &&
+        !itemHasContactProfile
           ? config
               .resolveMintContactProfile(contactPubkey, mintUrl)
               .catch((e) => {
@@ -1110,7 +1133,7 @@ export function createDefaultOperations(
                 return undefined;
               })
           : Promise.resolve(undefined),
-        config.fetchMintReviews
+        config.fetchMintReviews && !itemHasReviewAggregate
           ? config.fetchMintReviews(mintUrl).catch((e) => {
               logger.warn("operations.buildMintReviewInfo.reviews.failed", {
                 ...mintUrlFields(mintUrl),
@@ -1133,7 +1156,10 @@ export function createDefaultOperations(
       }
       if (reviews) {
         asyncEnrichment.reviews = reviews;
-        asyncEnrichment.reviewCount = reviews.recommendations.length;
+        // Prefer the server's authoritative full-set count; fall back to the
+        // returned page length only when the summary omitted it.
+        asyncEnrichment.reviewCount =
+          reviews.reviewCount ?? reviews.recommendations.length;
         if (typeof reviews.score === "number") {
           asyncEnrichment.kymScore = reviews.score;
         }
