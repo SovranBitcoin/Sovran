@@ -311,6 +311,10 @@ interface ContactRowProps {
 
   onPress?: () => void;
   loading?: boolean;
+  /** Animate the stat-accent values (cached→fresh roll-in). Mint rows only;
+   *  the accent is keyed by mintUrl so a recycled cell never rolls a neighbour's
+   *  value. Default off keeps every other row byte-identical. */
+  animate?: boolean;
   disabled?: boolean;
   disabledReason?: string;
 
@@ -618,6 +622,7 @@ export function ContactRow({
   onInspectPress,
   onPress,
   loading,
+  animate = false,
   disabled = false,
   disabledReason,
   padding = 'default',
@@ -782,7 +787,16 @@ export function ContactRow({
   const accentNode = reserveAccent ? (
     <RowStatsAccentSkeleton seed={seed} />
   ) : (
-    <RowStatsAccent stats={statList} note={disabledReason} nip05={nip05} />
+    // Key by mintUrl so a FlashList cell recycled from mint A→B remounts the
+    // stat pills (fresh first-render → no spurious roll); a same-mint
+    // cached→live value change keeps the key stable and animates.
+    <RowStatsAccent
+      key={mint?.mintUrl ?? seed}
+      stats={statList}
+      note={disabledReason}
+      nip05={nip05}
+      animate={animate && !!mint}
+    />
   );
 
   // ---- Trailing ---------------------------------------------------------

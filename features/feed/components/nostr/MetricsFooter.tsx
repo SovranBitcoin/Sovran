@@ -1,15 +1,8 @@
 import React from 'react';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 import { alpha, iconSize } from '@/shared/styles/tokens';
+import { AnimatedCountValue } from '@/shared/ui/composed/AnimatedCountValue';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
@@ -32,49 +25,6 @@ export const POST_ACTION_ICON_SIZES = {
     repost: iconSize.lg + 1,
   },
 } as const;
-
-/**
- * A count/sats value that "rolls in" when it changes instead of snapping — so a
- * lazily-loaded or updated engagement count animates rather than abruptly
- * changing. Wraps the app `Text` (font/colour stay exact); only a parent
- * Animated.View's opacity + a few-px translateY tween, so there's no clipping.
- * The first render never animates (avoids every count counting up on mount).
- */
-const AnimatedCountValue = React.memo(function AnimatedCountValue({
-  value,
-  size,
-  color,
-  overpass = false,
-}: {
-  value: string;
-  size: number;
-  color: string;
-  overpass?: boolean;
-}) {
-  const progress = useSharedValue(1);
-  const firstRender = React.useRef(true);
-  React.useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
-    progress.value = withSequence(
-      withTiming(0, { duration: 0 }),
-      withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) })
-    );
-  }, [value, progress]);
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: 0.25 + 0.75 * progress.value,
-    transform: [{ translateY: (1 - progress.value) * 6 }],
-  }));
-  return (
-    <Animated.View style={animatedStyle}>
-      <Text overpass={overpass} size={size} style={{ color }}>
-        {value}
-      </Text>
-    </Animated.View>
-  );
-});
 
 const AnimatedMetric = React.memo(function AnimatedMetric({
   iconName,

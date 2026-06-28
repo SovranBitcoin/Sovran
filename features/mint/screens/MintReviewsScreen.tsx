@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { FlatList } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
@@ -15,10 +16,14 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { reviewMint, type MintRecommendation } from '@/shared/lib/apiClient';
-import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
+import {
+  useCachedMintMetadata,
+  useMintMetadataStore,
+} from '@/shared/stores/global/mintMetadataStore';
 import { useIdentityName } from '@/shared/hooks/useIdentityName';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
+import { useCountRollIn } from '@/shared/ui/composed/AnimatedCountValue';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -276,18 +281,24 @@ const HeaderStats = React.memo(function HeaderStats({
 
   const displayScore = score !== null ? score.toFixed(1) : '0.0';
   const hasScore = score !== null && score >= 0;
+  const reviewsLabel = `${totalReviews} ${totalReviews === 1 ? 'review' : 'reviews'}`;
+  // Cached aggregate paints immediately; a fresh fetch rolls it in (feed metric).
+  const scoreRoll = useCountRollIn(displayScore);
+  const countRoll = useCountRollIn(reviewsLabel);
 
   return (
     <View className="items-center pb-6 pt-4">
       <VStack align="center" spacing={4}>
-        <Text
-          loading={loading && !hasScore}
-          placeholder="0.0"
-          heavy
-          size={48}
-          style={{ color: warning, lineHeight: 52 }}>
-          {displayScore}
-        </Text>
+        <Animated.View style={scoreRoll}>
+          <Text
+            loading={loading && !hasScore}
+            placeholder="0.0"
+            heavy
+            size={48}
+            style={{ color: warning, lineHeight: 52 }}>
+            {displayScore}
+          </Text>
+        </Animated.View>
 
         {loading && !hasScore ? (
           <HStack gap={4}>
@@ -307,13 +318,15 @@ const HeaderStats = React.memo(function HeaderStats({
           <StarRating score={score} size={24} />
         ) : null}
 
-        <Text
-          loading={loading && totalReviews === 0}
-          placeholder="0 reviews"
-          size={14}
-          style={{ color: opacity(foreground, 0.4), marginTop: 4 }}>
-          {totalReviews} {totalReviews === 1 ? 'review' : 'reviews'}
-        </Text>
+        <Animated.View style={countRoll}>
+          <Text
+            loading={loading && totalReviews === 0}
+            placeholder="0 reviews"
+            size={14}
+            style={{ color: opacity(foreground, 0.4), marginTop: 4 }}>
+            {reviewsLabel}
+          </Text>
+        </Animated.View>
       </VStack>
     </View>
   );
@@ -321,15 +334,20 @@ const HeaderStats = React.memo(function HeaderStats({
 
 export function MintReviewsScreen() {
   useLifecycleLogger('MintReviewsScreen');
-  const background = useThemeColor('background');
+  const [background, foreground] = useThemeColor(['background', 'foreground'] as const);
   const insets = useSafeAreaInsets();
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.reviews' });
   const mintUrl = params?.mintUrl;
 
   const [kymLoading, setKymLoading] = useState(true);
-  const cached = useKYMMintStore((s) => (mintUrl ? s.getCached(mintUrl) : undefined));
-  const kymScore = cached?.score;
-  const kymRecommendations = cached?.recommendations;
+  // Review ROWS are ephemeral — fetched fresh on every open, never persisted
+  // (the raw list is "junk to store forever"). Only the AGGREGATE (score +
+  // count) is durable, read from the unified cache so it survives a failed
+  // fetch and paints the header immediately on a warm open.
+  const [rawReviews, setRawReviews] = useState<MintRecommendation[]>([]);
+  const meta = useCachedMintMetadata(mintUrl);
+  const kymScore = meta?.averageScore ?? null;
+  const aggregateCount = meta?.reviewCount;
 
   useEffect(() => {
     if (!mintUrl) {
@@ -337,17 +355,17 @@ export function MintReviewsScreen() {
       setKymLoading(false);
       return;
     }
-    const cachedAtStart = useKYMMintStore.getState().getCached(mintUrl);
-    // Show cached data immediately if available
-    if (cachedAtStart) setKymLoading(false);
-    // Always fetch fresh from server. Abort on unmount or if mintUrl changes
-    // mid-flight so a slow review fetch doesn't write into a stale screen.
+    const cachedAtStart = useMintMetadataStore.getState().getCached(mintUrl);
+    // Show the cached aggregate immediately if we have one.
+    if (cachedAtStart?.reviewsAt) setKymLoading(false);
+    // Always fetch fresh review rows from server. Abort on unmount or if mintUrl
+    // changes mid-flight so a slow fetch doesn't write into a stale screen.
     const controller = new AbortController();
     cashuLog.info('mint.reviews.fetch.start', {
       ...mintUrlLogFields(mintUrl),
-      hasCached: !!cachedAtStart,
-      cachedScore: cachedAtStart?.score ?? null,
-      cachedRecommendationCount: cachedAtStart?.recommendations.length ?? 0,
+      hasCachedAggregate: !!cachedAtStart?.reviewsAt,
+      cachedScore: cachedAtStart?.averageScore ?? null,
+      cachedReviewCount: cachedAtStart?.reviewCount ?? 0,
     });
     reviewMint({ mintUrl, signal: controller.signal })
       .then((result) => {
@@ -364,16 +382,20 @@ export function MintReviewsScreen() {
           hasScore: result.isOk() && result.value.score !== null,
           recommendationCount: result.isOk() ? result.value.recommendations.length : 0,
         });
-        // Always overwrite with the fresh successful result (even a null score /
-        // empty list) so a stale snapshot can't outlive the source. (audit F3)
+        // Rows → local state (ephemeral); aggregate → durable cache. Always
+        // overwrite with the fresh successful result (even a null score / empty
+        // list) so a stale aggregate can't outlive the source. (audit F3)
         if (result.isOk()) {
-          useKYMMintStore
+          setRawReviews(result.value.recommendations);
+          useMintMetadataStore
             .getState()
-            .setCached(mintUrl, result.value.score, result.value.recommendations);
+            .setReviewsAggregate(mintUrl, result.value.score, result.value.recommendations.length);
         }
       })
       .catch((error) => {
         if (controller.signal.aborted) return;
+        // On failure the cached aggregate header stays visible; only the row
+        // list falls back to its empty/last-known state.
         cashuLog.warn('mint.reviews.fetch.failed', {
           ...mintUrlLogFields(mintUrl),
           error: redactError(error),
@@ -390,14 +412,15 @@ export function MintReviewsScreen() {
 
   const isLoading = kymLoading;
   const reviews = useMemo(() => {
-    const all = kymRecommendations || [];
-    const withContent = all.filter((r) => r.comment?.trim());
-    const withoutContent = all.filter((r) => !r.comment?.trim());
+    const withContent = rawReviews.filter((r) => r.comment?.trim());
+    const withoutContent = rawReviews.filter((r) => !r.comment?.trim());
     const byDate = (a: MintRecommendation, b: MintRecommendation) =>
       (b.created_at ?? 0) - (a.created_at ?? 0);
     return [...withContent.sort(byDate), ...withoutContent.sort(byDate)];
-  }, [kymRecommendations]);
-  const totalReviews = reviews.length;
+  }, [rawReviews]);
+  // Header count prefers the durable aggregate (survives a failed row fetch),
+  // falling back to the freshly-fetched rows before the first aggregate lands.
+  const totalReviews = aggregateCount ?? reviews.length;
 
   const renderItem = useCallback(
     ({ item, index }: { item: MintRecommendation; index: number }) => (
@@ -442,6 +465,26 @@ export function MintReviewsScreen() {
 
   const showEmptyState = !isLoading && totalReviews === 0;
 
+  // We're in the list branch (a cached aggregate says reviews exist) but the
+  // fresh row fetch returned nothing — distinguish "couldn't load" from the
+  // genuine no-reviews EmptyState above, instead of a silent blank body.
+  const listEmpty = useMemo(
+    () =>
+      !isLoading ? (
+        <Text
+          size={14}
+          style={{
+            color: opacity(foreground, 0.4),
+            textAlign: 'center',
+            paddingHorizontal: 32,
+            marginTop: 24,
+          }}>
+          Couldn&apos;t load reviews right now. Reopen to try again.
+        </Text>
+      ) : null,
+    [isLoading, foreground]
+  );
+
   return (
     <Log name="MintReviewsScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen options={{ title: 'Reviews' }} />
@@ -458,6 +501,7 @@ export function MintReviewsScreen() {
           keyExtractor={keyExtractor}
           ListHeaderComponent={ListHeader}
           ListFooterComponent={ListFooter}
+          ListEmptyComponent={listEmpty}
           contentContainerStyle={{
             paddingHorizontal: 16,
             paddingTop: insets.top + 48,

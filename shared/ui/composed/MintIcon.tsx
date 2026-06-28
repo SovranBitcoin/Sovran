@@ -53,6 +53,9 @@ export function MintIcon({
     setFailedUrl(null);
   }, [normalizedIconUrl]);
 
+  // Loading placeholder matches the thread-reply pfp / `Text` skeleton fill —
+  // a low-opacity foreground tint that reads as ambient "loading" and stays
+  // consistent with the Avatar/Text placeholders rendered beside it in a row.
   const loadingColor = useMemo(() => opacity(foreground, 0.07), [foreground]);
   const fallbackBackground = muted;
   const borderRadius = size / 2;

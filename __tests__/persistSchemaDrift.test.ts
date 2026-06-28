@@ -23,7 +23,7 @@ import '@/shared/stores/profile/transactionAnnotationStore';
 import '@/shared/stores/profile/ownedMediaStore';
 import '@/shared/stores/profile/nostrSocialStore';
 import '@/shared/stores/profile/dataMigrationStore';
-import '@/shared/stores/global/kymMintStore';
+import '@/shared/stores/global/mintMetadataStore';
 import '@/shared/stores/profile/mintStore';
 
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';

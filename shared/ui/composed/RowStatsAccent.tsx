@@ -23,12 +23,13 @@
 
 import React from 'react';
 import { View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
+import { useCountRollIn } from '@/shared/ui/composed/AnimatedCountValue';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 /** Canonical iconify glyphs for row-accent stats. Use these names so a star
@@ -80,6 +81,11 @@ export interface RowStat {
 
 interface RowStatsAccentProps {
   stats: RowStat[];
+  /** Animate each stat value with the feed roll-in when it changes (cached→fresh).
+   *  Off by default so non-mint rows stay byte-identical. The caller MUST key
+   *  this element by a stable identity (e.g. mintUrl) so a recycled list cell
+   *  remounts the pills instead of rolling a neighbour's value. */
+  animate?: boolean;
   /** Trailing note appended below the stats (e.g. a disabled reason). */
   note?: string;
   /** Color for the note text. Defaults to a dim foreground. */
@@ -92,7 +98,36 @@ interface RowStatsAccentProps {
   nip05?: { handle: string };
 }
 
-export function RowStatsAccent({ stats, note, noteColor, nip05 }: RowStatsAccentProps) {
+/**
+ * One icon + value stat pill. Each pill owns a single `useCountRollIn` instance
+ * (keyed by the parent on `stat.icon`, the stable semantic) so the hook count is
+ * constant as the stat set grows/shrinks. When `animate` is set, the value rolls
+ * in on change; otherwise the plain `Text` renders unchanged.
+ */
+function RowStatPill({ stat, animate }: { stat: RowStat; animate?: boolean }) {
+  // Hook is always called (rules-of-hooks); `animate` only decides the wrapper.
+  const rollIn = useCountRollIn(`${stat.value}|${stat.meta ?? ''}`);
+  const inner = (
+    <Text size={12} bold color={stat.color}>
+      {stat.value}
+      {stat.meta ? (
+        <Text size={12} color={opacity(stat.color, 0.7)}>
+          {' ('}
+          {stat.meta}
+          {')'}
+        </Text>
+      ) : null}
+    </Text>
+  );
+  return (
+    <HStack align="center" style={{ gap: 3 }} accessibilityLabel={stat.accessibilityLabel}>
+      <Icon name={stat.icon} size={12} color={stat.color} />
+      {animate ? <Animated.View style={rollIn}>{inner}</Animated.View> : inner}
+    </HStack>
+  );
+}
+
+export function RowStatsAccent({ stats, note, noteColor, nip05, animate }: RowStatsAccentProps) {
   const [foreground] = useThemeColor(['foreground'] as const);
 
   const hasNip05 = !!nip05?.handle;
@@ -112,22 +147,7 @@ export function RowStatsAccent({ stats, note, noteColor, nip05 }: RowStatsAccent
                   {'•'}
                 </Text>
               )}
-              <HStack
-                align="center"
-                style={{ gap: 3 }}
-                accessibilityLabel={stat.accessibilityLabel}>
-                <Icon name={stat.icon} size={12} color={stat.color} />
-                <Text size={12} bold color={stat.color}>
-                  {stat.value}
-                  {stat.meta ? (
-                    <Text size={12} color={opacity(stat.color, 0.7)}>
-                      {' ('}
-                      {stat.meta}
-                      {')'}
-                    </Text>
-                  ) : null}
-                </Text>
-              </HStack>
+              <RowStatPill stat={stat} animate={animate} />
             </React.Fragment>
           ))}
           {hasNip05 ? (
@@ -176,16 +196,18 @@ export function RowStatsAccent({ stats, note, noteColor, nip05 }: RowStatsAccent
  * pixel bar previously under-shot the text line height by a couple of pixels).
  */
 export function RowStatsAccentSkeleton({ seed }: { seed?: string }) {
+  const foreground = useThemeColor('foreground');
+  // Plain disc filled with the same low-opacity foreground tint that `Text`,
+  // `Avatar`, and `MintIcon` loading placeholders use — NOT the darker
+  // `bg-skeleton` token (nor its own `animate-pulse`, which those siblings lack)
+  // — so every skeleton element in a row reads as one consistent shade and the
+  // shared crossfade wave is the only motion.
+  const dotColor = opacity(foreground, 0.07);
   return (
     <HStack align="center" style={{ gap: 4, marginTop: 2 }}>
       {[`accent:${seed ?? 'x'}`, `accent2:${seed ?? 'x'}`].map((key, i) => (
         <HStack key={key} align="center" style={{ gap: 3 }}>
-          <Skeleton
-            className="bg-skeleton rounded-full"
-            style={{ width: 12, height: 12 }}
-            visualKey={key}
-            visualComponent="RowStatsAccentSkeleton"
-          />
+          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: dotColor }} />
           <Text size={12} bold loading placeholder={i === 0 ? '4.5' : '98%'} />
         </HStack>
       ))}

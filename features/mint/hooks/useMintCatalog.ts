@@ -16,7 +16,7 @@ import type { MintCatalogEntry } from '@sovranbitcoin/colada';
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
 import { log } from '@/shared/lib/logger';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
-import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
+import { getCachedMintInfo } from '@/shared/stores/global/mintMetadataStore';
 
 export function useMintCatalog(mintUrls: string[]): Record<string, MintCatalogEntry> {
   const manager = useManager();

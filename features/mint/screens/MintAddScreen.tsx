@@ -19,7 +19,7 @@ import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
 import { useDebouncedMintValidation } from '@/features/mint/hooks/useDebouncedMintValidation';
 import { useMintSearch } from '@/features/mint/hooks/useMintSearch';
 import type { MintSearchResult } from '@/shared/lib/apiClient';
-import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
+import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
 import {
   extractDomain,
@@ -36,7 +36,10 @@ import { List } from '@/shared/ui/composed/List';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { LoadingIndicator } from '@/shared/blocks/status';
-import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
+import {
+  MintCurrencyTabs,
+  MINT_CURRENCY_TABS_HEIGHT,
+} from '@/features/mint/components/MintCurrencyTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import opacity from 'hex-color-opacity';
@@ -45,7 +48,7 @@ import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 
 // Height constant for currency tabs (same as MintListScreen)
-const CURRENCY_TABS_HEIGHT = 48;
+const CURRENCY_TABS_HEIGHT = MINT_CURRENCY_TABS_HEIGHT;
 
 // MintStatCell removed — stats now rendered inline
 
@@ -108,7 +111,7 @@ interface DisplayMint {
 type SearchableMint = DisplayMint | PseudoMint | SkeletonMint;
 
 function adaptSearchResult(result: MintSearchResult): DisplayMint {
-  const profile = useMintProfileStore.getState().getCached(result.url);
+  const profile = useMintMetadataStore.getState().getCached(result.url);
   const info = (result.info ?? {}) as {
     icon_url?: string | null;
     name?: string;
@@ -124,10 +127,10 @@ function adaptSearchResult(result: MintSearchResult): DisplayMint {
       description: info.description ?? null,
       contact: Array.isArray(info.contact) ? info.contact : undefined,
     },
-    contactFollowers: profile?.followers,
+    contactFollowers: profile?.contactFollowers,
     contactReputation:
-      profile && typeof profile.reputation === 'number'
-        ? Math.round(profile.reputation)
+      profile && typeof profile.contactReputation === 'number'
+        ? Math.round(profile.contactReputation)
         : undefined,
     auditState: result.state,
     serverStats: {
@@ -378,10 +381,10 @@ export function MintAddScreen() {
 
   const { mints: knownMints } = useMintManagement();
 
-  // Subscribe to the mint-profile cache so that when `useMintProfiles` finishes
-  // resolving an operator's Nostr profile, `adaptSearchResult` re-runs and the
-  // row picks up `contactFollowers` / `contactReputation`.
-  const mintProfileCache = useMintProfileStore((s) => s.cache);
+  // Subscribe to the unified metadata cache so that when `useMintProfiles`
+  // finishes resolving an operator's Nostr profile, `adaptSearchResult` re-runs
+  // and the row picks up `contactFollowers` / `contactReputation`.
+  const mintProfileCache = useMintMetadataStore((s) => s.byMintUrl);
 
   // Adapt server results to display format, filter out already-known mints
   const displayMints = useMemo((): SearchableMint[] => {
@@ -434,7 +437,7 @@ export function MintAddScreen() {
   }, [searchResults, knownMints, searchQuery, validationState, customMintInfo, mintProfileCache]);
 
   // Kick off Nostr profile fetches for any search result that has an operator
-  // pubkey in NUT-06 contact info. Results land in `useMintProfileStore`
+  // pubkey in NUT-06 contact info. Results land in `mintMetadataStore`
   // and the memo above re-runs once they arrive.
   const profileFetchInputs = useMemo(
     () =>
@@ -733,6 +736,8 @@ export function MintAddScreen() {
     [isAdding, selectedMints.size, handleSave]
   );
 
+  // Reserves the full header height; the wrapper derives it from a frame-0-stable
+  // value on iOS, so this spacer no longer reflows on a late header settle.
   const listHeader = useMemo(
     () => <View style={{ height: totalHeaderHeight }} />,
     [totalHeaderHeight]
@@ -765,6 +770,12 @@ export function MintAddScreen() {
         getItemType={getItemType}
         extraData={selectedMints}
         drawDistance={300}
+        // FlashList v2 enables maintainVisibleContentPosition by default (anchor
+        // sits before the ListHeaderComponent), which mis-anchors a short list
+        // with a tall spacer header and snaps on first scroll (flash-list#2050).
+        // Opt out so the JS spacer is the sole inset authority.
+        maintainVisibleContentPosition={{ disabled: true }}
+        contentInsetAdjustmentBehavior="never"
         style={{ flex: 1, height: 0 }}
         contentContainerStyle={{ paddingBottom: 120 }}
         ListHeaderComponent={listHeader}

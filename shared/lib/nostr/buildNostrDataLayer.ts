@@ -127,7 +127,13 @@ function startProfilePersistence(layer: facade.NostrDataLayer): () => void {
     timer = setTimeout(flush, WRITE_BEHIND_DEBOUNCE_MS);
   });
   return () => {
-    if (timer) clearTimeout(timer);
+    // Flush any debounced write before tearing down (e.g. on profile switch /
+    // tier rebuild) so records the cache already observed aren't dropped with
+    // the pending timer.
+    if (timer) {
+      clearTimeout(timer);
+      flush();
+    }
     unsub();
   };
 }

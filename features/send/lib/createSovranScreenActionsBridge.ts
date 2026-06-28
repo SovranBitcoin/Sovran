@@ -17,12 +17,10 @@ import {
   shouldApplyEntryUpdate as defaultShouldApply,
 } from '@sovranbitcoin/colada';
 
+import { projectMintMeta } from '@/features/mint/lib/auditInfo';
 import { paymentLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
-import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
-import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
-import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
+import { getCachedMintInfo, useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
@@ -173,44 +171,40 @@ function subscriptionEventToEntryUpdate(
 
 export function getSovranMintEnrichment(mintUrl: string): Partial<MintReviewInfo> {
   const normalized = normalizeMintUrlKey(mintUrl);
-  const audit = useAuditMintStore.getState().getCached(normalized);
-  const kym = useKYMMintStore.getState().getCached(normalized);
+  const meta = useMintMetadataStore.getState().getCached(normalized);
 
   const enrichment: Partial<MintReviewInfo> = {};
-  if (kym) {
-    if (kym.score !== null) enrichment.kymScore = kym.score;
-    enrichment.reviewCount = kym.recommendations?.length;
-  }
+  if (!meta) return enrichment;
 
-  const profile = useMintProfileStore.getState().getCached(normalized);
-  if (profile) {
-    enrichment.contactFollowers = profile.followers;
-    if (typeof profile.reputation === 'number') {
-      enrichment.contactReputation = Math.round(profile.reputation);
-    }
-  }
+  // One owner for the cache-entry → scalars projection (shared with the
+  // catalog reader): keeps the audit-score formula and discover-scalar
+  // fallback from being hand-coded a second time here.
+  const p = projectMintMeta(meta);
 
-  if (audit) {
-    const swaps = audit.auditData.swaps ?? [];
-    const swapSuccess = swaps.reduce((acc, swap) => acc + (swap.state === 'OK' ? 1 : 0), 0);
-    const swapTotal = swaps.length;
-    const successRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
-    const successfulTimes = swaps
-      .filter((swap) => swap.state === 'OK' && typeof swap.time_taken === 'number')
-      .map((swap) => swap.time_taken)
-      .filter((time) => time > 0);
+  if (p.kymScore !== undefined) enrichment.kymScore = p.kymScore;
+  if (p.reviewCount !== undefined) enrichment.reviewCount = p.reviewCount;
+  if (p.contactFollowers !== undefined) enrichment.contactFollowers = p.contactFollowers;
+  if (p.contactReputation !== undefined) enrichment.contactReputation = p.contactReputation;
 
-    enrichment.auditScore = typeof successRate === 'number' ? successRate * 5 : undefined;
-    enrichment.auditState = audit.auditData.state;
-    enrichment.successRate = successRate;
-    enrichment.swapSuccess = swapSuccess;
-    enrichment.swapTotal = swapTotal;
-    enrichment.totalMints = audit.auditData.n_mints;
-    enrichment.totalMelts = audit.auditData.n_melts;
-    enrichment.avgTimeMs =
-      successfulTimes.length > 0
-        ? successfulTimes.reduce((sum, time) => sum + time, 0) / successfulTimes.length
-        : undefined;
+  if (p.audit) {
+    // Raw auditor blob present — assign the swap-derived fields explicitly (not
+    // guarded): the result is spread over the existing entry, so a now-scoreless
+    // mint (zero recent swaps → `auditScore` undefined) must CLEAR a stale score
+    // rather than silently preserve it.
+    enrichment.auditScore = p.auditScore;
+    enrichment.auditState = p.auditState;
+    enrichment.totalMints = p.auditMints;
+    enrichment.totalMelts = p.auditMelts;
+    enrichment.successRate = p.audit.successRate;
+    enrichment.swapSuccess = p.audit.swapSuccess;
+    enrichment.swapTotal = p.audit.swapTotal;
+    enrichment.avgTimeMs = p.audit.avgTimeMs;
+  } else {
+    // Discover-seeded scalars (no raw swaps) — surface what's present, omit holes.
+    if (p.auditScore !== undefined) enrichment.auditScore = p.auditScore;
+    if (p.auditState !== undefined) enrichment.auditState = p.auditState;
+    if (p.auditMints != null) enrichment.totalMints = p.auditMints;
+    if (p.auditMelts != null) enrichment.totalMelts = p.auditMelts;
   }
 
   return enrichment;
@@ -370,10 +364,8 @@ export function createSovranScreenActionsBridge({
           type: 'mintInfo.enrichmentChanged',
           mintUrl: mintInfoFetchingUrl ?? undefined,
         });
-      unsubscribes.push(useAuditMintStore.subscribe((state) => state.cache, publishMintEnrichment));
-      unsubscribes.push(useKYMMintStore.subscribe((state) => state.cache, publishMintEnrichment));
       unsubscribes.push(
-        useMintProfileStore.subscribe((state) => state.cache, publishMintEnrichment)
+        useMintMetadataStore.subscribe((state) => state.byMintUrl, publishMintEnrichment)
       );
 
       unsubscribes.push(

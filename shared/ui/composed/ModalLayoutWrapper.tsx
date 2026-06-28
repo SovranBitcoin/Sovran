@@ -29,6 +29,15 @@ import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
 
+/** Measured iOS flow-modal (pageSheet) header height — a STABLE, frame-0 value
+ *  used instead of the navigator header height, which react-native-screens seeds
+ *  with a default (`insets.top + 44`) and corrects ~700ms after the present, so
+ *  reserving JS layout from it reflows content. These modals are pageSheets, so
+ *  the header does NOT include the full notch inset (the navigator default of
+ *  `insets.top + 44 = 83` overshot the real measured 70) — it's ~constant across
+ *  devices. Confirm via the `modal.header.tune` log if a device looks off. */
+const IOS_MODAL_HEADER_HEIGHT = 70;
+
 const DebugRow = ({
   label,
   value,
@@ -166,6 +175,13 @@ export function ModalLayoutWrapper({
   const navigatorHeaderHeight = useContext(HeaderHeightContext) ?? 0;
   const headerHeight = sheetHeaderHeight ?? navigatorHeaderHeight;
   const insets = useSafeAreaInsets();
+  // Stable header bottom for app-owned chrome (sticky overlay, top gradient). On
+  // iOS the native automatic content inset owns the scroll content's nav-header
+  // spacing, so we only need a frame-0-stable reference for the overlay; the
+  // safe-area inset + standard nav-bar height is that, and matches the settled
+  // navigator value without the present-time settle. Android keeps the
+  // deterministic SheetHeaderHeightContext value (already shift-free).
+  const stableHeaderBottom = Platform.OS === 'ios' ? IOS_MODAL_HEADER_HEIGHT : headerHeight;
   const themeBackground = useThemeColor('background');
   const background = bgColor ?? themeBackground;
 
@@ -187,12 +203,15 @@ export function ModalLayoutWrapper({
     }
   }, []);
 
-  const gradientHeight = headerGradientHeight ?? headerHeight;
+  const gradientHeight = headerGradientHeight ?? stableHeaderBottom;
   // The declared stickyContentHeight prop is only a first-frame estimate —
   // prefer the measured height so a wrong declaration (or wrapping content)
   // can't permanently misplace the spacer/list padding.
   const [measuredStickyHeight, setMeasuredStickyHeight] = useState<number | null>(null);
-  const totalHeaderHeight = headerHeight + (measuredStickyHeight ?? stickyContentHeight);
+  // iOS: reserve from the frame-0-stable header bottom, not the navigator height
+  // that settles ~700ms after present (which reflowed the list). Android keeps
+  // its deterministic value. This is the single source the spacer/overlay use.
+  const totalHeaderHeight = stableHeaderBottom + (measuredStickyHeight ?? stickyContentHeight);
 
   useEffect(() => {
     onHeaderHeightChange?.(totalHeaderHeight);
@@ -233,7 +252,7 @@ export function ModalLayoutWrapper({
 
         {stickyContent && (
           <View
-            style={[styles.stickyContainer, { top: headerHeight }]}
+            style={[styles.stickyContainer, { top: stableHeaderBottom }]}
             onLayout={(e) => {
               const measured = Math.round(e.nativeEvent.layout.height);
               setMeasuredStickyHeight((prev) =>

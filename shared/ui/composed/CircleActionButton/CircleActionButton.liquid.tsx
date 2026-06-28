@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { GlassView } from 'expo-glass-effect';
 
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CIRCLE_SIZE, ICON_SIZE, type CircleActionButtonProps } from './CircleActionButton.types';
 import { CircleActionButtonShell } from './CircleActionButtonShell';
 
@@ -13,45 +14,59 @@ import { CircleActionButtonShell } from './CircleActionButtonShell';
 // RN view) rather than an @expo/ui SwiftUI `Host`. Host views (UIHostingController)
 // don't follow an RN ScrollView's content transform and visually pin to the top
 // while scrolling (expo/expo#46278); GlassView scrolls like any RN view.
+//
+// `isInteractive` restores the native press lensing the camera toolbar buttons
+// have. The tap is driven by a gesture-handler `Tap` rather than an RN
+// `Pressable`: the interactive glass installs its own UIKit gesture recognizer,
+// and an RN Pressable's JS responder loses arbitration to it intermittently (the
+// iOS-26 tap-swallow that forced `isInteractive` off in 17b70500). A
+// gesture-handler recognizer arbitrates natively alongside the glass, so the tap
+// fires reliably while the glass still reacts to touch.
 export function CircleActionButtonLiquid(props: CircleActionButtonProps): React.ReactElement {
   const [foreground] = useThemeColor(['foreground'] as const);
   const { icon, onPress, onPressIn, onPressOut, disabled = false, color } = props;
   const iconColor = color ?? foreground;
   const interactive = !disabled && !!(onPress || onPressIn || onPressOut);
 
+  // Preserve the single-flight guard the shared Pressable used to provide so a
+  // rapid double-tap whose handler navigates (Swap/More/…) can't fire twice.
+  const guardedPress = useSingleFlight(async () => {
+    if (!onPress) return;
+    const result = onPress() as unknown;
+    if (result instanceof Promise) await result;
+  });
+
+  const tap = useMemo(
+    () =>
+      Gesture.Tap()
+        .runOnJS(true)
+        .enabled(interactive)
+        .onBegin(() => onPressIn?.())
+        .onFinalize(() => onPressOut?.())
+        .onEnd((_event, success) => {
+          if (success) void guardedPress();
+        }),
+    [interactive, onPressIn, onPressOut, guardedPress]
+  );
+
   return (
     <CircleActionButtonShell {...props}>
-      <Pressable
-        onPress={interactive ? onPress : undefined}
-        onPressIn={interactive ? onPressIn : undefined}
-        onPressOut={interactive ? onPressOut : undefined}
-        disabled={!interactive}
-        style={({ pressed }) => [
-          styles.pressable,
-          pressed && interactive ? { opacity: 0.85 } : null,
-        ]}
-        hitSlop={6}>
+      <GestureDetector gesture={tap}>
         <GlassView
           glassEffectStyle="regular"
-          // NOT `isInteractive`: on iOS 26 the interactive glass layer contends
-          // for touches with the wrapping Pressable, so onPress fires only
-          // intermittently. Keep the glass decorative; the Pressable owns the tap.
+          isInteractive={interactive}
           style={[
             styles.circle,
             { width: CIRCLE_SIZE, height: CIRCLE_SIZE, borderRadius: CIRCLE_SIZE / 2 },
           ]}>
           <Icon name={icon} size={ICON_SIZE} color={iconColor} />
         </GlassView>
-      </Pressable>
+      </GestureDetector>
     </CircleActionButtonShell>
   );
 }
 
 const styles = StyleSheet.create({
-  pressable: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   circle: {
     alignItems: 'center',
     justifyContent: 'center',

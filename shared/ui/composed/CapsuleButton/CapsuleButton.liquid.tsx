@@ -1,12 +1,13 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
-import { PressableFeedback } from 'heroui-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import opacity from 'hex-color-opacity';
 
 import { GlassView } from 'expo-glass-effect';
 
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { controlHeight } from '@/shared/styles/tokens';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -20,6 +21,14 @@ const DEFAULT_HEIGHT = controlHeight.cta;
 // are rendered by a UIHostingController that does NOT follow an RN ScrollView's
 // content transform, so they visually pin to the top while scrolling
 // (expo/expo#46278). GlassView is a normal RN view and scrolls correctly.
+//
+// `isInteractive` restores the native press lensing the camera toolbar buttons
+// have. The tap is driven by a gesture-handler `Tap` rather than heroui's
+// `PressableFeedback`: the interactive glass installs its own UIKit gesture
+// recognizer, and a JS touch responder loses arbitration to it intermittently
+// (the iOS-26 tap-swallow that forced `isInteractive` off in 17b70500). A
+// gesture-handler recognizer arbitrates natively alongside the glass, so the tap
+// fires reliably — critical here since these are the Send/Receive entry points.
 export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactElement {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const {
@@ -50,20 +59,34 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
   const contentColor = color ?? (filled ? background : foreground);
   const tintColor = filled ? foreground : isActive ? opacity(foreground, 0.18) : undefined;
 
+  // Preserve the single-flight guard PressableFeedback's onPress used to provide
+  // so a rapid double-tap can't fire Send/Receive twice.
+  const guardedPress = useSingleFlight(async () => {
+    const result = onPress() as unknown;
+    if (result instanceof Promise) await result;
+  });
+
+  const tap = useMemo(
+    () =>
+      Gesture.Tap()
+        .runOnJS(true)
+        .onEnd((_event, success) => {
+          if (success) void guardedPress();
+        }),
+    [guardedPress]
+  );
+
   return (
-    <GlassView
-      testID={testID}
-      glassEffectStyle="regular"
-      // NOT `isInteractive`: on iOS 26 the interactive glass layer contends for
-      // touches with the nested PressableFeedback, so onPress fires only
-      // intermittently. Keep the glass decorative and let the pressable own the
-      // tap so Send/Receive open reliably.
-      tintColor={tintColor}
-      style={[styles.glass, widthStyle, cornerStyle, { minHeight: height }, style]}>
-      <PressableFeedback
-        animation={false}
-        onPress={onPress}
-        style={[styles.pressable, widthStyle, { minHeight: height }]}>
+    <GestureDetector gesture={tap}>
+      <GlassView
+        testID={testID}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        glassEffectStyle="regular"
+        isInteractive
+        tintColor={tintColor}
+        style={[styles.glass, widthStyle, cornerStyle, { minHeight: height }, style]}>
         <HStack
           align="center"
           justify="center"
@@ -78,9 +101,8 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
             {label}
           </Text>
         </HStack>
-        <PressableFeedback.Ripple />
-      </PressableFeedback>
-    </GlassView>
+      </GlassView>
+    </GestureDetector>
   );
 }
 
@@ -91,9 +113,6 @@ const styles = StyleSheet.create({
   },
   fullWidth: {
     width: '100%',
-  },
-  pressable: {
-    overflow: 'hidden',
   },
   content: {
     paddingHorizontal: 12,

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { discoverMints, type DiscoverMint, type MintSearchResult } from '@/shared/lib/apiClient';
 import { cashuLog } from '@/shared/lib/logger';
-import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
+import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 
 interface UseMintSearchReturn {
   results: MintSearchResult[];
@@ -97,12 +97,9 @@ export function useMintSearch(
           return;
         }
         const mapped = res.value.mints.map(discoverMintToSearchResult);
-        // Seed operator follower/reputation so useMintProfiles short-circuits.
-        for (const m of res.value.mints) {
-          if (m.followers != null) {
-            useMintProfileStore.getState().setCached(m.mintUrl, m.followers, m.vertexScore ?? null);
-          }
-        }
+        // Seed the unified cache from the discovery rows so the selector, audit
+        // and operator-profile lookups all become cache hits (not round-trips).
+        useMintMetadataStore.getState().upsertFromDiscover(res.value.mints);
         cashuLog.info('mint.discover.results', {
           fetchId,
           count: mapped.length,

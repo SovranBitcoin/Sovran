@@ -1,4 +1,5 @@
 import type { AuditMintResponse } from '@/shared/lib/apiClient';
+import type { MintMetadataEntry } from '@/shared/stores/global/mintMetadataStore';
 
 export interface AuditInfo {
   url: string;
@@ -61,4 +62,58 @@ export function transformAuditData(auditData: AuditMintResponse): AuditInfo {
       errors: auditData.n_errors,
     },
   };
+}
+
+/** Normalized presentation scalars projected from a cached metadata entry. */
+export interface MintMetaProjection {
+  kymScore?: number;
+  reviewCount?: number;
+  contactFollowers?: number;
+  /** rounded to a whole number */
+  contactReputation?: number;
+  auditScore?: number;
+  auditState?: string;
+  /** n_mints */
+  auditMints?: number;
+  /** n_melts */
+  auditMelts?: number;
+  /** full swap breakdown — present only when the raw auditor blob is cached */
+  audit?: AuditInfo;
+}
+
+/**
+ * Single owner for "given a cached mint metadata entry, here are the
+ * presentation scalars." Both the catalog reader (`getMintCatalog`) and the
+ * send-flow enrichment bridge project the same audit/review/social fields;
+ * centralizing the raw-blob-vs-discover-scalars fallback and the reputation
+ * rounding here keeps them from drifting (the swap-score formula lives only in
+ * `transformAuditData`). Lives next to that transform — a runtime leaf — so
+ * importing it never drags the network layer into a consumer.
+ */
+export function projectMintMeta(meta: MintMetadataEntry | undefined): MintMetaProjection {
+  const p: MintMetaProjection = {};
+  if (!meta) return p;
+
+  if (meta.averageScore != null) p.kymScore = meta.averageScore;
+  if (meta.reviewCount != null) p.reviewCount = meta.reviewCount;
+  if (meta.contactFollowers != null) p.contactFollowers = meta.contactFollowers;
+  if (typeof meta.contactReputation === 'number') {
+    p.contactReputation = Math.round(meta.contactReputation);
+  }
+
+  if (meta.auditData) {
+    const audit = transformAuditData(meta.auditData);
+    p.audit = audit;
+    if (audit.score !== undefined) p.auditScore = audit.score;
+    p.auditState = audit.state;
+    p.auditMints = audit.auditorData.mints;
+    p.auditMelts = audit.auditorData.melts;
+  } else if (meta.auditState !== undefined || meta.auditScore != null) {
+    // Discover-seeded entries carry audit scalars without the raw swap blob.
+    if (meta.auditScore != null) p.auditScore = meta.auditScore;
+    if (meta.auditState !== undefined) p.auditState = meta.auditState;
+    if (meta.nMints != null) p.auditMints = meta.nMints;
+    if (meta.nMelts != null) p.auditMelts = meta.nMelts;
+  }
+  return p;
 }

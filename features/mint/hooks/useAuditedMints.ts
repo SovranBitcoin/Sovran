@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { auditMint, fetchMintInfo } from '@/shared/lib/apiClient';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
+import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { cashuLog } from '@/shared/lib/logger';
 import { transformAuditData, type AuditInfo } from '../lib/auditInfo';
 
@@ -43,9 +43,9 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
   const fetchingRef = useRef(new Set<string>());
   const mountedRef = useRef(true);
 
-  const getCached = useAuditMintStore((state) => state.getCached);
-  const setCached = useAuditMintStore((state) => state.setCached);
-  const isStale = useAuditMintStore((state) => state.isStale);
+  const getCached = useMintMetadataStore((state) => state.getCached);
+  const setCached = useMintMetadataStore((state) => state.setAudit);
+  const isStale = useMintMetadataStore((state) => state.isStale);
 
   const mintUrlsKey = useMemo(() => mintUrls.join(','), [mintUrls]);
 
@@ -63,13 +63,13 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
     mintUrls.forEach((url) => {
       const normalized = normalizeMintUrlKey(url);
       const cached = getCached(normalized);
-      const stale = isStale(normalized);
+      const stale = isStale(normalized, 'audit');
 
-      if (cached && !stale) {
+      if (cached?.auditData && !stale) {
         cacheHits++;
         initialData[normalized] = {
           auditInfo: transformAuditData(cached.auditData),
-          mintInfo: cached.mintInfo,
+          mintInfo: cached.info,
           loading: false,
         };
       } else {
