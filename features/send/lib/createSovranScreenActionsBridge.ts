@@ -17,6 +17,7 @@ import {
   shouldApplyEntryUpdate as defaultShouldApply,
 } from '@sovranbitcoin/colada';
 
+import { projectMintMeta } from '@/features/mint/lib/auditInfo';
 import { paymentLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { getCachedMintInfo, useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
@@ -175,44 +176,35 @@ export function getSovranMintEnrichment(mintUrl: string): Partial<MintReviewInfo
   const enrichment: Partial<MintReviewInfo> = {};
   if (!meta) return enrichment;
 
-  if (meta.averageScore != null) enrichment.kymScore = meta.averageScore;
-  if (meta.reviewCount != null) enrichment.reviewCount = meta.reviewCount;
+  // One owner for the cache-entry → scalars projection (shared with the
+  // catalog reader): keeps the audit-score formula and discover-scalar
+  // fallback from being hand-coded a second time here.
+  const p = projectMintMeta(meta);
 
-  if (meta.contactFollowers != null) enrichment.contactFollowers = meta.contactFollowers;
-  if (typeof meta.contactReputation === 'number') {
-    enrichment.contactReputation = Math.round(meta.contactReputation);
-  }
+  if (p.kymScore !== undefined) enrichment.kymScore = p.kymScore;
+  if (p.reviewCount !== undefined) enrichment.reviewCount = p.reviewCount;
+  if (p.contactFollowers !== undefined) enrichment.contactFollowers = p.contactFollowers;
+  if (p.contactReputation !== undefined) enrichment.contactReputation = p.contactReputation;
 
-  // Swap-derived metrics need the raw auditor blob, which the store keeps.
-  if (meta.auditData) {
-    const swaps = meta.auditData.swaps ?? [];
-    const swapSuccess = swaps.reduce((acc, swap) => acc + (swap.state === 'OK' ? 1 : 0), 0);
-    const swapTotal = swaps.length;
-    const successRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
-    const successfulTimes = swaps
-      .filter((swap) => swap.state === 'OK' && typeof swap.time_taken === 'number')
-      .map((swap) => swap.time_taken)
-      .filter((time) => time > 0);
-
-    enrichment.auditScore = typeof successRate === 'number' ? successRate * 5 : undefined;
-    enrichment.auditState = meta.auditData.state;
-    enrichment.successRate = successRate;
-    enrichment.swapSuccess = swapSuccess;
-    enrichment.swapTotal = swapTotal;
-    enrichment.totalMints = meta.auditData.n_mints;
-    enrichment.totalMelts = meta.auditData.n_melts;
-    enrichment.avgTimeMs =
-      successfulTimes.length > 0
-        ? successfulTimes.reduce((sum, time) => sum + time, 0) / successfulTimes.length
-        : undefined;
-  } else if (meta.auditState !== undefined || meta.auditScore != null) {
-    // Discover-seeded entries carry audit scalars but not the raw `swaps` blob —
-    // surface what we have (mirrors `readCachedEntry` in getMintCatalog) so the
-    // send-flow selector shows audit state for discover-only mints, not nothing.
-    if (meta.auditScore != null) enrichment.auditScore = meta.auditScore;
-    if (meta.auditState !== undefined) enrichment.auditState = meta.auditState;
-    if (meta.nMints !== undefined) enrichment.totalMints = meta.nMints;
-    if (meta.nMelts !== undefined) enrichment.totalMelts = meta.nMelts;
+  if (p.audit) {
+    // Raw auditor blob present — assign the swap-derived fields explicitly (not
+    // guarded): the result is spread over the existing entry, so a now-scoreless
+    // mint (zero recent swaps → `auditScore` undefined) must CLEAR a stale score
+    // rather than silently preserve it.
+    enrichment.auditScore = p.auditScore;
+    enrichment.auditState = p.auditState;
+    enrichment.totalMints = p.auditMints;
+    enrichment.totalMelts = p.auditMelts;
+    enrichment.successRate = p.audit.successRate;
+    enrichment.swapSuccess = p.audit.swapSuccess;
+    enrichment.swapTotal = p.audit.swapTotal;
+    enrichment.avgTimeMs = p.audit.avgTimeMs;
+  } else {
+    // Discover-seeded scalars (no raw swaps) — surface what's present, omit holes.
+    if (p.auditScore !== undefined) enrichment.auditScore = p.auditScore;
+    if (p.auditState !== undefined) enrichment.auditState = p.auditState;
+    if (p.auditMints != null) enrichment.totalMints = p.auditMints;
+    if (p.auditMelts != null) enrichment.totalMelts = p.auditMelts;
   }
 
   return enrichment;

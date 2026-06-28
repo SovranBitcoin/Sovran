@@ -156,15 +156,18 @@ describe('migrateLegacyMintCaches', () => {
 });
 
 // Minimal DiscoverMint-shaped rows (cast to avoid importing the heavy apiClient).
-function discoverRow(overrides: Record<string, unknown>): Parameters<
+type DiscoverRow = Parameters<
   ReturnType<typeof useMintMetadataStore.getState>['upsertFromDiscover']
->[0][number] {
-  return {
+>[0][number];
+
+function discoverRow(overrides: Record<string, unknown>): DiscoverRow {
+  const row: Record<string, unknown> = {
     mintUrl: MINT,
     averageScore: 4,
     reviewCount: 3,
     ...overrides,
-  } as Parameters<ReturnType<typeof useMintMetadataStore.getState>['upsertFromDiscover']>[0][number];
+  };
+  return row as DiscoverRow;
 }
 
 describe('upsertFromDiscover stamps a group fresh only when it carried data', () => {
@@ -179,15 +182,29 @@ describe('upsertFromDiscover stamps a group fresh only when it carried data', ()
     expect(isStale(MINT, 'social')).toBe(true); // operator-profile fetch NOT suppressed
   });
 
-  it('stamps socialAt when followers are present', () => {
+  it('writes followers for display but leaves social stale when no reputation', () => {
+    // A follower COUNT alone is not "social resolved": the operator-profile
+    // fetch (which yields reputation) must still run, so `social` stays stale.
     useMintMetadataStore.getState().upsertFromDiscover([discoverRow({ followers: 42 })]);
     const { isStale, getCached } = useMintMetadataStore.getState();
-    expect(getCached(MINT)?.contactFollowers).toBe(42);
+    expect(getCached(MINT)?.contactFollowers).toBe(42); // shown immediately
+    expect(getCached(MINT)?.socialAt).toBeUndefined();
+    expect(isStale(MINT, 'social')).toBe(true); // operator-profile fetch NOT suppressed
+  });
+
+  it('stamps socialAt when a reputation-bearing vertexScore is present', () => {
+    useMintMetadataStore
+      .getState()
+      .upsertFromDiscover([discoverRow({ followers: 42, vertexScore: 77 })]);
+    const { isStale, getCached } = useMintMetadataStore.getState();
+    expect(getCached(MINT)?.contactReputation).toBe(77);
     expect(isStale(MINT, 'social')).toBe(false);
   });
 
   it('never stamps identityAt (discover carries no raw NUT-06 info blob)', () => {
-    useMintMetadataStore.getState().upsertFromDiscover([discoverRow({ name: 'Mint', iconUrl: 'i' })]);
+    useMintMetadataStore
+      .getState()
+      .upsertFromDiscover([discoverRow({ name: 'Mint', iconUrl: 'i' })]);
     const entry = useMintMetadataStore.getState().getCached(MINT)!;
     expect(entry.displayName).toBe('Mint'); // scalar updated…
     expect(entry.identityAt).toBeUndefined(); // …but identity not marked fresh

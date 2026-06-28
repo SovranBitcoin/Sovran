@@ -1,10 +1,10 @@
 /**
  * Per-mint catalog fetcher with a cache-first source preference.
  *
- * Existing source caches (audit / KYM / operator profile) are read before
- * touching the network, so offline mint lists can render the rich data the
- * wallet has already seen. Online callers use the same API surface: cached
- * rows return immediately and refreshes write back through the source stores.
+ * The unified `mintMetadataStore` (audit / KYM / operator profile) is read
+ * before touching the network, so offline mint lists can render the rich data
+ * the wallet has already seen. Online callers use the same API surface: cached
+ * rows return immediately and refreshes write back through that one store.
  *
  * Network refresh preference:
  *
@@ -31,7 +31,7 @@
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import type { MintCatalogEntry } from '@sovranbitcoin/colada';
 
-import { transformAuditData } from '@/features/mint/lib/auditInfo';
+import { projectMintMeta, transformAuditData } from '@/features/mint/lib/auditInfo';
 import { auditMint, fetchNostrProfile, reviewMint } from '@/shared/lib/apiClient';
 import { log } from '@/shared/lib/logger';
 import {
@@ -69,32 +69,19 @@ function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, un
 
 function readCachedEntry(mintUrl: string): { entry: MintCatalogEntry; info: unknown } {
   const meta = useMintMetadataStore.getState().getCached(mintUrl);
+  const p = projectMintMeta(meta);
 
   const entry: MintCatalogEntry = {};
-  let info: unknown = null;
-
-  if (meta) {
-    if (meta.auditData) {
-      const { score } = transformAuditData(meta.auditData);
-      if (score !== undefined) entry.auditScore = score;
-      entry.auditState = meta.auditData.state;
-      entry.auditTotalOps = meta.auditData.n_mints + meta.auditData.n_melts;
-    } else if (meta.auditState !== undefined) {
-      // Discover-seeded entries carry audit scalars without the raw swap blob.
-      if (meta.auditScore != null) entry.auditScore = meta.auditScore;
-      entry.auditState = meta.auditState;
-      if (meta.nMints != null && meta.nMelts != null) {
-        entry.auditTotalOps = meta.nMints + meta.nMelts;
-      }
-    }
-    if (meta.averageScore != null) entry.kymScore = meta.averageScore;
-    if (meta.reviewCount != null) entry.reviewCount = meta.reviewCount;
-    if (meta.contactFollowers != null) entry.contactFollowers = meta.contactFollowers;
-    if (typeof meta.contactReputation === 'number') {
-      entry.contactReputation = Math.round(meta.contactReputation);
-    }
-    info = meta.info ?? null;
+  if (p.auditScore !== undefined) entry.auditScore = p.auditScore;
+  if (p.auditState !== undefined) entry.auditState = p.auditState;
+  if (p.auditMints != null && p.auditMelts != null) {
+    entry.auditTotalOps = p.auditMints + p.auditMelts;
   }
+  if (p.kymScore !== undefined) entry.kymScore = p.kymScore;
+  if (p.reviewCount !== undefined) entry.reviewCount = p.reviewCount;
+  if (p.contactFollowers !== undefined) entry.contactFollowers = p.contactFollowers;
+  if (p.contactReputation !== undefined) entry.contactReputation = p.contactReputation;
+  const info: unknown = meta?.info ?? null;
 
   log.debug('mint.catalog.cache.read', {
     ...mintUrlLogFields(mintUrl),

@@ -172,7 +172,11 @@ function lastTouched(entry: MintMetadataEntry): number {
 function evictIfOverCap(byMintUrl: Record<string, MintMetadataEntry>): void {
   const keys = Object.keys(byMintUrl);
   if (keys.length <= MAX_ENTRIES) return;
-  const evictCount = Math.floor(MAX_ENTRIES * 0.1);
+  // Always evict at least the overflow so a bulk discover/migration write can't
+  // leave the map permanently over cap; round up to a 10% batch so steady-state
+  // single-entry writes don't re-sort and trim one at a time at the boundary.
+  const overflow = keys.length - MAX_ENTRIES;
+  const evictCount = Math.max(overflow, Math.floor(MAX_ENTRIES * 0.1));
   const sorted = keys.sort((a, b) => lastTouched(byMintUrl[a]) - lastTouched(byMintUrl[b]));
   for (let i = 0; i < evictCount; i++) delete byMintUrl[sorted[i]];
   storeLog.debug('store.mint_metadata.evicted', {
@@ -286,15 +290,19 @@ export const useMintMetadataStore = create<MintMetadataState>()(
               const prev = next[key] ?? {};
               // Stamp a group's `*At` ONLY when this row actually carried that
               // group's data — otherwise `isStale` lies and a consumer skips a
-              // needed refetch (e.g. a follower-less row marking `social` fresh
-              // would suppress the operator-profile fetch for 30m).
+              // needed refetch.
               const hasAudit =
                 m.state !== undefined ||
                 m.nMints !== undefined ||
                 m.nMelts !== undefined ||
                 m.nErrors !== undefined;
+              // A follower COUNT alone is not "social resolved": `resolveNostrProfile`
+              // reads the `social` group to decide whether the operator-profile
+              // fetch (which yields reputation) can be skipped. A discover row that
+              // carries followers but no reputation/operator identity must leave
+              // `social` stale so that fetch still runs — otherwise reputation
+              // never resolves. Followers are still written below for display.
               const hasSocial =
-                m.followers !== undefined ||
                 typeof m.vertexScore === 'number' ||
                 m.operatorPubkey !== undefined ||
                 m.operatorNpub !== undefined ||
@@ -315,7 +323,9 @@ export const useMintMetadataStore = create<MintMetadataState>()(
                 ...(m.favouriteCount !== undefined ? { favouriteCount: m.favouriteCount } : {}),
                 reviewsAt: now,
                 // audit scalars (no raw swaps) — stamp only when present.
-                ...(m.state ? { auditState: m.state } : {}),
+                // Use `!== undefined` (not truthiness) to match `hasAudit`, so a
+                // falsy-but-present state can't stamp `auditAt` without storing it.
+                ...(m.state !== undefined ? { auditState: m.state } : {}),
                 ...(m.nMints !== undefined ? { nMints: m.nMints } : {}),
                 ...(m.nMelts !== undefined ? { nMelts: m.nMelts } : {}),
                 ...(m.nErrors !== undefined ? { nErrors: m.nErrors } : {}),

@@ -47,11 +47,10 @@ interface ResolveMintRowsArgs {
  * tested directly (the hook is a thin reactive wrapper), mirroring the
  * `resolveStickyMintSelectorItems` convention.
  */
-export function resolveMintRows({
-  baseItems,
-  itemsStatus,
-  byMintUrl,
-}: ResolveMintRowsArgs): { rows: MintRow[]; allCold: boolean } {
+export function resolveMintRows({ baseItems, itemsStatus, byMintUrl }: ResolveMintRowsArgs): {
+  rows: MintRow[];
+  allCold: boolean;
+} {
   // `failed` is terminal too: colada is done (offline / enrichment error), so
   // trust the base rows and let them render real + selectable rather than
   // leaving them stuck `cold` (an endless skeleton the user can't pick from).
@@ -73,7 +72,9 @@ export function resolveMintRows({
 
     return {
       ...base,
-      // identity (cache wins pre-enrichment so the url/bank-icon never shows)
+      // identity (cache wins pre-enrichment so the url/bank-icon never shows).
+      // The `?? base.displayName` pins the result to the required `string` type
+      // (pickStr is `string | undefined`); it's type-load-bearing, not redundant.
       displayName: pickStr(base.displayName, cache.displayName) ?? base.displayName,
       iconUrl: pickStr(base.iconUrl, cache.iconUrl),
       // review + audit + social metadata (animate targets)
