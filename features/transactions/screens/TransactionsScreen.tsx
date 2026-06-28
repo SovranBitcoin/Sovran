@@ -253,6 +253,8 @@ export function TransactionsScreen({
     [months, selectedMonth, handlePillSelect]
   );
 
+  // Reserves the full header height; the wrapper derives it from a frame-0-stable
+  // value on iOS, so this spacer no longer reflows on a late header settle.
   const listHeader = useMemo(
     () => <View style={{ height: totalHeaderHeight }} />,
     [totalHeaderHeight]

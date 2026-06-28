@@ -14,7 +14,10 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Button } from '@/shared/ui/primitives/Button';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
-import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
+import {
+  MintCurrencyTabs,
+  MINT_CURRENCY_TABS_HEIGHT,
+} from '@/features/mint/components/MintCurrencyTabs';
 import { MintDistributionItem, DistributionBar } from '@/features/mint/components/distribution';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Card } from '@/shared/ui/composed/Card';
@@ -32,8 +35,7 @@ import opacity from 'hex-color-opacity';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 const DISTRIBUTION_BAR_HEIGHT = 48;
-const CURRENCY_TABS_HEIGHT = 48;
-const STICKY_CONTENT_HEIGHT = DISTRIBUTION_BAR_HEIGHT + CURRENCY_TABS_HEIGHT;
+const STICKY_CONTENT_HEIGHT = DISTRIBUTION_BAR_HEIGHT + MINT_CURRENCY_TABS_HEIGHT;
 
 const ParamsSchema = z.object({
   unit: z.string().max(16).optional(),

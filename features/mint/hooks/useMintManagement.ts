@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Mint } from '@cashu/coco-core';
 import { useManager } from '@cashu/coco-react';
 import { log } from '@/shared/lib/logger';
-import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
+import { getCachedMintInfo } from '@/shared/stores/global/mintMetadataStore';
 
 // Module-level in-flight dedupe. Multiple components that use this hook
 // (ContactsScreen, settings recovery, mint screens) each kick off their
@@ -13,6 +13,13 @@ import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
 // down to one call; each consumer still gets its own React state, but
 // reads from the shared result.
 let inflightLoad: Promise<Mint[]> | null = null;
+
+// Last successful trusted-mints load, kept so a freshly-mounted consumer
+// (notably the mint selector opening) renders the known mints synchronously
+// instead of flashing a loading state while the SQL query re-runs in the
+// background. Keyed by the Manager it came from: a profile switch creates a
+// new Manager instance, so the prior profile's mints can never bleed across.
+let lastLoad: { manager: unknown; mints: Mint[] } | null = null;
 
 function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
   return {
@@ -28,13 +35,21 @@ function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, un
  */
 export function useMintManagement() {
   const manager = useManager();
-  const [mints, setMints] = useState<Mint[]>([]);
+  // Seed from the last load for this Manager so the selector renders its mints
+  // on first frame with no loading flash; a stale Manager (post profile-switch)
+  // falls through to an empty list + a fresh load.
+  const cachedMints = lastLoad?.manager === manager ? lastLoad.mints : null;
+  const [mints, setMints] = useState<Mint[]>(() => cachedMints ?? []);
   const [isLoading, setIsLoading] = useState(false);
 
   const loadMints = useCallback(
     async (reason: string = 'manual') => {
       log.debug('mint.list.load.request', { reason, hasInflight: !!inflightLoad });
-      setIsLoading(true);
+      // Only surface a loading state when there is nothing cached to show for
+      // this Manager — a warm re-open keeps the prior mints visible while the
+      // refresh runs underneath.
+      const hasCached = lastLoad?.manager === manager && lastLoad.mints.length > 0;
+      setIsLoading(!hasCached);
 
       try {
         // Reuse an in-flight promise if another consumer is already loading.
@@ -53,6 +68,7 @@ export function useMintManagement() {
           })();
         }
         const allMints = await promise;
+        lastLoad = { manager, mints: allMints };
         setMints(allMints);
         log.info('mint.list.load.success', { reason, count: allMints.length });
       } catch (err) {
@@ -72,7 +88,7 @@ export function useMintManagement() {
     async (mintUrl: string) => {
       try {
         log.debug('mint.info.fetch.start', { ...mintUrlLogFields(mintUrl) });
-        // SWR through `mintInfoCache`: cached fresh resolves instantly, stale
+        // SWR through `mintMetadataStore`: cached fresh resolves instantly, stale
         // resolves with the prior value and refreshes in the background, miss
         // awaits coco's `getMintInfo` (which itself blocks on HTTP only when
         // its own 5-minute window has expired).

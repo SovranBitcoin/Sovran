@@ -19,10 +19,7 @@ import {
 
 import { paymentLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
-import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
-import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
-import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
+import { getCachedMintInfo, useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
@@ -173,25 +170,22 @@ function subscriptionEventToEntryUpdate(
 
 export function getSovranMintEnrichment(mintUrl: string): Partial<MintReviewInfo> {
   const normalized = normalizeMintUrlKey(mintUrl);
-  const audit = useAuditMintStore.getState().getCached(normalized);
-  const kym = useKYMMintStore.getState().getCached(normalized);
+  const meta = useMintMetadataStore.getState().getCached(normalized);
 
   const enrichment: Partial<MintReviewInfo> = {};
-  if (kym) {
-    if (kym.score !== null) enrichment.kymScore = kym.score;
-    enrichment.reviewCount = kym.recommendations?.length;
+  if (!meta) return enrichment;
+
+  if (meta.averageScore != null) enrichment.kymScore = meta.averageScore;
+  if (meta.reviewCount != null) enrichment.reviewCount = meta.reviewCount;
+
+  if (meta.contactFollowers != null) enrichment.contactFollowers = meta.contactFollowers;
+  if (typeof meta.contactReputation === 'number') {
+    enrichment.contactReputation = Math.round(meta.contactReputation);
   }
 
-  const profile = useMintProfileStore.getState().getCached(normalized);
-  if (profile) {
-    enrichment.contactFollowers = profile.followers;
-    if (typeof profile.reputation === 'number') {
-      enrichment.contactReputation = Math.round(profile.reputation);
-    }
-  }
-
-  if (audit) {
-    const swaps = audit.auditData.swaps ?? [];
+  // Swap-derived metrics need the raw auditor blob, which the store keeps.
+  if (meta.auditData) {
+    const swaps = meta.auditData.swaps ?? [];
     const swapSuccess = swaps.reduce((acc, swap) => acc + (swap.state === 'OK' ? 1 : 0), 0);
     const swapTotal = swaps.length;
     const successRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
@@ -201,16 +195,24 @@ export function getSovranMintEnrichment(mintUrl: string): Partial<MintReviewInfo
       .filter((time) => time > 0);
 
     enrichment.auditScore = typeof successRate === 'number' ? successRate * 5 : undefined;
-    enrichment.auditState = audit.auditData.state;
+    enrichment.auditState = meta.auditData.state;
     enrichment.successRate = successRate;
     enrichment.swapSuccess = swapSuccess;
     enrichment.swapTotal = swapTotal;
-    enrichment.totalMints = audit.auditData.n_mints;
-    enrichment.totalMelts = audit.auditData.n_melts;
+    enrichment.totalMints = meta.auditData.n_mints;
+    enrichment.totalMelts = meta.auditData.n_melts;
     enrichment.avgTimeMs =
       successfulTimes.length > 0
         ? successfulTimes.reduce((sum, time) => sum + time, 0) / successfulTimes.length
         : undefined;
+  } else if (meta.auditState !== undefined || meta.auditScore != null) {
+    // Discover-seeded entries carry audit scalars but not the raw `swaps` blob —
+    // surface what we have (mirrors `readCachedEntry` in getMintCatalog) so the
+    // send-flow selector shows audit state for discover-only mints, not nothing.
+    if (meta.auditScore != null) enrichment.auditScore = meta.auditScore;
+    if (meta.auditState !== undefined) enrichment.auditState = meta.auditState;
+    if (meta.nMints !== undefined) enrichment.totalMints = meta.nMints;
+    if (meta.nMelts !== undefined) enrichment.totalMelts = meta.nMelts;
   }
 
   return enrichment;
@@ -370,10 +372,8 @@ export function createSovranScreenActionsBridge({
           type: 'mintInfo.enrichmentChanged',
           mintUrl: mintInfoFetchingUrl ?? undefined,
         });
-      unsubscribes.push(useAuditMintStore.subscribe((state) => state.cache, publishMintEnrichment));
-      unsubscribes.push(useKYMMintStore.subscribe((state) => state.cache, publishMintEnrichment));
       unsubscribes.push(
-        useMintProfileStore.subscribe((state) => state.cache, publishMintEnrichment)
+        useMintMetadataStore.subscribe((state) => state.byMintUrl, publishMintEnrichment)
       );
 
       unsubscribes.push(

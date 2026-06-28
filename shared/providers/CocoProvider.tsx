@@ -4,7 +4,7 @@ import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { attachMintInfoCacheToManager } from '@/shared/stores/global/mintInfoCache';
+import { attachMintMetadataToManager } from '@/shared/stores/global/mintMetadataStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
@@ -313,7 +313,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
   useEffect(() => {
     if (!manager) return;
     log.info('coco.mint_info_cache.attach');
-    return attachMintInfoCacheToManager(manager);
+    return attachMintMetadataToManager(manager);
   }, [manager]);
 
   const contextValue: CocoContextValue = {

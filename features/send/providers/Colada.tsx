@@ -60,7 +60,7 @@ import { transactionAnnotationAdapter } from '@/shared/stores/profile/transactio
 import { runDataMigrations } from '@/shared/lib/migrations/dataMigrations';
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
 import { backendConfig } from '@/shared/config/backend';
-import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
+import { getCachedMintInfo } from '@/shared/stores/global/mintMetadataStore';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 
@@ -230,7 +230,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         // resolve synchronously, and even a true cold miss is bounded to
         // FIRST_OPEN_DEADLINE_MS so the slowest mint doesn't pin the list.
         // The background refresh continues after the deadline and writes through
-        // via attachMintInfoCacheToManager.
+        // via attachMintMetadataToManager.
         fetchMintInfo: async (url) => {
           const startedAt = performance.now();
           paymentLog.debug('colada.adapter.fetch_mint_info.start', {

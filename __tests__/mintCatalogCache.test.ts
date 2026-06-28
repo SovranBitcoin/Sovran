@@ -25,11 +25,9 @@ import { ok } from 'neverthrow';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
-import type { AuditMintResponse, MintRecommendation } from '@/shared/lib/apiClient';
+import type { AuditMintResponse } from '@/shared/lib/apiClient';
 import { auditMint, fetchNostrProfile, reviewMint } from '@/shared/lib/apiClient';
-import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
-import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
-import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
+import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 
 const MINT_URL = 'https://mint.example.com';
 const OPERATOR_PUBKEY = 'a'.repeat(64);
@@ -57,26 +55,21 @@ function auditData(overrides: Record<string, unknown> = {}) {
 }
 
 function seedCatalogCaches() {
-  useAuditMintStore
-    .getState()
-    .setCached(
-      MINT_URL,
-      auditData() as unknown as AuditMintResponse,
-      auditData().info as unknown as GetInfoResponse
-    );
-  useKYMMintStore.getState().setCached(MINT_URL, 4.2, [
-    { score: 4, comment: 'solid' },
-    { score: 5, comment: 'fast' },
-  ] as unknown as MintRecommendation[]);
-  useMintProfileStore.getState().setCached(MINT_URL, 123, 88);
+  const store = useMintMetadataStore.getState();
+  store.setAudit(
+    MINT_URL,
+    auditData() as unknown as AuditMintResponse,
+    auditData().info as unknown as GetInfoResponse
+  );
+  // Only the aggregate is cached now — the row count, not the rows.
+  store.setReviewsAggregate(MINT_URL, 4.2, 2);
+  store.setSocial(MINT_URL, 123, 88);
 }
 
 describe('getMintCatalog cache-first behavior', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    useAuditMintStore.getState().clearCache();
-    useKYMMintStore.getState().clearCache();
-    useMintProfileStore.setState({ cache: {} });
+    useMintMetadataStore.setState({ byMintUrl: {} });
   });
 
   it('returns cached catalog fields without network calls in cache-only mode', async () => {
@@ -141,16 +134,16 @@ describe('getMintCatalog cache-first behavior', () => {
       contactFollowers: 55,
       contactReputation: 77,
     });
-    expect(useAuditMintStore.getState().getCached(MINT_URL)?.auditData.state).toBe('OK');
-    expect(useKYMMintStore.getState().getCached(MINT_URL)?.score).toBe(3.7);
-    expect(useMintProfileStore.getState().getCached(MINT_URL)?.followers).toBe(55);
+    expect(useMintMetadataStore.getState().getCached(MINT_URL)?.auditData?.state).toBe('OK');
+    expect(useMintMetadataStore.getState().getCached(MINT_URL)?.averageScore).toBe(3.7);
+    expect(useMintMetadataStore.getState().getCached(MINT_URL)?.contactFollowers).toBe(55);
     expect(getMintInfo).not.toHaveBeenCalled();
   });
 
   it('overwrites a stale cached entry when the fresh review score is null (audit F3)', async () => {
     // Populated device: an old snapshot with a score is cached…
     seedCatalogCaches();
-    expect(useKYMMintStore.getState().getCached(MINT_URL)?.score).toBe(4.2);
+    expect(useMintMetadataStore.getState().getCached(MINT_URL)?.averageScore).toBe(4.2);
 
     // …then the live mint's reviews lose their score (e.g. all current reviews
     // are score-less endorsements). The fresh result MUST replace the snapshot.
@@ -165,9 +158,10 @@ describe('getMintCatalog cache-first behavior', () => {
 
     await getMintCatalog([MINT_URL], jest.fn(), { networkMode: 'network-first' });
 
-    const cached = useKYMMintStore.getState().getCached(MINT_URL);
-    expect(cached?.score).toBeNull(); // not the stale 4.2
-    expect(cached?.recommendations).toHaveLength(1);
+    const cached = useMintMetadataStore.getState().getCached(MINT_URL);
+    expect(cached?.averageScore).toBeNull(); // not the stale 4.2
+    // Rows are no longer persisted — only the fresh aggregate count survives.
+    expect(cached?.reviewCount).toBe(1);
   });
 
   it('keeps operator followers when Vertex reputation is null', async () => {
@@ -184,6 +178,6 @@ describe('getMintCatalog cache-first behavior', () => {
       contactFollowers: 55,
     });
     expect(catalog[MINT_URL]).not.toHaveProperty('contactReputation');
-    expect(useMintProfileStore.getState().getCached(MINT_URL)?.reputation).toBeNull();
+    expect(useMintMetadataStore.getState().getCached(MINT_URL)?.contactReputation).toBeNull();
   });
 });

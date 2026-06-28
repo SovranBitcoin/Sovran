@@ -34,25 +34,12 @@ jest.mock('@/shared/lib/logger', () => {
   };
 });
 
-jest.mock('@/shared/stores/global/auditMintStore', () => ({
-  useAuditMintStore: {
-    getState: () => ({ getCached: () => null }),
+jest.mock('@/shared/stores/global/mintMetadataStore', () => ({
+  useMintMetadataStore: {
+    getState: () => ({ getCached: () => undefined }),
     subscribe: jest.fn(() => () => {}),
   },
-}));
-
-jest.mock('@/shared/stores/global/kymMintStore', () => ({
-  useKYMMintStore: {
-    getState: () => ({ getCached: () => null }),
-    subscribe: jest.fn(() => () => {}),
-  },
-}));
-
-jest.mock('@/shared/stores/global/mintProfileStore', () => ({
-  useMintProfileStore: {
-    getState: () => ({ getCached: () => null }),
-    subscribe: jest.fn(() => () => {}),
-  },
+  getCachedMintInfo: jest.fn(),
 }));
 
 jest.mock('@/shared/stores/global/settingsStore', () => ({

@@ -30,6 +30,17 @@ const LARGE_GAP = 8;
 const SMALL_GAP = 4;
 const COLLAPSE_THRESHOLD = 50;
 
+/**
+ * Fixed height of the tab strip (the resting / scroll-top LARGE size): a tab is
+ * `LARGE_ICON_SIZE + 2×LARGE_PADDING_V` tall, plus the `pb-2` (8px) bottom space.
+ *
+ * The strip is pinned to this height so its `onLayout` measurement never changes
+ * — neither from the scroll shrink-animation nor the tab count. Sticky-header
+ * callers MUST declare this as `stickyContentHeight` so the list's reserved top
+ * space matches the measured height from the first frame (no content shift).
+ */
+export const MINT_CURRENCY_TABS_HEIGHT = LARGE_ICON_SIZE + LARGE_PADDING_V * 2 + 8;
+
 interface MintCurrencyTabsProps {
   /** Available currencies to show */
   currencies: string[];
@@ -246,6 +257,10 @@ export function MintCurrencyTabs({
         horizontal
         showsHorizontalScrollIndicator={false}
         className="px-4 pb-2"
+        // Pinned height — the tabs animate/shrink INSIDE this band on scroll, but
+        // the band itself never re-measures, so the sticky header (and the list's
+        // reserved top space) never shifts. See MINT_CURRENCY_TABS_HEIGHT.
+        style={{ height: MINT_CURRENCY_TABS_HEIGHT }}
         contentContainerStyle={{ alignItems: 'center' }}>
         <Animated.View className="flex-row items-center" style={animatedListGapStyle}>
           {currencies.map((currency) => (

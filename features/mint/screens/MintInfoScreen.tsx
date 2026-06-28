@@ -25,6 +25,7 @@ import { withGlassHeaderItems } from '@/navigation/headerItems';
 import Icon from 'assets/icons';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
+import { useCountRollIn } from '@/shared/ui/composed/AnimatedCountValue';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import * as Clipboard from 'expo-clipboard';
@@ -368,6 +369,9 @@ function RatingBarChartComponent({ score }: { score: number }) {
   const goldPercentage = isValidScore && targetRow > 0 ? Math.min(1, score / targetRow) : 0;
 
   const formattedScore = isValidScore ? score.toFixed(1) : '0.0';
+  // Rolls the headline score when a background refresh replaces the cached one
+  // (the bar-fill reveal below stays a one-shot mount-entrance animation).
+  const scoreRoll = useCountRollIn(formattedScore);
 
   const hasAnimatedRef = useRef(false);
   useEffect(() => {
@@ -413,9 +417,11 @@ function RatingBarChartComponent({ score }: { score: number }) {
     <HStack align="center" gap={16} className="w-full self-stretch px-4">
       <VStack align="center" className="shrink-0">
         <Animated.View style={fadeStyle}>
-          <Text heavy size={28} style={{ color: foreground }}>
-            {formattedScore}
-          </Text>
+          <Animated.View style={scoreRoll}>
+            <Text heavy size={28} style={{ color: foreground }}>
+              {formattedScore}
+            </Text>
+          </Animated.View>
           <Text size={12} style={{ color: opacity(foreground, 0.5) }}>
             out of 5
           </Text>
@@ -596,7 +602,9 @@ export function MintInfoScreen() {
           <Spacer size={16} />
 
           {typeof entry?.kymScore === 'number' && entry.kymScore >= 0 && (
-            <RatingBarChart score={entry.kymScore} />
+            // Keyed by mintUrl so a screen reused for a different mint remounts
+            // the chart (fresh roll-in) instead of rolling the prior mint's score.
+            <RatingBarChart key={mintUrl} score={entry.kymScore} />
           )}
 
           {(entry?.auditState != null || typeof entry?.auditScore === 'number') && (

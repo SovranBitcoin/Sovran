@@ -15,6 +15,7 @@ import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { List } from '@/shared/ui/composed/List';
 
 import type { MintListItem } from '@sovranbitcoin/colada';
+import type { MintRow } from '@/features/mint/hooks/useMintRowsWithCache';
 
 import Icon from 'assets/icons';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -22,9 +23,14 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import opacity from 'hex-color-opacity';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
+import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
-import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
+import {
+  MintCurrencyTabs,
+  MINT_CURRENCY_TABS_HEIGHT,
+} from '@/features/mint/components/MintCurrencyTabs';
+import { useShiftLogger } from '@/shared/lib/contentShiftLog';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -39,7 +45,22 @@ import { zIndex } from '@/shared/styles/tokens';
 const INSPECT_BUTTON_SIZE = 44;
 const INSPECT_BUTTON_RADIUS = Math.round(INSPECT_BUTTON_SIZE * 0.18);
 
-const CURRENCY_TABS_HEIGHT = 48;
+const CURRENCY_TABS_HEIGHT = MINT_CURRENCY_TABS_HEIGHT;
+
+// Placeholder rows shown while the selector's items are still resolving. Stable
+// synthetic urls keep keys deterministic; their values are never read (the rows
+// render in ContactRow's `loading` mode, which swaps in pulsing skeleton bars).
+const SKELETON_ITEM_COUNT = 5;
+const SKELETON_ITEMS: MintRow[] = Array.from({ length: SKELETON_ITEM_COUNT }, (_, i) => ({
+  mintUrl: `mint-skeleton-${i}`,
+  displayName: '',
+  balance: 0,
+  unit: 'sat',
+  status: 'available',
+  reason: null,
+  isPreferred: false,
+  metaState: 'cold',
+}));
 
 function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
   return {
@@ -49,8 +70,12 @@ function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, un
 }
 
 interface MintListScreenProps {
-  /** Pre-built mint rows from buildMintListItems(). Already sorted and availability-annotated. */
-  items: MintListItem[];
+  /** Pre-built mint rows (base colada rows overlaid with cached metadata, each
+   *  tagged with a `metaState`). Already sorted and availability-annotated. */
+  items: MintRow[];
+  /** True only when EVERY row is cold (no cache, not yet enriched) — drives the
+   *  cohesive full-list shimmer wave. Mixed/cached lists render per-row instead. */
+  loading?: boolean;
   /** When true, all rows show a global loading state (a handler is executing). */
   isExecuting?: boolean;
   /** Whether to show the details/inspect button on each mint (default: true) */
@@ -117,6 +142,7 @@ function MintInspectButton({ onPress }: { onPress: () => void }) {
 
 export const MintListScreen = memo(function MintListScreen({
   items,
+  loading = false,
   isExecuting = false,
   showDetailsButton = true,
   closeButtonLabel = 'Close',
@@ -130,6 +156,14 @@ export const MintListScreen = memo(function MintListScreen({
   const scrollY = useSharedValue(0);
   const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
   const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
+
+  // Content-shift telemetry: with the currency-tab strip pinned to a fixed
+  // height, the reserved header height should settle on the first measure and
+  // never produce a follow-up delta. A non-null delta here = a shift regressed.
+  const shift = useShiftLogger('MintListScreen');
+  useEffect(() => {
+    shift.report('mint.list.header.shift', 'totalHeaderHeight', totalHeaderHeight);
+  }, [totalHeaderHeight, shift]);
 
   const prevRenderKey = useRef('');
   const renderKey = `${items.length}:${isExecuting}`;
@@ -192,6 +226,8 @@ export const MintListScreen = memo(function MintListScreen({
     [availableCurrencies, selectedCurrency, handleCurrencyChange, scrollY]
   );
 
+  // Reserves the full header height (nav + sticky tabs). The wrapper now derives
+  // that from a frame-0-stable value on iOS, so this spacer no longer reflows.
   const listHeader = useMemo(
     () => <View style={{ height: totalHeaderHeight }} />,
     [totalHeaderHeight]
@@ -240,12 +276,82 @@ export const MintListScreen = memo(function MintListScreen({
           trailing={trailing}
           trailingVariant={inspectable ? undefined : 'none'}
           accentPosition="below"
+          // Stats roll in when cached values are replaced by fresh ones; the
+          // accent is keyed by mintUrl inside ContactRow against FlashList recycle.
+          animate
           onPress={() => handleMintPress(item)}
           testID={`contact-row:mint:${item.mintUrl}`}
         />
       );
     },
     [isExecuting, showDetailsButton, handleMintPress, onInspectMint]
+  );
+
+  // Skeleton row through the SAME ContactRow path (pulsing avatar + title /
+  // subtitle bars), so the crossfade to real rows shifts nothing.
+  const renderSkeletonItem = useCallback(
+    ({ item }: { item: MintListItem }) => (
+      <ContactRow
+        loading
+        identity={mintIdentity(item)}
+        accentPosition="below"
+        trailingVariant="none"
+        testID={`contact-row:mint-skeleton:${item.mintUrl}`}
+      />
+    ),
+    []
+  );
+
+  // Per-row branch: a cold row (no cache, not yet enriched) renders the skeleton
+  // ContactRow; a cached/live row renders the real one. This is what guarantees
+  // we never paint a bare url + bank-icon fallback — a row is either a skeleton
+  // or carries a real cached/live name + icon.
+  const renderRow = useCallback(
+    ({ item }: { item: MintRow }) =>
+      item.metaState === 'cold' ? renderSkeletonItem({ item }) : renderItem({ item }),
+    [renderItem, renderSkeletonItem]
+  );
+
+  // The cohesive full-list shimmer wave shows only when EVERY row is cold (cold
+  // first-ever open). A mixed/cached list renders real rows immediately and lets
+  // the per-row branch skeleton just the cold ones.
+  const showSkeleton = loading && filteredItems.length > 0;
+
+  const renderList = useCallback(
+    (data: MintRow[], skeleton: boolean) => (
+      <List
+        data={data}
+        renderItem={skeleton ? renderSkeletonItem : renderRow}
+        keyExtractor={keyExtractor}
+        extraData={isExecuting}
+        drawDistance={300}
+        // FlashList v2 enables maintainVisibleContentPosition by default and
+        // inserts its scroll anchor BEFORE the ListHeaderComponent, so with a
+        // tall spacer header and a short (non-screen-filling) list it mis-anchors
+        // the initial offset and snaps to the correct position on first scroll
+        // (Shopify/flash-list#2050). This list is a plain top-anchored list, so
+        // opt out. The JS spacer (header + max sticky-tab band) is then the sole
+        // inset authority; `never` keeps iOS from re-adjusting it natively.
+        maintainVisibleContentPosition={{ disabled: true }}
+        contentInsetAdjustmentBehavior="never"
+        style={{ flex: 1, height: 0 }}
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 }}
+        ListHeaderComponent={listHeader}
+        // Skeleton data is non-empty, so the empty text can't flash mid-load.
+        ListEmptyComponent={skeleton ? undefined : emptyComponent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      />
+    ),
+    [
+      renderRow,
+      renderSkeletonItem,
+      keyExtractor,
+      isExecuting,
+      listHeader,
+      emptyComponent,
+      handleScroll,
+    ]
   );
 
   return (
@@ -258,18 +364,13 @@ export const MintListScreen = memo(function MintListScreen({
       onHeaderHeightChange={setTotalHeaderHeight}
       footer={bottomButtons}
       bgColor={surface}>
-      <List
-        data={filteredItems}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        extraData={isExecuting}
-        drawDistance={300}
-        style={{ flex: 1, height: 0 }}
-        contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 }}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={emptyComponent}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
+      <SkeletonContentCrossfade
+        loading={showSkeleton}
+        style={{ flex: 1 }}
+        visualKey="mint-selector-list"
+        visualSurface="mint-selector"
+        renderSkeleton={() => renderList(SKELETON_ITEMS, true)}
+        renderContent={() => renderList(filteredItems, false)}
       />
     </Screen>
   );

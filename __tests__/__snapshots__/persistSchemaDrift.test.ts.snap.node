@@ -23,23 +23,24 @@ exports[`persisted schema drift data-migration-store schema matches the golden s
 }
 `;
 
-exports[`persisted schema drift kym-mint-store schema matches the golden snapshot for its version: kym-mint-store 1`] = `
+exports[`persisted schema drift mint-metadata-store schema matches the golden snapshot for its version: mint-metadata-store 1`] = `
 {
-  "name": "kym-mint-store",
+  "name": "mint-metadata-store",
   "shape": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
-      "cache": {
+      "byMintUrl": {
         "additionalProperties": {
           "additionalProperties": {},
           "properties": {
-            "recommendations": {
-              "items": {},
-              "maxItems": 1024,
-              "type": "array",
+            "auditAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
             },
-            "score": {
+            "auditData": {},
+            "auditScore": {
               "anyOf": [
                 {
                   "type": "number",
@@ -49,17 +50,108 @@ exports[`persisted schema drift kym-mint-store schema matches the golden snapsho
                 },
               ],
             },
-            "timestamp": {
+            "auditState": {
+              "maxLength": 32,
+              "type": "string",
+            },
+            "averageScore": {
+              "anyOf": [
+                {
+                  "type": "number",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "contactFollowers": {
               "maximum": 9007199254740991,
               "minimum": 0,
               "type": "integer",
             },
+            "contactReputation": {
+              "anyOf": [
+                {
+                  "type": "number",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "description": {
+              "maxLength": 4096,
+              "type": "string",
+            },
+            "displayName": {
+              "maxLength": 256,
+              "type": "string",
+            },
+            "favouriteCount": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "iconUrl": {
+              "maxLength": 2048,
+              "type": "string",
+            },
+            "identityAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "info": {},
+            "nErrors": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "nMelts": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "nMints": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "operatorNpub": {
+              "maxLength": 128,
+              "type": "string",
+            },
+            "operatorPubkey": {
+              "maxLength": 128,
+              "type": "string",
+            },
+            "reviewCount": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "reviewsAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "socialAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "supportedUnits": {
+              "items": {
+                "maxLength": 16,
+                "type": "string",
+              },
+              "maxItems": 64,
+              "type": "array",
+            },
+            "vertexRank": {
+              "type": "number",
+            },
           },
-          "required": [
-            "score",
-            "recommendations",
-            "timestamp",
-          ],
           "type": "object",
         },
         "default": {},
@@ -69,9 +161,14 @@ exports[`persisted schema drift kym-mint-store schema matches the golden snapsho
         },
         "type": "object",
       },
+      "legacyMigrated": {
+        "default": false,
+        "type": "boolean",
+      },
     },
     "required": [
-      "cache",
+      "byMintUrl",
+      "legacyMigrated",
     ],
     "type": "object",
   },

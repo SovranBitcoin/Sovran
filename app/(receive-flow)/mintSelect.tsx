@@ -24,7 +24,7 @@ import {
 } from '@sovranbitcoin/colada/react';
 import type { MintListItem, StepDataMap } from '@sovranbitcoin/colada';
 
-import { MintListScreen, useStickyMintSelectorItems } from '@/features/mint';
+import { MintListScreen, useMintRowsWithCache, useStickyMintSelectorItems } from '@/features/mint';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
@@ -52,6 +52,15 @@ function ReceiveMintSelectRoute() {
     : null;
   const entryItems = Array.isArray(entry?.items) ? (entry.items as MintListItem[]) : null;
   const items = useStickyMintSelectorItems(liveItems, entryItems);
+  // The machine emits un-enriched fallback rows first (raw url, no icon/scores)
+  // then fills them in — `mintListItemsStatus` flips to 'ready' when done. The
+  // cache overlay paints each row from `mintMetadataStore` immediately, so a
+  // warm open shows real name/icon/scores on the first frame and animates to
+  // fresh values; only genuinely-cold rows fall back to a skeleton.
+  const itemsStatus =
+    liveSelectMint?.mintListItemsStatus ??
+    (entry?.mintListItemsStatus as 'loading' | 'ready' | 'failed' | undefined);
+  const { rows, allCold } = useMintRowsWithCache({ baseItems: items, itemsStatus });
 
   useEffect(() => {
     const available = items.filter((i) => i.status === 'available').length;
@@ -72,6 +81,19 @@ function ReceiveMintSelectRoute() {
         .map((i) => ({ mint: i.displayName, reason: i.reason?.code })),
     });
   }, [items, entry?.scope, entry?.destination]);
+
+  // Row metadata composition — diagnoses "skeleton too long": all-cold means the
+  // cache was empty (cold open), not a stuck enrichment.
+  useEffect(() => {
+    log.debug('mint.selector.rows', {
+      flow: 'receive',
+      cold: rows.filter((r) => r.metaState === 'cold').length,
+      cached: rows.filter((r) => r.metaState === 'cached').length,
+      live: rows.filter((r) => r.metaState === 'live').length,
+      total: rows.length,
+      allCold,
+    });
+  }, [rows, allCold]);
 
   if (!params) return null;
 
@@ -95,7 +117,8 @@ function ReceiveMintSelectRoute() {
         })}
       />
       <MintListScreen
-        items={items}
+        items={rows}
+        loading={allCold}
         showDetailsButton={!isNpcScope && actions.getInfo.available}
         closeButtonLabel="Cancel"
         onMintSelect={(item) => actions.select.execute({ mintUrl: item.mintUrl })}
@@ -104,7 +127,7 @@ function ReceiveMintSelectRoute() {
             ? (url) =>
                 actions.getInfo.execute({
                   mintUrl: url,
-                  item: items.find((i) => i.mintUrl === url),
+                  item: rows.find((i) => i.mintUrl === url),
                 })
             : undefined
         }

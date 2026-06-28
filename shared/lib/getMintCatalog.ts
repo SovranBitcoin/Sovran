@@ -22,9 +22,10 @@
  *   3. **Nostr GraphQL mint reviews** — independent of audit, runs in
  *      parallel for every mint. Provides KYM score + review count.
  *
- * Side effects: populates the audit / KYM / mint-profile Zustand stores
- * along the way so the trust-review screen and other surfaces that read
- * from those caches get fresh data without a second round-trip.
+ * Side effects: writes audit / review-aggregate / operator-profile data back
+ * into the unified `mintMetadataStore` along the way so the trust-review screen
+ * and other surfaces that read the cache get fresh data without a second
+ * round-trip. Individual review rows are never persisted — only the aggregate.
  */
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
@@ -37,9 +38,7 @@ import {
   extractMintNostrPubkey,
   type MintInfoForNostr,
 } from '@/shared/lib/nostr/extractMintNostrPubkey';
-import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
-import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
-import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
+import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 
 type MintCatalogNetworkMode = 'cache-only' | 'cache-first' | 'network-first';
 
@@ -69,38 +68,37 @@ function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, un
 }
 
 function readCachedEntry(mintUrl: string): { entry: MintCatalogEntry; info: unknown } {
-  const audit = useAuditMintStore.getState().getCached(mintUrl);
-  const kym = useKYMMintStore.getState().getCached(mintUrl);
-  const profile = useMintProfileStore.getState().getCached(mintUrl);
+  const meta = useMintMetadataStore.getState().getCached(mintUrl);
 
   const entry: MintCatalogEntry = {};
   let info: unknown = null;
 
-  if (audit) {
-    const { score } = transformAuditData(audit.auditData);
-    entry.auditScore = score;
-    entry.auditState = audit.auditData.state;
-    entry.auditTotalOps = audit.auditData.n_mints + audit.auditData.n_melts;
-    info = audit.mintInfo;
-  }
-
-  if (kym) {
-    if (kym.score !== null) entry.kymScore = kym.score;
-    entry.reviewCount = kym.recommendations.length;
-  }
-
-  if (profile) {
-    entry.contactFollowers = profile.followers;
-    if (typeof profile.reputation === 'number') {
-      entry.contactReputation = Math.round(profile.reputation);
+  if (meta) {
+    if (meta.auditData) {
+      const { score } = transformAuditData(meta.auditData);
+      if (score !== undefined) entry.auditScore = score;
+      entry.auditState = meta.auditData.state;
+      entry.auditTotalOps = meta.auditData.n_mints + meta.auditData.n_melts;
+    } else if (meta.auditState !== undefined) {
+      // Discover-seeded entries carry audit scalars without the raw swap blob.
+      if (meta.auditScore != null) entry.auditScore = meta.auditScore;
+      entry.auditState = meta.auditState;
+      if (meta.nMints != null && meta.nMelts != null) {
+        entry.auditTotalOps = meta.nMints + meta.nMelts;
+      }
     }
+    if (meta.averageScore != null) entry.kymScore = meta.averageScore;
+    if (meta.reviewCount != null) entry.reviewCount = meta.reviewCount;
+    if (meta.contactFollowers != null) entry.contactFollowers = meta.contactFollowers;
+    if (typeof meta.contactReputation === 'number') {
+      entry.contactReputation = Math.round(meta.contactReputation);
+    }
+    info = meta.info ?? null;
   }
 
   log.debug('mint.catalog.cache.read', {
     ...mintUrlLogFields(mintUrl),
-    hasAudit: !!audit,
-    hasKym: !!kym,
-    hasProfile: !!profile,
+    hasMeta: !!meta,
     hasCatalogFields: hasCatalogFields(entry),
     hasInfo: isMintInfoObject(info),
   });
@@ -112,11 +110,11 @@ async function resolveNostrProfile(
   pubkey: string,
   signal?: AbortSignal
 ): Promise<{ followers: number; reputation: number | null } | undefined> {
-  const profileStore = useMintProfileStore.getState();
-  const cached = profileStore.getCached(mintUrl);
-  if (cached && !profileStore.isStale(mintUrl)) {
+  const store = useMintMetadataStore.getState();
+  const cached = store.getCached(mintUrl);
+  if (cached?.contactFollowers != null && !store.isStale(mintUrl, 'social')) {
     log.debug('mint.catalog.profile.cache_hit', { ...mintUrlLogFields(mintUrl) });
-    return { followers: cached.followers, reputation: cached.reputation };
+    return { followers: cached.contactFollowers, reputation: cached.contactReputation ?? null };
   }
   log.debug('mint.catalog.profile.fetch_start', {
     ...mintUrlLogFields(mintUrl),
@@ -131,7 +129,7 @@ async function resolveNostrProfile(
   });
   if (profile && profile.isOk()) {
     const { followers, score } = profile.value;
-    useMintProfileStore.getState().setCached(mintUrl, followers, score);
+    useMintMetadataStore.getState().setSocial(mintUrl, followers, score);
     log.info('mint.catalog.profile.fetch_success', {
       ...mintUrlLogFields(mintUrl),
       followers,
@@ -207,7 +205,7 @@ async function fetchEntry(
       });
     }
     if (info) {
-      useAuditMintStore.getState().setCached(mintUrl, audit, info as unknown as GetInfoResponse);
+      useMintMetadataStore.getState().setAudit(mintUrl, audit, info as unknown as GetInfoResponse);
     }
     log.info('mint.catalog.entry.audit_ok', {
       ...mintUrlLogFields(mintUrl),
@@ -239,12 +237,15 @@ async function fetchEntry(
     // `recommendations` is the authoritative source for the count regardless
     // of whether `score` was computable — keep it visible either way.
     entry.reviewCount = review.recommendations.length;
-    // ALWAYS overwrite the persisted cache with the fresh successful result —
+    // ALWAYS overwrite the persisted aggregate with the fresh successful result —
     // including a null score / empty list. The old `score !== null` guard let a
     // stale snapshot outlive the source: once a mint's live score went null, the
-    // cache was never overwritten, so a populated device kept showing old
-    // reviews while a fresh device showed the live (empty/null) state. (audit F3)
-    useKYMMintStore.getState().setCached(mintUrl, review.score, review.recommendations);
+    // cache was never overwritten, so a populated device kept showing the old
+    // count while a fresh device showed the live (empty/null) state. (audit F3)
+    // Only the aggregate (score + count) is persisted — never the raw rows.
+    useMintMetadataStore
+      .getState()
+      .setReviewsAggregate(mintUrl, review.score, review.recommendations.length);
     log.info('mint.catalog.entry.review_ok', {
       ...mintUrlLogFields(mintUrl),
       hasScore: review.score !== null,

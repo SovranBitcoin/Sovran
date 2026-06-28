@@ -5,7 +5,7 @@ import type { GetInfoResponse } from '@cashu/cashu-ts';
 
 import { auditMint, fetchMintInfo } from '@/shared/lib/apiClient';
 import { cashuLog } from '@/shared/lib/logger';
-import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
+import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { transformAuditData, type AuditInfo } from '../lib/auditInfo';
 
 interface UseAuditedMintResult {
@@ -28,9 +28,9 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
 
-  const getCached = useAuditMintStore((state) => state.getCached);
-  const setCached = useAuditMintStore((state) => state.setCached);
-  const isStale = useAuditMintStore((state) => state.isStale);
+  const getCached = useMintMetadataStore((state) => state.getCached);
+  const setCached = useMintMetadataStore((state) => state.setAudit);
+  const isStale = useMintMetadataStore((state) => state.isStale);
 
   useEffect(() => {
     if (!mintUrl) {
@@ -49,12 +49,12 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
 
         // Check cache first
         const cached = getCached(mintUrl);
-        const stale = isStale(mintUrl);
+        const stale = isStale(mintUrl, 'audit');
 
-        if (cached && !stale) {
+        if (cached?.auditData && !stale) {
           cashuLog.debug('mint.audit.cache.hit', { ...mintUrlLogFields(mintUrl) });
           setAuditInfo(transformAuditData(cached.auditData));
-          setMintInfo(cached.mintInfo);
+          setMintInfo(cached.info);
           setLoading(false);
           return;
         }

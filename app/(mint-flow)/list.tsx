@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { useBalanceContext, useMints } from '@cashu/coco-react';
 import type { MintAvailability } from '@sovranbitcoin/colada';
 
-import { MintListScreen } from '@/features/mint';
+import { MintListScreen, useMintRowsWithCache } from '@/features/mint';
 import { useMintCatalog } from '@/features/mint/hooks/useMintCatalog';
 import { buildMintListItems } from '@/features/send';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
@@ -92,6 +92,9 @@ function MintListRoute() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [trustedMints, availability, catalog, focusKey]
   );
+  // Trusted mints are known + catalog-enriched here, so treat every row as
+  // `live` (no skeleton); the cache overlay backfills holes and animates stats.
+  const { rows } = useMintRowsWithCache({ baseItems: items, itemsStatus: 'ready' });
 
   return (
     <>
@@ -110,7 +113,7 @@ function MintListRoute() {
       />
 
       <MintListScreen
-        items={items}
+        items={rows}
         showDetailsButton={showDetailsButton}
         closeButtonLabel="Close"
         onMintSelect={(item) => {
@@ -137,9 +140,15 @@ function MintListRoute() {
           cashuLog.info('mint.list.inspect', {
             ...mintUrlLogFields(mintUrl),
           });
+          // Pass the mint as the screen's `mintInfoEntry` seed (the param its
+          // schema actually reads), not a bare `mintUrl` the screen ignores —
+          // otherwise MintInfoScreen opens with no mint and resolves it from
+          // whatever the machine context happens to hold. Seeding only the URL
+          // (no displayName) lets the bridge fill audit/KYM from cache
+          // instantly and still fetch NUT-06 details (name/contact/MOTD).
           router.navigate({
             pathname: '/info',
-            params: { mintUrl },
+            params: { mintInfoEntry: JSON.stringify({ mintUrl }) },
           });
         }}
         onClose={() => router.back()}
