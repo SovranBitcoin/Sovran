@@ -1,13 +1,11 @@
-import React from 'react';
-import { Menu } from 'heroui-native';
+import React, { useCallback } from 'react';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
-import { BottomSheetMenu } from '@/shared/blocks/popup/BottomSheetMenu';
+import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { View } from '@/shared/ui/primitives/View/View';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
@@ -32,6 +30,26 @@ export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React
     'muted',
   ] as const);
   const [success] = useThemeColor(['success'] as const);
+
+  // The pick-one surface is the app-wide `actionMenuPopup()` bottom sheet
+  // (rendered once by <ActionMenuHost /> at the app root) — not an inline
+  // heroui Menu. Inline bottom-sheet menus mis-position / paint at rest on
+  // Android; the global host opens fully and stays hidden when closed.
+  const openCurrencyMenu = useCallback(() => {
+    actionMenuPopup({
+      title: 'Display currency',
+      buttons: CURRENCY_OPTIONS.map((option) => ({
+        text: option.label,
+        iconNode: <Icon name={option.icon} size={20} />,
+        testID: `fiat-currency-menu-${option.currency}`,
+        suffix:
+          option.currency === displayCurrency ? (
+            <Icon name="mdi:check" size={20} color={success} />
+          ) : undefined,
+        onPress: () => handleSelectCurrency(option.currency),
+      })),
+    });
+  }, [displayCurrency, success, handleSelectCurrency]);
 
   const renderPill = (primaryHandler?: () => void, longPressHandler?: () => void) => (
     <Pressable
@@ -64,34 +82,7 @@ export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React
     return renderPill(onPress, undefined);
   }
 
-  return (
-    <BottomSheetMenu
-      name="fiat-currency"
-      renderTrigger={({ open }) =>
-        // With an external onPress, tap toggles sats/fiat and long-press opens
-        // the currency menu; otherwise tap opens it. Mirrors useFiatCurrencyPill.
-        onPress ? renderPill(onPress, open) : renderPill(open, undefined)
-      }>
-      <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-        Display currency
-      </Menu.Label>
-      {CURRENCY_OPTIONS.map((option) => {
-        const isSelected = option.currency === displayCurrency;
-        return (
-          <Menu.Item
-            key={option.currency}
-            testID={`fiat-currency-menu-${option.currency}`}
-            onPress={() => handleSelectCurrency(option.currency)}>
-            <HStack align="center" gap={10} style={{ flex: 1 }}>
-              <Icon name={option.icon} size={20} />
-              <View style={{ flex: 1 }}>
-                <Menu.ItemTitle>{option.label}</Menu.ItemTitle>
-              </View>
-              {isSelected ? <Icon name="mdi:check" size={20} color={success} /> : null}
-            </HStack>
-          </Menu.Item>
-        );
-      })}
-    </BottomSheetMenu>
-  );
+  // With an external onPress, tap toggles sats/fiat and long-press opens the
+  // currency menu; otherwise tap opens it. Mirrors useFiatCurrencyPill.
+  return onPress ? renderPill(onPress, openCurrencyMenu) : renderPill(openCurrencyMenu, undefined);
 }

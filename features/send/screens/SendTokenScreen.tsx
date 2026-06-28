@@ -9,7 +9,7 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 
-import { Alert, Menu } from 'heroui-native';
+import { Alert } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from '@sovranbitcoin/colada/react';
 import {
@@ -39,8 +39,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { fetchMintInfo } from '@/shared/lib/apiClient';
-import Icon from 'assets/icons';
-import { BottomSheetMenu } from '@/shared/blocks/popup/BottomSheetMenu';
+import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import {
   useSendReachability,
@@ -185,94 +184,78 @@ export function SendTokenScreen({
       ? entry.token.memo.trim()
       : null;
 
+  // Copy opens the app-wide `actionMenuPopup()` bottom sheet (rendered once by
+  // <ActionMenuHost /> at the app root) listing the copy variants — no inline
+  // heroui sheet, which mis-positions / paints at rest on Android.
+  const openCopyMenu = () => {
+    actionMenuPopup({
+      title: 'Copy token',
+      buttons: copyVariants.map((v) => ({
+        text: v.label,
+        icon: v.icon,
+        testID: `send-token-copy-menu-${v.id}`,
+        disabled: !v.available,
+        reason: v.reason,
+        description: v.description,
+        onPress: () => handleCopyVariant(v.id),
+      })),
+    });
+  };
+
   const bottomButtons = (
     <BottomButtons>
-      {/*
-       * The Copy button opens a bottom-sheet Menu of copy variants. The sheet
-       * only mounts while open (BottomSheetMenu), so on Android it never paints
-       * its closed state at rest. The button row is the trigger.
-       */}
-      <BottomSheetMenu
-        name="send-token-copy"
-        renderTrigger={({ open }) => (
-          <HStack justify="center" align="center">
-            <ButtonHandler
-              buttons={[
-                {
-                  testID: 'send-token-copy',
-                  text: 'Copy',
-                  icon: 'lets-icons:copy',
-                  variant: 'primary',
-                  onPress: () => {
-                    open();
-                  },
-                  condition: actions.copy.available,
-                },
-                {
-                  testID: 'send-token-share',
-                  text: 'Share',
-                  icon: 'mdi:share-variant',
-                  variant: 'secondary',
-                  onPress: () => actions.share.execute(),
-                  condition: actions.share.available,
-                },
-                {
-                  testID: 'send-token-nfc',
-                  text: 'NFC',
-                  description: 'Transmit to a nearby phone',
-                  icon: 'lucide:nfc',
-                  variant: 'secondary',
-                  onPress: async () => {
-                    await new Promise((r) => setTimeout(r, 400));
-                    await actions.nfc.execute();
-                  },
-                  condition: actions.nfc.available,
-                },
-                {
-                  testID: 'send-token-check-status',
-                  text: actions.checkStatus.loading ? 'Checking...' : 'Check Status',
-                  description: 'Refresh the pending state',
-                  icon: 'mdi:refresh',
-                  variant: 'secondary',
-                  onPress: () => actions.checkStatus.execute(),
-                  condition: actions.checkStatus.available,
-                },
-                {
-                  testID: 'send-token-cancel-transaction',
-                  text: 'Cancel transaction',
-                  description: 'Return the funds to your balance',
-                  icon: 'mdi:cancel',
-                  variant: 'dangerous',
-                  onPress: () => actions.cancel.execute(),
-                  condition: actions.cancel.available,
-                },
-              ]}
-            />
-          </HStack>
-        )}>
-        <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-          Copy token
-        </Menu.Label>
-        {copyVariants.map((v) => (
-          <Menu.Item
-            key={v.id}
-            testID={`send-token-copy-menu-${v.id}`}
-            isDisabled={!v.available}
-            onPress={() => handleCopyVariant(v.id)}>
-            <HStack align="center" gap={10} style={{ flex: 1 }}>
-              {v.icon ? <Icon name={v.icon} size={18} /> : null}
-              <View style={{ flex: 1 }}>
-                <Menu.ItemTitle>{v.label}</Menu.ItemTitle>
-                {(v.description || (!v.available && v.reason)) && (
-                  <Menu.ItemDescription>
-                    {!v.available && v.reason ? v.reason : v.description}
-                  </Menu.ItemDescription>
-                )}
-              </View>
-            </HStack>
-          </Menu.Item>
-        ))}
-      </BottomSheetMenu>
+      <HStack justify="center" align="center">
+        <ButtonHandler
+          buttons={[
+            {
+              testID: 'send-token-copy',
+              text: 'Copy',
+              icon: 'lets-icons:copy',
+              variant: 'primary',
+              onPress: openCopyMenu,
+              condition: actions.copy.available,
+            },
+            {
+              testID: 'send-token-share',
+              text: 'Share',
+              icon: 'mdi:share-variant',
+              variant: 'secondary',
+              onPress: () => actions.share.execute(),
+              condition: actions.share.available,
+            },
+            {
+              testID: 'send-token-nfc',
+              text: 'NFC',
+              description: 'Transmit to a nearby phone',
+              icon: 'lucide:nfc',
+              variant: 'secondary',
+              onPress: async () => {
+                await new Promise((r) => setTimeout(r, 400));
+                await actions.nfc.execute();
+              },
+              condition: actions.nfc.available,
+            },
+            {
+              testID: 'send-token-check-status',
+              text: actions.checkStatus.loading ? 'Checking...' : 'Check Status',
+              description: 'Refresh the pending state',
+              icon: 'mdi:refresh',
+              variant: 'secondary',
+              onPress: () => actions.checkStatus.execute(),
+              condition: actions.checkStatus.available,
+            },
+            {
+              testID: 'send-token-cancel-transaction',
+              text: 'Cancel transaction',
+              description: 'Return the funds to your balance',
+              icon: 'mdi:cancel',
+              variant: 'dangerous',
+              onPress: () => actions.cancel.execute(),
+              condition: actions.cancel.available,
+            },
+          ]}
+        />
+      </HStack>
     </BottomButtons>
   );
 

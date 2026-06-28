@@ -54,16 +54,14 @@
  * @see {@link ./View}
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Platform, StyleProp, ViewStyle } from 'react-native';
-import { Menu, type MenuTriggerRef } from 'heroui-native';
+import React, { useMemo, useState } from 'react';
+import { StyleProp, ViewStyle } from 'react-native';
 import { Log, log } from '@/shared/lib/logger';
 import { Button } from '@/shared/ui/primitives/Button';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from '@/assets/icons';
-import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
+import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 
 /**
  * Configuration for individual buttons in ButtonHandler
@@ -159,7 +157,6 @@ export function ButtonHandler({
   className,
 }: ButtonHandlerProps) {
   const [loadingIdx, setLoadingIdx] = useState<number | null>(null);
-  const danger = useThemeColor('danger');
 
   // Filter buttons based on condition
   const visibleButtons = buttons.filter((button) => button.condition !== false);
@@ -176,18 +173,7 @@ export function ButtonHandler({
     ];
   }, [visibleButtons]);
 
-  // heroui's `Menu.Trigger asChild` routes through `Slot.Pressable`, which
-  // doesn't compose with our Button (it wraps `TouchableOpacity`, not
-  // `Pressable`). Use the same imperative-open pattern as the Copy menu:
-  // invisible ref-backed Trigger + `.open()` from the visible button's
-  // onPress.
-  const moreMenuTriggerRef = useRef<MenuTriggerRef>(null);
-  const openMoreMenu = useCallback(() => {
-    setTimeout(() => moreMenuTriggerRef.current?.open(), 0);
-  }, []);
-
-  // The Menu closes itself on select (shouldCloseOnSelect default); keep
-  // async action failures contained so overflow actions do not surface as
+  // Keep async action failures contained so overflow actions do not surface as
   // unhandled promise rejections on Android.
   const handleMenuItemPress = async (button: ButtonHandlerActionButton): Promise<void> => {
     if (button.disabled) return;
@@ -199,6 +185,25 @@ export function ButtonHandler({
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  };
+
+  // The overflow sheet is the app-wide `actionMenuPopup()` surface (rendered
+  // once by <ActionMenuHost /> at the app root). Inline heroui bottom-sheet
+  // menus mis-position / paint at rest on Android; the global host opens fully
+  // and stays hidden when closed.
+  const openMoreMenu = () => {
+    actionMenuPopup({
+      title: 'Select option',
+      buttons: overflowMenuButtons.map((button, i) => ({
+        text: typeof button.text === 'string' ? button.text : 'Action',
+        icon: button.icon,
+        description: button.description,
+        disabled: button.disabled,
+        variant: button.variant,
+        testID: button.testID ?? (typeof button.text === 'string' ? button.text : `overflow-${i}`),
+        onPress: () => handleMenuItemPress(button),
+      })),
+    });
   };
 
   // The inner shared `Button` already routes its onPress through
@@ -262,66 +267,16 @@ export function ButtonHandler({
           </View>
         )}
 
-        {/* 4+ buttons: "More" opens a bottom-sheet Menu listing items 3+. */}
+        {/* 4+ buttons: "More" opens the app-wide actionMenuPopup sheet listing items 3+. */}
         {visibleButtons.length > 3 && (
-          <>
-            <Menu presentation="bottom-sheet">
-              <Menu.Trigger
-                ref={moreMenuTriggerRef}
-                style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-                <View style={{ width: 1, height: 1 }} />
-              </Menu.Trigger>
-              <Menu.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
-                <MenuScrim />
-                <Menu.Content presentation="bottom-sheet">
-                  <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-                    Select option
-                  </Menu.Label>
-                  {overflowMenuButtons.map((button, i) => {
-                    const label = typeof button.text === 'string' ? button.text : 'Action';
-                    const isDanger = button.variant === 'dangerous';
-                    return (
-                      <Menu.Item
-                        key={
-                          button.testID ??
-                          (typeof button.text === 'string' ? button.text : `overflow-${i}`)
-                        }
-                        testID={button.testID ? `overflow-${button.testID}` : undefined}
-                        isDisabled={button.disabled}
-                        variant={isDanger ? 'danger' : 'default'}
-                        onPress={() => {
-                          void handleMenuItemPress(button);
-                        }}>
-                        <HStack align="center" gap={10} style={{ flex: 1 }}>
-                          {button.icon ? (
-                            <Icon
-                              name={button.icon}
-                              size={20}
-                              color={isDanger ? danger : undefined}
-                            />
-                          ) : null}
-                          <View style={{ flex: 1 }}>
-                            <Menu.ItemTitle>{label}</Menu.ItemTitle>
-                            {button.description ? (
-                              <Menu.ItemDescription>{button.description}</Menu.ItemDescription>
-                            ) : null}
-                          </View>
-                        </HStack>
-                      </Menu.Item>
-                    );
-                  })}
-                </Menu.Content>
-              </Menu.Portal>
-            </Menu>
-            <View>
-              <Button
-                testID="more-button"
-                icon={<Icon name="tabler:dots" />}
-                onPress={openMoreMenu}
-                variant="secondary"
-              />
-            </View>
-          </>
+          <View>
+            <Button
+              testID="more-button"
+              icon={<Icon name="tabler:dots" />}
+              onPress={openMoreMenu}
+              variant="secondary"
+            />
+          </View>
         )}
       </HStack>
     </Log>

@@ -1,9 +1,7 @@
 import { memo } from 'react';
 import { LiquidGlassMenu } from 'liquid-glass-menu';
-import { Menu as HeroMenu } from 'heroui-native';
 import { ActionSheetIOS, Platform, StyleSheet, Text } from 'react-native';
-import { BottomSheetMenu } from '@/shared/blocks/popup/BottomSheetMenu';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
@@ -110,26 +108,20 @@ export const StatsCard = memo(function StatsCard({
       );
     }
 
-    // Android: heroui bottom-sheet menu (the canonical pick-one-of-N surface) —
-    // ActionSheetIOS doesn't exist here, which used to leave this card a dead
-    // control. BottomSheetMenu only mounts the sheet while open, so the closed
-    // sheet can't paint at rest on Android.
-    return (
-      <BottomSheetMenu name="map-category" renderTrigger={({ open }) => renderCard(open)}>
-        <HeroMenu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-          Merchant category
-        </HeroMenu.Label>
-        {CATEGORY_FILTERS.map((cat) => (
-          <HeroMenu.Item key={cat} onPress={() => onCategoryChange(cat)}>
-            <HStack align="center" gap={10} style={{ flex: 1 }}>
-              <View style={{ flex: 1 }}>
-                <HeroMenu.ItemTitle>{categoryLabel(cat)}</HeroMenu.ItemTitle>
-              </View>
-              {cat === category ? <Icon name="mdi:check" size={20} color={success} /> : null}
-            </HStack>
-          </HeroMenu.Item>
-        ))}
-      </BottomSheetMenu>
+    // Android: the app-wide `actionMenuPopup()` bottom sheet (rendered once by
+    // <ActionMenuHost /> at the app root) — ActionSheetIOS doesn't exist here,
+    // which used to leave this card a dead control. The global host opens fully
+    // and stays hidden at rest, unlike an inline heroui sheet on Android.
+    return renderCard(() =>
+      actionMenuPopup({
+        title: 'Merchant category',
+        buttons: CATEGORY_FILTERS.map((cat) => ({
+          text: categoryLabel(cat),
+          suffix:
+            cat === category ? <Icon name="mdi:check" size={20} color={success} /> : undefined,
+          onPress: () => onCategoryChange(cat),
+        })),
+      })
     );
   }
 

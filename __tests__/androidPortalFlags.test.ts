@@ -4,11 +4,11 @@ import { relative, resolve } from 'path';
 const ROOT = resolve(__dirname, '..');
 
 const PORTAL_FILES = [
-  // BottomSheetMenu now owns the Menu.Portal for the currency / map-category /
-  // wallet-more / copy-token / action menus; the per-site files below no longer
-  // render a portal directly but are kept so a regression that reintroduces one
-  // is still caught.
-  'shared/blocks/popup/BottomSheetMenu.tsx',
+  // The currency / map-category / wallet-more / copy-token / overflow menus now
+  // route through the global actionMenuPopup() host (ActionMenuHost) instead of
+  // rendering inline portals. The per-site files below are kept so a regression
+  // that reintroduces an inline Menu.Portal without the Android opt-out is still
+  // caught.
   'features/send/screens/SendTokenScreen.tsx',
   'features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.androidMenu.tsx',
   'features/wallet/screens/WalletScreen.tsx',

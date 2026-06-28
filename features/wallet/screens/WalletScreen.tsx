@@ -1,9 +1,8 @@
 import { useCallback, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
-import { Menu } from 'heroui-native';
+import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 
-import Icon from 'assets/icons';
 import {
   useHistoryWithMelts,
   ReceivedThisMonth,
@@ -20,7 +19,6 @@ import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { zIndex } from '@/shared/styles/tokens';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { QRButton } from '@/shared/ui/composed/QRButton';
-import { BottomSheetMenu } from '@/shared/blocks/popup/BottomSheetMenu';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -191,42 +189,35 @@ export function WalletScreen() {
                   onPress={handleNfc}
                 />
               ) : null}
-              <BottomSheetMenu
-                name="wallet-more"
-                renderTrigger={({ open }) => (
-                  <CircleActionButton
-                    icon="tabler:dots"
-                    systemIcon="ellipsis"
-                    label="More"
-                    testID="wallet-more"
-                    onPress={open}
-                  />
-                )}>
-                <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-                  Select option
-                </Menu.Label>
-                <Menu.Item testID="wallet-action-theme" onPress={handleTheme}>
-                  <HStack align="center" gap={10} style={{ flex: 1 }}>
-                    <Icon name="mdi:palette" size={20} />
-                    <View style={{ flex: 1 }}>
-                      <Menu.ItemTitle>Theme</Menu.ItemTitle>
-                      <Menu.ItemDescription>Change wallet appearance</Menu.ItemDescription>
-                    </View>
-                  </HStack>
-                </Menu.Item>
-                <Menu.Item
-                  testID="wallet-action-near-pay"
-                  isDisabled={isSwapping}
-                  onPress={handleNearPay}>
-                  <HStack align="center" gap={10} style={{ flex: 1 }}>
-                    <Icon name="mdi:bluetooth" size={20} />
-                    <View style={{ flex: 1 }}>
-                      <Menu.ItemTitle>Nut Drop</Menu.ItemTitle>
-                      <Menu.ItemDescription>Pay a nearby BitChat user</Menu.ItemDescription>
-                    </View>
-                  </HStack>
-                </Menu.Item>
-              </BottomSheetMenu>
+              <CircleActionButton
+                icon="tabler:dots"
+                systemIcon="ellipsis"
+                label="More"
+                testID="wallet-more"
+                onPress={() =>
+                  // App-wide bottom sheet via <ActionMenuHost />; no inline sheet.
+                  actionMenuPopup({
+                    title: 'Select option',
+                    buttons: [
+                      {
+                        text: 'Theme',
+                        icon: 'mdi:palette',
+                        description: 'Change wallet appearance',
+                        testID: 'wallet-action-theme',
+                        onPress: () => handleTheme(),
+                      },
+                      {
+                        text: 'Nut Drop',
+                        icon: 'mdi:bluetooth',
+                        description: 'Pay a nearby BitChat user',
+                        testID: 'wallet-action-near-pay',
+                        disabled: isSwapping,
+                        onPress: () => handleNearPay(),
+                      },
+                    ],
+                  })
+                }
+              />
             </HStack>
 
             {/* Wrap the Receive / Send / QR row in a single pointerEvents=none
