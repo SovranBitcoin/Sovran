@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { useSharedValue } from 'react-native-reanimated';
 import { z } from 'zod';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -44,7 +43,6 @@ export function MintDistributionScreen() {
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.distribution' });
   const balanceSplitVariant = useSettingsStore((state) => state.balanceSplitVariant);
   const VariantBody = BALANCE_SPLIT_VARIANT_COMPONENTS[balanceSplitVariant];
-  const scrollY = useSharedValue(0);
   const { trustedMints } = useMints();
   const { balances: liveBalanceCtx } = useBalanceContext();
   const liveBalances = liveBalanceCtx.byMint;
@@ -191,10 +189,9 @@ export function MintDistributionScreen() {
         currencies={availableCurrencies}
         selectedCurrency={selectedCurrency}
         onCurrencyChange={setSelectedCurrency}
-        scrollY={scrollY}
       />
     ),
-    [availableCurrencies, selectedCurrency, scrollY]
+    [availableCurrencies, selectedCurrency]
   );
 
   const handleRebalance = useCallback(() => {
@@ -225,8 +222,11 @@ export function MintDistributionScreen() {
       headerGradient
       stickyContent={stickyHeader}
       stickyContentHeight={MINT_CURRENCY_TABS_HEIGHT}
-      scroll="animated"
-      scrollY={scrollY}
+      // Plain ScrollView (NOT scroll="animated"): on Android the reanimated
+      // Animated.ScrollView doesn't hand overscroll to the native form-sheet, so
+      // drag-to-dismiss was dead here. The currency tabs lose their scroll-shrink
+      // on this screen as the trade — keep it on the working dismiss path.
+      scroll="auto"
       footer={bottomButtons}
       contentPadding={0}>
       <Stack.Screen options={withGlassHeaderItems({ title: 'Balance split' })} />
