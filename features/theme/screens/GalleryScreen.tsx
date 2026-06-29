@@ -78,7 +78,10 @@ export function GalleryScreen() {
       <Screen name="GalleryScreen" scroll="custom">
         <ScrollView
           contentContainerStyle={{ paddingBottom: 40, paddingTop: headerHeight + 8 }}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          // Android: gallery opens as a form-sheet; opt into nested scrolling so
+          // dragging the page down scrolls instead of dismissing. No-op on iOS.
+          nestedScrollEnabled>
           {byTopic.length === 0 ? (
             <Text size={13} className="mt-12 text-center opacity-50" style={{ color: foreground }}>
               Loading albums…

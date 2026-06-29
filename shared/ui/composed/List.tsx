@@ -25,12 +25,18 @@ const DEFAULT_DRAW_DISTANCE = 250;
 export function List<T>({
   showsVerticalScrollIndicator = false,
   drawDistance = DEFAULT_DRAW_DISTANCE,
+  // Android: opt into the nested-scroll protocol by default so a list rendered
+  // inside a native form-sheet is recognised as the sheet's scrolling child —
+  // otherwise dragging the list down (to scroll up) dismisses the sheet. It's a
+  // no-op when the list isn't nested in another scrollable, and ignored on iOS.
+  nestedScrollEnabled = true,
   ...props
 }: FlashListProps<T> & { ref?: Ref<FlashListRef<T>> }) {
   return (
     <FlashList
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}
       drawDistance={drawDistance}
+      nestedScrollEnabled={nestedScrollEnabled}
       {...props}
     />
   );

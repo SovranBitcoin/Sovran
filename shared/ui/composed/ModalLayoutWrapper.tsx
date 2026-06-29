@@ -94,6 +94,12 @@ function AnimatedScrollContainer({
       contentContainerStyle={contentContainerStyle}
       onScroll={animatedScrollHandler}
       scrollEventThrottle={16}
+      // Android: opt this scroll view into the nested-scroll protocol so the
+      // native form-sheet's Material BottomSheetBehavior recognises it as the
+      // sheet's scrolling child. Without it, dragging the content down (to
+      // scroll back to the top) is read as a drag-to-dismiss and the sheet
+      // closes. Ignored on iOS. See ModalLayoutWrapper's plain ScrollView too.
+      nestedScrollEnabled
       scrollIndicatorInsets={scrollIndicatorInsets}>
       {showHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
       {children}
@@ -302,6 +308,10 @@ export function ModalLayoutWrapper({
             contentInsetAdjustmentBehavior="automatic"
             scrollEventThrottle={16}
             onScroll={handleScroll}
+            // Android: see the nested-scroll note on AnimatedScrollContainer
+            // above — required so the native form-sheet scrolls the content
+            // instead of dismissing when the user drags back toward the top.
+            nestedScrollEnabled
             contentContainerStyle={scrollContentStyle}>
             {shouldRenderAndroidHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
             {children}
