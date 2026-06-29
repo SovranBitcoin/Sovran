@@ -178,7 +178,13 @@ export function MintDistributionScreen() {
   const isBalanced = totalBp === TOTAL_BASIS_POINTS;
 
   useEffect(() => {
-    log.debug('mint.balance_split.render', { variant: balanceSplitVariant });
+    // `build` marker confirms which dismiss-fix revision is actually running on
+    // device (fast-refresh vs stale build), so we stop guessing blind.
+    log.debug('mint.balance_split.render', {
+      variant: balanceSplitVariant,
+      scrollMode: 'auto',
+      build: 'dismiss-fix-3',
+    });
   }, [balanceSplitVariant]);
 
   // The currency tabs are the only pinned chrome — a constant sticky height means
