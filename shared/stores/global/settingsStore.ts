@@ -9,6 +9,11 @@ import {
   DEFAULT_AVATAR_FALLBACK_VARIANT,
   type AvatarFallbackVariant,
 } from '@/shared/lib/avatarFallback';
+import {
+  BALANCE_SPLIT_VARIANTS,
+  DEFAULT_BALANCE_SPLIT_VARIANT,
+  type BalanceSplitVariant,
+} from '@/shared/lib/balanceSplitVariant';
 
 interface TermsAccepted {
   termsAccepted: boolean;
@@ -84,6 +89,12 @@ interface SettingsState {
   primalTierEnabled: boolean;
   relayTierEnabled: boolean;
   avatarFallbackVariant: AvatarFallbackVariant;
+  /**
+   * Dev-only: which presentational variant of the "Balance split"
+   * (mint distribution) screen to render. Chosen from Settings → Developer.
+   * Pure presentation — does not affect distribution behaviour.
+   */
+  balanceSplitVariant: BalanceSplitVariant;
   /** Minimum transfer amount in sats to include in a rebalance plan. */
   minTransferThreshold: number;
   middlemanRouting: MiddlemanRoutingSettings;
@@ -137,6 +148,7 @@ const PersistedSettings = z.object({
   primalTierEnabled: z.boolean().default(true),
   relayTierEnabled: z.boolean().default(true),
   avatarFallbackVariant: z.enum(AVATAR_FALLBACK_VARIANTS).default(DEFAULT_AVATAR_FALLBACK_VARIANT),
+  balanceSplitVariant: z.enum(BALANCE_SPLIT_VARIANTS).default(DEFAULT_BALANCE_SPLIT_VARIANT),
   minTransferThreshold: z.number().int().nonnegative().default(5),
   middlemanRouting: PersistedMiddlemanRouting.default({
     maxHops: 2,
@@ -170,6 +182,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   primalTierEnabled: true,
   relayTierEnabled: true,
   avatarFallbackVariant: DEFAULT_AVATAR_FALLBACK_VARIANT,
+  balanceSplitVariant: DEFAULT_BALANCE_SPLIT_VARIANT,
   minTransferThreshold: 5,
   middlemanRouting: DEFAULT_MIDDLEMAN_ROUTING,
 };
@@ -237,6 +250,10 @@ interface SettingsActions {
   // Avatar fallback variation
   setAvatarFallbackVariant: (variant: AvatarFallbackVariant) => void;
   getAvatarFallbackVariant: () => AvatarFallbackVariant;
+
+  // Balance split (mint distribution) presentational variant — dev only
+  setBalanceSplitVariant: (variant: BalanceSplitVariant) => void;
+  getBalanceSplitVariant: () => BalanceSplitVariant;
 
   // Rebalancing
   setMinTransferThreshold: (sats: number) => void;
@@ -389,6 +406,13 @@ export const useSettingsStore = create<SettingsStore>()(
         },
         getAvatarFallbackVariant: () => get().avatarFallbackVariant,
 
+        // Balance split presentational variant (dev)
+        setBalanceSplitVariant: (variant: BalanceSplitVariant) => {
+          storeLog.info('store.settings.set_balance_split_variant', { variant });
+          set({ balanceSplitVariant: variant });
+        },
+        getBalanceSplitVariant: () => get().balanceSplitVariant,
+
         // Rebalancing
         setMinTransferThreshold: (sats: number) => {
           storeLog.info('store.settings.set_min_transfer_threshold', { sats });
@@ -453,6 +477,7 @@ export const useSettingsStore = create<SettingsStore>()(
           sendLocationEnabled: state.sendLocationEnabled,
           fileLoggingEnabled: state.fileLoggingEnabled,
           avatarFallbackVariant: state.avatarFallbackVariant,
+          balanceSplitVariant: state.balanceSplitVariant,
           minTransferThreshold: state.minTransferThreshold,
           middlemanRouting: state.middlemanRouting,
           naggTierEnabled: state.naggTierEnabled,

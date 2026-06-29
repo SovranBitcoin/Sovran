@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import opacity from 'hex-color-opacity';
 import { TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { getLuminance } from '@/shared/lib/colorExtraction';
 import { Log } from '@/shared/lib/logger';
 
 const SLIDER_HEIGHT = 40;
@@ -46,12 +47,20 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
   customBorderColor,
   isLoadingColors = false,
 }) => {
-  const [defaultColor, surfaceTertiary, surfaceSecondary, accent] = useThemeColor([
+  const [defaultColor, surfaceTertiary, surfaceSecondary, accent, background] = useThemeColor([
     'default',
     'surface-tertiary',
     'surface-secondary',
     'accent',
+    'background',
   ] as const);
+
+  // The slider's neutral fallbacks were hardcoded white, which vanishes on light
+  // themes. Derive them from the actual background luminance so every variant
+  // stays legible across the dark/light theme axis.
+  const isLightBg = background.startsWith('#') ? getLuminance(background) > 0.55 : false;
+  const neutralBorder = isLightBg ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.10)';
+  const blurTint = isLightBg ? 'light' : 'dark';
 
   const gradientColors = useMemo(() => {
     if (isLoadingColors) return [surfaceTertiary, defaultColor] as const;
@@ -60,7 +69,7 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
   }, [isLoadingColors, customGradientColors, surfaceTertiary, defaultColor, accent]);
 
   const progressBorderColor = isLoadingColors
-    ? 'rgba(255,255,255,0.10)'
+    ? neutralBorder
     : opacity(customBorderColor || surfaceTertiary, BORDER_ALPHA);
 
   const stepWidth = width / TOTAL_STEPS;
@@ -205,7 +214,7 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
     const majorSteps = [0, 25, 50, 75, 100];
 
     const markerColor = isLoadingColors
-      ? 'rgba(255,255,255,0.10)'
+      ? neutralBorder
       : opacity(customBorderColor || surfaceTertiary, BORDER_ALPHA);
 
     for (let i = 0; i <= 100; i += 5) {
@@ -226,7 +235,7 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
       );
     }
     return markers;
-  }, [width, surfaceTertiary, customBorderColor, isLoadingColors]);
+  }, [width, surfaceTertiary, customBorderColor, isLoadingColors, neutralBorder]);
 
   return (
     <Log name="DistributionSlider">
@@ -244,12 +253,12 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
                 {
                   backgroundColor: Platform.OS === 'android' ? surfaceSecondary : 'transparent',
                   borderColor: isLoadingColors
-                    ? 'rgba(255,255,255,0.10)'
+                    ? neutralBorder
                     : opacity(customBorderColor || surfaceTertiary, BORDER_ALPHA),
                 },
               ]}>
               {Platform.OS === 'ios' && (
-                <BlurView style={StyleSheet.absoluteFill} tint="dark" intensity={40} />
+                <BlurView style={StyleSheet.absoluteFill} tint={blurTint} intensity={40} />
               )}
 
               <View style={styles.markersContainer}>{stepMarkers}</View>

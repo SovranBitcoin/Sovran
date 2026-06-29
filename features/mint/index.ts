@@ -7,7 +7,6 @@ export { MintDistributionScreen } from './screens/MintDistributionScreen';
 export { MintRebalancePlanScreen } from './screens/MintRebalancePlanScreen';
 export { MintReviewsScreen } from './screens/MintReviewsScreen';
 export { MintCurrencyTabs, MINT_CURRENCY_TABS_HEIGHT } from './components/MintCurrencyTabs';
-export { MintDistributionItem, DistributionBar } from './components/distribution';
 export {
   RebalanceStepRow,
   RebalanceChainCard,

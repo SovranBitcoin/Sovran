@@ -9,7 +9,6 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -18,7 +17,8 @@ import {
   MintCurrencyTabs,
   MINT_CURRENCY_TABS_HEIGHT,
 } from '@/features/mint/components/MintCurrencyTabs';
-import { MintDistributionItem, DistributionBar } from '@/features/mint/components/distribution';
+import { BALANCE_SPLIT_VARIANT_COMPONENTS } from '@/features/mint/components/distribution/variants';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Card } from '@/shared/ui/composed/Card';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
@@ -33,9 +33,6 @@ import {
 } from '@/shared/stores/profile/mintDistributionStore';
 import opacity from 'hex-color-opacity';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
-
-const DISTRIBUTION_BAR_HEIGHT = 48;
-const STICKY_CONTENT_HEIGHT = DISTRIBUTION_BAR_HEIGHT + MINT_CURRENCY_TABS_HEIGHT;
 
 const ParamsSchema = z.object({
   unit: z.string().max(16).optional(),
@@ -56,6 +53,8 @@ export function MintDistributionScreen() {
     'danger',
   ] as const);
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.distribution' });
+  const balanceSplitVariant = useSettingsStore((state) => state.balanceSplitVariant);
+  const VariantBody = BALANCE_SPLIT_VARIANT_COMPONENTS[balanceSplitVariant];
   const scrollY = useSharedValue(0);
   const { trustedMints } = useMints();
   const { balances: liveBalanceCtx } = useBalanceContext();
@@ -238,23 +237,24 @@ export function MintDistributionScreen() {
     return mintUrls.reduce((sum, url) => sum + (distribution[url] || 0), 0);
   }, [mintUrls, distribution]);
 
+  useEffect(() => {
+    log.debug('mint.balance_split.render', { variant: balanceSplitVariant });
+  }, [balanceSplitVariant]);
+
+  // The currency tabs are the only pinned chrome — keeping the sticky region a
+  // constant height means switching presentational variants never shifts the
+  // reserved scroll-top space. Each variant renders its own proportion viz
+  // (bar / hero / donut) inside the scrollable body.
   const stickyHeader = useMemo(
     () => (
-      <View>
-        <DistributionBar
-          distribution={distribution}
-          mintInfoMap={mintInfoMap}
-          mintUrls={mintUrls}
-        />
-        <MintCurrencyTabs
-          currencies={availableCurrencies}
-          selectedCurrency={selectedCurrency}
-          onCurrencyChange={setSelectedCurrency}
-          scrollY={scrollY}
-        />
-      </View>
+      <MintCurrencyTabs
+        currencies={availableCurrencies}
+        selectedCurrency={selectedCurrency}
+        onCurrencyChange={setSelectedCurrency}
+        scrollY={scrollY}
+      />
     ),
-    [distribution, mintInfoMap, mintUrls, availableCurrencies, selectedCurrency, scrollY]
+    [availableCurrencies, selectedCurrency, scrollY]
   );
 
   const handleRebalance = useCallback(() => {
@@ -311,7 +311,7 @@ export function MintDistributionScreen() {
         name="MintDistributionScreen"
         headerGradient
         stickyContent={stickyHeader}
-        stickyContentHeight={STICKY_CONTENT_HEIGHT}
+        stickyContentHeight={MINT_CURRENCY_TABS_HEIGHT}
         scroll="animated"
         scrollY={scrollY}
         footer={bottomButtons}
@@ -361,21 +361,16 @@ export function MintDistributionScreen() {
             </Text>
           </View>
         ) : (
-          <VStack gap={4}>
-            {mintsForCurrency.map((mint) => (
-              <MintDistributionItem
-                key={mint.mintUrl}
-                mintUrl={mint.mintUrl}
-                mintInfo={mintInfoMap[mint.mintUrl]}
-                balance={amountToNumber(liveBalances[mint.mintUrl]?.total)}
-                unit={selectedCurrency.toLowerCase()}
-                distributionBp={distribution[mint.mintUrl] || 0}
-                onDistributionChange={handleDistributionChange}
-                onMax={handleMax}
-                onMin={handleMin}
-              />
-            ))}
-          </VStack>
+          <VariantBody
+            mintUrls={mintUrls}
+            mintInfoMap={mintInfoMap}
+            distribution={distribution}
+            balanceTotals={balanceTotals}
+            unit={selectedCurrency.toLowerCase()}
+            onDistributionChange={handleDistributionChange}
+            onMax={handleMax}
+            onMin={handleMin}
+          />
         )}
 
         <View className="mx-4 mt-2">
