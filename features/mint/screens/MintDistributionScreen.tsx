@@ -8,9 +8,8 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-import { Button } from '@/shared/ui/primitives/Button';
+import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import {
   MintCurrencyTabs,
   MINT_CURRENCY_TABS_HEIGHT,
@@ -215,10 +214,12 @@ export function MintDistributionScreen() {
   const bottomButtons = useMemo(
     () => (
       <BottomButtons>
-        <VStack gap={4} className="px-4">
-          <Button text="Split evenly" variant="underline" onPress={handleEqualize} />
-          <Button text="Next" variant="primary" onPress={handleRebalance} />
-        </VStack>
+        <ButtonHandler
+          buttons={[
+            { text: 'Split evenly', variant: 'secondary', onPress: handleEqualize },
+            { text: 'Next', variant: 'primary', onPress: handleRebalance },
+          ]}
+        />
       </BottomButtons>
     ),
     [handleEqualize, handleRebalance]

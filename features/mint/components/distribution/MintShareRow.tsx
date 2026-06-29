@@ -51,7 +51,7 @@ export function MintShareRow({
           {bpToPercent(row.displayBp)}%
         </Text>
       </HStack>
-      <View className="min-h-[40px]" onLayout={row.onSliderLayout}>
+      <View className="h-9 justify-center" onLayout={row.onSliderLayout}>
         {row.sliderWidth > 0 && (
           <DistributionSlider
             value={row.sliderValue}

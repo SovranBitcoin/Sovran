@@ -18,7 +18,10 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { getLuminance } from '@/shared/lib/colorExtraction';
 import { Log } from '@/shared/lib/logger';
 
-const SLIDER_HEIGHT = 40;
+const SLIDER_HEIGHT = 28;
+// Full-capsule corners; `borderCurve: 'continuous'` smooths them on iOS and the
+// Android squircle path (see SquircleView) without needing a wrapper here.
+const SLIDER_RADIUS = SLIDER_HEIGHT / 2;
 const TOTAL_STEPS = 101;
 const BP_PER_STEP = TOTAL_BASIS_POINTS / (TOTAL_STEPS - 1);
 const BORDER_ALPHA = 0.22;
@@ -111,37 +114,19 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
   );
 
   const gesture = useMemo(() => {
-    return Gesture.Pan()
-      .enabled(!disabled)
-      .onBegin((event) => {
-        'worklet';
-        isActive.value = true;
-        const tapX = event.x;
+    return (
+      Gesture.Pan()
+        .enabled(!disabled)
+        // The visible track is slim (28dp); extend the touch target vertically so
+        // it stays comfortable to grab (~44dp).
+        .hitSlop({ top: 8, bottom: 8 })
+        .onBegin((event) => {
+          'worklet';
+          isActive.value = true;
+          const tapX = event.x;
 
-        const tappedStepIndex = Math.round(tapX / stepWidth);
-        const clampedStepIndex = Math.max(0, Math.min(tappedStepIndex, TOTAL_STEPS - 1));
-
-        const newProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
-        progress.value = newProgress;
-
-        const newBp = Math.round(clampedStepIndex * BP_PER_STEP);
-        value.value = newBp;
-
-        lastStepIndex.value = clampedStepIndex;
-
-        runOnJS(fireHaptic)();
-        runOnJS(notifyValueChange)(newBp);
-        runOnJS(notifyValueCommit)(newBp);
-      })
-      .onChange((event) => {
-        'worklet';
-        const currentX = event.x;
-
-        const currentStepIndex = Math.round(currentX / stepWidth);
-        const clampedStepIndex = Math.max(0, Math.min(currentStepIndex, TOTAL_STEPS - 1));
-
-        if (clampedStepIndex !== lastStepIndex.value) {
-          lastStepIndex.value = clampedStepIndex;
+          const tappedStepIndex = Math.round(tapX / stepWidth);
+          const clampedStepIndex = Math.max(0, Math.min(tappedStepIndex, TOTAL_STEPS - 1));
 
           const newProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
           progress.value = newProgress;
@@ -149,21 +134,44 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
           const newBp = Math.round(clampedStepIndex * BP_PER_STEP);
           value.value = newBp;
 
+          lastStepIndex.value = clampedStepIndex;
+
           runOnJS(fireHaptic)();
           runOnJS(notifyValueChange)(newBp);
-        }
-      })
-      .onFinalize(() => {
-        'worklet';
-        isActive.value = false;
+          runOnJS(notifyValueCommit)(newBp);
+        })
+        .onChange((event) => {
+          'worklet';
+          const currentX = event.x;
 
-        const stepIndex = Math.round(value.value / BP_PER_STEP);
-        const clampedStepIndex = Math.max(0, Math.min(stepIndex, TOTAL_STEPS - 1));
-        const finalProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
-        progress.value = finalProgress;
+          const currentStepIndex = Math.round(currentX / stepWidth);
+          const clampedStepIndex = Math.max(0, Math.min(currentStepIndex, TOTAL_STEPS - 1));
 
-        runOnJS(notifyValueCommit)(value.value);
-      });
+          if (clampedStepIndex !== lastStepIndex.value) {
+            lastStepIndex.value = clampedStepIndex;
+
+            const newProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
+            progress.value = newProgress;
+
+            const newBp = Math.round(clampedStepIndex * BP_PER_STEP);
+            value.value = newBp;
+
+            runOnJS(fireHaptic)();
+            runOnJS(notifyValueChange)(newBp);
+          }
+        })
+        .onFinalize(() => {
+          'worklet';
+          isActive.value = false;
+
+          const stepIndex = Math.round(value.value / BP_PER_STEP);
+          const clampedStepIndex = Math.max(0, Math.min(stepIndex, TOTAL_STEPS - 1));
+          const finalProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
+          progress.value = finalProgress;
+
+          runOnJS(notifyValueCommit)(value.value);
+        })
+    );
   }, [
     disabled,
     stepWidth,
@@ -307,7 +315,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
+    borderRadius: SLIDER_RADIUS,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     justifyContent: 'center',
   },
@@ -326,7 +335,8 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    borderRadius: 12,
+    borderRadius: SLIDER_RADIUS,
+    borderCurve: 'continuous',
     overflow: 'hidden',
   },
   fullWidthGradient: {
