@@ -3,7 +3,6 @@ import type { LayoutChangeEvent } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useExtractedColors } from '@/shared/lib/colorExtraction';
-import { bpToPercent, TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
 
 interface MintInfoLike {
   name?: string;
@@ -50,12 +49,6 @@ export function useDistributionRow({
     };
   }, [extractedColors, defaultColor, surfaceTertiary]);
 
-  // Stable, legible accent for dots/legend/donut segments.
-  const accentColor = useMemo(() => {
-    if (extractedColors.isLoading || !extractedColors.hasExtractedColors) return defaultColor;
-    return extractedColors.gradientColors?.[0] || extractedColors.baseColor || defaultColor;
-  }, [extractedColors, defaultColor]);
-
   const sliderValue = useSharedValue(distributionBp);
   const [previewBp, setPreviewBp] = useState<number | null>(null);
   const [sliderWidth, setSliderWidth] = useState(0);
@@ -92,10 +85,6 @@ export function useDistributionRow({
     handleSliderChange,
     handleSliderCommit,
     sliderColors,
-    accentColor,
     displayBp,
-    percentDisplay: bpToPercent(displayBp),
-    isAtMax: distributionBp === TOTAL_BASIS_POINTS,
-    isAtMin: distributionBp === 0,
   };
 }

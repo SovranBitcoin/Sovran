@@ -1,7 +1,7 @@
 import type { BalanceSplitVariant } from '@/shared/lib/balanceSplitVariant';
-import { CompactRowsVariant } from './CompactRowsVariant';
-import { HeroMinimalVariant } from './HeroMinimalVariant';
-import { ChartLedVariant } from './ChartLedVariant';
+import { MinimalListVariant } from './MinimalListVariant';
+import { TotalLedVariant } from './TotalLedVariant';
+import { DonutVariant } from './DonutVariant';
 import type { DistributionVariantComponent } from './types';
 
 export type { DistributionVariantProps, DistributionVariantComponent } from './types';
@@ -11,7 +11,7 @@ export type { DistributionVariantProps, DistributionVariantComponent } from './t
  * a variant to the enum a compile error until it is wired up here.
  */
 export const BALANCE_SPLIT_VARIANT_COMPONENTS = {
-  'compact-rows': CompactRowsVariant,
-  'hero-minimal': HeroMinimalVariant,
-  'chart-led': ChartLedVariant,
+  list: MinimalListVariant,
+  total: TotalLedVariant,
+  donut: DonutVariant,
 } satisfies Record<BalanceSplitVariant, DistributionVariantComponent>;

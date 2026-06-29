@@ -16,8 +16,6 @@ export interface DistributionVariantProps {
   /** Lowercased unit for amount formatting (e.g. "sat", "usd"). */
   unit: string;
   onDistributionChange: (mintUrl: string, bp: number) => void;
-  onMax: (mintUrl: string) => void;
-  onMin: (mintUrl: string) => void;
 }
 
 export type DistributionVariantComponent = React.FC<DistributionVariantProps>;

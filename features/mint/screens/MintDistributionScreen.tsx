@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Alert } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useSharedValue } from 'react-native-reanimated';
@@ -9,10 +8,9 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Button } from '@/shared/ui/primitives/Button';
-import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import {
   MintCurrencyTabs,
   MINT_CURRENCY_TABS_HEIGHT,
@@ -20,8 +18,6 @@ import {
 import { BALANCE_SPLIT_VARIANT_COMPONENTS } from '@/features/mint/components/distribution/variants';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Screen } from '@/shared/ui/composed/Screen';
-import { Card } from '@/shared/ui/composed/Card';
-import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useMints, useBalanceContext } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
@@ -31,7 +27,6 @@ import {
   useMintDistributionStore,
   TOTAL_BASIS_POINTS,
 } from '@/shared/stores/profile/mintDistributionStore';
-import opacity from 'hex-color-opacity';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 const ParamsSchema = z.object({
@@ -47,10 +42,11 @@ function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, un
 
 export function MintDistributionScreen() {
   useLifecycleLogger('MintDistributionScreen');
-  const [foreground, background, danger] = useThemeColor([
+  const [foreground, background, danger, muted] = useThemeColor([
     'foreground',
     'background',
     'danger',
+    'muted',
   ] as const);
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.distribution' });
   const balanceSplitVariant = useSettingsStore((state) => state.balanceSplitVariant);
@@ -82,10 +78,6 @@ export function MintDistributionScreen() {
   const setMintDistribution = useMintDistributionStore((state) => state.setMintDistribution);
   const initializeDistribution = useMintDistributionStore((state) => state.initializeDistribution);
   const equalizeMints = useMintDistributionStore((state) => state.equalizeMints);
-  const maxMint = useMintDistributionStore((state) => state.maxMint);
-  const minMint = useMintDistributionStore((state) => state.minMint);
-  const mirrorBalances = useMintDistributionStore((state) => state.mirrorBalances);
-  const concentrateOnPrimary = useMintDistributionStore((state) => state.concentrateOnPrimary);
 
   const availableCurrencies = useMemo(() => {
     const units: string[] = [];
@@ -173,30 +165,6 @@ export function MintDistributionScreen() {
     [selectedCurrency, mintUrls, setMintDistribution]
   );
 
-  const handleMax = useCallback(
-    (mintUrl: string) => {
-      log.info('mint.distribution.max', {
-        ...mintUrlLogFields(mintUrl),
-        currency: selectedCurrency,
-        mintCount: mintUrls.length,
-      });
-      maxMint(selectedCurrency, mintUrl, mintUrls);
-    },
-    [selectedCurrency, mintUrls, maxMint]
-  );
-
-  const handleMin = useCallback(
-    (mintUrl: string) => {
-      log.info('mint.distribution.min', {
-        ...mintUrlLogFields(mintUrl),
-        currency: selectedCurrency,
-        mintCount: mintUrls.length,
-      });
-      minMint(selectedCurrency, mintUrl, mintUrls);
-    },
-    [selectedCurrency, mintUrls, minMint]
-  );
-
   const handleEqualize = useCallback(() => {
     log.info('mint.distribution.equalize', {
       currency: selectedCurrency,
@@ -213,38 +181,17 @@ export function MintDistributionScreen() {
     return map;
   }, [mintUrls, liveBalances]);
 
-  const handleMirror = useCallback(() => {
-    log.info('mint.distribution.mirror', {
-      currency: selectedCurrency,
-      mintCount: mintUrls.length,
-    });
-    mirrorBalances(selectedCurrency, balanceTotals, mintUrls);
-  }, [selectedCurrency, mintUrls, balanceTotals, mirrorBalances]);
-
-  const handleConcentrate = useCallback(() => {
-    log.info('mint.distribution.concentrate', {
-      currency: selectedCurrency,
-      mintCount: mintUrls.length,
-    });
-    concentrateOnPrimary(selectedCurrency, balanceTotals, mintUrls);
-  }, [selectedCurrency, mintUrls, balanceTotals, concentrateOnPrimary]);
-
-  const hasActiveMints = useMemo(() => {
-    return mintUrls.some((url) => (distribution[url] || 0) > 0);
-  }, [mintUrls, distribution]);
-
   const totalBp = useMemo(() => {
     return mintUrls.reduce((sum, url) => sum + (distribution[url] || 0), 0);
   }, [mintUrls, distribution]);
+  const isBalanced = totalBp === TOTAL_BASIS_POINTS;
 
   useEffect(() => {
     log.debug('mint.balance_split.render', { variant: balanceSplitVariant });
   }, [balanceSplitVariant]);
 
-  // The currency tabs are the only pinned chrome — keeping the sticky region a
-  // constant height means switching presentational variants never shifts the
-  // reserved scroll-top space. Each variant renders its own proportion viz
-  // (bar / hero / donut) inside the scrollable body.
+  // The currency tabs are the only pinned chrome — a constant sticky height means
+  // switching presentational variants never shifts the reserved scroll-top space.
   const stickyHeader = useMemo(
     () => (
       <MintCurrencyTabs
@@ -265,44 +212,16 @@ export function MintDistributionScreen() {
     });
   }, [selectedCurrency]);
 
-  const canConcentrate = mintUrls.length > 1;
-
   const bottomButtons = useMemo(
     () => (
       <BottomButtons>
-        <HStack justify="space-around" align="flex-start" className="mb-3 px-8">
-          <CircleActionButton
-            icon="mdi:equal"
-            systemIcon="equal.circle.fill"
-            label="Split"
-            onPress={handleEqualize}
-            accessibilityHint="Distribute evenly across active mints"
-            testID="mint-dist-equalize"
-          />
-          <CircleActionButton
-            icon="mdi:restore"
-            systemIcon="arrow.counterclockwise"
-            label="Reset"
-            onPress={handleMirror}
-            accessibilityHint="Reset shares to match current balances"
-            testID="mint-dist-mirror"
-          />
-          <CircleActionButton
-            icon="mdi:target"
-            systemIcon="target"
-            label="Focus"
-            onPress={handleConcentrate}
-            disabled={!canConcentrate}
-            accessibilityHint="Concentrate share on the top-balance mint"
-            testID="mint-dist-concentrate"
-          />
-        </HStack>
-        <View className="px-4">
+        <VStack gap={4} className="px-4">
+          <Button text="Split evenly" variant="underline" onPress={handleEqualize} />
           <Button text="Next" variant="primary" onPress={handleRebalance} />
-        </View>
+        </VStack>
       </BottomButtons>
     ),
-    [handleEqualize, handleMirror, handleConcentrate, handleRebalance, canConcentrate]
+    [handleEqualize, handleRebalance]
   );
 
   return (
@@ -316,42 +235,13 @@ export function MintDistributionScreen() {
         scrollY={scrollY}
         footer={bottomButtons}
         contentPadding={0}>
-        <Stack.Screen
-          options={withGlassHeaderItems({
-            title: 'Balance split',
-            headerRight: () => (
-              <ScreenHeaderAction
-                icon="mdi:help-circle"
-                accessibilityLabel="Balance split help"
-                onPress={() => {
-                  Alert.alert(
-                    'Balance Split',
-                    'Set how new funds should be distributed across your mints. ' +
-                      'When you receive ecash, it will follow this split.\n\n' +
-                      '• Max: Set a mint to 100%\n' +
-                      '• Min: Set a mint to 0%\n' +
-                      '• Equalize: Distribute evenly among active mints',
-                    [{ text: 'Got it' }]
-                  );
-                }}
-              />
-            ),
-          })}
-        />
-        <View className="mb-1 py-1.5">
-          <HStack justify="space-between" align="center" className="px-4">
-            <Text size={14} style={{ color: opacity(foreground, 0.5) }}>
-              Total distribution
-            </Text>
-            <Text
-              bold
-              size={14}
-              style={{
-                color: totalBp === TOTAL_BASIS_POINTS ? foreground : danger,
-              }}>
-              {(totalBp / 100).toFixed(1)}%{totalBp !== TOTAL_BASIS_POINTS && ' ⚠️'}
-            </Text>
-          </HStack>
+        <Stack.Screen options={withGlassHeaderItems({ title: 'Balance split' })} />
+
+        {/* Ambient validity cue — the affirmative "100%", coloured only when off. */}
+        <View className="items-end px-4 pb-1 pt-2">
+          <Text bold size={13} style={{ color: isBalanced ? muted : danger }}>
+            {Math.round(totalBp / 100)}%
+          </Text>
         </View>
 
         {mintsForCurrency.length === 0 ? (
@@ -368,21 +258,8 @@ export function MintDistributionScreen() {
             balanceTotals={balanceTotals}
             unit={selectedCurrency.toLowerCase()}
             onDistributionChange={handleDistributionChange}
-            onMax={handleMax}
-            onMin={handleMin}
           />
         )}
-
-        <View className="mx-4 mt-2">
-          <Card
-            variant="info"
-            message={
-              hasActiveMints
-                ? 'When you change one mint, only mints already above 0% rebalance to keep the total at 100%. Mints at 0% stay at 0%.'
-                : 'Tap Equalize to distribute evenly across all mints.'
-            }
-          />
-        </View>
       </Screen>
     </GestureHandlerRootView>
   );
