@@ -29,7 +29,11 @@ export function MintSliderControls({
   onMin,
   disabled = false,
 }: MintSliderControlsProps) {
-  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
+  const [foreground, surfaceTertiary, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'surface-tertiary',
+    'surface-secondary',
+  ] as const);
   const buttonBorder = opacity(surfaceTertiary, 0.5);
 
   return (
@@ -56,7 +60,11 @@ export function MintSliderControls({
           haptics
           accessibilityLabel="Set to minimum"
           className="flex-1 rounded-[14px] border px-3.5 py-3"
-          style={{ borderColor: buttonBorder, opacity: disabled || row.isAtMin ? 0.5 : 1 }}>
+          style={{
+            backgroundColor: surfaceSecondary,
+            borderColor: buttonBorder,
+            opacity: disabled || row.isAtMin ? 0.5 : 1,
+          }}>
           <HStack align="center" gap={8}>
             <Icon name="mdi:arrow-collapse-down" size={16} color={foreground} />
             <Text size={12} heavy style={{ color: foreground }}>
@@ -71,7 +79,11 @@ export function MintSliderControls({
           haptics
           accessibilityLabel="Set to maximum"
           className="flex-1 rounded-[14px] border px-3.5 py-3"
-          style={{ borderColor: buttonBorder, opacity: disabled || row.isAtMax ? 0.5 : 1 }}>
+          style={{
+            backgroundColor: surfaceSecondary,
+            borderColor: buttonBorder,
+            opacity: disabled || row.isAtMax ? 0.5 : 1,
+          }}>
           <HStack align="center" gap={8}>
             <Icon name="mdi:arrow-collapse-up" size={16} color={foreground} />
             <Text size={12} heavy style={{ color: foreground }}>
