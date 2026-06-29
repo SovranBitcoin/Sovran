@@ -205,6 +205,8 @@ export function MerchantDetailScreen() {
     <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
       <ScrollView
         style={styles.scrollView}
+        // Android form-sheet: top-edge drag dismisses, mid-scroll scrolls.
+        nestedScrollEnabled
         contentContainerStyle={{
           paddingTop: insets.top + 56,
           paddingHorizontal: 16,

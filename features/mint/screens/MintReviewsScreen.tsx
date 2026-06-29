@@ -497,6 +497,8 @@ export function MintReviewsScreen() {
       ) : (
         <FlatList
           data={reviews}
+          // Android form-sheet: top-edge drag dismisses, mid-scroll scrolls.
+          nestedScrollEnabled
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           ListHeaderComponent={ListHeader}
