@@ -207,6 +207,9 @@ const AlbumPage = React.memo(function AlbumPage({
         keyExtractor={(n) => n}
         numColumns={GRID_COLUMNS}
         renderItem={renderWallpaper}
+        // Android: this grid scrolls inside the theme form-sheet; opt into
+        // nested scrolling so dragging it down scrolls instead of dismissing.
+        nestedScrollEnabled
         contentContainerStyle={{
           paddingTop: 16,
           paddingHorizontal: GRID_HORIZONTAL_PADDING,

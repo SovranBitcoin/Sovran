@@ -586,6 +586,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               getItemType={threadItemType}
               renderItem={renderThreadItem}
               extraData={threadExtraData}
+              // Android: the thread opens as a form-sheet; opt into nested
+              // scrolling so dragging the list down scrolls instead of
+              // dismissing the sheet. No-op when not sheet-nested.
+              nestedScrollEnabled
               drawDistance={500}
               onEndReached={handleEndReached}
               onEndReachedThreshold={0.4}

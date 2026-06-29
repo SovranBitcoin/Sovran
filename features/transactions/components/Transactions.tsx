@@ -628,6 +628,10 @@ export const Transactions = React.memo(
         <FlashList
           key={listKey}
           style={{ flex: 1 }}
+          // Android: this timeline renders inside the transactions form-sheet;
+          // opt into nested scrolling so dragging it down scrolls the list
+          // instead of dismissing the sheet. No-op when not sheet-nested.
+          nestedScrollEnabled
           data={sectionsToDisplay}
           keyExtractor={(section) => section.index ?? section.title}
           // FlashList v2 measures section heights synchronously, so there is no
