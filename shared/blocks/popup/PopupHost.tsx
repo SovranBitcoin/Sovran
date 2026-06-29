@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Log } from '@/shared/lib/logger';
+import { scheduleAfterLayout } from '@/shared/lib/scheduleAfterLayout';
 import {
   Keyboard,
   Platform,
@@ -613,8 +614,10 @@ function SheetPopup() {
   useEffect(() => {
     if (isOpen) {
       setMounted(true);
-      const openTimer = setTimeout(() => setRenderedOpen(true), 0);
-      return () => clearTimeout(openTimer);
+      // Open after a layout pass so gorhom has measured the freshly mounted
+      // content — flipping open on the next tick races the measurement and the
+      // sheet snaps to a partial height.
+      return scheduleAfterLayout(() => setRenderedOpen(true));
     }
     setRenderedOpen(false);
     // Unmount after heroui's exit animation lands (~300ms) — matches the

@@ -24,6 +24,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
+import { scheduleAfterLayout } from '@/shared/lib/scheduleAfterLayout';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 import {
@@ -563,8 +564,10 @@ export function ActionMenuHost() {
   useEffect(() => {
     if (isOpen) {
       setMounted(true);
-      const openTimer = setTimeout(() => setRenderedOpen(true), 0);
-      return () => clearTimeout(openTimer);
+      // Open after a layout pass so gorhom has measured the freshly mounted
+      // content — flipping open on the next tick races the measurement and the
+      // sheet snaps to a partial height.
+      return scheduleAfterLayout(() => setRenderedOpen(true));
     }
     setRenderedOpen(false);
     const unmountTimer = setTimeout(() => setMounted(false), 400);
