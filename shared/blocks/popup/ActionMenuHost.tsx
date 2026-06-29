@@ -548,8 +548,33 @@ export function ActionMenuHost() {
     </BottomSheetFooter>
   );
 
+  // Keep the sheet UNMOUNTED at rest. The closed Menu sheet otherwise parks at
+  // the bottom and its handle peeks on Android edge-to-edge (gorhom 5.2.14
+  // derives the closed position from the short measured container, and the
+  // height-override props are no-ops). Mount only while a menu is live; unmount
+  // after the close animation settles.
+  //
+  // `renderedOpen` lags `isOpen` by a tick on open so heroui sees the
+  // false->true transition it needs to snap the sheet open. The payload — and
+  // thus the content gorhom measures — is already set on that first closed
+  // frame, so the sheet opens to full height.
+  const [mounted, setMounted] = useState(false);
+  const [renderedOpen, setRenderedOpen] = useState(false);
+  useEffect(() => {
+    if (isOpen) {
+      setMounted(true);
+      const openTimer = setTimeout(() => setRenderedOpen(true), 0);
+      return () => clearTimeout(openTimer);
+    }
+    setRenderedOpen(false);
+    const unmountTimer = setTimeout(() => setMounted(false), 400);
+    return () => clearTimeout(unmountTimer);
+  }, [isOpen]);
+
+  if (!mounted) return null;
+
   return (
-    <Menu presentation="bottom-sheet" isOpen={isOpen} onOpenChange={handleOpenChange}>
+    <Menu presentation="bottom-sheet" isOpen={renderedOpen} onOpenChange={handleOpenChange}>
       {/*
        * Bottom-sheet presentation ignores Trigger position, but heroui still
        * requires a Trigger in the tree. A zero-size, offscreen Pressable
