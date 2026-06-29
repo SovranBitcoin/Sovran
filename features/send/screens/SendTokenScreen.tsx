@@ -6,10 +6,10 @@
  * only renders UI and wires buttons.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { StyleSheet } from 'react-native';
 
-import { Alert, Menu, type MenuTriggerRef } from 'heroui-native';
+import { Alert } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from '@sovranbitcoin/colada/react';
 import {
@@ -39,8 +39,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { fetchMintInfo } from '@/shared/lib/apiClient';
-import Icon from 'assets/icons';
-import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
+import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import {
   useSendReachability,
@@ -152,18 +151,12 @@ export function SendTokenScreen({
     [actions.copy.variants, actions.copy.available]
   );
 
-  const copyMenuTriggerRef = useRef<MenuTriggerRef>(null);
   const handleCopyVariant = useCallback(
     (variantId: string) => {
       void actions.copy.execute({ variantId });
     },
     [actions.copy]
   );
-  const openCopyMenu = useCallback(() => {
-    // Defer to the next tick so the ButtonHandler's sheet-close / press-in
-    // animation doesn't race with the menu's trigger-position measure call.
-    setTimeout(() => copyMenuTriggerRef.current?.open(), 0);
-  }, []);
   if (error) {
     log.warn('send.token.error', { error });
     return <ScreenErrorState message={error} onGoBack={onNavigateBack} />;
@@ -191,50 +184,26 @@ export function SendTokenScreen({
       ? entry.token.memo.trim()
       : null;
 
+  // Copy opens the app-wide `actionMenuPopup()` bottom sheet (rendered once by
+  // <ActionMenuHost /> at the app root) listing the copy variants — no inline
+  // heroui sheet, which mis-positions / paints at rest on Android.
+  const openCopyMenu = () => {
+    actionMenuPopup({
+      title: 'Copy token',
+      buttons: copyVariants.map((v) => ({
+        text: v.label,
+        icon: v.icon,
+        testID: `send-token-copy-menu-${v.id}`,
+        disabled: !v.available,
+        reason: v.reason,
+        description: v.description,
+        onPress: () => handleCopyVariant(v.id),
+      })),
+    });
+  };
+
   const bottomButtons = (
     <BottomButtons>
-      {/*
-       * Bottom-sheet Menu opened imperatively from the Copy button's onPress
-       * via the trigger ref's `.open()`. We keep the Trigger because heroui's
-       * imperative API requires one, but its position is irrelevant for
-       * bottom-sheet presentation — the sheet slides up from the bottom
-       * regardless.
-       */}
-      <Menu presentation="bottom-sheet">
-        <Menu.Trigger
-          ref={copyMenuTriggerRef}
-          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-          <View style={{ width: 1, height: 1 }} />
-        </Menu.Trigger>
-        <Menu.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
-          <MenuScrim />
-          <Menu.Content presentation="bottom-sheet">
-            <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-              Copy token
-            </Menu.Label>
-            {copyVariants.map((v) => (
-              <Menu.Item
-                key={v.id}
-                testID={`send-token-copy-menu-${v.id}`}
-                isDisabled={!v.available}
-                onPress={() => handleCopyVariant(v.id)}>
-                <HStack align="center" gap={10} style={{ flex: 1 }}>
-                  {v.icon ? <Icon name={v.icon} size={18} /> : null}
-                  <View style={{ flex: 1 }}>
-                    <Menu.ItemTitle>{v.label}</Menu.ItemTitle>
-                    {(v.description || (!v.available && v.reason)) && (
-                      <Menu.ItemDescription>
-                        {!v.available && v.reason ? v.reason : v.description}
-                      </Menu.ItemDescription>
-                    )}
-                  </View>
-                </HStack>
-              </Menu.Item>
-            ))}
-          </Menu.Content>
-        </Menu.Portal>
-      </Menu>
-
       <HStack justify="center" align="center">
         <ButtonHandler
           buttons={[
@@ -243,9 +212,7 @@ export function SendTokenScreen({
               text: 'Copy',
               icon: 'lets-icons:copy',
               variant: 'primary',
-              onPress: () => {
-                openCopyMenu();
-              },
+              onPress: openCopyMenu,
               condition: actions.copy.available,
             },
             {

@@ -1,9 +1,7 @@
-import { memo, useCallback, useRef } from 'react';
+import { memo } from 'react';
 import { LiquidGlassMenu } from 'liquid-glass-menu';
-import { Menu as HeroMenu, type MenuTriggerRef } from 'heroui-native';
 import { ActionSheetIOS, Platform, StyleSheet, Text } from 'react-native';
-import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
@@ -54,10 +52,6 @@ export const StatsCard = memo(function StatsCard({
   ] as const);
   const { liquidGlass } = useCapabilities();
   const colorScheme = useColorScheme();
-  const menuTriggerRef = useRef<MenuTriggerRef>(null);
-  const openCategoryMenu = useCallback(() => {
-    setTimeout(() => menuTriggerRef.current?.open(), 0);
-  }, []);
 
   const visibleText = loading ? '...' : `${visibleCount.toLocaleString()} visible`;
   const totalText = loading
@@ -67,31 +61,10 @@ export const StatsCard = memo(function StatsCard({
   // The glass path needs the native UIKit glass-button morph; without it we fall
   // through to the flat card (which also covers Android and pre-iOS-26).
   if (!liquidGlass || !LiquidGlassMenu.isSupported) {
-    const handlePress = () => {
-      if (Platform.OS !== 'ios') {
-        // Android: heroui Menu bottom sheet (the canonical pick-one-of-N
-        // surface) — ActionSheetIOS doesn't exist here, which used to leave
-        // this card a dead control.
-        openCategoryMenu();
-        return;
-      }
-
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: [...CATEGORY_FILTERS.map(categoryLabel), 'Cancel'],
-          cancelButtonIndex: CATEGORY_FILTERS.length,
-        },
-        (selectedIndex) => {
-          const next = CATEGORY_FILTERS[selectedIndex];
-          if (next) onCategoryChange(next);
-        }
-      );
-    };
-
-    const card = (
+    const renderCard = (onPress: () => void) => (
       <View style={styles.statsContainer}>
         <Pressable
-          onPress={handlePress}
+          onPress={onPress}
           style={[
             styles.fallbackCard,
             {
@@ -119,37 +92,36 @@ export const StatsCard = memo(function StatsCard({
       </View>
     );
 
+    // iOS keeps the native ActionSheet — the card itself is the trigger.
     if (Platform.OS !== 'android') {
-      return card;
+      return renderCard(() =>
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options: [...CATEGORY_FILTERS.map(categoryLabel), 'Cancel'],
+            cancelButtonIndex: CATEGORY_FILTERS.length,
+          },
+          (selectedIndex) => {
+            const next = CATEGORY_FILTERS[selectedIndex];
+            if (next) onCategoryChange(next);
+          }
+        )
+      );
     }
 
-    return (
-      <HeroMenu presentation="bottom-sheet">
-        <HeroMenu.Trigger
-          ref={menuTriggerRef}
-          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-          <View style={{ width: 1, height: 1 }} />
-        </HeroMenu.Trigger>
-        {card}
-        <HeroMenu.Portal disableFullWindowOverlay>
-          <MenuScrim />
-          <HeroMenu.Content presentation="bottom-sheet">
-            <HeroMenu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-              Merchant category
-            </HeroMenu.Label>
-            {CATEGORY_FILTERS.map((cat) => (
-              <HeroMenu.Item key={cat} onPress={() => onCategoryChange(cat)}>
-                <HStack align="center" gap={10} style={{ flex: 1 }}>
-                  <View style={{ flex: 1 }}>
-                    <HeroMenu.ItemTitle>{categoryLabel(cat)}</HeroMenu.ItemTitle>
-                  </View>
-                  {cat === category ? <Icon name="mdi:check" size={20} color={success} /> : null}
-                </HStack>
-              </HeroMenu.Item>
-            ))}
-          </HeroMenu.Content>
-        </HeroMenu.Portal>
-      </HeroMenu>
+    // Android: the app-wide `actionMenuPopup()` bottom sheet (rendered once by
+    // <ActionMenuHost /> at the app root) — ActionSheetIOS doesn't exist here,
+    // which used to leave this card a dead control. The global host opens fully
+    // and stays hidden at rest, unlike an inline heroui sheet on Android.
+    return renderCard(() =>
+      actionMenuPopup({
+        title: 'Merchant category',
+        buttons: CATEGORY_FILTERS.map((cat) => ({
+          text: categoryLabel(cat),
+          suffix:
+            cat === category ? <Icon name="mdi:check" size={20} color={success} /> : undefined,
+          onPress: () => onCategoryChange(cat),
+        })),
+      })
     );
   }
 

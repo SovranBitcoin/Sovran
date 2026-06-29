@@ -53,7 +53,17 @@ module.exports = ({ config }) => {
       ...(debugMnemonic ? { debugMnemonic } : {}),
       ...(giveawayP2pkSecret ? { giveawayP2pkSecret } : {}),
     },
-    plugins: [...(config.plugins || []), 'expo-maps'],
+    plugins: [
+      ...(config.plugins || []),
+      [
+        'expo-maps',
+        {
+          requestLocationPermission: true,
+          locationPermission:
+            'Sovran uses your location to show nearby Bitcoin-accepting places.',
+        },
+      ],
+    ],
     ios: {
       ...config.ios,
       bundleIdentifier: isDevelopment ? 'com.sovranbitcoin.dev' : 'com.sovranbitcoin',

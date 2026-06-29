@@ -11,6 +11,11 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockLogError = jest.fn();
+const mockActionMenuPopup = jest.fn();
+
+jest.mock('@/shared/lib/popup/popups/actionMenu', () => ({
+  actionMenuPopup: (...args: unknown[]) => mockActionMenuPopup(...args),
+}));
 
 jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -111,6 +116,7 @@ describe('menu action failure containment', () => {
 
   beforeEach(() => {
     mockLogError.mockReset();
+    mockActionMenuPopup.mockReset();
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
       if (String(args[0]).includes('react-test-renderer is deprecated')) return;
       throw new Error(`Unexpected console.error: ${args.map(String).join(' ')}`);
@@ -145,9 +151,19 @@ describe('menu action failure containment', () => {
       );
     });
 
-    const cancelItem = findByTestID(renderer!, 'overflow-send-token-cancel-transaction');
+    // The "More" overflow now dispatches the global actionMenuPopup() host
+    // instead of rendering an inline sheet; capture the dispatched payload and
+    // invoke the failing item's onPress.
     act(() => {
-      cancelItem.props.onPress();
+      findByTestID(renderer!, 'more-button').props.onPress();
+    });
+    expect(mockActionMenuPopup).toHaveBeenCalledTimes(1);
+    const payload = mockActionMenuPopup.mock.calls[0][0] as {
+      buttons: { testID?: string; onPress: () => void }[];
+    };
+    const cancel = payload.buttons.find((b) => b.testID === 'send-token-cancel-transaction');
+    act(() => {
+      cancel?.onPress();
     });
     await flushMicrotasks();
 

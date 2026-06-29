@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Log } from '@/shared/lib/logger';
+import { scheduleAfterLayout } from '@/shared/lib/scheduleAfterLayout';
 import {
   Keyboard,
   Platform,
@@ -598,6 +599,33 @@ function SheetPopup() {
     return unsubscribe;
   }, [isOpen, current, update]);
 
+  // Keep the sheet UNMOUNTED at rest. A parked CLOSED sheet peeks as an empty
+  // detached card at the bottom on Android edge-to-edge (gorhom 5.2.14 derives
+  // the closed position from the short measured container, and the
+  // height-override props are no-ops). So we mount the BottomSheet only while a
+  // popup is live, and unmount it once the exit animation settles.
+  //
+  // `renderedOpen` lags the store's `isOpen` by a frame on open: heroui only
+  // snaps the sheet open on a false->true `isOpen` transition, so a freshly
+  // mounted sheet must commit closed first, then flip open. Mounting it already
+  // open would skip the snap and the sheet would never appear.
+  const [mounted, setMounted] = useState(false);
+  const [renderedOpen, setRenderedOpen] = useState(false);
+  useEffect(() => {
+    if (isOpen) {
+      setMounted(true);
+      // Open after a layout pass so gorhom has measured the freshly mounted
+      // content — flipping open on the next tick races the measurement and the
+      // sheet snaps to a partial height.
+      return scheduleAfterLayout(() => setRenderedOpen(true));
+    }
+    setRenderedOpen(false);
+    // Unmount after heroui's exit animation lands (~300ms) — matches the
+    // lastPayloadRef cache window above.
+    const unmountTimer = setTimeout(() => setMounted(false), 400);
+    return () => clearTimeout(unmountTimer);
+  }, [isOpen]);
+
   const payload = current ?? lastPayloadRef.current;
   const isCustom = isCustomSheetPayload(payload);
   const [customStack, setCustomStack] = useState<CustomSheetPage[]>([]);
@@ -840,10 +868,10 @@ function SheetPopup() {
     [isCustom, customFooterConfig, isScrollableContentHeight, layoutConfig?.mode]
   );
 
-  if (destroyed) return null;
+  if (destroyed || !mounted) return null;
 
   return (
-    <BottomSheet isOpen={isOpen} onOpenChange={handleOpenChange}>
+    <BottomSheet isOpen={renderedOpen} onOpenChange={handleOpenChange}>
       <BottomSheet.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
         <NostrKeysContextBridge value={nostrKeysContextValue}>
           <BottomSheet.Overlay

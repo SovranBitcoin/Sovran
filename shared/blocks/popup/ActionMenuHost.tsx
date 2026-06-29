@@ -24,6 +24,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
+import { scheduleAfterLayout } from '@/shared/lib/scheduleAfterLayout';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 import {
@@ -548,8 +549,35 @@ export function ActionMenuHost() {
     </BottomSheetFooter>
   );
 
+  // Keep the sheet UNMOUNTED at rest. The closed Menu sheet otherwise parks at
+  // the bottom and its handle peeks on Android edge-to-edge (gorhom 5.2.14
+  // derives the closed position from the short measured container, and the
+  // height-override props are no-ops). Mount only while a menu is live; unmount
+  // after the close animation settles.
+  //
+  // `renderedOpen` lags `isOpen` by a tick on open so heroui sees the
+  // false->true transition it needs to snap the sheet open. The payload — and
+  // thus the content gorhom measures — is already set on that first closed
+  // frame, so the sheet opens to full height.
+  const [mounted, setMounted] = useState(false);
+  const [renderedOpen, setRenderedOpen] = useState(false);
+  useEffect(() => {
+    if (isOpen) {
+      setMounted(true);
+      // Open after a layout pass so gorhom has measured the freshly mounted
+      // content — flipping open on the next tick races the measurement and the
+      // sheet snaps to a partial height.
+      return scheduleAfterLayout(() => setRenderedOpen(true));
+    }
+    setRenderedOpen(false);
+    const unmountTimer = setTimeout(() => setMounted(false), 400);
+    return () => clearTimeout(unmountTimer);
+  }, [isOpen]);
+
+  if (!mounted) return null;
+
   return (
-    <Menu presentation="bottom-sheet" isOpen={isOpen} onOpenChange={handleOpenChange}>
+    <Menu presentation="bottom-sheet" isOpen={renderedOpen} onOpenChange={handleOpenChange}>
       {/*
        * Bottom-sheet presentation ignores Trigger position, but heroui still
        * requires a Trigger in the tree. A zero-size, offscreen Pressable

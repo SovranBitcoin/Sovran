@@ -12,11 +12,16 @@ import { FiatCurrencyPillAndroidMenu } from '@/features/wallet/components/FiatCu
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockSetDisplayCurrency = jest.fn();
+const mockActionMenuPopup = jest.fn();
 const mockLocationSectionState = {
   location: { latitude: 51.5, longitude: -0.12 },
   isRevealed: false,
   reveal: jest.fn(),
 };
+
+jest.mock('@/shared/lib/popup/popups/actionMenu', () => ({
+  actionMenuPopup: (...args: unknown[]) => mockActionMenuPopup(...args),
+}));
 
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | readonly string[]) =>
@@ -36,6 +41,8 @@ jest.mock('@/shared/hooks/useTransactionLocationSection', () => ({
 jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   log: {
+    debug: jest.fn(),
+    info: jest.fn(),
     error: jest.fn(),
     warn: jest.fn(),
   },
@@ -147,15 +154,12 @@ function findAllByType(renderer: TestRenderer.ReactTestRenderer, type: string) {
   return renderer.root.findAll((node) => node.type === type);
 }
 
-function findByTestID(renderer: TestRenderer.ReactTestRenderer, testID: string) {
-  return renderer.root.find((node) => node.props.testID === testID);
-}
-
 describe('Android UI regressions', () => {
   let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
     mockSetDisplayCurrency.mockReset();
+    mockActionMenuPopup.mockReset();
     mockLocationSectionState.isRevealed = false;
     mockLocationSectionState.reveal.mockReset();
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
@@ -169,7 +173,7 @@ describe('Android UI regressions', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('renders the Android fiat selector as a HeroUI bottom-sheet menu', () => {
+  it('renders no inline sheet at rest and dispatches the global currency menu on tap', () => {
     let renderer: TestRenderer.ReactTestRenderer;
 
     act(() => {
@@ -178,19 +182,33 @@ describe('Android UI regressions', () => {
       );
     });
 
-    const portals = findAllByType(renderer!, 'Menu.Portal');
-    const contents = findAllByType(renderer!, 'Menu.Content');
-    expect(portals).toHaveLength(1);
-    expect(portals[0].props.disableFullWindowOverlay).toBe(true);
-    expect(contents).toHaveLength(1);
-    expect(contents[0].props.presentation).toBe('bottom-sheet');
+    // Regression: the pill renders NO inline bottom-sheet (which paints at rest
+    // on Android). The pick-one surface is the app-wide actionMenuPopup() host.
+    expect(findAllByType(renderer!, 'Menu.Portal')).toHaveLength(0);
+    expect(findAllByType(renderer!, 'Menu.Content')).toHaveLength(0);
+    expect(mockActionMenuPopup).not.toHaveBeenCalled();
 
+    // The pill is the trigger — pressing it dispatches the global action menu.
     act(() => {
-      findByTestID(renderer!, 'fiat-currency-menu-eur').props.onPress();
+      findAllByType(renderer!, 'Pressable')[0].props.onPress();
     });
 
+    expect(mockActionMenuPopup).toHaveBeenCalledTimes(1);
+    const payload = mockActionMenuPopup.mock.calls[0][0] as {
+      title: string;
+      buttons: { testID?: string; suffix?: unknown; onPress: () => void }[];
+    };
+    expect(payload.title).toBe('Display currency');
+    expect(payload.buttons).toHaveLength(3);
+    // displayCurrency mock is 'usd' → the USD row carries the selected-check suffix.
+    const usd = payload.buttons.find((b) => b.testID === 'fiat-currency-menu-usd');
+    expect(usd?.suffix).toBeTruthy();
+
+    const eur = payload.buttons.find((b) => b.testID === 'fiat-currency-menu-eur');
+    act(() => {
+      eur?.onPress();
+    });
     expect(mockSetDisplayCurrency).toHaveBeenCalledWith('eur');
-    expect(findByTestID(renderer!, 'icon-mdi:check')).toBeTruthy();
   });
 
   it('does not mount map previews, blur, or gradients for Android location privacy placeholder', () => {

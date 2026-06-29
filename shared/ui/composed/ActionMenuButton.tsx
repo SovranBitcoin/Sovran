@@ -1,5 +1,5 @@
 /**
- * Split-button action with a heroui-native Menu dropdown of alternate variants.
+ * Split-button action with a dropdown of alternate variants.
  *
  * Usage:
  *   <ActionMenuButton
@@ -14,13 +14,19 @@
  *   />
  *
  * Renders a full-width primary button backed by `variants[0]`, flush alongside a
- * chevron that opens a Menu listing every variant (including the default, so the
+ * chevron that opens a menu listing every variant (including the default, so the
  * user can re-pick it). Even when only one variant is available the chevron is
  * rendered (`alwaysShowMenu`), making forthcoming methods discoverable.
  *
- * Disabled variants remain visible in the menu with their `reason` rendered as a
- * `Menu.ItemDescription`, matching the pattern used by availability.ts in
- * colada.
+ * Two presentations:
+ * - `popover` (default): an inline anchored heroui Menu (not affected by the
+ *   Android bottom-sheet bug).
+ * - `bottom-sheet`: routed through the app-wide `actionMenuPopup()` surface
+ *   (rendered once by `<ActionMenuHost />` at the app root). Inline bottom-sheet
+ *   menus mis-position / paint at rest on Android; the global host does not.
+ *
+ * Disabled variants remain visible with their `reason` rendered as the
+ * description, matching the pattern used by availability.ts in colada.
  */
 
 import React, { useCallback, useRef } from 'react';
@@ -33,6 +39,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import Icon from 'assets/icons';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
+import { actionMenuPopup, type ActionMenuItem } from '@/shared/lib/popup/popups/actionMenu';
 import { log } from '@/shared/lib/logger';
 
 export interface ActionMenuVariant {
@@ -87,9 +94,9 @@ interface ActionMenuButtonProps {
    * deliberate user choice).
    */
   collapsedPressOpensMenu?: boolean;
-  /** Popover vs. bottom-sheet mode passed to Menu.Content. */
+  /** Popover (default, inline anchored menu) vs. bottom-sheet (global host). */
   presentation?: 'popover' | 'bottom-sheet';
-  /** Optional heading rendered at the top of the Menu (e.g. "Select option"). */
+  /** Optional heading rendered at the top of the menu (e.g. "Select option"). */
   menuTitle?: string;
   /** Style applied to the outer HStack container. */
   style?: StyleProp<ViewStyle>;
@@ -103,6 +110,32 @@ interface ActionMenuButtonProps {
 }
 
 const MENU_WIDTH = 260;
+
+/** Map a variant to an `actionMenuPopup` item, wrapping onPress error logging. */
+function toActionMenuItem(v: ActionMenuVariant, rootTestID: string | undefined): ActionMenuItem {
+  const itemTestID = v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined);
+  return {
+    text: v.label,
+    icon: v.icon,
+    iconNode: v.iconNode,
+    description: v.description ?? (v.isDisabled ? v.reason : undefined),
+    disabled: v.isDisabled,
+    reason: v.reason,
+    variant: v.isDestructive ? 'dangerous' : undefined,
+    testID: itemTestID,
+    onPress: async () => {
+      try {
+        await v.onPress();
+      } catch (error) {
+        log.error('ui.action_menu.menu_action_failed', {
+          testID: itemTestID,
+          variantId: v.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  };
+}
 
 export function ActionMenuButton({
   label,
@@ -122,23 +155,29 @@ export function ActionMenuButton({
   const defaultVariant = variants[0];
   const hasVariants = variants.length > 0;
   const showChevron = hasVariants && (variants.length > 1 || alwaysShowMenu);
+  const isBottomSheet = presentation === 'bottom-sheet';
 
   const primaryDisabled = disabled || !hasVariants || defaultVariant?.isDisabled;
 
   // heroui-native `Menu.Trigger asChild` routes through `Slot.Pressable`, which
   // only composes onPress cleanly with children that are themselves a
   // `Pressable`. Our `Button` primitive wraps a custom `TouchableOpacity`, so
-  // the Slot can't inject the "open the menu" handler and taps fall through
-  // to the Button's own onPress (bypassing the menu entirely). To work around
-  // this we render an invisible absolute-positioned Trigger + open it
-  // imperatively via ref from the Button's onPress. The same pattern is used
-  // by SendTokenScreen's Copy menu.
+  // for the popover path we render an invisible absolute-positioned Trigger and
+  // open it imperatively via ref. The bottom-sheet path skips the inline Menu
+  // entirely and dispatches to the global actionMenuPopup host.
   const menuTriggerRef = useRef<MenuTriggerRef>(null);
   const openMenu = useCallback(() => {
+    if (isBottomSheet) {
+      actionMenuPopup({
+        title: menuTitle,
+        buttons: variants.map((v) => toActionMenuItem(v, testID)),
+      });
+      return;
+    }
     // Defer to the next tick so the Button's press animation doesn't race
     // with the Trigger's `measure()` call inside heroui's `.open()`.
     setTimeout(() => menuTriggerRef.current?.open(), 0);
-  }, []);
+  }, [isBottomSheet, variants, menuTitle, testID]);
 
   const handlePrimaryPress = useCallback(async () => {
     if (!defaultVariant || primaryDisabled) return;
@@ -155,7 +194,24 @@ export function ActionMenuButton({
 
   const primaryIconNode = icon ? <Icon name={icon} size={18} /> : undefined;
 
-  // When there are no variants, render a disabled primary button. No chevron.
+  // Wrap a trigger node in the inline popover Menu (anchored). For bottom-sheet
+  // the trigger stands alone — openMenu dispatches to the global host.
+  const withMenu = (trigger: React.ReactNode) => {
+    if (isBottomSheet) return <>{trigger}</>;
+    return (
+      <Menu presentation="popover">
+        <Menu.Trigger
+          ref={menuTriggerRef}
+          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
+          <View style={{ width: 1, height: 1 }} />
+        </Menu.Trigger>
+        {trigger}
+        {renderPopoverPortal(variants, testID, menuTitle)}
+      </Menu>
+    );
+  };
+
+  // When there are no variants, render a disabled primary button. No menu.
   if (!hasVariants) {
     return (
       <View style={[{ flex: 1 }, style]}>
@@ -173,26 +229,17 @@ export function ActionMenuButton({
   }
 
   // Circle trigger — render the icon button in a row of CircleActionButtons.
-  // Tapping always opens the menu (same hidden-trigger-ref pattern the
-  // WalletScreen "More" button uses), since there is no sensible default.
+  // Tapping always opens the menu, since there is no sensible default.
   if (circle) {
-    return (
-      <Menu presentation={presentation}>
-        <Menu.Trigger
-          ref={menuTriggerRef}
-          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-          <View style={{ width: 1, height: 1 }} />
-        </Menu.Trigger>
-        <CircleActionButton
-          icon={circle.icon}
-          systemIcon={circle.systemIcon}
-          label={circle.label}
-          testID={testID}
-          disabled={disabled}
-          onPress={openMenu}
-        />
-        {renderMenuPortal(variants, testID, presentation, menuTitle)}
-      </Menu>
+    return withMenu(
+      <CircleActionButton
+        icon={circle.icon}
+        systemIcon={circle.systemIcon}
+        label={circle.label}
+        testID={testID}
+        disabled={disabled}
+        onPress={openMenu}
+      />
     );
   }
 
@@ -200,12 +247,7 @@ export function ActionMenuButton({
   if (collapsedPressOpensMenu) {
     return (
       <View style={[{ flex: 1 }, style]}>
-        <Menu presentation={presentation}>
-          <Menu.Trigger
-            ref={menuTriggerRef}
-            style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-            <View style={{ width: 1, height: 1 }} />
-          </Menu.Trigger>
+        {withMenu(
           <Button
             testID={testID}
             text={label}
@@ -215,13 +257,12 @@ export function ActionMenuButton({
             disabled={disabled}
             onPress={openMenu}
           />
-          {renderMenuPortal(variants, testID, presentation, menuTitle)}
-        </Menu>
+        )}
       </View>
     );
   }
 
-  // Single-variant + !alwaysShowMenu → plain button, no chevron, no Menu.
+  // Single-variant + !alwaysShowMenu → plain button, no chevron, no menu.
   if (!showChevron) {
     return (
       <View style={[{ flex: 1 }, style]}>
@@ -238,8 +279,8 @@ export function ActionMenuButton({
     );
   }
 
-  // Default — split button (primary + chevron Menu trigger).
-  return (
+  // Default — split button (primary + chevron menu trigger).
+  return withMenu(
     <HStack align="center" gap={0} style={[{ flex: 1 }, style]}>
       <View style={{ flex: 1 }}>
         <Button
@@ -252,45 +293,26 @@ export function ActionMenuButton({
           onPress={handlePrimaryPress}
         />
       </View>
-      <Menu presentation={presentation}>
-        <Menu.Trigger
-          ref={menuTriggerRef}
-          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-          <View style={{ width: 1, height: 1 }} />
-        </Menu.Trigger>
-        <Button
-          testID={testID ? `${testID}-menu` : undefined}
-          icon={<Icon name="mdi:chevron-down" size={20} />}
-          variant={variant}
-          disabled={disabled}
-          onPress={openMenu}
-        />
-        {renderMenuPortal(variants, testID, presentation, menuTitle)}
-      </Menu>
+      <Button
+        testID={testID ? `${testID}-menu` : undefined}
+        icon={<Icon name="mdi:chevron-down" size={20} />}
+        variant={variant}
+        disabled={disabled}
+        onPress={openMenu}
+      />
     </HStack>
   );
 }
 
-function renderMenuPortal(
+function renderPopoverPortal(
   variants: ActionMenuVariant[],
   rootTestID: string | undefined,
-  presentation: 'popover' | 'bottom-sheet',
   title: string | undefined
 ) {
-  const contentProps =
-    presentation === 'bottom-sheet'
-      ? ({ presentation: 'bottom-sheet' as const } as const)
-      : ({
-          presentation: 'popover' as const,
-          placement: 'top' as const,
-          align: 'end' as const,
-          width: MENU_WIDTH,
-        } as const);
-
   return (
     <Menu.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
       <MenuScrim />
-      <Menu.Content {...contentProps}>
+      <Menu.Content presentation="popover" placement="top" align="end" width={MENU_WIDTH}>
         {title ? (
           <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
             {title}

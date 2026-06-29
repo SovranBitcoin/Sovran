@@ -98,7 +98,7 @@ com.sovranbitcoin
 Expected Android signing certificate SHA-256:
 
 ```text
-1F:7F:A5:DD:CB:4A:F4:C2:30:16:CD:AF:1D:89:64:C7:7A:F4:BF:44:10:B5:94:97:81:88:5F:F0:A4:F6:6B:B3
+AC:8C:26:60:36:E7:F9:A8:AC:C9:2E:D6:08:D2:44:3A:92:E5:59:CF:D7:53:DC:CB:FA:86:A0:21:55:CE:56:49
 ```
 
 For seamless Play Store to direct APK updates, the Play Console app signing certificate must match this same SHA-256. If Google Play uses a different app signing key, Play-installed users will not be able to update to the direct APK without uninstalling first.
