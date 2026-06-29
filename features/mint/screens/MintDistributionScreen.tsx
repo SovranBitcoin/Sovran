@@ -8,10 +8,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import {
-  MintCurrencyTabs,
-  MINT_CURRENCY_TABS_HEIGHT,
-} from '@/features/mint/components/MintCurrencyTabs';
+import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { BALANCE_SPLIT_VARIANT_COMPONENTS } from '@/features/mint/components/distribution/variants';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Screen } from '@/shared/ui/composed/Screen';
@@ -183,13 +180,15 @@ export function MintDistributionScreen() {
     log.debug('mint.balance_split.render', {
       variant: balanceSplitVariant,
       scrollMode: 'auto',
-      build: 'dismiss-fix-3',
+      build: 'dismiss-fix-4-nosticky',
     });
   }, [balanceSplitVariant]);
 
-  // The currency tabs are the only pinned chrome — a constant sticky height means
-  // switching presentational variants never shifts the reserved scroll-top space.
-  const stickyHeader = useMemo(
+  // Rendered INSIDE the scroll body (not as Screen stickyContent): the absolute
+  // sticky overlay sibling stopped this screen's plain ScrollView from handing
+  // overscroll to the native Android form-sheet, so drag-to-dismiss was dead.
+  // In-body keeps the working dismiss path; the tabs scroll with the content.
+  const currencyTabs = useMemo(
     () => (
       <MintCurrencyTabs
         currencies={availableCurrencies}
@@ -226,16 +225,14 @@ export function MintDistributionScreen() {
     <Screen
       name="MintDistributionScreen"
       headerGradient
-      stickyContent={stickyHeader}
-      stickyContentHeight={MINT_CURRENCY_TABS_HEIGHT}
       // Plain ScrollView (NOT scroll="animated"): on Android the reanimated
       // Animated.ScrollView doesn't hand overscroll to the native form-sheet, so
-      // drag-to-dismiss was dead here. The currency tabs lose their scroll-shrink
-      // on this screen as the trade — keep it on the working dismiss path.
+      // drag-to-dismiss was dead here. No stickyContent either — see currencyTabs.
       scroll="auto"
       footer={bottomButtons}
       contentPadding={0}>
       <Stack.Screen options={withGlassHeaderItems({ title: 'Balance split' })} />
+      {currencyTabs}
 
       {/* Ambient validity cue — the affirmative "100%", coloured only when off. */}
       <View className="items-end px-4 pb-1 pt-2">
