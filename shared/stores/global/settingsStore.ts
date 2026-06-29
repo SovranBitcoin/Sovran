@@ -123,13 +123,18 @@ const PersistedMiddlemanRouting = z.looseObject({
   maxFee: z.number().int().nonnegative(),
   minSuccessRate: z.number().min(0).max(1),
   requireLastOk: z.boolean(),
-  trustMode: z.enum(['trusted_only', 'allow_untrusted']),
+  // `.catch` keeps a stale/renamed enum value from failing the whole-blob parse
+  // (which would discard the entire settings store, incl. terms acceptance).
+  trustMode: z
+    .enum(['trusted_only', 'allow_untrusted'])
+    .default('trusted_only')
+    .catch('trusted_only'),
 });
 
 const PersistedSettings = z.object({
   language: z.string().max(16).default('en'),
   displayBtc: z.number().int().min(0).max(8).default(3),
-  displayCurrency: z.enum(['usd', 'eur', 'gbp']).default('usd'),
+  displayCurrency: z.enum(['usd', 'eur', 'gbp']).default('usd').catch('usd'),
   experimental: z.boolean().default(false),
   mockMode: z.boolean().default(false),
   mockOffline: z.boolean().default(false),
@@ -147,8 +152,17 @@ const PersistedSettings = z.object({
   naggTierEnabled: z.boolean().default(true),
   primalTierEnabled: z.boolean().default(true),
   relayTierEnabled: z.boolean().default(true),
-  avatarFallbackVariant: z.enum(AVATAR_FALLBACK_VARIANTS).default(DEFAULT_AVATAR_FALLBACK_VARIANT),
-  balanceSplitVariant: z.enum(BALANCE_SPLIT_VARIANTS).default(DEFAULT_BALANCE_SPLIT_VARIANT),
+  avatarFallbackVariant: z
+    .enum(AVATAR_FALLBACK_VARIANTS)
+    .default(DEFAULT_AVATAR_FALLBACK_VARIANT)
+    .catch(DEFAULT_AVATAR_FALLBACK_VARIANT),
+  // A renamed/removed presentational variant value must degrade to the default,
+  // never fail the parse — otherwise the whole settings blob (terms acceptance,
+  // onboarding, every real setting) is discarded on rehydrate.
+  balanceSplitVariant: z
+    .enum(BALANCE_SPLIT_VARIANTS)
+    .default(DEFAULT_BALANCE_SPLIT_VARIANT)
+    .catch(DEFAULT_BALANCE_SPLIT_VARIANT),
   minTransferThreshold: z.number().int().nonnegative().default(5),
   middlemanRouting: PersistedMiddlemanRouting.default({
     maxHops: 2,
