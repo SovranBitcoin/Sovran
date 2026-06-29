@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Log } from '@/shared/lib/logger';
 import {
-  Dimensions,
   Keyboard,
   Platform,
   StyleSheet,
@@ -855,14 +854,6 @@ function SheetPopup() {
           <BottomSheet.Content
             accessible={false}
             onClose={handleNativeSheetClose}
-            // Full screen height on Android so the CLOSED sheet clears the
-            // edge-to-edge nav bar instead of peeking as a sliver on first load
-            // (gorhom v5.2.14 computes the closed position from the shorter
-            // window height — gorhom #2680). iOS uses FullWindowOverlay.
-            containerHeight={
-              // eslint-disable-next-line no-restricted-syntax -- need the physical SCREEN height (not window) to clear the edge-to-edge nav bar; app is portrait-locked.
-              Platform.OS === 'android' ? Dimensions.get('screen').height : undefined
-            }
             detached={!isCustom}
             bottomInset={isCustom ? undefined : insets.bottom}
             snapPoints={isCustom ? customSnapPoints : undefined}

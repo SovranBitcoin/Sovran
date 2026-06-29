@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, LayoutChangeEvent, Platform } from 'react-native';
+import { LayoutChangeEvent } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Menu } from 'heroui-native';
@@ -548,17 +548,6 @@ export function ActionMenuHost() {
     </BottomSheetFooter>
   );
 
-  // gorhom (v5.2.14) computes the CLOSED sheet position from the measured
-  // window height. On Android edge-to-edge the window is shorter than the
-  // physical screen by the navigation-bar inset, so the closed sheet stops a
-  // sliver above the true bottom and peeks on first load (gorhom #2680). Pin
-  // containerHeight to the full screen height on Android so the closed position
-  // translates fully off-screen. iOS renders in a FullWindowOverlay and is
-  // unaffected.
-  const androidContainerHeight =
-    // eslint-disable-next-line no-restricted-syntax -- need the physical SCREEN height (not the window height useWindowDimensions exposes) to clear the edge-to-edge nav bar; the app is portrait-locked so this snapshot is stable.
-    Platform.OS === 'android' ? Dimensions.get('screen').height : undefined;
-
   return (
     <Menu presentation="bottom-sheet" isOpen={isOpen} onOpenChange={handleOpenChange}>
       {/*
@@ -583,9 +572,6 @@ export function ActionMenuHost() {
         <MenuScrim />
         <Menu.Content
           presentation="bottom-sheet"
-          // Full screen height on Android so the closed sheet clears the
-          // edge-to-edge nav bar instead of peeking (see androidContainerHeight).
-          containerHeight={androidContainerHeight}
           // `interactive` lifts the sheet by the keyboard height — works with
           // dynamic sizing because position becomes (highestDetent − keyboardHeight),
           // which is strictly higher than the natural content-fit position.
