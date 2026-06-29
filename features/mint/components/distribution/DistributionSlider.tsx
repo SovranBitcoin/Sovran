@@ -114,19 +114,57 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
   );
 
   const gesture = useMemo(() => {
-    return (
-      Gesture.Pan()
-        .enabled(!disabled)
-        // The visible track is slim (28dp); extend the touch target vertically so
-        // it stays comfortable to grab (~44dp).
-        .hitSlop({ top: 8, bottom: 8 })
-        .onBegin((event) => {
-          'worklet';
-          isActive.value = true;
-          const tapX = event.x;
+    // Tap-to-set: a tap anywhere on the track jumps to that value.
+    const tap = Gesture.Tap()
+      .enabled(!disabled)
+      .hitSlop({ top: 8, bottom: 8 })
+      .onEnd((event) => {
+        'worklet';
+        const stepIndex = Math.round(event.x / stepWidth);
+        const clampedStepIndex = Math.max(0, Math.min(stepIndex, TOTAL_STEPS - 1));
+        const newProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
+        progress.value = newProgress;
+        const newBp = Math.round(clampedStepIndex * BP_PER_STEP);
+        value.value = newBp;
+        lastStepIndex.value = clampedStepIndex;
+        runOnJS(fireHaptic)();
+        runOnJS(notifyValueChange)(newBp);
+        runOnJS(notifyValueCommit)(newBp);
+      });
 
-          const tappedStepIndex = Math.round(tapX / stepWidth);
-          const clampedStepIndex = Math.max(0, Math.min(tappedStepIndex, TOTAL_STEPS - 1));
+    // Horizontal-only drag. `activeOffsetX`/`failOffsetY` make a vertical drag
+    // FAIL this gesture so it falls through to the scroll view / form-sheet —
+    // otherwise the slider swallowed every vertical drag (and set its value),
+    // blocking scroll and drag-to-dismiss on the sheet. The value is only
+    // written once the horizontal drag activates (onStart), so scrolling over a
+    // slider never changes it.
+    const pan = Gesture.Pan()
+      .enabled(!disabled)
+      .hitSlop({ top: 8, bottom: 8 })
+      .activeOffsetX([-10, 10])
+      .failOffsetY([-12, 12])
+      .onStart((event) => {
+        'worklet';
+        isActive.value = true;
+        const stepIndex = Math.round(event.x / stepWidth);
+        const clampedStepIndex = Math.max(0, Math.min(stepIndex, TOTAL_STEPS - 1));
+        const newProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
+        progress.value = newProgress;
+        const newBp = Math.round(clampedStepIndex * BP_PER_STEP);
+        value.value = newBp;
+        lastStepIndex.value = clampedStepIndex;
+        runOnJS(fireHaptic)();
+        runOnJS(notifyValueChange)(newBp);
+      })
+      .onChange((event) => {
+        'worklet';
+        const currentX = event.x;
+
+        const currentStepIndex = Math.round(currentX / stepWidth);
+        const clampedStepIndex = Math.max(0, Math.min(currentStepIndex, TOTAL_STEPS - 1));
+
+        if (clampedStepIndex !== lastStepIndex.value) {
+          lastStepIndex.value = clampedStepIndex;
 
           const newProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
           progress.value = newProgress;
@@ -134,44 +172,23 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
           const newBp = Math.round(clampedStepIndex * BP_PER_STEP);
           value.value = newBp;
 
-          lastStepIndex.value = clampedStepIndex;
-
           runOnJS(fireHaptic)();
           runOnJS(notifyValueChange)(newBp);
-          runOnJS(notifyValueCommit)(newBp);
-        })
-        .onChange((event) => {
-          'worklet';
-          const currentX = event.x;
+        }
+      })
+      .onFinalize(() => {
+        'worklet';
+        isActive.value = false;
 
-          const currentStepIndex = Math.round(currentX / stepWidth);
-          const clampedStepIndex = Math.max(0, Math.min(currentStepIndex, TOTAL_STEPS - 1));
+        const stepIndex = Math.round(value.value / BP_PER_STEP);
+        const clampedStepIndex = Math.max(0, Math.min(stepIndex, TOTAL_STEPS - 1));
+        const finalProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
+        progress.value = finalProgress;
 
-          if (clampedStepIndex !== lastStepIndex.value) {
-            lastStepIndex.value = clampedStepIndex;
+        runOnJS(notifyValueCommit)(value.value);
+      });
 
-            const newProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
-            progress.value = newProgress;
-
-            const newBp = Math.round(clampedStepIndex * BP_PER_STEP);
-            value.value = newBp;
-
-            runOnJS(fireHaptic)();
-            runOnJS(notifyValueChange)(newBp);
-          }
-        })
-        .onFinalize(() => {
-          'worklet';
-          isActive.value = false;
-
-          const stepIndex = Math.round(value.value / BP_PER_STEP);
-          const clampedStepIndex = Math.max(0, Math.min(stepIndex, TOTAL_STEPS - 1));
-          const finalProgress = (clampedStepIndex / (TOTAL_STEPS - 1)) * width;
-          progress.value = finalProgress;
-
-          runOnJS(notifyValueCommit)(value.value);
-        })
-    );
+    return Gesture.Race(pan, tap);
   }, [
     disabled,
     stepWidth,

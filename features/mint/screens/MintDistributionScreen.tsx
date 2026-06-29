@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useSharedValue } from 'react-native-reanimated';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { z } from 'zod';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -41,12 +40,7 @@ function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, un
 
 export function MintDistributionScreen() {
   useLifecycleLogger('MintDistributionScreen');
-  const [foreground, background, danger, muted] = useThemeColor([
-    'foreground',
-    'background',
-    'danger',
-    'muted',
-  ] as const);
+  const [foreground, danger, muted] = useThemeColor(['foreground', 'danger', 'muted'] as const);
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.distribution' });
   const balanceSplitVariant = useSettingsStore((state) => state.balanceSplitVariant);
   const VariantBody = BALANCE_SPLIT_VARIANT_COMPONENTS[balanceSplitVariant];
@@ -226,42 +220,40 @@ export function MintDistributionScreen() {
   );
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: background }}>
-      <Screen
-        name="MintDistributionScreen"
-        headerGradient
-        stickyContent={stickyHeader}
-        stickyContentHeight={MINT_CURRENCY_TABS_HEIGHT}
-        scroll="animated"
-        scrollY={scrollY}
-        footer={bottomButtons}
-        contentPadding={0}>
-        <Stack.Screen options={withGlassHeaderItems({ title: 'Balance split' })} />
+    <Screen
+      name="MintDistributionScreen"
+      headerGradient
+      stickyContent={stickyHeader}
+      stickyContentHeight={MINT_CURRENCY_TABS_HEIGHT}
+      scroll="animated"
+      scrollY={scrollY}
+      footer={bottomButtons}
+      contentPadding={0}>
+      <Stack.Screen options={withGlassHeaderItems({ title: 'Balance split' })} />
 
-        {/* Ambient validity cue — the affirmative "100%", coloured only when off. */}
-        <View className="items-end px-4 pb-1 pt-2">
-          <Text bold size={13} style={{ color: isBalanced ? muted : danger }}>
-            {Math.round(totalBp / 100)}%
+      {/* Ambient validity cue — the affirmative "100%", coloured only when off. */}
+      <View className="items-end px-4 pb-1 pt-2">
+        <Text bold size={13} style={{ color: isBalanced ? muted : danger }}>
+          {Math.round(totalBp / 100)}%
+        </Text>
+      </View>
+
+      {mintsForCurrency.length === 0 ? (
+        <View className="items-center p-10">
+          <Text style={{ color: foreground, textAlign: 'center' }}>
+            No mints available for {selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}
           </Text>
         </View>
-
-        {mintsForCurrency.length === 0 ? (
-          <View className="items-center p-10">
-            <Text style={{ color: foreground, textAlign: 'center' }}>
-              No mints available for {selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}
-            </Text>
-          </View>
-        ) : (
-          <VariantBody
-            mintUrls={mintUrls}
-            mintInfoMap={mintInfoMap}
-            distribution={distribution}
-            balanceTotals={balanceTotals}
-            unit={selectedCurrency.toLowerCase()}
-            onDistributionChange={handleDistributionChange}
-          />
-        )}
-      </Screen>
-    </GestureHandlerRootView>
+      ) : (
+        <VariantBody
+          mintUrls={mintUrls}
+          mintInfoMap={mintInfoMap}
+          distribution={distribution}
+          balanceTotals={balanceTotals}
+          unit={selectedCurrency.toLowerCase()}
+          onDistributionChange={handleDistributionChange}
+        />
+      )}
+    </Screen>
   );
 }
