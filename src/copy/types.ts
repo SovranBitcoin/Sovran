@@ -112,6 +112,16 @@ export type PaymentCopyKey =
   | 'toast.receiveEcash.message'
   | 'toast.receiveEcash.processing'
   | 'toast.receiveEcash.confirmed'
-  | 'toast.receiveEcash.failed';
+  | 'toast.receiveEcash.failed'
+  | 'send.destination.redeemAmount'
+  | 'send.destination.redeem'
+  | 'send.destination.payAmount'
+  | 'send.destination.pay'
+  | 'send.destination.payRequest'
+  | 'send.destination.payInvoice'
+  | 'send.destination.sendAmount'
+  | 'send.destination.sendOnchain'
+  | 'send.destination.openMint'
+  | 'send.destination.unsupported';
 
 export type PaymentCopyCatalog = Record<PaymentCopyKey, string>;

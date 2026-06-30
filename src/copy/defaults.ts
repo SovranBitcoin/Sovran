@@ -106,4 +106,17 @@ export const paymentCopyDefaults = {
   'toast.receiveEcash.processing': 'Redeeming...',
   'toast.receiveEcash.confirmed': 'Received',
   'toast.receiveEcash.failed': 'Payment failed',
+
+  // Detected Send-flow destination row (describeDestination). For person-kinds
+  // the label is the bare verb and the app appends the resolved recipient name.
+  'send.destination.redeemAmount': 'Redeem {amount} sats',
+  'send.destination.redeem': 'Redeem ecash',
+  'send.destination.payAmount': 'Pay {amount} sats',
+  'send.destination.pay': 'Pay',
+  'send.destination.payRequest': 'Pay request',
+  'send.destination.payInvoice': 'Pay invoice',
+  'send.destination.sendAmount': 'Send {amount} sats',
+  'send.destination.sendOnchain': 'Send onchain',
+  'send.destination.openMint': 'View mint',
+  'send.destination.unsupported': 'Unrecognized destination',
 } as const satisfies PaymentCopyCatalog;

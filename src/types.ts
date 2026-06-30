@@ -22,6 +22,11 @@ export interface PaymentRequestInfo {
   amount: number | undefined;
   unit: string;
   transports?: PaymentRequestTransport[];
+  /**
+   * The 33-byte `02`-prefixed P2PK lock key from the request's `nut10` option,
+   * when it locks to a key. Null when the request carries no P2PK lock.
+   */
+  lockP2pkPubkey?: string | null;
 }
 
 export interface PaymentRequestTransport {
@@ -158,6 +163,92 @@ export type ResolvedIntent =
   | { type: 'openProfile'; npub: string }
   | { type: 'chooseOption'; options: AnnotatedOption[] }
   | { type: 'ignore'; reason: import('./formatting/locales').LocalizedReason };
+
+// ---------------------------------------------------------------------------
+// Destination Descriptor — render-ready model for a Send-flow destination.
+//
+// `describeDestination` composes `resolveIntent` and decorates it with
+// colada-owned copy, a semantic icon token, a statically-known amount, an
+// action tag, and (for payable identities) a recipient slot the app fills in
+// asynchronously. It is transient UI state — never persisted — so it is not
+// subject to the persisted-enum migration invariant.
+// ---------------------------------------------------------------------------
+
+export type DestinationKind =
+  | 'ecash' // cashu bearer token (redeem)
+  | 'paymentRequest' // NUT-18 creq
+  | 'lightningInvoice' // bolt11
+  | 'lightningAddress' // lnurlp endpoint paid via Lightning (NOT an identity)
+  | 'onchain' // bitcoin address
+  | 'person' // payable Nostr identity (npub / nprofile / lightning address)
+  | 'mint' // mint URL
+  | 'unsupported'; // empty / unknown / UR fragment / parse errors
+
+export type DestinationIcon =
+  | 'ecash'
+  | 'paymentRequest'
+  | 'lightning'
+  | 'onchain'
+  | 'person'
+  | 'mint'
+  | 'unknown';
+
+export type DestinationAction =
+  | 'receiveToken' // redeem a bearer ecash token
+  | 'sendPaymentRequest' // fulfill a creq
+  | 'meltInvoice' // pay a bolt11
+  | 'meltLnurl' // pay an lnurlp endpoint
+  | 'meltOnchain' // pay a btc address
+  | 'startContactSend' // person: app resolves profile, then contact send
+  | 'chooseOption' // multi-option: defer to the existing chooser
+  | 'openMint' // open mint info
+  | 'none'; // unsupported / empty
+
+export interface DestinationAmount {
+  /** Integer amount in `unit`'s base unit (sats for `'sat'`). */
+  value: number;
+  unit: string;
+}
+
+export type DestinationRecipientRef =
+  | { type: 'npub'; value: string } // bech32 npub
+  | { type: 'lightningAddress'; value: string } // user@domain (LUD-16)
+  | { type: 'pubkey'; value: string }; // 33-byte 02-prefixed P2PK lock from a creq
+
+export interface DestinationRecipient {
+  ref: DestinationRecipientRef;
+  /** True until the app resolves a display name / avatar for `ref`. */
+  pending: boolean;
+}
+
+export interface DestinationDescriptor {
+  kind: DestinationKind;
+  /**
+   * Resolved, colada-owned copy for the *action portion* of the row, e.g.
+   * "Redeem 100 sats", "Pay 100 sats", "Send onchain". For person-kinds this
+   * is the bare verb ("Pay") and the app appends the resolved recipient name
+   * it owns. Empty string for empty input (so the app can hide the row).
+   */
+  label: string;
+  /**
+   * Statically-known amount (token amount, invoice amount, fixed creq amount,
+   * BIP-321 amount). Null when the user must enter it (lightning address,
+   * amountless invoice, amountless creq, npub).
+   */
+  amount: DestinationAmount | null;
+  icon: DestinationIcon;
+  action: DestinationAction;
+  /** Present only for person-kinds; the async name/avatar slot the app fills. */
+  recipient?: DestinationRecipient;
+  /**
+   * True when the input carried more than one payable option (e.g. a BIP-321
+   * URI). The row shows the primary option; tapping defers to the existing
+   * chooser via `machine.execute(raw)`.
+   */
+  hasAlternatives: boolean;
+  /** The exact string the app feeds back into routing (`machine.execute`) on tap. */
+  raw: string;
+}
 
 export interface AmountEntryConstraints {
   paymentRequest?: string;

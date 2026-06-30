@@ -63,6 +63,23 @@ export interface SendFlowDefinition {
   copyKeys: (state: SendFlowState) => readonly PaymentCopyKey[];
 }
 
+/**
+ * Open the Send method chooser — the "destination-first" send entry. Lands on
+ * the `selectDestination` step so the wallet can present the send methods
+ * (QR / Create Ecash / NFC / Nut Drop) plus a destination input + contact
+ * search before any amount or mint is chosen. The method the user picks then
+ * drives the rest of the flow through the existing entries (`startSendEcash`,
+ * `execute`/`scan`, the Nut Drop route, etc.).
+ */
+export function startSendFlow(unit: string): SendFlowTransitionResult<'selectDestination'> {
+  logger.info('flow.send.chooseDestination', { unit });
+  return {
+    step: 'selectDestination',
+    context: { unit },
+    data: { unit },
+  };
+}
+
 export function startSendEcashFlow(
   walletCtx: WalletContext,
   unit: string,

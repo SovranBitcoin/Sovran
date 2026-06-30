@@ -16,6 +16,7 @@ import type {
 
 export type FlowStep =
   | 'idle'
+  | 'selectDestination'
   | 'chooseOption'
   | 'chooseFallbackOption'
   | 'enterAmount'
@@ -91,6 +92,12 @@ export interface AmountEntryDisplayMetadata {
 
 export interface StepDataMap {
   idle: Record<string, never>;
+  /**
+   * Destination-first send entry. The wallet renders the method chooser
+   * (QR / Create Ecash / NFC / Nut Drop) plus a destination input + contact
+   * search; the chosen method drives the rest of the flow.
+   */
+  selectDestination: { unit: string };
   chooseOption: {
     parsed: ParsedPaymentInput;
     options: AnnotatedOption[];
@@ -438,6 +445,14 @@ export type FlowEvent =
       p2pkLockPubkey?: string;
       /** Constrain the source mint to a set the recipient accepts (NUT-18 creq). */
       allowedMints?: string[];
+    }
+  | {
+      /**
+       * Open the destination-first Send method chooser (`selectDestination`
+       * step). No amount/mint is chosen yet — the method the user picks drives
+       * the rest of the flow via the existing entries.
+       */
+      type: 'START_SEND';
     }
   | { type: 'START_RECEIVE_LIGHTNING' }
   | { type: 'START_RECEIVE' }
@@ -1060,6 +1075,14 @@ export interface PaymentMachine {
    * Pass `{ scope: 'npc' }` to update NPC mint only (not selectedMint).
    */
   requestMintSelector: (opts?: { reset?: boolean; scope?: 'npc' | 'selected' }) => Promise<void>;
+  /**
+   * Open the destination-first Send method chooser. Lands on the
+   * `selectDestination` step (no amount/mint chosen yet) so the wallet can
+   * present the send methods + destination input + contact search. Pass
+   * `{ reset: true }` to clear stale flow context first (e.g. from the wallet
+   * Send button).
+   */
+  startSend: (opts?: { reset?: boolean }) => Promise<void>;
   /** Start a send ecash flow. Auto-selects mint, opens amount screen. */
   startSendEcash: (opts?: {
     reset?: boolean;

@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { sendFlow, startSendEcashFlow } from '../../src/machine/flows/send';
+import { sendFlow, startSendFlow, startSendEcashFlow } from '../../src/machine/flows/send';
 import { MINT1, WALLETS } from '../_harness/fixtures';
 
 describe('send flow', () => {
+  it('opens the destination chooser without selecting a mint or amount', () => {
+    const result = startSendFlow('sat');
+
+    expect(result.step).toBe('selectDestination');
+    expect(result.context).toEqual({ unit: 'sat' });
+    expect(result.data).toEqual({ unit: 'sat' });
+    // No mint/amount/destination committed yet — the method pick drives that.
+    expect(result.context.mintUrl).toBeUndefined();
+    expect(result.context.destination).toBeUndefined();
+  });
+
   it('starts ecash send at amount entry when a mint is selected', () => {
     const result = startSendEcashFlow(WALLETS.default, 'sat');
 

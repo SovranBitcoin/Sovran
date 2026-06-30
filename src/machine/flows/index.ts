@@ -10,6 +10,7 @@ export {
 } from './receive';
 export {
   sendFlow,
+  startSendFlow,
   startSendEcashFlow,
   type SendFlowAction,
   type SendFlowDefinition,

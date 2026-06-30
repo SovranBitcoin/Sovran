@@ -9,17 +9,13 @@
 // Do not add normalization logic here — keep it in normalize.ts.
 // ---------------------------------------------------------------------------
 
-import { decodePaymentRequest, getTokenMetadata } from "@cashu/cashu-ts";
-import { decode } from "@gandlaf21/bolt11-decode";
 import { nip19 } from "nostr-tools";
 
-import { amountToNumberOrUndefined } from "./amount";
+import { decodeBolt11Invoice } from "./bolt11";
+import { isValidEcashToken as decodeIsValidEcashToken } from "./ecash";
 import { logger } from "./logger";
-import type {
-  Detectors,
-  PaymentRequestInfo,
-  PaymentRequestTransport,
-} from "./types";
+import { decodePaymentRequestInfo } from "./payment-request";
+import type { Detectors, PaymentRequestInfo } from "./types";
 
 const tryDecode = <T>(fn: () => T): T | null => {
   try {
@@ -29,84 +25,26 @@ const tryDecode = <T>(fn: () => T): T | null => {
   }
 };
 
-const CREQ_PREFIX = /^creq[ab]/i;
 const LN_ADDRESS_REGEX =
   /^((?:[^<>()[\]\\.,;:\s@"]+(?:\.[^<>()[\]\\.,;:\s@"]+)*)|(?:".+"))@((?:\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(?:(?:[a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
 const LNURLP_REGEX =
   /^lnurlp:\/\/([\w-]+\.)+[\w-]+(:\d{1,5})?(\/[\w-./?%&=]*)?$/;
 
-const decodeBolt11 = (inv: string) => tryDecode(() => decode(inv));
+// Token / request / invoice decoding all live in the canonical decoder modules
+// (ecash.ts, payment-request.ts, bolt11.ts) — the detectors delegate so there
+// is exactly one decode implementation in colada.
 
-const isValidEcashToken = (v: string) => {
-  const metadata = tryDecode(() => getTokenMetadata(v));
-  const valid = metadata !== null;
-  if (valid) {
-    logger.debug("detectors.ecashToken.valid", { inputLength: v.length });
-  }
-  return valid;
-};
+const isValidEcashToken = (v: string) => decodeIsValidEcashToken(v);
 
-const isPaymentRequest = (v: string) => {
-  const trimmed = v.trim();
-  if (!CREQ_PREFIX.test(trimmed)) return false;
-  const decoded = tryDecode(() => decodePaymentRequest(trimmed));
-  const valid = decoded !== null;
-  logger.debug("detectors.paymentRequest.checked", {
-    inputLength: trimmed.length,
-    valid,
-  });
-  return valid;
-};
+const isPaymentRequest = (v: string) => decodePaymentRequestInfo(v) !== null;
 
-const getPaymentRequestInfo = (v: string): PaymentRequestInfo | null => {
-  const trimmed = v.trim();
-  const decoded = tryDecode(() => decodePaymentRequest(trimmed));
-  if (!decoded) {
-    logger.warn("detectors.paymentRequest.info.decodeFailed", {
-      inputLength: trimmed.length,
-    });
-    return null;
-  }
-  const transports: PaymentRequestTransport[] | undefined =
-    decoded.transport?.map((t) => ({
-      type: t.type,
-      target: t.target ?? "",
-    }));
-  const info = {
-    mints: decoded.mints ?? [],
-    amount: amountToNumberOrUndefined(decoded.amount),
-    unit: decoded.unit ?? "sat",
-    transports,
-  };
-  logger.debug("detectors.paymentRequest.info.decoded", {
-    inputLength: trimmed.length,
-    mintCount: info.mints.length,
-    hasAmount: info.amount != null,
-    unit: info.unit,
-    transportTypes: transports?.map((t) => t.type) ?? [],
-    transportCount: transports?.length ?? 0,
-  });
-  return info;
-};
+const getPaymentRequestInfo = (v: string): PaymentRequestInfo | null =>
+  decodePaymentRequestInfo(v);
 
-const isLightningInvoice = (v: string) => {
-  const valid = decodeBolt11(v) !== null;
-  if (valid)
-    logger.debug("detectors.lightningInvoice.valid", { inputLength: v.length });
-  return valid;
-};
+const isLightningInvoice = (v: string) => decodeBolt11Invoice(v) !== null;
 
-const getLightningAmount = (inv: string): number | null => {
-  const d = decodeBolt11(inv);
-  const msats = d?.sections?.find((s) => s?.name === "amount")?.value;
-  const sats = msats ? msats / 1000 : 0;
-  const amount = sats > 0 ? sats : null;
-  logger.debug("detectors.lightningInvoice.amount", {
-    inputLength: inv.length,
-    hasAmount: amount != null,
-  });
-  return amount;
-};
+const getLightningAmount = (inv: string): number | null =>
+  decodeBolt11Invoice(inv)?.amountSat ?? null;
 
 const isLightningAddress = (v: string) => {
   const valid = !!v && LN_ADDRESS_REGEX.test(v);
