@@ -1,4 +1,6 @@
-import { PaymentRequest, decodePaymentRequest, type NUT10Option } from '@cashu/cashu-ts';
+import { PaymentRequest, type NUT10Option } from '@cashu/cashu-ts';
+import { decodePaymentRequestInfo, lockableMintsFromRequest } from '@sovranbitcoin/colada';
+
 import { cashuLog } from '@/shared/lib/logger';
 
 /**
@@ -70,7 +72,12 @@ interface ParsedCreq {
   lockPubkey33: string | null;
 }
 
-/** Decode a peer's `creq` → accepted mints + P2PK lock key. Null if invalid. */
+/**
+ * Decode a peer's `creq` → accepted mints + P2PK lock key. Null if invalid.
+ * Decoding is owned by colada's `decodePaymentRequestInfo` (which validates the
+ * nut10 P2PK key against `02` + 32-byte hex); this adds the Nut-Drop-shaped
+ * `lockPubkey33` naming + logging.
+ */
 export function parseCreq(creq: string): ParsedCreq | null {
   if (!creq.toLowerCase().startsWith('creq')) {
     cashuLog.debug('cashu.creq.parse.rejected', {
@@ -79,29 +86,20 @@ export function parseCreq(creq: string): ParsedCreq | null {
     });
     return null;
   }
-  try {
-    const request = decodePaymentRequest(creq);
-    const mints = (request.mints ?? []).filter(Boolean);
-    let lockPubkey33: string | null = null;
-    const nut10 = request.nut10;
-    if (nut10 && nut10.kind?.toUpperCase() === 'P2PK' && typeof nut10.data === 'string') {
-      lockPubkey33 = P2PK_PUBKEY_RE.test(nut10.data) ? nut10.data : null;
-    }
-    cashuLog.debug('cashu.creq.parse.done', {
-      creqLength: creq.length,
-      mintCount: mints.length,
-      hasNut10: !!nut10,
-      nut10Kind: nut10?.kind ?? null,
-      hasValidLockPubkey: !!lockPubkey33,
-      lockPubkeyLength: typeof nut10?.data === 'string' ? nut10.data.length : 0,
-    });
-    return { mints, lockPubkey33 };
-  } catch {
-    cashuLog.warn('cashu.creq.parse.failed', {
-      creqLength: creq.length,
-    });
+  const info = decodePaymentRequestInfo(creq);
+  if (!info) {
+    cashuLog.warn('cashu.creq.parse.failed', { creqLength: creq.length });
     return null;
   }
+  const mints = info.mints.filter(Boolean);
+  const lockPubkey33 = info.lockP2pkPubkey ?? null;
+  cashuLog.debug('cashu.creq.parse.done', {
+    creqLength: creq.length,
+    mintCount: mints.length,
+    hasValidLockPubkey: !!lockPubkey33,
+    lockPubkeyLength: lockPubkey33?.length ?? 0,
+  });
+  return { mints, lockPubkey33 };
 }
 
 /**
@@ -113,43 +111,18 @@ export function lockableMintsFromCreq(
   creq: string | undefined,
   nostrPubkeyHex: string | undefined
 ): string[] | null {
-  if (!creq || !nostrPubkeyHex) {
-    cashuLog.debug('cashu.creq.lockable.rejected', {
-      reason: 'missing-input',
-      hasCreq: !!creq,
-      creqLength: creq?.length ?? 0,
-      hasNostrPubkey: !!nostrPubkeyHex,
-      nostrPubkeyLength: nostrPubkeyHex?.length ?? 0,
-    });
-    return null;
-  }
-  const parsed = parseCreq(creq);
-  if (!parsed) {
-    cashuLog.debug('cashu.creq.lockable.rejected', {
-      reason: 'parse-failed',
-      creqLength: creq.length,
-      nostrPubkeyLength: nostrPubkeyHex.length,
-    });
-    return null;
-  }
-  const expected = `02${nostrPubkeyHex}`.toLowerCase();
-  if (!parsed.lockPubkey33 || parsed.lockPubkey33.toLowerCase() !== expected) {
-    cashuLog.debug('cashu.creq.lockable.rejected', {
-      reason: 'lock-mismatch',
-      creqLength: creq.length,
-      mintCount: parsed.mints.length,
-      hasLockPubkey: !!parsed.lockPubkey33,
-      lockPubkeyLength: parsed.lockPubkey33?.length ?? 0,
-      nostrPubkeyLength: nostrPubkeyHex.length,
-    });
-    return null;
-  }
-  cashuLog.info('cashu.creq.lockable.done', {
-    creqLength: creq.length,
-    mintCount: parsed.mints.length,
-    nostrPubkeyLength: nostrPubkeyHex.length,
+  // The lock gate (nut10 P2PK key === `02` + nostr pubkey) is owned by colada's
+  // `lockableMintsFromRequest`; this keeps the Nut-Drop-named entry + logging.
+  const mints = lockableMintsFromRequest(creq, nostrPubkeyHex);
+  cashuLog.debug('cashu.creq.lockable.result', {
+    hasCreq: !!creq,
+    creqLength: creq?.length ?? 0,
+    hasNostrPubkey: !!nostrPubkeyHex,
+    nostrPubkeyLength: nostrPubkeyHex?.length ?? 0,
+    lockable: mints !== null,
+    mintCount: mints?.length ?? 0,
   });
-  return parsed.mints;
+  return mints;
 }
 
 /**

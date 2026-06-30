@@ -24,8 +24,9 @@ import { SheetHeaderHeightContext } from '@/shared/ui/composed/AndroidSheetRoot'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScrollEdgeFade } from './ScrollEdgeFade';
+import { FLOW_SHEET_SCRIM_OVERHANG } from './FlowSheetHeader';
 import { Text } from '@/shared/ui/primitives/Text';
-import { Log } from '@/shared/lib/logger';
+import { Log, log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
 
@@ -181,13 +182,23 @@ export function ModalLayoutWrapper({
   const navigatorHeaderHeight = useContext(HeaderHeightContext) ?? 0;
   const headerHeight = sheetHeaderHeight ?? navigatorHeaderHeight;
   const insets = useSafeAreaInsets();
+  // Inside an Android formSheet the JS FlowSheetHeader paints a scrim whose
+  // ~32dp eased fade tail deliberately overhangs below the measured bar — and
+  // that absolute scrim doesn't feed HeaderHeightContext, so the reserved inset
+  // would otherwise be the bar only. Add the overhang back so the first row /
+  // sticky chrome clears the fade AT REST instead of sitting under it (the
+  // "looks like you need to scroll up" bug). iOS (blur + native content inset)
+  // and native-header card stacks (clipped scrim) don't overhang.
+  const androidSheetScrimOverhang =
+    Platform.OS === 'android' && sheetHeaderHeight != null ? FLOW_SHEET_SCRIM_OVERHANG : 0;
   // Stable header bottom for app-owned chrome (sticky overlay, top gradient). On
   // iOS the native automatic content inset owns the scroll content's nav-header
   // spacing, so we only need a frame-0-stable reference for the overlay; the
   // safe-area inset + standard nav-bar height is that, and matches the settled
   // navigator value without the present-time settle. Android keeps the
   // deterministic SheetHeaderHeightContext value (already shift-free).
-  const stableHeaderBottom = Platform.OS === 'ios' ? IOS_MODAL_HEADER_HEIGHT : headerHeight;
+  const stableHeaderBottom =
+    (Platform.OS === 'ios' ? IOS_MODAL_HEADER_HEIGHT : headerHeight) + androidSheetScrimOverhang;
   const themeBackground = useThemeColor('background');
   const background = bgColor ?? themeBackground;
 
@@ -222,6 +233,24 @@ export function ModalLayoutWrapper({
   useEffect(() => {
     onHeaderHeightChange?.(totalHeaderHeight);
   }, [totalHeaderHeight, onHeaderHeightChange]);
+
+  useEffect(() => {
+    log.debug('modal.header.inset', {
+      platform: Platform.OS,
+      sheet: sheetHeaderHeight != null,
+      headerHeight,
+      scrimOverhang: androidSheetScrimOverhang,
+      stickyHeight: measuredStickyHeight ?? stickyContentHeight,
+      totalHeaderHeight,
+    });
+  }, [
+    headerHeight,
+    androidSheetScrimOverhang,
+    measuredStickyHeight,
+    stickyContentHeight,
+    totalHeaderHeight,
+    sheetHeaderHeight,
+  ]);
 
   const shouldRenderAndroidHeaderSpacer =
     Platform.OS === 'android' && !disableHeaderSpacer && totalHeaderHeight > 0;

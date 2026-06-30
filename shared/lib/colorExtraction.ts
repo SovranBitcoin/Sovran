@@ -27,7 +27,7 @@ export const FALLBACK_COLORS = [
 // Color conversion
 // ---------------------------------------------------------------------------
 
-export function hexToRgb(hex: string): { r: number; g: number; b: number } {
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace('#', '');
   return {
     r: parseInt(h.slice(0, 2), 16),

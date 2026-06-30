@@ -35,6 +35,7 @@ import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useDeferredMount } from '@/shared/hooks/useDeferredMount';
 import { ModalLayoutWrapper } from './ModalLayoutWrapper';
+import { FLOW_SHEET_SCRIM_OVERHANG } from './FlowSheetHeader';
 import { ScreenBackgroundContext, ScreenFooterContext } from './ScreenFooterContext';
 
 type ScreenScrollMode = 'auto' | 'animated' | 'none' | 'custom';
@@ -179,8 +180,13 @@ export function Screen({
 
   // When a Stack header is present we already get insets.top baked into
   // headerHeight, so adding insets.top would double-count. Outside a Stack
-  // headerHeight is 0 and we fall back to insets.top.
-  const safeAreaTopPadding = headerHeight > 0 ? headerHeight : insets.top;
+  // headerHeight is 0 and we fall back to insets.top. Inside an Android
+  // formSheet, also reserve the FlowSheetHeader scrim's fade overhang so custom
+  // scroll content clears the fade at rest (mirrors ModalLayoutWrapper).
+  const androidSheetScrimOverhang =
+    Platform.OS === 'android' && sheetHeaderHeight != null ? FLOW_SHEET_SCRIM_OVERHANG : 0;
+  const safeAreaTopPadding =
+    (headerHeight > 0 ? headerHeight : insets.top) + androidSheetScrimOverhang;
 
   const framedChildren =
     safeArea && useCustomScrollView ? (

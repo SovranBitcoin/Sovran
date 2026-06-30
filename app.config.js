@@ -59,8 +59,7 @@ module.exports = ({ config }) => {
         'expo-maps',
         {
           requestLocationPermission: true,
-          locationPermission:
-            'Sovran uses your location to show nearby Bitcoin-accepting places.',
+          locationPermission: 'Sovran uses your location to show nearby Bitcoin-accepting places.',
         },
       ],
     ],

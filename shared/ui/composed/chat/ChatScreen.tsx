@@ -368,6 +368,8 @@ export function ChatScreen({
               ) : (
                 <FlashList
                   data={messages}
+                  // Android form-sheet: top-edge drag dismisses, mid-scroll scrolls.
+                  nestedScrollEnabled
                   keyExtractor={keyExtractor}
                   renderItem={renderItem}
                   // Chat-bottom behavior via FlashList v2's maintainVisibleContentPosition:

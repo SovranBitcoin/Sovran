@@ -9,6 +9,11 @@ import {
   DEFAULT_AVATAR_FALLBACK_VARIANT,
   type AvatarFallbackVariant,
 } from '@/shared/lib/avatarFallback';
+import {
+  BALANCE_SPLIT_VARIANTS,
+  DEFAULT_BALANCE_SPLIT_VARIANT,
+  type BalanceSplitVariant,
+} from '@/shared/lib/balanceSplitVariant';
 
 interface TermsAccepted {
   termsAccepted: boolean;
@@ -84,6 +89,12 @@ interface SettingsState {
   primalTierEnabled: boolean;
   relayTierEnabled: boolean;
   avatarFallbackVariant: AvatarFallbackVariant;
+  /**
+   * Dev-only: which presentational variant of the "Balance split"
+   * (mint distribution) screen to render. Chosen from Settings → Developer.
+   * Pure presentation — does not affect distribution behaviour.
+   */
+  balanceSplitVariant: BalanceSplitVariant;
   /** Minimum transfer amount in sats to include in a rebalance plan. */
   minTransferThreshold: number;
   middlemanRouting: MiddlemanRoutingSettings;
@@ -97,9 +108,23 @@ const DEFAULT_MIDDLEMAN_ROUTING: MiddlemanRoutingSettings = {
   trustMode: 'trusted_only',
 };
 
-// Persisted-shape schema (defensive rehydrate validation). All fields are
-// optional + carry a default so adding a new field doesn't drop the user's
-// existing settings on first launch.
+// ⛔ DATA-LOSS FOOTGUN — read before adding or tightening any field below.
+//
+// On rehydrate, `createMergeWithSchema` runs ONE `safeParse` over this whole
+// blob and, if ANY single field fails, throws away the ENTIRE persisted
+// settings object — silently resetting `termsAccepted` (so the terms gate
+// shows on every launch), `hasSeenOnboarding`, and every other setting. A
+// renamed `z.enum` value on a device that persisted the old name is exactly
+// this trap: the Balance-split rename `hero-minimal` → `list` wiped settings
+// this way (symptom in logs: `store.settings.merge_rejected`).
+//
+// Defence: every constrained field carries `.default(D).catch(D)` —
+// `.default` absorbs a missing field, `.catch` absorbs a present-but-invalid
+// value so that field degrades to its default INSTEAD of failing the parse.
+// Keep this on every new field. Renaming/removing an enum value is still a
+// breaking change to durable data — `.catch` makes it degrade gracefully
+// instead of wiping. If an old value must be remapped to a SPECIFIC new one,
+// bump `version` + add a `migrate`. See skill `sovran-data` + AGENTS.md.
 const PersistedTermsAccepted = z
   .object({
     termsAccepted: z.boolean(),
@@ -108,43 +133,64 @@ const PersistedTermsAccepted = z
   .nullable();
 
 const PersistedMiddlemanRouting = z.looseObject({
-  maxHops: z.number().int().min(1).max(8),
-  maxFee: z.number().int().nonnegative(),
-  minSuccessRate: z.number().min(0).max(1),
-  requireLastOk: z.boolean(),
-  trustMode: z.enum(['trusted_only', 'allow_untrusted']),
+  // `.catch` keeps a stale/out-of-range value from failing the whole-blob parse
+  // (which would discard the entire settings store, incl. terms acceptance).
+  maxHops: z.number().int().min(1).max(8).default(2).catch(2),
+  maxFee: z.number().int().nonnegative().default(5).catch(5),
+  minSuccessRate: z.number().min(0).max(1).default(0.9).catch(0.9),
+  requireLastOk: z.boolean().default(true).catch(true),
+  trustMode: z
+    .enum(['trusted_only', 'allow_untrusted'])
+    .default('trusted_only')
+    .catch('trusted_only'),
 });
 
+const DEFAULT_MIDDLEMAN_ROUTING_PERSISTED = {
+  maxHops: 2,
+  maxFee: 5,
+  minSuccessRate: 0.9,
+  requireLastOk: true,
+  trustMode: 'trusted_only',
+} as const;
+
 const PersistedSettings = z.object({
-  language: z.string().max(16).default('en'),
-  displayBtc: z.number().int().min(0).max(8).default(3),
-  displayCurrency: z.enum(['usd', 'eur', 'gbp']).default('usd'),
-  experimental: z.boolean().default(false),
-  mockMode: z.boolean().default(false),
-  mockOffline: z.boolean().default(false),
-  mockFailSend: z.boolean().default(false),
-  mockFailMelt: z.boolean().default(false),
-  mockFailPaymentRequest: z.boolean().default(false),
-  whitenoiseEnabled: z.boolean().default(false),
-  mockNoGlass: z.boolean().default(false),
-  termsAccepted: PersistedTermsAccepted.default(null),
-  hasSeenOnboarding: z.boolean().default(false),
-  quickAccessP2PK: z.boolean().default(false),
-  regenerateP2PKOnReceive: z.boolean().default(true),
-  sendLocationEnabled: z.boolean().default(false),
-  fileLoggingEnabled: z.boolean().default(false),
-  naggTierEnabled: z.boolean().default(true),
-  primalTierEnabled: z.boolean().default(true),
-  relayTierEnabled: z.boolean().default(true),
-  avatarFallbackVariant: z.enum(AVATAR_FALLBACK_VARIANTS).default(DEFAULT_AVATAR_FALLBACK_VARIANT),
-  minTransferThreshold: z.number().int().nonnegative().default(5),
-  middlemanRouting: PersistedMiddlemanRouting.default({
-    maxHops: 2,
-    maxFee: 5,
-    minSuccessRate: 0.9,
-    requireLastOk: true,
-    trustMode: 'trusted_only',
-  }),
+  language: z.string().max(16).default('en').catch('en'),
+  displayBtc: z.number().int().min(0).max(8).default(3).catch(3),
+  displayCurrency: z.enum(['usd', 'eur', 'gbp']).default('usd').catch('usd'),
+  experimental: z.boolean().default(false).catch(false),
+  mockMode: z.boolean().default(false).catch(false),
+  mockOffline: z.boolean().default(false).catch(false),
+  mockFailSend: z.boolean().default(false).catch(false),
+  mockFailMelt: z.boolean().default(false).catch(false),
+  mockFailPaymentRequest: z.boolean().default(false).catch(false),
+  whitenoiseEnabled: z.boolean().default(false).catch(false),
+  mockNoGlass: z.boolean().default(false).catch(false),
+  // `.catch(null)` so a malformed terms record only resets terms (re-prompt),
+  // never takes the rest of the store (real settings) down with it.
+  termsAccepted: PersistedTermsAccepted.default(null).catch(null),
+  hasSeenOnboarding: z.boolean().default(false).catch(false),
+  quickAccessP2PK: z.boolean().default(false).catch(false),
+  regenerateP2PKOnReceive: z.boolean().default(true).catch(true),
+  sendLocationEnabled: z.boolean().default(false).catch(false),
+  fileLoggingEnabled: z.boolean().default(false).catch(false),
+  naggTierEnabled: z.boolean().default(true).catch(true),
+  primalTierEnabled: z.boolean().default(true).catch(true),
+  relayTierEnabled: z.boolean().default(true).catch(true),
+  avatarFallbackVariant: z
+    .enum(AVATAR_FALLBACK_VARIANTS)
+    .default(DEFAULT_AVATAR_FALLBACK_VARIANT)
+    .catch(DEFAULT_AVATAR_FALLBACK_VARIANT),
+  // A renamed/removed presentational variant value must degrade to the default,
+  // never fail the parse — otherwise the whole settings blob (terms acceptance,
+  // onboarding, every real setting) is discarded on rehydrate.
+  balanceSplitVariant: z
+    .enum(BALANCE_SPLIT_VARIANTS)
+    .default(DEFAULT_BALANCE_SPLIT_VARIANT)
+    .catch(DEFAULT_BALANCE_SPLIT_VARIANT),
+  minTransferThreshold: z.number().int().nonnegative().default(5).catch(5),
+  middlemanRouting: PersistedMiddlemanRouting.default(DEFAULT_MIDDLEMAN_ROUTING_PERSISTED).catch(
+    DEFAULT_MIDDLEMAN_ROUTING_PERSISTED
+  ),
 });
 
 /** Default settings used for initialization and reset. */
@@ -170,6 +216,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   primalTierEnabled: true,
   relayTierEnabled: true,
   avatarFallbackVariant: DEFAULT_AVATAR_FALLBACK_VARIANT,
+  balanceSplitVariant: DEFAULT_BALANCE_SPLIT_VARIANT,
   minTransferThreshold: 5,
   middlemanRouting: DEFAULT_MIDDLEMAN_ROUTING,
 };
@@ -237,6 +284,10 @@ interface SettingsActions {
   // Avatar fallback variation
   setAvatarFallbackVariant: (variant: AvatarFallbackVariant) => void;
   getAvatarFallbackVariant: () => AvatarFallbackVariant;
+
+  // Balance split (mint distribution) presentational variant — dev only
+  setBalanceSplitVariant: (variant: BalanceSplitVariant) => void;
+  getBalanceSplitVariant: () => BalanceSplitVariant;
 
   // Rebalancing
   setMinTransferThreshold: (sats: number) => void;
@@ -389,6 +440,13 @@ export const useSettingsStore = create<SettingsStore>()(
         },
         getAvatarFallbackVariant: () => get().avatarFallbackVariant,
 
+        // Balance split presentational variant (dev)
+        setBalanceSplitVariant: (variant: BalanceSplitVariant) => {
+          storeLog.info('store.settings.set_balance_split_variant', { variant });
+          set({ balanceSplitVariant: variant });
+        },
+        getBalanceSplitVariant: () => get().balanceSplitVariant,
+
         // Rebalancing
         setMinTransferThreshold: (sats: number) => {
           storeLog.info('store.settings.set_min_transfer_threshold', { sats });
@@ -453,6 +511,7 @@ export const useSettingsStore = create<SettingsStore>()(
           sendLocationEnabled: state.sendLocationEnabled,
           fileLoggingEnabled: state.fileLoggingEnabled,
           avatarFallbackVariant: state.avatarFallbackVariant,
+          balanceSplitVariant: state.balanceSplitVariant,
           minTransferThreshold: state.minTransferThreshold,
           middlemanRouting: state.middlemanRouting,
           naggTierEnabled: state.naggTierEnabled,

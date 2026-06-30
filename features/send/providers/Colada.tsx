@@ -37,6 +37,7 @@ import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog } from '@/shared/lib/logger';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
+import { publishGiftWrappedDM } from '@/shared/lib/nostr/publishGiftWrappedDM';
 import { ingestResolvedProfiles } from '@/shared/lib/nostr/useEntityCache';
 import {
   createSovranExecuteMintQuote,
@@ -423,6 +424,25 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     [manager, requestCameraPermission]
   );
 
+  // Deliver a bearer ecash token to a remote Nostr contact over an encrypted
+  // NIP-17 gift-wrapped DM (recipient wrap + self-copy, so it lands in our own
+  // thread too). Used by the destination-first Send flow's contact path.
+  const deliverContactEcashDm = useCallback(
+    async ({ recipientPubkey, token }: { recipientPubkey: string; token: string }) => {
+      const pk = privateKeyRef.current;
+      const ndkInstance = ndkRef.current;
+      if (!pk) throw new Error('Nostr keys not available');
+      if (!ndkInstance) throw new Error('NDK not available');
+      await publishGiftWrappedDM({
+        ndk: ndkInstance,
+        senderPrivateKey: pk,
+        recipientPublicKey: recipientPubkey,
+        content: token,
+      });
+    },
+    [privateKeyRef, ndkRef]
+  );
+
   const handlers = useCallback<ColadaProviderProps['handlers']>(
     (machine, refs) =>
       createSovranHandlers({
@@ -431,8 +451,9 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         getManager: () => manager,
         getNpub,
         getBitchatIdentityMaterial,
+        deliverContactEcashDm,
       }),
-    [manager, getNpub, getBitchatIdentityMaterial]
+    [manager, getNpub, getBitchatIdentityMaterial, deliverContactEcashDm]
   );
 
   return (

@@ -1,5 +1,6 @@
 import { storeLog } from '@/shared/lib/logger';
 import { useAmountDraftStore } from './amountDraftStore';
+import { useContactSendStore } from './contactSendStore';
 import { useNearPaySessionStore } from './nearPayStore';
 import { useRoutstrTopUpStore } from './routstrTopUpStore';
 
@@ -23,11 +24,18 @@ import { useRoutstrTopUpStore } from './routstrTopUpStore';
 export function clearPaymentContext(reason: string): void {
   const routstrActive = useRoutstrTopUpStore.getState().active;
   const nearPayActive = useNearPaySessionStore.getState().active != null;
-  if (routstrActive || nearPayActive) {
-    storeLog.info('payment.context.clear', { reason, routstrActive, nearPayActive });
+  const contactSendActive = useContactSendStore.getState().active != null;
+  if (routstrActive || nearPayActive || contactSendActive) {
+    storeLog.info('payment.context.clear', {
+      reason,
+      routstrActive,
+      nearPayActive,
+      contactSendActive,
+    });
   }
   useRoutstrTopUpStore.getState().reset();
   useNearPaySessionStore.getState().clear();
+  useContactSendStore.getState().clear();
   // A fresh flow must never restore an amount stashed during a previous,
   // abandoned mint-selector round trip.
   useAmountDraftStore.getState().clear();

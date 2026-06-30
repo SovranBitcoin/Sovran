@@ -574,6 +574,9 @@ export function MintInfoScreen() {
 
       <ScrollView
         className="flex-1"
+        // Android form-sheet: opt into nested-scroll so a top-edge drag dismisses
+        // the sheet while mid-scroll drags scroll (matches Receive / shared List).
+        nestedScrollEnabled
         contentContainerStyle={{
           paddingTop: insets.top + 16,
           paddingHorizontal: 16,

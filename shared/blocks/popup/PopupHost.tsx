@@ -45,6 +45,7 @@ import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { NostrKeysContextBridge, useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { alpha } from '@/shared/styles/tokens';
+import { ActionMenuSheetContent } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
@@ -255,6 +256,17 @@ const CUSTOM_SHEET_CONTENT: Record<
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>
 > = {
+  'action-menu': ActionMenuSheetContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
   'emoji-picker': EmojiPickerContent as React.ComponentType<{
     payload: unknown;
     close: () => void;

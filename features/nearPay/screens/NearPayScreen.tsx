@@ -57,6 +57,7 @@ import {
   type RecentPeopleProfileRow,
 } from '@/features/feed/hooks/useRecentPeopleProfiles';
 import { normalizeRecentPersonPubkey } from '@/shared/stores/profile/recentPeopleStore';
+import { useRememberPeers } from '@/features/nearPay/hooks/useRememberPeers';
 import { useBluetoothState } from '@/features/bitchat/hooks/useBluetoothState';
 import { BluetoothNotice } from '@/features/bitchat/components/BluetoothNotice';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
@@ -928,6 +929,11 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     () => peers.map((peer) => peerNostrPubkey(peer)).filter((key): key is string => !!key),
     [peers]
   );
+  // Remember every Sovran peer we resolve a Nostr identity for, so the Send
+  // modal's quick-pay tier can offer them again by last-seen even after they
+  // leave range (the live BLE list is session-only).
+  useRememberPeers(peers);
+
   const peerProfiles = useRecentPeopleProfiles(peerProfilePubkeys);
   const peerProfileByPubkey = useMemo(() => {
     const map = new Map<string, RecentPeopleProfileRow>();

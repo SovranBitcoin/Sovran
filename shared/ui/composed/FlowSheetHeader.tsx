@@ -54,6 +54,12 @@ export const FLOW_SHEET_HEADER_HEIGHT = 12 + headerButtonSize + spacing.xs * 2;
  *  below it over scrolling content. */
 export const SCRIM_TOTAL_HEIGHT = FLOW_SHEET_HEADER_HEIGHT + 32;
 
+/** How far the scrim's eased fade tail overhangs below the measured bar. The
+ *  absolute scrim doesn't feed HeaderHeightContext, so content/sticky insets
+ *  must add this back or the first row sits under the fade at rest (Android
+ *  formSheets only). */
+export const FLOW_SHEET_SCRIM_OVERHANG = SCRIM_TOTAL_HEIGHT - FLOW_SHEET_HEADER_HEIGHT;
+
 export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps) {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
 

@@ -19,11 +19,17 @@
  * rendered (`alwaysShowMenu`), making forthcoming methods discoverable.
  *
  * Two presentations:
- * - `popover` (default): an inline anchored heroui Menu (not affected by the
- *   Android bottom-sheet bug).
- * - `bottom-sheet`: routed through the app-wide `actionMenuPopup()` surface
- *   (rendered once by `<ActionMenuHost />` at the app root). Inline bottom-sheet
- *   menus mis-position / paint at rest on Android; the global host does not.
+ * - `popover` (default): an inline anchored heroui Menu. **iOS only** — on
+ *   Android the inline popover relies on heroui's async `measure()` to position
+ *   its portal, and that callback is routinely slow/stale/dropped on Android, so
+ *   the menu intermittently fails to open (first tap does nothing). Android
+ *   therefore always routes through the global host regardless of this prop.
+ * - `bottom-sheet`: routed through `actionMenuSheet()` — the FullWindowOverlay-
+ *   backed `<BottomSheet>` lane on `PopupHost`. Unlike the `actionMenuPopup()`
+ *   menu-lane host (which disables FWO and paints UNDER route modals), this
+ *   stacks above `(send-flow)` modals, so in-modal CTAs like the amount-screen
+ *   "Next" chooser are visible. Android's default-popover path still falls back
+ *   to the `actionMenuPopup` global host (inline popover mis-measures there).
  *
  * Disabled variants remain visible with their `reason` rendered as the
  * description, matching the pattern used by availability.ts in colada.
@@ -40,6 +46,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import Icon from 'assets/icons';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 import { actionMenuPopup, type ActionMenuItem } from '@/shared/lib/popup/popups/actionMenu';
+import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { log } from '@/shared/lib/logger';
 
 export interface ActionMenuVariant {
@@ -155,7 +162,15 @@ export function ActionMenuButton({
   const defaultVariant = variants[0];
   const hasVariants = variants.length > 0;
   const showChevron = hasVariants && (variants.length > 1 || alwaysShowMenu);
-  const isBottomSheet = presentation === 'bottom-sheet';
+  // An explicit `bottom-sheet` request routes through the FullWindowOverlay-
+  // backed `<BottomSheet>` lane (`actionMenuSheet`) so the menu stacks ABOVE
+  // route modals — the menu-lane host (`actionMenuPopup`) disables FWO and
+  // paints under any `(send-flow)` modal, hiding the chooser.
+  const useFwoSheet = presentation === 'bottom-sheet';
+  // On Android the inline popover races heroui's async `measure()` and can fail
+  // to open, so the default-popover path also routes through a global host
+  // there. iOS keeps the requested presentation (anchored popover by default).
+  const isBottomSheet = useFwoSheet || Platform.OS === 'android';
 
   const primaryDisabled = disabled || !hasVariants || defaultVariant?.isDisabled;
 
@@ -167,6 +182,15 @@ export function ActionMenuButton({
   // entirely and dispatches to the global actionMenuPopup host.
   const menuTriggerRef = useRef<MenuTriggerRef>(null);
   const openMenu = useCallback(() => {
+    if (useFwoSheet) {
+      // FWO lane — stacks above route modals (the amount-screen Next chooser
+      // lives inside `(send-flow)`).
+      actionMenuSheet({
+        title: menuTitle,
+        buttons: variants.map((v) => toActionMenuItem(v, testID)),
+      });
+      return;
+    }
     if (isBottomSheet) {
       actionMenuPopup({
         title: menuTitle,
@@ -177,7 +201,7 @@ export function ActionMenuButton({
     // Defer to the next tick so the Button's press animation doesn't race
     // with the Trigger's `measure()` call inside heroui's `.open()`.
     setTimeout(() => menuTriggerRef.current?.open(), 0);
-  }, [isBottomSheet, variants, menuTitle, testID]);
+  }, [useFwoSheet, isBottomSheet, variants, menuTitle, testID]);
 
   const handlePrimaryPress = useCallback(async () => {
     if (!defaultVariant || primaryDisabled) return;

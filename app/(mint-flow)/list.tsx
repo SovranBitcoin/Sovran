@@ -23,6 +23,7 @@ import { MintListScreen, useMintRowsWithCache } from '@/features/mint';
 import { useMintCatalog } from '@/features/mint/hooks/useMintCatalog';
 import { buildMintListItems } from '@/features/send';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { cashuLog } from '@/shared/lib/logger';
@@ -49,6 +50,12 @@ function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, un
 
 function MintListRoute() {
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.list' });
+  // MintListScreen paints its canvas `surface`; declare that to the Android
+  // sheet header so its scrim fades from `surface`, not the darker theme
+  // `background`. Must be set here explicitly — this inline <Stack.Screen>
+  // re-applies its options every render, which would otherwise clobber the
+  // one-shot bgColor→header auto-sync in the Screen component.
+  const surface = useThemeColor('surface');
 
   const showAddMintsButton = params?.showAddMintsButton !== 'false';
   const showDetailsButton = params?.showDetailsButton !== 'false';
@@ -102,7 +109,7 @@ function MintListRoute() {
         options={withGlassHeaderItems({
           title: 'Select Mint',
           headerTransparent: true,
-          headerStyle: { backgroundColor: 'transparent' },
+          headerStyle: { backgroundColor: surface },
           headerRight: () =>
             showAddMintsButton ? (
               <Link href="/add" asChild>

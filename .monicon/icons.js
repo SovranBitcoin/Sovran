@@ -700,16 +700,6 @@ module.exports = {
     "width": 16,
     "height": 16
   },
-  "mdi:arrow-collapse-down": {
-    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M19.92 12.08L12 20l-7.92-7.92l1.42-1.41l5.5 5.5V2h2v14.17l5.5-5.51zM12 20H2v2h20v-2z\"/></svg>",
-    "width": 16,
-    "height": 16
-  },
-  "mdi:arrow-collapse-up": {
-    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M4.08 11.92L12 4l7.92 7.92l-1.42 1.41l-5.5-5.5V22h-2V7.83l-5.5 5.5zM12 4h10V2H2v2z\"/></svg>",
-    "width": 16,
-    "height": 16
-  },
   "mdi:arrow-up": {
     "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M13 20h-2V8l-5.5 5.5l-1.42-1.42L12 4.16l7.92 7.92l-1.42 1.42L13 8z\"/></svg>",
     "width": 16,
@@ -732,11 +722,6 @@ module.exports = {
   },
   "mdi:check-decagram": {
     "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"m23 12l-2.44-2.78l.34-3.68l-3.61-.82l-1.89-3.18L12 3L8.6 1.54L6.71 4.72l-3.61.81l.34 3.68L1 12l2.44 2.78l-.34 3.69l3.61.82l1.89 3.18L12 21l3.4 1.46l1.89-3.18l3.61-.82l-.34-3.68zm-13 5l-4-4l1.41-1.41L10 14.17l6.59-6.59L18 9z\"/></svg>",
-    "width": 16,
-    "height": 16
-  },
-  "mdi:equal": {
-    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M19 10H5V8h14zm0 6H5v-2h14z\"/></svg>",
     "width": 16,
     "height": 16
   },
@@ -805,11 +790,6 @@ module.exports = {
     "width": 16,
     "height": 16
   },
-  "mdi:restore": {
-    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M13 3a9 9 0 0 0-9 9H1l3.89 3.89l.07.14L9 12H6a7 7 0 0 1 7-7a7 7 0 0 1 7 7a7 7 0 0 1-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.9 8.9 0 0 0 13 21a9 9 0 0 0 9-9a9 9 0 0 0-9-9\"/></svg>",
-    "width": 16,
-    "height": 16
-  },
   "mdi:send": {
     "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"m2 21l21-9L2 3v7l15 2l-15 2z\"/></svg>",
     "width": 16,
@@ -817,11 +797,6 @@ module.exports = {
   },
   "mdi:broadcast": {
     "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M12 10c-1.1 0-2 .9-2 2s.9 2 2 2s2-.9 2-2s-.9-2-2-2m6 2c0-3.3-2.7-6-6-6s-6 2.7-6 6c0 2.2 1.2 4.1 3 5.2l1-1.7c-1.2-.7-2-2-2-3.4c0-2.2 1.8-4 4-4s4 1.8 4 4c0 1.5-.8 2.8-2 3.4l1 1.7c1.8-1 3-3 3-5.2M12 2C6.5 2 2 6.5 2 12c0 3.7 2 6.9 5 8.6l1-1.7c-2.4-1.4-4-4-4-6.9c0-4.4 3.6-8 8-8s8 3.6 8 8c0 3-1.6 5.5-4 6.9l1 1.7c3-1.7 5-4.9 5-8.6c0-5.5-4.5-10-10-10\"/></svg>",
-    "width": 16,
-    "height": 16
-  },
-  "mdi:target": {
-    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M11 2v2.07A8 8 0 0 0 4.07 11H2v2h2.07A8 8 0 0 0 11 19.93V22h2v-2.07A8 8 0 0 0 19.93 13H22v-2h-2.07A8 8 0 0 0 13 4.07V2m-2 4.08V8h2V6.09c2.5.41 4.5 2.41 4.92 4.91H16v2h1.91c-.41 2.5-2.41 4.5-4.91 4.92V16h-2v1.91C8.5 17.5 6.5 15.5 6.08 13H8v-2H6.09C6.5 8.5 8.5 6.5 11 6.08M12 11a1 1 0 0 0-1 1a1 1 0 0 0 1 1a1 1 0 0 0 1-1a1 1 0 0 0-1-1\"/></svg>",
     "width": 16,
     "height": 16
   },

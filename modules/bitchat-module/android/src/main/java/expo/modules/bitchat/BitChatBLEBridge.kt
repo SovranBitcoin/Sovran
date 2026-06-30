@@ -13,6 +13,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -59,6 +60,12 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
     private const val MESSAGE_WAKE_LOCK_MS = 30_000L
     private val PEER_ID_RE = Regex("^[0-9a-fA-F]{16}$")
 
+    /// Cold-start discovery guard (see [armColdStartDiscoveryWatchdog]). Grace
+    /// window before deciding a fresh mesh came up inert, and the max number of
+    /// automatic rebuilds so a genuinely-alone device never thrashes the radio.
+    private const val COLD_START_REARM_DELAY_MS = 9_000L
+    private const val COLD_START_REARM_MAX = 2
+
     private data class DmPeerSummary(
         var peerID: String,
         var nickname: String?,
@@ -86,6 +93,14 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
     private var dmSummaries: MutableMap<String, DmPeerSummary> = mutableMapOf()
     private val pendingSends: MutableMap<String, MutableList<PendingSend>> = mutableMapOf()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    /// Cold-start discovery watchdog state. [meshGeneration] bumps on every
+    /// fresh BluetoothMeshService so a stale watchdog never acts on a mesh that
+    /// was since stopped/rebuilt; [hasDiscoveredPeerSinceStart] flips true the
+    /// moment the radio surfaces any peer (proving it actually scans/advertises).
+    @Volatile private var meshGeneration = 0
+    @Volatile private var hasDiscoveredPeerSinceStart = false
+    private var discoveryWatchdogJob: Job? = null
 
     /// Our own Nostr npub (bech32), derived from the profile key at start(). Sent
     /// in bitchat's native [FAVORITED]:npub favorite notification — Sovran's
@@ -220,11 +235,16 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
             }
             mesh = service
             isRunning = true
+            meshGeneration += 1
+            hasDiscoveredPeerSinceStart = false
 
             // Pin the process while the mesh runs so background BLE messages
             // still reach JS (Nut Drop auto-redeem). start() is only called
             // from a foregrounded app, so startForegroundService is legal.
             BitchatMeshForegroundService.start(context)
+
+            // Guard against an inert cold-start radio (see the watchdog doc).
+            armColdStartDiscoveryWatchdog(meshGeneration, attempt = 0)
         }
     }
 
@@ -233,6 +253,9 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
     }
 
     private fun stopLocked() {
+        discoveryWatchdogJob?.cancel()
+        discoveryWatchdogJob = null
+        hasDiscoveredPeerSinceStart = false
         appContext?.let { BitchatMeshForegroundService.stop(it) }
         mesh?.stopServices()
         mesh = null
@@ -249,6 +272,77 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         selfPeerID = null
         selfCreq = null
         favoritePeers.clear()
+    }
+
+    // MARK: - Cold-start discovery watchdog
+
+    /**
+     * The first BluetoothMeshService after a process/app cold start can come up
+     * inert: `startServices()` returns true (GATT server + client report a
+     * synchronous start), but the BLE scanner/advertiser fail ASYNCHRONOUSLY —
+     * `ScanCallback.onScanFailed` / `AdvertiseCallback.onStartFailure`, typically
+     * `SCAN_FAILED_APPLICATION_REGISTRATION_FAILED` while the BLE stack is still
+     * churning at launch. The radio then never actually scans or advertises, so
+     * no peers are ever discovered (and we are invisible to others), while JS
+     * still shows `ble_start_ok` / `poweredOn`. Recovery needs a fresh mesh —
+     * historically only achieved when the user toggled Bluetooth or
+     * re-foregrounded the app (which re-ran `startBLE`).
+     *
+     * This rearms automatically: if no peer is discovered within
+     * [COLD_START_REARM_DELAY_MS], rebuild the mesh. Bounded to
+     * [COLD_START_REARM_MAX] attempts so a genuinely-alone device (no peers, but
+     * a healthy radio) never thrashes the adapter. The guard is disarmed the
+     * instant the radio surfaces any peer ([didUpdatePeerList]).
+     */
+    private fun armColdStartDiscoveryWatchdog(generation: Int, attempt: Int) {
+        if (attempt >= COLD_START_REARM_MAX) return
+        discoveryWatchdogJob?.cancel()
+        discoveryWatchdogJob = scope.launch {
+            delay(COLD_START_REARM_DELAY_MS)
+            synchronized(lock) {
+                // Superseded by a stop()/profile-switch/rebuild, or the radio
+                // already proved healthy by discovering a peer — nothing to do.
+                if (!isRunning || meshGeneration != generation) return@launch
+                if (hasDiscoveredPeerSinceStart) return@launch
+                Log.w(
+                    TAG,
+                    "cold-start BLE discovered no peers in ${COLD_START_REARM_DELAY_MS}ms " +
+                        "(rearm ${attempt + 1}/$COLD_START_REARM_MAX) — rebuilding mesh",
+                )
+                if (rebuildMeshLocked()) {
+                    armColdStartDiscoveryWatchdog(meshGeneration, attempt + 1)
+                }
+            }
+        }
+    }
+
+    /**
+     * Tear down the inert mesh and bring up a fresh one with the SAME identity
+     * (already installed in the profile-scoped storage by [start]). Mirrors the
+     * mesh construction in [start] — keep the delegate + session wiring in sync.
+     * Must hold [lock]. Returns false if the new radio fails to start.
+     */
+    private fun rebuildMeshLocked(): Boolean {
+        val context = appContext ?: return false
+        val suffix = activeScopeSuffix ?: return false
+        val scopedContext = ProfileScopedContext(context, suffix)
+        // The vendor's stopServices() terminates the instance — always build a
+        // fresh BluetoothMeshService, never reuse.
+        mesh?.stopServices()
+        val service = BluetoothMeshService(scopedContext)
+        service.encryptionService.onSessionEstablished = { peerID ->
+            flushPendingSends(peerID)
+            resendFavoriteIfWanted(peerID)
+        }
+        service.delegate = this
+        if (!service.startServices()) {
+            Log.e(TAG, "cold-start rebuild: BluetoothMeshService.startServices() failed")
+            return false
+        }
+        mesh = service
+        meshGeneration += 1
+        hasDiscoveredPeerSinceStart = false
+        return true
     }
 
     // MARK: - Public mesh messaging
@@ -600,6 +694,11 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
     }
 
     override fun didUpdatePeerList(peers: List<String>) {
+        if (peers.isNotEmpty()) {
+            // The radio is proven healthy — disarm the cold-start rebuild guard.
+            hasDiscoveredPeerSinceStart = true
+            discoveryWatchdogJob?.cancel()
+        }
         emitter?.invoke("onBLEPeerUpdate", mapOf("type" to "list", "peers" to peers))
     }
 

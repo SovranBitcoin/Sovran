@@ -1,6 +1,18 @@
 import type { AnnotatedOption, PaymentMachine, StepDataMap } from '@sovranbitcoin/colada';
 
 import type { ParsedNostrConnectUri } from '@/features/nostrSigner';
+import type { ActionMenuItem } from './popups/actionMenu';
+
+/**
+ * Generic "pick one of N" menu rendered through the FullWindowOverlay-backed
+ * `<BottomSheet>` lane (above route modals). Dispatched by
+ * `ActionMenuButton presentation="bottom-sheet"`. Inputs / tabbed sections stay
+ * in the `actionMenuPopup` lane — this carries plain buttons only.
+ */
+type ActionMenuSheetPayload = {
+  title?: string;
+  buttons: readonly ActionMenuItem[];
+};
 
 export type ProfileSwitcherAction =
   | { type: 'switch'; accountIndex: number }
@@ -70,6 +82,14 @@ type SignerProfilePickerPayload = { parsed: ParsedNostrConnectUri };
  * above-modal stacking must live here.
  */
 type BaseActionSheetPayloads = {
+  /**
+   * Generic action-menu chooser routed here (FullWindowOverlay) because
+   * `ActionMenuButton presentation="bottom-sheet"` callers — e.g. the
+   * amount-screen "Next" split button (as Lightning / as Ecash) — live inside
+   * `(send-flow)` route modals, where the menu-lane host renders underneath
+   * and is invisible. Same above-modal stacking reason as `payment-options`.
+   */
+  'action-menu': ActionMenuSheetPayload;
   /**
    * Tabbed emoji picker invoked from inside the Send Ecash route modal.
    * Lives here because heroui Menu in FWO mode doesn't render visibly —

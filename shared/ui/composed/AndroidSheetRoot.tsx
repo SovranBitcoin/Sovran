@@ -27,10 +27,16 @@ import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 export const SheetHeaderHeightContext = createContext<number | null>(null);
 
-/** Visible gap between the status bar and the sheet's top edge — the iOS
+/** Visible peek of the previous page above the sheet's top edge — the iOS
  *  pageSheet margin equivalent. Content height controls the sheet position
- *  (isFitToContents), so the gap lives in the height math. */
-const ANDROID_SHEET_TOP_GAP = 12;
+ *  (isFitToContents), so the peek lives in the height math: a taller value
+ *  opens the sheet lower and reveals more of the page behind it.
+ *
+ *  Under SDK 56 edge-to-edge, `insets.top` inside the safe frame collapses to
+ *  ~0 on many devices, so this constant is effectively the WHOLE peek (it used
+ *  to read as status-bar + 12 and looked full-height). Device-tunable — bump it
+ *  if the previous page doesn't peek enough; trim it if the sheet sits too low. */
+const ANDROID_SHEET_TOP_GAP = 28;
 
 interface AndroidSheetRootProps {
   children: React.ReactNode;

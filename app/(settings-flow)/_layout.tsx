@@ -9,13 +9,16 @@
 import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
+import {
+  androidHeaderScrimOptions,
+  createFlowLayoutScreenOptions,
+} from '../../config/flowLayoutOptions';
 
 const INDEX_OPTIONS = { title: 'Settings' };
 const ABOUT_OPTIONS = { title: 'About' };
-const TERMS_OPTIONS = { title: 'Terms & conditions' };
 const PROFILE_OPTIONS = { title: 'Profile' };
 const AVATAR_OPTIONS = { title: 'Avatar fallback' };
+const BALANCE_SPLIT_OPTIONS = { title: 'Balance split' };
 const NOTIFICATION_POLICY_OPTIONS = { title: 'Notifications' };
 const ROUTING_OPTIONS = { title: 'Swap routing' };
 const NETWORK_OPTIONS = { title: 'Network' };
@@ -32,19 +35,37 @@ const RECOVERY_OPTIONS = { title: 'Recover wallet' };
 const DELETE_OPTIONS = { title: 'Delete account' };
 
 export default function SettingsFlowLayout() {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, background, surface] = useThemeColor([
+    'foreground',
+    'background',
+    'surface',
+  ] as const);
   const screenOptions = useMemo(
     () => createFlowLayoutScreenOptions({ foreground, background }),
     [foreground, background]
+  );
+  // TermsAndConditionsScreen paints its canvas `surface`. This is a native-header
+  // flow (no androidSheet), so the scrim color comes from androidHeaderScrimOptions,
+  // not headerStyle — override it to `surface` so the Android header gradient fades
+  // from the page color, not the darker theme `background`. (Same pattern as
+  // user-flow `thread`.) contentStyle keeps the slide-in background consistent.
+  const termsOptions = useMemo(
+    () => ({
+      title: 'Terms & conditions',
+      contentStyle: { backgroundColor: surface },
+      ...androidHeaderScrimOptions(surface),
+    }),
+    [surface]
   );
 
   return (
     <Stack screenOptions={screenOptions}>
       <Stack.Screen name="index" options={INDEX_OPTIONS} />
       <Stack.Screen name="about" options={ABOUT_OPTIONS} />
-      <Stack.Screen name="terms" options={TERMS_OPTIONS} />
+      <Stack.Screen name="terms" options={termsOptions} />
       <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
       <Stack.Screen name="avatar" options={AVATAR_OPTIONS} />
+      <Stack.Screen name="balance-split" options={BALANCE_SPLIT_OPTIONS} />
       <Stack.Screen name="notification-policy" options={NOTIFICATION_POLICY_OPTIONS} />
       <Stack.Screen name="routing" options={ROUTING_OPTIONS} />
       <Stack.Screen name="network" options={NETWORK_OPTIONS} />

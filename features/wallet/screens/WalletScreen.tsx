@@ -115,7 +115,10 @@ export function WalletScreen() {
   const handleSend = useCallback(async () => {
     walletLog.info('wallet.action.send', { unit: ACCOUNT.unit });
     clearPaymentContext('wallet.send');
-    await machine.startSendEcash({ reset: true });
+    // Destination-first: open the Send method chooser (QR / Create Ecash / NFC
+    // / Nut Drop + destination input + contact search) rather than jumping
+    // straight to amount entry. The chosen method drives the rest of the flow.
+    await machine.startSend({ reset: true });
   }, [machine]);
 
   const handleTheme = useCallback(() => {
