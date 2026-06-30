@@ -5,7 +5,7 @@ import {
   beginBLEBackgroundTask,
   endBLEBackgroundTask,
 } from 'bitchat-module';
-import { classifyMeshToken, meshTokenDedupeKey } from '@sovranbitcoin/colada';
+import { classifyMeshToken, meshTokenDedupeKey } from 'wallet';
 
 import { drainNutDropRedeemQueue } from '@/features/nearPay/lib/nutDropAutoRedeem';
 import { paymentLog } from '@/shared/lib/logger';

@@ -10,7 +10,7 @@ import {
   type ChainOnchainConfirmationProgress as OnchainConfirmationProgress,
   type TimelineItem,
   type TimelineStepType,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 import Animated, {
   Easing,
   FadeInDown,

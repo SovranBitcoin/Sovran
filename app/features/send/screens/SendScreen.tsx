@@ -25,8 +25,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
-import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
-import { describeDestination, defaultDetectors, parsePaymentInput } from '@sovranbitcoin/colada';
+import { usePaymentFlowMachine } from 'wallet/react';
+import { describeDestination, defaultDetectors, parsePaymentInput } from 'wallet';
 import type { BLEPeer } from 'bitchat-module';
 import Animated, {
   Easing,

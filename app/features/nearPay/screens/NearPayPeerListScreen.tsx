@@ -4,7 +4,7 @@ import { useHeaderHeight } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import type { BLEPeer } from 'bitchat-module';
-import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
+import { usePaymentFlowMachine } from 'wallet/react';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';

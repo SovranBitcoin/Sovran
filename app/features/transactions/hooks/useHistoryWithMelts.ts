@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useColadaTransactions } from '@sovranbitcoin/colada/react';
+import { useColadaTransactions } from 'wallet/react';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 

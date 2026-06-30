@@ -10,7 +10,7 @@ import type {
   ScanMethod,
   TransactionDirection,
   TransactionPaymentType,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { cashuLog } from '@/shared/lib/logger';

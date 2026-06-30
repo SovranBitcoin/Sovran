@@ -21,8 +21,8 @@ import {
   useExecutionState,
   useScreenActions,
   usePaymentFlowMachine,
-} from '@sovranbitcoin/colada/react';
-import type { MintListItem, StepDataMap } from '@sovranbitcoin/colada';
+} from 'wallet/react';
+import type { MintListItem, StepDataMap } from 'wallet';
 
 import { MintListScreen, useMintRowsWithCache, useStickyMintSelectorItems } from '@/features/mint';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';

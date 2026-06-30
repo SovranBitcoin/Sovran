@@ -26,7 +26,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
-import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
+import { usePaymentFlowMachine } from 'wallet/react';
 
 import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';

@@ -6,7 +6,7 @@ import {
   getCardLabel,
   getStatusColorType,
   getStatusHeader,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 
 const baseFields = {
   id: 'h1',

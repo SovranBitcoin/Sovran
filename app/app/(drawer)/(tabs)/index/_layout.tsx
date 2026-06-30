@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
+import { usePaymentFlowMachine } from 'wallet/react';
 import { MintSelector } from '@/features/wallet';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';

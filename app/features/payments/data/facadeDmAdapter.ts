@@ -8,7 +8,7 @@
  * 1059 gift wraps + kind 4 legacy) that reference the viewer. Decryption,
  * sender identification, and bucketing stay client-side in `dmDecryptPipeline`.
  */
-import type { facade } from '@sovranbitcoin/nagg-ts';
+import type { facade } from 'nostr';
 
 import type { DmEnvelope, DmEnvelopePage } from './dmEnvelopeClient';
 

@@ -5,7 +5,7 @@ import {
   MempoolAddressStatsSchema,
   summarizeMempoolAddress,
   type MempoolAddressSummary,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 import {
   getCachedMempoolAddressStats,
   useMempoolAddressCache,

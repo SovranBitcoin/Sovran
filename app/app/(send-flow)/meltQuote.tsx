@@ -8,7 +8,7 @@
 import React, { useCallback, useEffect } from 'react';
 
 import { MeltQuoteRoute } from '@/features/send';
-import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
+import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { cashuLog } from '@/shared/lib/logger';
 

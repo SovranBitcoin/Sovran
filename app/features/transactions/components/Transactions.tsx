@@ -32,7 +32,7 @@ import {
   type ScanMethod,
   type TransactionDirection,
   type TransactionPaymentType,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { spacing, zIndex } from '@/shared/styles/tokens';

@@ -12,7 +12,7 @@
  */
 
 import { type Manager, type ReceiveHistoryEntry } from '@cashu/coco-core';
-import { decodeEcashTokenMetadata } from '@sovranbitcoin/colada';
+import { decodeEcashTokenMetadata } from 'wallet';
 
 import { log } from '../logger';
 import { mintLocalId } from '../id';

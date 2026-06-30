@@ -13,8 +13,8 @@ import {
   createNaggClient,
   type NaggEventConnection,
   NaggDmConversationDataSchema,
-} from '@sovranbitcoin/nagg-ts';
-import { dmConversationAppView } from '@sovranbitcoin/nagg-ts/recipes';
+} from 'nostr';
+import { dmConversationAppView } from 'nostr/recipes';
 import { backendConfig } from '@/shared/config/backend';
 import { paymentLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';

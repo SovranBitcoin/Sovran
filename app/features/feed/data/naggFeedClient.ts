@@ -7,7 +7,7 @@ import {
   type NaggAppViewBinding,
   type NaggError,
   type NaggNotificationsPage,
-} from '@sovranbitcoin/nagg-ts';
+} from 'nostr';
 import {
   eventsAppView,
   followingPopularRankedEventsInput,
@@ -20,8 +20,8 @@ import {
   userFeedAppView,
   withRankedTargetExclusions,
   type RankedEventsInput,
-} from '@sovranbitcoin/nagg-ts/recipes';
-import { type NaggFeedPage } from '@sovranbitcoin/nagg-ts/map';
+} from 'nostr/recipes';
+import { type NaggFeedPage } from 'nostr/map';
 import type { z } from 'zod';
 import { backendConfig } from '@/shared/config/backend';
 import { apiLog, feedLog, redactError } from '@/shared/lib/logger';

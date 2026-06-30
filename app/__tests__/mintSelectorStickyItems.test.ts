@@ -1,5 +1,5 @@
 import { resolveStickyMintSelectorItems } from '@/features/mint/hooks/useStickyMintSelectorItems';
-import type { MintListItem } from '@sovranbitcoin/colada';
+import type { MintListItem } from 'wallet';
 
 function mintItem(mintUrl: string, displayName: string, iconUrl?: string): MintListItem {
   return {

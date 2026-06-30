@@ -1,5 +1,5 @@
 import { MeltQuoteState, MintQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
-import type { ChainOnchainConfirmationProgress } from '@sovranbitcoin/colada';
+import type { ChainOnchainConfirmationProgress } from 'wallet';
 import type { HistoryEntry } from '@cashu/coco-core';
 
 import {

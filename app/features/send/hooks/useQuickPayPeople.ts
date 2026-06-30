@@ -13,7 +13,7 @@
  */
 
 import { useMemo } from 'react';
-import { getCounterparty } from '@sovranbitcoin/colada';
+import { getCounterparty } from 'wallet';
 
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
 import { useRecentPeopleProfiles } from '@/features/feed/hooks/useRecentPeopleProfiles';

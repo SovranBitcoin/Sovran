@@ -1,4 +1,4 @@
-import { createNaggClient, setNostrLogger, facade, type NostrLogger } from '@sovranbitcoin/nagg-ts';
+import { createNaggClient, setNostrLogger, facade, type NostrLogger } from 'nostr';
 
 import { log } from '@/shared/lib/logger';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';

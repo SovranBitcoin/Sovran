@@ -4,7 +4,7 @@ import {
   defaultDetectors,
   DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
   parsePaymentInput,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 
 import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
 import { cashuLog } from '@/shared/lib/logger';

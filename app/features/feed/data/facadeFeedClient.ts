@@ -1,4 +1,4 @@
-import { facade } from '@sovranbitcoin/nagg-ts';
+import { facade } from 'nostr';
 
 import type { FeedEvent, FeedItem } from '@/features/feed/components/nostr/feedTypes';
 import { feedLog } from '@/shared/lib/logger';

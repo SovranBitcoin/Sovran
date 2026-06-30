@@ -1,4 +1,4 @@
-import type { facade } from '@sovranbitcoin/nagg-ts';
+import type { facade } from 'nostr';
 
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 

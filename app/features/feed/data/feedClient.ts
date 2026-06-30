@@ -1,4 +1,4 @@
-import type { RequestControls } from '@sovranbitcoin/colada';
+import type { RequestControls } from 'wallet';
 import type {
   FeedEvent,
   FeedItem,

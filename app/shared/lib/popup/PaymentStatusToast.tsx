@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text as RNText, View } from 'react-native';
 import { MeltQuoteState } from '@cashu/cashu-ts';
-import { createPaymentCopyGroups, type PaymentCopyResolver } from '@sovranbitcoin/colada';
+import { createPaymentCopyGroups, type PaymentCopyResolver } from 'wallet';
 
 import { popupLog } from '../logger';
 import { formatAmount } from '@/shared/lib/currency';

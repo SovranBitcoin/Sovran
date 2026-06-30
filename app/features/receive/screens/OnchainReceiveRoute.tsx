@@ -9,7 +9,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
-import { useScreenActions, type BoundAction } from '@sovranbitcoin/colada/react';
+import { useScreenActions, type BoundAction } from 'wallet/react';
 
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { paymentLog } from '@/shared/lib/logger';

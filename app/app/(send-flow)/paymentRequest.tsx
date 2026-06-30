@@ -16,7 +16,7 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 
 import { PaymentRequestScreen } from '@/features/send';
-import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
+import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { cashuLog } from '@/shared/lib/logger';

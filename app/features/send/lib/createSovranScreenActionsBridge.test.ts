@@ -1,6 +1,6 @@
 /* eslint-disable import/first */
 
-jest.mock('@sovranbitcoin/colada', () => ({
+jest.mock('wallet', () => ({
   meltOperationToScreenActionEntry: jest.fn(),
   mergeEntryUpdate: (
     current: Record<string, unknown> | null,

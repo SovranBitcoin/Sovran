@@ -4,7 +4,7 @@ const mockCreateNostrMintEnrichment = jest.fn(() => ({
   resolveMintContactProfile: jest.fn(),
 }));
 
-jest.mock('@sovranbitcoin/colada', () => ({
+jest.mock('wallet', () => ({
   combineSignals: (...signals: (AbortSignal | undefined)[]) =>
     signals.find((signal): signal is AbortSignal => !!signal) ?? new AbortController().signal,
   createNostrMintEnrichment: mockCreateNostrMintEnrichment,

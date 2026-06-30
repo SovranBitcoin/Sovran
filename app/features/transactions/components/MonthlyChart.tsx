@@ -12,7 +12,7 @@ import opacity from 'hex-color-opacity';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import type { HistoryEntry } from '@cashu/coco-core';
-import { isSettledReceiveHistoryEntry, isSettledSpendHistoryEntry } from '@sovranbitcoin/colada';
+import { isSettledReceiveHistoryEntry, isSettledSpendHistoryEntry } from 'wallet';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
 import { Log, paymentLog } from '@/shared/lib/logger';

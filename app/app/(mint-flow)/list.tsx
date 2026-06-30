@@ -17,7 +17,7 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 
 import { useBalanceContext, useMints } from '@cashu/coco-react';
-import type { MintAvailability } from '@sovranbitcoin/colada';
+import type { MintAvailability } from 'wallet';
 
 import { MintListScreen, useMintRowsWithCache } from '@/features/mint';
 import { useMintCatalog } from '@/features/mint/hooks/useMintCatalog';

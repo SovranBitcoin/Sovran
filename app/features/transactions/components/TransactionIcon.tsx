@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { isSendTokenCancelled, getCounterparty } from '@sovranbitcoin/colada';
+import { isSendTokenCancelled, getCounterparty } from 'wallet';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import Icon from 'assets/icons';

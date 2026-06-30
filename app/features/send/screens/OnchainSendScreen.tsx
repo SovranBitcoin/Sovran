@@ -10,7 +10,7 @@
 import React from 'react';
 
 import type { MeltHistoryEntry } from '@cashu/coco-core';
-import { useScreenActions } from '@sovranbitcoin/colada/react';
+import { useScreenActions } from 'wallet/react';
 
 import { Bip321MethodIcons, HistoryEntryHeader, useBip321Info } from '@/features/transactions';
 import { getOnchainMeltAddress } from '@/shared/lib/cashu/onchainMelt';

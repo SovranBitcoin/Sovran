@@ -43,7 +43,7 @@ import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { SkeletonLoadingShimmer } from '@/shared/ui/composed/SkeletonExitShimmer';
 import { LightningAddress } from '@sovranbitcoin/schemas';
-import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
+import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';

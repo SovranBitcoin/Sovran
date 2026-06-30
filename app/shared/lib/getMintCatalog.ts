@@ -29,7 +29,7 @@
  */
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
-import type { MintCatalogEntry } from '@sovranbitcoin/colada';
+import type { MintCatalogEntry } from 'wallet';
 
 import { projectMintMeta, transformAuditData } from '@/features/mint/lib/auditInfo';
 import { auditMint, fetchNostrProfile, reviewMint } from '@/shared/lib/apiClient';

@@ -1,4 +1,4 @@
-import type { AnnotatedOption, PaymentMachine, StepDataMap } from '@sovranbitcoin/colada';
+import type { AnnotatedOption, PaymentMachine, StepDataMap } from 'wallet';
 
 import type { ParsedNostrConnectUri } from '@/features/nostrSigner';
 import type { ActionMenuItem } from './popups/actionMenu';

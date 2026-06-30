@@ -17,6 +17,7 @@
     "react-native-quick-base64": "^3.0.0"
   },
   "scripts": {
+    "postinstall": "cd app && node scripts/apply-patches.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",

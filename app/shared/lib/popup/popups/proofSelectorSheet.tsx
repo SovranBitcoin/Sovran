@@ -11,7 +11,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { BottomSheet, Menu } from 'heroui-native';
-import { decodeUrlOrAddress, isLightningInvoiceBolt11 } from '@sovranbitcoin/colada';
+import { decodeUrlOrAddress, isLightningInvoiceBolt11 } from 'wallet';
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';

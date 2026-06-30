@@ -2,9 +2,28 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const root = path.resolve(__dirname, '..');
-const cashuKymPatchPath = path.join(root, 'patches', 'cashu-kym+0.4.1.patch');
-const patchPackageEntry = path.join(root, 'node_modules', 'patch-package', 'index.js');
+const appRoot = path.resolve(__dirname, '..');
+// `root` stays the app package dir (patch-dir + relative-path messaging base).
+// Under the bun workspace, dependencies hoist to the workspace root, so resolve
+// each package's node_modules by walking up from app/ rather than assuming app/.
+const root = appRoot;
+const patchesDir = path.join(appRoot, 'patches');
+const cashuKymPatchPath = path.join(patchesDir, 'cashu-kym+0.4.1.patch');
+
+function nmRootFor(pkg) {
+  let dir = appRoot;
+  for (let i = 0; i < 6; i += 1) {
+    if (fs.existsSync(path.join(dir, 'node_modules', pkg))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return appRoot;
+}
+
+const patchPackageRoot = nmRootFor('patch-package');
+const cashuKymRoot = nmRootFor('cashu-kym');
+const patchPackageEntry = path.join(patchPackageRoot, 'node_modules', 'patch-package', 'index.js');
 const skippedPatches = [];
 let exitCode = 0;
 
@@ -42,7 +61,7 @@ function updateFile(filePath, updater) {
 }
 
 function isCashuKymPatchApplied() {
-  const packageRoot = path.join(root, 'node_modules', 'cashu-kym', 'dist', 'main');
+  const packageRoot = path.join(cashuKymRoot, 'node_modules', 'cashu-kym', 'dist', 'main');
   const jsPath = path.join(packageRoot, 'index.js');
   const cjsPath = path.join(packageRoot, 'index.cjs');
   const dtsPath = path.join(packageRoot, 'index.d.ts');
@@ -56,7 +75,7 @@ function isCashuKymPatchApplied() {
 }
 
 function applyCashuKymPatch() {
-  const packageRoot = path.join(root, 'node_modules', 'cashu-kym', 'dist', 'main');
+  const packageRoot = path.join(cashuKymRoot, 'node_modules', 'cashu-kym', 'dist', 'main');
   const jsPath = path.join(packageRoot, 'index.js');
   const cjsPath = path.join(packageRoot, 'index.cjs');
   const dtsPath = path.join(packageRoot, 'index.d.ts');
@@ -153,15 +172,22 @@ try {
   const result = fs.existsSync(patchPackageEntry)
     ? spawnSync(
         process.execPath,
-        ['--preserve-symlinks', '--preserve-symlinks-main', patchPackageEntry, '--error-on-fail'],
+        [
+          '--preserve-symlinks',
+          '--preserve-symlinks-main',
+          patchPackageEntry,
+          '--patch-dir',
+          patchesDir,
+          '--error-on-fail',
+        ],
         {
-          cwd: root,
+          cwd: patchPackageRoot,
           env: process.env,
           stdio: 'inherit',
         }
       )
-    : spawnSync('patch-package', ['--error-on-fail'], {
-        cwd: root,
+    : spawnSync('patch-package', ['--patch-dir', patchesDir, '--error-on-fail'], {
+        cwd: patchPackageRoot,
         env: process.env,
         stdio: 'inherit',
       });

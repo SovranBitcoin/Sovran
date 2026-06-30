@@ -1,4 +1,4 @@
-import { isValidEcashToken } from '@sovranbitcoin/colada';
+import { isValidEcashToken } from 'wallet';
 
 import { cashuLog } from '@/shared/lib/logger';
 

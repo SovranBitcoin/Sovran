@@ -20,7 +20,7 @@
 
 import React, { ReactNode, useEffect } from 'react';
 import opacity from 'hex-color-opacity';
-import type { MintListItem } from '@sovranbitcoin/colada';
+import type { MintListItem } from 'wallet';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';

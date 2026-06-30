@@ -8,7 +8,7 @@ import {
   pubkeyToAccountNumber,
 } from '@/shared/lib/nostr/keyDerivation';
 import { getUsername } from '@/shared/lib/username';
-import { deriveStandardCashuSeed } from '@sovranbitcoin/colada';
+import { deriveStandardCashuSeed } from 'wallet';
 import { getPublicKey, nip19 } from 'nostr-tools';
 
 function toHex(bytes: Uint8Array): string {

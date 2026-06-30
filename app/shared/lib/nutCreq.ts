@@ -1,5 +1,5 @@
 import { PaymentRequest, type NUT10Option } from '@cashu/cashu-ts';
-import { decodePaymentRequestInfo, lockableMintsFromRequest } from '@sovranbitcoin/colada';
+import { decodePaymentRequestInfo, lockableMintsFromRequest } from 'wallet';
 
 import { cashuLog } from '@/shared/lib/logger';
 

@@ -36,7 +36,7 @@ import {
   type ScanMethod,
   type TransactionDirection,
   type TransactionPaymentType,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 
 type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 type SourceFilter = 'all' | ScanMethod;

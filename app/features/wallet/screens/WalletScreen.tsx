@@ -23,7 +23,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useHandleCameraPermission } from '@/features/camera';
-import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
+import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';

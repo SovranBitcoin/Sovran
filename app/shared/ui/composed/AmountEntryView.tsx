@@ -13,7 +13,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
 
-import type { QuickSendSuggestion } from '@sovranbitcoin/colada/react';
+import type { QuickSendSuggestion } from 'wallet/react';
 
 import { ActionMenuButton, type ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
 import { AMOUNT_FONT_FAMILY, AmountFormatter } from '@/shared/ui/composed/AmountFormatter';

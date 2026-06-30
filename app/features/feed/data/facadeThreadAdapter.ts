@@ -1,4 +1,4 @@
-import { facade } from '@sovranbitcoin/nagg-ts';
+import { facade } from 'nostr';
 
 import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';

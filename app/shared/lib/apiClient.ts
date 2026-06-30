@@ -7,7 +7,7 @@ import {
   type MintReviewRecommendation,
   type MintReviewsSummary,
   type RequestControls,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 import { ok, err, Result, ResultAsync } from 'neverthrow';
 import { z } from 'zod';
 import { apiLog } from './logger';

@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { createPaymentCopyResolver, type PaymentCopyResolver } from '@sovranbitcoin/colada';
+import { createPaymentCopyResolver, type PaymentCopyResolver } from 'wallet';
 
 import { cashuLog } from '@/shared/lib/logger';
 

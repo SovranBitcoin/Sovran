@@ -15,7 +15,7 @@ import {
   fetchNip05Pubkey,
   type DestinationDescriptor,
   type DestinationIcon,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 import { nip19 } from 'nostr-tools';
 
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';

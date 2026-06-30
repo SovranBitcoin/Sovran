@@ -1,4 +1,4 @@
-import type { facade } from '@sovranbitcoin/nagg-ts';
+import type { facade } from 'nostr';
 import { resolvedThreadToResult } from '@/features/feed/data/facadeThreadAdapter';
 import type { ThreadReplySort } from '@/features/feed/data/feedClient';
 

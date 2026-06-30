@@ -1,4 +1,4 @@
-import { facade } from '@sovranbitcoin/nagg-ts';
+import { facade } from 'nostr';
 
 import { parseJson } from '../components/nostr/feedParse';
 import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';

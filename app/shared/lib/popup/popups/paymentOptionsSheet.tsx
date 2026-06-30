@@ -17,7 +17,7 @@ import {
   decodeEcashTokenMetadata,
   defaultDetectors,
   type AnnotatedOption,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';

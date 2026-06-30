@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-import type { facade } from '@sovranbitcoin/nagg-ts';
+import type { facade } from 'nostr';
 
 import { fetchNostrProfile, type NostrProfileFull } from '@/shared/lib/apiClient';
 import { resolveIdentityName } from '@/shared/lib/identity';

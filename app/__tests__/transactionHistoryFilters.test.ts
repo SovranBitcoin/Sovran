@@ -4,7 +4,7 @@ import {
   isPendingTransaction,
   matchesTransactionFilters,
   matchesTransactionPaymentType,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 
 const ONCHAIN_ADDRESS = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080';
 

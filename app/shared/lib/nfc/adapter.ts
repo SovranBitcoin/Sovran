@@ -9,7 +9,7 @@
  * invariants as the one-shot writer.
  */
 
-import type { NfcIOAdapter } from '@sovranbitcoin/colada';
+import type { NfcIOAdapter } from 'wallet';
 
 import { NfcError } from './errors';
 import { SELECT_AID, SELECT_NDEF, readBinary, MAX_CHUNK_SIZE } from './constants';

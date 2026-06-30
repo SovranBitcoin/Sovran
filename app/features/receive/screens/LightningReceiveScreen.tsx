@@ -9,8 +9,8 @@ import React, { useEffect } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 import type { MintHistoryEntry } from '@cashu/coco-core';
-import { isMintQuotePaymentObserved } from '@sovranbitcoin/colada';
-import { useScreenActions } from '@sovranbitcoin/colada/react';
+import { isMintQuotePaymentObserved } from 'wallet';
+import { useScreenActions } from 'wallet/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 import { MintSelector } from '@/features/wallet';

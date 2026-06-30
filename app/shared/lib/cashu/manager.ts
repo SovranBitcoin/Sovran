@@ -1,5 +1,5 @@
 import { Manager, type Plugin } from '@cashu/coco-core';
-import { createCashuSeedGetter, deriveStandardCashuSeed } from '@sovranbitcoin/colada';
+import { createCashuSeedGetter, deriveStandardCashuSeed } from 'wallet';
 import { CocoCoreLogger } from './cocoLogger';
 import {
   ExpoSqliteRepositories,

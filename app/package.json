@@ -26,12 +26,6 @@
       }
     }
   },
-  "overrides": {
-    "@cashu/cashu-ts": "3.5.0",
-    "zod": "4.4.3",
-    "neverthrow": "8.2.0",
-    "react-native-quick-base64": "^3.0.0"
-  },
   "scripts": {
     "start": "expo start --clear 2>&1 | tee log.txt",
     "dev": "bash scripts/dev.sh",
@@ -39,7 +33,7 @@
     "start:emulator:ios": "expo run:ios",
     "start:emulator:android": "expo run:android",
     "clean:native": "rm -rf ios android",
-    "deps:sovran-latest": "GITHUB_TOKEN=$(gh auth token) bun update --latest @sovranbitcoin/coco-cashu-plugin-p2pk-import @sovranbitcoin/colada @sovranbitcoin/nagg-ts @sovranbitcoin/schemas",
+    "deps:sovran-latest": "GITHUB_TOKEN=$(gh auth token) bun update --latest @sovranbitcoin/coco-cashu-plugin-p2pk-import @sovranbitcoin/schemas",
     "build:dev:ios": "bun run deps:sovran-latest && bun run clean:native && EAS_NO_VCS=1 eas build --platform ios --profile development --non-interactive",
     "build:dev:android": "bun run deps:sovran-latest && bun run clean:native && EAS_NO_VCS=1 eas build --platform android --profile development --non-interactive",
     "build:ios": "bun run deps:sovran-latest && bun run clean:native && EAS_NO_VCS=1 eas build --platform ios --profile production  --auto-submit --non-interactive",
@@ -60,7 +54,6 @@
     "check:react-compiler": "react-compiler-healthcheck --src './{app,features,shared,components}/**/*.{ts,tsx,js,jsx}' | node scripts/check-react-compiler.mjs",
     "react-doctor": "bunx react-doctor@latest --verbose",
     "vendor:marmot-ts": "bash scripts/vendor-marmot-ts.sh",
-    "postinstall": "node scripts/apply-patches.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js && node scripts/link-local-siblings.mjs",
     "prebuild": "expo prebuild --clean",
     "maestro": "maestro test ./.maestro",
     "build:themes": "node scripts/build-background-themes.js",
@@ -101,9 +94,9 @@
     "@shopify/flash-list": "2.0.2",
     "@shopify/react-native-skia": "2.6.2",
     "@sovranbitcoin/coco-cashu-plugin-p2pk-import": "^0.1.0",
-    "@sovranbitcoin/colada": "^0.10.2",
-    "@sovranbitcoin/nagg-ts": "^0.6.1",
     "@sovranbitcoin/schemas": "^2.2.0",
+    "nostr": "workspace:*",
+    "wallet": "workspace:*",
     "bitchat-module": "file:./modules/bitchat-module",
     "buffer": "^6.0.3",
     "cashu-kym": "^0.4.1",

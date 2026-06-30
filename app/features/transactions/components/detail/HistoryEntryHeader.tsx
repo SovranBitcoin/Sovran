@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 
 import { HistoryEntry } from '@cashu/coco-core';
-import { getCounterparty } from '@sovranbitcoin/colada';
+import { getCounterparty } from 'wallet';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';

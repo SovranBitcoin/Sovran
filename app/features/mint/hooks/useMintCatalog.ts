@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useManager } from '@cashu/coco-react';
-import type { MintCatalogEntry } from '@sovranbitcoin/colada';
+import type { MintCatalogEntry } from 'wallet';
 
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
 import { log } from '@/shared/lib/logger';

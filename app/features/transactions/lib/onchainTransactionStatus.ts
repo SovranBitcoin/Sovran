@@ -1,4 +1,4 @@
-import type { MempoolAddressSummary } from '@sovranbitcoin/colada';
+import type { MempoolAddressSummary } from 'wallet';
 
 import { cashuLog } from '@/shared/lib/logger';
 

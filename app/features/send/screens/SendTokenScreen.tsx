@@ -11,13 +11,13 @@ import { StyleSheet } from 'react-native';
 
 import { Alert } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
-import { useScreenActions } from '@sovranbitcoin/colada/react';
+import { useScreenActions } from 'wallet/react';
 import {
   getSendTokenReachabilityWarning,
   isSendTokenCancelled,
   isSendTokenComplete,
   type ActionVariant,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   TransactionDetailShell,

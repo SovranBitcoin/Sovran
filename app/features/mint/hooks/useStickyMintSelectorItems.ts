@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import type { MintListItem } from '@sovranbitcoin/colada';
+import type { MintListItem } from 'wallet';
 
 import { cashuLog } from '@/shared/lib/logger';
 

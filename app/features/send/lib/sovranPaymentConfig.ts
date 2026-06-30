@@ -42,7 +42,7 @@ import {
   type StepHandlerMap,
   type NfcIOAdapter,
   rawAnnotationKey,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';

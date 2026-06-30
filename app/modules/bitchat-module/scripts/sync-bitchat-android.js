@@ -433,9 +433,22 @@ for (const asset of INCLUDE_ASSETS) {
 // node_modules before postinstall runs, and Expo's Android autolinking builds
 // that copy (iOS resolves ../modules/bitchat-module directly). Mirror the
 // generated sources into the copy so a fresh install (EAS) is deterministic.
-const NODE_MODULES_COPY = path.resolve(
-  __dirname, '..', '..', '..', 'node_modules', 'bitchat-module', 'android'
-);
+// Under the bun workspace the copy may hoist to the workspace-root node_modules,
+// so locate it by walking up from app/ instead of assuming app/node_modules.
+const NODE_MODULES_COPY = (() => {
+  let dir = path.resolve(__dirname, '..', '..', '..'); // app/
+  for (let i = 0; i < 6; i += 1) {
+    const candidate = path.join(dir, 'node_modules', 'bitchat-module', 'android');
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return path.join(
+    path.resolve(__dirname, '..', '..', '..'),
+    'node_modules', 'bitchat-module', 'android'
+  );
+})();
 if (fs.existsSync(NODE_MODULES_COPY) && fs.realpathSync(NODE_MODULES_COPY) !== MODULE_ROOT) {
   for (const sub of ['vendor-src', 'vendor-assets']) {
     rmrf(path.join(NODE_MODULES_COPY, sub));

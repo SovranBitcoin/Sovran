@@ -13,7 +13,7 @@ import { cameraRouteParamsSchema } from './CameraScreen/CameraScreen';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useColadaContext } from '@sovranbitcoin/colada/react';
+import { useColadaContext } from 'wallet/react';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 

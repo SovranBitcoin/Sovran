@@ -13,10 +13,10 @@ import { StyleSheet, useWindowDimensions } from 'react-native';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
-import { useScreenActions, type UseScreenActionsResult } from '@sovranbitcoin/colada/react';
+import { useScreenActions, type UseScreenActionsResult } from 'wallet/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
-import type { FormattedString } from '@sovranbitcoin/colada';
+import type { FormattedString } from 'wallet';
 import { Section } from '@/shared/ui/composed/Section';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';

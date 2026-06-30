@@ -11,7 +11,7 @@ import { SwipeableRow } from '@/features/transactions/components/SwipeableRow';
 import TransactionIcon from '@/features/transactions/components/TransactionIcon';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
-import { isCancellablePendingEcash, isSendTokenCancelled } from '@sovranbitcoin/colada';
+import { isCancellablePendingEcash, isSendTokenCancelled } from 'wallet';
 import {
   COLLAPSE_DURATION_MS,
   useIsCollapsing,
@@ -32,8 +32,8 @@ import {
   getMintDetailPathname,
 } from '@/shared/lib/nav/transactionDetailRoutes';
 import { cashuLog, log, Log } from '@/shared/lib/logger';
-import { useColadaTransactionAnnotation } from '@sovranbitcoin/colada/react';
-import type { DistributionSource, ScanMethod } from '@sovranbitcoin/colada';
+import { useColadaTransactionAnnotation } from 'wallet/react';
+import type { DistributionSource, ScanMethod } from 'wallet';
 import { getOnchainTransactionStatusLabel } from '../lib/onchainTransactionStatus';
 import { getTransactionActionLabel } from '../lib/transactionPresentation';
 

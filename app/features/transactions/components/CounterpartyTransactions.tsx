@@ -11,7 +11,7 @@ import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { getCounterparty } from '@sovranbitcoin/colada';
+import { getCounterparty } from 'wallet';
 
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';

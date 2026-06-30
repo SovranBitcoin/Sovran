@@ -13,8 +13,8 @@ import {
   useExecutionState,
   useScreenActions,
   usePaymentFlowMachine,
-} from '@sovranbitcoin/colada/react';
-import { fetchNip05Pubkey, type RecipientProfile } from '@sovranbitcoin/colada';
+} from 'wallet/react';
+import { fetchNip05Pubkey, type RecipientProfile } from 'wallet';
 
 import { MintSelector } from '@/features/wallet';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';

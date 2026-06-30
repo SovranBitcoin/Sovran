@@ -4,8 +4,8 @@ import Icon from 'assets/icons';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
-import { useColadaTransactionAnnotation } from '@sovranbitcoin/colada/react';
-import type { ScanMethod } from '@sovranbitcoin/colada';
+import { useColadaTransactionAnnotation } from 'wallet/react';
+import type { ScanMethod } from 'wallet';
 
 const SOURCE_LABELS: Record<ScanMethod, string> = {
   qr: 'QR Code',

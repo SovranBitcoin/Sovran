@@ -11,7 +11,7 @@ import {
   parseWith,
 } from '@sovranbitcoin/schemas';
 import { fetchJson } from '@/shared/lib/apiClient';
-import { type RequestControls } from '@sovranbitcoin/colada';
+import { type RequestControls } from 'wallet';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 // Upstream BTCMap exposes colon-keyed `osm:*` properties under the schema's

@@ -4,7 +4,7 @@ import {
   type MintAvailability,
   type MintCatalogEntry,
   type MintListItem,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 
 import { log } from '@/shared/lib/logger';
 import { getMintDisplayName } from '@/shared/lib/url';

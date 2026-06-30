@@ -18,7 +18,7 @@
 
 import { nip19, SimplePool } from 'nostr-tools';
 
-import { withTimeout } from '@sovranbitcoin/colada';
+import { withTimeout } from 'wallet';
 
 import { nostrLog } from '@/shared/lib/logger';
 

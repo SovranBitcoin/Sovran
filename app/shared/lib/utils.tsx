@@ -11,7 +11,7 @@ import React from 'react';
 
 import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import { type ClassValue, clsx } from 'clsx';
-import { decodeBolt11Invoice } from '@sovranbitcoin/colada';
+import { decodeBolt11Invoice } from 'wallet';
 import { twMerge } from 'tailwind-merge';
 
 import type { HistoryEntry } from '@cashu/coco-core';

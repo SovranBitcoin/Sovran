@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { getCounterparty } from '@sovranbitcoin/colada';
+import { getCounterparty } from 'wallet';
 
 import { Screen } from '@/shared/ui/composed/Screen';
 import { View } from '@/shared/ui/primitives/View/View';

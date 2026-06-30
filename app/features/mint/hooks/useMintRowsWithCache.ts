@@ -19,7 +19,7 @@
  */
 import { useMemo } from 'react';
 
-import type { MintListItem } from '@sovranbitcoin/colada';
+import type { MintListItem } from 'wallet';
 
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import {

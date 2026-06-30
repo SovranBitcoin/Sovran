@@ -23,8 +23,8 @@ import type {
   AnnotationRecord,
   AnnotationStoreAdapter,
   TransactionAnnotation,
-} from '@sovranbitcoin/colada';
-import { encodeAnnotation } from '@sovranbitcoin/colada';
+} from 'wallet';
+import { encodeAnnotation } from 'wallet';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';

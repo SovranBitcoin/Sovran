@@ -14,7 +14,7 @@ import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
 import { List } from '@/shared/ui/composed/List';
 
-import type { MintListItem } from '@sovranbitcoin/colada';
+import type { MintListItem } from 'wallet';
 import type { MintRow } from '@/features/mint/hooks/useMintRowsWithCache';
 
 import Icon from 'assets/icons';

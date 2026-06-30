@@ -5,7 +5,7 @@
  * behavior moved into the entity cache (mergeProfile, tested in nagg-ts). These
  * tests cover the mapping + the persisted-snapshot action.
  */
-import type { facade } from '@sovranbitcoin/nagg-ts';
+import type { facade } from 'nostr';
 import {
   cachedProfileToMetadata,
   useNostrMetadataCache,

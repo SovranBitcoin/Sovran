@@ -16,7 +16,7 @@ import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { actionMenuPopup, staticPopup } from '@/shared/lib/popup';
-import { useColadaBalance } from '@sovranbitcoin/colada/react';
+import { useColadaBalance } from 'wallet/react';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { walletLog, Log } from '@/shared/lib/logger';
 

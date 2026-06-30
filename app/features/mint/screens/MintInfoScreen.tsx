@@ -33,7 +33,7 @@ import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
-import { useScreenActions } from '@sovranbitcoin/colada/react';
+import { useScreenActions } from 'wallet/react';
 import opacity from 'hex-color-opacity';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -500,7 +500,7 @@ export function MintInfoScreen() {
   const mintUrl = (entry?.mintUrl as string) ?? '';
   const displayName = (entry?.displayName as string) ?? mintUrl;
   const contact = entry?.contact as
-    | { method: string; info: import('@sovranbitcoin/colada').FormattedString }[]
+    | { method: string; info: import('wallet').FormattedString }[]
     | undefined;
   const contactRows = useMemo(() => getSortedMintInfoContacts(contact), [contact]);
   const nostrContactPubkey = useMemo(

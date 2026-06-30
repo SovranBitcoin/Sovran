@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 
-import { facade } from '@sovranbitcoin/nagg-ts';
+import { facade } from 'nostr';
 
 import type {
   FeedEvent,

@@ -12,7 +12,7 @@ import { ReceiveScreen } from '@/features/receive/screens/ReceiveScreen';
 
 const mockUseScreenActions = jest.fn();
 
-jest.mock('@sovranbitcoin/colada/react', () => ({
+jest.mock('wallet/react', () => ({
   useScreenActions: (...args: unknown[]) => mockUseScreenActions(...args),
 }));
 

@@ -1,6 +1,6 @@
 import { fetchNostrProfile } from '@/shared/lib/apiClient';
 
-jest.mock('@sovranbitcoin/colada', () => ({
+jest.mock('wallet', () => ({
   combineSignals: (...signals: (AbortSignal | undefined)[]) =>
     signals.find((signal): signal is AbortSignal => !!signal) ?? new AbortController().signal,
   createNostrMintEnrichment: jest.fn(() => ({

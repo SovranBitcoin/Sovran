@@ -40,7 +40,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { chatLog, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 import { Screen } from '@/shared/ui/composed/Screen';
-import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
+import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 const SURFACE = 'nostr-dm' as const;

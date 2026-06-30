@@ -18,7 +18,7 @@ import {
 import { buttonStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
 import Icon from 'assets/icons';
-import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
+import { usePaymentFlowMachine } from 'wallet/react';
 import { useHandleCameraPermission } from '../../hooks/useHandleCameraPermission';
 import {
   openPairingFromUri,

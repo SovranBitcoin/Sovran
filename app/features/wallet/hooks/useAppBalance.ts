@@ -6,7 +6,7 @@
  * top. `total` is spendable + reserved (coco's BalanceSnapshot.total).
  */
 
-import { useColadaBalance } from '@sovranbitcoin/colada/react';
+import { useColadaBalance } from 'wallet/react';
 
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';

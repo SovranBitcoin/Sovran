@@ -3,8 +3,8 @@ import { useWindowDimensions } from 'react-native';
 
 import type { MintInfo } from '@cashu/cashu-ts';
 import type { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
-import { getOnchainConfirmationProgress, isMintQuotePaymentObserved } from '@sovranbitcoin/colada';
-import type { BoundAction } from '@sovranbitcoin/colada/react';
+import { getOnchainConfirmationProgress, isMintQuotePaymentObserved } from 'wallet';
+import type { BoundAction } from 'wallet/react';
 
 import { MintSelector } from '@/features/wallet';
 import {

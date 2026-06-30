@@ -38,7 +38,7 @@ import {
   matchesTransactionFilters,
   type TransactionDirection,
   type TransactionPaymentType,
-} from '@sovranbitcoin/colada';
+} from 'wallet';
 import type {
   TransactionSourceFilter,
   TransactionLockFilter,

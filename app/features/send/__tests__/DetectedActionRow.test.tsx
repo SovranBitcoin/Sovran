@@ -6,7 +6,7 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { DetectedActionRow } from '@/features/send/components/DetectedActionRow';
-import type { DestinationDescriptor } from '@sovranbitcoin/colada';
+import type { DestinationDescriptor } from 'wallet';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -22,7 +22,7 @@ jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
   }),
 }));
 
-jest.mock('@sovranbitcoin/colada', () => ({
+jest.mock('wallet', () => ({
   fetchNip05Pubkey: async () => mockNip05Result,
 }));
 

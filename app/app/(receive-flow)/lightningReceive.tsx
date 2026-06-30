@@ -5,7 +5,7 @@
 import { useCallback, useEffect } from 'react';
 
 import { LightningReceiveRoute } from '@/features/receive';
-import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
+import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { z } from 'zod';
