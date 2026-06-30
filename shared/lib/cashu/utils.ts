@@ -12,11 +12,10 @@
  */
 
 import { type Manager, type ReceiveHistoryEntry } from '@cashu/coco-core';
-import { getTokenMetadata } from '@cashu/cashu-ts';
+import { decodeEcashTokenMetadata } from '@sovranbitcoin/colada';
 
 import { log } from '../logger';
 import { mintLocalId } from '../id';
-import { amountToNumber } from './amount';
 
 function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
   return {
@@ -26,106 +25,33 @@ function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, un
 }
 
 /**
- * Validates if a string is a valid ecash token by attempting to decode it
- *
- * @description Checks if the provided string can be successfully decoded as an ecash token
- *
- * **Process:** getTokenMetadata() → return success/failure
- * **Effects:** None (pure validation function)
- *
- * @param {string} token - The token string to validate
- * @returns {boolean} True if token is valid, false otherwise
- *
- * @example
- * const token = 'cashuAeyJ0b2tlbiI6...';
- * const isValid = isValidEcashToken(token);
- * if (isValid) {
- *   // Process valid token
- * }
- */
-export function isValidEcashToken(token: string): boolean {
-  try {
-    getTokenMetadata(token);
-    log.debug('cashu.utils.validate_ecash_token', { valid: true, tokenLen: token.length });
-    return true;
-  } catch {
-    log.debug('cashu.utils.validate_ecash_token', { valid: false, tokenLen: token.length });
-    return false;
-  }
-}
-
-// ============================================================================
-// Ecash Token Helpers
-// ============================================================================
-
-/**
- * Extracts the amount in sats from an ecash token.
- */
-export function getEcashTokenAmount(token: string): number | undefined {
-  try {
-    const decoded = getTokenMetadata(token);
-    const amount = amountToNumber(decoded.amount);
-    log.debug('cashu.utils.get_ecash_token_amount', {
-      amount,
-      proofCount: decoded.incompleteProofs.length,
-      ...mintUrlLogFields(decoded.mint),
-    });
-    return amount;
-  } catch {
-    log.warn('cashu.utils.get_ecash_token_amount.decode_failed', { tokenLen: token.length });
-    return undefined;
-  }
-}
-
-/**
- * Extracts the P2PK public key from proofs, if any proof uses P2PK locking.
- * Returns the first P2PK data field found, or null.
- */
-function extractP2PKPubkey(proofs: readonly { secret: string }[]): string | null {
-  for (const proof of proofs) {
-    try {
-      const parsed = JSON.parse(proof.secret);
-      if (Array.isArray(parsed) && parsed[0] === 'P2PK' && parsed[1]?.data) {
-        return parsed[1].data as string;
-      }
-    } catch {
-      // not a structured secret
-    }
-  }
-  return null;
-}
-
-/**
  * Builds a `ReceiveHistoryEntry` from a decoded token.
  *
  * Centralises the pattern that was duplicated in ReceiveScreen and UserMessagesScreen —
- * each constructing the same shape manually.
+ * each constructing the same shape manually. Token decoding (amount, mint, unit,
+ * P2PK lock) is owned by colada's `decodeEcashTokenMetadata`.
  *
  * @param rawToken  The original encoded token string (stored in metadata for re-encoding)
- * @param unitOverride  Explicit unit; falls back to `decodedToken.unit ?? 'sat'`
+ * @param unitOverride  Explicit unit; falls back to `decoded.unit ?? 'sat'`
  */
 export function buildReceiveHistoryEntry(
   rawToken: string,
   unitOverride?: string
 ): ReceiveHistoryEntry & { source: 'legacy'; legacyHistoryId: string; updatedAt: number } {
   log.info('cashu.utils.build_receive_history_entry', { tokenLen: rawToken.length, unitOverride });
-  let decodedToken: ReturnType<typeof getTokenMetadata>;
-  try {
-    decodedToken = getTokenMetadata(rawToken);
-  } catch (error) {
+  const decoded = decodeEcashTokenMetadata(rawToken);
+  if (!decoded) {
     log.error('cashu.utils.build_receive_history_entry.decode_failed', {
       tokenLen: rawToken.length,
       unitOverride,
-      error,
     });
-    throw error;
+    throw new Error('Failed to decode ecash token');
   }
-  const p2pkPubkey = extractP2PKPubkey(decodedToken.incompleteProofs);
-  const amount = amountToNumber(decodedToken.amount);
+  const p2pkPubkey = decoded.p2pkPubkey;
+  const amount = decoded.amount;
   log.debug('cashu.utils.build_receive_history_entry.decoded', {
     amount: String(amount),
-    proofCount: decodedToken.incompleteProofs.length,
-    ...mintUrlLogFields(decodedToken.mint),
+    ...mintUrlLogFields(decoded.mint),
     hasP2pk: !!p2pkPubkey,
   });
   const now = Date.now();
@@ -136,8 +62,8 @@ export function buildReceiveHistoryEntry(
     source: 'legacy',
     legacyHistoryId: id,
     amount,
-    unit: unitOverride ?? decodedToken.unit ?? 'sat',
-    mintUrl: decodedToken.mint,
+    unit: unitOverride ?? decoded.unit ?? 'sat',
+    mintUrl: decoded.mint,
     createdAt: now,
     updatedAt: now,
     metadata: {

@@ -1,6 +1,9 @@
 import type { CustomSheetId, SheetLayoutConfig } from './types';
 
 export const SHEET_LAYOUT_CONFIG: Record<CustomSheetId, SheetLayoutConfig> = {
+  // Generic action-menu auto-fits: typically 1–4 short rows, same as the
+  // menu-lane equivalent (`actionMenuPopup` with no footer).
+  'action-menu': { mode: 'contentHeight' },
   'emoji-picker': { mode: 'snapPoints', snapPoints: ['80%'] },
   // Model picker is short — title + tab strip + three tier rows. 50% gives
   // headroom for the unaffordable-row "Top up X sats" reason line without

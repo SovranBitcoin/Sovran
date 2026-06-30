@@ -1,3 +1,9 @@
+// ⛔ These values are PERSISTED (settingsStore `avatarFallbackVariant`).
+// Renaming/removing one is a breaking change to durable user data — a device
+// holding the old value fails the persist parse, and because the settings
+// `merge` discards the WHOLE blob on any field failure, that silently wipes
+// terms acceptance + onboarding + every setting. The schema's `.catch(default)`
+// degrades unknown values instead of wiping; prefer adding over renaming.
 export const AVATAR_FALLBACK_VARIANTS = ['beam', 'pixel', 'glass', 'flat'] as const;
 
 export type AvatarFallbackVariant = (typeof AVATAR_FALLBACK_VARIANTS)[number];

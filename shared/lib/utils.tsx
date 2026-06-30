@@ -11,7 +11,7 @@ import React from 'react';
 
 import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import { type ClassValue, clsx } from 'clsx';
-import { decode } from '@gandlaf21/bolt11-decode';
+import { decodeBolt11Invoice } from '@sovranbitcoin/colada';
 import { twMerge } from 'tailwind-merge';
 
 import type { HistoryEntry } from '@cashu/coco-core';
@@ -43,22 +43,19 @@ export function isOutgoingTransaction(entry: Pick<HistoryEntry, 'type'>): boolea
  * }
  */
 export function mintHistoryEntryExpired(historyEntry: AnyMintHistoryEntry): boolean {
-  try {
-    if (!historyEntry.paymentRequest) {
-      return false;
-    }
-    const paymentRequest = decode(historyEntry.paymentRequest);
-
-    const expiry = paymentRequest.expiry ?? 3600;
-    const timestamp =
-      paymentRequest.sections.find((section) => section.name === 'timestamp')?.value ?? 0;
-    const expiryTime = (timestamp + expiry) * 1000;
-
-    return Date.now() > expiryTime;
-  } catch (error) {
-    log.error('utils.decode_payment_request_failed', { error });
+  if (!historyEntry.paymentRequest) {
     return false;
   }
+  const info = decodeBolt11Invoice(historyEntry.paymentRequest);
+  if (!info) {
+    log.error('utils.decode_payment_request_failed', {});
+    return false;
+  }
+  const expiry = info.expirySec ?? 3600;
+  const timestamp = info.timestampSec ?? 0;
+  const expiryTime = (timestamp + expiry) * 1000;
+
+  return Date.now() > expiryTime;
 }
 
 /**
@@ -70,35 +67,32 @@ export function mintHistoryEntryExpired(historyEntry: AnyMintHistoryEntry): bool
 export function getMintHistoryEntryTimeUntilExpiry(
   historyEntry: AnyMintHistoryEntry
 ): string | null {
-  try {
-    if (!historyEntry.paymentRequest) {
-      return null;
-    }
-    const paymentRequest = decode(historyEntry.paymentRequest);
-
-    const expiry = paymentRequest.expiry ?? 3600;
-    const timestamp =
-      paymentRequest.sections.find((section) => section.name === 'timestamp')?.value ?? 0;
-    const expiryTime = (timestamp + expiry) * 1000;
-
-    const timeLeft = Math.floor((expiryTime - Date.now()) / 1000);
-
-    if (timeLeft <= 0) return null;
-
-    const hours = Math.floor(timeLeft / 3600);
-    const minutes = Math.floor((timeLeft % 3600) / 60);
-    const seconds = timeLeft % 60;
-
-    if (hours > 0) {
-      return `expires in ${hours}h ${minutes}m ${seconds}s`;
-    } else if (minutes > 0) {
-      return `expires in ${minutes}m ${seconds}s`;
-    } else {
-      return `expires in ${seconds}s`;
-    }
-  } catch (error) {
-    log.error('utils.expiry_calc_failed', { error });
+  if (!historyEntry.paymentRequest) {
     return null;
+  }
+  const info = decodeBolt11Invoice(historyEntry.paymentRequest);
+  if (!info) {
+    log.error('utils.expiry_calc_failed', {});
+    return null;
+  }
+  const expiry = info.expirySec ?? 3600;
+  const timestamp = info.timestampSec ?? 0;
+  const expiryTime = (timestamp + expiry) * 1000;
+
+  const timeLeft = Math.floor((expiryTime - Date.now()) / 1000);
+
+  if (timeLeft <= 0) return null;
+
+  const hours = Math.floor(timeLeft / 3600);
+  const minutes = Math.floor((timeLeft % 3600) / 60);
+  const seconds = timeLeft % 60;
+
+  if (hours > 0) {
+    return `expires in ${hours}h ${minutes}m ${seconds}s`;
+  } else if (minutes > 0) {
+    return `expires in ${minutes}m ${seconds}s`;
+  } else {
+    return `expires in ${seconds}s`;
   }
 }
 

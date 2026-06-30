@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { Platform } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { ActionMenuButton } from '@/shared/ui/composed/ActionMenuButton';
@@ -206,4 +207,67 @@ describe('menu action failure containment', () => {
       error: 'variant failed',
     });
   });
+
+  it('routes the default popover through the global host on Android (no inline Menu)', async () => {
+    // The inline popover races heroui's async measure() and can fail to open on
+    // Android, so ActionMenuButton routes every menu through actionMenuPopup()
+    // there regardless of the (default) popover presentation. Guards the open
+    // path that the user reported as "inconsistently opens" on Android.
+    const original = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+    try {
+      let renderer: TestRenderer.ReactTestRenderer;
+      const failingVariant = jest.fn(async () => {
+        throw new Error('variant failed');
+      });
+
+      await act(async () => {
+        renderer = TestRenderer.create(
+          <ActionMenuButton
+            label="Copy"
+            testID="copy-token"
+            menuTitle="Select option"
+            variants={[
+              { id: 'text', label: 'as Text', onPress: jest.fn() },
+              { id: 'emoji', label: 'as Emoji', onPress: failingVariant },
+            ]}
+          />
+        );
+      });
+
+      // No inline popover is mounted on Android — the racy surface is gone.
+      expect(findAllByType(renderer!, 'Menu.Portal')).toHaveLength(0);
+      expect(findAllByType(renderer!, 'Menu.Content')).toHaveLength(0);
+
+      // Pressing the chevron dispatches the global action-menu host instead.
+      act(() => {
+        findByTestID(renderer!, 'copy-token-menu').props.onPress();
+      });
+      expect(mockActionMenuPopup).toHaveBeenCalledTimes(1);
+      const payload = mockActionMenuPopup.mock.calls[0][0] as {
+        title: string;
+        buttons: { testID?: string; onPress: () => void }[];
+      };
+      expect(payload.title).toBe('Select option');
+
+      // Async item failures stay contained even through the global host.
+      const emoji = payload.buttons.find((b) => b.testID === 'copy-token-menu-emoji');
+      act(() => {
+        emoji?.onPress();
+      });
+      await flushMicrotasks();
+      expect(failingVariant).toHaveBeenCalledTimes(1);
+      expect(mockLogError).toHaveBeenCalledWith('ui.action_menu.menu_action_failed', {
+        testID: 'copy-token-menu-emoji',
+        variantId: 'emoji',
+        error: 'variant failed',
+      });
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: original });
+    }
+  });
 });
+
+function findAllByType(renderer: TestRenderer.ReactTestRenderer, type: string) {
+  return renderer.root.findAll((node) => node.type === type, { deep: true });
+}

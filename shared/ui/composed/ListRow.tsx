@@ -40,13 +40,13 @@ export interface ListRowAvatar {
   picture?: string;
   seed?: string;
   name?: string;
-  size?: 40 | 44;
+  size?: 40 | 44 | 52;
 }
 
 export interface ListRowIconCircle {
   icon: string;
   color: string;
-  size?: 40 | 44;
+  size?: 40 | 44 | 52;
   backgroundColor?: string;
 }
 

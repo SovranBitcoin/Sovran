@@ -1,4 +1,5 @@
-import { isValidEcashToken } from '@/shared/lib/cashu/utils';
+import { isValidEcashToken } from '@sovranbitcoin/colada';
+
 import { cashuLog } from '@/shared/lib/logger';
 
 /**

@@ -13,12 +13,15 @@
 import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { BottomSheet, Menu } from 'heroui-native';
-import { defaultDetectors, type AnnotatedOption } from '@sovranbitcoin/colada';
+import {
+  decodeEcashTokenMetadata,
+  defaultDetectors,
+  type AnnotatedOption,
+} from '@sovranbitcoin/colada';
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { getEcashTokenAmount } from '@/shared/lib/cashu/utils';
 import { cashuLog } from '@/shared/lib/logger';
 
 import { showActionSheet } from './bridge';
@@ -66,7 +69,7 @@ function getOptionAmount(option: AnnotatedOption['option']): number | undefined 
     return amount;
   }
   if (option.kind === 'ecashToken') {
-    const amount = getEcashTokenAmount(option.value);
+    const amount = decodeEcashTokenMetadata(option.value)?.amount;
     cashuLog.debug('payment.options.amount.result', {
       kind: option.kind,
       source: 'ecash-token',

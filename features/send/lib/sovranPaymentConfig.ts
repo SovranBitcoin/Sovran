@@ -81,6 +81,7 @@ import { getBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
+import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
@@ -1180,6 +1181,15 @@ interface CreateSovranHandlersConfig {
   getManager: () => Manager | null;
   getNpub?: () => string | undefined;
   getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null;
+  /**
+   * Deliver a bearer ecash token to a remote Nostr contact over an encrypted
+   * NIP-17 gift-wrapped DM. Provided by the Colada provider (which holds the
+   * nostr keys + NDK). When a contact send completes and this is wired, the
+   * token is DM'd to the contact instead of shown on the bearer hand-off
+   * screen. Rejects when not delivered — the caller keeps the funds
+   * recoverable by falling back to the hand-off screen.
+   */
+  deliverContactEcashDm?: (params: { recipientPubkey: string; token: string }) => Promise<void>;
 }
 
 function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string | null {
@@ -1270,16 +1280,66 @@ async function deliverNearPayIfActive(
   }
 }
 
+/**
+ * Deliver a just-created bearer ecash token to a remote Nostr contact when a
+ * destination-first Send was addressed to one (`contactSendStore`). The token
+ * rides an encrypted NIP-17 gift-wrapped DM to the contact's npub — bearer is
+ * safe here because only that npub can decrypt it (unlike the public mesh).
+ *
+ * Returns true only when the token was handed to a relay; on any failure it
+ * returns false WITHOUT clearing the target, so the caller falls back to the
+ * bearer hand-off screen and the funds stay recoverable. Always clears the
+ * target on success so a later ordinary send never re-DMs to a stale contact.
+ */
+async function deliverContactDmIfActive(
+  historyEntry: string,
+  deliverContactEcashDm?: CreateSovranHandlersConfig['deliverContactEcashDm']
+): Promise<boolean> {
+  const target = useContactSendStore.getState().active;
+  if (!target) return false;
+  if (!deliverContactEcashDm) {
+    paymentLog.warn('contact_send.delivery.no_adapter');
+    return false;
+  }
+
+  try {
+    const encodedToken = getEncodedEcashTokenFromSendHistoryEntry(historyEntry);
+    if (!encodedToken) throw new Error('Created send entry did not contain an ecash token');
+
+    await deliverContactEcashDm({ recipientPubkey: target.pubkey, token: encodedToken });
+    paymentLog.info('contact_send.delivery.sent', { tokenBytes: encodedToken.length });
+
+    // The recipient identity (avatar/name) is already stamped on the
+    // transaction via the counterparty annotation in the `sendComplete`
+    // handler, so no extra source badge is needed here.
+    useContactSendStore.getState().clear();
+    return true;
+  } catch (err) {
+    // Do NOT clear the target or the token — fall back to the bearer hand-off
+    // screen so the user can still deliver (copy/share) the funds manually.
+    paymentLog.error('contact_send.delivery.failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return false;
+  }
+}
+
 export function createSovranHandlers({
   machine,
   onOptionDismiss,
   getManager,
   getNpub,
   getBitchatIdentityMaterial,
+  deliverContactEcashDm,
 }: CreateSovranHandlersConfig): StepHandlerMap {
   paymentLog.debug('payment.handlers.created');
 
   return {
+    selectDestination: ({ unit }) => {
+      paymentLog.info('payment.step.select_destination', { unit });
+      router.navigate({ pathname: '/(send-flow)/send', params: { unit } });
+    },
+
     receiveToken: ({ token }) => {
       paymentLog.info('payment.step.receive_token');
       router.navigate({
@@ -1382,6 +1442,27 @@ export function createSovranHandlers({
       }
 
       await deliverNearPayIfActive(enrichedHistoryEntry, getBitchatIdentityMaterial);
+
+      // Remote-contact ecash: deliver the bearer token over an encrypted Nostr
+      // DM and drop the user into that chat thread (the self-copy wrap surfaces
+      // the sent token bubble), instead of the bearer hand-off screen. A P2PK
+      // lock means this was a Nut Drop, not a contact DM — leave those alone.
+      const contactTarget = useContactSendStore.getState().active;
+      if (contactTarget && !p2pkLockPubkey) {
+        const recipientPubkey = contactTarget.pubkey;
+        const delivered = await deliverContactDmIfActive(
+          enrichedHistoryEntry,
+          deliverContactEcashDm
+        );
+        if (delivered) {
+          router.dismissAll();
+          router.navigate({ pathname: '/userMessages', params: { pubkey: recipientPubkey } });
+          return;
+        }
+        // Delivery failed — fall through to the bearer hand-off screen so the
+        // user can still copy/share the token (funds are not lost).
+        paymentLog.warn('contact_send.delivery.fallback_to_hand_off');
+      }
 
       router.navigate({
         pathname: '/(send-flow)/sendToken',

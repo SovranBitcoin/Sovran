@@ -4,6 +4,8 @@
  * This layout creates a nested stack navigator inside a modal presentation.
  * The parent root Stack presents this group as a modal (slides up from bottom).
  * Screens within this group push horizontally:
+ * - send: Destination-first entry — method chooser (QR / Create Ecash / NFC /
+ *   Nut Drop) + destination input + contact search
  * - mintSelect: Entry point when no balance (shows mint list)
  * - nearPay: Nut Drop nearby BitChat peer picker before amount selection
  * - nearPayPeers: Scrollable nearby BitChat peer list
@@ -25,6 +27,7 @@ import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
 import { FLOW_SHEET_HEADER_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
 
+const SEND_OPTIONS = { title: 'Send' };
 const MINT_SELECT_OPTIONS = { title: 'Select mint' };
 const NEAR_PAY_HEADER_OPTIONS = {
   headerShadowVisible: false,
@@ -72,6 +75,7 @@ export default function SendFlowLayout() {
   return (
     <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
       <Stack screenOptions={screenOptions}>
+        <Stack.Screen name="send" options={SEND_OPTIONS} />
         <Stack.Screen name="mintSelect" options={MINT_SELECT_OPTIONS} />
         <Stack.Screen name="nearPay" options={NEAR_PAY_OPTIONS} />
         <Stack.Screen name="nearPayPeers" options={NEAR_PAY_PEERS_OPTIONS} />
