@@ -100,7 +100,9 @@ describe('resolveMintRows', () => {
 
   it('never sources balance / status / isPreferred / worksOffline from cache', () => {
     const { rows } = resolveMintRows({
-      baseItems: [base({ balance: 999, status: 'available', isPreferred: true, worksOffline: true })],
+      baseItems: [
+        base({ balance: 999, status: 'available', isPreferred: true, worksOffline: true }),
+      ],
       itemsStatus: 'loading',
       byMintUrl: cacheOf({ displayName: 'X' }),
     });
