@@ -9,11 +9,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Stack } from 'expo-router';
 
-import {
-  useExecutionState,
-  useScreenActions,
-  usePaymentFlowMachine,
-} from 'wallet/react';
+import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'wallet/react';
 import { fetchNip05Pubkey, type RecipientProfile } from 'wallet';
 
 import { MintSelector } from '@/features/wallet';

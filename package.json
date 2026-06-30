@@ -29,7 +29,7 @@
     "type-check": "cd app && bun run type-check",
     "lint": "cd app && bun run lint",
     "test": "cd app && bun run test",
-    "knip": "cd app && bun run knip",
+    "knip": "knip",
     "pretty": "cd app && bun run pretty",
     "pretty:check": "cd app && bun run pretty:check",
     "deps:sovran-latest": "cd app && bun run deps:sovran-latest",

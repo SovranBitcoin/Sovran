@@ -20,11 +20,7 @@ import { useManager } from '@cashu/coco-react';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 
-import type {
-  MachineOperations,
-  NavigationCallbacks,
-  RecipientProfile,
-} from 'wallet';
+import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'wallet';
 import { createColada, createMempoolSpaceChainAdapter, withTimeout } from 'wallet';
 import {
   ColadaProvider as ColadaProviderBase,

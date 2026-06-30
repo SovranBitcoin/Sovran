@@ -9,11 +9,7 @@
  * (`GET /nostr/dm/conversation`) directly. Both are best-effort: an exhausted/
  * disabled chain returns empty rather than throwing, so the UI keeps working.
  */
-import {
-  createNaggClient,
-  type NaggEventConnection,
-  NaggDmConversationDataSchema,
-} from 'nostr';
+import { createNaggClient, type NaggEventConnection, NaggDmConversationDataSchema } from 'nostr';
 import { dmConversationAppView } from 'nostr/recipes';
 import { backendConfig } from '@/shared/config/backend';
 import { paymentLog } from '@/shared/lib/logger';

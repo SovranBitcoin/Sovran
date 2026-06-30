@@ -24,6 +24,7 @@ jobs:
         with:
           github-token: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
 
+      # knip is workspace-aware: config lives at the repo root and analyzes the
+      # app/wallet/nostr/docs members together, so run it at the checkout root.
       - name: Knip
-        working-directory: ${{ env.APP_DIR }}
         run: bun run knip

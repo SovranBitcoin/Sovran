@@ -19,11 +19,7 @@ import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { z } from 'zod';
 
-import type {
-  AnnotationRecord,
-  AnnotationStoreAdapter,
-  TransactionAnnotation,
-} from 'wallet';
+import type { AnnotationRecord, AnnotationStoreAdapter, TransactionAnnotation } from 'wallet';
 import { encodeAnnotation } from 'wallet';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';

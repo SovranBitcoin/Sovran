@@ -6,11 +6,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
-import type {
-  ScanMethod,
-  TransactionDirection,
-  TransactionPaymentType,
-} from 'wallet';
+import type { ScanMethod, TransactionDirection, TransactionPaymentType } from 'wallet';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { cashuLog } from '@/shared/lib/logger';

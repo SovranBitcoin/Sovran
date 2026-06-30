@@ -1,7 +1,4 @@
-import {
-  getSendTokenReachabilityWarning,
-  shouldShowMintOfflineWarning,
-} from 'wallet';
+import { getSendTokenReachabilityWarning, shouldShowMintOfflineWarning } from 'wallet';
 
 describe('send token mint offline warning', () => {
   it('shows while a mint-unreachable offline token is still pending', () => {

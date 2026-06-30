@@ -73,17 +73,11 @@ const appReactEntryPaths = Object.fromEntries(
 
 // Watch the whole workspace so Metro can resolve hoisted node_modules and the
 // in-repo wallet/ + nostr/ source.
-config.watchFolders = Array.from(
-  new Set([...(config.watchFolders ?? []), workspaceRoot])
-);
+config.watchFolders = Array.from(new Set([...(config.watchFolders ?? []), workspaceRoot]));
 config.resolver = {
   ...config.resolver,
   unstable_enableSymlinks: true,
-  nodeModulesPaths: [
-    ...(config.resolver?.nodeModulesPaths ?? []),
-    appNodeModules,
-    rootNodeModules,
-  ],
+  nodeModulesPaths: [...(config.resolver?.nodeModulesPaths ?? []), appNodeModules, rootNodeModules],
   extraNodeModules: {
     ...(config.resolver?.extraNodeModules ?? {}),
     react: resolvePkgDir('react'),
@@ -134,17 +128,8 @@ const uniwindConfig = withUniwindConfig(config, { cssEntryFile: './global.css' }
 // This replaces @monicon/metro's withMonicon() which is incompatible with
 // the installed version mix and the Expo resolver chain.
 const moniconIconsPath = path.resolve(__dirname, '.monicon', 'icons.js');
-const liquidGlassEntryPath = resolvePkgFile(
-  'expo-liquid-glass-native',
-  'build',
-  'index.js'
-);
-const herouiNativeEntryPath = resolvePkgFile(
-  'heroui-native',
-  'lib',
-  'module',
-  'index.js'
-);
+const liquidGlassEntryPath = resolvePkgFile('expo-liquid-glass-native', 'build', 'index.js');
+const herouiNativeEntryPath = resolvePkgFile('heroui-native', 'lib', 'module', 'index.js');
 const herouiNativeProviderPath = resolvePkgFile(
   'heroui-native',
   'lib',

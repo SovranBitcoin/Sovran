@@ -1,12 +1,7 @@
 import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import type { HistoryEntry } from '@cashu/coco-core';
 
-import {
-  buildTimeline,
-  getCardLabel,
-  getStatusColorType,
-  getStatusHeader,
-} from 'wallet';
+import { buildTimeline, getCardLabel, getStatusColorType, getStatusHeader } from 'wallet';
 
 const baseFields = {
   id: 'h1',

@@ -13,11 +13,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { BottomSheet, Menu } from 'heroui-native';
-import {
-  decodeEcashTokenMetadata,
-  defaultDetectors,
-  type AnnotatedOption,
-} from 'wallet';
+import { decodeEcashTokenMetadata, defaultDetectors, type AnnotatedOption } from 'wallet';
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';

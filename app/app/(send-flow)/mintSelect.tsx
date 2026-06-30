@@ -17,11 +17,7 @@ import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 
-import {
-  useExecutionState,
-  useScreenActions,
-  usePaymentFlowMachine,
-} from 'wallet/react';
+import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'wallet/react';
 import type { MintListItem, StepDataMap } from 'wallet';
 
 import { MintListScreen, useMintRowsWithCache, useStickyMintSelectorItems } from '@/features/mint';
