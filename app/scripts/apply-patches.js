@@ -24,6 +24,8 @@ function nmRootFor(pkg) {
 const patchPackageRoot = nmRootFor('patch-package');
 const cashuKymRoot = nmRootFor('cashu-kym');
 const patchPackageEntry = path.join(patchPackageRoot, 'node_modules', 'patch-package', 'index.js');
+// patch-package requires --patch-dir to be relative to its cwd (patchPackageRoot).
+const patchDirRel = path.relative(patchPackageRoot, patchesDir) || 'patches';
 const skippedPatches = [];
 let exitCode = 0;
 
@@ -172,21 +174,18 @@ try {
   const result = fs.existsSync(patchPackageEntry)
     ? spawnSync(
         process.execPath,
-        [
-          '--preserve-symlinks',
-          '--preserve-symlinks-main',
-          patchPackageEntry,
-          '--patch-dir',
-          patchesDir,
-          '--error-on-fail',
-        ],
+        // NOTE: no --preserve-symlinks here. Under bun's isolated node_modules
+        // (symlinks into a central .bun store), preserving symlinks stops node
+        // from resolving patch-package's own deps (chalk) which live beside the
+        // realpath in the store. Following symlinks is required.
+        [patchPackageEntry, '--patch-dir', patchDirRel, '--error-on-fail'],
         {
           cwd: patchPackageRoot,
           env: process.env,
           stdio: 'inherit',
         }
       )
-    : spawnSync('patch-package', ['--patch-dir', patchesDir, '--error-on-fail'], {
+    : spawnSync('patch-package', ['--patch-dir', patchDirRel, '--error-on-fail'], {
         cwd: patchPackageRoot,
         env: process.env,
         stdio: 'inherit',
