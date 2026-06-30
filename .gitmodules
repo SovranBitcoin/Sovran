@@ -1,11 +1,11 @@
 [submodule "coco"]
-	path = coco
+	path = app/coco
 	url = https://github.com/cashubtc/coco
 	branch = master
 [submodule "modules/bitchat-module/ios/BitChatVendor"]
-	path = modules/bitchat-module/ios/BitChatVendor
+	path = app/modules/bitchat-module/ios/BitChatVendor
 	url = https://github.com/permissionlesstech/bitchat.git
 	ignore = dirty
 [submodule "modules/bitchat-module/android/BitChatVendor"]
-	path = modules/bitchat-module/android/BitChatVendor
+	path = app/modules/bitchat-module/android/BitChatVendor
 	url = https://github.com/permissionlesstech/bitchat-android
