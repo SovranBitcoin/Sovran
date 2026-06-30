@@ -10,18 +10,12 @@ type IconReference = {
 
 const ROOT = process.cwd();
 const SOURCE_ROOTS = ['app', 'features', 'shared', 'navigation', 'config', 'assets'];
-// Colada action variants are rendered by app UI through ActionMenuButton, but
-// their icon names live in the package source instead of app-owned files.
+// Wallet-package action variants are rendered by app UI through ActionMenuButton,
+// but their icon names live in the package source instead of app-owned files.
+// The wallet package is an in-repo workspace member at <repo>/wallet (ROOT is
+// the app package dir), so read its source directly rather than via node_modules.
 const RUNTIME_ICON_SOURCE_FILES = [
-  path.join(
-    ROOT,
-    'node_modules',
-    '@sovranbitcoin',
-    'colada',
-    'src',
-    'screen-actions',
-    'availability.ts'
-  ),
+  path.join(ROOT, '..', 'wallet', 'src', 'screen-actions', 'availability.ts'),
 ];
 const EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
 const IGNORED_PATH_PARTS = new Set(['node_modules', '.monicon', 'ios', 'android']);
