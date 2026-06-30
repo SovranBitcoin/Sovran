@@ -12,11 +12,29 @@ module.exports = {
     require.resolve('@react-native/jest-preset/jest/setup.js'),
   ],
   moduleNameMapper: {
-    '^@babel/runtime/(.*)$': '<rootDir>/node_modules/@babel/runtime/$1',
-    '^@cashu/coco-core$': '<rootDir>/node_modules/@cashu/coco-core/dist/index.js',
-    '^@cashu/coco-expo-sqlite$': '<rootDir>/node_modules/@cashu/coco-expo-sqlite/dist/index.js',
-    '^@cashu/coco-react$': '<rootDir>/node_modules/@cashu/coco-react/dist/index.js',
-    '^@scure/bip32$': '<rootDir>/node_modules/@scure/bip32/lib/esm/index.js',
+    // Probe app-local then the hoisted workspace-root node_modules (jest tries
+    // each target in order and uses the first that exists). Under the bun
+    // workspace these shared deps hoist to <root>/node_modules.
+    '^@babel/runtime/(.*)$': [
+      '<rootDir>/node_modules/@babel/runtime/$1',
+      '<rootDir>/../node_modules/@babel/runtime/$1',
+    ],
+    '^@cashu/coco-core$': [
+      '<rootDir>/node_modules/@cashu/coco-core/dist/index.js',
+      '<rootDir>/../node_modules/@cashu/coco-core/dist/index.js',
+    ],
+    '^@cashu/coco-expo-sqlite$': [
+      '<rootDir>/node_modules/@cashu/coco-expo-sqlite/dist/index.js',
+      '<rootDir>/../node_modules/@cashu/coco-expo-sqlite/dist/index.js',
+    ],
+    '^@cashu/coco-react$': [
+      '<rootDir>/node_modules/@cashu/coco-react/dist/index.js',
+      '<rootDir>/../node_modules/@cashu/coco-react/dist/index.js',
+    ],
+    '^@scure/bip32$': [
+      '<rootDir>/node_modules/@scure/bip32/lib/esm/index.js',
+      '<rootDir>/../node_modules/@scure/bip32/lib/esm/index.js',
+    ],
     '^@/shared/(.*)$': '<rootDir>/shared/$1',
     '^@/features/(.*)$': '<rootDir>/features/$1',
     '^@/sheets/(.*)$': '<rootDir>/shared/lib/popup/sheets/$1',
@@ -34,6 +52,6 @@ module.exports = {
   ],
   modulePathIgnorePatterns: ['/coco-cashu-plugin-p2pk-import/'],
   transformIgnorePatterns: [
-    'node_modules/(?!(?:\\.bun/[^/]+/node_modules/)?(?:(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@shopify/react-native-skia|nostr-tools|@scure|@noble|coco-cashu-core|@cashu/cashu-ts|@cashu/coco-core|@cashu/coco-expo-sqlite|@cashu/coco-react|@sovranbitcoin/.*|bitchat-module|standard-navigation))',
+    'node_modules/(?!(?:\\.bun/[^/]+/node_modules/)?(?:(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@shopify/react-native-skia|nostr-tools|@scure|@noble|coco-cashu-core|@cashu/cashu-ts|@cashu/coco-core|@cashu/coco-expo-sqlite|@cashu/coco-react|@sovranbitcoin/.*|wallet|nostr|bitchat-module|standard-navigation))',
   ],
 };

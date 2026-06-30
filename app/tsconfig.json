@@ -22,16 +22,16 @@
       "@/redux/*": ["./redux/*"],
       "@/themes": ["./themes"],
       "~/*": ["src/*"],
-      // The @sovranbitcoin/* registry packages each carry a nested copy of
-      // these shared, type-bearing libs. Pin every `zod`/`neverthrow` import
-      // (including those inside the packages' own source) to the app's single
-      // copy so TypeScript sees one identity — otherwise cross-package types
-      // (ZodType, Result) are treated as incompatible. Mirrors the Metro
-      // resolver pinning so type-check and runtime agree on one realm.
-      "zod": ["./node_modules/zod"],
-      "zod/*": ["./node_modules/zod/*"],
-      "neverthrow": ["./node_modules/neverthrow"],
-      "neverthrow/*": ["./node_modules/neverthrow/*"]
+      // Pin every `zod`/`neverthrow` import (including those inside the wallet/
+      // nostr packages' own source) to a single copy so TypeScript sees one
+      // identity — otherwise cross-package types (ZodType, Result) are treated
+      // as incompatible. Under the bun workspace the single copy hoists to the
+      // root node_modules, so probe app-local first then the hoisted root.
+      // Mirrors the Metro resolver pinning so type-check and runtime agree.
+      "zod": ["./node_modules/zod", "../node_modules/zod"],
+      "zod/*": ["./node_modules/zod/*", "../node_modules/zod/*"],
+      "neverthrow": ["./node_modules/neverthrow", "../node_modules/neverthrow"],
+      "neverthrow/*": ["./node_modules/neverthrow/*", "../node_modules/neverthrow/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"],

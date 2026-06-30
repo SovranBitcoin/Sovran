@@ -5,93 +5,92 @@ const { withUniwindConfig } = require('uniwind/metro');
 
 const config = getDefaultConfig(__dirname);
 
-// `@sovranbitcoin/schemas`, Colada, and the local P2PK helper
-// live as sibling repos wired in via `file:../...`. Metro needs linked targets
-// in `watchFolders` so transform/resolve can walk their built files; otherwise
-// the `node_modules` symlink can resolve outside Metro's project roots.
-// `extraNodeModules` pins shared package names and schemas peer-deps (zod,
-// neverthrow) to the app's own copies so we don't ship duplicate realms.
+// Monorepo layout: this app is a bun-workspace member at <root>/app. The
+// `wallet` and `nostr` packages live at <root>/wallet and <root>/nostr and ship
+// raw TypeScript from their `src/`. Shared dependencies hoist to the workspace
+// root `node_modules`, so package locations are resolved by probing both the
+// app's own `node_modules` and the hoisted root copy.
 //
-// On EAS / CI builds the sibling source isn't checked out — the npm package
-// is installed from node_modules directly. Adding a non-existent watchFolder
-// makes Metro's `verifyRootExists` throw and the transformer construction
-// fails (`Cannot read properties of undefined (reading 'transformFile')`).
-// Only add the watchFolder when the directory actually exists locally.
-const sovranSchemasPath = path.resolve(__dirname, '..', 'sovran-schemas');
+// `extraNodeModules` + the resolveRequest pins force the type-bearing shared
+// libs (react, react-native, zod, neverthrow, @cashu/coco-*) to a single realm
+// so we never bundle duplicate copies (which would break hooks identity and
+// cross-package `instanceof ZodError` / Result identity).
 const appNodeModules = path.resolve(__dirname, 'node_modules');
+const workspaceRoot = path.resolve(__dirname, '..');
+const rootNodeModules = path.resolve(workspaceRoot, 'node_modules');
+const nmRoots = [appNodeModules, rootNodeModules];
+
+// Resolve a package directory (or a file within it) from whichever node_modules
+// realm bun installed it into — app-local first, then the hoisted root.
+function resolvePkgDir(name) {
+  const segs = name.split('/');
+  for (const nm of nmRoots) {
+    const candidate = path.join(nm, ...segs);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return path.join(appNodeModules, ...segs);
+}
+function resolvePkgFile(name, ...sub) {
+  const segs = name.split('/');
+  for (const nm of nmRoots) {
+    const candidate = path.join(nm, ...segs, ...sub);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return path.join(appNodeModules, ...segs, ...sub);
+}
+
 const appCocoPackages = {
-  '@cashu/coco-core': path.resolve(appNodeModules, '@cashu', 'coco-core'),
-  '@cashu/coco-expo-sqlite': path.resolve(appNodeModules, '@cashu', 'coco-expo-sqlite'),
-  '@cashu/coco-react': path.resolve(appNodeModules, '@cashu', 'coco-react'),
-};
-const localColadaPath = path.resolve(__dirname, '..', 'colada');
-const localColadaEntryPath = path.join(localColadaPath, 'src', 'index.ts');
-const localColadaReactEntryPath = path.join(localColadaPath, 'src', 'react', 'index.ts');
-const localColadaOperationsEntryPath = path.join(localColadaPath, 'src', 'operations', 'index.ts');
-const localNaggTsPath = path.resolve(__dirname, '..', 'nagg-ts');
-const localNaggTsEntryPath = path.join(localNaggTsPath, 'src', 'index.ts');
-const localNaggTsMapEntryPath = path.join(localNaggTsPath, 'src', 'map', 'index.ts');
-const localNaggTsRecipesEntryPath = path.join(localNaggTsPath, 'src', 'recipes', 'index.ts');
-const localNaggTsSchemasEntryPath = path.join(localNaggTsPath, 'src', 'schemas.ts');
-const localP2PKImportPluginPath = path.resolve(__dirname, '..', 'coco-p2pk-plugin-helper');
-const localP2PKImportPluginEntryPath = path.join(localP2PKImportPluginPath, 'src', 'index.ts');
-// Pin React singleton entry points for sibling packages, but let `react-native`
-// continue through Uniwind's resolver so className/css interop stays installed.
-const appReactEntryPaths = Object.fromEntries(
-  [
-    ['react', path.join(appNodeModules, 'react', 'index.js')],
-    ['react/jsx-runtime', path.join(appNodeModules, 'react', 'jsx-runtime.js')],
-    ['react/jsx-dev-runtime', path.join(appNodeModules, 'react', 'jsx-dev-runtime.js')],
-    ['react/compiler-runtime', path.join(appNodeModules, 'react', 'compiler-runtime.js')],
-  ].filter(([, filePath]) => fs.existsSync(filePath))
-);
-const existingSiblingPackagePaths = [
-  sovranSchemasPath,
-  localColadaPath,
-  localNaggTsPath,
-  localP2PKImportPluginPath,
-].filter(fs.existsSync);
-const localPackageEntryPaths = {
-  ...(fs.existsSync(localColadaEntryPath) ? { colada: localColadaEntryPath } : {}),
-  ...(fs.existsSync(localColadaReactEntryPath)
-    ? { 'colada/react': localColadaReactEntryPath }
-    : {}),
-  ...(fs.existsSync(localColadaOperationsEntryPath)
-    ? { 'colada/operations': localColadaOperationsEntryPath }
-    : {}),
-  ...(fs.existsSync(localNaggTsEntryPath) ? { 'nagg-ts': localNaggTsEntryPath } : {}),
-  ...(fs.existsSync(localNaggTsMapEntryPath) ? { 'nagg-ts/map': localNaggTsMapEntryPath } : {}),
-  ...(fs.existsSync(localNaggTsRecipesEntryPath)
-    ? { 'nagg-ts/recipes': localNaggTsRecipesEntryPath }
-    : {}),
-  ...(fs.existsSync(localNaggTsSchemasEntryPath)
-    ? { 'nagg-ts/schemas': localNaggTsSchemasEntryPath }
-    : {}),
-  ...(fs.existsSync(localP2PKImportPluginEntryPath)
-    ? { 'coco-cashu-plugin-p2pk-import': localP2PKImportPluginEntryPath }
-    : {}),
+  '@cashu/coco-core': resolvePkgDir('@cashu/coco-core'),
+  '@cashu/coco-expo-sqlite': resolvePkgDir('@cashu/coco-expo-sqlite'),
+  '@cashu/coco-react': resolvePkgDir('@cashu/coco-react'),
 };
 
+// In-repo workspace packages — always present, resolved straight to their TS
+// source entries so Metro doesn't depend on package-exports support.
+const walletPath = path.join(workspaceRoot, 'wallet');
+const nostrPath = path.join(workspaceRoot, 'nostr');
+const localPackageEntryPaths = {
+  wallet: path.join(walletPath, 'src', 'index.ts'),
+  'wallet/react': path.join(walletPath, 'src', 'react', 'index.ts'),
+  'wallet/operations': path.join(walletPath, 'src', 'operations', 'index.ts'),
+  nostr: path.join(nostrPath, 'src', 'index.ts'),
+  'nostr/map': path.join(nostrPath, 'src', 'map', 'index.ts'),
+  'nostr/recipes': path.join(nostrPath, 'src', 'recipes', 'index.ts'),
+  'nostr/schemas': path.join(nostrPath, 'src', 'schemas.ts'),
+};
+
+// Pin React singleton entry points for the workspace packages, but let
+// `react-native` continue through Uniwind's resolver so className/css interop
+// stays installed.
+const appReactEntryPaths = Object.fromEntries(
+  [
+    ['react', resolvePkgFile('react', 'index.js')],
+    ['react/jsx-runtime', resolvePkgFile('react', 'jsx-runtime.js')],
+    ['react/jsx-dev-runtime', resolvePkgFile('react', 'jsx-dev-runtime.js')],
+    ['react/compiler-runtime', resolvePkgFile('react', 'compiler-runtime.js')],
+  ].filter(([, filePath]) => fs.existsSync(filePath))
+);
+
+// Watch the whole workspace so Metro can resolve hoisted node_modules and the
+// in-repo wallet/ + nostr/ source.
 config.watchFolders = Array.from(
-  new Set([...(config.watchFolders ?? []), ...existingSiblingPackagePaths])
+  new Set([...(config.watchFolders ?? []), workspaceRoot])
 );
 config.resolver = {
   ...config.resolver,
   unstable_enableSymlinks: true,
-  nodeModulesPaths: [...(config.resolver?.nodeModulesPaths ?? []), appNodeModules],
+  nodeModulesPaths: [
+    ...(config.resolver?.nodeModulesPaths ?? []),
+    appNodeModules,
+    rootNodeModules,
+  ],
   extraNodeModules: {
     ...(config.resolver?.extraNodeModules ?? {}),
-    react: path.resolve(appNodeModules, 'react'),
-    'react-native': path.resolve(appNodeModules, 'react-native'),
+    react: resolvePkgDir('react'),
+    'react-native': resolvePkgDir('react-native'),
     ...appCocoPackages,
-    ...(fs.existsSync(localColadaPath) ? { colada: localColadaPath } : {}),
-    ...(fs.existsSync(localNaggTsPath) ? { 'nagg-ts': localNaggTsPath } : {}),
-    ...(fs.existsSync(localP2PKImportPluginPath)
-      ? { 'coco-cashu-plugin-p2pk-import': localP2PKImportPluginPath }
-      : {}),
-    ...(fs.existsSync(sovranSchemasPath) ? { '@sovranbitcoin/schemas': sovranSchemasPath } : {}),
-    zod: path.resolve(appNodeModules, 'zod'),
-    neverthrow: path.resolve(appNodeModules, 'neverthrow'),
+    zod: resolvePkgDir('zod'),
+    neverthrow: resolvePkgDir('neverthrow'),
   },
 };
 
@@ -135,24 +134,18 @@ const uniwindConfig = withUniwindConfig(config, { cssEntryFile: './global.css' }
 // This replaces @monicon/metro's withMonicon() which is incompatible with
 // the installed version mix and the Expo resolver chain.
 const moniconIconsPath = path.resolve(__dirname, '.monicon', 'icons.js');
-const liquidGlassEntryPath = path.resolve(
-  __dirname,
-  'node_modules',
+const liquidGlassEntryPath = resolvePkgFile(
   'expo-liquid-glass-native',
   'build',
   'index.js'
 );
-const herouiNativeEntryPath = path.resolve(
-  __dirname,
-  'node_modules',
+const herouiNativeEntryPath = resolvePkgFile(
   'heroui-native',
   'lib',
   'module',
   'index.js'
 );
-const herouiNativeProviderPath = path.resolve(
-  __dirname,
-  'node_modules',
+const herouiNativeProviderPath = resolvePkgFile(
   'heroui-native',
   'lib',
   'module',
@@ -192,11 +185,12 @@ uniwindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
     };
   }
   // Force the shared, type-bearing libs to the app's single copy. The
-  // `@sovranbitcoin/*` registry packages each ship a nested `zod`/`neverthrow`
-  // under their own `node_modules`, which Metro would otherwise bundle as
-  // separate realms — breaking cross-package `instanceof ZodError` / Result
-  // identity. Resolving these from the app root collapses them to one copy
-  // (mirrors the tsconfig `paths` pinning so bundle and type-check agree).
+  // workspace packages (wallet/nostr) and the `@sovranbitcoin/*` registry
+  // packages can each carry a nested `zod`/`neverthrow`, which Metro would
+  // otherwise bundle as separate realms — breaking cross-package
+  // `instanceof ZodError` / Result identity. Resolving from the app root
+  // collapses them to one copy (mirrors the tsconfig `paths` pinning so the
+  // bundle and type-check agree).
   if (
     moduleName === 'zod' ||
     moduleName.startsWith('zod/') ||
