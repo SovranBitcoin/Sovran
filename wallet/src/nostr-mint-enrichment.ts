@@ -1,4 +1,4 @@
-import { createNaggClient, type NaggError } from '@sovranbitcoin/nagg-ts';
+import { createNaggClient, type NaggError } from 'nostr';
 import { z } from 'zod';
 import { errField, logger, mintUrlFields } from './logger';
 import type { RequestControls } from './safeFetch';

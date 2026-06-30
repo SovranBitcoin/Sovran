@@ -1,8 +1,11 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 
-const cocoBunModules = resolve(__dirname, '../../coco/node_modules/.bun');
-const localNodeModules = resolve(__dirname, 'node_modules');
+// Monorepo layout: coco is a submodule under app/, deps hoist to the workspace root.
+// (If wallet's vitest @noble realm drifts, re-validate these two paths against the
+// actual post-`bun install` tree — they pin coco's bundled @noble versions.)
+const cocoBunModules = resolve(__dirname, '../app/coco/node_modules/.bun');
+const localNodeModules = resolve(__dirname, '../node_modules');
 
 export default defineConfig({
   resolve: {
@@ -10,11 +13,11 @@ export default defineConfig({
     alias: [
       {
         find: '@cashu/cashu-ts',
-        replacement: resolve(__dirname, 'node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js'),
+        replacement: resolve(__dirname, '../node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js'),
       },
       {
         find: '@cashu/coco-core',
-        replacement: resolve(__dirname, 'node_modules/@cashu/coco-core/dist/index.js'),
+        replacement: resolve(__dirname, '../node_modules/@cashu/coco-core/dist/index.js'),
       },
       {
         find: '@noble/curves/utils.js',
