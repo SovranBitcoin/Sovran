@@ -16,7 +16,7 @@ import { storeLog } from '@/shared/lib/logger';
  * is still payment ROUTING context, so it MUST be cleared at every payment root
  * via `clearPaymentContext`.
  */
-export interface ContactSendTarget {
+interface ContactSendTarget {
   /** Recipient Nostr pubkey (hex). */
   pubkey: string;
   displayName?: string;
