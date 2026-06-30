@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  APP_DIR: sovran-app
+  APP_DIR: app
 
 jobs:
   react-doctor:
@@ -18,13 +18,10 @@ jobs:
     steps:
       - name: Checkout app
         uses: actions/checkout@v6
-        with:
-          path: ${{ env.APP_DIR }}
 
       - name: Setup Sovran
-        uses: ./sovran-app/.github/actions/setup-sovran
+        uses: ./.github/actions/setup-sovran
         with:
-          app-dir: ${{ env.APP_DIR }}
           github-token: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
 
       # Informational, non-blocking: react-doctor surfaces patterns we *might* be

@@ -1,0 +1,44 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/docs.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      # The docs site only needs VitePress, but a bun-workspace install resolves
+      # every member's deps — including the app's @sovranbitcoin/schemas from
+      # GitHub Packages (needs auth). --ignore-scripts skips the app's native
+      # patch/bitchat postinstall, which the docs build doesn't require.
+      - name: Install workspace (no scripts)
+        env:
+          GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build docs
+        run: bun run docs:build
