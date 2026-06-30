@@ -1378,6 +1378,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
   const submitSendMemo = (memo?: string) => send({ type: 'SEND_MEMO_SUBMITTED', memo });
 
+  const startSend = (opts?: { reset?: boolean }) => {
+    if (opts?.reset) resetInternal();
+    return send({ type: 'START_SEND' });
+  };
+
   const startSendEcash = (opts?: {
     reset?: boolean;
     meltTarget?: string;
@@ -1443,6 +1448,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     submitSendMemo,
     changeMint,
     requestMintSelector,
+    startSend,
     startSendEcash,
     startReceiveLightning,
     startReceive,

@@ -243,6 +243,35 @@ export const INPUTS = {
 
   /** Empty string — triggers "Empty input" error */
   emptyString: '',
+
+  // ── Destination-descriptor fixtures ─────────────────────────────────
+  /** BOLT11 test-vector invoice, amount 2500u = 250000 sats, memo "1 cup coffee". */
+  bolt11WithAmount:
+    'lnbc2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpuaztrnwngzn3kdzw5hydlzf03qdgm2hdq27cqv3agm2awhz5se903vruatfhq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rspfj9srp',
+
+  /** lnurlp:// endpoint — paid via Lightning (no identity to resolve). */
+  lnurlpUri: 'lnurlp://pay.example.com/u/x',
+
+  /** Standalone bech32 mainnet on-chain address. */
+  onchainAddress: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
+
+  /** BIP-321 URI carrying an on-chain address + amount (0.0001 BTC = 10000 sats). */
+  bip321OnchainWithAmount:
+    'bitcoin:bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080?amount=0.0001',
+
+  /** BIP-321 URI with both an on-chain address and a lightning invoice (>1 option). */
+  bip321Multi:
+    'bitcoin:bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080?lightning=lnbc2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpuaztrnwngzn3kdzw5hydlzf03qdgm2hdq27cqv3agm2awhz5se903vruatfhq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rspfj9srp',
+
+  /** Real CBOR payment request: transportless, no amount, mints=[MINT1]. */
+  paymentRequestNoAmount: 'creqAomF1Y3NhdGFtgXgZaHR0cHM6Ly9taW50MS5leGFtcGxlLmNvbQ==',
+
+  /**
+   * Real CBOR payment request: amount 50, mints=[MINT1], nut10 P2PK lock to
+   * 02 + 32×0xaa.
+   */
+  paymentRequestLocked:
+    'creqApGFhGDJhdWNzYXRhbYF4GWh0dHBzOi8vbWludDEuZXhhbXBsZS5jb21lbnV0MTCjYWtkUDJQS2FkeEIwMmFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhdIA=',
 } as const;
 
 export type InputFixtureName = keyof typeof INPUTS;

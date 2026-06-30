@@ -247,6 +247,20 @@ export {
   type BuildBip321OnchainUriOptions,
 } from "./bip321";
 export { resolveIntent } from "./intent";
+export {
+  describeDestination,
+  type DescribeDestinationOptions,
+} from "./destination-descriptor";
+export {
+  decodeEcashTokenMetadata,
+  isValidEcashToken,
+  type EcashTokenMetadata,
+} from "./ecash";
+export {
+  decodePaymentRequestInfo,
+  lockableMintsFromRequest,
+} from "./payment-request";
+export { decodeBolt11Invoice, type Bolt11Info } from "./bolt11";
 export { defaultDetectors } from "./detectors";
 export { annotateOptions } from "./annotate";
 export {
@@ -441,6 +455,13 @@ export type {
   AnnotatedOption,
   RecommendationRule,
   ResolvedIntent,
+  DestinationKind,
+  DestinationIcon,
+  DestinationAction,
+  DestinationAmount,
+  DestinationRecipientRef,
+  DestinationRecipient,
+  DestinationDescriptor,
   AmountEntryConstraints,
   MintListItem,
   MintCatalogEntry,

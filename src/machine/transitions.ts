@@ -7,7 +7,7 @@ import type { Detectors, WalletContext } from '../types';
 import { resolveNext, type StepResult } from './resolveNext';
 import { buildProofSuggestions } from './amountFallback';
 import type { FlowContext, FlowEvent, FlowStep } from './types';
-import { startSendEcashFlow } from './flows/send';
+import { startSendFlow, startSendEcashFlow } from './flows/send';
 import { startReceiveFlow, startReceiveLightningFlow } from './flows/receive';
 import { requestMintSelector, resolveFromContext } from './contextResolution';
 
@@ -452,6 +452,8 @@ export function transition(
           ...(event.allowedMints ? { allowedMints: event.allowedMints } : {}),
         })
       );
+    case 'START_SEND':
+      return stamp(startSendFlow(unit));
     case 'START_RECEIVE_LIGHTNING':
       const receiveLightning = startReceiveLightningFlow(walletCtx, unit);
       logger.info('transitions.startReceiveLightning', {
