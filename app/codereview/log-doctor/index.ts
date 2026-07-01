@@ -4302,8 +4302,8 @@ async function main() {
     }
     raw = fs.readFileSync(logPath, 'utf-8');
   } else {
-    console.error('No log.txt found in sovran-app/. Either:');
-    console.error('  1. Paste dumpForLLM() output into sovran-app/log.txt');
+    console.error('No log.txt found in sovran-app/app/. Either:');
+    console.error('  1. Paste dumpForLLM() output into sovran-app/app/log.txt');
     console.error('  2. Pipe logs: cat logs.jsonl | npm run log-doctor -- stats');
     console.error('');
     console.error(
