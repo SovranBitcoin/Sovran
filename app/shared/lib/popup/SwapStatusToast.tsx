@@ -1,9 +1,10 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import type { ProgressLeg } from '@/shared/stores/runtime/legProgress';
+import { popupLog } from '@/shared/lib/logger';
 import { StatusToast, type StatusToastStatus } from './StatusToast';
 
 function legSummary(legs: ProgressLeg[] | undefined): { doneCount: number; total: number } {
@@ -51,6 +52,19 @@ export function SwapStatusToast({ hide, ...toastProps }: SwapStatusToastProps) {
     guardedRouter.push({ pathname: '/swap', params: { groupId } });
     hide();
   }, [groupId, hide]);
+
+  // The swap store slot is populated (`start()`) before `swapStatusPopup()`
+  // pops this toast, so a missing slot means it was cleared out from under a
+  // still-mounted persistent toast (e.g. terminal `onHide` raced, or the store
+  // reset). Rendering `null` here would leave an EMPTY toast slab pinned on
+  // screen forever (heroui keeps the slot until it's explicitly hidden). Hide
+  // it instead of lingering as a contentless duplicate.
+  const isPresent = view.present;
+  useEffect(() => {
+    if (isPresent) return;
+    popupLog.info('popup.swap_status.self_dismiss_no_state');
+    hide();
+  }, [isPresent, hide]);
 
   if (!view.present) return null;
 
