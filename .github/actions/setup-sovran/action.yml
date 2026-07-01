@@ -1,17 +1,14 @@
 name: Setup Sovran
 description: >-
-  Bun setup + dependency install shared by the Sovran CI gate workflows.
-  Installs against the latest published @sovranbitcoin/* packages
-  (deps:sovran-latest) and caches the Bun store so the latest-resolve
-  re-install hits warm downloads across the per-check workflows.
+  Bun setup + workspace install shared by the Sovran CI gate workflows.
+  Installs the bun workspace at the repo root (app + wallet + nostr + docs),
+  re-resolving the external @sovranbitcoin/* packages to their latest published
+  versions (deps:sovran-latest) and caching the Bun store.
 
-# The repo is checked out into ${APP_DIR} (sovran-app) by the calling workflow
-# before this action runs, so steps set working-directory: ${{ inputs.app-dir }}.
+# The repo is checked out at the runner root (no path nesting), so the workspace
+# root package.json / bun.lock live at the working directory. Install runs here;
+# per-gate workflows then run their checks with working-directory: app.
 inputs:
-  app-dir:
-    description: Path the repo was checked out into.
-    required: false
-    default: sovran-app
   github-token:
     description: Token used to auth the @sovranbitcoin/* GitHub Packages fetch.
     required: true
@@ -22,32 +19,27 @@ runs:
     - name: Setup Bun
       uses: oven-sh/setup-bun@v2
       with:
-        bun-version-file: ${{ inputs.app-dir }}/package.json
+        bun-version-file: package.json
 
-    # Warm download cache keyed on the lockfile. deps:sovran-latest re-resolves
-    # the @sovranbitcoin/* packages so the lock can drift between runs; the
-    # restore-keys fallback still reuses the cached tarballs for everything else.
+    # Warm download cache keyed on the workspace lockfile. deps:sovran-latest
+    # re-resolves the external @sovranbitcoin/* packages so the lock can drift
+    # between runs; the restore-keys fallback reuses cached tarballs otherwise.
     - name: Cache Bun store
       uses: actions/cache@v4
       with:
         path: ~/.bun/install/cache
-        key: bun-store-${{ runner.os }}-${{ hashFiles(format('{0}/bun.lock', inputs.app-dir)) }}
+        key: bun-store-${{ runner.os }}-${{ hashFiles('bun.lock') }}
         restore-keys: |
           bun-store-${{ runner.os }}-
 
-    # The gates run entirely against published packages — @cashu/coco-* from
-    # npm, @sovranbitcoin/* from GitHub Packages. SOVRAN_CI_TOKEN carries
-    # cross-repo GitHub Packages read; GITHUB_TOKEN is the fallback. (No
-    # coco/colada/schemas source checkout: nothing links it.)
-    #
-    # `deps:sovran-latest` re-resolves the @sovranbitcoin/* packages to their
-    # newest published versions before install, so CI always validates against
-    # the latest colada/nagg-ts/schemas without a manual bump. This is a
-    # deliberate trade of lockfile determinism for always-on compatibility
-    # signal: a breaking publish can red CI with no code change here — that is
-    # the early warning, by design.
-    - name: Install dependencies (latest Sovran packages)
-      working-directory: ${{ inputs.app-dir }}
+    # wallet/nostr are in-repo workspace packages (no publish). The remaining
+    # externals — @cashu/coco-* from npm, @sovranbitcoin/schemas +
+    # coco-cashu-plugin-p2pk-import from GitHub Packages — resolve here.
+    # SOVRAN_CI_TOKEN carries cross-repo GitHub Packages read; GITHUB_TOKEN is
+    # the fallback. `deps:sovran-latest` re-resolves the external @sovranbitcoin/*
+    # packages to newest published before install, so CI keeps the always-on
+    # compatibility signal (a breaking schemas/p2pk publish reds CI by design).
+    - name: Install workspace (latest Sovran externals)
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}

@@ -1,0 +1,63 @@
+{
+  "name": "wallet",
+  "version": "0.10.2",
+  "private": true,
+  "description": "Colada is standardized payment UX logic for Coco-based wallets. Parsing, classification, routing, annotation, offline suggestions — UI and navigation agnostic.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SovranBitcoin/Sovran.git",
+    "directory": "wallet"
+  },
+  "packageManager": "bun@1.3.5",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react/index.ts",
+    "./operations": "./src/operations/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@cashu/cashu-ts": "3.5.0",
+    "@gandlaf21/bolt11-decode": "^3.1.1",
+    "@noble/hashes": "^2.0.0",
+    "@scure/bip39": "2.0.1",
+    "@sovranbitcoin/schemas": "^2.2.0",
+    "neverthrow": "^8.2.0",
+    "nostr": "workspace:*",
+    "nostr-tools": "^2.0.0",
+    "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "@cashu/coco-core": "^1.0.1"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "@cashu/coco-core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@cashu/coco-core": "^1.0.1",
+    "@types/react": "~19.2.2",
+    "fast-check": "^4.0.0",
+    "react": "19.2.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.0"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run __tests__/unit",
+    "test:flows": "vitest run __tests__/flows",
+    "test:property": "vitest run __tests__/property"
+  }
+}

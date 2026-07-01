@@ -1,68 +1,190 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": [
-    "shim.js",
-    "polyfills.js",
-    "metro.config.js",
-    "app/**/*.{ts,tsx}",
-    "plugins/withLowerPodDeploymentTarget.js",
-    "plugins/withNeutralAndroidTextColors.js",
-    "scripts/*.{js,ts}"
-  ],
-  "project": ["**/*.{ts,tsx,js,jsx}"],
-  "ignore": [".monicon/**", "modules/**", "targets/**"],
-  "ignoreDependencies": [
-    "^@iconify-json/",
-    "@sovranbitcoin/colada",
-    "@sovranbitcoin/nagg-ts",
-    "@sovranbitcoin/schemas",
-    "buffer",
-    "process",
-    "@expo/metro-config",
-    "expo-screen-corner-radius",
-    "cashu-kym",
-    "@monicon/metro",
-    "metro-minify-terser",
-    "number-flow-react-native",
-    "nutpatch",
-    "patch-package",
-    "react-native-fast-squircle"
-  ],
-  "ignoreBinaries": ["claude", "eas", "gh", "maestro", "tsx"],
   "ignoreIssues": {
-    "**/*.android.{ts,tsx}": ["files"],
-    "**/*.ios.{ts,tsx}": ["files"],
-    "**/*.liquid.{ts,tsx}": ["files"],
-    "**/*.blur.{ts,tsx}": ["files"],
-    "codereview/**": ["exports", "types"],
-    "features/composer/**": ["exports", "types"],
-    "features/feed/**": ["exports", "types"],
-    "shared/lib/nostr/media/**": ["exports", "types"],
-    "shared/lib/nostr/outbox/**": ["types"],
-    "shared/lib/nostr/nip11.ts": ["exports", "types"],
-    "shared/lib/nostr/njump.ts": ["types"],
-    "shared/lib/nostr/nostrTierConfig.ts": ["exports", "types"],
-    "shared/lib/nostr/useEntityCache.ts": ["exports", "types"],
-    "features/transactions/components/MonthSelector.tsx": ["types"],
-    "features/camera/**": ["files", "types"],
-    "features/mint/**": ["exports", "types"],
-    "features/settings/**": ["exports"],
-    "features/transactions/**": ["exports"],
-    "features/user/**": ["exports"],
-    "features/wallet/**": ["exports", "types"],
-    "assets/icons/**": ["exports"],
-    "shared/blocks/PullToAiRefreshControl.tsx": ["exports"],
-    "shared/blocks/status/**": ["exports", "types", "duplicates"],
-    "shared/lib/date.ts": ["types"],
-    "shared/lib/nav/profileRoutes.ts": ["types"],
-    "shared/lib/popup/popups/index.ts": ["types"],
-    "shared/lib/wallpaperStorage.ts": ["exports"],
-    "shared/styles/tokens.ts": ["exports", "types"],
-    "shared/ui/capability/index.tsx": ["exports", "types"],
-    "shared/ui/composed/GlassSearchBar/**": ["files", "types"],
-    "shared/ui/composed/QRButton/**": ["files", "types"],
-    "shared/ui/primitives/SelectableCheck/index.tsx": ["types"],
-    "shared/lib/popup/**": ["exports"],
-    "coco-cashu-plugin-p2pk-import/**": ["files", "exports", "types", "unlisted"]
-  }
+    "**/*.android.{ts,tsx}": [
+      "files"
+    ],
+    "**/*.ios.{ts,tsx}": [
+      "files"
+    ],
+    "**/*.liquid.{ts,tsx}": [
+      "files"
+    ],
+    "**/*.blur.{ts,tsx}": [
+      "files"
+    ],
+    "app/codereview/**": [
+      "exports",
+      "types"
+    ],
+    "app/features/composer/**": [
+      "exports",
+      "types"
+    ],
+    "app/features/feed/**": [
+      "exports",
+      "types"
+    ],
+    "app/shared/lib/nostr/media/**": [
+      "exports",
+      "types"
+    ],
+    "app/shared/lib/nostr/outbox/**": [
+      "types"
+    ],
+    "app/shared/lib/nostr/nip11.ts": [
+      "exports",
+      "types"
+    ],
+    "app/shared/lib/nostr/njump.ts": [
+      "types"
+    ],
+    "app/shared/lib/nostr/nostrTierConfig.ts": [
+      "exports",
+      "types"
+    ],
+    "app/shared/lib/nostr/useEntityCache.ts": [
+      "exports",
+      "types"
+    ],
+    "app/features/transactions/components/MonthSelector.tsx": [
+      "types"
+    ],
+    "app/features/camera/**": [
+      "files",
+      "types"
+    ],
+    "app/features/mint/**": [
+      "exports",
+      "types"
+    ],
+    "app/features/settings/**": [
+      "exports"
+    ],
+    "app/features/transactions/**": [
+      "exports"
+    ],
+    "app/features/user/**": [
+      "exports"
+    ],
+    "app/features/wallet/**": [
+      "exports",
+      "types"
+    ],
+    "app/assets/icons/**": [
+      "exports"
+    ],
+    "app/shared/blocks/PullToAiRefreshControl.tsx": [
+      "exports"
+    ],
+    "app/shared/blocks/status/**": [
+      "exports",
+      "types",
+      "duplicates"
+    ],
+    "app/shared/lib/date.ts": [
+      "types"
+    ],
+    "app/shared/lib/nav/profileRoutes.ts": [
+      "types"
+    ],
+    "app/shared/lib/popup/popups/index.ts": [
+      "types"
+    ],
+    "app/shared/lib/wallpaperStorage.ts": [
+      "exports"
+    ],
+    "app/shared/styles/tokens.ts": [
+      "exports",
+      "types"
+    ],
+    "app/shared/ui/capability/index.tsx": [
+      "exports",
+      "types"
+    ],
+    "app/shared/ui/composed/GlassSearchBar/**": [
+      "files",
+      "types"
+    ],
+    "app/shared/ui/composed/QRButton/**": [
+      "files",
+      "types"
+    ],
+    "app/shared/ui/primitives/SelectableCheck/index.tsx": [
+      "types"
+    ],
+    "app/shared/lib/popup/**": [
+      "exports"
+    ],
+    "wallet/**": [
+      "exports",
+      "types",
+      "files"
+    ],
+    "nostr/**": [
+      "exports",
+      "types",
+      "files"
+    ]
+  },
+  "workspaces": {
+    "app": {
+      "entry": [
+        "shim.js",
+        "polyfills.js",
+        "metro.config.js",
+        "app/**/*.{ts,tsx}",
+        "plugins/withLowerPodDeploymentTarget.js",
+        "plugins/withNeutralAndroidTextColors.js",
+        "scripts/*.{js,ts}"
+      ],
+      "project": [
+        "**/*.{ts,tsx,js,jsx}"
+      ],
+      "ignore": [
+        ".monicon/**",
+        "modules/**",
+        "targets/**"
+      ],
+      "ignoreDependencies": [
+        "^@iconify-json/",
+        "buffer",
+        "process",
+        "@expo/metro-config",
+        "expo-screen-corner-radius",
+        "cashu-kym",
+        "@monicon/metro",
+        "metro-minify-terser",
+        "number-flow-react-native",
+        "nutpatch",
+        "patch-package",
+        "react-native-fast-squircle"
+      ],
+      "ignoreBinaries": [
+        "claude",
+        "eas",
+        "gh",
+        "maestro",
+        "tsx"
+      ]
+    },
+    "wallet": {
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
+    "nostr": {
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
+    "docs": {
+      "project": [
+        ".vitepress/**/*.{ts,mts}"
+      ]
+    }
+  },
+  "ignoreBinaries": [
+    "knip"
+  ]
 }

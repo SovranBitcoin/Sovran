@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  APP_DIR: sovran-app
+  APP_DIR: app
 
 jobs:
   code-quality:
@@ -18,8 +18,6 @@ jobs:
     steps:
       - name: Checkout app
         uses: actions/checkout@v6
-        with:
-          path: ${{ env.APP_DIR }}
 
       # Lint, Type Check, Knip, and React Compiler coverage each run in their own
       # workflow (lint.yml / type-check.yml / knip.yml / react-compiler.yml) so
@@ -30,9 +28,8 @@ jobs:
       # Prettier stays non-blocking (formatting signal), as do the aspirational
       # structural gates (analyze-structure / react-doctor jobs below).
       - name: Setup Sovran
-        uses: ./sovran-app/.github/actions/setup-sovran
+        uses: ./.github/actions/setup-sovran
         with:
-          app-dir: ${{ env.APP_DIR }}
           github-token: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Prettier Check
@@ -65,12 +62,10 @@ jobs:
           # Full history needed for `--history` (churn × complexity,
           # temporal coupling, stale-file signals).
           fetch-depth: 0
-          path: ${{ env.APP_DIR }}
 
       - name: Setup Sovran
-        uses: ./sovran-app/.github/actions/setup-sovran
+        uses: ./.github/actions/setup-sovran
         with:
-          app-dir: ${{ env.APP_DIR }}
           github-token: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Run analyze-structure

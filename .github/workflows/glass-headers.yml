@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  APP_DIR: sovran-app
+  APP_DIR: app
 
 jobs:
   glass-headers:
@@ -17,8 +17,6 @@ jobs:
     steps:
       - name: Checkout app
         uses: actions/checkout@v6
-        with:
-          path: ${{ env.APP_DIR }}
 
       # Pure source scan (no dependencies needed). Guards against a screen
       # putting a glass headerLeft/headerRight into Stack.Screen options without

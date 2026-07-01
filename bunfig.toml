@@ -1,0 +1,10 @@
+# Use the hoisted (flat) node_modules linker for the workspace.
+#
+# bun defaults workspaces to the isolated linker (a per-package .bun symlink
+# store). That breaks the app's toolchain, which assumes a flat node_modules:
+# tsc stops auto-including transitive @types (Buffer/process/__dirname), and
+# Metro/Expo autolinking + several deep-path package pins expect flat layout.
+# Hoisted linking restores the single-package behaviour the app was built for
+# while the wallet/nostr workspace packages still resolve via their symlinks.
+[install]
+linker = "hoisted"

@@ -1,0 +1,49 @@
+{
+  "name": "nostr",
+  "version": "0.7.0",
+  "private": true,
+  "description": "Typed, UI-agnostic client helpers for generic Nagg GraphQL and app-view APIs.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SovranBitcoin/Sovran.git",
+    "directory": "nostr"
+  },
+  "packageManager": "bun@1.3.5",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./map": "./src/map/index.ts",
+    "./schemas": "./src/schemas.ts",
+    "./recipes": "./src/recipes/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "neverthrow": "^8.2.0"
+  },
+  "peerDependencies": {
+    "@sovranbitcoin/schemas": "*",
+    "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@sovranbitcoin/schemas": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@sovranbitcoin/schemas": "^2.1.0",
+    "@types/bun": "^1.3.5",
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.0",
+    "zod": "^4.3.6"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  }
+}

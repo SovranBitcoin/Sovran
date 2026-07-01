@@ -1,0 +1,46 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "preserveSymlinks": true,
+    // Requires class methods that override a base implementation to be
+    // marked with `override`. Catches drift when a base method is
+    // renamed or removed — the override silently becomes a fresh method
+    // instead of a compile error. Free to enable here (zero current
+    // violations).
+    "noImplicitOverride": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "moduleSuffixes": [".ios", ".android", ""],
+    "paths": {
+      "@/*": ["./*"],
+      "@/shared/*": ["./shared/*"],
+      "@/features/*": ["./features/*"],
+      "@/sheets/*": ["./shared/lib/popup/sheets/*"],
+      "@/navigation/*": ["./navigation/*"],
+      "@/config/*": ["./config/*"],
+      "@/redux/*": ["./redux/*"],
+      "@/themes": ["./themes"],
+      "~/*": ["src/*"],
+      // Pin every `zod`/`neverthrow` import (including those inside the wallet/
+      // nostr packages' own source) to a single copy so TypeScript sees one
+      // identity — otherwise cross-package types (ZodType, Result) are treated
+      // as incompatible. Under the bun workspace the single copy hoists to the
+      // root node_modules, so probe app-local first then the hoisted root.
+      // Mirrors the Metro resolver pinning so type-check and runtime agree.
+      "zod": ["./node_modules/zod", "../node_modules/zod"],
+      "zod/*": ["./node_modules/zod/*", "../node_modules/zod/*"],
+      "neverthrow": ["./node_modules/neverthrow", "../node_modules/neverthrow"],
+      "neverthrow/*": ["./node_modules/neverthrow/*", "../node_modules/neverthrow/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"],
+  "exclude": [
+    "sovran.money/**",
+    "coco/**",
+    "eNuts/**",
+    "heroui-native/**",
+    "coco-cashu-plugin-p2pk-import/node_modules/**",
+    "coco-cashu-plugin-p2pk-import/dist/**"
+  ]
+}

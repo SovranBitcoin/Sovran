@@ -1,13 +1,20 @@
+# EAS archive ignore — workspace-root copy.
+# Used when EAS archives from the bun-workspace root (app/ is a workspace member,
+# and wallet/ + nostr/ must be included in the build). Paths are root-relative.
+# A second, app-relative copy lives at app/.easignore for the case where EAS
+# treats app/ as the archive root. Keep the two in sync.
+# NOTE: verify which root EAS actually archives from on the first build.
+
 # Exclude coco submodule — app uses npm packages (coco-cashu-core, etc.), not local source.
 # The submodule causes git clone exit 128 during EAS tarball creation.
-coco/
+app/coco/
 
-# Standard exclusions (mirror .gitignore for EAS archive)
+# Standard exclusions (match any depth)
 node_modules/
 .expo/
 dist/
-!vendor/**/dist/
-!vendor/**/dist/**
+!app/vendor/**/dist/
+!app/vendor/**/dist/**
 web-build/
 *.orig.*
 *.jks
@@ -27,10 +34,8 @@ yarn-error.*
 *.tsbuildinfo
 expo-env.d.ts
 .vscode
-/android/
-/ios/
-sovran.money/
-.cursor/skills/
-targets/widget/generated.entitlements
-targets/widget/Assets.xcassets/AppIcon.appiconset/
-targets/widget/Assets.xcassets/$*.colorset/
+/app/android/
+/app/ios/
+app/targets/widget/generated.entitlements
+app/targets/widget/Assets.xcassets/AppIcon.appiconset/
+app/targets/widget/Assets.xcassets/$*.colorset/

@@ -1,0 +1,6 @@
+# Vendored reference trees and local doc-site install — do not commit
+references/
+node_modules/
+.vitepress/cache/
+package.json
+package-lock.json
