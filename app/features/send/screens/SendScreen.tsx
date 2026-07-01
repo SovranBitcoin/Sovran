@@ -24,7 +24,7 @@
  * token delivered to them over an encrypted Nostr DM.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { usePaymentFlowMachine } from 'wallet/react';
@@ -53,15 +53,15 @@ import {
   peerNostrPubkey,
 } from '@/features/nearPay/lib/peerProfile';
 import { useRememberPeers } from '@/features/nearPay/hooks/useRememberPeers';
-import { useContactSearch, type DisplayResult } from '@/features/payments/hooks/useContactSearch';
 import {
-  useQuickPayPeople,
-  type QuickPayPerson,
-  type QuickPaySource,
-} from '@/features/send/hooks/useQuickPayPeople';
+  useOverlaidContactSearch,
+  CONTACT_SEARCH_MIN_LENGTH,
+} from '@/features/contacts/hooks/useOverlaidContactSearch';
+import { useQuickPayPeople, type QuickPayPerson } from '@/features/send/hooks/useQuickPayPeople';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 import { normalizeRecentPersonPubkey } from '@/shared/stores/profile/recentPeopleStore';
+import type { NostrSearchResult } from '@/shared/lib/apiClient';
 import { useNfcSupported } from '@/shared/lib/nfc';
 import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
 import { showActionSheet } from '@/shared/lib/popup';
@@ -69,6 +69,7 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { paymentLog } from '@/shared/lib/logger';
 import { ListRow } from '@/shared/ui/composed/ListRow';
+import { ContactRow, nostrIdentity } from '@/shared/ui/composed/ContactRow';
 import { useScreenOptions } from '@/shared/ui/composed/Screen';
 import { DetectedActionRow } from '@/features/send/components/DetectedActionRow';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
@@ -86,14 +87,6 @@ const COLLAPSED_H = 92;
 // Duration of the expanded-rows ⇄ collapsed-row cross-fade, both directions.
 const METHODS_FADE_MS = 300;
 
-// Quick-pay row subtitle, by the most recent interaction with the person.
-const SOURCE_SUBTITLE: Record<QuickPaySource, string> = {
-  sent: 'Sent',
-  received: 'Received',
-  peer: 'Nut Drop',
-  search: 'Searched',
-};
-
 interface SendMethod {
   id: 'qr' | 'createEcash' | 'nfc' | 'nutDrop';
   /** Row title (also the VoiceOver/TalkBack name). */
@@ -109,7 +102,7 @@ interface SendMethod {
   onPress: () => void | Promise<void>;
 }
 
-function resultDisplayName(profile: NonNullable<DisplayResult['profile']>): string {
+function resultDisplayName(profile: NostrSearchResult): string {
   return profile.displayName ?? profile.name ?? '';
 }
 
@@ -154,8 +147,8 @@ export function SendScreen({ unit }: { unit: string }) {
     [peers, query]
   );
 
-  // ── Quick-pay tier (people we've paid / been paid by / stood near) ────────
-  // Live peers already show in the "Nearby" tier, so exclude them here.
+  // Live peers already show in the "Nearby" tier, so exclude them from the
+  // People results (search hits + recents) below.
   const livePeerPubkeys = useMemo(
     () =>
       freshPeers
@@ -163,11 +156,21 @@ export function SendScreen({ unit }: { unit: string }) {
         .filter((key): key is string => !!key),
     [freshPeers]
   );
-  const quickPayPeople = useQuickPayPeople(livePeerPubkeys);
 
-  // ── Contact search (nagg / primal facade) ────────────────────────────────
-  const { displayResults, searchLoading, showNoResults } = useContactSearch(query);
+  // ── People search — the SAME canonical assembly wallet/feed use ───────────
+  // `useOverlaidContactSearch` wraps `useContactSearch` + the kind-0 overlay so
+  // Send inherits identical results and per-result metrics, but WITHOUT
+  // `useAllSearchResults`' unconditional `useLocationTiers()` — no location
+  // permission prompt on a payment screen.
+  const { contactRows, loading: searchLoading } = useOverlaidContactSearch(query);
   const trimmed = query.trim();
+  const isTyping = trimmed.length >= CONTACT_SEARCH_MIN_LENGTH;
+
+  // Recent people — the rich merge: everyone we've searched, sent to, been paid
+  // by, or stood near over the Nut Drop mesh (tx counterparties + recentPeopleStore).
+  // Shown at rest AND while focused-empty; replaced by live results once typing.
+  // Live Nearby peers are excluded (they get their own "Nearby" tier).
+  const quickPayPeople = useQuickPayPeople(livePeerPubkeys);
   // Stay in search mode while the field is focused OR a query is present. Tying
   // this to focus alone snapped back to the method rows the moment a drag-scroll
   // dismissed the keyboard (which blurs the input) — so the results couldn't be
@@ -221,6 +224,16 @@ export function SendScreen({ unit }: { unit: string }) {
     paymentLog.info('send.destination.paste');
     void machine.scan?.();
   }, [machine]);
+
+  // Once focused / typing, the Paste affordance becomes Cancel: clear the input
+  // and blur so the user drops straight back to the methods + recents at rest.
+  const inputRef = useRef<TextInput>(null);
+  const handleCancel = useCallback(() => {
+    paymentLog.info('send.destination.cancel');
+    setQuery('');
+    setFocused(false);
+    inputRef.current?.blur();
+  }, []);
 
   // One canonical seam for a whitespace-free destination the user typed, pasted,
   // or tapped (the DetectedActionRow) — the exact same pipeline as a scan.
@@ -318,8 +331,7 @@ export function SendScreen({ unit }: { unit: string }) {
   );
 
   const handleSelectContact = useCallback(
-    (result: Extract<DisplayResult, { profile: object }>) => {
-      const { pubkey, profile } = result;
+    (pubkey: string, profile: NostrSearchResult) => {
       const displayName = resultDisplayName(profile);
       paymentLog.info('send.contact.select', { hasLud16: !!profile.lud16 });
       startContactSend({
@@ -333,10 +345,18 @@ export function SendScreen({ unit }: { unit: string }) {
     [startContactSend]
   );
 
+  // A recents row → the same payment seam. QuickPayPerson already carries a real
+  // name + the fields the seam needs (source-tagged and profile-hydrated in-hook).
   const handleSelectQuickPay = useCallback(
     (person: QuickPayPerson) => {
       paymentLog.info('send.recent.select', { source: person.source, hasLud16: !!person.lud16 });
-      startContactSend(person);
+      startContactSend({
+        pubkey: person.pubkey,
+        displayName: person.displayName || null,
+        picture: person.picture,
+        nip05: person.nip05,
+        lud16: person.lud16,
+      });
     },
     [startContactSend]
   );
@@ -396,20 +416,14 @@ export function SendScreen({ unit }: { unit: string }) {
     [nfcSupported, handleQrScan, handleCreateEcash, handleNfc, handleNutDrop]
   );
 
-  // Anyone already surfaced in the Nearby or Recent tiers is dropped from the
-  // name-search results so they don't appear twice.
-  const pinnedPubkeys = useMemo(() => {
-    const set = new Set(livePeerPubkeys);
-    for (const person of quickPayPeople) set.add(person.pubkey);
-    return set;
-  }, [livePeerPubkeys, quickPayPeople]);
-  const realResults = useMemo(
-    () =>
-      displayResults.filter(
-        (r): r is Extract<DisplayResult, { profile: object }> =>
-          !!r.profile && !pinnedPubkeys.has(r.pubkey)
-      ),
-    [displayResults, pinnedPubkeys]
+  // Anyone already surfaced in the Nearby tier is dropped from the live People
+  // results so they don't appear twice (recents already exclude them in-hook).
+  const pinnedPubkeys = useMemo(() => new Set(livePeerPubkeys), [livePeerPubkeys]);
+  // Live search rows: keep placeholder rows (they paint the loading skeletons)
+  // but drop real rows already pinned in Nearby.
+  const renderedPeople = useMemo(
+    () => contactRows.filter((r) => !(r.profile && pinnedPubkeys.has(r.pubkey))),
+    [contactRows, pinnedPubkeys]
   );
 
   const containerHeightStyle = useAnimatedStyle(() => ({
@@ -459,10 +473,11 @@ export function SendScreen({ unit }: { unit: string }) {
       contentContainerStyle={[styles.content, { paddingTop: headerHeight + 8 }]}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag">
-      {/* Destination input + Paste */}
+      {/* Destination input + Paste/Cancel */}
       <View style={[styles.inputWrap, { backgroundColor: surfaceSecondary }]}>
         <Icon name="mdi:magnify" size={20} color={opacity(foreground, 0.5)} />
         <TextInput
+          ref={inputRef}
           value={query}
           onChangeText={setQuery}
           onFocus={() => setFocused(true)}
@@ -476,15 +491,30 @@ export function SendScreen({ unit }: { unit: string }) {
           style={[styles.input, { color: foreground }]}
           testID="send-destination-input"
         />
-        <Text
-          onPress={handlePaste}
-          color={accent}
-          bold
-          size={15}
-          style={styles.pasteBtn}
-          testID="send-paste">
-          Paste
-        </Text>
+        {/* Paste when the input is empty (the primary way to enter a
+            destination); once there's something to clear, it becomes Cancel to
+            wipe the input + unfocus in one tap. */}
+        {query.length > 0 ? (
+          <Text
+            onPress={handleCancel}
+            color={accent}
+            bold
+            size={15}
+            style={styles.pasteBtn}
+            testID="send-cancel">
+            Cancel
+          </Text>
+        ) : (
+          <Text
+            onPress={handlePaste}
+            color={accent}
+            bold
+            size={15}
+            style={styles.pasteBtn}
+            testID="send-paste">
+            Paste
+          </Text>
+        )}
       </View>
 
       {/* Methods: four rows (expanded) ⇄ four icon buttons in one row (collapsed),
@@ -524,35 +554,11 @@ export function SendScreen({ unit }: { unit: string }) {
         />
       ) : null}
 
-      {/* Quick-pay: recent people we've paid, been paid by, or stood near.
-          Shown both at rest (under the methods) and while searching. */}
-      {quickPayPeople.length > 0 ? (
+      {/* Nearby: live Nut Drop peers, pinned above. Shown whenever peers are in
+          range — at rest, focused, or searching. */}
+      {freshPeers.length > 0 ? (
         <VStack spacing={0}>
-          <SectionLabel text="Recent" color={opacity(foreground, 0.5)} />
-          {quickPayPeople.map((person) => (
-            <ListRow
-              key={person.pubkey}
-              avatar={{
-                picture: person.picture ?? undefined,
-                seed: person.pubkey,
-                name: person.displayName,
-                size: ROW_ICON,
-              }}
-              title={person.displayName}
-              subtitle={SOURCE_SUBTITLE[person.source] || undefined}
-              onPress={() => handleSelectQuickPay(person)}
-              testID={`send-recent-${person.pubkey.slice(0, 8)}`}
-            />
-          ))}
-        </VStack>
-      ) : null}
-
-      {inSearch ? (
-        <VStack spacing={0}>
-          {/* Nearby peers stay pinned above search results. */}
-          {freshPeers.length > 0 ? (
-            <SectionLabel text="Nearby" color={opacity(foreground, 0.5)} />
-          ) : null}
+          <SectionLabel text="Nearby" color={opacity(foreground, 0.5)} />
           {freshPeers.map((peer) => (
             <ListRow
               key={peer.peerID}
@@ -564,33 +570,57 @@ export function SendScreen({ unit }: { unit: string }) {
               testID={`send-peer-${peer.peerID}`}
             />
           ))}
-          {realResults.length > 0 ? (
+        </VStack>
+      ) : null}
+
+      {/* People slot (canonical ContactRow + nostrIdentity, metrics parity):
+          - typing a specific query → live search results at the top;
+          - otherwise (at rest OR focused-empty) → the recent-people list
+            (searched / sent / received / Nut Drop peers). */}
+      {isTyping ? (
+        <VStack spacing={0}>
+          {renderedPeople.length > 0 ? (
             <SectionLabel text="People" color={opacity(foreground, 0.5)} />
           ) : null}
-          {realResults.map((result) => {
-            const name = resultDisplayName(result.profile);
-            return (
-              <ListRow
-                key={result.pubkey}
-                avatar={{
-                  picture: result.profile.picture,
-                  seed: result.pubkey,
-                  name,
-                  size: ROW_ICON,
-                }}
-                title={name || 'Unknown'}
-                subtitle={result.profile.lud16 ?? result.profile.nip05 ?? undefined}
-                loading={searchLoading && realResults.length === 0}
-                onPress={() => handleSelectContact(result)}
-                testID={`send-contact-${result.pubkey.slice(0, 8)}`}
-              />
-            );
-          })}
-          {showNoResults && freshPeers.length === 0 ? (
+          {renderedPeople.map((row) => (
+            <ContactRow
+              key={row.pubkey}
+              identity={nostrIdentity(row.pubkey, row.profile, {
+                isLoadingProfile: row.isLoadingProfile,
+              })}
+              // Placeholder rows (no profile) paint skeletons and aren't tappable.
+              onPress={
+                row.profile ? () => handleSelectContact(row.pubkey, row.profile!) : undefined
+              }
+              testID={`send-contact:${row.pubkey}`}
+            />
+          ))}
+          {!searchLoading && renderedPeople.length === 0 && freshPeers.length === 0 ? (
             <View style={styles.emptyWrap}>
               <Text color={opacity(foreground, 0.5)}>No people found</Text>
             </View>
           ) : null}
+        </VStack>
+      ) : quickPayPeople.length > 0 ? (
+        <VStack spacing={0}>
+          <SectionLabel text="Recent" color={opacity(foreground, 0.5)} />
+          {quickPayPeople.map((person) => (
+            <ContactRow
+              key={person.pubkey}
+              identity={nostrIdentity(
+                person.pubkey,
+                {
+                  displayName: person.displayName,
+                  picture: person.picture ?? undefined,
+                  nip05: person.nip05 ?? undefined,
+                  lud16: person.lud16 ?? undefined,
+                },
+                { isLoadingProfile: person.isLoading }
+              )}
+              onPress={() => handleSelectQuickPay(person)}
+              testID={`send-contact:${person.pubkey}`}
+            />
+          ))}
         </VStack>
       ) : null}
     </ScrollView>

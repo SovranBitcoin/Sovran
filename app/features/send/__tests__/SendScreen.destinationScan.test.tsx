@@ -81,8 +81,9 @@ jest.mock('@/features/nearPay/lib/peerProfile', () => ({
   peerNostrPubkey: () => null,
 }));
 jest.mock('@/features/nearPay/hooks/useRememberPeers', () => ({ useRememberPeers: () => {} }));
-jest.mock('@/features/payments/hooks/useContactSearch', () => ({
-  useContactSearch: () => ({ displayResults: [], searchLoading: false, showNoResults: false }),
+jest.mock('@/features/contacts/hooks/useOverlaidContactSearch', () => ({
+  useOverlaidContactSearch: () => ({ contactRows: [], loading: false }),
+  CONTACT_SEARCH_MIN_LENGTH: 3,
 }));
 jest.mock('@/features/send/hooks/useQuickPayPeople', () => ({ useQuickPayPeople: () => [] }));
 jest.mock('@/shared/stores/runtime/clearPaymentContext', () => ({ clearPaymentContext: () => {} }));
@@ -120,6 +121,15 @@ const stub =
   };
 
 jest.mock('@/shared/ui/composed/ListRow', () => ({ ListRow: stub('ListRow') }));
+jest.mock('@/shared/ui/composed/ContactRow', () => ({
+  ContactRow: stub('ContactRow'),
+  nostrIdentity: (pubkey: string, profile: unknown, opts: unknown) => ({
+    kind: 'nostr',
+    pubkey,
+    profile,
+    ...(opts as object),
+  }),
+}));
 jest.mock('@/shared/ui/composed/Screen', () => ({ useScreenOptions: () => {} }));
 jest.mock('@/shared/ui/composed/CircleActionButton', () => ({
   CircleActionButton: stub('CircleActionButton'),

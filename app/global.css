@@ -2,7 +2,13 @@
 @import 'uniwind';
 @import 'heroui-native/styles';
 
-@source './node_modules/heroui-native/lib';
+/* heroui-native hoists to the workspace-root node_modules under the bun
+   hoisted linker (app/node_modules only holds the file: deps), so the scan
+   path must point one level up. A dangling @source is silently ignored by
+   Tailwind, which is how every heroui-only class (e.g. the Switch's
+   w-[48px]/h-[24px] track) vanished from the compiled registry after the
+   monorepo consolidation. */
+@source '../node_modules/heroui-native/lib';
 
 @theme {
   /* Static scales — var() references resolved at runtime via Uniwind.
