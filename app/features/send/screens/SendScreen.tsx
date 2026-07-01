@@ -7,8 +7,10 @@
  *
  *   • a destination input (top) that accepts any payment string (lightning
  *     address, bolt11, cashu token, NUT-18 creq, on-chain, npub) via Paste /
- *     keyboard-submit — routed through Colada's parser (`machine.scan`/
- *     `machine.execute`), never a new app-side parser;
+ *     keyboard-submit / the detected-action row — every path routed through the
+ *     one canonical `machine.scan` entry (identical parse, dedup, and `'paste'`
+ *     source tagging), never `machine.execute` directly and never a new
+ *     app-side parser;
  *   • four method rows (QR Scan, Create Ecash, Tap-to-pay, Nut Drop), each with
  *     a `CircleActionButton` circle as its leading icon — liquid glass on
  *     supported devices, flat otherwise. On focus they collapse into a compact
@@ -209,19 +211,45 @@ export function SendScreen({ unit }: { unit: string }) {
   }, [inSearch]);
 
   // ── Destination input actions (route through Colada's parser) ─────────────
+  // The Paste button reads the clipboard via the same `machine.scan` the camera
+  // uses (no data → clipboard source). Typed/pasted-into-field destinations are
+  // handed to `machine.scan(input, …)` too — the SINGLE canonical entry — so
+  // they get identical parse, dedup, and `'paste'` source tagging (via the app's
+  // clipboard→paste sourceMap). Never `machine.execute` directly: that bypasses
+  // scan's dedup and leaves the source untagged (mislabeled `'qr'` downstream).
   const handlePaste = useCallback(() => {
     paymentLog.info('send.destination.paste');
     void machine.scan?.();
   }, [machine]);
+
+  // One canonical seam for a whitespace-free destination the user typed, pasted,
+  // or tapped (the DetectedActionRow) — the exact same pipeline as a scan.
+  //
+  // `reset: true` is load-bearing. Tapping a specific destination is a fresh,
+  // deterministic "pay this now" intent, so it must start a clean generation.
+  // Without it the scan pipeline's own guards silently swallow the tap: after a
+  // prior scan parks the machine on an interactive step (option chooser / mint
+  // selector) that the user dismisses without resolving, `processedRef` stays
+  // set and/or `sendLocked` is still held, and `machine.scan(data)` — which runs
+  // synchronously, unlike the Paste button's async clipboard read — returns
+  // early before dispatching anything (the "tap does nothing" bug). resetInternal
+  // clears both guards and stale-aborts any in-flight send; `unit` survives (it's
+  // re-derived from getUnit) and the contact target lives in a separate store.
+  const runDestinationScan = useCallback(
+    (input: string) => {
+      paymentLog.info('send.destination.scan', { length: input.length });
+      void machine.scan?.(input, { source: 'clipboard', reset: true });
+    },
+    [machine]
+  );
 
   const handleSubmitDestination = useCallback(() => {
     // A pasted/typed destination is a single token (npub, lnaddr, invoice,
     // token, creq…). Multi-word input is a name search, so only hand
     // whitespace-free input to the parser; names fall through to the results.
     if (!trimmed || /\s/.test(trimmed)) return;
-    paymentLog.info('send.destination.execute', { length: trimmed.length });
-    void machine.execute(trimmed);
-  }, [machine, trimmed]);
+    runDestinationScan(trimmed);
+  }, [runDestinationScan, trimmed]);
 
   // ── Method handlers ──────────────────────────────────────────────────────
   const handleQrScan = useCallback(async () => {
@@ -483,14 +511,14 @@ export function SendScreen({ unit }: { unit: string }) {
 
       {/* Detected destination: colada parses the input and tells us what to
           render (Pay 100 sats / Redeem X sats / Pay <name> + pfp). Sits above
-          Recent; tap reuses machine.execute or startContactSend — no new
-          routing. */}
+          Recent; tap reuses machine.scan (same as the Paste button/input submit)
+          or startContactSend — no new routing. */}
       {destinationDescriptor ? (
         <DetectedActionRow
           descriptor={destinationDescriptor}
           onExecute={() => {
             paymentLog.info('send.detected.execute', { kind: destinationDescriptor.kind });
-            void machine.execute(destinationDescriptor.raw);
+            runDestinationScan(destinationDescriptor.raw);
           }}
           onStartContactSend={startContactSend}
         />

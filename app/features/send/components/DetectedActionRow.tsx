@@ -6,9 +6,10 @@
  *
  * Protocol kinds (invoice / ecash / payment request / lnurlp / onchain / mint)
  * render an icon-circle row whose colada-resolved label already carries the
- * amount, and tap → `onExecute` (the same `machine.execute` the input submit
- * uses). Person kinds (npub / lightning address) resolve the Nostr identity
- * (name + pfp) and tap → `onStartContactSend`, mirroring selecting a contact.
+ * amount, and tap → `onExecute` (the same canonical `machine.scan` the Paste
+ * button and input submit use). Person kinds (npub / lightning address) resolve
+ * the Nostr identity (name + pfp) and tap → `onStartContactSend`, mirroring
+ * selecting a contact.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { fetchNip05Pubkey, type DestinationDescriptor, type DestinationIcon } from 'wallet';
@@ -52,7 +53,7 @@ interface ContactSendTarget {
 
 interface DetectedActionRowProps {
   descriptor: DestinationDescriptor;
-  /** Route protocol kinds through `machine.execute(raw)` (same as input submit). */
+  /** Route protocol kinds through `machine.scan(raw)` (same as input submit). */
   onExecute: () => void;
   /** Route a resolved payable identity through the existing contact-send seam. */
   onStartContactSend: (target: ContactSendTarget) => void;
