@@ -13,9 +13,14 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 
 const mockLogError = jest.fn();
 const mockActionMenuPopup = jest.fn();
+const mockActionMenuSheet = jest.fn();
 
 jest.mock('@/shared/lib/popup/popups/actionMenu', () => ({
   actionMenuPopup: (...args: unknown[]) => mockActionMenuPopup(...args),
+}));
+
+jest.mock('@/shared/lib/popup/popups/actionMenuSheet', () => ({
+  actionMenuSheet: (...args: unknown[]) => mockActionMenuSheet(...args),
 }));
 
 jest.mock('@/shared/lib/logger', () => ({
@@ -118,6 +123,7 @@ describe('menu action failure containment', () => {
   beforeEach(() => {
     mockLogError.mockReset();
     mockActionMenuPopup.mockReset();
+    mockActionMenuSheet.mockReset();
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
       if (String(args[0]).includes('react-test-renderer is deprecated')) return;
       throw new Error(`Unexpected console.error: ${args.map(String).join(' ')}`);
@@ -152,14 +158,17 @@ describe('menu action failure containment', () => {
       );
     });
 
-    // The "More" overflow now dispatches the global actionMenuPopup() host
-    // instead of rendering an inline sheet; capture the dispatched payload and
-    // invoke the failing item's onPress.
+    // The "More" overflow dispatches the FullWindowOverlay-backed
+    // actionMenuSheet() lane — NOT actionMenuPopup(), whose host disables FWO
+    // and paints UNDER native route modals on iOS. ButtonHandler footers live
+    // inside route modals (e.g. SendTokenScreen in `(transactions-flow)`), so
+    // the popup lane renders the menu invisibly behind the modal.
     act(() => {
       findByTestID(renderer!, 'more-button').props.onPress();
     });
-    expect(mockActionMenuPopup).toHaveBeenCalledTimes(1);
-    const payload = mockActionMenuPopup.mock.calls[0][0] as {
+    expect(mockActionMenuPopup).not.toHaveBeenCalled();
+    expect(mockActionMenuSheet).toHaveBeenCalledTimes(1);
+    const payload = mockActionMenuSheet.mock.calls[0][0] as {
       buttons: { testID?: string; onPress: () => void }[];
     };
     const cancel = payload.buttons.find((b) => b.testID === 'send-token-cancel-transaction');

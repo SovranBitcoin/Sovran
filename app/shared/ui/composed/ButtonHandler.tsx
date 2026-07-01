@@ -61,7 +61,7 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from '@/assets/icons';
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 
 /**
  * Configuration for individual buttons in ButtonHandler
@@ -187,12 +187,14 @@ export function ButtonHandler({
     }
   };
 
-  // The overflow sheet is the app-wide `actionMenuPopup()` surface (rendered
-  // once by <ActionMenuHost /> at the app root). Inline heroui bottom-sheet
-  // menus mis-position / paint at rest on Android; the global host opens fully
-  // and stays hidden when closed.
+  // The overflow sheet is the FullWindowOverlay-backed `actionMenuSheet()`
+  // lane (PopupHost's standalone <BottomSheet>). ButtonHandler footers live
+  // inside route modals (e.g. SendTokenScreen in `(transactions-flow)`), and
+  // the `actionMenuPopup()` host disables FWO — it paints UNDER a native iOS
+  // route modal, leaving the menu invisible. The global-host routing (vs the
+  // old inline heroui menu, which mis-positioned on Android) is preserved.
   const openMoreMenu = () => {
-    actionMenuPopup({
+    actionMenuSheet({
       title: 'Select option',
       buttons: overflowMenuButtons.map((button, i) => ({
         text: typeof button.text === 'string' ? button.text : 'Action',
@@ -201,7 +203,13 @@ export function ButtonHandler({
         disabled: button.disabled,
         variant: button.variant,
         testID: button.testID ?? (typeof button.text === 'string' ? button.text : `overflow-${i}`),
-        onPress: () => handleMenuItemPress(button),
+        // Fire-and-forget: the sheet host defers its auto-close until the
+        // item's onPress settles, and overflow actions can be slow async ops
+        // (Check Status, Cancel transaction). Returning void keeps the sheet
+        // closing immediately on tap, matching the previous host's behavior.
+        onPress: () => {
+          void handleMenuItemPress(button);
+        },
       })),
     });
   };
@@ -267,7 +275,7 @@ export function ButtonHandler({
           </View>
         )}
 
-        {/* 4+ buttons: "More" opens the app-wide actionMenuPopup sheet listing items 3+. */}
+        {/* 4+ buttons: "More" opens the app-wide actionMenuSheet listing items 3+. */}
         {visibleButtons.length > 3 && (
           <View>
             <Button
