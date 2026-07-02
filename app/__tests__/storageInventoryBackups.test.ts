@@ -1,3 +1,5 @@
+import { getStorageInventorySnapshot } from '@/shared/lib/debug/storageInventory';
+
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getAllKeys: jest.fn().mockResolvedValue([]),
   multiGet: jest.fn().mockResolvedValue([]),
@@ -21,8 +23,6 @@ jest.mock('expo-file-system/legacy', () => ({
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn().mockResolvedValue(null),
 }));
-
-import { getStorageInventorySnapshot } from '@/shared/lib/debug/storageInventory';
 
 describe('storage inventory coco backup classification', () => {
   it('lists live coco dbs separately from pre-v2 migration backups', async () => {

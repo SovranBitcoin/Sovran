@@ -68,7 +68,7 @@ const { getInfoAsync, createUploadTask } = (
 const okBody = JSON.stringify({ url: 'https://b/abc.jpg', sha256: 'deadbeef', size: 10 });
 
 /** Builds a createUploadTask mock whose uploadAsync returns/throws per the queue. */
-function queueUploads(outcomes: Array<{ status?: number; body?: string; throw?: boolean }>) {
+function queueUploads(outcomes: { status?: number; body?: string; throw?: boolean }[]) {
   let i = 0;
   createUploadTask.mockImplementation(() => ({
     uploadAsync: async () => {

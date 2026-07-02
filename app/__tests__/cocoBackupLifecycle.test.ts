@@ -1,3 +1,7 @@
+import * as FileSystem from 'expo-file-system/legacy';
+import * as SQLite from 'expo-sqlite';
+import { CocoManager } from '@/shared/lib/cashu/manager';
+
 jest.mock('expo-sqlite', () => ({
   deleteDatabaseAsync: jest.fn().mockResolvedValue(undefined),
   openDatabaseAsync: jest.fn(),
@@ -56,10 +60,6 @@ jest.mock('@/shared/lib/cashu/npc', () => ({
   AsyncStorageSinceStore: class AsyncStorageSinceStore {},
   getNpcSinceStoreKey: jest.fn(() => 'npc-since'),
 }));
-
-import * as FileSystem from 'expo-file-system/legacy';
-import * as SQLite from 'expo-sqlite';
-import { CocoManager } from '@/shared/lib/cashu/manager';
 
 describe('CocoManager pre-v2 backup lifecycle', () => {
   it('completeReset deletes the pre-v2 backup set for every profile database', async () => {

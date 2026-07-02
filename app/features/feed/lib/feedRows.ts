@@ -15,7 +15,7 @@ export type FeedRow = {
   quotedEvents: Map<string, FeedEvent>;
   reposterName?: string;
   reposterPubkey?: string;
-  reposters?: Array<{ name: string; pubkey: string }>;
+  reposters?: { name: string; pubkey: string }[];
 };
 
 export const DEFAULT_ENGAGEMENT_STATE: EngagementViewState = Object.freeze({
@@ -184,7 +184,7 @@ function defaultResolveReposter(item: Extract<FeedItem, { type: 'repost' }>): {
 function resolveReposters(
   item: Extract<FeedItem, { type: 'repost' }>,
   resolveReposter: NonNullable<BuildFeedRowsOptions['resolveReposter']>
-): Array<{ name: string; pubkey: string }> {
+): { name: string; pubkey: string }[] {
   const reposterEvents =
     item.reposters && item.reposters.length > 0
       ? item.reposters.map((reposter) => reposter.event)
@@ -209,8 +209,8 @@ function feedRowContentEqual(previous: FeedRow, next: FeedRow): boolean {
 }
 
 function repostersEqual(
-  a: Array<{ name: string; pubkey: string }> | undefined,
-  b: Array<{ name: string; pubkey: string }> | undefined
+  a: { name: string; pubkey: string }[] | undefined,
+  b: { name: string; pubkey: string }[] | undefined
 ): boolean {
   if (a === b) return true;
   if (!a || !b || a.length !== b.length) return false;

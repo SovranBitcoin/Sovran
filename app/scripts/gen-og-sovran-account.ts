@@ -85,7 +85,9 @@ for (const tokenStr of tokenStrings) {
     decodedTokens.push({ token, raw: tokenStr });
     console.log(`\nDecoded token for mint: ${token.mint}`);
     console.log(`  proofs: ${token.proofs.length}`);
-    console.log(`  total amount: ${token.proofs.reduce((s, p) => s + Number(p.amount.toString()), 0)}`);
+    console.log(
+      `  total amount: ${token.proofs.reduce((s, p) => s + Number(p.amount.toString()), 0)}`
+    );
     console.log(`  unit: ${token.unit || 'sat'}`);
     console.log(`  keyset IDs: ${[...new Set(token.proofs.map((p) => p.id))].join(', ')}`);
   } catch (err) {

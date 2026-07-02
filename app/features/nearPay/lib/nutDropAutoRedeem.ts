@@ -1,6 +1,9 @@
 import { AppState } from 'react-native';
-import { createMeshRedeemOrchestrator, type MeshRedeemOrchestrator } from 'wallet';
-import type { TransactionAnnotation } from 'wallet';
+import {
+  createMeshRedeemOrchestrator,
+  type MeshRedeemOrchestrator,
+  TransactionAnnotation,
+} from 'wallet';
 import { createDefaultOperations } from 'wallet/operations';
 import { getBLEPeers } from 'bitchat-module';
 

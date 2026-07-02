@@ -146,7 +146,6 @@ export function useNostrProfileMetadataMany(
       if (!record || now - (record.seenAt ?? 0) > STALE_TTL_MS) out.push(pk);
     }
     return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pubkeys, records]);
 
   const [isFetching, setIsFetching] = useState(false);

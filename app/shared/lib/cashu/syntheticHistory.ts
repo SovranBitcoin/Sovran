@@ -4,7 +4,6 @@ import type {
   LegacyMeltHistoryEntry,
   LegacyMintHistoryEntry,
   LegacyReceiveHistoryEntry,
-  LegacySendHistoryEntry,
 } from '@cashu/coco-core';
 
 /**
@@ -22,10 +21,9 @@ type WithNumericAmount<E> = E extends { amount: unknown }
   ? Omit<E, 'amount'> & { amount: number }
   : E;
 
-export type SyntheticHistoryEntry = WithNumericAmount<LegacyHistoryEntry>;
+type SyntheticHistoryEntry = WithNumericAmount<LegacyHistoryEntry>;
 export type SyntheticMintHistoryEntry = WithNumericAmount<LegacyMintHistoryEntry>;
 export type SyntheticMeltHistoryEntry = WithNumericAmount<LegacyMeltHistoryEntry>;
-export type SyntheticSendHistoryEntry = WithNumericAmount<LegacySendHistoryEntry>;
 export type SyntheticReceiveHistoryEntry = WithNumericAmount<LegacyReceiveHistoryEntry>;
 
 export function asHistoryEntry(entry: SyntheticHistoryEntry): HistoryEntry {

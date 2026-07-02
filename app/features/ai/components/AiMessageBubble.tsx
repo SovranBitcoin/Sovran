@@ -12,7 +12,6 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { popup } from '@/shared/lib/popup';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { formatRelative } from '@/shared/lib/date';
-import { duration } from '@/shared/styles/tokens';
 import {
   useStreamingContent,
   useStreamingReasoning,

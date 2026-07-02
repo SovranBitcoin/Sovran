@@ -69,7 +69,6 @@ export function useRecentPeopleProfiles(pubkeys: readonly string[]): RecentPeopl
       active = false;
       controller.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [normalizedPubkeys, records]);
 
   const loadingPubkeys = useMemo(

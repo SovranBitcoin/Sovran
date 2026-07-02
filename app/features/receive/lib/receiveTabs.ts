@@ -1,6 +1,6 @@
 import { hasMintSupportingMethod, type WalletContext } from 'wallet';
 
-export type ReceiveTab = 'Lightning' | 'Bolt12' | 'Onchain' | 'P2PK';
+type ReceiveTab = 'Lightning' | 'Bolt12' | 'Onchain' | 'P2PK';
 
 /**
  * Amountless receive rails, capability-gated: Bolt12/Onchain appear when ANY

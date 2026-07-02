@@ -61,7 +61,7 @@ export function encodeAuthHeader(signedEventJson: string): string {
   const bytes = utf8ToBytes(signedEventJson);
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  // eslint-disable-next-line no-restricted-globals -- base64 of an in-memory string, not a network call
+
   const base64 = typeof btoa === 'function' ? btoa(binary) : Buffer.from(bytes).toString('base64');
   return `Nostr ${base64}`;
 }

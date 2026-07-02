@@ -79,7 +79,9 @@ describe('ephemeral keyring overlay', () => {
   function createKeyRingRepository(persisted: Keypair[] = []): KeyRingRepository {
     const rows = new Map(persisted.map((kp) => [kp.publicKeyHex, kp]));
     const byPurpose = (purpose?: KeypairPurpose) =>
-      [...rows.values()].filter((kp) => purpose === undefined || (kp.purpose ?? 'p2pk') === purpose);
+      [...rows.values()].filter(
+        (kp) => purpose === undefined || (kp.purpose ?? 'p2pk') === purpose
+      );
     return {
       getPersistedKeyPair: jest.fn(
         async (publicKey: string, purpose?: KeypairPurpose) =>
