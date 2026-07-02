@@ -85,8 +85,8 @@ export function subscribeThemeDragTarget(listener: () => void): () => void {
   };
 }
 
-/** Mount the target theme's wallpaper layer + set color endpoints. */
-export function beginThemeDrag(targetTheme: string, fromSurface: string | null): void {
+/** Mount the target theme's wallpaper layer + set color endpoints (used by releaseThemeDrag). */
+function beginThemeDrag(targetTheme: string, fromSurface: string | null): void {
   if (dragTargetTheme !== targetTheme) {
     dragTargetTheme = targetTheme;
     themeDragTargetSv.value = targetTheme;
