@@ -277,7 +277,17 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
           {/* Wallet unit above the fiat display-currency pill: the unit is
               the structural choice (what the balance IS), the currency pill
               only re-prices it. */}
-          <UnitSwitcherPill textSize={12} />
+          <UnitSwitcherPill
+            textSize={12}
+            displayUnit={
+              account.unit === 'sat' ||
+              account.unit === 'usd' ||
+              account.unit === 'eur' ||
+              account.unit === 'gbp'
+                ? account.unit
+                : undefined
+            }
+          />
           {/* Fiat conversion of a sat balance is meaningless when the wallet
               is already denominated in a fiat unit — structurally hide it. */}
           {isSatUnit ? <FiatCurrencyPill displayText={displayText} textSize={12} /> : null}

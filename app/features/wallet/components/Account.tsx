@@ -130,12 +130,12 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
                   align="center"
                   gap={8}
                   onLayout={(event) => onPageContentLayout(accountUnit, event)}>
-                  {/* Revolut model: every page renders the CURRENT account's
-                      content — pages are identical while swiping (no per-page
-                      content differences to stutter or shift) and the content
-                      "corrects itself" to the new account when the switch
-                      commits at idle. */}
-                  <PrimaryBalance account={{ unit }} />
+                  {/* Each page renders ITS OWN account's full data — balance,
+                      pending/reserved pills, fiat conversion — via its own
+                      always-mounted subscriptions, so the neighbour that
+                      slides into view during a drag is already correct.
+                      Heights stay uniform via the max-height container. */}
+                  <PrimaryBalance account={{ unit: accountUnit }} />
                 </VStack>
               </VStack>
             </View>

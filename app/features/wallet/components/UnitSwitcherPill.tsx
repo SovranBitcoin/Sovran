@@ -44,8 +44,17 @@ const PILL_LABELS: Record<ActiveUnit, string> = {
  * Picking a unit the preferred mint lacks also re-points the preferred mint
  * (see useActiveUnit.selectUnit).
  */
-export function UnitSwitcherPill({ textSize = 12 }: { textSize?: number }): React.ReactElement {
+export function UnitSwitcherPill({
+  textSize = 12,
+  displayUnit,
+}: {
+  textSize?: number;
+  /** Show THIS account on the pill (carousel pages preview their own unit);
+   *  the menu still switches the ACTIVE unit. Defaults to the active unit. */
+  displayUnit?: ActiveUnit;
+}): React.ReactElement {
   const { unit, availableUnits, selectUnit } = useActiveUnit();
+  const shownUnit = displayUnit ?? unit;
   const [textColor, surfaceSecondary, muted, success] = useThemeColor([
     'foreground',
     'surface-secondary',
@@ -91,14 +100,14 @@ export function UnitSwitcherPill({ textSize = 12 }: { textSize?: number }): Reac
           // Greyed out when only one unit exists — nothing to switch to.
           opacity: canSwitch ? 1 : 0.4,
         }}>
-        {unitIconNode(UNIT_OPTIONS.find((o) => o.unit === unit) ?? UNIT_OPTIONS[0], 16)}
+        {unitIconNode(UNIT_OPTIONS.find((o) => o.unit === shownUnit) ?? UNIT_OPTIONS[0], 16)}
         <Text
           overpass
           size={textSize}
           bold
           color={canSwitch ? textColor : muted}
           style={{ letterSpacing: 0.3 }}>
-          {PILL_LABELS[unit]}
+          {PILL_LABELS[shownUnit]}
         </Text>
       </HStack>
     </Pressable>
