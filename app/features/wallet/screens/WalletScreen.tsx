@@ -37,6 +37,9 @@ import { useHeaderHeight } from 'expo-router/react-navigation';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 
+// The wallet-screen transaction list shows EVERY account's entries;
+// Transactions treats unit 'all' as unfiltered.
+const ALL_UNITS_ACCOUNT = { unit: 'all' };
 const QR_BUTTON_SIZE = 64;
 const CAPSULE_BUTTON_HEIGHT = 48;
 const PRIMARY_ACTION_ROW_HEIGHT = Math.max(QR_BUTTON_SIZE, CAPSULE_BUTTON_HEIGHT);
@@ -78,7 +81,11 @@ export function WalletScreen() {
   const { unit: activeUnit } = useActiveUnit();
   const account = useMemo(() => ({ unit: activeUnit }), [activeUnit]);
 
-  const { history, refresh } = useHistoryWithMelts(100, activeUnit);
+  // ALL units, unfiltered: the transaction list is shared by every carousel
+  // account, so switching accounts never reloads it — which was the
+  // remaining content shift on commit (the list re-filtered and re-rendered
+  // exactly as the unit landed).
+  const { history, refresh } = useHistoryWithMelts(100);
   const handlePullToAiRefresh = useCallback(() => {
     void refresh();
   }, [refresh]);
@@ -263,7 +270,12 @@ export function WalletScreen() {
           </View>
 
           <View style={styles.content}>
-            <Transactions account={account} showMore={true} history={history} hideExpired={true} />
+            <Transactions
+              account={ALL_UNITS_ACCOUNT}
+              showMore={true}
+              history={history}
+              hideExpired={true}
+            />
             <SpentThisMonth history={history} unit={account.unit} />
             <ReceivedThisMonth history={history} unit={account.unit} />
             <BitcoinNearYou />
