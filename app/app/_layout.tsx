@@ -370,12 +370,15 @@ function RootLayoutContent() {
       <StatusBar style={currentTheme.includes('light') ? 'dark' : 'light'} />
       <OfflineShell>
         <Stack
-          // NOTE: keyed on the theme so a theme/wallpaper change re-applies
-          // contentStyle/header colors. This remounts the navigator on theme
-          // switch (not on the modal-open hot path). Removing it needs on-device
-          // verification that native-stack re-applies colors to already-mounted
-          // screens — left in place until that's confirmed (see perf plan §4).
-          key={currentTheme}
+          // NOTE: deliberately NOT keyed on the theme. The old key={currentTheme}
+          // remounted the ENTIRE navigator on every theme change — acceptable
+          // when themes changed from a settings screen, but the account
+          // carousel now changes the theme on every swipe, and the remount
+          // (WalletScreen unmount→mount, history refetch, carousel reset) was
+          // the post-switch jitter (log evidence: lifecycle.unmount
+          // WalletScreen 110ms before every wallet.layout.shift burst).
+          // screenOptions below stays reactive — native-stack re-applies
+          // contentStyle to mounted screens when options identity changes.
           screenOptions={{
             headerShown: false,
             gestureEnabled: true,
