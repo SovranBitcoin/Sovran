@@ -15,6 +15,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { MeltQuoteState } from '@cashu/cashu-ts';
+import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -484,10 +485,13 @@ export function SwapTransactionScreen({ groupId }: Props) {
                       const meltEntryForDisplay: MeltHistoryEntry | undefined =
                         meltEntry ??
                         (leg.meltQuoteId
-                          ? {
+                          ? (asHistoryEntry({
                               id: leg.meltOperationId ?? leg.id,
+                              source: 'legacy',
+                              legacyHistoryId: leg.meltOperationId ?? leg.id,
                               operationId: leg.meltOperationId ?? leg.id,
                               createdAt: group.createdAt,
+                              updatedAt: group.createdAt,
                               mintUrl: leg.fromMintUrl,
                               unit: group.unit,
                               type: 'melt' as const,
@@ -497,7 +501,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
                                   ? MeltQuoteState.PAID
                                   : MeltQuoteState.UNPAID,
                               amount: leg.amount,
-                            }
+                            }) as MeltHistoryEntry)
                           : undefined);
 
                       const fromInfo = mintInfoMap[leg.fromMintUrl];

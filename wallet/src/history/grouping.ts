@@ -11,6 +11,7 @@
 
 import type { HistoryEntry } from "@cashu/coco-core";
 
+import { amountToNumber } from "../amount";
 import { getSwap } from "../annotations/selectors";
 import {
   bucketTransaction,
@@ -83,9 +84,11 @@ function buildSwapItem(
   // Representative amount: the destination (mint-role) leg if present, else the
   // largest leg — both legs of a single hop carry ~the same amount.
   const mintLeg = legs.find((leg) => getSwap(leg)?.role === "mint");
+  // Amounts on live coco v2 entries are Amount value objects; the swap-group
+  // read model carries plain numbers.
   const amount = mintLeg
-    ? mintLeg.amount
-    : legs.reduce((max, leg) => Math.max(max, leg.amount ?? 0), 0);
+    ? amountToNumber(mintLeg.amount)
+    : legs.reduce((max, leg) => Math.max(max, amountToNumber(leg.amount ?? 0)), 0);
 
   const unit = legs.find((leg) => leg.unit)?.unit ?? "sat";
   // Sort the group by its most recent leg so it ranks by latest activity.

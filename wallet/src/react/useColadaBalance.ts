@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { BalancesByMint, BalanceSnapshot, Manager } from "@cashu/coco-core";
+import type { BalancesByMint, Manager } from "@cashu/coco-core";
 
 import { logger } from "../logger";
 import {
@@ -13,7 +13,15 @@ import { useColadaManager } from "./ColadaProvider";
 // (matches how the app previously filtered usePaginatedHistory()).
 const PENDING_PAGE_SIZE = 100;
 
-const EMPTY_SNAPSHOT: BalanceSnapshot = { spendable: 0, reserved: 0, total: 0 };
+// Colada's balance read model carries plain numbers; coco v2 BalanceSnapshot
+// fields are Amount value objects and convert once at reload.
+interface NumericSnapshot {
+  spendable: number;
+  reserved: number;
+  total: number;
+}
+
+const EMPTY_SNAPSHOT: NumericSnapshot = { spendable: 0, reserved: 0, total: 0 };
 
 /**
  * The wallet balance breakdown: spendable / reserved / total from coco's
@@ -24,7 +32,7 @@ const EMPTY_SNAPSHOT: BalanceSnapshot = { spendable: 0, reserved: 0, total: 0 };
 export function useColadaBalance(): WalletBalanceBreakdown {
   const manager = useColadaManager();
 
-  const [snapshot, setSnapshot] = useState<BalanceSnapshot>(EMPTY_SNAPSHOT);
+  const [snapshot, setSnapshot] = useState<NumericSnapshot>(EMPTY_SNAPSHOT);
   const [byMint, setByMint] = useState<BalancesByMint>({});
   const [pending, setPending] = useState(0);
   const [redeeming, setRedeeming] = useState(0);
@@ -50,7 +58,11 @@ export function useColadaBalance(): WalletBalanceBreakdown {
         mgr.ops.receive.listInFlight().catch(() => []),
       ]);
       if (!mountedRef.current) return;
-      setSnapshot(total);
+      setSnapshot({
+        spendable: amountToNumber(total.spendable),
+        reserved: amountToNumber(total.reserved),
+        total: amountToNumber(total.total),
+      });
       setByMint(perMint);
       setPending(sumReservedSends(historyPage ?? []));
       setRedeeming(inFlight.reduce((sum, op) => sum + amountToNumber(op.amount), 0));

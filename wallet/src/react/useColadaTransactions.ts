@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { HistoryEntry, Manager, MeltHistoryEntry } from "@cashu/coco-core";
+import type { HistoryEntry, Manager } from "@cashu/coco-core";
 
 import { logger } from "../logger";
 import {
   listInFlightReceiveEntries,
-  listMeltSupplementEntries,
   mergeTransactionSources,
   sameTransactionList,
 } from "../history/aggregate";
+import { normalizeHistoryEntries } from "../history/normalize";
 import {
   candidateKeys,
   mergeAnnotationRecords,
@@ -87,7 +87,6 @@ export function useColadaTransactions(
   const annotationStore = useAnnotationStore();
 
   const [cocoHistory, setCocoHistory] = useState<HistoryEntry[]>([]);
-  const [meltEntries, setMeltEntries] = useState<MeltHistoryEntry[]>([]);
   const [receiveEntries, setReceiveEntries] = useState<HistoryEntry[]>([]);
   const [isFetching, setIsFetching] = useState(false);
   // Bumped whenever the annotation store changes so the merged list recomputes.
@@ -117,11 +116,13 @@ export function useColadaTransactions(
   const fetchPage = useCallback(
     async (offset: number): Promise<HistoryEntry[]> => {
       try {
-        return (
+        // Normalize v2 operation-projected states to the legacy vocabulary
+        // once, at the read-model boundary.
+        return normalizeHistoryEntries(
           (await managerRef.current.history.getPaginatedHistory(
             offset,
             pageSize,
-          )) ?? []
+          )) ?? [],
         );
       } catch (err) {
         logger.warn("history.transactions.page_failed", {
@@ -136,12 +137,8 @@ export function useColadaTransactions(
 
   const fetchSupplements = useCallback(async () => {
     try {
-      const [melts, receives] = await Promise.all([
-        listMeltSupplementEntries(managerRef.current),
-        listInFlightReceiveEntries(managerRef.current),
-      ]);
+      const receives = await listInFlightReceiveEntries(managerRef.current);
       if (!mountedRef.current) return;
-      setMeltEntries(melts);
       setReceiveEntries(receives);
     } catch (err) {
       logger.warn("history.transactions.supplements_failed", {
@@ -211,9 +208,10 @@ export function useColadaTransactions(
     return () => manager.off("history:updated", onHistory);
   }, [manager]);
 
-  // Melt operation lifecycle -> re-fetch the melt supplement.
+  // Melt operation lifecycle -> refresh page 0 (v2 projects melts into
+  // history directly; there is no melt supplement anymore).
   useEffect(() => {
-    const onMelt = () => void fetchSupplements();
+    const onMelt = () => void refreshRef.current();
     manager.on("melt-op:prepared", onMelt);
     manager.on("melt-op:pending", onMelt);
     manager.on("melt-op:finalized", onMelt);
@@ -224,7 +222,7 @@ export function useColadaTransactions(
       manager.off("melt-op:finalized", onMelt);
       manager.off("melt-op:rolled-back", onMelt);
     };
-  }, [manager, fetchSupplements]);
+  }, [manager]);
 
   // Receive operation lifecycle -> re-fetch the in-flight receive supplement.
   useEffect(() => {
@@ -293,7 +291,6 @@ export function useColadaTransactions(
   const baseHistory = useMemo(() => {
     const merged = mergeTransactionSources({
       cocoHistory,
-      meltEntries,
       receiveEntries,
     });
     if (sameTransactionList(prevMergedRef.current, merged)) {
@@ -301,7 +298,7 @@ export function useColadaTransactions(
     }
     prevMergedRef.current = merged;
     return merged;
-  }, [cocoHistory, meltEntries, receiveEntries]);
+  }, [cocoHistory, receiveEntries]);
 
   // Merge per-transaction annotations into each entry's metadata. Un-annotated
   // rows keep their reference (mergeAnnotationsIntoEntry is identity on empty),

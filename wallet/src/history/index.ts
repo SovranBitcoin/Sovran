@@ -22,8 +22,6 @@ export type { TransactionBucket } from "./filters";
 export { inFlightReceiveToHistoryEntry } from "./inFlightReceives";
 export {
   listInFlightReceiveEntries,
-  listMeltSupplementEntries,
-  meltOpToHistoryEntry,
   mergeTransactionSources,
   sameTransactionList,
 } from "./aggregate";

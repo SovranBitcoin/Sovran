@@ -30,6 +30,7 @@ import {
 import { withSkippedPersistWrites } from '@/shared/lib/cashu/profileScopedStorage';
 import { amountToNumber, toCocoAmount } from '@/shared/lib/cashu/amount';
 import type { HistoryEntry } from '@cashu/coco-core';
+import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 // Type-only import — `useRecentContacts` does not import this file at runtime
 // (it reads mock state via getMockState() below), so there's no cycle.
 import type { RecentContact } from '@/features/payments/hooks/useNip17RecentContacts';
@@ -127,32 +128,40 @@ function buildMockData() {
     };
 
     if (row.type === 'melt') {
-      history.push({ ...base, type: 'melt', quoteId: `${id}-q`, state: 'PAID' as const });
+      history.push(
+        asHistoryEntry({ ...base, type: 'melt', quoteId: `${id}-q`, state: 'PAID' as const })
+      );
     } else if (row.type === 'mint') {
-      history.push({
-        ...base,
-        type: 'mint',
-        paymentRequest:
-          'lnbc500u1pnxk4ppq0gfq2ue6m8k5tvz6gwldkdhjr07samkjhy5palzqrn64aqxgx0qdqu2askcmr9wssx7e3q2dshgmmndp5scqzzsxqyz5vqsp5usycvxaz',
-        quoteId: `${id}-q`,
-        state: 'PAID' as const,
-      });
+      history.push(
+        asHistoryEntry({
+          ...base,
+          type: 'mint',
+          paymentRequest:
+            'lnbc500u1pnxk4ppq0gfq2ue6m8k5tvz6gwldkdhjr07samkjhy5palzqrn64aqxgx0qdqu2askcmr9wssx7e3q2dshgmmndp5scqzzsxqyz5vqsp5usycvxaz',
+          quoteId: `${id}-q`,
+          state: 'PAID' as const,
+        })
+      );
     } else if (row.type === 'receive') {
-      history.push({ ...base, type: 'receive', state: 'finalized' });
+      history.push(asHistoryEntry({ ...base, type: 'receive', state: 'finalized' }));
     } else if (row.type === 'send') {
-      history.push({
-        ...base,
-        type: 'send',
-        operationId: `${id}-op`,
-        state: 'pending' as const,
-      });
+      history.push(
+        asHistoryEntry({
+          ...base,
+          type: 'send',
+          operationId: `${id}-op`,
+          state: 'pending' as const,
+        })
+      );
     } else if (row.type === 'send-cancelled') {
-      history.push({
-        ...base,
-        type: 'send',
-        operationId: `${id}-op`,
-        state: 'rolledBack' as const,
-      });
+      history.push(
+        asHistoryEntry({
+          ...base,
+          type: 'send',
+          operationId: `${id}-op`,
+          state: 'rolledBack' as const,
+        })
+      );
     }
 
     if ('badge' in row && row.badge) {

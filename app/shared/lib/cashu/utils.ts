@@ -11,8 +11,9 @@
  * @see {@link https://github.com/bitcoinvault/coco-cashu-core} Coco Cashu Core
  */
 
-import { type Manager, type ReceiveHistoryEntry } from '@cashu/coco-core';
+import { type Manager } from '@cashu/coco-core';
 import { decodeEcashTokenMetadata } from 'wallet';
+import type { SyntheticReceiveHistoryEntry } from './syntheticHistory';
 
 import { log } from '../logger';
 import { mintLocalId } from '../id';
@@ -37,7 +38,7 @@ function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, un
 export function buildReceiveHistoryEntry(
   rawToken: string,
   unitOverride?: string
-): ReceiveHistoryEntry & { source: 'legacy'; legacyHistoryId: string; updatedAt: number } {
+): SyntheticReceiveHistoryEntry {
   log.info('cashu.utils.build_receive_history_entry', { tokenLen: rawToken.length, unitOverride });
   const decoded = decodeEcashTokenMetadata(rawToken);
   if (!decoded) {

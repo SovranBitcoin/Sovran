@@ -95,8 +95,6 @@ export {
   groupTimeline,
   inFlightReceiveToHistoryEntry,
   listInFlightReceiveEntries,
-  listMeltSupplementEntries,
-  meltOpToHistoryEntry,
   mergeTransactionSources,
   sameTransactionList,
   isCancellablePendingEcash,

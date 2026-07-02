@@ -46,6 +46,17 @@ import {
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
+import type {
+  SyntheticMeltHistoryEntry,
+  SyntheticMintHistoryEntry,
+} from '@/shared/lib/cashu/syntheticHistory';
+
+// The p2pk-import package is typed against coco v1's Manager (its module
+// augmentation contributed `ext`); v2's class shape no longer merges, but the
+// runtime contract (manager.ext registry + keyring) is unchanged. One nominal
+// cast at the seam — same pattern as the plugin registration in manager.ts.
+const asP2PKImportManager = (mgr: Manager) =>
+  mgr as unknown as Parameters<typeof resolvePrimaryReceiveP2PKPublicKey>[0];
 import { prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { getMintQuotePaymentValue, getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 import {
@@ -517,16 +528,21 @@ export function createSovranExecuteMintQuote(
 
     // Constructed entry — used as a fallback (same shape as coco's default
     // executeMintQuote) when polling can't find coco's persisted row in time.
-    const constructedEntry: MintHistoryEntry = {
+    // A freshly prepared bolt11 quote is always UNPAID (v2 moved observed
+    // state to the canonical quote row); amount serializes as a number.
+    const constructedEntry: SyntheticMintHistoryEntry = {
       id: mintOp.id,
       type: 'mint',
+      source: 'legacy',
+      legacyHistoryId: mintOp.id,
       operationId: mintOp.id,
       createdAt: mintOp.createdAt,
+      updatedAt: mintOp.createdAt,
       mintUrl: mintOp.mintUrl,
       unit: mintOp.unit,
       quoteId: mintOp.quoteId,
-      state: mintOp.lastObservedRemoteState ?? 'UNPAID',
-      amount: mintOp.amount,
+      state: 'UNPAID',
+      amount: amountToNumber(mintOp.amount),
       paymentRequest: mintOp.request,
       metadata: { operationId: mintOp.id },
     };
@@ -1035,7 +1051,7 @@ export function createSovranNotifications(
       if (hadP2PKProofs && useSettingsStore.getState().regenerateP2PKOnReceive) {
         const mgr = config?.getManager?.();
         if (mgr) {
-          if ((getP2PKImportExtension(mgr)?.getPublicKeys() ?? []).length > 0) {
+          if ((getP2PKImportExtension(asP2PKImportManager(mgr))?.getPublicKeys() ?? []).length > 0) {
             return;
           }
 
@@ -1528,11 +1544,7 @@ export function createSovranHandlers({
       // `LightningSendScreen` re-assembles them on read.
       const id = mintLocalId('melt-preview');
       const now = Date.now();
-      const entry: MeltHistoryEntry & {
-        source: 'legacy';
-        legacyHistoryId: string;
-        updatedAt: number;
-      } = {
+      const entry: SyntheticMeltHistoryEntry = {
         id,
         type: 'melt',
         source: 'legacy',
@@ -1619,7 +1631,7 @@ export function createSovranHandlers({
       const currentMgr = getManager();
       if (currentMgr) {
         try {
-          p2pkKey = await resolvePrimaryReceiveP2PKPublicKey(currentMgr);
+          p2pkKey = await resolvePrimaryReceiveP2PKPublicKey(asP2PKImportManager(currentMgr));
         } catch {
           /* ignore */
         }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text as RNText, View } from 'react-native';
 import { MeltQuoteState } from '@cashu/cashu-ts';
+import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 import { createPaymentCopyGroups, type PaymentCopyResolver } from 'wallet';
 
 import { popupLog } from '../logger';
@@ -249,16 +250,19 @@ export function PaymentStatusToast({
       // v3 melts are not in history; construct MeltHistoryEntry from operationId
       if (!entry && variant === 'melt' && effectiveOperationId) {
         const now = Date.now();
-        entry = {
+        entry = asHistoryEntry({
           type: 'melt',
           id: effectiveOperationId,
+          source: 'legacy',
+          legacyHistoryId: effectiveOperationId,
           quoteId: paymentId,
           mintUrl,
           amount,
           unit,
           state: MeltQuoteState.PAID,
           createdAt: now,
-        } as const;
+          updatedAt: now,
+        });
       }
       if (entry) {
         if (entry.type === 'mint') {
