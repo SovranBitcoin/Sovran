@@ -11,10 +11,10 @@ import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
 
 describe('computeReceiveTabs', () => {
   it('always shows Lightning, Bolt12, and Onchain', () => {
-    expect(computeReceiveTabs(false)).toEqual(['Lightning', 'Bolt12', 'Onchain']);
+    expect(computeReceiveTabs(false)).toEqual(['Lightning', 'BOLT 12', 'Onchain']);
   });
 
   it('appends P2PK when quick access is enabled', () => {
-    expect(computeReceiveTabs(true)).toEqual(['Lightning', 'Bolt12', 'Onchain', 'P2PK']);
+    expect(computeReceiveTabs(true)).toEqual(['Lightning', 'BOLT 12', 'Onchain', 'P2PK']);
   });
 });

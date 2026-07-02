@@ -380,7 +380,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                   muted={muted}
                 />
               </TabPane>
-              <TabPane visible={selectedTab === 'Bolt12'}>
+              <TabPane visible={selectedTab === 'BOLT 12'}>
                 <ReceiveReusableQuoteTab
                   method="bolt12"
                   unit={unit}

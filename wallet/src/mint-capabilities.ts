@@ -319,7 +319,7 @@ export function isMethodImplemented(
 
 function methodLabel(method: MintPaymentMethod): string {
   if (method === "bolt11") return "Lightning";
-  if (method === "bolt12") return "Bolt12";
+  if (method === "bolt12") return "BOLT 12";
   return "onchain";
 }
 

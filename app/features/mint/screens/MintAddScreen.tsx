@@ -331,7 +331,7 @@ export function MintAddScreen() {
   const { method: methodParam } = useLocalSearchParams<{ method?: string }>();
   const methodFilter =
     methodParam === 'bolt12' || methodParam === 'onchain' ? methodParam : undefined;
-  const methodLabel = methodFilter === 'bolt12' ? 'Bolt12' : 'Onchain';
+  const methodLabel = methodFilter === 'bolt12' ? 'BOLT 12' : 'Onchain';
   useEffect(() => {
     if (methodFilter) cashuLog.info('mint.add.method_filter', { method: methodFilter });
   }, [methodFilter]);
