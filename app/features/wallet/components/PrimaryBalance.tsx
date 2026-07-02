@@ -2,7 +2,6 @@ import React, { useCallback, useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { UnitSwitcherPill } from '@/features/wallet/components/UnitSwitcherPill';
 import { useSettingsStore, DisplayCurrency } from '@/shared/stores/global/settingsStore';
