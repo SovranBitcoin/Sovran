@@ -159,11 +159,6 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
   return (
     <>
       <PaymentInfo data={uri} copyTarget="bip321" unit={unit} />
-      <View className="mb-1 items-center">
-        <Text size={12} className="text-muted">
-          {`Includes: ${included.join(' · ')}`}
-        </Text>
-      </View>
       <View className="mx-4">
         <Section title="BIP-321 URI">
           <GradientCard>
