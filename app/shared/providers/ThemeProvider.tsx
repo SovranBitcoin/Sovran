@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeStore, type ThemeMode } from '@/shared/stores/profile/themeStore';
@@ -7,6 +7,7 @@ import { useUnitWallpaper } from '@/shared/lib/theme/useUnitWallpaper';
 import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
 import { themeVariables, getThemeVariables } from '@/shared/lib/themeEngine';
+import { primeThemeSurface, runThemeTransition } from '@/shared/lib/theme/themeTransition';
 import { Uniwind } from 'uniwind';
 
 initLog('Module', 'ThemeProvider loaded');
@@ -46,30 +47,53 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // while coco boots. Falls through resolveUnitWallpaper's chain (unit →
   // first override → album → fallback) when the unit has no assignment.
   const activeUnit = useMintStore((s) => s.activeUnit);
-  const currentTheme = useUnitWallpaper(activeUnit);
+  const resolvedTheme = useUnitWallpaper(activeUnit);
   const mode = useThemeStore((s) => s.mode);
 
+  // What consumers SEE. Trails `resolvedTheme` by the fade-out so the
+  // wallpaper image and CSS vars swap at the transition's dip, not on the
+  // very frame the account changes.
+  const [currentTheme, setCurrentTheme] = useState(resolvedTheme);
   const lastApplied = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!THEMES[currentTheme as ThemeName]) {
-      log.warn('theme.not_found', { themeName: currentTheme });
+    if (!THEMES[resolvedTheme as ThemeName]) {
+      log.warn('theme.not_found', { themeName: resolvedTheme });
       return;
     }
-    if (lastApplied.current === currentTheme) return;
+    if (lastApplied.current === resolvedTheme) return;
 
-    const t0 = performance.now();
-    const vars = themeVariables[currentTheme] ?? getThemeVariables(currentTheme);
-    Uniwind.updateCSSVariables('light', vars);
-    Uniwind.updateCSSVariables('dark', vars);
-    const duration_ms = Math.round((performance.now() - t0) * 100) / 100;
-    lastApplied.current = currentTheme;
-    log.info('theme.css_vars.applied', {
-      theme: currentTheme,
-      varCount: Object.keys(vars).length,
-      duration_ms,
-    });
-  }, [currentTheme]);
+    const applyVars = () => {
+      const t0 = performance.now();
+      const vars = themeVariables[resolvedTheme] ?? getThemeVariables(resolvedTheme);
+      Uniwind.updateCSSVariables('light', vars);
+      Uniwind.updateCSSVariables('dark', vars);
+      const duration_ms = Math.round((performance.now() - t0) * 100) / 100;
+      log.info('theme.css_vars.applied', {
+        theme: resolvedTheme,
+        varCount: Object.keys(vars).length,
+        duration_ms,
+      });
+      setCurrentTheme(resolvedTheme);
+    };
+    const surfaceOf =
+      ((themeVariables[resolvedTheme] ?? getThemeVariables(resolvedTheme))['--surface'] as
+        | string
+        | undefined) ?? null;
+
+    if (lastApplied.current === null) {
+      // Boot apply — no transition, no fade.
+      lastApplied.current = resolvedTheme;
+      primeThemeSurface(surfaceOf);
+      applyVars();
+      return;
+    }
+    // Account/theme switch: fade the wallpaper layer out, swap at the dip,
+    // fade in; the base surface color glides between the two themes.
+    lastApplied.current = resolvedTheme;
+    log.info('theme.transition.start', { to: resolvedTheme });
+    runThemeTransition(surfaceOf, applyVars);
+  }, [resolvedTheme]);
 
   // Wait for the wallpaper store to finish registering downloaded themes —
   // without this the first paint would render against unregistered THEMES

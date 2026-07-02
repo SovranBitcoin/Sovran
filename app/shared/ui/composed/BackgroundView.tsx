@@ -5,7 +5,13 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBackgroundContext } from '@/shared/providers/BackgroundProvider';
 import React, { memo, ReactNode, useMemo } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
-import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+import Animated, { interpolateColor, useAnimatedStyle } from 'react-native-reanimated';
+import {
+  themeLayerOpacity,
+  themeSurfaceFrom,
+  themeSurfaceProgress,
+  themeSurfaceTo,
+} from '@/shared/lib/theme/themeTransition';
 import { useTheme } from '@/shared/providers/ThemeProvider';
 import { isBackgroundImageTheme, getGradientColorScale } from '@/config/backgroundImageThemes';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -291,8 +297,26 @@ function AnimatedBackgroundViewComponent({
   }));
 
   const backgroundAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: backgroundOpacity.value,
+    // themeLayerOpacity dips to 0 during account/theme switches so the
+    // wallpaper swaps at the fade's midpoint (see themeTransition.ts).
+    opacity: backgroundOpacity.value * themeLayerOpacity.value,
   }));
+
+  // Color-theme glide: while a theme transition runs, an overlay above the
+  // base color interpolates old-surface → new-surface, so color-only themes
+  // transition instead of snapping when the CSS vars swap at the dip. It
+  // hides itself (opacity 0) once the glide completes.
+  const surfaceGlideStyle = useAnimatedStyle(() => {
+    const from = themeSurfaceFrom.value;
+    const to = themeSurfaceTo.value;
+    if (!from || !to || themeSurfaceProgress.value >= 1) {
+      return { opacity: 0, backgroundColor: 'transparent' };
+    }
+    return {
+      opacity: 1,
+      backgroundColor: interpolateColor(themeSurfaceProgress.value, [0, 1], [from, to]),
+    };
+  });
 
   const backgroundColorAnimatedStyle = useAnimatedStyle(() => ({
     backgroundColor: backgroundColor.value || surface,
@@ -303,6 +327,9 @@ function AnimatedBackgroundViewComponent({
       <View style={[styles.container, style]}>
         {/* Base background color */}
         <Animated.View style={[StyleSheet.absoluteFill, backgroundColorAnimatedStyle]} />
+
+        {/* Theme-transition surface glide (invisible outside transitions) */}
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, surfaceGlideStyle]} />
 
         {/* Animated background image plus optional theme fade */}
         <Animated.View style={[StyleSheet.absoluteFill, backgroundAnimatedStyle]}>
