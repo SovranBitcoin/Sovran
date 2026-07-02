@@ -197,9 +197,21 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
         "maxLength": 2048,
         "type": "string",
       },
+      "standingQuotes": {
+        "additionalProperties": {
+          "maxLength": 256,
+          "type": "string",
+        },
+        "default": {},
+        "propertyNames": {
+          "type": "string",
+        },
+        "type": "object",
+      },
     },
     "required": [
       "activeUnit",
+      "standingQuotes",
     ],
     "type": "object",
   },

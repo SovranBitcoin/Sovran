@@ -208,22 +208,6 @@ export function useColadaTransactions(
     return () => manager.off("history:updated", onHistory);
   }, [manager]);
 
-  // Melt operation lifecycle -> refresh page 0 (v2 projects melts into
-  // history directly; there is no melt supplement anymore).
-  useEffect(() => {
-    const onMelt = () => void refreshRef.current();
-    manager.on("melt-op:prepared", onMelt);
-    manager.on("melt-op:pending", onMelt);
-    manager.on("melt-op:finalized", onMelt);
-    manager.on("melt-op:rolled-back", onMelt);
-    return () => {
-      manager.off("melt-op:prepared", onMelt);
-      manager.off("melt-op:pending", onMelt);
-      manager.off("melt-op:finalized", onMelt);
-      manager.off("melt-op:rolled-back", onMelt);
-    };
-  }, [manager]);
-
   // Receive operation lifecycle -> re-fetch the in-flight receive supplement.
   useEffect(() => {
     const onReceive = () => void fetchSupplements();

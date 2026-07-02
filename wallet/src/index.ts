@@ -97,6 +97,7 @@ export {
   listInFlightReceiveEntries,
   mergeTransactionSources,
   sameTransactionList,
+  serializeHistoryEntry,
   isCancellablePendingEcash,
   isMeltQuotePaid,
   isMeltQuoteReadyToPay,
@@ -232,6 +233,20 @@ export type {
   SubscriptionFilter,
   SubscriptionListener,
 } from "./subscriptions";
+
+// Errors
+export {
+  isMeltUserCancelledError,
+  MeltUserCancelledError,
+} from "./errors";
+
+// Reusable mint-quote singleton (standing bolt12 offer / onchain address)
+export {
+  ensureReusableMintQuote,
+  reusableQuoteKey,
+  type EnsureReusableMintQuoteInput,
+  type ReusableQuoteIdentityStore,
+} from "./quotes/reusable";
 
 // Machine (state machine core)
 export { createPaymentMachine } from "./machine/createMachine";

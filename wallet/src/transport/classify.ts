@@ -51,8 +51,12 @@ export interface ClassifiedMeshToken {
 function getP2PKRequiredSigs(secret: Secret): number {
   const tags = secret[1]?.tags ?? [];
   const nSigs = tags.find((tag) => tag[0] === "n_sigs")?.[1];
-  const parsed = Number(nSigs ?? 1);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  // Absent tag = single-sig per NUT-11. A PRESENT but unparseable/invalid
+  // value must be treated as multisig ("never mine") — defaulting it to 1
+  // would let an unspendable token classify as receivable.
+  if (nSigs === undefined) return 1;
+  const parsed = Number(nSigs);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : Number.POSITIVE_INFINITY;
 }
 
 /**

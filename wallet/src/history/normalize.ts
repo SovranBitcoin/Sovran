@@ -6,12 +6,17 @@
 // entries carry operation-family states (mint: pending/executing/finalized/
 // failed; melt: prepared/pending/finalized; send/receive: rolled_back), while
 // `legacy:` entries keep the v1 vocabulary (mint: UNPAID/PAID/ISSUED; melt:
-// UNPAID/PENDING/PAID; send/receive: rolledBack). Every colada and app
-// consumer (filters, timeline, buckets, presentation) speaks the legacy
-// vocabulary, so the read model normalizes ONCE here — downstream code never
-// sees both families.
+// UNPAID/PENDING/PAID; send/receive: rolledBack). Consumers speak the legacy
+// vocabulary, so `useColadaTransactions.fetchPage` — the transaction-list
+// read model — normalizes there. NOTE the boundary is that hook, not the
+// coco API: code that calls `getPaginatedHistory` directly (balance pending
+// sums, sovranPaymentConfig polling) still sees raw v2 states and must not
+// branch on the legacy vocabulary without normalizing first (today those
+// readers only match states both families share).
 
 import type { HistoryEntry } from "@cashu/coco-core";
+
+import { amountToNumber, type AmountLike } from "../amount";
 
 const MINT_OP_STATE_TO_LEGACY: Record<string, string> = {
   // pending = quote created, payment not yet observed.
@@ -19,8 +24,9 @@ const MINT_OP_STATE_TO_LEGACY: Record<string, string> = {
   // executing = payment observed, proofs being minted.
   executing: "PAID",
   finalized: "ISSUED",
-  // Terminal failure has no legacy equivalent; funds never moved, and the
-  // timeline's expiry handling renders expired quotes from `expiry` anyway.
+  // Conscious v1 compromise: terminal failure has no legacy equivalent, so a
+  // mint quote that fails BEFORE expiry renders as still-waiting. Funds never
+  // moved, and the timeline's expiry handling covers the common timeout case.
   failed: "UNPAID",
 };
 
@@ -67,4 +73,18 @@ export function normalizeHistoryEntries(
     return normalized;
   });
   return changed ? out : (entries as HistoryEntry[]);
+}
+
+/**
+ * Serialize an entry into colada's JSON history contract: legacy state
+ * vocabulary and a PLAIN NUMERIC amount (a live cashu-ts Amount would
+ * stringify to a quoted string). Use this instead of raw JSON.stringify
+ * whenever a coco-read entry crosses into the serialized contract.
+ */
+export function serializeHistoryEntry(entry: HistoryEntry): string {
+  const normalized = normalizeHistoryEntryState(entry);
+  return JSON.stringify({
+    ...normalized,
+    amount: amountToNumber((normalized as { amount?: AmountLike }).amount),
+  });
 }

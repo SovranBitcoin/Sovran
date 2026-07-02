@@ -191,10 +191,13 @@ export class CocoManager {
   private static async runPreInitSafetyRails(
     db: SQLite.SQLiteDatabase,
     dbName: string
-  ): Promise<{ db: SQLite.SQLiteDatabase; migrationCount: number }> {
+  ): Promise<{ db: SQLite.SQLiteDatabase; migrationCount: number; migrationExpected: boolean }> {
     try {
       const { tables, migrationCount } = await this.dumpSchemaState(db);
       const isPreV2 = tables.length > 0 && !tables.includes('coco_cashu_canonical_mint_quotes');
+      // A migration will run this boot when the DB is still v1 OR brand new
+      // (fresh installs apply the full chain) — that gates the post-init dump.
+      const migrationExpected = isPreV2 || tables.length === 0;
       cashuLog.info('cashu.manager.schema_dump.before', {
         dbName,
         tableCount: tables.length,
@@ -202,17 +205,18 @@ export class CocoManager {
         isPreV2,
       });
       if (!isPreV2) {
-        return { db, migrationCount };
+        return { db, migrationCount, migrationExpected };
       }
 
       const balances = await this.snapshotReadyProofBalances(db, tables).catch(() => null);
       cashuLog.info('cashu.manager.balance_snapshot.pre_migration', { dbName, balances });
+      await this.scanNonCanonicalAmounts(db, dbName, tables).catch(() => undefined);
 
       const { dbPath, sidecars, backupPath, backupSidecars } = this.getDbPaths(dbName);
       const existing = await FileSystem.getInfoAsync(backupPath);
       if (existing.exists) {
         cashuLog.info('cashu.manager.db_backup.skipped', { dbName, reason: 'backup_exists' });
-        return { db, migrationCount };
+        return { db, migrationCount, migrationExpected: true };
       }
 
       cashuLog.info('cashu.manager.db_backup.start', { dbName });
@@ -232,15 +236,45 @@ export class CocoManager {
         dbName,
         bytes: backupInfo.exists && 'size' in backupInfo ? backupInfo.size : 0,
       });
-      return { db: reopened, migrationCount };
+      return { db: reopened, migrationCount, migrationExpected: true };
     } catch (error) {
       cashuLog.error('cashu.manager.db_backup.failed', { dbName, error });
       // The handle may have been closed mid-backup; make sure init still gets a live one.
       try {
         await db.getFirstAsync('SELECT 1');
-        return { db, migrationCount: -1 };
+        return { db, migrationCount: -1, migrationExpected: true };
       } catch {
-        return { db: await SQLite.openDatabaseAsync(dbName), migrationCount: -1 };
+        return {
+          db: await SQLite.openDatabaseAsync(dbName),
+          migrationCount: -1,
+          migrationExpected: true,
+        };
+      }
+    }
+  }
+
+  /**
+   * Read-only scan for v1 money values the deleted number-healer used to
+   * coerce (floats, whitespace strings, unsafe integers). coco v2's
+   * Amount.from THROWS on these after migration, so surfacing counts here
+   * lets a rehearsal boot catch them before real users hit zeroed balances.
+   */
+  private static async scanNonCanonicalAmounts(
+    db: SQLite.SQLiteDatabase,
+    dbName: string,
+    tables: string[]
+  ): Promise<void> {
+    for (const table of ['coco_cashu_proofs', 'coco_cashu_history']) {
+      if (!tables.includes(table)) continue;
+      const row = await db.getFirstAsync<{ c: number }>(
+        `SELECT COUNT(*) AS c FROM ${table} WHERE amount IS NOT NULL AND typeof(amount) != 'integer'`
+      );
+      if ((row?.c ?? 0) > 0) {
+        cashuLog.warn('cashu.manager.noncanonical_amounts', {
+          dbName,
+          table,
+          count: row?.c ?? 0,
+        });
       }
     }
   }
@@ -353,9 +387,12 @@ export class CocoManager {
           SQLite.openDatabaseAsync(dbName)
         );
         cashuLog.debug('cashu.manager.sqlite_opened', { dbName });
-        const { db, migrationCount: preInitMigrationCount } = await initPhase(
-          'CocoManager.preInitSafetyRails',
-          () => this.runPreInitSafetyRails(opened, dbName)
+        const {
+          db,
+          migrationCount: preInitMigrationCount,
+          migrationExpected,
+        } = await initPhase('CocoManager.preInitSafetyRails', () =>
+          this.runPreInitSafetyRails(opened, dbName)
         );
         this.db = db;
         const database = db as unknown as ExpoSqliteRepositoriesOptions['database'];
@@ -377,7 +414,11 @@ export class CocoManager {
         );
         await initPhase('CocoManager.reposInit', () => repositories.init());
         cashuLog.debug('cashu.manager.repositories.ready', { dbName });
-        await this.logPostInitSchema(db, dbName, preInitMigrationCount);
+        // Post-init dump is diagnostic for migration boots only — skip the
+        // extra sqlite_master scan on ordinary already-migrated boots.
+        if (migrationExpected) {
+          await this.logPostInitSchema(db, dbName, preInitMigrationCount);
+        }
 
         // 2. Seed getter (lazy — no crypto work until first call, cached after)
         // Tries SecureStore seed cache first (~5ms) before falling back to PBKDF2 (~5s).

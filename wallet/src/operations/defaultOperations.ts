@@ -39,6 +39,7 @@ import { defaultDetectors } from "../detectors";
 import { errField, logger, mintUrlFields } from "../logger";
 import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from "../lnurl";
 import { parsePaymentInput } from "../parse";
+import { MeltUserCancelledError } from "../errors";
 import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
 import { amountToNumber, type AmountLike } from "../amount";
 import {
@@ -112,6 +113,69 @@ function mapMeltOperationState(state: string): string {
   return "UNPAID";
 }
 
+/**
+ * Execute a prepared melt with the reservation rescue shared by every melt
+ * rail: prepare() reserved proofs at the mint, so if execute() throws — mint
+ * unreachable mid-flight, network drop, mint 5xx, or the QA mock-fail gate —
+ * the operation is cancelled so the proofs don't stay locked until the next
+ * manager restart. Safety-critical: keep ONE copy.
+ */
+async function executeMeltWithRescue(
+  mgr: Manager,
+  operation: { id: string },
+  input: { mockFail: boolean; logPrefix: "executeMelt" | "executeMeltOnchain" },
+): Promise<Awaited<ReturnType<Manager["ops"]["melt"]["execute"]>>> {
+  const { logPrefix } = input;
+  let result: Awaited<ReturnType<Manager["ops"]["melt"]["execute"]>>;
+  try {
+    // Mock-fail gate inside the try so the cancel-after-failure rescue runs —
+    // exercising the same path the QA toggle exists to test.
+    if (input.mockFail) {
+      throw new Error("Mock melt failure (dev)");
+    }
+    result = await mgr.ops.melt.execute(operation.id);
+  } catch (e) {
+    logger.warn(`operations.${logPrefix}.executeFailed`, {
+      operationId: operation.id,
+      error: errField(e),
+    });
+    await mgr.ops.melt
+      .cancel(operation.id, "Execute failed")
+      .catch((cancelErr) => {
+        logger.warn(`operations.${logPrefix}.cancelAfterFailureFailed`, {
+          operationId: operation.id,
+          error: errField(cancelErr),
+        });
+      });
+    throw e;
+  }
+  logger.info(`operations.${logPrefix}.complete`, {
+    operationId: result.id,
+    state: result.state,
+  });
+  return result;
+}
+
+/** Serialized melt history entry shared by the bolt11 and onchain rails. */
+function buildMeltEntry(
+  result: Awaited<ReturnType<Manager["ops"]["melt"]["execute"]>>,
+  unit: string,
+  metadata: Record<string, string>,
+): { historyEntry: string } {
+  const entry = {
+    id: result.id,
+    type: "melt" as const,
+    createdAt: result.createdAt,
+    mintUrl: result.mintUrl,
+    unit,
+    quoteId: result.quoteId,
+    state: mapMeltOperationState(result.state),
+    amount: amountToNumber(result.amount),
+    metadata: { operationId: result.id, ...metadata },
+  };
+  return { historyEntry: JSON.stringify(entry) };
+}
+
 /** Bare onchain address from a melt target (address or bitcoin:/BIP-321 URI). */
 function extractOnchainAddress(meltTarget: string): string | null {
   const parsed = parsePaymentInput(meltTarget, defaultDetectors);
@@ -182,7 +246,8 @@ async function executeOnchainMelt(
     logger.info("operations.executeMeltOnchain.fee_cancelled", {
       quoteId: quote.quoteId,
     });
-    throw new Error("Onchain fee selection cancelled");
+    // No proofs were reserved yet — routing treats this as a quiet cancel.
+    throw new MeltUserCancelledError("Onchain fee selection cancelled");
   }
   logger.info("operations.executeMeltOnchain.fee_selected", {
     feeIndex,
@@ -195,51 +260,15 @@ async function executeOnchainMelt(
     quoteId: operation.quoteId,
   });
 
-  // Same reservation rescue as the Lightning path: prepare() reserved
-  // proofs; if execute() throws, cancel so they don't stay locked.
-  let result: Awaited<ReturnType<typeof mgr.ops.melt.execute>>;
-  try {
-    if (input.mockFail) {
-      throw new Error("Mock melt failure (dev)");
-    }
-    result = await mgr.ops.melt.execute(operation.id);
-  } catch (e) {
-    logger.warn("operations.executeMeltOnchain.executeFailed", {
-      operationId: operation.id,
-      error: errField(e),
-    });
-    await mgr.ops.melt
-      .cancel(operation.id, "Execute failed")
-      .catch((cancelErr) => {
-        logger.warn("operations.executeMeltOnchain.cancelAfterFailureFailed", {
-          operationId: operation.id,
-          error: errField(cancelErr),
-        });
-      });
-    throw e;
-  }
-  logger.info("operations.executeMeltOnchain.complete", {
-    operationId: result.id,
-    state: result.state,
+  const result = await executeMeltWithRescue(mgr, operation, {
+    mockFail: input.mockFail,
+    logPrefix: "executeMeltOnchain",
   });
-
-  const entry = {
-    id: result.id,
-    type: "melt" as const,
-    createdAt: result.createdAt,
-    mintUrl: result.mintUrl,
-    unit,
-    quoteId: result.quoteId,
-    state: mapMeltOperationState(result.state),
-    amount: amountToNumber(result.amount),
-    metadata: {
-      operationId: result.id,
-      meltTarget: address,
-      method: "onchain",
-      onchainAddress: address,
-    },
-  };
-  return { historyEntry: JSON.stringify(entry) };
+  return buildMeltEntry(result, unit, {
+    meltTarget: address,
+    method: "onchain",
+    onchainAddress: address,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1211,51 +1240,11 @@ export function createDefaultOperations(
         operationId: operation.id,
         quoteId: operation.quoteId,
       });
-      // prepare() reserves proofs at the mint. If execute() throws — mint
-      // unreachable mid-flight, network drop, mint 5xx — the reservation
-      // stays live until the next manager restart unless we cancel here.
-      // Without this rescue, the user cannot send those sats again until
-      // background reconciliation eventually frees them.
-      let result: Awaited<ReturnType<typeof mgr.ops.melt.execute>>;
-      try {
-        // Mock-fail gate inside the try so the existing cancel-after-failure
-        // rescue runs — exercising the same path the QA toggle exists to test.
-        if (mockFailEnabled("melt")) {
-          throw new Error("Mock melt failure (dev)");
-        }
-        result = await mgr.ops.melt.execute(operation.id);
-      } catch (e) {
-        logger.warn("operations.executeMelt.executeFailed", {
-          operationId: operation.id,
-          error: errField(e),
-        });
-        await mgr.ops.melt
-          .cancel(operation.id, "Execute failed")
-          .catch((cancelErr) => {
-            logger.warn("operations.executeMelt.cancelAfterFailureFailed", {
-              operationId: operation.id,
-              error: errField(cancelErr),
-            });
-          });
-        throw e;
-      }
-      logger.info("operations.executeMelt.complete", {
-        operationId: result.id,
-        state: result.state,
+      const result = await executeMeltWithRescue(mgr, operation, {
+        mockFail: mockFailEnabled("melt"),
+        logPrefix: "executeMelt",
       });
-
-      const entry = {
-        id: result.id,
-        type: "melt" as const,
-        createdAt: result.createdAt,
-        mintUrl: result.mintUrl,
-        unit,
-        quoteId: result.quoteId,
-        state: mapMeltOperationState(result.state),
-        amount: amountToNumber(result.amount),
-        metadata: { operationId: result.id, meltTarget },
-      };
-      return { historyEntry: JSON.stringify(entry) };
+      return buildMeltEntry(result, unit, { meltTarget });
     },
 
     rollbackMelt: async (operationId) => {

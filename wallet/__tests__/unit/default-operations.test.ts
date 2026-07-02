@@ -609,9 +609,10 @@ describe('executeMelt — onchain (coco v2)', () => {
       selectOnchainFeeIndex: vi.fn().mockResolvedValue(null),
     });
 
-    await expect(ops.executeMelt!(MINT1, ADDRESS, 500, 'sat')).rejects.toThrow(
-      'Onchain fee selection cancelled'
-    );
+    // The named cancel error routes as a quiet user-cancel (no failure toast).
+    await expect(ops.executeMelt!(MINT1, ADDRESS, 500, 'sat')).rejects.toMatchObject({
+      name: 'MeltUserCancelledError',
+    });
     // No proofs were ever reserved: prepare/execute never ran.
     expect(prepare).not.toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();

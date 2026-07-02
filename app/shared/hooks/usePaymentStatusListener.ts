@@ -104,6 +104,7 @@ export function usePaymentStatusListener(): void {
       return;
     }
     paymentLog.info('hook.payment_status.subscribing');
+    let disposed = false;
 
     const offStateChanged = manager.on(
       'mint-quote:updated',
@@ -179,15 +180,28 @@ export function usePaymentStatusListener(): void {
         return;
       }
 
+      // NPC-imported paid quotes are bolt11; reusable (bolt12/onchain)
+      // deposits settle via mint-op:finalized instead. Gating here also
+      // saves a canonical-quote DB read per pending event.
+      if (operation.method !== 'bolt11') {
+        paymentLog.debug('hook.payment_status.mint_pending_non_bolt11_skipped', {
+          operationId,
+          method: operation.method,
+        });
+        return;
+      }
+
       const { quoteId, unit } = operation;
       const amount = amountToNumber(operation.amount);
       void (async () => {
+        if (disposed) return;
         // v2 moved remote-state observation off the operation onto the
         // canonical quote row — fetch it for the PAID check + NPC freshness.
         let state: string | undefined;
         let lastObservedRemoteStateAt: number | undefined;
         try {
           const quote = await manager.quotes.mint.get({ mintUrl, quoteId });
+          if (disposed) return;
           state = quote?.state ?? quote?.lastObservedRemoteState;
           lastObservedRemoteStateAt = quote?.lastObservedRemoteStateAt;
         } catch (error) {
@@ -260,13 +274,40 @@ export function usePaymentStatusListener(): void {
       })();
     });
 
-    const offRedeemed = manager.on('mint-op:finalized', ({ operationId, operation }) => {
+    const offRedeemed = manager.on('mint-op:finalized', ({ mintUrl, operationId, operation }) => {
       // FinalizedMintOperation always carries quoteId; init shouldn't reach finalize,
       // but narrow defensively to satisfy the union and keep operationId as a fallback
       // for any future variant that lacks a quoteId.
       const quoteId = operation.state === 'init' ? operationId : operation.quoteId;
       paymentLog.info('hook.payment_status.mint_quote_redeemed', { operationId, quoteId });
-      usePaymentStatusStore.getState().setConfirmed(quoteId);
+      const store = usePaymentStatusStore.getState();
+      const hadMatchingActive = store.active?.id === quoteId;
+      store.setConfirmed(quoteId);
+
+      // Standing-quote deposits (bolt12 offer / onchain address) auto-mint
+      // with no prior toast — surface a confirmed receive so the deposit
+      // isn't silent. bolt11 mints already ran the PAID-processing toast.
+      if (!hadMatchingActive && operation.state !== 'init' && operation.method !== 'bolt11') {
+        if (isSwapStatusActive()) return;
+        const amount = amountToNumber(operation.amount);
+        const unit = operation.unit;
+        paymentLog.info('hook.payment_status.reusable_deposit_confirmed', {
+          quoteId,
+          method: operation.method,
+          ...mintUrlLogFields(mintUrl),
+          amount,
+          unit,
+        });
+        usePaymentStatusStore.getState().setActive({
+          variant: 'receive',
+          id: quoteId,
+          mintUrl,
+          amount,
+          unit,
+          state: 'confirmed',
+        });
+        paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
+      }
     });
 
     // The receiveEntryId enrichment used to race a 50ms setTimeout against
@@ -529,6 +570,7 @@ export function usePaymentStatusListener(): void {
     );
 
     return () => {
+      disposed = true;
       paymentLog.debug('hook.payment_status.unsubscribing');
       offStateChanged();
       offAdded();

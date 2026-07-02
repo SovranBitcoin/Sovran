@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { useMints } from '@cashu/coco-react';
+import { useBalanceContext, useMints } from '@cashu/coco-react';
 import { deriveSupportedUnitsFromInfo, SWITCHABLE_UNITS } from 'wallet';
 
 import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { walletLog } from '@/shared/lib/logger';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 
 export interface ActiveUnitState {
   /** The unit the wallet view is denominated in right now. */
@@ -27,6 +28,7 @@ export function useActiveUnit(): ActiveUnitState {
   const persisted = useMintStore((state) => state.activeUnit);
   const setUnit = useMintStore((state) => state.setActiveUnit);
   const { trustedMints } = useMints();
+  const { balances } = useBalanceContext();
 
   const availableUnits = useMemo(() => {
     const advertised = new Set<string>(['sat']);
@@ -35,14 +37,20 @@ export function useActiveUnit(): ActiveUnitState {
         advertised.add(unit);
       }
     }
+    // Funds the wallet already HOLDS stay reachable even if no trusted mint
+    // advertises the unit anymore (e.g. the usd mint was untrusted) — hiding
+    // the unit would make that balance invisible with no way back.
+    for (const [unit, snapshot] of Object.entries(balances.byUnit ?? {})) {
+      if (snapshot && amountToNumber(snapshot.total) > 0) advertised.add(unit);
+    }
     const units = SWITCHABLE_UNITS.filter((unit) => advertised.has(unit)) as ActiveUnit[];
     walletLog.debug('wallet.unit.available', {
       units: units.join(','),
-      source: 'nut04',
+      source: 'nut04+balances',
       mintCount: trustedMints.length,
     });
     return units;
-  }, [trustedMints]);
+  }, [trustedMints, balances]);
 
   const unit = useMemo<ActiveUnit>(() => {
     if (availableUnits.includes(persisted)) return persisted;

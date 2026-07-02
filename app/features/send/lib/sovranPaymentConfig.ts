@@ -41,6 +41,7 @@ import {
   type StepHandlerMap,
   type NfcIOAdapter,
   rawAnnotationKey,
+  serializeHistoryEntry,
 } from 'wallet';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
@@ -570,7 +571,9 @@ export function createSovranExecuteMintQuote(
           });
           // Coco's persisted row is authoritative — its `id` is what flows
           // downstream to onTransactionCreated and the scan-history link.
-          return { historyEntry: JSON.stringify(persisted) };
+          // Serialize through colada's contract (legacy state vocabulary +
+          // numeric amount) so this path matches the timeout fallback below.
+          return { historyEntry: serializeHistoryEntry(persisted) };
         }
       } catch (e) {
         paymentLog.warn('payment.execute_mint_quote.poll_failed', {
@@ -762,6 +765,19 @@ export function createSovranNotifications(
         });
         store.setConfirmed(store.active.id);
       }
+    },
+    onPaymentCancelled: (data) => {
+      // Deliberate user cancel (e.g. dismissed the onchain fee sheet):
+      // dismiss the processing toast quietly — no failure surface.
+      const store = usePaymentStatusStore.getState();
+      paymentLog.info('payment.cancelled', {
+        variant: data.variant,
+        ...mintUrlLogFields(data.mintUrl),
+        amount: data.amount,
+        unit: data.unit,
+        activeId: store.active?.id ?? null,
+      });
+      store.clearActive();
     },
     onPaymentFailed: (data) => {
       const store = usePaymentStatusStore.getState();

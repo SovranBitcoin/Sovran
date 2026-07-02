@@ -100,7 +100,7 @@ export function WalletScreen() {
     walletLog.info('wallet.action.receive', { unit: account.unit });
     clearPaymentContext('wallet.receive');
     void machine.startReceive({ reset: true });
-  }, [machine]);
+  }, [machine, account.unit]);
 
   const handleScanQR = useCallback(async () => {
     walletLog.info('wallet.action.scan_qr', { unit: account.unit });
@@ -114,7 +114,7 @@ export function WalletScreen() {
       pathname: '/camera',
       params: { to: 'sendToken', unit: account.unit },
     });
-  }, [handlePermission]);
+  }, [handlePermission, account.unit]);
 
   const handleSend = useCallback(async () => {
     walletLog.info('wallet.action.send', { unit: account.unit });
@@ -123,7 +123,7 @@ export function WalletScreen() {
     // / Nut Drop + destination input + contact search) rather than jumping
     // straight to amount entry. The chosen method drives the rest of the flow.
     await machine.startSend({ reset: true });
-  }, [machine]);
+  }, [machine, account.unit]);
 
   const handleTheme = useCallback(() => {
     walletLog.info('wallet.theme.tap');
@@ -134,7 +134,7 @@ export function WalletScreen() {
     walletLog.info('wallet.near_pay.tap', { unit: account.unit });
     clearPaymentContext('wallet.near_pay');
     router.push('/(send-flow)/nearPay');
-  }, []);
+  }, [account.unit]);
 
   const nfcSupported = useNfcSupported();
   // Android hybrid tap-to-pay: the ambient focus loop owns NFC scanning, so
@@ -155,7 +155,7 @@ export function WalletScreen() {
     // be listening.
     clearPaymentContext('wallet.nfc');
     void machine.scan?.(undefined, { source: 'nfc' });
-  }, [machine, nfcArmed]);
+  }, [machine, nfcArmed, account.unit]);
 
   // Keep BootEntrance and the wallet body mounted across the search toggle so
   // the splash→QR morph never replays and closing search restores this screen.

@@ -5,6 +5,7 @@ import { logger, mintUrlFields } from "../logger";
 import {
   ensureReusableMintQuote,
   type EnsureReusableMintQuoteInput,
+  type ReusableQuoteIdentityStore,
 } from "../quotes/reusable";
 import { useColadaManager } from "./ColadaProvider";
 
@@ -23,12 +24,13 @@ export interface UseReusableMintQuoteResult {
 
 /**
  * React binding for the reusable-quote singleton: resolves the ONE standing
- * bolt12 offer / onchain address for (mint, method, unit) and re-reads on
- * `mint-quote:updated` so paid/issued totals and expiry stay fresh without
- * the QR churning.
+ * bolt12 offer / onchain address recorded in the app's identity store and
+ * re-reads only on `mint-quote:updated` events for THAT quote, so
+ * paid/issued totals and expiry stay fresh without the QR churning.
  */
 export function useReusableMintQuote(
   input: EnsureReusableMintQuoteInput | null,
+  identityStore: ReusableQuoteIdentityStore,
 ): UseReusableMintQuoteResult {
   const manager = useColadaManager();
   const [quote, setQuote] = useState<ReusableMintQuote | null>(null);
@@ -43,6 +45,11 @@ export function useReusableMintQuote(
       mountedRef.current = false;
     };
   }, []);
+
+  const identityStoreRef = useRef(identityStore);
+  identityStoreRef.current = identityStore;
+  const quoteIdRef = useRef<string | null>(null);
+  quoteIdRef.current = quote?.quoteId ?? null;
 
   const mintUrl = input?.mintUrl ?? null;
   const method = input?.method ?? null;
@@ -60,11 +67,11 @@ export function useReusableMintQuote(
     setError(null);
     (async () => {
       try {
-        const resolved = await ensureReusableMintQuote(manager, {
-          mintUrl,
-          method,
-          unit,
-        });
+        const resolved = await ensureReusableMintQuote(
+          manager,
+          { mintUrl, method, unit },
+          identityStoreRef.current,
+        );
         if (!cancelled && mountedRef.current) setQuote(resolved);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -85,12 +92,12 @@ export function useReusableMintQuote(
   }, [manager, mintUrl, method, unit, generation]);
 
   // Keep the standing quote's observed state fresh (amountPaid/amountIssued
-  // live in quoteData) without recreating it.
+  // live in quoteData) — only updates for THIS quote trigger a re-read.
   useEffect(() => {
     if (!mintUrl) return;
     const onQuoteUpdated = (payload: { mintUrl: string; quoteId: string }) => {
       if (payload.mintUrl !== mintUrl) return;
-      setQuote((current) => current);
+      if (!quoteIdRef.current || payload.quoteId !== quoteIdRef.current) return;
       setGeneration((g) => g + 1);
     };
     manager.on("mint-quote:updated", onQuoteUpdated);

@@ -25,6 +25,11 @@ export {
   mergeTransactionSources,
   sameTransactionList,
 } from "./aggregate";
+export {
+  normalizeHistoryEntries,
+  normalizeHistoryEntryState,
+  serializeHistoryEntry,
+} from "./normalize";
 export { getHistoryEntryRefreshLabel } from "./refresh";
 export {
   getSendTokenReachabilityWarning,

@@ -80,7 +80,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   const rawMintBalances = useMemo(
     () =>
       Object.fromEntries(
-        Object.entries(rawBalanceCtx.byMintAndUnit).map(([url, byUnit]) => [
+        Object.entries(rawBalanceCtx.byMintAndUnit ?? {}).map(([url, byUnit]) => [
           url,
           byUnit[activeUnit] ? amountToNumber(byUnit[activeUnit].total) : 0,
         ])
@@ -142,29 +142,32 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     });
     const next: Record<string, number[]> = {};
     let totalReady = 0;
-    for (const url of stableMintUrls) {
-      try {
-        const proofs = await getReadyProofs(manager, url);
-        const amounts = proofs
-          .filter((p) => (p.unit ?? 'sat') === activeUnit)
-          .map((p) => amountToNumber(p.amount))
-          .sort((a, b) => a - b);
-        const proofTotal = amounts.reduce((sum, n) => sum + n, 0);
-        next[url] = amounts;
-        totalReady += proofTotal;
-        walletLog.debug('provider.wallet_context.proof_fetch_done', {
-          ...mintUrlLogFields(url),
-          proofCount: amounts.length,
-          proofTotal,
-        });
-      } catch (err) {
-        walletLog.warn('provider.wallet_context.proof_fetch_failed', {
-          ...mintUrlLogFields(url),
-          error: err instanceof Error ? err : new Error(String(err)),
-        });
-        next[url] = [];
-      }
-    }
+    // Per-mint reads are independent — run them concurrently.
+    await Promise.all(
+      stableMintUrls.map(async (url) => {
+        try {
+          const proofs = await getReadyProofs(manager, url);
+          const amounts = proofs
+            .filter((p) => (p.unit ?? 'sat') === activeUnit)
+            .map((p) => amountToNumber(p.amount))
+            .sort((a, b) => a - b);
+          const proofTotal = amounts.reduce((sum, n) => sum + n, 0);
+          next[url] = amounts;
+          totalReady += proofTotal;
+          walletLog.debug('provider.wallet_context.proof_fetch_done', {
+            ...mintUrlLogFields(url),
+            proofCount: amounts.length,
+            proofTotal,
+          });
+        } catch (err) {
+          walletLog.warn('provider.wallet_context.proof_fetch_failed', {
+            ...mintUrlLogFields(url),
+            error: err instanceof Error ? err : new Error(String(err)),
+          });
+          next[url] = [];
+        }
+      })
+    );
     walletLog.debug('provider.wallet_context.fetch_proof_amounts_done', {
       mintCount: stableMintUrls.length,
       totalReady,

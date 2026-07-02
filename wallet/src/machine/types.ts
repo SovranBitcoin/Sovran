@@ -559,6 +559,17 @@ export type NotificationHandlerMap = {
     historyEntry: string;
   }) => MaybeAsync;
   /**
+   * Called when the user deliberately backs out of a multi-step operation
+   * mid-flow (e.g. dismisses the onchain fee sheet). The wallet dismisses
+   * the processing indicator WITHOUT showing a failure.
+   */
+  onPaymentCancelled?: (data: {
+    variant: 'melt' | 'paymentRequest' | 'send';
+    mintUrl: string;
+    amount: number;
+    unit: string;
+  }) => MaybeAsync;
+  /**
    * Called when a multi-step operation fails and no fallback options exist.
    * When BIP321 fallback IS available, the machine transitions to
    * `chooseFallbackOption` instead of firing this notification.

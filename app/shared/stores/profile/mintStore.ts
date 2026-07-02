@@ -16,11 +16,16 @@ export type ActiveUnit = 'sat' | 'usd' | 'eur' | 'gbp';
 interface MintState {
   selectedMint: string | undefined;
   activeUnit: ActiveUnit;
+  /** Standing reusable-quote identity per `${mintUrl}|${method}|${unit}` —
+   *  pins the receive-hub Bolt12/Onchain tabs to ONE quote so fixed-amount
+   *  requests (also reusable quotes) can never displace the standing QR. */
+  standingQuotes: Record<string, string>;
 }
 
 interface MintActions {
   setSelectedMint: (mintUrl: string) => void;
   setActiveUnit: (unit: ActiveUnit) => void;
+  setStandingQuote: (key: string, quoteId: string) => void;
 }
 
 type MintStore = MintState & MintActions;
@@ -34,6 +39,9 @@ const PersistedMintStore = z.object({
   // 'sat'; an unknown persisted value degrades to 'sat' instead of wiping the
   // store (sovran-data persisted-schema invariant).
   activeUnit: z.enum(['sat', 'usd', 'eur', 'gbp']).default('sat').catch('sat'),
+  // Additive tolerant field: a corrupt map degrades to {} (new standing
+  // quotes get created and re-recorded) instead of wiping the store.
+  standingQuotes: z.record(z.string(), z.string().max(256)).default({}).catch({}),
 });
 
 // v1 -> v2: the storage seam (createProfileScopedStorage) already partitions
@@ -64,6 +72,7 @@ export const useMintStore = create<MintStore>()(
     (set) => ({
       selectedMint: undefined,
       activeUnit: 'sat',
+      standingQuotes: {},
 
       setSelectedMint: (mintUrl: string) => {
         storeLog.info('store.mint.set_selected', { mintUrl });
@@ -76,6 +85,11 @@ export const useMintStore = create<MintStore>()(
           return { activeUnit: unit };
         });
       },
+
+      setStandingQuote: (key: string, quoteId: string) => {
+        storeLog.info('store.mint.set_standing_quote', { keyLength: key.length });
+        set((state) => ({ standingQuotes: { ...state.standingQuotes, [key]: quoteId } }));
+      },
     }),
     persistConfig({
       name: 'mint-store',
@@ -86,6 +100,7 @@ export const useMintStore = create<MintStore>()(
       partialize: (state) => ({
         selectedMint: state.selectedMint,
         activeUnit: state.activeUnit,
+        standingQuotes: state.standingQuotes,
       }),
     })
   )

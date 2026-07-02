@@ -7,11 +7,16 @@
  * attribution), so this tab never shows those.
  */
 
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
-import { getMintMethodCapability, buildBip321OnchainUri, type WalletContext } from 'wallet';
+import {
+  getMintMethodCapability,
+  buildBip321OnchainUri,
+  type ReusableQuoteIdentityStore,
+  type WalletContext,
+} from 'wallet';
 import { useReusableMintQuote } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
@@ -24,6 +29,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { setStringAsync } from 'expo-clipboard';
 import { copyPopup } from '@/shared/lib/popup';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 import Icon from 'assets/icons';
 
 interface ReceiveReusableQuoteTabProps {
@@ -63,8 +69,18 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     : null;
   const mintSupports = !!capability?.supported && !capability.disabled;
 
+  // Persisted identity map pins the standing quote — fixed-amount requests
+  // (which create their own fresh reusable quotes) can never displace it.
+  const identityStore = useMemo<ReusableQuoteIdentityStore>(
+    () => ({
+      get: (key) => useMintStore.getState().standingQuotes[key],
+      set: (key, quoteId) => useMintStore.getState().setStandingQuote(key, quoteId),
+    }),
+    []
+  );
   const { quote, isLoading, error } = useReusableMintQuote(
-    mintUrl && mintSupports ? { mintUrl, method, unit } : null
+    mintUrl && mintSupports ? { mintUrl, method, unit } : null,
+    identityStore
   );
 
   const request = quote?.request ?? null;
@@ -80,29 +96,24 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     paymentLog.info(`receive.${method}.copied`, { requestLength: request.length });
   }, [request, method, copy.copyTarget]);
 
-  if (!mintSupports) {
-    return (
-      <View className="mx-4 mt-8">
-        <View className="bg-surface-secondary items-center rounded-xl p-6">
-          <Icon name={copy.icon} size={48} color={muted} />
-          <Text size={14} className="text-muted mt-3 text-center">
-            {copy.unsupported}
-          </Text>
-        </View>
+  const renderEmptyState = (message: string) => (
+    <View className="mx-4 mt-8">
+      <View className="bg-surface-secondary items-center rounded-xl p-6">
+        <Icon name={copy.icon} size={48} color={muted} />
+        <Text size={14} className="text-muted mt-3 text-center">
+          {message}
+        </Text>
       </View>
-    );
+    </View>
+  );
+
+  if (!mintSupports) {
+    return renderEmptyState(copy.unsupported);
   }
 
   if (error) {
-    return (
-      <View className="mx-4 mt-8">
-        <View className="bg-surface-secondary items-center rounded-xl p-6">
-          <Icon name={copy.icon} size={48} color={muted} />
-          <Text size={14} className="text-muted mt-3 text-center">
-            Could not load the standing {method === 'bolt12' ? 'offer' : 'address'}: {error}
-          </Text>
-        </View>
-      </View>
+    return renderEmptyState(
+      `Could not load the standing ${method === 'bolt12' ? 'offer' : 'address'}: ${error}`
     );
   }
 
