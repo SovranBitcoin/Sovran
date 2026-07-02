@@ -27,7 +27,7 @@ import {
   resolveCandidateEntries,
   resolveSelectedEntry,
 } from '../lib/format';
-import { assembleApiMessages } from '../lib/assembleApiMessages';
+import { assembleApiMessages, stripImageParts } from '../lib/assembleApiMessages';
 import { encodeChatImage } from '../lib/attachments';
 import { deriveActivePath, getAncestorsExclusive } from '../lib/branching';
 import {
@@ -76,6 +76,25 @@ function isRetryableConnectError(err: unknown): boolean {
   if (status == null) return false;
   if (status === 0) return true; // network_error / fetch threw
   return status >= 500 && status <= 599;
+}
+
+/**
+ * Whether a connect-time failure means THIS model id is bad rather than
+ * the request as a whole — a retired/unknown id on an OpenAI-compatible
+ * API surfaces as 404, or 400 with a model-referencing message. These
+ * must also advance the candidate chain: the dynamic lineup's last-known
+ * fallback can legitimately hold an id the catalog has since dropped, and
+ * without this the very first dead candidate would hard-fail the send the
+ * chain exists to absorb. Auth (401), payment (402), and rate limit (429)
+ * stay non-retryable — they repeat identically across models.
+ */
+function isModelRejectedError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const status = (err as { status?: number }).status;
+  if (status === 404) return true;
+  if (status !== 400) return false;
+  const message = (err as { error?: { message?: string } }).error?.message ?? '';
+  return /model/i.test(message);
 }
 
 /**
@@ -180,8 +199,8 @@ export function useAiSend() {
       retriedFromMessageId?: string;
       pendingUserMessageForTopUp: string;
     }) => {
-      const { assistantMessageId, apiMessages, imageCount, flowId, pendingUserMessageForTopUp } =
-        params;
+      const { assistantMessageId, flowId, pendingUserMessageForTopUp } = params;
+      let { apiMessages, imageCount } = params;
       if (!apiKey) {
         staticPopup('no-api-key');
         return;
@@ -229,7 +248,17 @@ export function useAiSend() {
       let candidateEntries = primaryIdx >= 0 ? allEntries.slice(primaryIdx) : [primaryEntry];
       if (imageCount > 0) {
         const visionOnly = candidateEntries.filter((e) => e.visionInput);
-        candidateEntries = visionOnly.length > 0 ? visionOnly : [primaryEntry];
+        if (visionOnly.length > 0) {
+          candidateEntries = visionOnly;
+        } else {
+          // No vision-capable candidate anywhere (e.g. retry of an old
+          // image turn after switching to a text-only slot). Image parts
+          // sent to a text-only model 400 non-retryably, so degrade the
+          // request to text-only rather than guaranteeing a hard fail.
+          aiLog.warn('ai.attach.no_vision_candidate', { flowId, droppedImages: imageCount });
+          apiMessages = stripImageParts(apiMessages);
+          imageCount = 0;
+        }
       }
       const primaryModel = primaryEntry.modelId;
       const candidateChain = candidateEntries.map((e) => e.modelId);
@@ -335,7 +364,8 @@ export function useAiSend() {
           } catch (err) {
             lastConnectErr = err;
             if (isAbortError(err)) throw err;
-            if (!isRetryableConnectError(err) || i === candidateChain.length - 1) throw err;
+            const advance = isRetryableConnectError(err) || isModelRejectedError(err);
+            if (!advance || i === candidateChain.length - 1) throw err;
             aiLog.warn('ai.send.candidate_failed', {
               flowId,
               tier: tier.id,

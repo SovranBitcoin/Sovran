@@ -216,6 +216,19 @@ export function AiChatScreen() {
   const [draft, setDraft] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
   const [composerHeight, setComposerHeight] = useState(0);
+
+  // Picked-but-unsent images are only valid against a vision-capable
+  // model. If the user switches the slot to a text-only model after
+  // picking, drop them (the strip disappearing is the visible feedback) —
+  // otherwise submit would carry images the resolved model must reject.
+  useEffect(() => {
+    if (canAttachImages) return;
+    setPendingAttachments((prev) => {
+      if (prev.length === 0) return prev;
+      aiLog.info('ai.attach.cleared_on_model_switch', { dropped: prev.length });
+      return [];
+    });
+  }, [canAttachImages]);
   const handleComposerLayout = useCallback((e: LayoutChangeEvent) => {
     const next = e.nativeEvent.layout.height;
     setComposerHeight((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));

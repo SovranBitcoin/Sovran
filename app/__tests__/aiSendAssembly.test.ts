@@ -15,6 +15,7 @@ import {
   MAX_INLINE_IMAGES,
   MAX_INLINE_IMAGE_TURNS,
   assembleApiMessages,
+  stripImageParts,
 } from '@/features/ai/lib/assembleApiMessages';
 import {
   entryForSlot,
@@ -134,6 +135,20 @@ describe('assembleApiMessages', () => {
     const a = await assembleApiMessages(path, makeEncoder().encode);
     const b = await assembleApiMessages(path, makeEncoder().encode);
     expect(a).toEqual(b);
+  });
+
+  it('stripImageParts degrades a multimodal request to plain text (no-vision-candidate fallback)', async () => {
+    const { encode } = makeEncoder();
+    const { messages } = await assembleApiMessages(
+      [msg('u1', 'user', 'look', [att(1), att(2)]), msg('a1', 'assistant', 'reply')],
+      encode
+    );
+    const stripped = stripImageParts(messages);
+    expect(stripped).toEqual([
+      { role: 'user', content: 'look' },
+      { role: 'assistant', content: 'reply' },
+    ]);
+    expect(measureMessageContent(stripped).imageParts).toBe(0);
   });
 
   it('measureMessageContent counts text chars + image parts without serialising payloads', async () => {

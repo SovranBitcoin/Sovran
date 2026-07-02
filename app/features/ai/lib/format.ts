@@ -22,8 +22,10 @@ import {
  * `TIER_MATRIX` rotted as the catalog drifted (4 of its 9 ids stopped
  * existing, rendering "cost unavailable" rows), and its stated intent —
  * "retune the lineup without a persisted migration" — is preserved by the
- * derivation: the persisted state is still just a (provider id, tier id)
- * pair, never a model id. Pricing is NEVER hardcoded — every sat figure
+ * derivation: the AI tab's (provider id, tier id) selection is
+ * session-only state, so a lineup change never needs a migration. (The
+ * persisted `selectedModel` id belongs to the legacy UserMessagesScreen
+ * surface, not this picker.) Pricing is NEVER hardcoded — every sat figure
  * rendered to the user is read from the catalog's `sats_pricing` (or the
  * persisted lineup snapshot's compact copy of it) at display time.
  *

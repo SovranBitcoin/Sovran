@@ -29,6 +29,25 @@ export const MAX_INLINE_IMAGES = 4;
 
 type ChatImageEncoder = (attachment: ChatAttachment) => Promise<string | null>;
 
+/**
+ * Drop every `image_url` part, collapsing part-arrays back to plain string
+ * content. Used when an image-bearing request has NO vision-capable
+ * candidate to go to (e.g. retrying an old image turn after switching to
+ * a text-only slot) — sending image parts to a text-only model 400s
+ * non-retryably, so degrading the whole request to text is the only send
+ * that can succeed.
+ */
+export function stripImageParts(messages: RoutstrChatMessage[]): RoutstrChatMessage[] {
+  return messages.map((m) => {
+    if (typeof m.content === 'string') return m;
+    const text = m.content
+      .filter((p): p is Extract<RoutstrContentPart, { type: 'text' }> => p.type === 'text')
+      .map((p) => p.text)
+      .join('\n');
+    return { role: m.role, content: text };
+  });
+}
+
 interface AssembledApiMessages {
   messages: RoutstrChatMessage[];
   /** `image_url` parts actually included — drives the vision-aware
