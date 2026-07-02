@@ -1,4 +1,4 @@
-import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
+import { Amount, MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import type { HistoryEntry } from '@cashu/coco-core';
 
 import { buildTimeline, getCardLabel, getStatusColorType, getStatusHeader } from 'wallet';
@@ -218,8 +218,8 @@ describe('buildTimeline (audit 61.json F-006)', () => {
       const expiredQuote: MeltQuoteBolt11Response = {
         quote: 'q1',
         request: 'lnbc1...',
-        amount: 100,
-        fee_reserve: 0,
+        amount: Amount.from(100),
+        fee_reserve: Amount.from(0),
         state: MeltQuoteState.UNPAID,
         expiry: Math.floor(NOW / 1000) - 60,
         unit: 'sat',

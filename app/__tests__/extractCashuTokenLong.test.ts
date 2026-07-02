@@ -1,4 +1,4 @@
-import { getEncodedToken } from '@cashu/cashu-ts';
+import { Amount, getEncodedToken } from '@cashu/cashu-ts';
 
 import { extractCashuToken } from '@/shared/ui/composed/chat/extractCashuToken';
 
@@ -7,7 +7,7 @@ const MINT_URL = 'https://mint.test';
 
 function p2pkProof(amount: number, index: number) {
   return {
-    amount,
+    amount: Amount.from(amount),
     id: KEYSET_ID,
     secret: JSON.stringify([
       'P2PK',

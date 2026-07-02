@@ -1,10 +1,12 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 
-// Monorepo layout: coco is a submodule under app/, deps hoist to the workspace root.
-// (If wallet's vitest @noble realm drifts, re-validate these two paths against the
-// actual post-`bun install` tree — they pin coco's bundled @noble versions.)
-const cocoBunModules = resolve(__dirname, '../app/coco/node_modules/.bun');
+// Registry-dep layout (post coco-submodule): @cashu/* and the @noble/@scure
+// realm hoist to the workspace root at the versions coco v2 pins (2.x), and
+// packages that need older realms (nostr-tools' @scure/bip32 1.x with its
+// @noble/curves 1.x) carry their own nested node_modules. Natural resolution
+// is correct per-importer, so the only aliases left force the two @cashu
+// packages to their published entry files.
 const localNodeModules = resolve(__dirname, '../node_modules');
 
 export default defineConfig({
@@ -13,73 +15,19 @@ export default defineConfig({
     alias: [
       {
         find: '@cashu/cashu-ts',
-        replacement: resolve(__dirname, '../node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js'),
+        replacement: resolve(localNodeModules, '@cashu/cashu-ts/lib/cashu-ts.es.js'),
       },
       {
-        find: '@cashu/coco-core',
-        replacement: resolve(__dirname, '../node_modules/@cashu/coco-core/dist/index.js'),
+        find: /^@cashu\/coco-core$/,
+        replacement: resolve(localNodeModules, '@cashu/coco-core/dist/index.js'),
       },
       {
-        find: '@noble/curves/utils.js',
-        replacement: resolve(localNodeModules, '@noble/curves/utils.js'),
+        find: '@cashu/coco-core/adapter',
+        replacement: resolve(localNodeModules, '@cashu/coco-core/dist/adapter.js'),
       },
       {
-        find: '@noble/curves/secp256k1.js',
-        replacement: resolve(localNodeModules, '@noble/curves/secp256k1.js'),
-      },
-      {
-        find: '@noble/hashes/sha2.js',
-        replacement: resolve(localNodeModules, '@noble/hashes/sha2.js'),
-      },
-      {
-        find: '@noble/hashes/utils.js',
-        replacement: resolve(localNodeModules, '@noble/hashes/utils.js'),
-      },
-      {
-        find: '@noble/hashes/hmac.js',
-        replacement: resolve(localNodeModules, '@noble/hashes/hmac.js'),
-      },
-      {
-        find: '@noble/hashes/pbkdf2.js',
-        replacement: resolve(localNodeModules, '@noble/hashes/pbkdf2.js'),
-      },
-      {
-        find: '@noble/hashes/webcrypto.js',
-        replacement: resolve(localNodeModules, '@noble/hashes/webcrypto.js'),
-      },
-      {
-        find: '@noble/hashes/legacy.js',
-        replacement: resolve(localNodeModules, '@noble/hashes/legacy.js'),
-      },
-      {
-        find: /^@noble\/curves\/(.*)$/,
-        replacement: resolve(cocoBunModules, '@noble+curves@2.2.0/node_modules/@noble/curves/$1'),
-      },
-      {
-        find: '@noble/curves',
-        replacement: resolve(
-          cocoBunModules,
-          '@noble+curves@2.2.0/node_modules/@noble/curves/index.js'
-        ),
-      },
-      {
-        find: /^@noble\/hashes\/(.*)$/,
-        replacement: resolve(cocoBunModules, '@noble+hashes@2.2.0/node_modules/@noble/hashes/$1'),
-      },
-      {
-        find: '@noble/hashes',
-        replacement: resolve(
-          cocoBunModules,
-          '@noble+hashes@2.2.0/node_modules/@noble/hashes/index.js'
-        ),
-      },
-      {
-        find: /^@scure\/base$/,
-        replacement: resolve(localNodeModules, '@scure/base/index.js'),
-      },
-      {
-        find: /^@scure\/bip32$/,
-        replacement: resolve(localNodeModules, '@scure/bip32/index.js'),
+        find: '@cashu/coco-core/plugin',
+        replacement: resolve(localNodeModules, '@cashu/coco-core/dist/plugin.js'),
       },
     ],
   },

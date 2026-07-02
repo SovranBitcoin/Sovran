@@ -477,23 +477,52 @@ describe('buildMintReviewInfo — social enrichment', () => {
 });
 
 describe('executeMintQuote — onchain', () => {
-  it('reports onchain mint quotes as unsupported by the published Coco default manager', async () => {
+  it('creates a fresh reusable onchain quote and prepares the operation against it (quote-first)', async () => {
+    const quote = {
+      mintUrl: MINT1,
+      method: 'onchain',
+      quoteId: 'oq-1',
+      request: 'bc1qexampleaddress',
+      unit: 'sat',
+      reusable: true,
+      expiry: null,
+    };
+    const prepared = {
+      id: 'mint-op-1',
+      mintUrl: MINT1,
+      quoteId: 'oq-1',
+      createdAt: 1111,
+      unit: 'sat',
+      amount: 123,
+      request: 'bc1qexampleaddress',
+      state: 'pending',
+    };
+    const create = vi.fn().mockResolvedValue(quote);
+    const prepare = vi.fn().mockResolvedValue(prepared);
     const mockManager = createMockManager({
-      ops: {
-        mint: {
-          prepare: vi.fn(),
-        },
-      },
+      quotes: { mint: { create } },
+      ops: { mint: { prepare } },
     });
 
     const ops = createDefaultOperations({
       getManager: () => mockManager as unknown as Manager,
     });
 
-    await expect(ops.executeMintQuote!(MINT1, 123, 'sat', 'onchain')).rejects.toThrow(
-      'Onchain mint quotes are not supported by @cashu/coco-core 1.0.1'
-    );
+    const result = await ops.executeMintQuote!(MINT1, 123, 'sat', 'onchain');
 
-    expect(mockManager.ops.mint.prepare).not.toHaveBeenCalled();
+    // v2 quote-first contract: the canonical quote row exists before the
+    // durable operation, and reusable quotes take an explicit amount.
+    expect(create).toHaveBeenCalledWith({ mintUrl: MINT1, method: 'onchain', unit: 'sat' });
+    expect(prepare).toHaveBeenCalledWith({ quote, amount: 123 });
+    expect(create.mock.invocationCallOrder[0]).toBeLessThan(prepare.mock.invocationCallOrder[0]);
+
+    const entry = JSON.parse(result.historyEntry);
+    expect(entry).toMatchObject({
+      type: 'mint',
+      quoteId: 'oq-1',
+      state: 'UNPAID',
+      amount: 123,
+      paymentRequest: 'bc1qexampleaddress',
+    });
   });
 });

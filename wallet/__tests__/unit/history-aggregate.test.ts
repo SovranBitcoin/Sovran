@@ -1,61 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import type { HistoryEntry, MeltHistoryEntry, MeltOperation } from '@cashu/coco-core';
+import type { HistoryEntry } from '@cashu/coco-core';
 
+import { mergeTransactionSources, sameTransactionList } from '../../src/history';
 import {
-  meltOpToHistoryEntry,
-  mergeTransactionSources,
-  sameTransactionList,
-} from '../../src/history';
+  normalizeHistoryEntries,
+  normalizeHistoryEntryState,
+} from '../../src/history/normalize';
 
 function entry(partial: Partial<HistoryEntry> & { id: string; type: string }): HistoryEntry {
   return partial as unknown as HistoryEntry;
 }
 
-describe('meltOpToHistoryEntry', () => {
-  it('maps a finalized melt op to a PAID melt entry', () => {
-    const op = {
-      id: 'melt-1',
-      state: 'finalized',
-      mintUrl: 'https://mint.example',
-      createdAt: 10,
-      quoteId: 'q1',
-      amount: 500,
-    } as unknown as MeltOperation;
-    expect(meltOpToHistoryEntry(op)).toMatchObject({
-      id: 'melt-1',
-      type: 'melt',
-      quoteId: 'q1',
-      amount: 500,
-      state: 'PAID',
-    });
-  });
-
-  it('returns null for an op without quoteId/amount', () => {
-    const op = { id: 'melt-2', state: 'init', mintUrl: 'm', createdAt: 1 } as unknown as MeltOperation;
-    expect(meltOpToHistoryEntry(op)).toBeNull();
-  });
-});
-
 describe('mergeTransactionSources', () => {
-  it('appends supplements and sorts newest-first', () => {
+  it('appends the in-flight receive supplement and sorts newest-first', () => {
     const cocoHistory = [entry({ id: 'a', type: 'send', createdAt: 100 } as never)];
-    const meltEntries = [
-      { id: 'm1', type: 'melt', quoteId: 'q1', createdAt: 300 } as unknown as MeltHistoryEntry,
+    const receiveEntries = [
+      entry({ id: 'r1', type: 'receive', operationId: 'op1', createdAt: 200 } as never),
     ];
-    const receiveEntries = [entry({ id: 'r1', type: 'receive', operationId: 'op1', createdAt: 200 } as never)];
 
-    const merged = mergeTransactionSources({ cocoHistory, meltEntries, receiveEntries });
-    expect(merged.map((e) => e.id)).toEqual(['m1', 'r1', 'a']);
+    const merged = mergeTransactionSources({ cocoHistory, receiveEntries });
+    expect(merged.map((e) => e.id)).toEqual(['r1', 'a']);
   });
 
-  it('dedupes a melt already present in coco history by quoteId', () => {
-    const cocoHistory = [entry({ id: 'h-melt', type: 'melt', quoteId: 'q1', createdAt: 100 } as never)];
-    const meltEntries = [
-      { id: 'op-melt', type: 'melt', quoteId: 'q1', createdAt: 100 } as unknown as MeltHistoryEntry,
+  it('keeps a projected melt exactly once (no supplement — coco v2 projects melts)', () => {
+    const cocoHistory = [
+      entry({ id: 'melt:op1', type: 'melt', quoteId: 'q1', createdAt: 100 } as never),
     ];
-    const merged = mergeTransactionSources({ cocoHistory, meltEntries, receiveEntries: [] });
+    const merged = mergeTransactionSources({ cocoHistory, receiveEntries: [] });
     expect(merged).toHaveLength(1);
-    expect(merged[0].id).toBe('h-melt');
+    expect(merged[0].id).toBe('melt:op1');
   });
 
   it('dedupes an in-flight receive once it finalizes in coco history (by operationId)', () => {
@@ -65,16 +38,61 @@ describe('mergeTransactionSources', () => {
     const receiveEntries = [
       entry({ id: 'receive-op1', type: 'receive', operationId: 'op1', createdAt: 100 } as never),
     ];
-    const merged = mergeTransactionSources({ cocoHistory, meltEntries: [], receiveEntries });
+    const merged = mergeTransactionSources({ cocoHistory, receiveEntries });
     expect(merged).toHaveLength(1);
     expect(merged[0].id).toBe('final');
   });
 
   it('returns a copy of coco history when there are no supplements', () => {
     const cocoHistory = [entry({ id: 'a', type: 'send', createdAt: 1 } as never)];
-    const merged = mergeTransactionSources({ cocoHistory, meltEntries: [], receiveEntries: [] });
+    const merged = mergeTransactionSources({ cocoHistory, receiveEntries: [] });
     expect(merged).toEqual(cocoHistory);
     expect(merged).not.toBe(cocoHistory);
+  });
+});
+
+describe('normalizeHistoryEntryState', () => {
+  it.each([
+    // v2 operation-projected states → legacy vocabulary
+    ['mint', 'pending', 'UNPAID'],
+    ['mint', 'executing', 'PAID'],
+    ['mint', 'finalized', 'ISSUED'],
+    ['mint', 'failed', 'UNPAID'],
+    ['melt', 'prepared', 'UNPAID'],
+    ['melt', 'pending', 'PENDING'],
+    ['melt', 'finalized', 'PAID'],
+    ['melt', 'rolled_back', 'rolledBack'],
+    ['send', 'rolled_back', 'rolledBack'],
+    ['receive', 'rolled_back', 'rolledBack'],
+    // legacy states pass through unchanged
+    ['mint', 'UNPAID', 'UNPAID'],
+    ['mint', 'ISSUED', 'ISSUED'],
+    ['melt', 'PAID', 'PAID'],
+    ['send', 'rolledBack', 'rolledBack'],
+    ['send', 'pending', 'pending'],
+    ['receive', 'finalized', 'finalized'],
+  ])('%s %s → %s', (type, state, expected) => {
+    const normalized = normalizeHistoryEntryState(entry({ id: 'x', type, state } as never));
+    expect((normalized as { state?: string }).state).toBe(expected);
+  });
+
+  it('keeps the entry reference when nothing changes', () => {
+    const e = entry({ id: 'x', type: 'send', state: 'pending' } as never);
+    expect(normalizeHistoryEntryState(e)).toBe(e);
+  });
+});
+
+describe('normalizeHistoryEntries', () => {
+  it('keeps the array reference when no entry changes', () => {
+    const list = [entry({ id: 'a', type: 'send', state: 'pending' } as never)];
+    expect(normalizeHistoryEntries(list)).toBe(list);
+  });
+
+  it('returns a new array when any entry normalizes', () => {
+    const list = [entry({ id: 'a', type: 'send', state: 'rolled_back' } as never)];
+    const out = normalizeHistoryEntries(list);
+    expect(out).not.toBe(list);
+    expect((out[0] as { state?: string }).state).toBe('rolledBack');
   });
 });
 
