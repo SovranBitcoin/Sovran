@@ -12,6 +12,7 @@ import React, { memo, useCallback, useMemo } from 'react';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
 import {
+  buildMethodAwareMintCandidates,
   getMintMethodCapability,
   buildBip321OnchainUri,
   type ReusableQuoteIdentityStore,
@@ -23,20 +24,25 @@ import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { Section } from '@/shared/ui/composed/Section';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { setStringAsync } from 'expo-clipboard';
 import { copyPopup } from '@/shared/lib/popup';
+import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { getMintDisplayName } from '@/shared/lib/url';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import Icon from 'assets/icons';
 
 interface ReceiveReusableQuoteTabProps {
   method: 'bolt12' | 'onchain';
+  /** Hub default; the per-method "Receiving with" selection overrides it. */
   mintUrl: string | undefined;
   unit: string;
-  walletContext: Pick<WalletContext, 'trustedMintUrls' | 'mintMethodCapabilities'>;
+  walletContext: Pick<WalletContext, 'trustedMintUrls' | 'mintMethodCapabilities' | 'mintBalances'>;
   muted: string;
 }
 
@@ -64,10 +70,45 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   muted,
 }: ReceiveReusableQuoteTabProps) {
   const copy = METHOD_COPY[method];
-  const capability = mintUrl
-    ? getMintMethodCapability(walletContext, mintUrl, { operation: 'mint', method, unit })
+  // Each amountless rail keeps its own "Receiving with" mint (like the
+  // Lightning tab's npub.cash mint) — falling back to the hub's mint.
+  const methodMint = useMintStore((s) => s.receiveMintByMethod[method]) ?? mintUrl;
+  const setReceiveMintForMethod = useMintStore((s) => s.setReceiveMintForMethod);
+  const methodMintInfo = useMintInfo(methodMint);
+  const capability = methodMint
+    ? getMintMethodCapability(walletContext, methodMint, { operation: 'mint', method, unit })
     : null;
   const mintSupports = !!capability?.supported && !capability.disabled;
+
+  const openReceivingWithMenu = useCallback(() => {
+    // colada owns the candidate logic (capability + unit gating per mint);
+    // the app only renders and persists the pick.
+    const candidates = buildMethodAwareMintCandidates(walletContext, {
+      operation: 'mint',
+      method,
+      unit,
+    });
+    paymentLog.info(`receive.${method}.receiving_with_menu`, {
+      candidateCount: candidates.length,
+      availableCount: candidates.filter((c) => c.status === 'available').length,
+    });
+    actionMenuPopup({
+      title: 'Receiving with',
+      buttons: candidates.map((candidate) => ({
+        text: getMintDisplayName(candidate.mintUrl, null),
+        description: truncateMiddle(candidate.mintUrl, 14),
+        disabled: candidate.status === 'disabled',
+        ...(candidate.status === 'disabled' && candidate.reason
+          ? { reason: candidate.reason.message }
+          : {}),
+        suffix:
+          candidate.mintUrl === methodMint ? (
+            <Icon name="mdi:check" size={20} color={muted} />
+          ) : undefined,
+        onPress: () => setReceiveMintForMethod(method, candidate.mintUrl),
+      })),
+    });
+  }, [walletContext, method, unit, methodMint, muted, setReceiveMintForMethod]);
 
   // Persisted identity map pins the standing quote — fixed-amount requests
   // (which create their own fresh reusable quotes) can never displace it.
@@ -79,7 +120,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     []
   );
   const { quote, isLoading, error } = useReusableMintQuote(
-    mintUrl && mintSupports ? { mintUrl, method, unit } : null,
+    methodMint && mintSupports ? { mintUrl: methodMint, method, unit } : null,
     identityStore
   );
 
@@ -108,7 +149,11 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   );
 
   if (!mintSupports) {
-    return renderEmptyState(copy.unsupported);
+    return (
+      <Pressable onPress={openReceivingWithMenu} testID={`receive-${method}-pick-mint`}>
+        {renderEmptyState(`${copy.unsupported} Tap to choose a mint.`)}
+      </Pressable>
+    );
   }
 
   if (error) {
@@ -143,6 +188,30 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
                     </ListGroup.ItemContent>
                     <ListGroup.ItemSuffix>
                       <Icon name="lets-icons:copy" size={20} color={muted} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+            </ListGroup>
+          </GradientCard>
+        </Section>
+        <Section title="RECEIVING WITH">
+          <GradientCard>
+            <ListGroup variant="transparent">
+              <PressableFeedback animation={false} onPress={openReceivingWithMenu}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemPrefix>
+                      <Icon name="mingcute:bank-fill" size={20} color={muted} />
+                    </ListGroup.ItemPrefix>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>
+                        {methodMint ? getMintDisplayName(methodMint, methodMintInfo) : '—'}
+                      </ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <Icon name="mdi:chevron-right" size={20} color={muted} />
                     </ListGroup.ItemSuffix>
                   </ListGroup.Item>
                 </PressableFeedback.Scale>

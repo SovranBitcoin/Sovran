@@ -20,7 +20,11 @@ import React, {
 } from 'react';
 
 import { useBalanceContext, useManager, useMints } from '@cashu/coco-react';
-import { deriveMintMethodCapabilityMapFromTrustedMints, type WalletContext } from 'wallet';
+import {
+  deriveMintMethodCapabilityMapFromTrustedMints,
+  deriveSupportedUnitsFromInfo,
+  type WalletContext,
+} from 'wallet';
 import { getReadyProofs } from '@/shared/lib/cashu/managerInternals';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 
@@ -76,7 +80,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   // The whole wallet view is scoped to the active mint unit (coco v2
   // multi-unit): balances, method capabilities, and proof amounts below all
   // read the active unit's slice.
-  const { unit: activeUnit } = useActiveUnit();
+  const { unit: activeUnit, setUnit: setActiveUnit } = useActiveUnit();
   const rawMintBalances = useMemo(
     () =>
       Object.fromEntries(
@@ -135,6 +139,31 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
         .join('|'),
     [mintBalancesOnly]
   );
+
+  // Follow the preferred mint with the active unit: when the user switches
+  // mints and the new mint doesn't support the current unit, snap to sat (or
+  // the mint's first supported unit). Derived from CACHED NUT-04 mintInfo in
+  // coco's DB, so this works offline — no info-endpoint call. Keyed on the
+  // mint URL (a ref, not an effect dep on activeUnit) so a manual unit switch
+  // is never fought by this rule.
+  const lastUnitSyncMintRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!preferredMintUrl || lastUnitSyncMintRef.current === preferredMintUrl) return;
+    lastUnitSyncMintRef.current = preferredMintUrl;
+    const mint = rawTrustedMints.find((m) => m.mintUrl === preferredMintUrl);
+    if (!mint) return;
+    const supported = deriveSupportedUnitsFromInfo(mint.mintInfo);
+    const currentUnit = useMintStore.getState().activeUnit;
+    if (supported.includes(currentUnit)) return;
+    const next = supported.includes('sat') ? 'sat' : supported[0];
+    if (next !== 'sat' && next !== 'usd' && next !== 'eur' && next !== 'gbp') return;
+    walletLog.info('wallet.unit.synced_to_mint', {
+      ...preferredMintLogFields(preferredMintUrl),
+      from: currentUnit,
+      to: next,
+    });
+    setActiveUnit(next);
+  }, [preferredMintUrl, rawTrustedMints, setActiveUnit]);
 
   const fetchProofAmounts = useCallback(async () => {
     walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', {

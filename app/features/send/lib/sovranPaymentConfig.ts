@@ -50,7 +50,7 @@ import type {
   SyntheticMeltHistoryEntry,
   SyntheticMintHistoryEntry,
 } from '@/shared/lib/cashu/syntheticHistory';
-import { prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';
+import { prepareBolt11MintQuote, prepareOnchainMintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { getMintQuotePaymentValue, getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 import {
   getP2PKImportExtension,
@@ -493,10 +493,6 @@ export function createSovranExecuteMintQuote(
       throw new Error('Wallet manager is not available');
     }
 
-    if (method === 'onchain') {
-      throw new Error('Onchain mint quotes are not supported by @cashu/coco-core 1.0.1');
-    }
-
     // Snapshot existing mint ids for this mint URL so we can detect the
     // newly-persisted row by set difference if quoteId matching fails.
     let beforeIds: Set<string>;
@@ -516,8 +512,12 @@ export function createSovranExecuteMintQuote(
       ...mintUrlLogFields(mintUrl),
       amount,
     });
+    // coco v2 supports onchain minting (reusable quote, fresh address per
+    // call); the poll-for-persisted-row flow below is method-agnostic.
     const mintOp = await withTimeout(
-      prepareBolt11MintQuote(manager, mintUrl, amount, _unit),
+      method === 'onchain'
+        ? prepareOnchainMintQuote(manager, mintUrl, amount, _unit)
+        : prepareBolt11MintQuote(manager, mintUrl, amount, _unit),
       MINT_QUOTE_PREPARE_TIMEOUT_MS,
       'executeMintQuote.prepare'
     );

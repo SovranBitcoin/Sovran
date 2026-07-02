@@ -193,6 +193,17 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
         ],
         "type": "string",
       },
+      "receiveMintByMethod": {
+        "additionalProperties": {
+          "maxLength": 2048,
+          "type": "string",
+        },
+        "default": {},
+        "propertyNames": {
+          "type": "string",
+        },
+        "type": "object",
+      },
       "selectedMint": {
         "maxLength": 2048,
         "type": "string",
@@ -212,6 +223,7 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
     "required": [
       "activeUnit",
       "standingQuotes",
+      "receiveMintByMethod",
     ],
     "type": "object",
   },

@@ -64,6 +64,53 @@ export async function prepareBolt11MintQuote(
 }
 
 /**
+ * v2 quote-first onchain mint: reusable quote with a FRESH deposit address
+ * per call (payment attribution for fixed-amount receives), then the durable
+ * operation with an explicit amount, as v2 requires for reusable quotes.
+ */
+export async function prepareOnchainMintQuote(
+  manager: Manager,
+  mintUrl: string,
+  amount: number,
+  unit = 'sat'
+): Promise<PreparedBolt11MintOperation> {
+  cashuLog.info('coco.operations.mint.prepare.start', {
+    ...mintUrlLogFields(mintUrl),
+    amount,
+    unit,
+    method: 'onchain',
+  });
+  try {
+    const quote = await manager.quotes.mint.create({ mintUrl, method: 'onchain', unit });
+    cashuLog.info('coco.operations.mint.quote_created', {
+      ...mintUrlLogFields(mintUrl),
+      quoteId: quote.quoteId,
+      unit: quote.unit,
+      method: 'onchain',
+    });
+    const operation = await manager.ops.mint.prepare({ quote, amount });
+    cashuLog.info('coco.operations.mint.prepare.done', {
+      ...mintUrlLogFields(mintUrl),
+      amount,
+      method: 'onchain',
+    });
+    return operation;
+  } catch (error) {
+    cashuLog.warn('coco.operations.mint.prepare.failed', {
+      ...mintUrlLogFields(mintUrl),
+      amount,
+      method: 'onchain',
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
+    reportCocoApiFailure('quotes.mint.create/ops.mint.prepare', error, {
+      method: 'onchain',
+      unit,
+    });
+    throw error;
+  }
+}
+
+/**
  * v2 quote-first bolt11 melt: create the canonical melt quote row, then
  * prepare the durable operation (reserves proofs, computes fees) against it.
  */
