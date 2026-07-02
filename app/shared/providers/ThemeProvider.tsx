@@ -7,7 +7,12 @@ import { useUnitWallpaper } from '@/shared/lib/theme/useUnitWallpaper';
 import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
 import { themeVariables, getThemeVariables } from '@/shared/lib/themeEngine';
-import { primeThemeSurface, runThemeTransition } from '@/shared/lib/theme/themeTransition';
+import {
+  completeThemeDrag,
+  getThemeDragTarget,
+  primeThemeSurface,
+  runThemeTransition,
+} from '@/shared/lib/theme/themeTransition';
 import { Uniwind } from 'uniwind';
 
 initLog('Module', 'ThemeProvider loaded');
@@ -88,8 +93,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       applyVars();
       return;
     }
-    // Account/theme switch: fade the wallpaper layer out, swap at the dip,
-    // fade in; the base surface color glides between the two themes.
+    if (getThemeDragTarget() === resolvedTheme) {
+      // The carousel drag already crossfaded to this theme — apply instantly
+      // under the (fully opaque) drag layer, then release it.
+      lastApplied.current = resolvedTheme;
+      primeThemeSurface(surfaceOf);
+      applyVars();
+      completeThemeDrag();
+      log.info('theme.transition.drag_completed', { to: resolvedTheme });
+      return;
+    }
+    // Menu pick / programmatic switch: fade the wallpaper layer out, swap at
+    // the dip, fade in; the base surface color glides between the themes.
     lastApplied.current = resolvedTheme;
     log.info('theme.transition.start', { to: resolvedTheme });
     runThemeTransition(surfaceOf, applyVars);

@@ -3,10 +3,13 @@ import { MeshGradientView } from 'expo-mesh-gradient';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBackgroundContext } from '@/shared/providers/BackgroundProvider';
-import React, { memo, ReactNode, useMemo } from 'react';
+import React, { memo, ReactNode, useMemo, useSyncExternalStore } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
 import Animated, { interpolateColor, useAnimatedStyle } from 'react-native-reanimated';
 import {
+  getThemeDragTarget,
+  subscribeThemeDragTarget,
+  themeDragProgress,
   themeLayerOpacity,
   themeSurfaceFrom,
   themeSurfaceProgress,
@@ -296,10 +299,26 @@ function AnimatedBackgroundViewComponent({
     opacity: fullBlurOpacity.value,
   }));
 
+  // Drag-driven crossfade: while the account carousel drags, the ADJACENT
+  // account's wallpaper is mounted in a second layer and both opacities (and
+  // the surface color) track the drag fraction directly.
+  const dragTargetTheme = useSyncExternalStore(subscribeThemeDragTarget, getThemeDragTarget);
+  const dragGradientColors = useMemo(() => {
+    if (dragTargetTheme && isBackgroundImageTheme(dragTargetTheme)) {
+      return getGradientColorScale(dragTargetTheme);
+    }
+    return null;
+  }, [dragTargetTheme]);
+
   const backgroundAnimatedStyle = useAnimatedStyle(() => ({
-    // themeLayerOpacity dips to 0 during account/theme switches so the
-    // wallpaper swaps at the fade's midpoint (see themeTransition.ts).
-    opacity: backgroundOpacity.value * themeLayerOpacity.value,
+    // themeLayerOpacity dips to 0 during (non-drag) theme switches so the
+    // wallpaper swaps at the fade's midpoint; themeDragProgress crossfades
+    // toward the drag target while the carousel moves.
+    opacity: backgroundOpacity.value * themeLayerOpacity.value * (1 - themeDragProgress.value),
+  }));
+
+  const dragLayerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: backgroundOpacity.value * themeDragProgress.value,
   }));
 
   // Color-theme glide: while a theme transition runs, an overlay above the
@@ -309,12 +328,16 @@ function AnimatedBackgroundViewComponent({
   const surfaceGlideStyle = useAnimatedStyle(() => {
     const from = themeSurfaceFrom.value;
     const to = themeSurfaceTo.value;
-    if (!from || !to || themeSurfaceProgress.value >= 1) {
+    // Drag progress takes precedence: it maps the carousel position directly.
+    const progress =
+      themeDragProgress.value > 0 ? themeDragProgress.value : themeSurfaceProgress.value;
+    const active = themeDragProgress.value > 0 || themeSurfaceProgress.value < 1;
+    if (!from || !to || !active) {
       return { opacity: 0, backgroundColor: 'transparent' };
     }
     return {
       opacity: 1,
-      backgroundColor: interpolateColor(themeSurfaceProgress.value, [0, 1], [from, to]),
+      backgroundColor: interpolateColor(progress, [0, 1], [from, to]),
     };
   });
 
@@ -361,6 +384,31 @@ function AnimatedBackgroundViewComponent({
             )
           )}
         </Animated.View>
+
+        {/* Drag-target wallpaper layer — mounted the instant a carousel drag
+            starts so the adjacent account's wallpaper is already decoded and
+            crossfades with the drag. */}
+        {dragTargetTheme ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, dragLayerAnimatedStyle]}>
+            {showBackgroundImage && (
+              <AnimatedSpriteBackground themeName={dragTargetTheme} backgroundColor={surface} />
+            )}
+            {(dragGradientColors || gradientColor) && (
+              <LinearGradient
+                colors={[
+                  opacity(gradientColor || surface, gradientTopOpacity),
+                  gradientColor || surface,
+                ]}
+                locations={[0, 1]}
+                dither
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+              />
+            )}
+          </Animated.View>
+        ) : null}
 
         {blurSupported && (
           <Animated.View

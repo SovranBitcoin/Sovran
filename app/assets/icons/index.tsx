@@ -465,8 +465,11 @@ export function CurrencyIcon({
       <View
         style={{
           width: width,
+          height: width,
         }}>
         <Svg
+          width="100%"
+          height="100%"
           viewBox="0 0 33 33"
           fill="none"
           style={{
@@ -496,8 +499,11 @@ export function CurrencyIcon({
       <View
         style={{
           width: width,
+          height: width,
         }}>
         <Svg
+          width="100%"
+          height="100%"
           viewBox="0 0 33 33"
           fill="none"
           style={{
@@ -527,8 +533,11 @@ export function CurrencyIcon({
       <View
         style={{
           width: width,
+          height: width,
         }}>
         <Svg
+          width="100%"
+          height="100%"
           viewBox="0 0 33 33"
           fill="none"
           style={{
@@ -634,6 +643,8 @@ export function CurrencyIcon({
           height: width,
         }}>
         <Svg
+          width="100%"
+          height="100%"
           viewBox="0 0 33 33"
           fill="none"
           style={{
