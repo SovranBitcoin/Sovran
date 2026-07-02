@@ -232,8 +232,6 @@ export const SettingsKeyringScreen: React.FC = () => {
   const [isImportingCurrentNsec, setIsImportingCurrentNsec] = useState(false);
 
   // Quick access setting from settings store
-  const quickAccessP2PK = useSettingsStore((state) => state.quickAccessP2PK);
-  const setQuickAccessP2PK = useSettingsStore((state) => state.setQuickAccessP2PK);
   const regenerateP2PKOnReceive = useSettingsStore((state) => state.regenerateP2PKOnReceive);
   const setRegenerateP2PKOnReceive = useSettingsStore((state) => state.setRegenerateP2PKOnReceive);
 
@@ -478,21 +476,6 @@ export const SettingsKeyringScreen: React.FC = () => {
       {/* Quick Access Toggle */}
       <Section title="Preferences">
         <ListGroup variant="secondary">
-          <ListGroup.Item>
-            <ListGroup.ItemContent>
-              <ListGroup.ItemTitle>Quick Access to Lock</ListGroup.ItemTitle>
-              <ListGroup.ItemDescription>
-                Show your latest P2PK locking key in the receive ecash menu
-              </ListGroup.ItemDescription>
-            </ListGroup.ItemContent>
-            <ListGroup.ItemSuffix>
-              <HeroSwitch
-                isSelected={quickAccessP2PK ?? false}
-                onSelectedChange={setQuickAccessP2PK}
-              />
-            </ListGroup.ItemSuffix>
-          </ListGroup.Item>
-          <Separator className="mx-4" />
           <ListGroup.Item>
             <ListGroup.ItemContent>
               <ListGroup.ItemTitle>Regenerate Key on Receive</ListGroup.ItemTitle>

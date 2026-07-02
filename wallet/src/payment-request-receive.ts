@@ -30,6 +30,15 @@ export interface StandingPaymentRequestInput {
    *  mints — coco rejects payloads from untrusted mints, so advertising
    *  anything else strands the payer's ecash in a DM. */
   mints: string[];
+  /**
+   * Optional NUT-10 P2PK lock advertised in the DISPLAYED encoding (payers
+   * lock proofs to this 02-prefixed key). coco's create() still rejects
+   * nut10 input, so the durable op stays lock-free — but its claim path
+   * signs P2PK proofs transparently (ProofService.prepareProofsForReceiving
+   * → KeyRingService.signProof), PROVIDED this exact pubkey is persisted in
+   * the keyring under purpose 'p2pk' (exact lookup, no fallback).
+   */
+  lockP2pkPubkey?: string;
 }
 
 export interface StandingPaymentRequest {
@@ -55,8 +64,12 @@ function generateRequestId(): string {
   return `sov${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Re-encode coco's request without the floor amount for display. */
-function toAmountlessEncodings(encodedRequest: string): {
+/** Re-encode coco's request without the floor amount (and optionally WITH a
+ *  NUT-10 P2PK lock) for display. */
+function toAmountlessEncodings(
+  encodedRequest: string,
+  lockP2pkPubkey?: string,
+): {
   encodedRequest: string;
   encodedRequestB: string;
 } {
@@ -69,6 +82,9 @@ function toAmountlessEncodings(encodedRequest: string): {
     decoded.mints,
     decoded.description,
     false, // singleUse
+    lockP2pkPubkey
+      ? { kind: "P2PK", data: lockP2pkPubkey, tags: [] }
+      : undefined,
   );
   const encodedA = display.toEncodedRequest();
   let encodedB = encodedA;
@@ -89,11 +105,14 @@ type IncomingOp = Awaited<
   ReturnType<Manager["paymentRequests"]["incoming"]["create"]>
 >;
 
-function toStanding(operation: IncomingOp): StandingPaymentRequest {
+function toStanding(
+  operation: IncomingOp,
+  lockP2pkPubkey?: string,
+): StandingPaymentRequest {
   return {
     operationId: operation.id,
     requestId: operation.requestId,
-    ...toAmountlessEncodings(operation.encodedRequest),
+    ...toAmountlessEncodings(operation.encodedRequest, lockP2pkPubkey),
     mints: operation.mints,
     unit: operation.unit,
   };
@@ -122,8 +141,9 @@ async function createStanding(
     unit: operation.unit,
     mintCount: operation.mints.length,
     encodedLength: operation.encodedRequest.length,
+    hasP2pkLock: !!input.lockP2pkPubkey,
   });
-  return toStanding(operation);
+  return toStanding(operation, input.lockP2pkPubkey);
 }
 
 const inFlight = new Map<string, Promise<StandingPaymentRequest>>();
@@ -161,8 +181,9 @@ export async function ensureStandingPaymentRequest(
         logger.info("creq.standing.reused", {
           unit: operation.unit,
           mintCount: operation.mints.length,
+          hasP2pkLock: !!input.lockP2pkPubkey,
         });
-        return toStanding(operation);
+        return toStanding(operation, input.lockP2pkPubkey);
       }
       reason = !operation
         ? "recorded_not_found"

@@ -193,6 +193,10 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
         ],
         "type": "string",
       },
+      "creqP2pkLock": {
+        "default": false,
+        "type": "boolean",
+      },
       "receiveMintByMethod": {
         "additionalProperties": {
           "maxLength": 2048,
@@ -224,6 +228,7 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
       "activeUnit",
       "standingQuotes",
       "receiveMintByMethod",
+      "creqP2pkLock",
     ],
     "type": "object",
   },

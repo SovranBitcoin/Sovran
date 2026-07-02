@@ -42,14 +42,20 @@ const MAX_ADVERTISED_MINTS = 5;
 interface ReceiveUnifiedTabProps {
   unit: string;
   walletContext: Pick<WalletContext, 'trustedMintUrls' | 'mintMethodCapabilities' | 'mintBalances'>;
+  /** Latest keyring P2PK pubkey — applied to the creq when the lock is on. */
+  p2pkKey?: string;
   muted: string;
 }
 
 export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
   unit,
   walletContext,
+  p2pkKey,
   muted,
 }: ReceiveUnifiedTabProps) {
+  // Inherit the Cashu rail's lock setting — same standing request singleton.
+  const creqP2pkLock = useMintStore((s) => s.creqP2pkLock);
+  const lockP2pkPubkey = creqP2pkLock && p2pkKey ? p2pkKey : undefined;
   const identityStore = useMemo<ReusableQuoteIdentityStore>(
     () => ({
       get: (key) => useMintStore.getState().standingQuotes[key],
@@ -101,7 +107,7 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
     [walletContext.trustedMintUrls]
   );
   const creq = useStandingPaymentRequest(
-    creqMints.length > 0 ? { unit, mints: creqMints } : null,
+    creqMints.length > 0 ? { unit, mints: creqMints, lockP2pkPubkey } : null,
     identityStore
   );
 

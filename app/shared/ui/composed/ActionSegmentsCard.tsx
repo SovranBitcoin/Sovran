@@ -18,13 +18,16 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface ActionSegment {
-  icon: string;
+  icon?: string;
   label: string;
   onPress: () => void;
   testID?: string;
   /** Greyed-out rendering; the segment stays pressable so the handler can
    *  explain itself (e.g. a cooldown toast). */
   dimmed?: boolean;
+  /** Selected-mode rendering (full-opacity, bold) — for rows used as a
+   *  visible 2-way mode switcher rather than one-shot actions. */
+  active?: boolean;
 }
 
 export const ActionSegmentsCard = memo(function ActionSegmentsCard({
@@ -33,7 +36,8 @@ export const ActionSegmentsCard = memo(function ActionSegmentsCard({
   segments: ActionSegment[];
 }) {
   const foreground = useThemeColor('foreground');
-  const tint = (dimmed?: boolean) => opacity(foreground, dimmed ? 0.25 : 0.5);
+  const tint = (segment: ActionSegment) =>
+    segment.active ? foreground : opacity(foreground, segment.dimmed ? 0.25 : 0.5);
 
   return (
     <GradientCard style={{ marginHorizontal: 16 }}>
@@ -56,8 +60,10 @@ export const ActionSegmentsCard = memo(function ActionSegmentsCard({
               style={{ flex: 1 }}>
               <PressableFeedback.Scale>
                 <HStack align="center" justify="center" gap={6} style={{ paddingVertical: 12 }}>
-                  <Icon name={segment.icon} size={16} color={tint(segment.dimmed)} />
-                  <Text size={13} color={tint(segment.dimmed)}>
+                  {segment.icon ? (
+                    <Icon name={segment.icon} size={16} color={tint(segment)} />
+                  ) : null}
+                  <Text size={13} bold={segment.active} color={tint(segment)}>
                     {segment.label}
                   </Text>
                 </HStack>

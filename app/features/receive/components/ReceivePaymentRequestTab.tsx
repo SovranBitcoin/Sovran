@@ -15,7 +15,7 @@
 import React, { memo, useCallback, useMemo } from 'react';
 
 import { router } from 'expo-router';
-import { ListGroup, PressableFeedback } from 'heroui-native';
+import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
 
 import {
   standingPaymentRequestKey,
@@ -48,14 +48,25 @@ const MAX_ADVERTISED_MINTS = 5;
 interface ReceivePaymentRequestTabProps {
   unit: string;
   walletContext: Pick<WalletContext, 'trustedMintUrls'>;
+  /** Latest keyring P2PK pubkey (02-prefixed) — the only key coco's claim
+   *  path can sign for (exact persisted-'p2pk' lookup). Absent → the lock
+   *  toggle is disabled. */
+  p2pkKey?: string;
   muted: string;
 }
 
 export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   unit,
   walletContext,
+  p2pkKey,
   muted,
 }: ReceivePaymentRequestTabProps) {
+  // P2PK lock (absorbs the old P2PK tab): when on, the DISPLAYED request
+  // advertises a NUT-10 lock to the keyring key — payers lock their ecash to
+  // this wallet; coco's claim path signs the locked proofs transparently.
+  const creqP2pkLock = useMintStore((s) => s.creqP2pkLock);
+  const setCreqP2pkLock = useMintStore((s) => s.setCreqP2pkLock);
+  const lockP2pkPubkey = creqP2pkLock && p2pkKey ? p2pkKey : undefined;
   const mints = useMemo(
     () => walletContext.trustedMintUrls.slice(0, MAX_ADVERTISED_MINTS),
     [walletContext.trustedMintUrls]
@@ -79,7 +90,7 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   // one stays active) and costs nothing anywhere — no cooldown or manual
   // button needed.
   const { request, isLoading, error, rotate } = useStandingPaymentRequest(
-    mints.length > 0 ? { unit, mints } : null,
+    mints.length > 0 ? { unit, mints, lockP2pkPubkey } : null,
     identityStore,
     { freshOnMount: true }
   );
@@ -218,6 +229,30 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
                 </PressableFeedback.Scale>
                 <PressableFeedback.Ripple />
               </PressableFeedback>
+              <Separator className="mx-4" />
+              <ListGroup.Item>
+                <ListGroup.ItemPrefix>
+                  <Icon name="solar:key-bold" size={20} color={muted} />
+                </ListGroup.ItemPrefix>
+                <ListGroup.ItemContent>
+                  <ListGroup.ItemTitle>P2PK lock</ListGroup.ItemTitle>
+                  <ListGroup.ItemDescription>
+                    {p2pkKey
+                      ? 'Payers lock ecash to your key'
+                      : 'No P2PK key — generate one in Settings'}
+                  </ListGroup.ItemDescription>
+                </ListGroup.ItemContent>
+                <ListGroup.ItemSuffix>
+                  <HeroSwitch
+                    isSelected={creqP2pkLock && !!p2pkKey}
+                    isDisabled={!p2pkKey}
+                    onSelectedChange={(value) => {
+                      paymentLog.info('receive.creq.p2pk_lock_toggled', { enabled: value });
+                      setCreqP2pkLock(value);
+                    }}
+                  />
+                </ListGroup.ItemSuffix>
+              </ListGroup.Item>
             </ListGroup>
           </GradientCard>
         </Section>

@@ -62,6 +62,7 @@ export function useStandingPaymentRequest(
   const mintsKey = input ? input.mints.join("|") : null;
   const mintsRef = useRef<string[]>(input?.mints ?? []);
   mintsRef.current = input?.mints ?? [];
+  const lockP2pkPubkey = input?.lockP2pkPubkey;
 
   useEffect(() => {
     if (!unit || mintsKey === null) {
@@ -75,18 +76,21 @@ export function useStandingPaymentRequest(
     setError(null);
     (async () => {
       try {
+        // Lock changes only re-ENCODE the same operation, so they are
+        // excluded from the fresh key — toggling P2PK never rotates.
         const inputKey = `${unit}|${mintsKey}`;
         const wantFresh = freshOnMount && freshDoneForRef.current !== inputKey;
         if (wantFresh) freshDoneForRef.current = inputKey;
+        const requestInput = { unit, mints: mintsRef.current, lockP2pkPubkey };
         const resolved = wantFresh
           ? await rotateStandingPaymentRequest(
               manager,
-              { unit, mints: mintsRef.current },
+              requestInput,
               identityStoreRef.current,
             )
           : await ensureStandingPaymentRequest(
               manager,
-              { unit, mints: mintsRef.current },
+              requestInput,
               identityStoreRef.current,
             );
         if (!cancelled && mountedRef.current) setRequest(resolved);
@@ -101,7 +105,7 @@ export function useStandingPaymentRequest(
     return () => {
       cancelled = true;
     };
-  }, [manager, unit, mintsKey, generation, freshOnMount]);
+  }, [manager, unit, mintsKey, lockP2pkPubkey, generation, freshOnMount]);
 
   // External rotations land in the identity store — re-resolve.
   useEffect(() => {
@@ -121,7 +125,7 @@ export function useStandingPaymentRequest(
     try {
       const created = await rotateStandingPaymentRequest(
         manager,
-        { unit, mints: mintsRef.current },
+        { unit, mints: mintsRef.current, lockP2pkPubkey },
         identityStoreRef.current,
       );
       if (mountedRef.current) setRequest(created);
@@ -130,7 +134,7 @@ export function useStandingPaymentRequest(
       logger.warn("creq.standing.rotate_failed", { unit, error: message });
       if (mountedRef.current) setError(message);
     }
-  }, [manager, unit]);
+  }, [manager, unit, lockP2pkPubkey]);
 
   return { request, isLoading, error, rotate };
 }

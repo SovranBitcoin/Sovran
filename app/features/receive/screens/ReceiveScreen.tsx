@@ -21,6 +21,7 @@ import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
 import { ReceivePaymentRequestTab } from '@/features/receive/components/ReceivePaymentRequestTab';
 import { ReceiveUnifiedTab } from '@/features/receive/components/ReceiveUnifiedTab';
+import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
 import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
 import { Section } from '@/shared/ui/composed/Section';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
@@ -39,7 +40,6 @@ import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCr
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import Icon from 'assets/icons';
 
@@ -124,62 +124,6 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
   );
 });
 
-interface ReceiveP2pkTabProps {
-  data: ReceiveHubEntry;
-  actions: UseScreenActionsResult<'receive'>['actions'];
-  muted: string;
-}
-
-const ReceiveP2pkTab = memo(function ReceiveP2pkTab({ data, actions, muted }: ReceiveP2pkTabProps) {
-  if (!data.p2pkKey) {
-    return (
-      <View className="mx-4 mt-8">
-        <View className="bg-surface-secondary items-center rounded-xl p-6">
-          <Icon name="mdi:key-variant" size={48} color={muted} />
-          <Text size={14} className="text-muted mt-3 text-center">
-            No P2PK keys yet. Generate one in Settings → P2PK Keys.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <>
-      <PaymentInfo data={data.p2pkKey} copyTarget="p2pk" unit="p2pk" />
-      <View className="mx-4">
-        <Section title="P2PK PUBLIC KEY">
-          <GradientCard>
-            <ListGroup variant="transparent">
-              <PressableFeedback
-                animation={false}
-                onPress={async () => {
-                  await EnhancedHaptics.copyHaptic();
-                  await actions.copy.execute({ source: 'p2pk' });
-                }}>
-                <PressableFeedback.Scale>
-                  <ListGroup.Item disabled>
-                    <ListGroup.ItemPrefix>
-                      <Icon name="solar:key-bold" size={20} color={muted} />
-                    </ListGroup.ItemPrefix>
-                    <ListGroup.ItemContent>
-                      <ListGroup.ItemTitle>{truncateMiddle(data.p2pkKey, 10)}</ListGroup.ItemTitle>
-                    </ListGroup.ItemContent>
-                    <ListGroup.ItemSuffix>
-                      <Icon name="lets-icons:copy" size={20} color={muted} />
-                    </ListGroup.ItemSuffix>
-                  </ListGroup.Item>
-                </PressableFeedback.Scale>
-                <PressableFeedback.Ripple />
-              </PressableFeedback>
-            </ListGroup>
-          </GradientCard>
-        </Section>
-      </View>
-    </>
-  );
-});
-
 /**
  * Keeps every receive tab MOUNTED once the hub's entry is ready, showing only
  * the selected one (`display: none` hides without unmounting). The Bolt12
@@ -260,6 +204,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   useLifecycleLogger('ReceiveScreen');
   const muted = useThemeColor('muted');
   const [selectedTab, setSelectedTab] = useState<string>('Lightning');
+  const [lightningMode, setLightningMode] = useState<'address' | 'offer'>('address');
 
   const { entry, error, actions, mintUrl } = useScreenActions(
     'receive',
@@ -269,12 +214,11 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   const receiveEntryData = entry as ReceiveHubEntry | null;
   const hasReceiveEntryData = Boolean(receiveEntryData);
 
-  const quickAccessP2PK = useSettingsStore((state) => state.quickAccessP2PK);
   const isNpcMintUpdating = useNpcMintStore((s) => s.isUpdating);
   const mintInfo = useMintInfo(mintUrl);
   const walletContext = useWalletContext();
 
-  const tabs = useMemo(() => computeReceiveTabs(quickAccessP2PK), [quickAccessP2PK]);
+  const tabs = useMemo(() => computeReceiveTabs(), []);
 
   useEffect(() => {
     paymentLog.info('receive.tabs.computed', { tabs: tabs.join(','), unit });
@@ -372,22 +316,54 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
           return (
             <>
               <TabPane visible={selectedTab === 'Lightning'}>
-                <ReceiveLightningTab
-                  data={receiveEntryData}
-                  unit={unit}
-                  mintInfo={mintInfo}
-                  selectedMintUrl={mintUrl}
-                  isNpcMintUpdating={isNpcMintUpdating}
-                  actions={actions}
-                  muted={muted}
-                />
+                {/* Two Lightning rails behind a VISIBLE mode switcher (sub-tab
+                    at the top, not a buried setting): the npub.cash address
+                    (human-readable, BIP-353-style) and the reusable BOLT 12
+                    offer. Both stay mounted so switching never stutters. */}
+                <View style={{ marginBottom: 12 }}>
+                  <ActionSegmentsCard
+                    segments={[
+                      {
+                        label: 'Address',
+                        active: lightningMode === 'address',
+                        onPress: () => setLightningMode('address'),
+                        testID: 'receive-lightning-mode-address',
+                      },
+                      {
+                        label: 'BOLT 12',
+                        active: lightningMode === 'offer',
+                        onPress: () => setLightningMode('offer'),
+                        testID: 'receive-lightning-mode-offer',
+                      },
+                    ]}
+                  />
+                </View>
+                <View style={lightningMode === 'address' ? undefined : styles.hiddenPane}>
+                  <ReceiveLightningTab
+                    data={receiveEntryData}
+                    unit={unit}
+                    mintInfo={mintInfo}
+                    selectedMintUrl={mintUrl}
+                    isNpcMintUpdating={isNpcMintUpdating}
+                    actions={actions}
+                    muted={muted}
+                  />
+                </View>
+                <View style={lightningMode === 'offer' ? undefined : styles.hiddenPane}>
+                  <ReceiveReusableQuoteTab
+                    method="bolt12"
+                    unit={unit}
+                    walletContext={walletContext}
+                    actions={actions}
+                    muted={muted}
+                  />
+                </View>
               </TabPane>
-              <TabPane visible={selectedTab === 'BOLT 12'}>
-                <ReceiveReusableQuoteTab
-                  method="bolt12"
+              <TabPane visible={selectedTab === 'Unified'}>
+                <ReceiveUnifiedTab
                   unit={unit}
                   walletContext={walletContext}
-                  actions={actions}
+                  p2pkKey={receiveEntryData.p2pkKey}
                   muted={muted}
                 />
               </TabPane>
@@ -401,16 +377,13 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                 />
               </TabPane>
               <TabPane visible={selectedTab === 'Cashu'}>
-                <ReceivePaymentRequestTab unit={unit} walletContext={walletContext} muted={muted} />
+                <ReceivePaymentRequestTab
+                  unit={unit}
+                  walletContext={walletContext}
+                  p2pkKey={receiveEntryData.p2pkKey}
+                  muted={muted}
+                />
               </TabPane>
-              <TabPane visible={selectedTab === 'BIP321'}>
-                <ReceiveUnifiedTab unit={unit} walletContext={walletContext} muted={muted} />
-              </TabPane>
-              {quickAccessP2PK && (
-                <TabPane visible={selectedTab === 'P2PK'}>
-                  <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
-                </TabPane>
-              )}
             </>
           );
         }}
