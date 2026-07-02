@@ -11,7 +11,7 @@
  * — which is exactly why this tab is NOT the receive hub's default.
  */
 
-import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { setStringAsync } from 'expo-clipboard';
@@ -131,13 +131,45 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
 
   // As the DEFAULT tab this must not stutter: hold the placeholder until
   // every rail settles ONCE, then render the fully composed QR in a single
-  // swap. Later re-resolves (e.g. the Cashu rail's fresh-per-visit rotation
-  // retiring the creq) keep the current content and swap in place — the new
-  // request id replaces the cancelled one without a skeleton flash.
-  const [settled, setSettled] = useState(false);
+  // swap. With warm colada caches the rails seed synchronously, so this
+  // initializes TRUE and no placeholder frame ever paints. Later re-resolves
+  // (e.g. the Cashu rail's fresh-per-visit rotation retiring the creq) keep
+  // the current content and swap in place.
+  const [settled, setSettled] = useState(!anyLoading);
   useEffect(() => {
     if (!anyLoading && !settled) setSettled(true);
   }, [anyLoading, settled]);
+
+  // Which rail gates the skeleton? Log each rail's first settle relative to
+  // mount (duration_ms ≈ 0 ⇒ served from the colada cache) plus the moment
+  // the whole tab settles — log-doctor: `receive.unified.`.
+  const mountTsRef = useRef(Date.now());
+  const railLoggedRef = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    const rails: Record<string, boolean> = {
+      onchain: onchain.isLoading,
+      bolt12: bolt12.isLoading,
+      creq: creq.isLoading,
+    };
+    for (const [rail, loading] of Object.entries(rails)) {
+      if (!loading && !railLoggedRef.current[rail]) {
+        railLoggedRef.current[rail] = true;
+        paymentLog.info('receive.unified.rail_settled', {
+          rail,
+          duration_ms: Date.now() - mountTsRef.current,
+        });
+      }
+    }
+  }, [onchain.isLoading, bolt12.isLoading, creq.isLoading]);
+  useEffect(() => {
+    if (!settled) return;
+    paymentLog.info('receive.unified.settled', {
+      duration_ms: Date.now() - mountTsRef.current,
+      hasUri: !!uri,
+    });
+    // Settles exactly once — uri presence at that moment is the payload.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settled]);
 
   const handleCopy = useCallback(async () => {
     if (!uri) return;

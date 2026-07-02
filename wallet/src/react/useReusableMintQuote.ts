@@ -4,6 +4,7 @@ import type { Manager } from "@cashu/coco-core";
 import { logger, mintUrlFields } from "../logger";
 import {
   ensureReusableMintQuote,
+  peekReusableMintQuote,
   reusableQuoteKey,
   rotateReusableMintQuote,
   type EnsureReusableMintQuoteInput,
@@ -41,8 +42,13 @@ export function useReusableMintQuote(
   identityStore: ReusableQuoteIdentityStore,
 ): UseReusableMintQuoteResult {
   const manager = useColadaManager();
-  const [quote, setQuote] = useState<ReusableMintQuote | null>(null);
-  const [isLoading, setIsLoading] = useState(!!input);
+  // Seed from the last resolved value (per-manager cache) so re-mounts render
+  // the QR synchronously — the effect below still revalidates against the
+  // identity store and swaps in place if anything changed.
+  const [quote, setQuote] = useState<ReusableMintQuote | null>(() =>
+    input ? peekReusableMintQuote(manager, input) : null,
+  );
+  const [isLoading, setIsLoading] = useState(!!input && !quote);
   const [error, setError] = useState<string | null>(null);
   const [generation, setGeneration] = useState(0);
 
@@ -71,7 +77,11 @@ export function useReusableMintQuote(
       return;
     }
     let cancelled = false;
-    setIsLoading(true);
+    // Only show a loading state when we have nothing to show — cached seeds
+    // revalidate silently (stale-while-revalidate).
+    if (!peekReusableMintQuote(manager, { mintUrl, method, unit })) {
+      setIsLoading(true);
+    }
     setError(null);
     (async () => {
       try {

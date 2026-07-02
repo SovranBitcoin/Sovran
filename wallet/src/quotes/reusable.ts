@@ -69,6 +69,30 @@ function isUnexpired(expiry: number | null, nowSeconds: number): boolean {
 // rapid re-open) must never race two creates for the same standing quote.
 const inFlight = new Map<string, Promise<ReusableMintQuote>>();
 
+// Last resolved standing quote per key, PER MANAGER (WeakMap keyed by the
+// manager instance so one profile's addresses can never leak into another's
+// UI). Lets hooks render synchronously on re-mounts (stale-while-revalidate)
+// instead of showing a skeleton while the async DB read runs.
+const resolvedCache = new WeakMap<Manager, Map<string, ReusableMintQuote>>();
+
+function cacheFor(manager: Manager): Map<string, ReusableMintQuote> {
+  let map = resolvedCache.get(manager);
+  if (!map) {
+    map = new Map();
+    resolvedCache.set(manager, map);
+  }
+  return map;
+}
+
+/** Synchronous read of the last resolved standing quote for this manager —
+ *  render-from-cache seed; callers still revalidate asynchronously. */
+export function peekReusableMintQuote(
+  manager: Manager,
+  input: EnsureReusableMintQuoteInput,
+): ReusableMintQuote | null {
+  return cacheFor(manager).get(reusableQuoteKey(input)) ?? null;
+}
+
 export async function ensureReusableMintQuote(
   manager: Manager,
   input: EnsureReusableMintQuoteInput,
@@ -78,7 +102,20 @@ export async function ensureReusableMintQuote(
   const pending = inFlight.get(key);
   if (pending) return pending;
 
-  const task = resolveReusableMintQuote(manager, input, identityStore, key);
+  const startedAt = Date.now();
+  const task = resolveReusableMintQuote(
+    manager,
+    input,
+    identityStore,
+    key,
+  ).then((resolved) => {
+    cacheFor(manager).set(key, resolved);
+    logger.info("quotes.reusable.resolve_timing", {
+      method: input.method,
+      duration_ms: Date.now() - startedAt,
+    });
+    return resolved;
+  });
   inFlight.set(key, task);
   try {
     return await task;
@@ -116,6 +153,7 @@ export async function rotateReusableMintQuote(
       unit,
     });
     identityStore.set(key, created.quoteId);
+    cacheFor(manager).set(key, created);
     logger.info("quotes.reusable.rotated", {
       ...mintUrlFields(input.mintUrl),
       method: input.method,

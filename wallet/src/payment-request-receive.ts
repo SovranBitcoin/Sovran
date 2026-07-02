@@ -148,6 +148,35 @@ async function createStanding(
 
 const inFlight = new Map<string, Promise<StandingPaymentRequest>>();
 
+// Last resolved standing request per key+lock, PER MANAGER (WeakMap — see
+// quotes/reusable.ts). Seeds synchronous renders on re-mount.
+const resolvedCache = new WeakMap<
+  Manager,
+  Map<string, StandingPaymentRequest>
+>();
+
+function cacheFor(manager: Manager): Map<string, StandingPaymentRequest> {
+  let map = resolvedCache.get(manager);
+  if (!map) {
+    map = new Map();
+    resolvedCache.set(manager, map);
+  }
+  return map;
+}
+
+function cacheKey(input: StandingPaymentRequestInput): string {
+  return `${standingPaymentRequestKey(input.unit)}|${input.lockP2pkPubkey ?? ""}`;
+}
+
+/** Synchronous read of the last resolved standing request (per lock state)
+ *  — render-from-cache seed; callers still revalidate asynchronously. */
+export function peekStandingPaymentRequest(
+  manager: Manager,
+  input: StandingPaymentRequestInput,
+): StandingPaymentRequest | null {
+  return cacheFor(manager).get(cacheKey(input)) ?? null;
+}
+
 /**
  * Resolve the recorded standing payment request for the unit, creating and
  * recording one only when none is recorded or the recorded one is no longer
@@ -162,6 +191,7 @@ export async function ensureStandingPaymentRequest(
   const pending = inFlight.get(key);
   if (pending) return pending;
 
+  const startedAt = Date.now();
   const task = (async () => {
     const recordedId = identityStore.get(key);
     let reason = "no_recorded_request";
@@ -195,7 +225,13 @@ export async function ensureStandingPaymentRequest(
       logger.warn("creq.standing.recorded_discarded", { reason });
     }
     return createStanding(manager, input, identityStore, key, reason);
-  })();
+  })().then((resolved) => {
+    cacheFor(manager).set(cacheKey(input), resolved);
+    logger.info("creq.standing.resolve_timing", {
+      duration_ms: Date.now() - startedAt,
+    });
+    return resolved;
+  });
 
   inFlight.set(key, task);
   try {
@@ -232,7 +268,10 @@ export async function rotateStandingPaymentRequest(
       }
     }
     return createStanding(manager, input, identityStore, key, "rotated");
-  })();
+  })().then((resolved) => {
+    cacheFor(manager).set(cacheKey(input), resolved);
+    return resolved;
+  });
 
   inFlight.set(key, task);
   try {

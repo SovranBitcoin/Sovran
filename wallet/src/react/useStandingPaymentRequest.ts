@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { logger } from "../logger";
 import {
   ensureStandingPaymentRequest,
+  peekStandingPaymentRequest,
   rotateStandingPaymentRequest,
   standingPaymentRequestKey,
   type StandingPaymentRequest,
@@ -38,8 +39,13 @@ export function useStandingPaymentRequest(
   const freshOnMount = options?.freshOnMount ?? false;
   const freshDoneForRef = useRef<string | null>(null);
   const manager = useColadaManager();
-  const [request, setRequest] = useState<StandingPaymentRequest | null>(null);
-  const [isLoading, setIsLoading] = useState(!!input);
+  // Seed from the last resolved value (per-manager cache) so re-mounts render
+  // synchronously; the effect revalidates (or rotates, for freshOnMount) and
+  // swaps in place.
+  const [request, setRequest] = useState<StandingPaymentRequest | null>(() =>
+    input ? peekStandingPaymentRequest(manager, input) : null,
+  );
+  const [isLoading, setIsLoading] = useState(!!input && !request);
   const [error, setError] = useState<string | null>(null);
   const [generation, setGeneration] = useState(0);
 
@@ -72,7 +78,17 @@ export function useStandingPaymentRequest(
       return;
     }
     let cancelled = false;
-    setIsLoading(true);
+    // Cached seeds revalidate silently (stale-while-revalidate); only show a
+    // loading state when there is nothing to render.
+    if (
+      !peekStandingPaymentRequest(manager, {
+        unit,
+        mints: mintsRef.current,
+        lockP2pkPubkey,
+      })
+    ) {
+      setIsLoading(true);
+    }
     setError(null);
     (async () => {
       try {
