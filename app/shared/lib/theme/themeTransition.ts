@@ -97,6 +97,36 @@ export function beginThemeDrag(targetTheme: string, fromSurface: string | null):
   }
 }
 
+const RELEASE_FADE_MS = 500;
+let afterFadeCallbacks: Array<() => void> = [];
+
+function flushAfterFadeCallbacks(): void {
+  const callbacks = afterFadeCallbacks;
+  afterFadeCallbacks = [];
+  callbacks.forEach((callback) => callback());
+}
+
+/**
+ * Revolut-style release transition: the crossfade doesn't track the finger —
+ * it STARTS the moment the drag is released toward a new account and
+ * completes in ~0.5s. Mount the target layer and animate to it.
+ */
+export function releaseThemeDrag(targetTheme: string, fromSurface: string | null): void {
+  beginThemeDrag(targetTheme, fromSurface);
+  themeDragProgress.value = withTiming(1, { duration: RELEASE_FADE_MS }, (finished) => {
+    if (finished) runOnJS(flushAfterFadeCallbacks)();
+  });
+}
+
+/** Run once the release fade has fully landed (immediately if it has). */
+export function runAfterThemeDragFade(callback: () => void): void {
+  if (dragTargetTheme === null || themeDragProgress.value >= 0.999) {
+    callback();
+    return;
+  }
+  afterFadeCallbacks.push(callback);
+}
+
 /** Drag released without crossing — glide back to the current theme. */
 export function cancelThemeDrag(): void {
   if (dragTargetTheme === null) {
@@ -111,6 +141,7 @@ export function cancelThemeDrag(): void {
 function releaseDragTarget(): void {
   dragTargetTheme = null;
   themeDragTargetSv.value = null;
+  afterFadeCallbacks = [];
   notifyDragListeners();
 }
 

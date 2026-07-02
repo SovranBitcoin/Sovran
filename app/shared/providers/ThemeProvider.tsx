@@ -11,6 +11,7 @@ import {
   completeThemeDrag,
   getThemeDragTarget,
   primeThemeSurface,
+  runAfterThemeDragFade,
   runThemeTransition,
 } from '@/shared/lib/theme/themeTransition';
 import { Uniwind } from 'uniwind';
@@ -94,13 +95,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (getThemeDragTarget() === resolvedTheme) {
-      // The carousel drag already crossfaded to this theme — apply instantly
-      // under the (fully opaque) drag layer, then release it.
+      // The carousel release fade is crossfading to this theme — apply the
+      // vars only once the drag layer is FULLY opaque (the fade may still be
+      // mid-flight when the pager reports idle), then release the layer.
       lastApplied.current = resolvedTheme;
-      primeThemeSurface(surfaceOf);
-      applyVars();
-      completeThemeDrag();
-      log.info('theme.transition.drag_completed', { to: resolvedTheme });
+      runAfterThemeDragFade(() => {
+        primeThemeSurface(surfaceOf);
+        applyVars();
+        completeThemeDrag();
+        log.info('theme.transition.drag_completed', { to: resolvedTheme });
+      });
       return;
     }
     // Menu pick / programmatic switch: fade the wallpaper layer out, swap at

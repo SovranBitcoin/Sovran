@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import PagerView, {
   type PageScrollStateChangedNativeEvent,
-  type PagerViewOnPageScrollEvent,
   type PagerViewOnPageSelectedEvent,
 } from 'react-native-pager-view';
 
@@ -14,11 +13,9 @@ import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { resolveUnitWallpaper } from '@/shared/lib/theme/resolveUnitWallpaper';
 import {
-  beginThemeDrag,
   cancelThemeDrag,
-  getThemeDragTarget,
+  releaseThemeDrag,
   surfaceOfTheme,
-  themeDragProgress,
 } from '@/shared/lib/theme/themeTransition';
 
 import { Log, walletLog } from '@/shared/lib/logger';
@@ -79,35 +76,24 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
     setPageHeights((prev) => (prev[pageUnit] === height ? prev : { ...prev, [pageUnit]: height }));
   }, []);
 
-  const handlePageScroll = useCallback(
-    (event: PagerViewOnPageScrollEvent) => {
-      const { position, offset } = event.nativeEvent;
-      const settled = pagerPositionRef.current;
-      const delta = position + offset - settled;
-      const targetIndex = delta > 0.001 ? settled + 1 : delta < -0.001 ? settled - 1 : null;
-      if (targetIndex === null || targetIndex < 0 || targetIndex >= availableUnits.length) {
-        if (getThemeDragTarget() !== null) cancelThemeDrag();
-        return;
-      }
-      const fromTheme = themeForUnit(availableUnits[settled] ?? unit);
-      const targetTheme = themeForUnit(availableUnits[targetIndex]);
-      if (targetTheme === fromTheme) return; // identical theme — nothing to fade
-      if (getThemeDragTarget() !== targetTheme) {
-        beginThemeDrag(targetTheme, surfaceOfTheme(fromTheme));
-      }
-      themeDragProgress.value = Math.min(1, Math.abs(delta));
+  // Revolut model: the wallpaper crossfade does NOT track the finger. It
+  // starts the moment the drag is released toward a new account
+  // (onPageSelected fires when the landing page is determined ≈ release)
+  // and completes in ~0.5s, while the pager settles underneath. The unit
+  // itself commits later, at idle.
+  const handlePageSelected = useCallback(
+    (event: PagerViewOnPageSelectedEvent) => {
+      const position = event.nativeEvent.position;
+      pagerPositionRef.current = position;
+      const nextUnit = availableUnits[position];
+      if (!nextUnit || nextUnit === unit) return;
+      const fromTheme = themeForUnit(unit);
+      const targetTheme = themeForUnit(nextUnit);
+      if (targetTheme === fromTheme) return; // identical wallpaper — no fade
+      releaseThemeDrag(targetTheme, surfaceOfTheme(fromTheme));
     },
     [availableUnits, unit]
   );
-
-  // onPageSelected fires at the SNAP THRESHOLD, while the settle animation
-  // is still running — committing the unit there caused a re-render burst
-  // (unit-scoped wallet context, CSS-var swap, balance re-reads) mid-flight,
-  // which read as lag and content shifting. Record the landing page here and
-  // commit ONLY when the pager reports idle.
-  const handlePageSelected = useCallback((event: PagerViewOnPageSelectedEvent) => {
-    pagerPositionRef.current = event.nativeEvent.position;
-  }, []);
 
   const handlePageScrollStateChanged = useCallback(
     (event: PageScrollStateChangedNativeEvent) => {
@@ -132,7 +118,6 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
           ref={pagerRef}
           style={styles.pager}
           initialPage={pageIndex}
-          onPageScroll={handlePageScroll}
           onPageSelected={handlePageSelected}
           onPageScrollStateChanged={handlePageScrollStateChanged}
           // Rebuild when the available-account set changes so page indices
@@ -145,7 +130,12 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
                   align="center"
                   gap={8}
                   onLayout={(event) => onPageContentLayout(accountUnit, event)}>
-                  <PrimaryBalance account={{ unit: accountUnit }} />
+                  {/* Revolut model: every page renders the CURRENT account's
+                      content — pages are identical while swiping (no per-page
+                      content differences to stutter or shift) and the content
+                      "corrects itself" to the new account when the switch
+                      commits at idle. */}
+                  <PrimaryBalance account={{ unit }} />
                 </VStack>
               </VStack>
             </View>
