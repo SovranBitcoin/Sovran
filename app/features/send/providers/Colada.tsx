@@ -32,6 +32,8 @@ import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog } from '@/shared/lib/logger';
+import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
 import { publishGiftWrappedDM } from '@/shared/lib/nostr/publishGiftWrappedDM';
 import { ingestResolvedProfiles } from '@/shared/lib/nostr/useEntityCache';
@@ -188,6 +190,38 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         getBtcPrice,
         getDisplayCurrency,
         getPreferredMintUrl: () => useMintStore.getState().selectedMint,
+        // NUT-30 onchain melt fee picker. Runs BEFORE prepare (no proofs
+        // reserved while the sheet is open); dismiss resolves null = cancel.
+        selectOnchainFeeIndex: (options) =>
+          new Promise((resolve) => {
+            let settled = false;
+            const settle = (value: number | null) => {
+              if (settled) return;
+              settled = true;
+              resolve(value);
+            };
+            paymentLog.info('send.onchain.fee_options_shown', {
+              optionCount: options.length,
+            });
+            actionMenuPopup({
+              title: 'Network fee',
+              onDismiss: () => {
+                paymentLog.info('send.onchain.fee_cancelled');
+                settle(null);
+              },
+              buttons: options.map((option) => ({
+                text: `~${option.estimated_blocks} block${option.estimated_blocks === 1 ? '' : 's'}`,
+                description: `${amountToNumber(option.fee_reserve)} sat fee reserve`,
+                testID: `onchain-fee-${option.fee_index}`,
+                onPress: () => {
+                  paymentLog.info('send.onchain.fee_selected', {
+                    feeIndex: option.fee_index,
+                  });
+                  settle(option.fee_index);
+                },
+              })),
+            });
+          }),
         nostrAppViewBaseUrl: backendConfig.nostrAppViewBaseUrl,
         nostrAppViewVersion: 'v1',
         // Per-mint audit + KYM + operator Nostr profile. Reads existing

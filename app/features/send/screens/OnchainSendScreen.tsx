@@ -1,10 +1,11 @@
 /**
  * @fileoverview Shared Onchain send screen component.
  *
- * The underlying Cashu operation is still a melt quote. Onchain melt
- * execution is not enabled yet, so this screen is a dedicated rail boundary
- * that can show the prepared/unsupported state without overloading the
- * Lightning send UI.
+ * The underlying Cashu operation is a melt quote (coco v2 onchain melt,
+ * NUT-30 fee options chosen at confirm time). This screen is a dedicated
+ * rail boundary showing the melt's state, destination address, and BIP-321
+ * context without overloading the Lightning send UI; pending settlements
+ * advance via coco's melt quote watcher + settlement processor.
  */
 
 import React from 'react';
@@ -19,7 +20,6 @@ import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import { Card } from '@/shared/ui/composed/Card';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
@@ -87,12 +87,6 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
       <View testID={`onchain-send-id-${entry.id}`}>
         <VStack gap={12}>
           <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={false} />
-
-          <Card
-            title="Onchain send unavailable"
-            message="Onchain send is not supported yet."
-            variant="warning"
-          />
 
           <DetailsSection
             items={[

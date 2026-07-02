@@ -1,33 +1,32 @@
-import type { LocalizedReason } from '../formatting/locales';
-import { logger } from '../logger';
+import type { LocalizedReason } from "../formatting/locales";
+import { logger } from "../logger";
 import {
   buildMethodAwareMintCandidates,
   createAmountEntryMethodContext,
   getCapabilityUnavailableReason,
   getMintMethodCapability,
   hasMintSupportingMethod,
-  isMethodImplemented,
-} from '../mint-capabilities';
-import { pickPreferredCandidate, selectMint } from '../mint-selection';
+} from "../mint-capabilities";
+import { pickPreferredCandidate, selectMint } from "../mint-selection";
 import type {
   MintCandidate,
   MintMethodRequirement,
   ResolvedIntent,
   WalletContext,
-} from '../types';
+} from "../types";
 import {
   buildChooseAmountFallback,
   buildChooseProofsData,
   buildProofSuggestions,
   findFullAmountCandidates,
-} from './amountFallback';
+} from "./amountFallback";
 import type {
   Destination,
   ErrorCode,
   FlowContext,
   FlowStep,
   StepDataMap,
-} from './types';
+} from "./types";
 
 // ---------------------------------------------------------------------------
 // Result type
@@ -44,8 +43,8 @@ export interface StepResult<S extends FlowStep = FlowStep> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function errorResult(code: ErrorCode, message: string): StepResult<'error'> {
-  return { step: 'error', data: { code, message } };
+function errorResult(code: ErrorCode, message: string): StepResult<"error"> {
+  return { step: "error", data: { code, message } };
 }
 
 function summarizeContext(ctx: FlowContext): Record<string, unknown> {
@@ -108,10 +107,10 @@ function summarizeCandidates(
   return {
     candidateCount: candidates.length,
     enabledCandidateCount: candidates.filter(
-      (candidate) => candidate.status !== 'disabled',
+      (candidate) => candidate.status !== "disabled",
     ).length,
     disabledCandidateCount: candidates.filter(
-      (candidate) => candidate.status === 'disabled',
+      (candidate) => candidate.status === "disabled",
     ).length,
     reasonCodes: candidates
       .map((candidate) => candidate.reason?.code)
@@ -120,7 +119,7 @@ function summarizeCandidates(
 }
 
 function countProofSuggestions(
-  suggestions: StepDataMap['chooseProofs']['suggestions'],
+  suggestions: StepDataMap["chooseProofs"]["suggestions"],
 ): number {
   if (!suggestions) return 0;
   return (suggestions.roundDown ? 1 : 0) + (suggestions.roundUp ? 1 : 0);
@@ -132,7 +131,7 @@ function logStepResult<S extends FlowStep>(
   fields: Record<string, unknown> = {},
 ): StepResult<S> {
   const errorData =
-    result.step === 'error' ? (result.data as StepDataMap['error']) : null;
+    result.step === "error" ? (result.data as StepDataMap["error"]) : null;
   logger.info(event, {
     step: result.step,
     hasContextPatch: !!result.contextPatch,
@@ -146,31 +145,31 @@ function logStepResult<S extends FlowStep>(
   return result;
 }
 
-export function toMintError(reason: LocalizedReason): StepResult<'error'> {
+export function toMintError(reason: LocalizedReason): StepResult<"error"> {
   switch (reason.code) {
-    case 'INSUFFICIENT_BALANCE':
-    case 'INSUFFICIENT_BALANCE_ALLOWED':
-      return errorResult('INSUFFICIENT_BALANCE', reason.message);
-    case 'NO_BALANCE':
-    case 'NO_MINT_SUFFICIENT_BALANCE':
-      return errorResult('NO_BALANCE', reason.message);
+    case "INSUFFICIENT_BALANCE":
+    case "INSUFFICIENT_BALANCE_ALLOWED":
+      return errorResult("INSUFFICIENT_BALANCE", reason.message);
+    case "NO_BALANCE":
+    case "NO_MINT_SUFFICIENT_BALANCE":
+      return errorResult("NO_BALANCE", reason.message);
     default:
-      return errorResult('NO_VALID_MINT', reason.message);
+      return errorResult("NO_VALID_MINT", reason.message);
   }
 }
 
 function getDestination(intent: ResolvedIntent, ctx: FlowContext): Destination {
   if (ctx.destination) return ctx.destination;
   switch (intent.type) {
-    case 'sendPaymentRequest':
-      return 'paymentRequest';
-    case 'meltLightningInvoice':
-    case 'meltLightningAddress':
-    case 'meltLnurlp':
-    case 'meltOnchainAddress':
-      return 'meltQuote';
+    case "sendPaymentRequest":
+      return "paymentRequest";
+    case "meltLightningInvoice":
+    case "meltLightningAddress":
+    case "meltLnurlp":
+    case "meltOnchainAddress":
+      return "meltQuote";
     default:
-      return 'sendEcash';
+      return "sendEcash";
   }
 }
 
@@ -183,7 +182,7 @@ function needsAmount(ctx: FlowContext): boolean {
  * For send/melt, we need a mint with sufficient balance.
  */
 function needsSpendableBalance(destination: Destination): boolean {
-  return destination !== 'mintQuote';
+  return destination !== "mintQuote";
 }
 
 function methodRequirementForDestination(
@@ -191,11 +190,11 @@ function methodRequirementForDestination(
   ctx: FlowContext,
   unit: string,
 ): MintMethodRequirement | null {
-  if (destination === 'mintQuote') {
-    return { operation: 'mint', method: ctx.mintQuoteMethod ?? 'bolt11', unit };
+  if (destination === "mintQuote") {
+    return { operation: "mint", method: ctx.mintQuoteMethod ?? "bolt11", unit };
   }
-  if (destination === 'meltQuote') {
-    return { operation: 'melt', method: ctx.meltQuoteMethod ?? 'bolt11', unit };
+  if (destination === "meltQuote") {
+    return { operation: "melt", method: ctx.meltQuoteMethod ?? "bolt11", unit };
   }
   return null;
 }
@@ -203,9 +202,9 @@ function methodRequirementForDestination(
 function firstMethodError(
   candidates: MintCandidate[],
   fallbackMessage: string,
-): StepResult<'error'> {
+): StepResult<"error"> {
   const reason = candidates.find((candidate) => candidate.reason)?.reason;
-  return errorResult('NO_VALID_MINT', reason?.message ?? fallbackMessage);
+  return errorResult("NO_VALID_MINT", reason?.message ?? fallbackMessage);
 }
 
 function buildMethodCandidates(
@@ -227,7 +226,7 @@ function hasOnlyBalanceFailures(candidates: MintCandidate[]): boolean {
     candidates.length > 0 &&
     candidates.every((candidate) => {
       const code = candidate.reason?.code;
-      return code === 'INSUFFICIENT_BALANCE' || code === 'NO_BALANCE';
+      return code === "INSUFFICIENT_BALANCE" || code === "NO_BALANCE";
     })
   );
 }
@@ -269,13 +268,13 @@ function checkProofComposition(
   amount: number,
   unit: string,
   ctx: FlowContext,
-): StepResult<'chooseProofs'> | null {
+): StepResult<"chooseProofs"> | null {
   // Only show proof selector for ecash sends. Lightning melts and payment
   // requests must always attempt the exact amount — the mint handles the
   // swap server-side, so showing a proof picker is incorrect.
-  if (ctx.destination !== 'sendEcash') {
-    logger.info('resolveNext.proofComposition.skipped', {
-      reason: 'not-ecash-send',
+  if (ctx.destination !== "sendEcash") {
+    logger.info("resolveNext.proofComposition.skipped", {
+      reason: "not-ecash-send",
       destination: ctx.destination ?? null,
       amount,
       unit,
@@ -287,8 +286,8 @@ function checkProofComposition(
 
   // Locked sends never use local proofs — a P2PK lock requires a mint swap.
   if (ctx.p2pkLockPubkey) {
-    logger.info('resolveNext.proofComposition.skipped', {
-      reason: 'p2pk-lock-requires-mint-swap',
+    logger.info("resolveNext.proofComposition.skipped", {
+      reason: "p2pk-lock-requires-mint-swap",
       amount,
       unit,
       hasMintUrl: !!mintUrl,
@@ -301,8 +300,8 @@ function checkProofComposition(
   const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
   const proofTotal = proofAmounts.reduce((total, proof) => total + proof, 0);
   if (proofAmounts.length === 0) {
-    logger.info('resolveNext.proofComposition.skipped', {
-      reason: 'no-proofs-for-mint',
+    logger.info("resolveNext.proofComposition.skipped", {
+      reason: "no-proofs-for-mint",
       amount,
       unit,
       hasMintUrl: !!mintUrl,
@@ -315,8 +314,8 @@ function checkProofComposition(
   // server-side via executeSend. If executeSend fails, the catch block
   // in createMachine falls back to chooseProofs.
   if (!ctx.offline) {
-    logger.info('resolveNext.proofComposition.skipped', {
-      reason: 'online-send-prefers-mint-swap',
+    logger.info("resolveNext.proofComposition.skipped", {
+      reason: "online-send-prefers-mint-swap",
       amount,
       unit,
       hasMintUrl: !!mintUrl,
@@ -329,10 +328,10 @@ function checkProofComposition(
 
   const built = buildProofSuggestions(proofAmounts, amount);
   if (built.exactMatch || !built.hasSuggestion) {
-    logger.info('resolveNext.proofComposition.skipped', {
+    logger.info("resolveNext.proofComposition.skipped", {
       reason: built.exactMatch
-        ? 'exact-local-composition'
-        : 'no-nearby-suggestion',
+        ? "exact-local-composition"
+        : "no-nearby-suggestion",
       amount,
       unit,
       hasMintUrl: !!mintUrl,
@@ -347,9 +346,9 @@ function checkProofComposition(
   }
 
   return logStepResult(
-    'resolveNext.proofComposition.chooseProofs',
+    "resolveNext.proofComposition.chooseProofs",
     {
-      step: 'chooseProofs',
+      step: "chooseProofs",
       data: buildChooseProofsData({
         mintUrl,
         amount,
@@ -380,7 +379,7 @@ function terminalStep(
   ctx: FlowContext,
   enableEcashSendMemo: boolean,
 ): StepResult {
-  logger.info('resolveNext.terminal', {
+  logger.info("resolveNext.terminal", {
     destination,
     amount: ctx.amount,
     unit: ctx.unit,
@@ -401,9 +400,9 @@ function terminalStep(
   } = ctx;
 
   switch (destination) {
-    case 'mintQuote':
+    case "mintQuote":
       return {
-        step: 'createMintQuote',
+        step: "createMintQuote",
         data: {
           mintUrl: mintUrl!,
           amount: amount!,
@@ -411,9 +410,9 @@ function terminalStep(
           method: ctx.mintQuoteMethod,
         },
       };
-    case 'meltQuote':
+    case "meltQuote":
       return {
-        step: 'navigateToMeltPreview',
+        step: "navigateToMeltPreview",
         data: {
           mintUrl: mintUrl!,
           meltTarget: meltTarget!,
@@ -423,9 +422,9 @@ function terminalStep(
           recipientProfile,
         },
       };
-    case 'paymentRequest':
+    case "paymentRequest":
       return {
-        step: 'navigateToPaymentRequest',
+        step: "navigateToPaymentRequest",
         data: {
           mintUrl: mintUrl!,
           paymentRequest: ctx.paymentRequest!,
@@ -435,10 +434,10 @@ function terminalStep(
           recipientProfile,
         },
       };
-    case 'sendEcash':
+    case "sendEcash":
       if (enableEcashSendMemo && !ctx.sendMemoHandled) {
         return {
-          step: 'enterSendMemo',
+          step: "enterSendMemo",
           data: {
             mintUrl: mintUrl!,
             amount: amount!,
@@ -448,7 +447,7 @@ function terminalStep(
         };
       }
       return {
-        step: 'confirmSend',
+        step: "confirmSend",
         data: {
           mintUrl: mintUrl!,
           amount: amount!,
@@ -477,7 +476,7 @@ export function resolveNext(
   walletCtx: WalletContext,
   enableEcashSendMemo = false,
 ): StepResult {
-  logger.info('resolveNext.start', {
+  logger.info("resolveNext.start", {
     intentType: intent.type,
     enableEcashSendMemo,
     ...summarizeContext(ctx),
@@ -485,74 +484,61 @@ export function resolveNext(
   });
 
   // --- Terminal intents ---
-  if (intent.type === 'receiveToken') {
+  if (intent.type === "receiveToken") {
     return logStepResult(
-      'resolveNext.terminalIntent',
-      { step: 'receiveToken', data: { token: intent.option.value } },
+      "resolveNext.terminalIntent",
+      { step: "receiveToken", data: { token: intent.option.value } },
       {
         intentType: intent.type,
         tokenLength: intent.option.value.length,
       },
     );
   }
-  if (intent.type === 'openMint') {
+  if (intent.type === "openMint") {
     return logStepResult(
-      'resolveNext.terminalIntent',
-      { step: 'openMint', data: { url: intent.url } },
+      "resolveNext.terminalIntent",
+      { step: "openMint", data: { url: intent.url } },
       {
         intentType: intent.type,
         urlLength: intent.url.length,
       },
     );
   }
-  if (intent.type === 'openProfile') {
+  if (intent.type === "openProfile") {
     return logStepResult(
-      'resolveNext.terminalIntent',
-      { step: 'openProfile', data: { npub: intent.npub } },
+      "resolveNext.terminalIntent",
+      { step: "openProfile", data: { npub: intent.npub } },
       {
         intentType: intent.type,
         npubLength: intent.npub.length,
       },
     );
   }
-  if (intent.type === 'ignore') {
+  if (intent.type === "ignore") {
     return logStepResult(
-      'resolveNext.terminalIntent',
-      errorResult('UNSUPPORTED_INPUT', intent.reason.message),
+      "resolveNext.terminalIntent",
+      errorResult("UNSUPPORTED_INPUT", intent.reason.message),
       {
         intentType: intent.type,
         reasonCode: intent.reason.code,
       },
     );
   }
-  if (intent.type === 'meltOnchainAddress') {
+  if (intent.type === "meltOnchainAddress") {
     const requirement: MintMethodRequirement = {
-      operation: 'melt',
-      method: 'onchain',
+      operation: "melt",
+      method: "onchain",
       unit: ctx.unit,
     };
     if (!hasMintSupportingMethod(walletCtx, requirement)) {
       return logStepResult(
-        'resolveNext.onchainUnsupported',
+        "resolveNext.onchainUnsupported",
         errorResult(
-          'NO_VALID_MINT',
-          'No trusted mint supports onchain sending',
+          "NO_VALID_MINT",
+          "No trusted mint supports onchain sending",
         ),
         {
-          reason: 'no-trusted-mint-support',
-          unit: ctx.unit,
-        },
-      );
-    }
-    if (!isMethodImplemented(requirement)) {
-      return logStepResult(
-        'resolveNext.onchainUnsupported',
-        errorResult(
-          'UNSUPPORTED_PAYMENT_METHOD',
-          'Onchain send is not supported yet',
-        ),
-        {
-          reason: 'method-not-implemented',
+          reason: "no-trusted-mint-support",
           unit: ctx.unit,
         },
       );
@@ -560,12 +546,12 @@ export function resolveNext(
   }
 
   // --- Multi-option ---
-  if (intent.type === 'chooseOption') {
-    const hasViable = intent.options.some((o) => o.status !== 'disabled');
+  if (intent.type === "chooseOption") {
+    const hasViable = intent.options.some((o) => o.status !== "disabled");
     if (!hasViable) {
       return logStepResult(
-        'resolveNext.chooseOption',
-        errorResult('ALL_OPTIONS_DISABLED', 'All payment options are disabled'),
+        "resolveNext.chooseOption",
+        errorResult("ALL_OPTIONS_DISABLED", "All payment options are disabled"),
         {
           optionCount: intent.options.length,
           viableOptionCount: 0,
@@ -573,15 +559,15 @@ export function resolveNext(
       );
     }
     return logStepResult(
-      'resolveNext.chooseOption',
+      "resolveNext.chooseOption",
       {
-        step: 'chooseOption',
+        step: "chooseOption",
         data: { parsed: ctx.parsed!, options: intent.options, unit: ctx.unit },
       },
       {
         optionCount: intent.options.length,
         viableOptionCount: intent.options.filter(
-          (option) => option.status !== 'disabled',
+          (option) => option.status !== "disabled",
         ).length,
       },
     );
@@ -591,7 +577,7 @@ export function resolveNext(
   const destination = getDestination(intent, ctx);
   const supportedMintUrls = ctx.supportedMintUrls;
   const unit = ctx.unit;
-  logger.info('resolveNext.routing', {
+  logger.info("resolveNext.routing", {
     intentType: intent.type,
     destination,
     amount: ctx.amount,
@@ -603,7 +589,7 @@ export function resolveNext(
 
   // 1. Need amount?
   if (needsAmount(ctx)) {
-    logger.info('resolveNext.enterAmount.amountNeeded', {
+    logger.info("resolveNext.enterAmount.amountNeeded", {
       intentType: intent.type,
       destination,
       unit,
@@ -621,9 +607,9 @@ export function resolveNext(
 
     const preselectedMintUrl = ctx.mintUrl ?? walletCtx.preferredMintUrl;
     return logStepResult(
-      'resolveNext.enterAmount',
+      "resolveNext.enterAmount",
       {
-        step: 'enterAmount',
+        step: "enterAmount",
         data: {
           unit,
           preselectedMintUrl,
@@ -669,13 +655,13 @@ export function resolveNext(
     )
   ) {
     // Current mint is valid -- skip to proofs/terminal
-    logger.info('resolveNext.mint.currentValid', {
+    logger.info("resolveNext.mint.currentValid", {
       destination,
       amount,
       unit,
       mintUrlLength: ctx.mintUrl.length,
     });
-  } else if (destination === 'mintQuote') {
+  } else if (destination === "mintQuote") {
     const requirement = methodRequirementForDestination(destination, ctx, unit);
     const methodCandidates = requirement
       ? buildMethodCandidates(
@@ -688,7 +674,7 @@ export function resolveNext(
       : null;
     const availableMethodCandidates =
       methodCandidates?.filter(
-        (candidate) => candidate.status !== 'disabled',
+        (candidate) => candidate.status !== "disabled",
       ) ?? null;
 
     // For receive, prefer mint or let user pick
@@ -704,8 +690,8 @@ export function resolveNext(
         ctx,
       )
     ) {
-      logger.info('resolveNext.mint.selected', {
-        reason: ctx.mintUrl ? 'context-mint-valid' : 'preferred-mint-valid',
+      logger.info("resolveNext.mint.selected", {
+        reason: ctx.mintUrl ? "context-mint-valid" : "preferred-mint-valid",
         destination,
         amount,
         unit,
@@ -722,8 +708,8 @@ export function resolveNext(
       );
     }
     if (!requirement && walletCtx.trustedMintUrls.length === 1) {
-      logger.info('resolveNext.mint.selected', {
-        reason: 'single-trusted-mint',
+      logger.info("resolveNext.mint.selected", {
+        reason: "single-trusted-mint",
         destination,
         amount,
         unit,
@@ -744,7 +730,7 @@ export function resolveNext(
       (!availableMethodCandidates || availableMethodCandidates.length === 0)
     ) {
       return logStepResult(
-        'resolveNext.mint.methodError',
+        "resolveNext.mint.methodError",
         firstMethodError(
           methodCandidates ?? [],
           `No trusted mint supports ${requirement.method} receive`,
@@ -764,9 +750,9 @@ export function resolveNext(
       balance: walletCtx.mintBalances[mintUrl] ?? 0,
     }));
     return logStepResult(
-      'resolveNext.mint.selectionNeeded',
+      "resolveNext.mint.selectionNeeded",
       {
-        step: 'selectMint',
+        step: "selectMint",
         data: {
           candidates: methodCandidates ?? candidates,
           supportedMintUrls,
@@ -802,17 +788,17 @@ export function resolveNext(
       : null;
     const availableMethodCandidates =
       methodCandidates?.filter(
-        (candidate) => candidate.status !== 'disabled',
+        (candidate) => candidate.status !== "disabled",
       ) ?? null;
     if (
       requirement &&
       availableMethodCandidates &&
       availableMethodCandidates.length === 0 &&
-      (requirement.method !== 'bolt11' ||
+      (requirement.method !== "bolt11" ||
         !hasOnlyBalanceFailures(methodCandidates ?? []))
     ) {
       return logStepResult(
-        'resolveNext.mint.methodError',
+        "resolveNext.mint.methodError",
         firstMethodError(
           methodCandidates ?? [],
           `No trusted mint supports ${requirement.method} ${requirement.operation}`,
@@ -844,20 +830,20 @@ export function resolveNext(
       !ctx.mintUrl &&
       fullAmountCandidates.length > 0
     ) {
-      if (requirement?.method === 'bolt11') {
+      if (requirement?.method === "bolt11") {
         autoPick = pickPreferredCandidate(
           fullAmountCandidates,
           walletCtx.preferredMintUrl,
         );
-        logger.info('resolveNext.mint.meltAutoPick', {
+        logger.info("resolveNext.mint.meltAutoPick", {
           destination,
           amount,
           unit,
           candidateCount: fullAmountCandidates.length,
           reason:
             autoPick?.mintUrl === walletCtx.preferredMintUrl
-              ? 'preferred'
-              : 'highest_balance',
+              ? "preferred"
+              : "highest_balance",
           mintUrlLength: autoPick?.mintUrl.length ?? 0,
         });
       } else if (fullAmountCandidates.length === 1) {
@@ -868,13 +854,13 @@ export function resolveNext(
       ? selectMint(walletCtx, { allowedMints: supportedMintUrls })
       : autoPick
         ? {
-            type: 'selected' as const,
+            type: "selected" as const,
             mintUrl: autoPick.mintUrl,
             balance: autoPick.balance,
           }
         : fullAmountCandidates.length > 0
           ? {
-              type: 'selectionNeeded' as const,
+              type: "selectionNeeded" as const,
               validMints: fullAmountCandidates,
             }
           : selectMint(walletCtx, {
@@ -883,9 +869,9 @@ export function resolveNext(
             });
 
     switch (selection.type) {
-      case 'selected':
-        logger.info('resolveNext.mint.selected', {
-          reason: 'selection-selected',
+      case "selected":
+        logger.info("resolveNext.mint.selected", {
+          reason: "selection-selected",
           destination,
           amount,
           unit,
@@ -901,11 +887,11 @@ export function resolveNext(
           walletCtx,
           enableEcashSendMemo,
         );
-      case 'selectionNeeded':
+      case "selectionNeeded":
         return logStepResult(
-          'resolveNext.mint.selectionNeeded',
+          "resolveNext.mint.selectionNeeded",
           {
-            step: 'selectMint',
+            step: "selectMint",
             data: {
               candidates: selection.validMints,
               supportedMintUrls,
@@ -936,7 +922,7 @@ export function resolveNext(
             requirementMethod: requirement?.method ?? null,
           },
         );
-      case 'noValidMint':
+      case "noValidMint":
         if (needsSpendableBalance(destination)) {
           const fallback = buildChooseAmountFallback({
             walletCtx,
@@ -947,9 +933,9 @@ export function resolveNext(
           });
           if (fallback) {
             return logStepResult(
-              'resolveNext.mint.noValidMintProofFallback',
+              "resolveNext.mint.noValidMintProofFallback",
               {
-                step: 'chooseProofs',
+                step: "chooseProofs",
                 data: buildChooseProofsData({
                   mintUrl: fallback.mintUrl,
                   amount,
@@ -976,7 +962,7 @@ export function resolveNext(
           }
         }
         return logStepResult(
-          'resolveNext.mint.noValidMint',
+          "resolveNext.mint.noValidMint",
           toMintError(selection.reason),
           {
             destination,
@@ -1002,7 +988,7 @@ export function resolveNext(
     );
     if (proofResult) {
       return logStepResult(
-        'resolveNext.proofComposition.result',
+        "resolveNext.proofComposition.result",
         { ...proofResult, contextPatch: { destination } },
         {
           destination,
@@ -1016,7 +1002,7 @@ export function resolveNext(
 
   // 4. Terminal step
   return logStepResult(
-    'resolveNext.terminal.result',
+    "resolveNext.terminal.result",
     {
       ...terminalStep(destination, ctx, enableEcashSendMemo),
       contextPatch: { destination },
@@ -1053,7 +1039,7 @@ function resolveWithMint(
     );
     if (proofResult) {
       return logStepResult(
-        'resolveNext.resolveWithMint.proofComposition',
+        "resolveNext.resolveWithMint.proofComposition",
         { ...proofResult, contextPatch: { mintUrl, destination } },
         {
           destination,
@@ -1066,7 +1052,7 @@ function resolveWithMint(
   }
 
   return logStepResult(
-    'resolveNext.resolveWithMint.terminal',
+    "resolveNext.resolveWithMint.terminal",
     {
       ...terminalStep(destination, merged, enableEcashSendMemo),
       contextPatch: { mintUrl, destination },

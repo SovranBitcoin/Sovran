@@ -29,7 +29,10 @@ import type {
   MintReviewsFetcher,
   WalletContext,
 } from "../types";
-import { createDefaultOperations } from "../operations/defaultOperations";
+import {
+  createDefaultOperations,
+  type DefaultOperationsConfig,
+} from "../operations/defaultOperations";
 import {
   createWalletContextTracker,
   type WalletContextTracker,
@@ -56,6 +59,13 @@ export interface ColadaConfig {
   annotationStore?: AnnotationStoreAdapter;
 
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
+
+  /**
+   * Onchain melt fee picker (NUT-30 fee_options). Called BEFORE prepare (no
+   * proofs reserved while the user considers); resolve null to cancel.
+   * Omitted -> the cheapest option is selected automatically.
+   */
+  selectOnchainFeeIndex?: DefaultOperationsConfig["selectOnchainFeeIndex"];
 
   unit?: string;
   getOffline?: () => boolean;
@@ -89,7 +99,7 @@ export interface ColadaConfig {
    */
   nostrAppViewBaseUrl?: string;
   /** App-view route version prefix: `''` → `/nostr/*`, `'v1'` → `/v1/nostr/*`. Default `'v1'`. */
-  nostrAppViewVersion?: '' | 'v1';
+  nostrAppViewVersion?: "" | "v1";
   /** Resolve a mint operator Nostr pubkey from NUT-06 contact metadata. */
   resolveMintContactProfile?: MintContactProfileResolver;
   /** Fetch aggregated Nostr reviews for a mint. */
@@ -191,6 +201,7 @@ export function createColada(config: ColadaConfig): ColadaInstance {
       appViewEnrichment?.resolveMintContactProfile,
     fetchMintReviews:
       config.fetchMintReviews ?? appViewEnrichment?.fetchMintReviews,
+    selectOnchainFeeIndex: config.selectOnchainFeeIndex,
     shouldMockFailPaymentRequest: config.shouldMockFailPaymentRequest,
     shouldMockFailMelt: config.shouldMockFailMelt,
     shouldMockFailSend: config.shouldMockFailSend,

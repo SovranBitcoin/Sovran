@@ -45,7 +45,7 @@ export function UnitSwitcherPill({ textSize = 12 }: { textSize?: number }): Reac
           iconNode: <Icon name={option.icon} size={20} />,
           testID: `wallet-unit-menu-${option.unit}`,
           disabled: !available,
-          ...(available ? {} : { description: 'No trusted mint supports this unit' }),
+          ...(available ? {} : { reason: 'No trusted mint supports this unit' }),
           suffix:
             option.unit === unit ? <Icon name="mdi:check" size={20} color={success} /> : undefined,
           onPress: () => setUnit(option.unit),

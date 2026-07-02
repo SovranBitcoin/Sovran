@@ -12,7 +12,6 @@ import { localizeReason } from "./formatting/locales";
 import {
   buildMethodAwareMintCandidates,
   hasMintSupportingMethod,
-  isMethodImplemented,
 } from "./mint-capabilities";
 import { logger } from "./logger";
 import type {
@@ -190,17 +189,6 @@ const ONCHAIN_RULES: RecommendationRule[] = [
         locale === "en"
           ? "No trusted mint supports onchain sending"
           : "No trusted mint supports onchain sending",
-    }),
-  },
-  {
-    applies: () => !isMethodImplemented(onchainMeltRequirement()),
-    status: "disabled",
-    reason: (_o, _c, _i, locale) => ({
-      code: "PAYMENT_METHOD_NOT_IMPLEMENTED",
-      message:
-        locale === "en"
-          ? "Onchain send is not supported yet"
-          : "Onchain send is not supported yet",
     }),
   },
   {

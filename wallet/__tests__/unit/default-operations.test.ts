@@ -115,6 +115,16 @@ function createMockManager(overrides: MockManagerOverrides = {}) {
 vi.mock('../../src/detectors', () => ({
   defaultDetectors: {
     getPaymentRequestInfo: vi.fn(),
+    // parsePaymentInput (used by executeMelt's onchain-target detection)
+    // walks the full detector surface; stub the rest as no-matches so raw
+    // onchain addresses fall through to the built-in address recognizer.
+    parseNpub: vi.fn(() => null),
+    isLightningInvoice: vi.fn(() => false),
+    isLightningAddress: vi.fn(() => false),
+    isLnurlp: vi.fn(() => false),
+    isPaymentRequest: vi.fn(() => false),
+    isValidEcashToken: vi.fn(() => false),
+    getLightningAmount: vi.fn(() => null),
   },
 }));
 const mockGetPRInfo = defaultDetectors.getPaymentRequestInfo as ReturnType<typeof vi.fn>;
@@ -524,5 +534,119 @@ describe('executeMintQuote — onchain', () => {
       amount: 123,
       paymentRequest: 'bc1qexampleaddress',
     });
+  });
+});
+
+describe('executeMelt — onchain (coco v2)', () => {
+  const ADDRESS = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4';
+  const FEE_OPTIONS = [
+    { fee_index: 0, fee_reserve: 900, estimated_blocks: 1 },
+    { fee_index: 1, fee_reserve: 300, estimated_blocks: 6 },
+  ];
+
+  function onchainMocks() {
+    const quote = {
+      mintUrl: MINT1,
+      method: 'onchain',
+      quoteId: 'omq-1',
+      fee_options: FEE_OPTIONS,
+    };
+    const create = vi.fn().mockResolvedValue(quote);
+    const prepare = vi.fn().mockResolvedValue({ id: 'melt-op-1', quoteId: 'omq-1' });
+    const execute = vi.fn().mockResolvedValue({
+      id: 'melt-op-1',
+      quoteId: 'omq-1',
+      mintUrl: MINT1,
+      createdAt: 1111,
+      state: 'pending',
+      amount: 500,
+    });
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    return { quote, create, prepare, execute, cancel };
+  }
+
+  it('threads the picked feeIndex into ops.melt.prepare', async () => {
+    const { quote, create, prepare, execute } = onchainMocks();
+    const selectOnchainFeeIndex = vi.fn().mockResolvedValue(1);
+    const mockManager = createMockManager({
+      quotes: { melt: { create } },
+      ops: { melt: { prepare, execute, cancel: vi.fn() } },
+    });
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      selectOnchainFeeIndex,
+    });
+
+    const result = await ops.executeMelt!(MINT1, ADDRESS, 500, 'sat');
+
+    expect(create).toHaveBeenCalledWith({
+      mintUrl: MINT1,
+      method: 'onchain',
+      methodData: { address: ADDRESS, amountSats: 500 },
+      unit: 'sat',
+    });
+    expect(selectOnchainFeeIndex).toHaveBeenCalledWith(FEE_OPTIONS);
+    expect(prepare).toHaveBeenCalledWith({ quote, feeIndex: 1 });
+    const entry = JSON.parse(result.historyEntry);
+    expect(entry).toMatchObject({
+      type: 'melt',
+      state: 'PENDING',
+      amount: 500,
+      metadata: { method: 'onchain', onchainAddress: ADDRESS },
+    });
+  });
+
+  it('cancels before prepare when the fee picker is dismissed', async () => {
+    const { create, prepare, execute } = onchainMocks();
+    const mockManager = createMockManager({
+      quotes: { melt: { create } },
+      ops: { melt: { prepare, execute, cancel: vi.fn() } },
+    });
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      selectOnchainFeeIndex: vi.fn().mockResolvedValue(null),
+    });
+
+    await expect(ops.executeMelt!(MINT1, ADDRESS, 500, 'sat')).rejects.toThrow(
+      'Onchain fee selection cancelled'
+    );
+    // No proofs were ever reserved: prepare/execute never ran.
+    expect(prepare).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the cheapest fee option without a picker', async () => {
+    const { quote, create, prepare, execute } = onchainMocks();
+    const mockManager = createMockManager({
+      quotes: { melt: { create } },
+      ops: { melt: { prepare, execute, cancel: vi.fn() } },
+    });
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+    });
+
+    await ops.executeMelt!(MINT1, ADDRESS, 500, 'sat');
+    expect(prepare).toHaveBeenCalledWith({ quote, feeIndex: 1 });
+  });
+
+  it('cancels the operation when execute throws (reservation rescue)', async () => {
+    const { create, prepare } = onchainMocks();
+    const execute = vi.fn().mockRejectedValue(new Error('mint 500'));
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    const mockManager = createMockManager({
+      quotes: { melt: { create } },
+      ops: { melt: { prepare, execute, cancel } },
+    });
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      selectOnchainFeeIndex: vi.fn().mockResolvedValue(0),
+    });
+
+    await expect(ops.executeMelt!(MINT1, ADDRESS, 500, 'sat')).rejects.toThrow('mint 500');
+    expect(cancel).toHaveBeenCalledWith('melt-op-1', 'Execute failed');
   });
 });

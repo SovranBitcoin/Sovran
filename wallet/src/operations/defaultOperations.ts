@@ -16,7 +16,10 @@
 //                           createColada({ nostrAppViewBaseUrl })
 // ---------------------------------------------------------------------------
 
-import { getTokenMetadata } from "@cashu/cashu-ts";
+import {
+  getTokenMetadata,
+  type MeltQuoteOnchainFeeOption as OnchainMeltFeeOption,
+} from "@cashu/cashu-ts";
 import type {
   Manager,
   Mint,
@@ -35,6 +38,7 @@ import type {
 import { defaultDetectors } from "../detectors";
 import { errField, logger, mintUrlFields } from "../logger";
 import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from "../lnurl";
+import { parsePaymentInput } from "../parse";
 import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
 import { amountToNumber, type AmountLike } from "../amount";
 import {
@@ -106,6 +110,136 @@ function mapMeltOperationState(state: string): string {
   if (state === "finalized") return "PAID";
   if (state === "pending" || state === "executing") return "PENDING";
   return "UNPAID";
+}
+
+/** Bare onchain address from a melt target (address or bitcoin:/BIP-321 URI). */
+function extractOnchainAddress(meltTarget: string): string | null {
+  const parsed = parsePaymentInput(meltTarget, defaultDetectors);
+  const option = parsed?.options.find((o) => o.kind === "onchainAddress");
+  return option?.value ?? null;
+}
+
+interface ExecuteOnchainMeltInput {
+  mintUrl: string;
+  address: string;
+  amount: number;
+  unit: string;
+  selectFeeIndex?: (
+    options: readonly OnchainMeltFeeOption[],
+  ) => Promise<number | null>;
+  mockFail: boolean;
+}
+
+/**
+ * Onchain melt (coco v2, NUT-30): quote-first with the mint's fee options
+ * surfaced to the user. The fee choice happens BEFORE ops.melt.prepare —
+ * no proofs are reserved while the user considers, so dismissing the picker
+ * cancels with nothing held (the orphaned canonical quote simply expires).
+ * With no picker configured, the cheapest fee option is selected.
+ */
+async function executeOnchainMelt(
+  mgr: Manager,
+  input: ExecuteOnchainMeltInput,
+): Promise<{ historyEntry: string }> {
+  const { mintUrl, address, amount, unit } = input;
+  logger.info("operations.executeMeltOnchain.start", {
+    ...mintUrlFields(mintUrl),
+    amount,
+    unit,
+    addressLength: address.length,
+  });
+
+  const quote = await mgr.quotes.melt.create({
+    mintUrl,
+    method: "onchain",
+    methodData: { address, amountSats: amount },
+    unit,
+  });
+  const feeOptions = quote.fee_options ?? [];
+  logger.info("operations.executeMeltOnchain.quote_created", {
+    ...mintUrlFields(mintUrl),
+    quoteId: quote.quoteId,
+    feeOptionCount: feeOptions.length,
+  });
+  if (feeOptions.length === 0) {
+    throw new Error("Mint returned no onchain fee options");
+  }
+
+  let feeIndex: number | null;
+  if (input.selectFeeIndex) {
+    logger.info("operations.executeMeltOnchain.fee_options_shown", {
+      optionCount: feeOptions.length,
+    });
+    feeIndex = await input.selectFeeIndex(feeOptions);
+  } else {
+    feeIndex = feeOptions.reduce((cheapest, option) =>
+      amountToNumber(option.fee_reserve) < amountToNumber(cheapest.fee_reserve)
+        ? option
+        : cheapest,
+    ).fee_index;
+  }
+  if (feeIndex == null) {
+    logger.info("operations.executeMeltOnchain.fee_cancelled", {
+      quoteId: quote.quoteId,
+    });
+    throw new Error("Onchain fee selection cancelled");
+  }
+  logger.info("operations.executeMeltOnchain.fee_selected", {
+    feeIndex,
+    optionCount: feeOptions.length,
+  });
+
+  const operation = await mgr.ops.melt.prepare({ quote, feeIndex });
+  logger.info("operations.executeMeltOnchain.execute", {
+    operationId: operation.id,
+    quoteId: operation.quoteId,
+  });
+
+  // Same reservation rescue as the Lightning path: prepare() reserved
+  // proofs; if execute() throws, cancel so they don't stay locked.
+  let result: Awaited<ReturnType<typeof mgr.ops.melt.execute>>;
+  try {
+    if (input.mockFail) {
+      throw new Error("Mock melt failure (dev)");
+    }
+    result = await mgr.ops.melt.execute(operation.id);
+  } catch (e) {
+    logger.warn("operations.executeMeltOnchain.executeFailed", {
+      operationId: operation.id,
+      error: errField(e),
+    });
+    await mgr.ops.melt
+      .cancel(operation.id, "Execute failed")
+      .catch((cancelErr) => {
+        logger.warn("operations.executeMeltOnchain.cancelAfterFailureFailed", {
+          operationId: operation.id,
+          error: errField(cancelErr),
+        });
+      });
+    throw e;
+  }
+  logger.info("operations.executeMeltOnchain.complete", {
+    operationId: result.id,
+    state: result.state,
+  });
+
+  const entry = {
+    id: result.id,
+    type: "melt" as const,
+    createdAt: result.createdAt,
+    mintUrl: result.mintUrl,
+    unit,
+    quoteId: result.quoteId,
+    state: mapMeltOperationState(result.state),
+    amount: amountToNumber(result.amount),
+    metadata: {
+      operationId: result.id,
+      meltTarget: address,
+      method: "onchain",
+      onchainAddress: address,
+    },
+  };
+  return { historyEntry: JSON.stringify(entry) };
 }
 
 // ---------------------------------------------------------------------------
@@ -290,6 +424,13 @@ function buildRolledBackResult(
 
 export interface DefaultOperationsConfig {
   getManager: () => Manager | null;
+  /**
+   * Onchain melt fee picker (NUT-30 fee_options). Called BEFORE prepare (no
+   * proofs reserved yet); resolve null to cancel. Omitted -> cheapest option.
+   */
+  selectOnchainFeeIndex?: (
+    options: readonly OnchainMeltFeeOption[],
+  ) => Promise<number | null>;
   getProofAmounts?: () => Record<string, number[]>;
   getPreferredMintUrl?: () => string | undefined;
   /** Required for Nostr payment request transport. Wallet supplies a NIP-17 publisher bound to the user's private key. */
@@ -945,7 +1086,9 @@ export function createDefaultOperations(
         tokenLength: tokenString.length,
       });
       await mgr.wallet.receive(tokenString);
-      logger.info("operations.executeReceive.received", { ...mintUrlFields(mintUrl) });
+      logger.info("operations.executeReceive.received", {
+        ...mintUrlFields(mintUrl),
+      });
 
       let hadP2PK = false;
       let tokenAmount = 0;
@@ -1012,6 +1155,21 @@ export function createDefaultOperations(
     executeMelt: async (mintUrl, meltTarget, amount, _unit) => {
       const mgr = requireManager();
       const unit = _unit || "sat";
+
+      // Onchain targets (bare address or bitcoin:/BIP-321 URI) take the
+      // onchain melt path; everything else is Lightning (bolt11 or lnurl).
+      const onchainAddress = extractOnchainAddress(meltTarget);
+      if (onchainAddress) {
+        return executeOnchainMelt(mgr, {
+          mintUrl,
+          address: onchainAddress,
+          amount,
+          unit,
+          selectFeeIndex: config.selectOnchainFeeIndex,
+          mockFail: mockFailEnabled("melt"),
+        });
+      }
+
       const targetKind = isLightningInvoiceBolt11(meltTarget)
         ? "bolt11"
         : "lnurl";
@@ -1091,10 +1249,10 @@ export function createDefaultOperations(
         type: "melt" as const,
         createdAt: result.createdAt,
         mintUrl: result.mintUrl,
-        unit: "sat",
+        unit,
         quoteId: result.quoteId,
         state: mapMeltOperationState(result.state),
-        amount: result.amount,
+        amount: amountToNumber(result.amount),
         metadata: { operationId: result.id, meltTarget },
       };
       return { historyEntry: JSON.stringify(entry) };
