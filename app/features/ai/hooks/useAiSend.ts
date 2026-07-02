@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+import { useRoutstrStore, type ChatAttachment } from '@/shared/stores/profile/routstrStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { sendMessage, checkBalance } from '@/shared/lib/routstr/api';
+import {
+  sendMessage,
+  checkBalance,
+  measureMessageContent,
+  type RoutstrChatMessage,
+} from '@/shared/lib/routstr/api';
 import { isAbortError } from '@/shared/lib/apiClient';
 import { pickFinalizeMessage } from '../lib/finalize';
 import { actionMenuPopup, staticPopup, paramPopup } from '@/shared/lib/popup';
@@ -14,13 +19,16 @@ import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import {
   AFFORD_BUFFER,
   AUTO_ICON,
+  estimateTurnCostSats,
   getAffordabilityDetails,
   getModelDisplayName,
   getProviderById,
   getTierById,
-  resolveCandidateChainForSlot,
-  resolveSelectedModel,
+  resolveCandidateEntries,
+  resolveSelectedEntry,
 } from '../lib/format';
+import { assembleApiMessages } from '../lib/assembleApiMessages';
+import { encodeChatImage } from '../lib/attachments';
 import { deriveActivePath, getAncestorsExclusive } from '../lib/branching';
 import {
   clearStreaming,
@@ -74,8 +82,9 @@ function isRetryableConnectError(err: unknown): boolean {
  * Encapsulates the routstr send + stream + balance-refresh flow for the AI
  * tab. Two entry points share the same streaming core:
  *
- *   - `send(text)` appends a new user message under the current active leaf
- *     and streams the assistant reply.
+ *   - `send(text, attachments?)` appends a new user message (with optional
+ *     image attachments) under the current active leaf and streams the
+ *     assistant reply.
  *   - `retry(messageId)` spawns a *sibling* assistant under the same parent
  *     as `messageId` and streams a fresh response. The returned active
  *     branch flips to the new sibling so the chat list re-derives onto the
@@ -163,14 +172,41 @@ export function useAiSend() {
   const streamIntoPlaceholder = useCallback(
     async (params: {
       assistantMessageId: string;
-      apiMessages: { role: 'user' | 'assistant' | 'system'; content: string }[];
+      apiMessages: RoutstrChatMessage[];
+      /** `image_url` parts included in `apiMessages` (drives the
+       *  vision-aware candidate filter + request logs). */
+      imageCount: number;
       flowId: string;
       retriedFromMessageId?: string;
       pendingUserMessageForTopUp: string;
     }) => {
-      const { assistantMessageId, apiMessages, flowId, pendingUserMessageForTopUp } = params;
+      const { assistantMessageId, apiMessages, imageCount, flowId, pendingUserMessageForTopUp } =
+        params;
       if (!apiKey) {
         staticPopup('no-api-key');
+        return;
+      }
+
+      const storeState = useRoutstrStore.getState();
+      const balanceBeforeMsats = storeState.balance ?? 0;
+      const balanceSats = Math.floor(balanceBeforeMsats / 1000);
+      const tier = getTierById(storeState.selectedTier);
+      const provider = getProviderById(storeState.selectedProvider);
+      const cachedModels = storeState.modelsCache?.data ?? [];
+      // Resolve the (provider, tier) pair against the dynamic lineup —
+      // live-derived when a catalog fetch has landed this session, else
+      // the persisted last-known snapshot. `null` only on a true
+      // first-run-offline (no catalog AND no snapshot): there is
+      // deliberately no hardcoded id to guess at anymore, so surface it
+      // instead of burning a round-trip on a dead model.
+      const lineup = storeState.lineup ?? storeState.lastKnownLineup?.lineup ?? null;
+      const primaryEntry = resolveSelectedEntry(provider.id, tier.id, balanceSats, lineup);
+      if (!primaryEntry) {
+        aiLog.warn('ai.send.no_lineup', { flowId, hasCatalog: cachedModels.length > 0 });
+        removeMessages(new Set([assistantMessageId]));
+        staticPopup('send-message-failed', {
+          text: 'Models are still loading — check your connection and try again.',
+        });
         return;
       }
 
@@ -183,20 +219,20 @@ export function useAiSend() {
       const controller = new AbortController();
       streamControllerRef.current = controller;
 
-      const storeState = useRoutstrStore.getState();
-      const balanceBeforeMsats = storeState.balance ?? 0;
-      const balanceSats = Math.floor(balanceBeforeMsats / 1000);
-      const tier = getTierById(storeState.selectedTier);
-      const provider = getProviderById(storeState.selectedProvider);
-      const cachedModels = storeState.modelsCache?.data ?? [];
-      // Resolve the (provider, tier) pair against the live catalog, then
-      // take the affordable head of the same-tier chain across the other
-      // providers as runtime fallback for connect-time failures.
-      const primaryModel = resolveSelectedModel(provider.id, tier.id, balanceSats, cachedModels);
-      const allCandidates = resolveCandidateChainForSlot(provider.id, tier.id, cachedModels);
-      const primaryIdx = allCandidates.indexOf(primaryModel);
-      const candidateChain =
-        primaryIdx >= 0 ? allCandidates.slice(primaryIdx) : [primaryModel, ...allCandidates];
+      // Same-tier chain across the other providers as runtime fallback for
+      // connect-time failures. When the request carries image parts the
+      // chain is filtered to vision-capable models — failing over an image
+      // send onto a text-only model would 400 (non-retryable) and hard-fail
+      // the send instead of walking the chain.
+      const allEntries = resolveCandidateEntries(provider.id, tier.id, lineup);
+      const primaryIdx = allEntries.findIndex((e) => e.modelId === primaryEntry.modelId);
+      let candidateEntries = primaryIdx >= 0 ? allEntries.slice(primaryIdx) : [primaryEntry];
+      if (imageCount > 0) {
+        const visionOnly = candidateEntries.filter((e) => e.visionInput);
+        candidateEntries = visionOnly.length > 0 ? visionOnly : [primaryEntry];
+      }
+      const primaryModel = primaryEntry.modelId;
+      const candidateChain = candidateEntries.map((e) => e.modelId);
 
       setStatus({ isSending: true, streamingMessageId: assistantMessageId });
       // Captures `Date.now()` for the live "Thinking for X seconds"
@@ -226,7 +262,9 @@ export function useAiSend() {
       );
 
       try {
-        const apiInputChars = apiMessages.reduce((n, m) => n + m.content.length, 0);
+        // Text chars + image-part count — never serialises base64 payloads
+        // into a log line.
+        const { textChars: apiInputChars, imageParts } = measureMessageContent(apiMessages);
         const sendStart = performance.now();
         aiLog.info('ai.send.request', {
           flowId,
@@ -236,6 +274,7 @@ export function useAiSend() {
           candidates: candidateChain,
           historyMessages: apiMessages.length,
           totalInputChars: apiInputChars,
+          imageParts,
         });
 
         // Pre-flight diagnostic: every input the affordability gate
@@ -263,6 +302,11 @@ export function useAiSend() {
           buffer: AFFORD_BUFFER,
           catalogSize: cachedModels.length,
           candidates: candidateSnapshots,
+          // Per-image fees (e.g. Gemini) make an attachment turn cost more
+          // than the text-only estimate in the per-candidate snapshots.
+          imageParts,
+          estimatedTurnCostWithImagesSats:
+            imageParts > 0 ? estimateTurnCostSats(primaryModel, cachedModels, imageParts) : null,
         });
 
         let stream: AsyncIterable<any> | undefined;
@@ -609,7 +653,7 @@ export function useAiSend() {
   );
 
   const sendInner = useCallback(
-    async (userMessage: string) => {
+    async (userMessage: string, attachments?: ChatAttachment[]) => {
       const trimmed = userMessage.trim();
       if (!trimmed) return;
 
@@ -641,6 +685,7 @@ export function useAiSend() {
         content: trimmed,
         timestamp,
         pending: true,
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
       });
       addMessage({
         id: assistantMessageId,
@@ -652,22 +697,24 @@ export function useAiSend() {
 
       // Build context = active path + just-added user message. We read the
       // freshly-added messages via the active path because the store has
-      // already absorbed them.
+      // already absorbed them. Assembly (incl. the inline-image window and
+      // per-attachment encoding) is shared with retry via
+      // `assembleApiMessages` so the two flows can't diverge.
       const stateAfter = useRoutstrStore.getState();
-      const apiMessages = deriveActivePath(
+      const path = deriveActivePath(
         stateAfter.conversationHistory,
         stateAfter.activeChildren
-      )
-        .filter((m) => m.id !== assistantMessageId && m.content)
-        .map((m) => ({
-          role: m.role as 'user' | 'assistant' | 'system',
-          content: m.content,
-        }));
+      ).filter((m) => m.id !== assistantMessageId);
+      const { messages: apiMessages, imageCount } = await assembleApiMessages(
+        path,
+        encodeChatImage
+      );
 
       try {
         await streamIntoPlaceholder({
           assistantMessageId,
           apiMessages,
+          imageCount,
           flowId,
           pendingUserMessageForTopUp: trimmed,
         });
@@ -718,14 +765,14 @@ export function useAiSend() {
       }
       // Build the context that produced `messageId`: every ancestor up to
       // and including the user turn that prompted it. Excludes `messageId`
-      // itself so we generate a *fresh* response.
+      // itself so we generate a *fresh* response. Same assembly as `send`
+      // (inline-image window included) so a retry of an image turn re-sends
+      // the same content parts the original did.
       const ancestors = getAncestorsExclusive(messageId, stateNow.conversationHistory);
-      const apiMessages = ancestors
-        .filter((m) => m.content)
-        .map((m) => ({
-          role: m.role as 'user' | 'assistant' | 'system',
-          content: m.content,
-        }));
+      const { messages: apiMessages, imageCount } = await assembleApiMessages(
+        ancestors,
+        encodeChatImage
+      );
       if (apiMessages.length === 0) {
         aiLog.warn('ai.retry.no_context', { messageId });
         return;
@@ -757,6 +804,7 @@ export function useAiSend() {
       await streamIntoPlaceholder({
         assistantMessageId: newAssistantId,
         apiMessages,
+        imageCount,
         flowId,
         retriedFromMessageId: messageId,
         pendingUserMessageForTopUp: lastUserContent,

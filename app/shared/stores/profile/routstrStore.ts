@@ -3,27 +3,62 @@ import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { mintLocalId } from '@/shared/lib/id';
-import { storeLog } from '@/shared/lib/logger';
+import { aiLog, storeLog } from '@/shared/lib/logger';
 import { RoutstrModel } from '@/shared/lib/routstr/api';
+import {
+  AI_PROVIDER_IDS,
+  AI_TIER_IDS,
+  PersistedLineupSchema,
+  deriveLineup,
+  lineupHasEntries,
+  mergeLineupWithLastKnown,
+  type AiLineup,
+  type AiProviderId,
+  type AiTierId,
+  type PersistedLineup,
+} from '@/shared/lib/routstr/lineup';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { restoreActiveSessionView } from '@/shared/stores/profile/restoreActiveSessionView';
 
-// AI tab tier + provider ids — duplicated as literal types to avoid a
-// feature → store → feature import cycle. Kept in lockstep with the
-// matching declarations in `features/ai/lib/format.ts`.
-type RoutstrTierId = 'auto' | 'pro' | 'max';
-const TIER_IDS: readonly RoutstrTierId[] = ['auto', 'pro', 'max'] as const;
+// AI tab tier + provider ids — imported from the shared lineup module,
+// which is the single source of truth for both this store's selection
+// guards and the display metadata in `features/ai/lib/format.ts`. (These
+// used to be duplicated literal unions to avoid a feature → store cycle;
+// the shared module removed the need.)
+type RoutstrTierId = AiTierId;
+const TIER_IDS = AI_TIER_IDS;
 const DEFAULT_TIER: RoutstrTierId = 'auto';
 
-type RoutstrProviderId = 'openai' | 'claude' | 'grok';
-const PROVIDER_IDS: readonly RoutstrProviderId[] = ['openai', 'claude', 'grok'] as const;
+type RoutstrProviderId = AiProviderId;
+const PROVIDER_IDS = AI_PROVIDER_IDS;
 const DEFAULT_PROVIDER: RoutstrProviderId = 'openai';
+
+/**
+ * Image attached to a chat message. Bounded local-URI metadata ONLY —
+ * never base64 payloads (a 4-image message would be ~2MB of base64; the
+ * encode happens at send time in `features/ai/lib/attachments.ts` and the
+ * result never touches persistence or logs).
+ */
+export interface ChatAttachment {
+  localUri: string;
+  mimeType: string;
+  width: number;
+  height: number;
+}
 
 export interface RoutstrMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  /**
+   * Images attached to a user message (≤4). Bubbles render thumbnails from
+   * the local URIs; the send path re-encodes them into OpenAI-compatible
+   * `image_url` content parts. A URI can go stale (iOS container-path
+   * rotation across reinstalls) — renderers show a placeholder and the
+   * send path degrades that turn to text-only.
+   */
+  attachments?: ChatAttachment[];
   /**
    * Tree-link to the message that prompted this one (user → assistant) or
    * preceded it (assistant → next user). `null` is the conversation root.
@@ -118,6 +153,20 @@ interface RoutstrState {
    */
   selectedProvider: RoutstrProviderId;
   modelsCache: ModelsCache | null;
+  /**
+   * Session-only lineup derived from the last successful catalog fetch
+   * (already merged with per-provider last-known fallback). `null` until
+   * the first fetch of this app run; readers fall back to
+   * `lastKnownLineup?.lineup` and finally to a "models loading" state.
+   */
+  lineup: AiLineup | null;
+  /**
+   * Persisted compact snapshot of the most recent derived lineup — the
+   * offline fallback that keeps the model menu functional (with prices
+   * and vision flags) when the catalog fetch fails. Bounded (≤12 entries),
+   * tolerant on parse so it can never take down the rest of this blob.
+   */
+  lastKnownLineup: PersistedLineup | null;
   sessions: RoutstrSession[];
   currentSessionId: string | null;
   isAnonymousMode: boolean;
@@ -181,11 +230,23 @@ interface RoutstrActions {
 
 type RoutstrStore = RoutstrState & RoutstrActions;
 
+// Tightly bounded + tolerant: one malformed attachment must never fail the
+// whole-blob parse (which would wipe sessions AND the apiKey — the exact
+// failure class documented on `createMergeWithSchema`). Invalid arrays
+// collapse to [] and drop only the attachments, never the message.
+const PersistedChatAttachment = z.object({
+  localUri: z.string().max(2048),
+  mimeType: z.string().max(64),
+  width: z.number().int().nonnegative().catch(0),
+  height: z.number().int().nonnegative().catch(0),
+});
+
 const PersistedRoutstrMessage = z.looseObject({
   id: z.string().max(128),
   role: z.enum(['user', 'assistant']),
   content: z.string().max(65_536),
   timestamp: z.number().int().nonnegative(),
+  attachments: z.array(PersistedChatAttachment).max(4).optional().catch([]),
   parentId: z.string().max(128).nullable().optional(),
   thinkingDurationSec: z.number().nonnegative().optional(),
   reasoningContent: z.string().max(65_536).optional(),
@@ -207,6 +268,9 @@ const PersistedRoutstrStore = z.object({
   selectedModel: z.string().max(256).nullable().default(null),
   sessions: z.array(PersistedRoutstrSession).max(1024).default([]),
   currentSessionId: z.string().max(128).nullable().default(null),
+  // Additive + tolerant (no version bump needed): a malformed snapshot
+  // parses to null and the menu just re-derives on next fetch.
+  lastKnownLineup: PersistedLineupSchema.nullable().default(null).catch(null),
 });
 
 export const useRoutstrStore = create<RoutstrStore>()(
@@ -220,6 +284,8 @@ export const useRoutstrStore = create<RoutstrStore>()(
       selectedTier: DEFAULT_TIER,
       selectedProvider: DEFAULT_PROVIDER,
       modelsCache: null,
+      lineup: null,
+      lastKnownLineup: null,
       sessions: [],
       currentSessionId: null,
       isAnonymousMode: false,
@@ -420,7 +486,31 @@ export const useRoutstrStore = create<RoutstrStore>()(
 
       setCachedModels: (models: RoutstrModel[]) => {
         storeLog.debug('store.routstr.set_cached_models', { count: models.length });
-        set({ modelsCache: { data: models, timestamp: Date.now() } });
+        // Derive the (provider × tier) lineup alongside the raw cache and
+        // persist a compact last-known snapshot, so the model menu keeps
+        // prices + vision flags across offline relaunches. Per-provider
+        // zero-row results (catalog drift on a 200 — the failure class
+        // that produced "cost unavailable") substitute from the previous
+        // snapshot, marked `lastKnown`.
+        const { lineup: derived, stats } = deriveLineup(models);
+        const previous = get().lastKnownLineup;
+        const merged = mergeLineupWithLastKnown(derived, previous?.lineup ?? null);
+        aiLog.info('ai.lineup.derived', {
+          catalogSize: models.length,
+          totalQualifying: stats.totalQualifying,
+          perProvider: stats.perProvider,
+          substitutedProviders: PROVIDER_IDS.filter(
+            (p) => merged[p] !== derived[p] // mergeLineupWithLastKnown replaces the block reference
+          ),
+          allProvidersEmpty: !lineupHasEntries(derived),
+        });
+        set({
+          modelsCache: { data: models, timestamp: Date.now() },
+          lineup: merged,
+          lastKnownLineup: lineupHasEntries(merged)
+            ? { derivedAt: Date.now(), lineup: merged }
+            : previous,
+        });
       },
 
       isCacheStale: () => {
@@ -542,6 +632,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
         selectedModel: state.selectedModel,
         sessions: state.sessions,
         currentSessionId: state.currentSessionId,
+        lastKnownLineup: state.lastKnownLineup,
       }),
       afterHydrate: (state) => {
         if (!state) return;

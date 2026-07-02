@@ -61,6 +61,14 @@ interface LiquidChatComposerProps {
    */
   onPlusPress?: () => void;
   /**
+   * Renders the [+] button dimmed and inert while keeping it mounted (the
+   * three-shape glass layout must not reflow). Used by the AI surface when
+   * the resolved model lacks vision input — a dimmed affordance reads as
+   * "exists, unavailable here", where unmounting would read as a layout
+   * bug and a silent no-op reads as broken.
+   */
+  plusDisabled?: boolean;
+  /**
    * Tap handler for the voice icon rendered INSIDE the input. Currently a
    * placeholder for future voice messaging — no surface implements it yet.
    * Hidden when undefined.
@@ -129,6 +137,7 @@ export function LiquidChatComposer({
   disabled,
   placeholder = 'Write here',
   onPlusPress,
+  plusDisabled,
   onVoicePress,
   bottomPadding = 12,
   testID,
@@ -238,9 +247,10 @@ export function LiquidChatComposer({
   }, [surface, value.length, disabled, onSend]);
 
   const handlePlusPress = useCallback(() => {
-    chatLog.info('chat.composer.plus_tap', { surface: surface ?? 'unknown' });
+    chatLog.info('chat.composer.plus_tap', { surface: surface ?? 'unknown', plusDisabled });
+    if (plusDisabled) return;
     onPlusPress?.();
-  }, [surface, onPlusPress]);
+  }, [surface, onPlusPress, plusDisabled]);
 
   if (useNativeGlass) {
     return (
@@ -285,6 +295,7 @@ export function LiquidChatComposer({
                     buttonStyle('glass'),
                     frame({ width: BUTTON_SIZE, height: BUTTON_SIZE }),
                     glassEffectId('plus', namespaceId),
+                    swiftOpacity(plusDisabled ? 0.35 : 1),
                     animation(SEND_SPRING, trimmedHasText),
                   ]}
                   onPress={disabled ? () => {} : handlePlusPress}>
@@ -438,8 +449,11 @@ export function LiquidChatComposer({
       <HStack align="flex-end" spacing={GAP}>
         <Pressable
           onPress={disabled ? undefined : handlePlusPress}
-          disabled={disabled}
-          accessibilityLabel="Composer actions"
+          disabled={disabled || plusDisabled}
+          accessibilityLabel={
+            plusDisabled ? 'Image attach not supported by this model' : 'Composer actions'
+          }
+          accessibilityState={{ disabled: !!(disabled || plusDisabled) }}
           accessibilityRole="button">
           <View
             blur={useBlur}
@@ -452,6 +466,7 @@ export function LiquidChatComposer({
               alignItems: 'center',
               justifyContent: 'center',
               overflow: 'hidden',
+              opacity: plusDisabled ? 0.35 : 1,
               backgroundColor: useBlur ? undefined : surfaceSecondary,
             }}>
             <Icon name="mdi:plus" size={ICON_SIZE} color={useBlur ? '#FFFFFF' : foreground} />

@@ -25,12 +25,15 @@ import '@/shared/stores/profile/nostrSocialStore';
 import '@/shared/stores/profile/dataMigrationStore';
 import '@/shared/stores/global/mintMetadataStore';
 import '@/shared/stores/profile/mintStore';
+// AI chat: apiKey + sessions (now incl. message attachments) + the
+// last-known model lineup — none cheaply refetchable.
+import '@/shared/stores/profile/routstrStore';
 
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
 
 describe('persisted schema drift', () => {
   it('registered at least the durable stores under test', () => {
-    expect(persistRegistry.length).toBeGreaterThanOrEqual(6);
+    expect(persistRegistry.length).toBeGreaterThanOrEqual(7);
   });
 
   it.each(

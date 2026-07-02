@@ -1,28 +1,39 @@
 import type { RoutstrModel } from '@/shared/lib/routstr/api';
+import {
+  AI_PROVIDER_IDS,
+  AI_TIER_IDS,
+  type AiLineup,
+  type AiProviderId,
+  type AiTierId,
+  type LineupEntry,
+  type LineupPricing,
+} from '@/shared/lib/routstr/lineup';
 
 /**
- * Model picker shown in the AI tab. The picker is a 3 × 3 matrix:
- * three providers (OpenAI, Claude, Grok) crossed with three quality tiers
- * (Auto, Pro, Max). The user picks a (provider, tier) pair via the menu —
- * tabs at the top of the sheet are providers, rows under each tab are
- * tiers — and the runtime resolves that pair to a single model id via
- * `TIER_MATRIX`.
+ * Model picker shown in the AI tab. The picker is a providers × tiers
+ * matrix: four providers (OpenAI, Claude, Grok, Google) crossed with three
+ * quality tiers (Auto, Pro, Max). The user picks a (provider, tier) pair
+ * via the menu — tabs at the top of the sheet are providers, rows under
+ * each tab are tiers — and the runtime resolves that pair to a model id
+ * against the DYNAMIC lineup derived from the live `/v1/models` catalog
+ * (see `shared/lib/routstr/lineup.ts`).
  *
- * Tier intent (cheapest → premium):
- *   - Auto — daily-driver chat, kept under ~100 sats / msg.
- *   - Pro  — frontier reasoning at low latency.
- *   - Max  — most capable, for code and deep reasoning.
+ * There is deliberately no hardcoded model-id table here anymore. The old
+ * `TIER_MATRIX` rotted as the catalog drifted (4 of its 9 ids stopped
+ * existing, rendering "cost unavailable" rows), and its stated intent —
+ * "retune the lineup without a persisted migration" — is preserved by the
+ * derivation: the persisted state is still just a (provider id, tier id)
+ * pair, never a model id. Pricing is NEVER hardcoded — every sat figure
+ * rendered to the user is read from the catalog's `sats_pricing` (or the
+ * persisted lineup snapshot's compact copy of it) at display time.
  *
- * Edit `TIER_MATRIX` to retune the lineup without a persisted migration —
- * the persisted state is just a (provider id, tier id) pair, never a
- * model id, so swapping `gpt-5.4-mini` for `gpt-5.4-mini-vNext` is
- * invisible to the user. Pricing is NEVER hardcoded — every sat figure
- * rendered to the user is read from `RoutstrModel.sats_pricing` at
- * display time.
+ * Tier intent under the capability ordering (see `deriveLineup`):
+ *   - Max  — rank 1: the provider's newest / most capable model.
+ *   - Pro  — rank 2.
+ *   - Auto — rank 3: the accessible daily-driver end of the top-3.
+ * Per-row live cost display carries the price signal the old
+ * cheapest→premium ladder used to encode.
  */
-
-export type AiProviderId = 'openai' | 'claude' | 'grok';
-type AiTierId = 'auto' | 'pro' | 'max';
 
 export interface AiProvider {
   id: AiProviderId;
@@ -42,10 +53,13 @@ export interface AiTier {
   icon: string;
 }
 
+/** Ordered to match `AI_PROVIDER_IDS` — the provider-id union and this
+ *  display metadata stay in lockstep by construction (same source array). */
 export const AI_PROVIDERS: readonly AiProvider[] = [
   { id: 'openai', label: 'OpenAI', icon: 'ri:openai-fill' },
   { id: 'claude', label: 'Claude', icon: 'ri:anthropic-fill' },
   { id: 'grok', label: 'Grok', icon: 'ri:twitter-x-fill' },
+  { id: 'google', label: 'Google', icon: 'ri:google-fill' },
 ] as const;
 
 export const AI_TIERS: readonly AiTier[] = [
@@ -68,31 +82,6 @@ export const AI_TIERS: readonly AiTier[] = [
     icon: 'ic:round-star',
   },
 ] as const;
-
-/**
- * Source-of-truth lineup. Outer key is tier, inner key is provider —
- * `TIER_MATRIX[tier][provider]` is the model id we'd send to. Edit
- * freely; runtime fallback through other providers in the same tier is
- * handled by `buildCandidateChain` so a missing entry in any one cell
- * just removes that fallback hop.
- */
-const TIER_MATRIX: Readonly<Record<AiTierId, Readonly<Record<AiProviderId, string>>>> = {
-  auto: {
-    openai: 'gpt-5-nano',
-    claude: 'claude-3.5-haiku',
-    grok: 'grok-3-mini',
-  },
-  pro: {
-    openai: 'gpt-5.4-mini',
-    claude: 'claude-haiku-4.5',
-    grok: 'grok-4.1-fast',
-  },
-  max: {
-    openai: 'gpt-5.4',
-    claude: 'claude-sonnet-4.6',
-    grok: 'grok-4',
-  },
-} as const;
 
 const DEFAULT_PROVIDER_ID: AiProviderId = 'openai';
 
@@ -137,13 +126,78 @@ const TYPICAL_PROMPT_TOKENS = 8000;
  */
 const TYPICAL_COMPLETION_TOKENS = 2000;
 
+function pricingForModel(modelId: string, models: RoutstrModel[]): LineupPricing | null {
+  const model = models.find((m) => m.id === modelId);
+  const p = model?.sats_pricing;
+  if (!p) return null;
+  const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
+  return {
+    prompt: num(p.prompt),
+    completion: num(p.completion),
+    request: num(p.request),
+    image: num(p.image),
+    max_cost: num(p.max_cost),
+  };
+}
+
 /**
- * Approximate count of additional turns the user could send against
- * `modelId` before Routstr's `max_cost` reservation gate starts rejecting.
+ * Estimate a realistic worst-case cost for ONE chat turn, in whole sats,
+ * from a compact pricing record — works identically against a live catalog
+ * row (`sats_pricing`) or a persisted lineup entry, which is what keeps
+ * the picker's cost column alive offline.
+ *
+ * `request` (per-call fee) + `prompt` × `TYPICAL_PROMPT_TOKENS` +
+ * `completion` × `TYPICAL_COMPLETION_TOKENS` + `image` × `imageCount`
+ * (the per-image fee some vision models charge — attachment drafts on
+ * Gemini are systematically undercounted without it).
+ *
+ * Why not `max_cost`? `max_cost` is "fill the entire context window with
+ * the most expensive token mix". For a 400k-token context that works out
+ * to ~84 sats where a real turn costs ~0.2 sats; gating the affordability
+ * indicator on it produced "Top up X sats" banners on tiers the user
+ * could fund 100+ messages against.
+ *
+ * Falls back to `max_cost / 100` (a ~hundredth of the worst case is a
+ * reasonable typical-turn ballpark) when per-token pricing is missing,
+ * and to `null` when pricing is unknown entirely so the caller can
+ * short-circuit to "always affordable until proven otherwise".
+ */
+export function estimateTurnCostSatsFromPricing(
+  pricing: LineupPricing | null,
+  imageCount = 0
+): number | null {
+  if (!pricing) return null;
+  const imageFee = typeof pricing.image === 'number' ? pricing.image * imageCount : 0;
+  if (pricing.prompt != null && pricing.completion != null) {
+    return (
+      (pricing.request ?? 0) +
+      pricing.prompt * TYPICAL_PROMPT_TOKENS +
+      pricing.completion * TYPICAL_COMPLETION_TOKENS +
+      imageFee
+    );
+  }
+  if (pricing.max_cost != null) {
+    return pricing.max_cost / 100 + imageFee;
+  }
+  return null;
+}
+
+/** Catalog-keyed variant of `estimateTurnCostSatsFromPricing` for the send
+ *  path, which always works against live `RoutstrModel[]` rows. */
+export function estimateTurnCostSats(
+  modelId: string,
+  models: RoutstrModel[],
+  imageCount = 0
+): number | null {
+  return estimateTurnCostSatsFromPricing(pricingForModel(modelId, models), imageCount);
+}
+
+/**
+ * Approximate count of additional turns the user could send against this
+ * pricing before Routstr's `max_cost` reservation gate starts rejecting.
  * Two limits are at play:
  *
- *   1. Each turn drops the balance by `estimateTurnCostSats` (the actual
- *      per-turn spend after the reservation refund).
+ *   1. Each turn drops the balance by the estimated per-turn spend.
  *   2. Each request requires `balance >= max_cost` upfront — once the
  *      balance drifts below that ceiling, the next send fails with 402
  *      regardless of how cheap the typical turn is.
@@ -154,52 +208,15 @@ const TYPICAL_COMPLETION_TOKENS = 2000;
  * cost data is unavailable, and `0` when balance is already below the
  * reservation floor.
  */
-export function estimateMessagesRemaining(
+export function estimateMessagesRemainingFromPricing(
   balanceSats: number,
-  modelId: string,
-  models: RoutstrModel[]
+  pricing: LineupPricing | null
 ): number | null {
-  const max = maxCostSats(modelId, models);
-  const typical = estimateTurnCostSats(modelId, models);
+  const max = pricing?.max_cost ?? null;
+  const typical = estimateTurnCostSatsFromPricing(pricing);
   if (max == null || typical == null || typical <= 0) return null;
   if (balanceSats < max) return 0;
   return Math.floor((balanceSats - max) / typical) + 1;
-}
-
-/**
- * Estimate a realistic worst-case cost for ONE chat turn against `modelId`,
- * in whole sats. Uses the per-token pricing the Routstr `/models` endpoint
- * publishes — `request` (per-call fee) + `prompt` × `TYPICAL_PROMPT_TOKENS`
- * + `completion` × `TYPICAL_COMPLETION_TOKENS`.
- *
- * Why not `max_cost`? `max_cost` is "fill the entire context window with
- * the most expensive token mix". For a 400k-token gpt-5-nano context that
- * works out to ~84 sats; in practice a turn costs ~0.2 sats. Gating the
- * affordability indicator on `max_cost` was producing "Top up X sats"
- * banners on tiers the user could fund 100+ messages against.
- *
- * Falls back to `max_cost / 100` (a ~hundredth of the worst case is a
- * reasonable typical-turn ballpark) when per-token pricing is missing,
- * and to `null` when the model is unknown to the catalog so the caller
- * can short-circuit to "always affordable until proven otherwise".
- */
-export function estimateTurnCostSats(modelId: string, models: RoutstrModel[]): number | null {
-  const model = models.find((m) => m.id === modelId);
-  if (!model) return null;
-  const pricing = model.sats_pricing;
-  if (!pricing) return null;
-  const promptPer = typeof pricing.prompt === 'number' ? pricing.prompt : null;
-  const completionPer = typeof pricing.completion === 'number' ? pricing.completion : null;
-  const request = typeof pricing.request === 'number' ? pricing.request : 0;
-  if (promptPer != null && completionPer != null) {
-    const cost =
-      request + promptPer * TYPICAL_PROMPT_TOKENS + completionPer * TYPICAL_COMPLETION_TOKENS;
-    return cost;
-  }
-  if (typeof pricing.max_cost === 'number') {
-    return pricing.max_cost / 100;
-  }
-  return null;
 }
 
 /**
@@ -267,119 +284,119 @@ export function getTierById(id: AiTierId | string | null | undefined): AiTier {
   return TIER_BY_ID.get(DEFAULT_TIER_ID)!;
 }
 
-/** Look up the model id for a (provider, tier) pair. Always returns a
- *  defined string because `TIER_MATRIX` is exhaustive. */
-export function modelIdForSlot(provider: AiProviderId, tier: AiTierId): string {
-  return TIER_MATRIX[tier][provider];
+/** The lineup entry a (provider, tier) pair points at, or `null` when the
+ *  cell is unfilled (partial provider, or no lineup at all yet). */
+export function entryForSlot(
+  lineup: AiLineup | null,
+  provider: AiProviderId,
+  tier: AiTierId
+): LineupEntry | null {
+  return lineup?.[provider]?.[tier] ?? null;
 }
 
 /**
- * Ordered list of model ids to try at send time for a (provider, tier)
- * pair. The user's selected provider goes first; the same tier from the
- * other providers follows in `AI_PROVIDERS` order, providing transparent
- * fallback when the primary's network round-trip fails (5xx / network).
+ * Ordered candidate entries to try at send time for a (provider, tier)
+ * pair. The user's selected cell goes first; the same tier from the other
+ * providers follows in `AI_PROVIDER_IDS` order (transparent fallback when
+ * the primary's round-trip fails with 5xx/network); then, only if the
+ * whole tier row is empty, the selected provider's other tiers and finally
+ * everything else — so the send path always has *something* to attempt as
+ * long as one lineup cell anywhere is filled. Unfilled cells drop out;
+ * duplicates (impossible within a provider, defensive across the merge
+ * path) dedup by model id.
  *
- * Ordering rationale: the user picked their preferred provider explicitly,
- * so honour it. Falling back across providers (Claude → Grok → OpenAI in
- * the same Auto tier) is way better than hard-failing — the user just
- * wants a working chat.
+ * Ordering rationale: the user picked their provider explicitly, so
+ * honour it. Falling back across providers in the same tier is way better
+ * than hard-failing — the user just wants a working chat.
  */
-function buildCandidateChain(provider: AiProviderId, tier: AiTierId): string[] {
-  const primary = modelIdForSlot(provider, tier);
-  const fallbacks = AI_PROVIDERS.filter((p) => p.id !== provider).map((p) =>
-    modelIdForSlot(p.id, tier)
-  );
-  return [primary, ...fallbacks];
+export function resolveCandidateEntries(
+  provider: AiProviderId,
+  tier: AiTierId,
+  lineup: AiLineup | null
+): LineupEntry[] {
+  if (!lineup) return [];
+  const tierOrder: AiTierId[] = [tier, ...AI_TIER_IDS.filter((t) => t !== tier)];
+  const providerOrder: AiProviderId[] = [
+    provider,
+    ...AI_PROVIDER_IDS.filter((p) => p !== provider),
+  ];
+  const seen = new Set<string>();
+  const out: LineupEntry[] = [];
+  for (const t of tierOrder) {
+    for (const p of providerOrder) {
+      const entry = lineup[p]?.[t];
+      if (!entry || seen.has(entry.modelId)) continue;
+      seen.add(entry.modelId);
+      out.push(entry);
+    }
+  }
+  return out;
 }
 
 /**
- * Resolve a (provider, tier) pair to the first model id we'd actually
- * send to right now. Walks the candidate chain returned by
- * `buildCandidateChain`, preferring entries that are present in the live
- * catalog AND affordable. Falls back to "in-catalog at any cost" and
- * finally to "first listed" so the chip and send path always have a
- * model id, even before the catalog finishes loading.
+ * Resolve a (provider, tier) pair to the lineup entry we'd actually send
+ * to right now: the first affordable candidate, else the first candidate
+ * at any cost, else `null` — which only happens on a true first-run-offline
+ * (no live catalog AND no persisted lineup). Callers must handle `null` by
+ * rendering a "models loading" state instead of sending to a guessed id;
+ * the old TIER_MATRIX guarantee of "always a defined string" is deliberately
+ * relaxed here because a guessed hardcoded id is exactly the rot this
+ * change removes.
  */
-export function resolveSelectedModel(
+export function resolveSelectedEntry(
   provider: AiProviderId,
   tier: AiTierId,
   balanceSats: number,
-  models: RoutstrModel[]
-): string {
-  const chain = buildCandidateChain(provider, tier);
-  if (models.length === 0) return chain[0];
-  for (const c of chain) {
-    if (!models.some((m) => m.id === c)) continue;
-    if (canAffordModel(c, balanceSats, models)) return c;
-  }
-  for (const c of chain) {
-    if (models.some((m) => m.id === c)) return c;
+  lineup: AiLineup | null
+): LineupEntry | null {
+  const chain = resolveCandidateEntries(provider, tier, lineup);
+  if (chain.length === 0) return null;
+  for (const entry of chain) {
+    if (canAffordPricing(entry.satsPricing, balanceSats)) return entry;
   }
   return chain[0];
-}
-
-/**
- * In-catalog candidate chain for runtime fallback at send time. Same
- * shape as `buildCandidateChain` but filtered to ids actually present in
- * the catalog (so we don't try a retired model and waste a round-trip).
- * Falls through to the unfiltered list when the catalog is empty so a
- * cold start still has something to attempt.
- */
-export function resolveCandidateChainForSlot(
-  provider: AiProviderId,
-  tier: AiTierId,
-  models: RoutstrModel[]
-): string[] {
-  const chain = buildCandidateChain(provider, tier);
-  if (models.length === 0) return chain;
-  const inCatalog = chain.filter((id) => models.some((m) => m.id === id));
-  return inCatalog.length > 0 ? inCatalog : chain;
 }
 
 /** Worst-case cost in whole sats for a given model id, or null if unknown.
  *  Read straight from the catalog's `sats_pricing.max_cost`. Reserved for
  *  *diagnostic* / debug log paths — affordability decisions should use
  *  `estimateTurnCostSats` instead, which reflects realistic per-turn
- *  spend. See the comment on `estimateTurnCostSats` for the rationale. */
-export function maxCostSats(modelId: string, models: RoutstrModel[]): number | null {
+ *  spend. See the comment on `estimateTurnCostSatsFromPricing`. */
+function maxCostSats(modelId: string, models: RoutstrModel[]): number | null {
   const m = models.find((mm) => mm.id === modelId);
   const cost = m?.sats_pricing?.max_cost;
   return typeof cost === 'number' ? cost : null;
 }
 
 /**
- * True if `balanceSats` covers Routstr's reservation requirement for
- * `modelId`. Routstr 402s any request where balance < `max_cost`, so this
- * gate has to track `max_cost` exactly — gating on the per-turn estimate
- * (which is what the user will actually be charged after refunds) lets the
- * UI mark tiers as affordable that the API will reject upfront.
+ * True if `balanceSats` covers Routstr's reservation requirement. Routstr
+ * 402s any request where balance < `max_cost`, so this gate has to track
+ * `max_cost` exactly — gating on the per-turn estimate (which is what the
+ * user will actually be charged after refunds) lets the UI mark tiers as
+ * affordable that the API will reject upfront.
  *
  * Falls back to `true` when cost data is unavailable (cache not populated)
  * so the picker isn't entirely blank on first paint.
  */
-export function canAffordModel(
-  modelId: string,
-  balanceSats: number,
-  models: RoutstrModel[]
-): boolean {
-  const cost = maxCostSats(modelId, models);
+export function canAffordPricing(pricing: LineupPricing | null, balanceSats: number): boolean {
+  const cost = pricing?.max_cost ?? null;
   if (cost == null) return true;
   return balanceSats >= cost * AFFORD_BUFFER;
 }
 
 /**
- * Whole-sat shortfall to unlock `modelId`'s tier — the mirror of
- * `canAffordModel`. Mirrors Routstr's reservation requirement (`max_cost`)
- * so the "Top up X sats" copy reflects what the API will actually accept.
- * Returns `null` when cost data is unknown or already covered. Clamps the
- * result to ≥ 1 sat so we never render "Top up 0 more sats" after rounding.
+ * Whole-sat shortfall to unlock this pricing's tier — the mirror of
+ * `canAffordPricing`. Mirrors Routstr's reservation requirement
+ * (`max_cost`) so the "Top up X sats" copy reflects what the API will
+ * actually accept. Returns `null` when cost data is unknown or already
+ * covered. Clamps the result to ≥ 1 sat so we never render "Top up 0 more
+ * sats" after rounding.
  */
-export function topUpDeficitSats(
-  modelId: string,
-  balanceSats: number,
-  models: RoutstrModel[]
+export function topUpDeficitSatsFromPricing(
+  pricing: LineupPricing | null,
+  balanceSats: number
 ): number | null {
-  const cost = maxCostSats(modelId, models);
+  const cost = pricing?.max_cost ?? null;
   if (cost == null) return null;
   const required = Math.ceil(cost * AFFORD_BUFFER);
   if (balanceSats >= required) return null;
@@ -390,7 +407,10 @@ export function topUpDeficitSats(
  * Display-friendly model name pulled directly from the Routstr catalog's
  * `name` field, with the provider prefix stripped. Used wherever we want
  * the user to see the actual model behind a tier label — e.g. the chip
- * subtitle, or each tier row's description.
+ * subtitle, or each tier row's description. Lineup entries carry the same
+ * value precomputed (`displayName`) for offline rendering; this catalog
+ * variant remains for send-path surfaces keyed by raw model id (402 popup,
+ * fallback logs).
  *
  * Examples:
  *   `claude-haiku-4.5` → "Claude Haiku 4.5"     (from `name: "Anthropic: Claude Haiku 4.5"`)

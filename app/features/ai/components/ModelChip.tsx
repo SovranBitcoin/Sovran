@@ -12,12 +12,12 @@ import {
   AFFORD_BUFFER,
   AI_PROVIDERS,
   AI_TIERS,
-  getAffordabilityDetails,
-  getModelDisplayName,
+  canAffordPricing,
+  entryForSlot,
+  estimateTurnCostSatsFromPricing,
   getProviderById,
   getTierById,
-  modelIdForSlot,
-  resolveSelectedModel,
+  resolveSelectedEntry,
 } from '../lib/format';
 import { aiLog } from '@/shared/lib/logger';
 import opacity from 'hex-color-opacity';
@@ -33,14 +33,19 @@ import opacity from 'hex-color-opacity';
  *
  * Selection rules:
  *   - Both `selectedProvider` and `selectedTier` are session-only (see the
- *     store's `partialize`), so the app always boots into the curated
- *     defaults (`openai` / `auto`).
- *   - Each (provider, tier) pair maps to a single model id via
- *     `TIER_MATRIX`. Send-time runtime fallback (5xx / network) walks the
- *     same tier across the *other* providers — the user's chosen provider
- *     stays the primary attempt.
+ *     store's `partialize`), so the app always boots into the defaults
+ *     (`openai` / `auto`).
+ *   - Each (provider, tier) pair resolves against the DYNAMIC lineup
+ *     derived from the live catalog (persisted last-known snapshot when
+ *     offline — see `shared/lib/routstr/lineup.ts`). Send-time runtime
+ *     fallback (5xx / network) walks the same tier across the *other*
+ *     providers — the user's chosen provider stays the primary attempt.
  *   - Rows whose underlying model exceeds the user's balance render
  *     half-faded with the gap shown as the row description.
+ *
+ * This chip's mount effect is the app's SOLE catalog fetcher: a
+ * successful `getModels()` lands in `setCachedModels`, which derives the
+ * lineup and persists the compact last-known snapshot.
  */
 export function ModelChip() {
   const background = useThemeColor('background');
@@ -51,6 +56,10 @@ export function ModelChip() {
   const cachedModels = useRoutstrStore((s) => s.modelsCache?.data ?? null);
   const setCachedModels = useRoutstrStore((s) => s.setCachedModels);
   const isCacheStale = useRoutstrStore((s) => s.isCacheStale);
+  const sessionLineup = useRoutstrStore((s) => s.lineup);
+  const lastKnownLineup = useRoutstrStore((s) => s.lastKnownLineup);
+  const lineup = sessionLineup ?? lastKnownLineup?.lineup ?? null;
+  const lineupSource = sessionLineup ? 'live' : lastKnownLineup ? 'persisted' : 'empty';
 
   const [models, setModels] = useState<RoutstrModel[]>(cachedModels ?? []);
 
@@ -77,33 +86,35 @@ export function ModelChip() {
   const balanceSats = balanceMsats != null ? Math.floor(balanceMsats / 1000) : 0;
   const currentTier = getTierById(selectedTier);
   const currentProvider = getProviderById(selectedProvider);
-  const resolvedModelId = resolveSelectedModel(
+  const resolvedEntry = resolveSelectedEntry(
     currentProvider.id,
     currentTier.id,
     balanceSats,
-    models
+    lineup
   );
 
-  // Diagnostic snapshot — fires once per (balance, models, slot) change.
-  // Captures every cell of the (provider, tier) matrix the chip's
+  // Diagnostic snapshot — fires once per (balance, lineup, slot) change.
+  // Captures every filled cell of the (provider, tier) matrix the chip's
   // affordability gate uses, so a "Top up X sats" indicator that doesn't
   // match send-time behaviour is debuggable from logs alone.
   useEffect(() => {
-    if (models.length === 0) return;
+    if (!lineup) return;
     const cellSnapshots: Record<string, unknown>[] = [];
     for (const tier of AI_TIERS) {
       for (const provider of AI_PROVIDERS) {
-        const modelId = modelIdForSlot(provider.id, tier.id);
-        const details = getAffordabilityDetails(modelId, balanceSats, models);
-        const model = models.find((m) => m.id === modelId);
+        const entry = entryForSlot(lineup, provider.id, tier.id);
+        if (!entry) continue; // partial provider — cell deliberately empty
         cellSnapshots.push({
           tierId: tier.id,
           providerId: provider.id,
-          ...details,
-          catalog_max_cost_sats: model?.sats_pricing?.max_cost ?? null,
-          catalog_max_cost_usd: model?.pricing?.max_cost ?? null,
-          catalog_max_prompt_cost_sats: model?.sats_pricing?.max_prompt_cost ?? null,
-          catalog_max_completion_cost_sats: model?.sats_pricing?.max_completion_cost ?? null,
+          modelId: entry.modelId,
+          lastKnown: entry.lastKnown ?? false,
+          visionInput: entry.visionInput,
+          estimatedTurnCostSats: estimateTurnCostSatsFromPricing(entry.satsPricing),
+          affordable: canAffordPricing(entry.satsPricing, balanceSats),
+          catalog_max_cost_sats: entry.satsPricing.max_cost,
+          catalog_image_fee_sats: entry.satsPricing.image,
+          contextLength: entry.contextLength,
         });
       }
     }
@@ -113,18 +124,23 @@ export function ModelChip() {
       selectedTier,
       selectedProvider,
       buffer: AFFORD_BUFFER,
+      lineupSource,
       catalogSize: models.length,
       cells: cellSnapshots,
     });
-  }, [balanceMsats, balanceSats, models, selectedTier, selectedProvider]);
+  }, [
+    balanceMsats,
+    balanceSats,
+    models.length,
+    lineup,
+    lineupSource,
+    selectedTier,
+    selectedProvider,
+  ]);
 
-  const resolvedModelName = getModelDisplayName(resolvedModelId, models);
-  // Catalog hasn't loaded → `getModelDisplayName` returns the raw id; show
-  // the tier label in that case so the chip never reads like a dev string.
-  const friendlyResolvedName =
-    resolvedModelName === resolvedModelId ? currentTier.label : resolvedModelName;
-
-  const chipLabel = `${currentTier.label} · ${friendlyResolvedName}`;
+  // No lineup yet (first run, fetch pending) → show the tier label so the
+  // chip never reads like a dev string.
+  const chipLabel = `${currentTier.label} · ${resolvedEntry?.displayName ?? currentTier.label}`;
 
   const onPress = useCallback(() => {
     // Picker has no in-sheet inputs, so gorhom can't lift over an

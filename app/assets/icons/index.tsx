@@ -51,6 +51,10 @@ export const icons: string[] = [
   'ri:openai-fill', // Using robot as OpenAI icon
   'ri:anthropic-fill',
   'ri:twitter-x-fill',
+  'ri:google-fill',
+  // Model picker dynamic-lineup chrome (vision marker + offline row).
+  'mdi:image-outline',
+  'mdi:cloud-off-outline',
   'mdi:brain',
   'mdi:help-circle',
   'mdi:check-circle',

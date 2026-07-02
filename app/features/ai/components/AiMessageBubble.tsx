@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import * as Clipboard from 'expo-clipboard';
+import { Image as ExpoImage } from 'expo-image';
 import Icon from 'assets/icons';
-import type { RoutstrMessage } from '@/shared/stores/profile/routstrStore';
+import type { ChatAttachment, RoutstrMessage } from '@/shared/stores/profile/routstrStore';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -186,6 +187,41 @@ function ThinkingHeader({
   );
 }
 
+/**
+ * Thumbnail for one persisted image attachment. Renders from the bounded
+ * local URI only (base64 never persists); when the file is gone — photo
+ * deleted, or iOS rotated the app container across a reinstall — the
+ * `onError` flip shows a broken-image placeholder instead of a blank box.
+ */
+function AttachmentThumb({ attachment }: { attachment: ChatAttachment }) {
+  const shade400 = useThemeColor('shade-400');
+  const [failed, setFailed] = useState(false);
+  const onError = useCallback(() => setFailed(true), []);
+  if (failed) {
+    return (
+      <View
+        style={{
+          width: 96,
+          height: 96,
+          borderRadius: 12,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Icon name="mdi:image-broken-variant" size={28} color={shade400} />
+      </View>
+    );
+  }
+  return (
+    <ExpoImage
+      source={{ uri: attachment.localUri }}
+      style={{ width: 96, height: 96, borderRadius: 12 }}
+      contentFit="cover"
+      onError={onError}
+      accessibilityLabel="Image attachment"
+    />
+  );
+}
+
 function UserBubble({ message }: { message: RoutstrMessage }) {
   const [foreground, surfaceSecondary, shade400, shade500] = useThemeColor([
     'foreground',
@@ -194,8 +230,16 @@ function UserBubble({ message }: { message: RoutstrMessage }) {
     'shade-500',
   ] as const);
   const isSending = message.pending === true;
+  const attachments = message.attachments ?? [];
   return (
     <VStack align="flex-end" spacing={2} style={{ alignSelf: 'flex-end', maxWidth: '85%' }}>
+      {attachments.length > 0 ? (
+        <HStack align="center" spacing={6} style={{ marginTop: 6 }}>
+          {attachments.map((attachment, index) => (
+            <AttachmentThumb key={`${attachment.localUri}-${index}`} attachment={attachment} />
+          ))}
+        </HStack>
+      ) : null}
       <View
         style={{
           marginVertical: 6,
