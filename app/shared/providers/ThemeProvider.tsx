@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeStore, type ThemeMode } from '@/shared/stores/profile/themeStore';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useUnitWallpaper } from '@/shared/lib/theme/useUnitWallpaper';
 import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
@@ -37,11 +38,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // lower in the tree. Gating ThemeProvider on themeStore._hasHydrated
   // here would deadlock the splash screen.
   const wallpaperHydrated = useWallpaperStore((s) => s._hasHydrated);
-  // Resolve the chrome theme via the shared resolver hook, which subscribes
-  // to themeStore (unitWallpapers + activeAlbumSlug) and wallpaperStore
-  // (catalog) and walks the fallback chain. Re-renders when any of those
-  // references change.
-  const currentTheme = useUnitWallpaper();
+  // The chrome theme follows the ACTIVE WALLET UNIT: switching the wallet to
+  // usd applies the wallpaper assigned to usd (unit-scoped assignment inside
+  // the profile). Read the persisted unit straight from mintStore — this
+  // provider mounts above CocoProvider, so the coco-aware availability hook
+  // isn't reachable here, and the persisted choice is the right key even
+  // while coco boots. Falls through resolveUnitWallpaper's chain (unit →
+  // first override → album → fallback) when the unit has no assignment.
+  const activeUnit = useMintStore((s) => s.activeUnit);
+  const currentTheme = useUnitWallpaper(activeUnit);
   const mode = useThemeStore((s) => s.mode);
 
   const lastApplied = useRef<string | null>(null);
