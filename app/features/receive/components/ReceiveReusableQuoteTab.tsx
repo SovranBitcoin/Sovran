@@ -24,6 +24,7 @@ import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { Section } from '@/shared/ui/composed/Section';
 import { HistoryEntryRefresh } from '@/features/transactions';
+import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
 import { useReceiveMethodMint } from '@/features/receive/hooks/useReceiveMethodMint';
 import { Button } from '@/shared/ui/primitives/Button';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
@@ -161,15 +162,14 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     await rotate();
   }, [cooldownUntil, rotate]);
 
-  // TEMP debug surface: EVERY pending onchain quote in this profile's coco
-  // DB, across all mints. coco stores no origin tag — both the standing
-  // rail and the fixed-amount flow call the same quotes.mint.create — so the
-  // distinctions here are app-derived: "standing" = the id recorded in the
-  // identity map (any mint), and fixed-amount quotes carry a prepared mint
-  // OPERATION with the requested amount (the thing history projects), while
-  // standing quotes have no operation until a deposit lands. coco never
+  // "View all": every pending onchain quote in this profile's coco DB,
+  // across all mints. coco stores no origin tag — both the standing rail and
+  // the fixed-amount flow call the same quotes.mint.create — so the labels
+  // are app-derived: "standing" = the id recorded in the identity map (any
+  // mint), fixed-amount quotes carry a prepared mint OPERATION with the
+  // requested amount, and orphans are retired/rotated addresses. coco never
   // expires or GCs these rows; only ISSUED bolt11 quotes leave listPending.
-  const openDebugAddresses = useCallback(async () => {
+  const openAddressList = useCallback(async () => {
     const pending = await manager.quotes.mint.listPending({ method: 'onchain' });
     const standingIds = new Set(Object.values(useMintStore.getState().standingQuotes));
     const nowSeconds = Math.floor(Date.now() / 1000);
@@ -253,7 +253,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
           getMintDisplayName(q.mintUrl, null),
           isStanding ? 'standing' : ops.length > 0 ? 'fixed-amount' : 'orphan',
           ...(opAmount != null ? [`${opAmount} ${q.unit}`] : []),
-          `ops ${ops.length}`,
+          ...(__DEV__ ? [`ops ${ops.length}`] : []),
           ...(paid > 0 ? [`paid ${paid}`] : []),
           ...(isExpired ? ['expired'] : []),
           new Date(q.createdAt).toLocaleString(),
@@ -261,7 +261,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
           // answers repeated requests with the SAME quote, every "new"
           // create collapses into one row and only bumps updatedAt — a big
           // created→updated gap is the fingerprint of that collapse.
-          ...(q.updatedAt - q.createdAt > 60_000
+          ...(__DEV__ && q.updatedAt - q.createdAt > 60_000
             ? [`re-upserted until ${new Date(q.updatedAt).toLocaleString()}`]
             : []),
         ];
@@ -347,28 +347,24 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     <>
       <PaymentInfo data={qrData} copyTarget={copy.copyTarget} unit={unit} />
       {method === 'onchain' && (
-        <View className="mb-3 items-center">
-          <Pressable
-            onPress={() => void handleGenerateAddress()}
-            testID="receive-onchain-new-address"
-            accessibilityLabel="Generate new address">
-            <Text
-              size={13}
-              bold
-              color={cooldownActive ? muted : accent}
-              style={{ opacity: cooldownActive ? 0.5 : 1 }}>
-              Generate new address
-            </Text>
-          </Pressable>
-          {__DEV__ && (
-            <Pressable
-              onPress={() => void openDebugAddresses()}
-              testID="receive-onchain-debug-addresses">
-              <Text size={11} color={muted} className="mt-2">
-                debug: list generated addresses
-              </Text>
-            </Pressable>
-          )}
+        <View className="mb-3">
+          <ActionSegmentsCard
+            segments={[
+              {
+                icon: 'mdi:refresh',
+                label: 'New address',
+                onPress: () => void handleGenerateAddress(),
+                testID: 'receive-onchain-new-address',
+                dimmed: cooldownActive,
+              },
+              {
+                icon: 'fluent:list-16-filled',
+                label: 'View all',
+                onPress: () => void openAddressList(),
+                testID: 'receive-onchain-view-addresses',
+              },
+            ]}
+          />
         </View>
       )}
       <View className="mx-4">

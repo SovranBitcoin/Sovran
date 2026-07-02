@@ -3,9 +3,9 @@
  * an AMOUNTLESS reusable request (payer wallets prompt for the amount)
  * carrying the wallet's trusted mints and a Nostr transport (NIP-17); the
  * durable coco operation behind it claims incoming payloads automatically
- * via the registered nostr transport plugin. "New request" retires the
- * current request (cancels the op) and mints a fresh id — no cooldown:
- * unlike onchain rotation, this costs nothing at any mint.
+ * via the registered nostr transport plugin. Every visit mints a FRESH
+ * request (the previous op is cancelled, so exactly one stays active) —
+ * rotation costs nothing at any mint, so no cooldown or manual button.
  *
  * Mints never advertise NUT-18 (it's wallet-to-wallet), so availability is
  * simply "any trusted mint exists".
@@ -24,14 +24,12 @@ import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { Section } from '@/shared/ui/composed/Section';
 import { Button } from '@/shared/ui/primitives/Button';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { setStringAsync } from 'expo-clipboard';
 import { copyPopup } from '@/shared/lib/popup';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import Icon from 'assets/icons';
 
@@ -49,7 +47,6 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   walletContext,
   muted,
 }: ReceivePaymentRequestTabProps) {
-  const accent = useThemeColor('accent');
   const mints = useMemo(
     () => walletContext.trustedMintUrls.slice(0, MAX_ADVERTISED_MINTS),
     [walletContext.trustedMintUrls]
@@ -69,16 +66,14 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
     []
   );
 
-  const { request, isLoading, error, rotate } = useStandingPaymentRequest(
+  // A fresh request every visit: rotation cancels the previous op (exactly
+  // one stays active) and costs nothing anywhere — no cooldown or manual
+  // button needed.
+  const { request, isLoading, error } = useStandingPaymentRequest(
     mints.length > 0 ? { unit, mints } : null,
-    identityStore
+    identityStore,
+    { freshOnMount: true }
   );
-
-  const handleNewRequest = useCallback(async () => {
-    paymentLog.info('receive.creq.rotate_requested', { source: 'button' });
-    await EnhancedHaptics.copyHaptic();
-    await rotate();
-  }, [rotate]);
 
   const handleCopy = useCallback(async () => {
     if (!request) return;
@@ -132,16 +127,6 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   return (
     <>
       <PaymentInfo data={request.encodedRequest} copyTarget="paymentRequest" unit={unit} />
-      <View className="mb-3 items-center">
-        <Pressable
-          onPress={() => void handleNewRequest()}
-          testID="receive-creq-new-request"
-          accessibilityLabel="Generate new payment request">
-          <Text size={13} bold color={accent}>
-            New request
-          </Text>
-        </Pressable>
-      </View>
       <View className="mx-4">
         <Section title="CASHU PAYMENT REQUEST">
           <GradientCard>

@@ -28,7 +28,15 @@ export interface UseStandingPaymentRequestResult {
 export function useStandingPaymentRequest(
   input: StandingPaymentRequestInput | null,
   identityStore: ReusableQuoteIdentityStore,
+  options?: {
+    /** Mint a FRESH request on first resolve for this (unit, mints) input —
+     *  cancels the recorded op and creates a new id, so every visit hands
+     *  out a new request. Subsequent re-resolves (event-driven) reuse it. */
+    freshOnMount?: boolean;
+  },
 ): UseStandingPaymentRequestResult {
+  const freshOnMount = options?.freshOnMount ?? false;
+  const freshDoneForRef = useRef<string | null>(null);
   const manager = useColadaManager();
   const [request, setRequest] = useState<StandingPaymentRequest | null>(null);
   const [isLoading, setIsLoading] = useState(!!input);
@@ -67,11 +75,20 @@ export function useStandingPaymentRequest(
     setError(null);
     (async () => {
       try {
-        const resolved = await ensureStandingPaymentRequest(
-          manager,
-          { unit, mints: mintsRef.current },
-          identityStoreRef.current,
-        );
+        const inputKey = `${unit}|${mintsKey}`;
+        const wantFresh = freshOnMount && freshDoneForRef.current !== inputKey;
+        if (wantFresh) freshDoneForRef.current = inputKey;
+        const resolved = wantFresh
+          ? await rotateStandingPaymentRequest(
+              manager,
+              { unit, mints: mintsRef.current },
+              identityStoreRef.current,
+            )
+          : await ensureStandingPaymentRequest(
+              manager,
+              { unit, mints: mintsRef.current },
+              identityStoreRef.current,
+            );
         if (!cancelled && mountedRef.current) setRequest(resolved);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -84,7 +101,7 @@ export function useStandingPaymentRequest(
     return () => {
       cancelled = true;
     };
-  }, [manager, unit, mintsKey, generation]);
+  }, [manager, unit, mintsKey, generation, freshOnMount]);
 
   // External rotations land in the identity store — re-resolve.
   useEffect(() => {
