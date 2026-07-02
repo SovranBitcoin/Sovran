@@ -23,6 +23,15 @@ module.exports = {
       '<rootDir>/node_modules/@cashu/coco-core/dist/index.js',
       '<rootDir>/../node_modules/@cashu/coco-core/dist/index.js',
     ],
+    // v2 subpath exports (jest's resolver here predates package "exports" maps)
+    '^@cashu/coco-core/adapter$': [
+      '<rootDir>/node_modules/@cashu/coco-core/dist/adapter.js',
+      '<rootDir>/../node_modules/@cashu/coco-core/dist/adapter.js',
+    ],
+    '^@cashu/coco-core/plugin$': [
+      '<rootDir>/node_modules/@cashu/coco-core/dist/plugin.js',
+      '<rootDir>/../node_modules/@cashu/coco-core/dist/plugin.js',
+    ],
     '^@cashu/coco-expo-sqlite$': [
       '<rootDir>/node_modules/@cashu/coco-expo-sqlite/dist/index.js',
       '<rootDir>/../node_modules/@cashu/coco-expo-sqlite/dist/index.js',
