@@ -31,6 +31,7 @@
  *   screens      Screen navigation flow, content snapshots, and durations
  *   startup      Initialization waterfall, stage timing, gate sequence
  *   coco         Coco/Colada wallet module breakdown, issues, mint requests
+ *   upstream     coco v2 field report — versions + anomalies, paste-ready for a cashubtc/coco issue
  *   network      Network request/response pairs with latency
  *   feed         Feed/thread GraphQL, page mapping, and reply seed/render flow
  *   visual       Layout/content-shift telemetry, row positions, overlaps, jumps
@@ -1561,6 +1562,99 @@ function cocoModuleName(event: string): string {
   const parts = event.split('.');
   if (parts[0] === 'wallet') return `${parts[0]}.${parts[1] ?? 'unknown'}`;
   return parts[1] ?? 'unknown';
+}
+
+/**
+ * Upstream-feedback digest for the coco maintainers: every `coco.feedback.*`
+ * entry (version-stamped anomalies + coco API failures with upstream's own
+ * error-class names) plus all warn/error entries from the coco boundary,
+ * grouped and formatted so the output pastes straight into a cashubtc/coco
+ * issue. Complements `coco` (which shows healthy traffic too).
+ */
+function modeUpstream(entries: LogEntry[], _opts: Options): string {
+  const relevantEvent = /^(coco\.|cashu\.|quotes\.|operations\.|colada\.|history\.projection)/;
+  const relevant = entries.filter(
+    (e) =>
+      e.event.startsWith('coco.feedback.') ||
+      (['warn', 'error', 'fatal'].includes(e.level) && relevantEvent.test(e.event))
+  );
+
+  const lines: string[] = ['COCO V2 UPSTREAM FIELD REPORT', ''];
+
+  const versionsEntry = entries.find((e) => e.event === 'coco.feedback.versions');
+  if (versionsEntry?.params) {
+    const v = versionsEntry.params as Record<string, unknown>;
+    lines.push(
+      `versions: coco-core ${v.cocoCore ?? '?'}, coco-react ${v.cocoReact ?? '?'}, ` +
+        `coco-expo-sqlite ${v.cocoExpoSqlite ?? '?'}, cashu-ts ${v.cashuTs ?? '?'}`
+    );
+  } else {
+    lines.push('versions: (no coco.feedback.versions entry — session predates manager init?)');
+  }
+  lines.push('');
+
+  // Migration story, if this session ran one.
+  const migrationEvents = entries.filter((e) =>
+    /^cashu\.manager\.(schema_dump|migration|db_backup|balance_snapshot|noncanonical_amounts)/.test(
+      e.event
+    )
+  );
+  if (migrationEvents.length > 0) {
+    lines.push('MIGRATION TRAIL:');
+    for (const e of migrationEvents) {
+      const params = e.params
+        ? Object.entries(e.params)
+            .slice(0, 8)
+            .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
+            .join(' ')
+        : '';
+      lines.push(`  ${e.ts} [${e.level}] ${e.event}${params ? ` — ${params}` : ''}`);
+    }
+    lines.push('');
+  }
+
+  if (relevant.length === 0) {
+    lines.push('No coco anomalies, feedback events, or boundary warnings in this session.');
+    return lines.join('\n');
+  }
+
+  const groups = new Map<
+    string,
+    { count: number; level: string; first: LogEntry; last: LogEntry }
+  >();
+  for (const e of relevant) {
+    const g = groups.get(e.event);
+    if (g) {
+      g.count++;
+      g.last = e;
+    } else {
+      groups.set(e.event, { count: 1, level: e.level, first: e, last: e });
+    }
+  }
+
+  lines.push(
+    `ANOMALIES + BOUNDARY WARNINGS (${relevant.length} entries, ${groups.size} distinct):`
+  );
+  lines.push('');
+  const sorted = [...groups.entries()].sort((a, b) => {
+    const sev = (l: string) => (l === 'fatal' ? 3 : l === 'error' ? 2 : l === 'warn' ? 1 : 0);
+    return sev(b[1].level) - sev(a[1].level) || b[1].count - a[1].count;
+  });
+  for (const [event, g] of sorted) {
+    const params = g.first.params
+      ? Object.entries(g.first.params)
+          .filter(([k]) => !['cocoCore', 'cocoReact', 'cocoExpoSqlite', 'cashuTs'].includes(k))
+          .slice(0, 8)
+          .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
+          .join(' ')
+      : '';
+    lines.push(`  [${g.level}] ${event} ×${g.count}`);
+    if (params) lines.push(`      ${params}`);
+    lines.push(`      first ${g.first.ts}${g.count > 1 ? ` / last ${g.last.ts}` : ''}`);
+  }
+  lines.push('');
+  lines.push('Params follow the app redaction rules (names/lengths/counts, no payment strings).');
+  return lines.join('\n');
 }
 
 function modeCoco(entries: LogEntry[], opts: Options): string {
@@ -3711,6 +3805,7 @@ function modeBudget(entries: LogEntry[], opts: Options): string {
     { name: 'screens', fn: modeScreens },
     { name: 'startup', fn: modeStartup },
     { name: 'coco', fn: modeCoco },
+    { name: 'upstream', fn: modeUpstream },
     { name: 'network', fn: modeNetwork },
     { name: 'feed', fn: modeFeed },
     { name: 'visual', fn: modeVisual },
@@ -4360,6 +4455,9 @@ async function main() {
       break;
     case 'coco':
       output = modeCoco(entries, opts);
+      break;
+    case 'upstream':
+      output = modeUpstream(entries, opts);
       break;
     case 'network':
       output = modeNetwork(entries, opts);

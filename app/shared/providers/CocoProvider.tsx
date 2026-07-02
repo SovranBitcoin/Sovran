@@ -2,6 +2,7 @@ import React, { createContext, useEffect, useState, ReactNode, useRef } from 're
 import { CocoCashuProvider } from '@cashu/coco-react';
 import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { reportCocoApiFailure } from '@/shared/lib/cashu/cocoFeedback';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { attachMintMetadataToManager } from '@/shared/stores/global/mintMetadataStore';
@@ -241,6 +242,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
           log.warn('coco.recovery.failed', {
             error: recoveryErr instanceof Error ? recoveryErr.message : String(recoveryErr),
           });
+          reportCocoApiFailure('ops.*.recovery.run', recoveryErr);
         }
 
         bgStage.complete();

@@ -116,14 +116,30 @@ export function useColadaTransactions(
   const fetchPage = useCallback(
     async (offset: number): Promise<HistoryEntry[]> => {
       try {
-        // Normalize v2 operation-projected states to the legacy vocabulary
-        // once, at the read-model boundary.
-        return normalizeHistoryEntries(
+        const raw =
           (await managerRef.current.history.getPaginatedHistory(
             offset,
             pageSize,
-          )) ?? [],
-        );
+          )) ?? [];
+        // Upstream-feedback tripwire: coco's projection promises unique
+        // deterministic ids per page; duplicates would mean double-projected
+        // operations (the class the deleted melt supplement used to cause).
+        const ids = new Set<string>();
+        let duplicateIds = 0;
+        for (const entry of raw) {
+          if (ids.has(entry.id)) duplicateIds++;
+          else ids.add(entry.id);
+        }
+        if (duplicateIds > 0) {
+          logger.warn("history.projection.duplicate_ids", {
+            offset,
+            pageSize,
+            duplicateIds,
+          });
+        }
+        // Normalize v2 operation-projected states to the legacy vocabulary
+        // once, at the read-model boundary.
+        return normalizeHistoryEntries(raw);
       } catch (err) {
         logger.warn("history.transactions.page_failed", {
           offset,

@@ -1,6 +1,7 @@
 import type { Manager } from '@cashu/coco-core';
 
 import { cashuLog } from '@/shared/lib/logger';
+import { reportCocoApiFailure } from './cocoFeedback';
 
 function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
   return {
@@ -54,6 +55,10 @@ export async function prepareBolt11MintQuote(
       method: 'bolt11',
       errorName: error instanceof Error ? error.name : typeof error,
     });
+    reportCocoApiFailure('quotes.mint.create/ops.mint.prepare', error, {
+      method: 'bolt11',
+      unit,
+    });
     throw error;
   }
 }
@@ -98,6 +103,10 @@ export async function prepareBolt11MeltQuote(
       method: 'bolt11',
       invoiceLength: invoice.length,
       errorName: error instanceof Error ? error.name : typeof error,
+    });
+    reportCocoApiFailure('quotes.melt.create/ops.melt.prepare', error, {
+      method: 'bolt11',
+      unit,
     });
     throw error;
   }

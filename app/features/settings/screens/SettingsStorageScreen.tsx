@@ -18,6 +18,7 @@ import {
   getStorageInventorySnapshot,
   type ZustandInventory,
 } from '@/shared/lib/debug/storageInventory';
+import { buildCocoFeedbackReport } from '@/shared/lib/cashu/cocoFeedback';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -275,6 +276,15 @@ export const SettingsStorageScreen = () => {
     }
   }, []);
 
+  const handleCopyCocoReport = useCallback(async () => {
+    try {
+      await Clipboard.setStringAsync(buildCocoFeedbackReport());
+      Alert.alert('Copied', 'coco v2 feedback report copied — paste into a cashubtc/coco issue.');
+    } catch (copyError) {
+      setError(copyError instanceof Error ? copyError.message : 'Copy failed');
+    }
+  }, []);
+
   const handleCopyDebugLogs = useCallback(async () => {
     setIsCopyingLogs(true);
     try {
@@ -365,6 +375,9 @@ export const SettingsStorageScreen = () => {
                 isDisabled={isCopyingLogs}
                 onPress={handleCopyDebugLogs}>
                 <Button.Label>{isCopyingLogs ? 'Copying...' : 'Copy Debug Logs'}</Button.Label>
+              </Button>
+              <Button variant="secondary" size="sm" onPress={handleCopyCocoReport}>
+                <Button.Label>Copy coco v2 Report</Button.Label>
               </Button>
             </View>
             {error ? (

@@ -31,6 +31,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, getPublicKey, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
 import { cashuLog, initLog, initPhase } from '../logger';
+import { logCocoVersions, reportCocoApiFailure, reportCocoIssue } from './cocoFeedback';
 import {
   createP2PKImportPlugin,
   type P2PKSecretKeyInput,
@@ -293,6 +294,16 @@ export class CocoManager {
         migrationCount,
         tables: tables.join(','),
       });
+      if (beforeMigrationCount >= 0 && migrationCount === beforeMigrationCount) {
+        // A migration boot that applied nothing: either ensureSchema didn't
+        // run inside repositories.init() or the migration chain no-opped —
+        // both worth reporting upstream with counts.
+        reportCocoIssue('migration_not_advanced', {
+          dbName,
+          fromCount: beforeMigrationCount,
+          toCount: migrationCount,
+        });
+      }
       if (beforeMigrationCount >= 0 && migrationCount > beforeMigrationCount) {
         const balances = await this.snapshotReadyProofBalances(db, tables).catch(() => null);
         cashuLog.info('cashu.manager.migration.applied', {
@@ -383,6 +394,7 @@ export class CocoManager {
           hasSignerKey: !!p2pkImportSecretKey,
           hasGiveawayP2PK: !!GIVEAWAY_P2PK_SECRET,
         });
+        logCocoVersions();
         const opened = await initPhase(`CocoManager.openDB[${dbName}]`, () =>
           SQLite.openDatabaseAsync(dbName)
         );
@@ -520,6 +532,11 @@ export class CocoManager {
         return this.instance;
       } catch (error) {
         cashuLog.error('cashu.manager.init_failed', { error });
+        // Manager/repositories init failing is exactly what upstream needs
+        // to hear about (schema migration or adapter contract breakage).
+        reportCocoApiFailure('Manager.initialize/repositories.init', error, {
+          dbName: this.getDbName(),
+        });
         throw error;
       }
     };
@@ -566,6 +583,7 @@ export class CocoManager {
           cashuLog.info('cashu.manager.proof_watcher_retry_done');
         } catch (retryError) {
           cashuLog.error('cashu.manager.proof_watcher_retry_failed', { error: retryError });
+          reportCocoApiFailure('enableProofStateWatcher', retryError);
         }
       }
 
@@ -633,6 +651,7 @@ export class CocoManager {
         });
       } catch (error) {
         cashuLog.warn('cashu.manager.legacy_mint_quote_reconcile_failed', { error });
+        reportCocoApiFailure('reconcileLegacyMintQuotes', error);
       }
 
       try {
@@ -650,6 +669,7 @@ export class CocoManager {
         });
       } catch (error) {
         cashuLog.warn('cashu.manager.quote_watcher_failed', { error });
+        reportCocoApiFailure('enableMintOperationWatcher', error);
       }
 
       try {
@@ -659,6 +679,7 @@ export class CocoManager {
         cashuLog.info('cashu.manager.melt_quote_watcher_enabled');
       } catch (error) {
         cashuLog.warn('cashu.manager.melt_quote_watcher_failed', { error });
+        reportCocoApiFailure('enableMeltQuoteWatcher', error);
       }
 
       try {
@@ -676,6 +697,7 @@ export class CocoManager {
         });
       } catch (error) {
         cashuLog.warn('cashu.manager.quote_processor_failed', { error });
+        reportCocoApiFailure('enableMintOperationProcessor', error);
       }
 
       try {
@@ -685,6 +707,7 @@ export class CocoManager {
         cashuLog.info('cashu.manager.melt_settlement_processor_enabled');
       } catch (error) {
         cashuLog.warn('cashu.manager.melt_settlement_processor_failed', { error });
+        reportCocoApiFailure('enableMeltSettlementProcessor', error);
       }
 
       try {
@@ -694,6 +717,7 @@ export class CocoManager {
         cashuLog.info('cashu.manager.pending_mint_recovery_done');
       } catch (error) {
         cashuLog.warn('cashu.manager.pending_mint_recovery_failed', { error });
+        reportCocoApiFailure('recoverPendingMintOperations', error);
       }
 
       try {
@@ -709,6 +733,7 @@ export class CocoManager {
         }
       } catch (error) {
         cashuLog.warn('cashu.manager.paid_mint_quote_requeue_failed', { error });
+        reportCocoApiFailure('requeuePaidMintQuotes', error);
       }
 
       if (npcPlugin) {
