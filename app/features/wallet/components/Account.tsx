@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import PagerView, {
   type PageScrollStateChangedNativeEvent,
@@ -7,7 +7,7 @@ import PagerView, {
 
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { PrimaryBalance } from '@/features/wallet/components/PrimaryBalance';
+import { PrimaryBalance, type PillVisibility } from '@/features/wallet/components/PrimaryBalance';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
@@ -79,6 +79,33 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
   // must not clip); shrinks only apply when clearly real (a pill row
   // disappearing), never for sub-pill wobble.
   const HEIGHT_SHRINK_THRESHOLD = 24;
+  // Status-pill slot reservation: OR the pill visibility across all account
+  // pages, so a pill that shows on ANY page keeps an invisible slot on every
+  // page (consistent positions) — while pills nobody shows reserve nothing.
+  const [pillsByUnit, setPillsByUnit] = useState<Record<string, PillVisibility>>({});
+  const handlePillVisibilityChange = useCallback((pageUnit: string, visibility: PillVisibility) => {
+    setPillsByUnit((prev) => {
+      const current = prev[pageUnit];
+      if (
+        current &&
+        current.pending === visibility.pending &&
+        current.reserved === visibility.reserved &&
+        current.redeeming === visibility.redeeming
+      ) {
+        return prev;
+      }
+      return { ...prev, [pageUnit]: visibility };
+    });
+  }, []);
+  const reservePillSlots = useMemo<PillVisibility>(() => {
+    const all = Object.values(pillsByUnit);
+    return {
+      pending: all.some((v) => v.pending),
+      reserved: all.some((v) => v.reserved),
+      redeeming: all.some((v) => v.redeeming),
+    };
+  }, [pillsByUnit]);
+
   const onPageContentLayout = useCallback((pageUnit: string, event: LayoutChangeEvent) => {
     const height = Math.ceil(event.nativeEvent.layout.height);
     setPageHeights((prev) => {
@@ -171,7 +198,11 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
                       always-mounted subscriptions, so the neighbour that
                       slides into view during a drag is already correct.
                       Heights stay uniform via the max-height container. */}
-                  <PrimaryBalance account={{ unit: accountUnit }} />
+                  <PrimaryBalance
+                    account={{ unit: accountUnit }}
+                    reservePillSlots={reservePillSlots}
+                    onPillVisibilityChange={handlePillVisibilityChange}
+                  />
                 </VStack>
               </VStack>
             </View>

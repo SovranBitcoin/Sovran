@@ -28,8 +28,20 @@ interface Account {
 type CurrencyUnit = 'sat' | 'usd' | 'eur' | string;
 type DisplayBtcMode = 0 | 1 | 2 | 3;
 
+export interface PillVisibility {
+  pending: boolean;
+  reserved: boolean;
+  redeeming: boolean;
+}
+
 interface PrimaryBalanceProps {
   account: Account;
+  /** Which status-pill slots to keep (invisibly) when locally zero — the
+   *  carousel ORs visibility across its pages so pills align without
+   *  reserving space nobody uses. */
+  reservePillSlots?: PillVisibility;
+  /** Report this account's pill visibility up to the carousel. */
+  onPillVisibilityChange?: (unit: string, visibility: PillVisibility) => void;
 }
 
 // Currency display configuration
@@ -80,6 +92,10 @@ interface EcashStatusPillProps {
   totalAmount: number;
   unit: string;
   onPress: () => void;
+  /** Keep an invisible same-size slot when the amount is zero — set when
+   *  ANY carousel account shows this pill, so it sits at the same position
+   *  on every page. Unreserved zero pills render nothing (no dead space). */
+  reserveSlot?: boolean;
 }
 
 function EcashStatusPill({
@@ -87,14 +103,15 @@ function EcashStatusPill({
   totalAmount,
   unit,
   onPress,
+  reserveSlot = false,
 }: EcashStatusPillProps): React.ReactElement | null {
   const foreground = useThemeColor('foreground');
 
-  // Zero-amount pills render INVISIBLY instead of collapsing: every carousel
-  // page keeps the same slots (unit pill → currency pill → balance →
-  // pending/reserved/redeeming), so elements sit at identical positions on
-  // every account page.
+  // Zero-amount pills keep an INVISIBLE slot only when some other account
+  // page shows this pill (cross-page alignment); otherwise they render
+  // nothing at all — no dead space below the balance.
   const isPlaceholder = totalAmount <= 0;
+  if (isPlaceholder && !reserveSlot) return null;
   const text = `${label}: ${(isPlaceholder ? 0 : totalAmount).toLocaleString()} ${unit.toUpperCase()}`;
 
   return (
@@ -121,7 +138,11 @@ function EcashStatusPill({
 /**
  * Component that displays the primary balance with unit toggling capability
  */
-export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactElement {
+export function PrimaryBalance({
+  account,
+  reservePillSlots,
+  onPillVisibilityChange,
+}: PrimaryBalanceProps): React.ReactElement {
   const router = useGuardedRouter();
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
   const setDisplayBtc = useSettingsStore((state) => state.setDisplayBtc);
@@ -152,6 +173,14 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   // Pills sum amounts in the active unit (matches the balance above).
   const pendingUnit = account.unit;
   const lockedUnit = account.unit;
+
+  useEffect(() => {
+    onPillVisibilityChange?.(account.unit, {
+      pending: pendingTotal > 0,
+      reserved: reservedTotal > 0,
+      redeeming: lockedTotal > 0,
+    });
+  }, [onPillVisibilityChange, account.unit, pendingTotal, reservedTotal, lockedTotal]);
 
   const currencyConfig = CURRENCY_CONFIG[displayCurrency];
   const fiatValue = btcPrice ? ((btcPrice / 100_000_000) * balance).toFixed(2) : '0.00';
@@ -320,18 +349,21 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
           totalAmount={pendingTotal}
           unit={pendingUnit}
           onPress={handlePendingPress}
+          reserveSlot={reservePillSlots?.pending}
         />
         <EcashStatusPill
           label="RESERVED"
           totalAmount={reservedTotal}
           unit={account.unit}
           onPress={handleReservedPress}
+          reserveSlot={reservePillSlots?.reserved}
         />
         <EcashStatusPill
           label="REDEEMING"
           totalAmount={lockedTotal}
           unit={lockedUnit}
           onPress={handleRedeemingPress}
+          reserveSlot={reservePillSlots?.redeeming}
         />
       </VStack>
     </Log>
