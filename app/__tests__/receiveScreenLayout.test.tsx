@@ -16,8 +16,22 @@ jest.mock('wallet/react', () => ({
   useScreenActions: (...args: unknown[]) => mockUseScreenActions(...args),
 }));
 
+jest.mock('@/shared/providers/WalletContextProvider', () => ({
+  useWalletContext: () => ({
+    trustedMintUrls: [],
+    mintBalances: {},
+    mintMethodCapabilities: {},
+    proofAmounts: {},
+  }),
+}));
+
+jest.mock('@/features/receive/components/ReceiveReusableQuoteTab', () => ({
+  ReceiveReusableQuoteTab: () => null,
+}));
+
 jest.mock('@/shared/lib/logger', () => ({
   paymentLog: {
+    info: jest.fn(),
     warn: jest.fn(),
   },
   // The loading placeholder's SkeletonLoadingShimmer routes through

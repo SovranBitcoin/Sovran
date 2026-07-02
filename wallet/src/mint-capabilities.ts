@@ -13,7 +13,7 @@ import type {
 } from "./types";
 
 const DEFAULT_UNIT = "sat";
-const METHODS: readonly MintPaymentMethod[] = ["bolt11", "onchain"];
+const METHODS: readonly MintPaymentMethod[] = ["bolt11", "bolt12", "onchain"];
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -209,12 +209,16 @@ export function getMintMethodCapability(
 export function isMethodImplemented(
   requirement: MintMethodRequirement,
 ): boolean {
-  if (requirement.method === "onchain") return false;
+  // coco v2: bolt11 mint+melt, onchain mint+melt, bolt12 mint (reusable
+  // offers). Bolt12 SEND (paying an offer) is not wired into the app yet.
+  if (requirement.method === "bolt12") return requirement.operation === "mint";
   return true;
 }
 
 function methodLabel(method: MintPaymentMethod): string {
-  return method === "bolt11" ? "Lightning" : "onchain";
+  if (method === "bolt11") return "Lightning";
+  if (method === "bolt12") return "Bolt12";
+  return "onchain";
 }
 
 function operationLabel(operation: MintPaymentOperation): string {

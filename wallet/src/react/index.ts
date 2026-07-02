@@ -31,6 +31,11 @@ export { useColadaTransactionAnnotation } from "./useColadaTransactionAnnotation
 // Balance breakdown read model
 export { useColadaBalance } from "./useColadaBalance";
 
+export {
+  useReusableMintQuote,
+  type UseReusableMintQuoteResult,
+} from "./useReusableMintQuote";
+
 export type {
   BleAdapter,
   CameraAdapter,

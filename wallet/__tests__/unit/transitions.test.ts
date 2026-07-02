@@ -181,7 +181,7 @@ describe('transition — EXECUTE', () => {
     });
   });
 
-  it('reports payment-method unavailable when a mint advertises onchain melt before app support exists', () => {
+  it('opens amount entry when a mint advertises onchain melt (coco v2)', () => {
     const wallet: WalletContext = {
       ...WALLETS.default,
       mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
@@ -208,11 +208,8 @@ describe('transition — EXECUTE', () => {
       wallet
     );
 
-    expect(result.step).toBe('error');
-    expect(result.data).toMatchObject({
-      code: 'UNSUPPORTED_PAYMENT_METHOD',
-      message: 'Onchain send is not supported yet',
-    });
+    expect(result.step).toBe('enterAmount');
+    expect(result.context.destination).toBe('meltQuote');
   });
 
   it('sets unit from the parsed context', () => {
@@ -421,7 +418,7 @@ describe('transition — REQUEST_MINT_SELECTOR', () => {
     expect(result.step).toBe('selectMint');
   });
 
-  it('keeps onchain receive intent and disables all mints when reopening the mint selector', () => {
+  it('keeps onchain receive intent and gates mints by onchain support when reopening the mint selector', () => {
     const wallet: WalletContext = {
       trustedMintUrls: [MINT1, MINT2],
       mintBalances: { [MINT1]: 1000, [MINT2]: 0 },
@@ -451,8 +448,9 @@ describe('transition — REQUEST_MINT_SELECTOR', () => {
       mintQuoteMethod: 'onchain',
       methodRequirement: { operation: 'mint', method: 'onchain', unit: 'sat' },
       candidates: [
-        { mintUrl: MINT1, status: 'disabled' },
-        { mintUrl: MINT2, status: 'disabled' },
+        // coco v2 implements onchain minting: only MINT2 advertises it, so
+        // the reopened selector lists it alone (bolt11-only MINT1 drops out).
+        { mintUrl: MINT2, status: 'available' },
       ],
     });
   });
@@ -604,7 +602,7 @@ describe('transition — AMOUNT_ENTERED', () => {
     expect(result.context.meltTarget).toBe('user@example.com');
   });
 
-  it('returns an error when onchain receive is selected on the default Coco manager', () => {
+  it('opens a method-aware mint selector for onchain receive on a non-supporting mint (coco v2)', () => {
     const wallet: WalletContext = {
       trustedMintUrls: [MINT1, MINT2],
       mintBalances: { [MINT1]: 1000, [MINT2]: 0 },
@@ -648,14 +646,15 @@ describe('transition — AMOUNT_ENTERED', () => {
       wallet
     );
 
-    expect(result.step).toBe('error');
+    // MINT1 (selected) is bolt11-only but MINT2 supports onchain — the
+    // machine offers the method-aware selector instead of failing.
+    expect(result.step).toBe('selectMint');
     expect(result.data).toMatchObject({
-      code: 'NO_VALID_MINT',
-      message: 'onchain receive is not supported yet',
+      methodRequirement: { operation: 'mint', method: 'onchain', unit: 'sat' },
     });
   });
 
-  it('returns an error for onchain receive despite advertised minimums', () => {
+  it('proceeds to createMintQuote for onchain receive despite advertised minimums', () => {
     const wallet: WalletContext = {
       trustedMintUrls: [MINT1, MINT2],
       mintBalances: { [MINT1]: 0, [MINT2]: 0 },
@@ -699,11 +698,9 @@ describe('transition — AMOUNT_ENTERED', () => {
       wallet
     );
 
-    expect(result.step).toBe('error');
-    expect(result.data).toMatchObject({
-      code: 'NO_VALID_MINT',
-      message: 'onchain receive is not supported yet',
-    });
+    // Advertised NUT-04 minimums are ignored for method candidates; the
+    // selected mint supports onchain, so the quote step proceeds.
+    expect(result.step).toBe('createMintQuote');
   });
 
   it('opens a method-aware mint selector when Lightning melt is selected on an incompatible mint', () => {

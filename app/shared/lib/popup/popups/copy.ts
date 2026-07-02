@@ -15,6 +15,10 @@ const COPY_CONFIGS = {
     title: 'Lightning Invoice Copied',
     text: 'Lightning invoice has been copied to your clipboard.',
   },
+  bolt12Offer: {
+    title: 'Bolt12 Offer Copied',
+    text: 'Reusable Lightning offer has been copied to your clipboard.',
+  },
   address: {
     title: 'Address Copied',
     text: 'Address has been copied to your clipboard.',

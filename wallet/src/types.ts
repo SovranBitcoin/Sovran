@@ -60,7 +60,7 @@ export interface WalletContext {
   proofAmounts: Record<string, number[]>;
 }
 
-export type MintPaymentMethod = 'bolt11' | 'onchain';
+export type MintPaymentMethod = 'bolt11' | 'bolt12' | 'onchain';
 export type MintPaymentOperation = 'mint' | 'melt';
 
 export interface MintMethodRequirement {

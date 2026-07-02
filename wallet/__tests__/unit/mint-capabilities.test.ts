@@ -21,7 +21,7 @@ describe('mint method capabilities', () => {
     expect(support.melt.onchain?.supported).toBe(false);
   });
 
-  it('recognizes onchain NUT-04 metadata but reports it as not implemented', () => {
+  it('recognizes onchain NUT-04 metadata as an implemented receive method (coco v2)', () => {
     const capabilities = deriveMintMethodCapabilityMapFromTrustedMints([
       {
         mintUrl: MINT1,
@@ -45,10 +45,7 @@ describe('mint method capabilities', () => {
     );
 
     expect(capability.supported).toBe(true);
-    expect(getCapabilityUnavailableReason(capability, requirement, 50)).toMatchObject({
-      code: 'PAYMENT_METHOD_NOT_IMPLEMENTED',
-      message: 'onchain receive is not supported yet',
-    });
+    expect(getCapabilityUnavailableReason(capability, requirement, 50)).toBeNull();
   });
 
   it('treats disabled NUT settings as unavailable', () => {
@@ -89,8 +86,10 @@ describe('mint method capabilities', () => {
     });
 
     expect(candidates).toMatchObject([
+      // MINT2 advertises NUT-04 onchain and coco v2 implements it; MINT1
+      // (bolt11-only) stays disabled for the onchain requirement.
       { mintUrl: MINT1, status: 'disabled' },
-      { mintUrl: MINT2, status: 'disabled' },
+      { mintUrl: MINT2, status: 'available' },
     ]);
   });
 

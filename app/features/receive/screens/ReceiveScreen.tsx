@@ -17,6 +17,9 @@ import { useScreenActions, type UseScreenActionsResult } from 'wallet/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 import type { FormattedString } from 'wallet';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
+import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
 import { Section } from '@/shared/ui/composed/Section';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
@@ -240,7 +243,7 @@ interface ReceiveScreenProps {
 export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   useLifecycleLogger('ReceiveScreen');
   const muted = useThemeColor('muted');
-  const [selectedTab, setSelectedTab] = useState('Lightning');
+  const [selectedTab, setSelectedTab] = useState<string>('Lightning');
 
   const { entry, error, actions, mintUrl } = useScreenActions(
     'receive',
@@ -251,16 +254,24 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   const hasReceiveEntryData = Boolean(receiveEntryData);
 
   const quickAccessP2PK = useSettingsStore((state) => state.quickAccessP2PK);
-  const tabs = quickAccessP2PK ? ['Lightning', 'P2PK'] : ['Lightning'];
   const isNpcMintUpdating = useNpcMintStore((s) => s.isUpdating);
   const mintInfo = useMintInfo(mintUrl);
+  const walletContext = useWalletContext();
 
-  // The P2PK tab is gated behind the quickAccessP2PK setting. If the user
-  // had it open and then toggled the setting off elsewhere, snap back to
-  // Lightning so the now-hidden P2PK content stops rendering.
+  const tabs = useMemo(
+    () => computeReceiveTabs(walletContext, unit, quickAccessP2PK),
+    [walletContext, unit, quickAccessP2PK]
+  );
+
   useEffect(() => {
-    if (!quickAccessP2PK && selectedTab !== 'Lightning') setSelectedTab('Lightning');
-  }, [quickAccessP2PK, selectedTab]);
+    paymentLog.info('receive.tabs.computed', { tabs: tabs.join(','), unit });
+  }, [tabs, unit]);
+
+  // If the open tab disappears (setting toggled off / capability change),
+  // snap back to Lightning so hidden content stops rendering.
+  useEffect(() => {
+    if (!(tabs as readonly string[]).includes(selectedTab)) setSelectedTab('Lightning');
+  }, [tabs, selectedTab]);
 
   useEffect(() => {
     if (error) paymentLog.warn('receive.screen.error', { error });
@@ -332,7 +343,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
           />
         </BottomButtons>
       }>
-      {quickAccessP2PK && (
+      {tabs.length > 1 && (
         <View className="mx-4 mb-4">
           <UnderlineTabs tabs={tabs} selectedTab={selectedTab} handleTabPress={setSelectedTab} />
         </View>
@@ -345,9 +356,21 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
         renderSkeleton={() => <ReceiveHubPlaceholder />}
         renderContent={() => {
           if (!receiveEntryData) return null;
-          return quickAccessP2PK && selectedTab === 'P2PK' ? (
-            <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
-          ) : (
+          if (selectedTab === 'P2PK' && quickAccessP2PK) {
+            return <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />;
+          }
+          if (selectedTab === 'Bolt12' || selectedTab === 'Onchain') {
+            return (
+              <ReceiveReusableQuoteTab
+                method={selectedTab === 'Bolt12' ? 'bolt12' : 'onchain'}
+                mintUrl={mintUrl}
+                unit={unit}
+                walletContext={walletContext}
+                muted={muted}
+              />
+            );
+          }
+          return (
             <ReceiveLightningTab
               data={receiveEntryData}
               unit={unit}
