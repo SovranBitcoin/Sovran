@@ -347,7 +347,9 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     <>
       <PaymentInfo data={qrData} copyTarget={copy.copyTarget} unit={unit} />
       {method === 'onchain' && (
-        <View className="mb-3">
+        // Same 12px offset the QR speed controls use under the QR; the
+        // Section below brings its own py-3, keeping the gaps symmetric.
+        <View style={{ marginTop: 12 }}>
           <ActionSegmentsCard
             segments={[
               {
