@@ -66,11 +66,12 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
     pagerRef.current?.setPage(pageIndex);
   }, [pageIndex]);
 
-  // The carousel's height follows the ACTIVE page's content (pager pages are
-  // absolutely positioned, so the container can't grow naturally).
+  // The carousel's height is the MAX content height across all account pages
+  // (pager pages are absolutely positioned, so the container can't grow
+  // naturally) — sized to the tallest account, swiping never shifts layout.
   const [pageHeights, setPageHeights] = useState<Record<string, number>>({});
-  const activeContentHeight = pageHeights[unit] ?? 0;
-  const containerHeight = Math.max(minHeight, activeContentHeight + BALANCE_BOTTOM_INSET);
+  const tallestContentHeight = Math.max(0, ...Object.values(pageHeights));
+  const containerHeight = Math.max(minHeight, tallestContentHeight + BALANCE_BOTTOM_INSET);
 
   const onPageContentLayout = useCallback((pageUnit: string, event: LayoutChangeEvent) => {
     const height = Math.ceil(event.nativeEvent.layout.height);

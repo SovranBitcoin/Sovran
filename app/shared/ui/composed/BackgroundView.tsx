@@ -16,6 +16,7 @@ import {
   themeSurfaceTo,
 } from '@/shared/lib/theme/themeTransition';
 import { useTheme } from '@/shared/providers/ThemeProvider';
+import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import { isBackgroundImageTheme, getGradientColorScale } from '@/config/backgroundImageThemes';
 import { View } from '@/shared/ui/primitives/View/View';
 import { BlurView } from '@/shared/ui/primitives/BlurView';
@@ -299,26 +300,25 @@ function AnimatedBackgroundViewComponent({
     opacity: fullBlurOpacity.value,
   }));
 
-  // Drag-driven crossfade: while the account carousel drags, the ADJACENT
-  // account's wallpaper is mounted in a second layer and both opacities (and
-  // the surface color) track the drag fraction directly.
+  // Drag-driven crossfade: every unit-assigned wallpaper stays PRE-MOUNTED
+  // (decoded, opacity 0, parallax off) so the adjacent account's image is on
+  // the GPU before a drag even starts; the drag just raises its layer's
+  // opacity. Distinct themes only — a couple of full-screen bitmaps, decode
+  // capped at view size.
   const dragTargetTheme = useSyncExternalStore(subscribeThemeDragTarget, getThemeDragTarget);
-  const dragGradientColors = useMemo(() => {
-    if (dragTargetTheme && isBackgroundImageTheme(dragTargetTheme)) {
-      return getGradientColorScale(dragTargetTheme);
-    }
-    return null;
-  }, [dragTargetTheme]);
+  const unitWallpapers = useThemeStore((s) => s.unitWallpapers);
+  const preloadedThemes = useMemo(() => {
+    const themes = new Set<string>(Object.values(unitWallpapers));
+    if (dragTargetTheme) themes.add(dragTargetTheme);
+    themes.delete(currentTheme);
+    return [...themes];
+  }, [unitWallpapers, dragTargetTheme, currentTheme]);
 
   const backgroundAnimatedStyle = useAnimatedStyle(() => ({
     // themeLayerOpacity dips to 0 during (non-drag) theme switches so the
     // wallpaper swaps at the fade's midpoint; themeDragProgress crossfades
     // toward the drag target while the carousel moves.
     opacity: backgroundOpacity.value * themeLayerOpacity.value * (1 - themeDragProgress.value),
-  }));
-
-  const dragLayerAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: backgroundOpacity.value * themeDragProgress.value,
   }));
 
   // Color-theme glide: while a theme transition runs, an overlay above the
@@ -356,7 +356,9 @@ function AnimatedBackgroundViewComponent({
 
         {/* Animated background image plus optional theme fade */}
         <Animated.View style={[StyleSheet.absoluteFill, backgroundAnimatedStyle]}>
-          {showBackgroundImage && <AnimatedSpriteBackground backgroundColor={surface} />}
+          {showBackgroundImage && (
+            <AnimatedSpriteBackground backgroundColor={surface} imageTransitionMs={0} />
+          )}
 
           {useMeshGradient ? (
             <MeshGradientView
@@ -385,30 +387,20 @@ function AnimatedBackgroundViewComponent({
           )}
         </Animated.View>
 
-        {/* Drag-target wallpaper layer — mounted the instant a carousel drag
-            starts so the adjacent account's wallpaper is already decoded and
-            crossfades with the drag. */}
-        {dragTargetTheme ? (
-          <Animated.View
-            pointerEvents="none"
-            style={[StyleSheet.absoluteFill, dragLayerAnimatedStyle]}>
-            {showBackgroundImage && (
-              <AnimatedSpriteBackground themeName={dragTargetTheme} backgroundColor={surface} />
-            )}
-            {(dragGradientColors || gradientColor) && (
-              <LinearGradient
-                colors={[
-                  opacity(gradientColor || surface, gradientTopOpacity),
-                  gradientColor || surface,
-                ]}
-                locations={[0, 1]}
-                dither
-                style={StyleSheet.absoluteFill}
-                pointerEvents="none"
-              />
-            )}
-          </Animated.View>
-        ) : null}
+        {/* Pre-mounted wallpaper layers (one per unit-assigned theme):
+            decoded and composited at opacity 0 until one becomes the drag
+            target, whose opacity then tracks the drag fraction. */}
+        {showBackgroundImage &&
+          preloadedThemes.map((theme) => (
+            <PreloadedWallpaperLayer
+              key={theme}
+              theme={theme}
+              isDragTarget={theme === dragTargetTheme}
+              surface={surface}
+              gradientColor={gradientColor}
+              gradientTopOpacity={gradientTopOpacity}
+            />
+          ))}
 
         {blurSupported && (
           <Animated.View
@@ -425,3 +417,45 @@ function AnimatedBackgroundViewComponent({
 }
 
 export const AnimatedBackgroundView = memo(AnimatedBackgroundViewComponent);
+
+/**
+ * One pre-mounted wallpaper layer for the account carousel. Hidden layers
+ * cost decoded-bitmap memory only: opacity 0, pointerEvents none, parallax
+ * motion disabled (each enabled SpriteView streams DeviceMotion at 50ms),
+ * and expo-image decodes capped at view size. The drag target's opacity
+ * tracks the drag fraction directly.
+ */
+const PreloadedWallpaperLayer = memo(function PreloadedWallpaperLayer({
+  theme,
+  isDragTarget,
+  surface,
+  gradientColor,
+  gradientTopOpacity,
+}: {
+  theme: string;
+  isDragTarget: boolean;
+  surface: string;
+  gradientColor?: string;
+  gradientTopOpacity: number;
+}) {
+  const layerStyle = useAnimatedStyle(() => ({
+    opacity: isDragTarget ? themeDragProgress.value : 0,
+  }));
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, layerStyle]}>
+      <AnimatedSpriteBackground
+        themeName={theme}
+        backgroundColor={surface}
+        motionEnabled={false}
+        imageTransitionMs={0}
+      />
+      <LinearGradient
+        colors={[opacity(gradientColor || surface, gradientTopOpacity), gradientColor || surface]}
+        locations={[0, 1]}
+        dither
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+    </Animated.View>
+  );
+});

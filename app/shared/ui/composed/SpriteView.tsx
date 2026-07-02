@@ -15,6 +15,19 @@ interface AnimatedSpriteBackgroundProps {
    * passing per-unit wallpapers explicitly).
    */
   themeName?: string;
+  /**
+   * Parallax motion. Pre-mounted hidden wallpaper layers (the account
+   * carousel keeps every unit's wallpaper decoded at opacity 0) MUST pass
+   * false — each enabled instance streams DeviceMotion at 50ms and runs
+   * springs, a real per-instance CPU cost.
+   */
+  motionEnabled?: boolean;
+  /**
+   * expo-image source-change fade. The chrome background passes 0: its
+   * crossfades are driven by layer opacity (drag/settle), and the default
+   * 1s fade on top of that reads as a post-settle shimmer.
+   */
+  imageTransitionMs?: number;
 }
 
 function describeImageSource(source: unknown): Record<string, unknown> {
@@ -52,6 +65,8 @@ function describeImageLoadError(event: unknown): string {
 const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
   backgroundColor,
   themeName,
+  motionEnabled = true,
+  imageTransitionMs,
 }: AnimatedSpriteBackgroundProps) {
   const motion = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
@@ -74,7 +89,7 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
   // solid-colour theme has no visible parallax, so streaming the device-motion
   // sensor at 50ms (a real CPU cost on every screen) would be pure waste.
   useEffect(() => {
-    if (!hasImage) return;
+    if (!hasImage || !motionEnabled) return;
     DeviceMotion.setUpdateInterval(50);
     log.debug('bg.sprite.motion.start', { intervalMs: 50 });
     const subscription = DeviceMotion.addListener(({ rotation }) => {
@@ -95,7 +110,7 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
       log.debug('bg.sprite.motion.stop');
       subscription.remove();
     };
-  }, [motion, hasImage]);
+  }, [motion, hasImage, motionEnabled]);
 
   useEffect(() => {
     if (!backgroundImageSource) {
@@ -149,6 +164,11 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
         ]}>
         <Image
           source={backgroundImageSource}
+          // Decode capped at the view's size (full-screen), never the asset's
+          // native resolution — explicit so a primitive-default change can't
+          // silently start decoding 4K wallpapers.
+          allowDownscaling
+          {...(imageTransitionMs !== undefined ? { transition: imageTransitionMs } : {})}
           style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.18 }] }]}
           onLoad={() => {
             log.info('bg.sprite.image_loaded', {

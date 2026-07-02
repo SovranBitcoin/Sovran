@@ -11,12 +11,22 @@ import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import type { ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { walletLog } from '@/shared/lib/logger';
 
-const UNIT_OPTIONS: { unit: ActiveUnit; label: string }[] = [
+// Same icon language as the mint switcher's currency tabs: circle flags for
+// fiat accounts, the branded bitcoin disc for sats.
+const UNIT_OPTIONS: { unit: ActiveUnit; label: string; flagIcon?: string }[] = [
   { unit: 'sat', label: 'Bitcoin account' },
-  { unit: 'usd', label: 'USD account' },
-  { unit: 'eur', label: 'EUR account' },
-  { unit: 'gbp', label: 'GBP account' },
+  { unit: 'usd', label: 'USD account', flagIcon: 'circle-flags:us' },
+  { unit: 'eur', label: 'EUR account', flagIcon: 'circle-flags:eu' },
+  { unit: 'gbp', label: 'GBP account', flagIcon: 'circle-flags:gb' },
 ];
+
+function unitIconNode(option: (typeof UNIT_OPTIONS)[number], size: number): React.ReactNode {
+  return option.flagIcon ? (
+    <Icon name={option.flagIcon} size={size} />
+  ) : (
+    <CurrencyIcon width={size} currency={option.unit} />
+  );
+}
 
 const PILL_LABELS: Record<ActiveUnit, string> = {
   sat: 'Bitcoin',
@@ -51,9 +61,7 @@ export function UnitSwitcherPill({ textSize = 12 }: { textSize?: number }): Reac
       buttons: UNIT_OPTIONS.filter((option) => availableUnits.includes(option.unit)).map(
         (option) => ({
           text: option.label,
-          // The branded currency disc used everywhere else in the app (the
-          // bitcoin disc stays orange with a white B).
-          iconNode: <CurrencyIcon width={22} currency={option.unit} />,
+          iconNode: unitIconNode(option, 22),
           testID: `wallet-unit-menu-${option.unit}`,
           suffix:
             option.unit === unit ? <Icon name="mdi:check" size={20} color={success} /> : undefined,
@@ -83,7 +91,7 @@ export function UnitSwitcherPill({ textSize = 12 }: { textSize?: number }): Reac
           // Greyed out when only one unit exists — nothing to switch to.
           opacity: canSwitch ? 1 : 0.4,
         }}>
-        <CurrencyIcon width={16} currency={unit} />
+        {unitIconNode(UNIT_OPTIONS.find((o) => o.unit === unit) ?? UNIT_OPTIONS[0], 16)}
         <Text
           overpass
           size={textSize}
