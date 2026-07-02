@@ -3,10 +3,12 @@
  * under the Node jest project (the component itself pulls in uniwind).
  */
 
-/** Comfortable label breathing room per side before a tab counts as cramped. */
-const TAB_LABEL_PADDING = 12;
+/** Minimum label breathing room per side before a tab counts as cramped —
+ *  deliberately tight: collapsing a tab into the (…) menu costs more
+ *  discoverability than slightly snug labels do. */
+const TAB_LABEL_PADDING = 6;
 /** Fixed footprint of the trailing overflow (…) button. */
-export const MORE_BUTTON_WIDTH = 48;
+export const MORE_BUTTON_WIDTH = 40;
 
 /**
  * Split the tab list into visible tabs and overflow (menu) tabs. All tabs stay

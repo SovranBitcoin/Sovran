@@ -7,7 +7,7 @@
 
 import { partitionTabs } from '@/shared/ui/composed/underlineTabsLayout';
 
-// Mirror the component's constants: 12px padding per label side, 48px button.
+// Mirror the component's constants: 6px padding per label side, 40px button.
 const w = (widths: Record<string, number>) => widths;
 
 describe('partitionTabs', () => {
@@ -23,8 +23,8 @@ describe('partitionTabs', () => {
   });
 
   it('shows all tabs when the padded labels fit the container', () => {
-    // 4 × (50 + 24) = 296 ≤ 320
-    const widths = w({ Lightning: 50, Bolt12: 50, Onchain: 50, P2PK: 50 });
+    // 4 × (68 + 12) = 320 ≤ 320
+    const widths = w({ Lightning: 68, Bolt12: 68, Onchain: 68, P2PK: 68 });
     expect(partitionTabs(['Lightning', 'Bolt12', 'Onchain', 'P2PK'], widths, 320)).toEqual({
       visible: ['Lightning', 'Bolt12', 'Onchain', 'P2PK'],
       overflow: [],
@@ -32,13 +32,13 @@ describe('partitionTabs', () => {
   });
 
   it('collapses the tail behind the menu button when labels overflow', () => {
-    // Each padded tab needs 104; container 320 → total 520 > 320.
-    // Budget with the 48px button = 272 → two tabs (208) fit, third would not.
+    // Each padded tab needs 92; container 320 → total 460 > 320.
+    // Budget with the 40px button = 280 → three tabs (276) fit, fourth would not.
     const widths = w({ Lightning: 80, Bolt12: 80, Onchain: 80, P2PK: 80, Nostr: 80 });
     expect(partitionTabs(['Lightning', 'Bolt12', 'Onchain', 'P2PK', 'Nostr'], widths, 320)).toEqual(
       {
-        visible: ['Lightning', 'Bolt12'],
-        overflow: ['Onchain', 'P2PK', 'Nostr'],
+        visible: ['Lightning', 'Bolt12', 'Onchain'],
+        overflow: ['P2PK', 'Nostr'],
       }
     );
   });
@@ -52,9 +52,9 @@ describe('partitionTabs', () => {
   });
 
   it('is stable at the exact fit boundary', () => {
-    // 2 × (100 + 24) = 248 exactly — no overflow at 248, overflow at 247.
+    // 2 × (100 + 12) = 224 exactly — no overflow at 224, overflow at 223.
     const widths = w({ A: 100, B: 100 });
-    expect(partitionTabs(['A', 'B'], widths, 248).overflow).toEqual([]);
-    expect(partitionTabs(['A', 'B'], widths, 247).overflow).toEqual(['B']);
+    expect(partitionTabs(['A', 'B'], widths, 224).overflow).toEqual([]);
+    expect(partitionTabs(['A', 'B'], widths, 223).overflow).toEqual(['B']);
   });
 });

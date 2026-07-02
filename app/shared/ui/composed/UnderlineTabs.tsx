@@ -17,6 +17,10 @@ interface UnderlineTabsProps {
   accentColor?: string;
 }
 
+/** Slightly under body size — keeps 4–5 short tabs on-bar on phone widths
+ *  before the (…) overflow has to engage. */
+const LABEL_SIZE = 15;
+
 /**
  * Flat underline tab bar — each tab is `flex: 1`, the active tab gets a
  * 2 px bottom border in `accent` and a heavier weight; inactive labels use
@@ -91,7 +95,7 @@ export function UnderlineTabs({
         {tabs.map((tab) => (
           <Text
             key={tab}
-            size={16}
+            size={LABEL_SIZE}
             bold
             onLayout={(e) => onLabelLayout(tab, e.nativeEvent.layout.width)}>
             {tab}
@@ -109,7 +113,11 @@ export function UnderlineTabs({
                 styles.tab,
                 isActive && { borderBottomColor: underline, borderBottomWidth: 2 },
               ]}>
-              <Text size={16} bold={isActive} color={isActive ? foreground : muted}>
+              <Text
+                size={LABEL_SIZE}
+                bold={isActive}
+                numberOfLines={1}
+                color={isActive ? foreground : muted}>
                 {tab}
               </Text>
             </Pressable>
