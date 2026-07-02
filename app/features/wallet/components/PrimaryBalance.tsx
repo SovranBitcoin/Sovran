@@ -90,16 +90,21 @@ function EcashStatusPill({
 }: EcashStatusPillProps): React.ReactElement | null {
   const foreground = useThemeColor('foreground');
 
-  if (totalAmount <= 0) return null;
-
-  const text = `${label}: ${totalAmount.toLocaleString()} ${unit.toUpperCase()}`;
+  // Zero-amount pills render INVISIBLY instead of collapsing: every carousel
+  // page keeps the same slots (unit pill → currency pill → balance →
+  // pending/reserved/redeeming), so elements sit at identical positions on
+  // every account page.
+  const isPlaceholder = totalAmount <= 0;
+  const text = `${label}: ${(isPlaceholder ? 0 : totalAmount).toLocaleString()} ${unit.toUpperCase()}`;
 
   return (
-    <View style={styles.statusPillButtonSlot}>
+    <View
+      style={[styles.statusPillButtonSlot, isPlaceholder && styles.hiddenSlot]}
+      pointerEvents={isPlaceholder ? 'none' : 'auto'}>
       <CapsuleButton
         label={text}
         icon="majesticons:coins"
-        onPress={onPress}
+        onPress={isPlaceholder ? () => {} : onPress}
         color={opacity(foreground, 0.85)}
         height={PILL_HEIGHT}
         fitContent
@@ -289,8 +294,14 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
             }
           />
           {/* Fiat conversion of a sat balance is meaningless when the wallet
-              is already denominated in a fiat unit — structurally hide it. */}
-          {isSatUnit ? <FiatCurrencyPill displayText={displayText} textSize={12} /> : null}
+              is already denominated in a fiat unit — but the SLOT stays (an
+              invisible pill of the same size) so the balance and pills below
+              sit at identical positions on every carousel page. */}
+          <View
+            style={isSatUnit ? undefined : styles.hiddenSlot}
+            pointerEvents={isSatUnit ? 'auto' : 'none'}>
+            <FiatCurrencyPill displayText={isSatUnit ? displayText : '≈ 0.00'} textSize={12} />
+          </View>
         </VStack>
         <Pressable onPress={toggleUnit} style={styles.balancePressable}>
           <AmountFormatter
@@ -328,6 +339,11 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 }
 
 const styles = StyleSheet.create({
+  // Placeholder slots: identical size, invisible, untappable — layout
+  // consistency across carousel pages.
+  hiddenSlot: {
+    opacity: 0,
+  },
   statusPillButtonSlot: {
     alignSelf: 'center',
     maxWidth: '92%',
