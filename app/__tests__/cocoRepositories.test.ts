@@ -4,40 +4,12 @@
 
 import type {
   Keypair,
+  KeypairPurpose,
   KeyRingRepository,
-  MintOperation,
-  MintOperationRepository,
   Repositories,
   RepositoryTransactionScope,
-} from '@cashu/coco-core';
+} from '@cashu/coco-core/adapter';
 import { createSovranCocoRepositories } from '@/shared/lib/cashu/cocoRepositories';
-
-function mintOperation(amount: unknown): MintOperation {
-  return {
-    id: 'mint-op',
-    mintUrl: 'https://mint.example',
-    createdAt: 1,
-    updatedAt: 1,
-    state: 'init',
-    method: 'bolt11',
-    methodData: {},
-    amount,
-    unit: 'sat',
-  } as unknown as MintOperation;
-}
-
-function createMintOperationRepository(amount: unknown): MintOperationRepository {
-  return {
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-    getById: jest.fn(async () => mintOperation(amount)),
-    getByState: jest.fn(async () => [mintOperation(amount)]),
-    getPending: jest.fn(async () => [mintOperation(amount)]),
-    getByMintUrl: jest.fn(async () => [mintOperation(amount)]),
-    getByQuoteId: jest.fn(async () => [mintOperation(amount)]),
-  };
-}
 
 function createScope(overrides: Partial<RepositoryTransactionScope>): RepositoryTransactionScope {
   return {
@@ -47,6 +19,7 @@ function createScope(overrides: Partial<RepositoryTransactionScope>): Repository
     keysetRepository: {},
     proofRepository: {},
     mintQuoteRepository: {},
+    legacyMintQuoteRepository: {},
     meltQuoteRepository: {},
     historyRepository: {},
     sendOperationRepository: {},
@@ -54,6 +27,8 @@ function createScope(overrides: Partial<RepositoryTransactionScope>): Repository
     authSessionRepository: {},
     mintOperationRepository: {},
     receiveOperationRepository: {},
+    paymentRequestReceiveOperationRepository: {},
+    paymentRequestReceiveAttemptRepository: {},
     ...overrides,
   } as unknown as RepositoryTransactionScope;
 }
@@ -67,47 +42,25 @@ function createRepositories(scope: RepositoryTransactionScope): Repositories {
 }
 
 describe('createSovranCocoRepositories', () => {
-  it('normalizes persisted mint operation amounts to numbers', async () => {
+  it('passes v2-only repositories through the overlay untouched', async () => {
+    const paymentRequestReceiveOperationRepository = { getById: jest.fn() };
+    const legacyMintQuoteRepository = { getPendingLegacyMintQuotes: jest.fn(async () => []) };
     const scope = createScope({
-      mintOperationRepository: createMintOperationRepository('10000'),
+      paymentRequestReceiveOperationRepository:
+        paymentRequestReceiveOperationRepository as unknown as RepositoryTransactionScope['paymentRequestReceiveOperationRepository'],
+      legacyMintQuoteRepository:
+        legacyMintQuoteRepository as unknown as RepositoryTransactionScope['legacyMintQuoteRepository'],
     });
 
     const repositories = createSovranCocoRepositories(createRepositories(scope));
 
-    const byId = await repositories.mintOperationRepository.getById('mint-op');
-    const byState = await repositories.mintOperationRepository.getByState('init');
-
-    expect(byId?.amount).toBe(10000);
-    expect(typeof byId?.amount).toBe('number');
-    expect(byState[0]?.amount).toBe(10000);
-    expect(typeof byState[0]?.amount).toBe('number');
-  });
-
-  it('normalizes transaction-scoped repository reads', async () => {
-    const scope = createScope({
-      mintOperationRepository: createMintOperationRepository('10000'),
-    });
-
-    const repositories = createSovranCocoRepositories(createRepositories(scope));
-
-    await repositories.withTransaction(async (transactionScope) => {
-      const operation = await transactionScope.mintOperationRepository.getById('mint-op');
-
-      expect(operation?.amount).toBe(10000);
-      expect(typeof operation?.amount).toBe('number');
-    });
-  });
-
-  it('rejects corrupt persisted amount values at the app boundary', async () => {
-    const scope = createScope({
-      mintOperationRepository: createMintOperationRepository('not-a-number'),
-    });
-
-    const repositories = createSovranCocoRepositories(createRepositories(scope));
-
-    await expect(repositories.mintOperationRepository.getById('mint-op')).rejects.toThrow(
-      'Invalid persisted Coco mint operation.amount'
+    expect(repositories.paymentRequestReceiveOperationRepository).toBe(
+      paymentRequestReceiveOperationRepository
     );
+    expect(repositories.legacyMintQuoteRepository).toBe(legacyMintQuoteRepository);
+    await repositories.withTransaction(async (transactionScope) => {
+      expect(transactionScope.legacyMintQuoteRepository).toBe(legacyMintQuoteRepository);
+    });
   });
 });
 
@@ -115,22 +68,33 @@ describe('ephemeral keyring overlay', () => {
   const EPHEMERAL_PUBKEY = `02${'ab'.repeat(32)}`;
   const PERSISTED_PUBKEY = `02${'cd'.repeat(32)}`;
 
-  function keypair(publicKeyHex: string, derivationIndex?: number): Keypair {
-    return { publicKeyHex, secretKey: new Uint8Array(32).fill(7), derivationIndex };
+  function keypair(
+    publicKeyHex: string,
+    derivationIndex?: number,
+    purpose?: KeypairPurpose
+  ): Keypair {
+    return { publicKeyHex, secretKey: new Uint8Array(32).fill(7), derivationIndex, purpose };
   }
 
   function createKeyRingRepository(persisted: Keypair[] = []): KeyRingRepository {
     const rows = new Map(persisted.map((kp) => [kp.publicKeyHex, kp]));
+    const byPurpose = (purpose?: KeypairPurpose) =>
+      [...rows.values()].filter((kp) => purpose === undefined || (kp.purpose ?? 'p2pk') === purpose);
     return {
-      getPersistedKeyPair: jest.fn(async (publicKey: string) => rows.get(publicKey) ?? null),
+      getPersistedKeyPair: jest.fn(
+        async (publicKey: string, purpose?: KeypairPurpose) =>
+          byPurpose(purpose).find((kp) => kp.publicKeyHex === publicKey) ?? null
+      ),
       setPersistedKeyPair: jest.fn(async (kp: Keypair) => {
         rows.set(kp.publicKeyHex, kp);
       }),
       deletePersistedKeyPair: jest.fn(async (publicKey: string) => {
         rows.delete(publicKey);
       }),
-      getAllPersistedKeyPairs: jest.fn(async () => [...rows.values()]),
-      getLatestKeyPair: jest.fn(async () => [...rows.values()].pop() ?? null),
+      getAllPersistedKeyPairs: jest.fn(async (purpose?: KeypairPurpose) => byPurpose(purpose)),
+      getLatestKeyPair: jest.fn(
+        async (purpose?: KeypairPurpose) => byPurpose(purpose).pop() ?? null
+      ),
       getLastDerivationIndex: jest.fn(async () => 0),
     };
   }
@@ -160,11 +124,42 @@ describe('ephemeral keyring overlay', () => {
 
     await repositories.keyRingRepository.setPersistedKeyPair(keypair(EPHEMERAL_PUBKEY));
 
-    expect(delegate.deletePersistedKeyPair).toHaveBeenCalledWith(EPHEMERAL_PUBKEY);
+    expect(delegate.deletePersistedKeyPair).toHaveBeenCalledWith(EPHEMERAL_PUBKEY, 'p2pk');
     expect(await delegate.getPersistedKeyPair(EPHEMERAL_PUBKEY)).toBeNull();
     // Still resolvable through the overlay — auto-sign keeps working.
     const fetched = await repositories.keyRingRepository.getPersistedKeyPair(EPHEMERAL_PUBKEY);
     expect(fetched?.publicKeyHex).toBe(EPHEMERAL_PUBKEY);
+  });
+
+  it('never answers nut20_mint_quote queries from the overlay', async () => {
+    const nut20Key = keypair(PERSISTED_PUBKEY, undefined, 'nut20_mint_quote');
+    const delegate = createKeyRingRepository([nut20Key]);
+    const repositories = build(delegate);
+    await repositories.keyRingRepository.setPersistedKeyPair(keypair(EPHEMERAL_PUBKEY));
+
+    const latest = await repositories.keyRingRepository.getLatestKeyPair('nut20_mint_quote');
+    expect(latest?.publicKeyHex).toBe(PERSISTED_PUBKEY);
+
+    const all = await repositories.keyRingRepository.getAllPersistedKeyPairs('nut20_mint_quote');
+    expect(all.map((kp) => kp.publicKeyHex)).toEqual([PERSISTED_PUBKEY]);
+
+    const byId = await repositories.keyRingRepository.getPersistedKeyPair(
+      EPHEMERAL_PUBKEY,
+      'nut20_mint_quote'
+    );
+    expect(byId).toBeNull();
+  });
+
+  it('falls back to the overlay for the latest p2pk keypair only', async () => {
+    const delegate = createKeyRingRepository();
+    const repositories = build(delegate);
+    await repositories.keyRingRepository.setPersistedKeyPair(keypair(EPHEMERAL_PUBKEY));
+
+    const latestP2pk = await repositories.keyRingRepository.getLatestKeyPair('p2pk');
+    expect(latestP2pk?.publicKeyHex).toBe(EPHEMERAL_PUBKEY);
+
+    const latestNut20 = await repositories.keyRingRepository.getLatestKeyPair('nut20_mint_quote');
+    expect(latestNut20).toBeNull();
   });
 
   it('persists non-ephemeral keypairs through the delegate unchanged', async () => {
@@ -176,6 +171,18 @@ describe('ephemeral keyring overlay', () => {
 
     expect(delegate.setPersistedKeyPair).toHaveBeenCalledWith(derived);
     expect(await delegate.getPersistedKeyPair(PERSISTED_PUBKEY)).toEqual(derived);
+  });
+
+  it('persists an ephemeral-pubkey keypair when its purpose is nut20_mint_quote', async () => {
+    // Degenerate case: same pubkey, different purpose — the overlay must not
+    // swallow a NUT-20 quote key even if the pubkey collides.
+    const delegate = createKeyRingRepository();
+    const repositories = build(delegate);
+
+    const nut20 = keypair(EPHEMERAL_PUBKEY, undefined, 'nut20_mint_quote');
+    await repositories.keyRingRepository.setPersistedKeyPair(nut20);
+
+    expect(delegate.setPersistedKeyPair).toHaveBeenCalledWith(nut20);
   });
 
   it('merges overlay keys into getAllPersistedKeyPairs without duplicates', async () => {
