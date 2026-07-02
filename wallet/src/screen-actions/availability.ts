@@ -416,7 +416,12 @@ function amountEntryAvailability(
   let ecashReason: string | undefined;
   let ecashLabel = "as Ecash";
   if (isMintQuote) {
-    ecashReason = "Not available for receive";
+    // Receive "as Ecash" = a single-use NUT-18 payment request. Mints never
+    // advertise NUT-18 (wallet-to-wallet), so any trusted mint qualifies.
+    const hasTrustedMint = (methodContext?.trustedMintUrls.length ?? 0) > 0;
+    ecashAvailable = nextCanFire && hasTrustedMint;
+    ecashDescription = "Request as a Cashu payment request";
+    if (!hasTrustedMint) ecashReason = "No trusted mints";
   } else if (isMeltQuote) {
     ecashReason = "Lightning destination";
   } else if (isPaymentRequest) {

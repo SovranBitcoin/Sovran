@@ -426,6 +426,12 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       addMint: () => {
         router.push('/(mint-flow)/add');
       },
+      paymentRequestReceive: (entry) => {
+        router.navigate({
+          pathname: '/(receive-flow)/paymentRequest',
+          params: { paymentRequestEntry: entry },
+        });
+      },
       goBack: () => {
         router.back();
       },

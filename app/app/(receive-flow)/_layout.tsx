@@ -50,6 +50,7 @@ export default function ReceiveFlowLayout() {
         <Stack.Screen name="lightningReceive" options={LIGHTNING_RECEIVE_OPTIONS} />
         <Stack.Screen name="onchainReceive" options={ONCHAIN_RECEIVE_OPTIONS} />
         <Stack.Screen name="mintQuote" options={MINT_QUOTE_OPTIONS} />
+        <Stack.Screen name="paymentRequest" options={MINT_QUOTE_OPTIONS} />
         <Stack.Screen name="receiveToken" options={RECEIVE_TOKEN_OPTIONS} />
         <Stack.Screen name="camera" options={CAMERA_OPTIONS} />
       </Stack>

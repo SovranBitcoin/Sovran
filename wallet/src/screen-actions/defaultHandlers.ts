@@ -36,6 +36,9 @@ export interface NavigationCallbacks {
   mintInfo?: (mintInfoEntry: string) => void;
   addMint?: () => void;
   goBack?: () => void;
+  /** Show a freshly created single-use incoming payment request (receive
+   *  "as Ecash"). `entry` is the JSON-serialized create result. */
+  paymentRequestReceive?: (entry: string) => void;
 }
 
 export interface DefaultScreenActionHandlersConfig {
@@ -816,7 +819,27 @@ export function createDefaultScreenActionHandlers(
           }
         } else if (variantId === "ecash") {
           if (entryDestination === "mintQuote") {
-            logger.warn("screenAction.amountEntry.next.ecashOnMintQuote");
+            // Receive "as Ecash": a single-use NUT-18 request. No machine
+            // flow — the durable coco op claims the payload via the
+            // registered transport; we only create and display it (same
+            // persist-and-navigate shape as changeNpcMint).
+            const ops = getOperations();
+            if (!ops?.createPaymentRequestReceive) {
+              logger.warn(
+                "screenAction.amountEntry.next.ecashReceiveUnsupported",
+              );
+              return;
+            }
+            const unit = getString(entry, "unit") ?? "sat";
+            logger.info("screenAction.amountEntry.next.ecashReceive", {
+              amount: effectiveSat,
+              unit,
+            });
+            const created = await ops.createPaymentRequestReceive({
+              amount: effectiveSat,
+              unit,
+            });
+            navigation.paymentRequestReceive?.(JSON.stringify(created));
             return;
           }
           // sendEcash / paymentRequest keep their destination; nothing to do.

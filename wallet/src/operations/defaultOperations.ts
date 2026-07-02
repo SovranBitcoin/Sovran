@@ -986,6 +986,39 @@ export function createDefaultOperations(
       return items;
     },
 
+    // Receive "as Ecash": single-use NUT-18 request over the registered
+    // transport. Every trusted mint qualifies (mints never advertise NUT-18
+    // — wallet-to-wallet), so the allow-list is simply the trusted set,
+    // capped to keep the QR sane.
+    createPaymentRequestReceive: async ({ amount, unit }) => {
+      const mgr = requireManager();
+      const trusted = await mgr.mint.getAllTrustedMints();
+      const mints = trusted.map((mint) => mint.mintUrl).slice(0, 5);
+      logger.info("operations.createPaymentRequestReceive.start", {
+        amount,
+        unit,
+        mintCount: mints.length,
+      });
+      const operation = await mgr.paymentRequests.incoming.create({
+        amount,
+        unit,
+        mints,
+        singleUse: true,
+        transport: "nostr",
+      });
+      logger.info("operations.createPaymentRequestReceive.done", {
+        operationId: operation.id,
+        encodedLength: operation.encodedRequest.length,
+      });
+      return {
+        operationId: operation.id,
+        encodedRequest: operation.encodedRequest,
+        amount,
+        unit,
+        mints: operation.mints,
+      };
+    },
+
     trustMint: async (mintUrl) => {
       const mgr = requireManager();
       logger.info("operations.trustMint", { ...mintUrlFields(mintUrl) });

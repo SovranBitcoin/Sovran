@@ -827,6 +827,22 @@ export interface MachineOperations {
     unit: string,
     method?: MintQuoteMethod,
   ) => Promise<{ historyEntry: string }>;
+  /**
+   * Create a single-use incoming NUT-18 payment request (receive "as
+   * Ecash"): the durable coco op claims the payload automatically via the
+   * wallet's registered transport (nostr). Returns the encoded request for
+   * display. Mint allow-list policy (trusted mints) lives in the operation.
+   */
+  createPaymentRequestReceive?: (input: {
+    amount: number;
+    unit: string;
+  }) => Promise<{
+    operationId: string;
+    encodedRequest: string;
+    amount: number;
+    unit: string;
+    mints: string[];
+  }>;
   buildMintListItems: (
     data: StepDataMap["selectMint"],
   ) => Promise<MintListItem[]>;
