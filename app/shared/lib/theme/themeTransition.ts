@@ -88,8 +88,14 @@ export function subscribeThemeDragTarget(listener: () => void): () => void {
 /** Mount the target theme's wallpaper layer + set color endpoints (used by releaseThemeDrag). */
 function beginThemeDrag(targetTheme: string, fromSurface: string | null): void {
   if (dragTargetTheme !== targetTheme) {
+    // Re-targeting mid-fade (rapid swipes): the new fade starts CLEAN —
+    // progress back to 0 (the new layer must not pop in at the old fade's
+    // value) and any pending after-fade callbacks belong to the abandoned
+    // target, so they are dropped.
     dragTargetTheme = targetTheme;
     themeDragTargetSv.value = targetTheme;
+    themeDragProgress.value = 0;
+    afterFadeCallbacks = [];
     if (fromSurface) themeSurfaceFrom.value = fromSurface;
     const toSurface = surfaceOfTheme(targetTheme);
     if (toSurface) themeSurfaceTo.value = toSurface;

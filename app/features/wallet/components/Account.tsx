@@ -90,39 +90,61 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
     });
   }, []);
 
-  // Revolut model: the wallpaper crossfade does NOT track the finger. It
-  // starts the moment the drag is released toward a new account
-  // (onPageSelected fires when the landing page is determined ≈ release)
-  // and completes in ~0.5s, while the pager settles underneath. The unit
-  // itself commits later, at idle.
+  // Revolut model: the wallpaper crossfade starts at RELEASE, not at the
+  // pager's 50% snap threshold. onPageSelected fires mid-drag when the
+  // landing page crosses the threshold, so it only RECORDS the landing —
+  // the fade triggers on the dragging→settling state transition (the finger
+  // actually leaving), and the unit commits at idle. Catching the pager
+  // mid-settle and dragging again cancels the fade cleanly.
+  const scrollStateRef = useRef<'idle' | 'dragging' | 'settling'>('idle');
+
+  const maybeStartReleaseFade = useCallback(() => {
+    const position = pagerPositionRef.current;
+    const nextUnit = availableUnits[position];
+    if (!nextUnit || nextUnit === unit) {
+      cancelThemeDrag();
+      return;
+    }
+    const fromTheme = themeForUnit(unit);
+    const targetTheme = themeForUnit(nextUnit);
+    if (targetTheme === fromTheme) return; // identical wallpaper — no fade
+    releaseThemeDrag(targetTheme, surfaceOfTheme(fromTheme));
+  }, [availableUnits, unit]);
+
   const handlePageSelected = useCallback(
     (event: PagerViewOnPageSelectedEvent) => {
-      const position = event.nativeEvent.position;
-      pagerPositionRef.current = position;
-      const nextUnit = availableUnits[position];
-      if (!nextUnit || nextUnit === unit) return;
-      const fromTheme = themeForUnit(unit);
-      const targetTheme = themeForUnit(nextUnit);
-      if (targetTheme === fromTheme) return; // identical wallpaper — no fade
-      releaseThemeDrag(targetTheme, surfaceOfTheme(fromTheme));
+      pagerPositionRef.current = event.nativeEvent.position;
+      // The landing page can be (re)determined AFTER release while the pager
+      // is already settling — retarget the running fade to match.
+      if (scrollStateRef.current === 'settling') maybeStartReleaseFade();
     },
-    [availableUnits, unit]
+    [maybeStartReleaseFade]
   );
 
   const handlePageScrollStateChanged = useCallback(
     (event: PageScrollStateChangedNativeEvent) => {
-      if (event.nativeEvent.pageScrollState !== 'idle') return;
+      const state = event.nativeEvent.pageScrollState;
+      scrollStateRef.current = state;
+      if (state === 'dragging') {
+        // Finger back on a settling pager — abandon the running fade.
+        cancelThemeDrag();
+        return;
+      }
+      if (state === 'settling') {
+        maybeStartReleaseFade();
+        return;
+      }
+      // idle — commit.
       const position = pagerPositionRef.current;
       const nextUnit = availableUnits[position];
       if (!nextUnit || nextUnit === unit) {
-        // Sprang back to the same page — glide the drag layer home.
         cancelThemeDrag();
         return;
       }
       walletLog.info('wallet.account.carousel_selected', { from: unit, to: nextUnit, position });
       selectUnit(nextUnit);
     },
-    [availableUnits, unit, selectUnit]
+    [availableUnits, unit, selectUnit, maybeStartReleaseFade]
   );
 
   return (
