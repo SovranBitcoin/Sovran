@@ -177,6 +177,14 @@ export function createPaymentRequestNostrTransportPlugin(
           }
           const pubkey = getPublicKey(secretKey);
           const target = nip19.nprofileEncode({ pubkey, relays: PAYMENT_RELAYS.slice(0, 3) });
+          // The signer key is the profile's Nostr identity (NostrKeysProvider
+          // → setSignerKey), so this nprofile IS the profile npub. The npub
+          // prefix is logged (public identity) so device logs can be checked
+          // against the profile screen directly.
+          cashuLog.info('cashu.creq.transport.identity', {
+            npubPrefix: nip19.npubEncode(pubkey).slice(0, 12),
+            relayCount: Math.min(PAYMENT_RELAYS.length, 3),
+          });
           return {
             type: PaymentRequestTransportType.NOSTR,
             target,
