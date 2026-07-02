@@ -20,6 +20,7 @@ import type { FormattedString } from 'wallet';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
 import { ReceivePaymentRequestTab } from '@/features/receive/components/ReceivePaymentRequestTab';
+import { ReceiveUnifiedTab } from '@/features/receive/components/ReceiveUnifiedTab';
 import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
 import { Section } from '@/shared/ui/composed/Section';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
@@ -401,6 +402,9 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
               </TabPane>
               <TabPane visible={selectedTab === 'Cashu'}>
                 <ReceivePaymentRequestTab unit={unit} walletContext={walletContext} muted={muted} />
+              </TabPane>
+              <TabPane visible={selectedTab === 'BIP321'}>
+                <ReceiveUnifiedTab unit={unit} walletContext={walletContext} muted={muted} />
               </TabPane>
               {quickAccessP2PK && (
                 <TabPane visible={selectedTab === 'P2PK'}>

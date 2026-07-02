@@ -31,6 +31,9 @@ jest.mock('@/features/receive/components/ReceiveReusableQuoteTab', () => ({
 jest.mock('@/features/receive/components/ReceivePaymentRequestTab', () => ({
   ReceivePaymentRequestTab: () => null,
 }));
+jest.mock('@/features/receive/components/ReceiveUnifiedTab', () => ({
+  ReceiveUnifiedTab: () => null,
+}));
 
 jest.mock('@/shared/lib/logger', () => ({
   paymentLog: {

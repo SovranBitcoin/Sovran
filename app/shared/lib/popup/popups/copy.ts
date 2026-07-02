@@ -11,6 +11,10 @@ const COPY_CONFIGS = {
     title: 'Payment Request Copied',
     text: 'Payment request has been copied to your clipboard.',
   },
+  bip321: {
+    title: 'Bitcoin URI Copied',
+    text: 'Unified BIP-321 payment URI has been copied to your clipboard.',
+  },
   lightningInvoice: {
     title: 'Lightning Invoice Copied',
     text: 'Lightning invoice has been copied to your clipboard.',

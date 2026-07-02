@@ -40,6 +40,9 @@ export interface StandingPaymentRequest {
   /** Amountless encoding for display/QR (coco's own encodedRequest carries
    *  the 1-unit floor workaround). */
   encodedRequest: string;
+  /** Same amountless request in bech32m creqB — the encoding NUT-26's
+   *  BIP-321 integration expects for the `creq` URI key. */
+  encodedRequestB: string;
   mints: string[];
   unit: string;
 }
@@ -53,7 +56,10 @@ function generateRequestId(): string {
 }
 
 /** Re-encode coco's request without the floor amount for display. */
-function toAmountlessEncoding(encodedRequest: string): string {
+function toAmountlessEncodings(encodedRequest: string): {
+  encodedRequest: string;
+  encodedRequestB: string;
+} {
   const decoded = decodePaymentRequest(encodedRequest);
   const display = new PaymentRequest(
     decoded.transport,
@@ -64,7 +70,19 @@ function toAmountlessEncoding(encodedRequest: string): string {
     decoded.description,
     false, // singleUse
   );
-  return display.toEncodedRequest();
+  const encodedA = display.toEncodedRequest();
+  let encodedB = encodedA;
+  try {
+    // creqB TLV-encodes the transport target (validates the nprofile);
+    // NUT-18 accepts creqA everywhere, so fall back to it if B encoding
+    // rejects the transport.
+    encodedB = display.toEncodedCreqB();
+  } catch (error) {
+    logger.warn("creq.standing.creqb_encode_failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+  return { encodedRequest: encodedA, encodedRequestB: encodedB };
 }
 
 type IncomingOp = Awaited<
@@ -75,7 +93,7 @@ function toStanding(operation: IncomingOp): StandingPaymentRequest {
   return {
     operationId: operation.id,
     requestId: operation.requestId,
-    encodedRequest: toAmountlessEncoding(operation.encodedRequest),
+    ...toAmountlessEncodings(operation.encodedRequest),
     mints: operation.mints,
     unit: operation.unit,
   };

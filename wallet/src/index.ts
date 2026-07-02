@@ -261,8 +261,10 @@ export { resolveNext } from "./machine/resolveNext";
 export { parsePaymentInput, isBip321 } from "./parse";
 export {
   buildBip321OnchainUri,
+  buildUnifiedBip321Uri,
   formatSatsAsBtcAmount,
   type BuildBip321OnchainUriOptions,
+  type BuildUnifiedBip321UriInput,
 } from "./bip321";
 export { resolveIntent } from "./intent";
 export {

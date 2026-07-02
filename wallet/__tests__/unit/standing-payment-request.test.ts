@@ -5,6 +5,7 @@ import {
   decodePaymentRequest,
 } from "@cashu/cashu-ts";
 import type { Manager } from "@cashu/coco-core";
+import { nip19 } from "nostr-tools";
 
 import {
   ensureStandingPaymentRequest,
@@ -21,7 +22,7 @@ function encodedFixture(requestId: string): string {
     [
       {
         type: PaymentRequestTransportType.NOSTR,
-        target: "nprofile1example",
+        target: nip19.nprofileEncode({ pubkey: "ee".repeat(32) }),
         tags: [["n", "17"]],
       },
     ],
@@ -117,6 +118,9 @@ describe("ensureStandingPaymentRequest", () => {
     expect(display.id).toBe("req-1");
     expect(display.mints).toEqual(MINTS);
     expect(display.transport?.[0]?.type).toBe("nostr");
+    // creqB twin for the BIP-321 `creq` key (NUT-26 integration).
+    expect(standing.encodedRequestB.startsWith("CREQB")).toBe(true);
+    expect(decodePaymentRequest(standing.encodedRequestB).id).toBe("req-1");
     // The durable coco op keeps its floor — only the DISPLAY drops it.
     // (cashu-ts v4 decodes amounts as Amount value objects.)
     expect(
@@ -143,15 +147,13 @@ describe("ensureStandingPaymentRequest", () => {
       operation({ state: "cancelled" }),
       operation({ singleUse: true }),
     ]) {
-      const create = vi
-        .fn()
-        .mockResolvedValue(
-          operation({
-            id: "op-2",
-            requestId: "req-2",
-            encodedRequest: encodedFixture("req-2"),
-          }),
-        );
+      const create = vi.fn().mockResolvedValue(
+        operation({
+          id: "op-2",
+          requestId: "req-2",
+          encodedRequest: encodedFixture("req-2"),
+        }),
+      );
       const manager = mockManager({
         get: vi.fn().mockResolvedValue(recorded),
         create,
@@ -173,15 +175,13 @@ describe("ensureStandingPaymentRequest", () => {
 describe("rotateStandingPaymentRequest", () => {
   it("cancels the recorded op and records a fresh one with a new request id", async () => {
     const cancel = vi.fn().mockResolvedValue(operation({ state: "cancelled" }));
-    const create = vi
-      .fn()
-      .mockResolvedValue(
-        operation({
-          id: "op-2",
-          requestId: "req-2",
-          encodedRequest: encodedFixture("req-2"),
-        }),
-      );
+    const create = vi.fn().mockResolvedValue(
+      operation({
+        id: "op-2",
+        requestId: "req-2",
+        encodedRequest: encodedFixture("req-2"),
+      }),
+    );
     const manager = mockManager({ cancel, create });
     const store = memoryStore({ [KEY]: "op-1" });
 

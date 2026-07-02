@@ -1,4 +1,4 @@
-type ReceiveTab = 'Lightning' | 'BOLT 12' | 'Onchain' | 'Cashu' | 'P2PK';
+type ReceiveTab = 'Lightning' | 'BOLT 12' | 'Onchain' | 'Cashu' | 'BIP321' | 'P2PK';
 
 /**
  * Amountless receive rails. Bolt12/Onchain are ALWAYS shown: when no trusted
@@ -8,7 +8,7 @@ type ReceiveTab = 'Lightning' | 'BOLT 12' | 'Onchain' | 'Cashu' | 'P2PK';
  * P2PK keeps its quickAccessP2PK setting gate.
  */
 export function computeReceiveTabs(quickAccessP2PK: boolean): ReceiveTab[] {
-  const tabs: ReceiveTab[] = ['Lightning', 'BOLT 12', 'Onchain', 'Cashu'];
+  const tabs: ReceiveTab[] = ['Lightning', 'BOLT 12', 'Onchain', 'Cashu', 'BIP321'];
   if (quickAccessP2PK) tabs.push('P2PK');
   return tabs;
 }
