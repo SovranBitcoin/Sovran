@@ -108,16 +108,13 @@ function mapMeltOperationState(state: string): string {
   return "UNPAID";
 }
 
-function requireSatUnit(unit: string | undefined): "sat" {
-  if (unit == null || unit === "sat") return "sat";
-  throw new Error(`Unsupported unit ${unit}; only sat is supported`);
-}
-
 // ---------------------------------------------------------------------------
 // Synthetic history-entry builders — used when coco's history row hasn't
 // been persisted yet (race) or when we need to thread token data through
-// the entry. Shapes mirror coco-core's SendHistoryEntry / MintHistoryEntry
-// so consumers downstream see the same field set as a DB-backed row.
+// the entry. Shapes mirror coco-core's history entries EXCEPT amounts:
+// colada's JSON history contract carries plain numbers, so coco v2 Amount
+// value objects are converted here (once, at the boundary) and never
+// serialized — a raw Amount would JSON.stringify to a quoted string.
 // ---------------------------------------------------------------------------
 
 interface SendOperationLike {
@@ -126,18 +123,50 @@ interface SendOperationLike {
   updatedAt?: number;
   mintUrl: string;
   amount: AmountLike;
+  unit?: string;
+}
+
+interface SyntheticSendEntry {
+  id: string;
+  type: "send";
+  createdAt: number;
+  mintUrl: string;
+  unit: string;
+  state: "pending";
+  amount: number;
+  operationId: string;
+  token: CoreToken;
+  metadata: { operationId: string };
+}
+
+/**
+ * Send entry re-parsed from colada's JSON history contract — amounts are
+ * serialized (number in synthetic entries; string when a coco v2 Amount was
+ * stringified upstream), so this is deliberately NOT coco's SendHistoryEntry.
+ */
+interface ParsedSendEntry {
+  id: string;
+  type: "send";
+  createdAt: number;
+  mintUrl: string;
+  unit: string;
+  state: string;
+  amount: number | string;
+  operationId?: string;
+  token?: CoreToken;
+  metadata?: Record<string, unknown>;
 }
 
 function buildSyntheticSendEntry(
   operation: SendOperationLike,
   token: CoreToken,
-): SendHistoryEntry {
+): SyntheticSendEntry {
   return {
     id: operation.id,
     type: "send",
     createdAt: operation.createdAt,
     mintUrl: operation.mintUrl,
-    unit: "sat",
+    unit: operation.unit ?? "sat",
     state: "pending",
     amount: amountToNumber(operation.amount),
     operationId: operation.id,
@@ -396,7 +425,11 @@ export function createDefaultOperations(
       logger.info("operations.executeSend.execute", {
         operationId: prepared.id,
       });
-      const { operation, token } = await mgr.ops.send.execute(prepared.id);
+      // v2 persists the memo on the executed token (whitespace-only ignored);
+      // applyTokenMemo keeps the local copy consistent for synthetic entries.
+      const { operation, token } = await mgr.ops.send.execute(prepared.id, {
+        memo: normalizeMemo(memo),
+      });
       const tokenWithMemo = applyTokenMemo(token, memo);
       logger.info("operations.executeSend.complete", {
         operationId: operation.id,
@@ -458,7 +491,9 @@ export function createDefaultOperations(
         throw new Error("Offline send requires exact proof match");
       }
 
-      const { operation, token } = await mgr.ops.send.execute(prepared.id);
+      const { operation, token } = await mgr.ops.send.execute(prepared.id, {
+        memo: normalizeMemo(memo),
+      });
       const tokenWithMemo = applyTokenMemo(token, memo);
       logger.info("operations.executeOfflineSend.complete", {
         operationId: operation.id,
@@ -491,38 +526,50 @@ export function createDefaultOperations(
 
     executeMintQuote: async (mintUrl, amount, _unit, method = "bolt11") => {
       const mgr = requireManager();
+      const unit = _unit || "sat";
       logger.info("operations.executeMintQuote.prepare", {
         ...mintUrlFields(mintUrl),
         amount,
         method,
+        unit,
       });
-      if (method === "onchain") {
-        logger.warn("operations.executeMintQuote.onchainUnsupported", {
-          ...mintUrlFields(mintUrl),
-          amount,
-          method,
-        });
-        throw new Error(
-          "Onchain mint quotes are not supported by @cashu/coco-core 1.0.1",
-        );
-      }
 
-      const mintOp = await mgr.ops.mint.prepare({
-        mintUrl,
-        amount,
-        method: "bolt11",
-        unit: requireSatUnit(_unit),
-        methodData: {},
+      // v2 quote-first: create the canonical quote row (remote quote happens
+      // here), then prepare the durable mint operation against it. Onchain
+      // quotes are reusable and get a FRESH address per create() — the
+      // fixed-amount receive path relies on that for payment attribution.
+      const quote =
+        method === "onchain"
+          ? await mgr.quotes.mint.create({ mintUrl, method: "onchain", unit })
+          : await mgr.quotes.mint.create({
+              mintUrl,
+              method: "bolt11",
+              amount: { amount, unit },
+            });
+      logger.info("operations.executeMintQuote.quoteCreated", {
+        ...mintUrlFields(mintUrl),
+        quoteId: quote.quoteId,
+        method,
+        unit: quote.unit,
+        reusable: quote.reusable,
+        requestLength: quote.request.length,
       });
+
+      // Reusable (onchain) quotes derive nothing from the quote amount —
+      // the operation amount must be explicit in v2.
+      const mintOp = await mgr.ops.mint.prepare({ quote, amount });
       logger.info("operations.executeMintQuote.created", {
         operationId: mintOp.id,
         quoteId: mintOp.quoteId,
-        state: mintOp.lastObservedRemoteState ?? "UNPAID",
+        method,
+        state: quote.state ?? "UNPAID",
         unit: mintOp.unit,
       });
 
       // Build entry directly from the operation result to avoid a race
-      // where getPaginatedHistory runs before HistoryService persists the row.
+      // where getPaginatedHistory runs before HistoryService persists the
+      // row. State uses the legacy quote-state family; the read-model
+      // normalizer treats it interchangeably with v2 operation states.
       const entry = {
         id: mintOp.id,
         type: "mint" as const,
@@ -531,9 +578,9 @@ export function createDefaultOperations(
         mintUrl: mintOp.mintUrl,
         unit: mintOp.unit,
         quoteId: mintOp.quoteId,
-        state: mintOp.lastObservedRemoteState ?? ("UNPAID" as const),
-        amount: mintOp.amount,
-        paymentRequest: mintOp.request,
+        state: quote.state ?? ("UNPAID" as const),
+        amount: amountToNumber(mintOp.amount),
+        paymentRequest: quote.request,
         metadata: { operationId: mintOp.id },
       };
       return { historyEntry: JSON.stringify(entry) };
@@ -964,13 +1011,14 @@ export function createDefaultOperations(
 
     executeMelt: async (mintUrl, meltTarget, amount, _unit) => {
       const mgr = requireManager();
-      requireSatUnit(_unit);
+      const unit = _unit || "sat";
       const targetKind = isLightningInvoiceBolt11(meltTarget)
         ? "bolt11"
         : "lnurl";
       logger.info("operations.executeMelt.start", {
         ...mintUrlFields(mintUrl),
         amount,
+        unit,
         targetKind,
         targetLength: meltTarget.length,
       });
@@ -988,11 +1036,19 @@ export function createDefaultOperations(
         invoiceLength: bolt11.length,
       });
 
-      const operation = await mgr.ops.melt.prepare({
+      // v2 quote-first: canonical melt quote row, then the durable operation.
+      const quote = await mgr.quotes.melt.create({
         mintUrl,
         method: "bolt11",
         methodData: { invoice: bolt11 },
+        unit,
       });
+      logger.info("operations.executeMelt.quoteCreated", {
+        ...mintUrlFields(mintUrl),
+        quoteId: quote.quoteId,
+        unit,
+      });
+      const operation = await mgr.ops.melt.prepare({ quote });
       logger.info("operations.executeMelt.execute", {
         operationId: operation.id,
         quoteId: operation.quoteId,
@@ -1371,15 +1427,15 @@ export function createDefaultOperations(
         operationId,
         found: !!historyEntry,
       });
-      const baseEntry: SendHistoryEntry = historyEntry
+      const baseEntry: ParsedSendEntry = historyEntry
         ? // findSendHistoryEntryByOperationId only returns 'send' rows, so the
           // narrow is safe; the cast is a pragmatic alternative to re-running
           // the type guard inside parseHistoryEntryOnce's loose return.
-          ((parseHistoryEntryOnce(historyEntry) as SendHistoryEntry | null) ??
+          ((parseHistoryEntryOnce(historyEntry) as ParsedSendEntry | null) ??
           buildSyntheticPaymentRequestEntry(operationId, mintUrl, amount))
         : buildSyntheticPaymentRequestEntry(operationId, mintUrl, amount);
       // Enrich with transport metadata so the screen can show progress
-      const enriched: SendHistoryEntry = {
+      const enriched: ParsedSendEntry = {
         ...baseEntry,
         operationId: baseEntry.operationId ?? operationId,
         metadata: {
@@ -1498,7 +1554,7 @@ function buildSyntheticPaymentRequestEntry(
   operationId: string,
   mintUrl: string,
   amount: number,
-): SendHistoryEntry {
+): Omit<SyntheticSendEntry, "token" | "metadata"> {
   const now = Date.now();
   return {
     id: operationId,

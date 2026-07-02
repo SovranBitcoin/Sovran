@@ -9,12 +9,13 @@
 import {
   getDecodedToken,
   getP2PKExpectedWitnessPubkeys,
-  getP2PKNSigs,
   parseP2PKSecret,
+  type Secret,
 } from "@cashu/cashu-ts";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
+import { amountToNumber } from "../amount";
 import { logger, mintUrlFields } from "../logger";
 
 /**
@@ -40,6 +41,18 @@ export interface ClassifiedMeshToken {
   /** Sum of proof amounts (mint units). */
   amount: number;
   unit: string | null;
+}
+
+/**
+ * NUT-11 required-signature count from a parsed P2PK secret. cashu-ts 4.x
+ * removed the getP2PKNSigs helper; the `n_sigs` tag defaults to 1 (single
+ * sig) when absent or malformed.
+ */
+function getP2PKRequiredSigs(secret: Secret): number {
+  const tags = secret[1]?.tags ?? [];
+  const nSigs = tags.find((tag) => tag[0] === "n_sigs")?.[1];
+  const parsed = Number(nSigs ?? 1);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
 /**
@@ -69,7 +82,10 @@ export function classifyMeshToken(
   });
 
   try {
-    const token = getDecodedToken(tokenString);
+    // No mint keysets available on the mesh path: pass an empty keyset list.
+    // Standard (v0) keyset IDs decode fine; a short v2 keyset ID throws and
+    // the token classifies as `invalid` — we can't verify locks we can't parse.
+    const token = getDecodedToken(tokenString, []);
     mintUrl = token.mint ?? null;
     unit = token.unit ?? null;
     if (!Array.isArray(token.proofs) || token.proofs.length === 0) {
@@ -88,7 +104,7 @@ export function classifyMeshToken(
     }
 
     for (const proof of token.proofs) {
-      amount += proof.amount;
+      amount += amountToNumber(proof.amount);
       let secret: ReturnType<typeof parseP2PKSecret>;
       try {
         secret = parseP2PKSecret(proof.secret);
@@ -104,7 +120,7 @@ export function classifyMeshToken(
       }
       p2pkCount += 1;
       try {
-        if (getP2PKNSigs(secret) > 1) continue; // multisig — never "mine"
+        if (getP2PKRequiredSigs(secret) > 1) continue; // multisig — never "mine"
         const expected = getP2PKExpectedWitnessPubkeys(secret).map((k) =>
           k.toLowerCase(),
         );

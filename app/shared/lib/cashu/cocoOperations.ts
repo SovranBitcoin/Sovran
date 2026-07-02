@@ -12,35 +12,35 @@ function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, un
 type PreparedBolt11MintOperation = Awaited<ReturnType<Manager['ops']['mint']['prepare']>>;
 type PreparedBolt11MeltOperation = Awaited<ReturnType<Manager['ops']['melt']['prepare']>>;
 
-function requireSatUnit(unit?: string): 'sat' {
-  if (unit != null && unit !== 'sat') {
-    cashuLog.warn('coco.operations.unit.unsupported', { unit });
-    throw new Error(`@cashu/coco-core 1.0.1 only supports sat-denominated operations`);
-  }
-  cashuLog.debug('coco.operations.unit.ok', { unit: unit ?? 'sat' });
-  return 'sat';
-}
-
+/**
+ * v2 quote-first bolt11 mint: create the canonical quote row (remote quote
+ * happens here), then prepare the durable operation against it.
+ */
 export async function prepareBolt11MintQuote(
   manager: Manager,
   mintUrl: string,
   amount: number,
-  unit?: string
+  unit = 'sat'
 ): Promise<PreparedBolt11MintOperation> {
   cashuLog.info('coco.operations.mint.prepare.start', {
     ...mintUrlLogFields(mintUrl),
     amount,
-    unit: unit ?? 'sat',
+    unit,
     method: 'bolt11',
   });
   try {
-    const operation = await manager.ops.mint.prepare({
+    const quote = await manager.quotes.mint.create({
       mintUrl,
-      amount,
-      unit: requireSatUnit(unit),
       method: 'bolt11',
-      methodData: {},
+      amount: { amount, unit },
     });
+    cashuLog.info('coco.operations.mint.quote_created', {
+      ...mintUrlLogFields(mintUrl),
+      quoteId: quote.quoteId,
+      unit: quote.unit,
+      method: 'bolt11',
+    });
+    const operation = await manager.ops.mint.prepare({ quote, amount });
     cashuLog.info('coco.operations.mint.prepare.done', {
       ...mintUrlLogFields(mintUrl),
       amount,
@@ -58,10 +58,15 @@ export async function prepareBolt11MintQuote(
   }
 }
 
+/**
+ * v2 quote-first bolt11 melt: create the canonical melt quote row, then
+ * prepare the durable operation (reserves proofs, computes fees) against it.
+ */
 export async function prepareBolt11MeltQuote(
   manager: Manager,
   mintUrl: string,
-  invoice: string
+  invoice: string,
+  unit = 'sat'
 ): Promise<PreparedBolt11MeltOperation> {
   cashuLog.info('coco.operations.melt.prepare.start', {
     ...mintUrlLogFields(mintUrl),
@@ -69,11 +74,18 @@ export async function prepareBolt11MeltQuote(
     invoiceLength: invoice.length,
   });
   try {
-    const operation = await manager.ops.melt.prepare({
+    const quote = await manager.quotes.melt.create({
       mintUrl,
       method: 'bolt11',
       methodData: { invoice },
+      unit,
     });
+    cashuLog.info('coco.operations.melt.quote_created', {
+      ...mintUrlLogFields(mintUrl),
+      quoteId: quote.quoteId,
+      method: 'bolt11',
+    });
+    const operation = await manager.ops.melt.prepare({ quote });
     cashuLog.info('coco.operations.melt.prepare.done', {
       ...mintUrlLogFields(mintUrl),
       method: 'bolt11',
