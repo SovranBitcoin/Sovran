@@ -185,6 +185,61 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
       count: rows.length,
       mintCount: new Set(rows.map(({ q }) => q.mintUrl)).size,
     });
+
+    // TEMP DEBUG (dev metro console only — full addresses stay out of the
+    // structured/redacted log stream): every onchain address coco knows
+    // about, from BOTH stores, diffed against the menu's pending-quote list.
+    // The quotes table is upserted by (mintUrl, method, quoteId) — a mint
+    // reusing a quote id OVERWRITES the stored request — while mint
+    // operations keep the request snapshot they were created with, so
+    // operation history can surface addresses the quotes table has lost.
+    if (__DEV__) {
+      const looksOnchain = (addr: string) => /^(bc1|tb1|bcrt1|[13])[a-z0-9]+$/i.test(addr);
+      const bareAddress = (req: string) =>
+        req.startsWith('bitcoin:') ? req.slice('bitcoin:'.length).split('?')[0] : req;
+      const opAddresses = new Map<string, { quoteId?: string; state?: string }[]>();
+      const PAGE = 200;
+      for (let offset = 0; ; offset += PAGE) {
+        const page = await manager.history.getPaginatedHistory(offset, PAGE);
+        for (const entry of page) {
+          if (entry.type !== 'mint') continue;
+          const e = entry as { paymentRequest?: string; quoteId?: string; state?: string };
+          const addr = e.paymentRequest ? bareAddress(e.paymentRequest) : null;
+          if (!addr || !looksOnchain(addr)) continue;
+          const list = opAddresses.get(addr) ?? [];
+          list.push({ quoteId: e.quoteId, state: e.state });
+          opAddresses.set(addr, list);
+        }
+        if (page.length < PAGE) break;
+      }
+      const quoteAddresses = new Map(rows.map(({ q }) => [bareAddress(q.request), q]));
+      /* eslint-disable no-console */
+      console.log(
+        `[onchain-debug] quotes table: ${quoteAddresses.size} address(es), ` +
+          `operation snapshots: ${opAddresses.size} address(es)`
+      );
+      for (const [addr, q] of quoteAddresses) {
+        console.log(
+          `[onchain-debug] quote ${addr} id=${q.quoteId} ` +
+            `created=${new Date(q.createdAt).toISOString()} ` +
+            `updated=${new Date(q.updatedAt).toISOString()}`
+        );
+      }
+      for (const [addr, entries] of opAddresses) {
+        console.log(
+          `[onchain-debug] op    ${addr} entries=${entries.length} ` +
+            `states=${entries.map((e) => e.state).join(',')} ` +
+            `inMenu=${quoteAddresses.has(addr)}`
+        );
+      }
+      const onlyInOps = [...opAddresses.keys()].filter((a) => !quoteAddresses.has(a));
+      console.log(
+        `[onchain-debug] addresses ONLY in operation history (lost from quotes table): ` +
+          `${onlyInOps.length}`,
+        onlyInOps
+      );
+      /* eslint-enable no-console */
+    }
     actionMenuSheet({
       title: `Onchain addresses (${rows.length})`,
       buttons: rows.map(({ q, ops }) => {
