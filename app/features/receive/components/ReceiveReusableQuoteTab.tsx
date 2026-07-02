@@ -15,7 +15,6 @@ import { ListGroup, PressableFeedback } from 'heroui-native';
 import {
   getMintMethodCapability,
   buildBip321OnchainUri,
-  reusableQuoteKey,
   type ReusableQuoteIdentityStore,
   type WalletContext,
 } from 'wallet';
@@ -38,6 +37,7 @@ import { copyPopup, staticPopup } from '@/shared/lib/popup';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { getMintDisplayName } from '@/shared/lib/url';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import Icon from 'assets/icons';
@@ -161,41 +161,46 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     await rotate();
   }, [cooldownUntil, rotate]);
 
-  // TEMP debug surface: every pending onchain quote for this mint, annotated
-  // standing vs fixed-amount (fixed-amount quotes carry a prepared mint
-  // OPERATION with the requested amount; the standing quote has no operation
-  // until a deposit lands — the internal difference that keeps them out of
-  // pending history, which only projects operations).
+  // TEMP debug surface: EVERY pending onchain quote in this profile's coco
+  // DB, across all mints. coco stores no origin tag — both the standing
+  // rail and the fixed-amount flow call the same quotes.mint.create — so the
+  // distinctions here are app-derived: "standing" = the id recorded in the
+  // identity map (any mint), and fixed-amount quotes carry a prepared mint
+  // OPERATION with the requested amount (the thing history projects), while
+  // standing quotes have no operation until a deposit lands. coco never
+  // expires or GCs these rows; only ISSUED bolt11 quotes leave listPending.
   const openDebugAddresses = useCallback(async () => {
-    if (!methodMint) return;
     const pending = await manager.quotes.mint.listPending({ method: 'onchain' });
-    const standingId =
-      useMintStore.getState().standingQuotes[
-        reusableQuoteKey({ mintUrl: methodMint, method: 'onchain', unit })
-      ];
+    const standingIds = new Set(Object.values(useMintStore.getState().standingQuotes));
+    const nowSeconds = Math.floor(Date.now() / 1000);
     const rows = await Promise.all(
-      pending
-        .filter((q) => q.mintUrl === methodMint)
+      [...pending]
         .sort((a, b) => b.createdAt - a.createdAt)
         .map(async (q) => ({
           q,
           ops: await manager.ops.mint.listByQuote({ mintUrl: q.mintUrl, quoteId: q.quoteId }),
         }))
     );
-    paymentLog.info('receive.onchain.debug_addresses_opened', { count: rows.length });
+    paymentLog.info('receive.onchain.debug_addresses_opened', {
+      count: rows.length,
+      mintCount: new Set(rows.map(({ q }) => q.mintUrl)).size,
+    });
     actionMenuSheet({
       title: `Onchain addresses (${rows.length})`,
       buttons: rows.map(({ q, ops }) => {
-        const isStanding = q.quoteId === standingId;
+        const isStanding = standingIds.has(q.quoteId);
+        const isExpired = q.expiry != null && q.expiry > 0 && q.expiry <= nowSeconds;
         const data = q.quoteData as { amountPaid?: unknown; amountIssued?: unknown };
         const paid = data.amountPaid != null ? amountToNumber(data.amountPaid as never) : 0;
         const lastOp = ops.at(-1) as { amount?: unknown } | undefined;
         const opAmount = lastOp?.amount != null ? amountToNumber(lastOp.amount as never) : null;
         const parts = [
-          isStanding ? 'standing' : 'fixed-amount',
+          getMintDisplayName(q.mintUrl, null),
+          isStanding ? 'standing' : ops.length > 0 ? 'fixed-amount' : 'orphan',
           ...(opAmount != null ? [`${opAmount} ${q.unit}`] : []),
           `ops ${ops.length}`,
           ...(paid > 0 ? [`paid ${paid}`] : []),
+          ...(isExpired ? ['expired'] : []),
           new Date(q.createdAt).toLocaleString(),
         ];
         return {
@@ -209,7 +214,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
         };
       }),
     });
-  }, [manager, methodMint, unit, accent]);
+  }, [manager, accent]);
 
   const handleCopy = useCallback(async () => {
     if (!request) return;
