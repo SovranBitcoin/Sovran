@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Keyboard } from 'react-native';
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
-import { getModels, type RoutstrModel } from '@/shared/lib/routstr/api';
+import { checkBalance, getModels, type RoutstrModel } from '@/shared/lib/routstr/api';
 import { modelPickerPopup } from '@/shared/lib/popup';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -62,6 +62,33 @@ export function ModelChip() {
   const lineupSource = sessionLineup ? 'live' : lastKnownLineup ? 'persisted' : 'empty';
 
   const [models, setModels] = useState<RoutstrModel[]>(cachedModels ?? []);
+
+  // Balance self-heal on mount. The only other refresh point is the
+  // post-stream diff in `useAiSend`, which a 402 never reaches — so a
+  // drained key would otherwise leave the persisted balance stale
+  // indefinitely and every affordability gate lying (observed: UI at 299
+  // sats vs 0.2 sats actually available → endless insufficient-balance
+  // popups). One fetch per chip mount keeps the pill and picker honest.
+  const apiKey = useRoutstrStore((s) => s.apiKey);
+  const setBalance = useRoutstrStore((s) => s.setBalance);
+  useEffect(() => {
+    if (!apiKey) return;
+    let cancelled = false;
+    checkBalance(apiKey)
+      .then((data) => {
+        if (!cancelled) setBalance(data.balance);
+      })
+      .catch(() => {
+        // Silent — offline keeps the last-known balance, same policy as
+        // the models fetch below.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Mount-only: one refresh per AI-tab session, not per keystroke of
+    // dependent state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (cachedModels && !isCacheStale()) {

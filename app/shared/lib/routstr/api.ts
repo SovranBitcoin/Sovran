@@ -231,6 +231,21 @@ function getUserFriendlyErrorMessage(status: number, errorData: ParsedErrorData)
 }
 
 /**
+ * Lazy store access. A static import would create an api ↔ store cycle
+ * (the store imports this module's types and the shared lineup), so the
+ * store is resolved at call time — via `require` rather than a dynamic
+ * `import()` because Metro handles both but Jest's CJS VM can only
+ * execute the former, and the 401/402 branches below are exactly the
+ * paths that need regression tests.
+ */
+function routstrStoreState() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { useRoutstrStore } =
+    require('@/shared/stores/profile/routstrStore') as typeof import('@/shared/stores/profile/routstrStore');
+  return useRoutstrStore.getState();
+}
+
+/**
  * Throw a typed RoutstrError from a failed fetch Response.
  * Shared by all API functions to avoid duplicating the parse → format → throw chain.
  */
@@ -246,10 +261,25 @@ async function throwResponseError(response: Response): Promise<never> {
 
   // 401 with expired/spent key — clear stored API key so user can re-authenticate
   if (status === 401) {
-    const { useRoutstrStore } = await import('@/shared/stores/profile/routstrStore');
     apiLog.warn('api.routstr.api_key_expired');
-    useRoutstrStore.getState().clearApiKey();
-    useRoutstrStore.getState().clearBalance();
+    routstrStoreState().clearApiKey();
+    routstrStoreState().clearBalance();
+  }
+
+  // 402 carries the server's true available balance ("X mSats required …
+  // Y available") — sync it into the store. The local balance otherwise
+  // only refreshes after a SUCCESSFUL stream, so a drained (or
+  // reservation-held) key leaves the UI gating sends against a stale
+  // figure forever: every affordability check passes client-side, every
+  // send 402s, and the insufficient-balance popup loops. Syncing here
+  // makes the balance pill, picker fades, and estimates truthful the
+  // moment the server disagrees.
+  if (status === 402) {
+    const available = errorData.details?.available;
+    if (typeof available === 'number' && isFinite(available) && available >= 0) {
+      apiLog.info('api.routstr.balance_synced_from_402', { availableMsats: available });
+      routstrStoreState().setBalance(available);
+    }
   }
 
   throw {
