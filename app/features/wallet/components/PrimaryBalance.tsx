@@ -274,12 +274,15 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   return (
     <Log name="PrimaryBalance">
       <VStack align="center" gap={BALANCE_SECTION_GAP} className="z-9">
-        <HStack align="center" gap={8}>
+        <VStack align="center" gap={8}>
+          {/* Wallet unit above the fiat display-currency pill: the unit is
+              the structural choice (what the balance IS), the currency pill
+              only re-prices it. */}
+          <UnitSwitcherPill textSize={12} />
           {/* Fiat conversion of a sat balance is meaningless when the wallet
               is already denominated in a fiat unit — structurally hide it. */}
           {isSatUnit ? <FiatCurrencyPill displayText={displayText} textSize={12} /> : null}
-          <UnitSwitcherPill textSize={12} />
-        </HStack>
+        </VStack>
         <Pressable onPress={toggleUnit} style={styles.balancePressable}>
           <AmountFormatter
             amount={balance}
