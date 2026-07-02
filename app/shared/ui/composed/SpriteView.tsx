@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet } from 'react-native';
+import { Animated, StyleSheet, useWindowDimensions } from 'react-native';
 import { retainWallpaperMotion, wallpaperMotion } from '@/shared/lib/theme/wallpaperMotion';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Image } from '@/shared/ui/primitives/Image';
@@ -62,12 +62,24 @@ function describeImageLoadError(event: unknown): string {
   return String(event ?? 'unknown');
 }
 
+/**
+ * Wallpaper render quality: the image is laid out at this fraction of the
+ * screen and GPU-upscaled to cover it, so expo-image DECODES at the reduced
+ * resolution (decode follows layout size with allowDownscaling). 0.7 cuts
+ * decoded-bitmap memory roughly in half per layer (the account carousel
+ * pre-mounts several) and is visually imperceptible under the 1.18 parallax
+ * overscan. Raise toward 1 if a wallpaper ever looks soft.
+ */
+const WALLPAPER_RENDER_SCALE = 0.7;
+const PARALLAX_OVERSCAN = 1.18;
+
 const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
   backgroundColor,
   themeName,
   motionEnabled = true,
   imageTransitionMs,
 }: AnimatedSpriteBackgroundProps) {
+  const window = useWindowDimensions();
   const ctxTheme = useTheme();
   const activeTheme = themeName ?? ctxTheme.currentTheme;
   const backgroundImageSource = backgroundImageThemes[activeTheme];
@@ -144,12 +156,21 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
         ]}>
         <Image
           source={backgroundImageSource}
-          // Decode capped at the view's size (full-screen), never the asset's
-          // native resolution — explicit so a primitive-default change can't
-          // silently start decoding 4K wallpapers.
+          // Decode capped at the view's LAYOUT size, never the asset's native
+          // resolution — and the layout is deliberately sub-screen
+          // (WALLPAPER_RENDER_SCALE), upscaled on the GPU to cover.
           allowDownscaling
           {...(imageTransitionMs !== undefined ? { transition: imageTransitionMs } : {})}
-          style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.18 }] }]}
+          style={[
+            {
+              position: 'absolute',
+              width: window.width * WALLPAPER_RENDER_SCALE,
+              height: window.height * WALLPAPER_RENDER_SCALE,
+              left: (window.width * (1 - WALLPAPER_RENDER_SCALE)) / 2,
+              top: (window.height * (1 - WALLPAPER_RENDER_SCALE)) / 2,
+              transform: [{ scale: PARALLAX_OVERSCAN / WALLPAPER_RENDER_SCALE }],
+            },
+          ]}
           onLoad={() => {
             log.info('bg.sprite.image_loaded', {
               theme: activeTheme,
