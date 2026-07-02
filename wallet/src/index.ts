@@ -239,6 +239,13 @@ export { isMeltUserCancelledError, MeltUserCancelledError } from "./errors";
 
 // Reusable mint-quote singleton (standing bolt12 offer / onchain address)
 export {
+  ensureStandingPaymentRequest,
+  rotateStandingPaymentRequest,
+  standingPaymentRequestKey,
+  type StandingPaymentRequest,
+  type StandingPaymentRequestInput,
+} from "./payment-request-receive";
+export {
   ensureReusableMintQuote,
   rotateReusableMintQuote,
   reusableQuoteKey,

@@ -28,6 +28,9 @@ jest.mock('@/shared/providers/WalletContextProvider', () => ({
 jest.mock('@/features/receive/components/ReceiveReusableQuoteTab', () => ({
   ReceiveReusableQuoteTab: () => null,
 }));
+jest.mock('@/features/receive/components/ReceivePaymentRequestTab', () => ({
+  ReceivePaymentRequestTab: () => null,
+}));
 
 jest.mock('@/shared/lib/logger', () => ({
   paymentLog: {

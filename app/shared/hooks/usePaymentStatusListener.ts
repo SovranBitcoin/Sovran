@@ -348,6 +348,32 @@ export function usePaymentStatusListener(): void {
       }
     });
 
+    // NUT-18 payment-request claims arrive silently over Nostr (the transport
+    // plugin ingests DM payloads with no user gesture) — surface the settled
+    // receive, mirroring the standing bolt12/onchain deposit toast above.
+    const offPrReceive = manager.on('receive-op:finalized', ({ mintUrl, operation }) => {
+      const source = (operation as { source?: { type?: string } }).source;
+      if (source?.type !== 'payment-request') return;
+      if (isSwapStatusActive()) return;
+      const op = operation as unknown as { id: string; amount: unknown; unit: string };
+      const amount = amountToNumber(op.amount as never);
+      paymentLog.info('hook.payment_status.payment_request_claimed', {
+        operationId: op.id,
+        ...mintUrlLogFields(mintUrl),
+        amount,
+        unit: op.unit,
+      });
+      usePaymentStatusStore.getState().setActive({
+        variant: 'receive',
+        id: op.id,
+        mintUrl,
+        amount,
+        unit: op.unit,
+        state: 'confirmed',
+      });
+      paymentStatusPopup({ variant: 'receive', id: op.id, mintUrl, amount, unit: op.unit });
+    });
+
     // The receiveEntryId enrichment used to race a 50ms setTimeout against
     // HistoryService.handleReceiveOperationUpdated. Subscribe to the event
     // instead — `history:updated` fires once the entry is persisted, and
@@ -613,6 +639,7 @@ export function usePaymentStatusListener(): void {
       offStateChanged();
       offAdded();
       offRedeemed();
+      offPrReceive();
       offHistoryUpdated();
       offReceiveCreated();
       offSendFinalized();

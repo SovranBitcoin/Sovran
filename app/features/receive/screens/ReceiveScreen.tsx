@@ -19,6 +19,7 @@ import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import type { FormattedString } from 'wallet';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
+import { ReceivePaymentRequestTab } from '@/features/receive/components/ReceivePaymentRequestTab';
 import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
 import { Section } from '@/shared/ui/composed/Section';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
@@ -397,6 +398,9 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                   actions={actions}
                   muted={muted}
                 />
+              </TabPane>
+              <TabPane visible={selectedTab === 'Cashu'}>
+                <ReceivePaymentRequestTab unit={unit} walletContext={walletContext} muted={muted} />
               </TabPane>
               {quickAccessP2PK && (
                 <TabPane visible={selectedTab === 'P2PK'}>

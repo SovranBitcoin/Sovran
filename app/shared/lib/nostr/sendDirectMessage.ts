@@ -33,6 +33,10 @@ const FALLBACK_PAYMENT_RELAYS = [
   'wss://relay.nostr.band',
 ];
 
+/** Publish/advertise relay set for payment DMs — also embedded as the relay
+ *  hints in NUT-18 nostr-transport nprofiles. */
+export const PAYMENT_RELAYS = [DEFAULT_PAYMENT_RELAY, ...FALLBACK_PAYMENT_RELAYS];
+
 /** How long to wait for the first relay OK before failing the publish. */
 const DEFAULT_PUBLISH_TIMEOUT_MS = 15_000;
 

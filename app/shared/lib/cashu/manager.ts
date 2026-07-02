@@ -15,6 +15,7 @@ import {
   hashMnemonic,
 } from '@/shared/lib/nostr/secureStorage';
 import { NPCPlugin, type Signer as NpcSigner } from 'coco-cashu-plugin-npc';
+import { createPaymentRequestNostrTransportPlugin } from '@/shared/lib/cashu/paymentRequestNostrTransport';
 import {
   NPC_BASE_URL,
   NPC_SYNC_INTERVAL_MS,
@@ -505,6 +506,13 @@ export class CocoManager {
               return keys;
             },
           }) as unknown as Plugin,
+          // NUT-18 payment-request receive over Nostr: contributes the
+          // nprofile transport block at create time and polls the gift-wrap
+          // inbox for payloads while any request is active. Same
+          // profile-snapshot key rule as the P2PK import above.
+          createPaymentRequestNostrTransportPlugin({
+            getSignerKey: () => (p2pkImportSecretKey ? new Uint8Array(p2pkImportSecretKey) : null),
+          }),
         ];
         cashuLog.info('cashu.manager.plugins.configured', {
           pluginCount: plugins.length,

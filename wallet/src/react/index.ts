@@ -35,6 +35,10 @@ export {
   useReusableMintQuote,
   type UseReusableMintQuoteResult,
 } from "./useReusableMintQuote";
+export {
+  useStandingPaymentRequest,
+  type UseStandingPaymentRequestResult,
+} from "./useStandingPaymentRequest";
 
 export type {
   BleAdapter,
