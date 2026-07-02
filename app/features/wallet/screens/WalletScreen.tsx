@@ -17,6 +17,7 @@ import { BootEntrance } from '@/shared/ui/composed/BootEntrance';
 import { LayoutDebugWrapper } from '@/shared/ui/composed/LayoutDebugWrapper';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { zIndex } from '@/shared/styles/tokens';
+import { LayoutShiftProbe } from '@/shared/ui/composed/LayoutShiftProbe';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { QRButton } from '@/shared/ui/composed/QRButton';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -176,7 +177,9 @@ export function WalletScreen() {
           <ScrollableGradientOverlay contentHeight={contentHeight} />
 
           <View style={styles.topArea}>
-            <Account minHeight={minBalanceHeight} />
+            <LayoutShiftProbe tag="account-carousel">
+              <Account minHeight={minBalanceHeight} />
+            </LayoutShiftProbe>
 
             <HStack justify="space-around" style={styles.secondaryActions}>
               <CircleActionButton
@@ -270,14 +273,26 @@ export function WalletScreen() {
           </View>
 
           <View style={styles.content}>
-            <Transactions
-              account={ALL_UNITS_ACCOUNT}
-              showMore={true}
-              history={history}
-              hideExpired={true}
-            />
-            <SpentThisMonth history={history} unit={account.unit} />
-            <ReceivedThisMonth history={history} unit={account.unit} />
+            <LayoutShiftProbe tag="transactions">
+              <Transactions
+                account={ALL_UNITS_ACCOUNT}
+                showMore={true}
+                history={history}
+                hideExpired={true}
+                onVisiblePendingEcashChange={
+                  __DEV__
+                    ? (entries) =>
+                        walletLog.info('wallet.layout.pending_visible', { count: entries.length })
+                    : undefined
+                }
+              />
+            </LayoutShiftProbe>
+            <LayoutShiftProbe tag="spent-this-month">
+              <SpentThisMonth history={history} unit={account.unit} />
+            </LayoutShiftProbe>
+            <LayoutShiftProbe tag="received-this-month">
+              <ReceivedThisMonth history={history} unit={account.unit} />
+            </LayoutShiftProbe>
             <BitcoinNearYou />
           </View>
         </Log>
