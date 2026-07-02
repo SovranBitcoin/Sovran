@@ -18,31 +18,16 @@
 import { cashuLog, log } from '@/shared/lib/logger';
 import type { LogEntry } from '@/shared/lib/loggerCore';
 
-// Fallback pins (what package.json declares); the guarded requires below
-// replace them with the actually-installed versions when the bundler exposes
-// package.json subpaths.
-const PINNED_VERSIONS = {
+// The app pins these dependencies EXACTLY (no ^ ranges — see app/package.json
+// and the PR's artifact-parity gate), so the pins ARE the installed versions.
+// Metro cannot bundle dynamic require() and coco's exports map hides
+// package.json subpaths, so runtime resolution isn't an option here — keep
+// these in lockstep with the package.json pins when bumping coco/cashu-ts.
+export const COCO_VERSIONS = {
   cocoCore: '2.0.0-rc.0',
   cocoReact: '2.0.0-rc.0',
   cocoExpoSqlite: '2.0.0-rc.0',
   cashuTs: '4.5.1',
-};
-
-function installedVersion(pkg: string, fallback: string): string {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const json = require(`${pkg}/package.json`) as { version?: string };
-    return json.version ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-const COCO_VERSIONS = {
-  cocoCore: installedVersion('@cashu/coco-core', PINNED_VERSIONS.cocoCore),
-  cocoReact: installedVersion('@cashu/coco-react', PINNED_VERSIONS.cocoReact),
-  cocoExpoSqlite: installedVersion('@cashu/coco-expo-sqlite', PINNED_VERSIONS.cocoExpoSqlite),
-  cashuTs: installedVersion('@cashu/cashu-ts', PINNED_VERSIONS.cashuTs),
 } as const;
 
 /** Log the installed coco/cashu-ts versions once per manager init so every
