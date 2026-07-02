@@ -49,7 +49,7 @@ interface ReceiveReusableQuoteTabProps {
 const METHOD_COPY = {
   bolt12: {
     sectionTitle: 'BOLT 12 OFFER',
-    icon: 'mingcute:lightning-line', // outline bolt = reusable offer
+    icon: 'mingcute:lightning-fill', // same bolt as the Lightning tab's copy row
     copyTarget: 'bolt12Offer' as const,
     unsupported: 'This mint does not offer BOLT 12. Select a mint that advertises BOLT 12 minting.',
     noneSupport: 'None of your mints support BOLT 12 offers.',
