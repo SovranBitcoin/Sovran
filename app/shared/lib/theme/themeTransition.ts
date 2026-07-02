@@ -96,6 +96,11 @@ function beginThemeDrag(targetTheme: string, fromSurface: string | null): void {
     themeDragTargetSv.value = targetTheme;
     themeDragProgress.value = 0;
     afterFadeCallbacks = [];
+    pendingReleaseTarget = null;
+    if (releaseFallbackTimer) {
+      clearTimeout(releaseFallbackTimer);
+      releaseFallbackTimer = null;
+    }
     if (fromSurface) themeSurfaceFrom.value = fromSurface;
     const toSurface = surfaceOfTheme(targetTheme);
     if (toSurface) themeSurfaceTo.value = toSurface;
@@ -151,16 +156,56 @@ function releaseDragTarget(): void {
   notifyDragListeners();
 }
 
+// ---------------------------------------------------------------------------
+// Event-driven release: the drag layer must stay up until the BASE layer has
+// actually RENDERED the new wallpaper underneath (the commit's re-render
+// storm can delay the base image swap unpredictably — a blind timer either
+// wastes time or releases early and flashes whatever is under the layer).
+// The base sprite reports each rendered theme via noteBaseWallpaperRendered;
+// a generous fallback timer covers load failures.
+// ---------------------------------------------------------------------------
+
+const RELEASE_BLEND_MS = 150;
+const RELEASE_FALLBACK_MS = 1200;
+
+let pendingReleaseTarget: string | null = null;
+let releaseFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+let lastBaseRenderedTheme: string | null = null;
+
+/** Called by the base wallpaper sprite whenever it finishes rendering a
+ *  theme's image — the signal that the drag layer can safely blend away. */
+export function noteBaseWallpaperRendered(theme: string): void {
+  lastBaseRenderedTheme = theme;
+  if (pendingReleaseTarget && pendingReleaseTarget === theme) {
+    releaseNow();
+  }
+}
+
+function releaseNow(): void {
+  pendingReleaseTarget = null;
+  if (releaseFallbackTimer) {
+    clearTimeout(releaseFallbackTimer);
+    releaseFallbackTimer = null;
+  }
+  // Soft blend instead of a snap: if the base is pixel-identical the blend
+  // is invisible; if it is a frame behind, this hides the seam.
+  themeDragProgress.value = withTiming(0, { duration: RELEASE_BLEND_MS }, (finished) => {
+    if (finished) runOnJS(releaseDragTarget)();
+  });
+}
+
 /**
  * Settled on the target: the base theme now IS the target (vars applied by
- * ThemeProvider), so unmount the drag layer after the base has a frame to
- * paint the same wallpaper underneath.
+ * ThemeProvider) — release the drag layer once the base has rendered the
+ * same wallpaper underneath.
  */
 export function completeThemeDrag(): void {
-  setTimeout(() => {
-    dragTargetTheme = null;
-    themeDragTargetSv.value = null;
-    themeDragProgress.value = 0;
-    notifyDragListeners();
-  }, 250);
+  if (dragTargetTheme === null) return;
+  if (lastBaseRenderedTheme === dragTargetTheme) {
+    releaseNow();
+    return;
+  }
+  pendingReleaseTarget = dragTargetTheme;
+  if (releaseFallbackTimer) clearTimeout(releaseFallbackTimer);
+  releaseFallbackTimer = setTimeout(releaseNow, RELEASE_FALLBACK_MS);
 }

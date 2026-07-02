@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, useWindowDimensions } from 'react-native';
 import { retainWallpaperMotion, wallpaperMotion } from '@/shared/lib/theme/wallpaperMotion';
+import { noteBaseWallpaperRendered } from '@/shared/lib/theme/themeTransition';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Image } from '@/shared/ui/primitives/Image';
 import { backgroundImageThemes } from 'config/backgroundImageThemes';
@@ -172,6 +173,10 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
             },
           ]}
           onLoad={() => {
+            // Base (motion-enabled) sprites signal the theme transition that
+            // the new wallpaper is actually rendered — the drag layer holds
+            // until this fires, then blends away seamlessly.
+            if (motionEnabled) noteBaseWallpaperRendered(activeTheme);
             log.info('bg.sprite.image_loaded', {
               theme: activeTheme,
               decodeMs: loadStartRef.current ? Date.now() - loadStartRef.current : null,
