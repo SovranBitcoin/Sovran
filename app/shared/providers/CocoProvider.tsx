@@ -230,6 +230,12 @@ export function CocoProvider({ children }: CocoProviderProps) {
           log.info('coco.recovery.receive.start');
           await initPhase('Coco-bg.receiveRecovery', () => manager.ops.receive.recovery.run());
           log.info('coco.recovery.receive.done');
+          // Safe no-op sweep while the NUT-18 incoming saga is unused.
+          log.info('coco.recovery.payment_request_receive.start');
+          await initPhase('Coco-bg.paymentRequestReceiveRecovery', () =>
+            manager.recoverPendingPaymentRequestReceiveAttempts()
+          );
+          log.info('coco.recovery.payment_request_receive.done');
         } catch (recoveryErr) {
           initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);
           log.warn('coco.recovery.failed', {

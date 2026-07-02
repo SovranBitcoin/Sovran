@@ -1,4 +1,5 @@
-import { Manager, type Plugin } from '@cashu/coco-core';
+import { Manager } from '@cashu/coco-core';
+import type { Plugin } from '@cashu/coco-core/plugin';
 import { createCashuSeedGetter, deriveStandardCashuSeed } from 'wallet';
 import { CocoCoreLogger } from './cocoLogger';
 import {
@@ -438,6 +439,11 @@ export class CocoManager {
         //     above). This is intentionally global across all profiles so any
         //     install can redeem giveaway ecash; it is not a profile secret.
         const plugins: Plugin[] = [
+          // The p2pk-import package is typed against coco v1's root Plugin
+          // export; v2 moved Plugin to the /plugin subpath. Its runtime
+          // contract (keyRingService + logger from ServiceMap) is unchanged in
+          // v2, so bridge with one nominal cast at the seam — same pattern as
+          // the NPC plugin registration below.
           createP2PKImportPlugin({
             getSecretKeys: () => {
               const keys: P2PKSecretKeyInput[] = [];
@@ -445,7 +451,7 @@ export class CocoManager {
               if (GIVEAWAY_P2PK_SECRET) keys.push(GIVEAWAY_P2PK_SECRET);
               return keys;
             },
-          }),
+          }) as unknown as Plugin,
         ];
         cashuLog.info('cashu.manager.plugins.configured', {
           pluginCount: plugins.length,
@@ -590,13 +596,28 @@ export class CocoManager {
 
       try {
         initLog('CocoManager', 'enabling mint quote watcher...');
-        await manager.enableMintOperationWatcher({ watchExistingPendingOnStart: true });
+        await manager.enableMintOperationWatcher({
+          watchExistingPendingOnStart: true,
+          // v2: reusable bolt12/onchain quotes are watched as canonical quote
+          // rows, not operations — rewatch those on start too.
+          watchExistingPendingQuotesOnStart: true,
+        });
         initLog('CocoManager', 'mint quote watcher enabled');
         cashuLog.info('cashu.manager.quote_watcher_enabled', {
           watchExistingPendingOnStart: true,
+          watchExistingPendingQuotesOnStart: true,
         });
       } catch (error) {
         cashuLog.warn('cashu.manager.quote_watcher_failed', { error });
+      }
+
+      try {
+        initLog('CocoManager', 'enabling melt quote watcher...');
+        await manager.enableMeltQuoteWatcher();
+        initLog('CocoManager', 'melt quote watcher enabled');
+        cashuLog.info('cashu.manager.melt_quote_watcher_enabled');
+      } catch (error) {
+        cashuLog.warn('cashu.manager.melt_quote_watcher_failed', { error });
       }
 
       try {
@@ -614,6 +635,15 @@ export class CocoManager {
         });
       } catch (error) {
         cashuLog.warn('cashu.manager.quote_processor_failed', { error });
+      }
+
+      try {
+        initLog('CocoManager', 'enabling melt settlement processor...');
+        await manager.enableMeltSettlementProcessor();
+        initLog('CocoManager', 'melt settlement processor enabled');
+        cashuLog.info('cashu.manager.melt_settlement_processor_enabled');
+      } catch (error) {
+        cashuLog.warn('cashu.manager.melt_settlement_processor_failed', { error });
       }
 
       try {
@@ -755,6 +785,14 @@ export class CocoManager {
           cashuLog.debug('cashu.manager.quote_watcher_disabled');
         } catch (error) {
           cashuLog.warn('cashu.manager.quote_watcher_disable_failed', { error });
+        }
+
+        try {
+          await this.instance.disableMeltSettlementProcessor();
+          await this.instance.disableMeltQuoteWatcher();
+          cashuLog.debug('cashu.manager.melt_watchers_disabled');
+        } catch (error) {
+          cashuLog.warn('cashu.manager.melt_watchers_disable_failed', { error });
         }
 
         try {
@@ -910,6 +948,14 @@ export class CocoManager {
       cashuLog.debug('cashu.manager.quote_processor_disabled');
     } catch (error) {
       cashuLog.warn('cashu.manager.quote_processor_disable_failed', { error });
+    }
+
+    try {
+      await this.instance.disableMeltSettlementProcessor();
+      await this.instance.disableMeltQuoteWatcher();
+      cashuLog.debug('cashu.manager.melt_watchers_disabled');
+    } catch (error) {
+      cashuLog.warn('cashu.manager.melt_watchers_disable_failed', { error });
     }
   }
 
