@@ -202,6 +202,13 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
           ...(paid > 0 ? [`paid ${paid}`] : []),
           ...(isExpired ? ['expired'] : []),
           new Date(q.createdAt).toLocaleString(),
+          // coco upserts quotes by (mintUrl, method, quoteId): if the mint
+          // answers repeated requests with the SAME quote, every "new"
+          // create collapses into one row and only bumps updatedAt — a big
+          // created→updated gap is the fingerprint of that collapse.
+          ...(q.updatedAt - q.createdAt > 60_000
+            ? [`re-upserted until ${new Date(q.updatedAt).toLocaleString()}`]
+            : []),
         ];
         return {
           text: truncateMiddle(q.request, 12),
