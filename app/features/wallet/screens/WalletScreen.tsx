@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
@@ -35,8 +35,7 @@ import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
-
-const ACCOUNT = { unit: 'sat' } as const;
+import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 
 const QR_BUTTON_SIZE = 64;
 const CAPSULE_BUTTON_HEIGHT = 48;
@@ -74,7 +73,12 @@ export function WalletScreen() {
     setContentHeight(height);
   }, []);
 
-  const { history, refresh } = useHistoryWithMelts();
+  // The active mint unit scopes the whole wallet view (balance, machine,
+  // history filter, receive/send defaults). Persisted per profile.
+  const { unit: activeUnit } = useActiveUnit();
+  const account = useMemo(() => ({ unit: activeUnit }), [activeUnit]);
+
+  const { history, refresh } = useHistoryWithMelts(100, activeUnit);
   const handlePullToAiRefresh = useCallback(() => {
     void refresh();
   }, [refresh]);
@@ -83,7 +87,7 @@ export function WalletScreen() {
 
   const { handlePermission } = useHandleCameraPermission();
   const walletContext = useWalletContext();
-  const machine = usePaymentFlowMachine({ walletContext, unit: ACCOUNT.unit });
+  const machine = usePaymentFlowMachine({ walletContext, unit: account.unit });
 
   // While a multi-leg swap is running, every payment-initiating button on
   // this screen is gated. Coco's mint/melt services serialize through a
@@ -93,13 +97,13 @@ export function WalletScreen() {
   const isSwapping = useSwapStatusStore((s) => s.active?.state === 'running');
 
   const handleReceive = useCallback(() => {
-    walletLog.info('wallet.action.receive', { unit: ACCOUNT.unit });
+    walletLog.info('wallet.action.receive', { unit: account.unit });
     clearPaymentContext('wallet.receive');
     void machine.startReceive({ reset: true });
   }, [machine]);
 
   const handleScanQR = useCallback(async () => {
-    walletLog.info('wallet.action.scan_qr', { unit: ACCOUNT.unit });
+    walletLog.info('wallet.action.scan_qr', { unit: account.unit });
     const granted = await handlePermission();
     if (!granted) {
       walletLog.info('wallet.action.scan_qr_denied');
@@ -108,12 +112,12 @@ export function WalletScreen() {
     clearPaymentContext('wallet.scan_qr');
     router.navigate({
       pathname: '/camera',
-      params: { to: 'sendToken', unit: ACCOUNT.unit },
+      params: { to: 'sendToken', unit: account.unit },
     });
   }, [handlePermission]);
 
   const handleSend = useCallback(async () => {
-    walletLog.info('wallet.action.send', { unit: ACCOUNT.unit });
+    walletLog.info('wallet.action.send', { unit: account.unit });
     clearPaymentContext('wallet.send');
     // Destination-first: open the Send method chooser (QR / Create Ecash / NFC
     // / Nut Drop + destination input + contact search) rather than jumping
@@ -127,7 +131,7 @@ export function WalletScreen() {
   }, []);
 
   const handleNearPay = useCallback(() => {
-    walletLog.info('wallet.near_pay.tap', { unit: ACCOUNT.unit });
+    walletLog.info('wallet.near_pay.tap', { unit: account.unit });
     clearPaymentContext('wallet.near_pay');
     router.push('/(send-flow)/nearPay');
   }, []);
@@ -140,7 +144,7 @@ export function WalletScreen() {
   useAmbientNfcArm(machine);
   const nfcArmed = useNfcTapStore((s) => s.armed);
   const handleNfc = useCallback(() => {
-    walletLog.info('wallet.action.nfc', { unit: ACCOUNT.unit, armed: nfcArmed });
+    walletLog.info('wallet.action.nfc', { unit: account.unit, armed: nfcArmed });
     if (Platform.OS === 'android' && nfcArmed) {
       showActionSheet('nfc-tap', {});
       return;
@@ -165,7 +169,7 @@ export function WalletScreen() {
           <ScrollableGradientOverlay contentHeight={contentHeight} />
 
           <View style={styles.topArea}>
-            <Account account={ACCOUNT} minHeight={minBalanceHeight} />
+            <Account account={account} minHeight={minBalanceHeight} />
 
             <HStack justify="space-around" style={styles.secondaryActions}>
               <CircleActionButton
@@ -175,10 +179,10 @@ export function WalletScreen() {
                 testID="wallet-swap"
                 disabled={isSwapping}
                 onPress={() => {
-                  walletLog.info('wallet.swap.tap', { unit: ACCOUNT.unit });
+                  walletLog.info('wallet.swap.tap', { unit: account.unit });
                   router.navigate({
                     pathname: '/(mint-flow)/distribution',
-                    params: { unit: ACCOUNT.unit },
+                    params: { unit: account.unit },
                   });
                 }}
               />
@@ -259,9 +263,9 @@ export function WalletScreen() {
           </View>
 
           <View style={styles.content}>
-            <Transactions account={ACCOUNT} showMore={true} history={history} hideExpired={true} />
-            <SpentThisMonth history={history} unit={ACCOUNT.unit} />
-            <ReceivedThisMonth history={history} unit={ACCOUNT.unit} />
+            <Transactions account={account} showMore={true} history={history} hideExpired={true} />
+            <SpentThisMonth history={history} unit={account.unit} />
+            <ReceivedThisMonth history={history} unit={account.unit} />
             <BitcoinNearYou />
           </View>
         </Log>

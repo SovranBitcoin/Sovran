@@ -28,8 +28,11 @@ const EMPTY_SNAPSHOT: NumericSnapshot = { spendable: 0, reserved: 0, total: 0 };
  * balance API, plus pending (cancellable ecash sends) and redeeming
  * (received-but-unredeemed ecash). React binding over the framework-agnostic
  * helpers in `balance/breakdown`, reaching coco via the `useColadaManager` seam.
+ *
+ * All figures are scoped to `unit` (coco v2 multi-unit; defaults to sat so
+ * existing callers keep today's behavior).
  */
-export function useColadaBalance(): WalletBalanceBreakdown {
+export function useColadaBalance(unit = "sat"): WalletBalanceBreakdown {
   const manager = useColadaManager();
 
   const [snapshot, setSnapshot] = useState<NumericSnapshot>(EMPTY_SNAPSHOT);
@@ -52,8 +55,8 @@ export function useColadaBalance(): WalletBalanceBreakdown {
     const mgr = managerRef.current;
     try {
       const [total, perMint, historyPage, inFlight] = await Promise.all([
-        mgr.wallet.balances.total(),
-        mgr.wallet.balances.byMint(),
+        mgr.wallet.balances.total({ units: [unit] }),
+        mgr.wallet.balances.byMint({ units: [unit] }),
         mgr.history.getPaginatedHistory(0, PENDING_PAGE_SIZE).catch(() => []),
         mgr.ops.receive.listInFlight().catch(() => []),
       ]);
@@ -64,14 +67,27 @@ export function useColadaBalance(): WalletBalanceBreakdown {
         total: amountToNumber(total.total),
       });
       setByMint(perMint);
-      setPending(sumReservedSends(historyPage ?? []));
-      setRedeeming(inFlight.reduce((sum, op) => sum + amountToNumber(op.amount), 0));
+      setPending(
+        sumReservedSends(
+          (historyPage ?? []).filter((entry) => (entry.unit ?? "sat") === unit),
+        ),
+      );
+      setRedeeming(
+        inFlight
+          .filter((op) => (op.unit ?? "sat") === unit)
+          .reduce((sum, op) => sum + amountToNumber(op.amount), 0),
+      );
+      logger.debug("balance.breakdown.reload", {
+        unit,
+        mintCount: Object.keys(perMint).length,
+      });
     } catch (err) {
       logger.warn("balance.breakdown.reload_failed", {
+        unit,
         error: err instanceof Error ? err.message : String(err),
       });
     }
-  }, []);
+  }, [unit]);
 
   const reloadRef = useRef(reload);
   useEffect(() => {

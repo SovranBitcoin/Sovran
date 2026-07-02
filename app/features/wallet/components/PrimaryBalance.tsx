@@ -2,7 +2,9 @@ import React, { useCallback, useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
+import { UnitSwitcherPill } from '@/features/wallet/components/UnitSwitcherPill';
 import { useSettingsStore, DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
@@ -123,24 +125,29 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   const mockMode = useSettingsStore((state) => state.mockMode);
   const mockBalance = useMockDataStore((state) => state.mockBalance);
   const mockPendingAmount = useMockDataStore((state) => state.mockPendingAmount);
-  // Single colada read model for every figure: total (spendable + reserved),
-  // reserved, pending (cancellable ecash sends), and redeeming (received-but-
-  // unredeemed ecash — e.g. P2PK tokens accepted offline, invisible otherwise).
-  const breakdown = useColadaBalance();
+  // Single colada read model for every figure, scoped to the active mint
+  // unit: total (spendable + reserved), reserved, pending (cancellable ecash
+  // sends), and redeeming (received-but-unredeemed ecash — e.g. P2PK tokens
+  // accepted offline, invisible otherwise).
+  const breakdown = useColadaBalance(account.unit);
   const btcPrice = useBtcPrice(displayCurrency);
+  const isSatUnit = account.unit === 'sat';
 
   const toggleUnit = useCallback(async () => {
+    // displayBtc cycling re-formats a SAT balance (sat/BTC/⚡ modes); it has
+    // no meaning for a fiat-denominated wallet unit.
+    if (!isSatUnit) return;
     await EnhancedHaptics.successHaptic();
     setDisplayBtc(((displayBtc + 1) % 4) as DisplayBtcMode);
-  }, [displayBtc, setDisplayBtc]);
+  }, [displayBtc, setDisplayBtc, isSatUnit]);
 
   const balance = mockMode ? mockBalance : breakdown.total;
   const reservedTotal = breakdown.reserved;
   const pendingTotal = mockMode ? mockPendingAmount : breakdown.pending;
   const lockedTotal = breakdown.redeeming;
-  // Pills sum sat-denominated amounts; label as sat (matches RESERVED).
-  const pendingUnit = 'sat';
-  const lockedUnit = 'sat';
+  // Pills sum amounts in the active unit (matches the balance above).
+  const pendingUnit = account.unit;
+  const lockedUnit = account.unit;
 
   const currencyConfig = CURRENCY_CONFIG[displayCurrency];
   const fiatValue = btcPrice ? ((btcPrice / 100_000_000) * balance).toFixed(2) : '0.00';
@@ -267,7 +274,12 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   return (
     <Log name="PrimaryBalance">
       <VStack align="center" gap={BALANCE_SECTION_GAP} className="z-9">
-        <FiatCurrencyPill displayText={displayText} textSize={12} />
+        <HStack align="center" gap={8}>
+          {/* Fiat conversion of a sat balance is meaningless when the wallet
+              is already denominated in a fiat unit — structurally hide it. */}
+          {isSatUnit ? <FiatCurrencyPill displayText={displayText} textSize={12} /> : null}
+          <UnitSwitcherPill textSize={12} />
+        </HStack>
         <Pressable onPress={toggleUnit} style={styles.balancePressable}>
           <AmountFormatter
             amount={balance}
@@ -289,7 +301,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         <EcashStatusPill
           label="RESERVED"
           totalAmount={reservedTotal}
-          unit="sat"
+          unit={account.unit}
           onPress={handleReservedPress}
         />
         <EcashStatusPill

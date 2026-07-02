@@ -130,6 +130,32 @@ export function deriveMintMethodSupportFromInfo(
   return support;
 }
 
+/** Units the wallet's unit switcher may offer, in display order. */
+export const SWITCHABLE_UNITS = ["sat", "usd", "eur", "gbp"] as const;
+export type SwitchableUnit = (typeof SWITCHABLE_UNITS)[number];
+
+/**
+ * Units a mint advertises for minting (NUT-04 method-unit entries),
+ * restricted to the wallet's switchable set. Falls back to sat when the
+ * mint publishes no parseable method-unit metadata.
+ */
+export function deriveSupportedUnitsFromInfo(mintInfo: unknown): string[] {
+  const settings = getNutSettings(mintInfo, 4);
+  const methods = settings?.methods;
+  if (!Array.isArray(methods)) return [DEFAULT_UNIT];
+  const units = new Set<string>();
+  for (const entry of methods) {
+    if (!isRecord(entry)) continue;
+    const unit =
+      typeof entry.unit === "string" ? normalizeUnit(entry.unit) : null;
+    if (unit && (SWITCHABLE_UNITS as readonly string[]).includes(unit)) {
+      units.add(unit);
+    }
+  }
+  if (units.size === 0) units.add(DEFAULT_UNIT);
+  return [...units];
+}
+
 export function deriveMintMethodCapabilityMapFromTrustedMints(
   trustedMints: readonly { mintUrl: string; mintInfo?: unknown }[],
   unit: string = DEFAULT_UNIT,

@@ -11,6 +11,7 @@
  */
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useFocusEffect } from 'expo-router';
 import { staticPopup } from '@/shared/lib/popup';
@@ -83,7 +84,8 @@ export function UserMessagesScreen({
   const { keys: nostrKeys } = useNostrKeysContext();
   const { ndk } = useNDK();
   const walletContext = useWalletContext();
-  const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
+  const { unit: activeUnit } = useActiveUnit();
+  const machine = usePaymentFlowMachine({ walletContext, unit: activeUnit });
 
   // Mock-mode short-circuit: if this DM is with one of the demo contacts,
   // serve the seeded thread and disable the server fetch / publish. These

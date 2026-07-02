@@ -183,11 +183,24 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
+      "activeUnit": {
+        "default": "sat",
+        "enum": [
+          "sat",
+          "usd",
+          "eur",
+          "gbp",
+        ],
+        "type": "string",
+      },
       "selectedMint": {
         "maxLength": 2048,
         "type": "string",
       },
     },
+    "required": [
+      "activeUnit",
+    ],
     "type": "object",
   },
   "version": 2,

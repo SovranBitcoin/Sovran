@@ -98,6 +98,8 @@ export function NearPayPeerListScreen() {
   useLifecycleLogger('NearPayPeerListScreen', paymentLog);
   const headerHeight = useHeaderHeight();
   const walletContext = useWalletContext();
+  // NearPay is sat-pinned at the protocol level — it does NOT follow the
+  // wallet's active mint unit.
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
   const { isOffline } = useOfflineStatus();
   const { peers: blePeers } = useBLEPeers();

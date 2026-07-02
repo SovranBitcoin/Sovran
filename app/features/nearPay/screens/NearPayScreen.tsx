@@ -1485,6 +1485,8 @@ export function NearPayScreen() {
   const insets = useSafeAreaInsets();
   const walletContext = useWalletContext();
   const { isOffline } = useOfflineStatus();
+  // NearPay is sat-pinned at the protocol level — it does NOT follow the
+  // wallet's active mint unit.
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
   // Every bitchat peer is on the radar so the favorite exchange can run, but a
   // token DM is only enabled after the peer advertises a valid creq capability.

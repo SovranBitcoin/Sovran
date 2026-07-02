@@ -10,6 +10,7 @@
  */
 
 import React, { useEffect, useMemo, useCallback, useState } from 'react';
+import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
@@ -850,7 +851,8 @@ export function UserProfileScreen() {
   // button (same pattern as UserMessagesScreen). Gated on a valid lightning
   // address in the profile metadata.
   const walletContext = useWalletContext();
-  const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
+  const { unit: activeUnit } = useActiveUnit();
+  const machine = usePaymentFlowMachine({ walletContext, unit: activeUnit });
   const rawLud16 = cachedProfile?.lud16;
   const lud16 = rawLud16 && LightningAddress.safeParse(rawLud16).success ? rawLud16 : undefined;
   const handleSendMoney = useCallback(() => {

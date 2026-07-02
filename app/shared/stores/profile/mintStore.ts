@@ -8,12 +8,19 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 const profileStorage = createProfileScopedStorage();
 
+/** The wallet's active mint unit — NOT the fiat display currency
+ *  (settingsStore.displayCurrency); this is the unit ecash is denominated
+ *  in (coco v2 multi-unit balances/quotes/proofs are per mint+unit). */
+export type ActiveUnit = 'sat' | 'usd' | 'eur' | 'gbp';
+
 interface MintState {
   selectedMint: string | undefined;
+  activeUnit: ActiveUnit;
 }
 
 interface MintActions {
   setSelectedMint: (mintUrl: string) => void;
+  setActiveUnit: (unit: ActiveUnit) => void;
 }
 
 type MintStore = MintState & MintActions;
@@ -23,6 +30,10 @@ type V2Persisted = { selectedMint?: string };
 
 const PersistedMintStore = z.object({
   selectedMint: z.string().max(2048).optional(),
+  // Additive tolerant field (no version bump needed): old blobs rehydrate to
+  // 'sat'; an unknown persisted value degrades to 'sat' instead of wiping the
+  // store (sovran-data persisted-schema invariant).
+  activeUnit: z.enum(['sat', 'usd', 'eur', 'gbp']).default('sat').catch('sat'),
 });
 
 // v1 -> v2: the storage seam (createProfileScopedStorage) already partitions
@@ -52,10 +63,18 @@ export const useMintStore = create<MintStore>()(
   persist(
     (set) => ({
       selectedMint: undefined,
+      activeUnit: 'sat',
 
       setSelectedMint: (mintUrl: string) => {
         storeLog.info('store.mint.set_selected', { mintUrl });
         set({ selectedMint: mintUrl });
+      },
+
+      setActiveUnit: (unit: ActiveUnit) => {
+        set((state) => {
+          storeLog.info('store.mint.set_active_unit', { from: state.activeUnit, to: unit });
+          return { activeUnit: unit };
+        });
       },
     }),
     persistConfig({
@@ -64,7 +83,10 @@ export const useMintStore = create<MintStore>()(
       schema: PersistedMintStore,
       version: 2,
       migrate: migrateMintStore,
-      partialize: (state) => ({ selectedMint: state.selectedMint }),
+      partialize: (state) => ({
+        selectedMint: state.selectedMint,
+        activeUnit: state.activeUnit,
+      }),
     })
   )
 );
