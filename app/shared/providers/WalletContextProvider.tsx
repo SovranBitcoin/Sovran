@@ -23,6 +23,7 @@ import { useBalanceContext, useManager, useMints } from '@cashu/coco-react';
 import {
   deriveMintMethodCapabilityMapFromTrustedMints,
   deriveSupportedUnitsFromInfo,
+  pickHighestBalanceUnit,
   type WalletContext,
 } from 'wallet';
 import { getReadyProofs } from '@/shared/lib/cashu/managerInternals';
@@ -141,11 +142,14 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   );
 
   // Follow the preferred mint with the active unit: when the user switches
-  // mints and the new mint doesn't support the current unit, snap to sat (or
-  // the mint's first supported unit). Derived from CACHED NUT-04 mintInfo in
-  // coco's DB, so this works offline — no info-endpoint call. Keyed on the
-  // mint URL (a ref, not an effect dep on activeUnit) so a manual unit switch
-  // is never fought by this rule.
+  // mints and the new mint doesn't support the current unit, snap to the
+  // unit holding the highest balance AT THAT MINT (not blindly sat) —
+  // colada's pickHighestBalanceUnit, tie-broken sat-first. Derived from
+  // CACHED NUT-04 mintInfo in coco's DB, so this works offline — no
+  // info-endpoint call. Keyed on the mint URL (a ref, not an effect dep on
+  // activeUnit) so a manual unit switch is never fought by this rule; the
+  // switcher's own mint-follow (selectUnit) always lands on a supporting
+  // mint, so the two rules cannot ping-pong.
   const lastUnitSyncMintRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!preferredMintUrl || lastUnitSyncMintRef.current === preferredMintUrl) return;
@@ -155,15 +159,21 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     const supported = deriveSupportedUnitsFromInfo(mint.mintInfo);
     const currentUnit = useMintStore.getState().activeUnit;
     if (supported.includes(currentUnit)) return;
-    const next = supported.includes('sat') ? 'sat' : supported[0];
+    const balanceByUnit = Object.fromEntries(
+      Object.entries(rawBalanceCtx.byMintAndUnit?.[preferredMintUrl] ?? {}).map(
+        ([unitKey, snapshot]) => [unitKey, snapshot ? amountToNumber(snapshot.total) : 0]
+      )
+    );
+    const next = pickHighestBalanceUnit(supported, balanceByUnit);
     if (next !== 'sat' && next !== 'usd' && next !== 'eur' && next !== 'gbp') return;
     walletLog.info('wallet.unit.synced_to_mint', {
       ...preferredMintLogFields(preferredMintUrl),
       from: currentUnit,
       to: next,
+      source: 'highest_balance_at_mint',
     });
     setActiveUnit(next);
-  }, [preferredMintUrl, rawTrustedMints, setActiveUnit]);
+  }, [preferredMintUrl, rawTrustedMints, rawBalanceCtx, setActiveUnit]);
 
   const fetchProofAmounts = useCallback(async () => {
     walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', {

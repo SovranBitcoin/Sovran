@@ -156,6 +156,66 @@ export function deriveSupportedUnitsFromInfo(mintInfo: unknown): string[] {
   return [...units];
 }
 
+/**
+ * The unit to land on when the preferred mint changes and the active unit
+ * isn't among the mint's supported units: the supported unit holding the
+ * highest balance AT THAT MINT, tie-broken by SWITCHABLE_UNITS display order
+ * (sat first). Falls back to sat when the supported list is empty.
+ */
+export function pickHighestBalanceUnit(
+  supportedUnits: readonly string[],
+  balanceByUnit: Record<string, number>,
+): string {
+  const ordered = SWITCHABLE_UNITS.filter((unit) =>
+    supportedUnits.includes(unit),
+  );
+  if (ordered.length === 0) return DEFAULT_UNIT;
+  let best: string = ordered[0];
+  for (const unit of ordered) {
+    if ((balanceByUnit[unit] ?? 0) > (balanceByUnit[best] ?? 0)) best = unit;
+  }
+  logger.debug("mintCapabilities.pickHighestBalanceUnit", {
+    supported: ordered.join(","),
+    picked: best,
+  });
+  return best;
+}
+
+/**
+ * The mint to prefer when the user switches to a unit the current preferred
+ * mint doesn't support: the trusted mint advertising the unit with the
+ * highest balance IN THAT UNIT. Null when no trusted mint supports it (the
+ * unit may still be reachable via held balances at an untrusted mint).
+ */
+export function pickMintForUnit(
+  mints: readonly { mintUrl: string; mintInfo?: unknown }[],
+  unit: string,
+  balanceByMint: Record<string, number>,
+): string | null {
+  const normalized = normalizeUnit(unit);
+  const candidates = mints.filter((mint) =>
+    deriveSupportedUnitsFromInfo(mint.mintInfo).includes(normalized),
+  );
+  if (candidates.length === 0) {
+    logger.debug("mintCapabilities.pickMintForUnit.none", { unit: normalized });
+    return null;
+  }
+  let best = candidates[0];
+  for (const mint of candidates) {
+    if (
+      (balanceByMint[mint.mintUrl] ?? 0) > (balanceByMint[best.mintUrl] ?? 0)
+    ) {
+      best = mint;
+    }
+  }
+  logger.debug("mintCapabilities.pickMintForUnit.picked", {
+    unit: normalized,
+    candidateCount: candidates.length,
+    ...mintUrlFields(best.mintUrl),
+  });
+  return best.mintUrl;
+}
+
 export function deriveMintMethodCapabilityMapFromTrustedMints(
   trustedMints: readonly { mintUrl: string; mintInfo?: unknown }[],
   unit: string = DEFAULT_UNIT,

@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useBalanceContext, useMints } from '@cashu/coco-react';
-import { deriveSupportedUnitsFromInfo, SWITCHABLE_UNITS } from 'wallet';
+import { deriveSupportedUnitsFromInfo, pickMintForUnit, SWITCHABLE_UNITS } from 'wallet';
 
 import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore';
 import { walletLog } from '@/shared/lib/logger';
@@ -11,7 +11,15 @@ export interface ActiveUnitState {
   unit: ActiveUnit;
   /** Switchable units at least one trusted mint advertises (sat always). */
   availableUnits: ActiveUnit[];
+  /** Raw unit write — no mint coordination. For sync effects, not user picks. */
   setUnit: (unit: ActiveUnit) => void;
+  /**
+   * User-initiated unit pick: sets the unit AND, when the preferred mint
+   * doesn't support it, follows with the highest-balance (in that unit)
+   * trusted mint that does — so the wallet never assumes the current mint
+   * can serve the chosen unit.
+   */
+  selectUnit: (unit: ActiveUnit) => void;
 }
 
 /**
@@ -58,5 +66,33 @@ export function useActiveUnit(): ActiveUnitState {
     return 'sat';
   }, [persisted, availableUnits]);
 
-  return useMemo(() => ({ unit, availableUnits, setUnit }), [unit, availableUnits, setUnit]);
+  const selectUnit = useCallback(
+    (next: ActiveUnit) => {
+      setUnit(next);
+      const preferredUrl = useMintStore.getState().selectedMint;
+      const preferred = trustedMints.find((m) => m.mintUrl === preferredUrl);
+      if (preferred && deriveSupportedUnitsFromInfo(preferred.mintInfo).includes(next)) return;
+      // Balance IN THE CHOSEN UNIT per mint — colada picks the best target.
+      const balanceByMint = Object.fromEntries(
+        Object.entries(balances.byMintAndUnit ?? {}).map(([url, byUnit]) => [
+          url,
+          byUnit[next] ? amountToNumber(byUnit[next].total) : 0,
+        ])
+      );
+      const target = pickMintForUnit(trustedMints, next, balanceByMint);
+      if (!target || target === preferredUrl) return;
+      walletLog.info('wallet.unit.mint_followed_unit', {
+        unit: next,
+        hadPreferredMint: !!preferred,
+        targetMintUrlLength: target.length,
+      });
+      useMintStore.getState().setSelectedMint(target);
+    },
+    [trustedMints, balances, setUnit]
+  );
+
+  return useMemo(
+    () => ({ unit, availableUnits, setUnit, selectUnit }),
+    [unit, availableUnits, setUnit, selectUnit]
+  );
 }

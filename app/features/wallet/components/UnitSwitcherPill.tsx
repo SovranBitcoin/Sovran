@@ -22,40 +22,43 @@ const UNIT_OPTIONS: { unit: ActiveUnit; label: string; icon: string }[] = [
  * The wallet-unit switcher (coco v2 multi-unit): picks the unit the wallet
  * is DENOMINATED in — a different concept from the fiat display-currency
  * conversion pill, which only re-prices a sat balance. Opens the canonical
- * `actionMenuPopup` pick-one surface; units no trusted mint advertises are
- * disabled with a reason.
+ * `actionMenuPopup` pick-one surface listing ONLY units some trusted mint
+ * supports; with nothing to switch to, the pill itself is greyed out.
+ * Picking a unit the preferred mint lacks also re-points the preferred mint
+ * (see useActiveUnit.selectUnit).
  */
 export function UnitSwitcherPill({ textSize = 12 }: { textSize?: number }): React.ReactElement {
-  const { unit, availableUnits, setUnit } = useActiveUnit();
+  const { unit, availableUnits, selectUnit } = useActiveUnit();
   const [textColor, surfaceSecondary, muted, success] = useThemeColor([
     'foreground',
     'surface-secondary',
     'muted',
     'success',
   ] as const);
+  const canSwitch = availableUnits.length > 1;
 
   const openUnitMenu = useCallback(() => {
     walletLog.info('wallet.unit.menu_open', { unit, available: availableUnits.join(',') });
     actionMenuPopup({
       title: 'Wallet unit',
-      buttons: UNIT_OPTIONS.map((option) => {
-        const available = availableUnits.includes(option.unit);
-        return {
+      buttons: UNIT_OPTIONS.filter((option) => availableUnits.includes(option.unit)).map(
+        (option) => ({
           text: option.label,
           iconNode: <Icon name={option.icon} size={20} />,
           testID: `wallet-unit-menu-${option.unit}`,
-          disabled: !available,
-          ...(available ? {} : { reason: 'No trusted mint supports this unit' }),
           suffix:
             option.unit === unit ? <Icon name="mdi:check" size={20} color={success} /> : undefined,
-          onPress: () => setUnit(option.unit),
-        };
-      }),
+          onPress: () => selectUnit(option.unit),
+        })
+      ),
     });
-  }, [unit, availableUnits, setUnit, success]);
+  }, [unit, availableUnits, selectUnit, success]);
 
   return (
-    <Pressable onPress={openUnitMenu} testID="wallet-unit-switcher">
+    <Pressable
+      onPress={canSwitch ? openUnitMenu : undefined}
+      disabled={!canSwitch}
+      testID="wallet-unit-switcher">
       <HStack
         align="center"
         justify="center"
@@ -68,8 +71,15 @@ export function UnitSwitcherPill({ textSize = 12 }: { textSize?: number }): Reac
           borderColor: opacity(muted, 0.3),
           paddingHorizontal: 14,
           paddingVertical: 6,
+          // Greyed out when only one unit exists — nothing to switch to.
+          opacity: canSwitch ? 1 : 0.4,
         }}>
-        <Text overpass size={textSize} bold color={textColor} style={{ letterSpacing: 0.3 }}>
+        <Text
+          overpass
+          size={textSize}
+          bold
+          color={canSwitch ? textColor : muted}
+          style={{ letterSpacing: 0.3 }}>
           {unit.toUpperCase()}
         </Text>
       </HStack>
