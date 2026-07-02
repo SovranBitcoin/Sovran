@@ -169,7 +169,7 @@ export function WalletScreen() {
           <ScrollableGradientOverlay contentHeight={contentHeight} />
 
           <View style={styles.topArea}>
-            <Account account={account} minHeight={minBalanceHeight} />
+            <Account minHeight={minBalanceHeight} />
 
             <HStack justify="space-around" style={styles.secondaryActions}>
               <CircleActionButton
