@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
-import { DeviceMotion } from 'expo-sensors';
+import { retainWallpaperMotion, wallpaperMotion } from '@/shared/lib/theme/wallpaperMotion';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Image } from '@/shared/ui/primitives/Image';
 import { backgroundImageThemes } from 'config/backgroundImageThemes';
@@ -68,8 +68,6 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
   motionEnabled = true,
   imageTransitionMs,
 }: AnimatedSpriteBackgroundProps) {
-  const motion = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-
   const ctxTheme = useTheme();
   const activeTheme = themeName ?? ctxTheme.currentTheme;
   const backgroundImageSource = backgroundImageThemes[activeTheme];
@@ -85,32 +83,14 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
     loadStartRef.current = Date.now();
   }, [backgroundImageSource]);
 
-  // Parallax motion — only subscribe when an image is actually shown. A
-  // solid-colour theme has no visible parallax, so streaming the device-motion
-  // sensor at 50ms (a real CPU cost on every screen) would be pure waste.
+  // Parallax: ALL instances read the SHARED wallpaperMotion value (so
+  // pre-mounted carousel layers stay pixel-aligned with the base layer);
+  // motionEnabled only controls whether THIS instance keeps the shared
+  // DeviceMotion subscription alive (hidden layers don't).
   useEffect(() => {
     if (!hasImage || !motionEnabled) return;
-    DeviceMotion.setUpdateInterval(50);
-    log.debug('bg.sprite.motion.start', { intervalMs: 50 });
-    const subscription = DeviceMotion.addListener(({ rotation }) => {
-      if (rotation) {
-        const { beta = 0, gamma = 0 } = rotation;
-        Animated.spring(motion, {
-          toValue: {
-            x: gamma * 10,
-            y: beta * 10,
-          },
-          useNativeDriver: true,
-          bounciness: 100,
-          speed: 200,
-        }).start();
-      }
-    });
-    return () => {
-      log.debug('bg.sprite.motion.stop');
-      subscription.remove();
-    };
-  }, [motion, hasImage, motionEnabled]);
+    return retainWallpaperMotion();
+  }, [hasImage, motionEnabled]);
 
   useEffect(() => {
     if (!backgroundImageSource) {
@@ -159,7 +139,7 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
         style={[
           StyleSheet.absoluteFill,
           {
-            transform: motion.getTranslateTransform(),
+            transform: wallpaperMotion.getTranslateTransform(),
           },
         ]}>
         <Image

@@ -62,6 +62,10 @@ export function surfaceOfTheme(theme: string): string | null {
 
 /** 0..1 progress toward `themeDragTarget` (drag fraction). */
 export const themeDragProgress = makeMutable(0);
+/** Drag target as a SHARED VALUE too: pre-mounted layers compare against it
+ *  in their opacity worklets, so starting a drag touches zero React state
+ *  when the target's layer is already mounted. */
+export const themeDragTargetSv = makeMutable<string | null>(null);
 
 let dragTargetTheme: string | null = null;
 const dragListeners = new Set<() => void>();
@@ -85,6 +89,7 @@ export function subscribeThemeDragTarget(listener: () => void): () => void {
 export function beginThemeDrag(targetTheme: string, fromSurface: string | null): void {
   if (dragTargetTheme !== targetTheme) {
     dragTargetTheme = targetTheme;
+    themeDragTargetSv.value = targetTheme;
     if (fromSurface) themeSurfaceFrom.value = fromSurface;
     const toSurface = surfaceOfTheme(targetTheme);
     if (toSurface) themeSurfaceTo.value = toSurface;
@@ -105,6 +110,7 @@ export function cancelThemeDrag(): void {
 
 function releaseDragTarget(): void {
   dragTargetTheme = null;
+  themeDragTargetSv.value = null;
   notifyDragListeners();
 }
 
@@ -116,6 +122,7 @@ function releaseDragTarget(): void {
 export function completeThemeDrag(): void {
   setTimeout(() => {
     dragTargetTheme = null;
+    themeDragTargetSv.value = null;
     themeDragProgress.value = 0;
     notifyDragListeners();
   }, 250);

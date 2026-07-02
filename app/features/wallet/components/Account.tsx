@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import PagerView, {
+  type PageScrollStateChangedNativeEvent,
   type PagerViewOnPageScrollEvent,
   type PagerViewOnPageSelectedEvent,
 } from 'react-native-pager-view';
@@ -99,10 +100,19 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
     [availableUnits, unit]
   );
 
-  const handlePageSelected = useCallback(
-    (event: PagerViewOnPageSelectedEvent) => {
-      const position = event.nativeEvent.position;
-      pagerPositionRef.current = position;
+  // onPageSelected fires at the SNAP THRESHOLD, while the settle animation
+  // is still running — committing the unit there caused a re-render burst
+  // (unit-scoped wallet context, CSS-var swap, balance re-reads) mid-flight,
+  // which read as lag and content shifting. Record the landing page here and
+  // commit ONLY when the pager reports idle.
+  const handlePageSelected = useCallback((event: PagerViewOnPageSelectedEvent) => {
+    pagerPositionRef.current = event.nativeEvent.position;
+  }, []);
+
+  const handlePageScrollStateChanged = useCallback(
+    (event: PageScrollStateChangedNativeEvent) => {
+      if (event.nativeEvent.pageScrollState !== 'idle') return;
+      const position = pagerPositionRef.current;
       const nextUnit = availableUnits[position];
       if (!nextUnit || nextUnit === unit) {
         // Sprang back to the same page — glide the drag layer home.
@@ -124,6 +134,7 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
           initialPage={pageIndex}
           onPageScroll={handlePageScroll}
           onPageSelected={handlePageSelected}
+          onPageScrollStateChanged={handlePageScrollStateChanged}
           // Rebuild when the available-account set changes so page indices
           // stay aligned with availableUnits.
           key={availableUnits.join('|')}>

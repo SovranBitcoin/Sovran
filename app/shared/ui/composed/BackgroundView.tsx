@@ -10,6 +10,7 @@ import {
   getThemeDragTarget,
   subscribeThemeDragTarget,
   themeDragProgress,
+  themeDragTargetSv,
   themeLayerOpacity,
   themeSurfaceFrom,
   themeSurfaceProgress,
@@ -395,7 +396,6 @@ function AnimatedBackgroundViewComponent({
             <PreloadedWallpaperLayer
               key={theme}
               theme={theme}
-              isDragTarget={theme === dragTargetTheme}
               surface={surface}
               gradientColor={gradientColor}
               gradientTopOpacity={gradientTopOpacity}
@@ -427,19 +427,19 @@ export const AnimatedBackgroundView = memo(AnimatedBackgroundViewComponent);
  */
 const PreloadedWallpaperLayer = memo(function PreloadedWallpaperLayer({
   theme,
-  isDragTarget,
   surface,
   gradientColor,
   gradientTopOpacity,
 }: {
   theme: string;
-  isDragTarget: boolean;
   surface: string;
   gradientColor?: string;
   gradientTopOpacity: number;
 }) {
+  // Worklet-only visibility: comparing against the drag-target SHARED VALUE
+  // means dragging raises this layer with zero React re-renders.
   const layerStyle = useAnimatedStyle(() => ({
-    opacity: isDragTarget ? themeDragProgress.value : 0,
+    opacity: themeDragTargetSv.value === theme ? themeDragProgress.value : 0,
   }));
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, layerStyle]}>
