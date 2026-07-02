@@ -45,8 +45,13 @@ export function reusableQuoteKey(input: EnsureReusableMintQuoteInput): string {
 }
 
 function isUnexpired(expiry: number | null, nowSeconds: number): boolean {
-  // Null expiry = the mint issued a quote that never expires.
-  return expiry === null || expiry > nowSeconds;
+  // Null = the mint issued a quote that never expires. Some mints send 0
+  // with the same meaning for reusable offers (observed in the field:
+  // bolt12 quotes with expiry 0) — treating 0 as a 1970 timestamp made the
+  // standing offer "eternally expired" and rotated the QR on every open.
+  // NOTE: coco's own isMintQuoteExpired treats 0 as expired too — flagged
+  // for upstream via the zero_expiry warn below.
+  return expiry === null || expiry <= 0 || expiry > nowSeconds;
 }
 
 /**
@@ -125,6 +130,16 @@ async function resolveReusableMintQuote(
       else if (!isUnexpired(recorded.expiry, nowSeconds))
         createReason = "expired";
       else {
+        if (recorded.expiry === 0) {
+          // Upstream-relevant: mint sent expiry 0 for a reusable quote; coco
+          // core's expiry checks treat 0 as already-expired, which may stop
+          // its watcher from tracking this quote.
+          logger.warn("quotes.reusable.zero_expiry", {
+            ...mintUrlFields(mintUrl),
+            method,
+            unit,
+          });
+        }
         logger.info("quotes.reusable.reused", {
           ...mintUrlFields(mintUrl),
           method,
