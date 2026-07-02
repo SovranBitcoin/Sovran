@@ -71,9 +71,23 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
   const tallestContentHeight = Math.max(0, ...Object.values(pageHeights));
   const containerHeight = Math.max(minHeight, tallestContentHeight + BALANCE_BOTTOM_INSET);
 
+  // Deadbanded, mostly-monotonic height tracking. The unit commit repaints
+  // every themed element (CSS-var swap) and text metrics can wobble by a
+  // pixel — feeding raw onLayout values straight into the container height
+  // created a resize → relayout → remeasure loop that read as vertical
+  // jitter after each switch. Growth applies immediately (a pill appearing
+  // must not clip); shrinks only apply when clearly real (a pill row
+  // disappearing), never for sub-pill wobble.
+  const HEIGHT_SHRINK_THRESHOLD = 24;
   const onPageContentLayout = useCallback((pageUnit: string, event: LayoutChangeEvent) => {
     const height = Math.ceil(event.nativeEvent.layout.height);
-    setPageHeights((prev) => (prev[pageUnit] === height ? prev : { ...prev, [pageUnit]: height }));
+    setPageHeights((prev) => {
+      const current = prev[pageUnit] ?? 0;
+      const grewTaller = height > current;
+      const shrankForReal = current - height > HEIGHT_SHRINK_THRESHOLD;
+      if (!grewTaller && !shrankForReal) return prev;
+      return { ...prev, [pageUnit]: height };
+    });
   }, []);
 
   // Revolut model: the wallpaper crossfade does NOT track the finger. It
