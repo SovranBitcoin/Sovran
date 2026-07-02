@@ -178,6 +178,17 @@ const ReceiveP2pkTab = memo(function ReceiveP2pkTab({ data, actions, muted }: Re
   );
 });
 
+/**
+ * Keeps every receive tab MOUNTED once the hub's entry is ready, showing only
+ * the selected one (`display: none` hides without unmounting). The Bolt12
+ * offer and Onchain address therefore resolve/preload when the screen opens
+ * — switching tabs shows the finished QR instead of flashing the skeleton
+ * while the standing quote loads.
+ */
+function TabPane({ visible, children }: { visible: boolean; children: React.ReactNode }) {
+  return <View style={visible ? undefined : styles.hiddenPane}>{children}</View>;
+}
+
 const QR_PLACEHOLDER_HORIZONTAL_INSET = 32;
 
 function ReceiveHubPlaceholder() {
@@ -217,6 +228,9 @@ function ReceiveHubPlaceholder() {
 }
 
 const styles = StyleSheet.create({
+  hiddenPane: {
+    display: 'none',
+  },
   placeholderContainer: {
     alignItems: 'center',
   },
@@ -353,30 +367,43 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
         renderSkeleton={() => <ReceiveHubPlaceholder />}
         renderContent={() => {
           if (!receiveEntryData) return null;
-          if (selectedTab === 'P2PK' && quickAccessP2PK) {
-            return <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />;
-          }
-          if (selectedTab === 'Bolt12' || selectedTab === 'Onchain') {
-            return (
-              <ReceiveReusableQuoteTab
-                method={selectedTab === 'Bolt12' ? 'bolt12' : 'onchain'}
-                unit={unit}
-                walletContext={walletContext}
-                actions={actions}
-                muted={muted}
-              />
-            );
-          }
           return (
-            <ReceiveLightningTab
-              data={receiveEntryData}
-              unit={unit}
-              mintInfo={mintInfo}
-              selectedMintUrl={mintUrl}
-              isNpcMintUpdating={isNpcMintUpdating}
-              actions={actions}
-              muted={muted}
-            />
+            <>
+              <TabPane visible={selectedTab === 'Lightning'}>
+                <ReceiveLightningTab
+                  data={receiveEntryData}
+                  unit={unit}
+                  mintInfo={mintInfo}
+                  selectedMintUrl={mintUrl}
+                  isNpcMintUpdating={isNpcMintUpdating}
+                  actions={actions}
+                  muted={muted}
+                />
+              </TabPane>
+              <TabPane visible={selectedTab === 'Bolt12'}>
+                <ReceiveReusableQuoteTab
+                  method="bolt12"
+                  unit={unit}
+                  walletContext={walletContext}
+                  actions={actions}
+                  muted={muted}
+                />
+              </TabPane>
+              <TabPane visible={selectedTab === 'Onchain'}>
+                <ReceiveReusableQuoteTab
+                  method="onchain"
+                  unit={unit}
+                  walletContext={walletContext}
+                  actions={actions}
+                  muted={muted}
+                />
+              </TabPane>
+              {quickAccessP2PK && (
+                <TabPane visible={selectedTab === 'P2PK'}>
+                  <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
+                </TabPane>
+              )}
+            </>
           );
         }}
       />
