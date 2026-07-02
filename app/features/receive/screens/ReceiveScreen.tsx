@@ -57,6 +57,9 @@ interface ReceiveLightningTabProps {
   /** NPC mint sync disables the mint row; not on history entry (store-only). */
   isNpcMintUpdating: boolean;
   actions: UseScreenActionsResult<'receive'>['actions'];
+  /** Under-QR slot (the Address/BOLT 12 mode switcher) — rendered in every
+   *  state so the switcher never disappears. */
+  belowQr?: React.ReactNode;
   muted: string;
 }
 
@@ -67,14 +70,17 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
   selectedMintUrl,
   isNpcMintUpdating,
   actions,
+  belowQr,
   muted,
 }: ReceiveLightningTabProps) {
   const npcAddress = unit === 'sat' ? data.npcAddress : undefined;
-  if (!npcAddress) return null;
+  const belowQrSlot = belowQr ? <View style={{ marginTop: 12 }}>{belowQr}</View> : null;
+  if (!npcAddress) return belowQrSlot;
 
   return (
     <>
       <PaymentInfo data={npcAddress.toString()} copyTarget="address" unit="sat" />
+      {belowQrSlot}
       <View className="mx-4">
         <Section title="RECEIVE ADDRESS">
           <GradientCard>
@@ -206,6 +212,28 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   const [selectedTab, setSelectedTab] = useState<string>('Lightning');
   const [lightningMode, setLightningMode] = useState<'address' | 'offer'>('address');
 
+  const lightningModeSwitcher = useMemo(
+    () => (
+      <ActionSegmentsCard
+        segments={[
+          {
+            label: 'Address',
+            active: lightningMode === 'address',
+            onPress: () => setLightningMode('address'),
+            testID: 'receive-lightning-mode-address',
+          },
+          {
+            label: 'BOLT 12',
+            active: lightningMode === 'offer',
+            onPress: () => setLightningMode('offer'),
+            testID: 'receive-lightning-mode-offer',
+          },
+        ]}
+      />
+    ),
+    [lightningMode]
+  );
+
   const { entry, error, actions, mintUrl } = useScreenActions(
     'receive',
     receiveEntry as string | Record<string, unknown> | undefined
@@ -316,28 +344,12 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
           return (
             <>
               <TabPane visible={selectedTab === 'Lightning'}>
-                {/* Two Lightning rails behind a VISIBLE mode switcher (sub-tab
-                    at the top, not a buried setting): the npub.cash address
-                    (human-readable, BIP-353-style) and the reusable BOLT 12
-                    offer. Both stay mounted so switching never stutters. */}
-                <View style={{ marginBottom: 12 }}>
-                  <ActionSegmentsCard
-                    segments={[
-                      {
-                        label: 'Address',
-                        active: lightningMode === 'address',
-                        onPress: () => setLightningMode('address'),
-                        testID: 'receive-lightning-mode-address',
-                      },
-                      {
-                        label: 'BOLT 12',
-                        active: lightningMode === 'offer',
-                        onPress: () => setLightningMode('offer'),
-                        testID: 'receive-lightning-mode-offer',
-                      },
-                    ]}
-                  />
-                </View>
+                {/* Two Lightning rails behind a VISIBLE mode switcher — the
+                    npub.cash address (human-readable, BIP-353-style) and the
+                    reusable BOLT 12 offer. The switcher rides each sub-view's
+                    under-QR slot (rendered in every state, so it can never
+                    disappear); both sub-views stay mounted so switching never
+                    stutters. */}
                 <View style={lightningMode === 'address' ? undefined : styles.hiddenPane}>
                   <ReceiveLightningTab
                     data={receiveEntryData}
@@ -346,6 +358,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                     selectedMintUrl={mintUrl}
                     isNpcMintUpdating={isNpcMintUpdating}
                     actions={actions}
+                    belowQr={lightningModeSwitcher}
                     muted={muted}
                   />
                 </View>
@@ -355,6 +368,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                     unit={unit}
                     walletContext={walletContext}
                     actions={actions}
+                    belowQr={lightningModeSwitcher}
                     muted={muted}
                   />
                 </View>

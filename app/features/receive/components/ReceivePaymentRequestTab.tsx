@@ -26,11 +26,11 @@ import { useColadaManager, useStandingPaymentRequest } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
 import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
 import { Section } from '@/shared/ui/composed/Section';
 import { Button } from '@/shared/ui/primitives/Button';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { truncateMiddle } from '@/shared/lib/strings';
@@ -172,16 +172,16 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
     );
   }
 
-  if (error) {
+  // Hold the previous request while re-resolving (P2PK toggle / mint-list
+  // drift only re-encodes the same operation) — blanking everything to a
+  // skeleton on toggle was jarring. The placeholder only shows before the
+  // FIRST request resolves.
+  if (!request && error) {
     return renderEmptyState(`Could not load the payment request: ${error}`);
   }
 
-  if (isLoading || !request) {
-    return (
-      <View className="mx-4 mt-8">
-        <Skeleton style={{ height: 320, borderRadius: 16 }} />
-      </View>
-    );
+  if (!request) {
+    return <ReceiveRailPlaceholder sectionTitle="CASHU PAYMENT REQUEST" />;
   }
 
   return (

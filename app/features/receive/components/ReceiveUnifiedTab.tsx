@@ -26,10 +26,10 @@ import { useReusableMintQuote, useStandingPaymentRequest } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
 import { Section } from '@/shared/ui/composed/Section';
 import { useReceiveMethodMint } from '@/features/receive/hooks/useReceiveMethodMint';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { truncateMiddle } from '@/shared/lib/strings';
@@ -141,11 +141,7 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
   }, [uri, included]);
 
   if (!uri && anyLoading) {
-    return (
-      <View className="mx-4 mt-8">
-        <Skeleton style={{ height: 320, borderRadius: 16 }} />
-      </View>
-    );
+    return <ReceiveRailPlaceholder sectionTitle="BIP-321 URI" />;
   }
 
   if (!uri) {

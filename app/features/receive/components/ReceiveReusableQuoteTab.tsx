@@ -22,6 +22,7 @@ import { useColadaManager, useReusableMintQuote, type UseScreenActionsResult } f
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
 import { Section } from '@/shared/ui/composed/Section';
 import { HistoryEntryRefresh } from '@/features/transactions';
 import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
@@ -52,6 +53,10 @@ interface ReceiveReusableQuoteTabProps {
   unit: string;
   walletContext: Pick<WalletContext, 'trustedMintUrls' | 'mintMethodCapabilities' | 'mintBalances'>;
   actions: UseScreenActionsResult<'receive'>['actions'];
+  /** Rendered in the under-QR slot in EVERY state (content, loading, empty)
+   *  — the Lightning pane passes its Address/BOLT 12 mode switcher here, and
+   *  it must never disappear or the user can't switch back. */
+  belowQr?: React.ReactNode;
   muted: string;
 }
 
@@ -78,6 +83,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   unit,
   walletContext,
   actions,
+  belowQr,
   muted,
 }: ReceiveReusableQuoteTabProps) {
   const copy = METHOD_COPY[method];
@@ -303,19 +309,26 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     </View>
   );
 
+  const belowQrSlot = belowQr ? <View style={{ marginTop: 12 }}>{belowQr}</View> : null;
+
   // No trusted mint can serve this rail at all — point at discovery,
   // pre-filtered to mints advertising the method.
   if (!anyMintSupports) {
-    return renderEmptyState(
-      copy.noneSupport,
-      <Button
-        text="Find mints"
-        variant="primary"
-        size="compact"
-        onPress={openMintDiscovery}
-        style={{ marginTop: 16 }}
-        testID={`receive-${method}-find-mints`}
-      />
+    return (
+      <>
+        {belowQrSlot}
+        {renderEmptyState(
+          copy.noneSupport,
+          <Button
+            text="Find mints"
+            variant="primary"
+            size="compact"
+            onPress={openMintDiscovery}
+            style={{ marginTop: 16 }}
+            testID={`receive-${method}-find-mints`}
+          />
+        )}
+      </>
     );
   }
 
@@ -323,29 +336,39 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   // default always resolves to a supporting mint when one exists).
   if (!mintSupports) {
     return (
-      <Pressable onPress={() => void openMintSelect()} testID={`receive-${method}-pick-mint`}>
-        {renderEmptyState(`${copy.unsupported} Tap to choose a mint.`)}
-      </Pressable>
+      <>
+        {belowQrSlot}
+        <Pressable onPress={() => void openMintSelect()} testID={`receive-${method}-pick-mint`}>
+          {renderEmptyState(`${copy.unsupported} Tap to choose a mint.`)}
+        </Pressable>
+      </>
     );
   }
 
-  if (error) {
-    return renderEmptyState(
-      `Could not load the standing ${method === 'bolt12' ? 'offer' : 'address'}: ${error}`
-    );
-  }
-
-  if (isLoading || !request || !qrData) {
+  if (error && !request) {
     return (
-      <View className="mx-4 mt-8">
-        <Skeleton style={{ height: 320, borderRadius: 16 }} />
-      </View>
+      <>
+        {belowQrSlot}
+        {renderEmptyState(
+          `Could not load the standing ${method === 'bolt12' ? 'offer' : 'address'}: ${error}`
+        )}
+      </>
+    );
+  }
+
+  if (!request || !qrData) {
+    return (
+      <>
+        <ReceiveRailPlaceholder sectionTitle={copy.sectionTitle} />
+        {belowQrSlot}
+      </>
     );
   }
 
   return (
     <>
       <PaymentInfo data={qrData} copyTarget={copy.copyTarget} unit={unit} />
+      {belowQrSlot}
       {method === 'onchain' && (
         // Same 12px offset the QR speed controls use under the QR; the
         // Section below brings its own py-3, keeping the gaps symmetric.
