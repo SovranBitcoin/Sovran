@@ -157,7 +157,7 @@ export class DataMigration {
           continue;
         }
 
-        const wallet = await getWallet(this.manager, mintUrl);
+        const wallet = await getWallet(this.manager, mintUrl, 'sat');
         const proofStates = await wallet.checkProofsStates(satProofs);
 
         for (let i = 0; i < satProofs.length; i++) {
@@ -174,7 +174,10 @@ export class DataMigration {
             continue;
           }
 
-          await saveProofs(this.manager, mintUrl, [{ ...proof, mintUrl, state: 'ready' as const }]);
+          await saveProofs(this.manager, mintUrl, [
+            // Only sat proofs pass the keyset-unit filter above.
+            { ...proof, mintUrl, state: 'ready' as const, unit: 'sat' },
+          ]);
           result.proofsMigrated++;
         }
 

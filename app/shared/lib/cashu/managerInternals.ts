@@ -42,7 +42,7 @@ interface ManagerInternals {
     restoreProofsToReady(mintUrl: string, secrets: string[]): Promise<void>;
   };
   walletService: {
-    getWallet(mintUrl: string): Promise<Wallet>;
+    getWallet(mintUrl: string, unit: string): Promise<Wallet>;
   };
   counterService: {
     overwriteCounter(
@@ -92,12 +92,12 @@ export async function getReadyProofs(manager: Manager, mintUrl: string): Promise
   }
 }
 
-/** Wallet for one mint, via the private WalletService. */
-export async function getWallet(manager: Manager, mintUrl: string): Promise<Wallet> {
-  cashuLog.debug('cashu.manager_internals.wallet.start', { ...mintUrlLogFields(mintUrl) });
+/** Wallet for one mint+unit, via the private WalletService (v2 caches per (mint, unit)). */
+export async function getWallet(manager: Manager, mintUrl: string, unit: string): Promise<Wallet> {
+  cashuLog.debug('cashu.manager_internals.wallet.start', { ...mintUrlLogFields(mintUrl), unit });
   try {
-    const wallet = await internals(manager).walletService.getWallet(mintUrl);
-    cashuLog.debug('cashu.manager_internals.wallet.done', { ...mintUrlLogFields(mintUrl) });
+    const wallet = await internals(manager).walletService.getWallet(mintUrl, unit);
+    cashuLog.debug('cashu.manager_internals.wallet.done', { ...mintUrlLogFields(mintUrl), unit });
     return wallet;
   } catch (error) {
     cashuLog.warn('cashu.manager_internals.wallet.failed', {

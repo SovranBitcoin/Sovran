@@ -356,7 +356,7 @@ export function useMintRebalanceOrchestrator({
         let worstCaseInputFee = 0;
         try {
           const proofs = await getReadyProofs(manager, fromMintUrl);
-          const wallet = await getWallet(manager, fromMintUrl);
+          const wallet = await getWallet(manager, fromMintUrl, 'sat');
           worstCaseInputFee = amountToNumber(wallet.getFeesForProofs(proofs as unknown as Proof[]));
           // fee_reserve (conservative floor) + worst-case input fee (all proofs selected)
           feeHeadroom = Math.max(STATIC_FEE_HEADROOM, MIN_FEE_RESERVE + worstCaseInputFee);
@@ -448,9 +448,9 @@ export function useMintRebalanceOrchestrator({
         // HTTP, no persistence/events) to discover the real fee_reserve, then
         // re-cap the transfer amount if needed — avoiding blind retry loops.
         try {
-          const probeWallet = await getWallet(manager, fromMintUrl);
+          const probeWallet = await getWallet(manager, fromMintUrl, 'sat');
           const probeQuote = await probeWallet.createMeltQuoteBolt11(invoice);
-          const actualFeeReserve = Number(probeQuote.fee_reserve ?? 0);
+          const actualFeeReserve = amountToNumber(probeQuote.fee_reserve ?? 0);
 
           if (actualFeeReserve > 0) {
             const probedHeadroom = actualFeeReserve + worstCaseInputFee;
@@ -822,7 +822,7 @@ export function useMintRebalanceOrchestrator({
                 let hopFeeHeadroom = STATIC_FEE_HEADROOM;
                 try {
                   const hopProofs = await getReadyProofs(manager, hopFrom);
-                  const hopWallet = await getWallet(manager, hopFrom);
+                  const hopWallet = await getWallet(manager, hopFrom, 'sat');
                   const hopInputFee = amountToNumber(
                     hopWallet.getFeesForProofs(hopProofs as unknown as Proof[])
                   );
@@ -871,16 +871,16 @@ export function useMintRebalanceOrchestrator({
 
                 // ── Probe melt quote for this hop's actual fee_reserve ──
                 try {
-                  const hopProbeWallet = await getWallet(manager, hopFrom);
+                  const hopProbeWallet = await getWallet(manager, hopFrom, 'sat');
                   const hopProbeQuote = await hopProbeWallet.createMeltQuoteBolt11(hopInvoice);
-                  const hopActualFeeReserve = Number(hopProbeQuote.fee_reserve ?? 0);
+                  const hopActualFeeReserve = amountToNumber(hopProbeQuote.fee_reserve ?? 0);
 
                   if (hopActualFeeReserve > 0) {
                     // Recompute hop fee headroom with probed fee_reserve
                     let hopProbeInputFee = 0;
                     try {
                       const hpProofs = await getReadyProofs(manager, hopFrom);
-                      const hpWallet = await getWallet(manager, hopFrom);
+                      const hpWallet = await getWallet(manager, hopFrom, 'sat');
                       hopProbeInputFee = amountToNumber(
                         hpWallet.getFeesForProofs(hpProofs as unknown as Proof[])
                       );
