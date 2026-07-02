@@ -1,6 +1,6 @@
 /**
  * Subscribes to coco events for payment status.
- * Receive (mint): mint-op:quote-state-changed (PAID) or mint-op:pending (PAID) → mint-op:finalized.
+ * Receive (mint): mint-quote:updated (PAID) or mint-op:pending (quote PAID) → mint-op:finalized.
  * Receive (ecash): toast shown on redeem button → receive:created updates to confirmed.
  * Send: send:finalized confirms an active send/payment-request toast when present,
  * otherwise shows the standard send confirmation toast.
@@ -106,14 +106,18 @@ export function usePaymentStatusListener(): void {
     paymentLog.info('hook.payment_status.subscribing');
 
     const offStateChanged = manager.on(
-      'mint-op:quote-state-changed',
-      ({ mintUrl, quoteId, state: remoteState, operation }) => {
-        if (operation.state === 'init') return;
+      'mint-quote:updated',
+      ({ mintUrl, method, quoteId, quote }) => {
+        // Reusable (bolt12/onchain) quotes track paid/issued balances in
+        // quoteData and surface through mint-op events once the processor
+        // claims them; the PAID toast here is for one-shot bolt11 invoices.
+        if (quote.method !== 'bolt11') return;
+        const remoteState = quote.state;
 
-        paymentLog.debug('hook.payment_status.mint_quote_state_changed', {
+        paymentLog.debug('hook.payment_status.mint_quote_updated', {
           quoteId,
           state: remoteState ?? null,
-          method: operation.method,
+          method,
           ...mintUrlLogFields(mintUrl),
         });
         if (remoteState !== 'PAID') return;
@@ -124,13 +128,13 @@ export function usePaymentStatusListener(): void {
           paymentLog.info('hook.payment_status.suppressed_for_swap', {
             quoteId,
             ...mintUrlLogFields(mintUrl),
-            phase: 'mint_quote_state_changed',
+            phase: 'mint_quote_updated',
           });
           return;
         }
 
-        const amount = amountToNumber(operation.amount);
-        const unit = operation.unit;
+        const amount = amountToNumber(quote.amount);
+        const unit = quote.unit;
 
         const existingActive = usePaymentStatusStore.getState().active;
         const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
@@ -175,72 +179,85 @@ export function usePaymentStatusListener(): void {
         return;
       }
 
-      const {
-        quoteId,
-        lastObservedRemoteState: state,
-        lastObservedRemoteStateAt,
-        unit,
-      } = operation;
+      const { quoteId, unit } = operation;
       const amount = amountToNumber(operation.amount);
-      paymentLog.debug('hook.payment_status.mint_quote_added', {
-        quoteId,
-        state,
-        ...mintUrlLogFields(mintUrl),
-      });
-      if (state !== 'PAID') return;
+      void (async () => {
+        // v2 moved remote-state observation off the operation onto the
+        // canonical quote row — fetch it for the PAID check + NPC freshness.
+        let state: string | undefined;
+        let lastObservedRemoteStateAt: number | undefined;
+        try {
+          const quote = await manager.quotes.mint.get({ mintUrl, quoteId });
+          state = quote?.state ?? quote?.lastObservedRemoteState;
+          lastObservedRemoteStateAt = quote?.lastObservedRemoteStateAt;
+        } catch (error) {
+          paymentLog.debug('hook.payment_status.mint_quote_lookup_failed', {
+            quoteId,
+            ...mintUrlLogFields(mintUrl),
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return;
+        }
+        paymentLog.debug('hook.payment_status.mint_quote_added', {
+          quoteId,
+          state,
+          ...mintUrlLogFields(mintUrl),
+        });
+        if (state !== 'PAID') return;
 
-      if (isSwapStatusActive()) {
-        paymentLog.info('hook.payment_status.suppressed_for_swap', {
+        if (isSwapStatusActive()) {
+          paymentLog.info('hook.payment_status.suppressed_for_swap', {
+            quoteId,
+            ...mintUrlLogFields(mintUrl),
+            phase: 'mint_quote_added',
+          });
+          return;
+        }
+
+        if (!shouldShowNpcReceivePopup(lastObservedRemoteStateAt)) {
+          paymentLog.info('hook.payment_status.npc_quote_suppressed', {
+            quoteId,
+            ...mintUrlLogFields(mintUrl),
+            observedAt: lastObservedRemoteStateAt ?? null,
+            ageMs:
+              typeof lastObservedRemoteStateAt === 'number'
+                ? Date.now() - lastObservedRemoteStateAt
+                : null,
+            reason: lastObservedRemoteStateAt == null ? 'no_observed_at' : 'too_old',
+          });
+          return;
+        }
+
+        const existingActive = usePaymentStatusStore.getState().active;
+        const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
+
+        paymentLog.info('hook.payment_status.npc_receive_processing', {
           quoteId,
           ...mintUrlLogFields(mintUrl),
-          phase: 'mint_quote_added',
+          amount,
+          unit,
+          isDuplicate,
         });
-        return;
-      }
-
-      if (!shouldShowNpcReceivePopup(lastObservedRemoteStateAt)) {
-        paymentLog.info('hook.payment_status.npc_quote_suppressed', {
-          quoteId,
-          ...mintUrlLogFields(mintUrl),
-          observedAt: lastObservedRemoteStateAt ?? null,
-          ageMs:
-            typeof lastObservedRemoteStateAt === 'number'
-              ? Date.now() - lastObservedRemoteStateAt
-              : null,
-          reason: lastObservedRemoteStateAt == null ? 'no_observed_at' : 'too_old',
+        usePaymentStatusStore.getState().setActive({
+          variant: 'receive',
+          id: quoteId,
+          mintUrl,
+          amount,
+          unit,
+          state: 'processing',
         });
-        return;
-      }
 
-      const existingActive = usePaymentStatusStore.getState().active;
-      const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
+        if (isDuplicate) {
+          paymentLog.info('hook.payment_status.receive_popup_suppressed', {
+            quoteId,
+            ...mintUrlLogFields(mintUrl),
+            reason: 'already_active',
+          });
+          return;
+        }
 
-      paymentLog.info('hook.payment_status.npc_receive_processing', {
-        quoteId,
-        ...mintUrlLogFields(mintUrl),
-        amount,
-        unit,
-        isDuplicate,
-      });
-      usePaymentStatusStore.getState().setActive({
-        variant: 'receive',
-        id: quoteId,
-        mintUrl,
-        amount,
-        unit,
-        state: 'processing',
-      });
-
-      if (isDuplicate) {
-        paymentLog.info('hook.payment_status.receive_popup_suppressed', {
-          quoteId,
-          ...mintUrlLogFields(mintUrl),
-          reason: 'already_active',
-        });
-        return;
-      }
-
-      paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
+        paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
+      })();
     });
 
     const offRedeemed = manager.on('mint-op:finalized', ({ operationId, operation }) => {

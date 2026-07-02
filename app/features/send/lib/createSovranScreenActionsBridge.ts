@@ -304,10 +304,15 @@ export function createSovranScreenActionsBridge({
       unsubscribes.push(subscribeMeltOperation('melt-op:rolled-back'));
 
       unsubscribes.push(
-        manager.on('mint-op:quote-state-changed', ({ quoteId, state, operation }) => {
-          paymentLog.info('send.mint_quote_state_changed', {
+        // v2: quote state lives on the canonical quote row (mint-quote:updated),
+        // decoupled from operations — the payload carries no operationId; bus
+        // consumers match by quoteId.
+        manager.on('mint-quote:updated', ({ quoteId, quote }) => {
+          const state = quote.state ?? quote.lastObservedRemoteState;
+          paymentLog.info('send.mint_quote_updated', {
             quoteId,
             state: state ?? null,
+            method: quote.method,
           });
           if (isMintQuotePaymentObserved({ state }) && quoteId) {
             useTransactionDistributionStore.getState().setDistribution(quoteId, 'displayed');
@@ -323,12 +328,10 @@ export function createSovranScreenActionsBridge({
             entry: {
               type: 'mint',
               quoteId,
-              operationId: operation.id,
-              state,
-              remoteState: state,
+              state: state ?? null,
+              remoteState: state ?? null,
             },
             quoteId,
-            operationId: operation.id,
           });
         })
       );
