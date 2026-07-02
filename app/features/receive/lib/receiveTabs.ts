@@ -8,5 +8,5 @@ type ReceiveTab = 'Lightning' | 'Unified' | 'Onchain' | 'Cashu';
  * tab is permanent — tab bodies own their empty/discovery states.
  */
 export function computeReceiveTabs(): ReceiveTab[] {
-  return ['Lightning', 'Unified', 'Onchain', 'Cashu'];
+  return ['Unified', 'Lightning', 'Onchain', 'Cashu'];
 }

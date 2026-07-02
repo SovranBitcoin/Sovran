@@ -209,7 +209,7 @@ interface ReceiveScreenProps {
 export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   useLifecycleLogger('ReceiveScreen');
   const muted = useThemeColor('muted');
-  const [selectedTab, setSelectedTab] = useState<string>('Lightning');
+  const [selectedTab, setSelectedTab] = useState<string>('Unified');
   const [lightningMode, setLightningMode] = useState<'address' | 'offer'>('address');
 
   const lightningModeSwitcher = useMemo(
@@ -255,7 +255,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   // If the open tab disappears (setting toggled off / capability change),
   // snap back to Lightning so hidden content stops rendering.
   useEffect(() => {
-    if (!(tabs as readonly string[]).includes(selectedTab)) setSelectedTab('Lightning');
+    if (!(tabs as readonly string[]).includes(selectedTab)) setSelectedTab('Unified');
   }, [tabs, selectedTab]);
 
   useEffect(() => {

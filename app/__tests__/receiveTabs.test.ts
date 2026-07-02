@@ -9,6 +9,6 @@ import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
 
 describe('computeReceiveTabs', () => {
   it('returns the four high-level rails', () => {
-    expect(computeReceiveTabs()).toEqual(['Lightning', 'Unified', 'Onchain', 'Cashu']);
+    expect(computeReceiveTabs()).toEqual(['Unified', 'Lightning', 'Onchain', 'Cashu']);
   });
 });

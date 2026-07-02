@@ -11,7 +11,7 @@
  * — which is exactly why this tab is NOT the receive hub's default.
  */
 
-import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { setStringAsync } from 'expo-clipboard';
@@ -129,6 +129,16 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
 
   const anyLoading = onchain.isLoading || bolt12.isLoading || creq.isLoading;
 
+  // As the DEFAULT tab this must not stutter: hold the placeholder until
+  // every rail settles ONCE, then render the fully composed QR in a single
+  // swap. Later re-resolves (e.g. the Cashu rail's fresh-per-visit rotation
+  // retiring the creq) keep the current content and swap in place — the new
+  // request id replaces the cancelled one without a skeleton flash.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!anyLoading && !settled) setSettled(true);
+  }, [anyLoading, settled]);
+
   const handleCopy = useCallback(async () => {
     if (!uri) return;
     await EnhancedHaptics.copyHaptic();
@@ -140,7 +150,7 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
     });
   }, [uri, included]);
 
-  if (!uri && anyLoading) {
+  if (!settled) {
     return <ReceiveRailPlaceholder sectionTitle="BIP-321 URI" />;
   }
 
