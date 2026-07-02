@@ -132,6 +132,146 @@ export class CocoManager {
     return this.accountIndex === 0 ? 'coco.db' : `coco-${this.accountIndex}.db`;
   }
 
+  /** File-system paths for a coco database and its pre-v2 backup set. */
+  private static getDbPaths(dbName: string) {
+    const dbPath = `${FileSystem.documentDirectory}SQLite/${dbName}`;
+    return {
+      dbPath,
+      sidecars: [`${dbPath}-wal`, `${dbPath}-shm`] as const,
+      backupPath: `${dbPath}.pre-v2`,
+      backupSidecars: [`${dbPath}.pre-v2-wal`, `${dbPath}.pre-v2-shm`] as const,
+    };
+  }
+
+  /** Table names + applied-migration count for an open coco database. */
+  private static async dumpSchemaState(
+    db: SQLite.SQLiteDatabase
+  ): Promise<{ tables: string[]; migrationCount: number }> {
+    const rows = await db.getAllAsync<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    );
+    const tables = rows.map((row) => row.name);
+    let migrationCount = 0;
+    if (tables.includes('coco_cashu_migrations')) {
+      const row = await db.getFirstAsync<{ c: number }>(
+        'SELECT COUNT(*) AS c FROM coco_cashu_migrations'
+      );
+      migrationCount = row?.c ?? 0;
+    }
+    return { tables, migrationCount };
+  }
+
+  /** Per-unit ready-proof sums, e.g. "sat=1234(12)" — amounts only, no proof data. */
+  private static async snapshotReadyProofBalances(
+    db: SQLite.SQLiteDatabase,
+    tables: string[]
+  ): Promise<string | null> {
+    if (!tables.includes('coco_cashu_proofs')) return null;
+    const rows = await db.getAllAsync<{ unit: string | null; total: number | null; cnt: number }>(
+      "SELECT unit, SUM(CAST(amount AS INTEGER)) AS total, COUNT(*) AS cnt FROM coco_cashu_proofs WHERE state = 'ready' GROUP BY unit"
+    );
+    if (rows.length === 0) return 'empty';
+    return rows.map((row) => `${row.unit ?? 'sat'}=${row.total ?? 0}(${row.cnt})`).join(',');
+  }
+
+  /**
+   * v1→v2 migration safety rails, run after opening the DB but BEFORE
+   * `repositories.init()` applies coco's forward-only schema migrations
+   * (024–036 rewrite money columns to TEXT and restructure melt quotes; a
+   * migrated DB cannot be read by a v1 build). When the database still has
+   * the v1 schema, take a one-time file copy (`<dbName>.pre-v2`) so the
+   * wallet can be manually restored, and log schema + ready-proof snapshots
+   * so the migration outcome is verifiable from log.txt.
+   *
+   * Never throws — a failed backup logs and lets init proceed. Returns the
+   * live DB handle (reopened when the backup had to close it) and the
+   * pre-init migration count (-1 when unknown).
+   */
+  private static async runPreInitSafetyRails(
+    db: SQLite.SQLiteDatabase,
+    dbName: string
+  ): Promise<{ db: SQLite.SQLiteDatabase; migrationCount: number }> {
+    try {
+      const { tables, migrationCount } = await this.dumpSchemaState(db);
+      const isPreV2 = tables.length > 0 && !tables.includes('coco_cashu_canonical_mint_quotes');
+      cashuLog.info('cashu.manager.schema_dump.before', {
+        dbName,
+        tableCount: tables.length,
+        migrationCount,
+        isPreV2,
+      });
+      if (!isPreV2) {
+        return { db, migrationCount };
+      }
+
+      const balances = await this.snapshotReadyProofBalances(db, tables).catch(() => null);
+      cashuLog.info('cashu.manager.balance_snapshot.pre_migration', { dbName, balances });
+
+      const { dbPath, sidecars, backupPath, backupSidecars } = this.getDbPaths(dbName);
+      const existing = await FileSystem.getInfoAsync(backupPath);
+      if (existing.exists) {
+        cashuLog.info('cashu.manager.db_backup.skipped', { dbName, reason: 'backup_exists' });
+        return { db, migrationCount };
+      }
+
+      cashuLog.info('cashu.manager.db_backup.start', { dbName });
+      // Close first so the WAL checkpoint lands in the main file, then copy
+      // the full file set and reopen for the migration run.
+      await db.closeAsync();
+      await FileSystem.copyAsync({ from: dbPath, to: backupPath });
+      for (let i = 0; i < sidecars.length; i++) {
+        const info = await FileSystem.getInfoAsync(sidecars[i]);
+        if (info.exists) {
+          await FileSystem.copyAsync({ from: sidecars[i], to: backupSidecars[i] });
+        }
+      }
+      const backupInfo = await FileSystem.getInfoAsync(backupPath);
+      const reopened = await SQLite.openDatabaseAsync(dbName);
+      cashuLog.info('cashu.manager.db_backup.done', {
+        dbName,
+        bytes: backupInfo.exists && 'size' in backupInfo ? backupInfo.size : 0,
+      });
+      return { db: reopened, migrationCount };
+    } catch (error) {
+      cashuLog.error('cashu.manager.db_backup.failed', { dbName, error });
+      // The handle may have been closed mid-backup; make sure init still gets a live one.
+      try {
+        await db.getFirstAsync('SELECT 1');
+        return { db, migrationCount: -1 };
+      } catch {
+        return { db: await SQLite.openDatabaseAsync(dbName), migrationCount: -1 };
+      }
+    }
+  }
+
+  /** Post-`repositories.init()` schema dump; pairs with schema_dump.before. */
+  private static async logPostInitSchema(
+    db: SQLite.SQLiteDatabase,
+    dbName: string,
+    beforeMigrationCount: number
+  ): Promise<void> {
+    try {
+      const { tables, migrationCount } = await this.dumpSchemaState(db);
+      cashuLog.info('cashu.manager.schema_dump.after', {
+        dbName,
+        tableCount: tables.length,
+        migrationCount,
+        tables: tables.join(','),
+      });
+      if (beforeMigrationCount >= 0 && migrationCount > beforeMigrationCount) {
+        const balances = await this.snapshotReadyProofBalances(db, tables).catch(() => null);
+        cashuLog.info('cashu.manager.migration.applied', {
+          dbName,
+          fromCount: beforeMigrationCount,
+          toCount: migrationCount,
+          balances,
+        });
+      }
+    } catch (error) {
+      cashuLog.warn('cashu.manager.schema_dump.after_failed', { dbName, error });
+    }
+  }
+
   /**
    * Set the cashu mnemonic from NostrKeysProvider
    * This should be called before initialize()
@@ -208,10 +348,14 @@ export class CocoManager {
           hasSignerKey: !!p2pkImportSecretKey,
           hasGiveawayP2PK: !!GIVEAWAY_P2PK_SECRET,
         });
-        const db = await initPhase(`CocoManager.openDB[${dbName}]`, () =>
+        const opened = await initPhase(`CocoManager.openDB[${dbName}]`, () =>
           SQLite.openDatabaseAsync(dbName)
         );
         cashuLog.debug('cashu.manager.sqlite_opened', { dbName });
+        const { db, migrationCount: preInitMigrationCount } = await initPhase(
+          'CocoManager.preInitSafetyRails',
+          () => this.runPreInitSafetyRails(opened, dbName)
+        );
         this.db = db;
         const database = db as unknown as ExpoSqliteRepositoriesOptions['database'];
         // The profile's signer key is imported into coco's keyring (p2pk-import
@@ -232,6 +376,7 @@ export class CocoManager {
         );
         await initPhase('CocoManager.reposInit', () => repositories.init());
         cashuLog.debug('cashu.manager.repositories.ready', { dbName });
+        await this.logPostInitSchema(db, dbName, preInitMigrationCount);
 
         // 2. Seed getter (lazy — no crypto work until first call, cached after)
         // Tries SecureStore seed cache first (~5ms) before falling back to PBKDF2 (~5s).
@@ -772,14 +917,13 @@ export class CocoManager {
    * Delete a single coco database by name.
    */
   private static async deleteDatabase(dbName: string): Promise<void> {
+    const { dbPath, backupPath, backupSidecars } = this.getDbPaths(dbName);
     try {
       await SQLite.deleteDatabaseAsync(dbName);
       cashuLog.info('cashu.manager.db_deleted', { dbName });
     } catch (error) {
       cashuLog.warn('cashu.manager.db_delete_failed', { dbName, error });
       try {
-        const dbDirectory = FileSystem.documentDirectory;
-        const dbPath = `${dbDirectory}SQLite/${dbName}`;
         const filesToDelete = [dbPath, `${dbPath}-journal`, `${dbPath}-wal`, `${dbPath}-shm`];
         for (const filePath of filesToDelete) {
           await FileSystem.deleteAsync(filePath, { idempotent: true });
@@ -788,6 +932,17 @@ export class CocoManager {
       } catch (fsError) {
         cashuLog.warn('cashu.manager.db_delete_fallback_failed', { dbName, error: fsError });
       }
+    }
+
+    // Pre-v2 migration backups hold spendable proofs — account deletion must
+    // remove them along with the live database.
+    try {
+      for (const filePath of [backupPath, ...backupSidecars]) {
+        await FileSystem.deleteAsync(filePath, { idempotent: true });
+      }
+      cashuLog.debug('cashu.manager.db_backup_deleted', { dbName });
+    } catch (error) {
+      cashuLog.warn('cashu.manager.db_backup_delete_failed', { dbName, error });
     }
   }
 

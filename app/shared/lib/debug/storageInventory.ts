@@ -36,6 +36,10 @@ const SECURE_STORE_KEY_PREFIXES = {
 const SECURE_STORE_STATIC_KEYS = ['user_mnemonic', 'migrations_complete'] as const;
 
 const COCO_DB_REGEX = /^coco(?:-\d+)?\.db(?:-(?:wal|shm|journal))?$/;
+// Pre-v2 migration backups written by CocoManager.runPreInitSafetyRails.
+// Listed separately from live DBs; they hold spendable proofs and are never
+// included in dump/share flows (the AsyncStorage dump never reads SQLite files).
+const COCO_BACKUP_REGEX = /^coco(?:-\d+)?\.db\.pre-v2(?:-(?:wal|shm))?$/;
 
 export interface ZustandInventory {
   existingGlobalStoreKeys: string[];
@@ -53,6 +57,7 @@ interface StorageInventorySnapshot {
   zustand: ZustandInventory;
   secureStore: SecureStoreInventoryEntry[];
   cocoDatabases: string[];
+  cocoBackups: string[];
 }
 
 function buildSecureStoreProbeKeys(profiles: ProfileEntry[]): string[] {
@@ -126,26 +131,29 @@ async function getSecureStoreInventory(
   return entries;
 }
 
-async function getCocoDatabaseInventory(): Promise<string[]> {
+async function getCocoDatabaseInventory(): Promise<{ databases: string[]; backups: string[] }> {
   const documentDirectory = FileSystem.documentDirectory;
   if (!documentDirectory) {
     storeLog.debug('storage.inventory.coco_databases.skipped', {
       reason: 'missing-document-directory',
     });
-    return [];
+    return { databases: [], backups: [] };
   }
 
   const sqliteDirectory = `${documentDirectory}SQLite`;
 
   try {
     const files = await FileSystem.readDirectoryAsync(sqliteDirectory);
-    return files.filter((file) => COCO_DB_REGEX.test(file)).sort();
+    return {
+      databases: files.filter((file) => COCO_DB_REGEX.test(file)).sort(),
+      backups: files.filter((file) => COCO_BACKUP_REGEX.test(file)).sort(),
+    };
   } catch (error) {
     storeLog.warn('storage.inventory.coco_databases.failed', {
       hasDocumentDirectory: true,
       error: redactError(error),
     });
-    return [];
+    return { databases: [], backups: [] };
   }
 }
 
@@ -157,7 +165,7 @@ export async function getStorageInventorySnapshot(
     importedProfileCount: profiles.filter((profile) => profile.source === 'imported').length,
   });
 
-  const [zustand, secureStore, cocoDatabases] = await Promise.all([
+  const [zustand, secureStore, coco] = await Promise.all([
     getZustandInventory(),
     getSecureStoreInventory(profiles),
     getCocoDatabaseInventory(),
@@ -170,10 +178,11 @@ export async function getStorageInventorySnapshot(
     uncategorizedStoreCount: zustand.existingUncategorizedStoreKeys.length,
     secureStoreProbeCount: secureStore.length,
     secureStoreExistingCount: secureStore.filter((entry) => entry.exists).length,
-    cocoDatabaseCount: cocoDatabases.length,
+    cocoDatabaseCount: coco.databases.length,
+    cocoBackupCount: coco.backups.length,
   });
 
-  return { zustand, secureStore, cocoDatabases };
+  return { zustand, secureStore, cocoDatabases: coco.databases, cocoBackups: coco.backups };
 }
 
 /**

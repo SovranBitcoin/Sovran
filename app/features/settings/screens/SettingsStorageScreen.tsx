@@ -220,6 +220,7 @@ export const SettingsStorageScreen = () => {
   const [zustandGroups, setZustandGroups] = useState<ZustandInventory>(EMPTY_ZUSTAND_GROUPS);
   const [secureStoreKeys, setSecureStoreKeys] = useState<string[]>([]);
   const [cocoDbFiles, setCocoDbFiles] = useState<string[]>([]);
+  const [cocoBackupFiles, setCocoBackupFiles] = useState<string[]>([]);
   const [secureStoreMeta, setSecureStoreMeta] = useState({ existing: 0, total: 0 });
 
   const loadSnapshot = useCallback(
@@ -242,6 +243,7 @@ export const SettingsStorageScreen = () => {
         setZustandGroups(snapshot.zustand);
         setSecureStoreKeys(secureEntries);
         setCocoDbFiles(snapshot.cocoDatabases);
+        setCocoBackupFiles(snapshot.cocoBackups);
         setSecureStoreMeta({
           existing: secureEntries.length,
           total: snapshot.secureStore.length,
@@ -451,6 +453,7 @@ export const SettingsStorageScreen = () => {
           groups={[
             { label: 'Main DB files', items: cocoGrouped.mainDbFiles },
             { label: 'SQLite sidecars', items: cocoGrouped.sqliteSidecars },
+            { label: 'Pre-v2 backups (excluded from dumps)', items: cocoBackupFiles },
           ]}
           emptyLabel="No coco database files currently exist."
         />
