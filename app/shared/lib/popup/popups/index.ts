@@ -183,6 +183,11 @@ const STATIC_POPUPS = {
     icon: BANK_ICON,
     type: 'error',
   },
+  'onchain-address-cooldown': {
+    message: 'Wait a few seconds between new addresses',
+    icon: 'icon:mdi:clock-outline',
+    type: 'info',
+  },
 
   // messages
   'invalid-token': {

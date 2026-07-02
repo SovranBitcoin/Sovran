@@ -11,9 +11,11 @@ import { useEffect } from 'react';
 
 import { useManagerContext } from '@cashu/coco-react';
 
+import { reusableQuoteKey, rotateReusableMintQuote } from 'wallet';
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { isSwapStatusActive } from '@/shared/stores/runtime/swapStatusStore';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { paymentLog } from '@/shared/lib/logger';
 
@@ -283,6 +285,42 @@ export function usePaymentStatusListener(): void {
       const store = usePaymentStatusStore.getState();
       const hadMatchingActive = store.active?.id === quoteId;
       store.setConfirmed(quoteId);
+
+      // Onchain address-reuse policy (mirrors P2PK rotation-on-receive): a
+      // deposit that lands on the STANDING onchain address retires it — the
+      // next payer gets a fresh address. Fixed-amount quotes are one-offs
+      // and never match the recorded standing id, so they don't rotate
+      // anything. The old quote stays pending in coco, so late payments to
+      // the retired address still auto-mint.
+      if (operation.state !== 'init' && operation.method === 'onchain') {
+        const rotationInput = {
+          mintUrl,
+          method: 'onchain' as const,
+          unit: operation.unit,
+        };
+        const standingKey = reusableQuoteKey(rotationInput);
+        const mintState = useMintStore.getState();
+        if (mintState.standingQuotes[standingKey] === quoteId) {
+          paymentLog.info('hook.payment_status.onchain_standing_rotation', {
+            quoteId,
+            ...mintUrlLogFields(mintUrl),
+          });
+          void rotateReusableMintQuote(
+            manager,
+            rotationInput,
+            {
+              get: (key) => useMintStore.getState().standingQuotes[key],
+              set: (key, id) => useMintStore.getState().setStandingQuote(key, id),
+            },
+            'deposit_received'
+          ).catch((err) => {
+            paymentLog.warn('hook.payment_status.onchain_standing_rotation_failed', {
+              quoteId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+        }
+      }
 
       // Standing-quote deposits (bolt12 offer / onchain address) auto-mint
       // with no prior toast — surface a confirmed receive so the deposit

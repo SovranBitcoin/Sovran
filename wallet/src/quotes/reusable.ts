@@ -25,6 +25,12 @@ import { logger, mintUrlFields } from "../logger";
 export interface ReusableQuoteIdentityStore {
   get(key: string): string | undefined;
   set(key: string, quoteId: string): void;
+  /**
+   * Optional: notify when the recorded quote id for `key` changes from
+   * OUTSIDE the caller — e.g. a deposit-triggered rotation done by a global
+   * listener while the tab is mounted. Returns an unsubscribe function.
+   */
+  subscribe?(key: string, callback: () => void): () => void;
 }
 
 export interface EnsureReusableMintQuoteInput {
@@ -73,6 +79,52 @@ export async function ensureReusableMintQuote(
   if (pending) return pending;
 
   const task = resolveReusableMintQuote(manager, input, identityStore, key);
+  inFlight.set(key, task);
+  try {
+    return await task;
+  } finally {
+    inFlight.delete(key);
+  }
+}
+
+/**
+ * Force-rotate the standing quote for (mint, method, unit): create a fresh
+ * quote and record it, retiring the current one. Address-reuse policy for the
+ * ONCHAIN rail — after a deposit lands on the standing address (or the user
+ * asks for a new one), the next payer should get a fresh address. The old
+ * quote stays pending in coco (reusable quotes never close), so late payments
+ * to the old address still auto-mint. Bolt12 offers deliberately do NOT
+ * rotate — one stable offer per mint is the product contract.
+ */
+export async function rotateReusableMintQuote(
+  manager: Manager,
+  input: EnsureReusableMintQuoteInput,
+  identityStore: ReusableQuoteIdentityStore,
+  reason: "deposit_received" | "manual",
+): Promise<ReusableMintQuote> {
+  const key = reusableQuoteKey(input);
+  // Let any in-flight ensure settle first so its callers keep a consistent
+  // quote, then rotate — the rotation task owns the slot afterwards.
+  const pending = inFlight.get(key);
+  if (pending) await pending.catch(() => undefined);
+
+  const unit = input.unit.trim().toLowerCase();
+  const task = (async () => {
+    const created = await manager.quotes.mint.create({
+      mintUrl: input.mintUrl,
+      method: input.method,
+      unit,
+    });
+    identityStore.set(key, created.quoteId);
+    logger.info("quotes.reusable.rotated", {
+      ...mintUrlFields(input.mintUrl),
+      method: input.method,
+      unit,
+      reason,
+      requestLength: created.request.length,
+    });
+    return created;
+  })();
   inFlight.set(key, task);
   try {
     return await task;

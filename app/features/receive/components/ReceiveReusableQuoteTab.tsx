@@ -7,7 +7,7 @@
  * attribution), so this tab never shows those.
  */
 
-import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
 
 import { router } from 'expo-router';
 import { ListGroup, PressableFeedback } from 'heroui-native';
@@ -15,10 +15,11 @@ import { ListGroup, PressableFeedback } from 'heroui-native';
 import {
   getMintMethodCapability,
   buildBip321OnchainUri,
+  reusableQuoteKey,
   type ReusableQuoteIdentityStore,
   type WalletContext,
 } from 'wallet';
-import { useReusableMintQuote, type UseScreenActionsResult } from 'wallet/react';
+import { useColadaManager, useReusableMintQuote, type UseScreenActionsResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
@@ -33,10 +34,17 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { setStringAsync } from 'expo-clipboard';
-import { copyPopup } from '@/shared/lib/popup';
+import { copyPopup, staticPopup } from '@/shared/lib/popup';
+import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import Icon from 'assets/icons';
+
+/** Manual "new address" throttle — long enough to stop QR-spamming the
+ *  mint, short enough to never feel like a lockout. */
+const ROTATE_COOLDOWN_MS = 5000;
 
 interface ReceiveReusableQuoteTabProps {
   method: 'bolt12' | 'onchain';
@@ -99,14 +107,20 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
 
   // Persisted identity map pins the standing quote — fixed-amount requests
   // (which create their own fresh reusable quotes) can never displace it.
+  // `subscribe` lets the hook pick up EXTERNAL rotations (the global
+  // deposit-received listener retiring a paid onchain address).
   const identityStore = useMemo<ReusableQuoteIdentityStore>(
     () => ({
       get: (key) => useMintStore.getState().standingQuotes[key],
       set: (key, quoteId) => useMintStore.getState().setStandingQuote(key, quoteId),
+      subscribe: (key, callback) =>
+        useMintStore.subscribe((state, prev) => {
+          if (state.standingQuotes[key] !== prev.standingQuotes[key]) callback();
+        }),
     }),
     []
   );
-  const { quote, isLoading, error } = useReusableMintQuote(
+  const { quote, isLoading, error, rotate } = useReusableMintQuote(
     methodMint && mintSupports ? { mintUrl: methodMint, method, unit } : null,
     identityStore
   );
@@ -115,6 +129,87 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   // The amountless tab shows the BARE standing address; BIP-321 URIs with
   // amounts belong to the fixed-amount flow (fresh address per request).
   const qrData = request && method === 'onchain' ? buildBip321OnchainUri(request) : request;
+
+  // Manual address rotation (onchain only) with a short cooldown so the
+  // button can't be spammed into a pile of orphan quotes at the mint.
+  const manager = useColadaManager();
+  const accent = useThemeColor('accent');
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cooldownActive = cooldownUntil > Date.now();
+  React.useEffect(
+    () => () => {
+      if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+    },
+    []
+  );
+
+  const handleGenerateAddress = useCallback(async () => {
+    if (cooldownUntil > Date.now()) {
+      paymentLog.info('receive.onchain.rotate_cooldown_blocked', {
+        remainingMs: cooldownUntil - Date.now(),
+      });
+      staticPopup('onchain-address-cooldown');
+      return;
+    }
+    setCooldownUntil(Date.now() + ROTATE_COOLDOWN_MS);
+    if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+    // Re-render when the window closes so the label un-greys.
+    cooldownTimerRef.current = setTimeout(() => setCooldownUntil(0), ROTATE_COOLDOWN_MS);
+    paymentLog.info('receive.onchain.rotate_requested', { source: 'button' });
+    await EnhancedHaptics.copyHaptic();
+    await rotate();
+  }, [cooldownUntil, rotate]);
+
+  // TEMP debug surface: every pending onchain quote for this mint, annotated
+  // standing vs fixed-amount (fixed-amount quotes carry a prepared mint
+  // OPERATION with the requested amount; the standing quote has no operation
+  // until a deposit lands — the internal difference that keeps them out of
+  // pending history, which only projects operations).
+  const openDebugAddresses = useCallback(async () => {
+    if (!methodMint) return;
+    const pending = await manager.quotes.mint.listPending({ method: 'onchain' });
+    const standingId =
+      useMintStore.getState().standingQuotes[
+        reusableQuoteKey({ mintUrl: methodMint, method: 'onchain', unit })
+      ];
+    const rows = await Promise.all(
+      pending
+        .filter((q) => q.mintUrl === methodMint)
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(async (q) => ({
+          q,
+          ops: await manager.ops.mint.listByQuote({ mintUrl: q.mintUrl, quoteId: q.quoteId }),
+        }))
+    );
+    paymentLog.info('receive.onchain.debug_addresses_opened', { count: rows.length });
+    actionMenuSheet({
+      title: `Onchain addresses (${rows.length})`,
+      buttons: rows.map(({ q, ops }) => {
+        const isStanding = q.quoteId === standingId;
+        const data = q.quoteData as { amountPaid?: unknown; amountIssued?: unknown };
+        const paid = data.amountPaid != null ? amountToNumber(data.amountPaid as never) : 0;
+        const lastOp = ops.at(-1) as { amount?: unknown } | undefined;
+        const opAmount = lastOp?.amount != null ? amountToNumber(lastOp.amount as never) : null;
+        const parts = [
+          isStanding ? 'standing' : 'fixed-amount',
+          ...(opAmount != null ? [`${opAmount} ${q.unit}`] : []),
+          `ops ${ops.length}`,
+          ...(paid > 0 ? [`paid ${paid}`] : []),
+          new Date(q.createdAt).toLocaleString(),
+        ];
+        return {
+          text: truncateMiddle(q.request, 12),
+          description: parts.join(' · '),
+          suffix: isStanding ? <Icon name="mdi:check" size={20} color={accent} /> : undefined,
+          onPress: async () => {
+            await setStringAsync(q.request);
+            copyPopup('address');
+          },
+        };
+      }),
+    });
+  }, [manager, methodMint, unit, accent]);
 
   const handleCopy = useCallback(async () => {
     if (!request) return;
@@ -184,6 +279,31 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   return (
     <>
       <PaymentInfo data={qrData} copyTarget={copy.copyTarget} unit={unit} />
+      {method === 'onchain' && (
+        <View className="mb-3 items-center">
+          <Pressable
+            onPress={() => void handleGenerateAddress()}
+            testID="receive-onchain-new-address"
+            accessibilityLabel="Generate new address">
+            <Text
+              size={13}
+              bold
+              color={cooldownActive ? muted : accent}
+              style={{ opacity: cooldownActive ? 0.5 : 1 }}>
+              Generate new address
+            </Text>
+          </Pressable>
+          {__DEV__ && (
+            <Pressable
+              onPress={() => void openDebugAddresses()}
+              testID="receive-onchain-debug-addresses">
+              <Text size={11} color={muted} className="mt-2">
+                debug: list generated addresses
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
       <View className="mx-4">
         <Section title={copy.sectionTitle}>
           <GradientCard>

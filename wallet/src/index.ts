@@ -240,6 +240,7 @@ export { isMeltUserCancelledError, MeltUserCancelledError } from "./errors";
 // Reusable mint-quote singleton (standing bolt12 offer / onchain address)
 export {
   ensureReusableMintQuote,
+  rotateReusableMintQuote,
   reusableQuoteKey,
   type EnsureReusableMintQuoteInput,
   type ReusableQuoteIdentityStore,

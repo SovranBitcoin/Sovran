@@ -3,6 +3,7 @@ import type { Manager } from "@cashu/coco-core";
 
 import {
   ensureReusableMintQuote,
+  rotateReusableMintQuote,
   reusableQuoteKey,
   type ReusableQuoteIdentityStore,
 } from "../../src/quotes/reusable";
@@ -159,5 +160,54 @@ describe("ensureReusableMintQuote (identity-store singleton)", () => {
     const resolved = await ensureReusableMintQuote(manager, bolt12Input, store);
     expect(create).not.toHaveBeenCalled();
     expect(resolved.quoteId).toBe("offer-1");
+  });
+});
+
+describe("rotateReusableMintQuote", () => {
+  const input = { mintUrl: MINT, method: "onchain" as const, unit: "sat" };
+  const key = reusableQuoteKey(input);
+
+  it("creates a fresh quote and re-records it, retiring the standing one", async () => {
+    const create = vi.fn().mockResolvedValue(quote({ quoteId: "standing-2" }));
+    const manager = mockManager({ create });
+    const store = memoryStore({ [key]: "standing-1" });
+
+    const rotated = await rotateReusableMintQuote(
+      manager,
+      input,
+      store,
+      "manual",
+    );
+
+    expect(create).toHaveBeenCalledWith({
+      mintUrl: MINT,
+      method: "onchain",
+      unit: "sat",
+    });
+    expect(rotated.quoteId).toBe("standing-2");
+    expect(store.map[key]).toBe("standing-2");
+  });
+
+  it("rotates even when nothing was recorded (first address counts too)", async () => {
+    const create = vi.fn().mockResolvedValue(quote({ quoteId: "fresh-1" }));
+    const manager = mockManager({ create });
+    const store = memoryStore();
+
+    await rotateReusableMintQuote(manager, input, store, "deposit_received");
+    expect(store.map[key]).toBe("fresh-1");
+  });
+
+  it("subsequent ensure reuses the rotated quote", async () => {
+    const create = vi.fn().mockResolvedValue(quote({ quoteId: "standing-2" }));
+    const get = vi.fn().mockResolvedValue(quote({ quoteId: "standing-2" }));
+    const manager = mockManager({ create, get });
+    const store = memoryStore({ [key]: "standing-1" });
+
+    await rotateReusableMintQuote(manager, input, store, "manual");
+    const resolved = await ensureReusableMintQuote(manager, input, store);
+
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledWith({ mintUrl: MINT, quoteId: "standing-2" });
+    expect(resolved.quoteId).toBe("standing-2");
   });
 });

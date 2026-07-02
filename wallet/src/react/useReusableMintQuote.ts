@@ -4,6 +4,8 @@ import type { Manager } from "@cashu/coco-core";
 import { logger, mintUrlFields } from "../logger";
 import {
   ensureReusableMintQuote,
+  reusableQuoteKey,
+  rotateReusableMintQuote,
   type EnsureReusableMintQuoteInput,
   type ReusableQuoteIdentityStore,
 } from "../quotes/reusable";
@@ -20,6 +22,12 @@ export interface UseReusableMintQuoteResult {
   error: string | null;
   /** Re-run get-or-create (e.g. after the quote expired). */
   refresh: () => void;
+  /**
+   * Retire the standing quote and record a fresh one (onchain address-reuse
+   * policy: user-initiated "new address"). Keeps showing the current quote
+   * until the replacement resolves.
+   */
+  rotate: () => Promise<void>;
 }
 
 /**
@@ -104,7 +112,45 @@ export function useReusableMintQuote(
     return () => manager.off("mint-quote:updated", onQuoteUpdated);
   }, [manager, mintUrl]);
 
+  // External rotations (e.g. the deposit-received listener retiring the
+  // onchain address) land in the identity store — re-resolve so the mounted
+  // QR swaps to the fresh quote.
+  useEffect(() => {
+    if (!mintUrl || !method || !unit) return;
+    const store = identityStoreRef.current;
+    if (!store.subscribe) return;
+    return store.subscribe(reusableQuoteKey({ mintUrl, method, unit }), () => {
+      const recorded = identityStoreRef.current.get(
+        reusableQuoteKey({ mintUrl, method, unit }),
+      );
+      if (recorded && recorded === quoteIdRef.current) return;
+      setGeneration((g) => g + 1);
+    });
+  }, [mintUrl, method, unit]);
+
   const refresh = useCallback(() => setGeneration((g) => g + 1), []);
 
-  return { quote, isLoading, error, refresh };
+  const rotate = useCallback(async () => {
+    if (!mintUrl || !method || !unit) return;
+    try {
+      const created = await rotateReusableMintQuote(
+        manager,
+        { mintUrl, method, unit },
+        identityStoreRef.current,
+        "manual",
+      );
+      if (mountedRef.current) setQuote(created);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn("quotes.reusable.rotate_failed", {
+        ...mintUrlFields(mintUrl),
+        method,
+        unit,
+        error: message,
+      });
+      if (mountedRef.current) setError(message);
+    }
+  }, [manager, mintUrl, method, unit]);
+
+  return { quote, isLoading, error, refresh, rotate };
 }
