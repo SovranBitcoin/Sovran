@@ -586,15 +586,19 @@ export function requestMintSelector(
   currentCtx: FlowContext,
   walletCtx: WalletContext,
 ): ContextResolutionResult<"selectMint"> {
-  // An NPC-scoped selection only chooses which mint backs the npub.cash
-  // address. It must never inherit a stale receive/send `destination` (e.g.
-  // a `mintQuote` left over from a Fixed Amount lightning flow the user backed
-  // out of) — otherwise picking a mint would resolve that destination and
-  // reopen the amount selector. Opening the picker with a clean context also
-  // shows the full trusted-mint list instead of one filtered by the stale
-  // destination's method requirement.
+  // A persist-only selection (NPC mint, or a receive-rail's "Receiving with"
+  // mint) only chooses which mint backs that address/offer. It must never
+  // inherit a stale receive/send `destination` (e.g. a `mintQuote` left over
+  // from a Fixed Amount lightning flow the user backed out of) — otherwise
+  // picking a mint would resolve that destination and reopen the amount
+  // selector. Opening the picker with a clean context also shows the full
+  // trusted-mint list instead of one filtered by the stale destination's
+  // method requirement.
+  const methodScope =
+    event.scope === "bolt12" || event.scope === "onchain" ? event.scope : null;
+  const persistOnly = event.scope === "npc" || methodScope !== null;
   const ctx =
-    currentCtx.destination && event.scope !== "npc"
+    currentCtx.destination && !persistOnly
       ? currentCtx
       : ({ unit: currentCtx.unit } as FlowContext);
   logger.debug("contextResolution.requestMintSelector.start", {
@@ -603,18 +607,27 @@ export function requestMintSelector(
   });
 
   const amount = ctx.amount;
-  const requirement = ctx.destination
-    ? methodRequirementForDestination(ctx.destination, ctx, ctx.unit)
-    : null;
-  const methodCandidates = requirement
-    ? buildMethodCandidates(
-        walletCtx,
-        requirement,
-        amount,
-        ctx.supportedMintUrls,
-        ctx.destination!,
-      )
-    : null;
+  // Receive-rail scopes carry their method requirement directly (the rail IS
+  // the method); destination flows derive it from the destination.
+  const requirement = methodScope
+    ? {
+        operation: "mint" as const,
+        method: methodScope,
+        unit: ctx.unit,
+      }
+    : ctx.destination
+      ? methodRequirementForDestination(ctx.destination, ctx, ctx.unit)
+      : null;
+  const methodCandidates =
+    requirement && !methodScope
+      ? buildMethodCandidates(
+          walletCtx,
+          requirement,
+          amount,
+          ctx.supportedMintUrls,
+          ctx.destination!,
+        )
+      : null;
   const candidates = getValidMintCandidates(walletCtx, { minAmount: amount });
 
   const allTrustedCandidates = walletCtx.trustedMintUrls.map((mintUrl) => ({
@@ -626,12 +639,18 @@ export function requestMintSelector(
     ctx.destination === "meltQuote" ||
     ctx.destination === "sendEcash";
   const skipBalanceFilter =
-    !needsBalanceFilter || event.scope === "selected" || event.scope === "npc";
-  const finalCandidates = methodCandidates
-    ? hideMethodUnsupportedCandidates(methodCandidates)
-    : skipBalanceFilter
-      ? allTrustedCandidates
-      : candidates;
+    !needsBalanceFilter || persistOnly || event.scope === "selected";
+  // Receive-rail picks list every trusted mint with unsupported ones DISABLED
+  // (with the capability reason) rather than hidden — the user should see
+  // which mints could serve the rail, mirroring the NPC NUT-17 treatment.
+  const finalCandidates =
+    methodScope && requirement
+      ? buildMethodAwareMintCandidates(walletCtx, requirement, {})
+      : methodCandidates
+        ? hideMethodUnsupportedCandidates(methodCandidates)
+        : skipBalanceFilter
+          ? allTrustedCandidates
+          : candidates;
 
   return logContextResult("request_mint_selector", {
     step: "selectMint",

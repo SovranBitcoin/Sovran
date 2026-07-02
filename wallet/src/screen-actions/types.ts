@@ -2,10 +2,10 @@
 // Screen Actions — types
 // ---------------------------------------------------------------------------
 
-import type { FormattedString } from '../formatting/FormattedString';
-import type { FormattedTimestamp } from '../formatting/FormattedTimestamp';
-import type { ColadaSubscriptionBus } from '../subscriptions';
-import type { PaymentRequestInfo } from '../types';
+import type { FormattedString } from "../formatting/FormattedString";
+import type { FormattedTimestamp } from "../formatting/FormattedTimestamp";
+import type { ColadaSubscriptionBus } from "../subscriptions";
+import type { PaymentRequestInfo } from "../types";
 
 /**
  * Fields added by the built-in `decorateEntry()`. Screens combine this
@@ -23,46 +23,48 @@ export interface DecoratedEntryFields {
 }
 
 export type ScreenType =
-  | 'sendToken'
-  | 'receiveToken'
-  | 'mintQuote'
-  | 'meltQuote'
-  | 'paymentRequest'
-  | 'receive'
-  | 'mintInfo'
-  | 'amountEntry'
-  | 'mintSelector';
+  | "sendToken"
+  | "receiveToken"
+  | "mintQuote"
+  | "meltQuote"
+  | "paymentRequest"
+  | "receive"
+  | "mintInfo"
+  | "amountEntry"
+  | "mintSelector";
 
 /**
  * Maps each screen type to the set of action names available on that screen.
  * Screens use this to get type-safe action names; the wallet implements handlers for each.
  */
 export type ScreenActionName = {
-  sendToken: 'copy' | 'share' | 'nfc' | 'checkStatus' | 'cancel' | 'back';
-  receiveToken: 'redeem' | 'back';
-  mintQuote: 'copy' | 'share' | 'back';
-  meltQuote: 'pay' | 'cancel' | 'back';
-  paymentRequest: 'confirm' | 'cancel' | 'back';
+  sendToken: "copy" | "share" | "nfc" | "checkStatus" | "cancel" | "back";
+  receiveToken: "redeem" | "back";
+  mintQuote: "copy" | "share" | "back";
+  meltQuote: "pay" | "cancel" | "back";
+  paymentRequest: "confirm" | "cancel" | "back";
   receive:
-    | 'copy'
-    | 'share'
-    | 'paste'
-    | 'fixedAmount'
-    | 'scanQr'
-    | 'changeNpcMint'
-    | 'back';
-  mintInfo: 'trust' | 'copy' | 'share' | 'back';
+    | "copy"
+    | "share"
+    | "paste"
+    | "fixedAmount"
+    | "scanQr"
+    | "changeNpcMint"
+    | "changeBolt12Mint"
+    | "changeOnchainMint"
+    | "back";
+  mintInfo: "trust" | "copy" | "share" | "back";
   /** Flow amount screen — keyboard + submit; `setInput`/`toggle` are handled inside the manager. */
   amountEntry:
-    | 'setInput'
-    | 'toggle'
-    | 'next'
-    | 'paste'
-    | 'scanQr'
-    | 'cancel'
-    | 'back';
+    | "setInput"
+    | "toggle"
+    | "next"
+    | "paste"
+    | "scanQr"
+    | "cancel"
+    | "back";
   /** Mint selector screen — select a mint, inspect details, or add new mints. */
-  mintSelector: 'select' | 'getInfo' | 'addMint' | 'cancel' | 'back';
+  mintSelector: "select" | "getInfo" | "addMint" | "cancel" | "back";
 };
 
 /**

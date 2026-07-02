@@ -1053,6 +1053,14 @@ export function createSovranNotifications(
       }
     },
 
+    // Receive-rail "Receiving with" mint (standing Bolt12 offer / Onchain
+    // address tab). Local-only persistence — the standing quote for the new
+    // mint resolves via the reusable-quote identity store on next render.
+    onReceiveMethodMintChanged: ({ method, mintUrl }) => {
+      useMintStore.getState().setReceiveMintForMethod(method, mintUrl);
+      staticPopup('receive-mint-updated');
+    },
+
     onTransactionCreated: async ({ transactionId, rawInput }) => {
       if (rawInput) {
         useScanHistoryStore.getState().linkTransaction(rawInput, transactionId);
@@ -1738,8 +1746,11 @@ export function createSovranHandlers({
       };
 
       const params = { mintSelectorEntry: JSON.stringify(entry) };
+      // Receive-side pickers (fixed-amount quote, NPC mint, receive-rail
+      // "Receiving with" mints) live in the receive-flow stack.
+      const isReceiveScope = scope === 'npc' || scope === 'bolt12' || scope === 'onchain';
       router.navigate(
-        destination === 'mintQuote' || scope === 'npc'
+        destination === 'mintQuote' || isReceiveScope
           ? { pathname: '/(receive-flow)/mintSelect', params }
           : { pathname: '/(send-flow)/mintSelect', params }
       );

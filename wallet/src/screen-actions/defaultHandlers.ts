@@ -11,10 +11,10 @@
 //   3. Built-in copy/share handler (CONTENT_EXTRACTORS in createManager)
 // ---------------------------------------------------------------------------
 
-import { getEncodedToken, getTokenMetadata } from '@cashu/cashu-ts';
+import { getEncodedToken, getTokenMetadata } from "@cashu/cashu-ts";
 
-import { isMintOfflineError } from '../errors';
-import { errField, logger, mintUrlFields } from '../logger';
+import { isMintOfflineError } from "../errors";
+import { errField, logger, mintUrlFields } from "../logger";
 import type {
   AmountEntryDisplayMetadata,
   Destination,
@@ -22,17 +22,17 @@ import type {
   MeltQuoteMethod,
   MintQuoteMethod,
   PaymentMachine,
-} from '../machine/types';
-import { parseHistoryEntryOnce } from '../operations/historyEntry';
-import { getAvailableActions } from './availability';
-import type { ScreenActionContext, ScreenActionHandlerMap } from './types';
+} from "../machine/types";
+import { parseHistoryEntryOnce } from "../operations/historyEntry";
+import { getAvailableActions } from "./availability";
+import type { ScreenActionContext, ScreenActionHandlerMap } from "./types";
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
 export interface NavigationCallbacks {
-  scanQr?: (params: { unit: string; context: 'receive' | 'amount' }) => void;
+  scanQr?: (params: { unit: string; context: "receive" | "amount" }) => void;
   mintInfo?: (mintInfoEntry: string) => void;
   addMint?: () => void;
   goBack?: () => void;
@@ -52,43 +52,60 @@ export interface DefaultScreenActionHandlersConfig {
 
 type EntryLike = Record<string, unknown>;
 
-function getString(entry: EntryLike | null | undefined, key: string): string | undefined {
+function getString(
+  entry: EntryLike | null | undefined,
+  key: string,
+): string | undefined {
   const v = entry?.[key];
-  return typeof v === 'string' ? v : undefined;
+  return typeof v === "string" ? v : undefined;
 }
 
-function getNumber(entry: EntryLike | null | undefined, key: string): number | undefined {
+function getNumber(
+  entry: EntryLike | null | undefined,
+  key: string,
+): number | undefined {
   const v = entry?.[key];
-  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
 }
 
-function getNullableNumber(entry: EntryLike | null | undefined, key: string): number | null {
+function getNullableNumber(
+  entry: EntryLike | null | undefined,
+  key: string,
+): number | null {
   const v = entry?.[key];
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
-function getNullableString(entry: EntryLike | null | undefined, key: string): string | null {
+function getNullableString(
+  entry: EntryLike | null | undefined,
+  key: string,
+): string | null {
   const v = entry?.[key];
-  return typeof v === 'string' ? v : null;
+  return typeof v === "string" ? v : null;
 }
 
 function readAmountEntryDisplay(entry: EntryLike): AmountEntryDisplayMetadata {
-  const inputMode = entry.inputMode === 'fiat' ? 'fiat' : 'sat';
+  const inputMode = entry.inputMode === "fiat" ? "fiat" : "sat";
   return {
     inputMode,
-    rawInput: getString(entry, 'rawInput') ?? '',
-    fiatCurrency: getNullableString(entry, 'fiatCurrency'),
-    fiatSymbol: getNullableString(entry, 'fiatSymbol'),
-    btcPrice: getNumber(entry, 'btcPrice') ?? 0,
-    displayFiat: getNullableNumber(entry, 'displayFiat'),
-    displaySats: getNumber(entry, 'displaySats') ?? getNumber(entry, 'effectiveSatAmount') ?? 0,
+    rawInput: getString(entry, "rawInput") ?? "",
+    fiatCurrency: getNullableString(entry, "fiatCurrency"),
+    fiatSymbol: getNullableString(entry, "fiatSymbol"),
+    btcPrice: getNumber(entry, "btcPrice") ?? 0,
+    displayFiat: getNullableNumber(entry, "displayFiat"),
+    displaySats:
+      getNumber(entry, "displaySats") ??
+      getNumber(entry, "effectiveSatAmount") ??
+      0,
     autoOptimized: entry.autoOptimized === true,
   };
 }
 
-function getMetadata(entry: EntryLike | null | undefined): EntryLike | undefined {
+function getMetadata(
+  entry: EntryLike | null | undefined,
+): EntryLike | undefined {
   const m = entry?.metadata;
-  return typeof m === 'object' && m !== null ? (m as EntryLike) : undefined;
+  return typeof m === "object" && m !== null ? (m as EntryLike) : undefined;
 }
 
 function encodeToken(entry: EntryLike): string | null {
@@ -97,13 +114,13 @@ function encodeToken(entry: EntryLike): string | null {
     try {
       return getEncodedToken(token as Parameters<typeof getEncodedToken>[0]);
     } catch (e) {
-      logger.warn('screenAction.encodeToken.failed', { error: errField(e) });
+      logger.warn("screenAction.encodeToken.failed", { error: errField(e) });
     }
   }
   // Fall back to the raw scanned/pasted token string captured at receive time
   // (mirrors getReceiveTokenString in createManager) — entries built by
   // buildReceiveHistoryEntry carry the token in metadata.rawToken, not entry.token.
-  return getString(getMetadata(entry), 'rawToken') ?? null;
+  return getString(getMetadata(entry), "rawToken") ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +128,7 @@ function encodeToken(entry: EntryLike): string | null {
 // ---------------------------------------------------------------------------
 
 export function createDefaultScreenActionHandlers(
-  config: DefaultScreenActionHandlersConfig
+  config: DefaultScreenActionHandlersConfig,
 ): ScreenActionHandlerMap {
   const { getMachine, getOperations, getOffline, notify, navigation } = config;
   const goBack = async () => {
@@ -125,56 +142,60 @@ export function createDefaultScreenActionHandlers(
 
       checkStatus: async (ctx: ScreenActionContext) => {
         const entry = ctx.entry as EntryLike;
-        const operationId = getString(entry, 'operationId');
+        const operationId = getString(entry, "operationId");
         if (!operationId) return;
 
         const ops = getOperations();
         if (!ops?.checkSendStatus) return;
 
-        logger.info('screenAction.sendToken.checkStatus.start', { operationId });
+        logger.info("screenAction.sendToken.checkStatus.start", {
+          operationId,
+        });
         const result = await ops.checkSendStatus(operationId);
-        logger.info('screenAction.sendToken.checkStatus.result', {
+        logger.info("screenAction.sendToken.checkStatus.result", {
           operationId,
           state: result.state,
         });
-        notify('onSendStatusChecked', {
+        notify("onSendStatusChecked", {
           operationId,
           state: result.state,
-          redeemed: result.state === 'finalized',
+          redeemed: result.state === "finalized",
         });
       },
 
       cancel: async (ctx: ScreenActionContext) => {
         const entry = ctx.entry as EntryLike;
-        const operationId = getString(entry, 'operationId');
+        const operationId = getString(entry, "operationId");
         if (!operationId) return;
 
         const ops = getOperations();
         if (!ops?.rollbackSend) return;
 
         if (getOffline?.() === true) {
-          logger.info('screenAction.sendToken.cancel.blockedOffline', { operationId });
-          notify('onSendCancelFailed', {
+          logger.info("screenAction.sendToken.cancel.blockedOffline", {
             operationId,
-            message: 'Cancel transaction is not possible while offline.',
+          });
+          notify("onSendCancelFailed", {
+            operationId,
+            message: "Cancel transaction is not possible while offline.",
             offline: true,
           });
           return;
         }
 
-        logger.info('screenAction.sendToken.cancel.start', { operationId });
+        logger.info("screenAction.sendToken.cancel.start", { operationId });
         try {
           await ops.rollbackSend(operationId);
-          logger.info('screenAction.sendToken.cancel.done', { operationId });
-          notify('onSendCancelled', { operationId });
+          logger.info("screenAction.sendToken.cancel.done", { operationId });
+          notify("onSendCancelled", { operationId });
         } catch (err) {
           const mintUnreachable = isMintOfflineError(err);
-          logger.warn('screenAction.sendToken.cancel.failed', {
+          logger.warn("screenAction.sendToken.cancel.failed", {
             operationId,
             mintUnreachable,
             error: errField(err),
           });
-          notify('onSendCancelFailed', {
+          notify("onSendCancelFailed", {
             operationId,
             message: err instanceof Error ? err.message : String(err),
             mintUnreachable,
@@ -189,10 +210,10 @@ export function createDefaultScreenActionHandlers(
 
       redeem: async (ctx: ScreenActionContext) => {
         const entry = ctx.entry as EntryLike;
-        const mintUrl = getString(entry, 'mintUrl');
-        const amount = getNumber(entry, 'amount');
-        const unit = getString(entry, 'unit') ?? 'sat';
-        const id = getString(entry, 'id') ?? 'unknown';
+        const mintUrl = getString(entry, "mintUrl");
+        const amount = getNumber(entry, "amount");
+        const unit = getString(entry, "unit") ?? "sat";
+        const id = getString(entry, "id") ?? "unknown";
 
         // Capture the original raw scanned/pasted/NFC/deeplink input from the
         // active flow context. encodeToken(entry) and entry.metadata.rawToken
@@ -207,7 +228,7 @@ export function createDefaultScreenActionHandlers(
 
         const tokenString = encodeToken(entry);
         if (!tokenString || !mintUrl) {
-          logger.warn('screenAction.receiveToken.redeem.skipped', {
+          logger.warn("screenAction.receiveToken.redeem.skipped", {
             id,
             hasMintUrl: !!mintUrl,
             hasToken: !!tokenString,
@@ -215,7 +236,7 @@ export function createDefaultScreenActionHandlers(
           return;
         }
 
-        logger.info('screenAction.receiveToken.redeem.start', {
+        logger.info("screenAction.receiveToken.redeem.start", {
           id,
           ...mintUrlFields(mintUrl),
           amount,
@@ -227,17 +248,20 @@ export function createDefaultScreenActionHandlers(
         // Validate unit — only sat is supported
         try {
           const decoded = getTokenMetadata(tokenString);
-          if (decoded.unit && decoded.unit !== 'sat') {
-            logger.warn('screenAction.receiveToken.redeem.unsupportedUnit', {
+          if (decoded.unit && decoded.unit !== "sat") {
+            logger.warn("screenAction.receiveToken.redeem.unsupportedUnit", {
               id,
               ...mintUrlFields(mintUrl),
               unit: decoded.unit,
             });
-            notify('onUnsupportedTokenUnit', { unit: decoded.unit });
+            notify("onUnsupportedTokenUnit", { unit: decoded.unit });
             return;
           }
         } catch (e) {
-          logger.warn('screenAction.receiveToken.unitDecodeFailed', { id, error: errField(e) });
+          logger.warn("screenAction.receiveToken.unitDecodeFailed", {
+            id,
+            error: errField(e),
+          });
         }
 
         // Check mint trust
@@ -245,10 +269,10 @@ export function createDefaultScreenActionHandlers(
         if (ops?.isMintTrusted) {
           const trusted = await ops.isMintTrusted(mintUrl);
           if (!trusted) {
-            logger.info('screenAction.receiveToken.redeem.untrustedMint', {
+            logger.info("screenAction.receiveToken.redeem.untrustedMint", {
               id,
               ...mintUrlFields(mintUrl),
-              expectedNext: 'review_mint_then_retry_redeem',
+              expectedNext: "review_mint_then_retry_redeem",
             });
             const machine = getMachine();
             if (machine) {
@@ -259,18 +283,23 @@ export function createDefaultScreenActionHandlers(
         }
 
         // Dispatch processing notification
-        logger.info('screenAction.receiveToken.redeem.processing', {
+        logger.info("screenAction.receiveToken.redeem.processing", {
           ...mintUrlFields(mintUrl),
           amount,
           unit,
           id,
-          expectedNext: 'execute_receive',
+          expectedNext: "execute_receive",
         });
-        notify('onReceiveProcessing', { id, mintUrl, amount: amount ?? 0, unit });
+        notify("onReceiveProcessing", {
+          id,
+          mintUrl,
+          amount: amount ?? 0,
+          unit,
+        });
 
         // Execute receive
         if (!ops?.executeReceive) {
-          logger.warn('screenAction.receiveToken.redeem.noExecuteReceive', {
+          logger.warn("screenAction.receiveToken.redeem.noExecuteReceive", {
             id,
             ...mintUrlFields(mintUrl),
           });
@@ -278,11 +307,17 @@ export function createDefaultScreenActionHandlers(
         }
 
         try {
-          const result = await ops.executeReceive(tokenString, mintUrl, amount ?? 0);
+          const result = await ops.executeReceive(
+            tokenString,
+            mintUrl,
+            amount ?? 0,
+          );
 
-          const setEntry = (ctx as EntryLike).setEntry as ((e: EntryLike) => void) | undefined;
-          if (result.status === 'pending') {
-            logger.info('screenAction.receiveToken.redeem.pending', {
+          const setEntry = (ctx as EntryLike).setEntry as
+            | ((e: EntryLike) => void)
+            | undefined;
+          if (result.status === "pending") {
+            logger.info("screenAction.receiveToken.redeem.pending", {
               id,
               ...mintUrlFields(mintUrl),
               amount: amount ?? 0,
@@ -290,13 +325,13 @@ export function createDefaultScreenActionHandlers(
               operationId: result.operationId,
               pendingReason: result.pendingReason,
               hadP2PKProofs: result.hadP2PKProofs,
-              expectedNext: 'wallet_core_recovery_finalizes_receive',
+              expectedNext: "wallet_core_recovery_finalizes_receive",
             });
             const pendingEntry = parseHistoryEntryOnce(result.historyEntry);
             if (setEntry && pendingEntry) {
               setEntry(pendingEntry as EntryLike);
             }
-            notify('onReceivePending', {
+            notify("onReceivePending", {
               id,
               mintUrl,
               amount: amount ?? 0,
@@ -307,7 +342,7 @@ export function createDefaultScreenActionHandlers(
               ...(result.message ? { message: result.message } : {}),
             });
             if (result.hadP2PKProofs != null) {
-              notify('onP2PKReceiveCompleted', {
+              notify("onP2PKReceiveCompleted", {
                 transactionId: id,
                 mintUrl,
                 hadP2PKProofs: result.hadP2PKProofs,
@@ -316,23 +351,26 @@ export function createDefaultScreenActionHandlers(
             return;
           }
 
-          logger.info('screenAction.receiveToken.redeem.success', {
+          logger.info("screenAction.receiveToken.redeem.success", {
             id,
             ...mintUrlFields(mintUrl),
             amount: amount ?? 0,
             unit,
             hadP2PKProofs: result.hadP2PKProofs,
-            expectedNext: 'receive_confirmed_notification',
+            expectedNext: "receive_confirmed_notification",
           });
 
           // Update screen entry with real history entry
-          logger.info('screenAction.receiveToken.redeem.entryUpdate.eligibility', {
-            hasSetEntry: !!setEntry,
-            hasHistoryEntry: !!result.historyEntry,
-          });
+          logger.info(
+            "screenAction.receiveToken.redeem.entryUpdate.eligibility",
+            {
+              hasSetEntry: !!setEntry,
+              hasHistoryEntry: !!result.historyEntry,
+            },
+          );
           const realEntry = parseHistoryEntryOnce(result.historyEntry);
           if (setEntry && realEntry) {
-            logger.info('screenAction.receiveToken.redeem.entryUpdate.apply', {
+            logger.info("screenAction.receiveToken.redeem.entryUpdate.apply", {
               id: realEntry.id,
               type: realEntry.type,
               amount: realEntry.amount,
@@ -346,17 +384,22 @@ export function createDefaultScreenActionHandlers(
             // is missing (e.g. NPC/non-scan flows).
             if (ops.linkTransaction && realEntry.id) {
               const linkInput =
-                scannedRawInput ?? getString(getMetadata(entry), 'rawToken') ?? tokenString;
+                scannedRawInput ??
+                getString(getMetadata(entry), "rawToken") ??
+                tokenString;
               ops.linkTransaction(linkInput, realEntry.id);
             }
           } else if (!setEntry || !result.historyEntry) {
-            logger.warn('screenAction.receiveToken.redeem.entryUpdate.skipped', {
-              hasSetEntry: !!setEntry,
-              hasHistoryEntry: !!result.historyEntry,
-            });
+            logger.warn(
+              "screenAction.receiveToken.redeem.entryUpdate.skipped",
+              {
+                hasSetEntry: !!setEntry,
+                hasHistoryEntry: !!result.historyEntry,
+              },
+            );
           }
 
-          notify('onReceiveConfirmed', {
+          notify("onReceiveConfirmed", {
             id,
             mintUrl,
             amount: amount ?? 0,
@@ -365,9 +408,9 @@ export function createDefaultScreenActionHandlers(
           });
 
           if (realEntry?.id) {
-            notify('onTransactionCreated', {
+            notify("onTransactionCreated", {
               transactionId: realEntry.id,
-              type: 'receive',
+              type: "receive",
               mintUrl,
               amount: amount ?? 0,
               unit,
@@ -377,22 +420,22 @@ export function createDefaultScreenActionHandlers(
           }
 
           if (result.hadP2PKProofs != null) {
-            notify('onP2PKReceiveCompleted', {
+            notify("onP2PKReceiveCompleted", {
               transactionId: id,
               mintUrl,
               hadP2PKProofs: result.hadP2PKProofs,
             });
           }
         } catch (err) {
-          logger.warn('screenAction.receiveToken.redeem.failed', {
+          logger.warn("screenAction.receiveToken.redeem.failed", {
             id,
             ...mintUrlFields(mintUrl),
             amount: amount ?? 0,
             unit,
             error: errField(err),
-            expectedNext: 'receive_failed_notification',
+            expectedNext: "receive_failed_notification",
           });
-          notify('onReceiveFailed', {
+          notify("onReceiveFailed", {
             id,
             mintUrl,
             amount: amount ?? 0,
@@ -414,7 +457,7 @@ export function createDefaultScreenActionHandlers(
       back: goBack,
 
       pay: async (_ctx: ScreenActionContext) => {
-        logger.info('screenAction.meltQuote.pay');
+        logger.info("screenAction.meltQuote.pay");
         const machine = getMachine();
         if (machine?.confirmMelt) {
           await machine.confirmMelt();
@@ -424,8 +467,9 @@ export function createDefaultScreenActionHandlers(
       cancel: async (ctx: ScreenActionContext) => {
         const entry = ctx.entry as EntryLike;
         const operationId =
-          getString(getMetadata(entry), 'operationId') ?? getString(entry, 'operationId');
-        const quoteId = getString(entry, 'quoteId');
+          getString(getMetadata(entry), "operationId") ??
+          getString(entry, "operationId");
+        const quoteId = getString(entry, "quoteId");
 
         if (!operationId && !quoteId) return;
 
@@ -433,25 +477,31 @@ export function createDefaultScreenActionHandlers(
         if (!ops?.rollbackMelt) return;
 
         const rollbackId = operationId ?? quoteId!;
-        logger.info('screenAction.meltQuote.cancel.start', { operationId: rollbackId });
+        logger.info("screenAction.meltQuote.cancel.start", {
+          operationId: rollbackId,
+        });
 
         try {
           await ops.rollbackMelt(rollbackId);
-          logger.info('screenAction.meltQuote.cancel.done', { operationId: rollbackId });
-          notify('onMeltCancelled', { operationId: rollbackId });
+          logger.info("screenAction.meltQuote.cancel.done", {
+            operationId: rollbackId,
+          });
+          notify("onMeltCancelled", { operationId: rollbackId });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           // Silently ignore "not found" errors — the operation may have
           // already been finalized or rolled back.
           if (
-            msg.includes('Cannot rollback') ||
-            msg.includes('not found') ||
-            msg.includes('No melt operation')
+            msg.includes("Cannot rollback") ||
+            msg.includes("not found") ||
+            msg.includes("No melt operation")
           ) {
-            logger.warn('screenAction.meltQuote.cancel.expected', { message: msg });
+            logger.warn("screenAction.meltQuote.cancel.expected", {
+              message: msg,
+            });
             return;
           }
-          notify('onMeltCancelFailed', {
+          notify("onMeltCancelFailed", {
             operationId: rollbackId,
             message: msg,
             mintUnreachable: isMintOfflineError(err),
@@ -470,10 +520,10 @@ export function createDefaultScreenActionHandlers(
 
         // Capture the entry before the async call for reference.
         const preEntry = ctx.entry as EntryLike;
-        logger.info('screenAction.paymentRequest.confirm.start', {
+        logger.info("screenAction.paymentRequest.confirm.start", {
           operationId:
-            getString(getMetadata(preEntry), 'operationId') ??
-            getString(preEntry, 'operationId') ??
+            getString(getMetadata(preEntry), "operationId") ??
+            getString(preEntry, "operationId") ??
             null,
         });
 
@@ -484,22 +534,25 @@ export function createDefaultScreenActionHandlers(
         // If the delivery failed and ecash was rolled back, set the entry
         // to rolledBack state instead of enriching with delivered metadata.
         if (result.rolledBack) {
-          logger.info('screenAction.paymentRequest.confirm.rolledBack');
+          logger.info("screenAction.paymentRequest.confirm.rolledBack");
           if (setEntry) {
-            const metadata = (preEntry?.metadata ?? {}) as Record<string, unknown>;
+            const metadata = (preEntry?.metadata ?? {}) as Record<
+              string,
+              unknown
+            >;
             const operationId =
-              getString(getMetadata(preEntry), 'operationId') ??
-              getString(preEntry, 'operationId') ??
-              getString(preEntry, 'id');
+              getString(getMetadata(preEntry), "operationId") ??
+              getString(preEntry, "operationId") ??
+              getString(preEntry, "id");
             setEntry({
               ...preEntry,
-              state: 'rolledBack',
+              state: "rolledBack",
               operationId,
               metadata: {
                 ...metadata,
                 operationId,
-                phase: 'rolledBack',
-                tokenCreated: 'true',
+                phase: "rolledBack",
+                tokenCreated: "true",
               },
             } as EntryLike);
           }
@@ -508,24 +561,27 @@ export function createDefaultScreenActionHandlers(
 
         // Success path — enrich the screen entry with delivery metadata.
         if (setEntry) {
-          const metadata = (preEntry?.metadata ?? {}) as Record<string, unknown>;
+          const metadata = (preEntry?.metadata ?? {}) as Record<
+            string,
+            unknown
+          >;
           const operationId =
-            getString(getMetadata(preEntry), 'operationId') ??
-            getString(preEntry, 'operationId') ??
-            getString(preEntry, 'id');
+            getString(getMetadata(preEntry), "operationId") ??
+            getString(preEntry, "operationId") ??
+            getString(preEntry, "id");
           const enriched = {
             ...preEntry,
-            state: 'pending',
+            state: "pending",
             operationId,
             metadata: {
               ...metadata,
               operationId,
-              phase: 'delivered',
-              tokenCreated: 'true',
-              nostrSent: 'true',
+              phase: "delivered",
+              tokenCreated: "true",
+              nostrSent: "true",
             },
           };
-          logger.info('screenAction.paymentRequest.confirm.enrich', {
+          logger.info("screenAction.paymentRequest.confirm.enrich", {
             id: (enriched as any).id,
             operationId,
           });
@@ -552,13 +608,23 @@ export function createDefaultScreenActionHandlers(
 
       scanQr: async (ctx: ScreenActionContext) => {
         const entry = ctx.entry as EntryLike;
-        const unit = getString(entry, 'unit') ?? 'sat';
-        navigation.scanQr?.({ unit, context: 'receive' });
+        const unit = getString(entry, "unit") ?? "sat";
+        navigation.scanQr?.({ unit, context: "receive" });
       },
 
       changeNpcMint: async () => {
         const machine = getMachine();
-        await machine?.requestMintSelector({ scope: 'npc' });
+        await machine?.requestMintSelector({ scope: "npc" });
+      },
+
+      changeBolt12Mint: async () => {
+        const machine = getMachine();
+        await machine?.requestMintSelector({ scope: "bolt12" });
+      },
+
+      changeOnchainMint: async () => {
+        const machine = getMachine();
+        await machine?.requestMintSelector({ scope: "onchain" });
       },
     },
 
@@ -568,16 +634,20 @@ export function createDefaultScreenActionHandlers(
 
       trust: async (ctx: ScreenActionContext) => {
         const entry = ctx.entry as EntryLike;
-        const mintUrl = getString(entry, 'mintUrl');
+        const mintUrl = getString(entry, "mintUrl");
         if (!mintUrl) return;
 
         const ops = getOperations();
         if (!ops?.trustMint) return;
 
-        logger.info('screenAction.mintInfo.trust.start', { ...mintUrlFields(mintUrl) });
+        logger.info("screenAction.mintInfo.trust.start", {
+          ...mintUrlFields(mintUrl),
+        });
         await ops.trustMint(mintUrl);
-        logger.info('screenAction.mintInfo.trust.done', { ...mintUrlFields(mintUrl) });
-        notify('onMintTrustedFromScreen', {
+        logger.info("screenAction.mintInfo.trust.done", {
+          ...mintUrlFields(mintUrl),
+        });
+        notify("onMintTrustedFromScreen", {
           mintUrl,
           fromAccepter: entry.fromAccepter === true,
         });
@@ -592,9 +662,14 @@ export function createDefaultScreenActionHandlers(
         const machine = getMachine();
         const mintUrl = (ctx as EntryLike).mintUrl as string | undefined;
         const entry = ctx.entry as EntryLike;
-        const scope = (entry.scope as 'npc' | 'selected') ?? 'selected';
+        const scope =
+          (entry.scope as import("../machine/types").MintSelectorScope) ??
+          "selected";
         if (!mintUrl || !machine) return;
-        logger.info('screenAction.mintSelector.select', { ...mintUrlFields(mintUrl), scope });
+        logger.info("screenAction.mintSelector.select", {
+          ...mintUrlFields(mintUrl),
+          scope,
+        });
         await machine.changeMint(mintUrl, { scope });
       },
 
@@ -605,7 +680,9 @@ export function createDefaultScreenActionHandlers(
         // The selector hands the full row in via `actions.getInfo.execute`
         // so audit/score travel with the navigation; falls back to a
         // cache-only build for callers that don't have a row.
-        const item = (ctx as EntryLike).item as import('../types').MintListItem | undefined;
+        const item = (ctx as EntryLike).item as
+          | import("../types").MintListItem
+          | undefined;
 
         const ops = getOperations();
         let infoEntry: EntryLike = { mintUrl };
@@ -614,7 +691,7 @@ export function createDefaultScreenActionHandlers(
             const info = await ops.buildMintReviewInfo(mintUrl, item);
             infoEntry = { ...(info as unknown as EntryLike) };
           } catch (e) {
-            logger.warn('screenAction.mintInfo.buildReviewInfo.failed', {
+            logger.warn("screenAction.mintInfo.buildReviewInfo.failed", {
               ...mintUrlFields(mintUrl),
               error: errField(e),
             });
@@ -641,8 +718,11 @@ export function createDefaultScreenActionHandlers(
         if (!machine) return;
         const entry = ctx.entry as EntryLike;
         const effectiveSat = entry.effectiveSatAmount;
-        const mintUrl = typeof entry.selectedMintUrl === 'string' ? entry.selectedMintUrl : '';
-        if (typeof effectiveSat !== 'number' || effectiveSat <= 0) return;
+        const mintUrl =
+          typeof entry.selectedMintUrl === "string"
+            ? entry.selectedMintUrl
+            : "";
+        if (typeof effectiveSat !== "number" || effectiveSat <= 0) return;
         const entryDestination = entry.destination as Destination | undefined;
         if (!entryDestination) return;
 
@@ -651,10 +731,11 @@ export function createDefaultScreenActionHandlers(
         // pass it through; the only case that needs a real switch is picking
         // Lightning from a sendEcash flow that carries a meltTarget (the
         // "Send Money" DM path where both ecash and lightning are available).
-        const variantId = typeof ctx.variantId === 'string' ? ctx.variantId : undefined;
-        const nextAvailability = getAvailableActions('amountEntry', entry).next;
+        const variantId =
+          typeof ctx.variantId === "string" ? ctx.variantId : undefined;
+        const nextAvailability = getAvailableActions("amountEntry", entry).next;
         if (!nextAvailability.available) {
-          logger.warn('screenAction.amountEntry.next.unavailable', {
+          logger.warn("screenAction.amountEntry.next.unavailable", {
             reason: nextAvailability.reason ?? null,
             variantId: variantId ?? null,
           });
@@ -662,17 +743,18 @@ export function createDefaultScreenActionHandlers(
         }
         if (variantId) {
           const variantAvailability = nextAvailability.variants?.find(
-            (variant) => variant.id === variantId
+            (variant) => variant.id === variantId,
           );
           if (!variantAvailability || !variantAvailability.available) {
-            logger.warn('screenAction.amountEntry.next.variantUnavailable', {
+            logger.warn("screenAction.amountEntry.next.variantUnavailable", {
               variantId,
               reason: variantAvailability?.reason ?? null,
             });
             return;
           }
         }
-        const meltTargetFromEntry = typeof entry.meltTarget === 'string' ? entry.meltTarget : '';
+        const meltTargetFromEntry =
+          typeof entry.meltTarget === "string" ? entry.meltTarget : "";
         // Identity fields are accepted from two sources, in priority order:
         //   1. Per-call `execute(params)` — the amount screen passes whatever
         //      it has locally resolved at the moment of submit (NIP-05 +
@@ -680,13 +762,14 @@ export function createDefaultScreenActionHandlers(
         //      mutation, no reactive state churn.
         //   2. The entry itself — chat-launched flows seed it at flow start.
         const ctxRecipientPubkey =
-          typeof (ctx as Record<string, unknown>).recipientPubkey === 'string'
+          typeof (ctx as Record<string, unknown>).recipientPubkey === "string"
             ? ((ctx as Record<string, unknown>).recipientPubkey as string)
             : undefined;
-        const recipientPubkey = ctxRecipientPubkey ?? getString(entry, 'recipientPubkey');
+        const recipientPubkey =
+          ctxRecipientPubkey ?? getString(entry, "recipientPubkey");
         const ctxRecipientProfile =
           (ctx as Record<string, unknown>).recipientProfile &&
-          typeof (ctx as Record<string, unknown>).recipientProfile === 'object'
+          typeof (ctx as Record<string, unknown>).recipientProfile === "object"
             ? ((ctx as Record<string, unknown>).recipientProfile as {
                 displayName: string;
                 avatarUrl: string | null;
@@ -694,7 +777,7 @@ export function createDefaultScreenActionHandlers(
               })
             : undefined;
         const entryRecipientProfile =
-          entry.recipientProfile && typeof entry.recipientProfile === 'object'
+          entry.recipientProfile && typeof entry.recipientProfile === "object"
             ? (entry.recipientProfile as {
                 displayName: string;
                 avatarUrl: string | null;
@@ -708,42 +791,47 @@ export function createDefaultScreenActionHandlers(
         let meltQuoteMethod: MeltQuoteMethod | undefined;
         let meltTarget: string | undefined;
 
-        if (variantId === 'lightning') {
-          if (entryDestination === 'meltQuote' || entryDestination === 'mintQuote') {
+        if (variantId === "lightning") {
+          if (
+            entryDestination === "meltQuote" ||
+            entryDestination === "mintQuote"
+          ) {
             // Already on a lightning-backed flow — keep destination as-is.
             destination = entryDestination;
-            if (entryDestination === 'mintQuote') {
-              mintQuoteMethod = 'bolt11';
+            if (entryDestination === "mintQuote") {
+              mintQuoteMethod = "bolt11";
             } else {
-              meltQuoteMethod = 'bolt11';
+              meltQuoteMethod = "bolt11";
             }
           } else if (meltTargetFromEntry) {
             // Send-money path: switch sendEcash → meltQuote, seed meltTarget.
-            destination = 'meltQuote';
-            meltQuoteMethod = 'bolt11';
+            destination = "meltQuote";
+            meltQuoteMethod = "bolt11";
             meltTarget = meltTargetFromEntry;
           } else {
-            logger.warn('screenAction.amountEntry.next.lightningWithoutMeltTarget');
+            logger.warn(
+              "screenAction.amountEntry.next.lightningWithoutMeltTarget",
+            );
             return;
           }
-        } else if (variantId === 'ecash') {
-          if (entryDestination === 'mintQuote') {
-            logger.warn('screenAction.amountEntry.next.ecashOnMintQuote');
+        } else if (variantId === "ecash") {
+          if (entryDestination === "mintQuote") {
+            logger.warn("screenAction.amountEntry.next.ecashOnMintQuote");
             return;
           }
           // sendEcash / paymentRequest keep their destination; nothing to do.
           destination = entryDestination;
-        } else if (variantId === 'onchain') {
-          if (entryDestination === 'mintQuote') {
-            destination = 'mintQuote';
-            mintQuoteMethod = 'onchain';
+        } else if (variantId === "onchain") {
+          if (entryDestination === "mintQuote") {
+            destination = "mintQuote";
+            mintQuoteMethod = "onchain";
           } else {
-            logger.info('screenAction.amountEntry.next.onchainNotSupported');
+            logger.info("screenAction.amountEntry.next.onchainNotSupported");
             return;
           }
         }
 
-        logger.info('screenAction.amountEntry.next.confirm', {
+        logger.info("screenAction.amountEntry.next.confirm", {
           amount: effectiveSat,
           ...mintUrlFields(mintUrl || null),
           destination,
@@ -762,25 +850,35 @@ export function createDefaultScreenActionHandlers(
             recipientProfile,
             amountEntryDisplay: readAmountEntryDisplay(entry),
           });
-          logger.info('screenAction.amountEntry.next.resolved');
+          logger.info("screenAction.amountEntry.next.resolved");
         } catch (err) {
-          logger.warn('screenAction.amountEntry.next.threw', { error: errField(err) });
+          logger.warn("screenAction.amountEntry.next.threw", {
+            error: errField(err),
+          });
           throw err;
         }
       },
 
       paste: async (ctx: ScreenActionContext) => {
         const entry = ctx.entry as EntryLike;
-        if (entry.destination !== 'sendEcash' && entry.destination !== 'meltQuote') return;
+        if (
+          entry.destination !== "sendEcash" &&
+          entry.destination !== "meltQuote"
+        )
+          return;
         const machine = getMachine();
         await machine?.scan?.();
       },
 
       scanQr: async (ctx: ScreenActionContext) => {
         const entry = ctx.entry as EntryLike;
-        if (entry.destination !== 'sendEcash' && entry.destination !== 'meltQuote') return;
-        const unit = getString(entry, 'unit') ?? 'sat';
-        navigation.scanQr?.({ unit, context: 'amount' });
+        if (
+          entry.destination !== "sendEcash" &&
+          entry.destination !== "meltQuote"
+        )
+          return;
+        const unit = getString(entry, "unit") ?? "sat";
+        navigation.scanQr?.({ unit, context: "amount" });
       },
     },
   };

@@ -366,6 +366,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                 mintUrl={mintUrl}
                 unit={unit}
                 walletContext={walletContext}
+                actions={actions}
                 muted={muted}
               />
             );

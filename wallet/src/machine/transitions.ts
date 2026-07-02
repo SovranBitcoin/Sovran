@@ -1,15 +1,15 @@
-import { resolveIntent } from '../intent';
-import { logger, mintUrlFields } from '../logger';
-import { parsePaymentInput } from '../parse';
-import { isValidSatAmount } from '../guards';
-import { normalizeNostrPubkey } from '../recipient';
-import type { Detectors, WalletContext } from '../types';
-import { resolveNext, type StepResult } from './resolveNext';
-import { buildProofSuggestions } from './amountFallback';
-import type { FlowContext, FlowEvent, FlowStep } from './types';
-import { startSendFlow, startSendEcashFlow } from './flows/send';
-import { startReceiveFlow, startReceiveLightningFlow } from './flows/receive';
-import { requestMintSelector, resolveFromContext } from './contextResolution';
+import { resolveIntent } from "../intent";
+import { logger, mintUrlFields } from "../logger";
+import { parsePaymentInput } from "../parse";
+import { isValidSatAmount } from "../guards";
+import { normalizeNostrPubkey } from "../recipient";
+import type { Detectors, WalletContext } from "../types";
+import { resolveNext, type StepResult } from "./resolveNext";
+import { buildProofSuggestions } from "./amountFallback";
+import type { FlowContext, FlowEvent, FlowStep } from "./types";
+import { startSendFlow, startSendEcashFlow } from "./flows/send";
+import { startReceiveFlow, startReceiveLightningFlow } from "./flows/receive";
+import { requestMintSelector, resolveFromContext } from "./contextResolution";
 
 // ---------------------------------------------------------------------------
 // Transition result — new step + merged context
@@ -18,7 +18,7 @@ import { requestMintSelector, resolveFromContext } from './contextResolution';
 export interface TransitionResult {
   step: FlowStep;
   context: FlowContext;
-  data: StepResult['data'];
+  data: StepResult["data"];
 }
 
 function apply(result: StepResult, ctx: FlowContext): TransitionResult {
@@ -35,11 +35,14 @@ function handleExecute(
   detectors: Detectors,
   walletCtx: WalletContext,
   unit: string,
-  offline?: boolean
+  offline?: boolean,
 ): TransitionResult {
   const parsed = parsePaymentInput(input, detectors);
   const intent = resolveIntent(parsed, detectors, walletCtx);
-  logger.info('transitions.execute', { parsedType: parsed.type, intentType: intent.type });
+  logger.info("transitions.execute", {
+    parsedType: parsed.type,
+    intentType: intent.type,
+  });
 
   const ctx: FlowContext = {
     parsed,
@@ -51,14 +54,15 @@ function handleExecute(
 
   // Extract known data from the intent into context
   switch (intent.type) {
-    case 'sendPaymentRequest': {
+    case "sendPaymentRequest": {
       ctx.paymentRequest = intent.option.value;
-      ctx.supportedMintUrls = intent.info.mints.length > 0 ? intent.info.mints : undefined;
+      ctx.supportedMintUrls =
+        intent.info.mints.length > 0 ? intent.info.mints : undefined;
       if (isValidSatAmount(intent.info.amount)) {
         ctx.amount = intent.info.amount;
       } else if (intent.info.amount != null) {
-        logger.warn('transitions.execute.invalidAmount', {
-          source: 'sendPaymentRequest',
+        logger.warn("transitions.execute.invalidAmount", {
+          source: "sendPaymentRequest",
           amount: intent.info.amount,
         });
       }
@@ -68,7 +72,7 @@ function handleExecute(
       // profile resolver paint "Pay <name>" on the amount screen for any
       // scanned creq.
       const nostrTransport = intent.info.transports?.find(
-        (transport) => transport.type === 'nostr'
+        (transport) => transport.type === "nostr",
       );
       if (nostrTransport?.target) {
         const recipientPubkey = normalizeNostrPubkey(nostrTransport.target);
@@ -76,24 +80,24 @@ function handleExecute(
       }
       break;
     }
-    case 'meltLightningInvoice':
+    case "meltLightningInvoice":
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
         ctx.amount = intent.option.amount;
       } else if (intent.option.amount != null) {
-        logger.warn('transitions.execute.invalidAmount', {
-          source: 'meltLightningInvoice',
+        logger.warn("transitions.execute.invalidAmount", {
+          source: "meltLightningInvoice",
           amount: intent.option.amount,
         });
       }
       break;
-    case 'meltLightningAddress':
-    case 'meltLnurlp':
+    case "meltLightningAddress":
+    case "meltLnurlp":
       ctx.meltTarget = intent.option.value;
       break;
-    case 'meltOnchainAddress':
-      ctx.destination = 'meltQuote';
-      ctx.meltQuoteMethod = 'onchain';
+    case "meltOnchainAddress":
+      ctx.destination = "meltQuote";
+      ctx.meltQuoteMethod = "onchain";
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
         ctx.amount = intent.option.amount;
@@ -105,19 +109,19 @@ function handleExecute(
 }
 
 function handleOptionChosen(
-  option: FlowEvent & { type: 'OPTION_CHOSEN' },
+  option: FlowEvent & { type: "OPTION_CHOSEN" },
   currentCtx: FlowContext,
   detectors: Detectors,
-  walletCtx: WalletContext
+  walletCtx: WalletContext,
 ): TransitionResult {
   const parsed = currentCtx.parsed;
   if (!parsed) {
     return {
-      step: 'error',
+      step: "error",
       context: currentCtx,
       data: {
-        code: 'UNSUPPORTED_INPUT' as const,
-        message: 'No parsed input to resolve option from',
+        code: "UNSUPPORTED_INPUT" as const,
+        message: "No parsed input to resolve option from",
       },
     };
   }
@@ -142,36 +146,37 @@ function handleOptionChosen(
 
   // Extract data from the newly resolved intent
   switch (intent.type) {
-    case 'sendPaymentRequest':
+    case "sendPaymentRequest":
       ctx.paymentRequest = intent.option.value;
-      ctx.supportedMintUrls = intent.info.mints.length > 0 ? intent.info.mints : undefined;
+      ctx.supportedMintUrls =
+        intent.info.mints.length > 0 ? intent.info.mints : undefined;
       if (isValidSatAmount(intent.info.amount)) {
         ctx.amount = intent.info.amount;
       } else if (intent.info.amount != null) {
-        logger.warn('transitions.optionChosen.invalidAmount', {
-          source: 'sendPaymentRequest',
+        logger.warn("transitions.optionChosen.invalidAmount", {
+          source: "sendPaymentRequest",
           amount: intent.info.amount,
         });
       }
       break;
-    case 'meltLightningInvoice':
+    case "meltLightningInvoice":
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
         ctx.amount = intent.option.amount;
       } else if (intent.option.amount != null) {
-        logger.warn('transitions.optionChosen.invalidAmount', {
-          source: 'meltLightningInvoice',
+        logger.warn("transitions.optionChosen.invalidAmount", {
+          source: "meltLightningInvoice",
           amount: intent.option.amount,
         });
       }
       break;
-    case 'meltLightningAddress':
-    case 'meltLnurlp':
+    case "meltLightningAddress":
+    case "meltLnurlp":
       ctx.meltTarget = intent.option.value;
       break;
-    case 'meltOnchainAddress':
-      ctx.destination = 'meltQuote';
-      ctx.meltQuoteMethod = 'onchain';
+    case "meltOnchainAddress":
+      ctx.destination = "meltQuote";
+      ctx.meltQuoteMethod = "onchain";
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
         ctx.amount = intent.option.amount;
@@ -183,17 +188,18 @@ function handleOptionChosen(
 }
 
 function handleAmountEntered(
-  event: FlowEvent & { type: 'AMOUNT_ENTERED' },
+  event: FlowEvent & { type: "AMOUNT_ENTERED" },
   currentCtx: FlowContext,
   walletCtx: WalletContext,
-  enableEcashSendMemo: boolean
+  enableEcashSendMemo: boolean,
 ): TransitionResult {
-  logger.info('transitions.amountEntered', {
+  logger.info("transitions.amountEntered", {
     amount: event.amount,
     ...mintUrlFields(event.mintUrl),
     destination: event.destination ?? currentCtx.destination,
   });
-  const shouldResetContext = !!event.destination && event.destination !== currentCtx.destination;
+  const shouldResetContext =
+    !!event.destination && event.destination !== currentCtx.destination;
   const ctx: FlowContext = shouldResetContext
     ? {
         unit: currentCtx.unit,
@@ -221,47 +227,58 @@ function handleAmountEntered(
         meltTarget: event.meltTarget ?? currentCtx.meltTarget,
         recipientPubkey: event.recipientPubkey ?? currentCtx.recipientPubkey,
         recipientProfile: event.recipientProfile ?? currentCtx.recipientProfile,
-        amountEntryDisplay: event.amountEntryDisplay ?? currentCtx.amountEntryDisplay,
+        amountEntryDisplay:
+          event.amountEntryDisplay ?? currentCtx.amountEntryDisplay,
         memo: undefined,
         sendMemoHandled: false,
       };
 
   if (!ctx.intent) {
-    const destination = ctx.destination ?? 'sendEcash';
+    const destination = ctx.destination ?? "sendEcash";
     ctx.destination = destination;
     return resolveFromContext(ctx, walletCtx, enableEcashSendMemo);
   }
 
-  return apply(resolveNext(ctx.intent, ctx, walletCtx, enableEcashSendMemo), ctx);
+  return apply(
+    resolveNext(ctx.intent, ctx, walletCtx, enableEcashSendMemo),
+    ctx,
+  );
 }
 
 function handleMintSelected(
-  event: FlowEvent & { type: 'MINT_SELECTED' },
+  event: FlowEvent & { type: "MINT_SELECTED" },
   currentCtx: FlowContext,
   walletCtx: WalletContext,
-  enableEcashSendMemo: boolean
+  enableEcashSendMemo: boolean,
 ): TransitionResult {
-  logger.info('transitions.mintSelected', {
+  logger.info("transitions.mintSelected", {
     ...mintUrlFields(event.mintUrl),
     amount: event.amount,
     destination: event.destination ?? currentCtx.destination,
     scope: event.scope,
   });
 
-  // An NPC-scoped selection only sets which mint backs the npub.cash address.
-  // It is persist-only — the wallet persists it via `onNpcMintChanged` — and
-  // must never advance a receive/send flow. Guarding here keeps the invariant
-  // even if a stale `destination` (e.g. from a backed-out Fixed Amount flow)
-  // is still in context, which would otherwise reopen the amount selector.
-  if (event.scope === 'npc') {
+  // A persist-only-scoped selection only sets which mint backs the npub.cash
+  // address ('npc') or a receive rail's standing quote ('bolt12'/'onchain').
+  // The wallet persists it via `onNpcMintChanged` / `onReceiveMethodMintChanged`
+  // — it must never advance a receive/send flow. Guarding here keeps the
+  // invariant even if a stale `destination` (e.g. from a backed-out Fixed
+  // Amount flow) is still in context, which would otherwise reopen the
+  // amount selector.
+  if (
+    event.scope === "npc" ||
+    event.scope === "bolt12" ||
+    event.scope === "onchain"
+  ) {
     return {
-      step: 'dismiss',
+      step: "dismiss",
       context: { unit: currentCtx.unit, mintUrl: event.mintUrl },
       data: {} as any,
     };
   }
 
-  const shouldResetContext = !!event.destination && event.destination !== currentCtx.destination;
+  const shouldResetContext =
+    !!event.destination && event.destination !== currentCtx.destination;
   const ctx: FlowContext = shouldResetContext
     ? {
         unit: currentCtx.unit,
@@ -285,29 +302,34 @@ function handleMintSelected(
 
   if (!ctx.intent && !ctx.destination) {
     // Persist-only (e.g. home screen): dismiss the current screen
-    return { step: 'dismiss', context: ctx, data: {} as any };
+    return { step: "dismiss", context: ctx, data: {} as any };
   }
 
   if (!ctx.intent) {
-    ctx.destination = ctx.destination ?? 'sendEcash';
+    ctx.destination = ctx.destination ?? "sendEcash";
     return resolveFromContext(ctx, walletCtx, enableEcashSendMemo);
   }
 
-  return apply(resolveNext(ctx.intent, ctx, walletCtx, enableEcashSendMemo), ctx);
+  return apply(
+    resolveNext(ctx.intent, ctx, walletCtx, enableEcashSendMemo),
+    ctx,
+  );
 }
 
 function handleProofsChosen(
-  event: FlowEvent & { type: 'PROOFS_CHOSEN' },
+  event: FlowEvent & { type: "PROOFS_CHOSEN" },
   currentCtx: FlowContext,
   walletCtx: WalletContext,
-  enableEcashSendMemo: boolean
+  enableEcashSendMemo: boolean,
 ): TransitionResult {
-  const destination = currentCtx.destination ?? 'sendEcash';
-  const proofAmounts = currentCtx.mintUrl ? (walletCtx.proofAmounts[currentCtx.mintUrl] ?? []) : [];
+  const destination = currentCtx.destination ?? "sendEcash";
+  const proofAmounts = currentCtx.mintUrl
+    ? (walletCtx.proofAmounts[currentCtx.mintUrl] ?? [])
+    : [];
   // P2PK-locked sends require a mint swap — local proofs can never satisfy a
   // lock, so locked flows must not take the local-proof shortcut.
   const canSendLocally =
-    destination === 'sendEcash' &&
+    destination === "sendEcash" &&
     !currentCtx.p2pkLockPubkey &&
     buildProofSuggestions(proofAmounts, event.amount).exactMatch;
   const ctx: FlowContext = {
@@ -321,9 +343,9 @@ function handleProofsChosen(
   // re-check proof composition and loop back to chooseProofs when offline).
   const mintUrl = ctx.mintUrl!;
 
-  if (destination === 'paymentRequest' && ctx.paymentRequest) {
+  if (destination === "paymentRequest" && ctx.paymentRequest) {
     return {
-      step: 'navigateToPaymentRequest',
+      step: "navigateToPaymentRequest",
       context: ctx,
       data: {
         mintUrl,
@@ -336,9 +358,9 @@ function handleProofsChosen(
     };
   }
 
-  if (destination === 'meltQuote' && ctx.meltTarget) {
+  if (destination === "meltQuote" && ctx.meltTarget) {
     return {
-      step: 'navigateToMeltPreview',
+      step: "navigateToMeltPreview",
       context: ctx,
       data: {
         mintUrl,
@@ -351,39 +373,43 @@ function handleProofsChosen(
     };
   }
 
-  if (destination === 'sendEcash' && enableEcashSendMemo && !ctx.sendMemoHandled) {
+  if (
+    destination === "sendEcash" &&
+    enableEcashSendMemo &&
+    !ctx.sendMemoHandled
+  ) {
     return {
-      step: 'enterSendMemo',
+      step: "enterSendMemo",
       context: ctx,
       data: { mintUrl, amount: event.amount, unit: ctx.unit, memo: ctx.memo },
     };
   }
 
   return {
-    step: 'confirmSend',
+    step: "confirmSend",
     context: ctx,
     data: { mintUrl, amount: event.amount, memo: ctx.memo },
   };
 }
 
 function handleSendMemoSubmitted(
-  event: FlowEvent & { type: 'SEND_MEMO_SUBMITTED' },
-  currentCtx: FlowContext
+  event: FlowEvent & { type: "SEND_MEMO_SUBMITTED" },
+  currentCtx: FlowContext,
 ): TransitionResult {
   const mintUrl = currentCtx.mintUrl;
   const amount = currentCtx.amount;
-  if (!mintUrl || typeof amount !== 'number' || amount <= 0) {
+  if (!mintUrl || typeof amount !== "number" || amount <= 0) {
     return {
-      step: 'error',
+      step: "error",
       context: currentCtx,
       data: {
-        code: 'SEND_FAILED',
-        message: 'Cannot create token without a mint and amount',
+        code: "SEND_FAILED",
+        message: "Cannot create token without a mint and amount",
       },
     };
   }
 
-  const trimmed = typeof event.memo === 'string' ? event.memo.trim() : '';
+  const trimmed = typeof event.memo === "string" ? event.memo.trim() : "";
   const ctx: FlowContext = {
     ...currentCtx,
     memo: trimmed.length > 0 ? trimmed : undefined,
@@ -391,7 +417,7 @@ function handleSendMemoSubmitted(
   };
 
   return {
-    step: 'confirmSend',
+    step: "confirmSend",
     context: ctx,
     data: {
       mintUrl,
@@ -416,7 +442,7 @@ export function transition(
    *  context so that proof-composition checks always see the real-time
    *  value — even when a handler creates a fresh FlowContext. */
   offline?: boolean,
-  enableEcashSendMemo = false
+  enableEcashSendMemo = false,
 ): TransitionResult {
   function stamp(result: TransitionResult): TransitionResult {
     if (offline != null) result.context.offline = offline;
@@ -425,16 +451,18 @@ export function transition(
 
   // Global events: work from any state
   switch (event.type) {
-    case 'EXECUTE':
-      return stamp(handleExecute(event.input, detectors, walletCtx, unit, offline));
-    case 'RESET':
-      return stamp({ step: 'idle', context: { unit }, data: {} as any });
-    case 'REQUEST_MINT_SELECTOR':
+    case "EXECUTE":
+      return stamp(
+        handleExecute(event.input, detectors, walletCtx, unit, offline),
+      );
+    case "RESET":
+      return stamp({ step: "idle", context: { unit }, data: {} as any });
+    case "REQUEST_MINT_SELECTOR":
       return stamp(requestMintSelector(event, currentCtx, walletCtx));
-    case 'SEND_MEMO_SUBMITTED':
+    case "SEND_MEMO_SUBMITTED":
       return stamp(handleSendMemoSubmitted(event, currentCtx));
-    case 'START_SEND_ECASH':
-      logger.info('transitions.startSendEcash', {
+    case "START_SEND_ECASH":
+      logger.info("transitions.startSendEcash", {
         unit,
         offline: offline ?? false,
         hasMeltTarget: !!event.meltTarget,
@@ -446,34 +474,40 @@ export function transition(
         startSendEcashFlow(walletCtx, unit, {
           offline,
           ...(event.meltTarget ? { meltTarget: event.meltTarget } : {}),
-          ...(event.recipientPubkey ? { recipientPubkey: event.recipientPubkey } : {}),
-          ...(event.recipientProfile ? { recipientProfile: event.recipientProfile } : {}),
-          ...(event.p2pkLockPubkey ? { p2pkLockPubkey: event.p2pkLockPubkey } : {}),
+          ...(event.recipientPubkey
+            ? { recipientPubkey: event.recipientPubkey }
+            : {}),
+          ...(event.recipientProfile
+            ? { recipientProfile: event.recipientProfile }
+            : {}),
+          ...(event.p2pkLockPubkey
+            ? { p2pkLockPubkey: event.p2pkLockPubkey }
+            : {}),
           ...(event.allowedMints ? { allowedMints: event.allowedMints } : {}),
-        })
+        }),
       );
-    case 'START_SEND':
+    case "START_SEND":
       return stamp(startSendFlow(unit));
-    case 'START_RECEIVE_LIGHTNING':
+    case "START_RECEIVE_LIGHTNING":
       const receiveLightning = startReceiveLightningFlow(walletCtx, unit);
-      logger.info('transitions.startReceiveLightning', {
+      logger.info("transitions.startReceiveLightning", {
         unit,
         ...mintUrlFields(receiveLightning.context.mintUrl),
       });
       return stamp(receiveLightning);
-    case 'START_RECEIVE':
+    case "START_RECEIVE":
       return stamp(startReceiveFlow(walletCtx, unit));
-    case 'REVIEW_MINT':
+    case "REVIEW_MINT":
       return stamp({
-        step: 'reviewMint',
+        step: "reviewMint",
         context: { ...currentCtx, reviewToken: event.token },
         data: { mintUrl: event.mintUrl, token: event.token },
       });
-    case 'MINT_TRUSTED': {
+    case "MINT_TRUSTED": {
       const token = currentCtx.reviewToken;
       if (token) {
         return stamp({
-          step: 'receiveToken',
+          step: "receiveToken",
           context: { ...currentCtx, reviewToken: undefined },
           data: { token },
         });
@@ -484,14 +518,20 @@ export function transition(
 
   // State-specific events
   switch (event.type) {
-    case 'OPTION_CHOSEN':
+    case "OPTION_CHOSEN":
       return stamp(handleOptionChosen(event, currentCtx, detectors, walletCtx));
-    case 'AMOUNT_ENTERED':
-      return stamp(handleAmountEntered(event, currentCtx, walletCtx, enableEcashSendMemo));
-    case 'MINT_SELECTED':
-      return stamp(handleMintSelected(event, currentCtx, walletCtx, enableEcashSendMemo));
-    case 'PROOFS_CHOSEN':
-      return stamp(handleProofsChosen(event, currentCtx, walletCtx, enableEcashSendMemo));
+    case "AMOUNT_ENTERED":
+      return stamp(
+        handleAmountEntered(event, currentCtx, walletCtx, enableEcashSendMemo),
+      );
+    case "MINT_SELECTED":
+      return stamp(
+        handleMintSelected(event, currentCtx, walletCtx, enableEcashSendMemo),
+      );
+    case "PROOFS_CHOSEN":
+      return stamp(
+        handleProofsChosen(event, currentCtx, walletCtx, enableEcashSendMemo),
+      );
   }
 
   // Unhandled events (e.g. CONFIRM_MELT, CONFIRM_PAYMENT_REQUEST that

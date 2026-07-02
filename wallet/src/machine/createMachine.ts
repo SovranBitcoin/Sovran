@@ -26,6 +26,7 @@ import type {
   FlowStep,
   MeltQuoteMethod,
   MintQuoteMethod,
+  MintSelectorScope,
   PaymentMachine,
   ProcessResult,
   RecipientProfile,
@@ -948,10 +949,17 @@ export function createPaymentMachine(
         }
       }
 
-      // Mint selection notifications: scope 'npc' → onNpcMintChanged; else → onPreferredMintChanged when applicable.
+      // Mint selection notifications: scope 'npc' → onNpcMintChanged;
+      // 'bolt12'/'onchain' → onReceiveMethodMintChanged; else →
+      // onPreferredMintChanged when applicable.
       if (event.type === "MINT_SELECTED") {
         if (event.scope === "npc") {
           void notifications?.onNpcMintChanged?.({ mintUrl: event.mintUrl });
+        } else if (event.scope === "bolt12" || event.scope === "onchain") {
+          void notifications?.onReceiveMethodMintChanged?.({
+            method: event.scope,
+            mintUrl: event.mintUrl,
+          });
         } else {
           const isPersistOnlyPath = step === "dismiss" && !flowCtx.destination;
           const shouldPersist = event.persist ?? isPersistOnlyPath;
@@ -1326,7 +1334,7 @@ export function createPaymentMachine(
 
   const changeMint = (
     mintUrl: string,
-    opts?: { persist?: boolean; scope?: "npc" | "selected" },
+    opts?: { persist?: boolean; scope?: MintSelectorScope },
   ) => {
     return send({
       type: "MINT_SELECTED",
@@ -1338,7 +1346,7 @@ export function createPaymentMachine(
 
   const requestMintSelector = (opts?: {
     reset?: boolean;
-    scope?: "npc" | "selected";
+    scope?: MintSelectorScope;
   }) => {
     if (opts?.reset) resetInternal();
     return send({ type: "REQUEST_MINT_SELECTOR", scope: opts?.scope });

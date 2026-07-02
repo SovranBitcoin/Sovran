@@ -9,49 +9,63 @@ import type {
   AmountEntryConstraints,
   Detectors,
   MintMethodRequirement,
-} from '../types';
+} from "../types";
 // ---------------------------------------------------------------------------
 // Flow Steps — every state the machine can be in
 // ---------------------------------------------------------------------------
 
 export type FlowStep =
-  | 'idle'
-  | 'selectDestination'
-  | 'chooseOption'
-  | 'chooseFallbackOption'
-  | 'enterAmount'
-  | 'selectMint'
-  | 'chooseProofs'
-  | 'enterSendMemo'
-  | 'receiveToken'
-  | 'confirmSend'
-  | 'sendComplete'
-  | 'navigateToMeltPreview'
-  | 'navigateToPaymentRequest'
-  | 'createMintQuote'
-  | 'mintQuoteCreated'
-  | 'openMint'
-  | 'openProfile'
-  | 'navigateToReceive'
-  | 'reviewMint'
-  | 'dismiss'
-  | 'error';
+  | "idle"
+  | "selectDestination"
+  | "chooseOption"
+  | "chooseFallbackOption"
+  | "enterAmount"
+  | "selectMint"
+  | "chooseProofs"
+  | "enterSendMemo"
+  | "receiveToken"
+  | "confirmSend"
+  | "sendComplete"
+  | "navigateToMeltPreview"
+  | "navigateToPaymentRequest"
+  | "createMintQuote"
+  | "mintQuoteCreated"
+  | "openMint"
+  | "openProfile"
+  | "navigateToReceive"
+  | "reviewMint"
+  | "dismiss"
+  | "error";
 
-export type Destination = AmountEntryConstraints['destination'];
-export type PaymentQuoteMethod = 'bolt11' | 'onchain';
+export type Destination = AmountEntryConstraints["destination"];
+export type PaymentQuoteMethod = "bolt11" | "onchain";
 export type MintQuoteMethod = PaymentQuoteMethod;
 export type MeltQuoteMethod = PaymentQuoteMethod;
 
-export type ReceiveExecutePendingReason = 'network';
+/**
+ * Which selection a mint pick updates: the flow/preferred mint ('selected'),
+ * the npub.cash mint ('npc'), or the per-method "Receiving with" mint backing
+ * a standing reusable-quote rail ('bolt12' / 'onchain'). Non-'selected'
+ * scopes are persist-only — they never advance a receive/send flow.
+ */
+export type MintSelectorScope = "npc" | "selected" | "bolt12" | "onchain";
+
+/** The persist-only receive-rail scopes ('bolt12' / 'onchain'). */
+export type ReceiveMethodScope = Extract<
+  MintSelectorScope,
+  "bolt12" | "onchain"
+>;
+
+export type ReceiveExecutePendingReason = "network";
 
 export type ReceiveExecuteFinalizedResult = {
-  status?: 'finalized';
+  status?: "finalized";
   historyEntry: string;
   hadP2PKProofs?: boolean;
 };
 
 export type ReceiveExecutePendingResult = {
-  status: 'pending';
+  status: "pending";
   operationId: string;
   historyEntry: string;
   pendingReason: ReceiveExecutePendingReason;
@@ -59,7 +73,9 @@ export type ReceiveExecutePendingResult = {
   hadP2PKProofs?: boolean;
 };
 
-export type ReceiveExecuteResult = ReceiveExecuteFinalizedResult | ReceiveExecutePendingResult;
+export type ReceiveExecuteResult =
+  | ReceiveExecuteFinalizedResult
+  | ReceiveExecutePendingResult;
 
 // ---------------------------------------------------------------------------
 // Recipient identity — populated by `operations.resolveRecipientPubkey`
@@ -76,7 +92,7 @@ export interface RecipientProfile {
 }
 
 export interface AmountEntryDisplayMetadata {
-  inputMode: 'sat' | 'fiat';
+  inputMode: "sat" | "fiat";
   rawInput: string;
   fiatCurrency: string | null;
   fiatSymbol: string | null;
@@ -120,7 +136,7 @@ export interface StepDataMap {
       meltTarget?: string;
       recipientPubkey?: string;
       recipientProfile?: RecipientProfile;
-      methodContext?: AmountEntryConstraints['methodContext'];
+      methodContext?: AmountEntryConstraints["methodContext"];
     };
   };
   selectMint: {
@@ -133,11 +149,11 @@ export interface StepDataMap {
     recipientPubkey?: string;
     recipientProfile?: RecipientProfile;
     destination?: Destination;
-    mintListItemsStatus?: 'loading' | 'ready' | 'failed';
+    mintListItemsStatus?: "loading" | "ready" | "failed";
     /** Pre-computed mint list items (populated when machine operations are provided). */
     mintListItems?: MintListItem[];
-    /** When 'npc', selection updates NPC mint only (not selectedMint). */
-    scope?: 'npc' | 'selected';
+    /** Non-'selected' scopes are persist-only (NPC / receive-rail mints). */
+    scope?: MintSelectorScope;
     mintQuoteMethod?: MintQuoteMethod;
     meltQuoteMethod?: MeltQuoteMethod;
     methodRequirement?: MintMethodRequirement;
@@ -195,20 +211,28 @@ export interface StepDataMap {
     /** Populated after a successful payment request send. */
     historyEntry?: string;
   };
-  createMintQuote: { mintUrl: string; amount: number; unit: string; method?: MintQuoteMethod };
+  createMintQuote: {
+    mintUrl: string;
+    amount: number;
+    unit: string;
+    method?: MintQuoteMethod;
+  };
   mintQuoteCreated: { historyEntry: string; unit: string };
   openMint: {
     url: string;
     /** Pre-loaded mint info (populated when `operations.buildMintReviewInfo` is provided). */
-    mintInfo?: import('../types').MintReviewInfo;
+    mintInfo?: import("../types").MintReviewInfo;
   };
   openProfile: { npub: string };
-  navigateToReceive: { unit: string; methodContext?: AmountEntryConstraints['methodContext'] };
+  navigateToReceive: {
+    unit: string;
+    methodContext?: AmountEntryConstraints["methodContext"];
+  };
   reviewMint: {
     mintUrl: string;
     token: string;
     /** Pre-loaded mint info (populated when `operations.buildMintReviewInfo` is provided). */
-    mintInfo?: import('../types').MintReviewInfo;
+    mintInfo?: import("../types").MintReviewInfo;
   };
   dismiss: Record<string, never>;
   error: { code: ErrorCode; message: string; data?: Record<string, unknown> };
@@ -219,22 +243,22 @@ export interface StepDataMap {
 // ---------------------------------------------------------------------------
 
 export type ErrorCode =
-  | 'NO_AMOUNT'
-  | 'NO_VALID_MINT'
-  | 'INSUFFICIENT_BALANCE'
-  | 'NO_BALANCE'
-  | 'UNSUPPORTED_INPUT'
-  | 'UNSUPPORTED_PAYMENT_METHOD'
-  | 'ALL_OPTIONS_DISABLED'
-  | 'MISSING_MELT_TARGET'
-  | 'INVALID_P2PK_LOCK'
-  | 'SEND_FAILED'
-  | 'MINT_QUOTE_FAILED'
-  | 'MELT_FAILED'
-  | 'PAYMENT_REQUEST_FAILED'
-  | 'NFC_WRITE_FAILED'
-  | 'NFC_SESSION_LOST'
-  | 'NFC_READ_FAILED';
+  | "NO_AMOUNT"
+  | "NO_VALID_MINT"
+  | "INSUFFICIENT_BALANCE"
+  | "NO_BALANCE"
+  | "UNSUPPORTED_INPUT"
+  | "UNSUPPORTED_PAYMENT_METHOD"
+  | "ALL_OPTIONS_DISABLED"
+  | "MISSING_MELT_TARGET"
+  | "INVALID_P2PK_LOCK"
+  | "SEND_FAILED"
+  | "MINT_QUOTE_FAILED"
+  | "MELT_FAILED"
+  | "PAYMENT_REQUEST_FAILED"
+  | "NFC_WRITE_FAILED"
+  | "NFC_SESSION_LOST"
+  | "NFC_READ_FAILED";
 
 // ---------------------------------------------------------------------------
 // Flow Context — accumulated data through the flow
@@ -338,8 +362,8 @@ export interface MachineSnapshot<S extends FlowStep = FlowStep> {
 
 export type ExecutionState =
   | {
-      status: 'ready';
-      code: 'READY';
+      status: "ready";
+      code: "READY";
       message: null;
       isExecutable: true;
       isExecuting: boolean;
@@ -347,14 +371,14 @@ export type ExecutionState =
       details?: Record<string, unknown>;
     }
   | {
-      status: 'needsInput';
+      status: "needsInput";
       code:
-        | 'NO_AMOUNT'
-        | 'MINT_SELECTION_REQUIRED'
-        | 'OPTION_SELECTION_REQUIRED'
-        | 'FALLBACK_OPTION_REQUIRED'
-        | 'PROOF_SELECTION_REQUIRED'
-        | 'SEND_MEMO_REQUIRED';
+        | "NO_AMOUNT"
+        | "MINT_SELECTION_REQUIRED"
+        | "OPTION_SELECTION_REQUIRED"
+        | "FALLBACK_OPTION_REQUIRED"
+        | "PROOF_SELECTION_REQUIRED"
+        | "SEND_MEMO_REQUIRED";
       message: string;
       isExecutable: false;
       isExecuting: boolean;
@@ -362,21 +386,21 @@ export type ExecutionState =
       details?: Record<string, unknown>;
     }
   | {
-      status: 'blocked';
+      status: "blocked";
       code:
-        | 'UNSUPPORTED_INPUT'
-        | 'NO_VALID_MINT'
-        | 'INSUFFICIENT_BALANCE'
-        | 'NO_BALANCE'
-        | 'ALL_OPTIONS_DISABLED'
-        | 'UNSUPPORTED_PAYMENT_METHOD'
-        | 'SEND_FAILED'
-        | 'MINT_QUOTE_FAILED'
-        | 'MELT_FAILED'
-        | 'PAYMENT_REQUEST_FAILED'
-        | 'NFC_WRITE_FAILED'
-        | 'NFC_SESSION_LOST'
-        | 'NFC_READ_FAILED';
+        | "UNSUPPORTED_INPUT"
+        | "NO_VALID_MINT"
+        | "INSUFFICIENT_BALANCE"
+        | "NO_BALANCE"
+        | "ALL_OPTIONS_DISABLED"
+        | "UNSUPPORTED_PAYMENT_METHOD"
+        | "SEND_FAILED"
+        | "MINT_QUOTE_FAILED"
+        | "MELT_FAILED"
+        | "PAYMENT_REQUEST_FAILED"
+        | "NFC_WRITE_FAILED"
+        | "NFC_SESSION_LOST"
+        | "NFC_READ_FAILED";
       message: string;
       isExecutable: false;
       isExecuting: boolean;
@@ -390,12 +414,12 @@ export type ExecutionState =
 
 export type FlowEvent =
   | {
-      type: 'EXECUTE';
+      type: "EXECUTE";
       input: string;
     }
-  | { type: 'OPTION_CHOSEN'; option: PaymentOption }
+  | { type: "OPTION_CHOSEN"; option: PaymentOption }
   | {
-      type: 'AMOUNT_ENTERED';
+      type: "AMOUNT_ENTERED";
       amount: number;
       mintUrl: string;
       destination?: Destination;
@@ -417,20 +441,20 @@ export type FlowEvent =
       amountEntryDisplay?: AmountEntryDisplayMetadata;
     }
   | {
-      type: 'MINT_SELECTED';
+      type: "MINT_SELECTED";
       mintUrl: string;
       amount?: number;
       destination?: Destination;
       /** When true, the wallet should persist this mint as the user's preferred mint. */
       persist?: boolean;
-      /** When 'npc', update NPC mint only (not selectedMint). */
-      scope?: 'npc' | 'selected';
+      /** Non-'selected' scopes are persist-only (NPC / receive-rail mints). */
+      scope?: MintSelectorScope;
     }
-  | { type: 'PROOFS_CHOSEN'; amount: number }
-  | { type: 'SEND_MEMO_SUBMITTED'; memo?: string }
-  | { type: 'REQUEST_MINT_SELECTOR'; scope?: 'npc' | 'selected' }
+  | { type: "PROOFS_CHOSEN"; amount: number }
+  | { type: "SEND_MEMO_SUBMITTED"; memo?: string }
+  | { type: "REQUEST_MINT_SELECTOR"; scope?: MintSelectorScope }
   | {
-      type: 'START_SEND_ECASH';
+      type: "START_SEND_ECASH";
       /**
        * Optional Lightning target to carry into amount entry. Chat surfaces
        * can start with the same ecash-send mint guard while still enabling
@@ -452,15 +476,15 @@ export type FlowEvent =
        * step). No amount/mint is chosen yet — the method the user picks drives
        * the rest of the flow via the existing entries.
        */
-      type: 'START_SEND';
+      type: "START_SEND";
     }
-  | { type: 'START_RECEIVE_LIGHTNING' }
-  | { type: 'START_RECEIVE' }
-  | { type: 'REVIEW_MINT'; mintUrl: string; token: string }
-  | { type: 'MINT_TRUSTED' }
-  | { type: 'CONFIRM_MELT' }
-  | { type: 'CONFIRM_PAYMENT_REQUEST' }
-  | { type: 'RESET' };
+  | { type: "START_RECEIVE_LIGHTNING" }
+  | { type: "START_RECEIVE" }
+  | { type: "REVIEW_MINT"; mintUrl: string; token: string }
+  | { type: "MINT_TRUSTED" }
+  | { type: "CONFIRM_MELT" }
+  | { type: "CONFIRM_PAYMENT_REQUEST" }
+  | { type: "RESET" };
 
 // ---------------------------------------------------------------------------
 // Step Handler Map — wallet provides one handler per step
@@ -469,7 +493,9 @@ export type FlowEvent =
 type MaybeAsync = void | Promise<void>;
 
 export type StepHandlerMap = {
-  [K in FlowStep as K extends 'idle' ? never : K]?: (data: StepDataMap[K]) => MaybeAsync;
+  [K in FlowStep as K extends "idle" ? never : K]?: (
+    data: StepDataMap[K],
+  ) => MaybeAsync;
 };
 
 // ---------------------------------------------------------------------------
@@ -487,7 +513,7 @@ export type StepHandlerMap = {
  * notification is silently ignored.
  */
 export type NotificationHandlerMap = {
-  [K in ErrorCode]?: (data: StepDataMap['error']) => MaybeAsync;
+  [K in ErrorCode]?: (data: StepDataMap["error"]) => MaybeAsync;
 } & {
   /** Called when a scan source returns empty (clipboard empty, no QR in image). */
   onScanEmpty?: (source: string) => MaybeAsync;
@@ -542,7 +568,7 @@ export type NotificationHandlerMap = {
    * The wallet shows a processing indicator (toast/sheet).
    */
   onPaymentProcessing?: (data: {
-    variant: 'melt' | 'paymentRequest' | 'send';
+    variant: "melt" | "paymentRequest" | "send";
     mintUrl: string;
     amount: number;
     unit: string;
@@ -552,7 +578,7 @@ export type NotificationHandlerMap = {
    * The wallet updates the processing indicator to show success.
    */
   onPaymentConfirmed?: (data: {
-    variant: 'melt' | 'paymentRequest' | 'send';
+    variant: "melt" | "paymentRequest" | "send";
     mintUrl: string;
     amount: number;
     unit: string;
@@ -564,7 +590,7 @@ export type NotificationHandlerMap = {
    * the processing indicator WITHOUT showing a failure.
    */
   onPaymentCancelled?: (data: {
-    variant: 'melt' | 'paymentRequest' | 'send';
+    variant: "melt" | "paymentRequest" | "send";
     mintUrl: string;
     amount: number;
     unit: string;
@@ -575,7 +601,7 @@ export type NotificationHandlerMap = {
    * `chooseFallbackOption` instead of firing this notification.
    */
   onPaymentFailed?: (data: {
-    variant: 'melt' | 'paymentRequest' | 'send';
+    variant: "melt" | "paymentRequest" | "send";
     mintUrl: string;
     amount: number;
     unit: string;
@@ -587,14 +613,17 @@ export type NotificationHandlerMap = {
    * The wallet shows a "hold device steady" overlay with phase updates.
    */
   onNfcPaymentProgress?: (data: {
-    phase: 'reading' | 'selecting' | 'creating' | 'writing';
+    phase: "reading" | "selecting" | "creating" | "writing";
   }) => MaybeAsync;
   /**
    * Called when NFC write-back fails after token creation.
    * The wallet shows an error popup. If `rolledBack` is true, proofs
    * were successfully reclaimed.
    */
-  onNfcWriteFailed?: (data: { message: string; rolledBack: boolean }) => MaybeAsync;
+  onNfcWriteFailed?: (data: {
+    message: string;
+    rolledBack: boolean;
+  }) => MaybeAsync;
 
   // ── Screen action notifications ─────────────────────────────────────
   // Fired by the built-in default screen action handlers. The wallet
@@ -692,7 +721,10 @@ export type NotificationHandlerMap = {
    * `fromAccepter` is true when the trust was triggered from the
    * accept-mint modal rather than the info screen.
    */
-  onMintTrustedFromScreen?: (data: { mintUrl: string; fromAccepter: boolean }) => MaybeAsync;
+  onMintTrustedFromScreen?: (data: {
+    mintUrl: string;
+    fromAccepter: boolean;
+  }) => MaybeAsync;
 
   // ── State change notifications ────────────────────────────────────
   // Broader lifecycle notifications for state updates (zustand stores,
@@ -712,13 +744,23 @@ export type NotificationHandlerMap = {
   onNpcMintChanged?: (data: { mintUrl: string }) => MaybeAsync;
 
   /**
+   * Called when the "Receiving with" mint backing a standing reusable-quote
+   * rail (Bolt12 offer / Onchain address tab) changes. Persist-only, like
+   * `onNpcMintChanged` — the wallet stores one mint per method.
+   */
+  onReceiveMethodMintChanged?: (data: {
+    method: ReceiveMethodScope;
+    mintUrl: string;
+  }) => MaybeAsync;
+
+  /**
    * Called after any transaction is created (send, receive, melt,
    * mint-quote). Wallets use this for scan history linking, location
    * capture, analytics, etc.
    */
   onTransactionCreated?: (data: {
     transactionId: string;
-    type: 'send' | 'receive' | 'melt' | 'mint';
+    type: "send" | "receive" | "melt" | "mint";
     mintUrl: string;
     amount: number;
     unit: string;
@@ -767,7 +809,7 @@ export interface MachineOperations {
     options?: {
       /** See `FlowContext.p2pkLockPubkey` — lock outputs to this pubkey via a mint swap. */
       p2pkLockPubkey?: string;
-    }
+    },
   ) => Promise<{ historyEntry: string }>;
   /**
    * Execute a send using only local proofs (no mint contact).
@@ -777,15 +819,17 @@ export interface MachineOperations {
   executeOfflineSend?: (
     mintUrl: string,
     amount: number,
-    memo?: string
+    memo?: string,
   ) => Promise<{ historyEntry: string }>;
   executeMintQuote: (
     mintUrl: string,
     amount: number,
     unit: string,
-    method?: MintQuoteMethod
+    method?: MintQuoteMethod,
   ) => Promise<{ historyEntry: string }>;
-  buildMintListItems: (data: StepDataMap['selectMint']) => Promise<MintListItem[]>;
+  buildMintListItems: (
+    data: StepDataMap["selectMint"],
+  ) => Promise<MintListItem[]>;
   /**
    * Trust a mint. Called internally by `mintTrusted()` when the machine is
    * in the `reviewMint` step. The machine transitions to `receiveToken`
@@ -804,8 +848,8 @@ export interface MachineOperations {
    */
   buildMintReviewInfo?: (
     mintUrl: string,
-    item?: MintListItem
-  ) => Promise<import('../types').MintReviewInfo>;
+    item?: MintListItem,
+  ) => Promise<import("../types").MintReviewInfo>;
   /**
    * Execute a lightning melt. Called when the user confirms a melt from the
    * preview screen via `confirmMelt()`. The machine routes to the result
@@ -815,7 +859,7 @@ export interface MachineOperations {
     mintUrl: string,
     meltTarget: string,
     amount: number,
-    unit: string
+    unit: string,
   ) => Promise<{ historyEntry: string }>;
   /**
    * Execute a payment request send. Called when the user confirms from the
@@ -826,8 +870,12 @@ export interface MachineOperations {
     mintUrl: string,
     paymentRequest: string,
     amount: number,
-    unit: string
-  ) => Promise<{ historyEntry: string; rolledBack?: boolean; errorMessage?: string }>;
+    unit: string,
+  ) => Promise<{
+    historyEntry: string;
+    rolledBack?: boolean;
+    errorMessage?: string;
+  }>;
   /**
    * Link a scanned input string to a transaction ID for history provenance.
    * Fire-and-forget — called after successful melt/payment-request operations.
@@ -839,7 +887,7 @@ export interface MachineOperations {
    */
   executeNfcSend?: (
     mintUrl: string,
-    amount: number
+    amount: number,
   ) => Promise<{ token: string; historyEntry: string; operationId: string }>;
   /**
    * Roll back a pending send operation. Called when NFC write-back fails
@@ -867,7 +915,7 @@ export interface MachineOperations {
   executeReceive?: (
     tokenString: string,
     mintUrl: string,
-    amount: number
+    amount: number,
   ) => Promise<ReceiveExecuteResult>;
 
   /**
@@ -879,7 +927,7 @@ export interface MachineOperations {
    */
   executeAutoRedeem?: (
     tokenString: string,
-    mintUrl: string
+    mintUrl: string,
   ) => Promise<{ historyEntryId: string | null; historyEntry: string | null }>;
 
   /**
@@ -916,7 +964,7 @@ export interface MachineOperations {
    */
   resolveRecipientPubkey?: (
     meltTarget: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ) => Promise<string | null>;
 
   /**
@@ -929,7 +977,7 @@ export interface MachineOperations {
    */
   resolveRecipientProfile?: (
     pubkey: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ) => Promise<RecipientProfile | null>;
 }
 
@@ -947,7 +995,7 @@ export interface URDecoderLike {
 
 export interface ScanOptions {
   /** Source hint when data is provided. When no data, selects which source to fetch from. */
-  source?: 'clipboard' | 'gallery' | string;
+  source?: "clipboard" | "gallery" | string;
   /** When true, resets all flow state before processing the scan input. */
   reset?: boolean;
 }
@@ -1067,7 +1115,7 @@ export interface PaymentMachine {
       recipientPubkey?: string;
       recipientProfile?: RecipientProfile;
       amountEntryDisplay?: AmountEntryDisplayMetadata;
-    }
+    },
   ) => Promise<void>;
   /** User selected one of multiple payment options (e.g. from chooseOption step). */
   chooseOption: (option: PaymentOption) => Promise<void>;
@@ -1078,14 +1126,18 @@ export interface PaymentMachine {
   /** Select a mint. Without `destination`, continues the current flow with the new mint. */
   changeMint: (
     mintUrl: string,
-    opts?: { persist?: boolean; scope?: 'npc' | 'selected' }
+    opts?: { persist?: boolean; scope?: MintSelectorScope },
   ) => Promise<void>;
   /**
    * Open mint selector for current flow.
    * Pass `{ reset: true }` to clear stale flow context first (e.g. from home screen).
-   * Pass `{ scope: 'npc' }` to update NPC mint only (not selectedMint).
+   * Pass a non-'selected' scope for a persist-only pick: 'npc' (npub.cash
+   * mint) or 'bolt12'/'onchain' (per-method "Receiving with" mint).
    */
-  requestMintSelector: (opts?: { reset?: boolean; scope?: 'npc' | 'selected' }) => Promise<void>;
+  requestMintSelector: (opts?: {
+    reset?: boolean;
+    scope?: MintSelectorScope;
+  }) => Promise<void>;
   /**
    * Open the destination-first Send method chooser. Lands on the
    * `selectDestination` step (no amount/mint chosen yet) so the wallet can

@@ -345,7 +345,8 @@ function amountEntryAvailability(
   // flows can overspend; receive (mintQuote) has no balance ceiling. Computed
   // here, beside the per-rail balance checks, so the UI never re-derives it.
   const balanceValues = Object.values(methodContext?.mintBalances ?? {});
-  const spendableSat = balanceValues.length > 0 ? Math.max(...balanceValues) : 0;
+  const spendableSat =
+    balanceValues.length > 0 ? Math.max(...balanceValues) : 0;
   const isSpendDestination = isSendEcash || isMeltQuote || isPaymentRequest;
   const exceedsBalance =
     isSpendDestination && effectiveSat > 0 && effectiveSat > spendableSat;
@@ -658,12 +659,26 @@ function receiveAvailability(
     method: "bolt11",
     unit: unit ?? "sat",
   });
+  // The receive-rail pickers open whenever ANY trusted mint could serve the
+  // rail — mirroring the rail tab's own visibility gate.
+  const canReceiveBolt12 = methodContextHasSupportingMint(methodContext, {
+    operation: "mint",
+    method: "bolt12",
+    unit: unit ?? "sat",
+  });
+  const canReceiveOnchain = methodContextHasSupportingMint(methodContext, {
+    operation: "mint",
+    method: "onchain",
+    unit: unit ?? "sat",
+  });
   logger.debug("screenActions.availability.receive.context", {
     hasNpc,
     hasP2pk,
     isReceiveHub,
     unit: unit ?? null,
     canReceiveLightning,
+    canReceiveBolt12,
+    canReceiveOnchain,
   });
 
   return {
@@ -678,6 +693,8 @@ function receiveAvailability(
     },
     scanQr: { available: hubLoaded },
     changeNpcMint: { available: hubLoaded && hasNpc && unit === "sat" },
+    changeBolt12Mint: { available: hubLoaded && canReceiveBolt12 },
+    changeOnchainMint: { available: hubLoaded && canReceiveOnchain },
     back: { available: true },
   };
 }

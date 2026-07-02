@@ -10,20 +10,20 @@
 // melt-operation mapping) used as built-in defaults by useScreenActions.
 // ---------------------------------------------------------------------------
 
-import { getEncodedToken } from '@cashu/cashu-ts';
+import { getEncodedToken } from "@cashu/cashu-ts";
 
-import { createAmountActionManager } from '../amount-actions/createManager';
+import { createAmountActionManager } from "../amount-actions/createManager";
 import type {
   AmountResolution,
   CreateAmountActionManagerConfig,
-} from '../amount-actions/types';
-import { buildBip321OnchainUri } from '../bip321';
-import { defaultDetectors } from '../detectors';
-import { FormattedString } from '../formatting/FormattedString';
-import { FormattedTimestamp } from '../formatting/FormattedTimestamp';
-import { errField, logger } from '../logger';
-import type { PaymentRequestInfo } from '../types';
-import { getAvailableActions } from './availability';
+} from "../amount-actions/types";
+import { buildBip321OnchainUri } from "../bip321";
+import { defaultDetectors } from "../detectors";
+import { FormattedString } from "../formatting/FormattedString";
+import { FormattedTimestamp } from "../formatting/FormattedTimestamp";
+import { errField, logger } from "../logger";
+import type { PaymentRequestInfo } from "../types";
+import { getAvailableActions } from "./availability";
 import type {
   ActionState,
   ScreenActionContext,
@@ -31,7 +31,7 @@ import type {
   ScreenActionManager,
   ScreenActionName,
   ScreenType,
-} from './types';
+} from "./types";
 
 interface CreateScreenActionManagerConfig<S extends ScreenType> {
   screenType: S;
@@ -65,9 +65,9 @@ export function createScreenActionManager<S extends ScreenType>(
     return {
       hasParams: !!params,
       paramKeys: params ? Object.keys(params) : [],
-      hasVariantId: typeof params?.variantId === 'string',
+      hasVariantId: typeof params?.variantId === "string",
       variantId:
-        typeof params?.variantId === 'string' ? params.variantId : null,
+        typeof params?.variantId === "string" ? params.variantId : null,
     };
   }
 
@@ -151,24 +151,24 @@ export function createScreenActionManager<S extends ScreenType>(
     params?: Record<string, unknown>,
   ): Promise<void> => {
     if (amountMgr) {
-      if (action === 'setInput') {
-        logger.debug('screenActionManager.execute.amountInput', {
+      if (action === "setInput") {
+        logger.debug("screenActionManager.execute.amountInput", {
           screenType,
           action,
           mode: params?.mode,
           inputLength:
-            typeof params?.input === 'string' ? params.input.length : 0,
+            typeof params?.input === "string" ? params.input.length : 0,
         });
-        if (params?.mode === 'sat' || params?.mode === 'fiat') {
+        if (params?.mode === "sat" || params?.mode === "fiat") {
           amountMgr.setMode(params.mode);
         }
-        const raw = typeof params?.input === 'string' ? params.input : '';
+        const raw = typeof params?.input === "string" ? params.input : "";
         amountMgr.setInput(raw);
         notify();
         return;
       }
-      if (action === 'toggle') {
-        logger.debug('screenActionManager.execute.amountToggle', {
+      if (action === "toggle") {
+        logger.debug("screenActionManager.execute.amountToggle", {
           screenType,
           action,
         });
@@ -198,14 +198,14 @@ export function createScreenActionManager<S extends ScreenType>(
     const effectiveHandler =
       handler ??
       defaultHandler ??
-      (action === 'copy' && CONTENT_EXTRACTORS[screenType]
+      (action === "copy" && CONTENT_EXTRACTORS[screenType]
         ? (ctx: ScreenActionContext) => builtinCopyHandler(screenType, ctx)
-        : action === 'share' && CONTENT_EXTRACTORS[screenType]
+        : action === "share" && CONTENT_EXTRACTORS[screenType]
           ? (ctx: ScreenActionContext) => builtinShareHandler(screenType, ctx)
           : undefined);
 
     if (!effectiveHandler) {
-      logger.warn('screenActionManager.execute.noHandler', {
+      logger.warn("screenActionManager.execute.noHandler", {
         screenType,
         action,
         hasWalletHandler: !!handler,
@@ -216,14 +216,14 @@ export function createScreenActionManager<S extends ScreenType>(
     }
 
     loadingActions.add(action as string);
-    logger.info('screenActionManager.execute.start', {
+    logger.info("screenActionManager.execute.start", {
       screenType,
       action,
       handlerSource: handler
-        ? 'wallet'
+        ? "wallet"
         : defaultHandler
-          ? 'default'
-          : 'builtin',
+          ? "default"
+          : "builtin",
       loadingCount: loadingActions.size,
       ...summarizeParams(params),
     });
@@ -243,30 +243,30 @@ export function createScreenActionManager<S extends ScreenType>(
         ...(params ?? {}),
       };
       await effectiveHandler(ctx);
-      logger.info('screenActionManager.execute.done', {
+      logger.info("screenActionManager.execute.done", {
         screenType,
         action,
         handlerSource: handler
-          ? 'wallet'
+          ? "wallet"
           : defaultHandler
-            ? 'default'
-            : 'builtin',
+            ? "default"
+            : "builtin",
       });
     } catch (error) {
-      logger.warn('screenActionManager.execute.failed', {
+      logger.warn("screenActionManager.execute.failed", {
         screenType,
         action,
         handlerSource: handler
-          ? 'wallet'
+          ? "wallet"
           : defaultHandler
-            ? 'default'
-            : 'builtin',
+            ? "default"
+            : "builtin",
         error: errField(error),
       });
       throw error;
     } finally {
       loadingActions.delete(action as string);
-      logger.debug('screenActionManager.execute.clearLoading', {
+      logger.debug("screenActionManager.execute.clearLoading", {
         screenType,
         action,
         loadingCount: loadingActions.size,
@@ -278,7 +278,7 @@ export function createScreenActionManager<S extends ScreenType>(
   const getEntry = (): Record<string, unknown> | null => getEffectiveEntry();
 
   const setEntry = (newEntry: Record<string, unknown>): void => {
-    logger.info('screenActionManager.setEntry', {
+    logger.info("screenActionManager.setEntry", {
       screenType,
       id: newEntry?.id,
       type: newEntry?.type,
@@ -310,31 +310,33 @@ export function createScreenActionManager<S extends ScreenType>(
 // ---------------------------------------------------------------------------
 
 const ACTION_NAMES: Record<ScreenType, string[]> = {
-  sendToken: ['copy', 'share', 'nfc', 'checkStatus', 'cancel', 'back'],
-  receiveToken: ['redeem', 'back'],
-  mintQuote: ['copy', 'share', 'back'],
-  meltQuote: ['pay', 'cancel', 'back'],
-  paymentRequest: ['confirm', 'cancel', 'back'],
+  sendToken: ["copy", "share", "nfc", "checkStatus", "cancel", "back"],
+  receiveToken: ["redeem", "back"],
+  mintQuote: ["copy", "share", "back"],
+  meltQuote: ["pay", "cancel", "back"],
+  paymentRequest: ["confirm", "cancel", "back"],
   receive: [
-    'copy',
-    'share',
-    'paste',
-    'fixedAmount',
-    'scanQr',
-    'changeNpcMint',
-    'back',
+    "copy",
+    "share",
+    "paste",
+    "fixedAmount",
+    "scanQr",
+    "changeNpcMint",
+    "changeBolt12Mint",
+    "changeOnchainMint",
+    "back",
   ],
-  mintInfo: ['trust', 'copy', 'share', 'back'],
+  mintInfo: ["trust", "copy", "share", "back"],
   amountEntry: [
-    'setInput',
-    'toggle',
-    'next',
-    'paste',
-    'scanQr',
-    'cancel',
-    'back',
+    "setInput",
+    "toggle",
+    "next",
+    "paste",
+    "scanQr",
+    "cancel",
+    "back",
   ],
-  mintSelector: ['select', 'getInfo', 'addMint', 'cancel', 'back'],
+  mintSelector: ["select", "getInfo", "addMint", "cancel", "back"],
 };
 
 function getActionNames(screenType: ScreenType): string[] {
@@ -367,25 +369,25 @@ function looksLikeBitcoinAddress(value: string): boolean {
 
 function getEntryMetadataRecord(entry: EntryLike): EntryLike | null {
   const metadata = entry.metadata as Record<string, unknown> | undefined;
-  return metadata && typeof metadata === 'object' ? metadata : null;
+  return metadata && typeof metadata === "object" ? metadata : null;
 }
 
 function getStringValue(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function getNumberValue(value: unknown): number | null {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (typeof value === 'string' && value.trim()) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string" && value.trim()) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   }
-  if (value && typeof value === 'object') {
+  if (value && typeof value === "object") {
     const maybeToNumber = (value as { toNumber?: unknown }).toNumber;
-    if (typeof maybeToNumber === 'function') {
+    if (typeof maybeToNumber === "function") {
       try {
         const parsed = maybeToNumber.call(value);
-        return typeof parsed === 'number' && Number.isFinite(parsed)
+        return typeof parsed === "number" && Number.isFinite(parsed)
           ? parsed
           : null;
       } catch {
@@ -399,10 +401,10 @@ function getNumberValue(value: unknown): number | null {
 function getOnchainMintQuoteAddress(entry: EntryLike): string | null {
   const metadata = getEntryMetadataRecord(entry);
   const metadataAddress = getStringValue(metadata?.onchainAddress);
-  if (metadata?.method === 'onchain' && metadataAddress) return metadataAddress;
+  if (metadata?.method === "onchain" && metadataAddress) return metadataAddress;
 
   const pr = entry.paymentRequest;
-  return typeof pr === 'string' && looksLikeBitcoinAddress(pr)
+  return typeof pr === "string" && looksLikeBitcoinAddress(pr)
     ? pr.trim()
     : null;
 }
@@ -413,7 +415,7 @@ function getOnchainMintQuotePaymentText(
 ): string {
   const metadata = getEntryMetadataRecord(entry);
   const amountSats =
-    entry.unit === 'sat' || entry.unit == null
+    entry.unit === "sat" || entry.unit == null
       ? (getNumberValue(metadata?.requestedAmount) ??
         getNumberValue(entry.amount))
       : null;
@@ -431,10 +433,10 @@ const CONTENT_EXTRACTORS: Partial<Record<ScreenType, ContentExtractor>> = {
     try {
       return {
         text: getEncodedToken(token as Parameters<typeof getEncodedToken>[0]),
-        target: 'token',
+        target: "token",
       };
     } catch (e) {
-      logger.warn('screenActionManager.clipboard.tokenEncodeFailed', {
+      logger.warn("screenActionManager.clipboard.tokenEncodeFailed", {
         error: errField(e),
       });
       return null;
@@ -446,29 +448,29 @@ const CONTENT_EXTRACTORS: Partial<Record<ScreenType, ContentExtractor>> = {
     if (onchainAddress) {
       return {
         text: getOnchainMintQuotePaymentText(entry, onchainAddress),
-        target: 'address',
+        target: "address",
       };
     }
-    return typeof pr === 'string'
-      ? { text: pr, target: 'lightningInvoice' }
+    return typeof pr === "string"
+      ? { text: pr, target: "lightningInvoice" }
       : null;
   },
   receive: (entry, ctx) => {
-    const source = (ctx.source ?? 'npc') as string;
-    const raw = source === 'p2pk' ? entry.p2pkKey : entry.npcAddress;
+    const source = (ctx.source ?? "npc") as string;
+    const raw = source === "p2pk" ? entry.p2pkKey : entry.npcAddress;
     if (raw == null) return null;
-    const text = typeof raw === 'string' ? raw : String(raw);
+    const text = typeof raw === "string" ? raw : String(raw);
     if (!text) return null;
-    return { text, target: source === 'p2pk' ? 'p2pk' : 'address' };
+    return { text, target: source === "p2pk" ? "p2pk" : "address" };
   },
   mintInfo: (entry) => {
     const url = entry.mintUrl;
-    return typeof url === 'string' ? { text: url, target: 'mintUrl' } : null;
+    return typeof url === "string" ? { text: url, target: "mintUrl" } : null;
   },
 };
 
 const SHARE_URL_PREFIXES: Partial<Record<string, string>> = {
-  token: 'cashu://',
+  token: "cashu://",
 };
 
 function extractContent(
@@ -497,7 +499,7 @@ async function builtinCopyHandler(
   const notify = (ctx as EntryLike).notify as
     | ((event: string, ...args: unknown[]) => void)
     | undefined;
-  notify?.('onCopied', result.target, result.text);
+  notify?.("onCopied", result.target, result.text);
 }
 
 async function builtinShareHandler(
@@ -521,7 +523,7 @@ async function builtinShareHandler(
   const notify = (ctx as EntryLike).notify as
     | ((event: string, ...args: unknown[]) => void)
     | undefined;
-  notify?.('onShared', result.target, result.text);
+  notify?.("onShared", result.target, result.text);
 }
 
 // ---------------------------------------------------------------------------
@@ -540,7 +542,7 @@ function getStringField(
   key: string,
 ): string | undefined {
   const value = entry?.[key];
-  return typeof value === 'string' ? value : undefined;
+  return typeof value === "string" ? value : undefined;
 }
 
 function getNumberField(
@@ -548,7 +550,7 @@ function getNumberField(
   key: string,
 ): number | undefined {
   const value = entry?.[key];
-  return typeof value === 'number' && Number.isFinite(value)
+  return typeof value === "number" && Number.isFinite(value)
     ? value
     : undefined;
 }
@@ -557,7 +559,7 @@ function getMetadata(
   entry: EntryRecord | null | undefined,
 ): EntryRecord | undefined {
   const metadata = entry?.metadata;
-  return typeof metadata === 'object' && metadata !== null
+  return typeof metadata === "object" && metadata !== null
     ? (metadata as EntryRecord)
     : undefined;
 }
@@ -570,12 +572,12 @@ function getReceiveTokenString(
     try {
       return getEncodedToken(token as Parameters<typeof getEncodedToken>[0]);
     } catch (e) {
-      logger.warn('screenActionManager.getReceiveTokenString.failed', {
+      logger.warn("screenActionManager.getReceiveTokenString.failed", {
         error: errField(e),
       });
     }
   }
-  return getStringField(getMetadata(entry), 'rawToken');
+  return getStringField(getMetadata(entry), "rawToken");
 }
 
 export function shouldApplyEntryUpdate(
@@ -584,104 +586,104 @@ export function shouldApplyEntryUpdate(
 ): boolean {
   if (!currentEntry) return false;
 
-  const currentType = getStringField(currentEntry, 'type');
-  const updatedType = getStringField(updatedEntry, 'type');
+  const currentType = getStringField(currentEntry, "type");
+  const updatedType = getStringField(updatedEntry, "type");
   if (!currentType || currentType !== updatedType) return false;
 
-  const currentId = getStringField(currentEntry, 'id');
-  const updatedId = getStringField(updatedEntry, 'id');
+  const currentId = getStringField(currentEntry, "id");
+  const updatedId = getStringField(updatedEntry, "id");
   if (currentId && updatedId && currentId === updatedId) return true;
 
-  if (currentType === 'mint') {
-    const cq = getStringField(currentEntry, 'quoteId');
-    const uq = getStringField(updatedEntry, 'quoteId');
+  if (currentType === "mint") {
+    const cq = getStringField(currentEntry, "quoteId");
+    const uq = getStringField(updatedEntry, "quoteId");
     if (cq && uq && cq === uq) {
-      logger.info('shouldApplyEntryUpdate.mint.matchByQuoteId', {
+      logger.info("shouldApplyEntryUpdate.mint.matchByQuoteId", {
         quoteId: cq,
       });
       return true;
     }
 
     const co =
-      getStringField(getMetadata(currentEntry), 'operationId') ??
-      getStringField(currentEntry, 'operationId');
+      getStringField(getMetadata(currentEntry), "operationId") ??
+      getStringField(currentEntry, "operationId");
     const uo =
-      getStringField(getMetadata(updatedEntry), 'operationId') ??
-      getStringField(updatedEntry, 'operationId');
+      getStringField(getMetadata(updatedEntry), "operationId") ??
+      getStringField(updatedEntry, "operationId");
     if (co && uo && co === uo) {
-      logger.info('shouldApplyEntryUpdate.mint.matchByOperationId', {
+      logger.info("shouldApplyEntryUpdate.mint.matchByOperationId", {
         operationId: co,
       });
       return true;
     }
   }
 
-  if (currentType === 'send') {
+  if (currentType === "send") {
     const co =
-      getStringField(currentEntry, 'operationId') ??
-      getStringField(getMetadata(currentEntry), 'operationId');
+      getStringField(currentEntry, "operationId") ??
+      getStringField(getMetadata(currentEntry), "operationId");
     const uo =
-      getStringField(updatedEntry, 'operationId') ??
-      getStringField(getMetadata(updatedEntry), 'operationId');
+      getStringField(updatedEntry, "operationId") ??
+      getStringField(getMetadata(updatedEntry), "operationId");
     if (co && uo && co === uo) return true;
 
     // Preview entries (no operationId yet) match by mintUrl + amount
-    const isPreview = currentId?.startsWith('pr-preview-') ?? false;
+    const isPreview = currentId?.startsWith("pr-preview-") ?? false;
     if (!isPreview) return false;
 
-    const cm = getStringField(currentEntry, 'mintUrl');
-    const um = getStringField(updatedEntry, 'mintUrl');
-    const ca = getNumberField(currentEntry, 'amount');
-    const ua = getNumberField(updatedEntry, 'amount');
-    return !!cm && cm === um && typeof ca === 'number' && ca === ua;
+    const cm = getStringField(currentEntry, "mintUrl");
+    const um = getStringField(updatedEntry, "mintUrl");
+    const ca = getNumberField(currentEntry, "amount");
+    const ua = getNumberField(updatedEntry, "amount");
+    return !!cm && cm === um && typeof ca === "number" && ca === ua;
   }
 
-  if (currentType === 'melt') {
-    const cq = getStringField(currentEntry, 'quoteId');
-    const uq = getStringField(updatedEntry, 'quoteId');
+  if (currentType === "melt") {
+    const cq = getStringField(currentEntry, "quoteId");
+    const uq = getStringField(updatedEntry, "quoteId");
     if (cq && uq && cq === uq) return true;
 
     const co =
-      getStringField(getMetadata(currentEntry), 'operationId') ??
-      getStringField(currentEntry, 'operationId') ??
-      getStringField(currentEntry, 'id');
+      getStringField(getMetadata(currentEntry), "operationId") ??
+      getStringField(currentEntry, "operationId") ??
+      getStringField(currentEntry, "id");
     const uo =
-      getStringField(getMetadata(updatedEntry), 'operationId') ??
-      getStringField(updatedEntry, 'operationId') ??
-      getStringField(updatedEntry, 'id');
+      getStringField(getMetadata(updatedEntry), "operationId") ??
+      getStringField(updatedEntry, "operationId") ??
+      getStringField(updatedEntry, "id");
     if (co && uo && co === uo) return true;
 
     // Preview entries (no quoteId yet) match by mintUrl + amount
-    const isPreview = currentId?.startsWith('melt-preview-') ?? false;
+    const isPreview = currentId?.startsWith("melt-preview-") ?? false;
     if (!isPreview) return false;
 
-    const cm = getStringField(currentEntry, 'mintUrl');
-    const um = getStringField(updatedEntry, 'mintUrl');
-    const ca = getNumberField(currentEntry, 'amount');
-    const ua = getNumberField(updatedEntry, 'amount');
-    return !!cm && cm === um && typeof ca === 'number' && ca === ua;
+    const cm = getStringField(currentEntry, "mintUrl");
+    const um = getStringField(updatedEntry, "mintUrl");
+    const ca = getNumberField(currentEntry, "amount");
+    const ua = getNumberField(updatedEntry, "amount");
+    return !!cm && cm === um && typeof ca === "number" && ca === ua;
   }
 
-  if (currentType === 'receive') {
+  if (currentType === "receive") {
     const ct = getReceiveTokenString(currentEntry);
     const ut = getReceiveTokenString(updatedEntry);
     if (ct && ut && ct === ut) return true;
 
-    const isPreview = currentId?.startsWith('receive-') ?? false;
+    const isPreview = currentId?.startsWith("receive-") ?? false;
     if (!isPreview) {
-      logger.info('shouldApplyEntryUpdate.receive.notPreview', {
+      logger.info("shouldApplyEntryUpdate.receive.notPreview", {
         currentId,
         updatedId,
       });
       return false;
     }
 
-    const cm = getStringField(currentEntry, 'mintUrl');
-    const um = getStringField(updatedEntry, 'mintUrl');
-    const ca = getNumberField(currentEntry, 'amount');
-    const ua = getNumberField(updatedEntry, 'amount');
-    const matched = !!cm && cm === um && typeof ca === 'number' && ca === ua;
-    logger.info('shouldApplyEntryUpdate.receivePreviewMatch', {
+    const cm = getStringField(currentEntry, "mintUrl");
+    const um = getStringField(updatedEntry, "mintUrl");
+    const ca = getNumberField(currentEntry, "amount");
+    const ua = getNumberField(updatedEntry, "amount");
+    const matched = !!cm && cm === um && typeof ca === "number" && ca === ua;
+    logger.info("shouldApplyEntryUpdate.receivePreviewMatch", {
       matched,
       mintUrlMatch: cm === um,
       amountFrom: ca,
@@ -716,11 +718,11 @@ export function mergeEntryUpdate(
   // merged entry self-consistent.
   const mergedMeta = getMetadata(merged);
   if (
-    mergedMeta?.phase === 'preview' &&
-    (typeof (merged as Record<string, unknown>).operationId === 'string' ||
-      typeof mergedMeta?.operationId === 'string')
+    mergedMeta?.phase === "preview" &&
+    (typeof (merged as Record<string, unknown>).operationId === "string" ||
+      typeof mergedMeta?.operationId === "string")
   ) {
-    (mergedMeta as Record<string, unknown>).phase = 'delivered';
+    (mergedMeta as Record<string, unknown>).phase = "delivered";
   }
 
   return merged;
@@ -740,7 +742,7 @@ function extractP2PKPubkey(
   for (const proof of proofs) {
     try {
       const parsed = JSON.parse(proof.secret);
-      if (Array.isArray(parsed) && parsed[0] === 'P2PK' && parsed[1]?.data) {
+      if (Array.isArray(parsed) && parsed[0] === "P2PK" && parsed[1]?.data) {
         return parsed[1].data as string;
       }
     } catch {
@@ -752,9 +754,9 @@ function extractP2PKPubkey(
 
 function resolveTransportLabel(info: PaymentRequestInfo): string {
   const transports = info.transports;
-  if (!transports?.length) return 'Inband';
-  if (transports.find((t) => t.type === 'nostr')) return 'Nostr';
-  if (transports.find((t) => t.type === 'post')) return 'HTTP POST';
+  if (!transports?.length) return "Inband";
+  if (transports.find((t) => t.type === "nostr")) return "Nostr";
+  if (transports.find((t) => t.type === "post")) return "HTTP POST";
   return transports[0].type;
 }
 
@@ -770,11 +772,11 @@ export function decorateEntry(
     try {
       tokenString = new FormattedString(
         getEncodedToken(token as Parameters<typeof getEncodedToken>[0]),
-        'middle',
+        "middle",
         language,
       );
     } catch (e) {
-      logger.warn('buildEntryContent.tokenEncodeFailed', {
+      logger.warn("buildEntryContent.tokenEncodeFailed", {
         error: errField(e),
       });
     }
@@ -783,27 +785,27 @@ export function decorateEntry(
   let p2pkPubkey: FormattedString | null = null;
   const meta = raw.metadata as Record<string, string> | undefined;
   if (meta?.p2pkPubkey) {
-    p2pkPubkey = new FormattedString(meta.p2pkPubkey, 'middle', language);
+    p2pkPubkey = new FormattedString(meta.p2pkPubkey, "middle", language);
   } else if (token && (token as { proofs?: unknown[] }).proofs) {
     const extracted = extractP2PKPubkey(
       (token as { proofs: { secret: string }[] }).proofs,
     );
     if (extracted) {
-      p2pkPubkey = new FormattedString(extracted, 'middle', language);
+      p2pkPubkey = new FormattedString(extracted, "middle", language);
     }
   }
 
   let npcAddress: FormattedString | undefined;
   const rawNpc = raw.npcAddress;
-  if (typeof rawNpc === 'string' && rawNpc.length > 0) {
-    npcAddress = new FormattedString(rawNpc, 'beforeAt', language);
+  if (typeof rawNpc === "string" && rawNpc.length > 0) {
+    npcAddress = new FormattedString(rawNpc, "beforeAt", language);
   }
 
   let paymentRequestInfo: PaymentRequestInfo | null = null;
   let transportLabel: string | null = null;
   const rawMeta = raw.metadata as Record<string, unknown> | undefined;
   const prString = rawMeta?.paymentRequest;
-  if (prString && typeof prString === 'string') {
+  if (prString && typeof prString === "string") {
     paymentRequestInfo = defaultDetectors.getPaymentRequestInfo(prString);
     if (paymentRequestInfo) {
       transportLabel = resolveTransportLabel(paymentRequestInfo);
@@ -811,22 +813,22 @@ export function decorateEntry(
   }
 
   let mintUrlFormatted: FormattedString | undefined;
-  if (typeof raw.mintUrl === 'string' && raw.mintUrl.length > 0) {
-    mintUrlFormatted = new FormattedString(raw.mintUrl, 'middle', language);
+  if (typeof raw.mintUrl === "string" && raw.mintUrl.length > 0) {
+    mintUrlFormatted = new FormattedString(raw.mintUrl, "middle", language);
   }
 
   let contact: { method: string; info: FormattedString }[] | undefined;
   if (Array.isArray(raw.contact)) {
     contact = (raw.contact as { method: string; info: string }[]).map((c) => ({
       method: c.method,
-      info: new FormattedString(c.info, 'middle', language),
+      info: new FormattedString(c.info, "middle", language),
     }));
   }
 
   return {
     ...raw,
     createdAt: new FormattedTimestamp(
-      typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
+      typeof raw.createdAt === "number" ? raw.createdAt : Date.now(),
       language,
     ),
     tokenString,
@@ -852,23 +854,23 @@ export interface MeltOperationLike {
   amount?: number;
 }
 
-function mapMeltOperationState(state?: string): 'UNPAID' | 'PENDING' | 'PAID' {
-  if (state === 'finalized') return 'PAID';
-  if (state === 'pending' || state === 'executing') return 'PENDING';
-  return 'UNPAID';
+function mapMeltOperationState(state?: string): "UNPAID" | "PENDING" | "PAID" {
+  if (state === "finalized") return "PAID";
+  if (state === "pending" || state === "executing") return "PENDING";
+  return "UNPAID";
 }
 
 export function meltOperationToScreenActionEntry(
   operation: MeltOperationLike,
 ): EntryRecord | null {
-  if (!operation.quoteId || typeof operation.amount !== 'number') return null;
+  if (!operation.quoteId || typeof operation.amount !== "number") return null;
 
   return {
     id: operation.id,
-    type: 'melt',
+    type: "melt",
     createdAt: operation.createdAt,
     mintUrl: operation.mintUrl,
-    unit: 'sat',
+    unit: "sat",
     quoteId: operation.quoteId,
     amount: operation.amount,
     state: mapMeltOperationState(operation.state),
