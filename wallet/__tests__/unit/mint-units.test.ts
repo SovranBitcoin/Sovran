@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  deriveMintMethodCapabilityMapFromTrustedMints,
   deriveSupportedUnitsFromInfo,
   pickHighestBalanceUnit,
   pickMintForUnit,
+  resolveReceiveMethodMint,
   SWITCHABLE_UNITS,
 } from "../../src/mint-capabilities";
 
@@ -114,5 +116,77 @@ describe("pickMintForUnit", () => {
     expect(pickMintForUnit(mints, " USD ", { "https://c.mint": 1 })).toBe(
       "https://c.mint",
     );
+  });
+});
+
+describe("resolveReceiveMethodMint", () => {
+  const BOLT11_ONLY = mintInfo([{ method: "bolt11", unit: "sat" }]);
+  const WITH_BOLT12 = mintInfo([
+    { method: "bolt11", unit: "sat" },
+    { method: "bolt12", unit: "sat" },
+  ]);
+  const REQ = {
+    operation: "mint" as const,
+    method: "bolt12" as const,
+    unit: "sat",
+  };
+
+  function ctx(mints: { mintUrl: string; mintInfo?: unknown }[]) {
+    return {
+      trustedMintUrls: mints.map((m) => m.mintUrl),
+      mintMethodCapabilities:
+        deriveMintMethodCapabilityMapFromTrustedMints(mints),
+    };
+  }
+
+  it("honors an explicit pick while the mint is still trusted", () => {
+    const c = ctx([
+      { mintUrl: "https://a.mint", mintInfo: WITH_BOLT12 },
+      { mintUrl: "https://b.mint", mintInfo: WITH_BOLT12 },
+    ]);
+    expect(resolveReceiveMethodMint(c, "https://b.mint", REQ)).toEqual({
+      mintUrl: "https://b.mint",
+      source: "explicit",
+    });
+  });
+
+  it("honors an explicit pick even if the mint stopped advertising the method", () => {
+    // The rail shows its unsupported state instead of silently moving the
+    // user's deliberate choice.
+    const c = ctx([
+      { mintUrl: "https://a.mint", mintInfo: WITH_BOLT12 },
+      { mintUrl: "https://b.mint", mintInfo: BOLT11_ONLY },
+    ]);
+    expect(resolveReceiveMethodMint(c, "https://b.mint", REQ).source).toBe(
+      "explicit",
+    );
+  });
+
+  it("auto-picks the first trusted mint supporting the method when unset", () => {
+    const c = ctx([
+      { mintUrl: "https://a.mint", mintInfo: BOLT11_ONLY },
+      { mintUrl: "https://b.mint", mintInfo: WITH_BOLT12 },
+      { mintUrl: "https://c.mint", mintInfo: WITH_BOLT12 },
+    ]);
+    expect(resolveReceiveMethodMint(c, undefined, REQ)).toEqual({
+      mintUrl: "https://b.mint",
+      source: "auto",
+    });
+  });
+
+  it("self-heals a stale explicit pick pointing at an untrusted mint", () => {
+    const c = ctx([{ mintUrl: "https://a.mint", mintInfo: WITH_BOLT12 }]);
+    expect(resolveReceiveMethodMint(c, "https://gone.mint", REQ)).toEqual({
+      mintUrl: "https://a.mint",
+      source: "auto",
+    });
+  });
+
+  it("returns none when no trusted mint supports the method", () => {
+    const c = ctx([{ mintUrl: "https://a.mint", mintInfo: BOLT11_ONLY }]);
+    expect(resolveReceiveMethodMint(c, undefined, REQ)).toEqual({
+      mintUrl: null,
+      source: "none",
+    });
   });
 });

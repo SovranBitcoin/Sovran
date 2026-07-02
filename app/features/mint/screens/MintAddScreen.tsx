@@ -7,7 +7,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
@@ -325,6 +325,17 @@ export function MintAddScreen() {
   const [isAdding, setIsAdding] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('ALL');
 
+  // Receive-rail discovery CTAs deep-link here pre-filtered by the payment
+  // method the rail needs (?method=bolt12|onchain). Matching keys off nagg's
+  // per-mint supportedMethods field.
+  const { method: methodParam } = useLocalSearchParams<{ method?: string }>();
+  const methodFilter =
+    methodParam === 'bolt12' || methodParam === 'onchain' ? methodParam : undefined;
+  const methodLabel = methodFilter === 'bolt12' ? 'Bolt12' : 'Onchain';
+  useEffect(() => {
+    if (methodFilter) cashuLog.info('mint.add.method_filter', { method: methodFilter });
+  }, [methodFilter]);
+
   // Search toggle (matches contacts page pattern)
   const { isSearching, searchQuery, clearKey, onOpenSearch, onCloseSearch, onSearchChange } =
     useHeaderSearch();
@@ -366,7 +377,8 @@ export function MintAddScreen() {
   // Server-side mint search
   const { results: searchResults, loading: searchLoading } = useMintSearch(
     searchQuery,
-    selectedCurrency
+    selectedCurrency,
+    { method: methodFilter }
   );
 
   // Hold a skeleton until the discovered list stops changing for 500ms.
@@ -657,10 +669,19 @@ export function MintAddScreen() {
         )
       ) : (
         <Text className="text-foreground" size={17} bold>
-          Add Mints
+          {methodFilter ? `Add ${methodLabel} Mints` : 'Add Mints'}
         </Text>
       ),
-    [isSearching, searchBarWidth, onSearchChange, clearKey, searchQuery, validationState]
+    [
+      isSearching,
+      searchBarWidth,
+      onSearchChange,
+      clearKey,
+      searchQuery,
+      validationState,
+      methodFilter,
+      methodLabel,
+    ]
   );
 
   // ScreenHeaderAction + monicon glyphs (not IconSymbol/SF Symbols —
@@ -749,13 +770,15 @@ export function MintAddScreen() {
         <Text className="text-foreground text-center">
           {searchQuery.trim()
             ? 'No mints found matching your search'
-            : selectedCurrency === 'ALL'
-              ? 'No mints available'
-              : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
+            : methodFilter
+              ? `No known mints support ${methodLabel} yet`
+              : selectedCurrency === 'ALL'
+                ? 'No mints available'
+                : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
         </Text>
       </View>
     ),
-    [searchQuery, selectedCurrency]
+    [searchQuery, selectedCurrency, methodFilter, methodLabel]
   );
 
   // One List renderer for both crossfade branches: the skeleton branch and the

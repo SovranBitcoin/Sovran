@@ -297,7 +297,9 @@ export {
   methodContextHasSupportingMint,
   pickHighestBalanceUnit,
   pickMintForUnit,
+  resolveReceiveMethodMint,
   type MintMethodAmountAvailability,
+  type ReceiveMethodMintResolution,
 } from "./mint-capabilities";
 export {
   validateIntent,

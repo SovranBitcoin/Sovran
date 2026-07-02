@@ -216,6 +216,48 @@ export function pickMintForUnit(
   return best.mintUrl;
 }
 
+export interface ReceiveMethodMintResolution {
+  mintUrl: string | null;
+  source: "explicit" | "auto" | "none";
+}
+
+/**
+ * Resolve the mint backing a standing receive rail (Bolt12 offer / Onchain
+ * address). Policy: an EXPLICIT user pick is honored while that mint is
+ * still trusted (even if it stopped advertising the method — the rail shows
+ * its unsupported state rather than silently moving the user's choice);
+ * otherwise AUTO-pick the first trusted mint supporting the method. The
+ * auto pick is derived, never persisted — untrusting that mint self-heals
+ * to the next supporting one. The rails never fall back to the preferred
+ * or npub.cash mints; the four selections are independent.
+ */
+export function resolveReceiveMethodMint(
+  ctx: Pick<WalletContext, "trustedMintUrls" | "mintMethodCapabilities">,
+  explicitMintUrl: string | undefined,
+  requirement: MintMethodRequirement,
+): ReceiveMethodMintResolution {
+  if (explicitMintUrl && ctx.trustedMintUrls.includes(explicitMintUrl)) {
+    logger.debug("mintCapabilities.receiveMethodMint.explicit", {
+      method: requirement.method,
+      unit: normalizeUnit(requirement.unit),
+    });
+    return { mintUrl: explicitMintUrl, source: "explicit" };
+  }
+  const auto = ctx.trustedMintUrls.find((mintUrl) => {
+    const capability = getMintMethodCapability(ctx, mintUrl, requirement);
+    return capability.supported && !capability.disabled;
+  });
+  logger.debug("mintCapabilities.receiveMethodMint.derived", {
+    method: requirement.method,
+    unit: normalizeUnit(requirement.unit),
+    source: auto ? "auto" : "none",
+    hadStaleExplicit: !!explicitMintUrl,
+  });
+  return auto
+    ? { mintUrl: auto, source: "auto" }
+    : { mintUrl: null, source: "none" };
+}
+
 export function deriveMintMethodCapabilityMapFromTrustedMints(
   trustedMints: readonly { mintUrl: string; mintInfo?: unknown }[],
   unit: string = DEFAULT_UNIT,

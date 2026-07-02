@@ -258,10 +258,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   const mintInfo = useMintInfo(mintUrl);
   const walletContext = useWalletContext();
 
-  const tabs = useMemo(
-    () => computeReceiveTabs(walletContext, unit, quickAccessP2PK),
-    [walletContext, unit, quickAccessP2PK]
-  );
+  const tabs = useMemo(() => computeReceiveTabs(quickAccessP2PK), [quickAccessP2PK]);
 
   useEffect(() => {
     paymentLog.info('receive.tabs.computed', { tabs: tabs.join(','), unit });
@@ -363,7 +360,6 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
             return (
               <ReceiveReusableQuoteTab
                 method={selectedTab === 'Bolt12' ? 'bolt12' : 'onchain'}
-                mintUrl={mintUrl}
                 unit={unit}
                 walletContext={walletContext}
                 actions={actions}

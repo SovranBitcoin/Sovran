@@ -9,6 +9,7 @@
 
 import React, { memo, useCallback, useMemo } from 'react';
 
+import { router } from 'expo-router';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
 import {
@@ -23,6 +24,8 @@ import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { Section } from '@/shared/ui/composed/Section';
 import { HistoryEntryRefresh } from '@/features/transactions';
+import { useReceiveMethodMint } from '@/features/receive/hooks/useReceiveMethodMint';
+import { Button } from '@/shared/ui/primitives/Button';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
@@ -37,8 +40,6 @@ import Icon from 'assets/icons';
 
 interface ReceiveReusableQuoteTabProps {
   method: 'bolt12' | 'onchain';
-  /** Hub default; the per-method "Receiving with" selection overrides it. */
-  mintUrl: string | undefined;
   unit: string;
   walletContext: Pick<WalletContext, 'trustedMintUrls' | 'mintMethodCapabilities' | 'mintBalances'>;
   actions: UseScreenActionsResult<'receive'>['actions'];
@@ -51,6 +52,7 @@ const METHOD_COPY = {
     icon: 'mingcute:lightning-line', // outline bolt = reusable offer
     copyTarget: 'bolt12Offer' as const,
     unsupported: 'This mint does not offer Bolt12. Select a mint that advertises Bolt12 minting.',
+    noneSupport: 'None of your mints support Bolt12 offers.',
   },
   onchain: {
     sectionTitle: 'ONCHAIN ADDRESS',
@@ -58,21 +60,23 @@ const METHOD_COPY = {
     copyTarget: 'address' as const,
     unsupported:
       'This mint does not offer onchain deposits. Select a mint that advertises onchain minting.',
+    noneSupport: 'None of your mints support onchain deposits.',
   },
 } as const;
 
 export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   method,
-  mintUrl,
   unit,
   walletContext,
   actions,
   muted,
 }: ReceiveReusableQuoteTabProps) {
   const copy = METHOD_COPY[method];
-  // Each amountless rail keeps its own "Receiving with" mint (like the
-  // Lightning tab's npub.cash mint) — falling back to the hub's mint.
-  const methodMint = useMintStore((s) => s.receiveMintByMethod[method]) ?? mintUrl;
+  // Each amountless rail keeps its own "Receiving with" mint — one of the
+  // four independent selections (preferred / npub.cash / bolt12 / onchain).
+  // Explicit picks persist; otherwise colada auto-derives the first trusted
+  // mint supporting the method. Never the hub/NPC mint.
+  const { mintUrl: methodMint, anyMintSupports } = useReceiveMethodMint(method, unit);
   const methodMintInfo = useMintInfo(methodMint);
   const capability = methodMint
     ? getMintMethodCapability(walletContext, methodMint, { operation: 'mint', method, unit })
@@ -120,17 +124,41 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     paymentLog.info(`receive.${method}.copied`, { requestLength: request.length });
   }, [request, method, copy.copyTarget]);
 
-  const renderEmptyState = (message: string) => (
+  const openMintDiscovery = useCallback(() => {
+    paymentLog.info(`receive.${method}.discovery_opened`, { unit });
+    router.push({ pathname: '/(mint-flow)/add', params: { method } });
+  }, [method, unit]);
+
+  const renderEmptyState = (message: string, cta?: React.ReactNode) => (
     <View className="mx-4 mt-8">
       <View className="bg-surface-secondary items-center rounded-xl p-6">
         <Icon name={copy.icon} size={48} color={muted} />
         <Text size={14} className="text-muted mt-3 text-center">
           {message}
         </Text>
+        {cta}
       </View>
     </View>
   );
 
+  // No trusted mint can serve this rail at all — point at discovery,
+  // pre-filtered to mints advertising the method.
+  if (!anyMintSupports) {
+    return renderEmptyState(
+      copy.noneSupport,
+      <Button
+        text="Find mints"
+        variant="primary"
+        size="compact"
+        onPress={openMintDiscovery}
+        style={{ marginTop: 16 }}
+        testID={`receive-${method}-find-mints`}
+      />
+    );
+  }
+
+  // An explicitly-picked mint that no longer supports the method (the auto
+  // default always resolves to a supporting mint when one exists).
   if (!mintSupports) {
     return (
       <Pressable onPress={() => void openMintSelect()} testID={`receive-${method}-pick-mint`}>

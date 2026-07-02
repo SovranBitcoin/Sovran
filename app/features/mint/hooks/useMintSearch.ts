@@ -4,8 +4,13 @@ import { discoverMints, type DiscoverMint, type MintSearchResult } from '@/share
 import { cashuLog } from '@/shared/lib/logger';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 
+/** Discovery row + the app-local method field (the shared MintSearchResult
+ *  schema predates nagg's `supportedMethods`; extend locally rather than
+ *  changing the cross-repo contract). */
+export type MintSearchRow = MintSearchResult & { supported_methods: string[] };
+
 interface UseMintSearchReturn {
-  results: MintSearchResult[];
+  results: MintSearchRow[];
   loading: boolean;
   error: string | null;
 }
@@ -16,12 +21,13 @@ interface UseMintSearchReturn {
  * surfaced as a NUT-06 `contact` entry so the existing operator-profile path
  * still resolves. Exported for testing.
  */
-export function discoverMintToSearchResult(m: DiscoverMint): MintSearchResult {
+export function discoverMintToSearchResult(m: DiscoverMint): MintSearchRow {
   const contact = m.operatorPubkey ? [{ method: 'nostr', info: m.operatorPubkey }] : [];
   return {
     url: m.mintUrl,
     name: m.name || m.mintUrl,
     supported_units: m.supportedUnits ?? [],
+    supported_methods: m.supportedMethods ?? [],
     state: m.state ?? 'unknown',
     n_mints: m.nMints ?? 0,
     n_melts: m.nMelts ?? 0,
@@ -52,6 +58,14 @@ function matchesCurrency(result: MintSearchResult, currency: string): boolean {
   return result.supported_units.some((u) => units.includes(u.toLowerCase()));
 }
 
+/** Method filter (receive-rail discovery CTAs): a mint matches only when
+ *  nagg reported it advertises the method — absence means "not known to
+ *  support", so rows without the field are excluded while the filter is on. */
+function matchesMethod(result: MintSearchRow, method: string | undefined): boolean {
+  if (!method) return true;
+  return result.supported_methods.some((m) => m.toLowerCase() === method.toLowerCase());
+}
+
 /**
  * Mint discovery hook, backed by nagg's single `/nostr/mint/discover` app-view.
  *
@@ -65,10 +79,11 @@ function matchesCurrency(result: MintSearchResult, currency: string): boolean {
 export function useMintSearch(
   query: string,
   currency: string,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean; method?: string }
 ): UseMintSearchReturn {
   const enabled = options?.enabled ?? true;
-  const [allMints, setAllMints] = useState<MintSearchResult[]>([]);
+  const method = options?.method;
+  const [allMints, setAllMints] = useState<MintSearchRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const fetchCountRef = useRef(0);
@@ -125,8 +140,10 @@ export function useMintSearch(
 
   const results = useMemo(() => {
     const q = query.trim();
-    return allMints.filter((m) => matchesQuery(m, q) && matchesCurrency(m, currency));
-  }, [allMints, query, currency]);
+    return allMints.filter(
+      (m) => matchesQuery(m, q) && matchesCurrency(m, currency) && matchesMethod(m, method)
+    );
+  }, [allMints, query, currency, method]);
 
   return { results, loading, error };
 }

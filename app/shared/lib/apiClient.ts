@@ -77,6 +77,12 @@ const DiscoverMint = z
     iconUrl: z.string().max(2048).optional(),
     description: z.string().max(4096).optional(),
     supportedUnits: z.array(z.string().max(16)).max(64).optional(),
+    // Payment methods the mint advertises for minting — distilled by nagg
+    // from the mint's /v1/info `nuts."4".methods[].method` entries (bolt11
+    // per NUT-23, bolt12 per NUT-25, onchain non-standard). Optional until
+    // nagg ships it; the discovery method filter treats absence as
+    // "not known to support".
+    supportedMethods: z.array(z.string().max(16)).max(16).optional(),
     averageScore: z.number().nullable(),
     reviewCount: z.number().int().nonnegative(),
     favouriteCount: z.number().int().nonnegative().optional(),

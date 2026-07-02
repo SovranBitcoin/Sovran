@@ -7,6 +7,7 @@ const base: DiscoverMint = {
   iconUrl: 'https://i/x.png',
   description: 'a mint',
   supportedUnits: ['sat', 'usd'],
+  supportedMethods: ['bolt11', 'bolt12'],
   averageScore: 4.5,
   reviewCount: 12,
   favouriteCount: 3,
@@ -33,6 +34,7 @@ describe('discoverMintToSearchResult', () => {
       n_errors: 2,
       review_score: 4.5, // inline, no per-mint fan-out
       review_count: 12,
+      supported_methods: ['bolt11', 'bolt12'],
     });
     // operator pubkey surfaced as a NUT-06 nostr contact for the profile path
     expect((r.info as { contact: { method: string; info: string }[] }).contact).toEqual([
@@ -51,6 +53,9 @@ describe('discoverMintToSearchResult', () => {
       url: 'https://m2',
       name: 'https://m2', // falls back to url
       supported_units: [],
+      // Absent until nagg ships supportedMethods — the method filter treats
+      // this as "not known to support".
+      supported_methods: [],
       state: 'unknown',
       review_score: null,
       review_count: 1,
