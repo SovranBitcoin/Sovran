@@ -138,7 +138,10 @@ session (it detects restarts via `_t` resets), so you're not mixing three runs.
 | `slow` | ~5–18K | Gaps between consecutive entries exceeding `--threshold` ms (default 500). Note: measures *log-line gaps*, not op durations — use `perf` for durations. |
 | `startup` | ~1.5–5K | Init waterfall, stage timing, gate sequence. |
 | `gc` | varies | Hermes memory trend, GC pressure, JS-thread blocks, leak detection. |
-| `perf` | varies | Per-event latency distribution (**p50/p95/p99 + sparkline**) from `params.ms` / `_perf`-tagged ops, plus slow-op and network/compute breakdowns. |
+| `perf` | varies | Per-event duration distribution (**p50/p95/p99 + sparkline**) from any duration param (`ms`, `duration_ms`, `durationMs`, `elapsedMs`, `decodeMs`), plus slow-op and network/compute breakdowns. |
+| `spans` | small | Durations synthesized by pairing `.start`/`.request` entries with their `.done`/`.failed`-style ends (correlation-id match, FIFO fallback). Covers ops that never log a single-entry duration. |
+| `waste` | small | Repeated identical work: same event with the SAME identifying params ≥ `--min-repeats` (default 3) across the session, with a wasted-ms rollup from repeat durations. Catches re-decodes, re-unwraps, re-run migrations that consecutive-dup checks miss. |
+| `tiers` | small | Nostr tier waterfall from `nostr.tier.*` / `nostr.read.*`: per-tier tries/answers/failures with latency, failover cost (time burned in dead tiers before an answer), per-surface serving tier. |
 | `renders` | ~200 | Re-render counts + why-did-update hints. |
 
 ### Domain-specific
@@ -148,7 +151,7 @@ session (it detects restarts via `_t` resets), so you're not mixing three runs.
 | `payment` | Payment/receive/redeem timeline grouped by operation id. |
 | `toasts` | Toast lifecycle grouped by toast/payment id. |
 | `crypto` | Crypto/cashu amount + proof operations. |
-| `network` | Request/response pairs with latency. |
+| `network` | Net entries plus paired request→response latency (same pairing engine as `spans`). |
 | `ws` | WebSocket health, subscription analysis, message rates. |
 | `feed` | Feed/thread GraphQL, page mapping, reply seed/render flow. |
 | `flows` | Reconstruct cross-async traces via `flowId` in ctx. |
@@ -183,6 +186,7 @@ you *generate* a fresh session to then inspect.
 | `--latest` | Most recent session only. Use almost always. |
 | `--event <pattern>` | Filter to events matching substring/regex. |
 | `--threshold <ms>` | Duration cutoff for `slow` (default 500). |
+| `--min-repeats <n>` | `waste` repeat threshold (default 3). |
 | `--context <n>` | Entries around each error in `--all` mode (default 3). |
 | `--all` / `--no-cluster` | `errors` mode: list every entry instead of clustering. |
 | `--token-budget <n>` | Auto-prune output to fit N tokens. |

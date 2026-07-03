@@ -3,12 +3,15 @@
  */
 
 import {
+  detectWaste,
+  entryDurationMs,
   extractLatestSession,
   filterEntries,
   modeDevices,
   modePayment,
   modeToasts,
   modeVisual,
+  pairSpans,
   parseArgs,
   parseLogInput,
   shouldReadFromStdin,
@@ -894,5 +897,144 @@ describe('log-doctor mixed-device filters', () => {
     expect(virtualRowOutput).toContain('filters: key=virtual-only');
     expect(virtualRowOutput).toContain('FULL VIRTUAL POSITION SNAPSHOTS');
     expect(virtualRowOutput).toContain('key=virtual-only type=virtual-row');
+  });
+});
+
+describe('log-doctor perf analyzers', () => {
+  it('entryDurationMs reads every duration param the app emits', () => {
+    expect(entryDurationMs(entry({ t: 1, event: 'a', device: ios, params: { ms: 5 } }))).toBe(5);
+    expect(
+      entryDurationMs(entry({ t: 1, event: 'a', device: ios, params: { duration_ms: 7.5 } }))
+    ).toBe(7.5);
+    expect(
+      entryDurationMs(entry({ t: 1, event: 'a', device: ios, params: { durationMs: 30017 } }))
+    ).toBe(30017);
+    expect(
+      entryDurationMs(entry({ t: 1, event: 'a', device: ios, params: { elapsedMs: 3 } }))
+    ).toBe(3);
+    expect(
+      entryDurationMs(entry({ t: 1, event: 'a', device: ios, params: { decodeMs: 910 } }))
+    ).toBe(910);
+    expect(entryDurationMs(entry({ t: 1, event: 'a', device: ios, params: { other: 1 } }))).toBe(
+      null
+    );
+    expect(entryDurationMs(entry({ t: 1, event: 'a', device: ios }))).toBe(null);
+  });
+
+  it('pairSpans pairs start/done FIFO and start/failed with failure count', () => {
+    const entries = [
+      entry({ t: 100, event: 'api.thing.start', device: ios }),
+      entry({ t: 250, event: 'api.thing.done', device: ios }),
+      entry({ t: 300, event: 'api.thing.start', device: ios }),
+      entry({ t: 700, event: 'api.thing.failed', device: ios }),
+      entry({ t: 900, event: 'api.thing.start', device: ios }), // never ends
+      entry({ t: 950, event: 'api.other.done', device: ios }), // end without start
+    ];
+    const aggs = pairSpans(entries as never[]);
+    const thing = aggs.find((a) => a.base === 'api.thing');
+    expect(thing).toBeDefined();
+    expect(thing!.samples).toEqual([150, 400]);
+    expect(thing!.failures).toBe(1);
+    expect(thing!.unmatchedStarts).toBe(1);
+  });
+
+  it('pairSpans prefers correlation-id matches over FIFO', () => {
+    const entries = [
+      entry({ t: 0, event: 'op.run.start', device: ios, params: { operationId: 'A' } }),
+      entry({ t: 10, event: 'op.run.start', device: ios, params: { operationId: 'B' } }),
+      // B finishes first — id match must pair it with its own start, not A's.
+      entry({ t: 30, event: 'op.run.done', device: ios, params: { operationId: 'B' } }),
+      entry({ t: 100, event: 'op.run.done', device: ios, params: { operationId: 'A' } }),
+    ];
+    const [agg] = pairSpans(entries as never[]);
+    expect(agg.base).toBe('op.run');
+    expect(agg.samples.sort((a, b) => a - b)).toEqual([20, 100]);
+  });
+
+  it('detectWaste flags repeated identical work and charges repeat durations', () => {
+    const wrap = (t: number) =>
+      entry({
+        t,
+        event: 'nostr.nip17.unwrap_gift_wrap.success',
+        device: ios,
+        params: { wrapPubkeyPrefix: '8def3933', contentLen: 677, durationMs: 200 },
+      });
+    const entries = [
+      wrap(100),
+      wrap(10_000),
+      wrap(20_000),
+      wrap(30_000),
+      // Different wrap — only 2 occurrences, below the threshold.
+      entry({
+        t: 200,
+        event: 'nostr.nip17.unwrap_gift_wrap.success',
+        device: ios,
+        params: { wrapPubkeyPrefix: 'ffff0000', contentLen: 5, durationMs: 200 },
+      }),
+      entry({
+        t: 300,
+        event: 'nostr.nip17.unwrap_gift_wrap.success',
+        device: ios,
+        params: { wrapPubkeyPrefix: 'ffff0000', contentLen: 5, durationMs: 200 },
+      }),
+    ];
+    const rows = detectWaste(entries as never[], 3);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].count).toBe(4);
+    // 3 repeat occurrences × 200ms — the first run is legitimate work.
+    expect(rows[0].wastedMs).toBe(600);
+    expect(rows[0].preview).toContain('wrapPubkeyPrefix=8def3933');
+  });
+
+  it('detectWaste ignores volatile params when building signatures', () => {
+    const entries = [1, 2, 3].map((i) =>
+      entry({
+        t: i * 1000,
+        event: 'bg.sprite.image_loaded',
+        device: ios,
+        params: { theme: 'in-eclipse', decodeMs: 500 + i, renderCount: i, _suppressed: i },
+      })
+    );
+    const rows = detectWaste(entries as never[], 3);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].count).toBe(3);
+  });
+
+  it('extractLatestSession does not split one logSessionId on a long idle gap', () => {
+    const session = { ...ios, logSessionId: 'stable-session' };
+    const entries = [
+      entry({ t: 1_000, event: 'a', device: session }),
+      entry({ t: 2_000, event: 'b', device: session }),
+      // 5-minute idle gap (backgrounded app) — same session id, must not split.
+      entry({ t: 302_000, event: 'c', device: session }),
+      entry({ t: 303_000, event: 'd', device: session }),
+    ];
+    expect(extractLatestSession(entries as never[])).toHaveLength(4);
+  });
+
+  it('extractLatestSession still splits on idle gaps when session ids are absent', () => {
+    const bare = { label: 'ios:bare', platform: 'ios' };
+    const entries = [
+      entry({ t: 1_000, event: 'a', device: bare }),
+      entry({ t: 2_000, event: 'b', device: bare }),
+      entry({ t: 302_000, event: 'c', device: bare }),
+    ];
+    expect(extractLatestSession(entries as never[])).toHaveLength(1);
+  });
+
+  it('extractLatestSession still splits when _t resets backwards', () => {
+    const s1 = { ...ios, logSessionId: 's1' };
+    const entries = [
+      entry({ t: 50_000, event: 'a', device: s1 }),
+      entry({ t: 51_000, event: 'b', device: s1 }),
+      entry({ t: 100, event: 'c', device: { ...ios, logSessionId: 's2' } }),
+    ];
+    expect(extractLatestSession(entries as never[])).toHaveLength(1);
+  });
+
+  it('parseArgs collects unknown flags and maps --help to the help mode', () => {
+    expect(parseArgs(['node', 'log-doctor', 'stats', '--bogus']).unknownFlags).toEqual(['--bogus']);
+    expect(parseArgs(['node', 'log-doctor', '--help']).mode).toBe('help');
+    expect(parseArgs(['node', 'log-doctor', 'waste', '--min-repeats', '5']).minRepeats).toBe(5);
   });
 });

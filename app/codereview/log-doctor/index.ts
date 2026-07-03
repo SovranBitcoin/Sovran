@@ -164,6 +164,10 @@ interface Options {
   clusterErrors: boolean;
   /** Positional args after the mode name. Used by `phone` mode for subcommands. */
   restArgs: string[];
+  /** waste mode: minimum identical repeats before a signature is reported. */
+  minRepeats: number;
+  /** Unrecognized --flags. Fatal for every mode except `phone` (which forwards them). */
+  unknownFlags: string[];
 }
 
 // ─── Parse CLI args ──────────────────────────────────────────────────────────
@@ -193,6 +197,8 @@ export function parseArgs(argv: string[]): Options {
     tokenBudget: null,
     clusterErrors: true,
     restArgs: [],
+    minRepeats: 3,
+    unknownFlags: [],
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -244,14 +250,67 @@ export function parseArgs(argv: string[]): Options {
     } else if (arg === '--all' || arg === '--no-cluster') {
       // errors mode: expand every entry with context instead of clustering.
       opts.clusterErrors = false;
+    } else if (arg === '--min-repeats' && args[i + 1]) {
+      opts.minRepeats = parseInt(args[++i], 10);
+    } else if (arg === '--help' || arg === '-h') {
+      opts.mode = 'help';
     } else {
-      // Unknown flag — pass through to subcommand-style modes (phone test ...).
+      // Unknown flag — forwarded verbatim to `phone` subcommands; fatal elsewhere
+      // (main() reports it) so a typo can't silently fall through to stats.
       opts.restArgs.push(arg);
+      opts.unknownFlags.push(arg);
     }
   }
 
   return opts;
 }
+
+const MODE_HELP = `log-doctor — analyze sovran-app runtime logs (log.txt or stdin)
+
+Usage: log-doctor <mode> [flags]     (pipe big logs: cat old_log.txt | log-doctor <mode>)
+
+Modes:
+  stats      Event frequency, gaps, dup runs, templates (default)
+  timeline   One line per entry with delta timing (--event to filter)
+  errors     Warnings/errors clustered to exemplars (--all to expand)
+  slow       Gaps between consecutive log lines > --threshold ms
+  perf       Duration distributions per event (ms/duration_ms/durationMs/elapsedMs/decodeMs)
+  spans      Synthesized durations from paired .start → .done/.failed entries
+  waste      Repeated identical work (same event + same params ≥ --min-repeats)
+  tiers      Nostr tier waterfall health, failover cost, per-surface serving
+  renders    Component render counts + why-did-update hints
+  screens    Screen flow + content snapshots
+  startup    Init waterfall + gate sequence
+  network    Net entries + paired request→response latency
+  coco       Coco wallet module breakdown
+  feed       Feed/thread fetch-merge-render rollup
+  visual     Layout rows, overlaps, shifts, skeletons
+  flows      Cross-async traces grouped by flowId
+  ws         WebSocket connection/subscription health
+  gc         Heap trend + JS-thread blocks
+  ops        Operation phase breakdown (colada/coco)
+  payment    Payment traces grouped by correlation id
+  toasts     Toast lifecycle traces
+  crypto     Crypto op timings + native-crypto status
+  upstream   Upstream service health
+  devices    Device/session labels in a mixed log
+  budget     Token cost of each mode for this log
+  redaction  Secret-redaction audit
+  diff       Compare last two sessions in one file
+  full       Dense whole-log dump (--format json|yaml|md)
+  phone      Drive the device via WDA (tap/tree/shot/test ...)
+
+Common flags:
+  --latest              Only the most recent session
+  --event <regex>       Filter entries by event name
+  --token-budget <n>    Prune output to ~n tokens
+  --threshold <ms>      slow-mode gap threshold (default 500)
+  --min-repeats <n>     waste-mode repeat threshold (default 3)
+  --since/--until <ms>  Time window on _t
+  --device/--platform/--session <v>  Multi-device filters
+  --limit/--offset      Pagination for list modes
+  --no-inst             Strip instrumentation events
+  --format json|yaml|md Output format for full mode`;
 
 // ─── Parse log input ─────────────────────────────────────────────────────────
 
@@ -338,6 +397,13 @@ function sessionValues(entry: LogEntry): string[] {
     .filter((value): value is string => value !== null);
 }
 
+/** A true per-run id (regenerated every app start), unlike `device.label` which
+ *  is stable across restarts and therefore useless for session boundaries. */
+function runSessionId(entry: LogEntry): string | null {
+  const device = entry.device ?? {};
+  return asString(device.logSessionId) ?? asString(device.expoSessionId);
+}
+
 function matchesPattern(value: string, pattern: string): boolean {
   try {
     return new RegExp(pattern, 'i').test(value);
@@ -391,8 +457,14 @@ function extractLatestSessionForOneClock(entries: LogEntry[]): LogEntry[] {
     }
     if (prevT >= 0) {
       const delta = t - prevT;
-      if (delta < -500 || delta > 60_000) {
-        // _t went backwards (restart) or huge gap (>60s) — new session
+      const currentRun = runSessionId(entries[i]);
+      const prevRun = i > 0 ? runSessionId(entries[i - 1]) : null;
+      const sameKnownSession = Boolean(currentRun && prevRun && currentRun === prevRun);
+      // _t going backwards is always a restart. A forward gap (>60s) only marks
+      // a new session when session ids are unavailable — with a stable
+      // logSessionId a big gap is just idle time (backgrounded app), and
+      // splitting there used to truncate real sessions.
+      if (delta < -500 || (delta > 60_000 && !sameKnownSession)) {
         lastBoundary = i;
       }
     }
@@ -894,6 +966,23 @@ function correlationKey(entry: LogEntry): string {
     if (value) return `${key}:${value}`;
   }
   return `unlinked:${entry.event}`;
+}
+
+// Duration params the app actually emits: `timed`/`startSpan` write `duration_ms`,
+// coco perf entries write `ms`, various call sites use `durationMs`/`elapsedMs`,
+// image loads write `decodeMs`. Every analyzer that cares about "how long did
+// this take" must go through this helper — reading only `params.ms` silently
+// drops most span data.
+const DURATION_PARAM_KEYS = ['ms', 'duration_ms', 'durationMs', 'elapsedMs', 'decodeMs'] as const;
+
+export function entryDurationMs(entry: LogEntry): number | null {
+  const params = entry.params as Record<string, unknown> | undefined;
+  if (!params) return null;
+  for (const key of DURATION_PARAM_KEYS) {
+    const value = params[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+  return null;
 }
 
 function groupEntries(entries: LogEntry[]): Map<string, LogEntry[]> {
@@ -1801,13 +1890,34 @@ function modeNetwork(entries: LogEntry[], opts: Options): string {
       e.event.startsWith('net.') ||
       e.event.startsWith('api.') ||
       e.event.includes('fetch') ||
+      e.event.includes('.request') ||
       e.event.includes('.ws.')
   );
 
   if (netEntries.length === 0) return 'No network entries found.';
 
-  const { page, footer } = paginate(netEntries, opts);
   const lines: string[] = [];
+
+  // Request/response latency, synthesized by pairing .start/.request entries
+  // with their .done/.error counterparts (same engine as `spans` mode).
+  const paired = pairSpans(netEntries)
+    .filter((a) => a.samples.length > 0)
+    .sort((a, b) => b.samples.reduce((s, v) => s + v, 0) - a.samples.reduce((s, v) => s + v, 0));
+  if (paired.length > 0) {
+    lines.push('REQUEST LATENCY (paired request → response):');
+    lines.push('');
+    lines.push('  Request                                  Count   P50 ms   P95 ms    Max ms   Fail');
+    lines.push('  ' + '-'.repeat(88));
+    for (const agg of paired.slice(0, 15)) {
+      const d = summarizeDurations(agg.samples);
+      lines.push(
+        `  ${agg.base.padEnd(40).slice(0, 40)} ${String(agg.samples.length).padStart(5)}   ${d.p50.toFixed(0).padStart(6)}   ${d.p95.toFixed(0).padStart(6)}   ${d.max.toFixed(0).padStart(7)}   ${String(agg.failures).padStart(4)}`
+      );
+    }
+    lines.push('');
+  }
+
+  const { page, footer } = paginate(netEntries, opts);
   lines.push('NETWORK LOG:');
   lines.push('');
 
@@ -3423,7 +3533,7 @@ function modeCrypto(entries: LogEntry[], opts: Options): string {
   // Find coco perf entries with crypto timing
   const perfEntries = entries.filter((e) => {
     const params = e.params as Record<string, unknown> | undefined;
-    return params?._perf === true && typeof params?.ms === 'number';
+    return params?._perf === true && entryDurationMs(e) !== null;
   });
 
   // Find entries that match our crypto operations by event name patterns
@@ -3470,7 +3580,7 @@ function modeCrypto(entries: LogEntry[], opts: Options): string {
     let op = e.event;
     if (op.startsWith('coco.')) op = op.replace('coco.', '');
 
-    const ms = params.ms as number;
+    const ms = entryDurationMs(e) as number;
     const isNative = params.native === true;
     const existing = byOp.get(op) ?? {
       count: 0,
@@ -3565,8 +3675,7 @@ function modeOps(entries: LogEntry[], opts: Options): string {
     const byPhase = new Map<string, { count: number; totalMs: number; entries: LogEntry[] }>();
     for (const e of opEntries) {
       const phase = e.event.replace(pattern.prefix, '');
-      const params = e.params as Record<string, unknown> | undefined;
-      const ms = (params?.ms as number) ?? 0;
+      const ms = entryDurationMs(e) ?? 0;
       const existing = byPhase.get(phase) ?? { count: 0, totalMs: 0, entries: [] };
       existing.count++;
       existing.totalMs += ms;
@@ -3622,11 +3731,9 @@ function modeOps(entries: LogEntry[], opts: Options): string {
 // ─── Mode: perf ─────────────────────────────────────────────────────────────
 
 function modePerf(entries: LogEntry[], _opts: Options): string {
-  // Aggregate all entries with _perf: true or ms field
-  const perfEntries = entries.filter((e) => {
-    const params = e.params as Record<string, unknown> | undefined;
-    return (params?._perf === true || params?.ms !== undefined) && typeof params?.ms === 'number';
-  });
+  // Aggregate all entries carrying a duration param (ms, duration_ms, durationMs,
+  // elapsedMs, decodeMs) — `timed`/`startSpan` emit duration_ms, not ms.
+  const perfEntries = entries.filter((e) => entryDurationMs(e) !== null);
 
   if (perfEntries.length === 0)
     return 'No performance-tagged events found. Ensure patches are applied and operations have been performed.';
@@ -3641,7 +3748,7 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
     { count: number; totalMs: number; minMs: number; maxMs: number; samples: number[] }
   >();
   for (const e of perfEntries) {
-    const ms = (e.params as Record<string, unknown>).ms as number;
+    const ms = entryDurationMs(e) as number;
     const existing = byEvent.get(e.event) ?? {
       count: 0,
       totalMs: 0,
@@ -3682,20 +3789,18 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
   }
   lines.push('');
 
-  // Show entries with ms > 500 (slow operations)
-  const slowOps = perfEntries.filter(
-    (e) => ((e.params as Record<string, unknown>).ms as number) > 500
-  );
+  // Show entries with duration > 500 (slow operations)
+  const slowOps = perfEntries.filter((e) => (entryDurationMs(e) as number) > 500);
   if (slowOps.length > 0) {
     lines.push(`SLOW OPERATIONS (>500ms): ${slowOps.length}`);
     lines.push('');
     for (const e of slowOps
-      .sort((a, b) => ((b.params as any).ms as number) - ((a.params as any).ms as number))
+      .sort((a, b) => (entryDurationMs(b) as number) - (entryDurationMs(a) as number))
       .slice(0, 20)) {
       const params = e.params as Record<string, unknown>;
-      const ms = params.ms as number;
+      const ms = entryDurationMs(e) as number;
       const extra = Object.entries(params)
-        .filter(([k]) => !['ms', '_perf', '_t', '_dedup'].includes(k))
+        .filter(([k]) => !['_perf', '_t', '_dedup', ...DURATION_PARAM_KEYS].includes(k))
         .map(([k, v]) => `${k}=${typeof v === 'string' ? v.slice(0, 30) : v}`)
         .join(' ');
       lines.push(`  ${ms.toFixed(1).padStart(8)}ms  ${e.event.padEnd(35).slice(0, 35)} ${extra}`);
@@ -3714,7 +3819,7 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
     let totalNetwork = 0;
     for (const e of withNetwork) {
       const params = e.params as Record<string, unknown>;
-      const total = params.ms as number;
+      const total = entryDurationMs(e) as number;
       const network = params.networkMs as number;
       totalNetwork += network;
       totalCompute += total - network;
@@ -3725,6 +3830,411 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
     lines.push('');
   }
 
+  return lines.join('\n');
+}
+
+// ─── Span pairing (spans mode + network latency) ─────────────────────────────
+// Synthesizes durations for operations logged as separate `<base>.start` /
+// `<base>.done|failed|…` entries. Pairs by correlation id when both sides carry
+// one, else FIFO per base name. Complements `perf` (which needs a duration
+// param on a single entry).
+
+const SPAN_START_SUFFIXES = ['.start', '.request', '.begin'] as const;
+const SPAN_END_SUFFIXES: ReadonlyArray<{ suffix: string; ok: boolean }> = [
+  { suffix: '.done', ok: true },
+  { suffix: '.end', ok: true },
+  { suffix: '.success', ok: true },
+  { suffix: '.complete', ok: true },
+  { suffix: '.completed', ok: true },
+  { suffix: '.finish', ok: true },
+  { suffix: '.resolved', ok: true },
+  { suffix: '.loaded', ok: true },
+  { suffix: '.failed', ok: false },
+  { suffix: '.error', ok: false },
+  { suffix: '.exhausted', ok: false },
+  { suffix: '.rejected', ok: false },
+  { suffix: '.timeout', ok: false },
+];
+
+function spanCorrelationId(entry: LogEntry): string | null {
+  for (const key of CORRELATION_KEYS) {
+    const value = fieldString(entry.params?.[key]) ?? fieldString(entry.ctx?.[key]);
+    if (value) return `${key}:${value}`;
+  }
+  return null;
+}
+
+export interface SpanAggregate {
+  base: string;
+  samples: number[];
+  failures: number;
+  unmatchedStarts: number;
+  unmatchedEnds: number;
+}
+
+export function pairSpans(entries: LogEntry[]): SpanAggregate[] {
+  interface OpenStart {
+    t: number;
+    corrId: string | null;
+  }
+  const open = new Map<string, OpenStart[]>();
+  const aggregates = new Map<string, SpanAggregate>();
+
+  const aggregate = (base: string): SpanAggregate => {
+    const existing = aggregates.get(base);
+    if (existing) return existing;
+    const fresh: SpanAggregate = {
+      base,
+      samples: [],
+      failures: 0,
+      unmatchedStarts: 0,
+      unmatchedEnds: 0,
+    };
+    aggregates.set(base, fresh);
+    return fresh;
+  };
+
+  for (const entry of entries) {
+    if (typeof entry._t !== 'number') continue;
+
+    const startSuffix = SPAN_START_SUFFIXES.find((s) => entry.event.endsWith(s));
+    if (startSuffix) {
+      const base = entry.event.slice(0, -startSuffix.length);
+      const list = open.get(base) ?? [];
+      list.push({ t: entry._t, corrId: spanCorrelationId(entry) });
+      open.set(base, list);
+      continue;
+    }
+
+    const end = SPAN_END_SUFFIXES.find((s) => entry.event.endsWith(s.suffix));
+    if (!end) continue;
+    const base = entry.event.slice(0, -end.suffix.length);
+    const list = open.get(base);
+    if (!list || list.length === 0) {
+      aggregate(base).unmatchedEnds++;
+      continue;
+    }
+    const corrId = spanCorrelationId(entry);
+    let index = corrId ? list.findIndex((s) => s.corrId === corrId) : -1;
+    if (index === -1) index = 0; // FIFO fallback
+    const [start] = list.splice(index, 1);
+    const duration = entry._t - start.t;
+    if (duration < 0) continue;
+    const agg = aggregate(base);
+    agg.samples.push(duration);
+    if (!end.ok) agg.failures++;
+  }
+
+  for (const [base, list] of open) {
+    if (list.length > 0) aggregate(base).unmatchedStarts += list.length;
+  }
+
+  return [...aggregates.values()].filter((a) => a.samples.length > 0 || a.unmatchedEnds > 2);
+}
+
+function modeSpans(entries: LogEntry[], _opts: Options): string {
+  const aggregates = pairSpans(entries)
+    .filter((a) => a.samples.length > 0)
+    .sort(
+      (a, b) => b.samples.reduce((s, v) => s + v, 0) - a.samples.reduce((s, v) => s + v, 0)
+    );
+
+  if (aggregates.length === 0)
+    return 'No pairable .start/.done-style span events found. (Single-entry durations live in `perf`.)';
+
+  const lines: string[] = [];
+  lines.push('=== SYNTHESIZED SPANS (paired .start → .done/.failed entries) ===');
+  lines.push('');
+  lines.push(
+    '  Span                                     Count   Total ms   P50 ms   P95 ms    Max ms   Fail  Unmatched'
+  );
+  lines.push('  ' + '-'.repeat(104));
+  for (const agg of aggregates) {
+    const d = summarizeDurations(agg.samples);
+    const total = agg.samples.reduce((s, v) => s + v, 0);
+    const unmatched = agg.unmatchedStarts + agg.unmatchedEnds;
+    lines.push(
+      `  ${agg.base.padEnd(40).slice(0, 40)} ${String(agg.samples.length).padStart(5)}   ${total.toFixed(0).padStart(8)}   ${d.p50.toFixed(0).padStart(6)}   ${d.p95.toFixed(0).padStart(6)}   ${d.max.toFixed(0).padStart(7)}   ${String(agg.failures).padStart(4)}   ${String(unmatched).padStart(6)}`
+    );
+  }
+  lines.push('');
+  lines.push('LATENCY DISTRIBUTION (top 5 by total time):');
+  for (const agg of aggregates.slice(0, 5)) {
+    lines.push(`  ${agg.base.slice(0, 40).padEnd(40)} ${sparkline(agg.samples)}`);
+  }
+  lines.push('');
+  lines.push('Pairing is by correlation id when present, else FIFO per span name — concurrent');
+  lines.push('same-name spans without ids can cross-pair; treat outliers with suspicion.');
+  return lines.join('\n');
+}
+
+// ─── Waste detection (repeated identical work) ────────────────────────────────
+// Flags the same event with the SAME identifying params recurring across the
+// session — the classic redundant-work signature (re-decoding the same image,
+// re-unwrapping the same DM envelope, re-running the same migration). Distinct
+// from stats' duplicate-run check, which only catches consecutive repeats.
+
+const WASTE_VOLATILE_KEYS = new Set([
+  '_t',
+  '_dedup',
+  '_suppressed',
+  '_perf',
+  'ms',
+  'duration_ms',
+  'durationMs',
+  'elapsedMs',
+  'decodeMs',
+  'networkMs',
+  'offsetMs',
+  'blocked_ms',
+  'actual_ms',
+  'expected_ms',
+  'renderCount',
+  'renders',
+  'rendersPerSec',
+  'aliveMs',
+]);
+
+export interface WasteRow {
+  event: string;
+  count: number;
+  firstT: number;
+  lastT: number;
+  /** Sum of duration params on repeat occurrences (the redundant portion). */
+  wastedMs: number;
+  preview: string;
+}
+
+export function detectWaste(entries: LogEntry[], minRepeats = 3): WasteRow[] {
+  interface Bucket {
+    event: string;
+    count: number;
+    firstT: number;
+    lastT: number;
+    durations: number[];
+    preview: string;
+  }
+  const buckets = new Map<string, Bucket>();
+
+  for (const entry of entries) {
+    const params = entry.params ?? {};
+    const stable = Object.entries(params)
+      .filter(([k]) => !WASTE_VOLATILE_KEYS.has(k))
+      .sort(([a], [b]) => (a < b ? -1 : 1));
+    const signature = `${entry.event}|${JSON.stringify(stable)}`;
+    const t = entry._t ?? 0;
+    const duration = entryDurationMs(entry);
+    const bucket = buckets.get(signature);
+    if (bucket) {
+      bucket.count++;
+      bucket.lastT = Math.max(bucket.lastT, t);
+      bucket.firstT = Math.min(bucket.firstT, t);
+      if (duration !== null) bucket.durations.push(duration);
+    } else {
+      buckets.set(signature, {
+        event: entry.event,
+        count: 1,
+        firstT: t,
+        lastT: t,
+        durations: duration !== null ? [duration] : [],
+        preview: stable
+          .slice(0, 4)
+          .map(([k, v]) => `${k}=${typeof v === 'string' ? v.slice(0, 24) : v}`)
+          .join(' '),
+      });
+    }
+  }
+
+  const rows: WasteRow[] = [];
+  for (const bucket of buckets.values()) {
+    if (bucket.count < minRepeats) continue;
+    // All occurrences after the first are presumed redundant; charge their durations.
+    const wastedMs = bucket.durations.slice(1).reduce((s, v) => s + v, 0);
+    rows.push({
+      event: bucket.event,
+      count: bucket.count,
+      firstT: bucket.firstT,
+      lastT: bucket.lastT,
+      wastedMs,
+      preview: bucket.preview,
+    });
+  }
+  return rows.sort((a, b) => b.wastedMs - a.wastedMs || b.count - a.count);
+}
+
+function modeWaste(entries: LogEntry[], opts: Options): string {
+  const rows = detectWaste(entries, opts.minRepeats);
+  if (rows.length === 0)
+    return `No event repeated ≥${opts.minRepeats}× with identical params. (Tune with --min-repeats N.)`;
+
+  const totalWasted = rows.reduce((s, r) => s + r.wastedMs, 0);
+  const lines: string[] = [];
+  lines.push(`=== REPEATED IDENTICAL WORK (same event + same params ≥${opts.minRepeats}×) ===`);
+  lines.push('');
+  lines.push(
+    `${rows.length} repeated signatures; ~${totalWasted.toFixed(0)}ms of measured duration on repeat occurrences.`
+  );
+  lines.push('');
+  for (const row of rows.slice(0, 30)) {
+    const span = row.lastT - row.firstT;
+    const wasted = row.wastedMs > 0 ? `  ~${row.wastedMs.toFixed(0)}ms wasted` : '';
+    lines.push(
+      `  ${String(row.count).padStart(4)}x  ${row.event.padEnd(44).slice(0, 44)} over ${formatDelta(span).trim()}${wasted}`
+    );
+    if (row.preview) lines.push(`         ${row.preview}`);
+  }
+  if (rows.length > 30) lines.push(`  … +${rows.length - 30} more signatures`);
+  lines.push('');
+  lines.push('Heuristic: identical params ≠ always redundant (heartbeats, polls). Wasted-ms');
+  lines.push('rows with durations are the strong signal; bare counts need a code check.');
+  return lines.join('\n');
+}
+
+// ─── Nostr tier waterfall analysis ────────────────────────────────────────────
+// Rolls up the facade's tier trail (nostr.tier.try/answered/failed/unsupported,
+// nostr.read.<surface>.request/done/exhausted) into per-tier health, failover
+// cost (time burned in dead tiers before an answer), and per-surface serving.
+
+function modeTiers(entries: LogEntry[], _opts: Options): string {
+  interface TierStats {
+    tries: number;
+    answered: number[];
+    failed: number[];
+    unsupported: number;
+    cooldownSkips: number;
+    errorTypes: Map<string, number>;
+  }
+  const tiers = new Map<string, TierStats>();
+  const tierStats = (tier: string): TierStats => {
+    const existing = tiers.get(tier);
+    if (existing) return existing;
+    const fresh: TierStats = {
+      tries: 0,
+      answered: [],
+      failed: [],
+      unsupported: 0,
+      cooldownSkips: 0,
+      errorTypes: new Map(),
+    };
+    tiers.set(tier, fresh);
+    return fresh;
+  };
+
+  const surfaces = new Map<string, { requests: number; doneByTier: Map<string, number>; exhausted: number }>();
+  const surfaceStats = (surface: string) => {
+    const existing = surfaces.get(surface);
+    if (existing) return existing;
+    const fresh = { requests: 0, doneByTier: new Map<string, number>(), exhausted: 0 };
+    surfaces.set(surface, fresh);
+    return fresh;
+  };
+
+  let sawTierEvents = false;
+  let runFailedMs = 0;
+  const failoverCosts: number[] = [];
+  let exhaustedRuns = 0;
+
+  for (const entry of entries) {
+    const event = entry.event;
+    if (!event.startsWith('nostr.')) continue;
+    const params = entry.params ?? {};
+    const tier = typeof params.tier === 'string' ? params.tier : null;
+    const durationMs = typeof params.durationMs === 'number' ? params.durationMs : null;
+
+    if (event === 'nostr.tier.select.start') {
+      sawTierEvents = true;
+      runFailedMs = 0;
+    } else if (event === 'nostr.tier.try' && tier) {
+      sawTierEvents = true;
+      tierStats(tier).tries++;
+    } else if (event === 'nostr.tier.failed' && tier) {
+      sawTierEvents = true;
+      const stats = tierStats(tier);
+      if (durationMs !== null) stats.failed.push(durationMs);
+      const errorType = typeof params.errorType === 'string' ? params.errorType : 'unknown';
+      stats.errorTypes.set(errorType, (stats.errorTypes.get(errorType) ?? 0) + 1);
+      runFailedMs += durationMs ?? 0;
+    } else if (event === 'nostr.tier.unsupported' && tier) {
+      sawTierEvents = true;
+      tierStats(tier).unsupported++;
+    } else if (event === 'nostr.tier.cooldown' && tier) {
+      sawTierEvents = true;
+      tierStats(tier).cooldownSkips++;
+    } else if (event === 'nostr.tier.answered' && tier) {
+      sawTierEvents = true;
+      if (durationMs !== null) tierStats(tier).answered.push(durationMs);
+      else tierStats(tier).answered.push(0);
+      if (runFailedMs > 0) failoverCosts.push(runFailedMs);
+      runFailedMs = 0;
+    } else if (event === 'nostr.tier.exhausted') {
+      sawTierEvents = true;
+      exhaustedRuns++;
+      runFailedMs = 0;
+    } else {
+      const read = /^nostr\.read\.([^.]+)\.(request|done|exhausted)$/.exec(event);
+      if (read) {
+        sawTierEvents = true;
+        const stats = surfaceStats(read[1]);
+        if (read[2] === 'request') stats.requests++;
+        else if (read[2] === 'exhausted') stats.exhausted++;
+        else if (tier) stats.doneByTier.set(tier, (stats.doneByTier.get(tier) ?? 0) + 1);
+      }
+    }
+  }
+
+  if (!sawTierEvents)
+    return 'No nostr tier-trail events found (nostr.tier.* / nostr.read.*). Is the facade path exercised in this log?';
+
+  const lines: string[] = [];
+  lines.push('=== NOSTR TIER WATERFALL ===');
+  lines.push('');
+  lines.push('PER-TIER HEALTH:');
+  lines.push(
+    '  Tier      Tries  Answered  Failed  Unsup  Skip   Ans p50/p95 ms      Fail p50/p95 ms'
+  );
+  lines.push('  ' + '-'.repeat(92));
+  for (const [tier, stats] of tiers) {
+    const ans = summarizeDurations(stats.answered);
+    const fail = summarizeDurations(stats.failed);
+    const ansStr =
+      stats.answered.length > 0 ? `${ans.p50.toFixed(0)}/${ans.p95.toFixed(0)}`.padStart(12) : '—'.padStart(12);
+    const failStr =
+      stats.failed.length > 0 ? `${fail.p50.toFixed(0)}/${fail.p95.toFixed(0)}`.padStart(12) : '—'.padStart(12);
+    lines.push(
+      `  ${tier.padEnd(8)} ${String(stats.tries).padStart(6)} ${String(stats.answered.length).padStart(9)} ${String(stats.failed.length).padStart(7)} ${String(stats.unsupported).padStart(6)} ${String(stats.cooldownSkips).padStart(5)}  ${ansStr}      ${failStr}`
+    );
+    if (stats.errorTypes.size > 0) {
+      const errs = [...stats.errorTypes.entries()].map(([type, n]) => `${type}×${n}`).join(', ');
+      lines.push(`           errors: ${errs}`);
+    }
+  }
+  lines.push('');
+
+  if (failoverCosts.length > 0) {
+    const cost = summarizeDurations(failoverCosts);
+    const total = failoverCosts.reduce((s, v) => s + v, 0);
+    lines.push('FAILOVER COST (time burned in failed tiers before an answer):');
+    lines.push(
+      `  ${failoverCosts.length} answers paid a failover; total ${total.toFixed(0)}ms, p50 ${cost.p50.toFixed(0)}ms, max ${cost.max.toFixed(0)}ms`
+    );
+    lines.push('');
+  }
+  if (exhaustedRuns > 0) {
+    lines.push(`EXHAUSTED RUNS (no tier answered): ${exhaustedRuns}`);
+    lines.push('');
+  }
+
+  if (surfaces.size > 0) {
+    lines.push('PER-SURFACE SERVING (which tier answered each read):');
+    for (const [surface, stats] of surfaces) {
+      const byTier = [...stats.doneByTier.entries()].map(([tier, n]) => `${tier}×${n}`).join(', ') || '—';
+      const exhausted = stats.exhausted > 0 ? `  exhausted×${stats.exhausted}` : '';
+      lines.push(`  ${surface.padEnd(20)} requests×${stats.requests}  answered: ${byTier}${exhausted}`);
+    }
+    lines.push('');
+  }
+  lines.push('Attribution is sequential-scan approximate; overlapping concurrent reads can');
+  lines.push('misattribute failover cost by one run.');
   return lines.join('\n');
 }
 
@@ -3809,6 +4319,10 @@ function modeBudget(entries: LogEntry[], opts: Options): string {
     { name: 'network', fn: modeNetwork },
     { name: 'feed', fn: modeFeed },
     { name: 'visual', fn: modeVisual },
+    { name: 'perf', fn: modePerf },
+    { name: 'spans', fn: modeSpans },
+    { name: 'waste', fn: modeWaste },
+    { name: 'tiers', fn: modeTiers },
     { name: 'redaction', fn: modeRedaction },
     { name: 'full (json)', fn: (e, o) => modeFull(e, { ...o, format: 'json' }) },
     { name: 'full (md)', fn: (e, o) => modeFull(e, { ...o, format: 'md' }) },
@@ -4364,6 +4878,19 @@ async function modePhone(args: string[]): Promise<string> {
 async function main() {
   const opts = parseArgs(process.argv);
 
+  if (opts.mode === 'help') {
+    console.log(MODE_HELP);
+    return;
+  }
+
+  // Unknown flags are only meaningful to `phone` subcommands; anywhere else a
+  // typo'd flag must fail loudly instead of silently running the default mode.
+  if (opts.mode !== 'phone' && opts.unknownFlags.length > 0) {
+    console.error(`Unknown flag(s): ${opts.unknownFlags.join(', ')}`);
+    console.error('Run with --help for modes and flags.');
+    process.exit(1);
+  }
+
   // `phone` mode talks to the device, not to log files — short-circuit before
   // we try to read log.txt or stdin.
   if (opts.mode === 'phone') {
@@ -4402,7 +4929,7 @@ async function main() {
     console.error('  2. Pipe logs: cat logs.jsonl | npm run log-doctor -- stats');
     console.error('');
     console.error(
-      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, redaction, phone'
+      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, redaction, phone. Run --help for details.'
     );
     process.exit(1);
   }
@@ -4501,13 +5028,22 @@ async function main() {
     case 'perf':
       output = modePerf(entries, opts);
       break;
+    case 'spans':
+      output = modeSpans(entries, opts);
+      break;
+    case 'waste':
+      output = modeWaste(entries, opts);
+      break;
+    case 'tiers':
+      output = modeTiers(entries, opts);
+      break;
     case 'redaction':
       output = modeRedaction(entries, opts);
       break;
     default:
       console.error(`Unknown mode: ${opts.mode}`);
       console.error(
-        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, redaction, phone'
+        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, visual, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, spans, waste, tiers, redaction, phone. Run --help for details.'
       );
       process.exit(1);
   }

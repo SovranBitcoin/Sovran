@@ -169,11 +169,17 @@ a typical session — your numbers will differ.
 | `timeline`         | ~5K            | One-line-per-entry with delta timing     |
 | `startup`          | ~5K            | Initialization waterfall, gate sequence  |
 | `full --format md` | ~6K            | Pipe-delimited dense summary             |
-| `slow`             | ~18K           | Operations exceeding threshold           |
-| `perf`             | varies         | Per-event latency p50/p95/p99 + sparkline |
+| `slow`             | ~18K           | Gaps between consecutive log lines (NOT op durations — use `perf`/`spans`) |
+| `perf`             | varies         | Per-event duration p50/p95/p99 + sparkline (reads `ms`, `duration_ms`, `durationMs`, `elapsedMs`, `decodeMs`) |
+| `spans`            | small          | Durations synthesized by pairing `.start` → `.done`/`.failed` entries |
+| `waste`            | small          | Repeated identical work: same event + same params ≥ `--min-repeats`, with wasted-ms rollup |
+| `tiers`            | small          | Nostr tier waterfall: per-tier health, failover cost, per-surface serving |
 | `redaction`        | ~1K            | Secret-redaction audit (brands + un-redacted flags) |
 | `screens`          | ~70K           | Screen flow + content snapshots          |
 | `errors`           | clustered      | Errors collapsed to exemplars (`--all` = full context) |
+
+Run `--help` for the full mode list. Unknown flags are fatal (they used to
+silently fall through to `stats`).
 
 ### Recipes
 
@@ -211,6 +217,12 @@ npx tsx codereview/log-doctor/index.ts timeline --event 'visual\\.layout|\\.shif
 # `--scope`, `--component`, `--key`, and `--item-type` narrow visual summaries by params.
 # `__tests__/visualLayoutCoverage.test.ts` guards direct LegendList call-site coverage.
 
+# Perf-hunting sequence: measured spans, repeated identical work, nostr waterfall health.
+npx tsx codereview/log-doctor/index.ts perf  --latest
+npx tsx codereview/log-doctor/index.ts spans --latest
+npx tsx codereview/log-doctor/index.ts waste --latest --min-repeats 3
+npx tsx codereview/log-doctor/index.ts tiers --latest
+
 # Cap any mode at a token budget — output is auto-pruned to fit.
 npx tsx codereview/log-doctor/index.ts errors --token-budget 8000
 
@@ -222,9 +234,10 @@ npx tsx codereview/log-doctor/index.ts timeline --limit 200 --offset 0
 
 | Flag                            | Default   | What it does                                                 |
 | ------------------------------- | --------- | ------------------------------------------------------------ |
-| `--latest`                      | off       | Only the most recent session (detects `_t` resets)           |
+| `--latest`                      | off       | Only the most recent session (`_t` resets / session-id changes; idle gaps within one logSessionId do NOT split) |
 | `--no-inst`                     | off       | Strip instrumentation events (render.count, state.change, …) |
 | `--threshold <ms>`              | 500       | Duration threshold for `slow` mode                           |
+| `--min-repeats <n>`             | 3         | `waste` mode: identical repeats before a signature is reported |
 | `--context <n>`                 | 3         | Entries before/after each error                              |
 | `--token-budget <n>`            | unlimited | Auto-prune output to fit                                     |
 | `--event <pattern>`             | —         | Filter to events matching substring                          |
