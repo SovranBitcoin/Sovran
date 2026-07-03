@@ -2,6 +2,7 @@ export {
   receiveFlow,
   startReceiveFlow,
   startReceiveLightningFlow,
+  startReceiveQrFlow,
   type ReceiveFlowAction,
   type ReceiveFlowDefinition,
   type ReceiveFlowEvent,

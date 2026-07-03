@@ -4,6 +4,7 @@ import {
   receiveFlow,
   startReceiveFlow,
   startReceiveLightningFlow,
+  startReceiveQrFlow,
 } from '../../src/machine/flows/receive';
 import { MINT1, WALLETS } from '../_harness/fixtures';
 
@@ -24,6 +25,14 @@ describe('receive flow', () => {
 
   it('starts the receive hub without selecting a payment method', () => {
     const result = startReceiveFlow(WALLETS.default, 'sat');
+
+    expect(result.step).toBe('receiveHub');
+    expect(result.context).toEqual({ unit: 'sat' });
+    expect(result.data.methodContext).toBeTruthy();
+  });
+
+  it('opens the QR display with a clean context (no stale destination)', () => {
+    const result = startReceiveQrFlow(WALLETS.default, 'sat');
 
     expect(result.step).toBe('navigateToReceive');
     expect(result.context).toEqual({ unit: 'sat' });

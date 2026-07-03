@@ -1647,6 +1647,25 @@ export function createSovranHandlers({
       router.navigate(buildModalProfileHref({ npub }));
     },
 
+    // The receive modal's root: the method chooser. Entry is synchronous —
+    // only unit + methodContext gate the four options — so the modal opens
+    // without waiting on the P2PK key resolution the QR display needs.
+    receiveHub: ({ unit, methodContext }) => {
+      const t0 = performance.now();
+      const entry = {
+        type: 'receive',
+        id: 'receive-hub',
+        createdAt: Date.now(),
+        ...(methodContext ? { methodContext } : {}),
+        unit,
+      };
+      router.navigate({
+        pathname: '/(receive-flow)/receive',
+        params: { receiveHubEntry: JSON.stringify(entry), unit },
+      });
+      paymentLog.info('navigate.receiveHub.done', { duration_ms: performance.now() - t0 });
+    },
+
     navigateToReceive: async ({ unit, methodContext }) => {
       const t0 = performance.now();
       const npub = getNpub?.();
@@ -1674,7 +1693,7 @@ export function createSovranHandlers({
         unit,
       };
       router.navigate({
-        pathname: '/(receive-flow)/receive',
+        pathname: '/(receive-flow)/qrDisplay',
         params: { receiveEntry: JSON.stringify(entry), unit },
       });
       paymentLog.info('navigate.receive.done', { duration_ms: performance.now() - t0 });

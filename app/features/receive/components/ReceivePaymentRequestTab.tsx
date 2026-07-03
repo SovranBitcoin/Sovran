@@ -12,7 +12,7 @@
  * simply "any trusted mint exists".
  */
 
-import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useEffect, useMemo } from 'react';
 
 import { router } from 'expo-router';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
@@ -38,6 +38,7 @@ import { setStringAsync } from 'expo-clipboard';
 import { copyPopup } from '@/shared/lib/popup';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
+import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import Icon from 'assets/icons';
@@ -53,6 +54,9 @@ interface ReceivePaymentRequestTabProps {
    *  toggle is disabled. */
   p2pkKey?: string;
   muted: string;
+  /** Reports the encoded creq upward for the QR display's footer Copy
+   *  button. */
+  onQrPayload?: OnReceiveQrPayload;
 }
 
 export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
@@ -60,6 +64,7 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   walletContext,
   p2pkKey,
   muted,
+  onQrPayload,
 }: ReceivePaymentRequestTabProps) {
   // P2PK lock (absorbs the old P2PK tab): when on, the DISPLAYED request
   // advertises a NUT-10 lock to the keyring key — payers lock their ecash to
@@ -96,6 +101,14 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   );
   const manager = useColadaManager();
   const accent = useThemeColor('accent');
+
+  useEffect(() => {
+    onQrPayload?.(
+      request?.encodedRequest
+        ? { value: request.encodedRequest, copyTarget: 'paymentRequest' }
+        : null
+    );
+  }, [request?.encodedRequest, onQrPayload]);
 
   const handleNewRequest = useCallback(async () => {
     paymentLog.info('receive.creq.rotate_requested', { source: 'button' });

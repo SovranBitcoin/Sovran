@@ -1,14 +1,17 @@
 /**
- * @fileoverview Shared Receive screen component
+ * @fileoverview Receive QR display — the standing receive rails behind the
+ * hub's "QR Display" option (Unified / Lightning / Onchain / Cashu tabs).
  *
- * Receive hub UI — entry, copy, and hub actions come from `useScreenActions`;
- * paste / fixed amount / scan / NPC mint change run through colada handlers
- * with the payment machine from ColadaProvider (wallet context binds in
- * usePaymentFlowMachine after entry is available).
+ * Entry, copy, and mint-change actions come from `useScreenActions('receive')`
+ * with the payment machine from ColadaProvider. Paste / Fixed Amount / Scan QR
+ * live on the receive hub (ReceiveHubScreen); the footer here is a single
+ * Copy of whatever payload the visible tab's QR is showing (each rail
+ * reports its value via `onQrPayload`).
  */
 
-import React, { memo, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
+import { setStringAsync } from 'expo-clipboard';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { ListGroup, PressableFeedback } from 'heroui-native';
@@ -23,11 +26,12 @@ import { ReceivePaymentRequestTab } from '@/features/receive/components/ReceiveP
 import { ReceiveUnifiedTab } from '@/features/receive/components/ReceiveUnifiedTab';
 import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
 import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
+import type { ReceiveQrPayload } from '@/features/receive/lib/qrPayload';
+import { copyPopup } from '@/shared/lib/popup';
 import { Section } from '@/shared/ui/composed/Section';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { HistoryEntryRefresh } from '@/features/transactions';
-import { truncateMiddle } from '@/shared/lib/strings';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -38,7 +42,6 @@ import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
-import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import Icon from 'assets/icons';
@@ -242,6 +245,67 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   const receiveEntryData = entry as ReceiveHubEntry | null;
   const hasReceiveEntryData = Boolean(receiveEntryData);
 
+  // Each rail reports its copyable payload as it resolves; the footer Copy
+  // copies whichever rail the visible tab is showing.
+  const [qrPayloads, setQrPayloads] = useState<Record<string, ReceiveQrPayload | null>>({});
+  const setQrPayload = useCallback((key: string, payload: ReceiveQrPayload | null) => {
+    setQrPayloads((prev) => {
+      const existing = prev[key];
+      if (existing === payload) return prev;
+      if (
+        existing &&
+        payload &&
+        existing.value === payload.value &&
+        existing.copyTarget === payload.copyTarget
+      ) {
+        return prev;
+      }
+      return { ...prev, [key]: payload };
+    });
+  }, []);
+  const onOfferPayload = useCallback(
+    (p: ReceiveQrPayload | null) => setQrPayload('lightning-offer', p),
+    [setQrPayload]
+  );
+  const onUnifiedPayload = useCallback(
+    (p: ReceiveQrPayload | null) => setQrPayload('unified', p),
+    [setQrPayload]
+  );
+  const onOnchainPayload = useCallback(
+    (p: ReceiveQrPayload | null) => setQrPayload('onchain', p),
+    [setQrPayload]
+  );
+  const onCashuPayload = useCallback(
+    (p: ReceiveQrPayload | null) => setQrPayload('cashu', p),
+    [setQrPayload]
+  );
+
+  const npcAddress = unit === 'sat' ? receiveEntryData?.npcAddress : undefined;
+  const activePayload: ReceiveQrPayload | null =
+    selectedTab === 'Lightning'
+      ? lightningMode === 'address'
+        ? npcAddress
+          ? { value: npcAddress.toString(), copyTarget: 'address' }
+          : null
+        : (qrPayloads['lightning-offer'] ?? null)
+      : selectedTab === 'Unified'
+        ? (qrPayloads['unified'] ?? null)
+        : selectedTab === 'Onchain'
+          ? (qrPayloads['onchain'] ?? null)
+          : (qrPayloads['cashu'] ?? null);
+
+  const handleFooterCopy = useCallback(async () => {
+    if (!activePayload) return;
+    await EnhancedHaptics.copyHaptic();
+    await setStringAsync(activePayload.value);
+    copyPopup(activePayload.copyTarget);
+    paymentLog.info('receive.qr.footer_copied', {
+      tab: selectedTab,
+      copyTarget: activePayload.copyTarget,
+      valueLength: activePayload.value.length,
+    });
+  }, [activePayload, selectedTab]);
+
   const isNpcMintUpdating = useNpcMintStore((s) => s.isUpdating);
   const mintInfo = useMintInfo(mintUrl);
   const walletContext = useWalletContext();
@@ -280,49 +344,18 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
       deferContent={false}
       footer={
         <BottomButtons>
+          {/* Paste / Fixed Amount / Scan QR moved to the receive hub — here
+              the one relevant action is copying what the QR is showing. */}
           <ButtonHandler
             buttons={[
               {
-                testID: 'receive-paste',
-                text: hasReceiveEntryData && actions.paste.loading ? 'Pasting...' : 'Paste',
+                testID: 'receive-copy',
+                text: 'Copy',
                 icon: 'lets-icons:copy',
                 variant: 'primary',
-                onPress: async () => {
-                  if (!hasReceiveEntryData) return;
-                  await actions.paste.execute();
-                },
-                loading: hasReceiveEntryData && actions.paste.loading,
-                disabled: !hasReceiveEntryData,
-                condition: hasReceiveEntryData ? actions.paste.available : true,
-              },
-              {
-                testID: 'receive-fixed-amount',
-                text:
-                  hasReceiveEntryData && actions.fixedAmount.loading
-                    ? 'Opening...'
-                    : 'Fixed Amount',
-                icon: 'mdi:decimal',
-                variant: 'secondary',
-                onPress: async () => {
-                  if (!hasReceiveEntryData) return;
-                  await actions.fixedAmount.execute();
-                },
-                loading: hasReceiveEntryData && actions.fixedAmount.loading,
-                disabled: !hasReceiveEntryData,
-                condition: hasReceiveEntryData ? actions.fixedAmount.available : true,
-              },
-              {
-                testID: 'receive-scan-qr',
-                text: hasReceiveEntryData && actions.scanQr.loading ? 'Opening...' : 'Scan QR',
-                icon: 'stash:qr-code',
-                variant: 'secondary',
-                onPress: async () => {
-                  if (!hasReceiveEntryData) return;
-                  await actions.scanQr.execute();
-                },
-                loading: hasReceiveEntryData && actions.scanQr.loading,
-                disabled: !hasReceiveEntryData,
-                condition: hasReceiveEntryData ? actions.scanQr.available : true,
+                onPress: handleFooterCopy,
+                disabled: !hasReceiveEntryData || !activePayload,
+                condition: true,
               },
             ]}
           />
@@ -370,6 +403,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                     actions={actions}
                     belowQr={lightningModeSwitcher}
                     muted={muted}
+                    onQrPayload={onOfferPayload}
                   />
                 </View>
               </TabPane>
@@ -379,6 +413,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                   walletContext={walletContext}
                   p2pkKey={receiveEntryData.p2pkKey}
                   muted={muted}
+                  onQrPayload={onUnifiedPayload}
                 />
               </TabPane>
               <TabPane visible={selectedTab === 'Onchain'}>
@@ -388,6 +423,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                   walletContext={walletContext}
                   actions={actions}
                   muted={muted}
+                  onQrPayload={onOnchainPayload}
                 />
               </TabPane>
               <TabPane visible={selectedTab === 'Cashu'}>
@@ -396,6 +432,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                   walletContext={walletContext}
                   p2pkKey={receiveEntryData.p2pkKey}
                   muted={muted}
+                  onQrPayload={onCashuPayload}
                 />
               </TabPane>
             </>

@@ -1530,6 +1530,10 @@ export function createPaymentMachine(
     if (opts?.reset) resetInternal();
     return send({ type: "START_RECEIVE" });
   };
+  const showReceiveQr = (opts?: { reset?: boolean }) => {
+    if (opts?.reset) resetInternal();
+    return send({ type: "SHOW_RECEIVE_QR" });
+  };
 
   const reviewMint = (mintUrl: string, token: string) =>
     send({ type: "REVIEW_MINT", mintUrl, token });
@@ -1572,6 +1576,7 @@ export function createPaymentMachine(
     startSendEcash,
     startReceiveLightning,
     startReceive,
+    showReceiveQr,
     reviewMint,
     mintTrusted,
     confirmMelt,

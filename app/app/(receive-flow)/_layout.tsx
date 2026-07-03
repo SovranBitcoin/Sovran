@@ -4,7 +4,8 @@
  * This layout creates a nested stack navigator inside a modal presentation.
  * The parent root Stack presents this group as a modal (slides up from bottom).
  * Screens within this group push horizontally:
- * - receive: Entry point, shows receive options
+ * - receive: Entry point, the receive hub (QR Display / Scan QR / Fixed Amount / Paste)
+ * - qrDisplay: Standing receive rails (Unified / Lightning / Onchain / Cashu tabs)
  * - amount: Amount selector (pushes horizontally)
  * - lightningReceive: Lightning receive display (pushes horizontally)
  * - onchainReceive: Onchain receive display (pushes horizontally)
@@ -45,6 +46,7 @@ export default function ReceiveFlowLayout() {
     <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
       <Stack screenOptions={screenOptions}>
         <Stack.Screen name="receive" options={RECEIVE_OPTIONS} />
+        <Stack.Screen name="qrDisplay" options={RECEIVE_OPTIONS} />
         <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
         <Stack.Screen name="mintSelect" options={MINT_SELECT_OPTIONS} />
         <Stack.Screen name="lightningReceive" options={LIGHTNING_RECEIVE_OPTIONS} />

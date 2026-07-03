@@ -28,6 +28,7 @@ describe("screen action availability — back", () => {
     "mintQuote",
     "meltQuote",
     "paymentRequest",
+    "receiveHub",
     "receive",
     "mintInfo",
     "amountEntry",
@@ -775,5 +776,53 @@ describe("mintSelectorAvailability", () => {
     });
 
     expect(actions.cancel.available).toBe(true);
+  });
+});
+
+describe("receiveHubAvailability", () => {
+  const hubEntry = (mintInfoNuts: Record<string, unknown>) => ({
+    type: "receive",
+    id: "receive-hub",
+    unit: "sat",
+    methodContext: {
+      trustedMintUrls: [MINT1],
+      mintBalances: { [MINT1]: 0 },
+      mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+        { mintUrl: MINT1, mintInfo: { nuts: mintInfoNuts } },
+      ]),
+    },
+  });
+
+  it("exposes all four options when a bolt11 mint exists", () => {
+    const actions = getAvailableActions(
+      "receiveHub",
+      hubEntry({ "4": { methods: [{ method: "bolt11", unit: "sat" }] } }),
+    );
+
+    expect(actions.qrDisplay.available).toBe(true);
+    expect(actions.scanQr.available).toBe(true);
+    expect(actions.paste.available).toBe(true);
+    expect(actions.fixedAmount.available).toBe(true);
+  });
+
+  it("disables fixedAmount (with reason) when no mint supports bolt11", () => {
+    const actions = getAvailableActions(
+      "receiveHub",
+      hubEntry({ "4": { methods: [{ method: "onchain", unit: "sat" }] } }),
+    );
+
+    expect(actions.fixedAmount.available).toBe(false);
+    expect(actions.fixedAmount.reason).toMatch(/Lightning/);
+    expect(actions.qrDisplay.available).toBe(true);
+  });
+
+  it("gates every option except back until the hub entry loads", () => {
+    const actions = getAvailableActions("receiveHub", {});
+
+    expect(actions.qrDisplay.available).toBe(false);
+    expect(actions.scanQr.available).toBe(false);
+    expect(actions.paste.available).toBe(false);
+    expect(actions.fixedAmount.available).toBe(false);
+    expect(actions.back.available).toBe(true);
   });
 });

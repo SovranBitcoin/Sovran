@@ -199,12 +199,12 @@ describe('mint quote — hung operation recovery', () => {
     expect(tm.operationCalls.find((c) => c.name === 'executeMintQuote')).toBeDefined();
 
     await tm.machine.startReceive({ reset: true });
-    tm.assertStep('navigateToReceive');
+    tm.assertStep('receiveHub');
 
     pendingQuote.resolve(mintQuoteResult('late-receive'));
     await blockedNext;
 
-    tm.assertStep('navigateToReceive');
+    tm.assertStep('receiveHub');
   });
 
   it('startSendEcash({ reset: true }) recovers while executeMintQuote is still pending', async () => {
@@ -253,22 +253,19 @@ describe('mint quote — hung operation recovery', () => {
 });
 
 // ---------------------------------------------------------------------------
-// startReceive — navigateToReceive hub
+// startReceive — the receive hub (method chooser)
 // ---------------------------------------------------------------------------
 
 /**
- * startReceive() navigates to the receive hub screen where the user can
- * choose between:
- *   - Lightning (mint quote) — creates a Lightning invoice
- *   - Ecash (share token) — generates a receive address or shows QR
- *
- * It's a simple navigation action — no payment logic, just routing.
+ * startReceive() navigates to the receive hub — the method chooser
+ * (QR Display / Scan QR / Fixed Amount / Paste). It's a simple navigation
+ * action — no payment logic, just routing.
  */
 describe('startReceive', () => {
-  it('routes to navigateToReceive', async () => {
+  it('routes to receiveHub', async () => {
     const tm = createTestMachine();
     await tm.machine.startReceive();
-    tm.assertStep('navigateToReceive');
+    tm.assertStep('receiveHub');
   });
 });
 

@@ -644,6 +644,42 @@ function mintSelectorAvailability(
   };
 }
 
+function receiveHubAvailability(
+  entry: Record<string, unknown>,
+): AvailabilityMap<"receiveHub"> {
+  const isReceiveHub =
+    entry.type === "receive" &&
+    typeof entry.id === "string" &&
+    entry.id === "receive-hub";
+  const unit = entry.unit as string | undefined;
+  const methodContext = entry.methodContext as
+    | AmountEntryMethodContext
+    | undefined;
+  const canReceiveLightning = methodContextHasSupportingMint(methodContext, {
+    operation: "mint",
+    method: "bolt11",
+    unit: unit ?? "sat",
+  });
+  logger.debug("screenActions.availability.receiveHub.context", {
+    isReceiveHub,
+    unit: unit ?? null,
+    canReceiveLightning,
+  });
+
+  return {
+    qrDisplay: { available: isReceiveHub },
+    scanQr: { available: isReceiveHub },
+    fixedAmount: {
+      available: isReceiveHub && canReceiveLightning,
+      ...(!canReceiveLightning
+        ? { reason: "No trusted mint supports Lightning receive" }
+        : {}),
+    },
+    paste: { available: isReceiveHub },
+    back: { available: true },
+  };
+}
+
 function receiveAvailability(
   entry: Record<string, unknown>,
 ): AvailabilityMap<"receive"> {
@@ -659,11 +695,6 @@ function receiveAvailability(
   const methodContext = entry.methodContext as
     | AmountEntryMethodContext
     | undefined;
-  const canReceiveLightning = methodContextHasSupportingMint(methodContext, {
-    operation: "mint",
-    method: "bolt11",
-    unit: unit ?? "sat",
-  });
   // The receive-rail pickers open whenever ANY trusted mint could serve the
   // rail — mirroring the rail tab's own visibility gate.
   const canReceiveBolt12 = methodContextHasSupportingMint(methodContext, {
@@ -681,7 +712,6 @@ function receiveAvailability(
     hasP2pk,
     isReceiveHub,
     unit: unit ?? null,
-    canReceiveLightning,
     canReceiveBolt12,
     canReceiveOnchain,
   });
@@ -689,14 +719,6 @@ function receiveAvailability(
   return {
     copy: { available: hasNpc || hasP2pk },
     share: { available: hasNpc || hasP2pk },
-    paste: { available: hubLoaded },
-    fixedAmount: {
-      available: hubLoaded && canReceiveLightning,
-      ...(!canReceiveLightning
-        ? { reason: "No trusted mint supports Lightning receive" }
-        : {}),
-    },
-    scanQr: { available: hubLoaded },
     changeNpcMint: { available: hubLoaded && hasNpc && unit === "sat" },
     changeBolt12Mint: { available: hubLoaded && canReceiveBolt12 },
     changeOnchainMint: { available: hubLoaded && canReceiveOnchain },
@@ -716,6 +738,7 @@ const AVAILABILITY_FNS: {
   mintQuote: mintQuoteAvailability,
   meltQuote: meltQuoteAvailability,
   paymentRequest: paymentRequestAvailability,
+  receiveHub: receiveHubAvailability,
   receive: receiveAvailability,
   mintInfo: mintInfoAvailability,
   amountEntry: amountEntryAvailability,

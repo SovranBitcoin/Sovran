@@ -29,6 +29,7 @@ import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
 import { Section } from '@/shared/ui/composed/Section';
 import { useReceiveMethodMint } from '@/features/receive/hooks/useReceiveMethodMint';
+import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -45,6 +46,9 @@ interface ReceiveUnifiedTabProps {
   /** Latest keyring P2PK pubkey — applied to the creq when the lock is on. */
   p2pkKey?: string;
   muted: string;
+  /** Reports the composed BIP-321 URI upward for the QR display's footer
+   *  Copy button. */
+  onQrPayload?: OnReceiveQrPayload;
 }
 
 export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
@@ -52,6 +56,7 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
   walletContext,
   p2pkKey,
   muted,
+  onQrPayload,
 }: ReceiveUnifiedTabProps) {
   // Inherit the Cashu rail's lock setting — same standing request singleton.
   const creqP2pkLock = useMintStore((s) => s.creqP2pkLock);
@@ -126,6 +131,10 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
     ...(bolt12.quote ? ['BOLT 12'] : []),
     ...(creq.request ? ['Cashu'] : []),
   ];
+
+  useEffect(() => {
+    onQrPayload?.(uri ? { value: uri, copyTarget: 'bip321' } : null);
+  }, [uri, onQrPayload]);
 
   const anyLoading = onchain.isLoading || bolt12.isLoading || creq.isLoading;
 

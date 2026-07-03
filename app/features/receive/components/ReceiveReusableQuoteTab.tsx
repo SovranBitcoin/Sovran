@@ -27,10 +27,10 @@ import { Section } from '@/shared/ui/composed/Section';
 import { HistoryEntryRefresh } from '@/features/transactions';
 import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
 import { useReceiveMethodMint } from '@/features/receive/hooks/useReceiveMethodMint';
+import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import { Button } from '@/shared/ui/primitives/Button';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { truncateMiddle } from '@/shared/lib/strings';
@@ -58,6 +58,9 @@ interface ReceiveReusableQuoteTabProps {
    *  it must never disappear or the user can't switch back. */
   belowQr?: React.ReactNode;
   muted: string;
+  /** Reports the rail's copyable payload (bare offer/address) upward for the
+   *  QR display's footer Copy button. */
+  onQrPayload?: OnReceiveQrPayload;
 }
 
 const METHOD_COPY = {
@@ -85,6 +88,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   actions,
   belowQr,
   muted,
+  onQrPayload,
 }: ReceiveReusableQuoteTabProps) {
   const copy = METHOD_COPY[method];
   // Each amountless rail keeps its own "Receiving with" mint — one of the
@@ -136,6 +140,11 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   // The amountless tab shows the BARE standing address; BIP-321 URIs with
   // amounts belong to the fixed-amount flow (fresh address per request).
   const qrData = request && method === 'onchain' ? buildBip321OnchainUri(request) : request;
+
+  // Footer Copy copies the same bare value the in-card copy row does.
+  React.useEffect(() => {
+    onQrPayload?.(request ? { value: request, copyTarget: copy.copyTarget } : null);
+  }, [request, copy.copyTarget, onQrPayload]);
 
   // Manual address rotation (onchain only) with a short cooldown so the
   // button can't be spammed into a pile of orphan quotes at the mint.

@@ -6,6 +6,10 @@
  * hidden layers stuck at 0,0, which read as a weird offset while fading).
  */
 
+// This singleton IS a legacy Animated.ValueXY: SpriteView's parallax
+// transform runs native-driver springs on RN Animated (expo-image under
+// Animated.View); Reanimated can't drive those legacy styles.
+// eslint-disable-next-line no-restricted-imports
 import { Animated } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 import { log } from '@/shared/lib/logger';

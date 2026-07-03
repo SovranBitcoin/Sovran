@@ -16,7 +16,7 @@
  * have a known destination from the start:
  *   - startSendEcash: destination='sendEcash'
  *   - startReceiveLightning: destination='mintQuote'
- *   - startReceive: destination=navigateToReceive (hub screen)
+ *   - startReceive: destination=receiveHub (method chooser)
  *
  * The main routing question for manual entry is: "which mint should we use?"
  *   - Single mint → auto-select it
@@ -303,12 +303,24 @@ describe('manual entry — startReceiveLightning', () => {
 
 /**
  * startReceive() is the simplest entry point — it just navigates to the
- * receive hub screen. No amount, no mint, no payment logic.
+ * receive hub (the method chooser). No amount, no mint, no payment logic.
  */
 describe('manual entry — startReceive', () => {
+  it('routes to receiveHub', async () => {
+    const tm = createTestMachine();
+    await tm.machine.startReceive();
+    tm.assertStep('receiveHub');
+  });
+});
+
+/**
+ * showReceiveQr() opens the QR display from the hub — clean {unit} context.
+ */
+describe('manual entry — showReceiveQr', () => {
   it('routes to navigateToReceive', async () => {
     const tm = createTestMachine();
     await tm.machine.startReceive();
+    await tm.machine.showReceiveQr({ reset: true });
     tm.assertStep('navigateToReceive');
   });
 });

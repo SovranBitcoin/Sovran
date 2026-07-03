@@ -595,18 +595,16 @@ export function createDefaultScreenActionHandlers(
       cancel: goBack,
     },
 
-    // ── receive ──────────────────────────────────────────────────────
-    receive: {
+    // ── receiveHub ───────────────────────────────────────────────────
+    // The receive modal's root method chooser. Every option starts a FRESH
+    // flow (reset / clean context) so state left behind by a backed-out
+    // sub-flow can never leak into the next choice.
+    receiveHub: {
       back: goBack,
 
-      paste: async () => {
+      qrDisplay: async () => {
         const machine = getMachine();
-        await machine?.scan?.();
-      },
-
-      fixedAmount: async () => {
-        const machine = getMachine();
-        await machine?.startReceiveLightning({ reset: true });
+        await machine?.showReceiveQr({ reset: true });
       },
 
       scanQr: async (ctx: ScreenActionContext) => {
@@ -614,6 +612,21 @@ export function createDefaultScreenActionHandlers(
         const unit = getString(entry, "unit") ?? "sat";
         navigation.scanQr?.({ unit, context: "receive" });
       },
+
+      fixedAmount: async () => {
+        const machine = getMachine();
+        await machine?.startReceiveLightning({ reset: true });
+      },
+
+      paste: async () => {
+        const machine = getMachine();
+        await machine?.scan?.(undefined, { reset: true });
+      },
+    },
+
+    // ── receive ──────────────────────────────────────────────────────
+    receive: {
+      back: goBack,
 
       changeNpcMint: async () => {
         const machine = getMachine();

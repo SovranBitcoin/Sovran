@@ -29,7 +29,7 @@
  *     EXECUTE          → varies (parse input → resolve intent → route)
  *     START_SEND_ECASH → enterAmount or selectMint or error
  *     START_RECEIVE_LIGHTNING → enterAmount (destination: mintQuote)
- *     START_RECEIVE    → navigateToReceive
+ *     START_RECEIVE    → receiveHub
  *     REQUEST_MINT_SELECTOR → selectMint
  *     REVIEW_MINT      → reviewMint
  *     MINT_TRUSTED     → receiveToken (when reviewToken exists)
@@ -374,14 +374,28 @@ describe('transition — START_RECEIVE_LIGHTNING', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * START_RECEIVE navigates to the receive hub screen where the user can
- * choose between Lightning (mint quote) or ecash (share address/token).
- * It's just a navigation event — no payment logic involved.
+ * START_RECEIVE opens the receive hub — the method chooser (QR Display /
+ * Scan QR / Fixed Amount / Paste). It's just a navigation event — no
+ * payment logic involved.
  */
 describe('transition — START_RECEIVE', () => {
-  it('routes to navigateToReceive', () => {
+  it('routes to receiveHub', () => {
     const result = tx('idle', idle, { type: 'START_RECEIVE' });
+    expect(result.step).toBe('receiveHub');
+  });
+});
+
+/**
+ * SHOW_RECEIVE_QR opens the QR display (standing rails) from the hub with a
+ * clean `{unit}` context, so a stale destination from a backed-out flow
+ * (e.g. Fixed Amount) can never leak into it.
+ */
+describe('transition — SHOW_RECEIVE_QR', () => {
+  it('routes to navigateToReceive with a clean context', () => {
+    const staleCtx = { unit: 'sat', destination: 'mintQuote' as const };
+    const result = tx('enterAmount', staleCtx, { type: 'SHOW_RECEIVE_QR' });
     expect(result.step).toBe('navigateToReceive');
+    expect(result.context.destination).toBeUndefined();
   });
 });
 

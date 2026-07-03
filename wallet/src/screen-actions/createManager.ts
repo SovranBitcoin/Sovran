@@ -315,12 +315,10 @@ const ACTION_NAMES: Record<ScreenType, string[]> = {
   mintQuote: ["copy", "share", "back"],
   meltQuote: ["pay", "cancel", "back"],
   paymentRequest: ["confirm", "cancel", "back"],
+  receiveHub: ["qrDisplay", "scanQr", "fixedAmount", "paste", "back"],
   receive: [
     "copy",
     "share",
-    "paste",
-    "fixedAmount",
-    "scanQr",
     "changeNpcMint",
     "changeBolt12Mint",
     "changeOnchainMint",

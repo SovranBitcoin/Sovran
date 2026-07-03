@@ -28,6 +28,7 @@ export type ScreenType =
   | "mintQuote"
   | "meltQuote"
   | "paymentRequest"
+  | "receiveHub"
   | "receive"
   | "mintInfo"
   | "amountEntry"
@@ -43,12 +44,13 @@ export type ScreenActionName = {
   mintQuote: "copy" | "share" | "back";
   meltQuote: "pay" | "cancel" | "back";
   paymentRequest: "confirm" | "cancel" | "back";
+  /** Receive modal root — the method chooser (QR Display / Scan QR / Fixed
+   *  Amount / Paste). */
+  receiveHub: "qrDisplay" | "scanQr" | "fixedAmount" | "paste" | "back";
+  /** Receive QR display — the standing-rail tabs behind the hub's QR Display. */
   receive:
     | "copy"
     | "share"
-    | "paste"
-    | "fixedAmount"
-    | "scanQr"
     | "changeNpcMint"
     | "changeBolt12Mint"
     | "changeOnchainMint"

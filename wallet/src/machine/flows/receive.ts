@@ -115,11 +115,34 @@ export function startReceiveLightningFlow(
   };
 }
 
+/** START_RECEIVE → the receive hub (QR Display / Scan QR / Fixed Amount / Paste). */
 export function startReceiveFlow(
   walletCtx: WalletContext,
   unit: string,
-): ReceiveFlowTransitionResult<'navigateToReceive'> {
+): ReceiveFlowTransitionResult<'receiveHub'> {
   logger.info('flow.receiveHub.start', {
+    unit,
+    trustedMintCount: walletCtx.trustedMintUrls.length,
+    balanceMintCount: Object.keys(walletCtx.mintBalances).length,
+  });
+  return {
+    step: 'receiveHub',
+    context: { unit },
+    data: { unit, methodContext: createAmountEntryMethodContext(walletCtx) },
+  };
+}
+
+/**
+ * SHOW_RECEIVE_QR → the receive QR display (standing-rail tabs). Opens with a
+ * clean `{unit}` context — same self-cleaning rule as the persist-only mint
+ * scopes — so a stale destination from a backed-out Fixed Amount flow can't
+ * resolve into an unexpected step later.
+ */
+export function startReceiveQrFlow(
+  walletCtx: WalletContext,
+  unit: string,
+): ReceiveFlowTransitionResult<'navigateToReceive'> {
+  logger.info('flow.receiveQr.start', {
     unit,
     trustedMintCount: walletCtx.trustedMintUrls.length,
     balanceMintCount: Object.keys(walletCtx.mintBalances).length,

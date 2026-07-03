@@ -1,5 +1,6 @@
 // receive feature barrel
 
+export { ReceiveHubScreen } from './screens/ReceiveHubScreen';
 export { ReceiveScreen } from './screens/ReceiveScreen';
 export { ReceiveTokenRoute } from './screens/ReceiveTokenRoute';
 export { MintQuoteRoute } from './screens/MintQuoteRoute';

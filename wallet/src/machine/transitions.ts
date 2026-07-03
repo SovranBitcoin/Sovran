@@ -8,7 +8,11 @@ import { resolveNext, type StepResult } from "./resolveNext";
 import { buildProofSuggestions } from "./amountFallback";
 import type { FlowContext, FlowEvent, FlowStep } from "./types";
 import { startSendFlow, startSendEcashFlow } from "./flows/send";
-import { startReceiveFlow, startReceiveLightningFlow } from "./flows/receive";
+import {
+  startReceiveFlow,
+  startReceiveLightningFlow,
+  startReceiveQrFlow,
+} from "./flows/receive";
 import { requestMintSelector, resolveFromContext } from "./contextResolution";
 
 // ---------------------------------------------------------------------------
@@ -497,6 +501,8 @@ export function transition(
       return stamp(receiveLightning);
     case "START_RECEIVE":
       return stamp(startReceiveFlow(walletCtx, unit));
+    case "SHOW_RECEIVE_QR":
+      return stamp(startReceiveQrFlow(walletCtx, unit));
     case "REVIEW_MINT":
       return stamp({
         step: "reviewMint",

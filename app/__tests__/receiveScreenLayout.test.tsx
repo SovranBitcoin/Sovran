@@ -25,6 +25,16 @@ jest.mock('@/shared/providers/WalletContextProvider', () => ({
   }),
 }));
 
+// The popup barrel pulls AmountFormatter → uniwind, which the node test
+// environment can't load; ReceiveScreen only needs copyPopup from it.
+jest.mock('@/shared/lib/popup', () => ({
+  copyPopup: jest.fn(),
+}));
+
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn(async () => true),
+}));
+
 jest.mock('@/features/receive/components/ReceiveReusableQuoteTab', () => ({
   ReceiveReusableQuoteTab: () => null,
 }));
@@ -226,10 +236,10 @@ function receiveActions() {
   return {
     back: action(),
     changeNpcMint: action(),
+    changeBolt12Mint: action(),
+    changeOnchainMint: action(),
     copy: action(),
-    fixedAmount: action(),
-    paste: action(),
-    scanQr: action(),
+    share: action(),
   };
 }
 
@@ -256,7 +266,7 @@ describe('ReceiveScreen layout stability', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('renders the receive hub shell and footer actions on the first valid entry render', () => {
+  it('renders the QR display shell and footer Copy on the first valid entry render', () => {
     const npcAddress = {
       toString: () => 'npubcash1example',
       truncate: () => 'npubca...ample',
@@ -287,9 +297,13 @@ describe('ReceiveScreen layout stability', () => {
 
     expect(findAllByType(renderer!, 'ScreenErrorState')).toHaveLength(0);
     expect(findAllByType(renderer!, 'PaymentInfo')).toHaveLength(1);
-    expect(findByTestID(renderer!, 'receive-paste')).toBeTruthy();
-    expect(findByTestID(renderer!, 'receive-fixed-amount')).toBeTruthy();
-    expect(findByTestID(renderer!, 'receive-scan-qr')).toBeTruthy();
+    // Paste / Fixed Amount / Scan QR moved to the receive hub — the QR
+    // display's footer is a single Copy of the visible tab's payload.
+    const copyButton = findByTestID(renderer!, 'receive-copy');
+    expect(copyButton).toBeTruthy();
+    // Default tab is Unified and its (mocked) rail reported no payload yet,
+    // so Copy renders disabled until a payload lands.
+    expect(copyButton.props.disabled).toBe(true);
   });
 
   it('keeps an in-place QR-sized placeholder instead of swapping to a loading screen', () => {
@@ -317,8 +331,6 @@ describe('ReceiveScreen layout stability', () => {
         borderRadius: 16,
       })
     );
-    expect(findByTestID(renderer!, 'receive-paste').props.disabled).toBe(true);
-    expect(findByTestID(renderer!, 'receive-fixed-amount').props.disabled).toBe(true);
-    expect(findByTestID(renderer!, 'receive-scan-qr').props.disabled).toBe(true);
+    expect(findByTestID(renderer!, 'receive-copy').props.disabled).toBe(true);
   });
 });

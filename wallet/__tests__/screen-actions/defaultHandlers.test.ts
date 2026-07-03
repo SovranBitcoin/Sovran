@@ -81,6 +81,7 @@ function createMockConfig(overrides?: {
     confirmPaymentRequest: vi.fn(async () => ({ rolledBack: false })),
     scan: vi.fn(async (): Promise<ProcessResult> => ({ urInProgress: false })),
     startReceiveLightning: vi.fn(async () => {}),
+    showReceiveQr: vi.fn(async () => {}),
     requestMintSelector: vi.fn(async () => {}),
     changeMint: vi.fn(async () => {}),
     enterAmount: vi.fn(async () => {}),
@@ -790,7 +791,59 @@ describe('paymentRequest default handlers', () => {
 });
 
 // ---------------------------------------------------------------------------
-// receive
+// receiveHub — the receive modal's method chooser
+// ---------------------------------------------------------------------------
+
+describe('receiveHub default handlers', () => {
+  const hubEntry = {
+    type: 'receive',
+    id: 'receive-hub',
+    unit: 'sat',
+  };
+
+  describe('qrDisplay', () => {
+    it('opens the QR display via machine.showReceiveQr with reset', async () => {
+      const { handlers, machine } = createMockConfig();
+      const { mgr } = createManager('receiveHub', handlers, hubEntry);
+
+      await mgr.execute('qrDisplay');
+      expect(machine.showReceiveQr).toHaveBeenCalledWith({ reset: true });
+    });
+  });
+
+  describe('paste', () => {
+    it('delegates to machine.scan with reset (fresh flow from the hub)', async () => {
+      const { handlers, machine } = createMockConfig();
+      const { mgr } = createManager('receiveHub', handlers, hubEntry);
+
+      await mgr.execute('paste');
+      expect(machine.scan).toHaveBeenCalledWith(undefined, { reset: true });
+    });
+  });
+
+  describe('fixedAmount', () => {
+    it('delegates to machine.startReceiveLightning', async () => {
+      const { handlers, machine } = createMockConfig();
+      const { mgr } = createManager('receiveHub', handlers, hubEntry);
+
+      await mgr.execute('fixedAmount');
+      expect(machine.startReceiveLightning).toHaveBeenCalledWith({ reset: true });
+    });
+  });
+
+  describe('scanQr', () => {
+    it('calls navigation.scanQr with receive context', async () => {
+      const { handlers, navigation } = createMockConfig();
+      const { mgr } = createManager('receiveHub', handlers, hubEntry);
+
+      await mgr.execute('scanQr');
+      expect(navigation.scanQr).toHaveBeenCalledWith({ unit: 'sat', context: 'receive' });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// receive — the QR display
 // ---------------------------------------------------------------------------
 
 describe('receive default handlers', () => {
@@ -799,36 +852,6 @@ describe('receive default handlers', () => {
     unit: 'sat',
     selectedMintUrl: MINT1,
   };
-
-  describe('paste', () => {
-    it('delegates to machine.scan', async () => {
-      const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('receive', handlers, receiveEntry);
-
-      await mgr.execute('paste');
-      expect(machine.scan).toHaveBeenCalled();
-    });
-  });
-
-  describe('fixedAmount', () => {
-    it('delegates to machine.startReceiveLightning', async () => {
-      const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('receive', handlers, receiveEntry);
-
-      await mgr.execute('fixedAmount');
-      expect(machine.startReceiveLightning).toHaveBeenCalled();
-    });
-  });
-
-  describe('scanQr', () => {
-    it('calls navigation.scanQr with receive context', async () => {
-      const { handlers, navigation } = createMockConfig();
-      const { mgr } = createManager('receive', handlers, receiveEntry);
-
-      await mgr.execute('scanQr');
-      expect(navigation.scanQr).toHaveBeenCalledWith({ unit: 'sat', context: 'receive' });
-    });
-  });
 
   describe('changeNpcMint', () => {
     it('delegates to machine.requestMintSelector with npc scope', async () => {

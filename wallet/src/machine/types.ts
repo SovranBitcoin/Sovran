@@ -32,6 +32,7 @@ export type FlowStep =
   | "mintQuoteCreated"
   | "openMint"
   | "openProfile"
+  | "receiveHub"
   | "navigateToReceive"
   | "reviewMint"
   | "dismiss"
@@ -224,6 +225,17 @@ export interface StepDataMap {
     mintInfo?: import("../types").MintReviewInfo;
   };
   openProfile: { npub: string };
+  /**
+   * Receive-method chooser (the receive modal's root): QR Display / Scan QR /
+   * Fixed Amount / Paste. Opened by START_RECEIVE; the options run through
+   * the `receiveHub` screen actions.
+   */
+  receiveHub: {
+    unit: string;
+    methodContext?: AmountEntryConstraints["methodContext"];
+  };
+  /** The receive QR display (tabs of standing receive rails). Opened from the
+   *  hub via SHOW_RECEIVE_QR. */
   navigateToReceive: {
     unit: string;
     methodContext?: AmountEntryConstraints["methodContext"];
@@ -480,6 +492,7 @@ export type FlowEvent =
     }
   | { type: "START_RECEIVE_LIGHTNING" }
   | { type: "START_RECEIVE" }
+  | { type: "SHOW_RECEIVE_QR" }
   | { type: "REVIEW_MINT"; mintUrl: string; token: string }
   | { type: "MINT_TRUSTED" }
   | { type: "CONFIRM_MELT" }
@@ -1173,8 +1186,14 @@ export interface PaymentMachine {
   }) => Promise<void>;
   /** Start a receive lightning flow. Opens amount screen for mint quote. */
   startReceiveLightning: (opts?: { reset?: boolean }) => Promise<void>;
-  /** Open the receive hub screen (Lightning address, P2PK). */
+  /** Open the receive hub (QR Display / Scan QR / Fixed Amount / Paste). */
   startReceive: (opts?: { reset?: boolean }) => Promise<void>;
+  /**
+   * Open the receive QR display (the standing-rail tabs) from the hub.
+   * Opens with a clean `{unit}` context so a stale destination from a
+   * backed-out flow (e.g. Fixed Amount) can never leak into it.
+   */
+  showReceiveQr: (opts?: { reset?: boolean }) => Promise<void>;
   /**
    * Navigate to a mint info screen for trust review.
    * Used when a received token comes from an untrusted mint.
