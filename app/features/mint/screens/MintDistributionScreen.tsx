@@ -9,6 +9,8 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
+import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
+import { deriveSupportedUnitsFromInfo } from 'wallet';
 import { BALANCE_SPLIT_VARIANT_COMPONENTS } from '@/features/mint/components/distribution/variants';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Screen } from '@/shared/ui/composed/Screen';
@@ -67,24 +69,31 @@ export function MintDistributionScreen() {
   const initializeDistribution = useMintDistributionStore((state) => state.initializeDistribution);
   const equalizeMints = useMintDistributionStore((state) => state.equalizeMints);
 
+  // Keyset-backed: an advertised NUT-04 unit the mint holds no keys for
+  // (chorus lists usd/eur with sat-only keysets) is not distributable.
+  const keysetUnitsByMint = useMintKeysetUnits();
+  const supportedUnitsByMint = useMemo(
+    () =>
+      Object.fromEntries(
+        trustedMints.map((mint) => [
+          mint.mintUrl,
+          mint.mintInfo
+            ? deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl])
+            : ['sat'],
+        ])
+      ) as Record<string, string[]>,
+    [trustedMints, keysetUnitsByMint]
+  );
+
   const availableCurrencies = useMemo(() => {
-    const units: string[] = [];
-    trustedMints.forEach((mint) => {
-      if (mint.mintInfo?.nuts?.['4']?.methods) {
-        mint.mintInfo.nuts['4'].methods.forEach((method) => {
-          if (method.unit) {
-            units.push(method.unit.toUpperCase());
-          }
-        });
-      } else {
-        units.push('SAT');
-      }
-    });
-    const uniqueUnits = [...new Set(units)];
+    const units = new Set<string>();
+    for (const supported of Object.values(supportedUnitsByMint)) {
+      for (const unit of supported) units.add(unit.toUpperCase());
+    }
     // Filter to common currencies and ensure at least SAT
-    const filtered = uniqueUnits.filter((c) => ['SAT', 'USD', 'EUR', 'GBP'].includes(c));
+    const filtered = [...units].filter((c) => ['SAT', 'USD', 'EUR', 'GBP'].includes(c));
     return filtered.length > 0 ? filtered : ['SAT'];
-  }, [trustedMints]);
+  }, [supportedUnitsByMint]);
 
   useEffect(() => {
     if (!routeCurrency) return;
@@ -94,20 +103,12 @@ export function MintDistributionScreen() {
   }, [routeCurrency, availableCurrencies]);
 
   const mintsForCurrency = useMemo(() => {
-    return trustedMints.filter((mint) => {
-      if (selectedCurrency === 'SAT') {
-        // Default to SAT if no nuts data
-        if (!mint.mintInfo?.nuts?.['4']?.methods) return true;
-        return mint.mintInfo.nuts['4'].methods.some(
-          (method) => method.unit?.toUpperCase() === 'SAT'
-        );
-      }
-      if (!mint.mintInfo?.nuts?.['4']?.methods) return false;
-      return mint.mintInfo.nuts['4'].methods.some(
-        (method) => method.unit?.toUpperCase() === selectedCurrency
-      );
-    });
-  }, [trustedMints, selectedCurrency]);
+    return trustedMints.filter((mint) =>
+      (supportedUnitsByMint[mint.mintUrl] ?? ['sat']).some(
+        (unit) => unit.toUpperCase() === selectedCurrency
+      )
+    );
+  }, [trustedMints, selectedCurrency, supportedUnitsByMint]);
 
   const mintUrls = useMemo(() => mintsForCurrency.map((m) => m.mintUrl), [mintsForCurrency]);
 

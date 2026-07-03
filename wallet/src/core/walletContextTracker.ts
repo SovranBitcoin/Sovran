@@ -7,6 +7,7 @@
 
 import type { CoreProof, Manager } from '@cashu/coco-core';
 import { amountToNumber } from '../amount';
+import { getKeysetUnits } from './keysetUnits';
 import { errField, logger, mintUrlFields } from '../logger';
 import { deriveMintMethodCapabilityMapFromTrustedMints } from '../mint-capabilities';
 import type { WalletContext } from '../types';
@@ -28,34 +29,6 @@ function getReadyProofs(
   ).proofService.getReadyProofs(mintUrl);
 }
 
-// Reach past coco's mint service to the persisted keysets for one mint —
-// local DB read, no network. A mint can only issue units it holds keys for;
-// some mints advertise NUT-04/05 method-units without keysets (coco throws
-// "No valid keysets found" on attempt), so the capability map must gate on
-// the real keyset units, mirroring coco's own WalletService validKeysets
-// filter (keypairs present + unit match).
-async function getKeysetUnits(
-  manager: Manager,
-  mintUrl: string,
-): Promise<string[]> {
-  const keysets = await (
-    manager as unknown as {
-      mintService: {
-        keysetRepo: {
-          getKeysetsByMintUrl(
-            mintUrl: string,
-          ): Promise<{ unit?: string; keypairs?: Record<string, unknown> }[]>;
-        };
-      };
-    }
-  ).mintService.keysetRepo.getKeysetsByMintUrl(mintUrl);
-  const units = new Set<string>();
-  for (const keyset of keysets) {
-    if (!keyset.keypairs || Object.keys(keyset.keypairs).length === 0) continue;
-    units.add((keyset.unit || 'sat').toLowerCase());
-  }
-  return [...units];
-}
 
 interface WalletContextTrackerConfig {
   getPreferredMintUrl?: () => string | undefined;

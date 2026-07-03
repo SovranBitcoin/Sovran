@@ -46,7 +46,9 @@ import {
   buildMethodAwareMintCandidates,
   compareMintDisplayOrder,
   deriveMintMethodCapabilityMapFromTrustedMints,
+  deriveSupportedUnitsFromInfo,
 } from "../mint-capabilities";
+import { getKeysetUnits } from "../core/keysetUnits";
 import { parseHistoryEntryOnce } from "./historyEntry";
 
 // MintInfo is the cashu-ts GetInfoResponse — coco-core re-derives but does
@@ -868,6 +870,27 @@ export function createDefaultOperations(
         }
       }
 
+      // Units each mint can ACTUALLY issue — advertised NUT-04 units gated
+      // on the mint's real keysets (local DB read). Drives the per-row unit
+      // badges and the currency-tab filter, and keeps the capability map
+      // honest about mints that advertise units they hold no keys for.
+      const keysetUnitsByMint: Record<string, string[] | undefined> =
+        Object.fromEntries(
+          await Promise.all(
+            mintUrls.map(async (mintUrl) => {
+              try {
+                return [mintUrl, await getKeysetUnits(mgr, mintUrl)] as const;
+              } catch (e) {
+                logger.warn(
+                  "operations.buildMintListItems.keysetUnits.failed",
+                  { ...mintUrlFields(mintUrl), error: errField(e) },
+                );
+                return [mintUrl, undefined] as const;
+              }
+            }),
+          ),
+        );
+
       const supportedSet = data.supportedMintUrls
         ? new Set(data.supportedMintUrls)
         : null;
@@ -878,6 +901,7 @@ export function createDefaultOperations(
           allTrustedMints.map((mint) => ({
             mintUrl: mint.mintUrl,
             mintInfo: mintInfoMap.get(mint.mintUrl) ?? mint.mintInfo,
+            keysetUnits: keysetUnitsByMint[mint.mintUrl],
           })),
           data.unit,
         ),
@@ -966,6 +990,12 @@ export function createDefaultOperations(
           iconUrl: info?.icon_url ?? undefined,
           balance,
           unit: data.unit,
+          // undefined (unknown) when the mint's info never loaded — the sat
+          // fallback for missing info would wrongly hide the mint from
+          // non-sat currency filters.
+          supportedUnits: info
+            ? deriveSupportedUnitsFromInfo(info, keysetUnitsByMint[mintUrl])
+            : undefined,
           status,
           reason,
           isPreferred: false,

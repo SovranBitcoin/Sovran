@@ -174,22 +174,50 @@ export const MintListScreen = memo(function MintListScreen({
     }
   });
 
-  // Derive available currencies from items (no mint metadata needed — unit is in the item)
+  // Tabs list every unit some mint can ACTUALLY issue (keyset-backed
+  // `supportedUnits` from colada). `item.unit` is only the flow's
+  // denomination — every row carries the same value, which is why filtering
+  // on it used to be a visible no-op. Fallback rows without supportedUnits
+  // (pre-enrichment) contribute nothing here and pass every filter below.
   const availableCurrencies = useMemo(() => {
-    const units = [...new Set(items.map((item) => item.unit.toUpperCase()))];
-    return ['ALL', ...units];
+    const units = new Set<string>();
+    for (const item of items) {
+      for (const unit of item.supportedUnits ?? []) {
+        units.add(unit.toUpperCase());
+      }
+    }
+    // Sat first, then the rest alphabetically — stable tab order.
+    const ordered = [...units].sort((a, b) =>
+      a === 'SAT' ? -1 : b === 'SAT' ? 1 : a.localeCompare(b)
+    );
+    return ['ALL', ...ordered];
   }, [items]);
 
-  // Filter by selected currency tab
+  // Filter to mints that can issue the selected unit. Unknown supportedUnits
+  // (fallback rows) always pass — never hide a mint on missing data.
   const filteredItems = useMemo(() => {
     if (selectedCurrency === 'ALL') return items;
-    return items.filter((item) => item.unit.toUpperCase() === selectedCurrency);
+    return items.filter(
+      (item) =>
+        !item.supportedUnits ||
+        item.supportedUnits.some((unit) => unit.toUpperCase() === selectedCurrency)
+    );
   }, [items, selectedCurrency]);
 
   const handleCurrencyChange = useCallback((currency: string) => {
     cashuLog.info('mint.list.currency.change', { currency });
     setSelectedCurrency(currency);
   }, []);
+
+  // Enrichment can shrink the tab set (e.g. an advertised-but-keyless unit
+  // disappears); never leave the filter pointing at a tab that no longer
+  // exists.
+  useEffect(() => {
+    if (selectedCurrency !== 'ALL' && !availableCurrencies.includes(selectedCurrency)) {
+      cashuLog.info('mint.list.currency.reset', { from: selectedCurrency });
+      setSelectedCurrency('ALL');
+    }
+  }, [availableCurrencies, selectedCurrency]);
 
   const handleMintPress = useCallback(
     (item: MintListItem) => {

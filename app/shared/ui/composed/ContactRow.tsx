@@ -98,6 +98,9 @@ interface MintStatFields {
   worksOffline?: boolean;
   contactFollowers?: number;
   contactReputation?: number;
+  /** Units the mint can actually issue (keyset-backed). Badge renders only
+   *  when the mint issues more than sat — an all-sat list stays clean. */
+  supportedUnits?: string[];
 }
 
 interface MintIdentity {
@@ -153,6 +156,7 @@ export type Identity = NostrIdentity | MintIdentity | BleIdentity | GeohashIdent
 
 type StatKey =
   | 'balance'
+  | 'units'
   | 'score'
   | 'audit'
   | 'reputation'
@@ -214,6 +218,7 @@ export function mintIdentity(
       worksOffline,
       contactFollowers,
       contactReputation,
+      supportedUnits,
     } = input;
     return {
       kind: 'mint',
@@ -232,6 +237,7 @@ export function mintIdentity(
         worksOffline,
         contactFollowers,
         contactReputation,
+        supportedUnits,
       },
     };
   }
@@ -377,7 +383,7 @@ const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], readonly StatKey[]> = {
   // row where a second "people" number alongside followers doesn't earn its
   // space. UserProfileScreen still shows it on the full profile header.
   nostr: ['reputation', 'followers'],
-  mint: ['score', 'audit', 'reputation', 'followers', 'offline'],
+  mint: ['units', 'score', 'audit', 'reputation', 'followers', 'offline'],
   ble: [],
   geohash: [],
   self: [],
@@ -506,6 +512,24 @@ function buildStats(
           });
         }
         break;
+      case 'units': {
+        // Only multi-currency mints get the badge — "BTC" on every row of an
+        // all-sat list is noise. Keyset-backed, so an advertised-but-keyless
+        // unit (chorus usd) never shows here.
+        const units = mintStats?.supportedUnits;
+        if (units && units.length > 1) {
+          const label = units
+            .map((unit) => (unit.toLowerCase() === 'sat' ? 'BTC' : unit.toUpperCase()))
+            .join('·');
+          out.push({
+            icon: 'ph:coins',
+            value: label,
+            color: STAT_COLOR_SOCIAL,
+            accessibilityLabel: `Issues ${label}`,
+          });
+        }
+        break;
+      }
       case 'score':
         if (typeof mintStats?.kymScore === 'number') {
           const v = mintStats.kymScore;
@@ -964,6 +988,7 @@ export function ContactRow({
       auditState: mintStats?.auditState ?? null,
       auditTotalOps: mintStats?.auditTotalOps ?? null,
       worksOffline: mintStats?.worksOffline ?? null,
+      supportedUnits: mintStats?.supportedUnits?.join(',') ?? null,
       contactFollowers: mintStats?.contactFollowers ?? null,
       contactReputation: mintStats?.contactReputation ?? null,
       hasNostrCompanion: !!nostr,
@@ -1013,6 +1038,7 @@ export function ContactRow({
     mintStats?.kymScore,
     mintStats?.reviewCount,
     mintStats?.status,
+    mintStats?.supportedUnits,
     mintStats?.unit,
     mintStats?.worksOffline,
     mintUrlLength,

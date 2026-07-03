@@ -1,6 +1,7 @@
 import type { Mint } from '@cashu/coco-core';
 import {
   composeSatoshis,
+  deriveSupportedUnitsFromInfo,
   type MintAvailability,
   type MintCatalogEntry,
   type MintListItem,
@@ -30,7 +31,9 @@ export function buildMintListItems(
   trustedMints: Mint[],
   availability: MintAvailability[],
   catalog: Record<string, MintCatalogEntry> = {},
-  offlineCheck?: { amount: number; proofAmounts: Record<string, number[]> }
+  offlineCheck?: { amount: number; proofAmounts: Record<string, number[]> },
+  /** Keyset-backed units per mint (useMintKeysetUnits) — gates supportedUnits. */
+  keysetUnitsByMint: Record<string, string[] | undefined> = {}
 ): MintListItem[] {
   log.debug('mint.listItems.build.start', {
     trustedMintCount: trustedMints.length,
@@ -64,6 +67,12 @@ export function buildMintListItems(
         iconUrl: mint?.mintInfo?.icon_url ?? undefined,
         balance: avail?.balance ?? 0,
         unit: 'sat',
+        // undefined (unknown) when the mint info hasn't loaded — the sat
+        // fallback deriveSupportedUnitsFromInfo returns for missing info
+        // would wrongly hide the mint from non-sat currency filters.
+        supportedUnits: mint?.mintInfo
+          ? deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mintUrl])
+          : undefined,
         status: avail?.status ?? 'available',
         reason: avail?.reason ?? null,
         isPreferred: avail?.isPreferred ?? false,

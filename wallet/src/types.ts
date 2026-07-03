@@ -386,7 +386,14 @@ export interface MintListItem {
   displayName: string;
   iconUrl?: string;
   balance: number;
+  /** Unit the flow (and `balance`) is denominated in — NOT the mint's full unit set. */
   unit: string;
+  /**
+   * Units the mint can actually issue: advertised NUT-04 units gated on the
+   * mint's real keysets. Absent on synchronous fallback rows (unknown) —
+   * consumers treat absent as unrestricted.
+   */
+  supportedUnits?: string[];
   /** Whether this mint can be selected in the current flow. */
   status: 'available' | 'disabled';
   /** Reason the mint is disabled, null when status is 'available'. */

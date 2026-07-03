@@ -28,6 +28,7 @@ import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { cashuLog } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
 
 const ParamsSchema = z.object({
   showAddMintsButton: z.enum(['true', 'false']).optional(),
@@ -93,11 +94,14 @@ function MintListRoute() {
   // the audit / score pills render identically across both surfaces.
   const mintUrls = useMemo(() => trustedMints.map((m) => m.mintUrl), [trustedMints]);
   const catalog = useMintCatalog(mintUrls);
+  // Keyset-backed units per mint — drives the row unit badges and the
+  // currency-tab filter (an advertised unit with no keysets never shows).
+  const keysetUnitsByMint = useMintKeysetUnits();
 
   const items = useMemo(
-    () => buildMintListItems(trustedMints, availability, catalog),
+    () => buildMintListItems(trustedMints, availability, catalog, undefined, keysetUnitsByMint),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [trustedMints, availability, catalog, focusKey]
+    [trustedMints, availability, catalog, keysetUnitsByMint, focusKey]
   );
   // Trusted mints are known + catalog-enriched here, so treat every row as
   // `live` (no skeleton); the cache overlay backfills holes and animates stats.
