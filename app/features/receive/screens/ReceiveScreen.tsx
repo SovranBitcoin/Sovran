@@ -28,7 +28,7 @@ import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ReceiveReusableQuoteTab } from '@/features/receive/components/ReceiveReusableQuoteTab';
 import { ReceivePaymentRequestTab } from '@/features/receive/components/ReceivePaymentRequestTab';
 import { ReceiveUnifiedTab } from '@/features/receive/components/ReceiveUnifiedTab';
-import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
+import { PillTabs, PILL_TABS_HEIGHT } from '@/shared/ui/composed/PillTabs';
 import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
 import type { ReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import {
@@ -45,7 +45,7 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
+import { Screen as ScreenWrapper, useScreenOptions } from '@/shared/ui/composed/Screen';
 import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
@@ -69,9 +69,6 @@ interface ReceiveLightningTabProps {
   /** NPC mint sync disables the mint row; not on history entry (store-only). */
   isNpcMintUpdating: boolean;
   actions: UseScreenActionsResult<'receive'>['actions'];
-  /** Under-QR slot (the Address/BOLT 12 mode switcher) — rendered in every
-   *  state so the switcher never disappears. */
-  belowQr?: React.ReactNode;
   muted: string;
 }
 
@@ -82,17 +79,17 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
   selectedMintUrl,
   isNpcMintUpdating,
   actions,
-  belowQr,
   muted,
 }: ReceiveLightningTabProps) {
+  // The Address/BOLT 12 switcher lives in the pill sub-tab row above the
+  // content (contacts-style), so a unit without an npc address renders
+  // nothing here and the user can still switch to the offer rail.
   const npcAddress = unit === 'sat' ? data.npcAddress : undefined;
-  const belowQrSlot = belowQr ? <View style={{ marginTop: 12 }}>{belowQr}</View> : null;
-  if (!npcAddress) return belowQrSlot;
+  if (!npcAddress) return null;
 
   return (
     <>
       <PaymentInfo data={npcAddress.toString()} copyTarget="address" unit="sat" />
-      {belowQrSlot}
       <View className="mx-4">
         <Section title="RECEIVE ADDRESS">
           <GradientCard>
@@ -153,9 +150,34 @@ function TabPane({ visible, children }: { visible: boolean; children: React.Reac
   return <View style={visible ? undefined : styles.hiddenPane}>{children}</View>;
 }
 
+// The Lightning tab's two rails, as pill sub-tabs (contacts-style: top-level
+// UnderlineTabs, pill row beneath).
+const LIGHTNING_MODE_PILLS = ['Address', 'BOLT 12'] as const;
+type LightningModePill = (typeof LIGHTNING_MODE_PILLS)[number];
+const LIGHTNING_MODE_BY_PILL: Record<LightningModePill, 'address' | 'offer'> = {
+  Address: 'address',
+  'BOLT 12': 'offer',
+};
+const PILL_BY_LIGHTNING_MODE: Record<'address' | 'offer', LightningModePill> = {
+  address: 'Address',
+  offer: 'BOLT 12',
+};
+
 const styles = StyleSheet.create({
   hiddenPane: {
     display: 'none',
+  },
+  // Contacts-style header bands: full-bleed rows with hairline separators.
+  tabBand: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  pillBand: {
+    height: PILL_TABS_HEIGHT,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  content: {
+    paddingTop: 16,
   },
 });
 
@@ -166,31 +188,17 @@ interface ReceiveScreenProps {
 
 export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   useLifecycleLogger('ReceiveScreen');
-  const muted = useThemeColor('muted');
+  const [muted, overlay, separator] = useThemeColor([
+    'muted',
+    'overlay',
+    'separator-secondary',
+  ] as const);
   const [selectedTab, setSelectedTab] = useState<string>('Unified');
   const [lightningMode, setLightningMode] = useState<'address' | 'offer'>('address');
 
-  const lightningModeSwitcher = useMemo(
-    () => (
-      <ActionSegmentsCard
-        segments={[
-          {
-            label: 'Address',
-            active: lightningMode === 'address',
-            onPress: () => setLightningMode('address'),
-            testID: 'receive-lightning-mode-address',
-          },
-          {
-            label: 'BOLT 12',
-            active: lightningMode === 'offer',
-            onPress: () => setLightningMode('offer'),
-            testID: 'receive-lightning-mode-offer',
-          },
-        ]}
-      />
-    ),
-    [lightningMode]
-  );
+  // Same canvas as the send modal (which paints `overlay`); the sheet header
+  // scrim must fade from the same color or the header band reads as a seam.
+  useScreenOptions(() => ({ headerStyle: { backgroundColor: overlay } }), [overlay]);
 
   const { entry, error, actions, mintUrl } = useScreenActions(
     'receive',
@@ -314,6 +322,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
       name="ReceiveScreen"
       contentPadding={0}
       deferContent={false}
+      bgColor={overlay}
       footer={
         <BottomButtons>
           {/* Paste / Fixed Amount / Scan QR moved to the receive hub — here
@@ -333,91 +342,103 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
           />
         </BottomButtons>
       }>
+      {/* Contacts-style header: full-bleed top-level tabs, then (Lightning
+          only) the pill sub-tab row — hairline separators on each band. */}
       {tabs.length > 1 && (
-        <View className="mx-4 mb-4">
+        <View style={[styles.tabBand, { borderBottomColor: separator }]}>
           <UnderlineTabs tabs={tabs} selectedTab={selectedTab} handleTabPress={setSelectedTab} />
         </View>
       )}
-
-      <SkeletonContentCrossfade
-        loading={!receiveEntryData}
-        visualKey="receive-hub"
-        visualSurface="receive"
-        renderSkeleton={() => (
-          <ReceiveRailPlaceholder
-            sectionTitle="RECEIVE ADDRESS"
-            testID="receive-hub-placeholder"
-            qrTestID="receive-hub-qr-placeholder"
+      {selectedTab === 'Lightning' && (
+        <View style={[styles.pillBand, { borderBottomColor: separator }]}>
+          <PillTabs
+            tabs={LIGHTNING_MODE_PILLS}
+            activeTab={PILL_BY_LIGHTNING_MODE[lightningMode]}
+            onTabChange={(pill) => setLightningMode(LIGHTNING_MODE_BY_PILL[pill])}
+            testIDFor={(pill) =>
+              pill === 'Address' ? 'receive-lightning-mode-address' : 'receive-lightning-mode-offer'
+            }
           />
-        )}
-        renderContent={() => {
-          if (!receiveEntryData) return null;
-          return (
-            <>
-              <TabPane visible={selectedTab === 'Lightning'}>
-                {/* Two Lightning rails behind a VISIBLE mode switcher — the
+        </View>
+      )}
+
+      <View style={styles.content}>
+        <SkeletonContentCrossfade
+          loading={!receiveEntryData}
+          visualKey="receive-hub"
+          visualSurface="receive"
+          renderSkeleton={() => (
+            <ReceiveRailPlaceholder
+              sectionTitle="RECEIVE ADDRESS"
+              testID="receive-hub-placeholder"
+              qrTestID="receive-hub-qr-placeholder"
+            />
+          )}
+          renderContent={() => {
+            if (!receiveEntryData) return null;
+            return (
+              <>
+                <TabPane visible={selectedTab === 'Lightning'}>
+                  {/* Two Lightning rails behind the pill sub-tabs above — the
                     npub.cash address (human-readable, BIP-353-style) and the
-                    reusable BOLT 12 offer. The switcher rides each sub-view's
-                    under-QR slot (rendered in every state, so it can never
-                    disappear); both sub-views stay mounted so switching never
-                    stutters. */}
-                <View style={lightningMode === 'address' ? undefined : styles.hiddenPane}>
-                  <ReceiveLightningTab
-                    data={receiveEntryData}
+                    reusable BOLT 12 offer. Both sub-views stay mounted so
+                    switching never stutters. */}
+                  <View style={lightningMode === 'address' ? undefined : styles.hiddenPane}>
+                    <ReceiveLightningTab
+                      data={receiveEntryData}
+                      unit={unit}
+                      mintInfo={mintInfo}
+                      selectedMintUrl={mintUrl}
+                      isNpcMintUpdating={isNpcMintUpdating}
+                      actions={actions}
+                      muted={muted}
+                    />
+                  </View>
+                  <View style={lightningMode === 'offer' ? undefined : styles.hiddenPane}>
+                    <ReceiveReusableQuoteTab
+                      method="bolt12"
+                      unit={unit}
+                      walletContext={walletContext}
+                      actions={actions}
+                      muted={muted}
+                      onQrPayload={onOfferPayload}
+                    />
+                  </View>
+                </TabPane>
+                <TabPane visible={selectedTab === 'Unified'}>
+                  <ReceiveUnifiedTab
                     unit={unit}
-                    mintInfo={mintInfo}
-                    selectedMintUrl={mintUrl}
-                    isNpcMintUpdating={isNpcMintUpdating}
-                    actions={actions}
-                    belowQr={lightningModeSwitcher}
+                    walletContext={walletContext}
                     muted={muted}
+                    creq={creq}
+                    onQrPayload={onUnifiedPayload}
                   />
-                </View>
-                <View style={lightningMode === 'offer' ? undefined : styles.hiddenPane}>
+                </TabPane>
+                <TabPane visible={selectedTab === 'Onchain'}>
                   <ReceiveReusableQuoteTab
-                    method="bolt12"
+                    method="onchain"
                     unit={unit}
                     walletContext={walletContext}
                     actions={actions}
-                    belowQr={lightningModeSwitcher}
                     muted={muted}
-                    onQrPayload={onOfferPayload}
+                    onQrPayload={onOnchainPayload}
                   />
-                </View>
-              </TabPane>
-              <TabPane visible={selectedTab === 'Unified'}>
-                <ReceiveUnifiedTab
-                  unit={unit}
-                  walletContext={walletContext}
-                  muted={muted}
-                  creq={creq}
-                  onQrPayload={onUnifiedPayload}
-                />
-              </TabPane>
-              <TabPane visible={selectedTab === 'Onchain'}>
-                <ReceiveReusableQuoteTab
-                  method="onchain"
-                  unit={unit}
-                  walletContext={walletContext}
-                  actions={actions}
-                  muted={muted}
-                  onQrPayload={onOnchainPayload}
-                />
-              </TabPane>
-              <TabPane visible={selectedTab === 'Cashu'}>
-                <ReceivePaymentRequestTab
-                  unit={unit}
-                  walletContext={walletContext}
-                  p2pkKey={receiveEntryData.p2pkKey}
-                  muted={muted}
-                  creq={creq}
-                  onQrPayload={onCashuPayload}
-                />
-              </TabPane>
-            </>
-          );
-        }}
-      />
+                </TabPane>
+                <TabPane visible={selectedTab === 'Cashu'}>
+                  <ReceivePaymentRequestTab
+                    unit={unit}
+                    walletContext={walletContext}
+                    p2pkKey={receiveEntryData.p2pkKey}
+                    muted={muted}
+                    creq={creq}
+                    onQrPayload={onCashuPayload}
+                  />
+                </TabPane>
+              </>
+            );
+          }}
+        />
+      </View>
     </ScreenWrapper>
   );
 }

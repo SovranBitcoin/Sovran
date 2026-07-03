@@ -121,6 +121,15 @@ jest.mock('@/shared/ui/composed/Screen', () => ({
     const ReactActual = jest.requireActual<typeof import('react')>('react');
     return ReactActual.createElement('Screen', props, footer, children);
   },
+  useScreenOptions: jest.fn(),
+}));
+
+jest.mock('@/shared/ui/composed/PillTabs', () => ({
+  PILL_TABS_HEIGHT: 56,
+  PillTabs: (props: Record<string, unknown>) => {
+    const ReactActual = jest.requireActual<typeof import('react')>('react');
+    return ReactActual.createElement('PillTabs', props);
+  },
 }));
 
 jest.mock('@/shared/ui/composed/ScreenStates', () => ({
