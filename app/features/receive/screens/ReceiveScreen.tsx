@@ -10,13 +10,17 @@
  */
 
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, useWindowDimensions } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { setStringAsync } from 'expo-clipboard';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
-import { useScreenActions, type UseScreenActionsResult } from 'wallet/react';
+import {
+  useScreenActions,
+  useStandingPaymentRequest,
+  type UseScreenActionsResult,
+} from 'wallet/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 import type { FormattedString } from 'wallet';
@@ -27,6 +31,11 @@ import { ReceiveUnifiedTab } from '@/features/receive/components/ReceiveUnifiedT
 import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
 import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
 import type { ReceiveQrPayload } from '@/features/receive/lib/qrPayload';
+import {
+  MAX_ADVERTISED_MINTS,
+  standingQuoteIdentityStore,
+} from '@/features/receive/lib/standingQuoteIdentityStore';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { copyPopup } from '@/shared/lib/popup';
 import { Section } from '@/shared/ui/composed/Section';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
@@ -39,8 +48,8 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
+import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
@@ -144,63 +153,9 @@ function TabPane({ visible, children }: { visible: boolean; children: React.Reac
   return <View style={visible ? undefined : styles.hiddenPane}>{children}</View>;
 }
 
-const QR_PLACEHOLDER_HORIZONTAL_INSET = 32;
-
-function ReceiveHubPlaceholder() {
-  const { width } = useWindowDimensions();
-  const qrFrameSize = Math.max(0, Math.min(width, 600) - QR_PLACEHOLDER_HORIZONTAL_INSET);
-  const qrPlaceholderStyle = useMemo(
-    () => [styles.qrPlaceholder, { width: qrFrameSize, height: qrFrameSize }],
-    [qrFrameSize]
-  );
-
-  return (
-    <>
-      <View testID="receive-hub-placeholder" style={styles.placeholderContainer}>
-        <Skeleton testID="receive-hub-qr-placeholder" style={qrPlaceholderStyle} />
-      </View>
-      <View className="mx-4">
-        <Section title="RECEIVE ADDRESS">
-          <GradientCard>
-            <ListGroup variant="transparent">
-              <ListGroup.Item disabled>
-                <ListGroup.ItemPrefix>
-                  <Skeleton style={styles.placeholderIcon} />
-                </ListGroup.ItemPrefix>
-                <ListGroup.ItemContent>
-                  <Skeleton style={styles.placeholderLine} />
-                </ListGroup.ItemContent>
-                <ListGroup.ItemSuffix>
-                  <Skeleton style={styles.placeholderIcon} />
-                </ListGroup.ItemSuffix>
-              </ListGroup.Item>
-            </ListGroup>
-          </GradientCard>
-        </Section>
-      </View>
-    </>
-  );
-}
-
 const styles = StyleSheet.create({
   hiddenPane: {
     display: 'none',
-  },
-  placeholderContainer: {
-    alignItems: 'center',
-  },
-  qrPlaceholder: {
-    borderRadius: 16,
-  },
-  placeholderIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  placeholderLine: {
-    width: '58%',
-    height: 18,
-    borderRadius: 9,
   },
 });
 
@@ -310,6 +265,23 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   const mintInfo = useMintInfo(mintUrl);
   const walletContext = useWalletContext();
 
+  // THE standing creq, owned here and shared by the Cashu + Unified tabs so
+  // both always show the SAME request. freshOnMount rotates once per visit;
+  // the hook deliberately reports loading (no stale cache seed) until the
+  // fresh request lands, so neither tab can flash a retired creq.
+  const creqP2pkLock = useMintStore((s) => s.creqP2pkLock);
+  const creqLockPubkey =
+    creqP2pkLock && receiveEntryData?.p2pkKey ? receiveEntryData.p2pkKey : undefined;
+  const creqMints = useMemo(
+    () => walletContext.trustedMintUrls.slice(0, MAX_ADVERTISED_MINTS),
+    [walletContext.trustedMintUrls]
+  );
+  const creq = useStandingPaymentRequest(
+    creqMints.length > 0 ? { unit, mints: creqMints, lockP2pkPubkey: creqLockPubkey } : null,
+    standingQuoteIdentityStore,
+    { freshOnMount: true }
+  );
+
   const tabs = useMemo(() => computeReceiveTabs(), []);
 
   useEffect(() => {
@@ -371,7 +343,13 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
         loading={!receiveEntryData}
         visualKey="receive-hub"
         visualSurface="receive"
-        renderSkeleton={() => <ReceiveHubPlaceholder />}
+        renderSkeleton={() => (
+          <ReceiveRailPlaceholder
+            sectionTitle="RECEIVE ADDRESS"
+            testID="receive-hub-placeholder"
+            qrTestID="receive-hub-qr-placeholder"
+          />
+        )}
         renderContent={() => {
           if (!receiveEntryData) return null;
           return (
@@ -411,8 +389,8 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                 <ReceiveUnifiedTab
                   unit={unit}
                   walletContext={walletContext}
-                  p2pkKey={receiveEntryData.p2pkKey}
                   muted={muted}
+                  creq={creq}
                   onQrPayload={onUnifiedPayload}
                 />
               </TabPane>
@@ -432,6 +410,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                   walletContext={walletContext}
                   p2pkKey={receiveEntryData.p2pkKey}
                   muted={muted}
+                  creq={creq}
                   onQrPayload={onCashuPayload}
                 />
               </TabPane>

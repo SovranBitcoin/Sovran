@@ -16,13 +16,8 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from '
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { setStringAsync } from 'expo-clipboard';
 
-import {
-  buildUnifiedBip321Uri,
-  getMintMethodCapability,
-  type ReusableQuoteIdentityStore,
-  type WalletContext,
-} from 'wallet';
-import { useReusableMintQuote, useStandingPaymentRequest } from 'wallet/react';
+import { buildUnifiedBip321Uri, getMintMethodCapability, type WalletContext } from 'wallet';
+import { useReusableMintQuote, type UseStandingPaymentRequestResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
@@ -35,17 +30,17 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { copyPopup } from '@/shared/lib/popup';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { standingQuoteIdentityStore } from '@/features/receive/lib/standingQuoteIdentityStore';
 import Icon from 'assets/icons';
-
-const MAX_ADVERTISED_MINTS = 5;
 
 interface ReceiveUnifiedTabProps {
   unit: string;
   walletContext: Pick<WalletContext, 'trustedMintUrls' | 'mintMethodCapabilities' | 'mintBalances'>;
-  /** Latest keyring P2PK pubkey — applied to the creq when the lock is on. */
-  p2pkKey?: string;
   muted: string;
+  /** The ONE standing request — resolved fresh-per-visit by ReceiveScreen
+   *  and shared with the Cashu tab, so the composed URI can never carry a
+   *  retired creq. Loading until the fresh request lands. */
+  creq: UseStandingPaymentRequestResult;
   /** Reports the composed BIP-321 URI upward for the QR display's footer
    *  Copy button. */
   onQrPayload?: OnReceiveQrPayload;
@@ -54,24 +49,11 @@ interface ReceiveUnifiedTabProps {
 export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
   unit,
   walletContext,
-  p2pkKey,
   muted,
+  creq,
   onQrPayload,
 }: ReceiveUnifiedTabProps) {
-  // Inherit the Cashu rail's lock setting — same standing request singleton.
-  const creqP2pkLock = useMintStore((s) => s.creqP2pkLock);
-  const lockP2pkPubkey = creqP2pkLock && p2pkKey ? p2pkKey : undefined;
-  const identityStore = useMemo<ReusableQuoteIdentityStore>(
-    () => ({
-      get: (key) => useMintStore.getState().standingQuotes[key],
-      set: (key, id) => useMintStore.getState().setStandingQuote(key, id),
-      subscribe: (key, callback) =>
-        useMintStore.subscribe((state, prev) => {
-          if (state.standingQuotes[key] !== prev.standingQuotes[key]) callback();
-        }),
-    }),
-    []
-  );
+  const identityStore = standingQuoteIdentityStore;
 
   // Same standing singletons as the dedicated tabs (in-flight dedup + shared
   // identity store means no extra quotes/requests are ever created here).
@@ -107,15 +89,6 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
     identityStore
   );
 
-  const creqMints = useMemo(
-    () => walletContext.trustedMintUrls.slice(0, MAX_ADVERTISED_MINTS),
-    [walletContext.trustedMintUrls]
-  );
-  const creq = useStandingPaymentRequest(
-    creqMints.length > 0 ? { unit, mints: creqMints, lockP2pkPubkey } : null,
-    identityStore
-  );
-
   const uri = useMemo(
     () =>
       buildUnifiedBip321Uri({
@@ -132,22 +105,26 @@ export const ReceiveUnifiedTab = memo(function ReceiveUnifiedTab({
     ...(creq.request ? ['Cashu'] : []),
   ];
 
-  useEffect(() => {
-    onQrPayload?.(uri ? { value: uri, copyTarget: 'bip321' } : null);
-  }, [uri, onQrPayload]);
-
   const anyLoading = onchain.isLoading || bolt12.isLoading || creq.isLoading;
 
   // As the DEFAULT tab this must not stutter: hold the placeholder until
   // every rail settles ONCE, then render the fully composed QR in a single
-  // swap. With warm colada caches the rails seed synchronously, so this
-  // initializes TRUE and no placeholder frame ever paints. Later re-resolves
-  // (e.g. the Cashu rail's fresh-per-visit rotation retiring the creq) keep
-  // the current content and swap in place.
+  // swap. The quote rails seed synchronously from warm colada caches; the
+  // creq rail intentionally does NOT (fresh-per-visit — the cached request
+  // is about to be retired, so the shared hook loads until the fresh one
+  // lands). First visit therefore shows the skeleton; the URI that finally
+  // renders is always composed with the CURRENT creq, never a stale one.
   const [settled, setSettled] = useState(!anyLoading);
   useEffect(() => {
     if (!anyLoading && !settled) setSettled(true);
   }, [anyLoading, settled]);
+
+  // The footer Copy must never hand out a half-composed URI (e.g. missing
+  // the creq while the fresh rotation is in flight) — report only once the
+  // tab has settled.
+  useEffect(() => {
+    onQrPayload?.(settled && uri ? { value: uri, copyTarget: 'bip321' } : null);
+  }, [settled, uri, onQrPayload]);
 
   // Which rail gates the skeleton? Log each rail's first settle relative to
   // mount (duration_ms ≈ 0 ⇒ served from the colada cache) plus the moment

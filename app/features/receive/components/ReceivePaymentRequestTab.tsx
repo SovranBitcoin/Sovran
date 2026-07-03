@@ -17,12 +17,8 @@ import React, { memo, useCallback, useEffect, useMemo } from 'react';
 import { router } from 'expo-router';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
 
-import {
-  standingPaymentRequestKey,
-  type ReusableQuoteIdentityStore,
-  type WalletContext,
-} from 'wallet';
-import { useColadaManager, useStandingPaymentRequest } from 'wallet/react';
+import { standingPaymentRequestKey, type WalletContext } from 'wallet';
+import { useColadaManager, type UseStandingPaymentRequestResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
@@ -39,12 +35,10 @@ import { copyPopup } from '@/shared/lib/popup';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
+import { MAX_ADVERTISED_MINTS } from '@/features/receive/lib/standingQuoteIdentityStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import Icon from 'assets/icons';
-
-/** Keep the QR sane — same cap as the BLE standing creq. */
-const MAX_ADVERTISED_MINTS = 5;
 
 interface ReceivePaymentRequestTabProps {
   unit: string;
@@ -54,6 +48,10 @@ interface ReceivePaymentRequestTabProps {
    *  toggle is disabled. */
   p2pkKey?: string;
   muted: string;
+  /** The ONE standing request, resolved fresh-per-visit by ReceiveScreen
+   *  and shared with the Unified tab — so both rails always show the SAME
+   *  (current) creq and neither can flash a retired one. */
+  creq: UseStandingPaymentRequestResult;
   /** Reports the encoded creq upward for the QR display's footer Copy
    *  button. */
   onQrPayload?: OnReceiveQrPayload;
@@ -64,41 +62,21 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   walletContext,
   p2pkKey,
   muted,
+  creq,
   onQrPayload,
 }: ReceivePaymentRequestTabProps) {
   // P2PK lock (absorbs the old P2PK tab): when on, the DISPLAYED request
   // advertises a NUT-10 lock to the keyring key — payers lock their ecash to
   // this wallet; coco's claim path signs the locked proofs transparently.
+  // The lock feeds the shared request via ReceiveScreen's input.
   const creqP2pkLock = useMintStore((s) => s.creqP2pkLock);
   const setCreqP2pkLock = useMintStore((s) => s.setCreqP2pkLock);
-  const lockP2pkPubkey = creqP2pkLock && p2pkKey ? p2pkKey : undefined;
   const mints = useMemo(
     () => walletContext.trustedMintUrls.slice(0, MAX_ADVERTISED_MINTS),
     [walletContext.trustedMintUrls]
   );
 
-  // Same persisted identity map as the quote rails (key `creq|<unit>`), so
-  // the standing request survives restarts and external rotations propagate.
-  const identityStore = useMemo<ReusableQuoteIdentityStore>(
-    () => ({
-      get: (key) => useMintStore.getState().standingQuotes[key],
-      set: (key, id) => useMintStore.getState().setStandingQuote(key, id),
-      subscribe: (key, callback) =>
-        useMintStore.subscribe((state, prev) => {
-          if (state.standingQuotes[key] !== prev.standingQuotes[key]) callback();
-        }),
-    }),
-    []
-  );
-
-  // A fresh request every visit: rotation cancels the previous op (exactly
-  // one stays active) and costs nothing anywhere — no cooldown or manual
-  // button needed.
-  const { request, isLoading, error, rotate } = useStandingPaymentRequest(
-    mints.length > 0 ? { unit, mints, lockP2pkPubkey } : null,
-    identityStore,
-    { freshOnMount: true }
-  );
+  const { request, error, rotate } = creq;
   const manager = useColadaManager();
   const accent = useThemeColor('accent');
 

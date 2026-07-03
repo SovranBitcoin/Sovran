@@ -40,10 +40,13 @@ export function useStandingPaymentRequest(
   const freshDoneForRef = useRef<string | null>(null);
   const manager = useColadaManager();
   // Seed from the last resolved value (per-manager cache) so re-mounts render
-  // synchronously; the effect revalidates (or rotates, for freshOnMount) and
-  // swaps in place.
+  // synchronously; the effect revalidates and swaps in place. EXCEPT with
+  // freshOnMount: the cached request is exactly what the pending rotation is
+  // about to retire — seeding it would flash (and let consumers copy/encode)
+  // a request that is already doomed. Fresh consumers load until the fresh
+  // request lands.
   const [request, setRequest] = useState<StandingPaymentRequest | null>(() =>
-    input ? peekStandingPaymentRequest(manager, input) : null,
+    input && !freshOnMount ? peekStandingPaymentRequest(manager, input) : null,
   );
   const [isLoading, setIsLoading] = useState(!!input && !request);
   const [error, setError] = useState<string | null>(null);
@@ -78,9 +81,17 @@ export function useStandingPaymentRequest(
       return;
     }
     let cancelled = false;
-    // Cached seeds revalidate silently (stale-while-revalidate); only show a
-    // loading state when there is nothing to render.
-    if (
+    // Lock changes only re-ENCODE the same operation, so they are
+    // excluded from the fresh key — toggling P2PK never rotates.
+    const inputKey = `${unit}|${mintsKey}`;
+    const wantFresh = freshOnMount && freshDoneForRef.current !== inputKey;
+    // Cached seeds revalidate silently (stale-while-revalidate); show a
+    // loading state when there is nothing to render OR when the cached
+    // value is about to be rotated away (fresh pending — never show it).
+    if (wantFresh) {
+      setRequest(null);
+      setIsLoading(true);
+    } else if (
       !peekStandingPaymentRequest(manager, {
         unit,
         mints: mintsRef.current,
@@ -92,10 +103,6 @@ export function useStandingPaymentRequest(
     setError(null);
     (async () => {
       try {
-        // Lock changes only re-ENCODE the same operation, so they are
-        // excluded from the fresh key — toggling P2PK never rotates.
-        const inputKey = `${unit}|${mintsKey}`;
-        const wantFresh = freshOnMount && freshDoneForRef.current !== inputKey;
         if (wantFresh) freshDoneForRef.current = inputKey;
         const requestInput = { unit, mints: mintsRef.current, lockP2pkPubkey };
         const resolved = wantFresh

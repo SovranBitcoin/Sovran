@@ -14,6 +14,28 @@ const mockUseScreenActions = jest.fn();
 
 jest.mock('wallet/react', () => ({
   useScreenActions: (...args: unknown[]) => mockUseScreenActions(...args),
+  // The screen-owned standing creq (fresh-per-visit): loading until the
+  // fresh request lands — mirrors the no-stale-seed hook behavior.
+  useStandingPaymentRequest: () => ({
+    request: null,
+    isLoading: true,
+    error: null,
+    rotate: jest.fn(),
+  }),
+}));
+
+jest.mock('@/shared/stores/profile/mintStore', () => ({
+  useMintStore: (selector: (state: { creqP2pkLock: boolean }) => unknown) =>
+    selector({ creqP2pkLock: false }),
+}));
+
+jest.mock('@/features/receive/lib/standingQuoteIdentityStore', () => ({
+  MAX_ADVERTISED_MINTS: 5,
+  standingQuoteIdentityStore: {
+    get: jest.fn(),
+    set: jest.fn(),
+    subscribe: () => () => {},
+  },
 }));
 
 jest.mock('@/shared/providers/WalletContextProvider', () => ({

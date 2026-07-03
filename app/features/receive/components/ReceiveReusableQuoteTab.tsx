@@ -7,17 +7,12 @@
  * attribution), so this tab never shows those.
  */
 
-import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useRef, useState } from 'react';
 
 import { router } from 'expo-router';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
-import {
-  getMintMethodCapability,
-  buildBip321OnchainUri,
-  type ReusableQuoteIdentityStore,
-  type WalletContext,
-} from 'wallet';
+import { getMintMethodCapability, buildBip321OnchainUri, type WalletContext } from 'wallet';
 import { useColadaManager, useReusableMintQuote, type UseScreenActionsResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
@@ -28,6 +23,7 @@ import { HistoryEntryRefresh } from '@/features/transactions';
 import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
 import { useReceiveMethodMint } from '@/features/receive/hooks/useReceiveMethodMint';
 import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
+import { standingQuoteIdentityStore } from '@/features/receive/lib/standingQuoteIdentityStore';
 import { Button } from '@/shared/ui/primitives/Button';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -120,20 +116,9 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   // (which create their own fresh reusable quotes) can never displace it.
   // `subscribe` lets the hook pick up EXTERNAL rotations (the global
   // deposit-received listener retiring a paid onchain address).
-  const identityStore = useMemo<ReusableQuoteIdentityStore>(
-    () => ({
-      get: (key) => useMintStore.getState().standingQuotes[key],
-      set: (key, quoteId) => useMintStore.getState().setStandingQuote(key, quoteId),
-      subscribe: (key, callback) =>
-        useMintStore.subscribe((state, prev) => {
-          if (state.standingQuotes[key] !== prev.standingQuotes[key]) callback();
-        }),
-    }),
-    []
-  );
   const { quote, isLoading, error, rotate } = useReusableMintQuote(
     methodMint && mintSupports ? { mintUrl: methodMint, method, unit } : null,
-    identityStore
+    standingQuoteIdentityStore
   );
 
   const request = quote?.request ?? null;
