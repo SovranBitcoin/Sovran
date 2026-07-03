@@ -31,6 +31,7 @@ import { amountToNumber } from '@/shared/lib/cashu/amount';
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
+import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
 import { walletLog, initLog, useInitMount } from '@/shared/lib/logger';
 
@@ -102,16 +103,21 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
 
   // Stabilise trustedMintUrls by comparing the serialised URL list
   const trustedMintUrls = useMemo(() => rawTrustedMints.map((m) => m.mintUrl), [rawTrustedMints]);
+  // keysetUnits gates advertised method-units on the mint's REAL keysets —
+  // a NUT-04 unit without a backing keyset cannot be issued (coco throws
+  // "No valid keysets found" at quote creation).
+  const keysetUnitsByMint = useMintKeysetUnits();
   const mintMethodCapabilities = useMemo(
     () =>
       deriveMintMethodCapabilityMapFromTrustedMints(
         rawTrustedMints.map((mint) => ({
           mintUrl: mint.mintUrl,
           mintInfo: mint.mintInfo,
+          keysetUnits: keysetUnitsByMint[mint.mintUrl],
         })),
         activeUnit
       ),
-    [rawTrustedMints, activeUnit]
+    [rawTrustedMints, activeUnit, keysetUnitsByMint]
   );
   const prevMintUrlsRef = useRef<string[]>(trustedMintUrls);
   const stableMintUrls = useMemo(() => {
@@ -156,7 +162,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     lastUnitSyncMintRef.current = preferredMintUrl;
     const mint = rawTrustedMints.find((m) => m.mintUrl === preferredMintUrl);
     if (!mint) return;
-    const supported = deriveSupportedUnitsFromInfo(mint.mintInfo);
+    const supported = deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl]);
     const currentUnit = useMintStore.getState().activeUnit;
     if (supported.includes(currentUnit)) return;
     const balanceByUnit = Object.fromEntries(
@@ -173,7 +179,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
       source: 'highest_balance_at_mint',
     });
     setActiveUnit(next);
-  }, [preferredMintUrl, rawTrustedMints, rawBalanceCtx, setActiveUnit]);
+  }, [preferredMintUrl, rawTrustedMints, rawBalanceCtx, setActiveUnit, keysetUnitsByMint]);
 
   const fetchProofAmounts = useCallback(async () => {
     walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', {

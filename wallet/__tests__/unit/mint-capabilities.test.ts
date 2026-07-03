@@ -5,10 +5,12 @@ import {
   compareMintDisplayOrder,
   deriveMintMethodCapabilityMapFromTrustedMints,
   deriveMintMethodSupportFromInfo,
+  deriveSupportedUnitsFromInfo,
   evaluateMintMethodAmountAvailability,
   getCapabilityUnavailableReason,
   getMintMethodCapability,
   getUnitAmountEnvelope,
+  pickMintForUnit,
 } from '../../src/mint-capabilities';
 import type { MintMethodRequirement, WalletContext } from '../../src/types';
 import { MINT1, MINT2 } from '../_harness/fixtures';
@@ -237,6 +239,59 @@ describe('compareMintDisplayOrder', () => {
     ];
     const sorted = [...rows].sort(compareMintDisplayOrder);
     expect(sorted.map((r) => r.mintUrl)).toEqual(['c', 'b', 'd', 'e', 'a']);
+  });
+});
+
+describe('keyset-backed unit gating', () => {
+  // The chorus case: NUT-04/05 advertise bolt11 usd/eur, but the mint only
+  // serves sat keysets — attempting a usd quote throws coco's "No valid
+  // keysets found". Advertised units without keysets must not be offered.
+  const chorusInfo = {
+    nuts: {
+      '4': {
+        methods: [
+          { method: 'bolt11', unit: 'sat' },
+          { method: 'bolt11', unit: 'usd' },
+          { method: 'bolt11', unit: 'eur' },
+        ],
+      },
+      '5': {
+        methods: [
+          { method: 'bolt11', unit: 'sat' },
+          { method: 'bolt11', unit: 'usd' },
+        ],
+      },
+    },
+  };
+
+  it('drops advertised units the mint has no keysets for', () => {
+    expect(deriveSupportedUnitsFromInfo(chorusInfo, ['sat'])).toEqual(['sat']);
+  });
+
+  it('keeps advertised units when keysets back them', () => {
+    expect(deriveSupportedUnitsFromInfo(chorusInfo, ['sat', 'usd'])).toEqual(['sat', 'usd']);
+  });
+
+  it('trusts the advertisement when keyset units are unknown', () => {
+    expect(deriveSupportedUnitsFromInfo(chorusInfo)).toEqual(['sat', 'usd', 'eur']);
+  });
+
+  it('marks method capabilities unsupported for unbacked units', () => {
+    const support = deriveMintMethodSupportFromInfo(chorusInfo, 'usd', ['sat']);
+    expect(support.mint.bolt11?.supported).toBe(false);
+    expect(support.mint.bolt11?.reason).toContain('no usd keysets');
+    expect(support.melt.bolt11?.supported).toBe(false);
+
+    const satSupport = deriveMintMethodSupportFromInfo(chorusInfo, 'sat', ['sat']);
+    expect(satSupport.mint.bolt11?.supported).toBe(true);
+  });
+
+  it('pickMintForUnit skips mints without keysets for the unit', () => {
+    const mints = [
+      { mintUrl: MINT1, mintInfo: chorusInfo, keysetUnits: ['sat'] },
+      { mintUrl: MINT2, mintInfo: chorusInfo, keysetUnits: ['sat', 'usd'] },
+    ];
+    expect(pickMintForUnit(mints, 'usd', { [MINT1]: 999, [MINT2]: 1 })).toBe(MINT2);
   });
 });
 

@@ -114,9 +114,12 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
     setLoading(false);
   }, []);
 
+  // `unit` param (when present) is a deliberate flow override; absent, the
+  // provider's getUnit supplies the live active unit — never default 'sat'
+  // here, an explicit binding would clobber the app unit for flow resets.
   const machine = usePaymentFlowMachine({
     walletContext,
-    unit: unit || 'sat',
+    ...(unit ? { unit } : {}),
     onOptionDismiss,
   });
 

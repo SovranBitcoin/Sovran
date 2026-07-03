@@ -137,6 +137,13 @@ export interface ColadaProviderProps {
   /** Optional app bridge for `useScreenActions` enrichment/subscriptions. */
   screenActionsBridge?: ScreenActionsBridge;
   getOffline?: () => boolean;
+  /**
+   * The wallet's ACTIVE unit. This is the authoritative default the flow
+   * reset reads — a screen binding an explicit `unit` via
+   * `usePaymentFlowMachine({ unit })` overrides it only while that screen is
+   * mounted. Without this getter (and no explicit binding), 'sat' is used.
+   */
+  getUnit?: () => string;
   enableEcashSendMemo?: boolean;
   getBtcPrice?: () => number;
   getDisplayCurrency?: () => { code: string; symbol: string } | null;
@@ -176,7 +183,7 @@ export interface ColadaProviderProps {
 interface ColadaContextValue {
   machine: PaymentMachine;
   walletContextRef: React.MutableRefObject<WalletContext | null>;
-  unitRef: React.MutableRefObject<string>;
+  unitRef: React.MutableRefObject<string | undefined>;
   optionDismissRef: React.MutableRefObject<(() => void) | undefined>;
   screenActionHandlers: ScreenActionHandlerMap;
   screenActionsBridge: ScreenActionsBridge | undefined;
@@ -291,6 +298,7 @@ export function ColadaProvider({
   actions,
   screenActionsBridge,
   getOffline: getOfflineProp,
+  getUnit: getUnitProp,
   enableEcashSendMemo: enableEcashSendMemoProp,
   getBtcPrice: getBtcPriceProp,
   getDisplayCurrency: getDisplayCurrencyProp,
@@ -448,7 +456,13 @@ export function ColadaProvider({
   const getDisplayCurrencyRef = useLatestRef(getDisplayCurrency);
 
   const walletContextRef = useRef<WalletContext | null>(null);
-  const unitRef = useRef("sat");
+  const getUnitRef = useLatestRef(getUnitProp);
+  // Explicit per-screen unit override (usePaymentFlowMachine({ unit })).
+  // undefined = no override — the flow reset falls back to the app's
+  // authoritative getUnit prop. Screens must NOT be defaulted into 'sat'
+  // here: a unit-less binding used to clobber this ref and freeze the wrong
+  // unit into the next flow reset (first-open-wrong-unit bug).
+  const unitRef = useRef<string | undefined>(undefined);
   const optionDismissRef = useRef<(() => void) | undefined>(undefined);
   const handlersRef = useRef<StepHandlerMap>({});
   const machineRef = useRef<PaymentMachine | null>(null);
@@ -557,7 +571,7 @@ export function ColadaProvider({
             }
             return walletContextRef.current;
           },
-      getUnit: () => unitRef.current,
+      getUnit: () => unitRef.current ?? getUnitRef.current?.() ?? "sat",
       getOffline: () => getOfflineRef.current?.() ?? false,
       enableEcashSendMemo,
       getLocale: () => getLocaleRef.current?.() ?? "en",
@@ -798,6 +812,13 @@ function usePaymentFlowContext(): ColadaContextValue {
 
 interface UsePaymentFlowMachineConfig {
   walletContext: WalletContext;
+  /**
+   * Explicit unit override for flows started while this screen is bound
+   * (e.g. NearPay pins 'sat'). Omit to use the provider's `getUnit` — the
+   * app's live active unit. Do NOT pass the active unit redundantly: the
+   * override is last-binder-wins across mounted screens, so redundant
+   * bindings can clobber each other.
+   */
   unit?: string;
   onOptionDismiss?: () => void;
 }
@@ -808,7 +829,7 @@ interface UsePaymentFlowMachineConfig {
  */
 export function usePaymentFlowMachine({
   walletContext,
-  unit = "sat",
+  unit,
   onOptionDismiss,
 }: UsePaymentFlowMachineConfig): PaymentMachine {
   const ctx = usePaymentFlowContext();
@@ -818,11 +839,20 @@ export function usePaymentFlowMachine({
   // shared provider state with values that were never committed.
   useEffect(() => {
     ctx.walletContextRef.current = walletContext;
-    ctx.unitRef.current = unit;
     logger.debug("react.paymentFlowMachine.bindContext", {
-      unit,
+      unit: unit ?? null,
       ...summarizeWalletContext(walletContext),
     });
+    if (unit === undefined) return;
+    ctx.unitRef.current = unit;
+    return () => {
+      // Release the override when this binder unmounts (or changes unit) so
+      // a stale explicit unit can't leak into a later flow's reset. Guarded
+      // so we never clear a different screen's newer override.
+      if (ctx.unitRef.current === unit) {
+        ctx.unitRef.current = undefined;
+      }
+    };
   }, [ctx, walletContext, unit]);
 
   useEffect(() => {

@@ -125,19 +125,34 @@ function readNut17Support(mintInfo: unknown): boolean | undefined {
 export function deriveMintMethodSupportFromInfo(
   mintInfo: unknown,
   unit: string = DEFAULT_UNIT,
+  keysetUnits?: readonly string[],
 ): MintMethodSupport {
+  // A mint can only issue units it has keysets for. Some mints advertise
+  // NUT-04/05 method-units they cannot serve (e.g. chorus lists bolt11/usd
+  // with sat-only keysets and coco then throws "No valid keysets found"), so
+  // when the caller knows the mint's actual keyset units, an unbacked unit
+  // overrides the advertisement. undefined = unknown → trust the info.
+  const normalizedUnit = normalizeUnit(unit);
+  const unitIssued =
+    keysetUnits == null ||
+    keysetUnits.some((entry) => normalizeUnit(entry) === normalizedUnit);
+  const readGated = (nut: 4 | 5, method: MintPaymentMethod) => {
+    const capability = readCapability(mintInfo, nut, method, unit);
+    if (unitIssued || !capability.supported) return capability;
+    return {
+      disabled: false,
+      method,
+      unit: normalizedUnit,
+      supported: false,
+      reason: `Mint advertises ${normalizedUnit} but has no ${normalizedUnit} keysets`,
+    };
+  };
   const support = {
     mint: Object.fromEntries(
-      METHODS.map((method) => [
-        method,
-        readCapability(mintInfo, 4, method, unit),
-      ]),
+      METHODS.map((method) => [method, readGated(4, method)]),
     ),
     melt: Object.fromEntries(
-      METHODS.map((method) => [
-        method,
-        readCapability(mintInfo, 5, method, unit),
-      ]),
+      METHODS.map((method) => [method, readGated(5, method)]),
     ),
     nut17: readNut17Support(mintInfo),
   };
@@ -181,16 +196,30 @@ export type SwitchableUnit = (typeof SWITCHABLE_UNITS)[number];
  * restricted to the wallet's switchable set. Falls back to sat when the
  * mint publishes no parseable method-unit metadata.
  */
-export function deriveSupportedUnitsFromInfo(mintInfo: unknown): string[] {
+export function deriveSupportedUnitsFromInfo(
+  mintInfo: unknown,
+  keysetUnits?: readonly string[],
+): string[] {
   const settings = getNutSettings(mintInfo, 4);
   const methods = settings?.methods;
   if (!Array.isArray(methods)) return [DEFAULT_UNIT];
+  // A mint can only issue units it has keysets for — advertised NUT-04
+  // units without a backing keyset are dropped when keysetUnits is known
+  // (undefined = unknown → trust the advertisement).
+  const issued =
+    keysetUnits == null
+      ? null
+      : new Set(keysetUnits.map((unit) => normalizeUnit(unit)));
   const units = new Set<string>();
   for (const entry of methods) {
     if (!isRecord(entry)) continue;
     const unit =
       typeof entry.unit === "string" ? normalizeUnit(entry.unit) : null;
-    if (unit && (SWITCHABLE_UNITS as readonly string[]).includes(unit)) {
+    if (
+      unit &&
+      (SWITCHABLE_UNITS as readonly string[]).includes(unit) &&
+      (issued == null || issued.has(unit))
+    ) {
       units.add(unit);
     }
   }
@@ -230,13 +259,19 @@ export function pickHighestBalanceUnit(
  * unit may still be reachable via held balances at an untrusted mint).
  */
 export function pickMintForUnit(
-  mints: readonly { mintUrl: string; mintInfo?: unknown }[],
+  mints: readonly {
+    mintUrl: string;
+    mintInfo?: unknown;
+    keysetUnits?: readonly string[];
+  }[],
   unit: string,
   balanceByMint: Record<string, number>,
 ): string | null {
   const normalized = normalizeUnit(unit);
   const candidates = mints.filter((mint) =>
-    deriveSupportedUnitsFromInfo(mint.mintInfo).includes(normalized),
+    deriveSupportedUnitsFromInfo(mint.mintInfo, mint.keysetUnits).includes(
+      normalized,
+    ),
   );
   if (candidates.length === 0) {
     logger.debug("mintCapabilities.pickMintForUnit.none", { unit: normalized });
@@ -301,13 +336,18 @@ export function resolveReceiveMethodMint(
 }
 
 export function deriveMintMethodCapabilityMapFromTrustedMints(
-  trustedMints: readonly { mintUrl: string; mintInfo?: unknown }[],
+  trustedMints: readonly {
+    mintUrl: string;
+    mintInfo?: unknown;
+    /** Units the mint actually has keysets for; undefined = unknown. */
+    keysetUnits?: readonly string[];
+  }[],
   unit: string = DEFAULT_UNIT,
 ): MintMethodCapabilityMap {
   const map = Object.fromEntries(
     trustedMints.map((mint) => [
       mint.mintUrl,
-      deriveMintMethodSupportFromInfo(mint.mintInfo, unit),
+      deriveMintMethodSupportFromInfo(mint.mintInfo, unit, mint.keysetUnits),
     ]),
   );
   logger.info("mintCapabilities.deriveMap", {

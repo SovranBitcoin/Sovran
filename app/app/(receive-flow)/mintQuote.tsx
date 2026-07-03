@@ -20,15 +20,17 @@ const ParamsSchema = z.object({
 });
 
 export default function ModalScreen() {
-  // Bind unit to the machine each render so the active flow tracks the
-  // currency the route was opened with. MintQuoteRoute revalidates the
-  // full param shape; pulling `unit` off the validated params here is for
-  // the always-on machine binding.
+  // Bind unit to the machine only when the route was opened WITH one — the
+  // explicit binding overrides the app's live active unit for flow resets,
+  // so a hardcoded 'sat' fallback here would clobber a fiat account.
   const params = useRouteParams(ParamsSchema, { where: 'receive-flow.mintQuote' });
   const unit = params?.unit ?? 'sat';
 
   const walletContext = useWalletContext();
-  const machine = usePaymentFlowMachine({ walletContext, unit });
+  const machine = usePaymentFlowMachine({
+    walletContext,
+    ...(params?.unit ? { unit: params.unit } : {}),
+  });
 
   useEffect(() => {
     cashuLog.info('receive.mint_quote.route.ready', {

@@ -28,6 +28,35 @@ function getReadyProofs(
   ).proofService.getReadyProofs(mintUrl);
 }
 
+// Reach past coco's mint service to the persisted keysets for one mint —
+// local DB read, no network. A mint can only issue units it holds keys for;
+// some mints advertise NUT-04/05 method-units without keysets (coco throws
+// "No valid keysets found" on attempt), so the capability map must gate on
+// the real keyset units, mirroring coco's own WalletService validKeysets
+// filter (keypairs present + unit match).
+async function getKeysetUnits(
+  manager: Manager,
+  mintUrl: string,
+): Promise<string[]> {
+  const keysets = await (
+    manager as unknown as {
+      mintService: {
+        keysetRepo: {
+          getKeysetsByMintUrl(
+            mintUrl: string,
+          ): Promise<{ unit?: string; keypairs?: Record<string, unknown> }[]>;
+        };
+      };
+    }
+  ).mintService.keysetRepo.getKeysetsByMintUrl(mintUrl);
+  const units = new Set<string>();
+  for (const keyset of keysets) {
+    if (!keyset.keypairs || Object.keys(keyset.keypairs).length === 0) continue;
+    units.add((keyset.unit || 'sat').toLowerCase());
+  }
+  return [...units];
+}
+
 interface WalletContextTrackerConfig {
   getPreferredMintUrl?: () => string | undefined;
   /**
@@ -72,7 +101,11 @@ export function createWalletContextTracker(
   // All-unit snapshots from the last successful refresh. getContext()
   // derives (and caches) the active-unit view from these, so a unit switch
   // is served instantly from the same snapshot — no refresh race.
-  let trustedMints: { mintUrl: string; mintInfo?: unknown }[] = [];
+  let trustedMints: {
+    mintUrl: string;
+    mintInfo?: unknown;
+    keysetUnits?: string[];
+  }[] = [];
   let proofsByMint: Record<string, { amount: number; unit: string }[]> = {};
   let balancesByMintAndUnit: Record<string, Record<string, number>> = {};
   let revision = 0;
@@ -201,9 +234,30 @@ export function createWalletContextTracker(
           ),
         );
 
+      const keysetUnitsByMint: Record<string, string[] | undefined> =
+        Object.fromEntries(
+          await Promise.all(
+            mints.map(async (mint) => {
+              const mintUrl = (mint as TrustedMint).mintUrl;
+              try {
+                return [mintUrl, await getKeysetUnits(manager, mintUrl)] as const;
+              } catch (e) {
+                logger.warn('walletContextTracker.getKeysetUnits.failed', {
+                  ...mintUrlFields(mintUrl),
+                  error: errField(e),
+                });
+                // Unknown (not empty): capability gating must not turn a
+                // read failure into "mint issues nothing".
+                return [mintUrl, undefined] as const;
+              }
+            }),
+          ),
+        );
+
       trustedMints = mints.map((mint) => ({
         mintUrl: mint.mintUrl,
         mintInfo: mint.mintInfo,
+        keysetUnits: keysetUnitsByMint[mint.mintUrl],
       }));
       balancesByMintAndUnit = Object.fromEntries(
         Object.entries(balances).map(([url, byUnit]) => [

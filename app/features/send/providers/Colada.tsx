@@ -535,6 +535,10 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       scanSources={scanSources}
       qrDecoderAdapter={qrDecoderAdapter}
       deepLinks={deepLinks}
+      // Authoritative active unit for flow resets. Screens no longer need to
+      // bind `unit: activeUnit` — explicit `usePaymentFlowMachine({ unit })`
+      // remains only for deliberate pins (NearPay sat, rail routes).
+      getUnit={() => useMintStore.getState().activeUnit}
       navigation={navigation}>
       {children}
     </ColadaProviderBase>

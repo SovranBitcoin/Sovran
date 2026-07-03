@@ -6,6 +6,8 @@ import { useMintStore, type ActiveUnit } from '@/shared/stores/profile/mintStore
 import { walletLog } from '@/shared/lib/logger';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 
+import { useMintKeysetUnits } from './useMintKeysetUnits';
+
 export interface ActiveUnitState {
   /** The unit the wallet view is denominated in right now. */
   unit: ActiveUnit;
@@ -37,11 +39,15 @@ export function useActiveUnit(): ActiveUnitState {
   const setUnit = useMintStore((state) => state.setActiveUnit);
   const { trustedMints } = useMints();
   const { balances } = useBalanceContext();
+  // Units each mint actually has keysets for — an advertised unit without a
+  // backing keyset is not offerable (coco throws "No valid keysets found").
+  const keysetUnitsByMint = useMintKeysetUnits();
 
   const availableUnits = useMemo(() => {
     const advertised = new Set<string>(['sat']);
     for (const mint of trustedMints) {
-      for (const unit of deriveSupportedUnitsFromInfo(mint.mintInfo)) {
+      const units = deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl]);
+      for (const unit of units) {
         advertised.add(unit);
       }
     }
@@ -54,11 +60,11 @@ export function useActiveUnit(): ActiveUnitState {
     const units = SWITCHABLE_UNITS.filter((unit) => advertised.has(unit)) as ActiveUnit[];
     walletLog.debug('wallet.unit.available', {
       units: units.join(','),
-      source: 'nut04+balances',
+      source: 'nut04+keysets+balances',
       mintCount: trustedMints.length,
     });
     return units;
-  }, [trustedMints, balances]);
+  }, [trustedMints, balances, keysetUnitsByMint]);
 
   const unit = useMemo<ActiveUnit>(() => {
     if (availableUnits.includes(persisted)) return persisted;
@@ -71,7 +77,15 @@ export function useActiveUnit(): ActiveUnitState {
       setUnit(next);
       const preferredUrl = useMintStore.getState().selectedMint;
       const preferred = trustedMints.find((m) => m.mintUrl === preferredUrl);
-      if (preferred && deriveSupportedUnitsFromInfo(preferred.mintInfo).includes(next)) return;
+      if (
+        preferred &&
+        deriveSupportedUnitsFromInfo(
+          preferred.mintInfo,
+          keysetUnitsByMint[preferred.mintUrl]
+        ).includes(next)
+      ) {
+        return;
+      }
       // Balance IN THE CHOSEN UNIT per mint — colada picks the best target.
       const balanceByMint = Object.fromEntries(
         Object.entries(balances.byMintAndUnit ?? {}).map(([url, byUnit]) => [
@@ -79,7 +93,15 @@ export function useActiveUnit(): ActiveUnitState {
           byUnit[next] ? amountToNumber(byUnit[next].total) : 0,
         ])
       );
-      const target = pickMintForUnit(trustedMints, next, balanceByMint);
+      const target = pickMintForUnit(
+        trustedMints.map((mint) => ({
+          mintUrl: mint.mintUrl,
+          mintInfo: mint.mintInfo,
+          keysetUnits: keysetUnitsByMint[mint.mintUrl],
+        })),
+        next,
+        balanceByMint
+      );
       if (!target || target === preferredUrl) return;
       walletLog.info('wallet.unit.mint_followed_unit', {
         unit: next,
@@ -88,7 +110,7 @@ export function useActiveUnit(): ActiveUnitState {
       });
       useMintStore.getState().setSelectedMint(target);
     },
-    [trustedMints, balances, setUnit]
+    [trustedMints, balances, setUnit, keysetUnitsByMint]
   );
 
   return useMemo(

@@ -54,6 +54,13 @@ interface ManagerInternals {
   mintOperationRepository: {
     delete(id: string): Promise<void>;
   };
+  mintService: {
+    keysetRepo: {
+      getKeysetsByMintUrl(
+        mintUrl: string
+      ): Promise<{ unit?: string; keypairs?: Record<string, unknown> }[]>;
+    };
+  };
 }
 
 function internals(manager: Manager): ManagerInternals {
@@ -69,6 +76,39 @@ function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, un
     hasMintUrl: !!mintUrl,
     mintUrlLength: mintUrl?.length ?? 0,
   };
+}
+
+/**
+ * Units a mint actually holds keysets (with keys) for, via the private
+ * keyset repository — local DB read, no network. Mirrors coco's own
+ * WalletService validKeysets filter: a mint can only issue units it has
+ * keypairs for, regardless of what NUT-04/05 advertises.
+ */
+export async function getMintKeysetUnits(manager: Manager, mintUrl: string): Promise<string[]> {
+  cashuLog.debug('cashu.manager_internals.keyset_units.start', {
+    ...mintUrlLogFields(mintUrl),
+  });
+  try {
+    const keysets = await internals(manager).mintService.keysetRepo.getKeysetsByMintUrl(mintUrl);
+    const units = new Set<string>();
+    for (const keyset of keysets) {
+      if (!keyset.keypairs || Object.keys(keyset.keypairs).length === 0) continue;
+      units.add((keyset.unit || 'sat').toLowerCase());
+    }
+    const result = [...units];
+    cashuLog.debug('cashu.manager_internals.keyset_units.done', {
+      ...mintUrlLogFields(mintUrl),
+      keysetCount: keysets.length,
+      units: result.join(','),
+    });
+    return result;
+  } catch (error) {
+    cashuLog.warn('cashu.manager_internals.keyset_units.failed', {
+      ...mintUrlLogFields(mintUrl),
+      error: errorMessage(error),
+    });
+    throw error;
+  }
 }
 
 /** Ready (UNSPENT, unreserved) proofs for one mint, via the private ProofService. */

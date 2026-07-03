@@ -7,7 +7,6 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { Stack } from 'expo-router';
 
 import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'wallet/react';
@@ -56,8 +55,9 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   );
 
   const walletContext = useWalletContextWithOverride();
-  const { unit: activeUnit } = useActiveUnit();
-  const machine = usePaymentFlowMachine({ walletContext, unit: activeUnit });
+  // No explicit unit binding: the provider's getUnit already supplies the
+  // live active unit, and a redundant binding here is last-binder-wins churn.
+  const machine = usePaymentFlowMachine({ walletContext });
   const { isExecuting } = useExecutionState(machine);
 
   const handleRequestMintList = useCallback(() => {

@@ -19,7 +19,12 @@ const ParamsSchema = z.object({
 export default function LightningReceiveRouteWrapper() {
   const params = useRouteParams(ParamsSchema, { where: 'receive-flow.lightningReceive' });
   const walletContext = useWalletContext();
-  const machine = usePaymentFlowMachine({ walletContext, unit: params?.unit ?? 'sat' });
+  // Explicit unit binding only when the route carries one — a 'sat' fallback
+  // here would override the app's live active unit for flow resets.
+  const machine = usePaymentFlowMachine({
+    walletContext,
+    ...(params?.unit ? { unit: params.unit } : {}),
+  });
   useEffect(() => {
     cashuLog.info('receive.lightning.route.ready', {
       where: 'receive-flow.lightningReceive',
