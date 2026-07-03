@@ -22,7 +22,10 @@ import type {
   QuickSendSuggestion,
 } from '../amount-actions/types';
 import { logger } from '../logger';
-import { getUnitAmountEnvelope } from '../mint-capabilities';
+import {
+  getUnitAmountEnvelope,
+  type AmountEntryEnvelope,
+} from '../mint-capabilities';
 import {
   createScreenActionSession,
   type ScreenActionSession,
@@ -411,6 +414,13 @@ export function useScreenActions(
       : allDefaults[screenType as Exclude<ScreenType, 'amountEntry'>]
   ) as ScreenActionHandlerMap[typeof screenType];
 
+  const envelopeCacheRef = useRef<{
+    walletCtx: unknown;
+    unit: string;
+    destination: unknown;
+    envelope: AmountEntryEnvelope | null;
+  } | null>(null);
+
   // Auto-derive amountConfig from provider context when not explicitly provided.
   // Every reactive field is a getter so the manager — created once and held
   // in managerRef across the screen's lifetime — re-reads destination, unit,
@@ -437,11 +447,32 @@ export function useScreenActions(
         const walletCtx = walletContextRef.current;
         if (!walletCtx) return null;
         const machineCtx = machineRef.current.getContext();
-        return getUnitAmountEnvelope(
+        // The manager re-reads this on every keystroke AND every inspect
+        // (useSyncExternalStore getSnapshot runs 2+× per render), while the
+        // envelope only changes with the wallet context, unit, or
+        // destination — memoize on those so typing doesn't re-derive
+        // per-mint bounds several times per key.
+        const cached = envelopeCacheRef.current;
+        if (
+          cached &&
+          cached.walletCtx === walletCtx &&
+          cached.unit === machineCtx.unit &&
+          cached.destination === machineCtx.destination
+        ) {
+          return cached.envelope;
+        }
+        const envelope = getUnitAmountEnvelope(
           walletCtx,
           machineCtx.unit,
           machineCtx.destination,
         );
+        envelopeCacheRef.current = {
+          walletCtx,
+          unit: machineCtx.unit,
+          destination: machineCtx.destination,
+          envelope,
+        };
+        return envelope;
       },
     };
     // Refs are stable across renders; getter closures read .current on each

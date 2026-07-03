@@ -75,6 +75,12 @@ export interface ColadaConfig {
   getSatsPerUnitMinor?: DefaultOperationsConfig["getSatsPerUnitMinor"];
 
   unit?: string;
+  /**
+   * The wallet's ACTIVE unit (multi-unit wallets). The context tracker
+   * serves balances/proof amounts/capabilities denominated in this unit so
+   * machine-internal math never mixes units. Omit for sat-only wallets.
+   */
+  getActiveUnit?: () => string;
   getOffline?: () => boolean;
   getLocale?: () => string;
   getBtcPrice?: () => number;
@@ -181,6 +187,7 @@ export function createColada(config: ColadaConfig): ColadaInstance {
 
   const tracker = createWalletContextTracker(manager, {
     getPreferredMintUrl: config.getPreferredMintUrl,
+    getActiveUnit: config.getActiveUnit,
   });
 
   const appViewEnrichment = config.nostrAppViewBaseUrl

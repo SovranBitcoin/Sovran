@@ -30,6 +30,14 @@ function getReadyProofs(
 
 interface WalletContextTrackerConfig {
   getPreferredMintUrl?: () => string | undefined;
+  /**
+   * The wallet's ACTIVE unit. The tracker snapshots proofs and balances for
+   * every unit, then getContext() serves the view for this unit — balances,
+   * proof amounts, and the capability map are all denominated per unit, so
+   * machine-internal comparisons (exceedsBalance, offline proof composition)
+   * never mix usd-cents with sat proofs. Omit for sat-only wallets.
+   */
+  getActiveUnit?: () => string;
 }
 
 type TrustedMint = Awaited<
@@ -61,10 +69,62 @@ export function createWalletContextTracker(
   manager: Manager,
   config?: WalletContextTrackerConfig,
 ): WalletContextTracker {
-  let trustedMintUrls: string[] = [];
-  let mintBalances: Record<string, number> = {};
-  let proofAmounts: Record<string, number[]> = {};
-  let mintMethodCapabilities: WalletContext['mintMethodCapabilities'] = {};
+  // All-unit snapshots from the last successful refresh. getContext()
+  // derives (and caches) the active-unit view from these, so a unit switch
+  // is served instantly from the same snapshot — no refresh race.
+  let trustedMints: { mintUrl: string; mintInfo?: unknown }[] = [];
+  let proofsByMint: Record<string, { amount: number; unit: string }[]> = {};
+  let balancesByMintAndUnit: Record<string, Record<string, number>> = {};
+  let revision = 0;
+
+  let unitView: {
+    unit: string;
+    revision: number;
+    trustedMintUrls: string[];
+    mintBalances: Record<string, number>;
+    proofAmounts: Record<string, number[]>;
+    mintMethodCapabilities: WalletContext['mintMethodCapabilities'];
+  } | null = null;
+
+  const activeUnit = (): string =>
+    (config?.getActiveUnit?.() || 'sat').toLowerCase();
+
+  function viewFor(unit: string) {
+    if (unitView && unitView.unit === unit && unitView.revision === revision) {
+      return unitView;
+    }
+    unitView = {
+      unit,
+      revision,
+      trustedMintUrls: trustedMints.map((m) => m.mintUrl),
+      mintBalances: Object.fromEntries(
+        Object.entries(balancesByMintAndUnit).map(([url, byUnit]) => [
+          url,
+          byUnit[unit] ?? 0,
+        ]),
+      ),
+      proofAmounts: Object.fromEntries(
+        Object.entries(proofsByMint).map(([url, proofs]) => [
+          url,
+          proofs
+            .filter((p) => p.unit === unit)
+            .map((p) => p.amount)
+            .sort((a, b) => a - b),
+        ]),
+      ),
+      mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints(
+        trustedMints,
+        unit,
+      ),
+    };
+    logger.debug('walletContextTracker.unitView.derived', {
+      unit,
+      revision,
+      trustedMintCount: unitView.trustedMintUrls.length,
+      readyProofCount: countReadyProofs(unitView.proofAmounts),
+    });
+    return unitView;
+  }
 
   const listeners = new Set<() => void>();
   let refreshing = false;
@@ -81,10 +141,9 @@ export function createWalletContextTracker(
   function emit() {
     logger.debug('walletContextTracker.emit', {
       listenerCount: listeners.size,
-      trustedMintCount: trustedMintUrls.length,
-      balanceMintCount: Object.keys(mintBalances).length,
-      proofMintCount: Object.keys(proofAmounts).length,
-      readyProofCount: countReadyProofs(proofAmounts),
+      trustedMintCount: trustedMints.length,
+      balanceMintCount: Object.keys(balancesByMintAndUnit).length,
+      proofMintCount: Object.keys(proofsByMint).length,
     });
     listeners.forEach((fn) => fn());
   }
@@ -112,56 +171,60 @@ export function createWalletContextTracker(
     });
 
     try {
-      const [trustedMints, balancesByMint] = await Promise.all([
+      const [mints, balances] = await Promise.all([
         manager.mint.getAllTrustedMints(),
-        manager.wallet.balances.byMint(),
+        manager.wallet.balances.byMintAndUnit(),
       ]);
 
-      const amounts: Record<string, number[]> = Object.fromEntries(
-        await Promise.all(
-          trustedMints.map(async (mint) => {
-            const mintUrl = (mint as TrustedMint).mintUrl;
-            try {
-              const proofs = await getReadyProofs(manager, mintUrl);
-              return [
-                mintUrl,
-                proofs
-                  .map((p) => amountToNumber(p.amount))
-                  .sort((a, b) => a - b),
-              ] as const;
-            } catch (e) {
-              logger.warn('walletContextTracker.getReadyProofs.failed', {
-                ...mintUrlFields(mintUrl),
-                error: errField(e),
-              });
-              return [mintUrl, []] as const;
-            }
-          }),
-        ),
-      );
+      const proofs: Record<string, { amount: number; unit: string }[]> =
+        Object.fromEntries(
+          await Promise.all(
+            mints.map(async (mint) => {
+              const mintUrl = (mint as TrustedMint).mintUrl;
+              try {
+                const ready = await getReadyProofs(manager, mintUrl);
+                return [
+                  mintUrl,
+                  ready.map((p) => ({
+                    amount: amountToNumber(p.amount),
+                    unit: (p.unit || 'sat').toLowerCase(),
+                  })),
+                ] as const;
+              } catch (e) {
+                logger.warn('walletContextTracker.getReadyProofs.failed', {
+                  ...mintUrlFields(mintUrl),
+                  error: errField(e),
+                });
+                return [mintUrl, []] as const;
+              }
+            }),
+          ),
+        );
 
-      trustedMintUrls = trustedMints.map((m) => m.mintUrl);
-      mintMethodCapabilities = deriveMintMethodCapabilityMapFromTrustedMints(
-        trustedMints.map((mint) => ({
-          mintUrl: mint.mintUrl,
-          mintInfo: mint.mintInfo,
-        })),
-      );
-      mintBalances = Object.fromEntries(
-        Object.entries(balancesByMint).map(([url, snap]) => [
+      trustedMints = mints.map((mint) => ({
+        mintUrl: mint.mintUrl,
+        mintInfo: mint.mintInfo,
+      }));
+      balancesByMintAndUnit = Object.fromEntries(
+        Object.entries(balances).map(([url, byUnit]) => [
           url,
-          amountToNumber(snap.total),
+          Object.fromEntries(
+            Object.entries(byUnit).map(([unit, snap]) => [
+              unit.toLowerCase(),
+              amountToNumber(snap.total),
+            ]),
+          ),
         ]),
       );
-      proofAmounts = amounts;
+      proofsByMint = proofs;
+      revision += 1;
       consecutiveFailures = 0;
       logger.info('walletContextTracker.refresh.done', {
         refreshId,
-        trustedMintCount: trustedMintUrls.length,
-        balanceMintCount: Object.keys(mintBalances).length,
-        proofMintCount: Object.keys(proofAmounts).length,
-        readyProofCount: countReadyProofs(proofAmounts),
-        capabilityMintCount: Object.keys(mintMethodCapabilities).length,
+        revision,
+        trustedMintCount: trustedMints.length,
+        balanceMintCount: Object.keys(balancesByMintAndUnit).length,
+        proofMintCount: Object.keys(proofsByMint).length,
         listenerCount: listeners.size,
       });
 
@@ -226,13 +289,16 @@ export function createWalletContextTracker(
   void refresh();
 
   return {
-    getContext: () => ({
-      trustedMintUrls,
-      mintBalances,
-      mintMethodCapabilities,
-      proofAmounts,
-      preferredMintUrl: config?.getPreferredMintUrl?.(),
-    }),
+    getContext: () => {
+      const view = viewFor(activeUnit());
+      return {
+        trustedMintUrls: view.trustedMintUrls,
+        mintBalances: view.mintBalances,
+        mintMethodCapabilities: view.mintMethodCapabilities,
+        proofAmounts: view.proofAmounts,
+        preferredMintUrl: config?.getPreferredMintUrl?.(),
+      };
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       logger.debug('walletContextTracker.subscribe', {
@@ -256,9 +322,9 @@ export function createWalletContextTracker(
       disposed = true;
       logger.info('walletContextTracker.dispose', {
         listenerCount: listeners.size,
-        trustedMintCount: trustedMintUrls.length,
-        balanceMintCount: Object.keys(mintBalances).length,
-        proofMintCount: Object.keys(proofAmounts).length,
+        trustedMintCount: trustedMints.length,
+        balanceMintCount: Object.keys(balancesByMintAndUnit).length,
+        proofMintCount: Object.keys(proofsByMint).length,
       });
       unsubscribes.forEach((unsub) => unsub());
       listeners.clear();

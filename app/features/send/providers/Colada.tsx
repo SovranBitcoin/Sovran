@@ -21,7 +21,13 @@ import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 
 import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'wallet';
-import { createColada, createMempoolSpaceChainAdapter, withTimeout } from 'wallet';
+import {
+  createColada,
+  createMempoolSpaceChainAdapter,
+  isFiatUnit,
+  unitMinorDecimals,
+  withTimeout,
+} from 'wallet';
 import {
   ColadaProvider as ColadaProviderBase,
   type ColadaProviderProps,
@@ -153,10 +159,10 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   // express fiat-unit melt amounts in sats (LNURL invoices, onchain
   // amountSats). Keyed by the unit itself, not the display currency.
   const getSatsPerUnitMinor = useCallback((unit: string) => {
-    if (unit !== 'usd' && unit !== 'eur' && unit !== 'gbp') return null;
-    const price = usePricelistStore.getState().getBtcPrice(unit);
+    if (!isFiatUnit(unit)) return null;
+    const price = usePricelistStore.getState().getBtcPrice(unit as 'usd' | 'eur' | 'gbp');
     if (!price || price <= 0) return null;
-    return 100_000_000 / (price * 100);
+    return 100_000_000 / (price * 10 ** unitMinorDecimals(unit));
   }, []);
   const getDisplayCurrency = useCallback(() => {
     const currency = useSettingsStore.getState().displayCurrency as DisplayCurrency;
@@ -200,6 +206,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         getSatsPerUnitMinor,
         getDisplayCurrency,
         getPreferredMintUrl: () => useMintStore.getState().selectedMint,
+        getActiveUnit: () => useMintStore.getState().activeUnit,
         // NUT-30 onchain melt fee picker. Runs BEFORE prepare (no proofs
         // reserved while the sheet is open); dismiss resolves null = cancel.
         selectOnchainFeeIndex: (options) =>

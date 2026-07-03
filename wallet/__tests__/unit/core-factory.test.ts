@@ -39,9 +39,9 @@ function createMockManager() {
     },
     wallet: {
       balances: {
-        byMint: vi.fn().mockResolvedValue({
-          [MINT1]: { spendable: 1000, reserved: 0, total: 1000 },
-          [MINT2]: { spendable: 500, reserved: 0, total: 500 },
+        byMintAndUnit: vi.fn().mockResolvedValue({
+          [MINT1]: { sat: { spendable: 1000, reserved: 0, total: 1000 } },
+          [MINT2]: { sat: { spendable: 500, reserved: 0, total: 500 } },
         }),
         total: vi.fn().mockResolvedValue({ spendable: 1500, reserved: 0, total: 1500 }),
       },
@@ -80,11 +80,11 @@ function createMockManager() {
     // proofService is accessed via cast — same pattern as the real code
     proofService: {
       getReadyProofs: vi.fn().mockResolvedValue([
-        { amount: 1 },
-        { amount: 2 },
-        { amount: 4 },
-        { amount: 8 },
-        { amount: 64 },
+        { amount: 1, unit: 'sat' },
+        { amount: 2, unit: 'sat' },
+        { amount: 4, unit: 'sat' },
+        { amount: 8, unit: 'sat' },
+        { amount: 64, unit: 'sat' },
       ]),
     },
   };
@@ -237,14 +237,48 @@ describe('createWalletContextTracker', () => {
     tracker.dispose();
   });
 
+  it('serves per-unit views of balances and proofs (getActiveUnit)', async () => {
+    let unit = 'sat';
+    mockManager.manager.wallet.balances.byMintAndUnit.mockResolvedValue({
+      [MINT1]: {
+        sat: { spendable: 1000, reserved: 0, total: 1000 },
+        usd: { spendable: 250, reserved: 0, total: 250 },
+      },
+    });
+    mockManager.manager.proofService.getReadyProofs.mockResolvedValue([
+      { amount: 64, unit: 'sat' },
+      { amount: 8, unit: 'sat' },
+      { amount: 200, unit: 'usd' },
+      { amount: 50, unit: 'usd' },
+    ]);
+    const tracker = createWalletContextTracker(mockManager.manager, {
+      getActiveUnit: () => unit,
+    });
+    // The constructor's auto-refresh coalesces an immediate refresh() call;
+    // wait for it to settle like the sibling tests do.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await tracker.refresh();
+
+    // sat view: usd proofs and balances are invisible
+    expect(tracker.getContext().mintBalances[MINT1]).toBe(1000);
+    expect(tracker.getContext().proofAmounts[MINT1]).toEqual([8, 64]);
+
+    // usd view derives instantly from the same snapshot — no refresh needed
+    unit = 'usd';
+    expect(tracker.getContext().mintBalances[MINT1]).toBe(250);
+    expect(tracker.getContext().proofAmounts[MINT1]).toEqual([50, 200]);
+
+    tracker.dispose();
+  });
+
   it('refreshes on Manager proofs:saved event', async () => {
     const tracker = createWalletContextTracker(mockManager.manager);
     await tracker.refresh();
 
     // Change the mock data
-    mockManager.manager.wallet.balances.byMint.mockResolvedValue({
-      [MINT1]: { spendable: 2000, reserved: 0, total: 2000 },
-      [MINT2]: { spendable: 500, reserved: 0, total: 500 },
+    mockManager.manager.wallet.balances.byMintAndUnit.mockResolvedValue({
+      [MINT1]: { sat: { spendable: 2000, reserved: 0, total: 2000 } },
+      [MINT2]: { sat: { spendable: 500, reserved: 0, total: 500 } },
     });
 
     // Trigger Manager event
@@ -283,9 +317,9 @@ describe('createWalletContextTracker', () => {
     tracker.dispose();
 
     // Change mock data — should not affect context since disposed
-    mockManager.manager.wallet.balances.byMint.mockResolvedValue({
-      [MINT1]: { spendable: 9999, reserved: 0, total: 9999 },
-      [MINT2]: { spendable: 9999, reserved: 0, total: 9999 },
+    mockManager.manager.wallet.balances.byMintAndUnit.mockResolvedValue({
+      [MINT1]: { sat: { spendable: 9999, reserved: 0, total: 9999 } },
+      [MINT2]: { sat: { spendable: 9999, reserved: 0, total: 9999 } },
     });
 
     const listener = vi.fn();

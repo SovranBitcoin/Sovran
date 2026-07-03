@@ -158,7 +158,7 @@ export function ProofSelectorContent({ payload, close }: ProofSelectorContentPro
       hasRoundDown: suggestions?.roundDown != null,
       roundDownAmount: suggestions?.roundDown?.amount ?? null,
       showChangeMint,
-      inputMode: payload.displayMetadata?.inputMode ?? 'sat',
+      inputMode: payload.displayMetadata?.inputMode ?? 'unit',
     });
   }, [payload.displayMetadata?.inputMode, showChangeMint, suggestions, unit]);
 
@@ -222,7 +222,7 @@ export function proofSelectorPopup(payload: ActionSheetPayloads['proof-selector'
     unit: payload.unit,
     hasRoundUp: payload.suggestions?.roundUp != null,
     hasRoundDown: payload.suggestions?.roundDown != null,
-    inputMode: payload.displayMetadata?.inputMode ?? 'sat',
+    inputMode: payload.displayMetadata?.inputMode ?? 'unit',
   });
   showActionSheet('proof-selector', payload);
 }

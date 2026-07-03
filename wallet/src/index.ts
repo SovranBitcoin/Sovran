@@ -430,6 +430,13 @@ export type {
 export { FormattedTimestamp } from "./formatting";
 export { FormattedString, type TruncateMode } from "./formatting";
 export { localizeReason, type LocalizedReason } from "./formatting";
+export {
+  isFiatUnit,
+  majorToMinor,
+  minorToRawInput,
+  unitMinorDecimals,
+  unitSymbol,
+} from "./formatting";
 
 // LNURL resolution (lightning address & lnurlp → bolt11)
 export {
