@@ -34,6 +34,7 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
   const {
     label,
     icon,
+    iconNode,
     onPress,
     color,
     isActive = false,
@@ -92,7 +93,7 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
           justify="center"
           spacing={8}
           style={[styles.content, widthStyle, { minHeight: height }, contentStyle]}>
-          <Icon name={icon} size={iconSize} color={contentColor} />
+          {iconNode ?? (icon ? <Icon name={icon} size={iconSize} color={contentColor} /> : null)}
           <Text
             size={textSize}
             bold

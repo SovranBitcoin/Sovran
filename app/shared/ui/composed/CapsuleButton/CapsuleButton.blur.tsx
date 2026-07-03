@@ -26,6 +26,7 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
   const {
     label,
     icon,
+    iconNode,
     onPress,
     color = foreground,
     isActive = false,
@@ -76,7 +77,7 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
             justify="center"
             spacing={8}
             style={[styles.content, widthStyle, { minHeight: height }, contentStyle]}>
-            <Icon name={icon} size={iconSize} color={color} />
+            {iconNode ?? (icon ? <Icon name={icon} size={iconSize} color={color} /> : null)}
             <Text
               size={textSize}
               bold

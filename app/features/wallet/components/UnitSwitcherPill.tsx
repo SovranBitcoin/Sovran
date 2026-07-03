@@ -1,11 +1,10 @@
 import React, { useCallback } from 'react';
-import opacity from 'hex-color-opacity';
 
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { Text } from '@/shared/ui/primitives/Text';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
+import { StyleSheet } from 'react-native';
+import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import type { ActiveUnit } from '@/shared/stores/profile/mintStore';
@@ -35,6 +34,9 @@ const PILL_LABELS: Record<ActiveUnit, string> = {
   gbp: 'GBP',
 };
 
+// Matches FiatCurrencyPill's height — they stack in the same balance column.
+const PILL_HEIGHT = 34;
+
 /**
  * The wallet-unit switcher (coco v2 multi-unit): picks the unit the wallet
  * is DENOMINATED in — a different concept from the fiat display-currency
@@ -43,6 +45,10 @@ const PILL_LABELS: Record<ActiveUnit, string> = {
  * supports; with nothing to switch to, the pill itself is greyed out.
  * Picking a unit the preferred mint lacks also re-points the preferred mint
  * (see useActiveUnit.selectUnit).
+ *
+ * The pill face is the shared `CapsuleButton` — the same component behind
+ * the ecash status pills — so it inherits every capability tier (liquid
+ * glass / blur / flat) instead of hand-rolling a flat capsule.
  */
 export function UnitSwitcherPill({
   textSize = 12,
@@ -55,12 +61,7 @@ export function UnitSwitcherPill({
 }): React.ReactElement {
   const { unit, availableUnits, selectUnit } = useActiveUnit();
   const shownUnit = displayUnit ?? unit;
-  const [textColor, surfaceSecondary, muted, success] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'muted',
-    'success',
-  ] as const);
+  const success = useThemeColor('success');
   const canSwitch = availableUnits.length > 1;
 
   const openUnitMenu = useCallback(() => {
@@ -80,36 +81,33 @@ export function UnitSwitcherPill({
     });
   }, [unit, availableUnits, selectUnit, success]);
 
+  const shownOption = UNIT_OPTIONS.find((o) => o.unit === shownUnit) ?? UNIT_OPTIONS[0];
+
   return (
-    <Pressable
-      onPress={canSwitch ? openUnitMenu : undefined}
-      disabled={!canSwitch}
-      testID="wallet-unit-switcher">
-      <HStack
-        align="center"
-        justify="center"
-        gap={6}
-        className="overflow-hidden rounded-full"
-        style={{
-          // Same flat pill contract as FiatCurrencyPill — they share the row.
-          backgroundColor: surfaceSecondary,
-          borderWidth: 1,
-          borderColor: opacity(muted, 0.3),
-          paddingHorizontal: 14,
-          paddingVertical: 6,
-          // Greyed out when only one unit exists — nothing to switch to.
-          opacity: canSwitch ? 1 : 0.4,
-        }}>
-        {unitIconNode(UNIT_OPTIONS.find((o) => o.unit === shownUnit) ?? UNIT_OPTIONS[0], 16)}
-        <Text
-          overpass
-          size={textSize}
-          bold
-          color={canSwitch ? textColor : muted}
-          style={{ letterSpacing: 0.3 }}>
-          {PILL_LABELS[shownUnit]}
-        </Text>
-      </HStack>
-    </Pressable>
+    // Greyed out when only one unit exists — nothing to switch to.
+    <View
+      style={canSwitch ? undefined : styles.disabledSlot}
+      pointerEvents={canSwitch ? 'auto' : 'none'}>
+      <CapsuleButton
+        label={PILL_LABELS[shownUnit]}
+        iconNode={unitIconNode(shownOption, 16)}
+        onPress={openUnitMenu}
+        height={PILL_HEIGHT}
+        fitContent
+        textSize={textSize}
+        labelNumberOfLines={1}
+        textStyle={styles.pillText}
+        testID="wallet-unit-switcher"
+      />
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  disabledSlot: {
+    opacity: 0.4,
+  },
+  pillText: {
+    letterSpacing: 0.3,
+  },
+});

@@ -1,8 +1,16 @@
+import type { ReactNode } from 'react';
 import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
 
 export interface CapsuleButtonProps {
   label: string;
-  icon: string;
+  /** Iconify glyph name. Optional when `iconNode` supplies the leading slot. */
+  icon?: string;
+  /**
+   * Custom leading element (e.g. a circle flag or the branded bitcoin disc)
+   * for icons that aren't a monochrome iconify glyph. Takes precedence over
+   * `icon`; rendered identically by every tier.
+   */
+  iconNode?: ReactNode;
   systemIcon?: string;
   onPress: () => void;
   color?: string;
