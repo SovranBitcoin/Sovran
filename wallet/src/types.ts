@@ -75,6 +75,13 @@ export interface MintMethodUnitCapability {
   method: MintPaymentMethod;
   unit: string;
   reason?: string;
+  /**
+   * NUT-04/05 advertised amount bounds for this method-unit pair, in the
+   * capability's unit. Absent when the mint does not publish a bound on
+   * that side (no constraint).
+   */
+  minAmount?: number;
+  maxAmount?: number;
 }
 
 export type MintMethodSupport = Record<

@@ -93,10 +93,21 @@ function readCapability(
     };
   }
 
+  const minAmount = readAmountBound(match.min_amount ?? match.minAmount);
+  const maxAmount = readAmountBound(match.max_amount ?? match.maxAmount);
   return {
     ...base,
     supported: true,
+    ...(minAmount != null ? { minAmount } : {}),
+    ...(maxAmount != null ? { maxAmount } : {}),
   };
+}
+
+/** NUT-04/05 amount bounds are optional and untrusted input — numbers only. */
+function readAmountBound(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : null;
 }
 
 /** NUT-17 websocket support — tri-state: undefined when info is absent. */
@@ -360,7 +371,7 @@ function operationLabel(operation: MintPaymentOperation): string {
 export function getCapabilityUnavailableReason(
   capability: MintMethodUnitCapability,
   requirement: MintMethodRequirement,
-  _amount?: number,
+  amount?: number,
   locale: string = "en",
 ): LocalizedReason | null {
   if (!isMethodImplemented(requirement)) {
@@ -394,6 +405,34 @@ export function getCapabilityUnavailableReason(
         requirement.operation,
       )}`,
     };
+  }
+  if (amount != null && amount > 0) {
+    if (capability.minAmount != null && amount < capability.minAmount) {
+      logger.debug("mintCapabilities.unavailable.belowMin", {
+        operation: requirement.operation,
+        method: requirement.method,
+        unit: normalizeUnit(requirement.unit),
+        amount,
+        minAmount: capability.minAmount,
+      });
+      return localizeReason("AMOUNT_BELOW_MINT_MIN", locale, {
+        min: capability.minAmount,
+        unit: capability.unit,
+      });
+    }
+    if (capability.maxAmount != null && amount > capability.maxAmount) {
+      logger.debug("mintCapabilities.unavailable.aboveMax", {
+        operation: requirement.operation,
+        method: requirement.method,
+        unit: normalizeUnit(requirement.unit),
+        amount,
+        maxAmount: capability.maxAmount,
+      });
+      return localizeReason("AMOUNT_ABOVE_MINT_MAX", locale, {
+        max: capability.maxAmount,
+        unit: capability.unit,
+      });
+    }
   }
   return null;
 }
@@ -527,6 +566,53 @@ export interface MintMethodAmountAvailability {
   availableCandidates: MintCandidate[];
   selectedUnavailableReason: LocalizedReason | null;
   firstUnavailableReason: LocalizedReason | null;
+  /**
+   * Set when the amount alone rules out every candidate: at least one mint
+   * supports the method but the amount falls outside its advertised NUT-04/05
+   * bounds. Carries the LEAST strict bound across those mints (smallest
+   * minimum / largest maximum) so "the smallest onchain mint wants 1 000 sat"
+   * is what the user reads — not the bound of an arbitrary stricter mint.
+   */
+  amountBoundsReason: LocalizedReason | null;
+}
+
+function pickAmountBoundsReason(
+  candidates: readonly MintCandidate[],
+): LocalizedReason | null {
+  const boundsParam = (reason: LocalizedReason): number | null => {
+    const value =
+      reason.code === "AMOUNT_BELOW_MINT_MIN"
+        ? reason.params?.min
+        : reason.params?.max;
+    return typeof value === "number" ? value : null;
+  };
+  let best: LocalizedReason | null = null;
+  for (const candidate of candidates) {
+    const reason = candidate.reason;
+    if (
+      !reason ||
+      (reason.code !== "AMOUNT_BELOW_MINT_MIN" &&
+        reason.code !== "AMOUNT_ABOVE_MINT_MAX")
+    ) {
+      continue;
+    }
+    if (!best) {
+      best = reason;
+      continue;
+    }
+    // Below-min beats above-max only in that we keep the first kind seen;
+    // within a kind, prefer the least strict bound (lowest min, highest max).
+    if (best.code !== reason.code) continue;
+    const bestValue = boundsParam(best);
+    const nextValue = boundsParam(reason);
+    if (bestValue == null || nextValue == null) continue;
+    const nextIsLessStrict =
+      reason.code === "AMOUNT_BELOW_MINT_MIN"
+        ? nextValue < bestValue
+        : nextValue > bestValue;
+    if (nextIsLessStrict) best = reason;
+  }
+  return best;
 }
 
 export function evaluateMintMethodAmountAvailability(
@@ -561,6 +647,8 @@ export function evaluateMintMethodAmountAvailability(
     selectedUnavailableReason ??
     candidates.find((candidate) => candidate.reason)?.reason ??
     null;
+  const amountBoundsReason =
+    availableCandidates.length === 0 ? pickAmountBoundsReason(candidates) : null;
 
   logger.info("mintCapabilities.amountAvailability.result", {
     candidateCount: candidates.length,
@@ -568,6 +656,7 @@ export function evaluateMintMethodAmountAvailability(
     hasSelectedCandidate: !!selectedCandidate,
     selectedUnavailableReasonCode: selectedUnavailableReason?.code,
     firstUnavailableReasonCode: firstUnavailableReason?.code,
+    amountBoundsReasonCode: amountBoundsReason?.code,
     operation: requirement.operation,
     method: requirement.method,
     unit: normalizeUnit(requirement.unit),
@@ -578,6 +667,7 @@ export function evaluateMintMethodAmountAvailability(
     availableCandidates,
     selectedUnavailableReason,
     firstUnavailableReason,
+    amountBoundsReason,
   };
 }
 

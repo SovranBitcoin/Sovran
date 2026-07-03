@@ -710,7 +710,7 @@ describe('transition — AMOUNT_ENTERED', () => {
     });
   });
 
-  it('proceeds to createMintQuote for onchain receive despite advertised minimums', () => {
+  it('opens a method-aware mint selector when onchain receive is below the selected mint minimum', () => {
     const wallet: WalletContext = {
       trustedMintUrls: [MINT1, MINT2],
       mintBalances: { [MINT1]: 0, [MINT2]: 0 },
@@ -754,9 +754,17 @@ describe('transition — AMOUNT_ENTERED', () => {
       wallet
     );
 
-    // Advertised NUT-04 minimums are ignored for method candidates; the
-    // selected mint supports onchain, so the quote step proceeds.
-    expect(result.step).toBe('createMintQuote');
+    // 500 sat is below MINT1's advertised NUT-04 onchain minimum (1 000) but
+    // clears MINT2's (100) — instead of creating a quote MINT1 would reject,
+    // the machine offers the method-aware selector with MINT1 disabled.
+    expect(result.step).toBe('selectMint');
+    expect(result.data).toMatchObject({
+      methodRequirement: { operation: 'mint', method: 'onchain', unit: 'sat' },
+      candidates: [
+        { mintUrl: MINT1, status: 'disabled', reason: { code: 'AMOUNT_BELOW_MINT_MIN' } },
+        { mintUrl: MINT2, status: 'available' },
+      ],
+    });
   });
 
   it('opens a method-aware mint selector when Lightning melt is selected on an incompatible mint', () => {
@@ -863,12 +871,18 @@ describe('transition — AMOUNT_ENTERED', () => {
       wallet
     );
 
-    expect(result.step).toBe('navigateToMeltPreview');
+    // 500 sat is below MINT1's advertised NUT-05 bolt11 minimum (1 000) but
+    // clears MINT2's (100) — the melt no longer proceeds on a mint that would
+    // reject the quote; the selector opens with MINT1 disabled.
+    expect(result.step).toBe('selectMint');
     expect(result.data).toMatchObject({
-      mintUrl: MINT1,
-      amount: 500,
-      unit: 'sat',
-      meltTarget: 'alice@example.com',
+      destination: 'meltQuote',
+      meltQuoteMethod: 'bolt11',
+      methodRequirement: { operation: 'melt', method: 'bolt11', unit: 'sat' },
+      candidates: [
+        { mintUrl: MINT1, status: 'disabled', reason: { code: 'AMOUNT_BELOW_MINT_MIN' } },
+        { mintUrl: MINT2, status: 'available' },
+      ],
     });
   });
 

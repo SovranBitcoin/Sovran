@@ -1143,7 +1143,9 @@ describe('amountEntry default handlers', () => {
                   '4': {
                     methods: [
                       { method: 'bolt11', unit: 'sat', min_amount: 1 },
-                      { method: 'onchain', unit: 'sat', min_amount: 1_000 },
+                      // 500 sat clears the onchain minimum — bounds gating has
+                      // its own tests; this one exercises the happy-path handler.
+                      { method: 'onchain', unit: 'sat', min_amount: 100 },
                     ],
                   },
                 },

@@ -447,7 +447,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     });
   });
 
-  it("keeps next available when the selected receive mint advertises a higher minimum", () => {
+  it("disables Lightning receive with the mint minimum when the amount is below every mint's min", () => {
     const entry = {
       destination: "mintQuote",
       selectedMintUrl: MINT1,
@@ -478,9 +478,12 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
       (variant) => variant.id === "lightning",
     );
 
-    expect(actions.next.available).toBe(true);
-    expect(actions.next.reason).toBeUndefined();
-    expect(lightning).toMatchObject({ available: true });
+    // 500 sat is below the only mint's advertised bolt11 minimum (1 000):
+    // the rail grays out citing the bound instead of a generic reason.
+    expect(lightning).toMatchObject({
+      available: false,
+      reason: "Minimum 1,000 sat",
+    });
   });
 
   it("keeps next available when a lower-min alternate can receive the selected below-min amount", () => {
@@ -607,9 +610,15 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
       (variant) => variant.id === "onchain",
     );
 
+    // 500 sat clears the bolt11 bounds (1..500 000) but not the onchain
+    // minimum (1 000): Lightning stays the recommended live rail while
+    // onchain remains visible, grayed with its minimum as the reason.
     expect(actions.next.available).toBe(true);
     expect(lightning).toMatchObject({ available: true });
-    expect(onchain).toMatchObject({ available: true });
+    expect(onchain).toMatchObject({
+      available: false,
+      reason: "Minimum 1,000 sat",
+    });
   });
 
   it("disables Lightning send when no trusted mint advertises NUT-05 bolt11", () => {

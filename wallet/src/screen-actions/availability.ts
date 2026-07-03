@@ -110,14 +110,20 @@ function hasCompatibleCandidate(
 }
 
 function methodAmountReason(
-  _availability: MintMethodAmountAvailability | null,
+  availability: MintMethodAmountAvailability | null,
   fallback: string,
 ): string {
+  // When the amount alone rules the rail out (every supporting mint's
+  // advertised NUT-04/05 bounds exclude it), the reason cites the least
+  // strict bound — e.g. "Minimum 1,000 sat" — instead of the generic
+  // no-supporting-mint fallback.
+  const boundsMessage = availability?.amountBoundsReason?.message;
   logger.debug("screenActions.availability.methodAmountReason", {
-    hasAvailability: !!_availability,
+    hasAvailability: !!availability,
+    amountBoundsReasonCode: availability?.amountBoundsReason?.code ?? null,
     fallback,
   });
-  return fallback;
+  return boundsMessage ?? fallback;
 }
 
 function summarizeAvailabilityMap(

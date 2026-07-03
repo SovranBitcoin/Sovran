@@ -46,7 +46,50 @@ describe('mint method capabilities', () => {
     );
 
     expect(capability.supported).toBe(true);
-    expect(getCapabilityUnavailableReason(capability, requirement, 50)).toBeNull();
+    expect(capability.minAmount).toBe(100);
+    expect(getCapabilityUnavailableReason(capability, requirement, 150)).toBeNull();
+  });
+
+  it('reports advertised amount bounds as unavailable reasons', () => {
+    const capabilities = deriveMintMethodCapabilityMapFromTrustedMints([
+      {
+        mintUrl: MINT1,
+        mintInfo: {
+          nuts: {
+            '4': {
+              methods: [
+                { method: 'onchain', unit: 'sat', min_amount: 1_000, max_amount: 500_000 },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+    const requirement: MintMethodRequirement = {
+      operation: 'mint',
+      method: 'onchain',
+      unit: 'sat',
+    };
+    const capability = getMintMethodCapability(
+      { mintMethodCapabilities: capabilities },
+      MINT1,
+      requirement
+    );
+
+    expect(getCapabilityUnavailableReason(capability, requirement, 100)).toMatchObject({
+      code: 'AMOUNT_BELOW_MINT_MIN',
+      message: 'Minimum 1,000 sat',
+      params: { min: 1_000, unit: 'sat' },
+    });
+    expect(getCapabilityUnavailableReason(capability, requirement, 600_000)).toMatchObject({
+      code: 'AMOUNT_ABOVE_MINT_MAX',
+      message: 'Maximum 500,000 sat',
+      params: { max: 500_000, unit: 'sat' },
+    });
+    // No amount yet (nothing typed) — bounds cannot rule the method out.
+    expect(getCapabilityUnavailableReason(capability, requirement)).toBeNull();
+    expect(getCapabilityUnavailableReason(capability, requirement, 1_000)).toBeNull();
+    expect(getCapabilityUnavailableReason(capability, requirement, 500_000)).toBeNull();
   });
 
   it('treats disabled NUT settings as unavailable', () => {
@@ -94,7 +137,7 @@ describe('mint method capabilities', () => {
     ]);
   });
 
-  it('ignores advertised amount boundaries when building method candidates', () => {
+  it('enforces advertised amount boundaries when building method candidates', () => {
     const wallet: WalletContext = {
       trustedMintUrls: [MINT1, MINT2],
       mintBalances: { [MINT1]: 0, [MINT2]: 0 },
@@ -119,19 +162,24 @@ describe('mint method capabilities', () => {
       ]),
     };
 
+    // 500 sat clears MINT2's minimum (100) but not MINT1's (1 000): the pinned
+    // MINT1 is disabled with the bounds reason while the rail itself stays
+    // available through MINT2 — so no aggregate amountBoundsReason.
     const availability = evaluateMintMethodAmountAvailability(
       wallet,
       { operation: 'mint', method: 'bolt11', unit: 'sat' },
       { amount: 500, selectedMintUrl: MINT1 }
     );
 
-    expect(availability.selectedCandidate).toMatchObject({ mintUrl: MINT1, status: 'available' });
-    expect(availability.selectedUnavailableReason).toBeNull();
-    expect(availability.firstUnavailableReason).toBeNull();
+    expect(availability.selectedCandidate).toMatchObject({ mintUrl: MINT1, status: 'disabled' });
+    expect(availability.selectedUnavailableReason).toMatchObject({
+      code: 'AMOUNT_BELOW_MINT_MIN',
+      params: { min: 1_000, unit: 'sat' },
+    });
     expect(availability.availableCandidates).toMatchObject([
-      { mintUrl: MINT1, status: 'available' },
       { mintUrl: MINT2, status: 'available' },
     ]);
+    expect(availability.amountBoundsReason).toBeNull();
 
     expect(
       evaluateMintMethodAmountAvailability(
@@ -140,6 +188,20 @@ describe('mint method capabilities', () => {
         { amount: 1_000, selectedMintUrl: MINT1 }
       ).selectedCandidate
     ).toMatchObject({ mintUrl: MINT1, status: 'available' });
+
+    // 50 sat is below every mint's minimum: the aggregate reason cites the
+    // LEAST strict bound (MINT2's 100), not the arbitrary first mint's 1 000.
+    const blocked = evaluateMintMethodAmountAvailability(
+      wallet,
+      { operation: 'mint', method: 'bolt11', unit: 'sat' },
+      { amount: 50 }
+    );
+    expect(blocked.availableCandidates).toEqual([]);
+    expect(blocked.amountBoundsReason).toMatchObject({
+      code: 'AMOUNT_BELOW_MINT_MIN',
+      message: 'Minimum 100 sat',
+      params: { min: 100, unit: 'sat' },
+    });
   });
 });
 

@@ -11,6 +11,12 @@ import { logger } from '../logger';
 export interface LocalizedReason {
   code: string;
   message: string;
+  /**
+   * Structured values interpolated into `message` (e.g. `{min}`), kept so
+   * consumers can aggregate reasons numerically (e.g. pick the smallest
+   * advertised minimum across mints) without re-parsing the message.
+   */
+  params?: Record<string, string | number>;
 }
 
 type TranslationMap = Record<string, string>;
@@ -33,6 +39,8 @@ const en: TranslationMap = {
   MINT_METHOD_DISABLED: 'Payment method disabled by mint',
   MINT_METHOD_UNSUPPORTED: 'Mint does not support this payment method',
   PAYMENT_METHOD_NOT_IMPLEMENTED: 'Payment method is not supported yet',
+  AMOUNT_BELOW_MINT_MIN: 'Minimum {min} {unit}',
+  AMOUNT_ABOVE_MINT_MAX: 'Maximum {max} {unit}',
 
   // ExecutionState messages
   OPTION_SELECTION_REQUIRED: 'Option selection is required to continue',
@@ -71,6 +79,8 @@ const ar: TranslationMap = {
   MINT_METHOD_DISABLED: 'طريقة الدفع معطلة من المنت',
   MINT_METHOD_UNSUPPORTED: 'المنت لا يدعم طريقة الدفع هذه',
   PAYMENT_METHOD_NOT_IMPLEMENTED: 'طريقة الدفع غير مدعومة بعد',
+  AMOUNT_BELOW_MINT_MIN: 'الحد الأدنى {min} {unit}',
+  AMOUNT_ABOVE_MINT_MAX: 'الحد الأقصى {max} {unit}',
 
   OPTION_SELECTION_REQUIRED: 'يجب اختيار خيار للمتابعة',
   FALLBACK_OPTION_REQUIRED: 'اختر طريقة دفع بديلة',
@@ -106,6 +116,8 @@ const de: TranslationMap = {
   MINT_METHOD_DISABLED: 'Zahlungsmethode ist vom Mint deaktiviert',
   MINT_METHOD_UNSUPPORTED: 'Mint unterstützt diese Zahlungsmethode nicht',
   PAYMENT_METHOD_NOT_IMPLEMENTED: 'Zahlungsmethode wird noch nicht unterstützt',
+  AMOUNT_BELOW_MINT_MIN: 'Mindestens {min} {unit}',
+  AMOUNT_ABOVE_MINT_MAX: 'Höchstens {max} {unit}',
 
   OPTION_SELECTION_REQUIRED: 'Option muss ausgewählt werden',
   FALLBACK_OPTION_REQUIRED: 'Wählen Sie eine alternative Zahlungsmethode',
@@ -175,14 +187,32 @@ function resolveLocale(locale: string): TranslationMap {
   return fallback;
 }
 
+function interpolate(
+  template: string,
+  locale: string,
+  params?: Record<string, string | number>,
+): string {
+  if (!params) return template;
+  return template.replace(/\{(\w+)\}/g, (match, key: string) => {
+    const value = params[key];
+    if (value === undefined) return match;
+    return typeof value === 'number' ? value.toLocaleString(locale) : value;
+  });
+}
+
 /**
  * Translate a reason code to a localized message.
  * Falls back to English, then to the code itself.
+ * `params` values replace `{key}` placeholders in the message.
  */
-export function t(code: string, locale: string = 'en'): string {
+export function t(
+  code: string,
+  locale: string = 'en',
+  params?: Record<string, string | number>,
+): string {
   const dict = resolveLocale(locale);
   const localized = dict[code];
-  if (localized !== undefined) return localized;
+  if (localized !== undefined) return interpolate(localized, locale, params);
   const english = en[code];
   if (english !== undefined) {
     logger.debug('formatting.locale.translationFallback', {
@@ -190,7 +220,7 @@ export function t(code: string, locale: string = 'en'): string {
       locale,
       fallback: 'en',
     });
-    return english;
+    return interpolate(english, locale, params);
   }
   logger.warn('formatting.locale.translationMissing', { code, locale });
   return code;
@@ -203,10 +233,15 @@ export function t(code: string, locale: string = 'en'): string {
 export function localizeReason(
   code: string | null | undefined,
   locale: string = 'en',
+  params?: Record<string, string | number>,
 ): LocalizedReason | null {
   if (code == null) {
     logger.debug('formatting.locale.reasonSkipped', { locale });
     return null;
   }
-  return { code, message: t(code, locale) };
+  return {
+    code,
+    message: t(code, locale, params),
+    ...(params ? { params } : {}),
+  };
 }
