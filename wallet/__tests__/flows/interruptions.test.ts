@@ -59,7 +59,7 @@ describe('interruptions — reset', () => {
     const tm = createTestMachine();
     // Build up context through a lightning address flow
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     // Now reset — every flow field should be cleared
     tm.machine.reset();

@@ -163,7 +163,7 @@ describe('mint quote — executeMintQuote operation', () => {
   it('calls executeMintQuote when createMintQuote step is reached', async () => {
     const tm = createTestMachine();
     await tm.machine.startReceiveLightning();
-    await tm.machine.enterAmount(1000, MINT1);
+    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
 
     // The machine auto-executed the executeMintQuote operation.
     // Find it in the recording array.
@@ -177,7 +177,7 @@ describe('mint quote — executeMintQuote operation', () => {
     const tm = createTestMachine({ offline: true });
 
     await tm.machine.startReceiveLightning();
-    await tm.machine.enterAmount(1000, MINT1);
+    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
 
     tm.assertStep('error');
     tm.assertExecution({ code: 'MINT_QUOTE_FAILED' });
@@ -195,7 +195,7 @@ describe('mint quote — hung operation recovery', () => {
     });
 
     await tm.machine.startReceiveLightning();
-    const blockedNext = tm.machine.enterAmount(1000, MINT1);
+    const blockedNext = tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
     expect(tm.operationCalls.find((c) => c.name === 'executeMintQuote')).toBeDefined();
 
     await tm.machine.startReceive({ reset: true });
@@ -216,7 +216,7 @@ describe('mint quote — hung operation recovery', () => {
     });
 
     await tm.machine.startReceiveLightning();
-    const blockedNext = tm.machine.enterAmount(1000, MINT1);
+    const blockedNext = tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
 
     await tm.machine.startSendEcash({ reset: true });
     tm.assertStep('enterAmount');
@@ -238,7 +238,7 @@ describe('mint quote — hung operation recovery', () => {
     });
 
     await tm.machine.startReceiveLightning();
-    const blockedNext = tm.machine.enterAmount(1000, MINT1);
+    const blockedNext = tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
 
     await tm.machine.startReceiveLightning({ reset: true });
     tm.assertStep('enterAmount');
@@ -288,7 +288,7 @@ describe('mint quote — executeMintQuote error handling', () => {
       },
     });
     await tm.machine.startReceiveLightning();
-    await tm.machine.enterAmount(1000, MINT1);
+    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
     tm.assertStep('error');
     tm.assertExecution({ code: 'MINT_QUOTE_FAILED' });
   });
@@ -302,7 +302,7 @@ describe('mint quote — executeMintQuote error handling', () => {
       },
     });
     await tm.machine.startReceiveLightning();
-    await tm.machine.enterAmount(1000, MINT1);
+    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
     tm.assertStep('error');
     const execution = tm.machine.inspect();
     expect(execution.message).toContain('Connection refused');
@@ -321,7 +321,7 @@ describe('mint quote — result data', () => {
   it('mintQuoteCreated result contains historyEntry', async () => {
     const tm = createTestMachine();
     await tm.machine.startReceiveLightning();
-    await tm.machine.enterAmount(1000, MINT1);
+    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
     tm.assertStep('mintQuoteCreated');
 
     const opCall = tm.operationCalls.find((c) => c.name === 'executeMintQuote');
@@ -353,7 +353,7 @@ describe('mint quote — notification timeline', () => {
   it('fires only onTransactionCreated on success', async () => {
     const tm = createTestMachine();
     await tm.machine.startReceiveLightning();
-    await tm.machine.enterAmount(1000, MINT1);
+    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
     tm.assertStep('mintQuoteCreated');
 
     const keys = tm.notificationCalls.map((c) => c.key);
@@ -363,7 +363,7 @@ describe('mint quote — notification timeline', () => {
   it('onTransactionCreated carries type=mint with mintUrl, amount, unit, transactionId', async () => {
     const tm = createTestMachine();
     await tm.machine.startReceiveLightning();
-    await tm.machine.enterAmount(1000, MINT1);
+    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
 
     const txCreated = tm.notificationCalls.find((c) => c.key === 'onTransactionCreated');
     expect(txCreated!.data).toMatchObject({
@@ -378,7 +378,7 @@ describe('mint quote — notification timeline', () => {
   it('does not fire onPaymentProcessing or onPaymentConfirmed (melt/PR only)', async () => {
     const tm = createTestMachine();
     await tm.machine.startReceiveLightning();
-    await tm.machine.enterAmount(1000, MINT1);
+    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
 
     const keys = tm.notificationCalls.map((c) => c.key);
     expect(keys).not.toContain('onPaymentProcessing');
@@ -392,7 +392,7 @@ describe('mint quote — notification timeline', () => {
       },
     });
     await tm.machine.startReceiveLightning();
-    await tm.machine.enterAmount(1000, MINT1);
+    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
     tm.assertStep('error');
 
     const keys = tm.notificationCalls.map((c) => c.key);
@@ -406,7 +406,7 @@ describe('mint quote — notification timeline', () => {
       },
     });
     await tm.machine.startReceiveLightning();
-    await tm.machine.enterAmount(1000, MINT1);
+    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1);
 
     const keys = tm.notificationCalls.map((c) => c.key);
     expect(keys).not.toContain('onTransactionCreated');

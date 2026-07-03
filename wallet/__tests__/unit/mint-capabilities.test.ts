@@ -8,6 +8,7 @@ import {
   evaluateMintMethodAmountAvailability,
   getCapabilityUnavailableReason,
   getMintMethodCapability,
+  getUnitAmountEnvelope,
 } from '../../src/mint-capabilities';
 import type { MintMethodRequirement, WalletContext } from '../../src/types';
 import { MINT1, MINT2 } from '../_harness/fixtures';
@@ -236,5 +237,104 @@ describe('compareMintDisplayOrder', () => {
     ];
     const sorted = [...rows].sort(compareMintDisplayOrder);
     expect(sorted.map((r) => r.mintUrl)).toEqual(['c', 'b', 'd', 'e', 'a']);
+  });
+});
+
+describe('getUnitAmountEnvelope', () => {
+  const boundedMelt = (min?: number, max?: number) => ({
+    nuts: {
+      '5': {
+        methods: [
+          {
+            method: 'bolt11',
+            unit: 'sat',
+            ...(min != null ? { min_amount: min } : {}),
+            ...(max != null ? { max_amount: max } : {}),
+          },
+        ],
+      },
+    },
+  });
+  const ctxFor = (mints: { mintUrl: string; mintInfo?: unknown }[], unit = 'sat') => ({
+    trustedMintUrls: mints.map((m) => m.mintUrl),
+    mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints(mints, unit),
+  });
+
+  it('meltQuote takes the least-strict bolt11 melt bounds across mints', () => {
+    const ctx = ctxFor([
+      { mintUrl: MINT1, mintInfo: boundedMelt(10, 50_000) },
+      { mintUrl: MINT2, mintInfo: boundedMelt(100, 200_000) },
+    ]);
+
+    expect(getUnitAmountEnvelope(ctx, 'sat', 'meltQuote')).toEqual({
+      unit: 'sat',
+      minAmount: 10,
+      maxAmount: 200_000,
+    });
+  });
+
+  it('a supporting mint without an advertised bound unbounds that side', () => {
+    const ctx = ctxFor([
+      { mintUrl: MINT1, mintInfo: boundedMelt(10, 50_000) },
+      { mintUrl: MINT2, mintInfo: boundedMelt(undefined, undefined) },
+    ]);
+
+    expect(getUnitAmountEnvelope(ctx, 'sat', 'meltQuote')).toEqual({
+      unit: 'sat',
+      minAmount: null,
+      maxAmount: null,
+    });
+  });
+
+  it('mintQuote is uncapped whenever a trusted mint exists (ecash receive rail)', () => {
+    const ctx = ctxFor([{ mintUrl: MINT1, mintInfo: boundedMelt(10, 50_000) }]);
+
+    expect(getUnitAmountEnvelope(ctx, 'sat', 'mintQuote')).toEqual({
+      unit: 'sat',
+      minAmount: null,
+      maxAmount: null,
+    });
+  });
+
+  it('ecash destinations and unknown destinations never clamp', () => {
+    const ctx = ctxFor([{ mintUrl: MINT1, mintInfo: boundedMelt(10, 50_000) }]);
+
+    for (const destination of ['sendEcash', 'paymentRequest', undefined] as const) {
+      expect(getUnitAmountEnvelope(ctx, 'sat', destination)).toEqual({
+        unit: 'sat',
+        minAmount: null,
+        maxAmount: null,
+      });
+    }
+  });
+
+  it('no supporting mint means uncapped (availability gates Next instead)', () => {
+    const ctx = ctxFor([{ mintUrl: MINT1, mintInfo: {} }]);
+
+    expect(getUnitAmountEnvelope(ctx, 'sat', 'meltQuote')).toEqual({
+      unit: 'sat',
+      minAmount: null,
+      maxAmount: null,
+    });
+  });
+
+  it('bounds are per unit: usd bounds never leak into the sat envelope', () => {
+    const usdInfo = {
+      nuts: {
+        '5': {
+          methods: [
+            { method: 'bolt11', unit: 'usd', min_amount: 5, max_amount: 1_000 },
+            { method: 'bolt11', unit: 'sat', min_amount: 1 },
+          ],
+        },
+      },
+    };
+
+    expect(
+      getUnitAmountEnvelope(ctxFor([{ mintUrl: MINT1, mintInfo: usdInfo }], 'usd'), 'usd', 'meltQuote')
+    ).toEqual({ unit: 'usd', minAmount: 5, maxAmount: 1_000 });
+    expect(
+      getUnitAmountEnvelope(ctxFor([{ mintUrl: MINT1, mintInfo: usdInfo }], 'sat'), 'sat', 'meltQuote')
+    ).toEqual({ unit: 'sat', minAmount: 1, maxAmount: null });
   });
 });

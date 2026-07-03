@@ -33,7 +33,7 @@ describe('ecash send — P2PK locked', () => {
     tm.assertStep('enterAmount');
     tm.assertContext({ destination: 'sendEcash', p2pkLockPubkey: LOCK_PUBKEY });
 
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     tm.assertStep('sendComplete');
     const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
@@ -57,7 +57,7 @@ describe('ecash send — P2PK locked', () => {
     // send would take the localFirst path through executeOfflineSend.
     const tm = createTestMachine();
     await tm.machine.startSendEcash({ p2pkLockPubkey: LOCK_PUBKEY });
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     tm.assertStep('sendComplete');
     expect(tm.operationCalls.find((call) => call.name === 'executeOfflineSend')).toBeUndefined();
@@ -78,7 +78,7 @@ describe('ecash send — P2PK locked', () => {
     });
 
     await tm.machine.startSendEcash({ p2pkLockPubkey: LOCK_PUBKEY });
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     tm.assertStep('error');
     expect(tm.operationCalls.find((call) => call.name === 'executeOfflineSend')).toBeUndefined();
@@ -87,7 +87,7 @@ describe('ecash send — P2PK locked', () => {
   it('fails fast when the app is offline instead of creating a local token', async () => {
     const tm = createTestMachine({ offline: true });
     await tm.machine.startSendEcash({ p2pkLockPubkey: LOCK_PUBKEY });
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     tm.assertStep('error');
     expect(tm.operationCalls.find((call) => call.name === 'executeOfflineSend')).toBeUndefined();
@@ -99,7 +99,7 @@ describe('ecash send — P2PK locked', () => {
     // A locked send can never use local proofs, so it must error instead.
     const tm = createTestMachine({ wallet: WALLETS.noExactProofs, offline: true });
     await tm.machine.startSendEcash({ p2pkLockPubkey: LOCK_PUBKEY });
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     tm.assertStep('error');
     expect(tm.handlerCalls.find((call) => call.step === 'chooseProofs')).toBeUndefined();
@@ -125,7 +125,7 @@ describe('ecash send — P2PK locked', () => {
     await tm.machine.changeMint(MINT1);
     tm.assertContext({ p2pkLockPubkey: LOCK_PUBKEY });
 
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('sendComplete');
     const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
     expect(sendCall?.args[3]).toEqual({ p2pkLockPubkey: LOCK_PUBKEY });
@@ -134,7 +134,7 @@ describe('ecash send — P2PK locked', () => {
   it('unlocked sends are unaffected: localFirst still used with exact proofs', async () => {
     const tm = createTestMachine();
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     tm.assertStep('sendComplete');
     expect(tm.operationCalls.find((call) => call.name === 'executeOfflineSend')).toBeDefined();

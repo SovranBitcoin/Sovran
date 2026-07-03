@@ -986,24 +986,26 @@ describe('amountEntry default handlers', () => {
     it('delegates to machine.enterAmount', async () => {
       const { handlers, machine } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
-        effectiveSatAmount: 100,
+        effectiveAmount: { value: 100, unit: 'sat' },
         selectedMintUrl: MINT1,
         destination: 'sendEcash',
       });
 
       await mgr.execute('next');
-      expect(machine.enterAmount).toHaveBeenCalledWith(100, MINT1, {
+      expect(machine.enterAmount).toHaveBeenCalledWith({ value: 100, unit: 'sat' }, MINT1, {
         destination: 'sendEcash',
         meltTarget: undefined,
         recipientPubkey: undefined,
+        recipientProfile: undefined,
         amountEntryDisplay: {
-          inputMode: 'sat',
+          inputMode: 'unit',
           rawInput: '',
           fiatCurrency: null,
           fiatSymbol: null,
           btcPrice: 0,
           displayFiat: null,
-          displaySats: 100,
+          displayAmount: 100,
+          unit: 'sat',
           autoOptimized: false,
         },
       });
@@ -1012,7 +1014,7 @@ describe('amountEntry default handlers', () => {
     it('carries amount-entry display metadata to machine.enterAmount', async () => {
       const { handlers, machine } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
-        effectiveSatAmount: 20,
+        effectiveAmount: { value: 20, unit: 'sat' },
         selectedMintUrl: MINT1,
         destination: 'sendEcash',
         inputMode: 'fiat',
@@ -1021,15 +1023,16 @@ describe('amountEntry default handlers', () => {
         fiatSymbol: '$',
         btcPrice: 47_619,
         displayFiat: 0.01,
-        displaySats: 20,
+        displayAmount: 20,
         autoOptimized: true,
       });
 
       await mgr.execute('next');
-      expect(machine.enterAmount).toHaveBeenCalledWith(20, MINT1, {
+      expect(machine.enterAmount).toHaveBeenCalledWith({ value: 20, unit: 'sat' }, MINT1, {
         destination: 'sendEcash',
         meltTarget: undefined,
         recipientPubkey: undefined,
+        recipientProfile: undefined,
         amountEntryDisplay: {
           inputMode: 'fiat',
           rawInput: '0.01',
@@ -1037,7 +1040,8 @@ describe('amountEntry default handlers', () => {
           fiatSymbol: '$',
           btcPrice: 47_619,
           displayFiat: 0.01,
-          displaySats: 20,
+          displayAmount: 20,
+          unit: 'sat',
           autoOptimized: true,
         },
       });
@@ -1047,14 +1051,14 @@ describe('amountEntry default handlers', () => {
       const { handlers, machine } = createMockConfig();
       const recipientPubkey = 'a'.repeat(64);
       const { mgr } = createManager('amountEntry', handlers, {
-        effectiveSatAmount: 100,
+        effectiveAmount: { value: 100, unit: 'sat' },
         selectedMintUrl: MINT1,
         destination: 'sendEcash',
         recipientPubkey,
       });
 
       await mgr.execute('next');
-      expect(machine.enterAmount).toHaveBeenCalledWith(100, MINT1, {
+      expect(machine.enterAmount).toHaveBeenCalledWith({ value: 100, unit: 'sat' }, MINT1, {
         destination: 'sendEcash',
         meltTarget: undefined,
         recipientPubkey,
@@ -1075,7 +1079,7 @@ describe('amountEntry default handlers', () => {
         nip05: 'fresh@example.com',
       };
       const { mgr } = createManager('amountEntry', handlers, {
-        effectiveSatAmount: 100,
+        effectiveAmount: { value: 100, unit: 'sat' },
         selectedMintUrl: MINT1,
         destination: 'sendEcash',
         recipientPubkey: 'a'.repeat(64),
@@ -1087,7 +1091,7 @@ describe('amountEntry default handlers', () => {
         recipientProfile: ctxProfile,
       });
 
-      expect(machine.enterAmount).toHaveBeenCalledWith(100, MINT1, {
+      expect(machine.enterAmount).toHaveBeenCalledWith({ value: 100, unit: 'sat' }, MINT1, {
         destination: 'sendEcash',
         meltTarget: undefined,
         recipientPubkey: 'b'.repeat(64),
@@ -1105,7 +1109,7 @@ describe('amountEntry default handlers', () => {
       };
       const recipientPubkey = 'a'.repeat(64);
       const { mgr } = createManager('amountEntry', handlers, {
-        effectiveSatAmount: 100,
+        effectiveAmount: { value: 100, unit: 'sat' },
         selectedMintUrl: MINT1,
         destination: 'sendEcash',
         meltTarget: 'alice@example.com',
@@ -1115,7 +1119,7 @@ describe('amountEntry default handlers', () => {
 
       await mgr.execute('next', { variantId: 'lightning' });
 
-      expect(machine.enterAmount).toHaveBeenCalledWith(100, MINT1, {
+      expect(machine.enterAmount).toHaveBeenCalledWith({ value: 100, unit: 'sat' }, MINT1, {
         destination: 'meltQuote',
         meltQuoteMethod: 'bolt11',
         meltTarget: 'alice@example.com',
@@ -1128,7 +1132,7 @@ describe('amountEntry default handlers', () => {
     it('enters onchain receive from the default next handler (coco v2)', async () => {
       const { handlers, machine } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
-        effectiveSatAmount: 500,
+        effectiveAmount: { value: 500, unit: 'sat' },
         selectedMintUrl: MINT1,
         destination: 'mintQuote',
         unit: 'sat',
@@ -1158,7 +1162,7 @@ describe('amountEntry default handlers', () => {
       await mgr.execute('next', { variantId: 'onchain' });
 
       expect(machine.enterAmount).toHaveBeenCalledWith(
-        500,
+        { value: 500, unit: 'sat' },
         MINT1,
         expect.objectContaining({ destination: 'mintQuote', mintQuoteMethod: 'onchain' })
       );
@@ -1167,7 +1171,7 @@ describe('amountEntry default handlers', () => {
     it('enters onchain receive when an alternate mint also advertises it (coco v2)', async () => {
       const { handlers, machine } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
-        effectiveSatAmount: 500,
+        effectiveAmount: { value: 500, unit: 'sat' },
         selectedMintUrl: MINT1,
         destination: 'mintQuote',
         unit: 'sat',
@@ -1203,7 +1207,7 @@ describe('amountEntry default handlers', () => {
       await mgr.execute('next', { variantId: 'onchain' });
 
       expect(machine.enterAmount).toHaveBeenCalledWith(
-        500,
+        { value: 500, unit: 'sat' },
         MINT1,
         expect.objectContaining({ destination: 'mintQuote', mintQuoteMethod: 'onchain' })
       );
@@ -1212,7 +1216,7 @@ describe('amountEntry default handlers', () => {
     it('does nothing when effectiveSatAmount is 0', async () => {
       const { handlers, machine } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
-        effectiveSatAmount: 0,
+        effectiveAmount: { value: 0, unit: 'sat' },
         selectedMintUrl: MINT1,
         destination: 'sendEcash',
       });
@@ -1224,7 +1228,7 @@ describe('amountEntry default handlers', () => {
     it('does nothing without destination', async () => {
       const { handlers, machine } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
-        effectiveSatAmount: 100,
+        effectiveAmount: { value: 100, unit: 'sat' },
         selectedMintUrl: MINT1,
       });
 

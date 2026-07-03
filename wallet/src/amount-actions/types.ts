@@ -6,7 +6,23 @@
 // Follows the same subscribe/inspect pattern as ScreenActionManager.
 // ---------------------------------------------------------------------------
 
-export type AmountInputMode = 'sat' | 'fiat';
+import type { AmountEntryEnvelope } from '../mint-capabilities';
+
+/** Integer amount in a unit's minor denomination (sat, usd-cents, …). */
+export interface UnitAmount {
+  value: number;
+  unit: string;
+}
+
+/**
+ * - 'unit': typing in the active account unit — integer sats on the sat
+ *   account, 2-decimal major-denomination entry producing integer minor
+ *   units (cents) on fiat accounts.
+ * - 'fiat': display-currency entry converted to sats. Only reachable when
+ *   the active unit is 'sat' (the swapper toggle); fiat accounts input in
+ *   their own unit and never convert.
+ */
+export type AmountInputMode = 'unit' | 'fiat';
 
 /**
  * Core resolution fields — the pure math output from resolveAmount().
@@ -17,16 +33,16 @@ export interface CoreAmountResolution {
   inputMode: AmountInputMode;
   /** Raw string as entered via the keyboard (e.g. "0.02", "42", ""). */
   rawInput: string;
-  /** Parsed numeric value in current mode units (sats or fiat). */
+  /** Parsed numeric value in current mode's major denomination. */
   numericValue: number;
-  /** Resolved satoshi amount to submit to the machine. */
-  effectiveSatAmount: number;
+  /** Resolved amount to submit to the machine, in minor units of its unit. */
+  effectiveAmount: UnitAmount;
   /** Whether the effective amount can be sent offline. null when N/A. */
   canSendOffline: boolean | null;
-  /** Fiat equivalent for display. null when btcPrice unavailable. */
+  /** Display-currency equivalent. null off the sat account or without price. */
   displayFiat: number | null;
-  /** Satoshi equivalent for display. */
-  displaySats: number;
+  /** Minor-unit equivalent of the entry (sats on sat account, cents on fiat). */
+  displayAmount: number;
   /**
    * True when fiat mode auto-selected an offline-compatible sat amount
    * within the fiat rounding window (different from the naive center).
@@ -39,20 +55,26 @@ export interface CoreAmountResolution {
  * This is what inspect() returns and what the UI renders from.
  */
 export interface AmountResolution extends CoreAmountResolution {
-  /** Base unit (e.g. 'sat'). Always the configured unit regardless of mode. */
+  /** Active account unit. Always effectiveAmount.unit. */
   unit: string;
-  /** Unit the keyboard should use — 'sat' in sat mode, fiat currency code in fiat mode. */
+  /** Unit the keyboard should use — the unit code, or the display-currency code in 'fiat' mode. */
   keyboardUnit: string;
-  /** Secondary display text (e.g. '≈ $0.02' or '≈ 42 sats'). null when fiat toggle unavailable. */
+  /** Secondary display text (e.g. '≈ $0.02' or '≈ 42 sats'). null off the sat account. */
   secondaryDisplay: string | null;
-  /** Fiat currency code (e.g. 'usd'). null when fiat toggle unavailable. */
+  /** Display-currency code (e.g. 'usd'). null when the swapper toggle is unavailable. */
   fiatCurrency: string | null;
-  /** Fiat currency symbol (e.g. '$'). null when fiat toggle unavailable. */
+  /** Display-currency symbol (e.g. '$'). null when the swapper toggle is unavailable. */
   fiatSymbol: string | null;
-  /** Current BTC price in the configured fiat. 0 when unavailable. */
+  /** Symbol of the account unit itself — '$'/'€'/'£' on fiat accounts, '' on sat. */
+  unitSymbol: string;
+  /** Current BTC price in the configured display currency. 0 when unavailable. */
   btcPrice: number;
   /** Quick send suggestions — offline-composable amounts for one-tap entry. Empty when N/A. */
   suggestions: QuickSendSuggestion[];
+  /** True when the last setInput was replaced by the envelope cap. */
+  clampedToCap: boolean;
+  /** The envelope max the keypad is capped at. null when uncapped. */
+  inputCap: UnitAmount | null;
 }
 
 /**
@@ -67,8 +89,8 @@ export interface QuickSendSuggestion {
   inputValue: string;
   /** Input mode to switch to on tap */
   inputMode: AmountInputMode;
-  /** Exact sat amount this resolves to (offline-composable) */
-  satoshis: number;
+  /** Exact minor-unit amount this resolves to (offline-composable) */
+  amount: UnitAmount;
   /** When true, this suggestion represents the full wallet balance. */
   sendAll?: boolean;
 }
@@ -86,7 +108,7 @@ export interface QuickSendSuggestion {
 export interface CreateAmountActionManagerConfig {
   /** Returns the currently selected mint URL. */
   getMintUrl: () => string | undefined;
-  /** Returns proof amounts for the selected mint. */
+  /** Returns proof amounts for the selected mint, in the active unit's minor units. */
   getProofAmounts: () => number[];
   /** Returns current BTC price in user's fiat currency. */
   getBtcPrice: () => number;
@@ -96,25 +118,31 @@ export interface CreateAmountActionManagerConfig {
    * to track destination changes mid-flow without rebuilding the manager.
    */
   offlineOptimization: boolean | (() => boolean);
-  /** Base unit for sat mode (e.g. 'sat'). Pass a getter when the unit can change. */
+  /** Active account unit (e.g. 'sat', 'usd'). Pass a getter when the unit can change. */
   unit: string | (() => string);
   /**
-   * Fiat currency code (e.g. 'usd'). Enables fiat toggle when both
-   * fiatCurrency and fiatSymbol resolve to truthy values. Pass a getter to
-   * track display-currency changes mid-flow.
+   * Display-currency code (e.g. 'usd'). Enables the swapper toggle on the sat
+   * account when both fiatCurrency and fiatSymbol resolve truthy. Pass a
+   * getter to track display-currency changes mid-flow.
    */
   fiatCurrency?: string | (() => string | undefined);
-  /** Fiat currency symbol (e.g. '$'). Enables fiat toggle alongside fiatCurrency. */
+  /** Display-currency symbol (e.g. '$'). Enables the swapper toggle alongside fiatCurrency. */
   fiatSymbol?: string | (() => string | undefined);
   /** Quick send suggestion config. Omit for defaults, null to disable. */
   quickSendConfig?: QuickSendConfig | null;
+  /**
+   * Typed-input envelope for the current flow (per active unit/destination).
+   * Re-read on every setInput; `maxAmount` hard-caps typing by replacement.
+   * Omit or return null for uncapped input.
+   */
+  getAmountEnvelope?: () => AmountEntryEnvelope | null;
 }
 
 /**
  * Configuration for quick send suggestion targets and limits.
  */
 export interface QuickSendConfig {
-  /** Fiat amounts to try (default: broad range from $0.10 to $100) */
+  /** Display-currency amounts to try on the sat account (default: $0.10–$100 range) */
   fiatTargets?: number[];
   /** Sat amounts to try (default: broad range from 21 to 100,000) */
   satTargets?: number[];
@@ -133,9 +161,9 @@ export interface QuickSendConfig {
 export interface AmountActionManager {
   /** Set the raw input string (forwarded from CustomKeyboard's onKeyPress). */
   setInput: (rawInput: string) => void;
-  /** Set input mode directly (used by suggestion taps). No-op when fiat toggle unavailable. */
+  /** Set input mode directly (used by suggestion taps). No-op when the toggle is unavailable. */
   setMode: (mode: AmountInputMode) => void;
-  /** Toggle between sat and fiat input modes. No-op when fiat toggle unavailable. */
+  /** Toggle between unit and display-currency input. No-op off the sat account. */
   toggle: () => void;
   /** Get current resolved state. Stable reference when result unchanged. */
   inspect: () => AmountResolution;

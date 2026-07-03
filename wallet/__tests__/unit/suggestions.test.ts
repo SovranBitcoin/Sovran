@@ -41,7 +41,7 @@ describe('computeQuickSendSuggestions', () => {
   it('returns sat-only suggestions when no fiat info provided', () => {
     const result = computeQuickSendSuggestions(DEFAULT_PROOFS, 100_000);
     expect(result.length).toBeGreaterThan(0);
-    expect(result.every((s) => s.inputMode === 'sat')).toBe(true);
+    expect(result.every((s) => s.inputMode === 'unit')).toBe(true);
   });
 
   it('returns both fiat and sat suggestions when fiat info provided', () => {
@@ -51,7 +51,7 @@ describe('computeQuickSendSuggestions', () => {
     });
     expect(result.length).toBeGreaterThan(0);
     const hasFiat = result.some((s) => s.inputMode === 'fiat');
-    const hasSat = result.some((s) => s.inputMode === 'sat');
+    const hasSat = result.some((s) => s.inputMode === 'unit');
     expect(hasFiat).toBe(true);
     expect(hasSat).toBe(true);
   });
@@ -62,7 +62,7 @@ describe('computeQuickSendSuggestions', () => {
       fiatSymbol: '$',
     });
     for (let i = 1; i < result.length; i++) {
-      expect(result[i]!.satoshis).toBeGreaterThanOrEqual(result[i - 1]!.satoshis);
+      expect(result[i]!.amount.value).toBeGreaterThanOrEqual(result[i - 1]!.amount.value);
     }
   });
 
@@ -72,7 +72,7 @@ describe('computeQuickSendSuggestions', () => {
       fiatSymbol: '$',
     });
     for (const suggestion of result) {
-      const composition = composeSatoshis(DEFAULT_PROOFS, suggestion.satoshis);
+      const composition = composeSatoshis(DEFAULT_PROOFS, suggestion.amount.value);
       expect(composition.exactMatch).toBe(true);
     }
   });
@@ -82,7 +82,7 @@ describe('computeQuickSendSuggestions', () => {
       fiatCurrency: 'usd',
       fiatSymbol: '$',
     });
-    const sats = result.map((s) => s.satoshis);
+    const sats = result.map((s) => s.amount.value);
     expect(new Set(sats).size).toBe(sats.length);
   });
 
@@ -93,7 +93,7 @@ describe('computeQuickSendSuggestions', () => {
       config: { limit: 1 },
     });
     const fiatCount = result.filter((s) => s.inputMode === 'fiat').length;
-    const satCount = result.filter((s) => s.inputMode === 'sat' && !s.sendAll).length;
+    const satCount = result.filter((s) => s.inputMode === 'unit' && !s.sendAll).length;
     expect(fiatCount).toBeLessThanOrEqual(1);
     expect(satCount).toBeLessThanOrEqual(1);
   });
@@ -104,9 +104,9 @@ describe('computeQuickSendSuggestions', () => {
       fiatSymbol: '$',
       config: { fiatTargets: [1], satTargets: [21] },
     });
-    const satSuggestions = result.filter((s) => s.inputMode === 'sat');
+    const satSuggestions = result.filter((s) => s.inputMode === 'unit');
     if (satSuggestions.length > 0) {
-      expect(satSuggestions[0]!.satoshis).toBe(21);
+      expect(satSuggestions[0]!.amount.value).toBe(21);
     }
   });
 
@@ -118,7 +118,7 @@ describe('computeQuickSendSuggestions', () => {
     });
     expect(result.length).toBeGreaterThan(0);
     for (const s of result) {
-      expect(s.satoshis).toBeLessThanOrEqual(1023); // total balance
+      expect(s.amount.value).toBeLessThanOrEqual(1023); // total balance
     }
   });
 
@@ -130,7 +130,7 @@ describe('computeQuickSendSuggestions', () => {
     });
     // Fiat suggestions may be empty since even $0.10 = 10,000 sats > 1023
     // But sat suggestions should still exist
-    const satSuggestions = result.filter((s) => s.inputMode === 'sat');
+    const satSuggestions = result.filter((s) => s.inputMode === 'unit');
     expect(satSuggestions.length).toBeGreaterThan(0);
   });
 
@@ -140,7 +140,7 @@ describe('computeQuickSendSuggestions', () => {
       fiatSymbol: '$',
     });
     for (const suggestion of result) {
-      const composition = composeSatoshis(GAPPED_PROOFS, suggestion.satoshis);
+      const composition = composeSatoshis(GAPPED_PROOFS, suggestion.amount.value);
       expect(composition.exactMatch).toBe(true);
     }
   });

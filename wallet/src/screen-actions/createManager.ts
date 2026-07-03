@@ -91,14 +91,17 @@ export function createScreenActionManager<S extends ScreenType>(
       inputMode: resolution.inputMode,
       rawInput: resolution.rawInput,
       numericValue: resolution.numericValue,
-      effectiveSatAmount: resolution.effectiveSatAmount,
+      effectiveAmount: resolution.effectiveAmount,
       canSendOffline: resolution.canSendOffline,
       displayFiat: resolution.displayFiat,
-      displaySats: resolution.displaySats,
+      displayAmount: resolution.displayAmount,
       autoOptimized: resolution.autoOptimized,
       unit: resolution.unit,
       keyboardUnit: resolution.keyboardUnit,
+      unitSymbol: resolution.unitSymbol,
       secondaryDisplay: resolution.secondaryDisplay,
+      clampedToCap: resolution.clampedToCap,
+      inputCap: resolution.inputCap,
       // fiatCurrency + btcPrice flow from the AmountActionManager so the
       // amountEntry availability rule (`hasFiatToggle`) checks fields the
       // package itself controls — not entrySeed fields the wallet has to
@@ -159,7 +162,7 @@ export function createScreenActionManager<S extends ScreenType>(
           inputLength:
             typeof params?.input === "string" ? params.input.length : 0,
         });
-        if (params?.mode === "sat" || params?.mode === "fiat") {
+        if (params?.mode === "unit" || params?.mode === "fiat") {
           amountMgr.setMode(params.mode);
         }
         const raw = typeof params?.input === "string" ? params.input : "";
@@ -412,11 +415,14 @@ function getOnchainMintQuotePaymentText(
   address: string,
 ): string {
   const metadata = getEntryMetadataRecord(entry);
-  const amountSats =
-    entry.unit === "sat" || entry.unit == null
-      ? (getNumberValue(metadata?.requestedAmount) ??
-        getNumberValue(entry.amount))
-      : null;
+  // BIP-321 `amount` is denominated in BTC, so only sat-unit quotes can emit
+  // one. A fiat-unit onchain quote's requestedAmount is cents — never a BTC
+  // amount — so the URI deliberately omits it and the sender picks the value.
+  const isSatDenominated = entry.unit === "sat" || entry.unit == null;
+  const amountSats = isSatDenominated
+    ? (getNumberValue(metadata?.requestedAmount) ??
+      getNumberValue(entry.amount))
+    : null;
 
   return buildBip321OnchainUri(address, {
     amountSats,
@@ -850,6 +856,8 @@ export interface MeltOperationLike {
   state?: string;
   quoteId?: string;
   amount?: number;
+  /** Unit of `amount` (coco melt operations carry it; default 'sat'). */
+  unit?: string;
 }
 
 function mapMeltOperationState(state?: string): "UNPAID" | "PENDING" | "PAID" {
@@ -868,7 +876,7 @@ export function meltOperationToScreenActionEntry(
     type: "melt",
     createdAt: operation.createdAt,
     mintUrl: operation.mintUrl,
-    unit: "sat",
+    unit: operation.unit ?? "sat",
     quoteId: operation.quoteId,
     amount: operation.amount,
     state: mapMeltOperationState(operation.state),

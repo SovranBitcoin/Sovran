@@ -149,7 +149,7 @@ export type FlowAction =
   /** Scan from a specific source (NFC, camera, etc.). */
   | { type: 'scan'; data?: string; source?: string }
   /** User enters an amount. Can optionally specify destination and offline mode. */
-  | { type: 'enterAmount'; amount: number; mintUrl: string; destination?: Destination; offline?: boolean }
+  | { type: 'enterAmount'; amount: number; unit?: string; mintUrl: string; destination?: Destination; offline?: boolean }
   /** User picks a payment option from the multi-option screen. */
   | { type: 'chooseOption'; optionKind: PaymentOptionKind; optionValue?: string }
   /** User selects a different mint. */

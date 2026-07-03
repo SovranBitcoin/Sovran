@@ -2,14 +2,20 @@
 // Amount Actions — stateful runtime
 //
 // Owns the raw keyboard string and input mode. On every inspect(), resolves
-// the effective sat amount via the pure resolveAmount() function, then adds
-// display fields (keyboardUnit, secondaryDisplay, fiatSymbol). Returns
+// the effective minor-unit amount via the pure resolveAmount() function, then
+// adds display fields (keyboardUnit, secondaryDisplay, unitSymbol). Returns
 // stable references via structural comparison for useSyncExternalStore.
 //
 // The manager computes EVERYTHING the UI needs — the component is stateless.
 // ---------------------------------------------------------------------------
 
 import { logger } from '../logger';
+import {
+  isFiatUnit,
+  majorToMinor,
+  minorToRawInput,
+  unitSymbol as symbolForUnit,
+} from '../formatting/units';
 import { resolveAmount, resolutionEqual } from './resolve';
 import { computeQuickSendSuggestions } from './suggestions';
 import type {
@@ -18,7 +24,10 @@ import type {
   AmountInputMode,
   AmountResolution,
   CreateAmountActionManagerConfig,
+  UnitAmount,
 } from './types';
+
+const SATS_PER_BTC = 100_000_000;
 
 /**
  * Convert a fiat number to the most natural raw input string.
@@ -35,18 +44,19 @@ function fiatToRawInput(fiat: number): string {
 }
 
 /**
- * Format the secondary display text shown beneath the amount.
- * In fiat mode shows sat equivalent; in sat mode shows fiat equivalent.
+ * Format the secondary display text shown beneath the amount on the sat
+ * account. In fiat mode shows sat equivalent; in unit mode shows the
+ * display-currency equivalent. Fiat accounts render no secondary text.
  */
 function formatSecondaryDisplay(
   inputMode: AmountInputMode,
-  displaySats: number,
+  displayAmount: number,
   displayFiat: number | null,
   fiatSymbol: string,
 ): string {
   if (inputMode === 'fiat') {
-    if (displaySats > 0) {
-      return `≈ ${displaySats.toLocaleString('en-US')} sats`;
+    if (displayAmount > 0) {
+      return `≈ ${displayAmount.toLocaleString('en-US')} sats`;
     }
     return '≈ 0 sats';
   }
@@ -81,18 +91,24 @@ export function createAmountActionManager(
     fiatCurrency,
     fiatSymbol,
     quickSendConfig,
+    getAmountEnvelope,
   } = config;
 
   const getOfflineOptimization = asGetter(offlineOptimization);
   const getUnit = asGetter(unit);
   const getFiatCurrency = asGetter<string | undefined>(fiatCurrency);
   const getFiatSymbol = asGetter<string | undefined>(fiatSymbol);
+  // The display-currency swapper only exists on the sat account. Fiat
+  // accounts input in their own unit — converting "usd worth of usd" is
+  // meaningless, and "sats worth of usd" is deliberately not offered.
   const hasFiatToggleNow = (): boolean =>
-    !!getFiatCurrency() && !!getFiatSymbol();
+    getUnit() === 'sat' && !!getFiatCurrency() && !!getFiatSymbol();
   const suggestionsDisabled = quickSendConfig === null;
 
-  let inputMode: AmountInputMode = 'sat';
+  let inputMode: AmountInputMode = 'unit';
   let rawInput = '';
+  let lastUnit = getUnit();
+  let clampedToCap = false;
   let prevResolution: AmountResolution | null = null;
   let prevComputeLogKey: string | null = null;
   const listeners = new Set<() => void>();
@@ -102,28 +118,56 @@ export function createAmountActionManager(
     initialMintUrlLength: getMintUrl()?.length ?? 0,
     offlineOptimizationIsGetter: typeof offlineOptimization === 'function',
     unitIsGetter: typeof unit === 'function',
+    unit: lastUnit,
     fiatCurrencyIsGetter: typeof fiatCurrency === 'function',
     fiatSymbolIsGetter: typeof fiatSymbol === 'function',
     hasFiatCurrency: !!getFiatCurrency(),
     hasFiatSymbol: !!getFiatSymbol(),
+    hasAmountEnvelope: !!getAmountEnvelope,
     suggestionsDisabled,
   });
 
-  // Suggestion cache — invalidated when proofs or price change
+  /**
+   * A unit switch mid-entry (account switcher, or the mint change following
+   * pickHighestBalanceUnit) resets the draft: "1.5" must never be
+   * reinterpreted as dollars-that-were-sats or vice versa. Called from every
+   * state read/write; no notify — the unit change itself re-renders readers.
+   */
+  function ensureUnitCurrent(): void {
+    const unitNow = getUnit();
+    if (unitNow === lastUnit) return;
+    logger.info('amount.unit.reset', {
+      from: lastUnit,
+      to: unitNow,
+      hadInput: rawInput.length > 0,
+      previousMode: inputMode,
+    });
+    lastUnit = unitNow;
+    rawInput = '';
+    inputMode = 'unit';
+    clampedToCap = false;
+  }
+
+  // Suggestion cache — invalidated when proofs, price, or unit change
   const EMPTY_SUGGESTIONS: QuickSendSuggestion[] = [];
   let sugCache: {
     len: number;
     sum: number;
     price: number;
+    unit: string;
     result: QuickSendSuggestion[];
   } | null = null;
 
   function getSuggestions(): QuickSendSuggestion[] {
     if (!getOfflineOptimization() || suggestionsDisabled)
       return EMPTY_SUGGESTIONS;
+    const unitNow = getUnit();
     const proofs = getProofAmounts();
     const price = getBtcPrice();
-    if (proofs.length === 0 || price <= 0) return EMPTY_SUGGESTIONS;
+    // Fiat-unit suggestions are cent-exact and need no price; the sat
+    // account still needs one for the display-currency chip category.
+    if (proofs.length === 0) return EMPTY_SUGGESTIONS;
+    if (unitNow === 'sat' && price <= 0) return EMPTY_SUGGESTIONS;
 
     const len = proofs.length;
     const sum = proofs.reduce((a, b) => a + b, 0);
@@ -131,26 +175,29 @@ export function createAmountActionManager(
       sugCache &&
       sugCache.len === len &&
       sugCache.sum === sum &&
-      sugCache.price === price
+      sugCache.price === price &&
+      sugCache.unit === unitNow
     ) {
       return sugCache.result;
     }
 
     const result = computeQuickSendSuggestions(proofs, price, {
+      unit: unitNow,
       fiatCurrency: getFiatCurrency(),
       fiatSymbol: getFiatSymbol(),
       config: quickSendConfig ?? undefined,
     });
-    // Logged so we can verify the "Send all" suggestion's satoshis matches the
+    // Logged so we can verify the "Send all" suggestion's amount matches the
     // actual sum of available proofs. Mismatches indicate the wallet's
     // proofAmounts cache is stale relative to coco's proof state.
     const sendAll = result.find((s) => s.sendAll);
     logger.info('amountActions.suggestion.derive', {
       proofCount: len,
       spendableTotal: sum,
-      displayedSendAll: sendAll?.satoshis ?? null,
+      unit: unitNow,
+      displayedSendAll: sendAll?.amount.value ?? null,
     });
-    sugCache = { len, sum, price, result };
+    sugCache = { len, sum, price, unit: unitNow, result };
     return result;
   }
 
@@ -173,7 +220,41 @@ export function createAmountActionManager(
     return isNaN(parsed) ? 0 : parsed;
   }
 
+  /** The envelope max for the active unit, or null when uncapped. */
+  function currentCap(): number | null {
+    const envelope = getAmountEnvelope?.() ?? null;
+    if (!envelope || envelope.maxAmount == null) return null;
+    // A stale envelope for another unit must never clamp this one.
+    if (envelope.unit !== getUnit().toLowerCase()) return null;
+    return envelope.maxAmount > 0 ? envelope.maxAmount : null;
+  }
+
+  /** Minor-unit value the given raw string resolves to in the current mode. */
+  function rawToMinor(input: string): number {
+    const numericValue = parseNumericValue(input);
+    if (numericValue <= 0) return 0;
+    if (inputMode === 'fiat') {
+      const btcPrice = getBtcPrice();
+      if (btcPrice <= 0) return 0;
+      return Math.round(numericValue * (SATS_PER_BTC / btcPrice));
+    }
+    return majorToMinor(numericValue, getUnit());
+  }
+
+  /** Render a minor-unit cap as a raw-input string for the current mode. */
+  function capToRawInput(cap: number): string {
+    if (inputMode === 'fiat') {
+      const btcPrice = getBtcPrice();
+      if (btcPrice <= 0) return '';
+      // Floor to 2 decimals so the replacement never re-exceeds the cap.
+      const fiat = Math.floor((cap / SATS_PER_BTC) * btcPrice * 100) / 100;
+      return fiatToRawInput(fiat);
+    }
+    return minorToRawInput(cap, getUnit());
+  }
+
   function compute(): AmountResolution {
+    ensureUnitCurrent();
     const numericValue = parseNumericValue(rawInput);
     const mintUrl = getMintUrl();
     const proofAmounts = mintUrl ? getProofAmounts() : [];
@@ -182,31 +263,39 @@ export function createAmountActionManager(
     const unitNow = getUnit();
     const fiatCurrencyNow = getFiatCurrency();
     const fiatSymbolNow = getFiatSymbol();
-    const fiatToggleAvailable = !!fiatCurrencyNow && !!fiatSymbolNow;
+    const fiatToggleAvailable = hasFiatToggleNow();
     const fiatToggleActive = fiatToggleAvailable && btcPrice > 0;
 
-    const core = resolveAmount(
+    const core = resolveAmount({
       inputMode,
       rawInput,
       numericValue,
+      unit: unitNow,
       proofAmounts,
       btcPrice,
-      offlineOpt,
-    );
+      offlineOptimization: offlineOpt,
+    });
 
-    // Keyboard unit: fiat currency code in fiat mode, base unit otherwise
+    // Keyboard unit: display-currency code in fiat mode, unit code otherwise.
+    // CustomKeyboard renders the 2-decimal keypad for any non-'sat' unit, so
+    // fiat accounts get decimal entry with zero keyboard changes.
     const keyboardUnit =
       inputMode === 'fiat' && fiatCurrencyNow ? fiatCurrencyNow : unitNow;
 
-    // Secondary display: only when fiat toggle is available and btcPrice is valid
+    // Secondary "≈ …" line: sat account only. Fiat accounts show nothing —
+    // the entered value IS the amount, there is no conversion to explain.
     const secondaryDisplay = fiatToggleActive
       ? formatSecondaryDisplay(
           inputMode,
-          core.displaySats,
+          core.displayAmount,
           core.displayFiat,
           fiatSymbolNow!,
         )
       : null;
+
+    const cap = currentCap();
+    const inputCap: UnitAmount | null =
+      cap != null ? { value: cap, unit: unitNow } : null;
 
     const suggestions = getSuggestions();
     const result: AmountResolution = {
@@ -216,8 +305,11 @@ export function createAmountActionManager(
       secondaryDisplay,
       fiatCurrency: fiatToggleActive ? fiatCurrencyNow! : null,
       fiatSymbol: fiatToggleActive ? fiatSymbolNow! : null,
+      unitSymbol: symbolForUnit(unitNow),
       btcPrice,
       suggestions,
+      clampedToCap,
+      inputCap,
     };
 
     const proofTotal = sumAmounts(proofAmounts);
@@ -225,8 +317,9 @@ export function createAmountActionManager(
       inputMode: result.inputMode,
       rawInputLength: result.rawInput.length,
       numericValue: result.numericValue,
-      effectiveSatAmount: result.effectiveSatAmount,
-      displaySats: result.displaySats,
+      effectiveAmountValue: result.effectiveAmount.value,
+      effectiveAmountUnit: result.effectiveAmount.unit,
+      displayAmount: result.displayAmount,
       displayFiat: result.displayFiat,
       autoOptimized: result.autoOptimized,
       canSendOffline: result.canSendOffline,
@@ -236,6 +329,8 @@ export function createAmountActionManager(
       offlineOpt,
       fiatToggleAvailable,
       fiatToggleActive,
+      clampedToCap,
+      inputCapValue: inputCap?.value ?? null,
       hasMintUrl: !!mintUrl,
       proofCount: proofAmounts.length,
       proofTotal,
@@ -247,8 +342,9 @@ export function createAmountActionManager(
         inputMode: result.inputMode,
         rawInputLength: result.rawInput.length,
         numericValue: result.numericValue,
-        effectiveSatAmount: result.effectiveSatAmount,
-        displaySats: result.displaySats,
+        effectiveAmountValue: result.effectiveAmount.value,
+        effectiveAmountUnit: result.effectiveAmount.unit,
+        displayAmount: result.displayAmount,
         hasDisplayFiat: result.displayFiat != null,
         displayFiat: result.displayFiat,
         autoOptimized: result.autoOptimized,
@@ -262,6 +358,8 @@ export function createAmountActionManager(
         offlineOptimization: offlineOpt,
         fiatToggleAvailable,
         fiatToggleActive,
+        clampedToCap,
+        inputCapValue: inputCap?.value ?? null,
         hasMintUrl: !!mintUrl,
         mintUrlLength: mintUrl?.length ?? 0,
         proofCount: proofAmounts.length,
@@ -287,22 +385,43 @@ export function createAmountActionManager(
   };
 
   const setInput = (input: string): void => {
+    ensureUnitCurrent();
+    // Hard cap: replace (never silently reject) input that exceeds the
+    // envelope max — CustomKeyboard resyncs its internal state only when its
+    // `value` prop changes, so rejection would desync the keypad.
+    const cap = currentCap();
+    let next = input;
+    let clamped = false;
+    if (cap != null && rawToMinor(input) > cap) {
+      next = capToRawInput(cap);
+      clamped = true;
+      logger.info('amount.input.clamped', {
+        cap,
+        unit: getUnit(),
+        inputMode,
+        rejectedLength: input.length,
+      });
+    }
     logger.info('amountActions.setInput', {
       previousRawInputLength: rawInput.length,
-      nextRawInputLength: input.length,
-      unchanged: input === rawInput,
+      nextRawInputLength: next.length,
+      unchanged: next === rawInput,
+      clamped,
       inputMode,
     });
-    rawInput = input;
+    rawInput = next;
+    clampedToCap = clamped;
     notify();
   };
 
   const setMode = (mode: AmountInputMode): void => {
-    if (!hasFiatToggleNow()) {
+    ensureUnitCurrent();
+    if (mode === 'fiat' && !hasFiatToggleNow()) {
       logger.info('amountActions.setMode.skipped', {
         reason: 'fiat-toggle-unavailable',
         requestedMode: mode,
         inputMode,
+        unit: getUnit(),
         rawInputLength: rawInput.length,
       });
       return;
@@ -326,10 +445,12 @@ export function createAmountActionManager(
   };
 
   const toggle = (): void => {
+    ensureUnitCurrent();
     if (!hasFiatToggleNow()) {
       logger.info('amountActions.toggle.skipped', {
         reason: 'fiat-toggle-unavailable',
         inputMode,
+        unit: getUnit(),
         rawInputLength: rawInput.length,
       });
       return;
@@ -349,7 +470,7 @@ export function createAmountActionManager(
     const current = inspect();
     const previousMode = inputMode;
 
-    if (inputMode === 'sat') {
+    if (inputMode === 'unit') {
       // sat → fiat: convert current sats to fiat display value
       inputMode = 'fiat';
       if (
@@ -363,9 +484,9 @@ export function createAmountActionManager(
       }
     } else {
       // fiat → sat: use the effective (possibly auto-optimized) sat amount
-      inputMode = 'sat';
-      if (current.effectiveSatAmount > 0) {
-        rawInput = String(current.effectiveSatAmount);
+      inputMode = 'unit';
+      if (current.effectiveAmount.value > 0) {
+        rawInput = String(current.effectiveAmount.value);
       } else {
         rawInput = '';
       }
@@ -376,7 +497,7 @@ export function createAmountActionManager(
       previousRawInputLength: current.rawInput.length,
       nextRawInputLength: rawInput.length,
       btcPrice,
-      effectiveSatAmount: current.effectiveSatAmount,
+      effectiveAmountValue: current.effectiveAmount.value,
       hasDisplayFiat: current.displayFiat != null,
       displayFiat: current.displayFiat,
     });

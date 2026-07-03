@@ -298,6 +298,8 @@ export {
   type SwitchableUnit,
   evaluateMintMethodAmountAvailability,
   getCapabilityUnavailableReason,
+  getUnitAmountEnvelope,
+  type AmountEntryEnvelope,
   getMintMethodCapability,
   hasCompatibleMintForMethod,
   hasMintSupportingMethod,

@@ -296,19 +296,29 @@ describe('composeFiat', () => {
 });
 
 describe('fiat amount offline optimization', () => {
+  const fiatEntry = {
+    inputMode: 'fiat' as const,
+    rawInput: '0.01',
+    numericValue: 0.01,
+    unit: 'sat',
+    proofAmounts: [20],
+    btcPrice: 100_000_000 / 2100,
+    offlineOptimization: true,
+  };
+
   it('submits composable sats inside the fiat rounding window instead of center sats', () => {
-    const result = resolveAmount('fiat', '0.01', 0.01, [20], 100_000_000 / 2100, true);
+    const result = resolveAmount(fiatEntry);
 
     expect(result.displayFiat).toBe(0.01);
-    expect(result.displaySats).toBe(20);
-    expect(result.effectiveSatAmount).toBe(20);
+    expect(result.displayAmount).toBe(20);
+    expect(result.effectiveAmount).toEqual({ value: 20, unit: 'sat' });
     expect(result.autoOptimized).toBe(true);
   });
 
   it('keeps a one-cent amount sendable with only the optimized sats available', () => {
-    const result = resolveAmount('fiat', '0.01', 0.01, [20], 100_000_000 / 2100, true);
+    const result = resolveAmount(fiatEntry);
 
-    expect(result.effectiveSatAmount).toBe(20);
+    expect(result.effectiveAmount.value).toBe(20);
     expect(result.canSendOffline).toBe(true);
   });
 });

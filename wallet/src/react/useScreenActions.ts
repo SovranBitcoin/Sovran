@@ -22,6 +22,7 @@ import type {
   QuickSendSuggestion,
 } from '../amount-actions/types';
 import { logger } from '../logger';
+import { getUnitAmountEnvelope } from '../mint-capabilities';
 import {
   createScreenActionSession,
   type ScreenActionSession,
@@ -432,6 +433,16 @@ export function useScreenActions(
       unit: () => machineRef.current.getContext().unit,
       fiatCurrency: () => getDisplayCurrencyRef.current?.()?.code,
       fiatSymbol: () => getDisplayCurrencyRef.current?.()?.symbol,
+      getAmountEnvelope: () => {
+        const walletCtx = walletContextRef.current;
+        if (!walletCtx) return null;
+        const machineCtx = machineRef.current.getContext();
+        return getUnitAmountEnvelope(
+          walletCtx,
+          machineCtx.unit,
+          machineCtx.destination,
+        );
+      },
     };
     // Refs are stable across renders; getter closures read .current on each
     // inspect() so the manager always sees the latest values.

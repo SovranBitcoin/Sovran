@@ -103,7 +103,7 @@ describe('lightning melt — mint selection', () => {
     const tm = createTestMachine();
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
     // Enter amount with MINT1 (the preferred mint)
-    await tm.machine.enterAmount(200, MINT1);
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
     // Context should show MINT1 was selected
     tm.assertContext({ mintUrl: MINT1 });
   });
@@ -111,7 +111,7 @@ describe('lightning melt — mint selection', () => {
   it('allows mint change during flow', async () => {
     const tm = createTestMachine();
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
-    await tm.machine.enterAmount(200, MINT1);
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
     tm.assertStep('navigateToMeltPreview');
 
     // User decides to use MINT2 instead — request the mint selector
@@ -171,14 +171,14 @@ describe('lightning melt — no proof selector', () => {
     // For a melt, it should skip straight to navigateToMeltPreview.
     const tm = createTestMachine({ wallet: WALLETS.noExactProofs });
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('navigateToMeltPreview');
   });
 
   it('shows chooseProofs with balance round-down when no mint covers the full online amount', async () => {
     const tm = createTestMachine({ wallet: WALLETS.insufficientBalance });
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     tm.assertStep('chooseProofs');
     const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
@@ -201,7 +201,7 @@ describe('lightning melt — no proof selector', () => {
   it('does not show chooseProofs for lightning while offline', async () => {
     const tm = createTestMachine({ wallet: WALLETS.insufficientBalance, offline: true });
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     tm.assertStep('error');
   });
@@ -343,7 +343,7 @@ describe('lightning melt — confirmMelt notification sequence', () => {
   it('fires onPaymentProcessing then onPaymentConfirmed on success', async () => {
     const tm = createTestMachine();
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
-    await tm.machine.enterAmount(200, MINT1);
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
     tm.assertStep('navigateToMeltPreview');
 
     await tm.machine.confirmMelt();
@@ -385,7 +385,7 @@ describe('lightning melt — confirmMelt notification sequence', () => {
       },
     });
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
-    await tm.machine.enterAmount(200, MINT1);
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
     tm.assertStep('navigateToMeltPreview');
 
     await tm.machine.confirmMelt();
@@ -408,7 +408,7 @@ describe('lightning melt — confirmMelt notification sequence', () => {
   it('calls executeMelt with correct arguments', async () => {
     const tm = createTestMachine();
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
-    await tm.machine.enterAmount(200, MINT1);
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
 
     await tm.machine.confirmMelt();
 
@@ -423,7 +423,7 @@ describe('lightning melt — confirmMelt notification sequence', () => {
     // JSON with a quoteId so listeners can correlate melt-op events.
     const tm = createTestMachine();
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
-    await tm.machine.enterAmount(200, MINT1);
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
 
     await tm.machine.confirmMelt();
 
@@ -442,7 +442,7 @@ describe('lightning melt — confirmMelt notification sequence', () => {
   it('full success sequence: onPaymentProcessing → onPaymentConfirmed → onTransactionCreated → onMeltQuoteCreated', async () => {
     const tm = createTestMachine();
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
-    await tm.machine.enterAmount(200, MINT1);
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
 
     // Clear notifications from the routing phase (onScanResolved fires during execute)
     tm.notificationCalls.length = 0;
@@ -461,7 +461,7 @@ describe('lightning melt — confirmMelt notification sequence', () => {
   it('onTransactionCreated carries type=melt with transactionId, mintUrl, amount, unit', async () => {
     const tm = createTestMachine();
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
-    await tm.machine.enterAmount(200, MINT1);
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
     await tm.machine.confirmMelt();
 
     const txCreated = tm.notificationCalls.find((c) => c.key === 'onTransactionCreated');
@@ -477,7 +477,7 @@ describe('lightning melt — confirmMelt notification sequence', () => {
   it('onMeltQuoteCreated carries mintUrl, operationId, amount, unit, meltTarget', async () => {
     const tm = createTestMachine();
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
-    await tm.machine.enterAmount(200, MINT1);
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
     await tm.machine.confirmMelt();
 
     const meltQuote = tm.notificationCalls.find((c) => c.key === 'onMeltQuoteCreated');
@@ -499,7 +499,7 @@ describe('lightning melt — confirmMelt notification sequence', () => {
       },
     });
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
-    await tm.machine.enterAmount(200, MINT1);
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
 
     tm.notificationCalls.length = 0;
 

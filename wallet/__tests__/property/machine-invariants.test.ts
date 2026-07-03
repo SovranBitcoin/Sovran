@@ -242,7 +242,10 @@ async function executeAction(
         await machine.startReceive();
         break;
       case 'enterAmount':
-        await machine.enterAmount(action.amount, action.mintUrl);
+        await machine.enterAmount(
+          { value: action.amount, unit: 'sat' },
+          action.mintUrl,
+        );
         break;
       case 'changeMint':
         await machine.changeMint(action.mintUrl);

@@ -93,13 +93,16 @@ export interface RecipientProfile {
 }
 
 export interface AmountEntryDisplayMetadata {
-  inputMode: "sat" | "fiat";
+  inputMode: "unit" | "fiat";
   rawInput: string;
   fiatCurrency: string | null;
   fiatSymbol: string | null;
   btcPrice: number;
   displayFiat: number | null;
-  displaySats: number;
+  /** Minor-unit equivalent of the entry (sats on sat account, cents on fiat). */
+  displayAmount: number;
+  /** Unit the entry was denominated in. */
+  unit: string;
   autoOptimized: boolean;
 }
 
@@ -432,7 +435,14 @@ export type FlowEvent =
   | { type: "OPTION_CHOSEN"; option: PaymentOption }
   | {
       type: "AMOUNT_ENTERED";
+      /** Minor units of `unit`. */
       amount: number;
+      /**
+       * Unit the amount is denominated in. Must match `ctx.unit` — the amount
+       * screen resolves in the active unit; a mismatch means a stale draft
+       * crossed a unit switch and is logged + rejected by the reducer.
+       */
+      unit?: string;
       mintUrl: string;
       destination?: Destination;
       mintQuoteMethod?: MintQuoteMethod;
@@ -1131,9 +1141,13 @@ export interface PaymentMachine {
   send: (event: FlowEvent) => Promise<void>;
   /** Process scan/paste/lightning input. Parses and routes to the appropriate flow. */
   execute: (input: string, opts?: { reset?: boolean }) => Promise<void>;
-  /** Submit amount and mint for the current flow. Pass `offline: true` for local proof routing. */
+  /**
+   * Submit amount (minor units + unit, from the amount screen's resolution)
+   * and mint for the current flow. Pass `offline: true` for local proof
+   * routing. The unit must match the machine's active unit.
+   */
   enterAmount: (
-    amount: number,
+    amount: { value: number; unit: string },
     mintUrl: string,
     opts?: {
       destination?: Destination;

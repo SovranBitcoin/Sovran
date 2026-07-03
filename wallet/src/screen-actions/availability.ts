@@ -297,8 +297,13 @@ function paymentRequestAvailability(
 function amountEntryAvailability(
   entry: Record<string, unknown>,
 ): AvailabilityMap<"amountEntry"> {
-  const effectiveSat =
-    typeof entry.effectiveSatAmount === "number" ? entry.effectiveSatAmount : 0;
+  const effectiveRaw = entry.effectiveAmount as
+    | { value?: unknown; unit?: unknown }
+    | undefined;
+  const effectiveAmount =
+    typeof effectiveRaw?.value === "number" && Number.isFinite(effectiveRaw.value)
+      ? effectiveRaw.value
+      : 0;
   const destination = entry.destination as string | undefined;
   const isSendEcash = destination === "sendEcash";
   const isMeltQuote = destination === "meltQuote";
@@ -314,7 +319,7 @@ function amountEntryAvailability(
     typeof entry.btcPrice === "number" &&
     entry.btcPrice > 0;
   logger.debug("screenActions.availability.amountEntry.context", {
-    effectiveSat,
+    effectiveAmount,
     destination: destination ?? null,
     hasMeltTarget,
     hasFiatToggle,
@@ -336,7 +341,7 @@ function amountEntryAvailability(
   // entries that round to zero sats (e.g. "$0.000001") don't enable the
   // button and produce a silent no-op when the handler — which only sees
   // effectiveSatAmount — early-returns.
-  const nextCanFire = effectiveSat >= 1 && Number.isFinite(effectiveSat);
+  const nextCanFire = effectiveAmount >= 1 && Number.isFinite(effectiveAmount);
   const unit = typeof entry.unit === "string" ? entry.unit : "sat";
   const methodContext = entry.methodContext as
     | AmountEntryMethodContext
@@ -351,11 +356,11 @@ function amountEntryAvailability(
   // flows can overspend; receive (mintQuote) has no balance ceiling. Computed
   // here, beside the per-rail balance checks, so the UI never re-derives it.
   const balanceValues = Object.values(methodContext?.mintBalances ?? {});
-  const spendableSat =
+  const spendableAmount =
     balanceValues.length > 0 ? Math.max(...balanceValues) : 0;
   const isSpendDestination = isSendEcash || isMeltQuote || isPaymentRequest;
   const exceedsBalance =
-    isSpendDestination && effectiveSat > 0 && effectiveSat > spendableSat;
+    isSpendDestination && effectiveAmount > 0 && effectiveAmount > spendableAmount;
   const receiveLightningRequirement: MintMethodRequirement = {
     operation: "mint",
     method: "bolt11",
@@ -379,7 +384,7 @@ function amountEntryAvailability(
   const receiveLightningAvailability = getAmountAvailability(
     methodContext,
     receiveLightningRequirement,
-    effectiveSat,
+    effectiveAmount,
     selectedMintUrl,
   );
   const receiveOnchainSupported = methodContextHasSupportingMint(
@@ -389,13 +394,13 @@ function amountEntryAvailability(
   const receiveOnchainAvailability = getAmountAvailability(
     methodContext,
     receiveOnchainRequirement,
-    effectiveSat,
+    effectiveAmount,
     selectedMintUrl,
   );
   const sendLightningAvailability = getAmountAvailability(
     methodContext,
     sendLightningRequirement,
-    effectiveSat,
+    effectiveAmount,
     selectedMintUrl,
     { requireBalance: true },
   );
@@ -576,10 +581,10 @@ function amountEntryAvailability(
       ?.reason;
   logger.info("screenActions.availability.amountEntry.result", {
     destination: destination ?? null,
-    effectiveSat,
+    effectiveAmount,
     nextCanFire,
     hasAvailableNextVariant,
-    spendableSat,
+    spendableAmount,
     exceedsBalance,
     nextUnavailableReason: nextUnavailableReason ?? null,
     variantSummary: nextVariants.map((variant) => ({

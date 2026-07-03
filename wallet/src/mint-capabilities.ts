@@ -1,6 +1,7 @@
 import { localizeReason, type LocalizedReason } from "./formatting/locales";
 import { logger, mintUrlFields } from "./logger";
 import type {
+  AmountEntryConstraints,
   AmountEntryMethodContext,
   MintCandidate,
   MintMethodCapabilityMap,
@@ -669,6 +670,134 @@ export function evaluateMintMethodAmountAvailability(
     firstUnavailableReason,
     amountBoundsReason,
   };
+}
+
+export interface AmountEntryEnvelope {
+  unit: string;
+  /** Floor below which NO applicable method can proceed. null = no floor. */
+  minAmount: number | null;
+  /** Hard cap for typed input across applicable methods. null = uncapped. */
+  maxAmount: number | null;
+}
+
+interface MethodBounds {
+  min: number | null;
+  max: number | null;
+}
+
+/**
+ * Least-strict NUT-04/05 bounds for one method across the trusted mints that
+ * support it: the smallest advertised minimum and the largest advertised
+ * maximum. A supporting mint that publishes no bound on a side makes that
+ * side unbounded (null). Returns null when no trusted mint supports the
+ * method at all — the rail cannot fire, so it must not constrain typing.
+ */
+function methodBounds(
+  ctx: Pick<WalletContext, "trustedMintUrls" | "mintMethodCapabilities">,
+  requirement: MintMethodRequirement,
+): MethodBounds | null {
+  let supported = false;
+  let min: number | null = null;
+  let max: number | null = null;
+  let minUnbounded = false;
+  let maxUnbounded = false;
+  for (const mintUrl of ctx.trustedMintUrls) {
+    const capability = getMintMethodCapability(ctx, mintUrl, requirement);
+    if (!capability.supported || capability.disabled) continue;
+    supported = true;
+    if (capability.minAmount == null) minUnbounded = true;
+    else min = min == null ? capability.minAmount : Math.min(min, capability.minAmount);
+    if (capability.maxAmount == null) maxUnbounded = true;
+    else max = max == null ? capability.maxAmount : Math.max(max, capability.maxAmount);
+  }
+  if (!supported) return null;
+  return { min: minUnbounded ? null : min, max: maxUnbounded ? null : max };
+}
+
+/**
+ * The typed-input envelope for amount entry, per destination: the range
+ * outside which NO rail in the Next menu could serve the amount, in minor
+ * units of `unit`. The keypad hard-caps at `maxAmount`; `minAmount` gates
+ * Next (mid-entry values are transiently below any minimum, so typing is
+ * never blocked on the low side).
+ *
+ * Rails mirror amountEntryAvailability's menu. Ecash rails (NUT-18 receive,
+ * token send, payment request) have no NUT-04/05 bounds, so any destination
+ * that offers one is uncapped on both sides. In practice only `meltQuote`
+ * (Lightning-only) yields a real envelope today.
+ */
+export function getUnitAmountEnvelope(
+  ctx: Pick<WalletContext, "trustedMintUrls" | "mintMethodCapabilities">,
+  unit: string,
+  destination: AmountEntryConstraints["destination"] | undefined,
+): AmountEntryEnvelope {
+  const normalizedUnit = normalizeUnit(unit);
+  const uncapped: AmountEntryEnvelope = {
+    unit: normalizedUnit,
+    minAmount: null,
+    maxAmount: null,
+  };
+
+  let requirements: MintMethodRequirement[];
+  if (destination === "meltQuote") {
+    // Lightning is the only executable spend rail; onchain send is listed
+    // but forced unavailable ("not supported yet") and must not constrain.
+    requirements = [
+      { operation: "melt", method: "bolt11", unit: normalizedUnit },
+    ];
+  } else if (destination === "mintQuote") {
+    // Receive offers "as Ecash" (NUT-18 payment request — unbounded)
+    // whenever a trusted mint exists, so the envelope only bites when the
+    // user has no trusted mints, i.e. never.
+    if (ctx.trustedMintUrls.length > 0) {
+      logger.debug("amount.envelope.resolved", {
+        unit: normalizedUnit,
+        destination,
+        min: null,
+        max: null,
+        rail: "ecash",
+      });
+      return uncapped;
+    }
+    requirements = [
+      { operation: "mint", method: "bolt11", unit: normalizedUnit },
+      { operation: "mint", method: "onchain", unit: normalizedUnit },
+    ];
+  } else {
+    // sendEcash / paymentRequest (ecash rails, balance-bound only) and
+    // unknown destinations: never clamp typing.
+    logger.debug("amount.envelope.resolved", {
+      unit: normalizedUnit,
+      destination: destination ?? null,
+      min: null,
+      max: null,
+      rail: "ecash",
+    });
+    return uncapped;
+  }
+
+  const bounds = requirements
+    .filter((requirement) => isMethodImplemented(requirement))
+    .map((requirement) => methodBounds(ctx, requirement))
+    .filter((entry): entry is MethodBounds => entry != null);
+  // No rail can fire at any amount — availability gates Next; clamping the
+  // keypad to an empty range would just fight the user.
+  if (bounds.length === 0) return uncapped;
+
+  const minAmount = bounds.some((entry) => entry.min == null)
+    ? null
+    : Math.min(...bounds.map((entry) => entry.min as number));
+  const maxAmount = bounds.some((entry) => entry.max == null)
+    ? null
+    : Math.max(...bounds.map((entry) => entry.max as number));
+  logger.debug("amount.envelope.resolved", {
+    unit: normalizedUnit,
+    destination,
+    min: minAmount,
+    max: maxAmount,
+    railCount: bounds.length,
+  });
+  return { unit: normalizedUnit, minAmount, maxAmount };
 }
 
 export function createAmountEntryMethodContext(

@@ -297,7 +297,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "sendEcash",
       numericValue: 1e-5, // dollars in fiat mode
-      effectiveSatAmount: 0,
+      effectiveAmount: { value: 0, unit: 'sat' },
     };
     const actions = getAvailableActions("amountEntry", entry);
     expect(actions.next.available).toBe(false);
@@ -309,7 +309,18 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "sendEcash",
       numericValue: 1, // sat mode
-      effectiveSatAmount: 1,
+      effectiveAmount: { value: 1, unit: 'sat' },
+    };
+    const actions = getAvailableActions("amountEntry", entry);
+    expect(actions.next.available).toBe(true);
+  });
+
+  it("enables next at 1 minor unit on a fiat account (1 cent)", () => {
+    const entry = {
+      destination: "sendEcash",
+      numericValue: 0.01,
+      unit: "usd",
+      effectiveAmount: { value: 1, unit: "usd" },
     };
     const actions = getAvailableActions("amountEntry", entry);
     expect(actions.next.available).toBe(true);
@@ -318,7 +329,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
   it("always exposes cancel as available", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "sendEcash",
-      effectiveSatAmount: 0,
+      effectiveAmount: { value: 0, unit: 'sat' },
     });
 
     expect(actions.cancel.available).toBe(true);
@@ -362,7 +373,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
   it("hides onchain receive when no trusted mint advertises NUT-04 onchain", () => {
     const entry = {
       destination: "mintQuote",
-      effectiveSatAmount: 100,
+      effectiveAmount: { value: 100, unit: 'sat' },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1],
@@ -388,7 +399,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
   it("shows onchain receive when a trusted mint advertises NUT-04 onchain (coco v2)", () => {
     const entry = {
       destination: "mintQuote",
-      effectiveSatAmount: 100,
+      effectiveAmount: { value: 100, unit: 'sat' },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1, MINT2],
@@ -420,7 +431,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
   it("disables Lightning receive when no trusted mint advertises NUT-04 bolt11", () => {
     const entry = {
       destination: "mintQuote",
-      effectiveSatAmount: 100,
+      effectiveAmount: { value: 100, unit: 'sat' },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1],
@@ -451,7 +462,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "mintQuote",
       selectedMintUrl: MINT1,
-      effectiveSatAmount: 500,
+      effectiveAmount: { value: 500, unit: 'sat' },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1],
@@ -490,7 +501,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "mintQuote",
       selectedMintUrl: MINT1,
-      effectiveSatAmount: 500,
+      effectiveAmount: { value: 500, unit: 'sat' },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1, MINT2],
@@ -536,7 +547,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "mintQuote",
       selectedMintUrl: MINT1,
-      effectiveSatAmount: 500,
+      effectiveAmount: { value: 500, unit: 'sat' },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1],
@@ -569,7 +580,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "mintQuote",
       selectedMintUrl: MINT1,
-      effectiveSatAmount: 500,
+      effectiveAmount: { value: 500, unit: 'sat' },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1],
@@ -625,7 +636,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     const entry = {
       destination: "meltQuote",
       meltTarget: "alice@example.com",
-      effectiveSatAmount: 100,
+      effectiveAmount: { value: 100, unit: 'sat' },
       unit: "sat",
       methodContext: {
         trustedMintUrls: [MINT1],
@@ -668,7 +679,7 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
 describe("amountEntryAvailability — receive as Ecash (NUT-18 payment request)", () => {
   const mintQuoteEntry = (trustedMintUrls: string[]) => ({
     destination: "mintQuote",
-    effectiveSatAmount: 100,
+    effectiveAmount: { value: 100, unit: 'sat' },
     unit: "sat",
     methodContext: {
       trustedMintUrls,
@@ -712,7 +723,7 @@ describe("amountEntryAvailability — exceedsBalance", () => {
   it("flags a send amount above the largest mint balance", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "sendEcash",
-      effectiveSatAmount: 2500,
+      effectiveAmount: { value: 2500, unit: 'sat' },
       methodContext: balanceContext({ [MINT1]: 1000, [MINT2]: 2000 }),
     });
 
@@ -724,7 +735,7 @@ describe("amountEntryAvailability — exceedsBalance", () => {
   it("does not flag a send amount within the largest mint balance", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "sendEcash",
-      effectiveSatAmount: 2000,
+      effectiveAmount: { value: 2000, unit: 'sat' },
       methodContext: balanceContext({ [MINT1]: 1000, [MINT2]: 2000 }),
     });
 
@@ -735,7 +746,7 @@ describe("amountEntryAvailability — exceedsBalance", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "sendEcash",
       selectedMintUrl: MINT1,
-      effectiveSatAmount: 1500,
+      effectiveAmount: { value: 1500, unit: 'sat' },
       methodContext: balanceContext({ [MINT1]: 1000, [MINT2]: 2000 }),
     });
 
@@ -748,7 +759,7 @@ describe("amountEntryAvailability — exceedsBalance", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "meltQuote",
       selectedMintUrl: MINT1,
-      effectiveSatAmount: 5000,
+      effectiveAmount: { value: 5000, unit: 'sat' },
       methodContext: balanceContext({ [MINT1]: 1000, [MINT2]: 2000 }),
     });
 
@@ -759,7 +770,7 @@ describe("amountEntryAvailability — exceedsBalance", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "mintQuote",
       selectedMintUrl: MINT1,
-      effectiveSatAmount: 1_000_000,
+      effectiveAmount: { value: 1_000_000, unit: 'sat' },
       methodContext: balanceContext({ [MINT1]: 0 }),
     });
 
@@ -769,7 +780,7 @@ describe("amountEntryAvailability — exceedsBalance", () => {
   it("does not flag a zero/empty amount", () => {
     const actions = getAvailableActions("amountEntry", {
       destination: "sendEcash",
-      effectiveSatAmount: 0,
+      effectiveAmount: { value: 0, unit: 'sat' },
       methodContext: balanceContext({ [MINT1]: 0, [MINT2]: 0 }),
     });
 

@@ -199,9 +199,33 @@ function handleAmountEntered(
 ): TransitionResult {
   logger.info("transitions.amountEntered", {
     amount: event.amount,
+    unit: event.unit ?? null,
     ...mintUrlFields(event.mintUrl),
     destination: event.destination ?? currentCtx.destination,
   });
+  // The amount screen resolves in the active unit, so a mismatch means a
+  // stale draft crossed a unit switch. Reject rather than book a usd amount
+  // into a sat flow (or vice versa).
+  if (event.unit && event.unit !== currentCtx.unit) {
+    logger.warn("transitions.amountEntered.unitMismatch", {
+      eventUnit: event.unit,
+      ctxUnit: currentCtx.unit,
+      amount: event.amount,
+    });
+    return {
+      step: "enterAmount",
+      context: currentCtx,
+      data: {
+        unit: currentCtx.unit,
+        constraints: {
+          destination: event.destination ?? currentCtx.destination ?? "sendEcash",
+          meltTarget: currentCtx.meltTarget,
+          recipientPubkey: currentCtx.recipientPubkey,
+          recipientProfile: currentCtx.recipientProfile,
+        },
+      },
+    };
+  }
   const shouldResetContext =
     !!event.destination && event.destination !== currentCtx.destination;
   const ctx: FlowContext = shouldResetContext

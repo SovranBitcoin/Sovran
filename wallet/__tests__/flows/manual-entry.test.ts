@@ -148,7 +148,7 @@ describe('manual entry — startSendEcash', () => {
     tm.assertStep('enterAmount');
     tm.assertContext({ mintUrl: MINT2 });
 
-    await tm.machine.enterAmount(200, MINT2, {
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT2, {
       destination: 'meltQuote',
       meltTarget: 'alice@example.com',
       recipientPubkey,
@@ -239,7 +239,7 @@ describe('manual entry — startSendEcash', () => {
     tm.assertStep('enterAmount');
     tm.assertContext({ mintUrl: MINT3 });
 
-    await tm.machine.enterAmount(1000, MINT3, {
+    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT3, {
       destination: 'meltQuote',
       meltTarget: 'bob@example.com',
       recipientPubkey,
@@ -410,7 +410,7 @@ describe('manual entry — enterAmount with destination', () => {
   it('enterAmount with sendEcash destination from idle', async () => {
     const tm = createTestMachine();
     // Call enterAmount directly with destination — no startSendEcash needed
-    await tm.machine.enterAmount(100, MINT1, { destination: 'sendEcash' });
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1, { destination: 'sendEcash' });
     // Should resolve based on the destination context
     expect(tm.machine.getStep()).not.toBe('idle');
     tm.assertContext({ amount: 100, mintUrl: MINT1 });
@@ -419,7 +419,7 @@ describe('manual entry — enterAmount with destination', () => {
   it('enterAmount with mintQuote destination from idle', async () => {
     const tm = createTestMachine();
     // Direct mint quote creation — no startReceiveLightning needed
-    await tm.machine.enterAmount(1000, MINT1, { destination: 'mintQuote' });
+    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1, { destination: 'mintQuote' });
     // Should auto-execute the mint quote operation → mintQuoteCreated
     tm.assertStep('mintQuoteCreated');
   });
@@ -427,7 +427,7 @@ describe('manual entry — enterAmount with destination', () => {
   it('enterAmount with meltQuote destination from idle selects a spendable mint when none was provided', async () => {
     const tm = createTestMachine({ wallet: WALLETS.multiMintUnbalanced });
 
-    await tm.machine.enterAmount(200, '', {
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, '', {
       destination: 'meltQuote',
       meltTarget: 'carol@example.com',
     });

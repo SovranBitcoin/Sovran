@@ -17,6 +17,7 @@ import {
   runTrustMintEffect,
 } from "./effects";
 import { transition } from "./transitions";
+import type { UnitAmount } from "../amount-actions";
 import type { MintListItem, PaymentOption } from "../types";
 import type {
   CreateMachineConfig,
@@ -1464,7 +1465,7 @@ export function createPaymentMachine(
       : undefined;
 
   const enterAmount = (
-    amount: number,
+    amount: UnitAmount,
     mintUrl: string,
     opts?: {
       destination?: Destination;
@@ -1479,7 +1480,8 @@ export function createPaymentMachine(
   ) =>
     send({
       type: "AMOUNT_ENTERED",
-      amount,
+      amount: amount.value,
+      unit: amount.unit,
       mintUrl,
       destination: opts?.destination,
       mintQuoteMethod: opts?.mintQuoteMethod,

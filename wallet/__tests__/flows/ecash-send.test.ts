@@ -192,7 +192,7 @@ describe('ecash send — optional memo flow', () => {
     });
 
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     tm.assertStep('enterSendMemo');
     expect(tm.operationCalls.some((call) => call.name === 'executeSend')).toBe(false);
@@ -216,7 +216,7 @@ describe('ecash send — optional memo flow', () => {
     });
 
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     await tm.machine.submitSendMemo('   ');
 
     tm.assertStep('sendComplete');
@@ -234,7 +234,7 @@ describe('ecash send — optional memo flow', () => {
     });
 
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('chooseProofs');
 
     await tm.machine.chooseProofs(96);
@@ -264,7 +264,7 @@ describe('ecash send — proof selection', () => {
   it('offline + non-exact proofs → chooseProofs', async () => {
     const tm = createTestMachine({ wallet: WALLETS.noExactProofs, offline: true });
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     tm.assertStep('chooseProofs');
     const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
@@ -283,7 +283,7 @@ describe('ecash send — proof selection', () => {
   it('chooseProofs with round-down amount → sendComplete', async () => {
     const tm = createTestMachine({ wallet: WALLETS.noExactProofs, offline: true });
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('chooseProofs');
 
     // User chooses 96 sats (64+32) — the nearest composable amount below 100
@@ -312,7 +312,7 @@ describe('ecash send — insufficient balance', () => {
     tm.assertStep('enterAmount');
     tm.assertContext({ mintUrl: MINT2 });
 
-    await tm.machine.enterAmount(200, MINT2);
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT2);
 
     tm.assertStep('selectMint');
     tm.assertContext({ amount: 200, mintUrl: MINT2, destination: 'sendEcash' });
@@ -345,7 +345,7 @@ describe('ecash send — insufficient balance', () => {
     tm.assertStep('enterAmount');
     tm.assertContext({ mintUrl: MINT3 });
 
-    await tm.machine.enterAmount(1000, MINT3);
+    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT3);
 
     tm.assertStep('selectMint');
     tm.assertContext({ amount: 1000, mintUrl: MINT3, destination: 'sendEcash' });
@@ -366,7 +366,7 @@ describe('ecash send — insufficient balance', () => {
   it('selects a sufficient mint when amount entry provides no mintUrl', async () => {
     const tm = createTestMachine({ wallet: WALLETS.multiMintUnbalanced });
 
-    await tm.machine.enterAmount(200, '', { destination: 'sendEcash' });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, '', { destination: 'sendEcash' });
 
     tm.assertStep('sendComplete');
     tm.assertContext({ amount: 200, mintUrl: MINT1, destination: 'sendEcash' });
@@ -377,7 +377,7 @@ describe('ecash send — insufficient balance', () => {
   it('shows chooseProofs with a real round-down when amount exceeds all mints', async () => {
     const tm = createTestMachine({ wallet: WALLETS.insufficientBalance });
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(9999, MINT1);
+    await tm.machine.enterAmount({ value: 9999, unit: 'sat' }, MINT1);
     tm.assertStep('chooseProofs');
     tm.assertContext({ amount: 9999, mintUrl: MINT1, destination: 'sendEcash' });
     const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
@@ -412,7 +412,7 @@ describe('ecash send — online executeSend fallback', () => {
   it('online + non-exact proofs + send succeeds → sendComplete', async () => {
     const tm = createTestMachine({ wallet: WALLETS.noExactProofs });
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     // Online: executeSend succeeds, proof selector is skipped
     tm.assertStep('sendComplete');
   });
@@ -420,7 +420,7 @@ describe('ecash send — online executeSend fallback', () => {
   it('online + exact proofs → local-first offline send without executeSend', async () => {
     const tm = createTestMachine();
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     tm.assertStep('sendComplete');
     expect(tm.operationCalls.map((call) => call.name)).toContain('executeOfflineSend');
@@ -444,7 +444,7 @@ describe('ecash send — online executeSend fallback', () => {
       },
     });
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     // executeSend failed, proofs exist with composition options → chooseProofs
     tm.assertStep('chooseProofs');
     const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
@@ -469,7 +469,7 @@ describe('ecash send — online executeSend fallback', () => {
       },
     });
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('chooseProofs');
 
     await tm.machine.chooseProofs(96);
@@ -495,14 +495,14 @@ describe('ecash send — online executeSend fallback', () => {
       },
     });
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('error');
   });
 
   it('offline + exact proofs → sendComplete through executeOfflineSend', async () => {
     const tm = createTestMachine({ offline: true });
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('sendComplete');
     expect(tm.operationCalls.map((call) => call.name)).toContain('executeOfflineSend');
     expect(tm.handlerCalls[tm.handlerCalls.length - 1]).toMatchObject({
@@ -522,7 +522,7 @@ describe('ecash send — online executeSend fallback', () => {
     await tm.machine.startSendEcash();
     // Offline flag should already be on the flow context
     tm.assertContext({ offline: true });
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('sendComplete');
     tm.assertContext({ offline: true });
   });
@@ -546,7 +546,7 @@ describe('ecash send — executeSend operation', () => {
   it('calls executeSend and reaches sendComplete on success', async () => {
     const tm = createTestMachine({ wallet: WALLETS.noExactProofs });
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('sendComplete');
 
     const opCall = tm.operationCalls.find((c) => c.name === 'executeSend');
@@ -569,7 +569,7 @@ describe('ecash send — executeSend operation', () => {
       },
     });
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('error');
     tm.assertExecution({ code: 'SEND_FAILED' });
   });
@@ -587,7 +587,7 @@ describe('ecash send — historyEntry data', () => {
   it('sendComplete result contains parseable historyEntry with id', async () => {
     const tm = createTestMachine();
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('sendComplete');
 
     const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
@@ -616,7 +616,7 @@ describe('ecash send — notification timeline', () => {
   it('fires only onTransactionCreated on success', async () => {
     const tm = createTestMachine();
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('sendComplete');
 
     const keys = tm.notificationCalls.map((c) => c.key);
@@ -626,7 +626,7 @@ describe('ecash send — notification timeline', () => {
   it('onTransactionCreated carries type=send, mintUrl, amount, unit, transactionId', async () => {
     const tm = createTestMachine();
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     const txCreated = tm.notificationCalls.find((c) => c.key === 'onTransactionCreated');
     expect(txCreated!.data).toMatchObject({
@@ -641,7 +641,7 @@ describe('ecash send — notification timeline', () => {
   it('does not fire onPaymentProcessing or onPaymentConfirmed (melt/PR only)', async () => {
     const tm = createTestMachine();
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
     const keys = tm.notificationCalls.map((c) => c.key);
     expect(keys).not.toContain('onPaymentProcessing');
@@ -656,7 +656,7 @@ describe('ecash send — notification timeline', () => {
       },
     });
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('chooseProofs');
 
     expect(tm.notificationCalls).toHaveLength(0);
@@ -673,7 +673,7 @@ describe('ecash send — notification timeline', () => {
       },
     });
     await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('error');
 
     const keys = tm.notificationCalls.map((c) => c.key);

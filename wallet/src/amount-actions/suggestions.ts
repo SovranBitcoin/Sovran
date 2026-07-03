@@ -2,12 +2,18 @@
 // Quick Send Suggestions
 //
 // Pure function that computes offline-composable quick send suggestions from
-// available proofs. Collects all achievable amounts from a large pool of fiat
-// and sat targets, then picks an evenly distributed subset from each category.
-// All suggestions are guaranteed offline-composable.
+// available proofs. On the sat account it collects achievable amounts from a
+// pool of display-currency and sat targets; on fiat accounts targets are
+// cent-exact in the account's own unit (no price dependency). All suggestions
+// are guaranteed offline-composable.
 // ---------------------------------------------------------------------------
 
 import { composeFiat, composeSatoshis } from "../offline";
+import {
+  isFiatUnit,
+  minorToRawInput,
+  unitSymbol as symbolForUnit,
+} from "../formatting/units";
 import { logger } from "../logger";
 import type { QuickSendConfig, QuickSendSuggestion } from "./types";
 
@@ -23,6 +29,11 @@ const DEFAULT_FIAT_TARGETS = [
 
 const DEFAULT_SAT_TARGETS = [
   21, 50, 100, 250, 500, 1000, 2100, 5000, 10000, 21000, 50000, 100000,
+];
+
+/** Fiat-account targets, in minor units (cents): $0.10 … $100. */
+const DEFAULT_FIAT_UNIT_TARGETS = [
+  10, 25, 50, 100, 200, 300, 500, 1000, 1500, 2000, 2500, 5000, 10000,
 ];
 
 const DEFAULT_LIMIT = 3;
@@ -64,6 +75,51 @@ function pickDistributed<T>(items: T[], limit: number): T[] {
 }
 
 // ---------------------------------------------------------------------------
+// Fiat account — cent-exact targets in the account's own unit
+// ---------------------------------------------------------------------------
+
+function computeFiatUnitSuggestions(
+  proofAmounts: number[],
+  unit: string,
+  totalBalance: number,
+  config: QuickSendConfig | undefined,
+): QuickSendSuggestion[] {
+  const limit = config?.limit ?? DEFAULT_LIMIT;
+  const symbol = symbolForUnit(unit);
+  const all: QuickSendSuggestion[] = [];
+  for (const minor of DEFAULT_FIAT_UNIT_TARGETS) {
+    if (minor > totalBalance || minor <= 0) continue;
+    if (!composeSatoshis(proofAmounts, minor).exactMatch) continue;
+    all.push({
+      label: formatFiatLabel(minor / 100, symbol),
+      inputValue: minorToRawInput(minor, unit),
+      inputMode: "unit",
+      amount: { value: minor, unit },
+    });
+  }
+
+  const picked = pickDistributed(all, limit * 2).sort(
+    (a, b) => a.amount.value - b.amount.value,
+  );
+  picked.push({
+    label: `Send all ${formatFiatLabel(totalBalance / 100, symbol)}`,
+    inputValue: minorToRawInput(totalBalance, unit),
+    inputMode: "unit",
+    amount: { value: totalBalance, unit },
+    sendAll: true,
+  });
+
+  logger.info("amount.suggestions.result", {
+    unit,
+    totalBalance,
+    collected: all.length,
+    totalSuggestions: picked.length,
+    includesSendAll: true,
+  });
+  return picked;
+}
+
+// ---------------------------------------------------------------------------
 // Core
 // ---------------------------------------------------------------------------
 
@@ -71,18 +127,21 @@ export function computeQuickSendSuggestions(
   proofAmounts: number[],
   btcPrice: number,
   options: {
+    unit?: string;
     fiatCurrency?: string;
     fiatSymbol?: string;
     config?: QuickSendConfig;
   } = {},
 ): QuickSendSuggestion[] {
   const { fiatCurrency, fiatSymbol, config } = options;
+  const unit = options.unit ?? "sat";
   const fiatTargets = config?.fiatTargets ?? DEFAULT_FIAT_TARGETS;
   const satTargets = config?.satTargets ?? DEFAULT_SAT_TARGETS;
   const limit = config?.limit ?? DEFAULT_LIMIT;
 
   logger.debug("amount.suggestions.start", {
     proofCount: proofAmounts.length,
+    unit,
     hasBtcPrice: btcPrice > 0,
     hasFiatCurrency: !!fiatCurrency,
     hasFiatSymbol: !!fiatSymbol,
@@ -103,6 +162,10 @@ export function computeQuickSendSuggestions(
       proofCount: proofAmounts.length,
     });
     return [];
+  }
+
+  if (isFiatUnit(unit)) {
+    return computeFiatUnitSuggestions(proofAmounts, unit, totalBalance, config);
   }
 
   const hasFiat = !!fiatCurrency && !!fiatSymbol && btcPrice > 0;
@@ -127,7 +190,7 @@ export function computeQuickSendSuggestions(
         label: formatFiatLabel(fiatAmount, fiatSymbol!),
         inputValue: fiatToRawInput(fiatAmount),
         inputMode: "fiat",
-        satoshis: sats,
+        amount: { value: sats, unit: "sat" },
       });
     }
   }
@@ -151,8 +214,8 @@ export function computeQuickSendSuggestions(
     allSat.push({
       label: `${satFormatter.format(satTarget)} sats`,
       inputValue: String(satTarget),
-      inputMode: "sat",
-      satoshis: satTarget,
+      inputMode: "unit",
+      amount: { value: satTarget, unit: "sat" },
     });
   }
   logger.debug("amount.suggestions.sat.collected", {
@@ -165,7 +228,7 @@ export function computeQuickSendSuggestions(
   const pickedSat = pickDistributed(allSat, limit);
 
   const sorted = [...pickedFiat, ...pickedSat].sort(
-    (a, b) => a.satoshis - b.satoshis,
+    (a, b) => a.amount.value - b.amount.value,
   );
 
   // Append "Send all" as the last suggestion (always composable — uses all proofs)
@@ -173,13 +236,14 @@ export function computeQuickSendSuggestions(
     sorted.push({
       label: `Send all ${satFormatter.format(totalBalance)} sats`,
       inputValue: String(totalBalance),
-      inputMode: "sat",
-      satoshis: totalBalance,
+      inputMode: "unit",
+      amount: { value: totalBalance, unit: "sat" },
       sendAll: true,
     });
   }
 
   logger.info("amount.suggestions.result", {
+    unit,
     totalBalance,
     fiatCollected: allFiat.length,
     satCollected: allSat.length,

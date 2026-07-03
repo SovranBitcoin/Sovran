@@ -270,10 +270,14 @@ async function executeAction(machine: PaymentMachine, action: FlowAction): Promi
       await machine.scan?.(action.data, { source: action.source });
       break;
     case 'enterAmount':
-      await machine.enterAmount(action.amount, action.mintUrl, {
-        destination: action.destination,
-        offline: action.offline,
-      });
+      await machine.enterAmount(
+        { value: action.amount, unit: action.unit ?? 'sat' },
+        action.mintUrl,
+        {
+          destination: action.destination,
+          offline: action.offline,
+        },
+      );
       break;
     case 'chooseOption': {
       // Look up the actual option object from the machine's context.

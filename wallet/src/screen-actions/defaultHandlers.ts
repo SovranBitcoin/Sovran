@@ -87,8 +87,20 @@ function getNullableString(
   return typeof v === "string" ? v : null;
 }
 
+function readEffectiveAmount(
+  entry: EntryLike,
+): { value: number; unit: string } | null {
+  const raw = entry.effectiveAmount;
+  if (typeof raw !== "object" || raw === null) return null;
+  const value = (raw as EntryLike).value;
+  const unit = (raw as EntryLike).unit;
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return { value, unit: typeof unit === "string" ? unit : "sat" };
+}
+
 function readAmountEntryDisplay(entry: EntryLike): AmountEntryDisplayMetadata {
-  const inputMode = entry.inputMode === "fiat" ? "fiat" : "sat";
+  const inputMode = entry.inputMode === "fiat" ? "fiat" : "unit";
+  const effective = readEffectiveAmount(entry);
   return {
     inputMode,
     rawInput: getString(entry, "rawInput") ?? "",
@@ -96,10 +108,9 @@ function readAmountEntryDisplay(entry: EntryLike): AmountEntryDisplayMetadata {
     fiatSymbol: getNullableString(entry, "fiatSymbol"),
     btcPrice: getNumber(entry, "btcPrice") ?? 0,
     displayFiat: getNullableNumber(entry, "displayFiat"),
-    displaySats:
-      getNumber(entry, "displaySats") ??
-      getNumber(entry, "effectiveSatAmount") ??
-      0,
+    displayAmount:
+      getNumber(entry, "displayAmount") ?? effective?.value ?? 0,
+    unit: effective?.unit ?? getString(entry, "unit") ?? "sat",
     autoOptimized: entry.autoOptimized === true,
   };
 }
@@ -733,12 +744,12 @@ export function createDefaultScreenActionHandlers(
         const machine = getMachine();
         if (!machine) return;
         const entry = ctx.entry as EntryLike;
-        const effectiveSat = entry.effectiveSatAmount;
+        const effectiveAmount = readEffectiveAmount(entry);
         const mintUrl =
           typeof entry.selectedMintUrl === "string"
             ? entry.selectedMintUrl
             : "";
-        if (typeof effectiveSat !== "number" || effectiveSat <= 0) return;
+        if (!effectiveAmount || effectiveAmount.value <= 0) return;
         const entryDestination = entry.destination as Destination | undefined;
         if (!entryDestination) return;
 
@@ -843,14 +854,13 @@ export function createDefaultScreenActionHandlers(
               );
               return;
             }
-            const unit = getString(entry, "unit") ?? "sat";
             logger.info("screenAction.amountEntry.next.ecashReceive", {
-              amount: effectiveSat,
-              unit,
+              amount: effectiveAmount.value,
+              unit: effectiveAmount.unit,
             });
             const created = await ops.createPaymentRequestReceive({
-              amount: effectiveSat,
-              unit,
+              amount: effectiveAmount.value,
+              unit: effectiveAmount.unit,
             });
             navigation.paymentRequestReceive?.(JSON.stringify(created));
             return;
@@ -868,7 +878,8 @@ export function createDefaultScreenActionHandlers(
         }
 
         logger.info("screenAction.amountEntry.next.confirm", {
-          amount: effectiveSat,
+          amount: effectiveAmount.value,
+          unit: effectiveAmount.unit,
           ...mintUrlFields(mintUrl || null),
           destination,
           variantId: variantId ?? null,
@@ -877,7 +888,7 @@ export function createDefaultScreenActionHandlers(
           recipientProfilePresent: !!recipientProfile,
         });
         try {
-          await machine.enterAmount(effectiveSat, mintUrl, {
+          await machine.enterAmount(effectiveAmount, mintUrl, {
             destination,
             ...(mintQuoteMethod ? { mintQuoteMethod } : {}),
             ...(meltQuoteMethod ? { meltQuoteMethod } : {}),
