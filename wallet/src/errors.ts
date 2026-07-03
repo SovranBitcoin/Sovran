@@ -58,3 +58,24 @@ export function isMeltUserCancelledError(err: unknown): boolean {
     (err instanceof Error && err.name === "MeltUserCancelledError")
   );
 }
+
+/**
+ * A melt from a fiat-unit balance needed a sat-denominated payment amount
+ * (LNURL invoice request, onchain amountSats) but no exchange rate was
+ * available to convert the unit's minor amount to sats.
+ */
+export class UnitRateUnavailableError extends Error {
+  readonly unit: string;
+  constructor(unit: string) {
+    super(`No exchange rate available to convert ${unit} to sats`);
+    this.name = "UnitRateUnavailableError";
+    this.unit = unit;
+  }
+}
+
+export function isUnitRateUnavailableError(err: unknown): boolean {
+  return (
+    err instanceof UnitRateUnavailableError ||
+    (err instanceof Error && err.name === "UnitRateUnavailableError")
+  );
+}

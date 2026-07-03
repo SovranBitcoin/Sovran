@@ -235,7 +235,12 @@ export type {
 } from "./subscriptions";
 
 // Errors
-export { isMeltUserCancelledError, MeltUserCancelledError } from "./errors";
+export {
+  isMeltUserCancelledError,
+  MeltUserCancelledError,
+  isUnitRateUnavailableError,
+  UnitRateUnavailableError,
+} from "./errors";
 
 // Reusable mint-quote singleton (standing bolt12 offer / onchain address)
 export {

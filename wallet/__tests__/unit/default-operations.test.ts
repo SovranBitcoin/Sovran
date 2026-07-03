@@ -650,4 +650,47 @@ describe('executeMelt — onchain (coco v2)', () => {
     await expect(ops.executeMelt!(MINT1, ADDRESS, 500, 'sat')).rejects.toThrow('mint 500');
     expect(cancel).toHaveBeenCalledWith('melt-op-1', 'Execute failed');
   });
+
+  it('converts fiat-unit cents to sats for onchain amountSats', async () => {
+    const { create, prepare, execute } = onchainMocks();
+    const mockManager = createMockManager({
+      quotes: { melt: { create } },
+      ops: { melt: { prepare, execute, cancel: vi.fn() } },
+    });
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      selectOnchainFeeIndex: vi.fn().mockResolvedValue(0),
+      // 1 usd-cent = 10 sats (BTC at $100k)
+      getSatsPerUnitMinor: (unit) => (unit === 'usd' ? 10 : null),
+    });
+
+    await ops.executeMelt!(MINT1, ADDRESS, 500, 'usd');
+
+    expect(create).toHaveBeenCalledWith({
+      mintUrl: MINT1,
+      method: 'onchain',
+      methodData: { address: ADDRESS, amountSats: 5000 },
+      unit: 'usd',
+    });
+  });
+
+  it('throws UnitRateUnavailableError instead of booking cents as sats', async () => {
+    const { create, prepare, execute } = onchainMocks();
+    const mockManager = createMockManager({
+      quotes: { melt: { create } },
+      ops: { melt: { prepare, execute, cancel: vi.fn() } },
+    });
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      selectOnchainFeeIndex: vi.fn().mockResolvedValue(0),
+      getSatsPerUnitMinor: () => null,
+    });
+
+    await expect(ops.executeMelt!(MINT1, ADDRESS, 500, 'usd')).rejects.toMatchObject({
+      name: 'UnitRateUnavailableError',
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
 });

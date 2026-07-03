@@ -39,7 +39,7 @@ import { defaultDetectors } from "../detectors";
 import { errField, logger, mintUrlFields } from "../logger";
 import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from "../lnurl";
 import { parsePaymentInput } from "../parse";
-import { MeltUserCancelledError } from "../errors";
+import { MeltUserCancelledError, UnitRateUnavailableError } from "../errors";
 import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
 import { amountToNumber, type AmountLike } from "../amount";
 import {
@@ -187,7 +187,10 @@ function extractOnchainAddress(meltTarget: string): string | null {
 interface ExecuteOnchainMeltInput {
   mintUrl: string;
   address: string;
+  /** Amount in minor units of `unit` (what the user entered / the quote cost basis). */
   amount: number;
+  /** BTC amount to send onchain, in sats (converted when `unit` is fiat). */
+  amountSats: number;
   unit: string;
   selectFeeIndex?: (
     options: readonly OnchainMeltFeeOption[],
@@ -206,10 +209,11 @@ async function executeOnchainMelt(
   mgr: Manager,
   input: ExecuteOnchainMeltInput,
 ): Promise<{ historyEntry: string }> {
-  const { mintUrl, address, amount, unit } = input;
+  const { mintUrl, address, amount, amountSats, unit } = input;
   logger.info("operations.executeMeltOnchain.start", {
     ...mintUrlFields(mintUrl),
     amount,
+    amountSats,
     unit,
     addressLength: address.length,
   });
@@ -217,7 +221,7 @@ async function executeOnchainMelt(
   const quote = await mgr.quotes.melt.create({
     mintUrl,
     method: "onchain",
-    methodData: { address, amountSats: amount },
+    methodData: { address, amountSats },
     unit,
   });
   const feeOptions = quote.fee_options ?? [];
@@ -520,6 +524,14 @@ export interface DefaultOperationsConfig {
    * path indefinitely. Defaults to the helper's own default (15s).
    */
   lightningTimeoutMs?: number;
+  /**
+   * Sats per one minor unit of `unit` (e.g. sats per usd-cent), used when a
+   * fiat-unit melt must express its payment amount in sats: LNURL invoice
+   * requests and onchain amountSats. Return null when no rate is available —
+   * the melt throws UnitRateUnavailableError instead of misbooking cents as
+   * sats. Never called for unit 'sat'.
+   */
+  getSatsPerUnitMinor?: (unit: string) => number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1220,6 +1232,21 @@ export function createDefaultOperations(
       const mgr = requireManager();
       const unit = _unit || "sat";
 
+      // LNURL invoice requests and onchain amountSats are sat-denominated.
+      // A fiat-unit melt's `amount` is minor units (cents) and MUST be
+      // converted — booking cents as sats would pay the wrong amount.
+      const toSatDenominated = (minor: number): number => {
+        if (unit === "sat") return minor;
+        const rate = config.getSatsPerUnitMinor?.(unit) ?? null;
+        if (rate == null || rate <= 0) {
+          logger.warn("operations.executeMelt.unitRateUnavailable", { unit });
+          throw new UnitRateUnavailableError(unit);
+        }
+        const sats = Math.round(minor * rate);
+        logger.info("lnurl.convert", { unit, minor, rate, sats });
+        return sats;
+      };
+
       // Onchain targets (bare address or bitcoin:/BIP-321 URI) take the
       // onchain melt path; everything else is Lightning (bolt11 or lnurl).
       const onchainAddress = extractOnchainAddress(meltTarget);
@@ -1228,6 +1255,7 @@ export function createDefaultOperations(
           mintUrl,
           address: onchainAddress,
           amount,
+          amountSats: toSatDenominated(amount),
           unit,
           selectFeeIndex: config.selectOnchainFeeIndex,
           mockFail: mockFailEnabled("melt"),
@@ -1248,7 +1276,7 @@ export function createDefaultOperations(
       const bolt11 =
         targetKind === "bolt11"
           ? meltTarget
-          : await requestInvoiceFromLnurl(meltTarget, amount, {
+          : await requestInvoiceFromLnurl(meltTarget, toSatDenominated(amount), {
               timeoutMs: config.lightningTimeoutMs,
             });
       logger.info("operations.executeMelt.invoiceReady", {
