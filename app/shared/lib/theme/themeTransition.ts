@@ -34,6 +34,11 @@ export function primeThemeSurface(surface: string | null): void {
 /**
  * Fade out → `swap()` (apply vars + advance the displayed theme) → fade in,
  * while the base surface color glides to `nextSurface`.
+ *
+ * This dip-through-surface is the right visual ONLY for color-only targets
+ * (there is no image to crossfade to). Image-wallpaper targets go through
+ * `startThemeCrossfade` instead — dipping a full-bleed photo to a solid color
+ * and back reads as a flash.
  */
 export function runThemeTransition(nextSurface: string | null, swap: () => void): void {
   themeSurfaceFrom.value = themeSurfaceTo.value;
@@ -157,6 +162,113 @@ function releaseDragTarget(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Programmatic crossfade (unit switch / menu pick of an image wallpaper):
+// the same two-layer pattern as the drag — raise the pre-mounted target
+// layer's opacity over the old wallpaper, swap vars once it is opaque, then
+// blend the layer away after the base has rendered the new image. Driven by
+// its OWN target/progress shared values so an in-flight carousel drag and a
+// programmatic switch can never fight over one pair (rapid unit taps
+// mid-carousel-drag).
+// ---------------------------------------------------------------------------
+
+const CROSSFADE_MS = 350;
+
+/** 0..1 progress toward `themeCrossfadeTargetSv`. */
+export const themeCrossfadeProgress = makeMutable(0);
+export const themeCrossfadeTargetSv = makeMutable<string | null>(null);
+
+let crossfadeTargetTheme: string | null = null;
+let afterCrossfadeCallbacks: Array<() => void> = [];
+
+export function getThemeCrossfadeTarget(): string | null {
+  return crossfadeTargetTheme;
+}
+
+/** Reuses the drag-target listener set: BackgroundView re-derives its
+ *  pre-mounted layer list from BOTH targets on either change. */
+export function subscribeThemeCrossfadeTarget(listener: () => void): () => void {
+  return subscribeThemeDragTarget(listener);
+}
+
+function flushAfterCrossfadeCallbacks(): void {
+  const callbacks = afterCrossfadeCallbacks;
+  afterCrossfadeCallbacks = [];
+  callbacks.forEach((callback) => callback());
+}
+
+/**
+ * Fade the target theme's (pre-mounted) layer in over the current wallpaper
+ * while the surface color glides. Re-targeting mid-fade starts clean, exactly
+ * like beginThemeDrag: stale callbacks belong to the abandoned target.
+ */
+export function startThemeCrossfade(targetTheme: string, fromSurface: string | null): void {
+  if (crossfadeTargetTheme !== targetTheme) {
+    crossfadeTargetTheme = targetTheme;
+    themeCrossfadeTargetSv.value = targetTheme;
+    themeCrossfadeProgress.value = 0;
+    afterCrossfadeCallbacks = [];
+    pendingCrossfadeReleaseTarget = null;
+    if (crossfadeFallbackTimer) {
+      clearTimeout(crossfadeFallbackTimer);
+      crossfadeFallbackTimer = null;
+    }
+    if (fromSurface) themeSurfaceFrom.value = fromSurface;
+    const toSurface = surfaceOfTheme(targetTheme);
+    if (toSurface) themeSurfaceTo.value = toSurface;
+    notifyDragListeners();
+  }
+  themeCrossfadeProgress.value = withTiming(1, { duration: CROSSFADE_MS }, (finished) => {
+    if (finished) runOnJS(flushAfterCrossfadeCallbacks)();
+  });
+}
+
+/** Run once the crossfade has fully landed (immediately if it has). */
+export function runAfterThemeCrossfade(callback: () => void): void {
+  if (crossfadeTargetTheme === null || themeCrossfadeProgress.value >= 0.999) {
+    callback();
+    return;
+  }
+  afterCrossfadeCallbacks.push(callback);
+}
+
+let pendingCrossfadeReleaseTarget: string | null = null;
+let crossfadeFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+function releaseCrossfadeNow(): void {
+  pendingCrossfadeReleaseTarget = null;
+  if (crossfadeFallbackTimer) {
+    clearTimeout(crossfadeFallbackTimer);
+    crossfadeFallbackTimer = null;
+  }
+  themeCrossfadeProgress.value = withTiming(0, { duration: RELEASE_BLEND_MS }, (finished) => {
+    if (finished) runOnJS(releaseCrossfadeTarget)();
+  });
+}
+
+function releaseCrossfadeTarget(): void {
+  crossfadeTargetTheme = null;
+  themeCrossfadeTargetSv.value = null;
+  afterCrossfadeCallbacks = [];
+  notifyDragListeners();
+}
+
+/**
+ * Vars are applied and the base sprite now renders the target — blend the
+ * crossfade layer away once the base has actually painted the same wallpaper
+ * underneath (same event-driven release as the drag).
+ */
+export function completeThemeCrossfade(): void {
+  if (crossfadeTargetTheme === null) return;
+  if (lastBaseRenderedTheme === crossfadeTargetTheme) {
+    releaseCrossfadeNow();
+    return;
+  }
+  pendingCrossfadeReleaseTarget = crossfadeTargetTheme;
+  if (crossfadeFallbackTimer) clearTimeout(crossfadeFallbackTimer);
+  crossfadeFallbackTimer = setTimeout(releaseCrossfadeNow, RELEASE_FALLBACK_MS);
+}
+
+// ---------------------------------------------------------------------------
 // Event-driven release: the drag layer must stay up until the BASE layer has
 // actually RENDERED the new wallpaper underneath (the commit's re-render
 // storm can delay the base image swap unpredictably — a blind timer either
@@ -178,6 +290,9 @@ export function noteBaseWallpaperRendered(theme: string): void {
   lastBaseRenderedTheme = theme;
   if (pendingReleaseTarget && pendingReleaseTarget === theme) {
     releaseNow();
+  }
+  if (pendingCrossfadeReleaseTarget && pendingCrossfadeReleaseTarget === theme) {
+    releaseCrossfadeNow();
   }
 }
 

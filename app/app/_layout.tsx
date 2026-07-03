@@ -597,15 +597,25 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
     };
   }, [phase]);
 
-  // Phase 3 — morphing | fading: signal the handoff (so destination screens
-  // can start their own entrance animation), then advance to `done` after
-  // the CSS transition's own duration. Reanimated 4 CSS Transitions don't
-  // fire a completion callback, so we mirror the duration with a setTimeout.
-  // Deps are `phase` only — this timer does NOT restart if `anchor` changes
-  // mid-animation.
+  // Phase 3 — morphing: signal the handoff (so destination screens can start
+  // their own entrance animation), then advance to `done` after the CSS
+  // transition's own duration. Reanimated 4 CSS Transitions don't fire a
+  // completion callback, so we mirror the duration with a setTimeout.
+  //
+  // Deps include `anchor`/`parentOffset` ON PURPOSE: `overlayStyle` depends on
+  // them, so a mid-morph anchor republish (wallpaper decode or safe-area
+  // settle shifting the QR button) RESTARTS the CSS tween from scratch — the
+  // completion timer must restart with it. With phase-only deps the original
+  // timer yanked the overlay to done/unmounted while the restarted tween was
+  // mid-flight, which is why the splash sometimes just vanished instead of
+  // docking into the button.
   useEffect(() => {
-    if (phase !== 'morphing' && phase !== 'fading') return;
+    if (phase !== 'morphing') return;
     setBootSplashHandoff(true);
+    initLog(
+      'SplashMorph',
+      `morph timer armed — ${MORPH_DURATION_MS + 30}ms (restarts with the tween on anchor change)`
+    );
     const id = setTimeout(() => {
       const node = splashOverlayRef.current as unknown as {
         measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
@@ -616,6 +626,18 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
           `final overlay rect (window) — x=${x} y=${y} width=${w} height=${h}`
         );
       });
+      setBootMorphCompleted(true);
+      setPhase('done');
+    }, MORPH_DURATION_MS + 30);
+    return () => clearTimeout(id);
+  }, [phase, anchor, parentOffset]);
+
+  // Phase 3b — fading: same duration mirror, but the fade's target values
+  // never depend on the anchor, so an anchor republish must NOT restart it.
+  useEffect(() => {
+    if (phase !== 'fading') return;
+    setBootSplashHandoff(true);
+    const id = setTimeout(() => {
       setBootMorphCompleted(true);
       setPhase('done');
     }, MORPH_DURATION_MS + 30);

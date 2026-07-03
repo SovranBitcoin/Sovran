@@ -7,8 +7,12 @@ import React, { memo, ReactNode, useMemo, useSyncExternalStore } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
 import Animated, { interpolateColor, useAnimatedStyle } from 'react-native-reanimated';
 import {
+  getThemeCrossfadeTarget,
   getThemeDragTarget,
+  subscribeThemeCrossfadeTarget,
   subscribeThemeDragTarget,
+  themeCrossfadeProgress,
+  themeCrossfadeTargetSv,
   themeDragProgress,
   themeDragTargetSv,
   themeLayerOpacity,
@@ -307,19 +311,34 @@ function AnimatedBackgroundViewComponent({
   // opacity. Distinct themes only — a couple of full-screen bitmaps, decode
   // capped at view size.
   const dragTargetTheme = useSyncExternalStore(subscribeThemeDragTarget, getThemeDragTarget);
+  const crossfadeTargetTheme = useSyncExternalStore(
+    subscribeThemeCrossfadeTarget,
+    getThemeCrossfadeTarget
+  );
   const unitWallpapers = useThemeStore((s) => s.unitWallpapers);
   const preloadedThemes = useMemo(() => {
     const themes = new Set<string>(Object.values(unitWallpapers));
     if (dragTargetTheme) themes.add(dragTargetTheme);
     themes.delete(currentTheme);
+    // The crossfade target is added AFTER the currentTheme delete on purpose:
+    // once the vars swap makes it the current theme, its overlay must stay
+    // mounted (opaque) until the base sprite has painted the same image and
+    // the release blend runs — unmounting it at the swap would flash the
+    // surface color for the frames before the base's onLoad.
+    if (crossfadeTargetTheme) themes.add(crossfadeTargetTheme);
     return [...themes];
-  }, [unitWallpapers, dragTargetTheme, currentTheme]);
+  }, [unitWallpapers, dragTargetTheme, crossfadeTargetTheme, currentTheme]);
 
   const backgroundAnimatedStyle = useAnimatedStyle(() => ({
-    // themeLayerOpacity dips to 0 during (non-drag) theme switches so the
+    // themeLayerOpacity dips to 0 during color-only theme switches so the
     // wallpaper swaps at the fade's midpoint; themeDragProgress crossfades
-    // toward the drag target while the carousel moves.
-    opacity: backgroundOpacity.value * themeLayerOpacity.value * (1 - themeDragProgress.value),
+    // toward the drag target while the carousel moves; themeCrossfadeProgress
+    // does the same for programmatic (unit-switch) wallpaper changes.
+    opacity:
+      backgroundOpacity.value *
+      themeLayerOpacity.value *
+      (1 - themeDragProgress.value) *
+      (1 - themeCrossfadeProgress.value),
   }));
 
   // Color-theme glide: while a theme transition runs, an overlay above the
@@ -329,10 +348,18 @@ function AnimatedBackgroundViewComponent({
   const surfaceGlideStyle = useAnimatedStyle(() => {
     const from = themeSurfaceFrom.value;
     const to = themeSurfaceTo.value;
-    // Drag progress takes precedence: it maps the carousel position directly.
+    // Drag progress takes precedence (it maps the carousel position
+    // directly), then the programmatic crossfade, then the timed glide.
     const progress =
-      themeDragProgress.value > 0 ? themeDragProgress.value : themeSurfaceProgress.value;
-    const active = themeDragProgress.value > 0 || themeSurfaceProgress.value < 1;
+      themeDragProgress.value > 0
+        ? themeDragProgress.value
+        : themeCrossfadeProgress.value > 0
+          ? themeCrossfadeProgress.value
+          : themeSurfaceProgress.value;
+    const active =
+      themeDragProgress.value > 0 ||
+      themeCrossfadeProgress.value > 0 ||
+      themeSurfaceProgress.value < 1;
     if (!from || !to || !active) {
       return { opacity: 0, backgroundColor: 'transparent' };
     }
@@ -436,10 +463,17 @@ const PreloadedWallpaperLayer = memo(function PreloadedWallpaperLayer({
   gradientColor?: string;
   gradientTopOpacity: number;
 }) {
-  // Worklet-only visibility: comparing against the drag-target SHARED VALUE
-  // means dragging raises this layer with zero React re-renders.
+  // Worklet-only visibility: comparing against the target SHARED VALUES means
+  // a drag or a programmatic crossfade raises this layer with zero React
+  // re-renders. The two transitions own separate value pairs, so an in-flight
+  // drag and a unit switch can't clobber each other's target.
   const layerStyle = useAnimatedStyle(() => ({
-    opacity: themeDragTargetSv.value === theme ? themeDragProgress.value : 0,
+    opacity:
+      themeDragTargetSv.value === theme
+        ? themeDragProgress.value
+        : themeCrossfadeTargetSv.value === theme
+          ? themeCrossfadeProgress.value
+          : 0,
   }));
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, layerStyle]}>

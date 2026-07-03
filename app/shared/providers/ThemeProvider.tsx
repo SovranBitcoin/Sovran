@@ -8,12 +8,17 @@ import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
 import { themeVariables, getThemeVariables } from '@/shared/lib/themeEngine';
 import {
+  completeThemeCrossfade,
   completeThemeDrag,
   getThemeDragTarget,
   primeThemeSurface,
+  runAfterThemeCrossfade,
   runAfterThemeDragFade,
   runThemeTransition,
+  surfaceOfTheme,
+  startThemeCrossfade,
 } from '@/shared/lib/theme/themeTransition';
+import { isBackgroundImageTheme } from '@/config/backgroundImageThemes';
 import { Uniwind } from 'uniwind';
 
 initLog('Module', 'ThemeProvider loaded');
@@ -107,10 +112,29 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       });
       return;
     }
-    // Menu pick / programmatic switch: fade the wallpaper layer out, swap at
-    // the dip, fade in; the base surface color glides between the themes.
+    // Menu pick / programmatic switch (this is the unit-switch path).
+    const previousTheme = lastApplied.current;
     lastApplied.current = resolvedTheme;
-    log.info('theme.transition.start', { to: resolvedTheme });
+    if (isBackgroundImageTheme(resolvedTheme)) {
+      // Image wallpaper target: crossfade the pre-mounted target layer in
+      // over the old wallpaper — never dip through the surface color (the
+      // dip read as a flash on unit switches). Vars swap once the layer is
+      // fully opaque; the layer blends away after the base sprite has
+      // rendered the same image underneath.
+      log.info('theme.transition.start', { to: resolvedTheme, kind: 'crossfade' });
+      startThemeCrossfade(resolvedTheme, previousTheme ? surfaceOfTheme(previousTheme) : null);
+      runAfterThemeCrossfade(() => {
+        primeThemeSurface(surfaceOf);
+        applyVars();
+        completeThemeCrossfade();
+        log.info('theme.transition.crossfade_completed', { to: resolvedTheme });
+      });
+      return;
+    }
+    // Color-only target: there is no image to crossfade to — fade the
+    // wallpaper layer out, swap at the dip, fade in; the base surface color
+    // glides between the themes.
+    log.info('theme.transition.start', { to: resolvedTheme, kind: 'fade' });
     runThemeTransition(surfaceOf, applyVars);
   }, [resolvedTheme]);
 
