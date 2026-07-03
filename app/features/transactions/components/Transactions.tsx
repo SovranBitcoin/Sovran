@@ -1,7 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef, type ViewToken } from '@shopify/flash-list';
 import { Link } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import groupBy from 'lodash/groupBy';
@@ -20,6 +27,12 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/date';
+import {
+  findScrollIndexForMonth,
+  monthItemsFromKeys,
+  monthKeyOf,
+  type MonthItem,
+} from '@/features/transactions/lib/months';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import {
   bucketTransaction,
@@ -72,9 +85,33 @@ interface Section {
   title: string;
   data: TimelineItem[];
   index?: string;
+  /** "YYYY-MM" of the section's date — drives month jump + viewport tracking. */
+  monthKey: string;
+}
+
+/** Imperative surface for the virtualized timeline (month pill jumps). */
+export interface TransactionsHandle {
+  scrollToMonth: (monthKey: string) => void;
 }
 
 const DATE_HEADER_HEIGHT = 30;
+
+// Stable object: FlashList requires viewabilityConfig to keep its identity.
+const MONTH_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 20 };
+
+// Reveal gate: how long the section content must hold still before the list
+// is shown, and the cap after which it shows regardless (so a busy wallet
+// with in-flight operations can't spin forever).
+const SETTLE_DEBOUNCE_MS = 150;
+const SETTLE_MAX_WAIT_MS = 700;
+
+// FlashList v2 enables maintainVisibleContentPosition by default. On this
+// list the header spacer grows after mount (native header measures late) and
+// history arrives in waves (coco page + melts + annotations), so the anchor
+// drifts and first paint lands scrolled below the top with the rows above it
+// not yet drawn. A history timeline needs top-anchored behavior, not
+// chat-style anchoring — disable it.
+const MVCP_DISABLED = { disabled: true };
 
 interface Props {
   header?: React.ReactElement | (() => React.ReactElement) | null;
@@ -102,8 +139,6 @@ interface Props {
   tab?: 'All' | 'Confirmed' | 'Pending' | 'Expired';
   days?: number;
   hideExpired?: boolean; // If true, expired transactions will be filtered out
-  /** Selected month for filtering (format: "YYYY-MM") */
-  selectedMonth?: string | null;
   /** Optional custom press handler for transactions */
   onTransactionPress?: (historyEntry: HistoryEntry) => void;
   /** Optional scroll handler for tracking scroll position */
@@ -120,11 +155,30 @@ interface Props {
    */
   onCancelPendingEcash?: (entry: SendHistoryEntry) => void;
   /**
-   * Reports the currently-visible (post-filter) pending ecash sends so a
-   * parent screen can show a "Cancel all" footer that respects active
-   * filters. Fires on every filter/history change.
+   * Reports the cancellable pending ecash sends in the rendered list (all
+   * months — the list is one scrollable surface) so a parent screen can show
+   * a "Cancel all" footer that respects the active non-month filters. Fires
+   * on every filter/history change.
    */
   onVisiblePendingEcashChange?: (entries: SendHistoryEntry[]) => void;
+  /**
+   * Reports the months actually present in the rendered sections (newest
+   * first) so a parent can render month pills that always match the list —
+   * including swap-only months and post-annotation-filter gaps.
+   */
+  onMonthsChange?: (months: MonthItem[]) => void;
+  /**
+   * Reports the month of the topmost visible section as the user scrolls,
+   * so a parent can highlight the month the viewport is currently on.
+   */
+  onVisibleMonthChange?: (monthKey: string) => void;
+  /**
+   * Infinite scroll: called when the list nears its end so the parent can
+   * fetch the next history page (virtualized mode only).
+   */
+  onEndReached?: () => void;
+  /** Imperative handle for month pill jumps (virtualized mode only). */
+  ref?: React.Ref<TransactionsHandle>;
 }
 
 export const Transactions = React.memo(
@@ -145,12 +199,15 @@ export const Transactions = React.memo(
     tab = 'All',
     days = 1,
     hideExpired = false,
-    selectedMonth,
     onTransactionPress,
     onScroll,
     disableContentInsetAdjustment = false,
     onCancelPendingEcash,
     onVisiblePendingEcashChange,
+    onMonthsChange,
+    onVisibleMonthChange,
+    onEndReached,
+    ref,
   }: Props) => {
     const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
     const { height: screenHeight } = useWindowDimensions();
@@ -204,17 +261,6 @@ export const Transactions = React.memo(
           }
         }
 
-        // Filter by selected month if provided
-        if (selectedMonth) {
-          const [yearStr, monthStr] = selectedMonth.split('-');
-          const filterYear = parseInt(yearStr, 10);
-          const filterMonthNum = parseInt(monthStr, 10) - 1; // 0-indexed
-          const date = new Date(historyEntry.createdAt);
-          if (date.getFullYear() !== filterYear || date.getMonth() !== filterMonthNum) {
-            return false;
-          }
-        }
-
         return true;
       });
       const duration = Math.round((performance.now() - t0) * 100) / 100;
@@ -236,7 +282,6 @@ export const Transactions = React.memo(
       lock,
       counterparty,
       hideExpired,
-      selectedMonth,
     ]);
 
     // Build unified timeline: mix history entries + swap groups chronologically
@@ -251,24 +296,13 @@ export const Transactions = React.memo(
       // swaps are self-rebalances with no counterparty, so never inject them.
       if (embedded || filter !== 'all' || type !== 'all') return txItems;
 
-      const monthFilter = (createdAt: number) => {
-        if (!selectedMonth) return true;
-        const [yearStr, monthStr] = selectedMonth.split('-');
-        const filterYear = parseInt(yearStr, 10);
-        const filterMonthNum = parseInt(monthStr, 10) - 1;
-        const date = new Date(createdAt);
-        return date.getFullYear() === filterYear && date.getMonth() === filterMonthNum;
-      };
-
-      const swapItems: TimelineItem[] = swapGroups
-        .filter((group) => monthFilter(group.createdAt))
-        .map((group) => ({
-          kind: 'swap' as const,
-          data: group,
-        }));
+      const swapItems: TimelineItem[] = swapGroups.map((group) => ({
+        kind: 'swap' as const,
+        data: group,
+      }));
 
       return [...txItems, ...swapItems];
-    }, [filteredHistory, swapGroups, filter, type, selectedMonth, embedded]);
+    }, [filteredHistory, swapGroups, filter, type, embedded]);
 
     const sortedTimeline = useMemo(
       () => orderBy(timelineItems, [(item) => getTimelineCreatedAt(item)], ['desc']),
@@ -325,6 +359,7 @@ export const Transactions = React.memo(
           title: dateString,
           data: groupedByDate[dateString],
           index: `${prefix}-${dateString}`,
+          monthKey: monthKeyOf(getTimelineCreatedAt(groupedByDate[dateString][0])),
         }));
       };
 
@@ -351,6 +386,13 @@ export const Transactions = React.memo(
     }, [pending, confirmed, expired, showMore, days, embedded]);
 
     const sectionsToDisplay = useMemo(() => {
+      // Initial history fetch: coco's page hasn't landed yet, but the
+      // persisted swap-group store hydrates synchronously — rendering swaps
+      // alone paints an old month first, then every newer entry inserts
+      // above it when the page arrives (log-confirmed: swap-only frame at
+      // t+0, full 89-row frame at t+2s). Hold the list empty so the
+      // isFetching spinner shows until real history is in.
+      if (isFetching && filteredHistory.length === 0) return [];
       log.debug('transactions.sections_computed', {
         tab,
         pending: sections.pending.length,
@@ -362,7 +404,7 @@ export const Transactions = React.memo(
       if (tab === 'Confirmed') return sections.confirmed;
       if (tab === 'Expired') return sections.expired;
       return sections.all;
-    }, [sections, tab]);
+    }, [sections, tab, isFetching, filteredHistory.length]);
 
     // Embedded (per-person) list groups purely by date — no pending/confirmed/
     // expired split — so each date renders once under a single date header.
@@ -380,6 +422,7 @@ export const Transactions = React.memo(
           title: dateString,
           data: groupedByDate[dateString],
           index: `embedded-${dateString}`,
+          monthKey: monthKeyOf(getTimelineCreatedAt(groupedByDate[dateString][0])),
         })
       );
     }, [embedded, sortedTimeline]);
@@ -407,6 +450,151 @@ export const Transactions = React.memo(
       lastEmittedSignatureRef.current = signature;
       onVisiblePendingEcashChange(visiblePendingEcash);
     }, [visiblePendingEcash, onVisiblePendingEcashChange]);
+
+    // Reveal only after the list has settled ABOVE THE FOLD. History arrives
+    // in waves (first coco page, self-filling onEndReached pages, annotation
+    // and receive-supplement merges); frames shown as they land paint partial
+    // content that visibly reshuffles. The FlashList stays mounted-but-
+    // invisible so it measures beneath the spinner, and is revealed once the
+    // HEAD of the list (first rows — what the user will actually see) has
+    // held still for SETTLE_DEBOUNCE_MS, capped at SETTLE_MAX_WAIT_MS from
+    // first data. Older pages appending BELOW deliberately do not restart
+    // the debounce — appends don't move visible content, and small-page
+    // chaining would otherwise defer the reveal to the cap every time. If
+    // history is already loaded when this instance mounts, reveal
+    // immediately.
+    const [settled, setSettled] = useState(() => history.length > 0 && !isFetching);
+    const hasSettleData = !(isFetching && filteredHistory.length === 0);
+    const headSignature = useMemo(() => {
+      const keys: string[] = [];
+      for (const section of sectionsToDisplay) {
+        for (const item of section.data) {
+          keys.push(getTimelineKey(item));
+          if (keys.length >= 12) return keys.join('|');
+        }
+      }
+      return keys.join('|');
+    }, [sectionsToDisplay]);
+    useEffect(() => {
+      if (settled || !hasSettleData) return;
+      const timer = setTimeout(() => setSettled(true), SETTLE_DEBOUNCE_MS);
+      return () => clearTimeout(timer);
+      // headSignature restarts the debounce only when the top of the list
+      // changes — "settled" means the visible head held still for a window.
+    }, [settled, hasSettleData, headSignature]);
+    useEffect(() => {
+      if (settled || !hasSettleData) return;
+      const timer = setTimeout(() => setSettled(true), SETTLE_MAX_WAIT_MS);
+      return () => clearTimeout(timer);
+      // No sectionsToDisplay here: this is the churn-proof upper bound.
+    }, [settled, hasSettleData]);
+    useEffect(() => {
+      if (settled) {
+        log.info('transactions.render.settled', { items: sectionsToDisplay.length });
+      }
+      // Log once on the transition; sectionsToDisplay is read, not a trigger.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [settled]);
+
+    // Render-order diagnostics: the exact order the list renders, one line
+    // per change. Types + dates only — no amounts, mints, or tokens.
+    const lastRenderSignatureRef = useRef('');
+    useEffect(() => {
+      const rows: string[] = [];
+      for (const section of sectionsToDisplay) {
+        for (const item of section.data) {
+          rows.push(
+            `${item.kind === 'swap' ? 'swap' : item.data.type}@${new Date(
+              getTimelineCreatedAt(item)
+            )
+              .toISOString()
+              .slice(0, 10)}`
+          );
+        }
+      }
+      const signature = rows.join(',');
+      if (signature === lastRenderSignatureRef.current) return;
+      lastRenderSignatureRef.current = signature;
+      log.info('transactions.render.order', {
+        tab,
+        listKey: listKey ?? null,
+        sections: sectionsToDisplay.length,
+        items: rows.length,
+        monthsInOrder: sectionsToDisplay.map((s) => s.monthKey).join(','),
+        first30: rows.slice(0, 30).join(','),
+        last5: rows.slice(-5).join(','),
+      });
+    }, [sectionsToDisplay, tab, listKey]);
+
+    // Months present in the rendered sections, newest first. Emitted with a
+    // signature guard (same pattern as the pending-ecash report) so the parent
+    // only re-renders its pills when the month set actually changes. The
+    // sentinel start value guarantees the first emission fires even when the
+    // list mounts empty.
+    const monthItems = useMemo(
+      () => monthItemsFromKeys(sectionsToDisplay.map((section) => section.monthKey)),
+      [sectionsToDisplay]
+    );
+    const lastMonthsSignatureRef = useRef<string | null>(null);
+    useEffect(() => {
+      if (!onMonthsChange) return;
+      const signature = monthItems.map((m) => m.key).join('|');
+      if (signature === lastMonthsSignatureRef.current) return;
+      lastMonthsSignatureRef.current = signature;
+      onMonthsChange(monthItems);
+    }, [monthItems, onMonthsChange]);
+
+    const flashListRef = useRef<FlashListRef<Section>>(null);
+
+    // While a pill-triggered animated scroll is in flight, viewport-month
+    // reports are suppressed — otherwise every intermediate month would
+    // flicker through the pills on the way to the target.
+    const programmaticScrollRef = useRef(false);
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        scrollToMonth: (monthKey: string) => {
+          const index = findScrollIndexForMonth(sectionsToDisplay, monthKey);
+          log.info('transactions.month.scroll', {
+            monthKey,
+            index,
+            exact: sectionsToDisplay[index]?.monthKey === monthKey,
+            sections: sectionsToDisplay.length,
+          });
+          const list = flashListRef.current;
+          if (index < 0 || !list) return;
+          programmaticScrollRef.current = true;
+          void list
+            .scrollToIndex({ index, animated: true })
+            .catch(() => {})
+            .finally(() => {
+              programmaticScrollRef.current = false;
+            });
+        },
+      }),
+      [sectionsToDisplay]
+    );
+
+    // FlashList requires onViewableItemsChanged to keep its identity, so the
+    // latest callback is read through a ref instead of re-binding.
+    const onVisibleMonthChangeRef = useRef(onVisibleMonthChange);
+    useEffect(() => {
+      onVisibleMonthChangeRef.current = onVisibleMonthChange;
+    });
+    const handleViewableItemsChanged = useCallback(
+      ({ viewableItems }: { viewableItems: ViewToken<Section>[] }) => {
+        if (programmaticScrollRef.current) return;
+        // Topmost = lowest index; don't rely on the array's ordering.
+        let top: ViewToken<Section> | undefined;
+        for (const token of viewableItems) {
+          if (!token.isViewable || token.index === null) continue;
+          if (!top || token.index < (top.index as number)) top = token;
+        }
+        if (top?.item?.monthKey) onVisibleMonthChangeRef.current?.(top.item.monthKey);
+      },
+      []
+    );
 
     const renderTimelineItem = useCallback(
       (item: TimelineItem, rowIndex?: number) => {
@@ -625,30 +813,56 @@ export const Transactions = React.memo(
 
     return (
       <Log name="Transactions">
-        <FlashList
-          key={listKey}
-          style={{ flex: 1 }}
-          // Android: this timeline renders inside the transactions form-sheet;
-          // opt into nested scrolling so dragging it down scrolls the list
-          // instead of dismissing the sheet. No-op when not sheet-nested.
-          nestedScrollEnabled
-          data={sectionsToDisplay}
-          keyExtractor={(section) => section.index ?? section.title}
-          // FlashList v2 measures section heights synchronously, so there is no
-          // estimate to supply. A collapsing transaction row animates its own
-          // height via Transaction.tsx's reanimated `layout` transition; the
-          // sections below reflow as FlashList re-measures (the legend-only
-          // `itemLayoutAnimation` that animated sibling reflow has no v2
-          // equivalent, so that reflow is now immediate).
-          drawDistance={400}
-          contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
-          ListHeaderComponent={resolvedHeader}
-          ListEmptyComponent={emptyComponent}
-          onScroll={onScroll}
-          scrollEventThrottle={16}
-          renderItem={renderSection}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}
-        />
+        <View style={styles.listContainer}>
+          <View
+            style={[styles.listContainer, !settled && styles.listHidden]}
+            pointerEvents={settled ? 'auto' : 'none'}>
+            <FlashList
+              key={listKey}
+              ref={flashListRef}
+              style={{ flex: 1 }}
+              // Android: this timeline renders inside the transactions form-sheet;
+              // opt into nested scrolling so dragging it down scrolls the list
+              // instead of dismissing the sheet. No-op when not sheet-nested.
+              nestedScrollEnabled
+              data={sectionsToDisplay}
+              keyExtractor={(section) => section.index ?? section.title}
+              // FlashList v2 measures section heights synchronously, so there is no
+              // estimate to supply. A collapsing transaction row animates its own
+              // height via Transaction.tsx's reanimated `layout` transition; the
+              // sections below reflow as FlashList re-measures (the legend-only
+              // `itemLayoutAnimation` that animated sibling reflow has no v2
+              // equivalent, so that reflow is now immediate).
+              drawDistance={400}
+              maintainVisibleContentPosition={MVCP_DISABLED}
+              onEndReached={onEndReached}
+              // One full viewport of lookahead: with small history pages the
+              // next fetch must start before the user reaches the end, or
+              // fast scrolling hits a visible wait.
+              onEndReachedThreshold={1}
+              contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
+              ListHeaderComponent={resolvedHeader}
+              ListEmptyComponent={emptyComponent}
+              onScroll={onScroll}
+              scrollEventThrottle={16}
+              // Grabbing the list mid-animation cancels the pill jump's claim on
+              // the viewport: tracking resumes immediately (also a safety net if
+              // the scrollToIndex promise never settles).
+              onScrollBeginDrag={() => {
+                programmaticScrollRef.current = false;
+              }}
+              onViewableItemsChanged={handleViewableItemsChanged}
+              viewabilityConfig={MONTH_VIEWABILITY_CONFIG}
+              renderItem={renderSection}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}
+            />
+          </View>
+          {!settled && (
+            <View style={styles.settleOverlay} pointerEvents="none">
+              <Spinner size={22} />
+            </View>
+          )}
+        </View>
       </Log>
     );
   }
@@ -667,6 +881,22 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,
+  },
+  listContainer: {
+    flex: 1,
+  },
+  // Kept mounted so FlashList measures and settles beneath the spinner.
+  listHidden: {
+    opacity: 0,
+  },
+  settleOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     zIndex: zIndex.raised,

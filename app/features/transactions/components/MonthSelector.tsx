@@ -5,17 +5,9 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import opacity from 'hex-color-opacity';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
-
-export interface MonthItem {
-  key: string;
-  label: string;
-  fullLabel: string;
-  year: number;
-  month: number;
-}
+import type { MonthItem } from '@/features/transactions/lib/months';
 
 interface MonthTabProps {
   item: MonthItem;
@@ -23,21 +15,6 @@ interface MonthTabProps {
   onPress: (monthKey: string) => void;
   showYear?: boolean;
 }
-
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
 
 function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
   const [foreground, surfaceSecondary] = useThemeColor([
@@ -70,60 +47,20 @@ function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
 }
 
 interface MonthSelectorProps {
-  /**
-   * Either pass a precomputed `months` array (preferred when the parent also
-   * needs to render per-month pages) or pass `history` and let this component
-   * derive months internally (backwards-compatible legacy mode).
-   */
-  months?: MonthItem[];
-  history?: HistoryEntry[];
+  months: MonthItem[];
   selectedMonth: string | null;
   onMonthChange: (monthKey: string | null) => void;
   showYear?: boolean;
 }
 
-export function extractMonthsFromHistory(history: HistoryEntry[]): MonthItem[] {
-  const monthsMap = new Map<string, MonthItem>();
-
-  for (const entry of history) {
-    const date = new Date(entry.createdAt);
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const key = `${year}-${String(month + 1).padStart(2, '0')}`;
-
-    if (!monthsMap.has(key)) {
-      monthsMap.set(key, {
-        key,
-        label: MONTH_NAMES[month],
-        fullLabel: `${MONTH_NAMES[month]} ${year}`,
-        year,
-        month,
-      });
-    }
-  }
-
-  return Array.from(monthsMap.values()).sort((a, b) => {
-    if (a.year !== b.year) return b.year - a.year;
-    return b.month - a.month;
-  });
-}
-
 export function MonthSelector({
-  months: monthsProp,
-  history,
+  months,
   selectedMonth,
   onMonthChange,
   showYear: showYearProp,
 }: MonthSelectorProps) {
   const scrollViewRef = useRef<ScrollView>(null);
   const itemPositions = useRef<Map<string, number>>(new Map());
-
-  // Prefer the explicit prop; fall back to deriving from history so existing
-  // callers that pass `history` keep working.
-  const months = useMemo(() => {
-    if (monthsProp) return monthsProp;
-    return extractMonthsFromHistory(history ?? []);
-  }, [monthsProp, history]);
 
   const showYear = useMemo(() => {
     if (showYearProp !== undefined) return showYearProp;

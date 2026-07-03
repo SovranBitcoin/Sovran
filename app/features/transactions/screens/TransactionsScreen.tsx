@@ -7,7 +7,9 @@
  * Features:
  * - Native Stack header handles title and buttons
  * - Sticky month selector with blur/gradient below header (via Screen)
- * - Virtualized transaction list
+ * - One virtualized transaction list across all months: month pills jump the
+ *   list to the first section of that month, and manual scrolling moves the
+ *   pill highlight to the month currently at the top of the viewport.
  * - Filter support via external props (from filter flow)
  * - Inline pending-ecash sweep: when tab=Pending and the visible bucket has
  *   cancellable ecash sends, surfaces a "Cancel N pending" footer that
@@ -15,13 +17,13 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import PagerView from 'react-native-pager-view';
 import { View } from '@/shared/ui/primitives/View/View';
-import { Transactions } from '@/features/transactions/components/Transactions';
 import {
-  MonthSelector,
-  extractMonthsFromHistory,
-} from '@/features/transactions/components/MonthSelector';
+  Transactions,
+  type TransactionsHandle,
+} from '@/features/transactions/components/Transactions';
+import { MonthSelector } from '@/features/transactions/components/MonthSelector';
+import type { MonthItem } from '@/features/transactions/lib/months';
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
@@ -49,6 +51,13 @@ type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 
 const MONTH_SELECTOR_HEIGHT = 48;
 
+// Small pages, coco-style: getPaginatedHistory is a cheap offset/limit read
+// over an indexed SQLite projection, so the first paint needs only a
+// screenful — onEndReached chains further pages as the user scrolls (and
+// FlashList fires it immediately while content is shorter than the
+// viewport, so the first screen self-fills).
+const HISTORY_PAGE_SIZE = 10;
+
 function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
   return {
     hasMintUrl: !!mintUrl,
@@ -74,9 +83,12 @@ interface TransactionsScreenProps {
   filterLock?: TransactionLockFilter;
   /** External filter: has a nostr counterparty */
   filterCounterparty?: TransactionCounterpartyFilter;
-  /** External filter: selected month key (format: "YYYY-MM") */
+  /**
+   * External month key (format: "YYYY-MM"). No longer a filter — it names the
+   * month the viewport is on / should jump to.
+   */
   filterMonth?: string | null;
-  /** Callback when month selection changes */
+  /** Callback when the active month changes (pill tap or scroll). */
   onMonthChange?: (month: string | null) => void;
 }
 
@@ -107,7 +119,7 @@ export function TransactionsScreen({
   const handleMonthChange = onMonthChange || setInternalMonth;
 
   const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
-  const pagerRef = useRef<PagerView>(null);
+  const transactionsRef = useRef<TransactionsHandle>(null);
 
   const [visiblePendingEcash, setVisiblePendingEcash] = useState<SendHistoryEntry[]>([]);
   const [isSweeping, setIsSweeping] = useState(false);
@@ -176,9 +188,41 @@ export function TransactionsScreen({
   );
   const visibleUnit = visiblePendingEcash[0]?.unit || selectedCurrency;
 
-  const { history, isFetching } = useHistoryWithMelts();
+  const { history, isFetching, loadMore, hasMore } = useHistoryWithMelts(HISTORY_PAGE_SIZE);
 
-  const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${filterMintUrl}-${selectedMonth}`;
+  // One list over all months means the whole history must be reachable by
+  // scrolling: page in the next coco history batch as the end approaches.
+  // Month pills grow as older pages land (they derive from rendered sections).
+  //
+  // FlashList fires onEndReached ONCE on entering the near-end zone and only
+  // re-arms when `data` changes — so a request that lands mid-fetch must be
+  // QUEUED, not dropped. Dropping it deadlocks the list: no load → no data
+  // change → the trigger never fires again no matter how far the user
+  // scrolls. With small pages the very first shot fires while the initial
+  // fetch is still in flight, so this is the common path, not an edge case.
+  const pendingLoadMoreRef = useRef(false);
+  const handleEndReached = useCallback(() => {
+    if (!hasMore) return;
+    if (isFetching) {
+      pendingLoadMoreRef.current = true;
+      return;
+    }
+    log.info('transactions.history.load_more', { loaded: history.length });
+    void loadMore();
+  }, [hasMore, isFetching, loadMore, history.length]);
+
+  // Drain a queued load once the in-flight fetch settles.
+  useEffect(() => {
+    if (isFetching || !pendingLoadMoreRef.current) return;
+    pendingLoadMoreRef.current = false;
+    if (!hasMore) return;
+    log.info('transactions.history.load_more', { loaded: history.length, queued: true });
+    void loadMore();
+  }, [isFetching, hasMore, loadMore, history.length]);
+
+  // No month in the key: the active month changes as the user scrolls, and a
+  // remount on every month change would reset the scroll position it tracks.
+  const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${filterMintUrl}`;
 
   const filteredByTypeHistory = useMemo(() => {
     return history.filter((historyEntry) => {
@@ -190,56 +234,46 @@ export function TransactionsScreen({
 
   const parsedAccount = { unit: selectedCurrency };
 
-  // Pager pages and the month-pill row need to share the same months array so
-  // the active index always lines up with the active page.
-  const months = useMemo(
-    () => extractMonthsFromHistory(filteredByTypeHistory),
-    [filteredByTypeHistory]
-  );
+  // The list is the single source of truth for months: it reports the months
+  // actually present in its rendered sections (including swap-only months and
+  // annotation-filter gaps), so the pills always match what is scrollable.
+  const [months, setMonths] = useState<MonthItem[]>([]);
 
-  // Default to the newest month once the months list is known. Owning this
-  // here (instead of inside MonthSelector) lets the pager's `initialPage`
-  // line up with the selected pill on first paint, no flicker.
-  useEffect(() => {
-    if (selectedMonth === null && months.length > 0) {
-      handleMonthChange(months[0].key);
-    }
-  }, [months, selectedMonth, handleMonthChange]);
-
-  const activeIndex = useMemo(() => {
-    if (!selectedMonth || months.length === 0) return 0;
-    const idx = months.findIndex((m) => m.key === selectedMonth);
-    return idx >= 0 ? idx : 0;
-  }, [months, selectedMonth]);
-
-  // If a filter change drops the current month out of `months`, snap the
-  // pager and pill row back to the first available month. Mirrors the
-  // BackgroundScreen pattern.
+  // Keep the pill highlight valid: default to the newest month on first
+  // paint, and re-home it when a filter change drops the current month.
   useEffect(() => {
     if (months.length === 0) return;
-    if (selectedMonth && !months.some((m) => m.key === selectedMonth)) {
+    if (!selectedMonth || !months.some((m) => m.key === selectedMonth)) {
       handleMonthChange(months[0].key);
-      pagerRef.current?.setPageWithoutAnimation(0);
     }
   }, [months, selectedMonth, handleMonthChange]);
 
   const handlePillSelect = useCallback(
     (key: string | null) => {
       handleMonthChange(key);
-      if (!key) return;
-      const idx = months.findIndex((m) => m.key === key);
-      if (idx >= 0) pagerRef.current?.setPage(idx);
+      if (key) transactionsRef.current?.scrollToMonth(key);
     },
-    [handleMonthChange, months]
+    [handleMonthChange]
   );
 
-  const handlePageSelected = useCallback(
-    (event: { nativeEvent: { position: number } }) => {
-      const idx = event.nativeEvent.position;
-      const next = months[idx];
-      if (next) handleMonthChange(next.key);
+  // A filter/tab change remounts the FlashList (new `listKey`) at the top;
+  // jump back to the already-selected month so the viewport lands where the
+  // pill says it is. Mirrors the old pager's `initialPage` behavior — the
+  // sentinel start value also covers re-entering the screen with a month
+  // still selected in the flow context.
+  const lastListKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastListKeyRef.current === listKey) return;
+    lastListKeyRef.current = listKey;
+    if (selectedMonth) transactionsRef.current?.scrollToMonth(selectedMonth);
+  }, [listKey, selectedMonth]);
+
+  // Manual scrolling drives the pill highlight via the topmost visible section.
+  const handleVisibleMonthChange = useCallback(
+    (monthKey: string) => {
+      handleMonthChange(monthKey);
     },
-    [months, handleMonthChange]
+    [handleMonthChange]
   );
 
   const monthSelectorContent = useMemo(
@@ -260,9 +294,11 @@ export function TransactionsScreen({
     [totalHeaderHeight]
   );
 
-  // Footer: cancel-all-visible button. Only on the Pending tab — surfacing
-  // a sweep action while the user browses 'All' (mostly historical) mixes
-  // intents.
+  // Footer: cancel-all button. Only on the Pending tab — surfacing a sweep
+  // action while the user browses 'All' (mostly historical) mixes intents.
+  // Since the list spans all months, the sweep covers every cancellable
+  // pending send in the list, not just the month currently on screen; the
+  // button label carries the exact count and amount.
   const showSweepFooter = tab === 'Pending' && visiblePendingEcash.length > 0;
 
   const sweepFooter = useMemo(() => {
@@ -303,67 +339,30 @@ export function TransactionsScreen({
       scroll="custom"
       footer={sweepFooter}
       onHeaderHeightChange={setTotalHeaderHeight}>
-      {months.length > 0 ? (
-        <PagerView
-          ref={pagerRef}
-          style={{ flex: 1 }}
-          initialPage={activeIndex}
-          onPageSelected={handlePageSelected}
-          overdrag>
-          {months.map((month, idx) => (
-            <View key={month.key} className="flex-1">
-              <Transactions
-                listKey={`${listKey}-${month.key}`}
-                account={{ ...parsedAccount, unit: selectedCurrency }}
-                showMore={false}
-                history={filteredByTypeHistory}
-                isFetching={isFetching}
-                filter={direction}
-                type={paymentType}
-                mintUrlFilter={filterMintUrl}
-                source={filterSource}
-                lock={filterLock}
-                counterparty={filterCounterparty}
-                at="all"
-                tab={tab}
-                selectedMonth={month.key}
-                onTransactionPress={onTransactionPress}
-                onCancelPendingEcash={handleCancelOne}
-                // Only the active page reports its visible pending ecash so
-                // the sweep footer reflects what the user is currently
-                // looking at, not what other off-screen pages contain.
-                onVisiblePendingEcashChange={
-                  idx === activeIndex ? setVisiblePendingEcash : undefined
-                }
-                header={listHeader}
-                disableContentInsetAdjustment
-              />
-            </View>
-          ))}
-        </PagerView>
-      ) : (
-        <Transactions
-          listKey={listKey}
-          account={{ ...parsedAccount, unit: selectedCurrency }}
-          showMore={false}
-          history={filteredByTypeHistory}
-          isFetching={isFetching}
-          filter={direction}
-          type={paymentType}
-          mintUrlFilter={filterMintUrl}
-          source={filterSource}
-          lock={filterLock}
-          counterparty={filterCounterparty}
-          at="all"
-          tab={tab}
-          selectedMonth={selectedMonth}
-          onTransactionPress={onTransactionPress}
-          onCancelPendingEcash={handleCancelOne}
-          onVisiblePendingEcashChange={setVisiblePendingEcash}
-          header={listHeader}
-          disableContentInsetAdjustment
-        />
-      )}
+      <Transactions
+        ref={transactionsRef}
+        listKey={listKey}
+        account={{ ...parsedAccount, unit: selectedCurrency }}
+        showMore={false}
+        history={filteredByTypeHistory}
+        isFetching={isFetching}
+        filter={direction}
+        type={paymentType}
+        mintUrlFilter={filterMintUrl}
+        source={filterSource}
+        lock={filterLock}
+        counterparty={filterCounterparty}
+        at="all"
+        tab={tab}
+        onTransactionPress={onTransactionPress}
+        onCancelPendingEcash={handleCancelOne}
+        onVisiblePendingEcashChange={setVisiblePendingEcash}
+        onMonthsChange={setMonths}
+        onVisibleMonthChange={handleVisibleMonthChange}
+        onEndReached={handleEndReached}
+        header={listHeader}
+        disableContentInsetAdjustment
+      />
     </Screen>
   );
 }
