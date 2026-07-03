@@ -80,6 +80,26 @@ function sameAnnotatedList(
  * React binding over the framework-agnostic aggregation in `history/aggregate`.
  * Consumers bucket entries with `bucketTransaction`.
  */
+/** Compact, redaction-safe order summary for render diagnostics. */
+function summarizeEntries(
+  entries: readonly HistoryEntry[],
+): Record<string, unknown> {
+  return {
+    total: entries.length,
+    head: entries
+      .slice(0, 12)
+      .map(
+        (e) => `${e.type}@${new Date(e.createdAt).toISOString().slice(0, 10)}`,
+      )
+      .join(","),
+    headTs: entries[0]?.createdAt ?? null,
+    tailTs: entries[entries.length - 1]?.createdAt ?? null,
+    sortedDesc: entries.every(
+      (e, i) => i === 0 || entries[i - 1].createdAt >= e.createdAt,
+    ),
+  };
+}
+
 export function useColadaTransactions(
   pageSize = 100,
 ): UseColadaTransactionsResult {
@@ -96,6 +116,9 @@ export function useColadaTransactions(
   const offsetRef = useRef(0);
   const hasMoreRef = useRef(true);
   const modeRef = useRef<"infinite" | "page">("infinite");
+  // Which code path produced the current cocoHistory — stamped right before
+  // each setCocoHistory, logged once per committed change below.
+  const historyReasonRef = useRef("init");
   const mountedRef = useRef(true);
   const fetchingRef = useRef(false);
   const managerRef = useRef<Manager>(manager);
@@ -112,6 +135,17 @@ export function useColadaTransactions(
       mountedRef.current = false;
     };
   }, []);
+
+  // Render-order diagnostics: one line per committed list change, tagged
+  // with the path that produced it.
+  useEffect(() => {
+    logger.info("history.state.applied", {
+      reason: historyReasonRef.current,
+      mode: modeRef.current,
+      offset: offsetRef.current,
+      ...summarizeEntries(cocoHistory),
+    });
+  }, [cocoHistory]);
 
   const fetchPage = useCallback(
     async (offset: number): Promise<HistoryEntry[]> => {
@@ -139,7 +173,25 @@ export function useColadaTransactions(
         }
         // Normalize v2 operation-projected states to the legacy vocabulary
         // once, at the read-model boundary.
-        return normalizeHistoryEntries(raw);
+        const normalized = normalizeHistoryEntries(raw);
+        // Render-order diagnostics: exactly what coco returned for this
+        // window, in coco's order. Dates only — no amounts, mints, tokens.
+        logger.info("history.page.fetched", {
+          offset,
+          count: normalized.length,
+          first: normalized[0]
+            ? `${normalized[0].type}@${new Date(normalized[0].createdAt).toISOString()}`
+            : null,
+          last: normalized[normalized.length - 1]
+            ? `${normalized[normalized.length - 1].type}@${new Date(
+                normalized[normalized.length - 1].createdAt,
+              ).toISOString()}`
+            : null,
+          sortedDesc: normalized.every(
+            (e, i) => i === 0 || normalized[i - 1].createdAt >= e.createdAt,
+          ),
+        });
+        return normalized;
       } catch (err) {
         logger.warn("history.transactions.page_failed", {
           offset,
@@ -167,17 +219,29 @@ export function useColadaTransactions(
     if (fetchingRef.current) return;
     setFetching(true);
     try {
-      if (modeRef.current === "infinite" && offsetRef.current === 0) {
+      if (modeRef.current === "infinite") {
+        // Merge a fresh page 0 onto the head at ANY scroll depth. This
+        // deliberately diverges from coco-react's usePaginatedHistory, which
+        // only head-merges at offset 0 and otherwise REPLACES the whole
+        // accumulated list with the single window at the current offset —
+        // after loadMore, a history:updated event (any new transaction)
+        // would drop every newer page and jump the list to old history.
+        // Upstream-feedback case; report against coco-react.
         const page = await fetchPage(0);
         if (mountedRef.current) {
+          historyReasonRef.current = "refresh-head";
           setCocoHistory((prev) => {
-            const fresh = prev.filter((p) => !page.some((n) => n.id === p.id));
+            const pageIds = new Set(page.map((n) => n.id));
+            const fresh = prev.filter((p) => !pageIds.has(p.id));
             return [...page, ...fresh];
           });
         }
       } else {
         const page = await fetchPage(offsetRef.current);
-        if (mountedRef.current) setCocoHistory(page);
+        if (mountedRef.current) {
+          historyReasonRef.current = "refresh-window";
+          setCocoHistory(page);
+        }
       }
       await fetchSupplements();
     } finally {
@@ -200,7 +264,10 @@ export function useColadaTransactions(
     (async () => {
       const page = await fetchPage(0);
       hasMoreRef.current = page.length === pageSize;
-      if (!cancelled && mountedRef.current) setCocoHistory(page);
+      if (!cancelled && mountedRef.current) {
+        historyReasonRef.current = "initial";
+        setCocoHistory(page);
+      }
       await fetchSupplements();
       if (!cancelled) setFetching(false);
     })();
@@ -248,6 +315,7 @@ export function useColadaTransactions(
       const page = await fetchPage(nextOffset);
       hasMoreRef.current = page.length === pageSize;
       if (mountedRef.current) {
+        historyReasonRef.current = "loadMore";
         setCocoHistory((prev) => {
           const seen = new Set<string>();
           const out: HistoryEntry[] = [];
@@ -275,6 +343,7 @@ export function useColadaTransactions(
         const result = await fetchPage(offset);
         hasMoreRef.current = result.length === pageSize;
         if (mountedRef.current) {
+          historyReasonRef.current = "goToPage";
           setCocoHistory(result);
           offsetRef.current = offset;
         }
