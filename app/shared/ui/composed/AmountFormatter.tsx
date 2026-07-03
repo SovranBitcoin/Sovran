@@ -115,40 +115,6 @@ export function AmountFormatter({
   const colorScheme = useColorScheme();
   const containerClass = centered ? 'items-center justify-center' : 'flex-row items-center';
 
-  useEffect(() => {
-    paymentLog.debug('amount_formatter.render', {
-      unit,
-      amount: numericAmount,
-      formattedLength: decorated.length,
-      textLength: text.length,
-      displayBtc,
-      size,
-      weight,
-      centered,
-      animated,
-      liquid,
-      liquidGlass,
-      useGlass,
-      hasSign: !!sign,
-      colorMode: color === null ? 'none' : color ? 'explicit' : 'theme',
-    });
-  }, [
-    animated,
-    centered,
-    color,
-    decorated.length,
-    displayBtc,
-    liquid,
-    liquidGlass,
-    numericAmount,
-    sign,
-    size,
-    text.length,
-    unit,
-    useGlass,
-    weight,
-  ]);
-
   return (
     <Log name="AmountFormatter">
       <View className={cn(containerClass, className)} style={style}>

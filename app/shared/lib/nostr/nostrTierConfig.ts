@@ -21,6 +21,11 @@ export type NostrTierConfig = {
   relay: { enabled: boolean; relays: readonly string[] };
 };
 
+// getNostrTierConfig is called on every facade read and transport poll —
+// hundreds of times per session. Log only when the resolved config actually
+// changes (boot + toggle flips), not once per resolution.
+let lastLoggedConfigKey: string | null = null;
+
 export function getNostrTierConfig(): NostrTierConfig {
   const s = useSettingsStore.getState();
   const config: NostrTierConfig = {
@@ -28,16 +33,27 @@ export function getNostrTierConfig(): NostrTierConfig {
     primal: { enabled: s.primalTierEnabled, url: backendConfig.primalCacheUrl },
     relay: { enabled: s.relayTierEnabled, relays: DEFAULT_RELAYS },
   };
-  log.info('nostr.tierConfig.resolved', {
-    enabled: [
-      config.nagg.enabled ? 'nagg' : null,
-      config.primal.enabled ? 'primal' : null,
-      config.relay.enabled ? 'relay' : null,
-    ].filter(Boolean),
-    naggUrl: config.nagg.appViewBaseUrl,
-    primalUrl: config.primal.url,
-    relays: config.relay.relays.length,
-  });
+  const configKey = [
+    config.nagg.enabled,
+    config.primal.enabled,
+    config.relay.enabled,
+    config.nagg.appViewBaseUrl,
+    config.primal.url,
+    config.relay.relays.length,
+  ].join('|');
+  if (configKey !== lastLoggedConfigKey) {
+    lastLoggedConfigKey = configKey;
+    log.info('nostr.tierConfig.resolved', {
+      enabled: [
+        config.nagg.enabled ? 'nagg' : null,
+        config.primal.enabled ? 'primal' : null,
+        config.relay.enabled ? 'relay' : null,
+      ].filter(Boolean),
+      naggUrl: config.nagg.appViewBaseUrl,
+      primalUrl: config.primal.url,
+      relays: config.relay.relays.length,
+    });
+  }
   return config;
 }
 

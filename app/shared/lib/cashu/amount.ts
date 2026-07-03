@@ -4,50 +4,41 @@ export type AmountLike = number | bigint | string | { toNumber(): number };
 
 export type AmountValue = AmountLike | null | undefined;
 
+// These converters sit on render-hot paths (every amount display formats
+// through them — thousands of calls per session), so they only log anomalies,
+// never successful conversions.
+
 export function toCocoAmount(value: AmountValue): number {
-  const amount = amountToNumber(value);
-  cashuLog.debug('cashu.amount.to_coco', {
-    inputType: value == null ? 'nullish' : typeof value,
-    amount,
-  });
-  return amount;
+  return amountToNumber(value);
 }
 
 export function amountToNumber(value: AmountValue): number {
-  if (value == null) {
-    cashuLog.debug('cashu.amount.to_number.nullish');
-    return 0;
-  }
+  if (value == null) return 0;
   if (typeof value === 'number') {
-    cashuLog.debug('cashu.amount.to_number.number', {
-      amount: value,
-      finite: Number.isFinite(value),
-    });
+    if (!Number.isFinite(value)) {
+      cashuLog.warn('cashu.amount.to_number.non_finite', { inputType: 'number' });
+    }
     return value;
   }
   if (typeof value === 'bigint') {
     const amount = Number(value);
-    cashuLog.debug('cashu.amount.to_number.bigint', {
-      amount,
-      safeInteger: Number.isSafeInteger(amount),
-    });
+    if (!Number.isSafeInteger(amount)) {
+      cashuLog.warn('cashu.amount.to_number.unsafe_bigint', { amount });
+    }
     return amount;
   }
   if (typeof value === 'string') {
     const parsed = Number(value);
-    const finite = Number.isFinite(parsed);
-    cashuLog.debug('cashu.amount.to_number.string', {
-      inputLength: value.length,
-      finite,
-      amount: finite ? parsed : 0,
-    });
-    return finite ? parsed : 0;
+    if (!Number.isFinite(parsed)) {
+      cashuLog.warn('cashu.amount.to_number.unparseable_string', { inputLength: value.length });
+      return 0;
+    }
+    return parsed;
   }
   const amount = value.toNumber();
-  cashuLog.debug('cashu.amount.to_number.object', {
-    amount,
-    finite: Number.isFinite(amount),
-  });
+  if (!Number.isFinite(amount)) {
+    cashuLog.warn('cashu.amount.to_number.non_finite', { inputType: 'object' });
+  }
   return amount;
 }
 
@@ -61,11 +52,5 @@ export function toSafeSatAmount(value: AmountValue): number | null {
     });
     return null;
   }
-  const result = Math.trunc(amount);
-  cashuLog.debug('cashu.amount.safe_sat.result', {
-    amount,
-    result,
-    truncated: result !== amount,
-  });
-  return result;
+  return Math.trunc(amount);
 }
