@@ -65,9 +65,10 @@ function CurrencyGlyph({ currency }: { currency: SwapperCurrency }) {
 }
 
 interface CurrencySwapperPillProps {
-  /** Current input mode of the amount entry. The pill shows the
-   *  currency name + icon for this mode — tap to switch to the other. */
-  inputMode: 'sat' | 'fiat';
+  /** Current input mode of the amount entry ('unit' = typing sats on the
+   *  sat account). The pill shows the currency name + icon for this mode —
+   *  tap to switch to the other. */
+  inputMode: 'unit' | 'fiat';
   /** Tap handler — caller flips the input mode (or whatever the swap does
    *  in their flow). */
   onPress?: () => void;
@@ -86,7 +87,7 @@ export function CurrencySwapperPill({
   height = 36,
 }: CurrencySwapperPillProps) {
   const displayCurrency = useSettingsStore((s) => s.displayCurrency);
-  const activeCurrency: SwapperCurrency = inputMode === 'sat' ? 'sat' : displayCurrency;
+  const activeCurrency: SwapperCurrency = inputMode === 'unit' ? 'sat' : displayCurrency;
   const label = CURRENCY_LABELS[activeCurrency];
   const resolvedWidth = width ?? widthForLabel(label);
 

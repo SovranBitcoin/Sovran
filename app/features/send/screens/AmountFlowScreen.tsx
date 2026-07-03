@@ -68,26 +68,30 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     // here (the single chokepoint every flow's mint pill routes through) and
     // restore it on re-entry via the effect below.
     const rawInput = typeof entry?.rawInput === 'string' ? entry.rawInput : '';
-    const inputMode = entry?.inputMode === 'fiat' ? 'fiat' : 'sat';
+    const inputMode = entry?.inputMode === 'fiat' ? 'fiat' : 'unit';
     const scope = typeof entry?.destination === 'string' ? entry.destination : '';
+    const unit = typeof entry?.unit === 'string' ? entry.unit : 'sat';
     if (rawInput && rawInput !== '0') {
-      useAmountDraftStore.getState().stash({ rawInput, inputMode, scope });
+      useAmountDraftStore.getState().stash({ rawInput, inputMode, scope, unit });
     }
     void machine.requestMintSelector();
   }, [machine, entry]);
 
   // Restore the stashed amount when we return to a fresh amount step after a
-  // mint change. `take` only returns the draft when the destination matches, so
-  // an unrelated flow can't pick it up; we re-apply via the same `setInput`
-  // action the keypad uses and only when the keypad is currently empty.
+  // mint change. `take` only returns the draft when the destination AND unit
+  // match — a mint change can flip the active unit (pickHighestBalanceUnit
+  // follow), and a draft typed as dollars must never replay into a sat keypad.
+  // We re-apply via the same `setInput` action the keypad uses and only when
+  // the keypad is currently empty.
   useEffect(() => {
     const scope = typeof entry?.destination === 'string' ? entry.destination : '';
-    const draft = useAmountDraftStore.getState().take(scope);
+    const unit = typeof entry?.unit === 'string' ? entry.unit : 'sat';
+    const draft = useAmountDraftStore.getState().take(scope, unit);
     if (!draft) return;
     const currentRaw = typeof entry?.rawInput === 'string' ? entry.rawInput : '';
     if (currentRaw && currentRaw !== '0') return;
     void actions.setInput.execute({ input: draft.rawInput, mode: draft.inputMode });
-  }, [mintUrl, entry?.destination, entry?.rawInput, actions.setInput]);
+  }, [mintUrl, entry?.destination, entry?.unit, entry?.rawInput, actions.setInput]);
 
   const canSendOffline = typeof entry?.canSendOffline === 'boolean' ? entry.canSendOffline : null;
 

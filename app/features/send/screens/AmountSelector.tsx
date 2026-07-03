@@ -18,6 +18,8 @@ import type { ActionVariant, RecipientProfile, ScreenActionName } from 'wallet';
 import type { BoundAction, QuickSendSuggestion } from 'wallet/react';
 
 import { MintSelector } from '@/features/wallet';
+import { UnitSwitcherPill } from '@/features/wallet/components/UnitSwitcherPill';
+import { formatAmount } from '@/shared/lib/currency';
 import type { ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
 import {
   AmountEntryView,
@@ -34,13 +36,20 @@ const EMPTY_QUICK_SEND_SUGGESTIONS: QuickSendSuggestion[] = [];
 
 function readAmountEntryFields(entry: Record<string, unknown>) {
   const rawInput = typeof entry.rawInput === 'string' ? entry.rawInput : '';
-  const inputMode: 'sat' | 'fiat' = entry.inputMode === 'fiat' ? 'fiat' : 'sat';
+  const inputMode: 'unit' | 'fiat' = entry.inputMode === 'fiat' ? 'fiat' : 'unit';
   const numericValue = typeof entry.numericValue === 'number' ? entry.numericValue : 0;
   const keyboardUnit = typeof entry.keyboardUnit === 'string' ? entry.keyboardUnit : 'sat';
   const unit = typeof entry.unit === 'string' ? entry.unit : 'sat';
   const secondaryDisplay =
     typeof entry.secondaryDisplay === 'string' ? entry.secondaryDisplay : null;
   const fiatSymbol = typeof entry.fiatSymbol === 'string' ? entry.fiatSymbol : null;
+  const unitSymbol = typeof entry.unitSymbol === 'string' ? entry.unitSymbol : '';
+  const clampedToCap = entry.clampedToCap === true;
+  const capRaw = entry.inputCap as { value?: unknown; unit?: unknown } | null | undefined;
+  const inputCap =
+    capRaw && typeof capRaw.value === 'number' && typeof capRaw.unit === 'string'
+      ? { value: capRaw.value, unit: capRaw.unit }
+      : null;
 
   return {
     rawInput,
@@ -50,6 +59,9 @@ function readAmountEntryFields(entry: Record<string, unknown>) {
     unit,
     secondaryDisplay,
     fiatSymbol,
+    unitSymbol,
+    clampedToCap,
+    inputCap,
   };
 }
 
@@ -101,8 +113,18 @@ export function AmountSelector({
 }: AmountSelectorProps) {
   useLifecycleLogger('AmountSelector', walletLog);
 
-  const { rawInput, inputMode, numericValue, keyboardUnit, unit, secondaryDisplay, fiatSymbol } =
-    useMemo(() => readAmountEntryFields(entry), [entry]);
+  const {
+    rawInput,
+    inputMode,
+    numericValue,
+    keyboardUnit,
+    unit,
+    secondaryDisplay,
+    fiatSymbol,
+    unitSymbol,
+    clampedToCap,
+    inputCap,
+  } = useMemo(() => readAmountEntryFields(entry), [entry]);
 
   const handleKeyPress = useCallback(
     (value: string) => {
@@ -115,7 +137,8 @@ export function AmountSelector({
   const handleSuggestionTap = useCallback(
     (suggestion: QuickSendSuggestion) => {
       walletLog.info('amount.suggestion.tap', {
-        satoshis: suggestion.satoshis,
+        amountValue: suggestion.amount.value,
+        amountUnit: suggestion.amount.unit,
         label: suggestion.label,
         mode: suggestion.inputMode,
       });
@@ -233,6 +256,20 @@ export function AmountSelector({
   const nextLoading = machineBusy || actions.next.loading;
   const nextDisabled = !actions.next.available;
   const nextNoticeText = nextDisabled ? actions.next.reason : undefined;
+  // Typing hit the cross-method envelope max and was capped — tell the user
+  // why the digits stopped. Warning-tinted (the capped amount is valid).
+  const clampNoticeText = useMemo(() => {
+    if (!clampedToCap || !inputCap) return null;
+    const formatted = formatAmount(
+      { amount: inputCap.value, unit: inputCap.unit },
+      // Fiat caps carry their symbol; sats need the explicit unit name.
+      inputCap.unit === 'sat' ? { currencyDisplay: 'name' } : {}
+    );
+    return `Maximum ${formatted}`;
+  }, [clampedToCap, inputCap]);
+  // The account/unit indicator replaces the sat account's currency swapper on
+  // fiat accounts: it names the receiving account and opens the unit switcher.
+  const unitIndicator = useMemo(() => (unitSymbol ? <UnitSwitcherPill /> : null), [unitSymbol]);
   // Over-balance is reported separately from `available`: an ecash send rounds
   // down to the balance and stays available, so it never surfaces as a notice.
   // The amount still reads as a problem (red) when the entry exceeds balance.
@@ -309,8 +346,11 @@ export function AmountSelector({
         noticeText={nextNoticeText}
         nextTestID="amount-next"
         fiatSymbol={fiatSymbol}
+        unitSymbol={unitSymbol}
         secondaryDisplay={secondaryDisplay}
         onToggleMode={handleToggle}
+        unitIndicator={unitIndicator}
+        warningText={clampNoticeText}
         suggestions={suggestions}
         onSuggestionTap={handleSuggestionTap}
         extraButtons={extraButtons}

@@ -67,6 +67,13 @@ export interface ColadaConfig {
    */
   selectOnchainFeeIndex?: DefaultOperationsConfig["selectOnchainFeeIndex"];
 
+  /**
+   * Sats per one minor unit of a fiat wallet unit (e.g. sats per usd-cent).
+   * Required for fiat-unit melts to LNURL/onchain targets — see
+   * DefaultOperationsConfig.getSatsPerUnitMinor.
+   */
+  getSatsPerUnitMinor?: DefaultOperationsConfig["getSatsPerUnitMinor"];
+
   unit?: string;
   getOffline?: () => boolean;
   getLocale?: () => string;
@@ -202,6 +209,7 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     fetchMintReviews:
       config.fetchMintReviews ?? appViewEnrichment?.fetchMintReviews,
     selectOnchainFeeIndex: config.selectOnchainFeeIndex,
+    getSatsPerUnitMinor: config.getSatsPerUnitMinor,
     shouldMockFailPaymentRequest: config.shouldMockFailPaymentRequest,
     shouldMockFailMelt: config.shouldMockFailMelt,
     shouldMockFailSend: config.shouldMockFailSend,

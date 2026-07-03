@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { paymentLog } from '@/shared/lib/logger';
 
-type AmountInputMode = 'sat' | 'fiat';
+type AmountInputMode = 'unit' | 'fiat';
 
 interface AmountDraft {
   rawInput: string;
@@ -13,13 +13,20 @@ interface AmountDraft {
    * never picks up a stale amount.
    */
   scope: string;
+  /**
+   * Active unit the draft was typed in. The restore only fires when the
+   * re-entered screen is still on this unit — a mint change can flip the
+   * unit (pickHighestBalanceUnit follow), and a "1.5" typed as dollars must
+   * never replay into a sat keypad.
+   */
+  unit: string;
 }
 
 interface AmountDraftStore {
   pending: AmountDraft | null;
   stash: (draft: AmountDraft) => void;
-  /** Return AND consume the pending draft iff it matches `scope`; else null. */
-  take: (scope: string) => AmountDraft | null;
+  /** Return AND consume the pending draft iff it matches `scope` + `unit`; else null. */
+  take: (scope: string, unit: string) => AmountDraft | null;
   clear: () => void;
 }
 
@@ -39,24 +46,31 @@ export const useAmountDraftStore = create<AmountDraftStore>((set, get) => ({
   stash: (draft) => {
     paymentLog.info('amount_draft.stash', {
       scope: draft.scope,
+      unit: draft.unit,
       rawInputLength: draft.rawInput.length,
       inputMode: draft.inputMode,
     });
     set({ pending: draft });
   },
-  take: (scope) => {
+  take: (scope, unit) => {
     const p = get().pending;
-    if (!p || p.scope !== scope) {
+    if (!p || p.scope !== scope || p.unit !== unit) {
       paymentLog.info('amount_draft.take_miss', {
         scope,
+        unit,
         hasPending: !!p,
         pendingScope: p?.scope ?? null,
+        pendingUnit: p?.unit ?? null,
         pendingRawInputLength: p?.rawInput.length ?? 0,
       });
+      // A unit mismatch means the draft can never legally restore — drop it
+      // so it can't linger and match a later same-scope entry.
+      if (p && p.scope === scope) set({ pending: null });
       return null;
     }
     paymentLog.info('amount_draft.take_hit', {
       scope,
+      unit,
       rawInputLength: p.rawInput.length,
       inputMode: p.inputMode,
     });

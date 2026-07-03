@@ -1729,7 +1729,7 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
       e.event.includes('amount') ||
       e.params?.rawAmount != null ||
       e.params?.satAmount != null ||
-      e.params?.effectiveSatAmount != null
+      e.params?.effectiveAmountValue != null
   );
   if (amountEvents.length > 0) {
     lines.push(`AMOUNT DIAGNOSTICS (${amountEvents.length} events):`);

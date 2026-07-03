@@ -30,7 +30,8 @@ const fiatDisplay = {
   fiatSymbol: '$',
   btcPrice: 50_000,
   displayFiat: 0.01,
-  displaySats: 20,
+  displayAmount: 20,
+  unit: 'sat',
   autoOptimized: true,
 };
 

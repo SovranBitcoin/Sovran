@@ -99,14 +99,17 @@ function FiatAmountDisplay({
 interface AmountEntryViewProps {
   /** Raw keyboard input string; source of truth for CustomKeyboard's internal state. */
   rawInput: string;
-  /** Parsed amount as a number (sats when inputMode === 'sat'). */
+  /** Parsed amount as a number (sats when the sat account types in unit mode). */
   numericValue: number;
   /** Display unit passed to AmountFormatter for the sat path. */
   unit: string;
   /** Keyboard unit — 'sat' hides the decimal key; otherwise shows '.'. */
   keyboardUnit: string;
-  /** Which display renders: 'sat' uses AmountFormatter, 'fiat' uses FiatAmountDisplay. */
-  inputMode: 'sat' | 'fiat';
+  /**
+   * 'unit' types in the account unit (sats, or major-denomination fiat when
+   * `unitSymbol` is set); 'fiat' is the sat account's display-currency entry.
+   */
+  inputMode: 'unit' | 'fiat';
 
   /** Required: the keypad fires this with the updated raw string. */
   onKeyPress: (value: string) => void;
@@ -136,10 +139,23 @@ interface AmountEntryViewProps {
 
   /** Fiat currency symbol (e.g. '$'). Required when inputMode === 'fiat'. */
   fiatSymbol?: string | null;
+  /**
+   * Symbol of the ACCOUNT unit itself ('$'/'€'/'£' on fiat accounts, '' or
+   * unset on sat). When set, unit-mode entry renders as major-denomination
+   * decimals via FiatAmountDisplay instead of the sat AmountFormatter.
+   */
+  unitSymbol?: string | null;
   /** Text for the secondary FiatCurrencyPill under the amount. Hides the pill when null. */
   secondaryDisplay?: string | null;
   /** Tap handler for the secondary pill (fiat/sat toggle). */
   onToggleMode?: () => void;
+  /**
+   * Node rendered in the pill slot when there is no display-currency toggle
+   * (fiat accounts): the account/unit indicator with its own switcher (e.g.
+   * `<UnitSwitcherPill />`). Caller-supplied so this primitive stays free of
+   * feature imports.
+   */
+  unitIndicator?: React.ReactNode;
 
   /** Quick-send suggestions rendered above the keyboard (send flow only). */
   suggestions?: QuickSendSuggestion[];
@@ -193,8 +209,10 @@ export function AmountEntryView({
   noticeText = null,
   warningText = null,
   fiatSymbol = null,
+  unitSymbol = null,
   secondaryDisplay = null,
   onToggleMode,
+  unitIndicator = null,
   suggestions = [],
   onSuggestionTap,
   extraButtons,
@@ -220,7 +238,10 @@ export function AmountEntryView({
   const centerSpacing = isCompactPhone ? 3 : 4;
   const topPadding = insets.top + (isCompactPhone ? 12 : 24);
 
-  const isFiat = inputMode === 'fiat';
+  // The decimal-money display serves two paths: the sat account's
+  // display-currency mode (symbol = fiatSymbol) and a fiat account's native
+  // unit mode (symbol = unitSymbol). Everything else is the sat formatter.
+  const displaySymbol = inputMode === 'fiat' ? fiatSymbol : unitSymbol || null;
   // The amount is neutral foreground on BOTH send and receive — the colour
   // encodes only validity, never transaction direction. This keeps the two
   // screens identical.
@@ -257,21 +278,22 @@ export function AmountEntryView({
           const isPrimary = s.inputMode === 'fiat';
           const isSendAll = !!s.sendAll;
           // testID convention:
-          //   #amount-chip-send-all         — the "Send all" chip
-          //   #amount-chip-<satoshis>        — fixed-amount chips
-          //   #amount-chip-fiat-<satoshis>   — fiat-valued chips
+          //   #amount-chip-send-all          — the "Send all" chip
+          //   #amount-chip-<minor amount>    — fixed-amount chips
+          //   #amount-chip-fiat-<minor>      — display-currency chips
           const chipTestID = isSendAll
             ? 'amount-chip-send-all'
-            : `amount-chip-${isPrimary ? 'fiat-' : ''}${s.satoshis}`;
+            : `amount-chip-${isPrimary ? 'fiat-' : ''}${s.amount.value}`;
           return (
             <Pressable
-              key={isSendAll ? 'send-all' : s.satoshis}
+              key={isSendAll ? 'send-all' : s.amount.value}
               testID={chipTestID}
               onPress={() => {
                 cashuLog.info('amount_entry.suggestion.press', {
                   chipTestID,
                   inputMode: s.inputMode,
-                  satoshis: s.satoshis,
+                  amountValue: s.amount.value,
+                  amountUnit: s.amount.unit,
                   sendAll: !!s.sendAll,
                   hasHandler: !!onSuggestionTap,
                 });
@@ -294,8 +316,8 @@ export function AmountEntryView({
                     Send all
                   </Text>
                   <AmountFormatter
-                    amount={s.satoshis}
-                    unit="sat"
+                    amount={s.amount.value}
+                    unit={s.amount.unit}
                     size={13}
                     weight="heavy"
                     color={foreground}
@@ -303,8 +325,8 @@ export function AmountEntryView({
                 </HStack>
               ) : (
                 <AmountFormatter
-                  amount={s.satoshis}
-                  unit="sat"
+                  amount={s.amount.value}
+                  unit={s.amount.unit}
                   size={13}
                   weight="heavy"
                   color={foreground}
@@ -414,10 +436,10 @@ export function AmountEntryView({
       <View style={{ flex: 1, paddingTop: topPadding, paddingHorizontal: 16 }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <VStack align="center" spacing={centerSpacing}>
-            {isFiat && fiatSymbol ? (
+            {displaySymbol ? (
               <FiatAmountDisplay
                 rawInput={rawInput}
-                symbol={fiatSymbol}
+                symbol={displaySymbol}
                 size={amountTextSize}
                 lineHeight={amountLineHeight}
                 activeColor={amountColor}
@@ -435,8 +457,10 @@ export function AmountEntryView({
                 centered
               />
             )}
-            {secondaryDisplay && (
+            {secondaryDisplay ? (
               <CurrencySwapperPill inputMode={inputMode} onPress={handleToggleMode} />
+            ) : (
+              unitIndicator
             )}
             {noticeText != null && noticeText.length > 0 ? (
               <Text size={13} weight="bold" style={[styles.noticeText, { color: danger }]}>

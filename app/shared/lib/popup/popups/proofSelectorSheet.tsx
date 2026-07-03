@@ -41,7 +41,7 @@ export function getProofSuggestionDisplay(
   const metadata = payload.displayMetadata;
   if (metadata?.inputMode !== 'fiat') {
     cashuLog.debug('proof.selector.display.result', {
-      inputMode: metadata?.inputMode ?? 'sat',
+      inputMode: metadata?.inputMode ?? 'unit',
       result: 'sat',
       amount,
       unit,
@@ -51,7 +51,7 @@ export function getProofSuggestionDisplay(
   }
 
   const fiat =
-    metadata.displaySats === amount && metadata.displayFiat != null
+    metadata.displayAmount === amount && metadata.displayFiat != null
       ? metadata.displayFiat
       : metadata.btcPrice > 0
         ? Math.round((amount / 100_000_000) * metadata.btcPrice * 100) / 100

@@ -149,6 +149,15 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     const currency = useSettingsStore.getState().displayCurrency;
     return usePricelistStore.getState().getBtcPrice(currency) ?? 0;
   }, []);
+  // Sats per one minor unit (cent) of a fiat WALLET unit — used by colada to
+  // express fiat-unit melt amounts in sats (LNURL invoices, onchain
+  // amountSats). Keyed by the unit itself, not the display currency.
+  const getSatsPerUnitMinor = useCallback((unit: string) => {
+    if (unit !== 'usd' && unit !== 'eur' && unit !== 'gbp') return null;
+    const price = usePricelistStore.getState().getBtcPrice(unit);
+    if (!price || price <= 0) return null;
+    return 100_000_000 / (price * 100);
+  }, []);
   const getDisplayCurrency = useCallback(() => {
     const currency = useSettingsStore.getState().displayCurrency as DisplayCurrency;
     const symbol = FIAT_SYMBOLS[currency];
@@ -188,6 +197,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         enableEcashSendMemo: false,
         getLocale: () => useSettingsStore.getState().language || 'en',
         getBtcPrice,
+        getSatsPerUnitMinor,
         getDisplayCurrency,
         getPreferredMintUrl: () => useMintStore.getState().selectedMint,
         // NUT-30 onchain melt fee picker. Runs BEFORE prepare (no proofs
@@ -297,7 +307,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         shouldMockFailSend: () => useSettingsStore.getState().mockFailSend,
         logger: paymentLog,
       }),
-    [manager, getOffline, getBtcPrice, getDisplayCurrency, privateKeyRef]
+    [manager, getOffline, getBtcPrice, getSatsPerUnitMinor, getDisplayCurrency, privateKeyRef]
   );
 
   useEffect(() => {
