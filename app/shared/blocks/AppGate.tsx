@@ -34,9 +34,26 @@ type ReinstallState = 'checking' | 'none' | 'detected';
  */
 function useReinstallDetection(hasSeenOnboarding: boolean): ReinstallState {
   const [state, setState] = useState<ReinstallState>('checking');
+  const [settingsHydrated, setSettingsHydrated] = useState(() =>
+    useSettingsStore.persist.hasHydrated()
+  );
 
   useEffect(() => {
-    // Only check for returning users during onboarding phase
+    if (settingsHydrated) return;
+    const unsubscribe = useSettingsStore.persist.onFinishHydration(() => setSettingsHydrated(true));
+    if (useSettingsStore.persist.hasHydrated()) setSettingsHydrated(true);
+    return unsubscribe;
+  }, [settingsHydrated]);
+
+  useEffect(() => {
+    // hasSeenOnboarding defaults to false until settingsStore rehydrates from
+    // AsyncStorage, so probing before hydration fired the ~1.2s keychain read
+    // on EVERY boot for existing users. Wait for the real persisted value:
+    // for the overwhelmingly common existing-user boot it is true and the
+    // probe is skipped entirely; the keychain is only touched when a hydrated
+    // store still says onboarding was never seen (fresh install or true
+    // reinstall with wiped AsyncStorage).
+    if (!settingsHydrated) return;
     if (hasSeenOnboarding) {
       setState('none');
       return;
@@ -60,7 +77,7 @@ function useReinstallDetection(hasSeenOnboarding: boolean): ReinstallState {
     return () => {
       cancelled = true;
     };
-  }, [hasSeenOnboarding]);
+  }, [hasSeenOnboarding, settingsHydrated]);
 
   return state;
 }

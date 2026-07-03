@@ -28,7 +28,7 @@ import { PaymentRequestTransportType, type PaymentRequestTransport } from '@cash
 import type { Plugin } from '@cashu/coco-core/plugin';
 import type { PaymentRequestReceiveOperation } from '@cashu/coco-core';
 
-import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
+import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { PAYMENT_RELAYS } from '@/shared/lib/nostr/sendDirectMessage';
 import { cashuLog } from '@/shared/lib/logger';
 import { reportCocoIssue } from '@/shared/lib/cashu/cocoFeedback';
@@ -93,6 +93,11 @@ export function createPaymentRequestNostrTransportPlugin(
         }
         polling = true;
         try {
+          // The persistent unwrap cache is the cross-restart dedupe: the
+          // in-memory seenWraps set dies with every manager re-init (profile
+          // switch / reload), and re-unwrapping ~50 envelopes serially costs
+          // ~8-10s of JS-thread NIP-44 crypto per re-init without it.
+          await giftWrapCache.cache.hydrate(viewerPubkey);
           const outcome = await layer.getDmEnvelopes({
             viewerPubkey,
             limit: POLL_LIMIT,
@@ -107,8 +112,9 @@ export function createPaymentRequestNostrTransportPlugin(
             if (disposed || activeOps.size === 0) break;
             if (envelope.kind !== GIFT_WRAP_KIND || seenWraps.has(envelope.id)) continue;
             seenWraps.add(envelope.id);
-            const rumor = unwrapGiftWrap(
-              { content: envelope.content, pubkey: envelope.pubkey },
+            const rumor = giftWrapCache.unwrap(
+              viewerPubkey,
+              { id: envelope.id, content: envelope.content, pubkey: envelope.pubkey },
               secretKey
             );
             if (!rumor || !looksLikePaymentRequestPayload(rumor.content)) continue;

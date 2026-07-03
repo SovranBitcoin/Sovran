@@ -4,7 +4,7 @@ import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { ClusterManager, cameraToBbox, MapMarker, GeoPoint } from '@/shared/lib/map/mapClustering';
 import { getOrBuildBTCMapClusterManager } from '@/shared/lib/map/btcMapClusterCache';
 import { getIconsForCategory } from '@/shared/lib/map/categories';
-import { deferWork } from '@/shared/lib/logger';
+import { deferWork, mapLog } from '@/shared/lib/logger';
 import type { CategoryFilter } from '../components/StatsCard';
 
 type RenderedMarker = {
@@ -68,13 +68,11 @@ export function useMapMarkers({
   }, [placesCache?.timestamp, category]);
 
   const filteredPoints = useMemo((): GeoPoint[] => {
-    if (category === 'all') {
-      return places.map((p) => ({ id: p.id, lat: p.lat, lon: p.lon, icon: p.icon }));
-    }
+    // BtcMapPlace is a structural superset of GeoPoint — for 'all' pass the
+    // parsed array through instead of reshaping ~40k objects per tab switch.
+    if (category === 'all') return places;
     const icons = getIconsForCategory(category);
-    return places
-      .filter((p) => icons.includes(p.icon))
-      .map((p) => ({ id: p.id, lat: p.lat, lon: p.lon, icon: p.icon }));
+    return places.filter((p) => icons.includes(p.icon));
   }, [places, category]);
 
   const updateMarkersForCamera = useCallback(
@@ -91,7 +89,16 @@ export function useMapMarkers({
       // Avoid querying a padded bbox that's too large at high zoom (lots of pins)
       const padding = z >= 14 ? 0.25 : z >= 10 ? 0.5 : 0.75;
       const bbox = cameraToBbox(lat, lon, z, aspectRatio, padding);
+      const queryStart = performance.now();
       const clustered = manager.getClusters(bbox, z);
+      const queryMs = performance.now() - queryStart;
+      if (queryMs > 16) {
+        mapLog.debug('map.cluster.query_slow', {
+          duration_ms: queryMs,
+          zoom: z,
+          markers: clustered.length,
+        });
+      }
       markersRef.current = clustered;
 
       let count = 0;

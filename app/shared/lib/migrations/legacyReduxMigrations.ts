@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 
@@ -208,7 +209,19 @@ async function migrateReduxCashuProfiles(
  * 4. Redux settings are copied into Zustand if the new store is still empty
  * 5. Legacy Cashu data is migrated into Coco/profile-scoped storage
  */
+// Once the bootstrap has fully completed there is nothing left to migrate —
+// but without a completion marker it re-ran its mnemonic keychain read and
+// profile/settings scans on EVERY boot and profile-switch restart. A nuclear
+// reset clears AsyncStorage, which clears this flag too, so a genuinely fresh
+// state always re-evaluates.
+const BOOTSTRAP_DONE_KEY = 'legacy-redux-bootstrap:done:v1';
+
 export async function runLegacyReduxBootstrap(): Promise<void> {
+  if ((await AsyncStorage.getItem(BOOTSTRAP_DONE_KEY)) === 'true') {
+    initLog('LegacyReduxBootstrap', 'already-complete');
+    return;
+  }
+
   const rootState = getReduxState();
 
   initLog('LegacyReduxBootstrap', 'starting');
@@ -218,5 +231,6 @@ export async function runLegacyReduxBootstrap(): Promise<void> {
   await migrateSettingsFromRedux(rootState);
   await migrateReduxCashuProfiles(rootState, rootMnemonic);
 
+  await AsyncStorage.setItem(BOOTSTRAP_DONE_KEY, 'true');
   initLog('LegacyReduxBootstrap', 'complete');
 }
