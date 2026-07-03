@@ -61,9 +61,13 @@ export function mergeTransactionSources(input: {
   });
 
   if (newReceives.length === 0) return [...cocoHistory];
-  return [...cocoHistory, ...newReceives].sort(
-    (a, b) => b.createdAt - a.createdAt,
-  );
+  // Match coco's compareHistoryEntries (createdAt DESC, id DESC): without the
+  // id tiebreaker, equal-timestamp rows would order differently depending on
+  // whether an in-flight receive happens to be present.
+  return [...cocoHistory, ...newReceives].sort((a, b) => {
+    if (a.createdAt !== b.createdAt) return b.createdAt - a.createdAt;
+    return b.id.localeCompare(a.id);
+  });
 }
 
 /**

@@ -49,6 +49,20 @@ describe('mergeTransactionSources', () => {
     expect(merged).toEqual(cocoHistory);
     expect(merged).not.toBe(cocoHistory);
   });
+
+  it('breaks equal-createdAt ties by id DESC, matching coco compareHistoryEntries', () => {
+    // coco returns [b, a] for equal timestamps (id DESC). The merge sort must
+    // preserve that order even when an in-flight receive triggers a re-sort.
+    const cocoHistory = [
+      entry({ id: 'send:b', type: 'send', createdAt: 100 } as never),
+      entry({ id: 'send:a', type: 'send', createdAt: 100 } as never),
+    ];
+    const receiveEntries = [
+      entry({ id: 'receive-op1', type: 'receive', operationId: 'op1', createdAt: 100 } as never),
+    ];
+    const merged = mergeTransactionSources({ cocoHistory, receiveEntries });
+    expect(merged.map((e) => e.id)).toEqual(['send:b', 'send:a', 'receive-op1']);
+  });
 });
 
 describe('normalizeHistoryEntryState', () => {
