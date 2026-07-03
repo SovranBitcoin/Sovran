@@ -99,6 +99,17 @@ function readCapability(
   };
 }
 
+/** NUT-17 websocket support — tri-state: undefined when info is absent. */
+function readNut17Support(mintInfo: unknown): boolean | undefined {
+  if (!isRecord(mintInfo)) return undefined;
+  const nuts = mintInfo.nuts;
+  if (!isRecord(nuts)) return undefined;
+  const nut17 = nuts["17"] ?? nuts.nut17;
+  if (!isRecord(nut17)) return false;
+  const supported = nut17.supported;
+  return Array.isArray(supported) && supported.length > 0;
+}
+
 export function deriveMintMethodSupportFromInfo(
   mintInfo: unknown,
   unit: string = DEFAULT_UNIT,
@@ -116,6 +127,7 @@ export function deriveMintMethodSupportFromInfo(
         readCapability(mintInfo, 5, method, unit),
       ]),
     ),
+    nut17: readNut17Support(mintInfo),
   };
   logger.debug("mintCapabilities.deriveSupport", {
     unit: normalizeUnit(unit),
@@ -128,6 +140,24 @@ export function deriveMintMethodSupportFromInfo(
     ).length,
   });
   return support;
+}
+
+/**
+ * Display order for mint pickers: available mints first, then by balance
+ * (descending), ties keep their incoming (trusted) order. This is THE sort
+ * for every "Select Mint" list — the machine's synchronous fallback rows,
+ * the async enriched rows, and the candidates in step data all use it, so
+ * the FIRST render is already in the final order and enrichment never
+ * re-shuffles rows.
+ */
+export function compareMintDisplayOrder(
+  a: { status?: "available" | "disabled"; balance: number },
+  b: { status?: "available" | "disabled"; balance: number },
+): number {
+  const aDisabled = a.status === "disabled";
+  const bDisabled = b.status === "disabled";
+  if (aDisabled !== bDisabled) return aDisabled ? 1 : -1;
+  return b.balance - a.balance;
 }
 
 /** Units the wallet's unit switcher may offer, in display order. */

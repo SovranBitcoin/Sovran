@@ -80,7 +80,16 @@ export interface MintMethodUnitCapability {
 export type MintMethodSupport = Record<
   MintPaymentOperation,
   Partial<Record<MintPaymentMethod, MintMethodUnitCapability>>
->;
+> & {
+  /**
+   * NUT-17 websocket support, derived from the same cached mintInfo as the
+   * method capabilities. Tri-state: `undefined` when the mint's info hasn't
+   * been fetched yet (unknown — don't disable on it), boolean once known.
+   * The NPC receive mint requires it (the npub.cash plugin subscribes to
+   * quote settlement over the mint's websocket).
+   */
+  nut17?: boolean;
+};
 
 export type MintMethodCapabilityMap = Record<string, MintMethodSupport>;
 

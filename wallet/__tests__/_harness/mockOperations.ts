@@ -43,6 +43,7 @@
  */
 
 import type { MachineOperations, StepDataMap } from '../../src/machine/types';
+import { compareMintDisplayOrder } from '../../src/mint-capabilities';
 import type { MintListItem } from '../../src/types';
 import type { OperationCall } from './types';
 import { MINT_METADATA } from './fixtures';
@@ -176,10 +177,7 @@ export function createMockOperations(
           reason: null as MintListItem['reason'],
           isPreferred: false,
         }));
-        items.sort((a, b) => {
-          if (a.status !== b.status) return a.status === 'available' ? -1 : 1;
-          return b.balance - a.balance;
-        });
+        items.sort(compareMintDisplayOrder);
         return items;
       }
     ),

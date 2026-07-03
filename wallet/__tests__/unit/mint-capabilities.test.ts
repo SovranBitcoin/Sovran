@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildMethodAwareMintCandidates,
+  compareMintDisplayOrder,
   deriveMintMethodCapabilityMapFromTrustedMints,
   deriveMintMethodSupportFromInfo,
   evaluateMintMethodAmountAvailability,
@@ -139,5 +140,39 @@ describe('mint method capabilities', () => {
         { amount: 1_000, selectedMintUrl: MINT1 }
       ).selectedCandidate
     ).toMatchObject({ mintUrl: MINT1, status: 'available' });
+  });
+});
+
+describe('NUT-17 capability flag', () => {
+  it('reports true when the mint advertises NUT-17 subscriptions', () => {
+    const support = deriveMintMethodSupportFromInfo({
+      nuts: { '17': { supported: [{ method: 'bolt11', unit: 'sat', commands: [] }] } },
+    });
+    expect(support.nut17).toBe(true);
+  });
+
+  it('reports false when info is present but NUT-17 is absent or empty', () => {
+    expect(deriveMintMethodSupportFromInfo({ nuts: {} }).nut17).toBe(false);
+    expect(deriveMintMethodSupportFromInfo({ nuts: { '17': { supported: [] } } }).nut17).toBe(
+      false
+    );
+  });
+
+  it('reports undefined (unknown) when mintInfo has not been fetched', () => {
+    expect(deriveMintMethodSupportFromInfo(undefined).nut17).toBeUndefined();
+  });
+});
+
+describe('compareMintDisplayOrder', () => {
+  it('sorts available first, then balance descending, keeping stable ties', () => {
+    const rows = [
+      { mintUrl: 'a', balance: 10, status: 'disabled' as const },
+      { mintUrl: 'b', balance: 5 },
+      { mintUrl: 'c', balance: 900, status: 'available' as const },
+      { mintUrl: 'd', balance: 5 },
+      { mintUrl: 'e', balance: 9000, status: 'disabled' as const },
+    ];
+    const sorted = [...rows].sort(compareMintDisplayOrder);
+    expect(sorted.map((r) => r.mintUrl)).toEqual(['c', 'b', 'd', 'e', 'a']);
   });
 });

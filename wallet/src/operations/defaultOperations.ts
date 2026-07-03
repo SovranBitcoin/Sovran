@@ -44,6 +44,7 @@ import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
 import { amountToNumber, type AmountLike } from "../amount";
 import {
   buildMethodAwareMintCandidates,
+  compareMintDisplayOrder,
   deriveMintMethodCapabilityMapFromTrustedMints,
 } from "../mint-capabilities";
 import { parseHistoryEntryOnce } from "./historyEntry";
@@ -766,14 +767,18 @@ export function createDefaultOperations(
         scope: data.scope,
         destination: data.destination,
       });
-      const [allTrustedMints, balancesByMint] = await Promise.all([
+      const [allTrustedMints, balancesByMintAndUnit] = await Promise.all([
         mgr.mint.getAllTrustedMints(),
-        mgr.wallet.balances.byMint(),
+        mgr.wallet.balances.byMintAndUnit(),
       ]);
+      // Unit-scoped balances — the row shows "<balance> <unit>", and the
+      // synchronous fallback rows sort by the walletContext's unit-scoped
+      // balances. A cross-unit total here would both mislabel the row and
+      // make enrichment re-shuffle an already-sorted list.
       const balances: Record<string, number> = Object.fromEntries(
-        Object.entries(balancesByMint).map(([url, snap]) => [
+        Object.entries(balancesByMintAndUnit).map(([url, byUnit]) => [
           url,
-          amountToNumber(snap.total),
+          byUnit[data.unit] ? amountToNumber(byUnit[data.unit].total) : 0,
         ]),
       );
       logger.info("operations.buildMintListItems.context.loaded", {
@@ -962,10 +967,7 @@ export function createDefaultOperations(
         };
       });
 
-      items.sort((a, b) => {
-        if (a.status !== b.status) return a.status === "available" ? -1 : 1;
-        return b.balance - a.balance;
-      });
+      items.sort(compareMintDisplayOrder);
       const disabledReasons = items.reduce<Record<string, number>>(
         (acc, item) => {
           if (item.status !== "disabled") return acc;

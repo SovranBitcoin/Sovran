@@ -4,6 +4,7 @@ import {
   getCapabilityUnavailableReason,
   getMintMethodCapability,
 } from "../mint-capabilities";
+import { localizeReason } from "../formatting/locales";
 import { logger, mintUrlFields } from "../logger";
 import {
   getValidMintCandidates,
@@ -634,6 +635,28 @@ export function requestMintSelector(
     mintUrl,
     balance: walletCtx.mintBalances[mintUrl] ?? 0,
   }));
+  // NPC receive requires NUT-17 websockets (the npub.cash plugin subscribes
+  // to quote settlement). The capability map carries the flag synchronously,
+  // so non-NUT-17 mints are disabled ON THE FIRST FRAME — the async
+  // enrichment (which re-checks against fresh mintInfo) then agrees instead
+  // of re-shuffling rows. Unknown info (flag undefined) stays available;
+  // enrichment is the authority there.
+  const npcCandidates =
+    event.scope === "npc"
+      ? walletCtx.trustedMintUrls.map((mintUrl): MintCandidate => {
+          const nut17 = walletCtx.mintMethodCapabilities?.[mintUrl]?.nut17;
+          return {
+            mintUrl,
+            balance: walletCtx.mintBalances[mintUrl] ?? 0,
+            ...(nut17 === false
+              ? {
+                  status: "disabled" as const,
+                  reason: localizeReason("NO_WEBSOCKET"),
+                }
+              : {}),
+          };
+        })
+      : null;
   const needsBalanceFilter =
     ctx.destination === "paymentRequest" ||
     ctx.destination === "meltQuote" ||
@@ -646,11 +669,12 @@ export function requestMintSelector(
   const finalCandidates =
     methodScope && requirement
       ? buildMethodAwareMintCandidates(walletCtx, requirement, {})
-      : methodCandidates
-        ? hideMethodUnsupportedCandidates(methodCandidates)
-        : skipBalanceFilter
-          ? allTrustedCandidates
-          : candidates;
+      : (npcCandidates ??
+        (methodCandidates
+          ? hideMethodUnsupportedCandidates(methodCandidates)
+          : skipBalanceFilter
+            ? allTrustedCandidates
+            : candidates));
 
   return logContextResult("request_mint_selector", {
     step: "selectMint",

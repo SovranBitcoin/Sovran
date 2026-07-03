@@ -35,6 +35,7 @@
 import { describe, it, expect } from 'vitest';
 import { createTestMachine } from '../_harness';
 import { WALLETS, MINT1, MINT2, MINT_METADATA } from '../_harness/fixtures';
+import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
 import type { StepDataMap } from '../../src/machine/types';
 import type { MintListItem } from '../../src/types';
 
@@ -345,5 +346,63 @@ describe('mint list enrichment — unreachable mints', () => {
       expect(item.unreachable).toBe(true);
       expect(item.status).toBe('available');
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// First-render ordering — the fallback rows must already be in final order
+// ---------------------------------------------------------------------------
+
+describe('mint list fallback ordering', () => {
+  it('sorts the immediate fallback rows like the enriched rows (available first, balance desc)', async () => {
+    // Trusted order deliberately DIFFERS from balance order: MINT1 (200)
+    // precedes MINT2 (900) in the trusted list. The first painted frame
+    // must already show MINT2 first — enrichment then lands in the same
+    // order instead of re-shuffling rows under the user's finger.
+    const tm = createTestMachine({
+      wallet: {
+        preferredMintUrl: undefined,
+        mintBalances: { [MINT1]: 200, [MINT2]: 900 },
+      },
+      operations: {
+        // Enrichment never resolves — everything observed is the fallback.
+        buildMintListItems: async () => new Promise<MintListItem[]>(() => {}),
+      },
+    });
+    await tm.machine.startSendEcash();
+    tm.assertStep('selectMint');
+
+    const details = tm.machine.inspect().details as StepDataMap['selectMint'];
+    expect(details.mintListItemsStatus).toBe('loading');
+    expect(details.mintListItems!.map((item) => item.mintUrl)).toEqual([MINT2, MINT1]);
+  });
+
+  it('sorts receive-rail (onchain scope) fallback rows with unsupported mints last', async () => {
+    const tm = createTestMachine({
+      wallet: {
+        // MINT1 first in trusted order but bolt11-only (disabled for the
+        // onchain rail); MINT2 supports onchain minting.
+        mintBalances: { [MINT1]: 1000, [MINT2]: 5 },
+        mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+          {
+            mintUrl: MINT1,
+            mintInfo: { nuts: { '4': { methods: [{ method: 'bolt11', unit: 'sat' }] } } },
+          },
+          {
+            mintUrl: MINT2,
+            mintInfo: { nuts: { '4': { methods: [{ method: 'onchain', unit: 'sat' }] } } },
+          },
+        ]),
+      },
+      operations: {
+        buildMintListItems: async () => new Promise<MintListItem[]>(() => {}),
+      },
+    });
+    await tm.machine.requestMintSelector({ scope: 'onchain' });
+    tm.assertStep('selectMint');
+
+    const details = tm.machine.inspect().details as StepDataMap['selectMint'];
+    expect(details.mintListItems!.map((item) => item.mintUrl)).toEqual([MINT2, MINT1]);
+    expect(details.mintListItems![1].status).toBe('disabled');
   });
 });

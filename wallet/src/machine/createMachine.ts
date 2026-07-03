@@ -1,6 +1,7 @@
 import { defaultDetectors } from "../detectors";
 import { isMeltUserCancelledError, isMintOfflineError } from "../errors";
 import { t } from "../formatting/locales";
+import { compareMintDisplayOrder } from "../mint-capabilities";
 import { errField, logger, mintUrlFields } from "../logger";
 import { buildProofSuggestions } from "./amountFallback";
 import {
@@ -530,15 +531,20 @@ export function createPaymentMachine(
   function buildFallbackMintListItems(
     data: StepDataMap["selectMint"],
   ): MintListItem[] {
-    return data.candidates.map((candidate) => ({
-      mintUrl: candidate.mintUrl,
-      displayName: candidate.mintUrl,
-      balance: candidate.balance,
-      unit: data.unit,
-      status: candidate.status ?? ("available" as const),
-      reason: candidate.reason ?? null,
-      isPreferred: false,
-    }));
+    // Sorted with the SAME comparator the async enrichment uses, so the
+    // first painted frame is already in the final order and the enriched
+    // rows land without re-shuffling the list.
+    return data.candidates
+      .map((candidate) => ({
+        mintUrl: candidate.mintUrl,
+        displayName: candidate.mintUrl,
+        balance: candidate.balance,
+        unit: data.unit,
+        status: candidate.status ?? ("available" as const),
+        reason: candidate.reason ?? null,
+        isPreferred: false,
+      }))
+      .sort(compareMintDisplayOrder);
   }
 
   function startMintListEnrichment(

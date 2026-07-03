@@ -487,6 +487,48 @@ describe('transition — REQUEST_MINT_SELECTOR', () => {
     expect(result.data.destination).toBeUndefined();
     expect(result.data.methodRequirement).toBeUndefined();
   });
+
+  it('disables non-NUT-17 mints synchronously for the NPC scope', () => {
+    // NPC receive needs NUT-17 websockets. The candidates must carry the
+    // disabled status on the FIRST frame (from the cached capability map) so
+    // the picker's initial order matches the enriched order — mints with
+    // UNKNOWN info (never fetched) stay available for enrichment to decide.
+    const wallet: WalletContext = {
+      trustedMintUrls: [MINT1, MINT2, MINT3],
+      mintBalances: { [MINT1]: 100, [MINT2]: 900, [MINT3]: 50 },
+      preferredMintUrl: MINT1,
+      proofAmounts: {},
+      mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+        {
+          mintUrl: MINT1,
+          mintInfo: {
+            nuts: { '4': { methods: [{ method: 'bolt11', unit: 'sat' }] } },
+          },
+        },
+        {
+          mintUrl: MINT2,
+          mintInfo: {
+            nuts: {
+              '4': { methods: [{ method: 'bolt11', unit: 'sat' }] },
+              '17': { supported: [{ method: 'bolt11', unit: 'sat', commands: [] }] },
+            },
+          },
+        },
+        // MINT3: no mintInfo at all — NUT-17 support unknown.
+        { mintUrl: MINT3 },
+      ]),
+    };
+    const result = tx('idle', idle, { type: 'REQUEST_MINT_SELECTOR', scope: 'npc' }, wallet);
+
+    expect(result.step).toBe('selectMint');
+    const byMint = Object.fromEntries(result.data.candidates.map((c) => [c.mintUrl, c]));
+    expect(byMint[MINT1]).toMatchObject({
+      status: 'disabled',
+      reason: expect.objectContaining({ code: 'NO_WEBSOCKET' }),
+    });
+    expect(byMint[MINT2].status).toBeUndefined();
+    expect(byMint[MINT3].status).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
