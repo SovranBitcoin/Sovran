@@ -101,9 +101,14 @@ export function resolvedFeedPageToParseResult(
       neededPubkeys.add(event.pubkey);
       for (const tag of event.tags) {
         if (tag[0] === 'q' && tag[1]) neededQuoteIds.add(tag[1]);
+        // p-tag mentions render as names in note bodies — enrichment must be
+        // able to resolve them, same as the legacy mapNaggFeedPage path.
+        if (tag[0] === 'p' && tag[1]) neededPubkeys.add(tag[1]);
       }
     }
   }
+  // Quoted events the tier DID return still need their authors' profiles.
+  for (const quoted of quotedEventsMap.values()) neededPubkeys.add(quoted.pubkey);
 
   return {
     orderedFeedItems,
