@@ -1,4 +1,8 @@
-import type { NaggClient } from '../transport';
+import { errAsync } from 'neverthrow';
+import type { z } from 'zod';
+
+import type { NaggClient, NaggRestRequest } from '../transport';
+import type { NaggError } from '../errors';
 import { NaggFeedPageSchema, NaggThreadSchema, NaggNotificationsPageSchema } from '../schemas';
 import {
   rankedFeedAppView,
@@ -80,8 +84,50 @@ export type NaggTierConfig = {
   client: NaggClient;
 };
 
+/**
+ * Cooldown circuit-breaker: after a NETWORK failure (fetch failed or timed
+ * out — NOT a caller abort, NOT an HTTP/schema error, which prove the server
+ * is reachable), every nagg read short-circuits for this long instead of
+ * paying the full request timeout again. Without it, each read independently
+ * burned the whole timeout against a dead nagg before falling through to
+ * Primal/relay — a 30s stall per query while nagg was down.
+ */
+const NAGG_COOLDOWN_MS = 30_000;
+
+function withCooldown(rawClient: NaggClient): NaggClient {
+  let cooldownUntil = 0;
+  return {
+    appViewBaseUrl: rawClient.appViewBaseUrl,
+    rest: <TSchema extends z.ZodType>(request: NaggRestRequest<TSchema>) => {
+      const now = Date.now();
+      if (now < cooldownUntil) {
+        nostrLog.debug('nostr.tier.cooldown', {
+          tier: 'nagg',
+          remainingMs: Math.round(cooldownUntil - now),
+        });
+        return errAsync<z.infer<TSchema>, NaggError>({
+          type: 'network',
+          message: 'nagg is cooling down after a network failure',
+          cause: 'cooldown',
+        });
+      }
+      return rawClient.rest(request).mapErr((error) => {
+        // A caller abort (navigation away) says nothing about nagg's health.
+        if (error.type === 'network' && request.signal?.aborted !== true) {
+          cooldownUntil = Date.now() + NAGG_COOLDOWN_MS;
+          nostrLog.warn('nostr.tier.cooldown_armed', {
+            tier: 'nagg',
+            cooldownMs: NAGG_COOLDOWN_MS,
+          });
+        }
+        return error;
+      });
+    },
+  };
+}
+
 export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
-  const { client } = config;
+  const client = withCooldown(config.client);
 
   return {
     tier: 'nagg',

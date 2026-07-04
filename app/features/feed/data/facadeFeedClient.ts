@@ -4,7 +4,11 @@ import type { FeedEvent, FeedItem } from '@/features/feed/components/nostr/feedT
 import { feedLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
-import { mapAppSpecToFeedSpec, resolvedFeedPageToParseResult } from './facadeFeedAdapter';
+import {
+  isRootNote,
+  mapAppSpecToFeedSpec,
+  resolvedFeedPageToParseResult,
+} from './facadeFeedAdapter';
 import { recordDebugTiers } from '../stores/debugTierStore';
 import {
   resolvedNotificationsToResult,
@@ -84,14 +88,22 @@ function ingestFeedPageIntoCache(result: FeedParseResult): void {
 // ---------------------------------------------------------------------------
 // Facade-backed feed client.
 //
-// Routes the for-you / following-popular home feeds through the tier-selecting
-// nagg-ts facade so the Settings → Network toggles actually change which source
-// (nagg → Primal → relays) serves the feed — visible in the bridged nostr.* logs.
-// Every other read (threads, user feeds, following-replies, enrichment,
-// notifications) delegates to the existing client unchanged.
+// Routes the home feeds (for-you / following-popular), user/profile feeds,
+// posts-by-pubkeys, and notifications through the tier-selecting nagg-ts
+// facade so the Settings → Network toggles actually change which source
+// (nagg → Primal → relays) serves each read — visible in the bridged nostr.*
+// logs — and so a down nagg degrades to Primal/relay instead of blanking the
+// surface. Threads keep nagg's viewer-ranked GraphQL gold path while nagg is
+// enabled (the app-view can't reproduce that ranking); enrichment and
+// following-replies still delegate to the legacy client.
 //
 // The pure shape bridge lives in facadeFeedAdapter.
 // ---------------------------------------------------------------------------
+
+// Feed reads must not wait out the transport's 30s default when a tier is
+// down — a page that takes 8s is already failed from the user's perspective,
+// and the waterfall still has Primal + relays to try.
+const FEED_READ_TIMEOUT_MS = 8_000;
 
 export function createFacadeFeedClient(fallback: FeedClient): FeedClient {
   return {
@@ -115,6 +127,7 @@ export function createFacadeFeedClient(fallback: FeedClient): FeedClient {
         limit: request.limit,
         refresh: request.refresh,
         signal: request.signal,
+        timeoutMs: request.timeoutMs ?? FEED_READ_TIMEOUT_MS,
         cursor: request.until ? { createdAt: request.until, id: '' } : null,
       });
 
@@ -168,15 +181,84 @@ export function createFacadeFeedClient(fallback: FeedClient): FeedClient {
     },
 
     async getUserFeed(request): Promise<FeedParseResult> {
-      const result = await fallback.getUserFeed(request);
-      ingestFeedPageIntoCache(result);
-      return result;
+      // Full facade routing: the legacy nagg-only pass-through meant a down
+      // nagg produced an EMPTY profile feed even though Primal and the relays
+      // could serve it — the tier engine already speaks the `user` spec on
+      // all three tiers. The nagg tier hits the same userFeedAppView route
+      // the legacy client used, so a healthy nagg serves identical pages;
+      // the legacy author-owned root-note/repost filters are re-applied so
+      // replies stay out of profile feeds no matter which tier answers.
+      const layer = buildNostrDataLayer();
+      if (!layer) return emptyFeedParseResult();
+
+      const result = await layer.getFeedPage({
+        spec: { kind: 'user', pubkey: request.pubkey },
+        limit: request.limit,
+        refresh: request.refresh,
+        signal: request.signal,
+        timeoutMs: request.timeoutMs ?? FEED_READ_TIMEOUT_MS,
+        cursor: request.until ? { createdAt: request.until, id: '' } : null,
+      });
+
+      return result.match(
+        (page) => {
+          const parsed = resolvedFeedPageToParseResult(page, {
+            includeNote: (event) => event.pubkey === request.pubkey && isRootNote(event),
+            includeRepost: (event) => event.pubkey === request.pubkey,
+            extraProfile: request.authorName
+              ? {
+                  pubkey: request.pubkey,
+                  profile: { name: request.authorName, picture: request.authorPicture },
+                }
+              : undefined,
+          });
+          feedLog.info('feed.user.page.done', {
+            tier: page.tier,
+            items: parsed.orderedFeedItems.length,
+            paged: !!request.until,
+            paginationUntil: parsed.paginationUntil,
+          });
+          return parsed;
+        },
+        (error) => {
+          feedLog.warn('feed.user.facade.exhausted', {
+            attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
+          });
+          return emptyFeedParseResult();
+        }
+      );
     },
 
     async getPostsByPubkeys(request): Promise<FeedParseResult> {
-      const result = await fallback.getPostsByPubkeys(request);
-      ingestFeedPageIntoCache(result);
-      return result;
+      if (request.pubkeys.length === 0) return emptyFeedParseResult();
+      // Multi-author reads map to `following-recent` (chronological over an
+      // author set) — NOT the single-`user` spec.
+      const layer = buildNostrDataLayer();
+      if (!layer) return emptyFeedParseResult();
+
+      const pubkeySet = new Set(request.pubkeys);
+      const result = await layer.getFeedPage({
+        spec: { kind: 'following-recent', authors: request.pubkeys },
+        limit: request.limit,
+        refresh: request.refresh,
+        signal: request.signal,
+        timeoutMs: request.timeoutMs ?? FEED_READ_TIMEOUT_MS,
+        cursor: request.until ? { createdAt: request.until, id: '' } : null,
+      });
+
+      return result.match(
+        (page) =>
+          resolvedFeedPageToParseResult(page, {
+            includeNote: (event) => pubkeySet.has(event.pubkey) && isRootNote(event),
+            includeRepost: (event) => pubkeySet.has(event.pubkey),
+          }),
+        (error) => {
+          feedLog.warn('feed.posts_by_pubkeys.facade.exhausted', {
+            attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
+          });
+          return emptyFeedParseResult();
+        }
+      );
     },
 
     async getNotifications(request): Promise<FeedNotificationsResult> {

@@ -26,9 +26,32 @@ export function mapAppSpecToFeedSpec(
   }
 }
 
+/** Root note: no e-tags, or only 'mention'-marked ones (same rule the legacy
+ *  nagg client applied to profile feeds — replies don't belong there). */
+export function isRootNote(event: { tags: string[][] }): boolean {
+  const eTags = (event.tags || []).filter((tag) => tag[0] === 'e');
+  if (eTags.length === 0) return true;
+  return eTags.every((tag) => tag[3] === 'mention');
+}
+
+export interface FeedPageAdapterOptions {
+  /** Keep a note item? Profile feeds require author-owned root notes. */
+  includeNote?: (event: FeedEvent) => boolean;
+  /** Keep a repost item (judged by the repost event)? */
+  includeRepost?: (event: FeedEvent) => boolean;
+  /** Seed a known author identity so the header renders on first paint. */
+  extraProfile?: { pubkey: string; profile: ProfileInfo };
+}
+
 /** Adapt the facade's ResolvedFeedPage to the app's FeedParseResult. */
-export function resolvedFeedPageToParseResult(page: facade.ResolvedFeedPage): FeedParseResult {
-  const orderedFeedItems = page.items.map(toAppFeedItem);
+export function resolvedFeedPageToParseResult(
+  page: facade.ResolvedFeedPage,
+  options: FeedPageAdapterOptions = {}
+): FeedParseResult {
+  const orderedFeedItems = page.items.map(toAppFeedItem).filter((item) => {
+    if (item.type === 'note') return options.includeNote?.(item.event) ?? true;
+    return options.includeRepost?.(item.repostEvent) ?? true;
+  });
 
   // Dev-only: stamp each note with the tier that served this page so PostCard can
   // badge its source (n/c/r). No-op in production. Cover both the visible event and
@@ -61,6 +84,9 @@ export function resolvedFeedPageToParseResult(page: facade.ResolvedFeedPage): Fe
       { name: p.name, ...(p.picture ? { picture: p.picture } : {}) },
     ])
   );
+  if (options.extraProfile && !profilesMap.has(options.extraProfile.pubkey)) {
+    profilesMap.set(options.extraProfile.pubkey, options.extraProfile.profile);
+  }
   const quotedEventsMap = new Map<string, FeedEvent>(
     Object.entries(page.quoted) as [string, FeedEvent][]
   );
