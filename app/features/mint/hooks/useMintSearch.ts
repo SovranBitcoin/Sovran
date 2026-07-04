@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { discoverMints, type DiscoverMint, type MintSearchResult } from '@/shared/lib/apiClient';
+import { mintMethodsFromNuts } from '@/shared/lib/cashu/mintNuts';
 import { cashuLog } from '@/shared/lib/logger';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 
 /** Discovery row + the app-local method field (the shared MintSearchResult
- *  schema predates nagg's `supportedMethods`; extend locally rather than
- *  changing the cross-repo contract). */
+ *  schema predates the capability data; extend locally rather than changing
+ *  the cross-repo contract). */
 export type MintSearchRow = MintSearchResult & { supported_methods: string[] };
 
 interface UseMintSearchReturn {
@@ -27,7 +28,9 @@ export function discoverMintToSearchResult(m: DiscoverMint): MintSearchRow {
     url: m.mintUrl,
     name: m.name || m.mintUrl,
     supported_units: m.supportedUnits ?? [],
-    supported_methods: m.supportedMethods ?? [],
+    // Derived from the raw NUT-06 nuts map (nuts['4'].methods) — nagg ships
+    // capabilities undistilled by design.
+    supported_methods: mintMethodsFromNuts(m.nuts),
     state: m.state ?? 'unknown',
     n_mints: m.nMints ?? 0,
     n_melts: m.nMelts ?? 0,

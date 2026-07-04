@@ -62,6 +62,13 @@ export interface MintMetadataEntry {
   // identity (NUT-06 info + discover identity) — 24h
   /** Raw NUT-06 blob. Single owner now (was duplicated across info + audit caches). */
   info?: GetInfoResponse;
+  /**
+   * The NUT-06 `nuts` capability map, verbatim from nagg discover (auditor-
+   * cached). A SUBSET of `info` — kept separately because discover refreshes
+   * it in one bulk call while the full `info` still requires a per-mint
+   * /v1/info fetch. Read via shared/lib/cashu/mintNuts.
+   */
+  nuts?: Record<string, unknown>;
   displayName?: string;
   iconUrl?: string;
   description?: string;
@@ -130,6 +137,9 @@ interface MintMetadataState {
 // rehydrate and let consumers re-fetch on a miss.
 const PersistedMintMetadataEntry = z.looseObject({
   info: z.unknown().optional(),
+  // Additive optional field (persist-safe): untrusted upstream wire shape,
+  // envelope-only like `info`.
+  nuts: z.record(z.string(), z.unknown()).optional(),
   displayName: z.string().max(256).optional(),
   iconUrl: z.string().max(2048).optional(),
   description: z.string().max(4096).optional(),
@@ -309,13 +319,16 @@ export const useMintMetadataStore = create<MintMetadataState>()(
                 m.vertexRank !== undefined;
               next[key] = {
                 ...prev,
-                // identity scalars only — discover carries name/icon but NOT the
-                // raw NUT-06 `info` blob, so do NOT stamp `identityAt` (that would
-                // make `getCachedMintInfo` treat an aging `info` as fresh for 24h).
+                // identity scalars + the nuts capability map — discover still
+                // does NOT carry the full NUT-06 `info` blob, so do NOT stamp
+                // `identityAt` (that would make `getCachedMintInfo` treat an
+                // aging `info` as fresh for 24h). `nuts` is refreshed on every
+                // discover pass regardless.
                 ...(m.name ? { displayName: m.name } : {}),
                 ...(m.iconUrl ? { iconUrl: m.iconUrl } : {}),
                 ...(m.description ? { description: m.description } : {}),
                 ...(m.supportedUnits ? { supportedUnits: m.supportedUnits } : {}),
+                ...(m.nuts ? { nuts: m.nuts } : {}),
                 // reviews aggregate — discover always carries it (null score = no
                 // scored reviews); overwriting a stale aggregate is intended (F3).
                 averageScore: m.averageScore ?? null,

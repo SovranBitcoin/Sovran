@@ -7,7 +7,18 @@ const base: DiscoverMint = {
   iconUrl: 'https://i/x.png',
   description: 'a mint',
   supportedUnits: ['sat', 'usd'],
-  supportedMethods: ['bolt11', 'bolt12'],
+  // Raw NUT-06 capability map, as nagg passes it through from the auditor.
+  nuts: {
+    '4': {
+      methods: [
+        { method: 'bolt11', unit: 'sat' },
+        { method: 'bolt12', unit: 'sat' },
+        { method: 'bolt11', unit: 'usd' },
+      ],
+    },
+    '5': { methods: [{ method: 'bolt11', unit: 'sat' }] },
+    '7': { supported: true },
+  },
   averageScore: 4.5,
   reviewCount: 12,
   favouriteCount: 3,
@@ -34,6 +45,7 @@ describe('discoverMintToSearchResult', () => {
       n_errors: 2,
       review_score: 4.5, // inline, no per-mint fan-out
       review_count: 12,
+      // Derived from nuts['4'].methods (deduped, order-preserving).
       supported_methods: ['bolt11', 'bolt12'],
     });
     // operator pubkey surfaced as a NUT-06 nostr contact for the profile path
@@ -53,8 +65,8 @@ describe('discoverMintToSearchResult', () => {
       url: 'https://m2',
       name: 'https://m2', // falls back to url
       supported_units: [],
-      // Absent until nagg ships supportedMethods — the method filter treats
-      // this as "not known to support".
+      // No nuts map (auditor had no info) — the method filter treats this
+      // as "not known to support".
       supported_methods: [],
       state: 'unknown',
       review_score: null,
