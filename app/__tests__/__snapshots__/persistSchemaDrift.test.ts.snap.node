@@ -117,6 +117,13 @@ exports[`persisted schema drift mint-metadata-store schema matches the golden sn
               "minimum": -9007199254740991,
               "type": "integer",
             },
+            "nuts": {
+              "additionalProperties": {},
+              "propertyNames": {
+                "type": "string",
+              },
+              "type": "object",
+            },
             "operatorNpub": {
               "maxLength": 128,
               "type": "string",
