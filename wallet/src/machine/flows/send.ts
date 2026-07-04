@@ -6,6 +6,7 @@ import type {
   FlowContext,
   FlowStep,
   RecipientProfile,
+  SendEntrySource,
   StepDataMap,
 } from '../types';
 import { logger, mintUrlFields } from '../../logger';
@@ -41,6 +42,8 @@ export interface StartSendEcashOptions {
   recipientProfile?: RecipientProfile;
   /** See `FlowContext.p2pkLockPubkey` — 33-byte compressed hex, `02`-prefixed. */
   p2pkLockPubkey?: string;
+  /** See `SendEntrySource` — how this flow was entered (Create Ecash / scan / paste / contact). */
+  entrySource?: SendEntrySource;
   /**
    * Constrain the source mint to this set (the intersection of our trusted
    * mints and the recipient's accepted mints, e.g. from a NUT-18 `creq`), so the
@@ -111,6 +114,7 @@ export function startSendEcashFlow(
     ...(opts.p2pkLockPubkey
       ? { p2pkLockPubkey: opts.p2pkLockPubkey.toLowerCase() }
       : {}),
+    ...(opts.entrySource ? { entrySource: opts.entrySource } : {}),
   };
   // A malformed lock key must abort the flow — silently dropping it would
   // downgrade the send to a bearer token on whatever surface requested a lock.

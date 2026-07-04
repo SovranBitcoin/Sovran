@@ -34,6 +34,7 @@ import type {
   RecipientProfile,
   ScanOptions,
   ScanSourceResult,
+  SendEntrySource,
   StepDataMap,
 } from "./types";
 
@@ -1514,6 +1515,7 @@ export function createPaymentMachine(
     recipientProfile?: RecipientProfile;
     p2pkLockPubkey?: string;
     allowedMints?: string[];
+    entrySource?: SendEntrySource;
   }) => {
     if (opts?.reset) resetInternal();
     return send({
@@ -1527,6 +1529,7 @@ export function createPaymentMachine(
         : {}),
       ...(opts?.p2pkLockPubkey ? { p2pkLockPubkey: opts.p2pkLockPubkey } : {}),
       ...(opts?.allowedMints ? { allowedMints: opts.allowedMints } : {}),
+      ...(opts?.entrySource ? { entrySource: opts.entrySource } : {}),
     });
   };
 

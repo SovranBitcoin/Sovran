@@ -856,6 +856,7 @@ export function resolveFromContext(
           methodContext: createAmountEntryMethodContext(walletCtx),
           recipientPubkey: ctx.recipientPubkey,
           recipientProfile: ctx.recipientProfile,
+          entrySource: ctx.entrySource,
         },
       },
     });

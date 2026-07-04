@@ -512,6 +512,7 @@ export function transition(
             ? { p2pkLockPubkey: event.p2pkLockPubkey }
             : {}),
           ...(event.allowedMints ? { allowedMints: event.allowedMints } : {}),
+          ...(event.entrySource ? { entrySource: event.entrySource } : {}),
         }),
       );
     case "START_SEND":

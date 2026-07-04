@@ -285,6 +285,12 @@ export interface AmountEntryConstraints {
   recipientProfile?: import('./machine/types').RecipientProfile;
   methodContext?: AmountEntryMethodContext;
   destination: 'paymentRequest' | 'meltQuote' | 'sendEcash' | 'mintQuote';
+  /**
+   * How the flow was entered (Create Ecash / scan / paste / contact) — lets
+   * the amount screen render entry-appropriate chrome, e.g. a single
+   * "Create ecash" action when the user explicitly chose that method.
+   */
+  entrySource?: import('./machine/types').SendEntrySource;
 }
 
 // ---------------------------------------------------------------------------

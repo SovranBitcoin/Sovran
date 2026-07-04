@@ -371,6 +371,7 @@ export type {
   ScanSources,
   NfcIOAdapter,
   RecipientProfile,
+  SendEntrySource,
 } from "./machine/types";
 
 export type { MintAvailability } from "./machine/selectMintContext";

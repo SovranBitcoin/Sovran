@@ -148,11 +148,23 @@ export function createAmountActionManager(
     clampedToCap = false;
   }
 
+  // Proof-set signature: sorted amounts joined. (length, sum) was the old
+  // cache key and it collides — [4,4] and [1,7] share both but compose
+  // different amounts. Memoized by array identity since getProofAmounts()
+  // usually returns a stable reference between proof changes.
+  let lastProofsForSig: number[] | null = null;
+  let lastProofsSig = '';
+  function proofSignature(proofs: number[]): string {
+    if (proofs === lastProofsForSig) return lastProofsSig;
+    lastProofsForSig = proofs;
+    lastProofsSig = [...proofs].sort((a, b) => a - b).join(',');
+    return lastProofsSig;
+  }
+
   // Suggestion cache — invalidated when proofs, price, or unit change
   const EMPTY_SUGGESTIONS: QuickSendSuggestion[] = [];
   let sugCache: {
-    len: number;
-    sum: number;
+    sig: string;
     price: number;
     unit: string;
     result: QuickSendSuggestion[];
@@ -169,12 +181,10 @@ export function createAmountActionManager(
     if (proofs.length === 0) return EMPTY_SUGGESTIONS;
     if (unitNow === 'sat' && price <= 0) return EMPTY_SUGGESTIONS;
 
-    const len = proofs.length;
-    const sum = proofs.reduce((a, b) => a + b, 0);
+    const sig = proofSignature(proofs);
     if (
       sugCache &&
-      sugCache.len === len &&
-      sugCache.sum === sum &&
+      sugCache.sig === sig &&
       sugCache.price === price &&
       sugCache.unit === unitNow
     ) {
@@ -192,12 +202,12 @@ export function createAmountActionManager(
     // proofAmounts cache is stale relative to coco's proof state.
     const sendAll = result.find((s) => s.sendAll);
     logger.info('amountActions.suggestion.derive', {
-      proofCount: len,
-      spendableTotal: sum,
+      proofCount: proofs.length,
+      spendableTotal: proofs.reduce((a, b) => a + b, 0),
       unit: unitNow,
       displayedSendAll: sendAll?.amount.value ?? null,
     });
-    sugCache = { len, sum, price, unit: unitNow, result };
+    sugCache = { sig, price, unit: unitNow, result };
     return result;
   }
 
@@ -253,11 +263,19 @@ export function createAmountActionManager(
     return minorToRawInput(cap, getUnit());
   }
 
+  // compute() memo. inspect() is the useSyncExternalStore getSnapshot, so it
+  // runs on EVERY render of the amount screen — and resolveAmount runs a
+  // subset-sum composition synchronously on the JS thread. The structural
+  // resolutionEqual check below only stabilizes the returned REFERENCE; this
+  // memo skips the work itself when no input changed since the last call.
+  let computeCache: { key: string; result: AmountResolution } | null = null;
+
   function compute(): AmountResolution {
     ensureUnitCurrent();
     const numericValue = parseNumericValue(rawInput);
     const mintUrl = getMintUrl();
-    const proofAmounts = mintUrl ? getProofAmounts() : [];
+    const allProofAmounts = getProofAmounts();
+    const proofAmounts = mintUrl ? allProofAmounts : [];
     const btcPrice = getBtcPrice();
     const offlineOpt = getOfflineOptimization();
     const unitNow = getUnit();
@@ -265,6 +283,26 @@ export function createAmountActionManager(
     const fiatSymbolNow = getFiatSymbol();
     const fiatToggleAvailable = hasFiatToggleNow();
     const fiatToggleActive = fiatToggleAvailable && btcPrice > 0;
+
+    // Keyed on the UNGATED proof set: getSuggestions() reads proofs even when
+    // mintUrl is null, so gating the signature on mintUrl could serve a stale
+    // suggestions list from the memo.
+    const computeKey = [
+      inputMode,
+      rawInput,
+      unitNow,
+      mintUrl ?? '',
+      proofSignature(allProofAmounts),
+      btcPrice,
+      offlineOpt,
+      fiatCurrencyNow ?? '',
+      fiatSymbolNow ?? '',
+      clampedToCap,
+      currentCap() ?? 'uncapped',
+    ].join('§');
+    if (computeCache && computeCache.key === computeKey) {
+      return computeCache.result;
+    }
 
     const core = resolveAmount({
       inputMode,
@@ -368,6 +406,7 @@ export function createAmountActionManager(
       });
     }
 
+    computeCache = { key: computeKey, result };
     return result;
   }
 

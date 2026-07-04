@@ -39,6 +39,16 @@ export type FlowStep =
   | "error";
 
 export type Destination = AmountEntryConstraints["destination"];
+
+/**
+ * How an ecash-send flow was entered. `destination: 'sendEcash'` alone can't
+ * distinguish the Send chooser's "Create Ecash" method from scan/paste/contact
+ * launches that resolve to the same destination, and the amount screen needs
+ * that distinction to render entry-appropriate chrome (a single "Create ecash"
+ * action instead of Next + Paste + Scan).
+ */
+export type SendEntrySource = "createEcash" | "scan" | "paste" | "contact";
+
 export type PaymentQuoteMethod = "bolt11" | "onchain";
 export type MintQuoteMethod = PaymentQuoteMethod;
 export type MeltQuoteMethod = PaymentQuoteMethod;
@@ -141,6 +151,8 @@ export interface StepDataMap {
       recipientPubkey?: string;
       recipientProfile?: RecipientProfile;
       methodContext?: AmountEntryConstraints["methodContext"];
+      /** See `SendEntrySource` — how the flow was entered. */
+      entrySource?: SendEntrySource;
     };
   };
   selectMint: {
@@ -285,6 +297,9 @@ export interface FlowContext {
   amount?: number;
   mintUrl?: string;
   destination?: Destination;
+  /** See `SendEntrySource` — set by `startSendEcash` when the caller declares
+   *  how the flow was entered; absent on legacy/indirect launches. */
+  entrySource?: SendEntrySource;
   mintQuoteMethod?: MintQuoteMethod;
   meltQuoteMethod?: MeltQuoteMethod;
   unit: string;
@@ -491,6 +506,8 @@ export type FlowEvent =
       p2pkLockPubkey?: string;
       /** Constrain the source mint to a set the recipient accepts (NUT-18 creq). */
       allowedMints?: string[];
+      /** See `SendEntrySource` — how this flow was entered. */
+      entrySource?: SendEntrySource;
     }
   | {
       /**
@@ -1197,6 +1214,8 @@ export interface PaymentMachine {
     recipientProfile?: RecipientProfile;
     /** See `FlowContext.p2pkLockPubkey` — P2PK-lock the sent token to this key. */
     p2pkLockPubkey?: string;
+    /** See `SendEntrySource` — how this flow was entered. */
+    entrySource?: SendEntrySource;
   }) => Promise<void>;
   /** Start a receive lightning flow. Opens amount screen for mint quote. */
   startReceiveLightning: (opts?: { reset?: boolean }) => Promise<void>;

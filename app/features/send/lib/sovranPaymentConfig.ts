@@ -1715,6 +1715,10 @@ export function createSovranHandlers({
         // after navigation.
         ...(constraints.recipientPubkey ? { recipientPubkey: constraints.recipientPubkey } : {}),
         ...(constraints.recipientProfile ? { recipientProfile: constraints.recipientProfile } : {}),
+        // Entry-method marker (Create Ecash / scan / paste / contact) — the
+        // amount screen keys its action chrome off this, e.g. a single
+        // "Create ecash" button instead of Next + Paste + Scan.
+        ...(constraints.entrySource ? { entrySource: constraints.entrySource } : {}),
       };
       const params = { amountEntry: JSON.stringify(entry) };
       const nearPaySessionStore = useNearPaySessionStore.getState();

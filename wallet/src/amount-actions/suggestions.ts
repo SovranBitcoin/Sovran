@@ -8,7 +8,11 @@
 // are guaranteed offline-composable.
 // ---------------------------------------------------------------------------
 
-import { composeFiat, composeSatoshis } from "../offline";
+import {
+  buildExactOfflineAmountIndex,
+  composeFiat,
+  composeSatoshis,
+} from "../offline";
 import {
   isFiatUnit,
   minorToRawInput,
@@ -24,19 +28,37 @@ import type { QuickSendConfig, QuickSendSuggestion } from "./types";
 const SATS_PER_BTC = 100_000_000;
 
 const DEFAULT_FIAT_TARGETS = [
-  0.1, 0.25, 0.5, 1, 2, 3, 5, 10, 15, 20, 25, 50, 100,
+  0.1, 0.25, 0.5, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200,
 ];
 
 const DEFAULT_SAT_TARGETS = [
-  21, 50, 100, 250, 500, 1000, 2100, 5000, 10000, 21000, 50000, 100000,
+  21, 50, 100, 210, 250, 500, 750, 1000, 2100, 2500, 5000, 7500, 10000, 15000,
+  21000, 25000, 50000, 75000, 100000, 210000, 500000, 1000000,
 ];
 
-/** Fiat-account targets, in minor units (cents): $0.10 … $100. */
+/** Fiat-account targets, in minor units (cents): $0.10 … $200. */
 const DEFAULT_FIAT_UNIT_TARGETS = [
-  10, 25, 50, 100, 200, 300, 500, 1000, 1500, 2000, 2500, 5000, 10000,
+  10, 25, 50, 100, 200, 300, 400, 500, 1000, 1500, 2000, 2500, 3000, 4000,
+  5000, 7500, 10000, 15000, 20000,
 ];
 
-const DEFAULT_LIMIT = 3;
+const DEFAULT_LIMIT = 5;
+
+/**
+ * The exact-amount index enumerates EVERY composable subset sum, so it is
+ * only built when the proof count keeps it provably small (≤2^14 sums).
+ * These are precisely the wallets where the nice-target sweep goes hungry —
+ * a handful of odd denominations composes almost none of the round numbers,
+ * and the index supplies the amounts that ARE actually sendable offline.
+ * Bigger wallets compose most round targets anyway and skip the index.
+ */
+const INDEX_MAX_PROOFS = 14;
+
+function maybeBuildReachableIndex(proofAmounts: number[]): number[] | null {
+  if (proofAmounts.length === 0 || proofAmounts.length > INDEX_MAX_PROOFS)
+    return null;
+  return buildExactOfflineAmountIndex(proofAmounts).reachableSums;
+}
 
 const satFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
@@ -86,10 +108,16 @@ function computeFiatUnitSuggestions(
 ): QuickSendSuggestion[] {
   const limit = config?.limit ?? DEFAULT_LIMIT;
   const symbol = symbolForUnit(unit);
+  const reachable = maybeBuildReachableIndex(proofAmounts);
+  const reachableSet = reachable ? new Set(reachable) : null;
   const all: QuickSendSuggestion[] = [];
   for (const minor of DEFAULT_FIAT_UNIT_TARGETS) {
     if (minor > totalBalance || minor <= 0) continue;
-    if (!composeSatoshis(proofAmounts, minor).exactMatch) continue;
+    // Index membership is O(1); without an index fall back to a compose call.
+    const composable = reachableSet
+      ? reachableSet.has(minor)
+      : composeSatoshis(proofAmounts, minor).exactMatch;
+    if (!composable) continue;
     all.push({
       label: formatFiatLabel(minor / 100, symbol),
       inputValue: minorToRawInput(minor, unit),
@@ -98,9 +126,29 @@ function computeFiatUnitSuggestions(
     });
   }
 
-  const picked = pickDistributed(all, limit * 2).sort(
-    (a, b) => a.amount.value - b.amount.value,
-  );
+  // Small wallets with odd denominations compose almost no round targets —
+  // fill with the amounts that ARE composable so quick-send is never just
+  // "Send all".
+  if (reachable && all.length < limit) {
+    const used = new Set(all.map((s) => s.amount.value));
+    const fillers = pickDistributed(
+      reachable.filter((minor) => minor < totalBalance && !used.has(minor)),
+      limit - all.length,
+    );
+    for (const minor of fillers) {
+      all.push({
+        label: formatFiatLabel(minor / 100, symbol),
+        inputValue: minorToRawInput(minor, unit),
+        inputMode: "unit",
+        amount: { value: minor, unit },
+      });
+    }
+  }
+
+  const picked = pickDistributed(
+    all.sort((a, b) => a.amount.value - b.amount.value),
+    limit * 2,
+  ).sort((a, b) => a.amount.value - b.amount.value);
   picked.push({
     label: `Send all ${formatFiatLabel(totalBalance / 100, symbol)}`,
     inputValue: minorToRawInput(totalBalance, unit),
@@ -171,6 +219,8 @@ export function computeQuickSendSuggestions(
   const hasFiat = !!fiatCurrency && !!fiatSymbol && btcPrice > 0;
   const satsPerFiat = btcPrice > 0 ? SATS_PER_BTC / btcPrice : 0;
   const usedSats = new Set<number>();
+  const reachable = maybeBuildReachableIndex(proofAmounts);
+  const reachableSet = reachable ? new Set(reachable) : null;
 
   // Collect ALL achievable fiat suggestions
   const allFiat: QuickSendSuggestion[] = [];
@@ -206,8 +256,11 @@ export function computeQuickSendSuggestions(
     if (satTarget > totalBalance || satTarget <= 0) continue;
     if (usedSats.has(satTarget)) continue;
 
-    const result = composeSatoshis(proofAmounts, satTarget);
-    if (!result.exactMatch) continue;
+    // Index membership is O(1); without an index fall back to a compose call.
+    const composable = reachableSet
+      ? reachableSet.has(satTarget)
+      : composeSatoshis(proofAmounts, satTarget).exactMatch;
+    if (!composable) continue;
 
     usedSats.add(satTarget);
 
@@ -222,6 +275,28 @@ export function computeQuickSendSuggestions(
     totalBalance,
     collected: allSat.length,
   });
+
+  // Small wallets with odd denominations compose almost no round targets —
+  // fill the sat category with amounts that ARE composable so quick-send is
+  // never just "Send all". Only rescues the DEFAULT sweep: a caller that
+  // passed explicit targets asked for exactly those.
+  const customTargets = !!config?.fiatTargets || !!config?.satTargets;
+  if (reachable && !customTargets && allFiat.length + allSat.length < limit) {
+    const fillers = pickDistributed(
+      reachable.filter((sats) => sats < totalBalance && !usedSats.has(sats)),
+      limit - allFiat.length - allSat.length,
+    );
+    for (const sats of fillers) {
+      usedSats.add(sats);
+      allSat.push({
+        label: `${satFormatter.format(sats)} sats`,
+        inputValue: String(sats),
+        inputMode: "unit",
+        amount: { value: sats, unit: "sat" },
+      });
+    }
+    allSat.sort((a, b) => a.amount.value - b.amount.value);
+  }
 
   // Pick evenly distributed subset from each category, merge, sort
   const pickedFiat = pickDistributed(allFiat, limit);

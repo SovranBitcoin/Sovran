@@ -186,8 +186,16 @@ export function AmountSelector({
   // send-money flows) into ActionMenuButton's variant shape. Each variant
   // invokes `actions.next.execute({ variantId })`, which routes through the
   // screen-action handler to the machine.
+  // The Send chooser's "Create Ecash" method is a deliberate, recipient-less
+  // bearer-token entry: the only sensible action is creating the token.
+  // Paste / Scan QR (which re-route the flow to a scanned destination) and
+  // the delivery-variant menu don't apply, so the screen reduces to the
+  // keypad + a single explicitly-labeled action — mirroring the
+  // routstr-top-up suppression precedent below.
+  const isCreateEcashEntry = entry?.entrySource === 'createEcash';
+
   const nextVariants = useMemo<ActionMenuVariant[] | undefined>(() => {
-    if (suppressNextVariants) return undefined;
+    if (suppressNextVariants || isCreateEcashEntry) return undefined;
     const raw = actions.next.variants as ActionVariant[] | undefined;
     if (!raw || raw.length === 0) return undefined;
     return raw.map((v) => ({
@@ -210,7 +218,7 @@ export function AmountSelector({
         await actions.next.execute({ variantId: v.id, ...nextExecuteParams });
       },
     }));
-  }, [actions.next, nextExecuteParams, suppressNextVariants]);
+  }, [actions.next, nextExecuteParams, suppressNextVariants, isCreateEcashEntry]);
 
   // The AI-credit top-up flow lands on this screen via a hand-rolled
   // navigation (`useRoutstrTopUpStore.start()` → `/(send-flow)/amount`),
@@ -222,7 +230,7 @@ export function AmountSelector({
   const isRoutstrTopUpActive = useRoutstrTopUpStore((s) => s.active);
 
   const extraButtons = useMemo((): ButtonHandlerProps['buttons'] => {
-    if (isRoutstrTopUpActive) return [];
+    if (isRoutstrTopUpActive || isCreateEcashEntry) return [];
     const buttons: ButtonHandlerProps['buttons'] = [];
     if (actions.paste.available) {
       buttons.push({
@@ -251,7 +259,7 @@ export function AmountSelector({
       });
     }
     return buttons;
-  }, [isRoutstrTopUpActive, actions.paste, actions.scanQr]);
+  }, [isRoutstrTopUpActive, isCreateEcashEntry, actions.paste, actions.scanQr]);
 
   const nextLoading = machineBusy || actions.next.loading;
   const nextDisabled = !actions.next.available;
@@ -345,6 +353,7 @@ export function AmountSelector({
         exceedsBalance={exceedsBalance}
         noticeText={nextNoticeText}
         nextTestID="amount-next"
+        nextText={isCreateEcashEntry ? 'Create ecash' : undefined}
         fiatSymbol={fiatSymbol}
         unitSymbol={unitSymbol}
         secondaryDisplay={secondaryDisplay}
