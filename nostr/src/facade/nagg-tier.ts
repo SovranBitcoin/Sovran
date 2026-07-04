@@ -85,17 +85,26 @@ export type NaggTierConfig = {
 };
 
 /**
- * Cooldown circuit-breaker: after a NETWORK failure (fetch failed or timed
- * out — NOT a caller abort, NOT an HTTP/schema error, which prove the server
- * is reachable), every nagg read short-circuits for this long instead of
- * paying the full request timeout again. Without it, each read independently
- * burned the whole timeout against a dead nagg before falling through to
- * Primal/relay — a 30s stall per query while nagg was down.
+ * Cooldown circuit-breaker: after CONSECUTIVE network failures (fetch failed
+ * or timed out — NOT a caller abort, NOT an HTTP/schema error, which prove
+ * the server is reachable), every nagg read short-circuits for this long
+ * instead of paying the full request timeout again. Without it, each read
+ * independently burned the whole timeout against a dead nagg before falling
+ * through to Primal/relay — a 30s stall per query while nagg was down.
+ *
+ * The threshold exists because a slow-but-alive nagg is NOT a dead nagg: a
+ * single heavy read (cold ranked feed) exceeding its per-request timeout must
+ * only fail over THAT read, not poison every nagg read for 30s — that traded
+ * the gold tier away for speed on the whole session. A genuinely hung nagg
+ * fails every request, so it still opens the breaker on the second failure;
+ * any success closes it.
  */
 const NAGG_COOLDOWN_MS = 30_000;
+const NAGG_COOLDOWN_THRESHOLD = 2;
 
 function withCooldown(rawClient: NaggClient): NaggClient {
   let cooldownUntil = 0;
+  let consecutiveNetworkFailures = 0;
   return {
     appViewBaseUrl: rawClient.appViewBaseUrl,
     rest: <TSchema extends z.ZodType>(request: NaggRestRequest<TSchema>) => {
@@ -107,21 +116,33 @@ function withCooldown(rawClient: NaggClient): NaggClient {
         });
         return errAsync<z.infer<TSchema>, NaggError>({
           type: 'network',
-          message: 'nagg is cooling down after a network failure',
+          message: 'nagg is cooling down after repeated network failures',
           cause: 'cooldown',
         });
       }
-      return rawClient.rest(request).mapErr((error) => {
-        // A caller abort (navigation away) says nothing about nagg's health.
-        if (error.type === 'network' && request.signal?.aborted !== true) {
-          cooldownUntil = Date.now() + NAGG_COOLDOWN_MS;
-          nostrLog.warn('nostr.tier.cooldown_armed', {
-            tier: 'nagg',
-            cooldownMs: NAGG_COOLDOWN_MS,
-          });
-        }
-        return error;
-      });
+      return rawClient.rest(request)
+        .map((value) => {
+          consecutiveNetworkFailures = 0;
+          return value;
+        })
+        .mapErr((error) => {
+          // A caller abort (navigation away) says nothing about nagg's health.
+          if (error.type === 'network' && request.signal?.aborted !== true) {
+            consecutiveNetworkFailures += 1;
+            if (consecutiveNetworkFailures >= NAGG_COOLDOWN_THRESHOLD) {
+              cooldownUntil = Date.now() + NAGG_COOLDOWN_MS;
+              nostrLog.warn('nostr.tier.cooldown_armed', {
+                tier: 'nagg',
+                cooldownMs: NAGG_COOLDOWN_MS,
+                consecutiveFailures: consecutiveNetworkFailures,
+              });
+            }
+          } else if (error.type !== 'network') {
+            // An HTTP/schema answer proves the server is alive.
+            consecutiveNetworkFailures = 0;
+          }
+          return error;
+        });
     },
   };
 }

@@ -101,9 +101,12 @@ function ingestFeedPageIntoCache(result: FeedParseResult): void {
 // ---------------------------------------------------------------------------
 
 // Feed reads must not wait out the transport's 30s default when a tier is
-// down — a page that takes 8s is already failed from the user's perspective,
-// and the waterfall still has Primal + relays to try.
-const FEED_READ_TIMEOUT_MS = 8_000;
+// hung — but nagg is the QUALITY tier, and its ranked feed can legitimately
+// take several seconds cold (field logs showed real answers just past 8s, so
+// an 8s cap silently traded every feed to Primal/relay). 15s cuts a genuine
+// hang in half while letting a slow-but-alive nagg still serve the gold page;
+// the waterfall still has Primal + relays after it.
+const FEED_READ_TIMEOUT_MS = 15_000;
 
 export function createFacadeFeedClient(fallback: FeedClient): FeedClient {
   return {
