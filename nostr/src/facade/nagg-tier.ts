@@ -287,6 +287,9 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
             mintUrl: page.summary.mintUrl,
             averageScore: page.summary.averageScore,
             reviewCount: page.summary.reviewCount,
+            // Older nagg deployments predate the field; derive from reviews.
+            favouriteCount:
+              page.summary.favouriteCount ?? reviews.filter((r) => r.score == null).length,
             reviews,
           });
         },

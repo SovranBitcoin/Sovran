@@ -38,6 +38,9 @@ export type MintReviewsSummary = {
   mintUrl: string;
   averageScore: number | null;
   reviewCount: number;
+  /** Reviews posted WITHOUT a score (pure endorsements); 0 when the serving
+   *  nagg predates the field. */
+  favouriteCount: number;
   reviews: MintReview[];
 };
 
@@ -58,6 +61,14 @@ export type DiscoveredMint = {
   iconUrl?: string;
   description?: string;
   supportedUnits?: string[];
+  /**
+   * The mint's NUT-06 `nuts` capability map, verbatim from the mint's
+   * /v1/info (via nagg's auditor feed). Read whichever NUT entries you need
+   * (e.g. nuts['4'].methods payment methods, nuts['7'] state check,
+   * nuts['10']/nuts['11'] P2PK, nuts['17'] websockets) — deliberately
+   * untyped so new capabilities need no client release.
+   */
+  nuts?: Record<string, unknown>;
   hasAudit?: boolean;
   state?: string;
   nMints?: number;
@@ -100,6 +111,9 @@ const MintAggregateSchema = z.object({
   mintUrl: z.string(),
   averageScore: z.number().nullable(),
   reviewCount: z.number(),
+  /** Reviews posted WITHOUT a score (pure endorsements). Optional until every
+   *  deployed nagg ships it; mirrors the discover row's field. */
+  favouriteCount: z.number().optional(),
 });
 
 // Bundled kind-0 identity (reviewer or operator), keyed by pubkey.
@@ -129,6 +143,7 @@ const DiscoverMintSchema = z.object({
   iconUrl: z.string().optional(),
   description: z.string().optional(),
   supportedUnits: z.array(z.string()).optional(),
+  nuts: z.record(z.string(), z.unknown()).optional(),
   averageScore: z.number().nullable(),
   reviewCount: z.number(),
   favouriteCount: z.number().optional(),
@@ -212,7 +227,13 @@ export function summarizeReviews(mintUrl: string, events: ReadonlyArray<NaggFeed
       .filter((r): r is MintReview => r !== null && normalizeMintUrl(r.mintUrl) === target),
   ).sort((a, b) => b.createdAt - a.createdAt);
 
-  return { mintUrl, averageScore: averageOf(reviews), reviewCount: reviews.length, reviews };
+  return {
+    mintUrl,
+    averageScore: averageOf(reviews),
+    reviewCount: reviews.length,
+    favouriteCount: reviews.filter((r) => r.score == null).length,
+    reviews,
+  };
 }
 
 /** Group review events by mint for discovery: per-mint average + count, best-attested first. */
