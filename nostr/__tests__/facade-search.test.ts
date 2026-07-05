@@ -39,14 +39,24 @@ describe('searchProfiles through the facade', () => {
           ok: true,
           status: 200,
           statusText: 'OK',
+          // v2 envelope: kind-0 events + ranked pubkeys + per-provider scores.
           json: async () => ({
-            query: 'ali',
-            limit: 10,
-            sort: 'globalPagerank',
-            fromCache: false,
-            results: [
-              { pubkey: A, npub: 'npub1a', rank: 1, score: 0.9, name: 'alice', displayName: 'Alice' },
+            order: ['9'.repeat(64)],
+            orderBy: 'rank',
+            events: [
+              {
+                id: '9'.repeat(64),
+                kind: 0,
+                pubkey: A,
+                content: JSON.stringify({ name: 'alice', display_name: 'Alice' }),
+                tags: [],
+                created_at: 100,
+              },
             ],
+            aggregates: {},
+            pubkeys: [A],
+            providers: { [A]: { vertex: { rank: 1, score: 0.9 } } },
+            fromCache: false,
           }),
         } as unknown as Response;
       }) as unknown as typeof fetch,

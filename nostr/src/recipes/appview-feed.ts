@@ -1,15 +1,10 @@
-// REST app-view bindings for the feed / ranked / thread / notifications / stats
-// views. Each binding describes how a `transport:'appview'` request reaches the
-// dedicated nagg REST route. nagg's app-view now emits the SAME canonical shape
-// the GraphQL path converges on, so the bindings carry no `normalize` step — the
-// raw REST body is parsed directly by the request's `dataSchema` (the same schema
-// the GraphQL `graphqlToData`-distilled output parses with).
-//
-// The canonical shape for feed/ranked is `NaggFeedPage` (see `src/map/feed.ts`):
-// a list of feed items plus `metrics`/`profiles`/`quoted` side maps. The REST
-// `FeedResponse` carries exactly that, and the rich GraphQL node-with-aggregates
-// selection is distilled to the same shape by `graphqlNodesToNaggPage` — so both
-// transports produce an identical `NaggFeedPage`.
+// REST app-view bindings for the feed / ranked / thread / notifications /
+// aggregates views. Each binding describes how a request reaches the dedicated
+// nagg REST route. nagg v2 answers EVERY one of these with the generic envelope
+// (`{ order, orderBy, events, aggregates, cursor? }`) — parse with
+// `NaggEnvelopeSchema` (or the route's extension) and reconstruct the canonical
+// facade shapes via `src/envelope.ts` (`feedPageFromEnvelope`,
+// `threadFromEnvelope`, `notificationsPageFromEnvelope`, …).
 
 import type { NaggAppViewBinding } from '../transport';
 import type { RankedEventsInput } from './feed';
@@ -163,12 +158,13 @@ export type NotificationsAppViewInput = {
 };
 
 /**
- * App-view binding for notifications: GET `/nostr/notifications`. The server
- * returns the canonical `NotificationsResponse` (`NaggNotificationsPage`): a
- * `{ notifications: { nodes, pageInfo } }` connection (each node = `{ event,
- * reason, actorVertexScore }`) with the feed's `metrics`/`profiles`/`quoted`
- * hydration side maps alongside. The server now synthesises `pageInfo`
- * (`endCursor`/`hasNextPage`) itself, matching the GraphQL connection shape.
+ * App-view binding for notifications: GET `/nostr/notifications`. v2 returns
+ * the generic envelope EXTENDED with `entries` (`{ id, kind, actor, target?,
+ * total?, totalCapped?, actors? }`) and `hasNext`. There are NO reason strings
+ * anymore — the client derives follow/repost/reaction/zap/reply/quote/mention
+ * from the entry kind + the embedded event's tags (`deriveNotificationReason`).
+ * Parse with `NaggNotificationsEnvelopeSchema`, reconstruct via
+ * `notificationsPageFromEnvelope`.
  */
 export function notificationsAppView(input: NotificationsAppViewInput): NaggAppViewBinding {
   return {
@@ -189,24 +185,25 @@ export function notificationsAppView(input: NotificationsAppViewInput): NaggAppV
 }
 
 // ---------------------------------------------------------------------------
-// 5. Note stats — POST /nostr/notes/stats
+// 5. Event aggregates — POST /nostr/events/aggregates
 // ---------------------------------------------------------------------------
 
 /**
- * App-view binding for per-note engagement stats (the per-node aggregates a feed
- * GraphQL query embeds, distilled by `metricsFromGraphqlNode`): POSTs the id
- * list to `/nostr/notes/stats`. The server returns the canonical
- * `map[string]NoteStats` (`NaggNoteStats`) keyed by event id.
+ * App-view binding for per-event engagement aggregates. v2 REPLACED
+ * `POST /nostr/notes/stats`: POST the id list to `/nostr/events/aggregates` and
+ * the server returns an envelope whose `aggregates` map carries the rule values
+ * (`order`/`events` stay empty). Reconstruct the friendly per-id stats map with
+ * `noteStatsFromEnvelope` (zero values are omitted server-side and default to 0
+ * there).
  *
- * Note: nagg registers this route for POST only (the request carries an `ids`
- * JSON body, since a CSV id list can exceed URL length limits).
+ * POST only — an `ids` CSV can exceed URL length limits.
  */
-export function noteStatsAppView(ids: readonly string[]): NaggAppViewBinding {
+export function eventsAggregatesAppView(ids: readonly string[]): NaggAppViewBinding {
   const normalizedIds = ids.filter((id) => id.length > 0);
   return {
-    path: '/nostr/notes/stats',
+    path: '/nostr/events/aggregates',
     method: 'POST',
-    operationName: 'NoteStats',
+    operationName: 'EventsAggregates',
     body: { ids: normalizedIds },
   };
 }

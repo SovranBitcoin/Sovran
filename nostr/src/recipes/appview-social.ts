@@ -1,9 +1,12 @@
-// REST app-view bindings for the reads that used to run over GraphQL: enrich /
-// batch-profile lookups, the constrained filtered-events query (Whitenoise +
-// wallpaper catalog + recent posts-by-pubkeys), follow-status, own-profiles, and
-// the scoped DM conversation. Each returns a `NaggAppViewBinding` the client/
-// facade hands to `client.rest`, parsed by the matching canonical schema — there
-// is no GraphQL path.
+// REST app-view bindings for the social reads: enrich / batch-profile lookups,
+// the constrained filtered-events query (Whitenoise + wallpaper catalog +
+// recent posts-by-pubkeys), follow-status, own-profiles, the notifications-seen
+// marker, and the scoped DM conversation. Each returns a `NaggAppViewBinding`
+// the client/facade hands to `client.rest`. Every route answers with the v2
+// generic envelope — parse with `NaggEnvelopeSchema` (or the route's extension,
+// e.g. `NaggFollowStatusEnvelopeSchema`) and reconstruct via `src/envelope.ts`
+// (`enrichmentFromEnvelope`, `followStatusRowsFromEnvelope`,
+// `ownProfilesFromEnvelope`, `seenUntilFromEnvelope`, …).
 
 import type { NaggAppViewBinding, NaggSearchParams } from '../transport';
 import type { EventQueryInput } from './rank';
@@ -12,7 +15,7 @@ import type { EventQueryInput } from './rank';
 // Enrich / batch profiles
 // ---------------------------------------------------------------------------
 
-/** GET `/nostr/events?ids=…` — enrich/quoted events by id (canonical EnrichmentResponse). */
+/** GET `/nostr/events?ids=…` — enrich/quoted events by id. */
 export function eventsAppView(ids: readonly string[]): NaggAppViewBinding {
   return {
     path: '/nostr/events',
@@ -22,7 +25,7 @@ export function eventsAppView(ids: readonly string[]): NaggAppViewBinding {
   };
 }
 
-/** GET `/nostr/profiles?pubkeys=…` — batch profile info (canonical EnrichmentResponse). */
+/** GET `/nostr/profiles?pubkeys=…` — batch kind-0 profile events + pubkey aggregates. */
 export function profilesAppView(pubkeys: readonly string[]): NaggAppViewBinding {
   return {
     path: '/nostr/profiles',
@@ -95,6 +98,23 @@ export function ownProfilesAppView(pubkeys: readonly string[]): NaggAppViewBindi
     method: 'GET',
     operationName: 'OwnProfiles',
     searchParams: { pubkeys: pubkeys.slice(0, 10).join(',') },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Notifications seen marker — GET /nostr/notifications/seen
+// ---------------------------------------------------------------------------
+
+/**
+ * GET `/nostr/notifications/seen` — returns an envelope carrying the viewer's
+ * kind-30078 seen marker event; parse the watermark with `seenUntilFromEnvelope`.
+ */
+export function notificationsSeenAppView(pubkey: string): NaggAppViewBinding {
+  return {
+    path: '/nostr/notifications/seen',
+    method: 'GET',
+    operationName: 'NotificationsSeen',
+    searchParams: { pubkey },
   };
 }
 

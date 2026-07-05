@@ -10,38 +10,43 @@ const REPLY = 'b'.repeat(64);
 const PUB = 'c'.repeat(64);
 const ACTOR = 'd'.repeat(64);
 
-function event(id: string, created_at: number) {
-  return { id, kind: 1, pubkey: PUB, content: `e ${id}`, tags: [], created_at };
+function event(id: string, created_at: number, overrides: Record<string, unknown> = {}) {
+  return { id, kind: 1, pubkey: PUB, content: `e ${id}`, tags: [], created_at, ...overrides };
 }
 
+// v2 envelope + entries: NO reason strings — the client derives reaction/reply
+// from the entry kind (7 → reaction) and the embedded kind-1's tags.
+const REACTION_ID = 'f'.repeat(64);
 const PAGE = {
-  notifications: {
-    nodes: [
-      {
-        type: 'group',
-        event: event(TARGET, 1_700_000_200),
-        reason: 'reaction',
-        actorVertexScore: 0,
-        total: 12,
-        totalCapped: false,
-        sampleActors: [{ pubkey: ACTOR, eventId: 'f'.repeat(64), createdAt: 1_700_000_200 }],
-        targetEventId: TARGET,
-      },
-      {
-        type: 'single',
-        event: event(REPLY, 1_700_000_100),
-        reason: 'reply',
-        actorVertexScore: 0,
-      },
-    ],
-    pageInfo: { hasNextPage: false },
-  },
-  metrics: {
-    [TARGET]: { likeCount: 12, repostCount: 0, replyCount: 1, satsZapped: 0 },
-    [REPLY]: { likeCount: 0, repostCount: 0, replyCount: 0, satsZapped: 0 },
-  },
-  profiles: { [PUB]: { name: 'alice' } },
-  quoted: {},
+  order: [REACTION_ID, REPLY],
+  orderBy: 'created_at',
+  events: [
+    event(REACTION_ID, 1_700_000_200, { kind: 7, pubkey: ACTOR, content: '+', tags: [['e', TARGET]] }),
+    event(REPLY, 1_700_000_100, { pubkey: ACTOR, tags: [['e', TARGET, '', 'root']] }),
+    event(TARGET, 1_700_000_000), // the viewer post, hydrated for previews
+    {
+      id: '9'.repeat(64),
+      kind: 0,
+      pubkey: PUB,
+      content: JSON.stringify({ name: 'alice' }),
+      tags: [],
+      created_at: 1_700_000_000,
+    },
+  ],
+  aggregates: { [TARGET]: { k7_e: { actors: 12 }, k1_1111_e_reply: { sources: 1 } } },
+  entries: [
+    {
+      id: REACTION_ID,
+      kind: 7,
+      actor: ACTOR,
+      target: TARGET,
+      total: 12,
+      totalCapped: false,
+      actors: [{ pubkey: ACTOR, eventId: REACTION_ID, createdAt: 1_700_000_200 }],
+    },
+    { id: REPLY, kind: 1, actor: ACTOR, target: TARGET },
+  ],
+  hasNext: false,
 };
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}): Response {

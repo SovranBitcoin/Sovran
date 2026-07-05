@@ -17,7 +17,6 @@ import {
   withEventExclusions,
   withRankedTargetExclusions,
 } from "../src/recipes";
-import { NaggProfileSearchDataSchema } from "../src/schemas";
 
 const root = {
   id: "1".repeat(64),
@@ -54,49 +53,6 @@ describe("rank recipes", () => {
       search: "calle",
       limit: 7,
     });
-  });
-
-  test("profile search schema accepts sparse nullable GraphQL profile fields", () => {
-    const result = NaggProfileSearchDataSchema.safeParse({
-      profileSearch: {
-        query: "calle",
-        limit: 2,
-        sort: "globalPagerank",
-        source: null,
-        fromCache: true,
-        nodes: [
-          {
-            pubkey: "5".repeat(64),
-            npub: "npub1example",
-            rank: 0.01,
-            score: 99.1,
-            searchRank: 0.01,
-            searchScore: 99.1,
-            profileRank: null,
-            profileScore: null,
-            followers: null,
-            follows: null,
-            createdAt: null,
-            name: null,
-            displayName: null,
-            picture: null,
-            image: null,
-            banner: null,
-            about: null,
-            nip05: null,
-            nip05Valid: null,
-            website: null,
-            lud16: null,
-            lud06: null,
-          },
-        ],
-        pageInfo: {
-          hasNextPage: false,
-        },
-      },
-    });
-
-    expect(result.success).toBe(true);
   });
 
   test("authored reply chain input stays generic and bounded", () => {
@@ -179,7 +135,7 @@ describe("rank recipes", () => {
       references: { kinds: [7], since: 10, until: undefined },
       via: { key: "e" },
       target: { kinds: [1] },
-      metric: { name: "likers", op: "COUNT_DISTINCT", distinctField: "PUBKEY" },
+      metric: { name: "k7_e.actors", op: "COUNT_DISTINCT", distinctField: "PUBKEY" },
       shuffle: undefined,
       limit: 12,
       offset: 3,

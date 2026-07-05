@@ -35,7 +35,9 @@ type RawEventNode = {
   id: string;
   pubkey: string;
   kind: number;
-  createdAt: string | number;
+  /** GraphQL-era camelCase timestamp; the v2 envelope carries `created_at`. */
+  createdAt?: string | number;
+  created_at?: number;
   content: string;
   tags: string[][];
 };
@@ -61,8 +63,9 @@ export function wallpaperAlbumsInput(adminPubkey: string): EventQueryInput {
   };
 }
 
-function toUnixSeconds(value: string | number): number {
+function toUnixSeconds(value: string | number | undefined): number {
   if (typeof value === 'number') return value;
+  if (value === undefined) return 0;
   const ms = Date.parse(value);
   return Number.isNaN(ms) ? 0 : Math.floor(ms / 1000);
 }
@@ -111,7 +114,7 @@ export function parseWallpaperEvent(
     dimensions: getTag('dim') || '',
     albumSlug,
     ...colors,
-    createdAt: toUnixSeconds(event.createdAt),
+    createdAt: event.created_at ?? toUnixSeconds(event.createdAt),
   };
 }
 

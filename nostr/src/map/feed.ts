@@ -12,6 +12,10 @@ export type NaggNoteMetrics = {
   repostCount: number;
   replyCount: number;
   satsZapped: number;
+  /** Discrete zap-receipt count (new in the v2 envelope; v1 had no zap count). */
+  zapCount?: number;
+  /** q-tag quote count (new in the v2 envelope). */
+  quoteCount?: number;
 };
 
 export type NaggProfileInfo = {

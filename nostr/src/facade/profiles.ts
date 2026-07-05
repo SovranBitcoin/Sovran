@@ -11,16 +11,10 @@ import type { TierOutcome } from '../tiers';
 // so the nagg tier does NOT implement this surface — the richer tiers cover it.
 // ---------------------------------------------------------------------------
 
-export type ProfileMetadata = {
-  name?: string;
-  displayName?: string;
-  picture?: string;
-  banner?: string;
-  nip05?: string;
-  lud16?: string;
-  website?: string;
-  about?: string;
-};
+// The kind-0 content parser lives with the envelope module (the one v2 parser);
+// re-exported here so the tiers and the app keep importing it from the facade.
+export { parseProfileMetadata, type ProfileMetadata } from '../envelope';
+import { parseProfileMetadata, type ProfileMetadata } from '../envelope';
 
 export type ProfilesRequest = RequestControls & {
   pubkeys: string[];
@@ -40,34 +34,6 @@ export type ResolvedProfiles = {
 export interface ProfilesTier {
   readonly tier: NostrTier;
   getProfiles(request: ProfilesRequest): Promise<TierOutcome<ProfilesBundle>>;
-}
-
-/**
- * Parse a kind-0 event's `content` JSON into ProfileMetadata. Tolerant: unknown
- * fields ignored, `display_name`/`displayName` both accepted, null on bad JSON.
- */
-export function parseProfileMetadata(content: string): ProfileMetadata | null {
-  let json: unknown;
-  try {
-    json = JSON.parse(content);
-  } catch {
-    return null;
-  }
-  if (typeof json !== 'object' || json === null) return null;
-  const o = json as Record<string, unknown>;
-  const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
-  const metadata: ProfileMetadata = {
-    name: str(o.name),
-    displayName: str(o.display_name) ?? str(o.displayName),
-    picture: str(o.picture),
-    banner: str(o.banner),
-    nip05: str(o.nip05),
-    lud16: str(o.lud16),
-    website: str(o.website),
-    about: str(o.about),
-  };
-  // Drop a profile that carried nothing useful.
-  return Object.values(metadata).some((v) => v !== undefined) ? metadata : null;
 }
 
 /** Reduce raw kind-0 events to the latest metadata per pubkey. */

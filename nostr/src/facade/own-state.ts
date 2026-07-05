@@ -1,8 +1,6 @@
-import { z } from 'zod';
 import type { NostrCursor, NostrTier, OrderingManifest } from '@sovranbitcoin/schemas';
 import type { OwnActionType } from '@sovranbitcoin/schemas';
 import type { NaggFeedEvent } from '../map/feed';
-import { NaggFeedEventSchema } from '../schemas';
 import { synthesizeRecencyManifest } from '../tiers';
 import type { RequestControls } from '../timeout';
 import type { TierOutcome } from '../tiers';
@@ -50,16 +48,6 @@ export interface OwnHistoryTier {
   readonly tier: NostrTier;
   ownHistory(request: OwnHistoryRequest): Promise<TierOutcome<OwnHistoryBundle>>;
 }
-
-/**
- * The nagg own-events endpoint response shape (`/nostr/own/{type}`). This pins
- * the contract PR-2 implements: a paginated list of the viewer's own events for
- * one action type, cursor = the oldest event's created_at.
- */
-export const OwnHistoryResponseSchema = z.object({
-  events: z.array(NaggFeedEventSchema),
-  paginationUntil: z.number().optional(),
-});
 
 /** The Nostr kinds backing each action type (used by the relay floor's filters). */
 export function ownActionKinds(actionType: OwnActionType): number[] {

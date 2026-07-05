@@ -15,16 +15,28 @@ function event(id: string, created_at: number) {
   return { id, kind: 1, pubkey: PUB, content: `e ${id}`, tags: [], created_at };
 }
 
-const THREAD = {
-  root: event(ROOT, 1_700_000_000),
-  events: [event(R1, 1_700_000_100), event(R2, 1_700_000_200)],
-  metrics: {
-    [ROOT]: { likeCount: 9, repostCount: 0, replyCount: 2, satsZapped: 0 },
-    [R1]: { likeCount: 1, repostCount: 0, replyCount: 0, satsZapped: 0 },
-    [R2]: { likeCount: 0, repostCount: 0, replyCount: 0, satsZapped: 0 },
+// v2 envelope: order[0] is the root id, the rest are the ranked reply ids.
+// Zero-valued aggregates are omitted server-side (R2 has none at all).
+const THREAD_ENVELOPE = {
+  order: [ROOT, R1, R2],
+  orderBy: 'rank',
+  events: [
+    event(ROOT, 1_700_000_000),
+    event(R1, 1_700_000_100),
+    event(R2, 1_700_000_200),
+    {
+      id: 'd'.repeat(64),
+      kind: 0,
+      pubkey: PUB,
+      content: JSON.stringify({ name: 'alice' }),
+      tags: [],
+      created_at: 1_700_000_000,
+    },
+  ],
+  aggregates: {
+    [ROOT]: { k7_e: { actors: 9 }, k1_1111_e_reply: { sources: 2 } },
+    [R1]: { k7_e: { actors: 1 } },
   },
-  profiles: { [PUB]: { name: 'alice' } },
-  quoted: {},
 };
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}): Response {
@@ -50,7 +62,7 @@ function naggClientReturning(body: unknown, init?: { ok?: boolean; status?: numb
 
 describe('NostrDataLayer.getThread — nagg tier', () => {
   test('returns the root plus manifest-ordered replies, stats mapped', async () => {
-    const { client, urlOf } = naggClientReturning(THREAD);
+    const { client, urlOf } = naggClientReturning(THREAD_ENVELOPE);
     const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
 
     const result = await layer.getThread({ noteId: ROOT });
@@ -64,15 +76,15 @@ describe('NostrDataLayer.getThread — nagg tier', () => {
     expect(thread.stats[ROOT]).toEqual({ likes: 9, reposts: 0, replies: 2, zaps: 0, satsZapped: 0 });
   });
 
-  test('an empty thread with null hydration maps still answers (the 0/42 fix)', async () => {
-    // A root with no replies/stats: Go serializes nil maps as JSON null. This must
-    // parse as an empty thread, NOT fail validation and silently fall through.
+  test('an empty thread with null aggregates still answers (the 0/42 fix)', async () => {
+    // A root with no replies/stats: Go serializes nil maps/slices as JSON null.
+    // This must parse as an empty thread, NOT fail validation and silently fall
+    // through the tier.
     const { client } = naggClientReturning({
-      root: event(ROOT, 1_700_000_000),
-      events: [],
-      metrics: null,
-      profiles: null,
-      quoted: null,
+      order: [ROOT],
+      orderBy: 'rank',
+      events: [event(ROOT, 1_700_000_000)],
+      aggregates: null,
     });
     const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
     const result = await layer.getThread({ noteId: ROOT });
@@ -81,7 +93,8 @@ describe('NostrDataLayer.getThread — nagg tier', () => {
     expect(thread.tier).toBe('nagg'); // gold tier serves it, no fallthrough
     expect(thread.root.type === 'note' && thread.root.event.id).toBe(ROOT);
     expect(thread.replies).toEqual([]);
-    expect(thread.stats).toEqual({});
+    // Rendered ids get zero-defaulted stats (aggregates omit zero values).
+    expect(thread.stats[ROOT]).toEqual({ likes: 0, reposts: 0, replies: 0, zaps: 0, satsZapped: 0 });
   });
 
   test('a feed-only tier is skipped for thread reads (not in the attempt trail)', async () => {

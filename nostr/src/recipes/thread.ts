@@ -49,7 +49,7 @@ export function threadReplyRankInput(
   const base: ReferenceRankInput = {
     references: { kinds: [7], limit: 500 },
     via: { key: 'e' },
-    metric: { name: 'likes', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+    metric: { name: 'k7_e.actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
     shuffle: options.shuffle,
   };
   if (sort === 'likes') return base;
@@ -57,7 +57,7 @@ export function threadReplyRankInput(
     return {
       references: { kinds: [9735], limit: 500 },
       via: { key: 'e' },
-      metric: { name: 'zapSats', op: 'SUM', derived: 'nip57.amount_sats' },
+      metric: { name: 'k9735_e.value_total', op: 'SUM', derived: 'nip57.amount_sats' },
       shuffle: options.shuffle,
     };
   }
@@ -65,14 +65,14 @@ export function threadReplyRankInput(
     return {
       references: { kinds: [6, 16], limit: 500 },
       via: { key: 'e' },
-      metric: { name: 'reposts', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+      metric: { name: 'k6_16_e.actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
       shuffle: options.shuffle,
     };
   }
   return {
     references: { kinds: [7], limit: 500 },
     via: { key: 'e' },
-    metric: { name: 'likes', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+    metric: { name: 'k7_e.actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
     terms: [
       contributionQualityTerm(3),
       ...engagementRankTerms(),

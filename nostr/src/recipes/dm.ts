@@ -39,12 +39,10 @@ export function dmConversationInput(options: DmConversationInput): DmConversatio
 }
 
 /**
- * App-view binding for {@link DM_ENVELOPES_QUERY}: routes a `transport:'appview'`
- * request to the dedicated REST endpoint `GET /nostr/dm/envelopes`. nagg now emits
- * the canonical `{ dmEnvelopes: { nodes, pageInfo } }` connection shape directly
- * (nodes are raw `EventView`s, matching the GraphQL selection), so the body is
- * parsed by the request's `dataSchema` with no per-transport normalize — the
- * caller gets an identical result whichever transport runs.
+ * App-view binding for the DM index: `GET /nostr/dm/envelopes`. v2 answers with
+ * the generic envelope, and BY DESIGN it carries no aggregates and no profile
+ * hydration (privacy) — only the raw encrypted wraps. Parse with
+ * `NaggEnvelopeSchema` and bridge via `bundleFromDmEnvelope`.
  */
 export function dmEnvelopesAppView(options: DmEnvelopesInput): NaggAppViewBinding {
   const kinds = options.kinds ?? [4, 1059];

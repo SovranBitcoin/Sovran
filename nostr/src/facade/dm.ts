@@ -1,5 +1,5 @@
 import type { NostrCursor, NostrTier } from '@sovranbitcoin/schemas';
-import type { NaggEvent } from '../schemas';
+import { orderedEnvelopeEvents, type NaggEnvelope } from '../envelope';
 import type { RequestControls } from '../timeout';
 import type { TierOutcome } from '../tiers';
 
@@ -57,18 +57,26 @@ export interface DmTier {
 /** The wrap kinds the index serves: NIP-17 gift wrap + NIP-04 legacy. */
 export const DM_ENVELOPE_KINDS = [4, 1059];
 
-/** Bridge nagg's DM envelope nodes (createdAt already) into opaque DmEnvelopes. */
-export function bundleFromNaggDmNodes(nodes: ReadonlyArray<NaggEvent>): DmEnvelopesBundle {
-  const envelopes: DmEnvelope[] = nodes.map((n) => ({
-    id: n.id,
-    pubkey: n.pubkey,
-    kind: n.kind,
-    content: n.content,
-    tags: n.tags as string[][],
-    createdAt: typeof n.createdAt === 'number' ? n.createdAt : Number(n.createdAt) || 0,
-    ...(n.sig ? { sig: n.sig } : {}),
-  }));
-  // nagg returns arrival-desc; the tail envelope is the next page's cursor.
+/**
+ * Bridge a v2 DM envelope into opaque DmEnvelopes. By design the DM routes
+ * carry NO aggregates and NO profile hydration (privacy) — only the raw
+ * encrypted wraps, ordered by arrival. The tail envelope is the next page's
+ * cursor.
+ */
+export function bundleFromDmEnvelope(envelope: NaggEnvelope): DmEnvelopesBundle {
+  const events = envelope.order.length > 0 ? orderedEnvelopeEvents(envelope) : envelope.events;
+  const envelopes: DmEnvelope[] = events.map((e) => {
+    const sig = (e as { sig?: unknown }).sig;
+    return {
+      id: e.id,
+      pubkey: e.pubkey,
+      kind: e.kind,
+      content: e.content,
+      tags: e.tags,
+      createdAt: e.created_at,
+      ...(typeof sig === 'string' && sig ? { sig } : {}),
+    };
+  });
   const last = envelopes[envelopes.length - 1];
   return { envelopes, cursor: last ? { createdAt: last.createdAt, id: last.id } : null };
 }

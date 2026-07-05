@@ -1,6 +1,6 @@
 {
   "name": "nostr",
-  "version": "0.7.0",
+  "version": "0.8.0-v2.0",
   "private": true,
   "description": "Typed, UI-agnostic client helpers for generic Nagg GraphQL and app-view APIs.",
   "license": "MIT",

@@ -1,7 +1,5 @@
-import { z } from 'zod';
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import type { NaggFeedEvent, NaggProfileInfo } from '../map/feed';
-import { NaggProfileInfoSchema } from '../schemas';
 import { shouldReplace } from '@sovranbitcoin/schemas';
 import type { RequestControls } from '../timeout';
 import type { TierOutcome } from '../tiers';
@@ -43,33 +41,10 @@ export interface SocialGraphTier {
   getSocialGraph(request: SocialGraphRequest): Promise<TierOutcome<SocialGraph>>;
 }
 
-// nagg's bundled social-graph response (contact_list extended_response shape).
-// Pins the contract PR-2 implements.
-export const SocialGraphResponseSchema = z.object({
-  pubkey: z.string(),
-  follows: z.array(z.string()),
-  profiles: z.record(z.string(), NaggProfileInfoSchema).optional(),
-  relays: z
-    .array(z.object({ url: z.string(), read: z.boolean().optional(), write: z.boolean().optional() }))
-    .optional(),
-  mutes: z.array(z.string()).optional(),
-  /** `created_at` of the contact list nagg bundled this from (optional until the
-   *  app-view surfaces it; treated as 0/unknown when absent). */
-  contacts_updated_at: z.number().optional(),
-});
-
-export function socialGraphFromResponse(data: z.infer<typeof SocialGraphResponseSchema>): SocialGraph {
-  return {
-    pubkey: data.pubkey,
-    follows: data.follows,
-    profiles: data.profiles ?? {},
-    relayList: (data.relays ?? []).map((r) => ({ url: r.url, read: r.read ?? true, write: r.write ?? true })),
-    mutes: data.mutes ?? [],
-    contactsUpdatedAt: data.contacts_updated_at ?? 0,
-  };
-}
-
-// --- relay-floor parsing (latest kind-3 / 10002 / 10000) --------------------
+// --- event parsing (latest kind-3 / 10002 / 10000) --------------------------
+//
+// nagg v2 returns the raw replaceable list events inside the generic envelope,
+// so the nagg tier and the relay floor now share this ONE derivation.
 
 const KIND_CONTACTS = 3;
 const KIND_RELAY_LIST = 10_002;

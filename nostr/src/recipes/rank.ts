@@ -88,33 +88,39 @@ function engagementReferences(
   return { ...input, pubkeyScore: options.pubkeyScore };
 }
 
+/**
+ * The standard engagement terms. v2 names each term metric by its server RULE
+ * name (`k7_e.actors`, `k1_1111_e_reply.sources`, `k6_16_e.actors`,
+ * `k9735_e.value_total`) so nagg can serve the term from its precomputed
+ * aggregate rules instead of a live scan.
+ */
 export function engagementRankTerms(options: EngagementRankTermOptions = {}): WeightedRankTermInput[] {
   return [
     {
       references: engagementReferences({ kinds: [7], limit: 500 }, options),
       via: { key: 'e' },
-      metric: { name: 'likes', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+      metric: { name: 'k7_e.actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
       weight: 3,
       transform: 'LOG1P',
     },
     {
       references: engagementReferences({ kinds: [1, 1111], limit: 500 }, options),
       via: { key: 'e' },
-      metric: { name: 'replies', op: 'COUNT' },
+      metric: { name: 'k1_1111_e_reply.sources', op: 'COUNT' },
       weight: 2.5,
       transform: 'LOG1P',
     },
     {
       references: engagementReferences({ kinds: [6, 16], limit: 500 }, options),
       via: { key: 'e' },
-      metric: { name: 'reposts', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+      metric: { name: 'k6_16_e.actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
       weight: 2,
       transform: 'LOG1P',
     },
     {
       references: engagementReferences({ kinds: [9735], limit: 500 }, options),
       via: { key: 'e' },
-      metric: { name: 'zapSats', op: 'SUM', derived: 'nip57.amount_sats' },
+      metric: { name: 'k9735_e.value_total', op: 'SUM', derived: 'nip57.amount_sats' },
       weight: 1.5,
       transform: 'LOG1P',
     },

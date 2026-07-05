@@ -111,7 +111,7 @@ export function globalTrendingRankedEventsInput(options: {
     },
     via: { key: 'e' },
     target: { kinds: [1] },
-    metric: { name: 'likers', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+    metric: { name: 'k7_e.actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
     shuffle: options.shuffle,
     limit: options.limit ?? 30,
     ...(options.offset ? { offset: options.offset } : {}),

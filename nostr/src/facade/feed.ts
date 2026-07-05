@@ -99,9 +99,9 @@ export function feedItemKey(item: FeedItem): SortKey {
 }
 
 /**
- * Map nagg's per-note metrics onto the shared `NoteStats` contract. nagg does not
- * yet emit a discrete zap COUNT (only `satsZapped`), so `zaps` bridges to 0 until
- * the v2 response carries it; the sats total is preserved.
+ * Map nagg's per-note metrics onto the shared `NoteStats` contract. The v2
+ * envelope carries a discrete zap count (`k9735_e.sources`); v1-era maps that
+ * lack it bridge `zaps` to 0. The sats total is preserved either way.
  */
 export function statsFromMetrics(metrics: Record<string, NaggNoteMetrics>): NoteStatsMap {
   const out: Record<string, NoteStats> = {};
@@ -110,7 +110,7 @@ export function statsFromMetrics(metrics: Record<string, NaggNoteMetrics>): Note
       likes: m.likeCount,
       reposts: m.repostCount,
       replies: m.replyCount,
-      zaps: 0,
+      zaps: m.zapCount ?? 0,
       satsZapped: m.satsZapped,
     };
   }

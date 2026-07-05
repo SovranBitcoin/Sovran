@@ -1,6 +1,9 @@
-import { z } from 'zod';
 import type { NostrTier } from '@sovranbitcoin/schemas';
-import { NaggProfileSearchResultSchema } from '../schemas';
+import {
+  aggregateValue,
+  profileMetadataByPubkey,
+  type NaggProfilesEnvelope,
+} from '../envelope';
 import type { RequestControls } from '../timeout';
 import type { TierOutcome } from '../tiers';
 import { parseProfileMetadata, type ProfileMetadata } from './profiles';
@@ -47,40 +50,51 @@ export interface SearchTier {
   searchProfiles(request: SearchRequest): Promise<TierOutcome<ProfileSearchBundle>>;
 }
 
-/** nagg `/nostr/search` REST response — mirrors the GraphQL `profileSearch` nodes. */
-export const NaggProfileSearchRestSchema = z.object({
-  query: z.string().optional(),
-  limit: z.number().optional(),
-  sort: z.string().optional(),
-  fromCache: z.boolean().optional(),
-  results: z.array(NaggProfileSearchResultSchema),
-});
+/**
+ * Build the ranked hits from a v2 `/nostr/search` envelope. The `pubkeys` list
+ * is the COMPLETE ranked result (it includes profiles nagg has no local kind-0
+ * for — those hits carry empty metadata); rank/score come from the `providers`
+ * map (`providers[pk].vertex`), follower/following counts from the pubkey-keyed
+ * aggregates. Zero-omitted aggregates map to null (unknown), matching v1's
+ * nullable counts. v2 carries no `npub` — callers derive it when needed.
+ */
+export function searchHitsFromEnvelope(envelope: NaggProfilesEnvelope): ProfileSearchHit[] {
+  const metadataByPubkey = profileMetadataByPubkey(envelope);
+  const ranked =
+    envelope.pubkeys.length > 0
+      ? envelope.pubkeys
+      : rankedPubkeysFromOrder(envelope);
+  return ranked.map((pubkey) => {
+    const vertex = envelope.providers[pubkey]?.vertex;
+    const rank = typeof vertex?.rank === 'number' ? vertex.rank : null;
+    const score = typeof vertex?.score === 'number' ? vertex.score : null;
+    return {
+      pubkey,
+      metadata: metadataByPubkey[pubkey] ?? {},
+      rank,
+      score,
+      followers: aggregateValue(envelope.aggregates, pubkey, 'followers') ?? null,
+      follows: aggregateValue(envelope.aggregates, pubkey, 'following') ?? null,
+    };
+  });
+}
 
-const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
-
-/** Map a ranked nagg search node into a tier-neutral hit. */
-export function hitFromNaggSearchResult(
-  node: z.infer<typeof NaggProfileSearchResultSchema>,
-): ProfileSearchHit {
-  const metadata: ProfileMetadata = {
-    name: str(node.name),
-    displayName: str(node.displayName),
-    picture: str(node.picture) ?? str(node.image),
-    banner: str(node.banner),
-    nip05: str(node.nip05),
-    lud16: str(node.lud16),
-    website: str(node.website),
-    about: str(node.about),
-  };
-  return {
-    pubkey: node.pubkey,
-    npub: node.npub,
-    metadata,
-    rank: node.rank ?? null,
-    score: node.score ?? null,
-    followers: node.followers ?? null,
-    follows: node.follows ?? null,
-  };
+/** Fallback ranking when `pubkeys` is absent: the kind-0 authors in `order`. */
+function rankedPubkeysFromOrder(envelope: NaggProfilesEnvelope): string[] {
+  const authorByEventId = new Map<string, string>();
+  for (const event of envelope.events) {
+    if (event.kind === 0) authorByEventId.set(event.id, event.pubkey);
+  }
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const id of envelope.order) {
+    const pubkey = authorByEventId.get(id);
+    if (pubkey && !seen.has(pubkey)) {
+      seen.add(pubkey);
+      out.push(pubkey);
+    }
+  }
+  return out;
 }
 
 /** Relay floor (NIP-50): latest kind-0 per author → unranked hits. */

@@ -25,9 +25,13 @@ describe('getOwnHistory — nagg tier', () => {
       appView: { baseUrl: 'https://nagg.test' },
       fetchImpl: (async (url: string) => {
         lastUrl = String(url);
+        // v2 envelope: the own action events, `order` authoritative.
         return jsonResponse({
+          order: ['1'.repeat(64), '2'.repeat(64)],
+          orderBy: 'created_at',
           events: [ownEvent('1'.repeat(64), 7, 100, [['e', T1]]), ownEvent('2'.repeat(64), 7, 200, [['e', T2]])],
-          paginationUntil: 100,
+          aggregates: {},
+          cursor: '100|0',
         });
       }) as unknown as typeof fetch,
     });

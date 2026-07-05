@@ -48,12 +48,18 @@ describe('getSocialGraph through the facade', () => {
           ok: true,
           status: 200,
           statusText: 'OK',
+          // v2 envelope: the raw latest kind-3 / 10002 / 10000 events plus the
+          // follows' kind-0 profiles; the client derives the lists from tags.
           json: async () => ({
-            pubkey: ME,
-            follows: [F1, F2],
-            profiles: { [F1]: { name: 'f1' } },
-            relays: [{ url: 'wss://a' }],
-            mutes: [M1],
+            order: [],
+            orderBy: 'created_at',
+            events: [
+              CONTACTS,
+              RELAYS,
+              MUTES,
+              { id: '4'.repeat(64), pubkey: F1, kind: 0, content: JSON.stringify({ name: 'f1' }), tags: [], created_at: 100 },
+            ],
+            aggregates: {},
           }),
         } as unknown as Response;
       }) as unknown as typeof fetch,

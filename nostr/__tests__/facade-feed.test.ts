@@ -2,27 +2,43 @@ import { describe, test, expect } from 'vitest';
 import { createNaggClient } from '../src/transport';
 import { createNaggTier, createNostrDataLayer, pendingFeedTier } from '../src/facade';
 
-// A canonical FeedResponse (the shape nagg's REST app-view emits) with two notes
-// in ranked order [newer, older] so we can assert the facade renders by the
+// A v2 envelope (the ONE shape nagg's REST app-view emits) with two notes in
+// ranked order [newer, older] so we can assert the facade renders by the
 // server's order, not by created_at or insertion accident.
 const ID_A = 'a'.repeat(64);
 const ID_B = 'b'.repeat(64);
 const PUB = 'c'.repeat(64);
+const PROFILE_ID = 'd'.repeat(64);
 
 function note(id: string, created_at: number) {
-  return { type: 'note', event: { id, kind: 1, pubkey: PUB, content: `note ${id}`, tags: [], created_at } };
+  return { id, kind: 1, pubkey: PUB, content: `note ${id}`, tags: [], created_at };
 }
 
-const FEED_PAGE = {
-  items: [note(ID_A, 1_700_000_200), note(ID_B, 1_700_000_100)],
-  metrics: {
-    [ID_A]: { likeCount: 5, repostCount: 2, replyCount: 1, satsZapped: 2100 },
-    [ID_B]: { likeCount: 0, repostCount: 0, replyCount: 0, satsZapped: 0 },
+const FEED_ENVELOPE = {
+  order: [ID_A, ID_B],
+  orderBy: 'rank',
+  events: [
+    note(ID_A, 1_700_000_200),
+    note(ID_B, 1_700_000_100),
+    {
+      id: PROFILE_ID,
+      kind: 0,
+      pubkey: PUB,
+      content: JSON.stringify({ name: 'alice' }),
+      tags: [],
+      created_at: 1_700_000_000,
+    },
+  ],
+  // Zero values are omitted server-side: ID_B carries no aggregates at all.
+  aggregates: {
+    [ID_A]: {
+      k7_e: { actors: 5 },
+      k6_16_e: { actors: 2 },
+      k1_1111_e_reply: { sources: 1 },
+      k9735_e: { sources: 3, value_total: 2100 },
+    },
   },
-  profiles: { [PUB]: { name: 'alice' } },
-  quoted: {},
-  paginationUntil: 1_700_000_100,
-  paginationOffset: 0,
+  cursor: '1700000100|0',
 };
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}): Response {
@@ -48,7 +64,7 @@ function naggClientReturning(body: unknown, init?: { ok?: boolean; status?: numb
 
 describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
   test('answers from nagg with an ordered, validated, stats-mapped page', async () => {
-    const { client, urlOf } = naggClientReturning(FEED_PAGE);
+    const { client, urlOf } = naggClientReturning(FEED_ENVELOPE);
     const layer = createNostrDataLayer({
       tiers: [createNaggTier({ client }), pendingFeedTier('primal'), pendingFeedTier('relay')],
     });
@@ -60,22 +76,26 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
     expect(page.tier).toBe('nagg');
     // hit the ranked REST app-view route
     expect(urlOf()).toContain('/nostr/feed/ranked');
-    // rendered strictly by the server's ranked order
+    // rendered strictly by the server's `order`
     expect(page.items.map((i) => (i.type === 'note' ? i.event.id : ''))).toEqual([ID_A, ID_B]);
-    // metrics mapped onto the NoteStats contract (zaps bridges to 0; sats preserved)
-    expect(page.stats[ID_A]).toEqual({ likes: 5, reposts: 2, replies: 1, zaps: 0, satsZapped: 2100 });
-    // cursor carries the (created_at, id) page position
+    // aggregates mapped onto the NoteStats contract (v2 carries a discrete zap count)
+    expect(page.stats[ID_A]).toEqual({ likes: 5, reposts: 2, replies: 1, zaps: 3, satsZapped: 2100 });
+    // zero-omitted aggregates default to 0 for rendered ids
+    expect(page.stats[ID_B]).toEqual({ likes: 0, reposts: 0, replies: 0, zaps: 0, satsZapped: 0 });
+    // cursor carries the (until, id) page position parsed from "<until>|<offset>"
     expect(page.cursor).toEqual({ createdAt: 1_700_000_100, id: ID_B });
+    // profiles reconstructed from the hydrated kind-0
     expect(page.profiles[PUB]).toEqual({ name: 'alice' });
     expect(page.missingIds).toEqual([]);
   });
 
-  test('prefers the server ordering manifest over deriving from item order', async () => {
-    // server returns items [A, B] but a manifest ordering them [B, A] with the
-    // created_at semantic — the facade must render by the manifest, not item order.
+  test('renders by the server order even when events arrive shuffled', async () => {
+    // Same events, but `order` says [B, A] with the created_at semantic — the
+    // facade must render by the manifest, not by events[] position.
     const { client } = naggClientReturning({
-      ...FEED_PAGE,
-      ordering: { orderBy: 'created_at', elements: [ID_B, ID_A] },
+      ...FEED_ENVELOPE,
+      order: [ID_B, ID_A],
+      orderBy: 'created_at',
     });
     const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
 
@@ -103,7 +123,7 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
   });
 
   test('user feed hits /nostr/feed/user with the author', async () => {
-    const { client, urlOf } = naggClientReturning(FEED_PAGE);
+    const { client, urlOf } = naggClientReturning(FEED_ENVELOPE);
     const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
     const result = await layer.getFeedPage({ spec: { kind: 'user', pubkey: PUB } });
     expect(result.isOk()).toBe(true);
@@ -112,7 +132,7 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
   });
 
   test('following-recent GETs /nostr/feed with the explicit author list', async () => {
-    const { client, urlOf } = naggClientReturning(FEED_PAGE);
+    const { client, urlOf } = naggClientReturning(FEED_ENVELOPE);
     const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
     const result = await layer.getFeedPage({ spec: { kind: 'following-recent', authors: [PUB, ID_A] } });
     expect(result.isOk()).toBe(true);
@@ -121,10 +141,10 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
   });
 
   test('a malformed nagg response is a tier failure (schema), not a crash', async () => {
-    // `items` must be an array; a wrong-typed core field → NaggFeedPageSchema rejects.
-    // (Missing hydration maps are NOT malformed — they default to {} — see the
-    //  null-hydration test below.)
-    const { client } = naggClientReturning({ items: 'nope', paginationUntil: 0, paginationOffset: 0 });
+    // `order` must be an array (or null); a wrong-typed core field → the
+    // envelope schema rejects. (Null order/events/aggregates are NOT malformed
+    // — they default to empty — see the null-tolerance test below.)
+    const { client } = naggClientReturning({ order: 42, orderBy: 'rank', events: [], aggregates: {} });
     const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
 
     const result = await layer.getFeedPage({ spec: { kind: 'for-you' } });
@@ -132,13 +152,11 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
     expect(result._unsafeUnwrapErr().attempts[0]).toMatchObject({ tier: 'nagg', outcome: 'failed' });
   });
 
-  test('null hydration maps (Go nil → JSON null) parse as empty, not a failure', async () => {
-    // The thread-0/42 fix: an empty page sends metrics/profiles/quoted as null.
+  test('null aggregates (Go nil → JSON null) parse as empty, not a failure', async () => {
     const { client } = naggClientReturning({
-      ...FEED_PAGE,
-      metrics: null,
-      profiles: null,
-      quoted: null,
+      ...FEED_ENVELOPE,
+      events: FEED_ENVELOPE.events.filter((e) => e.kind !== 0),
+      aggregates: null,
     });
     const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
     const result = await layer.getFeedPage({ spec: { kind: 'for-you', viewerPubkey: PUB } });
@@ -146,12 +164,13 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
     const page = result._unsafeUnwrap();
     expect(page.tier).toBe('nagg');
     expect(page.items.map((i) => (i.type === 'note' ? i.event.id : ''))).toEqual([ID_A, ID_B]);
-    expect(page.stats).toEqual({}); // null metrics defaulted to {}
+    // rendered ids still get zero-defaulted stats; no profiles were hydrated
+    expect(page.stats[ID_A]).toEqual({ likes: 0, reposts: 0, replies: 0, zaps: 0, satsZapped: 0 });
     expect(page.profiles).toEqual({});
   });
 
   test('write-through: a feed read populates the shared entity cache', async () => {
-    const { client } = naggClientReturning(FEED_PAGE);
+    const { client } = naggClientReturning(FEED_ENVELOPE);
     const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
 
     // Cold cache: nothing about these entities yet.
@@ -167,7 +186,7 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
       likes: 5,
       reposts: 2,
       replies: 1,
-      zaps: 0,
+      zaps: 3,
       satsZapped: 2100,
     });
     expect(layer.cache.getProfile(PUB)?.name).toBe('alice');

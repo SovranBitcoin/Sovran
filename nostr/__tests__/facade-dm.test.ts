@@ -28,14 +28,16 @@ describe('getDmEnvelopes — nagg index', () => {
           ok: true,
           status: 200,
           statusText: 'OK',
+          // v2 envelope: raw wraps in arrival order — and BY DESIGN no
+          // aggregates and no kind-0 profile hydration (privacy).
           json: async () => ({
-            dmEnvelopes: {
-              nodes: [
-                { id: '1'.repeat(64), pubkey: 'b'.repeat(64), kind: 1059, createdAt: 222, content: 'ct1', tags: [['p', ME]], sig: SIG },
-                { id: '2'.repeat(64), pubkey: 'c'.repeat(64), kind: 4, createdAt: 111, content: 'ct2', tags: [['p', ME]], sig: SIG },
-              ],
-              pageInfo: { hasNextPage: false },
-            },
+            order: ['1'.repeat(64), '2'.repeat(64)],
+            orderBy: 'created_at',
+            events: [
+              { id: '1'.repeat(64), pubkey: 'b'.repeat(64), kind: 1059, created_at: 222, content: 'ct1', tags: [['p', ME]], sig: SIG },
+              { id: '2'.repeat(64), pubkey: 'c'.repeat(64), kind: 4, created_at: 111, content: 'ct2', tags: [['p', ME]], sig: SIG },
+            ],
+            aggregates: {},
           }),
         } as unknown as Response;
       }) as unknown as typeof fetch,
