@@ -6,6 +6,7 @@ import { fetchNostrProfile, type NostrProfileFull } from '@/shared/lib/apiClient
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
+import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import { fetchProfileStatsViaFacade } from '@/shared/lib/nostr/fetchProfiles';
 import { log } from '@/shared/lib/logger';
@@ -83,6 +84,7 @@ export function useNostrProfile(pubkey: string | null): UseNostrProfileResult {
         if (signal?.aborted) return;
         if (result.isOk()) {
           log.debug('feed.profile.fetch.success', { pubkey, source: 'nagg' });
+          recordDebugTiers([pubkey], 'nagg');
           setData(result.value);
           setIsLoading(false);
           return;
@@ -94,6 +96,7 @@ export function useNostrProfile(pubkey: string | null): UseNostrProfileResult {
       if (signal?.aborted) return;
       if (stats) {
         log.debug('feed.profile.fetch.success', { pubkey, source: stats.tier });
+        recordDebugTiers([pubkey], stats.tier);
         setData(profileFullFromStats(pubkey, stats));
       } else {
         const err = new Error('profile unavailable from all tiers');

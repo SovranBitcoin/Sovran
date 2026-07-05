@@ -9,6 +9,7 @@ import {
   type RequestControls,
 } from 'wallet';
 import { ok, err, Result, ResultAsync } from 'neverthrow';
+import { nip19 } from 'nostr-tools';
 import { z } from 'zod';
 import { apiLog } from './logger';
 import {
@@ -286,7 +287,122 @@ function describeRoute(url: string): { host: string; path: string } {
 // ---------------------------------------------------------------------------
 
 const parseAuditMint = parseWith(AuditMintResponse, 'cashu/mint/audit');
-const parseNostrProfile = parseWith(NostrProfileFull, 'nostr/profile');
+// nagg v2 serves /nostr/profile as the generic providers envelope: kind-0
+// events in events[], counts under pubkey-keyed aggregates, and float
+// provider payloads (vertex rank/score, nagg firstEventAt, nip05 validity)
+// under providers[pubkey]. Map it into the app-facing NostrProfileFull shape
+// the callers have always consumed, then validate the RESULT with the shared
+// schema so downstream guarantees are unchanged.
+const ProfileEnvelope = z.object({
+  events: z.array(
+    z.object({
+      id: z.string(),
+      kind: z.number().int(),
+      pubkey: z.string(),
+      content: z.string(),
+      created_at: z.number().int(),
+    })
+  ),
+  aggregates: z
+    .record(z.string(), z.record(z.string(), z.record(z.string(), z.number())))
+    .default({}),
+  providers: z.record(z.string(), z.record(z.string(), z.unknown())).default({}),
+  fromCache: z.boolean().optional(),
+});
+
+function npubOrEmpty(hex: string): string {
+  try {
+    return nip19.npubEncode(hex);
+  } catch {
+    return '';
+  }
+}
+
+function metadataFields(content: string): Record<string, string> {
+  try {
+    const meta = JSON.parse(content) as Record<string, unknown>;
+    const pick = (k: string) =>
+      typeof meta[k] === 'string' && meta[k]
+        ? { [k === 'display_name' ? 'displayName' : k]: meta[k] as string }
+        : {};
+    return {
+      ...pick('name'),
+      ...pick('display_name'),
+      ...pick('picture'),
+      ...pick('banner'),
+      ...pick('about'),
+      ...pick('nip05'),
+      ...pick('website'),
+      ...pick('lud16'),
+      ...pick('lud06'),
+    };
+  } catch {
+    return {};
+  }
+}
+
+const parseNostrProfileFor =
+  (pubkey: string) =>
+  (input: unknown): Result<NostrProfileFullType, ParseError> => {
+    const env = ProfileEnvelope.safeParse(input);
+    if (!env.success) {
+      return err({ type: 'schema/zod', where: 'nostr/profile', issues: env.error.issues });
+    }
+    const { events, aggregates, providers, fromCache } = env.data;
+
+    // Latest kind-0 per author (envelope hydration is just more events).
+    const k0ByPubkey = new Map<string, (typeof events)[number]>();
+    for (const e of events) {
+      if (e.kind !== 0) continue;
+      const prev = k0ByPubkey.get(e.pubkey);
+      if (!prev || e.created_at > prev.created_at) k0ByPubkey.set(e.pubkey, e);
+    }
+
+    const prov = (pk: string, ns: string): Record<string, unknown> =>
+      (providers[pk]?.[ns] ?? {}) as Record<string, unknown>;
+    const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : undefined);
+
+    const vertex = prov(pubkey, 'vertex');
+    const followerRefs = Array.isArray(vertex.references)
+      ? (vertex.references as unknown[]).filter((r): r is string => typeof r === 'string')
+      : [];
+    const topFollowers = followerRefs.map((pk) => {
+      const fv = prov(pk, 'vertex');
+      const fk0 = k0ByPubkey.get(pk);
+      return {
+        pubkey: pk,
+        npub: npubOrEmpty(pk),
+        rank: num(fv.rank) ?? 0,
+        ...(num(fv.score) !== undefined ? { score: num(fv.score) } : { score: null }),
+        ...(fk0 ? metadataFields(fk0.content) : {}),
+      };
+    });
+
+    const agg = (rule: string, metric: string): number | undefined =>
+      aggregates[pubkey]?.[rule]?.[metric];
+    const nip05Valid = prov(pubkey, 'nip05').valid;
+    const k0 = k0ByPubkey.get(pubkey);
+
+    const candidate = {
+      pubkey,
+      npub: npubOrEmpty(pubkey),
+      rank: num(vertex.rank) ?? 0,
+      score: num(vertex.score) ?? null,
+      followers: agg('k3_p_latest', 'actors') ?? 0,
+      follows: agg('k3_author_latest', 'sources') ?? 0,
+      created_at: num(prov(pubkey, 'nagg').firstEventAt) ?? null,
+      nodes: num(vertex.nodes) ?? null,
+      topFollowers,
+      fromCache: fromCache ?? false,
+      ...(typeof nip05Valid === 'boolean' ? { nip05Valid } : {}),
+      ...(k0 ? metadataFields(k0.content) : {}),
+    };
+    const parsed = NostrProfileFull.safeParse(candidate);
+    if (!parsed.success) {
+      return err({ type: 'schema/zod', where: 'nostr/profile', issues: parsed.error.issues });
+    }
+    return ok(parsed.data);
+  };
 const parseLatestVersion = parseWith(LatestVersionResponse, 'app/latest-version');
 const parseDiscoverMints = parseWith(DiscoverMintsResponse, 'nostr/mint/discover');
 const parseCatalog = parseWith(CatalogResponse, 'wallpapers/catalog');
@@ -381,10 +497,13 @@ export const getLatestVersion = ({
     { signal }
   );
 
+/** Test seam: the v2 envelope -> NostrProfileFull mapper. */
+export const __parseNostrProfileForTest = parseNostrProfileFor;
+
 export const fetchNostrProfile = (pubkey: string, controls: RequestControls = {}) =>
   fetchJson(
     `${SCORE_API_BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}`,
-    parseNostrProfile,
+    parseNostrProfileFor(pubkey),
     'nostr/profile',
     undefined,
     controls

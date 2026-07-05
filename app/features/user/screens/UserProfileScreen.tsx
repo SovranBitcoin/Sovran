@@ -23,6 +23,7 @@ import { Stack } from 'expo-router';
 import { z } from 'zod';
 import { Hex64, HttpsUrl, Npub } from '@/shared/lib/nav/routeSchemas';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -1239,8 +1240,13 @@ export function UserProfileScreen() {
 
               <Spacer size={16} />
 
-              {/* Stats Grid */}
+              {/* Stats Grid (dev tier badge: which source served this profile) */}
               <View style={{ paddingHorizontal: 16 }}>
+                {pubkey ? (
+                  <View style={{ position: 'absolute', right: 20, top: -12, zIndex: 1 }}>
+                    <TierBadge eventId={pubkey} />
+                  </View>
+                ) : null}
                 <ProfileStatsGrid
                   followingCount={followingCount}
                   followerCount={followerCount}
