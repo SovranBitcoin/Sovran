@@ -45,6 +45,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useFadeRevealProbe } from '@/shared/lib/debug/fadeRevealProbe';
 import { SkeletonLoadingShimmer } from '@/shared/ui/composed/SkeletonExitShimmer';
 
 /** Total skeleton→content transition: the skeleton fades out over the first
@@ -123,6 +124,14 @@ export function SkeletonContentCrossfade({
   const progress = useSharedValue(0);
 
   const finishExit = useCallback(() => setPhase('content'), []);
+
+  // [DEBUG-inv] armed only while 'exiting' — a stuck report means the
+  // crossfade timing never flushed and the content is sitting at opacity 0
+  // behind an already-faded skeleton (content present but invisible).
+  useFadeRevealProbe(`skeleton.crossfade:${visualKey ?? visualComponent}`, progress, {
+    enabled: phase === 'exiting',
+    deadlineMs: durationMs + 900,
+  });
 
   // React to the loading edge. Entering loading always wins and cancels an
   // in-flight exit (so rapid true→false→true never stacks overlays).

@@ -16,6 +16,7 @@ import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { Log, initLog } from '@/shared/lib/logger';
 import { useBootMorphFailsafe } from './useBootMorphFailsafe';
+import { useFadeRevealProbe } from '@/shared/lib/debug/fadeRevealProbe';
 import {
   registerQRButtonRemeasure,
   setQRButtonAnchor,
@@ -104,6 +105,10 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   }, [morphCompleted, visibility]);
 
   useBootMorphFailsafe(morphCompleted, visibility);
+  // [DEBUG-inv] deadline sits past the 1500ms boot-morph failsafe + 180ms fade,
+  // so a stuck report means BOTH the morph rendezvous and the failsafe reveal
+  // failed to flush — the invisible-QR-button case.
+  useFadeRevealProbe('wallet.qrButton', visibility, { deadlineMs: 2600 });
 
   useEffect(() => {
     const unregister = registerQRButtonRemeasure(publishAnchor);

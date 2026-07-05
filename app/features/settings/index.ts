@@ -14,6 +14,7 @@ export { SettingsDesignSystemSegmentedScreen } from './screens/SettingsDesignSys
 export { SettingsDesignSystemTimelineScreen } from './screens/SettingsDesignSystemTimelineScreen';
 export { SettingsDesignSystemEmptyStatesScreen } from './screens/SettingsDesignSystemEmptyStatesScreen';
 export { SettingsDesignSystemSkeletonCrossfadeScreen } from './screens/SettingsDesignSystemSkeletonCrossfadeScreen';
+export { SettingsDesignSystemFadeStressScreen } from './screens/SettingsDesignSystemFadeStressScreen';
 export { SettingsAvatarScreen } from './screens/SettingsAvatarScreen';
 export { SettingsBalanceSplitScreen } from './screens/SettingsBalanceSplitScreen';
 export { SettingsNotificationPolicyScreen } from './screens/SettingsNotificationPolicyScreen';

@@ -13,6 +13,7 @@ import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -26,6 +27,7 @@ import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { useFadeRevealProbe } from '@/shared/lib/debug/fadeRevealProbe';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -333,6 +335,12 @@ function TopFollowersComponent({
   const { width: screenWidth } = useWindowDimensions();
   const fadeAnim = useSharedValue(0);
   const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
+  // Once revealed, opacity is handed back to React as a static style: a Fabric
+  // re-render commit can rebuild this view's props from the JS-side style and
+  // silently drop the UI-thread-applied opacity (elements vanish while the
+  // shared value still reads 1). A plain style can't be clobbered.
+  const [fadeSettled, setFadeSettled] = useState(false);
+  const settleFade = useCallback(() => setFadeSettled(true), []);
 
   const GRID_PADDING = 32;
   const GRID_GAP = 12;
@@ -347,9 +355,23 @@ function TopFollowersComponent({
 
   useEffect(() => {
     if (followersWithProfiles.length > 0) {
-      fadeAnim.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) });
+      fadeAnim.value = withTiming(
+        1,
+        { duration: 400, easing: Easing.out(Easing.cubic) },
+        (finished) => {
+          if (finished) runOnJS(settleFade)();
+        }
+      );
+      // Failsafe: settle even if the completion callback is lost mid-churn.
+      const timer = setTimeout(settleFade, 1000);
+      return () => clearTimeout(timer);
     }
-  }, [followersWithProfiles.length, fadeAnim]);
+  }, [followersWithProfiles.length, fadeAnim, settleFade]);
+  // [DEBUG-inv] catches the reveal animation never flushing (invisible follower grid)
+  useFadeRevealProbe('profile.topFollowers', fadeAnim, {
+    enabled: followersWithProfiles.length > 0,
+    deadlineMs: 1400,
+  });
 
   if (!isLoading && followersWithProfiles.length === 0) return null;
 
@@ -423,7 +445,7 @@ function TopFollowersComponent({
           <SkeletonLoadingShimmer active />
         </View>
       ) : (
-        <Animated.View style={fadeStyle}>
+        <Animated.View style={fadeSettled ? styles.settledReveal : fadeStyle}>
           <View style={styles.topFollowersGrid}>{followersWithProfiles.map(renderItem)}</View>
         </Animated.View>
       )}
@@ -480,6 +502,11 @@ function BannerWithAvatarComponent({
     opacity: fadeAnim.value,
     transform: [{ scale: fadeAnim.value }],
   }));
+  // Once revealed, opacity/scale are handed back to React as a static style —
+  // a Fabric re-render commit can drop UI-thread-applied props (the invisible
+  // pfp+ring), and this header re-renders constantly. See settledReveal.
+  const [avatarSettled, setAvatarSettled] = useState(false);
+  const settleAvatar = useCallback(() => setAvatarSettled(true), []);
   const [bannerStatus, setBannerStatus] = useState<'loading' | 'loaded' | 'failed'>('loading');
 
   const fallbackIndex = useMemo(
@@ -533,8 +560,19 @@ function BannerWithAvatarComponent({
   }, [bannerUrl]);
 
   useEffect(() => {
-    fadeAnim.value = withTiming(1, { duration: 500, easing: Easing.out(Easing.cubic) });
-  }, [fadeAnim]);
+    fadeAnim.value = withTiming(
+      1,
+      { duration: 500, easing: Easing.out(Easing.cubic) },
+      (finished) => {
+        if (finished) runOnJS(settleAvatar)();
+      }
+    );
+    // Failsafe: settle even if the completion callback is lost mid-churn.
+    const timer = setTimeout(settleAvatar, 1100);
+    return () => clearTimeout(timer);
+  }, [fadeAnim, settleAvatar]);
+  // [DEBUG-inv] catches the reveal animation never flushing (invisible pfp)
+  useFadeRevealProbe('profile.avatar', fadeAnim, { deadlineMs: 1500 });
 
   const avatarContent = (
     <View style={[styles.avatarBorder, { borderColor: background, backgroundColor: background }]}>
@@ -664,7 +702,8 @@ function BannerWithAvatarComponent({
       </View>
 
       {/* Avatar - positioned to overlap banner */}
-      <Animated.View style={[styles.avatarContainer, avatarStyle]}>
+      <Animated.View
+        style={[styles.avatarContainer, avatarSettled ? styles.settledReveal : avatarStyle]}>
         {hasStories && onAvatarPress ? (
           <Pressable activeOpacity={0.8} onPress={onAvatarPress}>
             {avatarContent}
@@ -1307,6 +1346,11 @@ export function UserProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Post-reveal static style: opacity owned by React, immune to Fabric commits
+  // dropping UI-thread-applied animated props (the invisible-element bug).
+  settledReveal: {
+    opacity: 1,
+  },
   bannerContainer: {
     width: '100%',
     height: BANNER_HEIGHT,

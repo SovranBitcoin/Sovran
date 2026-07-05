@@ -41,6 +41,11 @@ const COMPONENTS: ComponentEntry[] = [
     title: 'Skeleton crossfade',
     description: 'Region wave, 220ms skeleton→content fade, independent image fades',
   },
+  {
+    href: '/(settings-flow)/design-system-fade-stress',
+    title: 'Fade-reveal stress',
+    description: 'Remounting fade-in grid hunting the invisible-element race (red = stuck)',
+  },
 ];
 
 const DesignSystemLinkItem: React.FC<ComponentEntry> = ({ href, title, description }) => (

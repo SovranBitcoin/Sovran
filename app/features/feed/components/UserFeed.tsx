@@ -29,6 +29,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { useFadeRevealProbe } from '@/shared/lib/debug/fadeRevealProbe';
 import { log, Log, feedLog } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -180,6 +181,11 @@ export const RepostCard = React.memo(function RepostCard({
       )
     );
   }, [progress, index, skipAnimation]);
+  // [DEBUG-inv] catches the card entrance animation never flushing (invisible feed rows)
+  useFadeRevealProbe(`feed.card:${index}`, progress, {
+    enabled: !skipAnimation,
+    deadlineMs: 1600,
+  });
 
   const animStyle = useAnimatedStyle(() => ({
     opacity: progress.get(),

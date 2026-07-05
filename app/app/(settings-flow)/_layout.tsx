@@ -31,6 +31,7 @@ const DESIGN_SYSTEM_SEGMENTED_OPTIONS = { title: 'Segmented progress' };
 const DESIGN_SYSTEM_TIMELINE_OPTIONS = { title: 'Timeline' };
 const DESIGN_SYSTEM_EMPTY_STATES_OPTIONS = { title: 'Empty states' };
 const DESIGN_SYSTEM_SKELETON_CROSSFADE_OPTIONS = { title: 'Skeleton crossfade' };
+const DESIGN_SYSTEM_FADE_STRESS_OPTIONS = { title: 'Fade-reveal stress' };
 const RECOVERY_OPTIONS = { title: 'Recover wallet' };
 const DELETE_OPTIONS = { title: 'Delete account' };
 
@@ -84,6 +85,7 @@ export default function SettingsFlowLayout() {
         name="design-system-skeleton-crossfade"
         options={DESIGN_SYSTEM_SKELETON_CROSSFADE_OPTIONS}
       />
+      <Stack.Screen name="design-system-fade-stress" options={DESIGN_SYSTEM_FADE_STRESS_OPTIONS} />
       <Stack.Screen name="recovery" options={RECOVERY_OPTIONS} />
       <Stack.Screen name="delete" options={DELETE_OPTIONS} />
     </Stack>

@@ -309,7 +309,14 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
               // `iconColor` is set: `iconColor` paints the OUTER disc,
               // `colors[0]` paints the INNER symbol glyph. So:
               //   dark disc + light symbol  →  iconColor=QR_DARK, colors=[QR_LIGHT]
+              //
+              // `key={unit}`: CurrencyIcon returns a different Svg tree per
+              // currency, and react-native-svg does not reliably repaint that
+              // swap in place — on the Share screen's NPUB ↔ LIGHTNING tabs the
+              // logo kept the mount-time glyph instead of the bitcoin disc.
+              // Remounting by unit goes through the known-good mount path.
               <CurrencyIcon
+                key={unit}
                 width={logoSize}
                 currency={unit}
                 colors={[QR_LIGHT, QR_LIGHT, QR_LIGHT]}
