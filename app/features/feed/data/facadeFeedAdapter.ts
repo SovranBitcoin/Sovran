@@ -2,7 +2,7 @@ import { facade } from 'nostr';
 
 import { parseJson } from '../components/nostr/feedParse';
 import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
-import { recordDebugTiers } from '../stores/debugTierStore';
+import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import type { FeedParseResult } from './feedClient';
 
 // Pure shape bridge between the tier-selecting facade and the app's feed UI.

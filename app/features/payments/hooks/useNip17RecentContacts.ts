@@ -31,6 +31,9 @@ export interface RecentContact {
   isDefault?: boolean;
   /** Which protocol this conversation is on. Absent rows default to NIP-17. */
   protocol?: DmProtocol | 'whitenoise';
+  /** Newest message's event id — dev-only source-badge key; absent for
+   *  default/mock rows (no badge renders). */
+  newestMessageId?: string;
 }
 
 export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
@@ -47,6 +50,7 @@ export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
       nip17Content: c.lastMessagePreview,
       timestamp: c.lastMessageAt,
       protocol: c.protocol,
+      newestMessageId: c.newestMessageId,
     }));
 
     const existing = new Set(recent.map((c) => c.pubkey));

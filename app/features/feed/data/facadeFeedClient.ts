@@ -9,7 +9,7 @@ import {
   mapAppSpecToFeedSpec,
   resolvedFeedPageToParseResult,
 } from './facadeFeedAdapter';
-import { recordDebugTiers } from '../stores/debugTierStore';
+import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import {
   resolvedNotificationsToResult,
   toFacadeNotificationsRequest,

@@ -18,6 +18,7 @@ import {
 import { dmConversationAppView } from 'nostr/recipes';
 import { backendConfig } from '@/shared/config/backend';
 import { paymentLog } from '@/shared/lib/logger';
+import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import { resolvedDmEnvelopesToPage, toFacadeDmEnvelopesRequest } from './facadeDmAdapter';
 
@@ -106,7 +107,17 @@ export async function fetchDmEnvelopes(args: {
         tier: resolved.tier,
         envelopes: resolved.envelopes.length,
       });
-      return resolvedDmEnvelopesToPage(resolved);
+      const page = resolvedDmEnvelopesToPage(resolved);
+      // Dev-only: stamp each envelope with its serving tier so the contacts
+      // list can badge each conversation's source (n/c/r) — the decrypted
+      // message keeps the wrap's event id, which is the badge key.
+      if (__DEV__) {
+        recordDebugTiers(
+          page.envelopes.map((envelope) => envelope.id),
+          resolved.tier
+        );
+      }
+      return page;
     },
     (error) => {
       paymentLog.debug('payment.dm.envelopes.exhausted', {

@@ -26,6 +26,7 @@ import {
   nostrIdentity,
   type Identity,
 } from '@/shared/ui/composed/ContactRow';
+import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { ScreenContainer } from '../components/ScreenContainer';
@@ -330,6 +331,12 @@ export const ContactsScreen = () => {
       // be on our relay set, so missing IS the steady state.
       const isLoadingProfile = false;
       const mintUrl = item.type === 'mint' ? item.mint?.mintUrl : undefined;
+      // Dev-only data-source chip (n/c/r) for DM-backed rows, keyed by the
+      // conversation's newest message id — same pattern as PostCard/notifications.
+      const sourceBadge =
+        item.type === 'contact' && item.newestMessageId ? (
+          <TierBadge eventId={item.newestMessageId} />
+        ) : undefined;
 
       // Layered identity: mint-type items also have a nostr contact key
       // (NIP-87 / NUT-06), so render the mint avatar/name with the nostr
@@ -357,10 +364,15 @@ export const ContactsScreen = () => {
           subtitle={lastMessage}
           hideMetadata={!!lastMessage}
           titleTrailing={
-            protocolLabel || lastMessageAt ? (
-              <Text style={{ fontSize: 12, color: muted }}>
-                {[protocolLabel, lastMessageAt].filter(Boolean).join(' · ')}
-              </Text>
+            protocolLabel || lastMessageAt || sourceBadge ? (
+              <View style={styles.titleTrailingRow}>
+                {protocolLabel || lastMessageAt ? (
+                  <Text style={{ fontSize: 12, color: muted }}>
+                    {[protocolLabel, lastMessageAt].filter(Boolean).join(' · ')}
+                  </Text>
+                ) : null}
+                {sourceBadge}
+              </View>
             ) : undefined
           }
           onPress={() => navigateToProfile(item.pubkey, mintUrl)}
@@ -544,6 +556,11 @@ export const ContactsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  titleTrailingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   root: {
     flex: 1,
   },

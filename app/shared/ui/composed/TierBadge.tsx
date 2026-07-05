@@ -2,7 +2,7 @@ import type { NostrTier } from '@sovranbitcoin/schemas';
 import * as React from 'react';
 
 import { Badge } from '@/shared/ui/primitives/Badge';
-import { useDebugTier } from '@/features/feed/stores/debugTierStore';
+import { useDebugTier } from '@/shared/stores/runtime/debugTierStore';
 
 // Single-letter debug chip showing which facade tier served this note's data.
 // Legend: n = nagg (app-view), c = primal (public cache server), r = relay (raw NIP-01).

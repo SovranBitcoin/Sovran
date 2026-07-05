@@ -2,7 +2,7 @@ import { facade } from 'nostr';
 
 import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
-import { recordDebugTiers } from '../stores/debugTierStore';
+import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import type { ThreadRequest, ThreadResult } from './feedClient';
 
 // Pure shape bridge: facade ResolvedThread → the app's ThreadResult. Used only

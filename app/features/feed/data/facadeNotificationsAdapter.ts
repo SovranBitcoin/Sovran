@@ -1,5 +1,7 @@
 import { facade } from 'nostr';
 
+import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
+
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
 import type {
   FeedNotification,
@@ -50,6 +52,19 @@ export function resolvedNotificationsToResult(
       ...(targetEvent ? { targetEvent } : {}),
     };
   });
+
+  // Dev-only: stamp each notification with the tier that served this page so
+  // the row can badge its source (n/c/r), same as PostCard. Covers both the
+  // triggering event (the row's badge key) and the target event (rendered as
+  // the referenced-post preview). No-op in production.
+  if (__DEV__) {
+    const ids: string[] = [];
+    for (const n of notifications) {
+      ids.push(n.event.id);
+      if (n.targetEvent) ids.push(n.targetEvent.id);
+    }
+    recordDebugTiers(ids, page.tier);
+  }
 
   const metricsMap = new Map<string, NoteMetrics>();
   for (const [id, s] of Object.entries(page.stats)) {

@@ -22,6 +22,9 @@ export interface DmConversation {
   lastMessageAt: number;
   /** Protocol of the most recent message with this counterparty. */
   protocol: DmProtocol;
+  /** Event id of the newest message (gift-wrap id for NIP-17, kind-4 id for
+   *  NIP-04) — the key the dev-only source badge resolves its tier by. */
+  newestMessageId: string;
 }
 
 const PAGE_LIMIT = 100;
@@ -74,6 +77,7 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
             lastMessagePreview: dm.content,
             lastMessageAt: dm.createdAt,
             protocol: dm.protocol,
+            newestMessageId: dm.id,
           });
         }
       }

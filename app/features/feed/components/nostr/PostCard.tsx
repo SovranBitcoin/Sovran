@@ -29,7 +29,7 @@ import {
   selectIsDeleteRequested,
   useNostrSocialStore,
 } from '@/shared/stores/profile/nostrSocialStore';
-import { TierBadge } from './TierBadge';
+import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { formatDate, formatRelative } from '@/shared/lib/date';
 import { tryNpubEncode } from './feedParse';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';

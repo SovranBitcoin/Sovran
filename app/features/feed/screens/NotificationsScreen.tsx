@@ -38,6 +38,7 @@ import {
   type NotificationListItem,
 } from '@/features/feed/lib/notificationGroups';
 import { seedThread } from '@/features/feed/lib/threadSeedCache';
+import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
 import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
@@ -868,6 +869,7 @@ function NotificationRow({
               timestamp={timestamp}
               foreground={foreground}
               muted={muted}
+              badge={<TierBadge eventId={notification.event.id} />}
             />
           </VStack>
         </HStack>
@@ -925,6 +927,11 @@ function NotificationGroupRow({
               timestamp={timestamp}
               foreground={foreground}
               muted={muted}
+              badge={
+                item.notifications[0] ? (
+                  <TierBadge eventId={item.notifications[0].event.id} />
+                ) : undefined
+              }
             />
           </VStack>
         </HStack>
@@ -997,22 +1004,28 @@ function NotificationTitleLine({
   timestamp,
   foreground,
   muted,
+  badge,
 }: {
   title: string;
   timestamp: string;
   foreground: string;
   muted: string;
+  /** Dev-only data-source chip (n/c/r), rendered after the timestamp. */
+  badge?: React.ReactNode;
 }) {
   return (
     <HStack align="flex-start" justify="space-between" gap={8} style={styles.titleLine}>
       <Text numberOfLines={2} size={16} style={[styles.titleText, { color: foreground }]}>
         {title}
       </Text>
-      {timestamp ? (
-        <Text numberOfLines={1} size={13} style={[styles.timestampText, { color: muted }]}>
-          {timestamp}
-        </Text>
-      ) : null}
+      <HStack align="center" gap={4}>
+        {timestamp ? (
+          <Text numberOfLines={1} size={13} style={[styles.timestampText, { color: muted }]}>
+            {timestamp}
+          </Text>
+        ) : null}
+        {badge}
+      </HStack>
     </HStack>
   );
 }
