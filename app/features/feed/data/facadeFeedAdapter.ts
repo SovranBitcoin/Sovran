@@ -21,6 +21,8 @@ export function mapAppSpecToFeedSpec(
       return { kind: 'for-you', ...(userPubkey ? { viewerPubkey: userPubkey } : {}) };
     case 'following-popular':
       return userPubkey ? { kind: 'following-popular', viewerPubkey: userPubkey } : null;
+    case 'following-recent':
+      return userPubkey ? { kind: 'following-recent', viewerPubkey: userPubkey } : null;
     default:
       return null;
   }

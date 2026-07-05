@@ -389,7 +389,7 @@ function feedBindingForSpec(request: FeedPageRequest) {
         followingPopularRankedEventsInput({ viewerPubkey: spec.viewerPubkey, until, limit }),
       );
     case 'following-recent':
-      return followsFeedAppView({ pubkeys: spec.authors, until, limit });
+      return followsFeedAppView({ pubkeys: spec.authors, viewer: spec.viewerPubkey, until, limit });
     case 'user':
       return userFeedAppView({ pubkey: spec.pubkey, until, limit });
   }

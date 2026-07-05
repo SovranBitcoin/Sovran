@@ -23,14 +23,20 @@ import type { SortKey } from './session/page-buffer';
 /**
  * Which feed the caller wants. Tiers map this to their own query.
  * - `for-you` / `following-popular`: server-RANKED (nagg derives follows itself).
- * - `following-recent`: CHRONOLOGICAL over an explicit author list the caller
+ * - `following-recent`: CHRONOLOGICAL over the authors the viewer's latest
  *   already holds (the app's social store), so no server-side follow resolution.
  * - `user`: a single author's profile feed.
  */
 export type FeedSpec =
   | { kind: 'for-you'; viewerPubkey?: string }
   | { kind: 'following-popular'; viewerPubkey: string }
-  | { kind: 'following-recent'; authors: string[] }
+  | {
+      kind: 'following-recent';
+      /** Explicit author set (posts-by-pubkeys reads, relay-floor serving). */
+      authors?: string[];
+      /** Viewer anchor: nagg expands to the viewer's latest kind-3 references. */
+      viewerPubkey?: string;
+    }
   | { kind: 'user'; pubkey: string };
 
 export type FeedPageRequest = RequestControls & {

@@ -34,6 +34,8 @@ export function rankedFeedAppView(input: RankedEventsInput): NaggAppViewBinding 
 // ---------------------------------------------------------------------------
 
 export type FollowsFeedAppViewOptions = {
+  /** Viewer anchor: nagg expands to the viewer's latest kind-3 references. */
+  viewer?: string;
   /** Authors whose notes make up the feed. Falls back to the server viewer when omitted. */
   pubkeys?: readonly string[];
   until?: number;
@@ -53,7 +55,14 @@ export function followsFeedAppView(options: FollowsFeedAppViewOptions = {}): Nag
     method: 'GET',
     operationName: 'FollowsFeed',
     searchParams: {
-      ...(pubkeys.length > 0 ? { pubkeys: pubkeys.join(',') } : {}),
+      // Explicit authors win; otherwise anchor on the viewer and nagg expands
+      // to the authors the viewer's latest kind-3 references (server-side —
+      // a follow list does not fit in a GET URL).
+      ...(pubkeys.length > 0
+        ? { pubkeys: pubkeys.join(',') }
+        : options.viewer
+          ? { viewer: options.viewer }
+          : {}),
       ...(options.until ? { until: options.until } : {}),
       limit: options.limit ?? 30,
       ...(options.offset ? { offset: options.offset } : {}),
