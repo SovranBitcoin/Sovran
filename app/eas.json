@@ -11,8 +11,8 @@
       "env": {
         "APP_VARIANT": "development",
         "EXPO_NO_DEV_CLIENT": "1",
-        "EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL": "https://nagg.up.railway.app",
-        "EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT": "https://nagg.up.railway.app/graphql"
+        "EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL": "https://nagg-production.up.railway.app",
+        "EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT": "https://nagg-production.up.railway.app/graphql"
       },
       "autoIncrement": true
     },
@@ -20,8 +20,8 @@
       "distribution": "internal",
       "environment": "preview",
       "env": {
-        "EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL": "https://nagg.up.railway.app",
-        "EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT": "https://nagg.up.railway.app/graphql"
+        "EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL": "https://nagg-production.up.railway.app",
+        "EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT": "https://nagg-production.up.railway.app/graphql"
       },
       "autoIncrement": true
     },
