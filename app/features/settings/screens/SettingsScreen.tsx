@@ -22,7 +22,6 @@ import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'h
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { AVATAR_FALLBACK_VARIANT_LABELS } from '@/shared/lib/avatarFallback';
-import { BALANCE_SPLIT_VARIANT_LABELS } from '@/shared/lib/balanceSplitVariant';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
 import { notificationPolicyLabel } from '@/features/feed/lib/notificationCopy';
 import { useNip46RequestsStore } from '@/features/nostrSigner';
@@ -162,7 +161,6 @@ export const SettingsScreen = () => {
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
   const avatarFallbackVariant = useSettingsStore((state) => state.avatarFallbackVariant);
-  const balanceSplitVariant = useSettingsStore((state) => state.balanceSplitVariant);
   const notificationPolicy = useNotificationPolicyStore((state) => state.policy);
   const signerPendingCount = useNip46RequestsStore((state) => state.pending.length);
 
@@ -313,12 +311,6 @@ export const SettingsScreen = () => {
                   href="/(settings-flow)/design-system"
                   title="Design system"
                   description="Preview shared UI components"
-                />
-                <Separator className="mx-4" />
-                <SettingsListLinkItem
-                  href="/(settings-flow)/balance-split"
-                  title="Balance split layout"
-                  description={BALANCE_SPLIT_VARIANT_LABELS[balanceSplitVariant]}
                 />
                 <Separator className="mx-4" />
                 <PressableFeedback animation={false} onPress={() => setMockMode(!mockMode)}>

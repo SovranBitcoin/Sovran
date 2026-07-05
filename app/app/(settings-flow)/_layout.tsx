@@ -18,7 +18,6 @@ const INDEX_OPTIONS = { title: 'Settings' };
 const ABOUT_OPTIONS = { title: 'About' };
 const PROFILE_OPTIONS = { title: 'Profile' };
 const AVATAR_OPTIONS = { title: 'Avatar fallback' };
-const BALANCE_SPLIT_OPTIONS = { title: 'Balance split' };
 const NOTIFICATION_POLICY_OPTIONS = { title: 'Notifications' };
 const ROUTING_OPTIONS = { title: 'Swap routing' };
 const NETWORK_OPTIONS = { title: 'Network' };
@@ -66,7 +65,6 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="terms" options={termsOptions} />
       <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
       <Stack.Screen name="avatar" options={AVATAR_OPTIONS} />
-      <Stack.Screen name="balance-split" options={BALANCE_SPLIT_OPTIONS} />
       <Stack.Screen name="notification-policy" options={NOTIFICATION_POLICY_OPTIONS} />
       <Stack.Screen name="routing" options={ROUTING_OPTIONS} />
       <Stack.Screen name="network" options={NETWORK_OPTIONS} />

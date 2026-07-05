@@ -61,24 +61,22 @@ describe('settingsStore persist resilience', () => {
     for (const k of Object.keys(mockMemory)) delete mockMemory[k];
   });
 
-  it('keeps terms acceptance when a renamed balanceSplitVariant is persisted', async () => {
-    // 'hero-minimal' is a value from a prior enum; the current enum is
-    // ['list','total','donut']. Pre-fix this rejected the whole blob.
+  it('keeps terms acceptance when a removed persisted field is still in the blob', async () => {
+    // `balanceSplitVariant` was a persisted enum that no longer exists in the
+    // schema. A device that persisted it must still parse cleanly (the loose
+    // z.object strips unknown keys) without wiping the rest of the blob.
     preload({
       termsAccepted: { termsAccepted: true, date: '2025-01-01T00:00:00.000Z' },
       hasSeenOnboarding: true,
-      balanceSplitVariant: 'hero-minimal',
+      balanceSplitVariant: 'list',
       displayCurrency: 'eur',
     });
 
     const store = await loadStore();
 
-    // Load-bearing fields survive ...
     expect(store.getState().isTermsAccepted()).toBe(true);
     expect(store.getState().hasSeenOnboarding).toBe(true);
     expect(store.getState().displayCurrency).toBe('eur');
-    // ... and the stale enum degrades to its default instead of wiping the blob.
-    expect(store.getState().balanceSplitVariant).toBe('list');
   });
 
   it('keeps terms acceptance when an unknown avatarFallbackVariant is persisted', async () => {

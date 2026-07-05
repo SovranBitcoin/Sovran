@@ -1,9 +1,8 @@
 /**
  * @fileoverview Shared color extraction and manipulation utilities.
  *
- * Pure functions for hex/RGB/HSL conversion, contrast/luminance, and
- * two React hooks for extracting dominant colors from images:
- * - useExtractedColors: returns gradient pair + border from the primary palette color
+ * Pure functions for hex/RGB/HSL conversion, contrast/luminance, and a React
+ * hook for extracting dominant colors from images:
  * - useDominantColor: filters corner colors and clamps brightness; better for banners/large images
  */
 
@@ -12,7 +11,7 @@ import { Platform } from 'react-native';
 import { getColors } from 'react-native-image-colors';
 import { darken, lighten } from 'polished';
 
-export const FALLBACK_COLORS = [
+const FALLBACK_COLORS = [
   '#6366f1', // Indigo
   '#8b5cf6', // Violet
   '#ec4899', // Pink
@@ -159,89 +158,6 @@ function extractCandidates(res: any): (string | undefined)[] {
     return [res.vibrant, res.dominant, res.lightVibrant, res.muted, res.average];
   }
   return [res.background, res.primary, res.secondary, res.detail];
-}
-
-// ---------------------------------------------------------------------------
-// useExtractedColors
-// ---------------------------------------------------------------------------
-
-interface ExtractedColors {
-  baseColor: string;
-  gradientColors: readonly [string, string];
-  borderColor: string;
-  isLoading: boolean;
-  hasExtractedColors: boolean;
-}
-
-/**
- * Extracts a gradient color pair from the image's primary palette color.
- * Best for small images like mint icons.
- */
-export function useExtractedColors(
-  imageUrl: string | undefined,
-  fallbackIndex: number = 0
-): ExtractedColors {
-  const fallback = FALLBACK_COLORS[fallbackIndex % FALLBACK_COLORS.length];
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [hasExtractedColors, setHasExtractedColors] = useState(false);
-  const [colors, setColors] = useState<Omit<ExtractedColors, 'isLoading' | 'hasExtractedColors'>>(
-    () => {
-      const { contrastColor, borderColor } = getContrastColors(fallback, 0.3);
-      return {
-        baseColor: fallback,
-        gradientColors: [fallback, contrastColor] as const,
-        borderColor,
-      };
-    }
-  );
-
-  useEffect(() => {
-    if (!imageUrl) {
-      setHasLoaded(true);
-      return;
-    }
-
-    let mounted = true;
-
-    getColors(imageUrl, { fallback, cache: true, key: imageUrl })
-      .then((res: any) => {
-        if (!mounted || !res) return;
-
-        const candidates = extractCandidates(res);
-        const mainColor = candidates[1];
-
-        if (mainColor) {
-          const { contrastColor, borderColor } = getContrastColors(mainColor, 0.3);
-          setColors({
-            baseColor: mainColor,
-            gradientColors: [mainColor, contrastColor] as const,
-            borderColor,
-          });
-          setHasExtractedColors(true);
-        } else {
-          const picked = candidates.find((c) => c);
-          if (picked) {
-            const { contrastColor, borderColor } = getContrastColors(picked, 0.3);
-            setColors({
-              baseColor: picked,
-              gradientColors: [picked, contrastColor] as const,
-              borderColor,
-            });
-            setHasExtractedColors(true);
-          }
-        }
-        setHasLoaded(true);
-      })
-      .catch(() => {
-        setHasLoaded(true);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [imageUrl, fallback]);
-
-  return { ...colors, isLoading: !hasLoaded, hasExtractedColors };
 }
 
 // ---------------------------------------------------------------------------

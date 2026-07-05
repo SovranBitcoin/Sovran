@@ -16,6 +16,5 @@ export { SettingsDesignSystemEmptyStatesScreen } from './screens/SettingsDesignS
 export { SettingsDesignSystemSkeletonCrossfadeScreen } from './screens/SettingsDesignSystemSkeletonCrossfadeScreen';
 export { SettingsDesignSystemFadeStressScreen } from './screens/SettingsDesignSystemFadeStressScreen';
 export { SettingsAvatarScreen } from './screens/SettingsAvatarScreen';
-export { SettingsBalanceSplitScreen } from './screens/SettingsBalanceSplitScreen';
 export { SettingsNotificationPolicyScreen } from './screens/SettingsNotificationPolicyScreen';
 export { DeleteScreen } from './screens/DeleteScreen';

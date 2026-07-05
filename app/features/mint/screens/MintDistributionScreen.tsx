@@ -1,4 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import {
+  LayoutAnimation,
+  ScrollView,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
+} from 'react-native';
+import { useSharedValue } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
@@ -6,18 +13,20 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
+import { ListGroup, Switch as HeroSwitch } from 'heroui-native';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
+import {
+  MintCurrencyTabs,
+  MINT_CURRENCY_TABS_HEIGHT,
+} from '@/features/mint/components/MintCurrencyTabs';
 import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
 import { deriveSupportedUnitsFromInfo } from 'wallet';
-import { BALANCE_SPLIT_VARIANT_COMPONENTS } from '@/features/mint/components/distribution/variants';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { MintDistributionCards } from '@/features/mint/components/distribution/MintDistributionCards';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
-import { useMints, useBalanceContext } from '@cashu/coco-react';
+import { useMints } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
 import {
   EMPTY_DISTRIBUTION,
   useMintDistributionStore,
@@ -36,15 +45,45 @@ function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, un
   };
 }
 
+/**
+ * Every commit redistributes the OTHER mints' shares in one store write, which
+ * would snap their fills/thumbs to the new positions. The heroui Slider lays
+ * out fill/thumb with plain `left`/`width`, so a layout animation on the commit
+ * springs all sliders (and the collapsing slider row on toggle) together —
+ * mirroring the old DistributionSlider's withSpring fill. Drag frames stay
+ * un-animated: they go through the card's local preview state, not the store.
+ */
+function animateRedistribution() {
+  LayoutAnimation.configureNext({
+    duration: 350,
+    update: { type: LayoutAnimation.Types.spring, springDamping: 0.85 },
+    create: {
+      type: LayoutAnimation.Types.easeInEaseOut,
+      property: LayoutAnimation.Properties.opacity,
+    },
+    delete: {
+      type: LayoutAnimation.Types.easeInEaseOut,
+      property: LayoutAnimation.Properties.opacity,
+    },
+  });
+}
+
+/**
+ * "Even" as `equalizeMints` produces it: every active mint within 1bp of the
+ * others (floor + largest-remainder spread). Used to seed the Split evenly
+ * switch from the persisted distribution.
+ */
+function isEvenSplit(distribution: Record<string, number>, mintUrls: string[]): boolean {
+  const active = mintUrls.map((url) => distribution[url] || 0).filter((bp) => bp > 0);
+  if (active.length === 0) return false;
+  return Math.max(...active) - Math.min(...active) <= 1;
+}
+
 export function MintDistributionScreen() {
   useLifecycleLogger('MintDistributionScreen');
-  const [foreground, danger, muted] = useThemeColor(['foreground', 'danger', 'muted'] as const);
+  const [foreground] = useThemeColor(['foreground'] as const);
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.distribution' });
-  const balanceSplitVariant = useSettingsStore((state) => state.balanceSplitVariant);
-  const VariantBody = BALANCE_SPLIT_VARIANT_COMPONENTS[balanceSplitVariant];
   const { trustedMints } = useMints();
-  const { balances: liveBalanceCtx } = useBalanceContext();
-  const liveBalances = liveBalanceCtx.byMint;
   const { getMintInfo } = useMintManagement();
   const [mintInfoMap, setMintInfoMap] = useState<Record<string, any>>({});
 
@@ -68,6 +107,7 @@ export function MintDistributionScreen() {
   const setMintDistribution = useMintDistributionStore((state) => state.setMintDistribution);
   const initializeDistribution = useMintDistributionStore((state) => state.initializeDistribution);
   const equalizeMints = useMintDistributionStore((state) => state.equalizeMints);
+  const minMint = useMintDistributionStore((state) => state.minMint);
 
   // Keyset-backed: an advertised NUT-04 unit the mint holds no keys for
   // (chorus lists usd/eur with sat-only keysets) is not distributable.
@@ -118,6 +158,22 @@ export function MintDistributionScreen() {
     }
   }, [selectedCurrency, mintUrls, initializeDistribution]);
 
+  // "Split evenly" mode: ON keeps every enabled mint at an equal share (the
+  // sliders are read-only), OFF frees the sliders for a custom split. Not
+  // persisted — seeded per currency from whether the stored split is already
+  // even. Reads the store imperatively: this runs in the same effect flush as
+  // initializeDistribution above (declared later → runs after), so the
+  // subscribed `distribution` snapshot can be one commit stale here.
+  const [splitEvenly, setSplitEvenly] = useState(false);
+  const seededSplitEvenlyFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (mintUrls.length === 0) return;
+    if (seededSplitEvenlyFor.current === selectedCurrency) return;
+    seededSplitEvenlyFor.current = selectedCurrency;
+    const stored = useMintDistributionStore.getState().getDistribution(selectedCurrency);
+    setSplitEvenly(isEvenSplit(stored, mintUrls));
+  }, [selectedCurrency, mintUrls]);
+
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -149,55 +205,95 @@ export function MintDistributionScreen() {
         basisPoints: bp,
         currency: selectedCurrency,
       });
+      animateRedistribution();
       setMintDistribution(selectedCurrency, mintUrl, bp, mintUrls);
     },
     [selectedCurrency, mintUrls, setMintDistribution]
   );
 
-  const handleEqualize = useCallback(() => {
-    log.info('mint.distribution.equalize', {
-      currency: selectedCurrency,
-      mintCount: mintUrls.length,
-    });
-    equalizeMints(selectedCurrency, mintUrls);
-  }, [selectedCurrency, mintUrls, equalizeMints]);
+  const handleSplitEvenlyToggle = useCallback(
+    (next: boolean) => {
+      log.info('mint.distribution.split_evenly.toggle', {
+        enabled: next,
+        currency: selectedCurrency,
+        mintCount: mintUrls.length,
+      });
+      if (next) {
+        animateRedistribution();
+        equalizeMints(selectedCurrency, mintUrls);
+      }
+      // Turning OFF keeps the current (even) values — it just frees the sliders.
+      setSplitEvenly(next);
+    },
+    [selectedCurrency, mintUrls, equalizeMints]
+  );
 
-  const balanceTotals = useMemo(() => {
-    const map: Record<string, number> = {};
-    mintUrls.forEach((url) => {
-      map[url] = amountToNumber(liveBalances[url]?.total);
-    });
-    return map;
-  }, [mintUrls, liveBalances]);
-
-  const totalBp = useMemo(() => {
-    return mintUrls.reduce((sum, url) => sum + (distribution[url] || 0), 0);
-  }, [mintUrls, distribution]);
-  const isBalanced = totalBp === TOTAL_BASIS_POINTS;
+  const handleToggleMint = useCallback(
+    (mintUrl: string, enabled: boolean) => {
+      log.info('mint.distribution.toggle', {
+        ...mintUrlLogFields(mintUrl),
+        enabled,
+        currency: selectedCurrency,
+        splitEvenly,
+      });
+      animateRedistribution();
+      if (enabled) {
+        // Re-enable with an even share; the store takes it from the active
+        // mints proportionally.
+        setMintDistribution(
+          selectedCurrency,
+          mintUrl,
+          Math.round(TOTAL_BASIS_POINTS / mintUrls.length),
+          mintUrls
+        );
+      } else {
+        minMint(selectedCurrency, mintUrl, mintUrls);
+      }
+      // In Split evenly mode the membership change must land exactly even —
+      // the proportional redistribution above only gets within rounding drift.
+      // Both writes batch into the same commit, so one animation runs.
+      if (splitEvenly) {
+        equalizeMints(selectedCurrency, mintUrls);
+      }
+    },
+    [selectedCurrency, mintUrls, setMintDistribution, minMint, splitEvenly, equalizeMints]
+  );
 
   useEffect(() => {
-    // `build` marker confirms which dismiss-fix revision is actually running on
-    // device (fast-refresh vs stale build), so we stop guessing blind.
+    // `build` marker confirms which revision is actually running on device
+    // (fast-refresh vs stale build), so we stop guessing blind.
     log.debug('mint.balance_split.render', {
-      variant: balanceSplitVariant,
-      scrollMode: 'auto',
-      build: 'dismiss-fix-4-nosticky',
+      scrollMode: 'custom-sticky',
+      build: 'routing-cards-4-evenswitch',
     });
-  }, [balanceSplitVariant]);
+  }, []);
 
-  // Rendered INSIDE the scroll body (not as Screen stickyContent): the absolute
-  // sticky overlay sibling stopped this screen's plain ScrollView from handing
-  // overscroll to the native Android form-sheet, so drag-to-dismiss was dead.
-  // In-body keeps the working dismiss path; the tabs scroll with the content.
+  // Sticky currency header, mirroring MintListScreen (the mint selector): tabs
+  // pinned as Screen stickyContent, scrollY-driven large→small shrink, and a
+  // custom plain ScrollView that reserves the nav+tabs band via a spacer from
+  // onHeaderHeightChange. nestedScrollEnabled keeps the Android form-sheet's
+  // drag-to-dismiss working (the sheet reads this scroller's overscroll) — the
+  // earlier in-body fallback predates the mint-list sticky pattern.
+  const scrollY = useSharedValue(0);
+  const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
+
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollY.value = Math.max(0, event.nativeEvent.contentOffset.y);
+    },
+    [scrollY]
+  );
+
   const currencyTabs = useMemo(
     () => (
       <MintCurrencyTabs
         currencies={availableCurrencies}
         selectedCurrency={selectedCurrency}
         onCurrencyChange={setSelectedCurrency}
+        scrollY={scrollY}
       />
     ),
-    [availableCurrencies, selectedCurrency]
+    [availableCurrencies, selectedCurrency, scrollY]
   );
 
   const handleRebalance = useCallback(() => {
@@ -211,53 +307,73 @@ export function MintDistributionScreen() {
   const bottomButtons = useMemo(
     () => (
       <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            { text: 'Split evenly', variant: 'secondary', onPress: handleEqualize },
-            { text: 'Next', variant: 'primary', onPress: handleRebalance },
-          ]}
-        />
+        <ButtonHandler buttons={[{ text: 'Next', variant: 'primary', onPress: handleRebalance }]} />
       </BottomButtons>
     ),
-    [handleEqualize, handleRebalance]
+    [handleRebalance]
   );
 
   return (
     <Screen
       name="MintDistributionScreen"
       headerGradient
-      // Plain ScrollView (NOT scroll="animated"): on Android the reanimated
-      // Animated.ScrollView doesn't hand overscroll to the native form-sheet, so
-      // drag-to-dismiss was dead here. No stickyContent either — see currencyTabs.
-      scroll="auto"
-      footer={bottomButtons}
-      contentPadding={0}>
+      stickyContent={currencyTabs}
+      stickyContentHeight={MINT_CURRENCY_TABS_HEIGHT}
+      scroll="custom"
+      onHeaderHeightChange={setTotalHeaderHeight}
+      footer={bottomButtons}>
       <Stack.Screen options={withGlassHeaderItems({ title: 'Balance split' })} />
-      {currencyTabs}
+      <ScrollView
+        // The JS spacer below is the sole inset authority (same as the mint
+        // list); `never` keeps iOS from re-adjusting it natively.
+        contentInsetAdjustmentBehavior="never"
+        // Android form-sheet: scroll the content instead of dismissing when
+        // dragging back toward the top; overscroll at rest still dismisses.
+        nestedScrollEnabled
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 120 }}>
+        <View style={{ height: totalHeaderHeight }} />
 
-      {/* Ambient validity cue — the affirmative "100%", coloured only when off. */}
-      <View className="items-end px-4 pb-1 pt-2">
-        <Text bold size={13} style={{ color: isBalanced ? muted : danger }}>
-          {Math.round(totalBp / 100)}%
-        </Text>
-      </View>
+        {mintsForCurrency.length === 0 ? (
+          <View className="items-center p-10">
+            <Text style={{ color: foreground, textAlign: 'center' }}>
+              No mints available for {selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View className="px-4 pb-3 pt-2">
+              <ListGroup variant="secondary">
+                <ListGroup.Item>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>Split evenly</ListGroup.ItemTitle>
+                    <ListGroup.ItemDescription>
+                      Keep every enabled mint at an equal share.
+                    </ListGroup.ItemDescription>
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix>
+                    <HeroSwitch
+                      isSelected={splitEvenly}
+                      onSelectedChange={handleSplitEvenlyToggle}
+                    />
+                  </ListGroup.ItemSuffix>
+                </ListGroup.Item>
+              </ListGroup>
+            </View>
 
-      {mintsForCurrency.length === 0 ? (
-        <View className="items-center p-10">
-          <Text style={{ color: foreground, textAlign: 'center' }}>
-            No mints available for {selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}
-          </Text>
-        </View>
-      ) : (
-        <VariantBody
-          mintUrls={mintUrls}
-          mintInfoMap={mintInfoMap}
-          distribution={distribution}
-          balanceTotals={balanceTotals}
-          unit={selectedCurrency.toLowerCase()}
-          onDistributionChange={handleDistributionChange}
-        />
-      )}
+            <MintDistributionCards
+              mintUrls={mintUrls}
+              mintInfoMap={mintInfoMap}
+              distribution={distribution}
+              slidersDisabled={splitEvenly}
+              onDistributionChange={handleDistributionChange}
+              onToggleMint={handleToggleMint}
+            />
+          </>
+        )}
+      </ScrollView>
     </Screen>
   );
 }

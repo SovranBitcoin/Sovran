@@ -41,7 +41,6 @@ import {
   DEFAULT_AVATAR_FALLBACK_VARIANT,
   type AvatarFallbackVariant,
 } from '@/shared/lib/avatarFallback';
-import { DEFAULT_BALANCE_SPLIT_VARIANT } from '@/shared/lib/balanceSplitVariant';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 const storage = AsyncStorage as unknown as {
@@ -115,21 +114,21 @@ describe('settings persist resilience', () => {
     useSettingsStore.setState({
       termsAccepted: null,
       hasSeenOnboarding: false,
-      balanceSplitVariant: DEFAULT_BALANCE_SPLIT_VARIANT,
     });
   });
 
-  // Regression: a renamed/stale dev-only enum value must degrade to its default
-  // on rehydrate — it must NOT fail the whole-blob parse and discard the rest of
+  // Regression: a stale/unknown enum value must degrade to its default on
+  // rehydrate — it must NOT fail the whole-blob parse and discard the rest of
   // the settings store (terms acceptance, onboarding, …), which resurfaced the
   // terms gate on every launch. See `.catch()` on the enum fields in the schema.
+  // (`balanceSplitVariant` is a field removed from the schema entirely; the
+  // loose z.object must strip it without failing.)
   it('preserves the rest of the settings blob when a variant value is stale', async () => {
     await setPersistedSettings({
       termsAccepted: { termsAccepted: true, date: '2026-01-01' },
       hasSeenOnboarding: true,
-      // 'hero-minimal' was a real value on shipped devices before the enum was
-      // renamed to list | total | donut.
-      balanceSplitVariant: 'hero-minimal',
+      avatarFallbackVariant: 'hero-minimal',
+      balanceSplitVariant: 'list',
     });
 
     await useSettingsStore.persist.rehydrate();
@@ -137,6 +136,6 @@ describe('settings persist resilience', () => {
     const state = useSettingsStore.getState();
     expect(state.termsAccepted?.termsAccepted).toBe(true);
     expect(state.hasSeenOnboarding).toBe(true);
-    expect(state.balanceSplitVariant).toBe(DEFAULT_BALANCE_SPLIT_VARIANT);
+    expect(state.avatarFallbackVariant).toBe(DEFAULT_AVATAR_FALLBACK_VARIANT);
   });
 });
