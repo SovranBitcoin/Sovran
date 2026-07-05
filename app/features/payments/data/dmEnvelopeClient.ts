@@ -9,7 +9,12 @@
  * (`GET /nostr/dm/conversation`) directly. Both are best-effort: an exhausted/
  * disabled chain returns empty rather than throwing, so the UI keeps working.
  */
-import { createNaggClient, type NaggEventConnection, NaggDmConversationDataSchema } from 'nostr';
+import {
+  createNaggClient,
+  NaggEnvelopeSchema,
+  orderedEnvelopeEvents,
+  type NaggEnvelope,
+} from 'nostr';
 import { dmConversationAppView } from 'nostr/recipes';
 import { backendConfig } from '@/shared/config/backend';
 import { paymentLog } from '@/shared/lib/logger';
@@ -36,28 +41,32 @@ export interface DmEnvelope {
 
 export interface DmEnvelopePage {
   envelopes: DmEnvelope[];
-  endCursor?: string;
   hasNextPage: boolean;
 }
 
 const EMPTY_PAGE: DmEnvelopePage = { envelopes: [], hasNextPage: false };
 
-function toPage(connection: NaggEventConnection): DmEnvelopePage {
-  const endCursor =
-    typeof connection.pageInfo?.endCursor === 'string' ? connection.pageInfo.endCursor : undefined;
-  return {
-    envelopes: connection.nodes.map((node) => ({
-      id: node.id,
-      pubkey: node.pubkey,
-      kind: node.kind,
-      createdAt: node.createdAt,
-      content: node.content,
-      tags: node.tags,
-      sig: node.sig,
-    })),
-    endCursor,
-    hasNextPage: connection.pageInfo?.hasNextPage ?? false,
-  };
+/**
+ * Bridge a v2 envelope into the app's DM page. By design the DM routes carry
+ * NO aggregates and NO profile hydration (privacy) — only the raw encrypted
+ * wraps, arrival-ordered. Paging is length-based here (the callers re-derive
+ * their `until` cursor from envelope `createdAt`), matching the facade path.
+ */
+function toPage(envelope: NaggEnvelope): DmEnvelopePage {
+  const events = envelope.order.length > 0 ? orderedEnvelopeEvents(envelope) : envelope.events;
+  const envelopes: DmEnvelope[] = events.map((event) => {
+    const sig = (event as { sig?: unknown }).sig;
+    return {
+      id: event.id,
+      pubkey: event.pubkey,
+      kind: event.kind,
+      createdAt: event.created_at,
+      content: event.content,
+      tags: event.tags,
+      ...(typeof sig === 'string' && sig ? { sig } : {}),
+    };
+  });
+  return { envelopes, hasNextPage: envelopes.length > 0 };
 }
 
 /**
@@ -131,7 +140,7 @@ export async function fetchDmConversation(args: {
     path: binding.path,
     method: binding.method,
     searchParams: binding.searchParams,
-    responseSchema: NaggDmConversationDataSchema,
+    responseSchema: NaggEnvelopeSchema,
     operationName: binding.operationName,
     refresh: args.refresh,
     signal: args.signal,
@@ -140,5 +149,5 @@ export async function fetchDmConversation(args: {
     paymentLog.debug('payment.dm.conversation.failed', { error: result.error.message });
     return EMPTY_PAGE;
   }
-  return toPage(result.value.dmConversation);
+  return toPage(result.value);
 }

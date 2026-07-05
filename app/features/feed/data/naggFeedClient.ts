@@ -1,9 +1,11 @@
 import {
   createNaggClient,
-  NaggEnrichmentSchema,
-  NaggFeedPageSchema,
-  NaggNotificationsPageSchema,
-  NaggThreadSchema,
+  NaggEnvelopeSchema,
+  NaggNotificationsEnvelopeSchema,
+  enrichmentFromEnvelope,
+  feedPageFromEnvelope,
+  notificationsPageFromEnvelope,
+  threadFromEnvelope,
   type NaggAppViewBinding,
   type NaggError,
   type NaggNotificationsPage,
@@ -100,9 +102,12 @@ type NaggRestOptions<TSchema extends z.ZodType> = {
 
 /**
  * One REST app-view request per view. The caller supplies the route `binding`
- * (path + params/body, from a recipe) and the canonical `responseSchema`; nagg's
- * app-view emits the canonical shape directly, so the raw body is parsed by the
- * schema with no distill step. Errors are logged and rethrown.
+ * (path + params/body, from a recipe) and the route's envelope `responseSchema`;
+ * nagg v2 answers every app-view route with the ONE generic envelope
+ * (`{ order, orderBy, events, aggregates, cursor? }`), which the caller
+ * reconstructs into the canonical shape via `nostr`'s envelope helpers
+ * (`feedPageFromEnvelope`, `threadFromEnvelope`, …). Errors are logged and
+ * rethrown.
  */
 async function runNaggRest<TSchema extends z.ZodType>(
   binding: NaggAppViewBinding,
@@ -184,36 +189,39 @@ function logBackendConfigOnce(): void {
   });
 }
 
-// Counts the rows in a parsed canonical payload (feed items / notification nodes
-// / thread events) for log diagnostics — distinguishes "request returned data"
-// from "request returned an empty page".
+// Counts the rows in a parsed payload for log diagnostics — distinguishes
+// "request returned data" from "request returned an empty page". A v2 envelope
+// carries the server render order in `order` (anchor ids), so prefer it; fall
+// back to `events`/`entries` for routes whose order is empty by design.
 function countCanonical(value: unknown): number {
   if (!value || typeof value !== 'object') return 0;
   const v = value as {
-    items?: unknown[];
-    notifications?: { nodes?: unknown[] };
+    order?: unknown[];
+    entries?: unknown[];
     events?: unknown[];
   };
-  if (Array.isArray(v.items)) return v.items.length;
-  if (v.notifications && Array.isArray(v.notifications.nodes)) return v.notifications.nodes.length;
+  if (Array.isArray(v.order) && v.order.length > 0) return v.order.length;
+  if (Array.isArray(v.entries) && v.entries.length > 0) return v.entries.length;
   if (Array.isArray(v.events)) return v.events.length;
   return 0;
 }
 
 /**
- * The feed seam: fetch a route binding's canonical {@link NaggFeedPage} from the
- * REST app-view and feed it straight into `mapNaggFeedPage`.
+ * The feed seam: fetch a route binding's v2 envelope from the REST app-view,
+ * reconstruct the canonical {@link NaggFeedPage} with `feedPageFromEnvelope`,
+ * and feed it straight into `mapNaggFeedPage`.
  */
-function fetchNaggFeedPage(
+async function fetchNaggFeedPage(
   binding: NaggAppViewBinding,
   refresh: boolean | undefined,
   options: { signal?: AbortSignal; timeoutMs?: number } = {}
 ): Promise<NaggFeedPage<FeedEvent, ProfileInfo>> {
-  return runNaggRest(binding, refresh, {
-    responseSchema: NaggFeedPageSchema,
+  const envelope = await runNaggRest(binding, refresh, {
+    responseSchema: NaggEnvelopeSchema,
     signal: options.signal,
     timeoutMs: options.timeoutMs,
-  }) as Promise<NaggFeedPage<FeedEvent, ProfileInfo>>;
+  });
+  return feedPageFromEnvelope(envelope) as NaggFeedPage<FeedEvent, ProfileInfo>;
 }
 
 function errorFromNaggError(error: NaggError): Error {
@@ -626,25 +634,31 @@ export function createNaggFeedClient(): FeedClient {
       if (missingQuotedIds.length > 0) {
         tasks.push(
           runNaggRest(eventsAppView(missingQuotedIds), refresh, {
-            responseSchema: NaggEnrichmentSchema,
+            responseSchema: NaggEnvelopeSchema,
             signal,
             timeoutMs,
-          }).then((page) => ({
-            metrics: new Map(Object.entries(page.metrics)) as Map<string, NoteMetrics>,
-            profiles: new Map(Object.entries(page.profiles)) as Map<string, ProfileInfo>,
-            quotedEvents: new Map(Object.entries(page.quoted)) as Map<string, FeedEvent>,
-          }))
+          }).then((envelope) => {
+            const page = enrichmentFromEnvelope(envelope);
+            return {
+              metrics: new Map(Object.entries(page.metrics)) as Map<string, NoteMetrics>,
+              profiles: new Map(Object.entries(page.profiles)) as Map<string, ProfileInfo>,
+              quotedEvents: new Map(Object.entries(page.quoted)) as Map<string, FeedEvent>,
+            };
+          })
         );
       }
 
       if (missingProfilePubkeys.length > 0) {
         tasks.push(
           runNaggRest(profilesAppView(missingProfilePubkeys), refresh, {
-            responseSchema: NaggEnrichmentSchema,
+            responseSchema: NaggEnvelopeSchema,
             signal,
             timeoutMs,
-          }).then((page) => ({
-            profiles: new Map(Object.entries(page.profiles)) as Map<string, ProfileInfo>,
+          }).then((envelope) => ({
+            profiles: new Map(Object.entries(enrichmentFromEnvelope(envelope).profiles)) as Map<
+              string,
+              ProfileInfo
+            >,
           }))
         );
       }
@@ -682,7 +696,7 @@ export function createNaggFeedClient(): FeedClient {
       signal,
       timeoutMs,
     }: FeedNotificationsRequest): Promise<FeedNotificationsResult> {
-      const page = await runNaggRest(
+      const envelope = await runNaggRest(
         notificationsAppView({
           pubkey: viewerPubkey,
           tab,
@@ -694,8 +708,11 @@ export function createNaggFeedClient(): FeedClient {
           grouped,
         }),
         refresh,
-        { responseSchema: NaggNotificationsPageSchema, signal, timeoutMs }
+        { responseSchema: NaggNotificationsEnvelopeSchema, signal, timeoutMs }
       );
+      // v2 sends grouped `entries` with NO reason strings; the reconstruction
+      // derives follow/repost/reaction/zap/reply/quote/mention client-side.
+      const page = notificationsPageFromEnvelope(envelope);
       const result = notificationsResultFromPage(page);
       feedLog.info('feed.notifications.fetch.done', {
         transport: 'appview',
@@ -731,7 +748,7 @@ export function createNaggFeedClient(): FeedClient {
       // engagement sorts (likes/zaps/reposts) all map to the server's `ranked`.
       const threadSort: 'relevant' | 'ranked' | 'new' =
         sort === 'relevant' || sort === 'new' ? sort : 'ranked';
-      const page = await runNaggRest(
+      const envelope = await runNaggRest(
         threadAppView({
           id: eventId,
           limit: candidateLimit,
@@ -743,8 +760,16 @@ export function createNaggFeedClient(): FeedClient {
           rankedLimit: Math.min(candidateLimit, 50),
         }),
         false,
-        { responseSchema: NaggThreadSchema, signal, timeoutMs }
+        { responseSchema: NaggEnvelopeSchema, signal, timeoutMs }
       );
+      // v2: order[0] is the root id, the rest the ranked reply ids. A missing/
+      // unhydrated root means nagg has nothing to render — surface it as an
+      // error, exactly as the v1 schema parse would have (the caller's
+      // fallback/error handling is unchanged).
+      const page = threadFromEnvelope(envelope);
+      if (!page) {
+        throw new Error(`nagg thread root missing for ${eventId.slice(0, 10)}`);
+      }
 
       // The canonical thread carries the root + flat descendants + side maps;
       // FeedEvent/NoteMetrics/ProfileInfo are structurally the canonical shapes,

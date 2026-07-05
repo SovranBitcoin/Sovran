@@ -1,6 +1,6 @@
 import { parseResponse, prettify, type FetchParseError } from '@sovranbitcoin/schemas';
+import { NaggEnvelopeSchema } from 'nostr';
 import { z, type ZodType } from 'zod';
-import { NaggEnrichmentResponse, NaggFeedResponse, NaggThreadResponse } from '../naggSchemas';
 
 type Probe = {
   name: string;
@@ -23,18 +23,21 @@ const baseUrl = stripTrailingSlash(
 const pubkey = process.env.NAGG_PROBE_PUBKEY;
 const eventId = process.env.NAGG_PROBE_EVENT_ID;
 
+// nagg v2 answers every app-view route with the ONE generic envelope
+// (`{ order, orderBy, events, aggregates, cursor? }`), so every shaped probe
+// validates against `NaggEnvelopeSchema`.
 const probes: Probe[] = [
   { name: 'healthz', path: '/healthz' },
   {
     name: 'follows feed',
     path: pubkey ? `/nostr/feed?kind=follows&pubkeys=${encodeURIComponent(pubkey)}&limit=5` : '',
-    schema: NaggFeedResponse,
+    schema: NaggEnvelopeSchema,
     optional: !pubkey,
   },
   {
     name: 'user feed',
     path: pubkey ? `/nostr/feed/user?pubkey=${encodeURIComponent(pubkey)}&limit=5` : '',
-    schema: NaggFeedResponse,
+    schema: NaggEnvelopeSchema,
     optional: !pubkey,
   },
   {
@@ -45,18 +48,19 @@ const probes: Probe[] = [
   {
     name: 'thread',
     path: eventId ? `/nostr/thread?id=${encodeURIComponent(eventId)}&limit=100` : '',
-    schema: NaggThreadResponse,
+    schema: NaggEnvelopeSchema,
     optional: !eventId,
   },
   {
     name: 'events enrichment',
     path: eventId ? `/nostr/events?ids=${encodeURIComponent(eventId)}` : '',
-    schema: NaggEnrichmentResponse,
+    schema: NaggEnvelopeSchema,
     optional: !eventId,
   },
   {
-    name: 'notes stats',
-    path: '/nostr/notes/stats',
+    name: 'events aggregates',
+    path: '/nostr/events/aggregates',
+    schema: NaggEnvelopeSchema,
     init: {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

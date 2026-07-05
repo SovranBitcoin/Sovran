@@ -18,8 +18,10 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
 }));
 
 // The nagg client is app-view (REST) only — these tests mock fetch returning the
-// canonical REST bodies nagg emits, and assert the client maps them and hits the
-// right `/v1/nostr/*` route. There is no GraphQL transport.
+// v2 generic envelopes nagg emits (`{ order, orderBy, events, aggregates,
+// cursor? }`, plus `entries`/`hasNext` on notifications), and assert the client
+// reconstructs them and hits the right `/v1/nostr/*` route. There is no GraphQL
+// transport.
 
 const ENV_KEYS = [
   'EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL',
@@ -50,7 +52,10 @@ const note = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const emptyStats = { likeCount: 0, repostCount: 0, replyCount: 0, satsZapped: 0 };
+// A kind-0 profile event — v2 envelopes hydrate profiles as raw kind-0 events,
+// not a server-built `profiles` side map.
+const profileEvent = (pubkey: string, name: string) =>
+  note({ id: `k0-${pubkey}`, kind: 0, pubkey, content: JSON.stringify({ name }) });
 
 function loadClient() {
   const { createNaggFeedClient } = jest.requireActual<
@@ -95,13 +100,11 @@ describe('createNaggFeedClient (app-view REST)', () => {
   it('maps a generic feed page from GET /v1/nostr/feed', async () => {
     mockFetch.mockResolvedValueOnce(
       restResponse({
-        items: [{ type: 'note', event: note() }],
-        ordering: { orderBy: 'created_at', elements: ['root'] },
-        metrics: { root: emptyStats },
-        profiles: { alice: { name: 'Alice' } },
-        quoted: {},
-        paginationUntil: 100,
-        paginationOffset: 1,
+        order: ['root'],
+        orderBy: 'created_at',
+        events: [note(), profileEvent('alice', 'Alice')],
+        aggregates: {},
+        cursor: '100|1',
       })
     );
 
@@ -122,13 +125,11 @@ describe('createNaggFeedClient (app-view REST)', () => {
   it('routes a for-you spec to POST /v1/nostr/feed/ranked', async () => {
     mockFetch.mockResolvedValueOnce(
       restResponse({
-        items: [{ type: 'note', event: note() }],
-        ordering: { orderBy: 'rank', elements: ['root'] },
-        metrics: { root: emptyStats },
-        profiles: {},
-        quoted: {},
-        paginationUntil: 0,
-        paginationOffset: 1,
+        order: ['root'],
+        orderBy: 'rank',
+        events: [note()],
+        aggregates: {},
+        cursor: '0|1',
       })
     );
 
@@ -146,16 +147,11 @@ describe('createNaggFeedClient (app-view REST)', () => {
   it('getUserFeed filters to the author root notes from /v1/nostr/feed/user', async () => {
     mockFetch.mockResolvedValueOnce(
       restResponse({
-        items: [
-          { type: 'note', event: note({ id: 'own', pubkey: 'bob' }) },
-          { type: 'note', event: note({ id: 'other', pubkey: 'alice' }) },
-        ],
-        ordering: { orderBy: 'created_at', elements: ['own', 'other'] },
-        metrics: {},
-        profiles: {},
-        quoted: {},
-        paginationUntil: 100,
-        paginationOffset: 2,
+        order: ['own', 'other'],
+        orderBy: 'created_at',
+        events: [note({ id: 'own', pubkey: 'bob' }), note({ id: 'other', pubkey: 'alice' })],
+        aggregates: {},
+        cursor: '100|2',
       })
     );
 
@@ -166,22 +162,17 @@ describe('createNaggFeedClient (app-view REST)', () => {
     expect(result.orderedFeedItems[0]).toMatchObject({ type: 'note' });
   });
 
-  it('getNotifications maps the canonical connection from /v1/nostr/notifications', async () => {
+  it('getNotifications derives reasons from the v2 entries of /v1/nostr/notifications', async () => {
+    // v2 sends NO reason strings — a kind-1 entry whose event has no e/q tags
+    // must derive to 'mention' client-side.
     mockFetch.mockResolvedValueOnce(
       restResponse({
-        notifications: {
-          nodes: [
-            {
-              event: note({ id: 'n1', pubkey: 'carol' }),
-              reason: 'mention',
-              actorVertexScore: 0.5,
-            },
-          ],
-          pageInfo: { hasNextPage: false, endCursor: null },
-        },
-        metrics: { n1: emptyStats },
-        profiles: { carol: { name: 'Carol' } },
-        quoted: {},
+        order: [],
+        orderBy: 'created_at',
+        events: [note({ id: 'n1', pubkey: 'carol' }), profileEvent('carol', 'Carol')],
+        aggregates: {},
+        entries: [{ id: 'n1', kind: 1, actor: 'carol' }],
+        hasNext: false,
       })
     );
 
@@ -189,6 +180,7 @@ describe('createNaggFeedClient (app-view REST)', () => {
 
     expect(lastUrl()).toContain('/v1/nostr/notifications');
     expect(result.notifications).toHaveLength(1);
+    expect(result.notifications[0].reason).toBe('mention');
     expect(result.profilesMap.get('carol')).toEqual({ name: 'Carol' });
   });
 
@@ -197,12 +189,11 @@ describe('createNaggFeedClient (app-view REST)', () => {
     const reply2 = note({ id: 'reply2', pubkey: 'carol', tags: [['e', 'root', '', 'reply']] });
     mockFetch.mockResolvedValueOnce(
       restResponse({
-        root: note(),
-        events: [reply1, reply2],
-        ordering: { orderBy: 'rank', elements: ['reply2', 'reply1'] },
-        metrics: { root: emptyStats },
-        profiles: {},
-        quoted: {},
+        // order[0] is the root id; the rest are the server-ranked reply ids.
+        order: ['root', 'reply2', 'reply1'],
+        orderBy: 'rank',
+        events: [note(), reply1, reply2],
+        aggregates: {},
       })
     );
 
@@ -225,13 +216,19 @@ describe('createNaggFeedClient (app-view REST)', () => {
     mockFetch
       .mockResolvedValueOnce(
         restResponse({
-          metrics: { q1: emptyStats },
-          profiles: {},
-          quoted: { q1: note({ id: 'q1' }) },
+          order: ['q1'],
+          orderBy: 'created_at',
+          events: [note({ id: 'q1' })],
+          aggregates: {},
         })
       )
       .mockResolvedValueOnce(
-        restResponse({ metrics: {}, profiles: { dave: { name: 'Dave' } }, quoted: {} })
+        restResponse({
+          order: [],
+          orderBy: 'created_at',
+          events: [profileEvent('dave', 'Dave')],
+          aggregates: {},
+        })
       );
 
     const updates = await loadClient().enrich({
@@ -249,13 +246,10 @@ describe('createNaggFeedClient (app-view REST)', () => {
   it('never issues a GraphQL request', async () => {
     mockFetch.mockResolvedValue(
       restResponse({
-        items: [],
-        ordering: { orderBy: 'created_at', elements: [] },
-        metrics: {},
-        profiles: {},
-        quoted: {},
-        paginationUntil: 0,
-        paginationOffset: 0,
+        order: [],
+        orderBy: 'created_at',
+        events: [],
+        aggregates: {},
       })
     );
 

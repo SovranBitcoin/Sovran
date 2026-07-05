@@ -71,24 +71,4 @@ export const NaggFeedResponse = z
   })
   .passthrough();
 
-export const NaggEnrichmentResponse = z
-  .object({
-    metrics: z.record(z.string(), NaggNoteMetrics).default({}),
-    profiles: z.record(z.string(), NaggProfileInfo).default({}),
-    quoted: z.record(z.string(), NaggFeedEvent).default({}),
-  })
-  .passthrough();
-
-export const NaggThreadResponse = z
-  .object({
-    root: NaggFeedEvent.nullable().optional(),
-    events: z.array(NaggFeedEvent).default([]),
-    metrics: z.record(z.string(), NaggNoteMetrics).default({}),
-    profiles: z.record(z.string(), NaggProfileInfo).default({}),
-    quoted: z.record(z.string(), NaggFeedEvent).default({}),
-  })
-  .passthrough();
-
 export type NaggFeedResponseData = z.infer<typeof NaggFeedResponse>;
-export type NaggEnrichmentResponseData = z.infer<typeof NaggEnrichmentResponse>;
-export type NaggThreadResponseData = z.infer<typeof NaggThreadResponse>;
