@@ -279,7 +279,9 @@ export function SendScreen({ unit }: { unit: string }) {
     useContactSendStore.getState().clear();
     // No reset: we're mid-flow on selectDestination and want to keep `unit`.
     // Routes to amount entry with no recipient — a bearer hand-off token.
-    void machine.startSendEcash({});
+    // entrySource lets the amount screen show a single "Create ecash" action
+    // instead of the generic Next + Paste + Scan chrome.
+    void machine.startSendEcash({ entrySource: 'createEcash' });
   }, [machine]);
 
   const nfcSupported = useNfcSupported();
@@ -483,7 +485,7 @@ export function SendScreen({ unit }: { unit: string }) {
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onSubmitEditing={handleSubmitDestination}
-          placeholder="Address, invoice, token, or name"
+          placeholder="Name, address, or token"
           placeholderTextColor={opacity(foreground, 0.4)}
           autoCapitalize="none"
           autoCorrect={false}

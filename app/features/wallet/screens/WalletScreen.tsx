@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 
 import {
@@ -18,9 +17,8 @@ import { LayoutDebugWrapper } from '@/shared/ui/composed/LayoutDebugWrapper';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { zIndex } from '@/shared/styles/tokens';
 import { LayoutShiftProbe } from '@/shared/ui/composed/LayoutShiftProbe';
-import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
+import { CircleActionRow, type CircleRowAction } from '@/shared/ui/composed/CircleActionRow';
 import { QRButton } from '@/shared/ui/composed/QRButton';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useHandleCameraPermission } from '@/features/camera';
@@ -28,10 +26,7 @@ import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
-import { useNfcSupported } from '@/shared/lib/nfc';
 import { useAmbientNfcArm } from '@/features/wallet/hooks/useAmbientNfcArm';
-import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
-import { showActionSheet } from '@/shared/lib/popup';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { useHeaderHeight } from 'expo-router/react-navigation';
@@ -95,7 +90,7 @@ export function WalletScreen() {
 
   const { handlePermission } = useHandleCameraPermission();
   const walletContext = useWalletContext();
-  const machine = usePaymentFlowMachine({ walletContext, unit: account.unit });
+  const machine = usePaymentFlowMachine({ walletContext });
 
   // While a multi-leg swap is running, every payment-initiating button on
   // this screen is gated. Coco's mint/melt services serialize through a
@@ -138,32 +133,46 @@ export function WalletScreen() {
     router.push('/(theme-flow)/preview');
   }, []);
 
-  const handleNearPay = useCallback(() => {
-    walletLog.info('wallet.near_pay.tap', { unit: account.unit });
-    clearPaymentContext('wallet.near_pay');
-    router.push('/(send-flow)/nearPay');
+  const handleSplit = useCallback(() => {
+    walletLog.info('wallet.swap.tap', { unit: account.unit });
+    router.navigate({
+      pathname: '/(mint-flow)/distribution',
+      params: { unit: account.unit },
+    });
   }, [account.unit]);
 
-  const nfcSupported = useNfcSupported();
-  // Android hybrid tap-to-pay: the ambient focus loop owns NFC scanning, so
-  // the button only surfaces the tap-to-pay sheet (the "visual indicator").
-  // iOS keeps press-to-scan — the system "Ready to Scan" sheet IS the UI and
-  // iOS cannot listen ambiently.
+  // Android hybrid tap-to-pay: the ambient focus loop owns NFC scanning.
+  // The wallet screen no longer has an NFC button (the affordance lives in
+  // the Send modal) but the ambient listener stays armed here so tapping a
+  // terminal still works from the home screen.
   useAmbientNfcArm(machine);
-  const nfcArmed = useNfcTapStore((s) => s.armed);
-  const handleNfc = useCallback(() => {
-    walletLog.info('wallet.action.nfc', { unit: account.unit, armed: nfcArmed });
-    if (Platform.OS === 'android' && nfcArmed) {
-      showActionSheet('nfc-tap', {});
-      return;
-    }
-    // iOS always; Android only when the ambient loop is NOT armed (NFC off /
-    // start failure) — a one-shot press scan surfaces the existing
-    // "NFC is turned off" popups instead of a sheet that falsely claims to
-    // be listening.
-    clearPaymentContext('wallet.nfc');
-    void machine.scan?.(undefined, { source: 'nfc' });
-  }, [machine, nfcArmed, account.unit]);
+
+  // Secondary wallet actions in priority order. CircleActionRow decides what
+  // to render: today's two actions are two circle buttons; a fourth would
+  // collapse the tail into "More". NFC and Nut Drop live in the Send modal.
+  const secondaryActions = useMemo<CircleRowAction[]>(
+    () => [
+      {
+        icon: 'mdi:swap-horizontal',
+        systemIcon: 'arrow.left.arrow.right',
+        label: 'Split',
+        menuText: 'Balance split',
+        description: 'Rebalance funds across mints',
+        testID: 'wallet-split',
+        disabled: isSwapping,
+        onPress: handleSplit,
+      },
+      {
+        icon: 'mdi:palette',
+        systemIcon: 'paintpalette',
+        label: 'Theme',
+        description: 'Change wallet appearance',
+        testID: 'wallet-theme',
+        onPress: handleTheme,
+      },
+    ],
+    [isSwapping, handleSplit, handleTheme]
+  );
 
   // Keep BootEntrance and the wallet body mounted across the search toggle so
   // the splash→QR morph never replays and closing search restores this screen.
@@ -181,61 +190,11 @@ export function WalletScreen() {
               <Account minHeight={minBalanceHeight} />
             </LayoutShiftProbe>
 
-            <HStack justify="space-around" style={styles.secondaryActions}>
-              <CircleActionButton
-                icon="mdi:swap-horizontal"
-                systemIcon="arrow.left.arrow.right"
-                label="Swap"
-                testID="wallet-swap"
-                disabled={isSwapping}
-                onPress={() => {
-                  walletLog.info('wallet.swap.tap', { unit: account.unit });
-                  router.navigate({
-                    pathname: '/(mint-flow)/distribution',
-                    params: { unit: account.unit },
-                  });
-                }}
-              />
-              {nfcSupported ? (
-                <CircleActionButton
-                  icon="lucide:nfc"
-                  systemIcon="wave.3.right"
-                  label="NFC"
-                  testID="wallet-nfc"
-                  disabled={isSwapping}
-                  onPress={handleNfc}
-                />
-              ) : null}
-              <CircleActionButton
-                icon="tabler:dots"
-                systemIcon="ellipsis"
-                label="More"
-                testID="wallet-more"
-                onPress={() =>
-                  // App-wide bottom sheet via <ActionMenuHost />; no inline sheet.
-                  actionMenuPopup({
-                    title: 'Select option',
-                    buttons: [
-                      {
-                        text: 'Theme',
-                        icon: 'mdi:palette',
-                        description: 'Change wallet appearance',
-                        testID: 'wallet-action-theme',
-                        onPress: () => handleTheme(),
-                      },
-                      {
-                        text: 'Nut Drop',
-                        icon: 'mdi:bluetooth',
-                        description: 'Pay a nearby BitChat user',
-                        testID: 'wallet-action-near-pay',
-                        disabled: isSwapping,
-                        onPress: () => handleNearPay(),
-                      },
-                    ],
-                  })
-                }
-              />
-            </HStack>
+            <CircleActionRow
+              actions={secondaryActions}
+              moreTestID="wallet-more"
+              style={styles.secondaryActions}
+            />
 
             {/* Wrap the Receive / Send / QR row in a single pointerEvents=none
                 shroud while swapping. CapsuleButton and QRButton don't accept a
