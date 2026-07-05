@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-const DEFAULT_NOSTR_APPVIEW_BASE_URL = 'https://nagg.up.railway.app';
+// The v2 stack: this branch's vendored nostr/ package speaks the v2 generic
+// envelope, so the code-coupled default must be the v2 deployment. Release
+// profiles override via eas.json env until the production cutover.
+const DEFAULT_NOSTR_APPVIEW_BASE_URL = 'https://nagg-production.up.railway.app';
 const DEFAULT_API_BASE_URL = 'https://api.sovran.money/api';
 /**
  * Primal's PUBLIC cache server (Primal operates it; we only connect). Tier 2 of

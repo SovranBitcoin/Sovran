@@ -3,10 +3,10 @@ import { parseBackendConfig } from '@/shared/config/backend';
 describe('backend config', () => {
   it('defaults Nostr app-view, score, and GraphQL calls when env is unset', () => {
     expect(parseBackendConfig({})).toEqual({
-      nostrAppViewBaseUrl: 'https://nagg.up.railway.app',
+      nostrAppViewBaseUrl: 'https://nagg-production.up.railway.app',
       apiBaseUrl: 'https://api.sovran.money/api',
-      scoreApiBaseUrl: 'https://nagg.up.railway.app',
-      nostrGraphqlEndpoint: 'https://nagg.up.railway.app/graphql',
+      scoreApiBaseUrl: 'https://nagg-production.up.railway.app',
+      nostrGraphqlEndpoint: 'https://nagg-production.up.railway.app/graphql',
       primalCacheUrl: 'wss://cache2.primal.net/v1',
     });
   });
