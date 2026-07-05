@@ -39,6 +39,15 @@ export interface StandingPaymentRequestInput {
    * the keyring under purpose 'p2pk' (exact lookup, no fallback).
    */
   lockP2pkPubkey?: string;
+  /**
+   * Optional narrowed mint list for the DISPLAYED encoding (user toggles /
+   * P2PK capability filtering). Applied as an intersection with the durable
+   * op's own mint list, so the display can only ever advertise a subset —
+   * the op keeps the FULL trusted list, and a payment from a de-advertised
+   * (still trusted) mint still claims. Like the lock, changing this only
+   * re-encodes; it never rotates the operation.
+   */
+  displayMints?: string[];
 }
 
 export interface StandingPaymentRequest {
@@ -65,21 +74,38 @@ function generateRequestId(): string {
 }
 
 /** Re-encode coco's request without the floor amount (and optionally WITH a
- *  NUT-10 P2PK lock) for display. */
+ *  NUT-10 P2PK lock and/or a narrowed mint list) for display. */
 function toAmountlessEncodings(
   encodedRequest: string,
   lockP2pkPubkey?: string,
+  displayMints?: string[],
 ): {
   encodedRequest: string;
   encodedRequestB: string;
 } {
   const decoded = decodePaymentRequest(encodedRequest);
+  let mints = decoded.mints;
+  if (displayMints && displayMints.length > 0 && mints && mints.length > 0) {
+    const allowed = new Set(displayMints);
+    const narrowed = mints.filter((m) => allowed.has(m));
+    // An empty intersection would advertise "any mint" (m is optional in
+    // NUT-18) — worse than the un-narrowed list. Callers prevent this; keep
+    // the op's list as the defensive floor.
+    if (narrowed.length > 0) {
+      mints = narrowed;
+    } else {
+      logger.warn("creq.standing.display_mints_empty_intersection", {
+        opMintCount: mints.length,
+        displayMintCount: displayMints.length,
+      });
+    }
+  }
   const display = new PaymentRequest(
     decoded.transport,
     decoded.id,
     undefined, // amount — the whole point
     decoded.unit,
-    decoded.mints,
+    mints,
     decoded.description,
     false, // singleUse
     lockP2pkPubkey
@@ -107,12 +133,16 @@ type IncomingOp = Awaited<
 
 function toStanding(
   operation: IncomingOp,
-  lockP2pkPubkey?: string,
+  input: Pick<StandingPaymentRequestInput, "lockP2pkPubkey" | "displayMints">,
 ): StandingPaymentRequest {
   return {
     operationId: operation.id,
     requestId: operation.requestId,
-    ...toAmountlessEncodings(operation.encodedRequest, lockP2pkPubkey),
+    ...toAmountlessEncodings(
+      operation.encodedRequest,
+      input.lockP2pkPubkey,
+      input.displayMints,
+    ),
     mints: operation.mints,
     unit: operation.unit,
   };
@@ -140,10 +170,11 @@ async function createStanding(
     reason,
     unit: operation.unit,
     mintCount: operation.mints.length,
+    displayMintCount: input.displayMints?.length ?? null,
     encodedLength: operation.encodedRequest.length,
     hasP2pkLock: !!input.lockP2pkPubkey,
   });
-  return toStanding(operation, input.lockP2pkPubkey);
+  return toStanding(operation, input);
 }
 
 const inFlight = new Map<string, Promise<StandingPaymentRequest>>();
@@ -165,7 +196,7 @@ function cacheFor(manager: Manager): Map<string, StandingPaymentRequest> {
 }
 
 function cacheKey(input: StandingPaymentRequestInput): string {
-  return `${standingPaymentRequestKey(input.unit)}|${input.lockP2pkPubkey ?? ""}`;
+  return `${standingPaymentRequestKey(input.unit)}|${input.lockP2pkPubkey ?? ""}|${input.displayMints?.join(",") ?? ""}`;
 }
 
 /** Synchronous read of the last resolved standing request (per lock state)
@@ -211,9 +242,10 @@ export async function ensureStandingPaymentRequest(
         logger.info("creq.standing.reused", {
           unit: operation.unit,
           mintCount: operation.mints.length,
+          displayMintCount: input.displayMints?.length ?? null,
           hasP2pkLock: !!input.lockP2pkPubkey,
         });
-        return toStanding(operation, input.lockP2pkPubkey);
+        return toStanding(operation, input);
       }
       reason = !operation
         ? "recorded_not_found"

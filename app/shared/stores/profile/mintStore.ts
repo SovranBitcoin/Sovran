@@ -27,6 +27,10 @@ interface MintState {
   /** Cashu rail: advertise a NUT-10 P2PK lock in the standing payment
    *  request so payers lock ecash to this wallet's key. */
   creqP2pkLock: boolean;
+  /** Cashu rail: mints the user toggled OFF in the payment request's
+   *  Advanced section (url → true). Advertisement-only — the mint stays
+   *  trusted, so payments sent to an old copy of the request still claim. */
+  creqExcludedMints: Record<string, boolean>;
 }
 
 interface MintActions {
@@ -35,6 +39,7 @@ interface MintActions {
   setStandingQuote: (key: string, quoteId: string) => void;
   setReceiveMintForMethod: (method: 'bolt12' | 'onchain', mintUrl: string) => void;
   setCreqP2pkLock: (enabled: boolean) => void;
+  setCreqMintExcluded: (mintUrl: string, excluded: boolean) => void;
 }
 
 type MintStore = MintState & MintActions;
@@ -54,6 +59,9 @@ const PersistedMintStore = z.object({
   receiveMintByMethod: z.record(z.string(), z.string().max(2048)).default({}).catch({}),
   // Additive tolerant field: corrupt value degrades to false (lock off).
   creqP2pkLock: z.boolean().default(false).catch(false),
+  // Additive tolerant field: a corrupt map degrades to {} (all mints
+  // advertised again) instead of wiping the store.
+  creqExcludedMints: z.record(z.string().max(2048), z.boolean()).default({}).catch({}),
 });
 
 // v1 -> v2: the storage seam (createProfileScopedStorage) already partitions
@@ -87,6 +95,7 @@ export const useMintStore = create<MintStore>()(
       standingQuotes: {},
       receiveMintByMethod: {},
       creqP2pkLock: false,
+      creqExcludedMints: {},
 
       setSelectedMint: (mintUrl: string) => {
         storeLog.info('store.mint.set_selected', { mintUrl });
@@ -108,6 +117,19 @@ export const useMintStore = create<MintStore>()(
       setCreqP2pkLock: (enabled: boolean) => {
         storeLog.info('store.mint.set_creq_p2pk_lock', { enabled });
         set({ creqP2pkLock: enabled });
+      },
+
+      setCreqMintExcluded: (mintUrl: string, excluded: boolean) => {
+        storeLog.info('store.mint.set_creq_mint_excluded', {
+          mintUrlLength: mintUrl.length,
+          excluded,
+        });
+        set((state) => {
+          const next = { ...state.creqExcludedMints };
+          if (excluded) next[mintUrl] = true;
+          else delete next[mintUrl];
+          return { creqExcludedMints: next };
+        });
       },
 
       setReceiveMintForMethod: (method: 'bolt12' | 'onchain', mintUrl: string) => {
@@ -132,6 +154,7 @@ export const useMintStore = create<MintStore>()(
         standingQuotes: state.standingQuotes,
         receiveMintByMethod: state.receiveMintByMethod,
         creqP2pkLock: state.creqP2pkLock,
+        creqExcludedMints: state.creqExcludedMints,
       }),
     })
   )

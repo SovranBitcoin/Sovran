@@ -200,6 +200,17 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
         ],
         "type": "string",
       },
+      "creqExcludedMints": {
+        "additionalProperties": {
+          "type": "boolean",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 2048,
+          "type": "string",
+        },
+        "type": "object",
+      },
       "creqP2pkLock": {
         "default": false,
         "type": "boolean",
@@ -236,6 +247,7 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
       "standingQuotes",
       "receiveMintByMethod",
       "creqP2pkLock",
+      "creqExcludedMints",
     ],
     "type": "object",
   },

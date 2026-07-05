@@ -12,7 +12,7 @@
  * simply "any trusted mint exists".
  */
 
-import React, { memo, useCallback, useEffect, useMemo } from 'react';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 
 import { router } from 'expo-router';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
@@ -35,7 +35,7 @@ import { copyPopup } from '@/shared/lib/popup';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
-import { MAX_ADVERTISED_MINTS } from '@/features/receive/lib/standingQuoteIdentityStore';
+import type { CreqMintSelection } from '@/features/receive/lib/creqMintSelection';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import Icon from 'assets/icons';
@@ -52,6 +52,10 @@ interface ReceivePaymentRequestTabProps {
    *  and shared with the Unified tab — so both rails always show the SAME
    *  (current) creq and neither can flash a retired one. */
   creq: UseStandingPaymentRequestResult;
+  /** Which trusted mints the request advertises (Advanced toggles + NUT-11
+   *  gating under the P2PK lock) — derived by ReceiveScreen, the owner of
+   *  the creq input, so the toggles and the encoding can't drift. */
+  mintSelection: CreqMintSelection;
   /** Reports the encoded creq upward for the QR display's footer Copy
    *  button. */
   onQrPayload?: OnReceiveQrPayload;
@@ -63,18 +67,38 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   p2pkKey,
   muted,
   creq,
+  mintSelection,
   onQrPayload,
 }: ReceivePaymentRequestTabProps) {
   // P2PK lock (absorbs the old P2PK tab): when on, the DISPLAYED request
   // advertises a NUT-10 lock to the keyring key — payers lock their ecash to
   // this wallet; coco's claim path signs the locked proofs transparently.
-  // The lock feeds the shared request via ReceiveScreen's input.
+  // The lock feeds the shared request via ReceiveScreen's input. NUT-11 is
+  // optional per mint, so the toggle also needs a capable mint to exist —
+  // locking over incapable-only mints would advertise anyone-can-spend
+  // ecash as locked.
   const creqP2pkLock = useMintStore((s) => s.creqP2pkLock);
   const setCreqP2pkLock = useMintStore((s) => s.setCreqP2pkLock);
-  const mints = useMemo(
-    () => walletContext.trustedMintUrls.slice(0, MAX_ADVERTISED_MINTS),
-    [walletContext.trustedMintUrls]
-  );
+  const setCreqMintExcluded = useMintStore((s) => s.setCreqMintExcluded);
+  const mints = walletContext.trustedMintUrls;
+
+  // Advanced (mint toggles) — collapsed by default, chevron expander like
+  // DetailsSection.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // Contradictory persisted state: the lock is on but every NUT-11-capable
+  // mint was toggled off earlier (while the lock was off). The selection
+  // already advertises the capable set (never an empty "any mint" list);
+  // clear the stale exclusions so the switches match what's advertised.
+  useEffect(() => {
+    if (!mintSelection.needsExclusionReset) return;
+    paymentLog.warn('receive.creq.exclusions_reset', {
+      count: mintSelection.options.filter((o) => o.enabled).length,
+    });
+    for (const option of mintSelection.options) {
+      if (option.enabled) setCreqMintExcluded(option.mintUrl, false);
+    }
+  }, [mintSelection, setCreqMintExcluded]);
 
   const { request, error, rotate } = creq;
   const manager = useColadaManager();
@@ -133,6 +157,24 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
     copyPopup('paymentRequest');
     paymentLog.info('receive.creq.copied', { requestLength: request.encodedRequest.length });
   }, [request]);
+
+  const handleAdvancedToggle = useCallback(() => {
+    setAdvancedOpen((open) => {
+      paymentLog.info('receive.creq.advanced_toggled', { open: !open });
+      return !open;
+    });
+  }, []);
+
+  const handleMintToggle = useCallback(
+    (mintUrl: string, advertise: boolean) => {
+      paymentLog.info('receive.creq.mint_toggled', {
+        mintUrlLength: mintUrl.length,
+        advertise,
+      });
+      setCreqMintExcluded(mintUrl, !advertise);
+    },
+    [setCreqMintExcluded]
+  );
 
   const renderEmptyState = (message: string, cta?: React.ReactNode) => (
     <View className="mx-4 mt-8">
@@ -228,15 +270,17 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
                 <ListGroup.ItemContent>
                   <ListGroup.ItemTitle>P2PK lock</ListGroup.ItemTitle>
                   <ListGroup.ItemDescription>
-                    {p2pkKey
-                      ? 'Payers lock ecash to your key'
-                      : 'No P2PK key — generate one in Settings'}
+                    {!p2pkKey
+                      ? 'No P2PK key — generate one in Settings'
+                      : !mintSelection.hasP2pkCapableMint
+                        ? 'None of your mints support P2PK locks'
+                        : 'Payers lock ecash to your key'}
                   </ListGroup.ItemDescription>
                 </ListGroup.ItemContent>
                 <ListGroup.ItemSuffix>
                   <HeroSwitch
-                    isSelected={creqP2pkLock && !!p2pkKey}
-                    isDisabled={!p2pkKey}
+                    isSelected={creqP2pkLock && !!p2pkKey && mintSelection.hasP2pkCapableMint}
+                    isDisabled={!p2pkKey || !mintSelection.hasP2pkCapableMint}
                     onSelectedChange={(value) => {
                       paymentLog.info('receive.creq.p2pk_lock_toggled', { enabled: value });
                       setCreqP2pkLock(value);
@@ -244,6 +288,59 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
                   />
                 </ListGroup.ItemSuffix>
               </ListGroup.Item>
+              <Separator className="mx-4" />
+              {/* Advanced — which trusted mints the request advertises. Rows
+                  the P2PK filter forces off carry the reason inline. */}
+              <PressableFeedback animation={false} onPress={handleAdvancedToggle}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemPrefix>
+                      <Icon name="mdi:tune" size={20} color={muted} />
+                    </ListGroup.ItemPrefix>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>Advanced</ListGroup.ItemTitle>
+                      <ListGroup.ItemDescription>
+                        {`${mintSelection.advertisedCount} of ${mintSelection.totalCount} mint${
+                          mintSelection.totalCount === 1 ? '' : 's'
+                        } in this request`}
+                      </ListGroup.ItemDescription>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <Icon
+                        name={advancedOpen ? 'mdi:chevron-down' : 'mdi:chevron-right'}
+                        size={20}
+                        color={muted}
+                      />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+              {advancedOpen
+                ? mintSelection.options.map((option) => (
+                    <React.Fragment key={option.mintUrl}>
+                      <Separator className="mx-4" />
+                      <ListGroup.Item>
+                        <ListGroup.ItemPrefix>
+                          <Icon name="ph:bank" size={20} color={muted} />
+                        </ListGroup.ItemPrefix>
+                        <ListGroup.ItemContent>
+                          <ListGroup.ItemTitle>{option.displayName}</ListGroup.ItemTitle>
+                          {option.reason ? (
+                            <ListGroup.ItemDescription>{option.reason}</ListGroup.ItemDescription>
+                          ) : null}
+                        </ListGroup.ItemContent>
+                        <ListGroup.ItemSuffix>
+                          <HeroSwitch
+                            isSelected={option.enabled}
+                            isDisabled={option.switchDisabled}
+                            onSelectedChange={(value) => handleMintToggle(option.mintUrl, value)}
+                          />
+                        </ListGroup.ItemSuffix>
+                      </ListGroup.Item>
+                    </React.Fragment>
+                  ))
+                : null}
             </ListGroup>
           </GradientCard>
         </Section>

@@ -17,7 +17,7 @@ import type { ReusableQuoteIdentityStore } from "../../src/quotes/reusable";
 const MINTS = ["https://mint.example.com"];
 
 /** A realistic coco encodedRequest: amount floor 1, nostr transport. */
-function encodedFixture(requestId: string): string {
+function encodedFixture(requestId: string, mints: string[] = MINTS): string {
   return new PaymentRequest(
     [
       {
@@ -29,7 +29,7 @@ function encodedFixture(requestId: string): string {
     requestId,
     1,
     "sat",
-    MINTS,
+    mints,
     undefined,
     false,
   ).toEncodedRequest();
@@ -169,6 +169,83 @@ describe("ensureStandingPaymentRequest", () => {
       expect(standing.operationId).toBe("op-2");
       expect(store.map[KEY]).toBe("op-2");
     }
+  });
+});
+
+describe("displayMints narrowing", () => {
+  const TWO_MINTS = ["https://a.mint.example", "https://b.mint.example"];
+  const twoMintOp = () =>
+    operation({
+      mints: TWO_MINTS,
+      encodedRequest: encodedFixture("req-1", TWO_MINTS),
+    });
+
+  it("narrows the DISPLAY encoding to displayMints ∩ op mints", async () => {
+    const manager = mockManager({
+      get: vi.fn().mockResolvedValue(twoMintOp()),
+    });
+    const store = memoryStore({ [KEY]: "op-1" });
+
+    const standing = await ensureStandingPaymentRequest(
+      manager,
+      // The stray URL is not in the op — intersection must drop it.
+      {
+        unit: "sat",
+        mints: TWO_MINTS,
+        displayMints: [TWO_MINTS[1], "https://stray.mint.example"],
+      },
+      store,
+    );
+
+    expect(decodePaymentRequest(standing.encodedRequest).mints).toEqual([
+      TWO_MINTS[1],
+    ]);
+    // The durable op is untouched — `mints` still reports the full list.
+    expect(standing.mints).toEqual(TWO_MINTS);
+  });
+
+  it("keeps the op's mints when the intersection is empty (never 'any mint')", async () => {
+    const manager = mockManager({
+      get: vi.fn().mockResolvedValue(twoMintOp()),
+    });
+    const store = memoryStore({ [KEY]: "op-1" });
+
+    const standing = await ensureStandingPaymentRequest(
+      manager,
+      {
+        unit: "sat",
+        mints: TWO_MINTS,
+        displayMints: ["https://stray.mint.example"],
+      },
+      store,
+    );
+
+    expect(decodePaymentRequest(standing.encodedRequest).mints).toEqual(
+      TWO_MINTS,
+    );
+  });
+
+  it("resolves per displayMints selection (cache keyed on the narrowed list)", async () => {
+    const manager = mockManager({
+      get: vi.fn().mockResolvedValue(twoMintOp()),
+    });
+    const store = memoryStore({ [KEY]: "op-1" });
+
+    const narrowed = await ensureStandingPaymentRequest(
+      manager,
+      { unit: "sat", mints: TWO_MINTS, displayMints: [TWO_MINTS[0]] },
+      store,
+    );
+    const full = await ensureStandingPaymentRequest(
+      manager,
+      { unit: "sat", mints: TWO_MINTS },
+      store,
+    );
+
+    expect(decodePaymentRequest(narrowed.encodedRequest).mints).toEqual([
+      TWO_MINTS[0],
+    ]);
+    expect(decodePaymentRequest(full.encodedRequest).mints).toEqual(TWO_MINTS);
   });
 });
 

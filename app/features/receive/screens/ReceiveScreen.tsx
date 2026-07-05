@@ -14,6 +14,7 @@ import { StyleSheet } from 'react-native';
 import { setStringAsync } from 'expo-clipboard';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
+import { useMints } from '@cashu/coco-react';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
 import {
@@ -30,6 +31,7 @@ import { ReceivePaymentRequestTab } from '@/features/receive/components/ReceiveP
 import { ReceiveUnifiedTab } from '@/features/receive/components/ReceiveUnifiedTab';
 import { PillTabs, PILL_TABS_HEIGHT } from '@/shared/ui/composed/PillTabs';
 import { computeReceiveTabs } from '@/features/receive/lib/receiveTabs';
+import { deriveCreqMintSelection } from '@/features/receive/lib/creqMintSelection';
 import type { ReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import {
   MAX_ADVERTISED_MINTS,
@@ -277,15 +279,38 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   // both always show the SAME request. freshOnMount rotates once per visit;
   // the hook deliberately reports loading (no stale cache seed) until the
   // fresh request lands, so neither tab can flash a retired creq.
+  //
+  // The durable op carries the FULL trusted list (a payment from any trusted
+  // mint claims); what the QR ADVERTISES is the selection below — the user's
+  // Advanced toggles, forced down to NUT-11-capable mints while the P2PK
+  // lock is on, capped at MAX_ADVERTISED_MINTS. The lock itself only applies
+  // when a capable mint exists (p2pkLockEffective).
   const creqP2pkLock = useMintStore((s) => s.creqP2pkLock);
-  const creqLockPubkey =
-    creqP2pkLock && receiveEntryData?.p2pkKey ? receiveEntryData.p2pkKey : undefined;
-  const creqMints = useMemo(
-    () => walletContext.trustedMintUrls.slice(0, MAX_ADVERTISED_MINTS),
-    [walletContext.trustedMintUrls]
+  const creqExcludedMints = useMintStore((s) => s.creqExcludedMints);
+  const { trustedMints: rawTrustedMints } = useMints();
+  const creqMintSelection = useMemo(
+    () =>
+      deriveCreqMintSelection({
+        mints: rawTrustedMints,
+        excluded: creqExcludedMints,
+        p2pkLockActive: creqP2pkLock && !!receiveEntryData?.p2pkKey,
+        maxAdvertised: MAX_ADVERTISED_MINTS,
+      }),
+    [rawTrustedMints, creqExcludedMints, creqP2pkLock, receiveEntryData?.p2pkKey]
   );
+  const creqLockPubkey = creqMintSelection.p2pkLockEffective
+    ? receiveEntryData?.p2pkKey
+    : undefined;
+  const creqMints = walletContext.trustedMintUrls;
   const creq = useStandingPaymentRequest(
-    creqMints.length > 0 ? { unit, mints: creqMints, lockP2pkPubkey: creqLockPubkey } : null,
+    creqMints.length > 0
+      ? {
+          unit,
+          mints: creqMints,
+          lockP2pkPubkey: creqLockPubkey,
+          displayMints: creqMintSelection.displayMints,
+        }
+      : null,
     standingQuoteIdentityStore,
     { freshOnMount: true }
   );
@@ -431,6 +456,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
                     p2pkKey={receiveEntryData.p2pkKey}
                     muted={muted}
                     creq={creq}
+                    mintSelection={creqMintSelection}
                     onQrPayload={onCashuPayload}
                   />
                 </TabPane>

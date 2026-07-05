@@ -72,6 +72,12 @@ export function useStandingPaymentRequest(
   const mintsRef = useRef<string[]>(input?.mints ?? []);
   mintsRef.current = input?.mints ?? [];
   const lockP2pkPubkey = input?.lockP2pkPubkey;
+  // Display-mint identity: like the lock, a change only re-ENCODEs the same
+  // operation (never rotates), so it triggers the effect but stays out of
+  // the fresh key.
+  const displayMintsKey = input?.displayMints?.join("|");
+  const displayMintsRef = useRef<string[] | undefined>(input?.displayMints);
+  displayMintsRef.current = input?.displayMints;
 
   useEffect(() => {
     if (!unit || mintsKey === null) {
@@ -81,8 +87,9 @@ export function useStandingPaymentRequest(
       return;
     }
     let cancelled = false;
-    // Lock changes only re-ENCODE the same operation, so they are
-    // excluded from the fresh key — toggling P2PK never rotates.
+    // Lock and display-mint changes only re-ENCODE the same operation, so
+    // they are excluded from the fresh key — toggling P2PK or a mint never
+    // rotates.
     const inputKey = `${unit}|${mintsKey}`;
     const wantFresh = freshOnMount && freshDoneForRef.current !== inputKey;
     // Cached seeds revalidate silently (stale-while-revalidate); show a
@@ -96,6 +103,7 @@ export function useStandingPaymentRequest(
         unit,
         mints: mintsRef.current,
         lockP2pkPubkey,
+        displayMints: displayMintsRef.current,
       })
     ) {
       setIsLoading(true);
@@ -104,7 +112,12 @@ export function useStandingPaymentRequest(
     (async () => {
       try {
         if (wantFresh) freshDoneForRef.current = inputKey;
-        const requestInput = { unit, mints: mintsRef.current, lockP2pkPubkey };
+        const requestInput = {
+          unit,
+          mints: mintsRef.current,
+          lockP2pkPubkey,
+          displayMints: displayMintsRef.current,
+        };
         const resolved = wantFresh
           ? await rotateStandingPaymentRequest(
               manager,
@@ -128,7 +141,7 @@ export function useStandingPaymentRequest(
     return () => {
       cancelled = true;
     };
-  }, [manager, unit, mintsKey, lockP2pkPubkey, generation, freshOnMount]);
+  }, [manager, unit, mintsKey, lockP2pkPubkey, displayMintsKey, generation, freshOnMount]);
 
   // External rotations land in the identity store — re-resolve.
   useEffect(() => {
@@ -148,7 +161,12 @@ export function useStandingPaymentRequest(
     try {
       const created = await rotateStandingPaymentRequest(
         manager,
-        { unit, mints: mintsRef.current, lockP2pkPubkey },
+        {
+          unit,
+          mints: mintsRef.current,
+          lockP2pkPubkey,
+          displayMints: displayMintsRef.current,
+        },
         identityStoreRef.current,
       );
       if (mountedRef.current) setRequest(created);
