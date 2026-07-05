@@ -2,25 +2,16 @@ import React, { useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, {
-  useAnimatedRef,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { useAnimatedRef } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { Log, initLog } from '@/shared/lib/logger';
-import { useBootMorphFailsafe } from './useBootMorphFailsafe';
-import {
-  registerQRButtonRemeasure,
-  setQRButtonAnchor,
-  useBootMorphCompleted,
-} from '@/shared/lib/qrButtonAnchor';
+import { registerQRButtonRemeasure, setQRButtonAnchor } from '@/shared/lib/qrButtonAnchor';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useQRButtonPressFeedback } from './useQRButtonPressFeedback';
+import { useQRButtonReveal } from './useQRButtonReveal';
 
 export interface QRButtonProps {
   onPress: () => void;
@@ -59,9 +50,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   };
 
   const animatedRef = useAnimatedRef<Animated.View>();
-  const morphCompleted = useBootMorphCompleted();
-  const visibility = useSharedValue(morphCompleted ? 1 : 0);
-  const visibilityStyle = useAnimatedStyle(() => ({ opacity: visibility.get() }));
+  const visibilityStyle = useQRButtonReveal();
   const pressFeedback = useQRButtonPressFeedback();
 
   const publishAnchor = useCallback(() => {
@@ -78,12 +67,6 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
       initLog('QRButtonAnchor', `measureInWindow(JS) — x=${x} y=${y} width=${w} height=${h}`);
     });
   }, [animatedRef, borderRadius]);
-
-  useEffect(() => {
-    visibility.set(withTiming(morphCompleted ? 1 : 0, { duration: 180 }));
-  }, [morphCompleted, visibility]);
-
-  useBootMorphFailsafe(morphCompleted, visibility);
 
   useEffect(() => {
     const unregister = registerQRButtonRemeasure(publishAnchor);

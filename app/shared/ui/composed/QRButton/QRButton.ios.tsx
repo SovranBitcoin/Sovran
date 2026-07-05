@@ -2,28 +2,15 @@ import React, { useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PressableFeedback } from 'heroui-native';
-import Animated, {
-  measure,
-  runOnJS,
-  runOnUI,
-  useAnimatedRef,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { measure, runOnJS, runOnUI, useAnimatedRef } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { Log, initLog } from '@/shared/lib/logger';
-import { useBootMorphFailsafe } from './useBootMorphFailsafe';
-import { useFadeRevealProbe } from '@/shared/lib/debug/fadeRevealProbe';
-import {
-  registerQRButtonRemeasure,
-  setQRButtonAnchor,
-  useBootMorphCompleted,
-} from '@/shared/lib/qrButtonAnchor';
+import { registerQRButtonRemeasure, setQRButtonAnchor } from '@/shared/lib/qrButtonAnchor';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useQRButtonPressFeedback } from './useQRButtonPressFeedback';
+import { useQRButtonReveal } from './useQRButtonReveal';
 
 export interface QRButtonProps {
   onPress: () => void;
@@ -63,9 +50,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   };
 
   const animatedRef = useAnimatedRef<Animated.View>();
-  const morphCompleted = useBootMorphCompleted();
-  const visibility = useSharedValue(morphCompleted ? 1 : 0);
-  const visibilityStyle = useAnimatedStyle(() => ({ opacity: visibility.get() }));
+  const visibilityStyle = useQRButtonReveal();
   const pressFeedback = useQRButtonPressFeedback();
 
   const publishAnchor = useCallback(() => {
@@ -99,16 +84,6 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
       initLog('QRButtonAnchor', `measureInWindow(JS) — x=${x} y=${y} width=${w} height=${h}`);
     });
   }, [animatedRef, borderRadius]);
-
-  useEffect(() => {
-    visibility.set(withTiming(morphCompleted ? 1 : 0, { duration: 180 }));
-  }, [morphCompleted, visibility]);
-
-  useBootMorphFailsafe(morphCompleted, visibility);
-  // [DEBUG-inv] deadline sits past the 1500ms boot-morph failsafe + 180ms fade,
-  // so a stuck report means BOTH the morph rendezvous and the failsafe reveal
-  // failed to flush — the invisible-QR-button case.
-  useFadeRevealProbe('wallet.qrButton', visibility, { deadlineMs: 2600 });
 
   useEffect(() => {
     const unregister = registerQRButtonRemeasure(publishAnchor);
