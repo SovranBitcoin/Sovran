@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { discoverMints, type DiscoverMint, type MintSearchResult } from '@/shared/lib/apiClient';
+import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import { mintMethodsFromNuts } from '@/shared/lib/cashu/mintNuts';
 import { cashuLog } from '@/shared/lib/logger';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
@@ -115,6 +116,14 @@ export function useMintSearch(
           return;
         }
         const mapped = res.value.mints.map(discoverMintToSearchResult);
+        // Dev tier badges: discovery is served by nagg's app-view only (no
+        // cache/relay fallback exists for this surface), so every row that
+        // arrives is honestly 'n'. Keyed by mint URL — the badge store keys
+        // by string, not strictly event ids.
+        recordDebugTiers(
+          mapped.map((m) => m.url),
+          'nagg'
+        );
         // Seed the unified cache from the discovery rows so the selector, audit
         // and operator-profile lookups all become cache hits (not round-trips).
         useMintMetadataStore.getState().upsertFromDiscover(res.value.mints);

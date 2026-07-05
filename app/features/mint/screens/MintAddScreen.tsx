@@ -32,6 +32,7 @@ import { staticPopup, paramPopup } from '@/shared/lib/popup';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
+import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { List } from '@/shared/ui/composed/List';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Screen } from '@/shared/ui/composed/Screen';
@@ -299,6 +300,7 @@ const MintItem = memo(function MintItem({
         },
       })}
       subtitle={extractDomain(mint.url)}
+      titleTrailing={loading ? undefined : <TierBadge eventId={mint.url} />}
       selectable
       selected={selected}
       onToggle={() => onToggle(mint.url)}
