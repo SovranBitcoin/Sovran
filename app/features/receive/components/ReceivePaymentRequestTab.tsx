@@ -38,6 +38,7 @@ import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import type { CreqMintSelection } from '@/features/receive/lib/creqMintSelection';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import Icon from 'assets/icons';
 
 interface ReceivePaymentRequestTabProps {
@@ -295,7 +296,9 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
                 <PressableFeedback.Scale>
                   <ListGroup.Item disabled>
                     <ListGroup.ItemPrefix>
-                      <Icon name="mdi:tune" size={20} color={muted} />
+                      {/* Must be a name present in .monicon/icons.js — mdi:tune
+                          wasn't bundled and rendered blank. */}
+                      <Icon name="material-symbols:settings-rounded" size={20} color={muted} />
                     </ListGroup.ItemPrefix>
                     <ListGroup.ItemContent>
                       <ListGroup.ItemTitle>Advanced</ListGroup.ItemTitle>
@@ -322,7 +325,15 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
                       <Separator className="mx-4" />
                       <ListGroup.Item>
                         <ListGroup.ItemPrefix>
-                          <Icon name="ph:bank" size={20} color={muted} />
+                          {/* Same identity treatment as the Balance split
+                              cards: the mint's own icon with MintIcon's
+                              built-in fallback (ph:bank wasn't bundled). */}
+                          <MintIcon
+                            iconUrl={option.iconUrl}
+                            size={28}
+                            name={option.displayName}
+                            alt={`${option.displayName} icon`}
+                          />
                         </ListGroup.ItemPrefix>
                         <ListGroup.ItemContent>
                           <ListGroup.ItemTitle>{option.displayName}</ListGroup.ItemTitle>

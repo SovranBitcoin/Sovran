@@ -20,12 +20,14 @@ import { nutSupported, type MintNuts } from '@/shared/lib/cashu/mintNuts';
 
 export interface CreqMintCandidate {
   mintUrl: string;
-  mintInfo?: { name?: string; nuts?: unknown } | null;
+  mintInfo?: { name?: string; icon_url?: string; nuts?: unknown } | null;
 }
 
 export interface CreqMintOption {
   mintUrl: string;
   displayName: string;
+  /** Mint-advertised icon for the row's MintIcon (falls back internally). */
+  iconUrl: string | undefined;
   /** Toggle value — the user wants this mint advertised. */
   enabled: boolean;
   /** The switch cannot be flipped (forced off by P2PK, or the last one on). */
@@ -85,10 +87,12 @@ export function deriveCreqMintSelection(params: {
 
   const options: CreqMintOption[] = mints.map((m) => {
     const displayName = getMintDisplayName(m.mintUrl, m.mintInfo);
+    const iconUrl = m.mintInfo?.icon_url;
     if (p2pkLockEffective && !supportsP2pk(m)) {
       return {
         mintUrl: m.mintUrl,
         displayName,
+        iconUrl,
         enabled: false,
         switchDisabled: true,
         reason: REASON_NO_P2PK,
@@ -100,6 +104,7 @@ export function deriveCreqMintSelection(params: {
     return {
       mintUrl: m.mintUrl,
       displayName,
+      iconUrl,
       enabled,
       switchDisabled: isLastEnabled,
       reason: isLastEnabled ? REASON_LAST_MINT : overCap ? REASON_OVER_CAP : null,
