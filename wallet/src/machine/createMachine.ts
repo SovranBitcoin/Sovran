@@ -176,6 +176,35 @@ const INPUT_STEPS = new Set<FlowStep>([
   "enterSendMemo",
 ]);
 
+/**
+ * Events that carry fresh user intent. The router never tells the machine
+ * about back navigation, so a screen belonging to an EARLIER step can be
+ * re-driven while a prior send() still awaits a *resolve* effect (quote
+ * creation, mint info). When one of these events arrives during that window
+ * it supersedes the in-flight work instead of being dropped: the flow
+ * generation bump makes every pending continuation stale (success and
+ * failure results are both discarded on arrival) and the new event is
+ * processed immediately. CONFIRM_MELT / CONFIRM_PAYMENT_REQUEST are
+ * deliberately absent — while money is moving, a later tap must never win.
+ */
+const INTENT_EVENTS = new Set<import("./types").FlowEvent["type"]>([
+  "EXECUTE",
+  "OPTION_CHOSEN",
+  "AMOUNT_ENTERED",
+  "MINT_SELECTED",
+  "PROOFS_CHOSEN",
+  "SEND_MEMO_SUBMITTED",
+  "REQUEST_MINT_SELECTOR",
+  "START_SEND_ECASH",
+  "START_SEND",
+  "START_RECEIVE_LIGHTNING",
+  "START_RECEIVE",
+  "SHOW_RECEIVE_QR",
+  "REVIEW_MINT",
+  "MINT_TRUSTED",
+  "RESET",
+]);
+
 // ---------------------------------------------------------------------------
 // createPaymentMachine
 // ---------------------------------------------------------------------------
@@ -216,6 +245,12 @@ export function createPaymentMachine(
   let stepData: StepDataMap[FlowStep] = idleData;
   let handlerExecuting = false;
   let sendLocked = false;
+  // True only while an irreversible operation is actually executing
+  // (send/melt/payment-request delivery, NFC write-back). Distinguishes
+  // "locked because money is moving" (events must drop) from "locked because
+  // a resolve effect is slow" (fresh user intent supersedes, see
+  // INTENT_EVENTS).
+  let commitInFlight = false;
   let flowGeneration = 0;
   // Per-call result holders for `confirmPaymentRequest`. Each invocation
   // pushes its own holder before awaiting `send`; the CONFIRM_PAYMENT_REQUEST
@@ -594,11 +629,22 @@ export function createPaymentMachine(
 
   const send = async (event: import("./types").FlowEvent): Promise<void> => {
     if (sendLocked) {
-      logger.info("machine.event.ignored", {
-        reason: "locked",
+      if (commitInFlight || !INTENT_EVENTS.has(event.type)) {
+        logger.info("machine.event.ignored", {
+          reason: commitInFlight ? "commit-in-flight" : "locked",
+          type: event.type,
+        });
+        return;
+      }
+      // Supersede the in-flight resolve work: the generation bump strands
+      // every continuation of the prior send() at its next stale check (it
+      // returns without unlocking — this call now owns the lock).
+      flowGeneration += 1;
+      handlerExecuting = false;
+      logger.info("machine.event.superseded", {
         type: event.type,
+        currentStep: step,
       });
-      return;
     }
     sendLocked = true;
     const sendGeneration = flowGeneration;
@@ -668,12 +714,18 @@ export function createPaymentMachine(
         unit: data.unit,
       });
 
-      const effect = await runConfirmMeltEffect({
-        data,
-        operation: operations.executeMelt,
-        context: flowCtx,
-        isStale: (op) => isStaleGeneration(sendGeneration, op),
-      });
+      commitInFlight = true;
+      let effect: Awaited<ReturnType<typeof runConfirmMeltEffect>>;
+      try {
+        effect = await runConfirmMeltEffect({
+          data,
+          operation: operations.executeMelt,
+          context: flowCtx,
+          isStale: (op) => isStaleGeneration(sendGeneration, op),
+        });
+      } finally {
+        commitInFlight = false;
+      }
 
       if (effect.isOk()) {
         if (effect.value.kind === "stale") return;
@@ -761,12 +813,18 @@ export function createPaymentMachine(
         unit: data.unit,
       });
 
-      const effect = await runConfirmPaymentRequestEffect({
-        data,
-        operation: operations.executePaymentRequest,
-        context: flowCtx,
-        isStale: (op) => isStaleGeneration(sendGeneration, op),
-      });
+      commitInFlight = true;
+      let effect: Awaited<ReturnType<typeof runConfirmPaymentRequestEffect>>;
+      try {
+        effect = await runConfirmPaymentRequestEffect({
+          data,
+          operation: operations.executePaymentRequest,
+          context: flowCtx,
+          isStale: (op) => isStaleGeneration(sendGeneration, op),
+        });
+      } finally {
+        commitInFlight = false;
+      }
 
       if (effect.isOk()) {
         if (effect.value.kind === "stale") return;
@@ -1064,17 +1122,23 @@ export function createPaymentMachine(
             handlerExecuting = true;
             notify();
 
-            const effect = await runNfcWriteBackEffect({
-              data,
-              executeNfcSend: operations.executeNfcSend,
-              rollbackSend: operations.rollbackSend,
-              nfcAdapter,
-              context: flowCtx,
-              onProgress: (progress) => {
-                void notifications?.onNfcPaymentProgress?.(progress);
-              },
-              isStale: (op) => isStaleGeneration(sendGeneration, op),
-            });
+            commitInFlight = true;
+            let effect: Awaited<ReturnType<typeof runNfcWriteBackEffect>>;
+            try {
+              effect = await runNfcWriteBackEffect({
+                data,
+                executeNfcSend: operations.executeNfcSend,
+                rollbackSend: operations.rollbackSend,
+                nfcAdapter,
+                context: flowCtx,
+                onProgress: (progress) => {
+                  void notifications?.onNfcPaymentProgress?.(progress);
+                },
+                isStale: (op) => isStaleGeneration(sendGeneration, op),
+              });
+            } finally {
+              commitInFlight = false;
+            }
 
             if (effect.isOk()) {
               if (effect.value.kind === "stale") return;
@@ -1136,15 +1200,21 @@ export function createPaymentMachine(
           });
           handlerExecuting = true;
           notify();
-          const effect = await runConfirmSendEffect({
-            data,
-            operations,
-            context: flowCtx,
-            proofAmounts,
-            getOffline: () => getOffline?.() ?? false,
-            getLocale: () => getLocale?.() ?? "en",
-            isStale: (op) => isStaleGeneration(sendGeneration, op),
-          });
+          commitInFlight = true;
+          let effect: Awaited<ReturnType<typeof runConfirmSendEffect>>;
+          try {
+            effect = await runConfirmSendEffect({
+              data,
+              operations,
+              context: flowCtx,
+              proofAmounts,
+              getOffline: () => getOffline?.() ?? false,
+              getLocale: () => getLocale?.() ?? "en",
+              isStale: (op) => isStaleGeneration(sendGeneration, op),
+            });
+          } finally {
+            commitInFlight = false;
+          }
 
           if (effect.isOk()) {
             if (effect.value.context) {

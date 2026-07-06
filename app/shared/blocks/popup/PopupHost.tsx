@@ -568,6 +568,7 @@ function SheetPopup() {
   const nostrKeysContextValue = useNostrKeysContext();
   const current = usePopupStore((s) => s.current);
   const isOpen = usePopupStore((s) => s.isOpen);
+  const openSeq = usePopupStore((s) => s.openSeq);
   const destroyed = usePopupStore((s) => s.destroyed);
   const close = usePopupStore((s) => s.close);
   const update = usePopupStore((s) => s.update);
@@ -623,20 +624,41 @@ function SheetPopup() {
   // open would skip the snap and the sheet would never appear.
   const [mounted, setMounted] = useState(false);
   const [renderedOpen, setRenderedOpen] = useState(false);
+  // True while a presentation is being forced through its rendered-closed
+  // frame. Close reports that gorhom emits during that window are the
+  // re-present itself settling, not user intent — handleOpenChange must not
+  // route them into store.close() or they'd cancel the presentation.
+  const representingRef = useRef(false);
   useEffect(() => {
     if (isOpen) {
       setMounted(true);
-      // Open after a layout pass so gorhom has measured the freshly mounted
-      // content — flipping open on the next tick races the measurement and the
-      // sheet snaps to a partial height.
-      return scheduleAfterLayout(() => setRenderedOpen(true));
+      // Present on every open() nonce (openSeq), not just on isOpen edges: a
+      // sheet natively torn down without store.close() — route navigation
+      // ripping the FullWindowOverlay, heroui's measure/snap race — leaves
+      // isOpen stuck true, and an edge-only present turns every later open()
+      // into a silent no-op (the amount screen's dead Next). Committing
+      // closed first, then flipping open after a layout pass (so gorhom has
+      // measured the content — opening on the next tick races the
+      // measurement and the sheet snaps to a partial height), forces
+      // heroui's false→true snap in both the fresh and the stuck case.
+      representingRef.current = true;
+      setRenderedOpen(false);
+      const cancel = scheduleAfterLayout(() => {
+        representingRef.current = false;
+        setRenderedOpen(true);
+      });
+      return () => {
+        cancel();
+        representingRef.current = false;
+      };
     }
+    representingRef.current = false;
     setRenderedOpen(false);
     // Unmount after heroui's exit animation lands (~300ms) — matches the
     // lastPayloadRef cache window above.
     const unmountTimer = setTimeout(() => setMounted(false), 400);
     return () => clearTimeout(unmountTimer);
-  }, [isOpen]);
+  }, [isOpen, openSeq]);
 
   const payload = current ?? lastPayloadRef.current;
   const isCustom = isCustomSheetPayload(payload);
@@ -813,6 +835,9 @@ function SheetPopup() {
 
   const handleOpenChange = (open: boolean) => {
     if (!open && isOpen) {
+      // A close reported during a forced re-present is the transient
+      // rendered-closed frame settling, not a user dismissal.
+      if (representingRef.current) return;
       Keyboard.dismiss();
       close();
     }

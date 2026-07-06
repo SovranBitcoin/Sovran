@@ -51,6 +51,14 @@ export function isCustomSheetPayload(p: SheetPayload | null): p is CustomSheetPa
 type PopupStore = {
   current: SheetPayload | null;
   isOpen: boolean;
+  /**
+   * Monotonic presentation nonce, bumped on every open(). PopupHost presents
+   * on nonce changes rather than on `isOpen` edges alone: a native teardown
+   * that bypasses close() (route navigation ripping the FullWindowOverlay,
+   * heroui's measure/snap race) leaves `isOpen` stuck true, and an
+   * edge-triggered host would render every subsequent open() a silent no-op.
+   */
+  openSeq: number;
   /** When true, PopupHost must fully unmount the BottomSheet tree to tear down native overlays. */
   destroyed: boolean;
   open: (payload: SheetPayload) => void;
@@ -77,6 +85,7 @@ export const usePopupStore = create<PopupStore>((set, get) => {
   return {
     current: null,
     isOpen: false,
+    openSeq: 0,
     destroyed: false,
     open: (payload) => {
       storeLog.info(
@@ -87,7 +96,7 @@ export const usePopupStore = create<PopupStore>((set, get) => {
       // sheet is already open, fire its onClose with `replaced` before the
       // new payload overwrites `current`.
       fireOnClose('replaced');
-      set({ current: payload, isOpen: true, destroyed: false });
+      set({ current: payload, isOpen: true, destroyed: false, openSeq: get().openSeq + 1 });
     },
     update: (partial) => {
       const { current } = get();
