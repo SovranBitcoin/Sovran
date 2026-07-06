@@ -73,10 +73,12 @@ jest.mock('@/shared/blocks/status', () => {
       phase?: string;
       result?: string;
       confirmationProgress?: unknown;
+      segmentedInProgress?: boolean;
     }) =>
       ReactActual.createElement('LoadingIndicatorMock', {
         testID: `indicator-${props.phase}-${props.result}`,
         confirmationProgress: props.confirmationProgress,
+        segmentedInProgress: props.segmentedInProgress,
       }),
     mapCheckpointStatusToIndicator,
   };
@@ -280,16 +282,17 @@ describe('HistoryEntryTimeline connector rail', () => {
     );
 
     expect(progressIndicators).toHaveLength(1);
-    expect(
+    const paidIndicator =
       progressIndicators[0] &&
-        typeof progressIndicators[0] !== 'string' &&
-        !Array.isArray(progressIndicators[0])
-        ? progressIndicators[0].props.confirmationProgress
-        : null
-    ).toEqual({
+      typeof progressIndicators[0] !== 'string' &&
+      !Array.isArray(progressIndicators[0])
+        ? progressIndicators[0]
+        : null;
+    expect(paidIndicator?.props.confirmationProgress).toEqual({
       currentConfirmations: 2,
       requiredConfirmations: 6,
     });
+    expect(paidIndicator?.props.segmentedInProgress).toBe(true);
 
     act(() => {
       renderer.unmount();
@@ -325,16 +328,20 @@ describe('HistoryEntryTimeline connector rail', () => {
     );
 
     expect(progressIndicators).toHaveLength(1);
-    expect(
+    const previewIndicator =
       progressIndicators[0] &&
-        typeof progressIndicators[0] !== 'string' &&
-        !Array.isArray(progressIndicators[0])
-        ? progressIndicators[0].props.confirmationProgress
-        : null
-    ).toEqual({
+      typeof progressIndicators[0] !== 'string' &&
+      !Array.isArray(progressIndicators[0])
+        ? progressIndicators[0]
+        : null;
+    expect(previewIndicator?.props.confirmationProgress).toEqual({
       currentConfirmations: null,
       requiredConfirmations: 3,
     });
+    // No payment observed yet: the ring is a preview of the required
+    // confirmations, so the next segment must not breathe "in progress"
+    // while the prior "Waiting for payment" step is still pending.
+    expect(previewIndicator?.props.segmentedInProgress).toBe(false);
 
     act(() => {
       renderer.unmount();

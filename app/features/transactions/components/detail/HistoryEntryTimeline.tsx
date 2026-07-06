@@ -398,6 +398,10 @@ export function HistoryEntryTimeline({
                       revertedColor={warningColor}
                       warningColor={warningColor}
                       confirmationProgress={confirmationProgress}
+                      // Before a payment is observed the ring only previews the
+                      // required confirmations — nothing is in progress yet, so
+                      // the next segment must not breathe.
+                      segmentedInProgress={onchainConfirmationProgress?.hasPayment}
                       {...mapCheckpointStatusToIndicator(
                         timelineStepTypeToCheckpointStatus(item.stepType)
                       )}

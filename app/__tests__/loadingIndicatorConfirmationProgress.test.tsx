@@ -189,6 +189,47 @@ describe('LoadingIndicator confirmation progress', () => {
     });
   });
 
+  it('breathes the next segment only when the step is in progress', () => {
+    const reanimated = jest.requireMock('react-native-reanimated') as {
+      withRepeat: (...args: unknown[]) => unknown;
+    };
+    const withRepeatSpy = jest.spyOn(reanimated, 'withRepeat');
+    let renderer: TestRenderer.ReactTestRenderer;
+
+    // Default: the first not-yet-filled segment runs the looping breathe.
+    act(() => {
+      renderer = TestRenderer.create(
+        <LoadingIndicator
+          confirmationProgress={{ currentConfirmations: 1, requiredConfirmations: 3 }}
+          phase="idle"
+        />
+      );
+    });
+    expect(withRepeatSpy).toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+
+    // Preview mode (segmentedInProgress={false}): no segment breathes — the
+    // ring only shows the upcoming confirmation count.
+    withRepeatSpy.mockClear();
+    act(() => {
+      renderer = TestRenderer.create(
+        <LoadingIndicator
+          confirmationProgress={{ currentConfirmations: null, requiredConfirmations: 3 }}
+          phase="idle"
+          segmentedInProgress={false}
+        />
+      );
+    });
+    expect(withRepeatSpy).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+
+    withRepeatSpy.mockRestore();
+  });
+
   it('keeps generic segments mounted while completion resolves through success', () => {
     let renderer: TestRenderer.ReactTestRenderer;
 

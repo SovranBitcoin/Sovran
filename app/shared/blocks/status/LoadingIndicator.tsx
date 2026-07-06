@@ -95,6 +95,11 @@ export interface LoadingIndicatorProps extends LoadingIndicatorVisualProps {
   /** Dynamic segmented progress for onchain confirmation counts. Kept as a
    *  domain-named convenience over `segmentedProgress`. */
   confirmationProgress?: ConfirmationProgress;
+  /** Whether the segmented step is actively progressing. When false, the
+   *  next-to-complete segment skips its "in progress" breathe — used when the
+   *  ring previews upcoming segments before the step has started (e.g. onchain
+   *  confirmations shown before any payment is observed). Default true. */
+  segmentedInProgress?: boolean;
 }
 
 // Geometry tuned so the disc fills ~76% of the size box (matches the
@@ -383,6 +388,7 @@ export function LoadingIndicator({
   playOnMount = false,
   segmentedProgress,
   confirmationProgress,
+  segmentedInProgress = true,
   visualScope = 'loading.status_indicator',
   visualKey,
   visualSurface = 'shared',
@@ -761,8 +767,11 @@ export function LoadingIndicator({
                     segmentCount={normalizedSegmentedProgress.segmentCount}
                     completed={index < normalizedSegmentedProgress.completedSegments}
                     // The first not-yet-filled segment breathes to show the step
-                    // in progress; nothing breathes once the ring is complete.
-                    active={index === normalizedSegmentedProgress.completedSegments}
+                    // in progress; nothing breathes once the ring is complete or
+                    // while the ring is only previewing a step that hasn't started.
+                    active={
+                      segmentedInProgress && index === normalizedSegmentedProgress.completedSegments
+                    }
                     pendingColor={ringColor}
                     successColor={okColor}
                     delayMs={transitionDelayMs + cascadeOrder * SEGMENT_STAGGER_MS}
