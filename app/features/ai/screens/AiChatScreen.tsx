@@ -5,12 +5,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
 import { FlashList } from '@shopify/flash-list';
+import { Image } from 'expo-image';
 
+import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { PatternBackground } from '@/shared/ui/composed/PatternBackground';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
-import { useRoutstrStore, type RoutstrMessage } from '@/shared/stores/profile/routstrStore';
+import {
+  useRoutstrStore,
+  type ChatAttachment,
+  type RoutstrMessage,
+} from '@/shared/stores/profile/routstrStore';
 import { LiquidChatComposer } from '@/shared/ui/composed/chat/LiquidChatComposer';
 import {
   useChatKeyboardAnimationLogger,
@@ -26,6 +32,9 @@ import { ModelChip } from '../components/ModelChip';
 import { AiEmptyState } from '../components/AiEmptyState';
 import { AiMessageBubble, type BranchNav } from '../components/AiMessageBubble';
 import { useAiSend } from '../hooks/useAiSend';
+import { resolveSelectedEntry } from '../lib/format';
+import { pickChatImage } from '../lib/attachments';
+import { MAX_INLINE_IMAGES } from '../lib/assembleApiMessages';
 import { deriveActivePath, getSiblingInfo, withSynthesisedParents } from '../lib/branching';
 
 const SURFACE = 'ai';
@@ -124,6 +133,27 @@ export function AiChatScreen() {
   const activeChildren = useRoutstrStore((s) => s.activeChildren);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
 
+  // Vision gate for the composer's [+]: image attach is only offered when
+  // the model the current (provider, tier) slot resolves to accepts image
+  // input. Falls to disabled while no lineup exists yet (first run before
+  // the catalog fetch lands).
+  const selectedTier = useRoutstrStore((s) => s.selectedTier);
+  const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
+  const balanceMsats = useRoutstrStore((s) => s.balance);
+  const sessionLineup = useRoutstrStore((s) => s.lineup);
+  const lastKnownLineup = useRoutstrStore((s) => s.lastKnownLineup);
+  const resolvedEntry = useMemo(
+    () =>
+      resolveSelectedEntry(
+        selectedProvider,
+        selectedTier,
+        balanceMsats != null ? Math.floor(balanceMsats / 1000) : 0,
+        sessionLineup ?? lastKnownLineup?.lineup ?? null
+      ),
+    [selectedProvider, selectedTier, balanceMsats, sessionLineup, lastKnownLineup]
+  );
+  const canAttachImages = resolvedEntry?.visionInput === true;
+
   const { send, retry, isSending, streamingMessageId } = useAiSend();
 
   const activeMessages = useMemo(
@@ -179,9 +209,26 @@ export function AiChatScreen() {
     [retry]
   );
 
-  // Composer state (draft + measured height for list bottom padding).
+  // Composer state (draft + pending image attachments + measured height
+  // for list bottom padding). Attachments accumulate via repeated single
+  // picks (PostComposer's maxMedia pattern) and clear on successful
+  // dispatch.
   const [draft, setDraft] = useState('');
+  const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
   const [composerHeight, setComposerHeight] = useState(0);
+
+  // Picked-but-unsent images are only valid against a vision-capable
+  // model. If the user switches the slot to a text-only model after
+  // picking, drop them (the strip disappearing is the visible feedback) —
+  // otherwise submit would carry images the resolved model must reject.
+  useEffect(() => {
+    if (canAttachImages) return;
+    setPendingAttachments((prev) => {
+      if (prev.length === 0) return prev;
+      aiLog.info('ai.attach.cleared_on_model_switch', { dropped: prev.length });
+      return [];
+    });
+  }, [canAttachImages]);
   const handleComposerLayout = useCallback((e: LayoutChangeEvent) => {
     const next = e.nativeEvent.layout.height;
     setComposerHeight((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
@@ -224,15 +271,16 @@ export function AiChatScreen() {
     ],
   }));
 
-  const dispatchSend = useSingleFlight(async (text: string) => {
+  const dispatchSend = useSingleFlight(async (text: string, attachments: ChatAttachment[]) => {
     const sendStart = performance.now();
     aiLog.info('chat.send.dispatch', {
       surface: SURFACE,
       textLen: text.length,
+      attachmentCount: attachments.length,
       historyCount: activeMessages.length,
     });
     try {
-      await send(text);
+      await send(text, attachments);
       aiLog.info('chat.send.complete', {
         surface: SURFACE,
         duration_ms: Math.round((performance.now() - sendStart) * 100) / 100,
@@ -250,12 +298,33 @@ export function AiChatScreen() {
   const handleSubmit = useCallback(() => {
     const text = draft.trim();
     if (!text) return;
+    const attachments = pendingAttachments;
     setDraft('');
-    void dispatchSend(text).catch(() => {
+    setPendingAttachments([]);
+    void dispatchSend(text, attachments).catch(() => {
       // Errors already logged; consumer's onSend is expected to surface
       // user-visible feedback (popups/banners).
     });
-  }, [draft, dispatchSend]);
+  }, [draft, pendingAttachments, dispatchSend]);
+
+  // [+] → system photo library. Attachments cap at the per-request inline
+  // budget; the button dims when the resolved model can't accept images.
+  const handlePlusPress = useCallback(() => {
+    if (pendingAttachments.length >= MAX_INLINE_IMAGES) {
+      aiLog.info('ai.attach.limit_reached', { max: MAX_INLINE_IMAGES });
+      return;
+    }
+    void pickChatImage().then((picked) => {
+      if (!picked) return;
+      setPendingAttachments((prev) =>
+        prev.length >= MAX_INLINE_IMAGES ? prev : [...prev, picked]
+      );
+    });
+  }, [pendingAttachments.length]);
+
+  const handleRemoveAttachment = useCallback((index: number) => {
+    setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
+  }, []);
 
   // Perf loggers — same canonical emits the shared ChatScreen produces, so
   // the AI surface stays observable in chat.kav.* and chat.list.history_change
@@ -361,6 +430,44 @@ export function AiChatScreen() {
           keyboardLiftStyle,
         ]}>
         <RNView onLayout={handleComposerLayout}>
+          {pendingAttachments.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{
+                paddingHorizontal: 12,
+                gap: 8,
+                paddingBottom: 8,
+              }}
+              style={{ flexGrow: 0 }}>
+              {pendingAttachments.map((attachment, index) => (
+                <RNView key={`${attachment.localUri}-${index}`}>
+                  <Image
+                    source={{ uri: attachment.localUri }}
+                    style={{ width: 56, height: 56, borderRadius: 10 }}
+                    contentFit="cover"
+                    accessibilityLabel="Pending image attachment"
+                  />
+                  <Pressable
+                    onPress={() => handleRemoveAttachment(index)}
+                    hitSlop={8}
+                    accessibilityLabel="Remove attachment"
+                    accessibilityRole="button"
+                    testID={`ai-attachment-remove-${index}`}
+                    style={{
+                      position: 'absolute',
+                      top: -6,
+                      right: -6,
+                      backgroundColor: surfaceColor,
+                      borderRadius: 10,
+                    }}>
+                    <Icon name="mdi:close-circle" size={20} />
+                  </Pressable>
+                </RNView>
+              ))}
+            </ScrollView>
+          ) : null}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -379,6 +486,8 @@ export function AiChatScreen() {
             onSend={handleSubmit}
             disabled={isSending}
             placeholder="Ask anything"
+            onPlusPress={handlePlusPress}
+            plusDisabled={!canAttachImages}
             testID="ai-input"
             surface={SURFACE}
           />

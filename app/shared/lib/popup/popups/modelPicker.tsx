@@ -1,7 +1,9 @@
 /**
  * AI tab model picker — tabbed sheet with one tab per provider (OpenAI /
- * Claude / Grok), each showing the same three tier rows (Auto / Pro /
- * Max) for that provider's curated lineup.
+ * Claude / Grok / Google), each showing up to three tier rows (Auto /
+ * Pro / Max) from that provider's dynamically derived lineup (see
+ * `shared/lib/routstr/lineup.ts`). Rows carry live per-message cost and a
+ * small image glyph on vision-capable models.
  *
  * Why a custom sheet instead of `actionMenuPopup` with sections:
  *   `actionMenuPopup`'s tabbed mode (used by Select Profile) renders all
@@ -31,7 +33,7 @@ import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
-import type { RoutstrModel } from '@/shared/lib/routstr/api';
+import type { AiProviderId, LineupEntry } from '@/shared/lib/routstr/lineup';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -41,15 +43,12 @@ import {
   AI_PROVIDERS,
   AI_TIERS,
   type AiProvider,
-  type AiProviderId,
   type AiTier,
-  canAffordModel,
-  estimateMessagesRemaining,
-  estimateTurnCostSats,
-  getModelDisplayName,
-  maxCostSats,
-  modelIdForSlot,
-  topUpDeficitSats,
+  canAffordPricing,
+  entryForSlot,
+  estimateMessagesRemainingFromPricing,
+  estimateTurnCostSatsFromPricing,
+  topUpDeficitSatsFromPricing,
 } from '@/features/ai/lib/format';
 
 import { showActionSheet } from './bridge';
@@ -59,6 +58,9 @@ import type { CustomSheetSharedProps } from '../sheets/types';
 
 const pickerLog = log.child({ module: 'modelPicker' });
 
+// "cost unavailable" now only renders when a live catalog row genuinely
+// ships without pricing — the dynamic lineup can no longer point at a
+// model that doesn't exist (the old hardcoded-id failure mode).
 const formatTypicalCost = (sats: number | null): string => {
   if (sats == null) return 'cost unavailable';
   if (sats >= 1) return `~${Math.round(sats).toLocaleString()} sats / msg`;
@@ -69,7 +71,7 @@ const formatTypicalCost = (sats: number | null): string => {
 interface TierRowProps {
   tier: AiTier;
   provider: AiProvider;
-  models: RoutstrModel[];
+  entry: LineupEntry;
   balanceSats: number;
   isCurrent: boolean;
   onPress: () => void;
@@ -85,25 +87,32 @@ interface TierRowProps {
  * neither Trigger, Portal, nor Content is required because Menu.Root
  * just renders its children inline through a context Provider.
  */
-function TierRow({ tier, provider, models, balanceSats, isCurrent, onPress }: TierRowProps) {
-  const modelId = modelIdForSlot(provider.id, tier.id);
-  const reservationCeiling = maxCostSats(modelId, models);
-  const typicalCost = estimateTurnCostSats(modelId, models);
-  const affordable = canAffordModel(modelId, balanceSats, models);
-  const messagesLeft = estimateMessagesRemaining(balanceSats, modelId, models);
-  const deficit = !affordable ? topUpDeficitSats(modelId, balanceSats, models) : null;
+function TierRow({ tier, provider, entry, balanceSats, isCurrent, onPress }: TierRowProps) {
+  // Every figure comes from the lineup entry's compact pricing — identical
+  // math against a live catalog row or the persisted offline snapshot, so
+  // the picker keeps real prices across an offline relaunch.
+  const pricing = entry.satsPricing;
+  const reservationCeiling = pricing.max_cost;
+  const typicalCost = estimateTurnCostSatsFromPricing(pricing);
+  const affordable = canAffordPricing(pricing, balanceSats);
+  const messagesLeft = estimateMessagesRemainingFromPricing(balanceSats, pricing);
+  const deficit = !affordable ? topUpDeficitSatsFromPricing(pricing, balanceSats) : null;
 
-  const modelName = getModelDisplayName(modelId, models);
-  const friendlyModelName = modelName === modelId ? tier.label : modelName;
+  const friendlyModelName = entry.displayName || tier.label;
 
   // Affordable copy: "{Model} · ~N sats / msg" using the realistic
-  // per-turn estimate. Unaffordable copy: "{Model} · needs N sats
-  // reserved" so the deficit number lines up with the API's actual
-  // reservation requirement. Mirrors `ActionMenuHost.renderActionButton`
-  // exactly so the picker rows read as the same component family.
-  const description = affordable
-    ? `${friendlyModelName} · ${formatTypicalCost(typicalCost)}`
-    : `${friendlyModelName} · needs ${reservationCeiling != null ? Math.ceil(reservationCeiling).toLocaleString() : '?'} sats reserved`;
+  // per-turn estimate (text-only baseline — per-image fees apply only to
+  // attachment drafts and are reflected in the send-path logs, not here).
+  // Unaffordable copy: "{Model} · needs N sats reserved" so the deficit
+  // number lines up with the API's actual reservation requirement.
+  // Mirrors `ActionMenuHost.renderActionButton` exactly so the picker
+  // rows read as the same component family. Entries substituted from the
+  // last-known snapshot are annotated — their ids may no longer exist on
+  // the API, and the send-path candidate chain absorbs that.
+  const costCopy = affordable
+    ? formatTypicalCost(typicalCost)
+    : `needs ${reservationCeiling != null ? Math.ceil(reservationCeiling).toLocaleString() : '?'} sats reserved`;
+  const description = `${friendlyModelName} · ${costCopy}${entry.lastKnown ? ' · last known' : ''}`;
 
   const labelText =
     affordable && messagesLeft != null && messagesLeft > 0
@@ -146,6 +155,13 @@ function TierRow({ tier, provider, models, balanceSats, isCurrent, onPress }: Ti
           </Menu.ItemTitle>
           <Menu.ItemDescription>{descriptionText}</Menu.ItemDescription>
         </View>
+        {entry.visionInput ? (
+          // Image-input capability marker — the user-facing signal for
+          // "you can attach photos with this model".
+          <View>
+            <Icon name="mdi:image-outline" size={14} />
+          </View>
+        ) : null}
         {isCurrent ? (
           <View>
             <Icon name="mdi:check-circle" size={18} />
@@ -174,7 +190,13 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
   const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
   const setSelectedSlot = useRoutstrStore((s) => s.setSelectedSlot);
   const balanceMsats = useRoutstrStore((s) => s.balance);
-  const cachedModels = useRoutstrStore((s) => s.modelsCache?.data ?? null);
+  // Live-derived lineup when a catalog fetch has landed this session,
+  // else the persisted last-known snapshot, else null (true first-run
+  // offline → "models loading" rows).
+  const sessionLineup = useRoutstrStore((s) => s.lineup);
+  const lastKnownLineup = useRoutstrStore((s) => s.lastKnownLineup);
+  const lineup = sessionLineup ?? lastKnownLineup?.lineup ?? null;
+  const lineupSource = sessionLineup ? 'live' : lastKnownLineup ? 'persisted' : 'empty';
 
   // Open onto the user's currently-selected provider tab — they almost
   // always come here to swap *tier*, not provider, so the active tab
@@ -185,7 +207,7 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
     pickerLog.info('modelPicker.mount', {
       selectedProvider,
       selectedTier,
-      catalogSize: cachedModels?.length ?? 0,
+      lineupSource,
     });
     return () => pickerLog.info('modelPicker.unmount', {});
     // Mount-only — we want a single record per open cycle.
@@ -193,7 +215,6 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
   }, []);
 
   const balanceSats = balanceMsats != null ? Math.floor(balanceMsats / 1000) : 0;
-  const models = cachedModels ?? [];
   const activeProvider = useMemo(
     () => AI_PROVIDERS.find((p) => p.id === activeProviderTab) ?? AI_PROVIDERS[0],
     [activeProviderTab]
@@ -272,17 +293,47 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
           row chrome inside our own BottomSheet host. */}
       <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 24 }}>
         <Menu>
-          {AI_TIERS.map((tier) => (
-            <TierRow
-              key={`${activeProvider.id}-${tier.id}`}
-              tier={tier}
-              provider={activeProvider}
-              models={models}
-              balanceSats={balanceSats}
-              isCurrent={selectedProvider === activeProvider.id && selectedTier === tier.id}
-              onPress={() => handleSelect(tier)}
-            />
-          ))}
+          {(() => {
+            // Partial-lineup rendering is explicit: only filled tier cells
+            // get rows (a provider with 2 qualifying models shows 2 rows —
+            // never duplicated entries, and the tab itself never hides).
+            // A provider with no entries at all renders one neutral
+            // loading/empty row instead of a dangling-id lookup.
+            const rows = AI_TIERS.map((tier) => ({
+              tier,
+              entry: entryForSlot(lineup, activeProvider.id, tier.id),
+            })).filter((r) => r.entry != null);
+            if (rows.length === 0) {
+              return (
+                <Menu.Item isDisabled onPress={() => {}}>
+                  <HStack align="center" gap={10} style={{ flex: 1 }}>
+                    <Icon name="mdi:cloud-off-outline" size={20} />
+                    <View style={{ flex: 1 }}>
+                      <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
+                        Models loading
+                      </Menu.ItemTitle>
+                      <Menu.ItemDescription>
+                        {lineupSource === 'empty'
+                          ? 'Connect to the internet to load the model list'
+                          : 'No models available for this provider right now'}
+                      </Menu.ItemDescription>
+                    </View>
+                  </HStack>
+                </Menu.Item>
+              );
+            }
+            return rows.map(({ tier, entry }) => (
+              <TierRow
+                key={`${activeProvider.id}-${tier.id}`}
+                tier={tier}
+                provider={activeProvider}
+                entry={entry!}
+                balanceSats={balanceSats}
+                isCurrent={selectedProvider === activeProvider.id && selectedTier === tier.id}
+                onPress={() => handleSelect(tier)}
+              />
+            ));
+          })()}
         </Menu>
       </View>
     </View>

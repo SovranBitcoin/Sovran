@@ -56,12 +56,44 @@ type ChatCompletionChunk = z.infer<typeof ChatCompletionChunkSpine>;
  * `balance` or `data` into non-numbers/non-arrays are rejected before they
  * reach the wallet UI.
  */
+// Per-field `.catch(undefined)` keeps the spine tolerant one level deeper
+// than the envelope: these are the fields `deriveLineup` consumes, and a
+// type drift in any ONE of them must degrade that field (the row then
+// fails lineup qualification or ranks last), never reject the whole
+// response — rejecting a 200 wholesale would silently drop the entire
+// model menu the way the old unvalidated cast silently drifted.
+const undef = <T extends z.ZodTypeAny>(schema: T) => schema.optional().catch(undefined);
+
 const ModelsResponseSpine = z
   .object({
     data: z.array(
       z
         .object({
           enabled: z.boolean().optional(),
+          created: undef(z.number()),
+          context_length: undef(z.number()),
+          name: undef(z.string()),
+          canonical_slug: undef(z.string().nullable()),
+          architecture: undef(
+            z
+              .object({
+                input_modalities: undef(z.array(z.string())),
+                output_modalities: undef(z.array(z.string())),
+              })
+              .passthrough()
+          ),
+          sats_pricing: undef(
+            z
+              .object({
+                prompt: undef(z.number()),
+                completion: undef(z.number()),
+                request: undef(z.number()),
+                image: undef(z.number()),
+                max_cost: undef(z.number()),
+              })
+              .passthrough()
+              .nullable()
+          ),
         })
         .passthrough()
     ),
@@ -199,6 +231,21 @@ function getUserFriendlyErrorMessage(status: number, errorData: ParsedErrorData)
 }
 
 /**
+ * Lazy store access. A static import would create an api ↔ store cycle
+ * (the store imports this module's types and the shared lineup), so the
+ * store is resolved at call time — via `require` rather than a dynamic
+ * `import()` because Metro handles both but Jest's CJS VM can only
+ * execute the former, and the 401/402 branches below are exactly the
+ * paths that need regression tests.
+ */
+function routstrStoreState() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { useRoutstrStore } =
+    require('@/shared/stores/profile/routstrStore') as typeof import('@/shared/stores/profile/routstrStore');
+  return useRoutstrStore.getState();
+}
+
+/**
  * Throw a typed RoutstrError from a failed fetch Response.
  * Shared by all API functions to avoid duplicating the parse → format → throw chain.
  */
@@ -214,10 +261,25 @@ async function throwResponseError(response: Response): Promise<never> {
 
   // 401 with expired/spent key — clear stored API key so user can re-authenticate
   if (status === 401) {
-    const { useRoutstrStore } = await import('@/shared/stores/profile/routstrStore');
     apiLog.warn('api.routstr.api_key_expired');
-    useRoutstrStore.getState().clearApiKey();
-    useRoutstrStore.getState().clearBalance();
+    routstrStoreState().clearApiKey();
+    routstrStoreState().clearBalance();
+  }
+
+  // 402 carries the server's true available balance ("X mSats required …
+  // Y available") — sync it into the store. The local balance otherwise
+  // only refreshes after a SUCCESSFUL stream, so a drained (or
+  // reservation-held) key leaves the UI gating sends against a stale
+  // figure forever: every affordability check passes client-side, every
+  // send 402s, and the insufficient-balance popup loops. Syncing here
+  // makes the balance pill, picker fades, and estimates truthful the
+  // moment the server disagrees.
+  if (status === 402) {
+    const available = errorData.details?.available;
+    if (typeof available === 'number' && isFinite(available) && available >= 0) {
+      apiLog.info('api.routstr.balance_synced_from_402', { availableMsats: available });
+      routstrStoreState().setBalance(available);
+    }
   }
 
   throw {
@@ -543,9 +605,53 @@ function* parseSSEFromText(text: string): Generator<ChatCompletionChunk> {
   }
 }
 
+/**
+ * OpenAI-compatible multimodal message content. Images travel INLINE as
+ * base64 data-URLs in `image_url` parts — routstr-core decodes data-URLs
+ * server-side; there is no separate upload endpoint. This is the single
+ * wire contract for chat content: `sendMessage`, the send/retry assembly
+ * in `useAiSend`, and every input-length log all consume these types so a
+ * string-only assumption can't survive anywhere on the path.
+ */
+export type RoutstrContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
+export type RoutstrMessageContent = string | RoutstrContentPart[];
+
+export interface RoutstrChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: RoutstrMessageContent;
+}
+
+/**
+ * Input-size accounting that never serialises image payloads: text chars
+ * are summed, image parts are counted. Exported for `useAiSend`'s request
+ * logs — base64 in a log line would blow the log budget AND trip the
+ * redaction scanner's large-blob heuristics.
+ */
+export function measureMessageContent(messages: RoutstrChatMessage[]): {
+  textChars: number;
+  imageParts: number;
+} {
+  let textChars = 0;
+  let imageParts = 0;
+  for (const m of messages) {
+    if (typeof m.content === 'string') {
+      textChars += m.content.length;
+      continue;
+    }
+    for (const part of m.content) {
+      if (part.type === 'text') textChars += part.text.length;
+      else imageParts++;
+    }
+  }
+  return { textChars, imageParts };
+}
+
 export async function sendMessage(
   apiKey: string,
-  messages: { role: 'user' | 'assistant' | 'system'; content: string }[],
+  messages: RoutstrChatMessage[],
   options: {
     model?: string;
     temperature?: number;
@@ -554,11 +660,12 @@ export async function sendMessage(
   } = {}
 ): Promise<{ stream: AsyncIterable<ChatCompletionChunk> }> {
   const { model = 'gpt-3.5-turbo', temperature = 0.7, max_tokens, signal } = options;
-  const totalTokens = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0);
+  const { textChars, imageParts } = measureMessageContent(messages);
   apiLog.info('api.routstr.chat.start', {
     model,
     messageCount: messages.length,
-    totalInputChars: totalTokens,
+    totalInputChars: textChars,
+    imageParts,
     temperature,
     max_tokens,
   });
