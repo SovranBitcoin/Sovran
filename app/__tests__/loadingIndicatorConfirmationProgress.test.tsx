@@ -230,6 +230,15 @@ describe('LoadingIndicator confirmation progress', () => {
     // ring must not sit thinner than the neighbouring idle dashes/rail.
     expect(segmentStrokeWidth(segments[0])).toBeCloseTo(15);
     expect(segmentStrokeWidth(segments[1])).toBeCloseTo(15);
+    // Seams scale with the stroke: gap = stroke + 0.75·stroke = 26.25 units,
+    // so the dash is the per-segment step minus that gap.
+    const CIRC = 2 * Math.PI * 38;
+    const expectedGap = 15 * 1.75;
+    const segmentDash =
+      segments[0] && typeof segments[0] !== 'string' && !Array.isArray(segments[0])
+        ? (segments[0].props.strokeDasharray as number[])[0]
+        : null;
+    expect(segmentDash).toBeCloseTo(CIRC / 3 - expectedGap);
     act(() => {
       renderer.unmount();
     });
@@ -273,7 +282,8 @@ describe('LoadingIndicator confirmation progress', () => {
       ring && typeof ring !== 'string' && !Array.isArray(ring)
         ? (ring.props.animatedProps.strokeDasharray as number[])
         : [];
-    expect(dashArray[1]).toBeCloseTo(19); // gap = stroke + 4
+    // Idle dashes share the segment-ring seam policy: gap = stroke + 0.75·stroke.
+    expect(dashArray[1]).toBeCloseTo(15 * 1.75);
     act(() => {
       renderer.unmount();
     });

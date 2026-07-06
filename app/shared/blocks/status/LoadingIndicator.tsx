@@ -134,6 +134,18 @@ function effectiveSegmentStroke(segmentCount: number, overrideUnits: number | nu
   const step = CIRC / segmentCount;
   return Math.min(overrideUnits, Math.max(base, step * 0.5 - 2));
 }
+
+/** Dasharray gap between arc segments. Round caps extend each dash by
+ *  stroke/2 per end, so the gap the eye sees is `gap - stroke`. Px-targeted
+ *  strokes scale that visible gap with the stroke (0.75×, matching the
+ *  sparse-ring look) so every ring style — idle dashes and segment rings of
+ *  any count — shows the same seam weight; the default keeps the legacy
+ *  proportional policy. */
+function segmentGapUnits(step: number, stroke: number, pxTargeted: boolean): number {
+  if (!pxTargeted) return Math.min(step * 0.5, Math.max(stroke + 4, step * 0.22));
+  const visibleGap = Math.max(4, stroke * 0.75);
+  return stroke + Math.max(0, Math.min(visibleGap, step - stroke - 1));
+}
 const ICON_STROKE = 6.5;
 const DEFAULT_SEGMENT_COUNT = 6;
 const MAX_SEGMENT_COUNT = 24;
@@ -276,10 +288,10 @@ interface ConfirmationSegmentProps {
   delayMs: number;
   /** Full-thickness stroke in viewBox units (see `effectiveSegmentStroke`). */
   stroke: number;
-  /** Pending-arc thickness as a fraction of `stroke`. The default grows the
-   *  arc as it fills; 1 keeps every segment at full weight (used when the
-   *  stroke targets a fixed px width and must match neighbouring strokes). */
-  pendingScale: number;
+  /** True when the stroke targets a fixed px width and must match
+   *  neighbouring strokes: pending arcs keep full weight (instead of the
+   *  grow-on-fill thinning) and seams scale with the stroke. */
+  pxTargeted: boolean;
 }
 
 function ConfirmationSegment({
@@ -291,7 +303,7 @@ function ConfirmationSegment({
   successColor,
   delayMs,
   stroke,
-  pendingScale,
+  pxTargeted,
 }: ConfirmationSegmentProps): React.ReactElement {
   const progress = useSharedValue(completed ? 1 : 0);
   const pulse = useSharedValue(0);
@@ -308,8 +320,9 @@ function ConfirmationSegment({
   const step = CIRC / segmentCount;
   // Widen the gap with the stroke so round line caps don't close the seams
   // between thick segments and blur the ring into one continuous arc.
-  const gap = segmentCount === 1 ? 0 : Math.min(step * 0.5, Math.max(stroke + 4, step * 0.22));
+  const gap = segmentCount === 1 ? 0 : segmentGapUnits(step, stroke, pxTargeted);
   const dash = Math.max(1, step - gap);
+  const pendingScale = pxTargeted ? 1 : SEGMENT_PENDING_SCALE;
 
   useEffect(() => {
     const firstMount = !mountedRef.current;
@@ -471,9 +484,13 @@ export function LoadingIndicator({
   const strokeUnits =
     strokeWidthPx != null && strokeWidthPx > 0 && size > 0 ? (strokeWidthPx * 100) / size : null;
   const ringStrokeUnits = strokeUnits ?? RING_STROKE;
-  // Round caps extend each idle dash by stroke/2 per end, so a thicker ring
-  // needs a wider gap or the six dashes merge into a solid circle.
-  const idleGapUnits = Math.max(IDLE_SEGMENT_GAP, ringStrokeUnits + 4);
+  // Round caps extend each idle dash by stroke/2 per end, so a px-targeted
+  // ring recomputes the dash gap from the stroke — same seam policy as the
+  // segment rings — or the six dashes merge into a solid circle.
+  const idleGapUnits =
+    strokeUnits != null
+      ? segmentGapUnits(CIRC / IDLE_SEGMENT_COUNT, ringStrokeUnits, true)
+      : IDLE_SEGMENT_GAP;
   const segmentStrokeUnits =
     normalizedSegmentedProgress != null
       ? effectiveSegmentStroke(normalizedSegmentedProgress.segmentCount, strokeUnits)
@@ -828,10 +845,7 @@ export function LoadingIndicator({
                     stroke={
                       segmentStrokeUnits ?? segmentStroke(normalizedSegmentedProgress.segmentCount)
                     }
-                    // A px-targeted stroke must match neighbouring strokes
-                    // (e.g. the timeline's idle dashes and connector rail), so
-                    // pending arcs keep full weight instead of growing on fill.
-                    pendingScale={strokeUnits != null ? 1 : SEGMENT_PENDING_SCALE}
+                    pxTargeted={strokeUnits != null}
                   />
                 );
               })
