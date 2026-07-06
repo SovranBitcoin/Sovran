@@ -60,6 +60,10 @@ interface HistoryEntryTimelineProps {
 
 const LINE_WIDTH = 3;
 const LINE_HEIGHT = 50;
+// Top-aligns every label's cap height with the top of its 20px dot. One
+// constant for ALL step types: the old future-small special case (-7) made a
+// step's label jump 4px the moment it went active and gained its sublabel.
+const CONTENT_MARGIN_TOP = -3;
 const LINE_ANIM_MS = 400;
 const LINE_TIMING = { duration: LINE_ANIM_MS, easing: Easing.out(Easing.cubic) };
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
@@ -384,7 +388,6 @@ export function HistoryEntryTimeline({
             const dotDelay = index * 300;
             const lineDelay = dotDelay + 150;
 
-            const contentMarginTop = item.stepType === 'future-small' ? -7 : -3;
             const isWaitingStep = item.stepType === 'waiting';
 
             return (
@@ -444,7 +447,7 @@ export function HistoryEntryTimeline({
                     style={{
                       flex: 1,
                       paddingBottom: isLast ? 0 : 16,
-                      marginTop: contentMarginTop,
+                      marginTop: CONTENT_MARGIN_TOP,
                     }}>
                     {/* Keyed by label so a step that changes meaning in place
                         ("Sent" → "Cancelled") crossfades its text block, while

@@ -288,6 +288,41 @@ describe('HistoryEntryTimeline connector rail', () => {
     });
   });
 
+  it('top-aligns label blocks identically for every step type', () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+
+    // Unpaid mint: one next-pending row + two future-small rows. All label
+    // blocks must share one marginTop so a step going active (gaining its
+    // sublabel) never nudges the label.
+    act(() => {
+      renderer = TestRenderer.create(<HistoryEntryTimeline historyEntry={unpaidMintEntry} />);
+    });
+
+    const negativeMarginTops: number[] = [];
+    const walk = (node: JsonNode) => {
+      if (!node || typeof node === 'string') return;
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+      const style = StyleSheet.flatten(node.props?.style);
+      // This environment renders styles as CSS strings ("-3px"); parse both.
+      const marginTop = style?.marginTop != null ? parseFloat(String(style.marginTop)) : NaN;
+      if (Number.isFinite(marginTop) && marginTop < 0) {
+        negativeMarginTops.push(marginTop);
+      }
+      node.children?.forEach((child) => walk(child as JsonNode));
+    };
+    walk(renderer!.toJSON());
+
+    expect(negativeMarginTops).toHaveLength(3);
+    expect(new Set(negativeMarginTops)).toEqual(new Set([-3]));
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('transitions rows in place on rollback with an animated gradient rail', () => {
     let renderer: TestRenderer.ReactTestRenderer;
 
