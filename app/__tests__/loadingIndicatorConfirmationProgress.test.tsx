@@ -222,12 +222,33 @@ describe('LoadingIndicator confirmation progress', () => {
       'loading-indicator-confirmation-segment-'
     );
     expect(segments).toHaveLength(3);
-    const completedSegment = segments[0];
-    expect(
-      completedSegment && typeof completedSegment !== 'string' && !Array.isArray(completedSegment)
-        ? completedSegment.props.animatedProps.strokeWidth
-        : null
-    ).toBeCloseTo(15);
+    const segmentStrokeWidth = (segment: JsonNode) =>
+      segment && typeof segment !== 'string' && !Array.isArray(segment)
+        ? segment.props.animatedProps.strokeWidth
+        : null;
+    // Completed AND pending segments render at the target weight: a px-matched
+    // ring must not sit thinner than the neighbouring idle dashes/rail.
+    expect(segmentStrokeWidth(segments[0])).toBeCloseTo(15);
+    expect(segmentStrokeWidth(segments[1])).toBeCloseTo(15);
+    act(() => {
+      renderer.unmount();
+    });
+
+    // Without the px target, pending arcs keep the grow-on-fill thinning.
+    act(() => {
+      renderer = TestRenderer.create(
+        <LoadingIndicator
+          confirmationProgress={{ currentConfirmations: 1, requiredConfirmations: 3 }}
+          phase="idle"
+        />
+      );
+    });
+    const defaultSegments = collectNodesByTestIDPrefix(
+      renderer!.toJSON(),
+      'loading-indicator-confirmation-segment-'
+    );
+    expect(segmentStrokeWidth(defaultSegments[0])).toBeCloseTo(8.5);
+    expect(segmentStrokeWidth(defaultSegments[1])).toBeCloseTo(8.5 * 0.72);
     act(() => {
       renderer.unmount();
     });

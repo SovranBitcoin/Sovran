@@ -140,6 +140,9 @@ const MAX_SEGMENT_COUNT = 24;
 const SEGMENT_ANIM_MS = 340;
 const SEGMENT_STAGGER_MS = 55;
 const SEGMENT_PULSE_MS = 180;
+// Pending arcs render thinner than completed ones so a filling segment reads
+// as growing to full weight.
+const SEGMENT_PENDING_SCALE = 0.72;
 // The next-to-complete segment breathes a subtle colour/opacity pulse to signal
 // "this step is in progress". One half-cycle duration; loops (reversing).
 const SEGMENT_ACTIVE_PULSE_MS = 760;
@@ -273,6 +276,10 @@ interface ConfirmationSegmentProps {
   delayMs: number;
   /** Full-thickness stroke in viewBox units (see `effectiveSegmentStroke`). */
   stroke: number;
+  /** Pending-arc thickness as a fraction of `stroke`. The default grows the
+   *  arc as it fills; 1 keeps every segment at full weight (used when the
+   *  stroke targets a fixed px width and must match neighbouring strokes). */
+  pendingScale: number;
 }
 
 function ConfirmationSegment({
@@ -284,6 +291,7 @@ function ConfirmationSegment({
   successColor,
   delayMs,
   stroke,
+  pendingScale,
 }: ConfirmationSegmentProps): React.ReactElement {
   const progress = useSharedValue(completed ? 1 : 0);
   const pulse = useSharedValue(0);
@@ -372,7 +380,8 @@ function ConfirmationSegment({
       stroke: interpolateColor(p + breathe * 0.5, [0, 1], [pendingColor, successColor]),
       // Grow from a thinner pending arc to the full thickness as it fills, with
       // a brief pulse-thicken at completion and a gentle swell while active.
-      strokeWidth: stroke * (0.72 + p * 0.28) + pulse.get() * 1.6 + breathe * 0.7,
+      strokeWidth:
+        stroke * (pendingScale + p * (1 - pendingScale)) + pulse.get() * 1.6 + breathe * 0.7,
     };
   });
 
@@ -819,6 +828,10 @@ export function LoadingIndicator({
                     stroke={
                       segmentStrokeUnits ?? segmentStroke(normalizedSegmentedProgress.segmentCount)
                     }
+                    // A px-targeted stroke must match neighbouring strokes
+                    // (e.g. the timeline's idle dashes and connector rail), so
+                    // pending arcs keep full weight instead of growing on fill.
+                    pendingScale={strokeUnits != null ? 1 : SEGMENT_PENDING_SCALE}
                   />
                 );
               })
