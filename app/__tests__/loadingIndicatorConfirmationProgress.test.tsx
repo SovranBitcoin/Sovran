@@ -212,6 +212,7 @@ describe('LoadingIndicator confirmation progress', () => {
         <LoadingIndicator
           size={20}
           strokeWidthPx={3}
+          pendingColor="rail-track"
           confirmationProgress={{ currentConfirmations: 1, requiredConfirmations: 3 }}
           phase="idle"
         />
@@ -239,6 +240,15 @@ describe('LoadingIndicator confirmation progress', () => {
         ? (segments[0].props.strokeDasharray as number[])[0]
         : null;
     expect(segmentDash).toBeCloseTo(CIRC / 3 - expectedGap);
+    // Pending arcs take the supplied rail-track color at full opacity so ring
+    // and connector read as one piece of chrome; completed arcs stay success.
+    const segmentAnimated = (segment: JsonNode) =>
+      segment && typeof segment !== 'string' && !Array.isArray(segment)
+        ? segment.props.animatedProps
+        : null;
+    expect(segmentAnimated(segments[1])?.stroke).toBe('rail-track');
+    expect(segmentAnimated(segments[1])?.opacity).toBe(1);
+    expect(segmentAnimated(segments[0])?.opacity).toBe(1);
     act(() => {
       renderer.unmount();
     });
@@ -258,6 +268,14 @@ describe('LoadingIndicator confirmation progress', () => {
     );
     expect(segmentStrokeWidth(defaultSegments[0])).toBeCloseTo(8.5);
     expect(segmentStrokeWidth(defaultSegments[1])).toBeCloseTo(8.5 * 0.72);
+    // Default consumers keep the pending fade.
+    expect(
+      defaultSegments[1] &&
+        typeof defaultSegments[1] !== 'string' &&
+        !Array.isArray(defaultSegments[1])
+        ? defaultSegments[1].props.animatedProps.opacity
+        : null
+    ).toBeCloseTo(0.45);
     act(() => {
       renderer.unmount();
     });

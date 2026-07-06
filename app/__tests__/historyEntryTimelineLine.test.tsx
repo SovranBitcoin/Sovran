@@ -75,12 +75,14 @@ jest.mock('@/shared/blocks/status', () => {
       confirmationProgress?: unknown;
       segmentedInProgress?: boolean;
       strokeWidthPx?: number;
+      pendingColor?: string;
     }) =>
       ReactActual.createElement('LoadingIndicatorMock', {
         testID: `indicator-${props.phase}-${props.result}`,
         confirmationProgress: props.confirmationProgress,
         segmentedInProgress: props.segmentedInProgress,
         strokeWidthPx: props.strokeWidthPx,
+        pendingColor: props.pendingColor,
       }),
     mapCheckpointStatusToIndicator,
   };
@@ -222,11 +224,13 @@ describe('HistoryEntryTimeline connector rail', () => {
     const indicators = collectNodesByTestIDPrefix(renderer!.toJSON(), 'indicator-');
     expect(indicators.length).toBeGreaterThan(0);
     indicators.forEach((indicator) => {
-      expect(
+      const props =
         indicator && typeof indicator !== 'string' && !Array.isArray(indicator)
-          ? indicator.props.strokeWidthPx
-          : null
-      ).toBe(3);
+          ? indicator.props
+          : null;
+      expect(props?.strokeWidthPx).toBe(3);
+      // Pending strokes share the rail's unfilled track color (theme `muted`).
+      expect(props?.pendingColor).toBe('muted');
     });
 
     lines.forEach((line) => {

@@ -77,6 +77,10 @@ export interface LoadingIndicatorProps extends LoadingIndicatorVisualProps {
   revertedColor?: string;
   /** Done/warning disc + glyph color. Defaults to theme `warning`. */
   warningColor?: string;
+  /** Not-yet-filled segment arcs. Defaults to the ring `color` — the timeline
+   *  passes its muted rail-track color so a pending ring and the unfilled
+   *  connector below it read as the same chrome. */
+  pendingColor?: string;
   /** Defer the phase/result transition by this many ms. Used by timeline
    *  and chain UIs to cascade indicators left→right (dot completes → line
    *  fills → next dot activates). Default 0 (transition immediately). */
@@ -387,7 +391,10 @@ function ConfirmationSegment({
     // segment fills (`1 - p`) so a completing segment hands off cleanly.
     const breathe = (1 - p) * activePulse.get();
     return {
-      opacity: 0.45 + p * 0.55 + breathe * 0.32,
+      // Px-targeted rings match surrounding chrome (rail track) at full
+      // opacity — the pending→success colour alone marks the fill; the
+      // default fades pending arcs instead.
+      opacity: pxTargeted ? 1 : 0.45 + p * 0.55 + breathe * 0.32,
       // Push the pending colour partway toward success while breathing — a subtle
       // tint, not a full fill (which is reserved for actual completion).
       stroke: interpolateColor(p + breathe * 0.5, [0, 1], [pendingColor, successColor]),
@@ -429,6 +436,7 @@ export function LoadingIndicator({
   confirmationProgress,
   segmentedInProgress = true,
   strokeWidthPx,
+  pendingColor,
   visualScope = 'loading.status_indicator',
   visualKey,
   visualSurface = 'shared',
@@ -839,7 +847,7 @@ export function LoadingIndicator({
                     active={
                       segmentedInProgress && index === normalizedSegmentedProgress.completedSegments
                     }
-                    pendingColor={ringColor}
+                    pendingColor={pendingColor ?? ringColor}
                     successColor={okColor}
                     delayMs={transitionDelayMs + cascadeOrder * SEGMENT_STAGGER_MS}
                     stroke={
