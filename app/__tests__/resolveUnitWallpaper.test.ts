@@ -2,8 +2,9 @@
  * Pure-resolver tests for shared/lib/theme/resolveUnitWallpaper.
  *
  * Drive the fallback chain with plain objects — no Zustand mocks. Covers:
- *   override → first-stored override → newest in active album → 'dark'
- * plus the built-in 'colors' album short-circuit.
+ *   override → newest in active album → 'dark'
+ * (a unit never inherits a sibling's wallpaper — the per-unit default is
+ * 'dark') plus the built-in 'colors' album short-circuit.
  */
 
 import {
@@ -25,13 +26,23 @@ describe('resolveUnitWallpaper', () => {
     expect(result).toBe('artemis-3');
   });
 
-  it('falls back to the first stored override when the unit has none', () => {
+  it("defaults to 'dark' for a unit with no assignment even when a sibling has one", () => {
     const result = resolveUnitWallpaper(
       'usd',
       { unitWallpapers: { sat: 'artemis-3' }, activeAlbumSlug: null },
       []
     );
-    expect(result).toBe('artemis-3');
+    expect(result).toBe('dark');
+  });
+
+  it('ignores sibling assignments and uses the active album for an unset unit', () => {
+    const catalog = [entry('flowers-old', 'flowers', 1), entry('flowers-new', 'flowers', 100)];
+    const result = resolveUnitWallpaper(
+      'usd',
+      { unitWallpapers: { sat: 'artemis-3' }, activeAlbumSlug: 'flowers' },
+      catalog
+    );
+    expect(result).toBe('flowers-new');
   });
 
   it('falls back to the newest theme in the active album when no overrides exist', () => {
@@ -62,13 +73,13 @@ describe('resolveUnitWallpaper', () => {
     expect(result).toBe('dark');
   });
 
-  it('treats unitId=undefined the same as missing unit override', () => {
+  it("treats unitId=undefined the same as an unset unit — 'dark', no sibling inherit", () => {
     const result = resolveUnitWallpaper(
       undefined,
       { unitWallpapers: { sat: 'artemis-3' }, activeAlbumSlug: null },
       []
     );
-    expect(result).toBe('artemis-3');
+    expect(result).toBe('dark');
   });
 });
 

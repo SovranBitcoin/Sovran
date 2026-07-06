@@ -51,7 +51,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // provider mounts above CocoProvider, so the coco-aware availability hook
   // isn't reachable here, and the persisted choice is the right key even
   // while coco boots. Falls through resolveUnitWallpaper's chain (unit →
-  // first override → album → fallback) when the unit has no assignment.
+  // album → 'dark') when the unit has no assignment.
   const activeUnit = useMintStore((s) => s.activeUnit);
   const resolvedTheme = useUnitWallpaper(activeUnit);
   const mode = useThemeStore((s) => s.mode);

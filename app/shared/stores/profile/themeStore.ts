@@ -27,6 +27,27 @@ export type { ThemeMode };
 
 const DEFAULT_MODE: ThemeMode = 'dark';
 
+type PersistedTheme = {
+  activeAlbumSlug: string | null;
+  unitWallpapers: Record<UnitId, string>;
+  mode: ThemeMode;
+};
+
+// Append-only migration chain (see mintStore). Zustand only calls migrate on
+// a version mismatch, so an "already current" branch would be unreachable.
+//
+// v1 -> v2: one-time theme reset. Product decision (2026-07): every unit
+// defaults to 'dark' unless explicitly assigned, and existing devices start
+// from that clean slate — discard prior album / per-unit wallpaper / mode
+// choices rather than carrying them forward. Runs per profile blob (the
+// storage seam partitions by profile pubkey).
+export function migrateThemeStore(state: unknown, version: number): PersistedTheme {
+  if (version < 2) {
+    return { activeAlbumSlug: null, unitWallpapers: {}, mode: DEFAULT_MODE };
+  }
+  return state as PersistedTheme;
+}
+
 interface ThemeState {
   _hasHydrated: boolean;
   activeAlbumSlug: string | null;
@@ -60,6 +81,8 @@ export const useThemeStore = create<ThemeStore>()(
       name: 'theme-store',
       storage: profileStorage,
       schema: PersistedThemeStore,
+      version: 2,
+      migrate: migrateThemeStore,
       partialize: (state) => ({
         activeAlbumSlug: state.activeAlbumSlug,
         unitWallpapers: state.unitWallpapers,

@@ -11,8 +11,12 @@
 import { create } from 'zustand';
 import type { UnitId, ThemeMode } from '@/shared/stores/profile/themeStore';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
-import { PROFILE_PRIMARY_UNIT_ID } from '@/shared/lib/theme/builtinAlbums';
 import {
+  BUILTIN_COLORS_ALBUM_SLUG,
+  PROFILE_PRIMARY_UNIT_ID,
+} from '@/shared/lib/theme/builtinAlbums';
+import {
+  FALLBACK_THEME,
   getCatalogThemesForAlbum,
   resolveUnitWallpaper,
 } from '@/shared/lib/theme/resolveUnitWallpaper';
@@ -66,6 +70,22 @@ function snapshotFromStore(): Pick<ThemeDraftState, 'activeAlbumSlug' | 'unitWal
 }
 
 function distributeFromAlbum(albumSlug: string, unitIds: UnitId[]): Record<UnitId, string> {
+  // The built-in solid-colour album is "no wallpaper": applying it puts every
+  // unit on the default 'dark' palette instead of spreading the colour pool
+  // across units. Individual units can still be recoloured afterwards via the
+  // Background picker.
+  if (albumSlug === BUILTIN_COLORS_ALBUM_SLUG) {
+    const assigned: Record<UnitId, string> = {};
+    for (const unitId of unitIds) assigned[unitId] = FALLBACK_THEME;
+    log.info('theme.draft.album_distribute', {
+      albumSlug,
+      poolSize: 1,
+      unitCount: unitIds.length,
+      assigned,
+    });
+    return assigned;
+  }
+
   const catalog = useWallpaperStore.getState().catalog;
   const pool = getCatalogThemesForAlbum(catalog, albumSlug);
 

@@ -2,8 +2,10 @@
  * Wallpaper resolver — pure functions.
  *
  * Resolves a `themeName` for a given unit by walking the fallback chain
- * (explicit override → first stored override → newest in active album →
- * 'dark'). Lives outside both stores so neither has to import the other —
+ * (explicit override → newest in active album → 'dark'). A unit with no
+ * explicit assignment never inherits a sibling's wallpaper — the default
+ * for every unit is 'dark'. Lives outside both stores so neither has to
+ * import the other —
  * this is the seam that breaks the themeStore ↔ wallpaperStore cycle.
  *
  * Pure-only on purpose so tests can drive it with plain objects without
@@ -15,7 +17,9 @@ import {
   BUILTIN_COLOR_THEME_NAMES,
 } from '@/shared/lib/theme/builtinAlbums';
 
-const FALLBACK_THEME = 'dark';
+/** The default theme every unit resolves to when nothing is assigned — also
+ *  what applying the built-in solid-colour album assigns to every unit. */
+export const FALLBACK_THEME = 'dark';
 
 interface CatalogEntry {
   themeName: string;
@@ -51,8 +55,6 @@ export function resolveUnitWallpaper(
 ): string {
   const { unitWallpapers, activeAlbumSlug } = themeState;
   if (unitId && unitWallpapers[unitId]) return unitWallpapers[unitId];
-  const firstOverride = Object.values(unitWallpapers)[0];
-  if (firstOverride) return firstOverride;
   if (activeAlbumSlug) {
     const pool = getCatalogThemesForAlbum(catalog, activeAlbumSlug);
     if (pool.length > 0) return pool[0];
