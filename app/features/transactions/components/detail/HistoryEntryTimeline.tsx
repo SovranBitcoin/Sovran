@@ -397,9 +397,11 @@ export function HistoryEntryTimeline({
                       strokeWidthPx={LINE_WIDTH}
                       transitionDelayMs={dotDelay}
                       color={isWaitingStep ? warningColor : undefined}
-                      // Pending segments render in the rail's unfilled track
-                      // color so ring and connector read as one piece of chrome.
-                      pendingColor={mutedColor}
+                      // Unfilled strokes (idle dashes, pending segments) render
+                      // in the rail's unfilled track color so ring and connector
+                      // read as one piece of chrome. Waiting steps keep their
+                      // warning tint instead.
+                      pendingColor={isWaitingStep ? undefined : mutedColor}
                       successColor={successColor}
                       errorColor={dangerColor}
                       revertedColor={warningColor}

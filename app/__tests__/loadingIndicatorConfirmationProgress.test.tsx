@@ -283,7 +283,9 @@ describe('LoadingIndicator confirmation progress', () => {
     // Plain idle ring: the outline stroke follows the same px target, and the
     // dash gaps widen so round caps don't merge the dashes.
     act(() => {
-      renderer = TestRenderer.create(<LoadingIndicator size={20} strokeWidthPx={3} phase="idle" />);
+      renderer = TestRenderer.create(
+        <LoadingIndicator size={20} strokeWidthPx={3} pendingColor="rail-track" phase="idle" />
+      );
     });
     const circles = collectNodesByType(renderer!.toJSON(), 'Circle');
     const ring = circles.find(
@@ -296,12 +298,15 @@ describe('LoadingIndicator confirmation progress', () => {
     expect(
       ring && typeof ring !== 'string' && !Array.isArray(ring) ? ring.props.strokeWidth : null
     ).toBeCloseTo(15);
-    const dashArray =
-      ring && typeof ring !== 'string' && !Array.isArray(ring)
-        ? (ring.props.animatedProps.strokeDasharray as number[])
-        : [];
+    const ringAnimated =
+      ring && typeof ring !== 'string' && !Array.isArray(ring) ? ring.props.animatedProps : null;
+    const dashArray = (ringAnimated?.strokeDasharray as number[]) ?? [];
     // Idle dashes share the segment-ring seam policy: gap = stroke + 0.75·stroke.
     expect(dashArray[1]).toBeCloseTo(15 * 1.75);
+    // Idle dashes are unfilled chrome too: rail-track colour at full opacity,
+    // same as the pending segment arcs.
+    expect(ringAnimated?.stroke).toBe('rail-track');
+    expect(ringAnimated?.opacity).toBe(1);
     act(() => {
       renderer.unmount();
     });
@@ -322,6 +327,13 @@ describe('LoadingIndicator confirmation progress', () => {
         ? defaultRing.props.strokeWidth
         : null
     ).toBeCloseTo(3.5);
+    // Default idle chrome unchanged: ring `color` at the dimmed idle opacity.
+    const defaultRingAnimated =
+      defaultRing && typeof defaultRing !== 'string' && !Array.isArray(defaultRing)
+        ? defaultRing.props.animatedProps
+        : null;
+    expect(defaultRingAnimated?.stroke).toBe('foreground');
+    expect(defaultRingAnimated?.opacity).toBe(0.5);
     act(() => {
       renderer.unmount();
     });

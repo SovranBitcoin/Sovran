@@ -77,9 +77,10 @@ export interface LoadingIndicatorProps extends LoadingIndicatorVisualProps {
   revertedColor?: string;
   /** Done/warning disc + glyph color. Defaults to theme `warning`. */
   warningColor?: string;
-  /** Not-yet-filled segment arcs. Defaults to the ring `color` — the timeline
-   *  passes its muted rail-track color so a pending ring and the unfilled
-   *  connector below it read as the same chrome. */
+  /** Colour of every not-yet-filled stroke — the idle dash ring and pending
+   *  segment arcs alike. Defaults to the ring `color`; the timeline passes its
+   *  muted rail-track color so unfilled rings and the unfilled connector read
+   *  as the same chrome. Loading/done phases keep `color`/result colours. */
   pendingColor?: string;
   /** Defer the phase/result transition by this many ms. Used by timeline
    *  and chain UIs to cascade indicators left→right (dot completes → line
@@ -487,22 +488,32 @@ export function LoadingIndicator({
     prevSegCompletedRef.current = segCompleted;
   }, [segCompleted]);
 
-  // Convert the px target into viewBox units for this render size; null keeps
-  // the viewBox-relative defaults.
+  // ── Unfilled-stroke chrome ─────────────────────────────────────────────
+  // Single owner for how NOT-yet-filled strokes render — the idle dash ring
+  // and the pending segment arcs alike. `strokeWidthPx` switches the whole
+  // indicator into chrome-matching mode (weight, seams, full opacity) and
+  // `pendingColor` supplies the chrome colour; keep every such decision here
+  // so the two ring implementations cannot drift apart again.
   const strokeUnits =
     strokeWidthPx != null && strokeWidthPx > 0 && size > 0 ? (strokeWidthPx * 100) / size : null;
+  const pxTargeted = strokeUnits != null;
+  const unfilledColor = pendingColor ?? ringColor;
   const ringStrokeUnits = strokeUnits ?? RING_STROKE;
   // Round caps extend each idle dash by stroke/2 per end, so a px-targeted
   // ring recomputes the dash gap from the stroke — same seam policy as the
   // segment rings — or the six dashes merge into a solid circle.
-  const idleGapUnits =
-    strokeUnits != null
-      ? segmentGapUnits(CIRC / IDLE_SEGMENT_COUNT, ringStrokeUnits, true)
-      : IDLE_SEGMENT_GAP;
+  const idleGapUnits = pxTargeted
+    ? segmentGapUnits(CIRC / IDLE_SEGMENT_COUNT, ringStrokeUnits, true)
+    : IDLE_SEGMENT_GAP;
+  // Chrome-matching renders unfilled strokes at full opacity — the muted
+  // chrome colour carries the "not yet" signal, exactly like the unfilled
+  // track of a neighbouring connector rail.
+  const idleRingOpacity = pxTargeted ? 1 : RING_OPAC.idle;
   const segmentStrokeUnits =
     normalizedSegmentedProgress != null
       ? effectiveSegmentStroke(normalizedSegmentedProgress.segmentCount, strokeUnits)
       : null;
+  // ───────────────────────────────────────────────────────────────────────
 
   const segmentedComplete =
     normalizedSegmentedProgress != null &&
@@ -578,8 +589,11 @@ export function LoadingIndicator({
     startedDone ? DASH.done[0] : CIRC / IDLE_SEGMENT_COUNT - idleGapUnits
   );
   const dashB = useSharedValue(startedDone ? DASH.done[1] : idleGapUnits);
-  const ringOpac = useSharedValue(startedDone ? RING_OPAC.done : RING_OPAC.idle);
+  const ringOpac = useSharedValue(startedDone ? RING_OPAC.done : idleRingOpacity);
   const colorProgress = useSharedValue(startedDone ? 1 : 0);
+  // 1 while idle (ring wears the unfilled chrome colour), 0 in loading/done
+  // (ring wears the active `color`). Tweened alongside the dash morph.
+  const chromeMix = useSharedValue(startedDone ? 0 : 1);
 
   const rotation = useSharedValue(0);
   const speed = useSharedValue(0);
@@ -621,7 +635,13 @@ export function LoadingIndicator({
         : DASH[effectivePhase];
     dashA.set(t(a, { duration: D_RING, easing: E_RING }));
     dashB.set(t(b, { duration: D_RING, easing: E_RING }));
-    ringOpac.set(t(RING_OPAC[effectivePhase], { duration: D_OPAC, easing: E_DEF }));
+    ringOpac.set(
+      t(effectivePhase === 'idle' ? idleRingOpacity : RING_OPAC[effectivePhase], {
+        duration: D_OPAC,
+        easing: E_DEF,
+      })
+    );
+    chromeMix.set(t(effectivePhase === 'idle' ? 1 : 0, { duration: D_OPAC, easing: E_DEF }));
 
     const nextSpeed = isSegmentedMode ? 0 : SPEED[effectivePhase];
 
@@ -691,6 +711,8 @@ export function LoadingIndicator({
     resultDelayMs,
     normalizedSegmentedProgress,
     idleGapUnits,
+    idleRingOpacity,
+    chromeMix,
     colorProgress,
     fillOpac,
     fillScale,
@@ -700,11 +722,16 @@ export function LoadingIndicator({
     wifiOff,
   ]);
 
-  const ringStrokeAP = useAnimatedProps(() => ({
-    strokeDasharray: [dashA.get(), dashB.get()],
-    opacity: ringOpac.get(),
-    stroke: interpolateColor(colorProgress.get(), [0, 1], [ringColor, resultColor]),
-  }));
+  const ringStrokeAP = useAnimatedProps(() => {
+    // Idle wears the unfilled chrome colour; loading hands back to the active
+    // ring colour; done resolves to the result colour.
+    const baseColor = interpolateColor(chromeMix.get(), [0, 1], [ringColor, unfilledColor]);
+    return {
+      strokeDasharray: [dashA.get(), dashB.get()],
+      opacity: ringOpac.get(),
+      stroke: interpolateColor(colorProgress.get(), [0, 1], [baseColor, resultColor]),
+    };
+  });
 
   // Rotation and scale are applied via Animated.View transform styles
   // rather than as animated SVG props — react-native-svg doesn't reliably
@@ -847,13 +874,13 @@ export function LoadingIndicator({
                     active={
                       segmentedInProgress && index === normalizedSegmentedProgress.completedSegments
                     }
-                    pendingColor={pendingColor ?? ringColor}
+                    pendingColor={unfilledColor}
                     successColor={okColor}
                     delayMs={transitionDelayMs + cascadeOrder * SEGMENT_STAGGER_MS}
                     stroke={
                       segmentStrokeUnits ?? segmentStroke(normalizedSegmentedProgress.segmentCount)
                     }
-                    pxTargeted={strokeUnits != null}
+                    pxTargeted={pxTargeted}
                   />
                 );
               })
