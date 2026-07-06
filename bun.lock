@@ -39,7 +39,7 @@
         "@scure/bip39": "^1.2.2",
         "@shopify/flash-list": "2.0.2",
         "@shopify/react-native-skia": "2.6.2",
-        "@sovranbitcoin/coco-cashu-plugin-p2pk-import": "^0.1.0",
+        "@sovranbitcoin/coco-cashu-plugin-p2pk-import": "^0.2.0",
         "@sovranbitcoin/schemas": "^2.2.0",
         "bitchat-module": "file:./modules/bitchat-module",
         "buffer": "^6.0.3",
@@ -1173,7 +1173,7 @@
 
     "@sinonjs/fake-timers": ["@sinonjs/fake-timers@10.3.0", "", { "dependencies": { "@sinonjs/commons": "^3.0.0" } }, "sha512-V4BG07kuYSUkTCSBHG8G8TNhM+F19jXFWnQtzj+we8DrkpSBCee9Z3Ms8yiGer/dlmhe35/Xdgyo3/0rQKg7YA=="],
 
-    "@sovranbitcoin/coco-cashu-plugin-p2pk-import": ["@sovranbitcoin/coco-cashu-plugin-p2pk-import@0.1.0", "https://npm.pkg.github.com/download/@sovranbitcoin/coco-cashu-plugin-p2pk-import/0.1.0/3f7be1c41a6ed5a327559cba0b915aa0e84fd697", { "dependencies": { "@noble/hashes": "^2.0.1", "nostr-tools": "^2.0.0" }, "peerDependencies": { "@cashu/coco-core": "^1.0.1" } }, "sha512-nC5/13xmdsHTLCFMjtu18CqUmbQtXp1kUAGFr9Jmx6fugrCgpL+Bfxo4GEKMrtfJ27oIjbCDXMdTgFCfAVO2rw=="],
+    "@sovranbitcoin/coco-cashu-plugin-p2pk-import": ["@sovranbitcoin/coco-cashu-plugin-p2pk-import@0.2.0", "https://npm.pkg.github.com/download/@sovranbitcoin/coco-cashu-plugin-p2pk-import/0.2.0/9f5be9c5041bca195c5e4cadf0bb52634d203048", { "dependencies": { "@noble/hashes": "^2.0.1", "nostr-tools": "^2.0.0" }, "peerDependencies": { "@cashu/coco-core": "^2.0.0-rc.0" } }, "sha512-YqR0uI7DK7Yldqir8ZTSzl3znmdFBwTZ3Ziln0eiG9HI94Wf3jsEMZl1WXTlO5M8LZD7F5qW3wP+jYjxSWPfZg=="],
 
     "@sovranbitcoin/schemas": ["@sovranbitcoin/schemas@2.2.0", "https://npm.pkg.github.com/download/@sovranbitcoin/schemas/2.2.0/0da1da74127741be9521efe8769c5428820a79fe", { "peerDependencies": { "neverthrow": "^8.0.0", "zod": "^4.0.0" } }, "sha512-Zr8U85aL+NRW6xw9ZbAgnBfc6WEBF05rcVjERNPZS2dFbtNLDwkBScpoKs/ULX3EKOlptTu70/nJPseT+E9arw=="],
 
@@ -3781,8 +3781,6 @@
 
     "@scure/bip39/@scure/base": ["@scure/base@1.2.6", "", {}, "sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg=="],
 
-    "@sovranbitcoin/coco-cashu-plugin-p2pk-import/@cashu/coco-core": ["@cashu/coco-core@1.0.1", "", { "dependencies": { "@cashu/cashu-ts": "^3.5.0", "@noble/curves": "^2.0.1", "@noble/hashes": "^2.0.1", "@scure/bip32": "^2.0.1" }, "peerDependencies": { "typescript": "^5" } }, "sha512-Nv0T9+K49X+jqnrqn65Vgn/4Id+271JyHTgjwP/URdgShIJX3O8aGH4uidNphKnuBEa0EZKWPiFRn5K4mXh9jA=="],
-
     "@tailwindcss/node/lightningcss": ["lightningcss@1.31.1", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.31.1", "lightningcss-darwin-arm64": "1.31.1", "lightningcss-darwin-x64": "1.31.1", "lightningcss-freebsd-x64": "1.31.1", "lightningcss-linux-arm-gnueabihf": "1.31.1", "lightningcss-linux-arm64-gnu": "1.31.1", "lightningcss-linux-arm64-musl": "1.31.1", "lightningcss-linux-x64-gnu": "1.31.1", "lightningcss-linux-x64-musl": "1.31.1", "lightningcss-win32-arm64-msvc": "1.31.1", "lightningcss-win32-x64-msvc": "1.31.1" } }, "sha512-l51N2r93WmGUye3WuFoN5k10zyvrVs0qfKBhyC5ogUQ6Ew6JUSswh78mbSO+IU3nTWsyOArqPCcShdQSadghBQ=="],
 
     "@tailwindcss/node/tailwindcss": ["tailwindcss@4.2.1", "", {}, "sha512-/tBrSQ36vCleJkAOsy9kbNTgaxvGbyOamC30PRePTQe/o1MFwEKHQk4Cn7BNGaPtjp+PuUrByJehM1hgxfq4sw=="],
@@ -4377,8 +4375,6 @@
 
     "@monicon/core/jsdom/xml-name-validator": ["xml-name-validator@5.0.0", "", {}, "sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg=="],
 
-    "@sovranbitcoin/coco-cashu-plugin-p2pk-import/@cashu/coco-core/@scure/bip32": ["@scure/bip32@2.0.1", "", { "dependencies": { "@noble/curves": "2.0.1", "@noble/hashes": "2.0.1", "@scure/base": "2.0.0" } }, "sha512-4Md1NI5BzoVP+bhyJaY3K6yMesEFzNS1sE/cP+9nuvE7p/b0kx9XbpDHHFl8dHtufcbdHRUUQdRqLIPHN/s7yA=="],
-
     "@tailwindcss/node/lightningcss/lightningcss-android-arm64": ["lightningcss-android-arm64@1.31.1", "", { "os": "android", "cpu": "arm64" }, "sha512-HXJF3x8w9nQ4jbXRiNppBCqeZPIAfUo8zE/kOEGbW5NZvGc/K7nMxbhIr+YlFlHW5mpbg/YFPdbnCh1wAXCKFg=="],
 
     "@tailwindcss/node/lightningcss/lightningcss-darwin-arm64": ["lightningcss-darwin-arm64@1.31.1", "", { "os": "darwin", "cpu": "arm64" }, "sha512-02uTEqf3vIfNMq3h/z2cJfcOXnQ0GRwQrkmPafhueLb2h7mqEidiCzkE4gBMEH65abHRiQvhdcQ+aP0D0g67sg=="],
@@ -4760,12 +4756,6 @@
     "@monicon/core/jsdom/https-proxy-agent/agent-base": ["agent-base@7.1.4", "", {}, "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ=="],
 
     "@monicon/core/jsdom/whatwg-url/tr46": ["tr46@5.1.1", "", { "dependencies": { "punycode": "^2.3.1" } }, "sha512-hdF5ZgjTqgAntKkklYw0R03MG2x/bSzTtkxmIRw/sTNV8YXsCJ1tfLAX23lhxhHJlEf3CRCOCGGWw3vI3GaSPw=="],
-
-    "@sovranbitcoin/coco-cashu-plugin-p2pk-import/@cashu/coco-core/@scure/bip32/@noble/curves": ["@noble/curves@2.0.1", "", { "dependencies": { "@noble/hashes": "2.0.1" } }, "sha512-vs1Az2OOTBiP4q0pwjW5aF0xp9n4MxVrmkFBxc6EKZc6ddYx5gaZiAsZoq0uRRXWbi3AT/sBqn05eRPtn1JCPw=="],
-
-    "@sovranbitcoin/coco-cashu-plugin-p2pk-import/@cashu/coco-core/@scure/bip32/@noble/hashes": ["@noble/hashes@2.0.1", "", {}, "sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw=="],
-
-    "@sovranbitcoin/coco-cashu-plugin-p2pk-import/@cashu/coco-core/@scure/bip32/@scure/base": ["@scure/base@2.0.0", "", {}, "sha512-3E1kpuZginKkek01ovG8krQ0Z44E3DHPjc5S2rjJw9lZn3KSQOs8S7wqikF/AH7iRanHypj85uGyxk0XAyC37w=="],
 
     "@typescript-eslint/typescript-estree/minimatch/brace-expansion/balanced-match": ["balanced-match@4.0.4", "", {}, "sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA=="],
 

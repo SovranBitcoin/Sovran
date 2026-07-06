@@ -100,13 +100,6 @@ import {
 import { useSendReachabilityStore } from '@/shared/stores/profile/sendReachabilityStore';
 import { useTransactionDistributionStore } from '@/shared/stores/profile/transactionDistributionStore';
 
-// The p2pk-import package is typed against coco v1's Manager (its module
-// augmentation contributed `ext`); v2's class shape no longer merges, but the
-// runtime contract (manager.ext registry + keyring) is unchanged. One nominal
-// cast at the seam — same pattern as the plugin registration in manager.ts.
-const asP2PKImportManager = (mgr: Manager) =>
-  mgr as unknown as Parameters<typeof resolvePrimaryReceiveP2PKPublicKey>[0];
-
 // =============================================================================
 // createSovranExecuteReceive
 // =============================================================================
@@ -1074,9 +1067,7 @@ export function createSovranNotifications(
       if (hadP2PKProofs && useSettingsStore.getState().regenerateP2PKOnReceive) {
         const mgr = config?.getManager?.();
         if (mgr) {
-          if (
-            (getP2PKImportExtension(asP2PKImportManager(mgr))?.getPublicKeys() ?? []).length > 0
-          ) {
+          if ((getP2PKImportExtension(mgr)?.getPublicKeys() ?? []).length > 0) {
             return;
           }
 
@@ -1675,7 +1666,7 @@ export function createSovranHandlers({
       const currentMgr = getManager();
       if (currentMgr) {
         try {
-          p2pkKey = await resolvePrimaryReceiveP2PKPublicKey(asP2PKImportManager(currentMgr));
+          p2pkKey = await resolvePrimaryReceiveP2PKPublicKey(currentMgr);
         } catch {
           /* ignore */
         }

@@ -493,11 +493,6 @@ export class CocoManager {
         //     above). This is intentionally global across all profiles so any
         //     install can redeem giveaway ecash; it is not a profile secret.
         const plugins: Plugin[] = [
-          // The p2pk-import package is typed against coco v1's root Plugin
-          // export; v2 moved Plugin to the /plugin subpath. Its runtime
-          // contract (keyRingService + logger from ServiceMap) is unchanged in
-          // v2, so bridge with one nominal cast at the seam — same pattern as
-          // the NPC plugin registration below.
           createP2PKImportPlugin({
             getSecretKeys: () => {
               const keys: P2PKSecretKeyInput[] = [];
@@ -505,7 +500,7 @@ export class CocoManager {
               if (GIVEAWAY_P2PK_SECRET) keys.push(GIVEAWAY_P2PK_SECRET);
               return keys;
             },
-          }) as unknown as Plugin,
+          }),
           // NUT-18 payment-request receive over Nostr: contributes the
           // nprofile transport block at create time and polls the gift-wrap
           // inbox for payloads while any request is active. Same
