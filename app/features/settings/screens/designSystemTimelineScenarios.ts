@@ -32,9 +32,16 @@ interface TimelineFrame {
   onchainConfirmationProgress?: ChainOnchainConfirmationProgress | null;
 }
 
-interface TimelineScenario {
+/** Top-level tab on the Design System Timeline screen (payment method). */
+export type TimelineScenarioGroup = 'Cashu' | 'Lightning' | 'Onchain' | 'Request';
+
+export interface TimelineScenario {
   id: string;
   label: string;
+  /** Which top-level method tab the scenario lives under. */
+  group: TimelineScenarioGroup;
+  /** Pill sub-tab label within the group (Success / Rollback / …). */
+  variant: string;
   frames: TimelineFrame[];
 }
 
@@ -142,8 +149,52 @@ export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
 
   return [
     {
+      id: 'ecash-send',
+      label: 'Cashu · Send',
+      group: 'Cashu',
+      variant: 'Send',
+      frames: [
+        { note: 'Preparing token', historyEntry: sendEntry('prepared', base) },
+        { note: 'Sending', historyEntry: sendEntry('pending', base) },
+        { note: 'Sent', historyEntry: sendEntry('finalized', base) },
+      ],
+    },
+    {
+      id: 'ecash-receive',
+      label: 'Cashu · Receive',
+      group: 'Cashu',
+      variant: 'Receive',
+      frames: [
+        { note: 'Receiving token', historyEntry: receiveEntry('prepared', base) },
+        { note: 'Redeemed', historyEntry: receiveEntry('finalized', base) },
+      ],
+    },
+    {
+      id: 'send-rolled-back',
+      label: 'Cashu · Send → rolled back',
+      group: 'Cashu',
+      variant: 'Rollback',
+      frames: [
+        { note: 'Preparing token', historyEntry: sendEntry('prepared', base) },
+        { note: 'Sending', historyEntry: sendEntry('pending', base) },
+        { note: 'Returned to balance', historyEntry: sendEntry('rolledBack', base) },
+      ],
+    },
+    {
+      id: 'receive-already-spent',
+      label: 'Cashu · Receive → already spent',
+      group: 'Cashu',
+      variant: 'Already spent',
+      frames: [
+        { note: 'Receiving token', historyEntry: receiveEntry('prepared', base) },
+        { note: 'Already spent', historyEntry: receiveEntry('rolledBack', base) },
+      ],
+    },
+    {
       id: 'ln-receive',
       label: 'Lightning · Receive',
+      group: 'Lightning',
+      variant: 'Receive',
       frames: [
         { note: 'Waiting for payment', historyEntry: mintEntry(MintQuoteState.UNPAID, base) },
         { note: 'Payment received', historyEntry: mintEntry(MintQuoteState.PAID, base) },
@@ -153,6 +204,8 @@ export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
     {
       id: 'ln-send',
       label: 'Lightning · Send',
+      group: 'Lightning',
+      variant: 'Send',
       frames: [
         {
           note: 'Ready to send',
@@ -166,6 +219,8 @@ export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
     {
       id: 'ln-send-expired',
       label: 'Lightning · Send → expired',
+      group: 'Lightning',
+      variant: 'Expired',
       frames: [
         {
           note: 'Ready to send',
@@ -180,8 +235,20 @@ export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
       ],
     },
     {
+      id: 'mint-failed',
+      label: 'Lightning · Mint → failed',
+      group: 'Lightning',
+      variant: 'Failed',
+      frames: [
+        { note: 'Waiting for payment', historyEntry: mintEntry(MintQuoteState.UNPAID, base) },
+        { note: 'Mint failed', historyEntry: mintEntry('failed', base) },
+      ],
+    },
+    {
       id: 'onchain-receive',
       label: 'Onchain · Receive (mempool)',
+      group: 'Onchain',
+      variant: 'Receive',
       frames: [
         {
           note: 'Waiting for payment',
@@ -218,25 +285,10 @@ export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
       ],
     },
     {
-      id: 'ecash-send',
-      label: 'Ecash · Send',
-      frames: [
-        { note: 'Preparing token', historyEntry: sendEntry('prepared', base) },
-        { note: 'Sending', historyEntry: sendEntry('pending', base) },
-        { note: 'Sent', historyEntry: sendEntry('finalized', base) },
-      ],
-    },
-    {
-      id: 'ecash-receive',
-      label: 'Ecash · Receive',
-      frames: [
-        { note: 'Receiving token', historyEntry: receiveEntry('prepared', base) },
-        { note: 'Redeemed', historyEntry: receiveEntry('finalized', base) },
-      ],
-    },
-    {
       id: 'payment-request',
       label: 'Payment Request (Nostr)',
+      group: 'Request',
+      variant: 'Nostr send',
       frames: [
         {
           note: 'Creating token',
@@ -266,31 +318,6 @@ export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
           tokenCreated: true,
           nostrSent: true,
         },
-      ],
-    },
-    {
-      id: 'send-rolled-back',
-      label: 'Send → rolled back',
-      frames: [
-        { note: 'Preparing token', historyEntry: sendEntry('prepared', base) },
-        { note: 'Sending', historyEntry: sendEntry('pending', base) },
-        { note: 'Returned to balance', historyEntry: sendEntry('rolledBack', base) },
-      ],
-    },
-    {
-      id: 'receive-already-spent',
-      label: 'Receive → already spent',
-      frames: [
-        { note: 'Receiving token', historyEntry: receiveEntry('prepared', base) },
-        { note: 'Already spent', historyEntry: receiveEntry('rolledBack', base) },
-      ],
-    },
-    {
-      id: 'mint-failed',
-      label: 'Mint → failed',
-      frames: [
-        { note: 'Waiting for payment', historyEntry: mintEntry(MintQuoteState.UNPAID, base) },
-        { note: 'Mint failed', historyEntry: mintEntry('failed', base) },
       ],
     },
   ];

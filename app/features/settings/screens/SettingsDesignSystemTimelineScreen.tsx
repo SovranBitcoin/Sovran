@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 
@@ -9,8 +9,15 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { HistoryEntryTimeline } from '@/features/transactions';
+import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
+import { PillTabs, PILL_TABS_HEIGHT } from '@/shared/ui/composed/PillTabs';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
-import { buildTimelineScenarios, describeFrameState } from './designSystemTimelineScenarios';
+import {
+  buildTimelineScenarios,
+  describeFrameState,
+  type TimelineScenarioGroup,
+} from './designSystemTimelineScenarios';
 
 const TIMELINE_FRAME_DURATION_MS = 1500;
 const TIMELINE_COMPLETE_HOLD_STEPS = 2;
@@ -28,9 +35,21 @@ export function SettingsDesignSystemTimelineScreen() {
   const [loopIteration, setLoopIteration] = useState(0);
   const timelineCycleRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timelineHoldRef = useRef(0);
+  const [separator] = useThemeColor(['separator'] as const);
 
   const selectedScenario =
     timelineScenarios.find((s) => s.id === selectedScenarioId) ?? timelineScenarios[0];
+  // Receive-hub chrome: method groups as top-level underline tabs, the
+  // group's scenario variants (Success / Rollback / …) as the pill row.
+  const groups = useMemo(
+    () => [...new Set(timelineScenarios.map((s) => s.group))],
+    [timelineScenarios]
+  );
+  const groupScenarios = useMemo(
+    () => timelineScenarios.filter((s) => s.group === selectedScenario.group),
+    [selectedScenario.group, timelineScenarios]
+  );
+  const variants = groupScenarios.map((s) => s.variant);
   const frameCount = selectedScenario.frames.length;
   const currentFrame = selectedScenario.frames[Math.min(frameIndex, frameCount - 1)];
   const frameState = describeFrameState(currentFrame);
@@ -73,6 +92,14 @@ export function SettingsDesignSystemTimelineScreen() {
     setLoopIteration((value) => value + 1);
     setTimelineAuto(true);
   };
+  const onSelectGroup = (group: string) => {
+    const first = timelineScenarios.find((s) => s.group === (group as TimelineScenarioGroup));
+    if (first && first.group !== selectedScenario.group) onSelectScenario(first.id);
+  };
+  const onSelectVariant = (variant: string) => {
+    const scenario = groupScenarios.find((s) => s.variant === variant);
+    if (scenario && scenario.id !== selectedScenarioId) onSelectScenario(scenario.id);
+  };
   const onStepFrame = () => {
     setTimelineAuto(false);
     setFrameIndex((index) => (index >= frameCount - 1 ? 0 : index + 1));
@@ -85,6 +112,23 @@ export function SettingsDesignSystemTimelineScreen() {
 
   return (
     <ScreenWrapper name="SettingsDesignSystemTimelineScreen" scroll="custom" safeArea>
+      {/* Receive-hub-style header: full-bleed top-level method tabs, then the
+          scenario pill row — hairline separators on each band. */}
+      <View style={[styles.tabBand, { borderBottomColor: separator }]}>
+        <UnderlineTabs
+          tabs={groups}
+          selectedTab={selectedScenario.group}
+          handleTabPress={onSelectGroup}
+        />
+      </View>
+      <View style={[styles.pillBand, { borderBottomColor: separator }]}>
+        <PillTabs
+          tabs={variants}
+          activeTab={selectedScenario.variant}
+          onTabChange={onSelectVariant}
+        />
+      </View>
+
       <ScrollView className="px-4">
         <Text size={12} className="text-foreground/60 mb-4 mt-2">
           The payment{' '}
@@ -154,21 +198,6 @@ export function SettingsDesignSystemTimelineScreen() {
               ) : null}
             </View>
 
-            <Text size={11} bold className="text-foreground/50 mt-2 tracking-widest">
-              SCENARIO
-            </Text>
-            <HStack gap={8} wrap="wrap">
-              {timelineScenarios.map((scenario) => (
-                <Button
-                  key={scenario.id}
-                  variant={selectedScenarioId === scenario.id ? 'primary' : 'secondary'}
-                  size="sm"
-                  onPress={() => onSelectScenario(scenario.id)}>
-                  <Button.Label>{scenario.label}</Button.Label>
-                </Button>
-              ))}
-            </HStack>
-
             <HStack spacing={8}>
               <View className="flex-1">
                 <Button
@@ -195,3 +224,14 @@ export function SettingsDesignSystemTimelineScreen() {
     </ScreenWrapper>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBand: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  pillBand: {
+    height: PILL_TABS_HEIGHT,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+});
