@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, useWindowDimensions } from 'react-native';
 import { retainWallpaperMotion, wallpaperMotion } from '@/shared/lib/theme/wallpaperMotion';
-import { noteBaseWallpaperRendered } from '@/shared/lib/theme/themeTransition';
+import { noteWallpaperRendered } from '@/shared/lib/theme/themeTransition';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Image } from '@/shared/ui/primitives/Image';
 import { backgroundImageThemes } from 'config/backgroundImageThemes';
@@ -148,6 +148,10 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
 
   return (
     <Log name="SpriteView">
+      {/* Solid own-surface underlay: keeps the layer fully opaque before the
+          image decodes and under parallax translation, so a fading layer
+          never lets the backdrop bleed through. */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor }]} />
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
@@ -173,10 +177,10 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
             },
           ]}
           onLoad={() => {
-            // Base (motion-enabled) sprites signal the theme transition that
-            // the new wallpaper is actually rendered — the drag layer holds
-            // until this fires, then blends away seamlessly.
-            if (motionEnabled) noteBaseWallpaperRendered(activeTheme);
+            // Every sprite signals the transition seam when a theme's image
+            // is rendered — the programmatic overlay holds until the layer
+            // underneath reports its theme, then blends away seamlessly.
+            noteWallpaperRendered(activeTheme);
             log.info('bg.sprite.image_loaded', {
               theme: activeTheme,
               decodeMs: loadStartRef.current ? Date.now() - loadStartRef.current : null,

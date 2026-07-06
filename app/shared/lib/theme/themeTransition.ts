@@ -1,13 +1,18 @@
 /**
- * Account-switch theme transition (module-level reanimated mutables so
+ * Theme/wallpaper transition seam (module-level reanimated mutables so
  * ThemeProvider — which mounts ABOVE BackgroundProvider — can drive layers
  * that BackgroundView renders, without provider-order gymnastics).
  *
- * Wallpapers: fade the themed image/gradient layer out, swap the theme (CSS
- * vars + context, which re-points the sprite) at the dip, fade back in.
- * Colors: the base surface interpolates from the old theme's surface to the
- * new one over the whole transition, so color-only themes glide instead of
- * snapping.
+ * The wallpaper is a stack of PERSISTENT per-carousel-page layers whose
+ * opacities are a pure function of one shared value: the account pager's
+ * continuous position (`carouselX`). There is no fake→real handoff — the
+ * layer that fades in during a drag simply IS the wallpaper afterwards, so
+ * rapid back-and-forth swipes can't desync and nothing waits on an image
+ * reload to release an overlay.
+ *
+ * Non-carousel wallpaper changes (menu pick, album apply, profile switch)
+ * go through a single snapshot-cover layer instead; color-only themes keep
+ * the fade-through-surface transition.
  */
 
 import { makeMutable, runOnJS, withTiming } from 'react-native-reanimated';
@@ -17,7 +22,7 @@ const FADE_OUT_MS = 160;
 const FADE_IN_MS = 260;
 const COLOR_MS = 420;
 
-/** Multiplied into the themed background layer's opacity. */
+/** Multiplied into the wallpaper stack's opacity (color-only theme dip). */
 export const themeLayerOpacity = makeMutable(1);
 /** Surface color interpolation endpoints + progress (0→1). */
 export const themeSurfaceFrom = makeMutable<string | null>(null);
@@ -37,8 +42,8 @@ export function primeThemeSurface(surface: string | null): void {
  *
  * This dip-through-surface is the right visual ONLY for color-only targets
  * (there is no image to crossfade to). Image-wallpaper targets go through
- * `startThemeCrossfade` instead — dipping a full-bleed photo to a solid color
- * and back reads as a flash.
+ * the carousel stack or `coverWallpaperChange` instead — dipping a
+ * full-bleed photo to a solid color and back reads as a flash.
  */
 export function runThemeTransition(nextSurface: string | null, swap: () => void): void {
   themeSurfaceFrom.value = themeSurfaceTo.value;
@@ -59,268 +64,155 @@ export function surfaceOfTheme(theme: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Drag-driven crossfade (the account carousel): the adjacent account's
-// wallpaper mounts the moment a drag starts and both layers' opacities (and
-// the surface color) track the drag fraction directly — the release
-// animation is just the pager settling.
+// Carousel wallpaper stack: the account pager registers its pages (one unit +
+// resolved wallpaper theme per page) and streams its continuous position into
+// `carouselX` from an onPageScroll worklet. BackgroundView renders one
+// persistent layer per page; each layer's opacity derives from carouselX
+// alone, so drags, cancels, retargets, and programmatic setPage animations
+// are all correct with zero transition state.
 // ---------------------------------------------------------------------------
 
-/** 0..1 progress toward `themeDragTarget` (drag fraction). */
-export const themeDragProgress = makeMutable(0);
-/** Drag target as a SHARED VALUE too: pre-mounted layers compare against it
- *  in their opacity worklets, so starting a drag touches zero React state
- *  when the target's layer is already mounted. */
-export const themeDragTargetSv = makeMutable<string | null>(null);
+/** Continuous pager position (pageIndex + drag fraction), clamped at write. */
+export const carouselX = makeMutable(0);
 
-let dragTargetTheme: string | null = null;
-const dragListeners = new Set<() => void>();
-
-function notifyDragListeners(): void {
-  dragListeners.forEach((listener) => listener());
+interface CarouselPage {
+  unit: string;
+  theme: string;
 }
 
-export function getThemeDragTarget(): string | null {
-  return dragTargetTheme;
+let carouselPages: CarouselPage[] = [];
+const wallpaperListeners = new Set<() => void>();
+
+function notifyWallpaperListeners(): void {
+  wallpaperListeners.forEach((listener) => listener());
 }
 
-export function subscribeThemeDragTarget(listener: () => void): () => void {
-  dragListeners.add(listener);
+/** BackgroundView re-derives its layer list on page or overlay changes. */
+export function subscribeWallpaperLayers(listener: () => void): () => void {
+  wallpaperListeners.add(listener);
   return () => {
-    dragListeners.delete(listener);
+    wallpaperListeners.delete(listener);
   };
 }
 
-/** Mount the target theme's wallpaper layer + set color endpoints (used by releaseThemeDrag). */
-function beginThemeDrag(targetTheme: string, fromSurface: string | null): void {
-  if (dragTargetTheme !== targetTheme) {
-    // Re-targeting mid-fade (rapid swipes): the new fade starts CLEAN —
-    // progress back to 0 (the new layer must not pop in at the old fade's
-    // value) and any pending after-fade callbacks belong to the abandoned
-    // target, so they are dropped.
-    dragTargetTheme = targetTheme;
-    themeDragTargetSv.value = targetTheme;
-    themeDragProgress.value = 0;
-    afterFadeCallbacks = [];
-    pendingReleaseTarget = null;
-    if (releaseFallbackTimer) {
-      clearTimeout(releaseFallbackTimer);
-      releaseFallbackTimer = null;
-    }
-    if (fromSurface) themeSurfaceFrom.value = fromSurface;
-    const toSurface = surfaceOfTheme(targetTheme);
-    if (toSurface) themeSurfaceTo.value = toSurface;
-    notifyDragListeners();
-  }
+export function getCarouselPages(): CarouselPage[] {
+  return carouselPages;
 }
 
-const RELEASE_FADE_MS = 500;
-let afterFadeCallbacks: Array<() => void> = [];
+/** Register the pager's pages (order = page order). Dedupes by value so
+ *  identity-churning `availableUnits` arrays don't rebuild the layer stack. */
+export function setCarouselPages(pages: CarouselPage[]): void {
+  const unchanged =
+    pages.length === carouselPages.length &&
+    pages.every(
+      (page, i) => page.unit === carouselPages[i].unit && page.theme === carouselPages[i].theme
+    );
+  if (unchanged) return;
+  carouselPages = pages;
+  notifyWallpaperListeners();
+}
 
-function flushAfterFadeCallbacks(): void {
-  const callbacks = afterFadeCallbacks;
-  afterFadeCallbacks = [];
-  callbacks.forEach((callback) => callback());
+/** Is this theme currently one of the carousel's page wallpapers? When true,
+ *  a unit-driven theme change needs no overlay — the page stack already
+ *  shows (or is animating to) it. */
+export function isCarouselTheme(theme: string): boolean {
+  return carouselPages.some((page) => page.theme === theme);
 }
 
 /**
- * Revolut-style release transition: the crossfade doesn't track the finger —
- * it STARTS the moment the drag is released toward a new account and
- * completes in ~0.5s. Mount the target layer and animate to it.
+ * Layer opacity as a pure function of the pager position. Layers stack in
+ * page order (page 0 bottom … page N top): the floor page holds opacity 1
+ * underneath while the page above fades in with the drag fraction — a
+ * top-layer-only crossfade, so the surface color never bleeds through
+ * mid-blend (fading both layers dips the composite toward the backdrop).
  */
-export function releaseThemeDrag(targetTheme: string, fromSurface: string | null): void {
-  beginThemeDrag(targetTheme, fromSurface);
-  themeDragProgress.value = withTiming(1, { duration: RELEASE_FADE_MS }, (finished) => {
-    if (finished) runOnJS(flushAfterFadeCallbacks)();
-  });
-}
-
-/** Run once the release fade has fully landed (immediately if it has). */
-export function runAfterThemeDragFade(callback: () => void): void {
-  if (dragTargetTheme === null || themeDragProgress.value >= 0.999) {
-    callback();
-    return;
-  }
-  afterFadeCallbacks.push(callback);
-}
-
-/** Drag released without crossing — glide back to the current theme. */
-export function cancelThemeDrag(): void {
-  if (dragTargetTheme === null) {
-    themeDragProgress.value = 0;
-    return;
-  }
-  themeDragProgress.value = withTiming(0, { duration: 140 }, (finished) => {
-    if (finished) runOnJS(releaseDragTarget)();
-  });
-}
-
-function releaseDragTarget(): void {
-  dragTargetTheme = null;
-  themeDragTargetSv.value = null;
-  afterFadeCallbacks = [];
-  notifyDragListeners();
+export function carouselLayerOpacity(x: number, pageIndex: number, pageCount: number): number {
+  'worklet';
+  const maxIndex = pageCount - 1;
+  const clamped = x < 0 ? 0 : x > maxIndex ? maxIndex : x;
+  const distance = clamped - pageIndex;
+  if (distance >= 0 && distance < 1) return 1; // floor layer (or settled)
+  if (distance > -1 && distance < 0) return 1 + distance; // fading in on top
+  return 0;
 }
 
 // ---------------------------------------------------------------------------
-// Programmatic crossfade (unit switch / menu pick of an image wallpaper):
-// the same two-layer pattern as the drag — raise the pre-mounted target
-// layer's opacity over the old wallpaper, swap vars once it is opaque, then
-// blend the layer away after the base has rendered the new image. Driven by
-// its OWN target/progress shared values so an in-flight carousel drag and a
-// programmatic switch can never fight over one pair (rapid unit taps
-// mid-carousel-drag).
+// Programmatic cover (menu pick / album apply / profile switch — any image
+// wallpaper change NOT driven by the pager): a snapshot layer of the
+// OUTGOING wallpaper mounts above the page stack at full opacity — invisible,
+// it is pixel-identical to what is already on screen — so the vars can swap
+// and the layers underneath can re-point and decode freely. Once a layer
+// below has actually rendered the target image, the cover dissolves over it.
+// One animation, no callback queue, and nothing to strand if the change is
+// superseded mid-flight (the cover just keeps covering).
 // ---------------------------------------------------------------------------
 
-const CROSSFADE_MS = 350;
+const COVER_DISSOLVE_MS = 350;
+const COVER_FALLBACK_MS = 1200;
 
-/** 0..1 progress toward `themeCrossfadeTargetSv`. */
-export const themeCrossfadeProgress = makeMutable(0);
-export const themeCrossfadeTargetSv = makeMutable<string | null>(null);
+/** Cover layer opacity (1 while covering, dissolves to 0 on release). */
+export const overlayProgress = makeMutable(0);
 
-let crossfadeTargetTheme: string | null = null;
-let afterCrossfadeCallbacks: Array<() => void> = [];
+let coverTheme: string | null = null;
+let coverTargetTheme: string | null = null;
+let coverStartSeq = 0;
+let coverFallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
-export function getThemeCrossfadeTarget(): string | null {
-  return crossfadeTargetTheme;
+/** Monotonic stamp per rendered theme, so the cover only releases on a
+ *  render that happened AFTER it mounted — a stale render of the target
+ *  from some earlier switch must not drop the cover early. */
+let renderSeq = 0;
+const renderedSeqByTheme = new Map<string, number>();
+
+export function getWallpaperOverlayTheme(): string | null {
+  return coverTheme;
 }
 
-/** Reuses the drag-target listener set: BackgroundView re-derives its
- *  pre-mounted layer list from BOTH targets on either change. */
-export function subscribeThemeCrossfadeTarget(listener: () => void): () => void {
-  return subscribeThemeDragTarget(listener);
-}
-
-function flushAfterCrossfadeCallbacks(): void {
-  const callbacks = afterCrossfadeCallbacks;
-  afterCrossfadeCallbacks = [];
-  callbacks.forEach((callback) => callback());
+function clearCoverFallbackTimer(): void {
+  if (coverFallbackTimer) {
+    clearTimeout(coverFallbackTimer);
+    coverFallbackTimer = null;
+  }
 }
 
 /**
- * Fade the target theme's (pre-mounted) layer in over the current wallpaper
- * while the surface color glides. Re-targeting mid-fade starts clean, exactly
- * like beginThemeDrag: stale callbacks belong to the abandoned target.
+ * Cover the wallpaper with `previousTheme` (what is on screen right now) and
+ * hold until a layer underneath renders `targetTheme`, then dissolve. Callers
+ * apply the CSS vars immediately after — the swap happens under the cover.
+ * Re-targeting mid-cover keeps the ORIGINAL snapshot (still what the user is
+ * looking at) and just moves the release condition to the new target.
  */
-export function startThemeCrossfade(targetTheme: string, fromSurface: string | null): void {
-  if (crossfadeTargetTheme !== targetTheme) {
-    crossfadeTargetTheme = targetTheme;
-    themeCrossfadeTargetSv.value = targetTheme;
-    themeCrossfadeProgress.value = 0;
-    afterCrossfadeCallbacks = [];
-    pendingCrossfadeReleaseTarget = null;
-    if (crossfadeFallbackTimer) {
-      clearTimeout(crossfadeFallbackTimer);
-      crossfadeFallbackTimer = null;
-    }
-    if (fromSurface) themeSurfaceFrom.value = fromSurface;
-    const toSurface = surfaceOfTheme(targetTheme);
-    if (toSurface) themeSurfaceTo.value = toSurface;
-    notifyDragListeners();
+export function coverWallpaperChange(previousTheme: string, targetTheme: string): void {
+  if (coverTheme === null) {
+    coverTheme = previousTheme;
+    overlayProgress.value = 1;
+    notifyWallpaperListeners();
   }
-  themeCrossfadeProgress.value = withTiming(1, { duration: CROSSFADE_MS }, (finished) => {
-    if (finished) runOnJS(flushAfterCrossfadeCallbacks)();
+  coverTargetTheme = targetTheme;
+  coverStartSeq = renderSeq;
+  clearCoverFallbackTimer();
+  coverFallbackTimer = setTimeout(releaseCoverNow, COVER_FALLBACK_MS);
+}
+
+function releaseCoverNow(): void {
+  coverTargetTheme = null;
+  clearCoverFallbackTimer();
+  overlayProgress.value = withTiming(0, { duration: COVER_DISSOLVE_MS }, (finished) => {
+    if (finished) runOnJS(unmountCover)();
   });
 }
 
-/** Run once the crossfade has fully landed (immediately if it has). */
-export function runAfterThemeCrossfade(callback: () => void): void {
-  if (crossfadeTargetTheme === null || themeCrossfadeProgress.value >= 0.999) {
-    callback();
-    return;
-  }
-  afterCrossfadeCallbacks.push(callback);
+function unmountCover(): void {
+  coverTheme = null;
+  notifyWallpaperListeners();
 }
 
-let pendingCrossfadeReleaseTarget: string | null = null;
-let crossfadeFallbackTimer: ReturnType<typeof setTimeout> | null = null;
-
-function releaseCrossfadeNow(): void {
-  pendingCrossfadeReleaseTarget = null;
-  if (crossfadeFallbackTimer) {
-    clearTimeout(crossfadeFallbackTimer);
-    crossfadeFallbackTimer = null;
+/** Called by every wallpaper sprite when it finishes rendering a theme's
+ *  image — the signal that the cover can safely dissolve. */
+export function noteWallpaperRendered(theme: string): void {
+  renderSeq += 1;
+  renderedSeqByTheme.set(theme, renderSeq);
+  if (coverTargetTheme === theme && (renderedSeqByTheme.get(theme) ?? 0) > coverStartSeq) {
+    releaseCoverNow();
   }
-  themeCrossfadeProgress.value = withTiming(0, { duration: RELEASE_BLEND_MS }, (finished) => {
-    if (finished) runOnJS(releaseCrossfadeTarget)();
-  });
-}
-
-function releaseCrossfadeTarget(): void {
-  crossfadeTargetTheme = null;
-  themeCrossfadeTargetSv.value = null;
-  afterCrossfadeCallbacks = [];
-  notifyDragListeners();
-}
-
-/**
- * Vars are applied and the base sprite now renders the target — blend the
- * crossfade layer away once the base has actually painted the same wallpaper
- * underneath (same event-driven release as the drag).
- */
-export function completeThemeCrossfade(): void {
-  if (crossfadeTargetTheme === null) return;
-  if (lastBaseRenderedTheme === crossfadeTargetTheme) {
-    releaseCrossfadeNow();
-    return;
-  }
-  pendingCrossfadeReleaseTarget = crossfadeTargetTheme;
-  if (crossfadeFallbackTimer) clearTimeout(crossfadeFallbackTimer);
-  crossfadeFallbackTimer = setTimeout(releaseCrossfadeNow, RELEASE_FALLBACK_MS);
-}
-
-// ---------------------------------------------------------------------------
-// Event-driven release: the drag layer must stay up until the BASE layer has
-// actually RENDERED the new wallpaper underneath (the commit's re-render
-// storm can delay the base image swap unpredictably — a blind timer either
-// wastes time or releases early and flashes whatever is under the layer).
-// The base sprite reports each rendered theme via noteBaseWallpaperRendered;
-// a generous fallback timer covers load failures.
-// ---------------------------------------------------------------------------
-
-const RELEASE_BLEND_MS = 150;
-const RELEASE_FALLBACK_MS = 1200;
-
-let pendingReleaseTarget: string | null = null;
-let releaseFallbackTimer: ReturnType<typeof setTimeout> | null = null;
-let lastBaseRenderedTheme: string | null = null;
-
-/** Called by the base wallpaper sprite whenever it finishes rendering a
- *  theme's image — the signal that the drag layer can safely blend away. */
-export function noteBaseWallpaperRendered(theme: string): void {
-  lastBaseRenderedTheme = theme;
-  if (pendingReleaseTarget && pendingReleaseTarget === theme) {
-    releaseNow();
-  }
-  if (pendingCrossfadeReleaseTarget && pendingCrossfadeReleaseTarget === theme) {
-    releaseCrossfadeNow();
-  }
-}
-
-function releaseNow(): void {
-  pendingReleaseTarget = null;
-  if (releaseFallbackTimer) {
-    clearTimeout(releaseFallbackTimer);
-    releaseFallbackTimer = null;
-  }
-  // Soft blend instead of a snap: if the base is pixel-identical the blend
-  // is invisible; if it is a frame behind, this hides the seam.
-  themeDragProgress.value = withTiming(0, { duration: RELEASE_BLEND_MS }, (finished) => {
-    if (finished) runOnJS(releaseDragTarget)();
-  });
-}
-
-/**
- * Settled on the target: the base theme now IS the target (vars applied by
- * ThemeProvider) — release the drag layer once the base has rendered the
- * same wallpaper underneath.
- */
-export function completeThemeDrag(): void {
-  if (dragTargetTheme === null) return;
-  if (lastBaseRenderedTheme === dragTargetTheme) {
-    releaseNow();
-    return;
-  }
-  pendingReleaseTarget = dragTargetTheme;
-  if (releaseFallbackTimer) clearTimeout(releaseFallbackTimer);
-  releaseFallbackTimer = setTimeout(releaseNow, RELEASE_FALLBACK_MS);
 }

@@ -44,11 +44,15 @@ export function ReceiveRailPlaceholder({
   return (
     <View testID={testID}>
       <View style={styles.qrContainer}>
-        <Skeleton testID={qrTestID} style={qrPlaceholderStyle} />
+        {/* `bg-surface-secondary` overrides the default `bg-skeleton`
+            (palette-500 — far brighter than every other skeleton surface),
+            matching the fill PaymentInfo's own QR skeleton uses so the hub
+            placeholder and the in-rail QR skeleton read as one system. */}
+        <Skeleton testID={qrTestID} className="bg-surface-secondary" style={qrPlaceholderStyle} />
       </View>
       <View className="mx-4">
         <Section title={sectionTitle}>
-          <Skeleton style={styles.cardBlock}>
+          <Skeleton className="bg-surface-secondary" style={styles.cardBlock}>
             {/* Invisible replica of the real card row — sizes the skeleton
                 block to exactly the height the GradientCard row will take. */}
             <View style={styles.cardSizer} pointerEvents="none">

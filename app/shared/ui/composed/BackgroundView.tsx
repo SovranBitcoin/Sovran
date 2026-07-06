@@ -7,21 +7,20 @@ import React, { memo, ReactNode, useMemo, useSyncExternalStore } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
 import Animated, { interpolateColor, useAnimatedStyle } from 'react-native-reanimated';
 import {
-  getThemeCrossfadeTarget,
-  getThemeDragTarget,
-  subscribeThemeCrossfadeTarget,
-  subscribeThemeDragTarget,
-  themeCrossfadeProgress,
-  themeCrossfadeTargetSv,
-  themeDragProgress,
-  themeDragTargetSv,
+  carouselLayerOpacity,
+  carouselX,
+  getCarouselPages,
+  getWallpaperOverlayTheme,
+  overlayProgress,
+  subscribeWallpaperLayers,
+  surfaceOfTheme,
   themeLayerOpacity,
   themeSurfaceFrom,
   themeSurfaceProgress,
   themeSurfaceTo,
 } from '@/shared/lib/theme/themeTransition';
+import { retainWallpaperMotion } from '@/shared/lib/theme/wallpaperMotion';
 import { useTheme } from '@/shared/providers/ThemeProvider';
-import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import { isBackgroundImageTheme, getGradientColorScale } from '@/config/backgroundImageThemes';
 import { View } from '@/shared/ui/primitives/View/View';
 import { BlurView } from '@/shared/ui/primitives/BlurView';
@@ -276,23 +275,11 @@ function AnimatedBackgroundViewComponent({
 }: AnimatedBackgroundViewProps) {
   useRenderLogger('AnimatedBackgroundView');
   const surface = useThemeColor('surface');
-
-  // Get gradient colors for background image themes
   const { currentTheme } = useTheme();
-  const gradientColors = useMemo(() => {
-    if (isBackgroundImageTheme(currentTheme)) {
-      return getGradientColorScale(currentTheme);
-    }
-    return null;
-  }, [currentTheme]);
-  const meshGradientColors = useMemo(
-    () => getMeshGradientColors(gradientColors, gradientColor || surface),
-    [gradientColors, gradientColor, surface]
-  );
 
   log.debug('bg.view.render', {
     theme: currentTheme,
-    isImageTheme: !!gradientColors,
+    isImageTheme: isBackgroundImageTheme(currentTheme),
     blurTint,
   });
 
@@ -305,67 +292,44 @@ function AnimatedBackgroundViewComponent({
     opacity: fullBlurOpacity.value,
   }));
 
-  // Drag-driven crossfade: every unit-assigned wallpaper stays PRE-MOUNTED
-  // (decoded, opacity 0, parallax off) so the adjacent account's image is on
-  // the GPU before a drag even starts; the drag just raises its layer's
-  // opacity. Distinct themes only — a couple of full-screen bitmaps, decode
-  // capped at view size.
-  const dragTargetTheme = useSyncExternalStore(subscribeThemeDragTarget, getThemeDragTarget);
-  const crossfadeTargetTheme = useSyncExternalStore(
-    subscribeThemeCrossfadeTarget,
-    getThemeCrossfadeTarget
-  );
-  const unitWallpapers = useThemeStore((s) => s.unitWallpapers);
-  const preloadedThemes = useMemo(() => {
-    const themes = new Set<string>(Object.values(unitWallpapers));
-    if (dragTargetTheme) themes.add(dragTargetTheme);
-    themes.delete(currentTheme);
-    // The crossfade target is added AFTER the currentTheme delete on purpose:
-    // once the vars swap makes it the current theme, its overlay must stay
-    // mounted (opaque) until the base sprite has painted the same image and
-    // the release blend runs — unmounting it at the swap would flash the
-    // surface color for the frames before the base's onLoad.
-    if (crossfadeTargetTheme) themes.add(crossfadeTargetTheme);
-    return [...themes];
-  }, [unitWallpapers, dragTargetTheme, crossfadeTargetTheme, currentTheme]);
+  // The wallpaper stack: one PERSISTENT layer per account-carousel page
+  // (registered by the pager) plus at most one programmatic overlay layer.
+  // Layer opacities derive from carouselX / overlayProgress in worklets, so
+  // drags and transitions touch zero React state.
+  const carouselPages = useSyncExternalStore(subscribeWallpaperLayers, getCarouselPages);
+  const overlayTheme = useSyncExternalStore(subscribeWallpaperLayers, getWallpaperOverlayTheme);
+
+  // ONE shared DeviceMotion subscription drives every layer's parallax
+  // transform (they all read the shared wallpaperMotion value), retained
+  // here while any image wallpaper is in play.
+  const hasImageWallpaper =
+    isBackgroundImageTheme(currentTheme) ||
+    carouselPages.some((page) => isBackgroundImageTheme(page.theme));
+  React.useEffect(() => {
+    if (!showBackgroundImage || !hasImageWallpaper) return;
+    return retainWallpaperMotion();
+  }, [showBackgroundImage, hasImageWallpaper]);
 
   const backgroundAnimatedStyle = useAnimatedStyle(() => ({
     // themeLayerOpacity dips to 0 during color-only theme switches so the
-    // wallpaper swaps at the fade's midpoint; themeDragProgress crossfades
-    // toward the drag target while the carousel moves; themeCrossfadeProgress
-    // does the same for programmatic (unit-switch) wallpaper changes.
-    opacity:
-      backgroundOpacity.value *
-      themeLayerOpacity.value *
-      (1 - themeDragProgress.value) *
-      (1 - themeCrossfadeProgress.value),
+    // wallpaper swaps at the fade's midpoint.
+    opacity: backgroundOpacity.value * themeLayerOpacity.value,
   }));
 
-  // Color-theme glide: while a theme transition runs, an overlay above the
-  // base color interpolates old-surface → new-surface, so color-only themes
-  // transition instead of snapping when the CSS vars swap at the dip. It
-  // hides itself (opacity 0) once the glide completes.
+  // Color-theme glide: while a color-only theme transition runs, an overlay
+  // above the base color interpolates old-surface → new-surface, so those
+  // themes glide instead of snapping when the CSS vars swap at the dip. It
+  // hides itself (opacity 0) once the glide completes. Image transitions
+  // don't need it — every wallpaper layer carries its own opaque surface.
   const surfaceGlideStyle = useAnimatedStyle(() => {
     const from = themeSurfaceFrom.value;
     const to = themeSurfaceTo.value;
-    // Drag progress takes precedence (it maps the carousel position
-    // directly), then the programmatic crossfade, then the timed glide.
-    const progress =
-      themeDragProgress.value > 0
-        ? themeDragProgress.value
-        : themeCrossfadeProgress.value > 0
-          ? themeCrossfadeProgress.value
-          : themeSurfaceProgress.value;
-    const active =
-      themeDragProgress.value > 0 ||
-      themeCrossfadeProgress.value > 0 ||
-      themeSurfaceProgress.value < 1;
-    if (!from || !to || !active) {
+    if (!from || !to || themeSurfaceProgress.value >= 1) {
       return { opacity: 0, backgroundColor: 'transparent' };
     }
     return {
       opacity: 1,
-      backgroundColor: interpolateColor(progress, [0, 1], [from, to]),
+      backgroundColor: interpolateColor(themeSurfaceProgress.value, [0, 1], [from, to]),
     };
   });
 
@@ -382,52 +346,50 @@ function AnimatedBackgroundViewComponent({
         {/* Theme-transition surface glide (invisible outside transitions) */}
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, surfaceGlideStyle]} />
 
-        {/* Animated background image plus optional theme fade */}
-        <Animated.View style={[StyleSheet.absoluteFill, backgroundAnimatedStyle]}>
-          {showBackgroundImage && (
-            <AnimatedSpriteBackground backgroundColor={surface} imageTransitionMs={0} />
-          )}
-
-          {useMeshGradient ? (
-            <MeshGradientView
-              columns={3}
-              rows={3}
-              colors={meshGradientColors}
-              points={BACKGROUND_MESH_POINTS}
-              resolution={BACKGROUND_MESH_RESOLUTION}
-              smoothsColors
-              style={StyleSheet.absoluteFill}
-            />
-          ) : (
-            /* Gradient overlay for image themes */
-            (gradientColors || gradientColor) && (
-              <LinearGradient
-                colors={[
-                  opacity(gradientColor || surface, gradientTopOpacity),
-                  gradientColor || surface,
-                ]}
-                locations={[0, 1]}
-                dither
-                style={StyleSheet.absoluteFill}
-                pointerEvents="none"
+        {/* The wallpaper stack. Page layers stack in page order (page 0
+            bottom … page N top) so a drag is always a top-layer-only fade;
+            the programmatic overlay sits above them all. The stack falls
+            back to a single static layer for the current theme until the
+            pager registers its pages. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, backgroundAnimatedStyle]}>
+          {carouselPages.length > 0 ? (
+            carouselPages.map((page, index) => (
+              <WallpaperLayer
+                key={page.unit}
+                theme={page.theme}
+                pageIndex={index}
+                pageCount={carouselPages.length}
+                fallbackSurface={surface}
+                gradientColor={gradientColor}
+                gradientTopOpacity={gradientTopOpacity}
+                showImage={showBackgroundImage}
+                useMeshGradient={useMeshGradient}
               />
-            )
-          )}
-        </Animated.View>
-
-        {/* Pre-mounted wallpaper layers (one per unit-assigned theme):
-            decoded and composited at opacity 0 until one becomes the drag
-            target, whose opacity then tracks the drag fraction. */}
-        {showBackgroundImage &&
-          preloadedThemes.map((theme) => (
-            <PreloadedWallpaperLayer
-              key={theme}
-              theme={theme}
-              surface={surface}
+            ))
+          ) : (
+            <WallpaperLayer
+              theme={currentTheme}
+              fallbackSurface={surface}
               gradientColor={gradientColor}
               gradientTopOpacity={gradientTopOpacity}
+              showImage={showBackgroundImage}
+              useMeshGradient={useMeshGradient}
             />
-          ))}
+          )}
+          {overlayTheme && (
+            <WallpaperLayer
+              theme={overlayTheme}
+              overlay
+              fallbackSurface={surface}
+              gradientColor={gradientColor}
+              gradientTopOpacity={gradientTopOpacity}
+              showImage={showBackgroundImage}
+              useMeshGradient={useMeshGradient}
+            />
+          )}
+        </Animated.View>
 
         {blurSupported && (
           <Animated.View
@@ -446,50 +408,90 @@ function AnimatedBackgroundViewComponent({
 export const AnimatedBackgroundView = memo(AnimatedBackgroundViewComponent);
 
 /**
- * One pre-mounted wallpaper layer for the account carousel. Hidden layers
- * cost decoded-bitmap memory only: opacity 0, pointerEvents none, parallax
- * motion disabled (each enabled SpriteView streams DeviceMotion at 50ms),
- * and expo-image decodes capped at view size. The drag target's opacity
- * tracks the drag fraction directly.
+ * One persistent wallpaper layer. Each layer carries its OWN theme's opaque
+ * surface color (solid underlay + gradient tint), so crossfades never bleed
+ * the backdrop through and nothing recolors when the CSS vars swap. Hidden
+ * layers cost decoded-bitmap memory only: opacity 0, pointerEvents none,
+ * parallax motion subscription shared (retained once by the parent), and
+ * expo-image decodes capped at view size.
+ *
+ * Visibility is worklet-only — a pure function of `carouselX` for page
+ * layers (see carouselLayerOpacity) or `overlayProgress` for the overlay —
+ * so drags raise layers with zero React re-renders.
  */
-const PreloadedWallpaperLayer = memo(function PreloadedWallpaperLayer({
+const WallpaperLayer = memo(function WallpaperLayer({
   theme,
-  surface,
+  pageIndex,
+  pageCount,
+  overlay = false,
+  fallbackSurface,
   gradientColor,
   gradientTopOpacity,
+  showImage,
+  useMeshGradient,
 }: {
   theme: string;
-  surface: string;
+  /** Carousel page this layer belongs to; omit (with pageCount) for the
+   *  static fallback layer, which holds opacity 1. */
+  pageIndex?: number;
+  pageCount?: number;
+  /** The programmatic-transition overlay layer (tracks overlayProgress). */
+  overlay?: boolean;
+  fallbackSurface: string;
   gradientColor?: string;
   gradientTopOpacity: number;
+  showImage: boolean;
+  useMeshGradient: boolean;
 }) {
-  // Worklet-only visibility: comparing against the target SHARED VALUES means
-  // a drag or a programmatic crossfade raises this layer with zero React
-  // re-renders. The two transitions own separate value pairs, so an in-flight
-  // drag and a unit switch can't clobber each other's target.
+  const layerSurface = surfaceOfTheme(theme) ?? fallbackSurface;
+  const isPage = pageIndex !== undefined && pageCount !== undefined;
   const layerStyle = useAnimatedStyle(() => ({
-    opacity:
-      themeDragTargetSv.value === theme
-        ? themeDragProgress.value
-        : themeCrossfadeTargetSv.value === theme
-          ? themeCrossfadeProgress.value
-          : 0,
+    opacity: overlay
+      ? overlayProgress.value
+      : isPage
+        ? carouselLayerOpacity(carouselX.value, pageIndex as number, pageCount as number)
+        : 1,
   }));
+  const meshColors = useMemo(
+    () =>
+      getMeshGradientColors(
+        isBackgroundImageTheme(theme) ? getGradientColorScale(theme) : null,
+        gradientColor || layerSurface
+      ),
+    [theme, gradientColor, layerSurface]
+  );
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, layerStyle]}>
-      <AnimatedSpriteBackground
-        themeName={theme}
-        backgroundColor={surface}
-        motionEnabled={false}
-        imageTransitionMs={0}
-      />
-      <LinearGradient
-        colors={[opacity(gradientColor || surface, gradientTopOpacity), gradientColor || surface]}
-        locations={[0, 1]}
-        dither
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
+      {showImage && (
+        <AnimatedSpriteBackground
+          themeName={theme}
+          backgroundColor={layerSurface}
+          motionEnabled={false}
+          imageTransitionMs={0}
+        />
+      )}
+      {useMeshGradient ? (
+        <MeshGradientView
+          columns={3}
+          rows={3}
+          colors={meshColors}
+          points={BACKGROUND_MESH_POINTS}
+          resolution={BACKGROUND_MESH_RESOLUTION}
+          smoothsColors
+          style={StyleSheet.absoluteFill}
+        />
+      ) : (
+        <LinearGradient
+          colors={[
+            opacity(gradientColor || layerSurface, gradientTopOpacity),
+            gradientColor || layerSurface,
+          ]}
+          locations={[0, 1]}
+          dither
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+      )}
     </Animated.View>
   );
 });

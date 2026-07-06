@@ -4,6 +4,7 @@ import PagerView, {
   type PageScrollStateChangedNativeEvent,
   type PagerViewOnPageSelectedEvent,
 } from 'react-native-pager-view';
+import Animated, { useEvent, useHandler } from 'react-native-reanimated';
 
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -12,16 +13,44 @@ import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { resolveUnitWallpaper } from '@/shared/lib/theme/resolveUnitWallpaper';
-import {
-  cancelThemeDrag,
-  releaseThemeDrag,
-  surfaceOfTheme,
-} from '@/shared/lib/theme/themeTransition';
+import { carouselX, setCarouselPages } from '@/shared/lib/theme/themeTransition';
 
 import { Log, walletLog } from '@/shared/lib/logger';
 import { zIndex } from '@/shared/styles/tokens';
 
 const BALANCE_BOTTOM_INSET = 24;
+
+const AnimatedPagerView = Animated.createAnimatedComponent(PagerView);
+
+/** The onPageScroll payload as reanimated's useEvent delivers it (flattened
+ *  nativeEvent plus the eventName tag). */
+interface PagerScrollWorkletEvent extends Record<string, unknown> {
+  position: number;
+  offset: number;
+  eventName: string;
+}
+
+/** Reanimated worklet handler for the pager's native onPageScroll stream
+ *  (the standard useHandler/useEvent adapter from the pager-view docs). */
+function usePagerScrollHandler(
+  handlers: {
+    onPageScroll: (event: PagerScrollWorkletEvent, context: Record<string, unknown>) => void;
+  },
+  dependencies: unknown[]
+) {
+  const { context, doDependenciesDiffer } = useHandler(handlers, dependencies);
+  return useEvent<PagerScrollWorkletEvent>(
+    (event) => {
+      'worklet';
+      const { onPageScroll } = handlers;
+      if (onPageScroll && event.eventName.endsWith('onPageScroll')) {
+        onPageScroll(event, context);
+      }
+    },
+    ['onPageScroll'],
+    doDependenciesDiffer
+  );
+}
 
 interface AccountProps {
   // Phone-dimension floor for the balance region. The region grows naturally
@@ -31,25 +60,18 @@ interface AccountProps {
   minHeight: number;
 }
 
-/** The unit's wallpaper theme from the CURRENT store snapshots — called from
- *  the scroll handler, so no hook subscription churn. */
-function themeForUnit(unit: string): string {
-  const { unitWallpapers, activeAlbumSlug } = useThemeStore.getState();
-  const catalog = useWallpaperStore.getState().catalog;
-  return resolveUnitWallpaper(unit, { unitWallpapers, activeAlbumSlug }, catalog);
-}
-
 /**
  * The wallet-account carousel: one page per available unit (Bitcoin / USD /
  * EUR / GBP account), swipeable on iOS and Android (react-native-pager-view).
  *
- * The theme transition is DRAG-DRIVEN: the moment a drag moves toward a
- * neighbour, that account's wallpaper layer mounts (beginThemeDrag) and the
- * crossfade + surface-color interpolation track the drag fraction frame by
- * frame (themeDragProgress). Settling on the new page runs `selectUnit`
- * (which also re-points the preferred mint when needed) and ThemeProvider
- * applies the vars instantly under the already-opaque drag layer; springing
- * back cancels the drag and glides home.
+ * The wallpaper transition is POSITION-DRIVEN: this pager registers its
+ * pages (unit + resolved wallpaper) with the theme-transition seam and
+ * streams its continuous position into `carouselX` from an onPageScroll
+ * worklet. The persistent wallpaper layers in BackgroundView derive their
+ * opacities from that one value, so drags, cancels, direction changes, and
+ * programmatic setPage animations are all correct with no transition state
+ * here. Settling on a new page just commits the unit (`selectUnit`);
+ * ThemeProvider applies the CSS vars under an already-correct wallpaper.
  */
 export function Account({ minHeight }: AccountProps): React.ReactElement {
   const { unit, availableUnits, selectUnit } = useActiveUnit();
@@ -58,11 +80,54 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
   // Tracks the page the PAGER currently sits on, so external unit changes
   // move the pager but pager-driven changes don't re-set the same page.
   const pagerPositionRef = useRef(pageIndex);
+  const pageIndexRef = useRef(pageIndex);
+  pageIndexRef.current = pageIndex;
 
   useEffect(() => {
     if (pagerPositionRef.current === pageIndex) return;
+    // Animated page move — onPageScroll streams the wallpaper crossfade.
     pagerRef.current?.setPage(pageIndex);
   }, [pageIndex]);
+
+  // Register the wallpaper layer stack: one page per unit, in pager order.
+  // setCarouselPages dedupes by value, so identity churn in availableUnits
+  // or store snapshots is harmless.
+  const unitWallpapers = useThemeStore((s) => s.unitWallpapers);
+  const activeAlbumSlug = useThemeStore((s) => s.activeAlbumSlug);
+  const catalog = useWallpaperStore((s) => s.catalog);
+  useEffect(() => {
+    setCarouselPages(
+      availableUnits.map((pageUnit) => ({
+        unit: pageUnit,
+        theme: resolveUnitWallpaper(pageUnit, { unitWallpapers, activeAlbumSlug }, catalog),
+      }))
+    );
+  }, [availableUnits, unitWallpapers, activeAlbumSlug, catalog]);
+  useEffect(() => () => setCarouselPages([]), []);
+
+  // The pager rebuilds (new native instance at initialPage, no scroll events)
+  // whenever the available-unit set changes — snap the wallpaper stack to the
+  // new geometry. Deliberately NOT keyed on pageIndex: unit changes animate
+  // via setPage above and must not be snapped over.
+  const pagerKey = availableUnits.join('|');
+  useEffect(() => {
+    pagerPositionRef.current = pageIndexRef.current;
+    carouselX.value = pageIndexRef.current;
+  }, [pagerKey]);
+
+  const maxPageIndex = availableUnits.length - 1;
+  const scrollHandler = usePagerScrollHandler(
+    {
+      onPageScroll: (event) => {
+        'worklet';
+        // Clamp iOS edge-bounce overshoot so layer 0 / layer N never fade
+        // toward an empty backdrop.
+        const x = event.position + event.offset;
+        carouselX.value = x < 0 ? 0 : x > maxPageIndex ? maxPageIndex : x;
+      },
+    },
+    [maxPageIndex]
+  );
 
   // The carousel's height is the MAX content height across all account pages
   // (pager pages are absolutely positioned, so the container can't grow
@@ -117,75 +182,44 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
     });
   }, []);
 
-  // Revolut model: the wallpaper crossfade starts at RELEASE, not at the
-  // pager's 50% snap threshold. onPageSelected fires mid-drag when the
-  // landing page crosses the threshold, so it only RECORDS the landing —
-  // the fade triggers on the dragging→settling state transition (the finger
-  // actually leaving), and the unit commits at idle. Catching the pager
-  // mid-settle and dragging again cancels the fade cleanly.
-  const scrollStateRef = useRef<'idle' | 'dragging' | 'settling'>('idle');
-
-  const maybeStartReleaseFade = useCallback(() => {
-    const position = pagerPositionRef.current;
-    const nextUnit = availableUnits[position];
-    if (!nextUnit || nextUnit === unit) {
-      cancelThemeDrag();
-      return;
-    }
-    const fromTheme = themeForUnit(unit);
-    const targetTheme = themeForUnit(nextUnit);
-    if (targetTheme === fromTheme) return; // identical wallpaper — no fade
-    releaseThemeDrag(targetTheme, surfaceOfTheme(fromTheme));
-  }, [availableUnits, unit]);
-
-  const handlePageSelected = useCallback(
-    (event: PagerViewOnPageSelectedEvent) => {
-      pagerPositionRef.current = event.nativeEvent.position;
-      // The landing page can be (re)determined AFTER release while the pager
-      // is already settling — retarget the running fade to match.
-      if (scrollStateRef.current === 'settling') maybeStartReleaseFade();
-    },
-    [maybeStartReleaseFade]
-  );
+  const handlePageSelected = useCallback((event: PagerViewOnPageSelectedEvent) => {
+    pagerPositionRef.current = event.nativeEvent.position;
+  }, []);
 
   const handlePageScrollStateChanged = useCallback(
     (event: PageScrollStateChangedNativeEvent) => {
-      const state = event.nativeEvent.pageScrollState;
-      scrollStateRef.current = state;
-      if (state === 'dragging') {
-        // Finger back on a settling pager — abandon the running fade.
-        cancelThemeDrag();
-        return;
-      }
-      if (state === 'settling') {
-        maybeStartReleaseFade();
-        return;
-      }
-      // idle — commit.
+      if (event.nativeEvent.pageScrollState !== 'idle') return;
       const position = pagerPositionRef.current;
+      // Defensive snap: the final native scroll event should land exactly on
+      // the page, but a truncated stream must not leave a hidden layer up.
+      carouselX.value = position;
       const nextUnit = availableUnits[position];
-      if (!nextUnit || nextUnit === unit) {
-        cancelThemeDrag();
-        return;
-      }
+      if (!nextUnit || nextUnit === unit) return;
       walletLog.info('wallet.account.carousel_selected', { from: unit, to: nextUnit, position });
       selectUnit(nextUnit);
     },
-    [availableUnits, unit, selectUnit, maybeStartReleaseFade]
+    [availableUnits, unit, selectUnit]
   );
 
   return (
     <Log name="Account">
       <View style={[styles.container, { height: containerHeight }]}>
-        <PagerView
+        <AnimatedPagerView
           ref={pagerRef}
           style={styles.pager}
           initialPage={pageIndex}
+          // Reanimated's useEvent handler and the pager's codegen prop type
+          // don't unify — the cast is the documented pager-view pattern.
+          onPageScroll={
+            scrollHandler as unknown as React.ComponentProps<
+              typeof AnimatedPagerView
+            >['onPageScroll']
+          }
           onPageSelected={handlePageSelected}
           onPageScrollStateChanged={handlePageScrollStateChanged}
           // Rebuild when the available-account set changes so page indices
           // stay aligned with availableUnits.
-          key={availableUnits.join('|')}>
+          key={pagerKey}>
           {availableUnits.map((accountUnit) => (
             <View key={accountUnit} collapsable={false}>
               <VStack style={styles.balanceSlot}>
@@ -207,7 +241,7 @@ export function Account({ minHeight }: AccountProps): React.ReactElement {
               </VStack>
             </View>
           ))}
-        </PagerView>
+        </AnimatedPagerView>
       </View>
     </Log>
   );

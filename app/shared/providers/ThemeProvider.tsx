@@ -8,15 +8,10 @@ import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
 import { themeVariables, getThemeVariables } from '@/shared/lib/themeEngine';
 import {
-  completeThemeCrossfade,
-  completeThemeDrag,
-  getThemeDragTarget,
+  coverWallpaperChange,
+  isCarouselTheme,
   primeThemeSurface,
-  runAfterThemeCrossfade,
-  runAfterThemeDragFade,
   runThemeTransition,
-  surfaceOfTheme,
-  startThemeCrossfade,
 } from '@/shared/lib/theme/themeTransition';
 import { isBackgroundImageTheme } from '@/config/backgroundImageThemes';
 import { Uniwind } from 'uniwind';
@@ -61,18 +56,23 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const resolvedTheme = useUnitWallpaper(activeUnit);
   const mode = useThemeStore((s) => s.mode);
 
-  // What consumers SEE. Trails `resolvedTheme` by the fade-out so the
-  // wallpaper image and CSS vars swap at the transition's dip, not on the
-  // very frame the account changes.
+  // What consumers SEE. On programmatic wallpaper changes it trails
+  // `resolvedTheme` until the overlay covers the swap; on carousel-driven
+  // changes it applies immediately (the page stack already shows the
+  // wallpaper, so there is nothing to hide).
   const [currentTheme, setCurrentTheme] = useState(resolvedTheme);
   const lastApplied = useRef<string | null>(null);
+  const lastAppliedUnit = useRef<string | null>(null);
 
   useEffect(() => {
     if (!THEMES[resolvedTheme as ThemeName]) {
       log.warn('theme.not_found', { themeName: resolvedTheme });
       return;
     }
-    if (lastApplied.current === resolvedTheme) return;
+    if (lastApplied.current === resolvedTheme) {
+      lastAppliedUnit.current = activeUnit;
+      return;
+    }
 
     const applyVars = () => {
       const t0 = performance.now();
@@ -92,6 +92,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         | string
         | undefined) ?? null;
 
+    const unitChanged = lastAppliedUnit.current !== activeUnit;
+    lastAppliedUnit.current = activeUnit;
+
     if (lastApplied.current === null) {
       // Boot apply — no transition, no fade.
       lastApplied.current = resolvedTheme;
@@ -99,36 +102,28 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       applyVars();
       return;
     }
-    if (getThemeDragTarget() === resolvedTheme) {
-      // The carousel release fade is crossfading to this theme — apply the
-      // vars only once the drag layer is FULLY opaque (the fade may still be
-      // mid-flight when the pager reports idle), then release the layer.
-      lastApplied.current = resolvedTheme;
-      runAfterThemeDragFade(() => {
-        primeThemeSurface(surfaceOf);
-        applyVars();
-        completeThemeDrag();
-        log.info('theme.transition.drag_completed', { to: resolvedTheme });
-      });
-      return;
-    }
-    // Menu pick / programmatic switch (this is the unit-switch path).
     const previousTheme = lastApplied.current;
     lastApplied.current = resolvedTheme;
+    if (unitChanged && isCarouselTheme(resolvedTheme)) {
+      // Unit switch with the account carousel mounted: the wallpaper layer
+      // stack already shows (or is animating to) this page's wallpaper —
+      // apply the vars right away. No queue, so a rapid drag back can never
+      // strand the vars behind an abandoned fade.
+      primeThemeSurface(surfaceOf);
+      applyVars();
+      log.info('theme.transition.carousel_applied', { to: resolvedTheme });
+      return;
+    }
     if (isBackgroundImageTheme(resolvedTheme)) {
-      // Image wallpaper target: crossfade the pre-mounted target layer in
-      // over the old wallpaper — never dip through the surface color (the
-      // dip read as a flash on unit switches). Vars swap once the layer is
-      // fully opaque; the layer blends away after the base sprite has
-      // rendered the same image underneath.
-      log.info('theme.transition.start', { to: resolvedTheme, kind: 'crossfade' });
-      startThemeCrossfade(resolvedTheme, previousTheme ? surfaceOfTheme(previousTheme) : null);
-      runAfterThemeCrossfade(() => {
-        primeThemeSurface(surfaceOf);
-        applyVars();
-        completeThemeCrossfade();
-        log.info('theme.transition.crossfade_completed', { to: resolvedTheme });
-      });
+      // Programmatic image-wallpaper change (menu pick / album apply /
+      // profile switch): snapshot-cover the outgoing wallpaper, swap the
+      // vars under it, and dissolve once a layer underneath has rendered
+      // the new image — never dip through the surface color (the dip reads
+      // as a flash), and never let the stack re-point in plain sight.
+      log.info('theme.transition.start', { to: resolvedTheme, kind: 'cover' });
+      coverWallpaperChange(previousTheme, resolvedTheme);
+      primeThemeSurface(surfaceOf);
+      applyVars();
       return;
     }
     // Color-only target: there is no image to crossfade to — fade the
@@ -136,7 +131,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // glides between the themes.
     log.info('theme.transition.start', { to: resolvedTheme, kind: 'fade' });
     runThemeTransition(surfaceOf, applyVars);
-  }, [resolvedTheme]);
+  }, [resolvedTheme, activeUnit]);
 
   // Wait for the wallpaper store to finish registering downloaded themes —
   // without this the first paint would render against unregistered THEMES

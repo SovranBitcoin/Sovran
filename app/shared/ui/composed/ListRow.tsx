@@ -21,8 +21,10 @@
 
 import React, { ReactNode } from 'react';
 import { View, StyleProp, ViewStyle, StyleSheet } from 'react-native';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
+
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 
 import { Avatar, AvatarState } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -165,10 +167,16 @@ export function ListRow({
   accessibilityLabel,
   accessibilityHint,
 }: ListRowProps) {
-  const [foreground, surfaceSecondary] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-  ] as const);
+  const foreground = useThemeColor('foreground');
+
+  // Same double-tap guard the project Pressable provided before the press
+  // surface moved to heroui PressableFeedback — rows routinely await payment
+  // actions, so a rapid second tap must drop synchronously.
+  const guardedPress = useSingleFlight(async () => {
+    if (!onPress) return;
+    const result = onPress() as unknown;
+    if (result instanceof Promise) await result;
+  });
 
   const paddingVertical = padding === 'compact' ? 8 : 12;
 
@@ -312,22 +320,24 @@ export function ListRow({
 
   const a11yLabel = accessibilityLabel ?? (typeof title === 'string' ? title : undefined);
 
+  // Settings-row press grammar (see SettingsScreen): subtle scale on the
+  // content + a ripple expanding from the touch point, instead of a flat
+  // full-row highlight. `animation={false}` moves the scale from the root to
+  // the compound `.Scale` part, matching the settings rows exactly.
   return (
-    <Pressable
+    <PressableFeedback
       testID={testID}
-      onPress={onPress}
-      disabled={disabled}
+      animation={false}
+      onPress={guardedPress}
+      isDisabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={a11yLabel}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled }}
-      style={({ pressed }) => [
-        pressed && { backgroundColor: surfaceSecondary },
-        disabled && styles.disabled,
-        style,
-      ]}>
-      {body}
-    </Pressable>
+      style={[disabled && styles.disabled, style]}>
+      <PressableFeedback.Scale>{body}</PressableFeedback.Scale>
+      <PressableFeedback.Ripple />
+    </PressableFeedback>
   );
 }
 
