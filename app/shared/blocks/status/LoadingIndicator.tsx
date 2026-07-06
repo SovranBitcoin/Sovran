@@ -595,9 +595,14 @@ export function LoadingIndicator({
   const dashB = useSharedValue(startedDone ? DASH.done[1] : idleGapUnits);
   const ringOpac = useSharedValue(startedDone ? RING_OPAC.done : idleRingOpacity);
   const colorProgress = useSharedValue(startedDone ? 1 : 0);
-  // 1 while idle (ring wears the unfilled chrome colour), 0 in loading/done
-  // (ring wears the active `color`). Tweened alongside the dash morph.
-  const chromeMix = useSharedValue(startedDone ? 0 : 1);
+  // 1 while the unfilled chrome colour should show (idle ring, any segmented
+  // ring), 0 once the active `color` takes over (a plain loading arc). Frozen
+  // on `done` so the result colour blends FROM whatever the ring was wearing:
+  // muted chrome dots colourise directly with no white flash, while a
+  // foreground loading arc keeps the legacy white→result bloom.
+  const chromeMix = useSharedValue(
+    startedDone || (effectivePhase === 'loading' && !isSegmentedMode) ? 0 : 1
+  );
 
   const rotation = useSharedValue(0);
   const speed = useSharedValue(0);
@@ -645,7 +650,14 @@ export function LoadingIndicator({
         easing: E_DEF,
       })
     );
-    chromeMix.set(t(effectivePhase === 'idle' ? 1 : 0, { duration: D_OPAC, easing: E_DEF }));
+    if (effectivePhase !== 'done') {
+      chromeMix.set(
+        t(isSegmentedMode || effectivePhase === 'idle' ? 1 : 0, {
+          duration: D_OPAC,
+          easing: E_DEF,
+        })
+      );
+    }
 
     const nextSpeed = isSegmentedMode ? 0 : SPEED[effectivePhase];
 
@@ -750,9 +762,15 @@ export function LoadingIndicator({
     transform: [{ scale: fillScale.get() }],
   }));
 
-  const fillCircleAP = useAnimatedProps(() => ({
-    fill: interpolateColor(colorProgress.get(), [0, 1], [ringColor, resultColor]),
-  }));
+  const fillCircleAP = useAnimatedProps(() => {
+    // The disc colourises from the same base the ring was wearing (see
+    // chromeMix) so a chrome dot resolves muted→result without flashing the
+    // foreground white in between.
+    const baseColor = interpolateColor(chromeMix.get(), [0, 1], [ringColor, unfilledColor]);
+    return {
+      fill: interpolateColor(colorProgress.get(), [0, 1], [baseColor, resultColor]),
+    };
+  });
 
   const checkAP = useAnimatedProps(() => ({ strokeDashoffset: checkOff.get() }));
   const xAP = useAnimatedProps(() => ({ strokeDashoffset: xOff.get() }));

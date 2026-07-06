@@ -257,6 +257,17 @@ describe('LoadingIndicator confirmation progress', () => {
     expect(segmentAnimated(segments[1])?.stroke).toBe('rail-track');
     expect(segmentAnimated(segments[1])?.opacity).toBe(1);
     expect(segmentAnimated(segments[0])?.opacity).toBe(1);
+    // The result disc colourises from the chrome the ring wears — not the
+    // foreground — so resolving never flashes white.
+    const disc = collectNodesByType(renderer!.toJSON(), 'Circle').find(
+      (circle) =>
+        circle && typeof circle !== 'string' && !Array.isArray(circle) && circle.props.mask != null
+    );
+    expect(
+      disc && typeof disc !== 'string' && !Array.isArray(disc)
+        ? disc.props.animatedProps.fill
+        : null
+    ).toBe('rail-track');
     act(() => {
       renderer.unmount();
     });
@@ -347,6 +358,16 @@ describe('LoadingIndicator confirmation progress', () => {
         : null;
     expect(defaultRingAnimated?.stroke).toBe('foreground');
     expect(defaultRingAnimated?.opacity).toBe(0.5);
+    // Default consumers keep the legacy foreground→result disc bloom.
+    const defaultDisc = collectNodesByType(renderer!.toJSON(), 'Circle').find(
+      (circle) =>
+        circle && typeof circle !== 'string' && !Array.isArray(circle) && circle.props.mask != null
+    );
+    expect(
+      defaultDisc && typeof defaultDisc !== 'string' && !Array.isArray(defaultDisc)
+        ? defaultDisc.props.animatedProps.fill
+        : null
+    ).toBe('foreground');
     act(() => {
       renderer.unmount();
     });
