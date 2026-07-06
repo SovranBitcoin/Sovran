@@ -24,11 +24,6 @@
       "count": 1
     }
   },
-  "features/ai/components/AiMessageBubble.tsx": {
-    "unused-imports/no-unused-imports": {
-      "count": 1
-    }
-  },
   "features/ai/hooks/useAiSend.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 6
@@ -84,11 +79,6 @@
   },
   "features/map/screens/MerchantDetailScreen.tsx": {
     "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "features/mint/components/distribution/DistributionBar.tsx": {
-    "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
   },
@@ -235,7 +225,7 @@
   },
   "shared/lib/colorExtraction.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 3
+      "count": 2
     }
   },
   "shared/lib/downloadedThemeRegistry.ts": {
