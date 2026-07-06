@@ -443,11 +443,21 @@ export const useSettingsStore = create<SettingsStore>()(
         // guarantees every existing install lands with mock OFF on the next
         // launch, regardless of how it was turned on; afterHydrate then purges
         // any fixture metadata that already leaked into the cache.
-        version: 3,
-        migrate: (state) => {
+        version: 4,
+        migrate: (state, version) => {
           const persisted = (state ?? {}) as z.infer<typeof PersistedSettings>;
           return {
             ...persisted,
+            // v3 -> v4: one-time developer reset (mirrors the wallpaper/theme
+            // reset). Anyone who wandered into dev mode via the triple-tap —
+            // or flipped any developer toggle — lands back on stock behavior;
+            // the mock-flag resets below are subsumed but kept for old blobs.
+            experimental: false,
+            whitenoiseEnabled: false,
+            fileLoggingEnabled: false,
+            naggTierEnabled: true,
+            primalTierEnabled: true,
+            relayTierEnabled: true,
             mockMode: false,
             mockOffline: false,
             mockFailSend: false,
@@ -457,9 +467,12 @@ export const useSettingsStore = create<SettingsStore>()(
             // v2 -> v3: the avatar fallback default moved from the cute `beam`
             // face to the neutral `flat` person glyph (so dense surfaces stay
             // quiet). Installs still carrying the old default ride the new one;
-            // explicit `pixel`/`glass`/`flat` choices are preserved.
+            // explicit `pixel`/`glass`/`flat` choices are preserved. Gated to
+            // pre-v3 blobs so a deliberate post-v3 `beam` pick survives v4+.
             avatarFallbackVariant:
-              persisted.avatarFallbackVariant === 'beam' ? 'flat' : persisted.avatarFallbackVariant,
+              version < 3 && persisted.avatarFallbackVariant === 'beam'
+                ? 'flat'
+                : persisted.avatarFallbackVariant,
           };
         },
         partialize: (state) => ({

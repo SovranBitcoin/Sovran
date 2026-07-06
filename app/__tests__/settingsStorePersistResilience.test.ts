@@ -44,8 +44,8 @@ jest.mock('@/shared/stores/runtime/mockDataStore', () => ({
 
 const STORAGE_KEY = 'settings-store';
 
-function preload(state: Record<string, unknown>) {
-  mockMemory[STORAGE_KEY] = JSON.stringify({ state, version: 3 });
+function preload(state: Record<string, unknown>, version = 3) {
+  mockMemory[STORAGE_KEY] = JSON.stringify({ state, version });
 }
 
 async function loadStore() {
@@ -84,6 +84,69 @@ describe('settingsStore persist resilience', () => {
       termsAccepted: { termsAccepted: true, date: '2025-01-01T00:00:00.000Z' },
       avatarFallbackVariant: 'some-removed-variant',
     });
+
+    const store = await loadStore();
+
+    expect(store.getState().isTermsAccepted()).toBe(true);
+    expect(store.getState().avatarFallbackVariant).toBe('flat');
+  });
+
+  it('v3 -> v4 resets every developer setting without touching user settings', async () => {
+    preload(
+      {
+        termsAccepted: { termsAccepted: true, date: '2025-01-01T00:00:00.000Z' },
+        hasSeenOnboarding: true,
+        displayCurrency: 'eur',
+        avatarFallbackVariant: 'beam',
+        experimental: true,
+        mockMode: true,
+        mockOffline: true,
+        mockFailSend: true,
+        mockFailMelt: true,
+        mockFailPaymentRequest: true,
+        mockNoGlass: true,
+        whitenoiseEnabled: true,
+        fileLoggingEnabled: true,
+        naggTierEnabled: false,
+        primalTierEnabled: false,
+        relayTierEnabled: false,
+      },
+      3
+    );
+
+    const store = await loadStore();
+    const state = store.getState();
+
+    // Dev mode + every developer toggle back to defaults.
+    expect(state.experimental).toBe(false);
+    expect(state.mockMode).toBe(false);
+    expect(state.mockOffline).toBe(false);
+    expect(state.mockFailSend).toBe(false);
+    expect(state.mockFailMelt).toBe(false);
+    expect(state.mockFailPaymentRequest).toBe(false);
+    expect(state.mockNoGlass).toBe(false);
+    expect(state.whitenoiseEnabled).toBe(false);
+    expect(state.fileLoggingEnabled).toBe(false);
+    expect(state.naggTierEnabled).toBe(true);
+    expect(state.primalTierEnabled).toBe(true);
+    expect(state.relayTierEnabled).toBe(true);
+
+    // User settings survive, including a deliberate post-v3 `beam` pick
+    // (the v2->v3 beam->flat remap must not re-run on v3 blobs).
+    expect(state.isTermsAccepted()).toBe(true);
+    expect(state.hasSeenOnboarding).toBe(true);
+    expect(state.displayCurrency).toBe('eur');
+    expect(state.avatarFallbackVariant).toBe('beam');
+  });
+
+  it('v2 -> v4 still remaps the old beam default to flat', async () => {
+    preload(
+      {
+        termsAccepted: { termsAccepted: true, date: '2025-01-01T00:00:00.000Z' },
+        avatarFallbackVariant: 'beam',
+      },
+      2
+    );
 
     const store = await loadStore();
 
