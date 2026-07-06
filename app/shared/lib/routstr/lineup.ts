@@ -34,13 +34,18 @@ export type AiTierId = (typeof AI_TIER_IDS)[number];
  * affordability estimate assumes a typical turn of ~8k prompt + ~2k
  * completion tokens (see `format.ts`); a model that cannot comfortably
  * hold that plus history is not usable as a chat daily-driver, however
- * recent it is. Guards against tiny/toy releases outranking real models
- * under the recency-first ordering.
+ * cheap or recent it is. Guards against tiny/toy releases entering the
+ * ladder (they'd otherwise dominate the cheap end).
  */
 const MIN_CONTEXT_LENGTH = 16_000;
 
-/** Lineup depth per provider: Auto / Pro / Max. */
-const MAX_PER_PROVIDER = 3;
+/**
+ * Freshness window for automatic tier picks (~18 months), mirroring nagg's
+ * `aiLineupFreshWindow`. Catalogs keep retired premium relics listed
+ * (o1-pro class, ~4× the current flagship's price) and the price-ordered
+ * Max pick must not land on those over the real flagship.
+ */
+const FRESH_WINDOW_SECONDS = 548 * 24 * 60 * 60;
 
 /**
  * Compact per-model pricing subset carried into the lineup (and persisted
@@ -67,6 +72,13 @@ const LineupEntrySchema = z.object({
   /** Model accepts image input — gates the composer's image attach. */
   visionInput: z.boolean().catch(false),
   satsPricing: LineupPricingSchema,
+  /**
+   * Model's completion-token ceiling (`top_provider.max_completion_tokens`),
+   * used to clamp the `max_tokens` sent with each request below the model's
+   * own limit. Additive + tolerant: absent on lineups persisted before this
+   * field existed, in which case the send path uses the default clamp.
+   */
+  maxCompletionTokens: z.number().int().positive().nullable().catch(null).optional(),
   /**
    * True when this entry was substituted from the persisted last-known
    * lineup because a successful fetch returned zero qualifying models for
@@ -192,14 +204,18 @@ function isRollingAlias(model: RoutstrModel): boolean {
 }
 
 /**
- * Chat-capability qualification: enabled, priced, text-only output (a
- * naive top-by-recency otherwise selects image-generation and embedding
- * models — `gemini-3-pro-image`, `gemini-embedding-2`), and a context
- * window large enough for a typical turn.
+ * Chat-capability qualification: enabled, priced (a positive completion
+ * rate — embedding rows price prompt-only), text-only output (image
+ * generators and embedding models must never enter — `gemini-3-pro-image`,
+ * `gemini-embedding-2`), and a context window large enough for a typical
+ * turn. Mirrors nagg's `qualifiesForAILineup`.
  */
 function isChatCapable(model: RoutstrModel): boolean {
   if (model.enabled !== true) return false;
-  if (model.sats_pricing == null || typeof model.sats_pricing !== 'object') return false;
+  const p = model.sats_pricing;
+  if (p == null || typeof p !== 'object') return false;
+  if (!(typeof p.completion === 'number' && p.completion > 0)) return false;
+  if (!(typeof p.max_cost === 'number' && p.max_cost > 0)) return false;
   const out = model.architecture?.output_modalities;
   if (!Array.isArray(out) || !out.includes('text')) return false;
   if (out.includes('image') || out.includes('embeddings') || out.includes('audio')) return false;
@@ -209,20 +225,30 @@ function isChatCapable(model: RoutstrModel): boolean {
 }
 
 /**
- * Capability ordering — the ONE documented ordering used for both top-3
- * selection and tier assignment. The catalog carries no benchmark field,
- * so recency (`created` desc) is the primary capability proxy, context
- * length desc the secondary, and the id an alphabetical final tie-break
- * so exact created+context ties (observed in the live catalog) resolve
- * deterministically.
+ * Tier-ranking metric — the sats cost of a typical turn (~8k prompt / ~2k
+ * completion tokens), the same shape as `format.ts`'s per-turn estimate
+ * and nagg's `aiTurnCost`. Within one vendor this tracks the
+ * cheap→flagship capability ladder well.
  */
-function byCapability(a: RoutstrModel, b: RoutstrModel): number {
+function turnCostSats(model: RoutstrModel): number {
+  const p = model.sats_pricing;
+  const num = (v: unknown): number => (typeof v === 'number' && isFinite(v) ? v : 0);
+  return num(p?.request) + num(p?.prompt) * 8000 + num(p?.completion) * 2000;
+}
+
+/**
+ * Price ordering — the ONE documented ordering for tier assignment:
+ * turn cost asc (the tier ladder IS the price ladder), recency desc so
+ * same-priced siblings resolve toward the current release, id asc as the
+ * deterministic final tie-break.
+ */
+function byTurnCost(a: RoutstrModel, b: RoutstrModel): number {
+  const costA = turnCostSats(a);
+  const costB = turnCostSats(b);
+  if (costA !== costB) return costA - costB;
   const createdA = typeof a.created === 'number' ? a.created : 0;
   const createdB = typeof b.created === 'number' ? b.created : 0;
   if (createdA !== createdB) return createdB - createdA;
-  const ctxA = typeof a.context_length === 'number' ? a.context_length : 0;
-  const ctxB = typeof b.context_length === 'number' ? b.context_length : 0;
-  if (ctxA !== ctxB) return ctxB - ctxA;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
@@ -240,6 +266,7 @@ function displayNameFor(model: RoutstrModel): string {
 function toLineupEntry(model: RoutstrModel): LineupEntry {
   const p = model.sats_pricing;
   const num = (v: unknown): number | null => (typeof v === 'number' && isFinite(v) ? v : null);
+  const maxCompletion = model.top_provider?.max_completion_tokens;
   return {
     modelId: model.id,
     displayName: displayNameFor(model),
@@ -255,30 +282,64 @@ function toLineupEntry(model: RoutstrModel): LineupEntry {
       image: num(p?.image),
       max_cost: num(p?.max_cost),
     },
+    maxCompletionTokens:
+      typeof maxCompletion === 'number' && maxCompletion > 0 ? Math.floor(maxCompletion) : null,
   };
 }
 
 /**
- * Assign the ranked top-N to tiers from the SAME capability ordering:
- * Max = rank 1 (most capable / newest), Pro = rank 2, Auto = rank 3.
- * Partial providers fill deterministically: 2 models → Max + Auto,
- * 1 model → Auto only, 0 → all cells null (the provider tab still
- * renders, with whatever rows exist). Live per-row cost display carries
- * the price signal the old cheapest→premium ladder used to encode.
+ * Price-tier assignment, mirroring nagg's `pickAITiers` so the fallback
+ * derivation and the server-curated lineup agree on what the tiers MEAN:
+ *
+ *   - Auto — the cheapest qualifying model (affordable everyday chat).
+ *   - Pro  — the median of the price ladder.
+ *   - Max  — the NEWEST model in the top price quartile. Price alone
+ *     picks retired ultra-priced relics (o1-pro class); recency alone
+ *     picks whatever was listed last. Price finds the premium band,
+ *     listing recency finds the current flagship in it.
+ *
+ * Automatic picks only consider models inside the freshness window
+ * (falling back to all qualifying rows when a provider lists nothing
+ * fresh). Partial providers fill deterministically: 2 models →
+ * Auto + Max, 1 → Auto only, 0 → all cells null.
  */
-function assignTiers(ranked: LineupEntry[]): ProviderLineup {
-  const [first, second, third] = ranked;
-  if (third) return { max: first, pro: second, auto: third };
-  if (second) return { max: first, pro: null, auto: second };
-  if (first) return { max: null, pro: null, auto: first };
-  return emptyProviderLineup();
+function pickTiers(candidates: RoutstrModel[], nowSeconds: number): ProviderLineup {
+  if (candidates.length === 0) return emptyProviderLineup();
+  const cutoff = nowSeconds - FRESH_WINDOW_SECONDS;
+  let fresh = candidates.filter((m) => (typeof m.created === 'number' ? m.created : 0) >= cutoff);
+  if (fresh.length === 0) fresh = candidates;
+  const ranked = [...fresh].sort(byTurnCost);
+
+  const auto = ranked[0];
+  let pro: RoutstrModel | null = null;
+  let max: RoutstrModel | null = null;
+  if (ranked.length >= 2) {
+    const quartile = ranked.slice(Math.max(1, Math.floor((ranked.length * 3) / 4)));
+    max = quartile.reduce((newest, m) =>
+      (typeof m.created === 'number' ? m.created : 0) >
+      (typeof newest.created === 'number' ? newest.created : 0)
+        ? m
+        : newest
+    );
+  }
+  if (ranked.length >= 3) pro = ranked[Math.floor(ranked.length / 2)];
+
+  return {
+    auto: toLineupEntry(auto),
+    pro: pro ? toLineupEntry(pro) : null,
+    max: max ? toLineupEntry(max) : null,
+  };
 }
 
 /**
  * Derive the (provider × tier) lineup from a raw catalog. Pure and
  * total — never throws, returns an empty lineup for garbage input.
+ * `nowSeconds` is injectable so tests pin the freshness window.
  */
-export function deriveLineup(models: RoutstrModel[]): { lineup: AiLineup; stats: LineupStats } {
+export function deriveLineup(
+  models: RoutstrModel[],
+  nowSeconds: number = Math.floor(Date.now() / 1000)
+): { lineup: AiLineup; stats: LineupStats } {
   const lineup = emptyLineup();
   const stats: LineupStats = {
     perProvider: {
@@ -309,10 +370,10 @@ export function deriveLineup(models: RoutstrModel[]): { lineup: AiLineup; stats:
   }
 
   for (const provider of AI_PROVIDER_IDS) {
-    const candidates = (byProvider.get(provider) ?? []).sort(byCapability);
+    const candidates = byProvider.get(provider) ?? [];
     stats.perProvider[provider].qualifying = candidates.length;
     stats.totalQualifying += candidates.length;
-    lineup[provider] = assignTiers(candidates.slice(0, MAX_PER_PROVIDER).map(toLineupEntry));
+    lineup[provider] = pickTiers(candidates, nowSeconds);
   }
 
   return { lineup, stats };
@@ -326,6 +387,102 @@ export function deriveLineup(models: RoutstrModel[]): { lineup: AiLineup; stats:
  * picker can annotate them. A substituted id may be dead on the API; the
  * send-path candidate chain and failed-send popup absorb that.
  */
+/**
+ * nagg's `GET /app/ai-lineup` payload — the server-curated lineup that takes
+ * precedence over the client-side derivation. Serving the lineup from nagg
+ * makes the model set, tier picks (via `NAGG_AI_LINEUP_PINS`), and even the
+ * Routstr node base URL updatable for already-shipped builds by a nagg
+ * deploy alone. Envelope is permissive (Postel's Law): unknown provider ids
+ * and extra fields are skipped, malformed models drop individually.
+ */
+const NaggLineupModelSchema = z.object({
+  tier: z.string().max(32),
+  id: z.string().max(256),
+  name: z.string().max(256).catch(''),
+  created: z.number().int().nonnegative().catch(0),
+  contextLength: z.number().int().nonnegative().catch(0),
+  maxCompletionTokens: z.number().int().positive().nullable().catch(null).optional(),
+  inputModalities: z.array(z.string().max(32)).max(16).catch([]),
+  pricing: z
+    .object({
+      prompt: z.number().nullable().catch(null),
+      completion: z.number().nullable().catch(null),
+      request: z.number().nullable().catch(null),
+      image: z.number().nullable().catch(null).optional(),
+      maxCost: z.number().nullable().catch(null),
+    })
+    .partial()
+    .catch({}),
+});
+
+export const NaggAiLineupSchema = z.object({
+  version: z.number().int().catch(1),
+  updatedAt: z.number().int().nonnegative().catch(0),
+  node: z.object({ baseUrl: z.string().max(512).catch('') }).catch({ baseUrl: '' }),
+  providers: z
+    .array(
+      z.object({
+        id: z.string().max(64),
+        vendor: z.string().max(64).catch(''),
+        models: z.array(NaggLineupModelSchema).max(16).catch([]),
+      })
+    )
+    .max(64)
+    .catch([]),
+});
+export type NaggAiLineup = z.infer<typeof NaggAiLineupSchema>;
+
+/**
+ * Map the nagg payload onto the app's `AiLineup` shape. Providers the app
+ * doesn't know (a future Qwen/DeepSeek tab served to newer builds) and tiers
+ * outside auto/pro/max are skipped — old builds stay correct on a newer
+ * payload by construction. Returns a `null` lineup when no known provider
+ * carried any model so callers fall back to the client-side derivation.
+ */
+export function lineupFromNaggPayload(payload: NaggAiLineup): {
+  lineup: AiLineup | null;
+  nodeBaseUrl: string | null;
+} {
+  const lineup = emptyLineup();
+  const knownProviders = new Set<string>(AI_PROVIDER_IDS);
+  const knownTiers = new Set<string>(AI_TIER_IDS);
+  let filled = 0;
+  for (const provider of payload.providers) {
+    if (!knownProviders.has(provider.id)) continue;
+    const providerId = provider.id as AiProviderId;
+    for (const model of provider.models) {
+      if (!knownTiers.has(model.tier)) continue;
+      const tier = model.tier as AiTierId;
+      lineup[providerId][tier] = {
+        modelId: model.id,
+        displayName: stripProviderPrefix(model.name) || model.id,
+        contextLength: model.contextLength,
+        created: model.created,
+        visionInput: model.inputModalities?.includes('image') ?? false,
+        satsPricing: {
+          prompt: model.pricing?.prompt ?? null,
+          completion: model.pricing?.completion ?? null,
+          request: model.pricing?.request ?? null,
+          image: model.pricing?.image ?? null,
+          max_cost: model.pricing?.maxCost ?? null,
+        },
+        maxCompletionTokens: model.maxCompletionTokens ?? null,
+      };
+      filled++;
+    }
+  }
+  const nodeBaseUrl = payload.node.baseUrl.trim() || null;
+  return { lineup: filled > 0 ? lineup : null, nodeBaseUrl };
+}
+
+/** Same `Provider:` prefix strip as `displayNameFor`, for nagg names. */
+function stripProviderPrefix(raw: string): string {
+  const trimmed = raw.trim();
+  const colonIdx = trimmed.indexOf(':');
+  if (colonIdx >= 0 && colonIdx < trimmed.length - 1) return trimmed.slice(colonIdx + 1).trim();
+  return trimmed;
+}
+
 export function mergeLineupWithLastKnown(
   derived: AiLineup,
   lastKnown: AiLineup | null | undefined

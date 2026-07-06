@@ -22,9 +22,10 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
   }),
 }));
 
-jest.mock('@sovranbitcoin/schemas', () => ({
-  loggableIssues: (e: { issues: unknown[] }) => e.issues,
-}));
+// No @sovranbitcoin/schemas mock: this store's import graph reaches the
+// real package at module scope (routstr/api → apiClient → schema extends,
+// and `wallet`'s lnurl parseWith), and the real package loads fine under
+// jest — a partial mock breaks whichever module-scope consumer it misses.
 
 jest.mock('@/shared/lib/logger', () => {
   const noop = { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() };

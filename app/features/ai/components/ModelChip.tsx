@@ -3,6 +3,8 @@ import { Keyboard } from 'react-native';
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { checkBalance, getModels, type RoutstrModel } from '@/shared/lib/routstr/api';
+import { getAiLineup } from '@/shared/lib/apiClient';
+import { lineupFromNaggPayload } from '@/shared/lib/routstr/lineup';
 import { modelPickerPopup } from '@/shared/lib/popup';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -87,6 +89,31 @@ export function ModelChip() {
     };
     // Mount-only: one refresh per AI-tab session, not per keystroke of
     // dependent state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Server-curated lineup first: nagg's /app/ai-lineup outranks the
+  // client-side derivation (it carries the pinned/curated tier picks and
+  // the Routstr node override). Mount-only; a failure is silent — the
+  // catalog-derived lineup below remains the fallback, then the persisted
+  // last-known snapshot.
+  useEffect(() => {
+    if (useRoutstrStore.getState().serverLineupAt != null) return;
+    let cancelled = false;
+    getAiLineup()
+      .then((result) => {
+        if (cancelled || result.isErr()) return;
+        const { lineup: serverLineup, nodeBaseUrl } = lineupFromNaggPayload(result.value);
+        if (!serverLineup) return;
+        useRoutstrStore.getState().setServerLineup({ lineup: serverLineup, nodeBaseUrl });
+      })
+      .catch(() => {
+        // Silent — the derived/persisted lineup keeps the menu working.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Mount-only, same rationale as the catalog fetch below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

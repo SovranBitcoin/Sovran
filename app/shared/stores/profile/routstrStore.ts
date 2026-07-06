@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { mintLocalId } from '@/shared/lib/id';
 import { aiLog, storeLog } from '@/shared/lib/logger';
-import { RoutstrModel } from '@/shared/lib/routstr/api';
+import { RoutstrModel, setRoutstrNodeBaseUrl } from '@/shared/lib/routstr/api';
 import {
   AI_PROVIDER_IDS,
   AI_TIER_IDS,
@@ -167,6 +167,21 @@ interface RoutstrState {
    * tolerant on parse so it can never take down the rest of this blob.
    */
   lastKnownLineup: PersistedLineup | null;
+  /**
+   * Timestamp of the last applied nagg-served lineup (`/app/ai-lineup`).
+   * Session-only. While set, `setCachedModels` keeps refreshing the raw
+   * catalog cache (pricing lookups, vision flags) but no longer overwrites
+   * `lineup` — the server-curated lineup outranks the client derivation.
+   */
+  serverLineupAt: number | null;
+  /**
+   * Routstr node origin served by nagg's lineup (e.g.
+   * "https://api.routstr.com"), applied to `shared/lib/routstr/api` as the
+   * base-URL override on receipt and re-applied on hydrate. Persisted
+   * (tolerant, additive) so a node repoint survives offline relaunches.
+   * `null` = the built-in default node.
+   */
+  nodeBaseUrl: string | null;
   sessions: RoutstrSession[];
   currentSessionId: string | null;
   isAnonymousMode: boolean;
@@ -217,6 +232,11 @@ interface RoutstrActions {
   setSelectedSlot: (slot: { provider: RoutstrProviderId; tier: RoutstrTierId }) => void;
 
   setCachedModels: (models: RoutstrModel[]) => void;
+  /** Apply the nagg-served lineup (already mapped via
+   *  `lineupFromNaggPayload`). Takes precedence over `setCachedModels`'
+   *  derivation for the rest of the session and persists the snapshot +
+   *  node override. */
+  setServerLineup: (params: { lineup: AiLineup; nodeBaseUrl: string | null }) => void;
   isCacheStale: () => boolean;
   clearModelsCache: () => void;
 
@@ -271,6 +291,9 @@ const PersistedRoutstrStore = z.object({
   // Additive + tolerant (no version bump needed): a malformed snapshot
   // parses to null and the menu just re-derives on next fetch.
   lastKnownLineup: PersistedLineupSchema.nullable().default(null).catch(null),
+  // Additive + tolerant: a malformed value parses to null and the app
+  // falls back to the built-in default node.
+  nodeBaseUrl: z.string().max(512).nullable().default(null).catch(null),
 });
 
 export const useRoutstrStore = create<RoutstrStore>()(
@@ -286,6 +309,8 @@ export const useRoutstrStore = create<RoutstrStore>()(
       modelsCache: null,
       lineup: null,
       lastKnownLineup: null,
+      serverLineupAt: null,
+      nodeBaseUrl: null,
       sessions: [],
       currentSessionId: null,
       isAnonymousMode: false,
@@ -492,6 +517,14 @@ export const useRoutstrStore = create<RoutstrStore>()(
         // zero-row results (catalog drift on a 200 — the failure class
         // that produced "cost unavailable") substitute from the previous
         // snapshot, marked `lastKnown`.
+        // A nagg-served lineup outranks the client derivation for the rest
+        // of the session: keep the raw catalog fresh (pricing lookups,
+        // vision flags, display names) but leave `lineup` untouched.
+        if (get().serverLineupAt != null) {
+          aiLog.debug('ai.lineup.derive_skipped_server_lineup');
+          set({ modelsCache: { data: models, timestamp: Date.now() } });
+          return;
+        }
         const { lineup: derived, stats } = deriveLineup(models);
         const previous = get().lastKnownLineup;
         const merged = mergeLineupWithLastKnown(derived, previous?.lineup ?? null);
@@ -510,6 +543,24 @@ export const useRoutstrStore = create<RoutstrStore>()(
           lastKnownLineup: lineupHasEntries(merged)
             ? { derivedAt: Date.now(), lineup: merged }
             : previous,
+        });
+      },
+
+      setServerLineup: ({ lineup, nodeBaseUrl }) => {
+        if (!lineupHasEntries(lineup)) {
+          aiLog.warn('ai.lineup.server_empty');
+          return;
+        }
+        aiLog.info('ai.lineup.server_applied', {
+          nodeBaseUrl,
+          providers: PROVIDER_IDS.filter((p) => TIER_IDS.some((t) => lineup[p][t] != null)),
+        });
+        setRoutstrNodeBaseUrl(nodeBaseUrl);
+        set({
+          lineup,
+          serverLineupAt: Date.now(),
+          nodeBaseUrl,
+          lastKnownLineup: { derivedAt: Date.now(), lineup },
         });
       },
 
@@ -633,9 +684,13 @@ export const useRoutstrStore = create<RoutstrStore>()(
         sessions: state.sessions,
         currentSessionId: state.currentSessionId,
         lastKnownLineup: state.lastKnownLineup,
+        nodeBaseUrl: state.nodeBaseUrl,
       }),
       afterHydrate: (state) => {
         if (!state) return;
+        // Re-apply the nagg-served node override before any Routstr call
+        // this session — a repointed node must survive offline relaunches.
+        setRoutstrNodeBaseUrl(state.nodeBaseUrl ?? null);
         // Drop transient `pending: true` flags — any user message marked
         // pending at persist time (e.g. app killed mid-send) resolves to
         // "not in flight" on the next launch so the user sees a static

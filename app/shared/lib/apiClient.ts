@@ -25,6 +25,7 @@ import {
   type ParseError,
 } from '@sovranbitcoin/schemas';
 import { backendConfig } from '@/shared/config/backend';
+import { NaggAiLineupSchema } from '@/shared/lib/routstr/lineup';
 
 // Local relaxation: the auditor returns `info` in several shapes depending
 // on the upstream mint state — sometimes a NUT-06 object, sometimes null,
@@ -404,6 +405,7 @@ const parseNostrProfileFor =
     return ok(parsed.data);
   };
 const parseLatestVersion = parseWith(LatestVersionResponse, 'app/latest-version');
+const parseAiLineup = parseWith(NaggAiLineupSchema, 'app/ai-lineup');
 const parseDiscoverMints = parseWith(DiscoverMintsResponse, 'nostr/mint/discover');
 const parseCatalog = parseWith(CatalogResponse, 'wallpapers/catalog');
 
@@ -495,6 +497,20 @@ export const getLatestVersion = ({
       body: JSON.stringify({ storage }),
     },
     { signal }
+  );
+
+/**
+ * nagg-served AI model lineup (see `shared/lib/routstr/lineup.ts` for the
+ * schema and precedence rules). Served by nagg, not api.sovran.money, so a
+ * nagg deploy can retune the AI tab on shipped builds.
+ */
+export const getAiLineup = (controls: RequestControls = {}) =>
+  fetchJson(
+    `${SCORE_API_BASE_URL}/app/ai-lineup`,
+    parseAiLineup,
+    'app/ai-lineup',
+    undefined,
+    controls
   );
 
 /** Test seam: the v2 envelope -> NostrProfileFull mapper. */

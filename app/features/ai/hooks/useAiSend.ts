@@ -8,6 +8,7 @@ import {
   sendMessage,
   checkBalance,
   measureMessageContent,
+  ROUTSTR_MAX_COMPLETION_TOKENS,
   type RoutstrChatMessage,
 } from '@/shared/lib/routstr/api';
 import { isAbortError } from '@/shared/lib/apiClient';
@@ -342,10 +343,22 @@ export function useAiSend() {
         let lastConnectErr: unknown = null;
         for (let i = 0; i < candidateChain.length; i++) {
           const candidate = candidateChain[i];
+          // Always send max_tokens: Routstr only discounts the completion
+          // side of its upfront balance reservation when the request bounds
+          // it — omitting max_tokens makes the node demand the model's FULL
+          // max_completion_cost (~1,500 sats on frontier models) and 402
+          // balances that cover the real turn cost many times over. Clamped
+          // under the model's own completion ceiling when the lineup knows it.
+          const candidateCeiling = candidateEntries[i]?.maxCompletionTokens;
+          const maxTokens =
+            candidateCeiling != null && candidateCeiling > 0
+              ? Math.min(ROUTSTR_MAX_COMPLETION_TOKENS, candidateCeiling)
+              : ROUTSTR_MAX_COMPLETION_TOKENS;
           try {
             const result = await sendMessage(apiKey, apiMessages, {
               model: candidate,
               temperature: 0.7,
+              max_tokens: maxTokens,
               signal: controller.signal,
             });
             stream = result.stream;
@@ -628,9 +641,16 @@ export function useAiSend() {
           const requiredSats = requiredMsats != null ? Math.ceil(requiredMsats / 1000) : null;
           const availableSats = availableMsats != null ? Math.floor(availableMsats / 1000) : null;
           const friendlyName = getModelDisplayName(modelToUse, cachedModels);
+          // Exact shortfall straight from the server's 402 details (msats):
+          // the one number guaranteed to unlock this model, vs. re-deriving
+          // it from pricing that may have drifted since the catalog fetch.
+          const shortfallSats =
+            requiredMsats != null && availableMsats != null
+              ? Math.max(1, Math.ceil((requiredMsats - availableMsats) / 1000))
+              : null;
           const detail =
             requiredSats != null && availableSats != null
-              ? `${friendlyName} needs ${requiredSats} sats; you have ${availableSats}.`
+              ? `${friendlyName} needs ${requiredSats} sats reserved; you have ${availableSats}. Top up at least ${shortfallSats} sats.`
               : `${friendlyName} costs more than your current balance.`;
           actionMenuPopup({
             title: 'Insufficient balance',

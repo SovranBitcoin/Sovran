@@ -3,7 +3,42 @@ import { apiLog } from '../logger';
 import { buildAbortSignal, isAbortError } from '../apiClient';
 import { type RequestControls } from 'wallet';
 
-const ROUTSTR_BASE_URL = 'https://api.routstr.com/v1';
+const ROUTSTR_DEFAULT_BASE_URL = 'https://api.routstr.com/v1';
+
+/**
+ * Node override served by nagg's `/app/ai-lineup` (and re-applied from the
+ * persisted `routstrStore.nodeBaseUrl` on hydrate). Lets a nagg deploy
+ * repoint already-shipped builds at a different Routstr node if the default
+ * one dies — the strongest OTA lever the lineup endpoint carries. Module
+ * state rather than a store read so this shared lib never imports a store.
+ */
+let routstrBaseUrlOverride: string | null = null;
+
+/** Set (or clear with null) the Routstr node base URL, e.g.
+ *  "https://api.routstr.com". The `/v1` path segment is appended here so the
+ *  server payload stays a plain origin. */
+export function setRoutstrNodeBaseUrl(url: string | null): void {
+  const trimmed = typeof url === 'string' ? url.trim().replace(/\/+$/, '') : '';
+  routstrBaseUrlOverride = trimmed ? `${trimmed}/v1` : null;
+}
+
+function routstrBaseUrl(): string {
+  return routstrBaseUrlOverride ?? ROUTSTR_DEFAULT_BASE_URL;
+}
+
+/**
+ * `max_tokens` sent with every chat completion, and the completion-side
+ * token count the affordability gate prices in (`format.ts`). Routstr
+ * admits a request only when the balance covers its DISCOUNTED max cost:
+ * the prompt side auto-discounts to the actual prompt size, but the
+ * completion side only discounts when the request carries `max_tokens` —
+ * without it the node reserves the model's ENTIRE `max_completion_cost`
+ * (~1,500 sats for a frontier model), which is what produced "insufficient
+ * balance" 402s against balances that covered the real turn cost many
+ * times over. 4096 tokens is ample for chat answers while keeping the
+ * upfront reservation ~30× smaller.
+ */
+export const ROUTSTR_MAX_COMPLETION_TOKENS = 4096;
 
 /**
  * Per-request budget for routstr endpoints. The chat APIs can take longer
@@ -363,7 +398,7 @@ export async function getModels(controls: RequestControls = {}): Promise<Routstr
   apiLog.info('api.routstr.models.start');
   const start = performance.now();
   try {
-    const response = await fetch(`${ROUTSTR_BASE_URL}/models`, {
+    const response = await fetch(`${routstrBaseUrl()}/models`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       signal: buildAbortSignal({ timeoutMs: ROUTSTR_TIMEOUT_MS, ...controls }),
@@ -401,7 +436,7 @@ export async function checkBalance(
   apiLog.debug('api.routstr.balance.start', { hasApiKey: !!apiKey, keyLength: apiKey?.length });
   const start = performance.now();
   try {
-    const response = await fetch(`${ROUTSTR_BASE_URL}/wallet/info`, {
+    const response = await fetch(`${routstrBaseUrl()}/wallet/info`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -454,7 +489,7 @@ export async function topUpBalance(
   apiLog.info('api.routstr.wallet.topup.start', { tokenLength: cashuToken?.length });
   const start = performance.now();
   try {
-    const response = await fetch(`${ROUTSTR_BASE_URL}/wallet/topup`, {
+    const response = await fetch(`${routstrBaseUrl()}/wallet/topup`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -672,7 +707,7 @@ export async function sendMessage(
   const start = performance.now();
 
   try {
-    const response = await fetch(`${ROUTSTR_BASE_URL}/chat/completions`, {
+    const response = await fetch(`${routstrBaseUrl()}/chat/completions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,

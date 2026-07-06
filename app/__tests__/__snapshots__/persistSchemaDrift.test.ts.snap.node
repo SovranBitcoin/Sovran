@@ -774,6 +774,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                               "lastKnown": {
                                 "type": "boolean",
                               },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
                               "modelId": {
                                 "maxLength": 256,
                                 "type": "string",
@@ -891,6 +904,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                               "lastKnown": {
                                 "type": "boolean",
                               },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
                               "modelId": {
                                 "maxLength": 256,
                                 "type": "string",
@@ -1007,6 +1033,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                               },
                               "lastKnown": {
                                 "type": "boolean",
+                              },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
                               },
                               "modelId": {
                                 "maxLength": 256,
@@ -1136,6 +1175,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                               "lastKnown": {
                                 "type": "boolean",
                               },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
                               "modelId": {
                                 "maxLength": 256,
                                 "type": "string",
@@ -1253,6 +1305,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                               "lastKnown": {
                                 "type": "boolean",
                               },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
                               "modelId": {
                                 "maxLength": 256,
                                 "type": "string",
@@ -1369,6 +1434,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                               },
                               "lastKnown": {
                                 "type": "boolean",
+                              },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
                               },
                               "modelId": {
                                 "maxLength": 256,
@@ -1498,6 +1576,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                               "lastKnown": {
                                 "type": "boolean",
                               },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
                               "modelId": {
                                 "maxLength": 256,
                                 "type": "string",
@@ -1615,6 +1706,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                               "lastKnown": {
                                 "type": "boolean",
                               },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
                               "modelId": {
                                 "maxLength": 256,
                                 "type": "string",
@@ -1731,6 +1835,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                               },
                               "lastKnown": {
                                 "type": "boolean",
+                              },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
                               },
                               "modelId": {
                                 "maxLength": 256,
@@ -1860,6 +1977,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                               "lastKnown": {
                                 "type": "boolean",
                               },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
                               "modelId": {
                                 "maxLength": 256,
                                 "type": "string",
@@ -1976,6 +2106,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                               },
                               "lastKnown": {
                                 "type": "boolean",
+                              },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
                               },
                               "modelId": {
                                 "maxLength": 256,
@@ -2094,6 +2237,19 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                               "lastKnown": {
                                 "type": "boolean",
                               },
+                              "maxCompletionTokens": {
+                                "anyOf": [
+                                  {
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                                "default": null,
+                              },
                               "modelId": {
                                 "maxLength": 256,
                                 "type": "string",
@@ -2210,6 +2366,18 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
               "lineup",
             ],
             "type": "object",
+          },
+          {
+            "type": "null",
+          },
+        ],
+        "default": null,
+      },
+      "nodeBaseUrl": {
+        "anyOf": [
+          {
+            "maxLength": 512,
+            "type": "string",
           },
           {
             "type": "null",
@@ -2378,6 +2546,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
       "sessions",
       "currentSessionId",
       "lastKnownLineup",
+      "nodeBaseUrl",
     ],
     "type": "object",
   },

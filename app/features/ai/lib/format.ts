@@ -1,4 +1,4 @@
-import type { RoutstrModel } from '@/shared/lib/routstr/api';
+import { ROUTSTR_MAX_COMPLETION_TOKENS, type RoutstrModel } from '@/shared/lib/routstr/api';
 import {
   AI_PROVIDER_IDS,
   AI_TIER_IDS,
@@ -29,12 +29,11 @@ import {
  * rendered to the user is read from the catalog's `sats_pricing` (or the
  * persisted lineup snapshot's compact copy of it) at display time.
  *
- * Tier intent under the capability ordering (see `deriveLineup`):
- *   - Max  — rank 1: the provider's newest / most capable model.
- *   - Pro  — rank 2.
- *   - Auto — rank 3: the accessible daily-driver end of the top-3.
- * Per-row live cost display carries the price signal the old
- * cheapest→premium ladder used to encode.
+ * Tier intent under the price ordering (see `deriveLineup` /
+ * nagg's `buildAILineup` — both assign tiers the same way):
+ *   - Auto — the provider's cheapest qualifying model.
+ *   - Pro  — the median of the price ladder.
+ *   - Max  — the flagship: newest model in the top price quartile.
  */
 
 export interface AiProvider {
@@ -102,14 +101,12 @@ const PROVIDER_BY_ID = new Map<AiProviderId, AiProvider>(
 const TIER_BY_ID = new Map<AiTierId, AiTier>(AI_TIERS.map((t) => [t.id, t] as const));
 
 /**
- * Multiplier applied to `max_cost` when computing the affordability gate.
- * Kept at 1.0: Routstr's `max_cost` is already the absolute upper bound it
- * will reserve from the balance, so any client-side multiplier > 1 just
- * produces false-negative "Top up X sats" indicators for tiers the API
- * would happily accept. Surfaced (and exported) so the diagnostic logs
- * can quote it next to `max_cost`.
+ * Safety multiplier on the reservation estimate the affordability gate
+ * mirrors. The server estimates prompt tokens as `chars / 3` while we gate
+ * on a fixed typical-turn size, so a small cushion absorbs estimator skew
+ * without re-introducing the old full-`max_cost` false negatives.
  */
-export const AFFORD_BUFFER = 1.0;
+export const AFFORD_BUFFER = 1.1;
 
 /**
  * Typical chat-turn input size used to estimate cost from per-token
@@ -195,6 +192,45 @@ export function estimateTurnCostSats(
 }
 
 /**
+ * The balance Routstr actually requires upfront for one request, in sats —
+ * the number the affordability gate and "Top up X sats" copy must track.
+ *
+ * Routstr admits a request when the balance covers the DISCOUNTED max cost
+ * (routstr-core `calculate_discounted_max_cost`): the prompt side shrinks
+ * to the actual prompt size automatically, and the completion side shrinks
+ * to `max_tokens × completion` because `useAiSend` sends
+ * `ROUTSTR_MAX_COMPLETION_TOKENS` with every request. So the requirement is
+ *
+ *   `request + TYPICAL_PROMPT_TOKENS × prompt + max_tokens × completion`
+ *
+ * — NOT `max_cost`. Gating on `max_cost` (fill-the-whole-context worst
+ * case, ~3,600 sats for a frontier model) is what produced "insufficient
+ * balance" on balances that funded hundreds of real turns. The reservation
+ * is refunded down to actual usage after the stream completes.
+ *
+ * Falls back to `max_cost` when per-token pricing is missing (the server
+ * can't discount what it can't price either) and `null` when pricing is
+ * unknown entirely.
+ */
+export function requiredReserveSatsFromPricing(
+  pricing: LineupPricing | null,
+  imageCount = 0
+): number | null {
+  if (!pricing) return null;
+  const imageFee = typeof pricing.image === 'number' ? pricing.image * imageCount : 0;
+  if (pricing.prompt != null && pricing.completion != null) {
+    return (
+      (pricing.request ?? 0) +
+      pricing.prompt * TYPICAL_PROMPT_TOKENS +
+      pricing.completion * ROUTSTR_MAX_COMPLETION_TOKENS +
+      imageFee
+    );
+  }
+  if (pricing.max_cost != null) return pricing.max_cost + imageFee;
+  return null;
+}
+
+/**
  * Approximate count of additional turns the user could send against this
  * pricing before Routstr's `max_cost` reservation gate starts rejecting.
  * Two limits are at play:
@@ -214,20 +250,22 @@ export function estimateMessagesRemainingFromPricing(
   balanceSats: number,
   pricing: LineupPricing | null
 ): number | null {
-  const max = pricing?.max_cost ?? null;
+  const reserve = requiredReserveSatsFromPricing(pricing);
   const typical = estimateTurnCostSatsFromPricing(pricing);
-  if (max == null || typical == null || typical <= 0) return null;
-  if (balanceSats < max) return 0;
-  return Math.floor((balanceSats - max) / typical) + 1;
+  if (reserve == null || typical == null || typical <= 0) return null;
+  if (balanceSats < reserve) return 0;
+  return Math.floor((balanceSats - reserve) / typical) + 1;
 }
 
 /**
  * One-shot diagnostic snapshot of "is this model affordable right now?".
- * The gate tracks Routstr's `max_cost` reservation requirement (so the UI
- * never marks a tier affordable that the API will 402), and we report the
- * realistic per-turn estimate alongside it so logs make the spread between
- * "what you'll pay" and "what Routstr reserves" obvious. Keep serialisable;
- * logged verbatim by `ModelChip` and `useAiSend`.
+ * The gate tracks Routstr's discounted admission requirement (see
+ * `requiredReserveSatsFromPricing` — with `max_tokens` sent, the node
+ * requires prompt + max_tokens×completion, NOT `max_cost`). The realistic
+ * per-turn estimate and the raw `max_cost` ride along so logs make the
+ * spread between "what you'll pay", "what Routstr holds", and the old
+ * worst-case ceiling obvious. Keep serialisable; logged verbatim by
+ * `ModelChip` and `useAiSend`.
  */
 export function getAffordabilityDetails(
   modelId: string,
@@ -244,29 +282,30 @@ export function getAffordabilityDetails(
   deficitSats: number;
   catalogSize: number;
 } {
-  const estimated = estimateTurnCostSats(modelId, models);
-  const max = maxCostSats(modelId, models);
-  if (max == null) {
+  const pricing = pricingForModel(modelId, models);
+  const estimated = estimateTurnCostSatsFromPricing(pricing);
+  const reserve = requiredReserveSatsFromPricing(pricing);
+  if (reserve == null) {
     return {
       modelId,
       costKnown: false,
       estimatedTurnCostSats: estimated,
       bufferedThresholdSats: null,
-      maxCostSats: null,
+      maxCostSats: maxCostSats(modelId, models),
       balanceSats,
       affordable: true,
       deficitSats: 0,
       catalogSize: models.length,
     };
   }
-  const threshold = Math.ceil(max * AFFORD_BUFFER);
+  const threshold = Math.ceil(reserve * AFFORD_BUFFER);
   const affordable = balanceSats >= threshold;
   return {
     modelId,
     costKnown: true,
     estimatedTurnCostSats: estimated,
     bufferedThresholdSats: threshold,
-    maxCostSats: max,
+    maxCostSats: maxCostSats(modelId, models),
     balanceSats,
     affordable,
     deficitSats: affordable ? 0 : Math.max(1, threshold - balanceSats),
@@ -371,19 +410,17 @@ function maxCostSats(modelId: string, models: RoutstrModel[]): number | null {
 }
 
 /**
- * True if `balanceSats` covers Routstr's reservation requirement. Routstr
- * 402s any request where balance < `max_cost`, so this gate has to track
- * `max_cost` exactly — gating on the per-turn estimate (which is what the
- * user will actually be charged after refunds) lets the UI mark tiers as
- * affordable that the API will reject upfront.
+ * True if `balanceSats` covers Routstr's admission requirement — the
+ * discounted reservation (`requiredReserveSatsFromPricing`), not the raw
+ * `max_cost` ceiling. See that function for the server-side contract.
  *
  * Falls back to `true` when cost data is unavailable (cache not populated)
  * so the picker isn't entirely blank on first paint.
  */
 export function canAffordPricing(pricing: LineupPricing | null, balanceSats: number): boolean {
-  const cost = pricing?.max_cost ?? null;
-  if (cost == null) return true;
-  return balanceSats >= cost * AFFORD_BUFFER;
+  const reserve = requiredReserveSatsFromPricing(pricing);
+  if (reserve == null) return true;
+  return balanceSats >= reserve * AFFORD_BUFFER;
 }
 
 /**
@@ -398,9 +435,9 @@ export function topUpDeficitSatsFromPricing(
   pricing: LineupPricing | null,
   balanceSats: number
 ): number | null {
-  const cost = pricing?.max_cost ?? null;
-  if (cost == null) return null;
-  const required = Math.ceil(cost * AFFORD_BUFFER);
+  const reserve = requiredReserveSatsFromPricing(pricing);
+  if (reserve == null) return null;
+  const required = Math.ceil(reserve * AFFORD_BUFFER);
   if (balanceSats >= required) return null;
   return Math.max(1, required - balanceSats);
 }

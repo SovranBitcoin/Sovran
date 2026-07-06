@@ -18,8 +18,10 @@ import {
   stripImageParts,
 } from '@/features/ai/lib/assembleApiMessages';
 import {
+  canAffordPricing,
   entryForSlot,
   estimateTurnCostSatsFromPricing,
+  requiredReserveSatsFromPricing,
   resolveCandidateEntries,
   resolveSelectedEntry,
 } from '@/features/ai/lib/format';
@@ -162,10 +164,14 @@ describe('assembleApiMessages', () => {
 });
 
 describe('vision-aware candidate resolution (format.ts over the derived lineup)', () => {
-  const { lineup } = deriveLineup(fixture.data as unknown as RoutstrModel[]);
+  // Pinned "now" ≈ the fixture snapshot date so the freshness window stays
+  // deterministic as the fixture ages (same constant as routstrLineup.test).
+  const FIXTURE_NOW = 1_782_950_400;
+  const { lineup } = deriveLineup(fixture.data as unknown as RoutstrModel[], FIXTURE_NOW);
 
   it('resolves a (provider, tier) slot and returns null only when no lineup exists', () => {
-    expect(resolveSelectedEntry('openai', 'auto', 1_000_000, lineup)?.modelId).toBe('gpt-5.5');
+    // Auto = the provider's cheapest qualifying model under price-tiering.
+    expect(resolveSelectedEntry('openai', 'auto', 1_000_000, lineup)?.modelId).toBe('gpt-5.4-nano');
     expect(resolveSelectedEntry('openai', 'auto', 1_000_000, null)).toBeNull();
   });
 
@@ -179,13 +185,16 @@ describe('vision-aware candidate resolution (format.ts over the derived lineup)'
   });
 
   it('prefers the first affordable candidate, else the primary at any cost', () => {
-    // Balance below every max_cost → primary comes back unaffordable-first.
+    // Balance below every reservation → primary comes back unaffordable-first.
     const broke = resolveSelectedEntry('claude', 'max', 0, lineup);
     expect(broke?.modelId).toBe(entryForSlot(lineup, 'claude', 'max')?.modelId);
-    // A balance that can only afford the cheapest cells skips to them.
+    // A balance that only clears some cells' admission reserve (the
+    // discounted requirement the gate mirrors — NOT `max_cost`) skips to
+    // the first candidate whose reserve it covers.
     const cheap = resolveSelectedEntry('openai', 'max', 700, lineup);
     expect(cheap).not.toBeNull();
-    expect(cheap!.satsPricing.max_cost!).toBeLessThanOrEqual(700);
+    expect(canAffordPricing(cheap!.satsPricing, 700)).toBe(true);
+    expect(requiredReserveSatsFromPricing(cheap!.satsPricing)!).toBeLessThanOrEqual(700);
   });
 
   it('every selected entry carries visionInput so the send path can filter a chain with images', () => {
@@ -203,5 +212,42 @@ describe('vision-aware candidate resolution (format.ts over the derived lineup)'
     // Models without an image fee are unchanged.
     const noFee = estimateTurnCostSatsFromPricing({ ...gemini.satsPricing, image: null }, 2);
     expect(noFee).toBeCloseTo(base!, 6);
+  });
+});
+
+/**
+ * The affordability gate must mirror Routstr's ADMISSION requirement — the
+ * discounted reservation (prompt estimate + the max_tokens we send ×
+ * completion + request fee) — never the raw `max_cost` context-fill
+ * ceiling. Gating on `max_cost` is what 402-blocked balances that funded
+ * hundreds of real turns (Sonnet-class: ~3,600-sat ceiling vs ~60-sat
+ * actual requirement).
+ */
+describe('reserve-based affordability gate (format.ts)', () => {
+  // Sonnet-5-shaped pricing from the live catalog (sats floats).
+  const frontier = {
+    prompt: 0.0023854535514797807,
+    completion: 0.011927267757398904,
+    request: 0.001,
+    image: 0,
+    max_cost: 3606.8057698374278,
+  };
+
+  it('requires the discounted reserve, not max_cost', () => {
+    const reserve = requiredReserveSatsFromPricing(frontier)!;
+    // request + 8000×prompt + 4096×completion ≈ 68 sats — two orders of
+    // magnitude under the 3,607-sat max_cost ceiling.
+    expect(reserve).toBeGreaterThan(50);
+    expect(reserve).toBeLessThan(100);
+    expect(canAffordPricing(frontier, 100)).toBe(true); // old gate said no until 3,607
+    expect(canAffordPricing(frontier, 10)).toBe(false);
+  });
+
+  it('falls back to max_cost only when per-token pricing is missing', () => {
+    const opaque = { prompt: null, completion: null, request: null, image: null, max_cost: 42 };
+    expect(requiredReserveSatsFromPricing(opaque)).toBe(42);
+    const unknown = { prompt: null, completion: null, request: null, image: null, max_cost: null };
+    expect(requiredReserveSatsFromPricing(unknown)).toBeNull();
+    expect(canAffordPricing(unknown, 0)).toBe(true); // unknown cost never blocks the picker
   });
 });
