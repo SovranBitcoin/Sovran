@@ -74,11 +74,13 @@ jest.mock('@/shared/blocks/status', () => {
       result?: string;
       confirmationProgress?: unknown;
       segmentedInProgress?: boolean;
+      strokeWidthPx?: number;
     }) =>
       ReactActual.createElement('LoadingIndicatorMock', {
         testID: `indicator-${props.phase}-${props.result}`,
         confirmationProgress: props.confirmationProgress,
         segmentedInProgress: props.segmentedInProgress,
+        strokeWidthPx: props.strokeWidthPx,
       }),
     mapCheckpointStatusToIndicator,
   };
@@ -215,6 +217,18 @@ describe('HistoryEntryTimeline connector rail', () => {
     const lines = collectNodesByTestID(renderer!.toJSON(), 'history-entry-timeline-line');
 
     expect(lines).toHaveLength(2);
+
+    // Every dot's ring/segment strokes match the 3px connector rail width.
+    const indicators = collectNodesByTestIDPrefix(renderer!.toJSON(), 'indicator-');
+    expect(indicators.length).toBeGreaterThan(0);
+    indicators.forEach((indicator) => {
+      expect(
+        indicator && typeof indicator !== 'string' && !Array.isArray(indicator)
+          ? indicator.props.strokeWidthPx
+          : null
+      ).toBe(3);
+    });
+
     lines.forEach((line) => {
       expect(
         line && typeof line !== 'string' && !Array.isArray(line) ? line.props.width : null

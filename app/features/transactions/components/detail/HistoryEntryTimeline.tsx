@@ -391,6 +391,10 @@ export function HistoryEntryTimeline({
                   <VStack align="center" style={{ marginRight: 14 }}>
                     <LoadingIndicator
                       size={20}
+                      // Ring dashes and confirmation segments render at the
+                      // connector rail's width so the dot strokes and the rail
+                      // read as one weight.
+                      strokeWidthPx={LINE_WIDTH}
                       transitionDelayMs={dotDelay}
                       color={isWaitingStep ? warningColor : undefined}
                       successColor={successColor}

@@ -100,6 +100,12 @@ export interface LoadingIndicatorProps extends LoadingIndicatorVisualProps {
    *  ring previews upcoming segments before the step has started (e.g. onchain
    *  confirmations shown before any payment is observed). Default true. */
   segmentedInProgress?: boolean;
+  /** Target on-screen stroke thickness in px for the ring outline and segment
+   *  arcs. Strokes are otherwise viewBox-relative, so small indicators render
+   *  hairline-thin — the 20px timeline dots set this to the connector-rail
+   *  width so rings and rail read as one weight. Dense segment rings clamp
+   *  below the target to keep the seams between segments visible. */
+  strokeWidthPx?: number;
 }
 
 // Geometry tuned so the disc fills ~76% of the size box (matches the
@@ -114,10 +120,19 @@ const RING_STROKE = 3.5;
 // 24-segment ring stays legible. See `segmentStroke()`.
 const SEGMENT_STROKE_MIN = 4.5;
 const SEGMENT_STROKE_MAX = 8.5;
-const SEGMENT_RESULT_DISC_R = RING_R + SEGMENT_STROKE_MAX / 2;
 
 function segmentStroke(segmentCount: number): number {
   return Math.max(SEGMENT_STROKE_MIN, Math.min(SEGMENT_STROKE_MAX, 54 / segmentCount));
+}
+
+/** Segment stroke in viewBox units, honouring a `strokeWidthPx` override.
+ *  The override is clamped so round line caps (which extend each dash by
+ *  stroke/2 per end) cannot swallow the seams on dense rings. */
+function effectiveSegmentStroke(segmentCount: number, overrideUnits: number | null): number {
+  const base = segmentStroke(segmentCount);
+  if (overrideUnits == null) return base;
+  const step = CIRC / segmentCount;
+  return Math.min(overrideUnits, Math.max(base, step * 0.5 - 2));
 }
 const ICON_STROKE = 6.5;
 const DEFAULT_SEGMENT_COUNT = 6;
@@ -256,6 +271,8 @@ interface ConfirmationSegmentProps {
   pendingColor: string;
   successColor: string;
   delayMs: number;
+  /** Full-thickness stroke in viewBox units (see `effectiveSegmentStroke`). */
+  stroke: number;
 }
 
 function ConfirmationSegment({
@@ -266,6 +283,7 @@ function ConfirmationSegment({
   pendingColor,
   successColor,
   delayMs,
+  stroke,
 }: ConfirmationSegmentProps): React.ReactElement {
   const progress = useSharedValue(completed ? 1 : 0);
   const pulse = useSharedValue(0);
@@ -280,7 +298,6 @@ function ConfirmationSegment({
   const delayRef = React.useRef(delayMs);
   delayRef.current = delayMs;
   const step = CIRC / segmentCount;
-  const stroke = segmentStroke(segmentCount);
   // Widen the gap with the stroke so round line caps don't close the seams
   // between thick segments and blur the ring into one continuous arc.
   const gap = segmentCount === 1 ? 0 : Math.min(step * 0.5, Math.max(stroke + 4, step * 0.22));
@@ -389,6 +406,7 @@ export function LoadingIndicator({
   segmentedProgress,
   confirmationProgress,
   segmentedInProgress = true,
+  strokeWidthPx,
   visualScope = 'loading.status_indicator',
   visualKey,
   visualSurface = 'shared',
@@ -438,6 +456,19 @@ export function LoadingIndicator({
   React.useEffect(() => {
     prevSegCompletedRef.current = segCompleted;
   }, [segCompleted]);
+
+  // Convert the px target into viewBox units for this render size; null keeps
+  // the viewBox-relative defaults.
+  const strokeUnits =
+    strokeWidthPx != null && strokeWidthPx > 0 && size > 0 ? (strokeWidthPx * 100) / size : null;
+  const ringStrokeUnits = strokeUnits ?? RING_STROKE;
+  // Round caps extend each idle dash by stroke/2 per end, so a thicker ring
+  // needs a wider gap or the six dashes merge into a solid circle.
+  const idleGapUnits = Math.max(IDLE_SEGMENT_GAP, ringStrokeUnits + 4);
+  const segmentStrokeUnits =
+    normalizedSegmentedProgress != null
+      ? effectiveSegmentStroke(normalizedSegmentedProgress.segmentCount, strokeUnits)
+      : null;
 
   const segmentedComplete =
     normalizedSegmentedProgress != null &&
@@ -509,8 +540,10 @@ export function LoadingIndicator({
   const startedReverted = startedDone && startedResult === 'reverted';
   const startedWarning = startedDone && startedResult === 'warning';
 
-  const dashA = useSharedValue(startedDone ? DASH.done[0] : DASH.idle[0]);
-  const dashB = useSharedValue(startedDone ? DASH.done[1] : DASH.idle[1]);
+  const dashA = useSharedValue(
+    startedDone ? DASH.done[0] : CIRC / IDLE_SEGMENT_COUNT - idleGapUnits
+  );
+  const dashB = useSharedValue(startedDone ? DASH.done[1] : idleGapUnits);
   const ringOpac = useSharedValue(startedDone ? RING_OPAC.done : RING_OPAC.idle);
   const colorProgress = useSharedValue(startedDone ? 1 : 0);
 
@@ -548,7 +581,10 @@ export function LoadingIndicator({
       config: { duration: number; easing: EasingFunction | EasingFunctionFactory }
     ) => (d > 0 ? withDelay(d, withTiming(target, config)) : withTiming(target, config));
 
-    const [a, b] = DASH[effectivePhase];
+    const [a, b] =
+      effectivePhase === 'idle'
+        ? [CIRC / IDLE_SEGMENT_COUNT - idleGapUnits, idleGapUnits]
+        : DASH[effectivePhase];
     dashA.set(t(a, { duration: D_RING, easing: E_RING }));
     dashB.set(t(b, { duration: D_RING, easing: E_RING }));
     ringOpac.set(t(RING_OPAC[effectivePhase], { duration: D_OPAC, easing: E_DEF }));
@@ -620,6 +656,7 @@ export function LoadingIndicator({
     shouldShowResult,
     resultDelayMs,
     normalizedSegmentedProgress,
+    idleGapUnits,
     colorProgress,
     fillOpac,
     fillScale,
@@ -656,7 +693,11 @@ export function LoadingIndicator({
   const xAP = useAnimatedProps(() => ({ strokeDashoffset: xOff.get() }));
   const revertAP = useAnimatedProps(() => ({ strokeDashoffset: revertOff.get() }));
   const wifiAP = useAnimatedProps(() => ({ strokeDashoffset: wifiOff.get() }));
-  const resultDiscRadius = isSegmentedMode ? SEGMENT_RESULT_DISC_R : RING_R;
+  // The success disc must still cover the thickest arc it replaces, including
+  // an override-thickened segment ring.
+  const resultDiscRadius = isSegmentedMode
+    ? RING_R + Math.max(SEGMENT_STROKE_MAX, segmentStrokeUnits ?? 0) / 2
+    : RING_R;
 
   return (
     <View
@@ -775,6 +816,9 @@ export function LoadingIndicator({
                     pendingColor={ringColor}
                     successColor={okColor}
                     delayMs={transitionDelayMs + cascadeOrder * SEGMENT_STAGGER_MS}
+                    stroke={
+                      segmentStrokeUnits ?? segmentStroke(normalizedSegmentedProgress.segmentCount)
+                    }
                   />
                 );
               })
@@ -785,7 +829,7 @@ export function LoadingIndicator({
               cy={50}
               r={RING_R}
               fill="none"
-              strokeWidth={RING_STROKE}
+              strokeWidth={ringStrokeUnits}
               strokeLinecap="round"
               animatedProps={ringStrokeAP}
             />

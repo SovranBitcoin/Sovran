@@ -104,6 +104,19 @@ function collectNodesByTestIDPrefix(
   return matches;
 }
 
+function collectNodesByType(node: JsonNode, type: string, matches: JsonNode[] = []): JsonNode[] {
+  if (!node || typeof node === 'string') return matches;
+  if (Array.isArray(node)) {
+    node.forEach((child) => collectNodesByType(child, type, matches));
+    return matches;
+  }
+  if (node.type === type) {
+    matches.push(node);
+  }
+  node.children?.forEach((child) => collectNodesByType(child as JsonNode, type, matches));
+  return matches;
+}
+
 describe('LoadingIndicator confirmation progress', () => {
   beforeEach(() => {
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
@@ -184,6 +197,82 @@ describe('LoadingIndicator confirmation progress', () => {
     );
     expect(segments).toHaveLength(4);
 
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('renders ring and segment strokes at strokeWidthPx for the indicator size', () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+
+    // Segmented ring: 3px at size 20 → 15 viewBox units. The completed
+    // segment renders at full thickness.
+    act(() => {
+      renderer = TestRenderer.create(
+        <LoadingIndicator
+          size={20}
+          strokeWidthPx={3}
+          confirmationProgress={{ currentConfirmations: 1, requiredConfirmations: 3 }}
+          phase="idle"
+        />
+      );
+    });
+    const segments = collectNodesByTestIDPrefix(
+      renderer!.toJSON(),
+      'loading-indicator-confirmation-segment-'
+    );
+    expect(segments).toHaveLength(3);
+    const completedSegment = segments[0];
+    expect(
+      completedSegment && typeof completedSegment !== 'string' && !Array.isArray(completedSegment)
+        ? completedSegment.props.animatedProps.strokeWidth
+        : null
+    ).toBeCloseTo(15);
+    act(() => {
+      renderer.unmount();
+    });
+
+    // Plain idle ring: the outline stroke follows the same px target, and the
+    // dash gaps widen so round caps don't merge the dashes.
+    act(() => {
+      renderer = TestRenderer.create(<LoadingIndicator size={20} strokeWidthPx={3} phase="idle" />);
+    });
+    const circles = collectNodesByType(renderer!.toJSON(), 'Circle');
+    const ring = circles.find(
+      (circle) =>
+        circle &&
+        typeof circle !== 'string' &&
+        !Array.isArray(circle) &&
+        circle.props.strokeLinecap === 'round'
+    );
+    expect(
+      ring && typeof ring !== 'string' && !Array.isArray(ring) ? ring.props.strokeWidth : null
+    ).toBeCloseTo(15);
+    const dashArray =
+      ring && typeof ring !== 'string' && !Array.isArray(ring)
+        ? (ring.props.animatedProps.strokeDasharray as number[])
+        : [];
+    expect(dashArray[1]).toBeCloseTo(19); // gap = stroke + 4
+    act(() => {
+      renderer.unmount();
+    });
+
+    // Without the prop the viewBox-relative default is untouched.
+    act(() => {
+      renderer = TestRenderer.create(<LoadingIndicator size={20} phase="idle" />);
+    });
+    const defaultRing = collectNodesByType(renderer!.toJSON(), 'Circle').find(
+      (circle) =>
+        circle &&
+        typeof circle !== 'string' &&
+        !Array.isArray(circle) &&
+        circle.props.strokeLinecap === 'round'
+    );
+    expect(
+      defaultRing && typeof defaultRing !== 'string' && !Array.isArray(defaultRing)
+        ? defaultRing.props.strokeWidth
+        : null
+    ).toBeCloseTo(3.5);
     act(() => {
       renderer.unmount();
     });
