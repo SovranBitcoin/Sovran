@@ -77,10 +77,11 @@ export interface LoadingIndicatorProps extends LoadingIndicatorVisualProps {
   revertedColor?: string;
   /** Done/warning disc + glyph color. Defaults to theme `warning`. */
   warningColor?: string;
-  /** Colour of every not-yet-filled stroke — the idle dash ring and pending
-   *  segment arcs alike. Defaults to the ring `color`; the timeline passes its
-   *  muted rail-track color so unfilled rings and the unfilled connector read
-   *  as the same chrome. Loading/done phases keep `color`/result colours. */
+  /** Colour of every non-result ring stroke — the idle dash ring, the
+   *  spinning loading arc, and pending segment arcs alike. Defaults to the
+   *  ring `color`; the timeline passes its muted rail-track color so ring
+   *  chrome and the unfilled connector read as one system. Done resolves to
+   *  the result colour from this base. */
   pendingColor?: string;
   /** Defer the phase/result transition by this many ms. Used by timeline
    *  and chain UIs to cascade indicators left→right (dot completes → line
@@ -493,11 +494,11 @@ export function LoadingIndicator({
   }, [segCompleted]);
 
   // ── Unfilled-stroke chrome ─────────────────────────────────────────────
-  // Single owner for how NOT-yet-filled strokes render — the idle dash ring
-  // and the pending segment arcs alike. `strokeWidthPx` switches the whole
-  // indicator into chrome-matching mode (weight, seams, full opacity) and
-  // `pendingColor` supplies the chrome colour; keep every such decision here
-  // so the two ring implementations cannot drift apart again.
+  // Single owner for how non-result strokes render — the idle dash ring, the
+  // loading arc, and the pending segment arcs alike. `strokeWidthPx` switches
+  // the whole indicator into chrome-matching mode (weight, seams, full
+  // opacity) and `pendingColor` supplies the chrome colour; keep every such
+  // decision here so the two ring implementations cannot drift apart again.
   const strokeUnits =
     strokeWidthPx != null && strokeWidthPx > 0 && size > 0 ? (strokeWidthPx * 100) / size : null;
   const pxTargeted = strokeUnits != null;
@@ -595,14 +596,6 @@ export function LoadingIndicator({
   const dashB = useSharedValue(startedDone ? DASH.done[1] : idleGapUnits);
   const ringOpac = useSharedValue(startedDone ? RING_OPAC.done : idleRingOpacity);
   const colorProgress = useSharedValue(startedDone ? 1 : 0);
-  // 1 while the unfilled chrome colour should show (idle ring, any segmented
-  // ring), 0 once the active `color` takes over (a plain loading arc). Frozen
-  // on `done` so the result colour blends FROM whatever the ring was wearing:
-  // muted chrome dots colourise directly with no white flash, while a
-  // foreground loading arc keeps the legacy white→result bloom.
-  const chromeMix = useSharedValue(
-    startedDone || (effectivePhase === 'loading' && !isSegmentedMode) ? 0 : 1
-  );
 
   const rotation = useSharedValue(0);
   const speed = useSharedValue(0);
@@ -650,15 +643,6 @@ export function LoadingIndicator({
         easing: E_DEF,
       })
     );
-    if (effectivePhase !== 'done') {
-      chromeMix.set(
-        t(isSegmentedMode || effectivePhase === 'idle' ? 1 : 0, {
-          duration: D_OPAC,
-          easing: E_DEF,
-        })
-      );
-    }
-
     const nextSpeed = isSegmentedMode ? 0 : SPEED[effectivePhase];
 
     let speedTimer: ReturnType<typeof setTimeout> | null = null;
@@ -728,7 +712,6 @@ export function LoadingIndicator({
     normalizedSegmentedProgress,
     idleGapUnits,
     idleRingOpacity,
-    chromeMix,
     colorProgress,
     fillOpac,
     fillScale,
@@ -738,16 +721,14 @@ export function LoadingIndicator({
     wifiOff,
   ]);
 
-  const ringStrokeAP = useAnimatedProps(() => {
-    // Idle wears the unfilled chrome colour; loading hands back to the active
-    // ring colour; done resolves to the result colour.
-    const baseColor = interpolateColor(chromeMix.get(), [0, 1], [ringColor, unfilledColor]);
-    return {
-      strokeDasharray: [dashA.get(), dashB.get()],
-      opacity: ringOpac.get(),
-      stroke: interpolateColor(colorProgress.get(), [0, 1], [baseColor, resultColor]),
-    };
-  });
+  const ringStrokeAP = useAnimatedProps(() => ({
+    strokeDasharray: [dashA.get(), dashB.get()],
+    opacity: ringOpac.get(),
+    // Every non-result phase wears the unfilled chrome colour (idle dashes
+    // AND the spinning loading arc); done blends chrome → result, so a chrome
+    // dot never flashes the foreground while resolving.
+    stroke: interpolateColor(colorProgress.get(), [0, 1], [unfilledColor, resultColor]),
+  }));
 
   // Rotation and scale are applied via Animated.View transform styles
   // rather than as animated SVG props — react-native-svg doesn't reliably
@@ -762,15 +743,11 @@ export function LoadingIndicator({
     transform: [{ scale: fillScale.get() }],
   }));
 
-  const fillCircleAP = useAnimatedProps(() => {
-    // The disc colourises from the same base the ring was wearing (see
-    // chromeMix) so a chrome dot resolves muted→result without flashing the
-    // foreground white in between.
-    const baseColor = interpolateColor(chromeMix.get(), [0, 1], [ringColor, unfilledColor]);
-    return {
-      fill: interpolateColor(colorProgress.get(), [0, 1], [baseColor, resultColor]),
-    };
-  });
+  const fillCircleAP = useAnimatedProps(() => ({
+    // The disc colourises from the same chrome the ring wears, so resolving
+    // never flashes the foreground in between.
+    fill: interpolateColor(colorProgress.get(), [0, 1], [unfilledColor, resultColor]),
+  }));
 
   const checkAP = useAnimatedProps(() => ({ strokeDashoffset: checkOff.get() }));
   const xAP = useAnimatedProps(() => ({ strokeDashoffset: xOff.get() }));

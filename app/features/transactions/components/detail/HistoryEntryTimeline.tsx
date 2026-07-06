@@ -13,7 +13,6 @@ import {
 } from 'wallet';
 import Animated, {
   Easing,
-  FadeInDown,
   useSharedValue,
   withDelay,
   withTiming,
@@ -386,7 +385,11 @@ export function HistoryEntryTimeline({
             const isWaitingStep = item.stepType === 'waiting';
 
             return (
-              <Animated.View key={item.state} entering={FadeInDown.delay(index * 60).duration(250)}>
+              // No entering animation: rows are keyed by state, so timeline
+              // transitions (including errors/rollbacks) remount every row and
+              // an entrance effect would replay a whole-timeline slide. The
+              // dots and rails carry their own transition choreography.
+              <View key={item.state}>
                 <HStack align="flex-start">
                   <VStack align="center" style={{ marginRight: 14 }}>
                     <LoadingIndicator
@@ -454,7 +457,7 @@ export function HistoryEntryTimeline({
                     )}
                   </VStack>
                 </HStack>
-              </Animated.View>
+              </View>
             );
           })}
         </View>

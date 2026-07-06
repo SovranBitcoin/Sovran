@@ -335,6 +335,29 @@ describe('LoadingIndicator confirmation progress', () => {
       renderer.unmount();
     });
 
+    // The spinning loading arc wears the same chrome colour as the idle
+    // dashes — pendingColor covers every non-result stroke.
+    act(() => {
+      renderer = TestRenderer.create(
+        <LoadingIndicator size={20} strokeWidthPx={3} pendingColor="rail-track" phase="loading" />
+      );
+    });
+    const loadingRing = collectNodesByType(renderer!.toJSON(), 'Circle').find(
+      (circle) =>
+        circle &&
+        typeof circle !== 'string' &&
+        !Array.isArray(circle) &&
+        circle.props.strokeLinecap === 'round'
+    );
+    expect(
+      loadingRing && typeof loadingRing !== 'string' && !Array.isArray(loadingRing)
+        ? loadingRing.props.animatedProps.stroke
+        : null
+    ).toBe('rail-track');
+    act(() => {
+      renderer.unmount();
+    });
+
     // Without the prop the viewBox-relative default is untouched.
     act(() => {
       renderer = TestRenderer.create(<LoadingIndicator size={20} phase="idle" />);
