@@ -33,7 +33,7 @@
     "start:emulator:ios": "expo run:ios",
     "start:emulator:android": "expo run:android",
     "clean:native": "rm -rf ios android",
-    "deps:sovran-latest": "GITHUB_TOKEN=$(gh auth token) bun update --latest @sovranbitcoin/coco-cashu-plugin-p2pk-import @sovranbitcoin/schemas",
+    "deps:sovran-latest": "GITHUB_TOKEN=$(gh auth token) bun update --latest --backend=copyfile @sovranbitcoin/coco-cashu-plugin-p2pk-import @sovranbitcoin/schemas",
     "build:dev:ios": "bun run deps:sovran-latest && bun run clean:native && EAS_NO_VCS=1 eas build --platform ios --profile development --non-interactive",
     "build:dev:android": "bun run deps:sovran-latest && bun run clean:native && EAS_NO_VCS=1 eas build --platform android --profile development --non-interactive",
     "build:ios": "bun run deps:sovran-latest && bun run clean:native && EAS_NO_VCS=1 eas build --platform ios --profile production  --auto-submit --non-interactive",

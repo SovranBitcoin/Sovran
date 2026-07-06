@@ -24,13 +24,16 @@ runs:
     # Warm download cache keyed on the workspace lockfile. deps:sovran-latest
     # re-resolves the external @sovranbitcoin/* packages so the lock can drift
     # between runs; the restore-keys fallback reuses cached tarballs otherwise.
+    # v2: purges stores poisoned by patch-package writing through bun's Linux
+    # hardlink backend into ~/.bun/install/cache (why installs below force
+    # --backend=copyfile).
     - name: Cache Bun store
       uses: actions/cache@v4
       with:
         path: ~/.bun/install/cache
-        key: bun-store-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+        key: bun-store-v2-${{ runner.os }}-${{ hashFiles('bun.lock') }}
         restore-keys: |
-          bun-store-${{ runner.os }}-
+          bun-store-v2-${{ runner.os }}-
 
     # wallet/nostr are in-repo workspace packages (no publish). The remaining
     # externals — @cashu/coco-* from npm, @sovranbitcoin/schemas +
@@ -39,10 +42,15 @@ runs:
     # the fallback. `deps:sovran-latest` re-resolves the external @sovranbitcoin/*
     # packages to newest published before install, so CI keeps the always-on
     # compatibility signal (a breaking schemas/p2pk publish reds CI by design).
+    # --backend=copyfile (also inside deps:sovran-latest) keeps node_modules
+    # files as real copies: bun's Linux default hardlinks them to the global
+    # store, so postinstall patch-package writes mutate the cached copies and
+    # actions/cache persists the patched state — the next run's pristine patch
+    # then fails to apply whenever a patch file has since been regenerated.
     - name: Install workspace (latest Sovran externals)
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       run: |
         bun run deps:sovran-latest
-        bun install
+        bun install --backend=copyfile
