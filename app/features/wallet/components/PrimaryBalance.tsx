@@ -307,31 +307,20 @@ export function PrimaryBalance({
   return (
     <Log name="PrimaryBalance">
       <VStack align="center" gap={BALANCE_SECTION_GAP} className="z-9">
-        <VStack align="center" gap={8}>
-          {/* Wallet unit above the fiat display-currency pill: the unit is
-              the structural choice (what the balance IS), the currency pill
-              only re-prices it. */}
-          <UnitSwitcherPill
-            textSize={12}
-            displayUnit={
-              account.unit === 'sat' ||
-              account.unit === 'usd' ||
-              account.unit === 'eur' ||
-              account.unit === 'gbp'
-                ? account.unit
-                : undefined
-            }
-          />
-          {/* Fiat conversion of a sat balance is meaningless when the wallet
-              is already denominated in a fiat unit — but the SLOT stays (an
-              invisible pill of the same size) so the balance and pills below
-              sit at identical positions on every carousel page. */}
-          <View
-            style={isSatUnit ? undefined : styles.hiddenSlot}
-            pointerEvents={isSatUnit ? 'auto' : 'none'}>
-            <FiatCurrencyPill displayText={isSatUnit ? displayText : '≈ 0.00'} textSize={12} />
-          </View>
-        </VStack>
+        {/* Wallet unit above the balance: the unit is the structural choice
+            (what the balance IS); the display-currency pill below only
+            re-prices it. */}
+        <UnitSwitcherPill
+          textSize={12}
+          displayUnit={
+            account.unit === 'sat' ||
+            account.unit === 'usd' ||
+            account.unit === 'eur' ||
+            account.unit === 'gbp'
+              ? account.unit
+              : undefined
+          }
+        />
         <Pressable onPress={toggleUnit} style={styles.balancePressable}>
           <AmountFormatter
             amount={balance}
@@ -344,6 +333,15 @@ export function PrimaryBalance({
             color={balanceTint}
           />
         </Pressable>
+        {/* Fiat conversion of a sat balance is meaningless when the wallet
+            is already denominated in a fiat unit — but the SLOT stays (an
+            invisible pill of the same size) so the pills below sit at
+            identical positions on every carousel page. */}
+        <View
+          style={isSatUnit ? undefined : styles.hiddenSlot}
+          pointerEvents={isSatUnit ? 'auto' : 'none'}>
+          <FiatCurrencyPill displayText={isSatUnit ? displayText : '≈ 0.00'} textSize={12} />
+        </View>
         <EcashStatusPill
           label="PENDING"
           totalAmount={pendingTotal}
