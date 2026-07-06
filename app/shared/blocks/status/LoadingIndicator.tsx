@@ -415,7 +415,11 @@ function ConfirmationSegment({
       fill="none"
       strokeLinecap="round"
       strokeDasharray={[dash, CIRC - dash]}
-      strokeDashoffset={-index * step}
+      // Center each dash within its step so the seams straddle the step
+      // boundaries (12 o'clock and every step after it). Starting the dash AT
+      // the boundary would push the whole gap to the trailing side and the
+      // ring would read as rotated by half a gap.
+      strokeDashoffset={-(index * step + gap / 2)}
       transform="rotate(-90 50 50)"
       animatedProps={animatedProps}
     />
@@ -893,6 +897,13 @@ export function LoadingIndicator({
               fill="none"
               strokeWidth={ringStrokeUnits}
               strokeLinecap="round"
+              // Same seam frame as the segment ring: start at 12 o'clock and
+              // center each idle dash within its step, so the six seams land
+              // symmetrically instead of trailing from the SVG path start at
+              // 3 o'clock. Loading spins via the wrapper and done is a full
+              // circle, so the offset is inert outside idle.
+              strokeDashoffset={-idleGapUnits / 2}
+              transform="rotate(-90 50 50)"
               animatedProps={ringStrokeAP}
             />
           )}

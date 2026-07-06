@@ -240,6 +240,14 @@ describe('LoadingIndicator confirmation progress', () => {
         ? (segments[0].props.strokeDasharray as number[])[0]
         : null;
     expect(segmentDash).toBeCloseTo(CIRC / 3 - expectedGap);
+    // Dashes center within their step (offset by half a gap) so the seams
+    // straddle 12 o'clock and the step boundaries — no half-gap slant.
+    const segmentOffset = (segment: JsonNode, index: number) =>
+      segment && typeof segment !== 'string' && !Array.isArray(segment)
+        ? segment.props.strokeDashoffset + (index * CIRC) / 3
+        : null;
+    expect(segmentOffset(segments[0], 0)).toBeCloseTo(-expectedGap / 2);
+    expect(segmentOffset(segments[1], 1)).toBeCloseTo(-expectedGap / 2);
     // Pending arcs take the supplied rail-track color at full opacity so ring
     // and connector read as one piece of chrome; completed arcs stay success.
     const segmentAnimated = (segment: JsonNode) =>
@@ -307,6 +315,11 @@ describe('LoadingIndicator confirmation progress', () => {
     // same as the pending segment arcs.
     expect(ringAnimated?.stroke).toBe('rail-track');
     expect(ringAnimated?.opacity).toBe(1);
+    // Same seam frame as the segment ring: 12 o'clock start, dash centered
+    // within its step (offset by half a gap).
+    const ringProps = ring && typeof ring !== 'string' && !Array.isArray(ring) ? ring.props : null;
+    expect(ringProps?.strokeDashoffset).toBeCloseTo(-(15 * 1.75) / 2);
+    expect(ringProps?.transform).toBe('rotate(-90 50 50)');
     act(() => {
       renderer.unmount();
     });
