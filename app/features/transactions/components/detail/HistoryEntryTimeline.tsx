@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { MintQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
@@ -13,6 +13,8 @@ import {
 } from 'wallet';
 import Animated, {
   Easing,
+  FadeIn,
+  FadeOut,
   useSharedValue,
   withDelay,
   withTiming,
@@ -81,12 +83,15 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
   warningColor,
   mutedColor,
 }: AnimatedTimelineLineProps) {
-  const isComplete = lineType === 'complete';
-  const fillHeight = useSharedValue(isComplete ? 1 : 0);
+  // Expired/rolled-back gradients are terminal fills too: they animate down
+  // the rail exactly like a success fill, just with a gradient into the
+  // outcome colour. Only 'future' stays unfilled.
+  const isFilled = lineType !== 'future';
+  const fillHeight = useSharedValue(isFilled ? 1 : 0);
   const gradientId = React.useId().replace(/:/g, '');
 
   useEffect(() => {
-    const target = lineType === 'complete' ? 1 : 0;
+    const target = lineType === 'future' ? 0 : 1;
     fillHeight.value =
       delayMs > 0
         ? withDelay(delayMs, withTiming(target, LINE_TIMING))
@@ -97,32 +102,8 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
     height: fillHeight.value * LINE_HEIGHT,
   }));
 
-  if (lineType === 'expired-gradient' || lineType === 'rolled-back-gradient') {
-    const endColor = lineType === 'expired-gradient' ? dangerColor : warningColor;
-    return (
-      <Svg
-        testID="history-entry-timeline-line"
-        width={LINE_WIDTH}
-        height={LINE_HEIGHT}
-        style={styles.timelineLine}>
-        <Defs>
-          <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor={successColor} />
-            <Stop offset="100%" stopColor={endColor} />
-          </LinearGradient>
-        </Defs>
-        <Rect
-          x={0}
-          y={0}
-          width={LINE_WIDTH}
-          height={LINE_HEIGHT}
-          rx={LINE_WIDTH / 2}
-          ry={LINE_WIDTH / 2}
-          fill={`url(#${gradientId})`}
-        />
-      </Svg>
-    );
-  }
+  const isGradient = lineType === 'expired-gradient' || lineType === 'rolled-back-gradient';
+  const endColor = lineType === 'expired-gradient' ? dangerColor : warningColor;
 
   return (
     <Svg
@@ -130,6 +111,22 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
       width={LINE_WIDTH}
       height={LINE_HEIGHT}
       style={styles.timelineLine}>
+      {isGradient && (
+        <Defs>
+          {/* userSpaceOnUse pins the gradient to the full rail so the colour
+              ramp stays put while the fill's bounding box grows. */}
+          <LinearGradient
+            id={gradientId}
+            gradientUnits="userSpaceOnUse"
+            x1="0"
+            y1="0"
+            x2="0"
+            y2={LINE_HEIGHT}>
+            <Stop offset="0%" stopColor={successColor} />
+            <Stop offset="100%" stopColor={endColor} />
+          </LinearGradient>
+        </Defs>
+      )}
       <Rect
         x={0}
         y={0}
@@ -145,7 +142,7 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
         width={LINE_WIDTH}
         rx={LINE_WIDTH / 2}
         ry={LINE_WIDTH / 2}
-        fill={successColor}
+        fill={isGradient ? `url(#${gradientId})` : successColor}
         animatedProps={fillProps}
       />
     </Svg>
@@ -172,6 +169,12 @@ export function HistoryEntryTimeline({
   ] as const);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const paymentCopy = usePaymentCopyResolver();
+  // False for the very first render so opening the screen paints the timeline
+  // without entrance fades; rows/labels added by LATER timeline changes fade.
+  const hasMountedRef = useRef(false);
+  useEffect(() => {
+    hasMountedRef.current = true;
+  }, []);
 
   const foreground66 = opacity(foreground, 0.66);
   const foreground50 = opacity(foreground, 0.5);
@@ -385,11 +388,18 @@ export function HistoryEntryTimeline({
             const isWaitingStep = item.stepType === 'waiting';
 
             return (
-              // No entering animation: rows are keyed by state, so timeline
-              // transitions (including errors/rollbacks) remount every row and
-              // an entrance effect would replay a whole-timeline slide. The
-              // dots and rails carry their own transition choreography.
-              <View key={item.state}>
+              // Rows are keyed by POSITION, not state: when a timeline changes
+              // shape (rollback, expiry) the row at each index transitions in
+              // place — the dot animates to its new status with the full
+              // draw-in choreography and the label crossfades — instead of
+              // remounting the whole timeline. A row that disappears (3 steps
+              // → 2 on rollback) fades out; a row that appears fades in. No
+              // slide: entrance/exit is opacity only, and only after the
+              // initial mount.
+              <Animated.View
+                key={`step-${index}`}
+                entering={hasMountedRef.current ? FadeIn.duration(220) : undefined}
+                exiting={FadeOut.duration(220)}>
                 <HStack align="flex-start">
                   <VStack align="center" style={{ marginRight: 14 }}>
                     <LoadingIndicator
@@ -436,28 +446,37 @@ export function HistoryEntryTimeline({
                       paddingBottom: isLast ? 0 : 16,
                       marginTop: contentMarginTop,
                     }}>
-                    <Text
-                      size={15}
-                      bold
-                      style={{
-                        color: getStateTextColor(item.stepType, isFutureState),
-                        marginBottom: 2,
-                      }}>
-                      {item.displayLabel}
-                    </Text>
-                    {item.timestamp && (
-                      <Text size={13} style={{ color: foreground66 }}>
-                        {formatDate(item.timestamp, 'iso')}
+                    {/* Keyed by label so a step that changes meaning in place
+                        ("Sent" → "Cancelled") crossfades its text block, while
+                        info-only updates (confirmation counts) mutate without
+                        remounting. */}
+                    <Animated.View
+                      key={item.displayLabel}
+                      entering={hasMountedRef.current ? FadeIn.duration(220) : undefined}
+                      exiting={FadeOut.duration(220)}>
+                      <Text
+                        size={15}
+                        bold
+                        style={{
+                          color: getStateTextColor(item.stepType, isFutureState),
+                          marginBottom: 2,
+                        }}>
+                        {item.displayLabel}
                       </Text>
-                    )}
-                    {item.info && (
-                      <Text size={12} style={{ color: foreground66, marginTop: 2 }}>
-                        {item.info}
-                      </Text>
-                    )}
+                      {item.timestamp && (
+                        <Text size={13} style={{ color: foreground66 }}>
+                          {formatDate(item.timestamp, 'iso')}
+                        </Text>
+                      )}
+                      {item.info && (
+                        <Text size={12} style={{ color: foreground66, marginTop: 2 }}>
+                          {item.info}
+                        </Text>
+                      )}
+                    </Animated.View>
                   </VStack>
                 </HStack>
-              </View>
+              </Animated.View>
             );
           })}
         </View>

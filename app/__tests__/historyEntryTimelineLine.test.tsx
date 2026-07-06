@@ -103,8 +103,11 @@ jest.mock('react-native-reanimated', () => {
       cubic: easingFn,
       out: <T,>(fn: T) => fn,
     },
-    FadeInDown: {
-      delay: () => entering,
+    FadeIn: {
+      duration: () => entering,
+    },
+    FadeOut: {
+      duration: () => entering,
     },
     useSharedValue: <T,>(value: T) => ({ value }),
     useAnimatedProps: <T extends object>(factory: () => T) => factory(),
@@ -168,6 +171,21 @@ function collectNodesByTestIDPrefix(
   }
   node.children?.forEach((child) => collectNodesByTestIDPrefix(child as JsonNode, prefix, matches));
   return matches;
+}
+
+function sendEntry(state: string): HistoryEntry {
+  return {
+    id: 'send-entry',
+    source: 'legacy',
+    legacyHistoryId: 'send-entry',
+    type: 'send',
+    createdAt: 1_779_430_133,
+    updatedAt: 1_779_430_133,
+    mintUrl: 'https://mint.example',
+    unit: 'sat',
+    state,
+    amount: 21,
+  } as unknown as HistoryEntry;
 }
 
 const unpaidMintEntry = {
@@ -264,6 +282,45 @@ describe('HistoryEntryTimeline connector rail', () => {
     });
 
     expect(utils.mintHistoryEntryExpired).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('transitions rows in place on rollback with an animated gradient rail', () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      renderer = TestRenderer.create(<HistoryEntryTimeline historyEntry={sendEntry('pending')} />);
+    });
+    expect(collectNodesByTestIDPrefix(renderer!.toJSON(), 'indicator-')).toHaveLength(3);
+
+    // Rollback: 3 steps collapse to 2. Rows are position-keyed, so the second
+    // row's indicator TRANSITIONS to done/reverted (playing the draw-in) and
+    // the third row unmounts.
+    act(() => {
+      renderer.update(<HistoryEntryTimeline historyEntry={sendEntry('rolledBack')} />);
+    });
+    const indicators = collectNodesByTestIDPrefix(renderer!.toJSON(), 'indicator-');
+    expect(indicators).toHaveLength(2);
+    expect(collectNodesByTestID(renderer!.toJSON(), 'indicator-done-reverted')).toHaveLength(1);
+
+    // The rolled-back rail animates its fill like a success rail: a muted base
+    // rect plus a growing gradient fill rect — not a static gradient.
+    const lines = collectNodesByTestID(renderer!.toJSON(), 'history-entry-timeline-line');
+    expect(lines).toHaveLength(1);
+    const line = lines[0];
+    const lineChildren =
+      line && typeof line !== 'string' && !Array.isArray(line) ? (line.children ?? []) : [];
+    const rects = lineChildren.filter(
+      (child) => child && typeof child !== 'string' && child.type === 'Rect'
+    );
+    expect(rects).toHaveLength(2);
+    const hasGradientFill = rects.some(
+      (rect) => rect && typeof rect !== 'string' && String(rect.props.fill).startsWith('url(#')
+    );
+    expect(hasGradientFill).toBe(true);
 
     act(() => {
       renderer.unmount();
