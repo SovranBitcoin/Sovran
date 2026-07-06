@@ -430,7 +430,7 @@ export const NaggAiLineupSchema = z.object({
     .max(64)
     .catch([]),
 });
-export type NaggAiLineup = z.infer<typeof NaggAiLineupSchema>;
+type NaggAiLineup = z.infer<typeof NaggAiLineupSchema>;
 
 /**
  * Map the nagg payload onto the app's `AiLineup` shape. Providers the app

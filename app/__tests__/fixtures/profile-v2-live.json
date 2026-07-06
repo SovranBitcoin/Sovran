@@ -1,1 +1,27 @@
-{"order":["37ed86ba48007dfdab46b3605e5644fceb09605088e83645949650fb588adf4b"],"orderBy":"created_at","events":[{"id":"37ed86ba48007dfdab46b3605e5644fceb09605088e83645949650fb588adf4b","kind":0,"pubkey":"3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d","content":"{\"name\":\"fiatjaf\",\"about\":\"~\",\"picture\":\"https://fiatjaf.com/static/favicon.jpg\",\"nip05\":\"_@fiatjaf.com\",\"lud16\":\"npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6@npub.cash\",\"website\":\"https://stuff.fiatjaf.com/\",\"banner\":\"https://cdn.satellite.earth/8f10244a702cbc2ca57b6c27a57b8cc02d5fdddccab0fc2e5988ce17e08f1732.jpg\"}","tags":[],"created_at":1755901618}],"aggregates":{"3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d":{"k3_author_latest":{"sources":163}}},"pubkeys":["3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"],"providers":{"3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d":{"nagg":{"firstEventAt":1697051805},"nip05":{"valid":true},"vertex":{"rank":0}}}}
+{
+  "order": ["37ed86ba48007dfdab46b3605e5644fceb09605088e83645949650fb588adf4b"],
+  "orderBy": "created_at",
+  "events": [
+    {
+      "id": "37ed86ba48007dfdab46b3605e5644fceb09605088e83645949650fb588adf4b",
+      "kind": 0,
+      "pubkey": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+      "content": "{\"name\":\"fiatjaf\",\"about\":\"~\",\"picture\":\"https://fiatjaf.com/static/favicon.jpg\",\"nip05\":\"_@fiatjaf.com\",\"lud16\":\"npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6@npub.cash\",\"website\":\"https://stuff.fiatjaf.com/\",\"banner\":\"https://cdn.satellite.earth/8f10244a702cbc2ca57b6c27a57b8cc02d5fdddccab0fc2e5988ce17e08f1732.jpg\"}",
+      "tags": [],
+      "created_at": 1755901618
+    }
+  ],
+  "aggregates": {
+    "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d": {
+      "k3_author_latest": { "sources": 163 }
+    }
+  },
+  "pubkeys": ["3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"],
+  "providers": {
+    "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d": {
+      "nagg": { "firstEventAt": 1697051805 },
+      "nip05": { "valid": true },
+      "vertex": { "rank": 0 }
+    }
+  }
+}

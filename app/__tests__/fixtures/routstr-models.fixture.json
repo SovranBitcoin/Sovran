@@ -1,1890 +1,1687 @@
 {
- "data": [
-  {
-   "id": "gpt-chat-latest",
-   "name": "OpenAI: GPT Chat Latest",
-   "created": 1778000212,
-   "description": "GPT Chat Latest points to OpenAI's stable API alias `chat-latest` that always resolves to the latest Instant chat model used in ChatGPT. As OpenAI rolls out new Instant model updates...",
-   "context_length": 400000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "file"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "GPT",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 3.7875000000000006e-06,
-    "completion": 2.2725e-05,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 3.7875000000000003e-07,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 1.5150000000000001,
-    "max_completion_cost": 2.9088,
-    "max_cost": 3.939
-   },
-   "sats_pricing": {
-    "prompt": 0.00618738135236798,
-    "completion": 0.03712428811420787,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.000618738135236798,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 2474.9525409471917,
-    "max_completion_cost": 4751.908878618608,
-    "max_cost": 6434.876606462698
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 400000,
-    "max_completion_tokens": 128000,
-    "is_moderated": true
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "openai/gpt-chat-latest-20260505",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gpt-mini-latest",
-   "name": "OpenAI GPT Mini Latest",
-   "created": 1777318471,
-   "description": "This model always redirects to the latest model in the OpenAI GPT Mini family.",
-   "context_length": 400000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "file",
-     "image",
-     "text"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Router",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 5.681250000000001e-07,
-    "completion": 3.4087499999999998e-06,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 5.68125e-08,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 0.22725000000000004,
-    "max_completion_cost": 0.43632,
-    "max_cost": 0.59085
-   },
-   "sats_pricing": {
-    "prompt": 0.0009281072028551969,
-    "completion": 0.005568643217131181,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 9.281072028551968e-05,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 371.2428811420788,
-    "max_completion_cost": 712.7863317927912,
-    "max_cost": 965.2314909694047
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 400000,
-    "max_completion_tokens": 128000,
-    "is_moderated": true
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "~openai/gpt-mini-latest",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gpt-latest",
-   "name": "OpenAI GPT Latest",
-   "created": 1777318334,
-   "description": "This model always redirects to the latest model in the OpenAI GPT family.",
-   "context_length": 1050000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "file",
-     "image",
-     "text"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Router",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 3.7875000000000006e-06,
-    "completion": 2.2725e-05,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 3.7875000000000003e-07,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 3.9768750000000006,
-    "max_completion_cost": 2.9088,
-    "max_cost": 6.400875000000001
-   },
-   "sats_pricing": {
-    "prompt": 0.00618738135236798,
-    "completion": 0.03712428811420787,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.000618738135236798,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 6496.750419986379,
-    "max_completion_cost": 4751.908878618608,
-    "max_cost": 10456.674485501886
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1050000,
-    "max_completion_tokens": 128000,
-    "is_moderated": true
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "~openai/gpt-latest",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gpt-5.5-pro",
-   "name": "OpenAI: GPT-5.5 Pro",
-   "created": 1777051896,
-   "description": "GPT-5.5 Pro is OpenAI\u2019s high-capability model optimized for deep reasoning and accuracy on complex, high-stakes workloads. It features a 1M+ token context window (922K input, 128K output) with support for...",
-   "context_length": 1050000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "file",
-     "image",
-     "text"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "GPT",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 2.2725e-05,
-    "completion": 0.00013635,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 2.2725000000000003e-06,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 23.861250000000002,
-    "max_completion_cost": 17.4528,
-    "max_cost": 38.405249999999995
-   },
-   "sats_pricing": {
-    "prompt": 0.03712428811420787,
-    "completion": 0.22274572868524725,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.0037124288114207876,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 38980.50251991827,
-    "max_completion_cost": 28511.453271711645,
-    "max_cost": 62740.0469130113
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1050000,
-    "max_completion_tokens": 128000,
-    "is_moderated": true
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "openai/gpt-5.5-pro-20260423",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gpt-5.5",
-   "name": "OpenAI: GPT-5.5",
-   "created": 1777051893,
-   "description": "GPT-5.5 is OpenAI\u2019s frontier model designed for complex professional workloads, building on GPT-5.4 with stronger reasoning, higher reliability, and improved token efficiency on hard tasks. It features a 1M+ token...",
-   "context_length": 1050000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "file",
-     "image",
-     "text"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "GPT",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 3.7875000000000006e-06,
-    "completion": 2.2725e-05,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 3.7875000000000003e-07,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 3.9768750000000006,
-    "max_completion_cost": 2.9088,
-    "max_cost": 6.400875000000001
-   },
-   "sats_pricing": {
-    "prompt": 0.00618738135236798,
-    "completion": 0.03712428811420787,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.000618738135236798,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 6496.750419986379,
-    "max_completion_cost": 4751.908878618608,
-    "max_cost": 10456.674485501886
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1050000,
-    "max_completion_tokens": 128000,
-    "is_moderated": true
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "openai/gpt-5.5-20260423",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gpt-5.4-image-2",
-   "name": "OpenAI: GPT-5.4 Image 2",
-   "created": 1776797528,
-   "description": "[GPT-5.4](https://openrouter.ai/openai/gpt-5.4) Image 2 combines OpenAI's GPT-5.4 model with state-of-the-art image generation capabilities from GPT Image 2. It enables rich multimodal workflows, allowing users to seamlessly move between reasoning, coding, and...",
-   "context_length": 272000,
-   "architecture": {
-    "modality": "text+image+file->text+image",
-    "input_modalities": [
-     "image",
-     "text",
-     "file"
-    ],
-    "output_modalities": [
-     "image",
-     "text"
-    ],
-    "tokenizer": "GPT",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 6.0600000000000004e-06,
-    "completion": 1.13625e-05,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 1.5150000000000001e-06,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 1.64832,
-    "max_completion_cost": 1.4544,
-    "max_cost": 2.32704
-   },
-   "sats_pricing": {
-    "prompt": 0.009899810163788767,
-    "completion": 0.018562144057103935,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.002474952540947192,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 2692.7483645505445,
-    "max_completion_cost": 2375.954439309304,
-    "max_cost": 3801.5271028948864
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 272000,
-    "max_completion_tokens": 128000,
-    "is_moderated": true
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "openai/gpt-5.4-image-2-20260421",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gpt-5.4-nano",
-   "name": "OpenAI: GPT-5.4 Nano",
-   "created": 1773748187,
-   "description": "GPT-5.4 nano is the most lightweight and cost-efficient variant of the GPT-5.4 family, optimized for speed-critical and high-volume tasks. It supports text and image inputs and is designed for low-latency...",
-   "context_length": 400000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "file",
-     "image",
-     "text"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "GPT",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 1.515e-07,
-    "completion": 9.468750000000001e-07,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 1.5150000000000003e-08,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 0.0606,
-    "max_completion_cost": 0.12120000000000002,
-    "max_cost": 0.16240800000000002
-   },
-   "sats_pricing": {
-    "prompt": 0.00024749525409471914,
-    "completion": 0.001546845338091995,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 2.474952540947192e-05,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 98.99810163788767,
-    "max_completion_cost": 197.99620327577534,
-    "max_cost": 265.31491238953896
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 400000,
-    "max_completion_tokens": 128000,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "openai/gpt-5.4-nano-20260317",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gpt-5.4-mini",
-   "name": "OpenAI: GPT-5.4 Mini",
-   "created": 1773748178,
-   "description": "GPT-5.4 mini brings the core capabilities of GPT-5.4 to a faster, more efficient model optimized for high-throughput workloads. It supports text and image inputs with strong performance across reasoning, coding,...",
-   "context_length": 400000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "file",
-     "image",
-     "text"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "GPT",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 5.681250000000001e-07,
-    "completion": 3.4087499999999998e-06,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 5.68125e-08,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 0.22725000000000004,
-    "max_completion_cost": 0.43632,
-    "max_cost": 0.59085
-   },
-   "sats_pricing": {
-    "prompt": 0.0009281072028551969,
-    "completion": 0.005568643217131181,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 9.281072028551968e-05,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 371.2428811420788,
-    "max_completion_cost": 712.7863317927912,
-    "max_cost": 965.2314909694047
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 400000,
-    "max_completion_tokens": 128000,
-    "is_moderated": true
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "openai/gpt-5.4-mini-20260317",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gpt-audio",
-   "name": "OpenAI: GPT Audio",
-   "created": 1768862569,
-   "description": "The gpt-audio model is OpenAI's first generally available audio model. The new snapshot features an upgraded decoder for more natural sounding voices and maintains better voice consistency. Audio is priced...",
-   "context_length": 128000,
-   "architecture": {
-    "modality": "text+audio->text+audio",
-    "input_modalities": [
-     "text",
-     "audio"
-    ],
-    "output_modalities": [
-     "text",
-     "audio"
-    ],
-    "tokenizer": "GPT",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 1.8937500000000003e-06,
-    "completion": 7.575000000000001e-06,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.0,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 0.24240000000000003,
-    "max_completion_cost": 0.12410880000000002,
-    "max_cost": 0.33548160000000005
-   },
-   "sats_pricing": {
-    "prompt": 0.00309369067618399,
-    "completion": 0.01237476270473596,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.0,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 395.9924065515507,
-    "max_completion_cost": 202.74811215439397,
-    "max_cost": 548.0534906673462
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 128000,
-    "max_completion_tokens": 16384,
-    "is_moderated": true
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "openai/gpt-audio",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "claude-sonnet-5",
-   "name": "Anthropic: Claude Sonnet 5",
-   "created": 1782843083,
-   "description": "Sonnet 5 is Anthropic's most capable Sonnet-class model, with frontier performance across coding, agents, and professional work. It supports adaptive thinking with selectable reasoning effort levels (low, medium, high, max,...",
-   "context_length": 1000000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "file"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Claude",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 1.5150000000000001e-06,
-    "completion": 7.575000000000001e-06,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 1.515e-07,
-    "input_cache_write": 1.8937500000000003e-06,
-    "max_prompt_cost": 1.5150000000000001,
-    "max_completion_cost": 0.9696000000000001,
-    "max_cost": 2.29068
-   },
-   "sats_pricing": {
-    "prompt": 0.002474952540947192,
-    "completion": 0.01237476270473596,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.00024749525409471914,
-    "input_cache_write": 0.00309369067618399,
-    "max_prompt_cost": 2474.9525409471917,
-    "max_completion_cost": 1583.9696262062027,
-    "max_cost": 3742.128241912154
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1000000,
-    "max_completion_tokens": 128000,
-    "is_moderated": true
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "anthropic/claude-sonnet-5-20260630",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "claude-fable-latest",
-   "name": "Anthropic: Claude Fable Latest",
-   "created": 1781029944,
-   "description": "This model always redirects to the latest model in the Claude Fable family.",
-   "context_length": 1000000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "file"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Router",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 7.575000000000001e-06,
-    "completion": 3.7875000000000006e-05,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 7.575000000000001e-07,
-    "input_cache_write": 9.468750000000001e-06,
-    "max_prompt_cost": 7.575000000000001,
-    "max_completion_cost": 4.848000000000001,
-    "max_cost": 11.453400000000002
-   },
-   "sats_pricing": {
-    "prompt": 0.01237476270473596,
-    "completion": 0.0618738135236798,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.001237476270473596,
-    "input_cache_write": 0.01546845338091995,
-    "max_prompt_cost": 12374.76270473596,
-    "max_completion_cost": 7919.848131031014,
-    "max_cost": 18710.64120956077
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1000000,
-    "max_completion_tokens": 128000,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "~anthropic/claude-fable-latest",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "claude-fable-5",
-   "name": "Anthropic: Claude Fable 5",
-   "created": 1781007515,
-   "description": "Claude Fable 5 is a Mythos-class model from Anthropic, built for autonomous knowledge work and coding. It supports text, image, and file inputs with text output, with reasoning support and...",
-   "context_length": 1000000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "file"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Claude",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 7.575000000000001e-06,
-    "completion": 3.7875000000000006e-05,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 7.575000000000001e-07,
-    "input_cache_write": 9.468750000000001e-06,
-    "max_prompt_cost": 7.575000000000001,
-    "max_completion_cost": 4.848000000000001,
-    "max_cost": 11.453400000000002
-   },
-   "sats_pricing": {
-    "prompt": 0.01237476270473596,
-    "completion": 0.0618738135236798,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.001237476270473596,
-    "input_cache_write": 0.01546845338091995,
-    "max_prompt_cost": 12374.76270473596,
-    "max_completion_cost": 7919.848131031014,
-    "max_cost": 18710.64120956077
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1000000,
-    "max_completion_tokens": 128000,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "anthropic/claude-5-fable-20260609",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "claude-opus-4.8-fast",
-   "name": "Anthropic: Claude Opus 4.8 (Fast)",
-   "created": 1779913703,
-   "description": "Fast-mode variant of [Opus 4.8](/anthropic/claude-opus-4.8) - identical capabilities with higher output speed at 2x pricing relative to regular Opus 4.8.\n\nLearn more in Anthropic's docs: https://platform.claude.com/docs/en/build-with-claude/fast-mode",
-   "context_length": 1000000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "file"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Claude",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 7.575000000000001e-06,
-    "completion": 3.7875000000000006e-05,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 7.575000000000001e-07,
-    "input_cache_write": 9.468750000000001e-06,
-    "max_prompt_cost": 7.575000000000001,
-    "max_completion_cost": 4.848000000000001,
-    "max_cost": 11.453400000000002
-   },
-   "sats_pricing": {
-    "prompt": 0.01237476270473596,
-    "completion": 0.0618738135236798,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.001237476270473596,
-    "input_cache_write": 0.01546845338091995,
-    "max_prompt_cost": 12374.76270473596,
-    "max_completion_cost": 7919.848131031014,
-    "max_cost": 18710.64120956077
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1000000,
-    "max_completion_tokens": 128000,
-    "is_moderated": true
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "anthropic/claude-4.8-opus-fast-20260528",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "claude-opus-4.8",
-   "name": "Anthropic: Claude Opus 4.8",
-   "created": 1779905091,
-   "description": "Claude Opus 4.8 is Anthropic's most capable generally available model in the Opus family. It supports text, image, and file inputs with text output, with reasoning support and a 1M-token...",
-   "context_length": 1000000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "file"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Claude",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 3.7875000000000006e-06,
-    "completion": 1.8937500000000003e-05,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 3.7875000000000003e-07,
-    "input_cache_write": 4.734375000000001e-06,
-    "max_prompt_cost": 3.7875000000000005,
-    "max_completion_cost": 2.4240000000000004,
-    "max_cost": 5.726700000000001
-   },
-   "sats_pricing": {
-    "prompt": 0.00618738135236798,
-    "completion": 0.0309369067618399,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.000618738135236798,
-    "input_cache_write": 0.007734226690459975,
-    "max_prompt_cost": 6187.38135236798,
-    "max_completion_cost": 3959.924065515507,
-    "max_cost": 9355.320604780385
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1000000,
-    "max_completion_tokens": 128000,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "anthropic/claude-4.8-opus-20260528",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "claude-haiku-latest",
-   "name": "Anthropic Claude Haiku Latest",
-   "created": 1777318492,
-   "description": "This model always redirects to the latest model in the Anthropic Claude Haiku family.",
-   "context_length": 200000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "file"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Router",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 7.575000000000001e-07,
-    "completion": 3.7875000000000006e-06,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 7.575e-08,
-    "input_cache_write": 9.468750000000001e-07,
-    "max_prompt_cost": 0.15150000000000002,
-    "max_completion_cost": 0.24240000000000003,
-    "max_cost": 0.34542000000000006
-   },
-   "sats_pricing": {
-    "prompt": 0.001237476270473596,
-    "completion": 0.00618738135236798,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.00012374762704735957,
-    "input_cache_write": 0.001546845338091995,
-    "max_prompt_cost": 247.4952540947192,
-    "max_completion_cost": 395.9924065515507,
-    "max_cost": 564.2891793359598
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 200000,
-    "max_completion_tokens": 64000,
-    "is_moderated": true
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "~anthropic/claude-haiku-latest",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "claude-haiku-4.5",
-   "name": "Anthropic: Claude Haiku 4.5",
-   "created": 1760547638,
-   "description": "Claude Haiku 4.5 is Anthropic\u2019s fastest and most efficient model, delivering near-frontier intelligence at a fraction of the cost and latency of larger Claude models. Matching Claude Sonnet 4\u2019s performance...",
-   "context_length": 200000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "file"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Claude",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 7.575000000000001e-07,
-    "completion": 3.7875000000000006e-06,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 7.575e-08,
-    "input_cache_write": 9.468750000000001e-07,
-    "max_prompt_cost": 0.15150000000000002,
-    "max_completion_cost": 0.24240000000000003,
-    "max_cost": 0.34542000000000006
-   },
-   "sats_pricing": {
-    "prompt": 0.001237476270473596,
-    "completion": 0.00618738135236798,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.00012374762704735957,
-    "input_cache_write": 0.001546845338091995,
-    "max_prompt_cost": 247.4952540947192,
-    "max_completion_cost": 395.9924065515507,
-    "max_cost": 564.2891793359598
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 200000,
-    "max_completion_tokens": 64000,
-    "is_moderated": true
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "anthropic/claude-4.5-haiku-20251001",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "grok-build-0.1",
-   "name": "xAI: Grok Build 0.1",
-   "created": 1779298123,
-   "description": "Grok Build 0.1 is xAI\u2019s fast coding model trained specifically for agentic software engineering workflows. It supports text and image inputs with text output, and is optimized for interactive coding...",
-   "context_length": 256000,
-   "architecture": {
-    "modality": "text+image->text",
-    "input_modalities": [
-     "text",
-     "image"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Grok",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 7.575000000000001e-07,
-    "completion": 1.5150000000000001e-06,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.0037875,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 1.515e-07,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 0.19392,
-    "max_completion_cost": 0.38784,
-    "max_cost": 0.38784
-   },
-   "sats_pricing": {
-    "prompt": 0.001237476270473596,
-    "completion": 0.002474952540947192,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 6.1873813523679795,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.00024749525409471914,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 316.7939252412405,
-    "max_completion_cost": 633.587850482481,
-    "max_cost": 633.587850482481
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 256000,
-    "max_completion_tokens": null,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "x-ai/grok-build-0.1-20260520",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "grok-4.3",
-   "name": "xAI: Grok 4.3",
-   "created": 1777591821,
-   "description": "Grok 4.3 is a reasoning model from xAI. It accepts text and image inputs with text output, and is suited for agentic workflows, instruction-following tasks, and applications requiring high factual...",
-   "context_length": 1000000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "file"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Grok",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 9.468750000000001e-07,
-    "completion": 1.8937500000000003e-06,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.0037875,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 1.515e-07,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 0.9468750000000001,
-    "max_completion_cost": 1.8937500000000003,
-    "max_cost": 1.8937500000000003
-   },
-   "sats_pricing": {
-    "prompt": 0.001546845338091995,
-    "completion": 0.00309369067618399,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 6.1873813523679795,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.00024749525409471914,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 1546.845338091995,
-    "max_completion_cost": 3093.69067618399,
-    "max_cost": 3093.69067618399
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1000000,
-    "max_completion_tokens": null,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "x-ai/grok-4.3-20260430",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "grok-4.20-multi-agent",
-   "name": "xAI: Grok 4.20 Multi-Agent",
-   "created": 1774979158,
-   "description": "Grok 4.20 Multi-Agent is a variant of xAI\u2019s Grok 4.20 designed for collaborative, agent-based workflows. Multiple agents operate in parallel to conduct deep research, coordinate tool use, and synthesize information...",
-   "context_length": 2000000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "file"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Grok",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 9.468750000000001e-07,
-    "completion": 1.8937500000000003e-06,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.0037875,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 1.515e-07,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 1.8937500000000003,
-    "max_completion_cost": 3.7875000000000005,
-    "max_cost": 3.7875000000000005
-   },
-   "sats_pricing": {
-    "prompt": 0.001546845338091995,
-    "completion": 0.00309369067618399,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 6.1873813523679795,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.00024749525409471914,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 3093.69067618399,
-    "max_completion_cost": 6187.38135236798,
-    "max_cost": 6187.38135236798
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 2000000,
-    "max_completion_tokens": null,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "x-ai/grok-4.20-multi-agent-20260309",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "grok-4.20",
-   "name": "xAI: Grok 4.20",
-   "created": 1774979019,
-   "description": "Grok 4.20 is a reasoning model from xAI with industry-leading speed and agentic tool calling capabilities. It combines the lowest hallucination rate on the market with strict prompt adherance, delivering...",
-   "context_length": 2000000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "file"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Grok",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 9.468750000000001e-07,
-    "completion": 1.8937500000000003e-06,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.0037875,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 1.515e-07,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 1.8937500000000003,
-    "max_completion_cost": 3.7875000000000005,
-    "max_cost": 3.7875000000000005
-   },
-   "sats_pricing": {
-    "prompt": 0.001546845338091995,
-    "completion": 0.00309369067618399,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 6.1873813523679795,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.00024749525409471914,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 3093.69067618399,
-    "max_completion_cost": 6187.38135236798,
-    "max_cost": 6187.38135236798
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 2000000,
-    "max_completion_tokens": null,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "x-ai/grok-4.20-20260309",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gemini-3.5-flash",
-   "name": "Google: Gemini 3.5 Flash",
-   "created": 1779193800,
-   "description": "Gemini 3.5 Flash is Google's high-efficiency multimodal model, bringing near-Pro level coding and reasoning at Flash-tier cost and speed. It is highly optimized for coding proficiency and parallel agentic execution...",
-   "context_length": 1048576,
-   "architecture": {
-    "modality": "text+image+file+audio+video->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "video",
-     "file",
-     "audio"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Gemini",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 1.1362500000000001e-06,
-    "completion": 6.8174999999999995e-06,
-    "request": 0.0,
-    "image": 1.1362500000000001e-06,
-    "web_search": 0.010605000000000002,
-    "internal_reasoning": 6.8174999999999995e-06,
-    "input_cache_read": 1.13625e-07,
-    "input_cache_write": 6.312500000000002e-08,
-    "max_prompt_cost": 1.1914444800000001,
-    "max_completion_cost": 0.44679167999999997,
-    "max_cost": 1.56377088
-   },
-   "sats_pricing": {
-    "prompt": 0.0018562144057103938,
-    "completion": 0.011137286434262362,
-    "request": 0.001,
-    "image": 0.0018562144057103938,
-    "web_search": 17.324667786630343,
-    "internal_reasoning": 0.011137286434262362,
-    "input_cache_read": 0.00018562144057103936,
-    "input_cache_write": 0.00010312302253946634,
-    "max_prompt_cost": 1946.3818766821819,
-    "max_completion_cost": 729.8932037558181,
-    "max_cost": 2554.6262131453636
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1048576,
-    "max_completion_tokens": 65536,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "google/gemini-3.5-flash-20260519",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gemini-3.1-flash-lite",
-   "name": "Google: Gemini 3.1 Flash Lite",
-   "created": 1778168828,
-   "description": "Gemini 3.1 Flash Lite is Google\u2019s GA high-efficiency multimodal model optimized for low-latency, high-volume workloads. It supports text, image, video, audio, and PDF inputs, and is designed for lightweight agentic...",
-   "context_length": 1048576,
-   "architecture": {
-    "modality": "text+image+file+audio+video->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "video",
-     "file",
-     "audio"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Gemini",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 1.8937500000000001e-07,
-    "completion": 1.1362500000000001e-06,
-    "request": 0.0,
-    "image": 1.8937500000000001e-07,
-    "web_search": 0.010605000000000002,
-    "internal_reasoning": 1.1362500000000001e-06,
-    "input_cache_read": 1.89375e-08,
-    "input_cache_write": 6.312500000000002e-08,
-    "max_prompt_cost": 0.19857408000000001,
-    "max_completion_cost": 0.07446528000000001,
-    "max_cost": 0.26062848
-   },
-   "sats_pricing": {
-    "prompt": 0.000309369067618399,
-    "completion": 0.0018562144057103938,
-    "request": 0.001,
-    "image": 0.000309369067618399,
-    "web_search": 17.324667786630343,
-    "internal_reasoning": 0.0018562144057103938,
-    "input_cache_read": 3.093690676183989e-05,
-    "input_cache_write": 0.00010312302253946634,
-    "max_prompt_cost": 324.39697944703033,
-    "max_completion_cost": 121.64886729263637,
-    "max_cost": 425.7710355242273
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1048576,
-    "max_completion_tokens": 65536,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "google/gemini-3.1-flash-lite-20260507",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gemini-pro-latest",
-   "name": "Google Gemini Pro Latest",
-   "created": 1777318451,
-   "description": "This model always redirects to the latest model in the Google Gemini Pro family.",
-   "context_length": 1048576,
-   "architecture": {
-    "modality": "text+image+file+audio+video->text",
-    "input_modalities": [
-     "audio",
-     "file",
-     "image",
-     "text",
-     "video"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Router",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 1.5150000000000001e-06,
-    "completion": 9.090000000000001e-06,
-    "request": 0.0,
-    "image": 1.5150000000000001e-06,
-    "web_search": 0.010605000000000002,
-    "internal_reasoning": 9.090000000000001e-06,
-    "input_cache_read": 1.515e-07,
-    "input_cache_write": 2.8406250000000003e-07,
-    "max_prompt_cost": 1.5885926400000001,
-    "max_completion_cost": 0.5957222400000001,
-    "max_cost": 2.08502784
-   },
-   "sats_pricing": {
-    "prompt": 0.002474952540947192,
-    "completion": 0.01484971524568315,
-    "request": 0.001,
-    "image": 0.002474952540947192,
-    "web_search": 17.324667786630343,
-    "internal_reasoning": 0.01484971524568315,
-    "input_cache_read": 0.00024749525409471914,
-    "input_cache_write": 0.00046405360142759845,
-    "max_prompt_cost": 2595.1758355762427,
-    "max_completion_cost": 973.1909383410909,
-    "max_cost": 3406.168284193818
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1048576,
-    "max_completion_tokens": 65536,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "~google/gemini-pro-latest",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gemini-flash-latest",
-   "name": "Google Gemini Flash Latest",
-   "created": 1777318398,
-   "description": "This model always redirects to the latest model in the Google Gemini Flash family.",
-   "context_length": 1048576,
-   "architecture": {
-    "modality": "text+image+file+audio+video->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "video",
-     "file",
-     "audio"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Router",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 1.1362500000000001e-06,
-    "completion": 6.8174999999999995e-06,
-    "request": 0.0,
-    "image": 1.1362500000000001e-06,
-    "web_search": 0.010605000000000002,
-    "internal_reasoning": 6.8174999999999995e-06,
-    "input_cache_read": 1.13625e-07,
-    "input_cache_write": 6.312500000000002e-08,
-    "max_prompt_cost": 1.1914444800000001,
-    "max_completion_cost": 0.44679167999999997,
-    "max_cost": 1.56377088
-   },
-   "sats_pricing": {
-    "prompt": 0.0018562144057103938,
-    "completion": 0.011137286434262362,
-    "request": 0.001,
-    "image": 0.0018562144057103938,
-    "web_search": 17.324667786630343,
-    "internal_reasoning": 0.011137286434262362,
-    "input_cache_read": 0.00018562144057103936,
-    "input_cache_write": 0.00010312302253946634,
-    "max_prompt_cost": 1946.3818766821819,
-    "max_completion_cost": 729.8932037558181,
-    "max_cost": 2554.6262131453636
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1048576,
-    "max_completion_tokens": 65536,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "~google/gemini-flash-latest",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gemma-4-26b-a4b-it",
-   "name": "Google: Gemma 4 26B A4B ",
-   "created": 1775227989,
-   "description": "Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind. Despite 25.2B total parameters, only 3.8B activate per token during inference \u2014 delivering near-31B quality at...",
-   "context_length": 262144,
-   "architecture": {
-    "modality": "text+image+video->text",
-    "input_modalities": [
-     "image",
-     "text",
-     "video"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Gemma",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 4.5449999999999993e-08,
-    "completion": 2.4997500000000004e-07,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.0,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 0.011914444799999998,
-    "max_completion_cost": 0.06552944640000001,
-    "max_cost": 0.06552944640000001
-   },
-   "sats_pricing": {
-    "prompt": 7.424857622841574e-05,
-    "completion": 0.0004083671692562867,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.0,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 19.463818766821817,
-    "max_completion_cost": 107.05100321752002,
-    "max_cost": 107.05100321752002
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 262144,
-    "max_completion_tokens": null,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "google/gemma-4-26b-a4b-it-20260403",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gemini-3-pro-image",
-   "name": "Google: Nano Banana Pro (Gemini 3 Pro Image)",
-   "created": 1781754054,
-   "description": "Nano Banana Pro is Google\u2019s most advanced image-generation and editing model, built on Gemini 3 Pro. It extends the original Nano Banana with significantly improved multimodal reasoning, real-world grounding, and...",
-   "context_length": 65536,
-   "architecture": {
-    "modality": "text+image->text+image",
-    "input_modalities": [
-     "image",
-     "text"
-    ],
-    "output_modalities": [
-     "image",
-     "text"
-    ],
-    "tokenizer": "Gemini",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 1.5150000000000001e-06,
-    "completion": 9.090000000000001e-06,
-    "request": 0.0,
-    "image": 1.5150000000000001e-06,
-    "web_search": 0.010605000000000002,
-    "internal_reasoning": 9.090000000000001e-06,
-    "input_cache_read": 1.515e-07,
-    "input_cache_write": 2.8406250000000003e-07,
-    "max_prompt_cost": 0.09928704000000001,
-    "max_completion_cost": 0.29786112000000003,
-    "max_cost": 0.34750464000000003
-   },
-   "sats_pricing": {
-    "prompt": 0.002474952540947192,
-    "completion": 0.01484971524568315,
-    "request": 0.001,
-    "image": 0.002474952540947192,
-    "web_search": 17.324667786630343,
-    "internal_reasoning": 0.01484971524568315,
-    "input_cache_read": 0.00024749525409471914,
-    "input_cache_write": 0.00046405360142759845,
-    "max_prompt_cost": 162.19848972351517,
-    "max_completion_cost": 486.59546917054547,
-    "max_cost": 567.6947140323031
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 65536,
-    "max_completion_tokens": 32768,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "google/gemini-3-pro-image-20260528",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gemini-embedding-2",
-   "name": "Google: Gemini Embedding 2",
-   "created": 1779290135,
-   "description": "Gemini Embedding 2 is Google's first multimodal embedding model. We currently support mapping text and images into a unified vector space for semantic search and retrieval-augmented generation (RAG). It supports...",
-   "context_length": 8192,
-   "architecture": {
-    "modality": "text+image+file+audio+video->embeddings",
-    "input_modalities": [
-     "text",
-     "image",
-     "file",
-     "audio",
-     "video"
-    ],
-    "output_modalities": [
-     "embeddings"
-    ],
-    "tokenizer": "Gemini",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 1.515e-07,
-    "completion": 0.0,
-    "request": 0.0,
-    "image": 3.40875e-07,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.0,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 0.001241088,
-    "max_completion_cost": 0.0,
-    "max_cost": 0.001241088
-   },
-   "sats_pricing": {
-    "prompt": 0.00024749525409471914,
-    "completion": 0.0,
-    "request": 0.001,
-    "image": 0.0005568643217131181,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.0,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 2.0274811215439392,
-    "max_completion_cost": 0.0,
-    "max_cost": 2.0274811215439392
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 8192,
-    "max_completion_tokens": null,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "google/gemini-embedding-2",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gemma4:31b",
-   "name": "gemma4 31b",
-   "created": 1781126043,
-   "description": "Ollama gemma4 model (31.3B)",
-   "context_length": 2048,
-   "architecture": {
-    "modality": "text",
-    "input_modalities": [
-     "text"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "gguf",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 6.06e-07,
-    "completion": 6.06e-07,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.0,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 0.001241088,
-    "max_completion_cost": 0.000620544,
-    "max_cost": 0.001241088
-   },
-   "sats_pricing": {
-    "prompt": 0.0009899810163788766,
-    "completion": 0.0009899810163788766,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.0,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 2.0274811215439392,
-    "max_completion_cost": 1.0137405607719696,
-    "max_cost": 2.0274811215439392
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 2048,
-    "max_completion_tokens": 1024,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": null,
-   "alias_ids": null,
-   "forwarded_model_id": "gemma4:31b"
-  },
-  {
-   "id": "deepseek-v4-pro",
-   "name": "deepseek-v4-pro",
-   "created": 1781822958,
-   "description": "deepseek-v4-pro via deepseek",
-   "context_length": 1048576,
-   "architecture": {
-    "modality": "text",
-    "input_modalities": [
-     "text"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "unknown",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 4.343e-07,
-    "completion": 8.787000000000001e-07,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 3.6612500000000004e-09,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 0.4553965568,
-    "max_completion_cost": 0.3374208,
-    "max_cost": 0.6260461568
-   },
-   "sats_pricing": {
-    "prompt": 0.0007094863950715283,
-    "completion": 0.0014354724737493712,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 5.981135307289047e-06,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 743.9504061985228,
-    "max_completion_cost": 551.2214299197585,
-    "max_cost": 1022.7290604108144
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1048576,
-    "max_completion_tokens": 384000,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": null,
-   "alias_ids": null,
-   "forwarded_model_id": "deepseek-v4-pro"
-  },
-  {
-   "id": "qwen3.7-plus",
-   "name": "Qwen: Qwen3.7 Plus",
-   "created": 1780491783,
-   "description": "Qwen3.7-Plus is a cost-effective model in Alibaba's Qwen3.7 series. It supports text and image input with text output, building on the series' text capabilities with a comprehensive upgrade to its...",
-   "context_length": 1000000,
-   "architecture": {
-    "modality": "text+image->text",
-    "input_modalities": [
-     "text",
-     "image"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Qwen",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 2.4240000000000005e-07,
-    "completion": 9.696000000000002e-07,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 4.848000000000001e-08,
-    "input_cache_write": 3.03e-07,
-    "max_prompt_cost": 0.24240000000000006,
-    "max_completion_cost": 0.06354370560000001,
-    "max_cost": 0.2900577792000001
-   },
-   "sats_pricing": {
-    "prompt": 0.00039599240655155074,
-    "completion": 0.001583969626206203,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 7.919848131031014e-05,
-    "input_cache_write": 0.0004949905081894383,
-    "max_prompt_cost": 395.99240655155074,
-    "max_completion_cost": 103.80703342304972,
-    "max_cost": 473.84768161883807
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1000000,
-    "max_completion_tokens": 65536,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "qwen/qwen3.7-plus-20260602",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "mistral-medium-3-5",
-   "name": "Mistral: Mistral Medium 3.5",
-   "created": 1777570439,
-   "description": "Mistral Medium 3.5 is a dense 128B instruction-following model from Mistral AI. It supports text and image inputs with text output, and is designed for agentic workflows, coding, and complex...",
-   "context_length": 262144,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "file"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Mistral",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 1.1362500000000001e-06,
-    "completion": 5.68125e-06,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.0,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 0.29786112000000003,
-    "max_completion_cost": 1.4893056,
-    "max_cost": 1.4893056
-   },
-   "sats_pricing": {
-    "prompt": 0.0018562144057103938,
-    "completion": 0.009281072028551968,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 0.0,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.0,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 486.59546917054547,
-    "max_completion_cost": 2432.977345852727,
-    "max_cost": 2432.977345852727
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 262144,
-    "max_completion_tokens": null,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "mistralai/mistral-medium-3.5-20260430",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "grok-latest",
-   "name": "xAI: Grok Latest",
-   "created": 1777591821,
-   "description": "Rolling alias: always redirects to the latest model in the Grok family (synthetic fixture row).",
-   "context_length": 1000000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "text",
-     "image",
-     "file"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Grok",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 9.468750000000001e-07,
-    "completion": 1.8937500000000003e-06,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.0037875,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 1.515e-07,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 0.9468750000000001,
-    "max_completion_cost": 1.8937500000000003,
-    "max_cost": 1.8937500000000003
-   },
-   "sats_pricing": {
-    "prompt": 0.001546845338091995,
-    "completion": 0.00309369067618399,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 6.1873813523679795,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 0.00024749525409471914,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 1546.845338091995,
-    "max_completion_cost": 3093.69067618399,
-    "max_cost": 3093.69067618399
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 1000000,
-    "max_completion_tokens": null,
-    "is_moderated": false
-   },
-   "enabled": true,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "~x-ai/grok-latest",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  },
-  {
-   "id": "gpt-5.4-mini-disabled",
-   "name": "OpenAI: GPT-5.4 Mini (disabled)",
-   "created": 1773748178,
-   "description": "GPT-5.4 mini brings the core capabilities of GPT-5.4 to a faster, more efficient model optimized for high-throughput workloads. It supports text and image inputs with strong performance across reasoning, coding,...",
-   "context_length": 400000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "file",
-     "image",
-     "text"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "GPT",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": 5.681250000000001e-07,
-    "completion": 3.4087499999999998e-06,
-    "request": 0.0,
-    "image": 0.0,
-    "web_search": 0.007575,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 5.68125e-08,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 0.22725000000000004,
-    "max_completion_cost": 0.43632,
-    "max_cost": 0.59085
-   },
-   "sats_pricing": {
-    "prompt": 0.0009281072028551969,
-    "completion": 0.005568643217131181,
-    "request": 0.001,
-    "image": 0.0,
-    "web_search": 12.374762704735959,
-    "internal_reasoning": 0.0,
-    "input_cache_read": 9.281072028551968e-05,
-    "input_cache_write": 0.0,
-    "max_prompt_cost": 371.2428811420788,
-    "max_completion_cost": 712.7863317927912,
-    "max_cost": 965.2314909694047
-   },
-   "per_request_limits": null,
-   "top_provider": {
-    "context_length": 400000,
-    "max_completion_tokens": 128000,
-    "is_moderated": true
-   },
-   "enabled": false,
-   "upstream_provider_id": "routstr",
-   "canonical_slug": "openai/gpt-5.4-mini-disabled",
-   "alias_ids": null,
-   "forwarded_model_id": null
-  }
- ]
+  "data": [
+    {
+      "id": "gpt-chat-latest",
+      "name": "OpenAI: GPT Chat Latest",
+      "created": 1778000212,
+      "description": "GPT Chat Latest points to OpenAI's stable API alias `chat-latest` that always resolves to the latest Instant chat model used in ChatGPT. As OpenAI rolls out new Instant model updates...",
+      "context_length": 400000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 3.7875000000000006e-6,
+        "completion": 2.2725e-5,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 3.7875000000000003e-7,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 1.5150000000000001,
+        "max_completion_cost": 2.9088,
+        "max_cost": 3.939
+      },
+      "sats_pricing": {
+        "prompt": 0.00618738135236798,
+        "completion": 0.03712428811420787,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.000618738135236798,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 2474.9525409471917,
+        "max_completion_cost": 4751.908878618608,
+        "max_cost": 6434.876606462698
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 400000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "openai/gpt-chat-latest-20260505",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gpt-mini-latest",
+      "name": "OpenAI GPT Mini Latest",
+      "created": 1777318471,
+      "description": "This model always redirects to the latest model in the OpenAI GPT Mini family.",
+      "context_length": 400000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["file", "image", "text"],
+        "output_modalities": ["text"],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 5.681250000000001e-7,
+        "completion": 3.4087499999999998e-6,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 5.68125e-8,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 0.22725000000000004,
+        "max_completion_cost": 0.43632,
+        "max_cost": 0.59085
+      },
+      "sats_pricing": {
+        "prompt": 0.0009281072028551969,
+        "completion": 0.005568643217131181,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 9.281072028551968e-5,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 371.2428811420788,
+        "max_completion_cost": 712.7863317927912,
+        "max_cost": 965.2314909694047
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 400000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "~openai/gpt-mini-latest",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gpt-latest",
+      "name": "OpenAI GPT Latest",
+      "created": 1777318334,
+      "description": "This model always redirects to the latest model in the OpenAI GPT family.",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["file", "image", "text"],
+        "output_modalities": ["text"],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 3.7875000000000006e-6,
+        "completion": 2.2725e-5,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 3.7875000000000003e-7,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 3.9768750000000006,
+        "max_completion_cost": 2.9088,
+        "max_cost": 6.400875000000001
+      },
+      "sats_pricing": {
+        "prompt": 0.00618738135236798,
+        "completion": 0.03712428811420787,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.000618738135236798,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 6496.750419986379,
+        "max_completion_cost": 4751.908878618608,
+        "max_cost": 10456.674485501886
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "~openai/gpt-latest",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gpt-5.5-pro",
+      "name": "OpenAI: GPT-5.5 Pro",
+      "created": 1777051896,
+      "description": "GPT-5.5 Pro is OpenAI\u2019s high-capability model optimized for deep reasoning and accuracy on complex, high-stakes workloads. It features a 1M+ token context window (922K input, 128K output) with support for...",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["file", "image", "text"],
+        "output_modalities": ["text"],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 2.2725e-5,
+        "completion": 0.00013635,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 2.2725000000000003e-6,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 23.861250000000002,
+        "max_completion_cost": 17.4528,
+        "max_cost": 38.405249999999995
+      },
+      "sats_pricing": {
+        "prompt": 0.03712428811420787,
+        "completion": 0.22274572868524725,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.0037124288114207876,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 38980.50251991827,
+        "max_completion_cost": 28511.453271711645,
+        "max_cost": 62740.0469130113
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "openai/gpt-5.5-pro-20260423",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gpt-5.5",
+      "name": "OpenAI: GPT-5.5",
+      "created": 1777051893,
+      "description": "GPT-5.5 is OpenAI\u2019s frontier model designed for complex professional workloads, building on GPT-5.4 with stronger reasoning, higher reliability, and improved token efficiency on hard tasks. It features a 1M+ token...",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["file", "image", "text"],
+        "output_modalities": ["text"],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 3.7875000000000006e-6,
+        "completion": 2.2725e-5,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 3.7875000000000003e-7,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 3.9768750000000006,
+        "max_completion_cost": 2.9088,
+        "max_cost": 6.400875000000001
+      },
+      "sats_pricing": {
+        "prompt": 0.00618738135236798,
+        "completion": 0.03712428811420787,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.000618738135236798,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 6496.750419986379,
+        "max_completion_cost": 4751.908878618608,
+        "max_cost": 10456.674485501886
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "openai/gpt-5.5-20260423",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gpt-5.4-image-2",
+      "name": "OpenAI: GPT-5.4 Image 2",
+      "created": 1776797528,
+      "description": "[GPT-5.4](https://openrouter.ai/openai/gpt-5.4) Image 2 combines OpenAI's GPT-5.4 model with state-of-the-art image generation capabilities from GPT Image 2. It enables rich multimodal workflows, allowing users to seamlessly move between reasoning, coding, and...",
+      "context_length": 272000,
+      "architecture": {
+        "modality": "text+image+file->text+image",
+        "input_modalities": ["image", "text", "file"],
+        "output_modalities": ["image", "text"],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 6.0600000000000004e-6,
+        "completion": 1.13625e-5,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 1.5150000000000001e-6,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 1.64832,
+        "max_completion_cost": 1.4544,
+        "max_cost": 2.32704
+      },
+      "sats_pricing": {
+        "prompt": 0.009899810163788767,
+        "completion": 0.018562144057103935,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.002474952540947192,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 2692.7483645505445,
+        "max_completion_cost": 2375.954439309304,
+        "max_cost": 3801.5271028948864
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 272000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "openai/gpt-5.4-image-2-20260421",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gpt-5.4-nano",
+      "name": "OpenAI: GPT-5.4 Nano",
+      "created": 1773748187,
+      "description": "GPT-5.4 nano is the most lightweight and cost-efficient variant of the GPT-5.4 family, optimized for speed-critical and high-volume tasks. It supports text and image inputs and is designed for low-latency...",
+      "context_length": 400000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["file", "image", "text"],
+        "output_modalities": ["text"],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 1.515e-7,
+        "completion": 9.468750000000001e-7,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 1.5150000000000003e-8,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 0.0606,
+        "max_completion_cost": 0.12120000000000002,
+        "max_cost": 0.16240800000000002
+      },
+      "sats_pricing": {
+        "prompt": 0.00024749525409471914,
+        "completion": 0.001546845338091995,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 2.474952540947192e-5,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 98.99810163788767,
+        "max_completion_cost": 197.99620327577534,
+        "max_cost": 265.31491238953896
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 400000,
+        "max_completion_tokens": 128000,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "openai/gpt-5.4-nano-20260317",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gpt-5.4-mini",
+      "name": "OpenAI: GPT-5.4 Mini",
+      "created": 1773748178,
+      "description": "GPT-5.4 mini brings the core capabilities of GPT-5.4 to a faster, more efficient model optimized for high-throughput workloads. It supports text and image inputs with strong performance across reasoning, coding,...",
+      "context_length": 400000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["file", "image", "text"],
+        "output_modalities": ["text"],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 5.681250000000001e-7,
+        "completion": 3.4087499999999998e-6,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 5.68125e-8,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 0.22725000000000004,
+        "max_completion_cost": 0.43632,
+        "max_cost": 0.59085
+      },
+      "sats_pricing": {
+        "prompt": 0.0009281072028551969,
+        "completion": 0.005568643217131181,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 9.281072028551968e-5,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 371.2428811420788,
+        "max_completion_cost": 712.7863317927912,
+        "max_cost": 965.2314909694047
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 400000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "openai/gpt-5.4-mini-20260317",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gpt-audio",
+      "name": "OpenAI: GPT Audio",
+      "created": 1768862569,
+      "description": "The gpt-audio model is OpenAI's first generally available audio model. The new snapshot features an upgraded decoder for more natural sounding voices and maintains better voice consistency. Audio is priced...",
+      "context_length": 128000,
+      "architecture": {
+        "modality": "text+audio->text+audio",
+        "input_modalities": ["text", "audio"],
+        "output_modalities": ["text", "audio"],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 1.8937500000000003e-6,
+        "completion": 7.575000000000001e-6,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.0,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 0.24240000000000003,
+        "max_completion_cost": 0.12410880000000002,
+        "max_cost": 0.33548160000000005
+      },
+      "sats_pricing": {
+        "prompt": 0.00309369067618399,
+        "completion": 0.01237476270473596,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.0,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 395.9924065515507,
+        "max_completion_cost": 202.74811215439397,
+        "max_cost": 548.0534906673462
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 128000,
+        "max_completion_tokens": 16384,
+        "is_moderated": true
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "openai/gpt-audio",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "claude-sonnet-5",
+      "name": "Anthropic: Claude Sonnet 5",
+      "created": 1782843083,
+      "description": "Sonnet 5 is Anthropic's most capable Sonnet-class model, with frontier performance across coding, agents, and professional work. It supports adaptive thinking with selectable reasoning effort levels (low, medium, high, max,...",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Claude",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 1.5150000000000001e-6,
+        "completion": 7.575000000000001e-6,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 1.515e-7,
+        "input_cache_write": 1.8937500000000003e-6,
+        "max_prompt_cost": 1.5150000000000001,
+        "max_completion_cost": 0.9696000000000001,
+        "max_cost": 2.29068
+      },
+      "sats_pricing": {
+        "prompt": 0.002474952540947192,
+        "completion": 0.01237476270473596,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.00024749525409471914,
+        "input_cache_write": 0.00309369067618399,
+        "max_prompt_cost": 2474.9525409471917,
+        "max_completion_cost": 1583.9696262062027,
+        "max_cost": 3742.128241912154
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "anthropic/claude-sonnet-5-20260630",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "claude-fable-latest",
+      "name": "Anthropic: Claude Fable Latest",
+      "created": 1781029944,
+      "description": "This model always redirects to the latest model in the Claude Fable family.",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 7.575000000000001e-6,
+        "completion": 3.7875000000000006e-5,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 7.575000000000001e-7,
+        "input_cache_write": 9.468750000000001e-6,
+        "max_prompt_cost": 7.575000000000001,
+        "max_completion_cost": 4.848000000000001,
+        "max_cost": 11.453400000000002
+      },
+      "sats_pricing": {
+        "prompt": 0.01237476270473596,
+        "completion": 0.0618738135236798,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.001237476270473596,
+        "input_cache_write": 0.01546845338091995,
+        "max_prompt_cost": 12374.76270473596,
+        "max_completion_cost": 7919.848131031014,
+        "max_cost": 18710.64120956077
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 128000,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "~anthropic/claude-fable-latest",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "claude-fable-5",
+      "name": "Anthropic: Claude Fable 5",
+      "created": 1781007515,
+      "description": "Claude Fable 5 is a Mythos-class model from Anthropic, built for autonomous knowledge work and coding. It supports text, image, and file inputs with text output, with reasoning support and...",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Claude",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 7.575000000000001e-6,
+        "completion": 3.7875000000000006e-5,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 7.575000000000001e-7,
+        "input_cache_write": 9.468750000000001e-6,
+        "max_prompt_cost": 7.575000000000001,
+        "max_completion_cost": 4.848000000000001,
+        "max_cost": 11.453400000000002
+      },
+      "sats_pricing": {
+        "prompt": 0.01237476270473596,
+        "completion": 0.0618738135236798,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.001237476270473596,
+        "input_cache_write": 0.01546845338091995,
+        "max_prompt_cost": 12374.76270473596,
+        "max_completion_cost": 7919.848131031014,
+        "max_cost": 18710.64120956077
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 128000,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "anthropic/claude-5-fable-20260609",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "claude-opus-4.8-fast",
+      "name": "Anthropic: Claude Opus 4.8 (Fast)",
+      "created": 1779913703,
+      "description": "Fast-mode variant of [Opus 4.8](/anthropic/claude-opus-4.8) - identical capabilities with higher output speed at 2x pricing relative to regular Opus 4.8.\n\nLearn more in Anthropic's docs: https://platform.claude.com/docs/en/build-with-claude/fast-mode",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Claude",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 7.575000000000001e-6,
+        "completion": 3.7875000000000006e-5,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 7.575000000000001e-7,
+        "input_cache_write": 9.468750000000001e-6,
+        "max_prompt_cost": 7.575000000000001,
+        "max_completion_cost": 4.848000000000001,
+        "max_cost": 11.453400000000002
+      },
+      "sats_pricing": {
+        "prompt": 0.01237476270473596,
+        "completion": 0.0618738135236798,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.001237476270473596,
+        "input_cache_write": 0.01546845338091995,
+        "max_prompt_cost": 12374.76270473596,
+        "max_completion_cost": 7919.848131031014,
+        "max_cost": 18710.64120956077
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "anthropic/claude-4.8-opus-fast-20260528",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "claude-opus-4.8",
+      "name": "Anthropic: Claude Opus 4.8",
+      "created": 1779905091,
+      "description": "Claude Opus 4.8 is Anthropic's most capable generally available model in the Opus family. It supports text, image, and file inputs with text output, with reasoning support and a 1M-token...",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Claude",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 3.7875000000000006e-6,
+        "completion": 1.8937500000000003e-5,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 3.7875000000000003e-7,
+        "input_cache_write": 4.734375000000001e-6,
+        "max_prompt_cost": 3.7875000000000005,
+        "max_completion_cost": 2.4240000000000004,
+        "max_cost": 5.726700000000001
+      },
+      "sats_pricing": {
+        "prompt": 0.00618738135236798,
+        "completion": 0.0309369067618399,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.000618738135236798,
+        "input_cache_write": 0.007734226690459975,
+        "max_prompt_cost": 6187.38135236798,
+        "max_completion_cost": 3959.924065515507,
+        "max_cost": 9355.320604780385
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 128000,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "anthropic/claude-4.8-opus-20260528",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "claude-haiku-latest",
+      "name": "Anthropic Claude Haiku Latest",
+      "created": 1777318492,
+      "description": "This model always redirects to the latest model in the Anthropic Claude Haiku family.",
+      "context_length": 200000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 7.575000000000001e-7,
+        "completion": 3.7875000000000006e-6,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 7.575e-8,
+        "input_cache_write": 9.468750000000001e-7,
+        "max_prompt_cost": 0.15150000000000002,
+        "max_completion_cost": 0.24240000000000003,
+        "max_cost": 0.34542000000000006
+      },
+      "sats_pricing": {
+        "prompt": 0.001237476270473596,
+        "completion": 0.00618738135236798,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.00012374762704735957,
+        "input_cache_write": 0.001546845338091995,
+        "max_prompt_cost": 247.4952540947192,
+        "max_completion_cost": 395.9924065515507,
+        "max_cost": 564.2891793359598
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 200000,
+        "max_completion_tokens": 64000,
+        "is_moderated": true
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "~anthropic/claude-haiku-latest",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "claude-haiku-4.5",
+      "name": "Anthropic: Claude Haiku 4.5",
+      "created": 1760547638,
+      "description": "Claude Haiku 4.5 is Anthropic\u2019s fastest and most efficient model, delivering near-frontier intelligence at a fraction of the cost and latency of larger Claude models. Matching Claude Sonnet 4\u2019s performance...",
+      "context_length": 200000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Claude",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 7.575000000000001e-7,
+        "completion": 3.7875000000000006e-6,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 7.575e-8,
+        "input_cache_write": 9.468750000000001e-7,
+        "max_prompt_cost": 0.15150000000000002,
+        "max_completion_cost": 0.24240000000000003,
+        "max_cost": 0.34542000000000006
+      },
+      "sats_pricing": {
+        "prompt": 0.001237476270473596,
+        "completion": 0.00618738135236798,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.00012374762704735957,
+        "input_cache_write": 0.001546845338091995,
+        "max_prompt_cost": 247.4952540947192,
+        "max_completion_cost": 395.9924065515507,
+        "max_cost": 564.2891793359598
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 200000,
+        "max_completion_tokens": 64000,
+        "is_moderated": true
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "anthropic/claude-4.5-haiku-20251001",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "grok-build-0.1",
+      "name": "xAI: Grok Build 0.1",
+      "created": 1779298123,
+      "description": "Grok Build 0.1 is xAI\u2019s fast coding model trained specifically for agentic software engineering workflows. It supports text and image inputs with text output, and is optimized for interactive coding...",
+      "context_length": 256000,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"],
+        "tokenizer": "Grok",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 7.575000000000001e-7,
+        "completion": 1.5150000000000001e-6,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.0037875,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 1.515e-7,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 0.19392,
+        "max_completion_cost": 0.38784,
+        "max_cost": 0.38784
+      },
+      "sats_pricing": {
+        "prompt": 0.001237476270473596,
+        "completion": 0.002474952540947192,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 6.1873813523679795,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.00024749525409471914,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 316.7939252412405,
+        "max_completion_cost": 633.587850482481,
+        "max_cost": 633.587850482481
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 256000,
+        "max_completion_tokens": null,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "x-ai/grok-build-0.1-20260520",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "grok-4.3",
+      "name": "xAI: Grok 4.3",
+      "created": 1777591821,
+      "description": "Grok 4.3 is a reasoning model from xAI. It accepts text and image inputs with text output, and is suited for agentic workflows, instruction-following tasks, and applications requiring high factual...",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Grok",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 9.468750000000001e-7,
+        "completion": 1.8937500000000003e-6,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.0037875,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 1.515e-7,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 0.9468750000000001,
+        "max_completion_cost": 1.8937500000000003,
+        "max_cost": 1.8937500000000003
+      },
+      "sats_pricing": {
+        "prompt": 0.001546845338091995,
+        "completion": 0.00309369067618399,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 6.1873813523679795,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.00024749525409471914,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 1546.845338091995,
+        "max_completion_cost": 3093.69067618399,
+        "max_cost": 3093.69067618399
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": null,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "x-ai/grok-4.3-20260430",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "grok-4.20-multi-agent",
+      "name": "xAI: Grok 4.20 Multi-Agent",
+      "created": 1774979158,
+      "description": "Grok 4.20 Multi-Agent is a variant of xAI\u2019s Grok 4.20 designed for collaborative, agent-based workflows. Multiple agents operate in parallel to conduct deep research, coordinate tool use, and synthesize information...",
+      "context_length": 2000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Grok",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 9.468750000000001e-7,
+        "completion": 1.8937500000000003e-6,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.0037875,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 1.515e-7,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 1.8937500000000003,
+        "max_completion_cost": 3.7875000000000005,
+        "max_cost": 3.7875000000000005
+      },
+      "sats_pricing": {
+        "prompt": 0.001546845338091995,
+        "completion": 0.00309369067618399,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 6.1873813523679795,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.00024749525409471914,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 3093.69067618399,
+        "max_completion_cost": 6187.38135236798,
+        "max_cost": 6187.38135236798
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 2000000,
+        "max_completion_tokens": null,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "x-ai/grok-4.20-multi-agent-20260309",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "grok-4.20",
+      "name": "xAI: Grok 4.20",
+      "created": 1774979019,
+      "description": "Grok 4.20 is a reasoning model from xAI with industry-leading speed and agentic tool calling capabilities. It combines the lowest hallucination rate on the market with strict prompt adherance, delivering...",
+      "context_length": 2000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Grok",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 9.468750000000001e-7,
+        "completion": 1.8937500000000003e-6,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.0037875,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 1.515e-7,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 1.8937500000000003,
+        "max_completion_cost": 3.7875000000000005,
+        "max_cost": 3.7875000000000005
+      },
+      "sats_pricing": {
+        "prompt": 0.001546845338091995,
+        "completion": 0.00309369067618399,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 6.1873813523679795,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.00024749525409471914,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 3093.69067618399,
+        "max_completion_cost": 6187.38135236798,
+        "max_cost": 6187.38135236798
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 2000000,
+        "max_completion_tokens": null,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "x-ai/grok-4.20-20260309",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gemini-3.5-flash",
+      "name": "Google: Gemini 3.5 Flash",
+      "created": 1779193800,
+      "description": "Gemini 3.5 Flash is Google's high-efficiency multimodal model, bringing near-Pro level coding and reasoning at Flash-tier cost and speed. It is highly optimized for coding proficiency and parallel agentic execution...",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image+file+audio+video->text",
+        "input_modalities": ["text", "image", "video", "file", "audio"],
+        "output_modalities": ["text"],
+        "tokenizer": "Gemini",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 1.1362500000000001e-6,
+        "completion": 6.8174999999999995e-6,
+        "request": 0.0,
+        "image": 1.1362500000000001e-6,
+        "web_search": 0.010605000000000002,
+        "internal_reasoning": 6.8174999999999995e-6,
+        "input_cache_read": 1.13625e-7,
+        "input_cache_write": 6.312500000000002e-8,
+        "max_prompt_cost": 1.1914444800000001,
+        "max_completion_cost": 0.44679167999999997,
+        "max_cost": 1.56377088
+      },
+      "sats_pricing": {
+        "prompt": 0.0018562144057103938,
+        "completion": 0.011137286434262362,
+        "request": 0.001,
+        "image": 0.0018562144057103938,
+        "web_search": 17.324667786630343,
+        "internal_reasoning": 0.011137286434262362,
+        "input_cache_read": 0.00018562144057103936,
+        "input_cache_write": 0.00010312302253946634,
+        "max_prompt_cost": 1946.3818766821819,
+        "max_completion_cost": 729.8932037558181,
+        "max_cost": 2554.6262131453636
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 65536,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "google/gemini-3.5-flash-20260519",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gemini-3.1-flash-lite",
+      "name": "Google: Gemini 3.1 Flash Lite",
+      "created": 1778168828,
+      "description": "Gemini 3.1 Flash Lite is Google\u2019s GA high-efficiency multimodal model optimized for low-latency, high-volume workloads. It supports text, image, video, audio, and PDF inputs, and is designed for lightweight agentic...",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image+file+audio+video->text",
+        "input_modalities": ["text", "image", "video", "file", "audio"],
+        "output_modalities": ["text"],
+        "tokenizer": "Gemini",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 1.8937500000000001e-7,
+        "completion": 1.1362500000000001e-6,
+        "request": 0.0,
+        "image": 1.8937500000000001e-7,
+        "web_search": 0.010605000000000002,
+        "internal_reasoning": 1.1362500000000001e-6,
+        "input_cache_read": 1.89375e-8,
+        "input_cache_write": 6.312500000000002e-8,
+        "max_prompt_cost": 0.19857408000000001,
+        "max_completion_cost": 0.07446528000000001,
+        "max_cost": 0.26062848
+      },
+      "sats_pricing": {
+        "prompt": 0.000309369067618399,
+        "completion": 0.0018562144057103938,
+        "request": 0.001,
+        "image": 0.000309369067618399,
+        "web_search": 17.324667786630343,
+        "internal_reasoning": 0.0018562144057103938,
+        "input_cache_read": 3.093690676183989e-5,
+        "input_cache_write": 0.00010312302253946634,
+        "max_prompt_cost": 324.39697944703033,
+        "max_completion_cost": 121.64886729263637,
+        "max_cost": 425.7710355242273
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 65536,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "google/gemini-3.1-flash-lite-20260507",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gemini-pro-latest",
+      "name": "Google Gemini Pro Latest",
+      "created": 1777318451,
+      "description": "This model always redirects to the latest model in the Google Gemini Pro family.",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image+file+audio+video->text",
+        "input_modalities": ["audio", "file", "image", "text", "video"],
+        "output_modalities": ["text"],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 1.5150000000000001e-6,
+        "completion": 9.090000000000001e-6,
+        "request": 0.0,
+        "image": 1.5150000000000001e-6,
+        "web_search": 0.010605000000000002,
+        "internal_reasoning": 9.090000000000001e-6,
+        "input_cache_read": 1.515e-7,
+        "input_cache_write": 2.8406250000000003e-7,
+        "max_prompt_cost": 1.5885926400000001,
+        "max_completion_cost": 0.5957222400000001,
+        "max_cost": 2.08502784
+      },
+      "sats_pricing": {
+        "prompt": 0.002474952540947192,
+        "completion": 0.01484971524568315,
+        "request": 0.001,
+        "image": 0.002474952540947192,
+        "web_search": 17.324667786630343,
+        "internal_reasoning": 0.01484971524568315,
+        "input_cache_read": 0.00024749525409471914,
+        "input_cache_write": 0.00046405360142759845,
+        "max_prompt_cost": 2595.1758355762427,
+        "max_completion_cost": 973.1909383410909,
+        "max_cost": 3406.168284193818
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 65536,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "~google/gemini-pro-latest",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gemini-flash-latest",
+      "name": "Google Gemini Flash Latest",
+      "created": 1777318398,
+      "description": "This model always redirects to the latest model in the Google Gemini Flash family.",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image+file+audio+video->text",
+        "input_modalities": ["text", "image", "video", "file", "audio"],
+        "output_modalities": ["text"],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 1.1362500000000001e-6,
+        "completion": 6.8174999999999995e-6,
+        "request": 0.0,
+        "image": 1.1362500000000001e-6,
+        "web_search": 0.010605000000000002,
+        "internal_reasoning": 6.8174999999999995e-6,
+        "input_cache_read": 1.13625e-7,
+        "input_cache_write": 6.312500000000002e-8,
+        "max_prompt_cost": 1.1914444800000001,
+        "max_completion_cost": 0.44679167999999997,
+        "max_cost": 1.56377088
+      },
+      "sats_pricing": {
+        "prompt": 0.0018562144057103938,
+        "completion": 0.011137286434262362,
+        "request": 0.001,
+        "image": 0.0018562144057103938,
+        "web_search": 17.324667786630343,
+        "internal_reasoning": 0.011137286434262362,
+        "input_cache_read": 0.00018562144057103936,
+        "input_cache_write": 0.00010312302253946634,
+        "max_prompt_cost": 1946.3818766821819,
+        "max_completion_cost": 729.8932037558181,
+        "max_cost": 2554.6262131453636
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 65536,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "~google/gemini-flash-latest",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gemma-4-26b-a4b-it",
+      "name": "Google: Gemma 4 26B A4B ",
+      "created": 1775227989,
+      "description": "Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind. Despite 25.2B total parameters, only 3.8B activate per token during inference \u2014 delivering near-31B quality at...",
+      "context_length": 262144,
+      "architecture": {
+        "modality": "text+image+video->text",
+        "input_modalities": ["image", "text", "video"],
+        "output_modalities": ["text"],
+        "tokenizer": "Gemma",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 4.5449999999999993e-8,
+        "completion": 2.4997500000000004e-7,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.0,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 0.011914444799999998,
+        "max_completion_cost": 0.06552944640000001,
+        "max_cost": 0.06552944640000001
+      },
+      "sats_pricing": {
+        "prompt": 7.424857622841574e-5,
+        "completion": 0.0004083671692562867,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.0,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 19.463818766821817,
+        "max_completion_cost": 107.05100321752002,
+        "max_cost": 107.05100321752002
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 262144,
+        "max_completion_tokens": null,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "google/gemma-4-26b-a4b-it-20260403",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gemini-3-pro-image",
+      "name": "Google: Nano Banana Pro (Gemini 3 Pro Image)",
+      "created": 1781754054,
+      "description": "Nano Banana Pro is Google\u2019s most advanced image-generation and editing model, built on Gemini 3 Pro. It extends the original Nano Banana with significantly improved multimodal reasoning, real-world grounding, and...",
+      "context_length": 65536,
+      "architecture": {
+        "modality": "text+image->text+image",
+        "input_modalities": ["image", "text"],
+        "output_modalities": ["image", "text"],
+        "tokenizer": "Gemini",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 1.5150000000000001e-6,
+        "completion": 9.090000000000001e-6,
+        "request": 0.0,
+        "image": 1.5150000000000001e-6,
+        "web_search": 0.010605000000000002,
+        "internal_reasoning": 9.090000000000001e-6,
+        "input_cache_read": 1.515e-7,
+        "input_cache_write": 2.8406250000000003e-7,
+        "max_prompt_cost": 0.09928704000000001,
+        "max_completion_cost": 0.29786112000000003,
+        "max_cost": 0.34750464000000003
+      },
+      "sats_pricing": {
+        "prompt": 0.002474952540947192,
+        "completion": 0.01484971524568315,
+        "request": 0.001,
+        "image": 0.002474952540947192,
+        "web_search": 17.324667786630343,
+        "internal_reasoning": 0.01484971524568315,
+        "input_cache_read": 0.00024749525409471914,
+        "input_cache_write": 0.00046405360142759845,
+        "max_prompt_cost": 162.19848972351517,
+        "max_completion_cost": 486.59546917054547,
+        "max_cost": 567.6947140323031
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 65536,
+        "max_completion_tokens": 32768,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "google/gemini-3-pro-image-20260528",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gemini-embedding-2",
+      "name": "Google: Gemini Embedding 2",
+      "created": 1779290135,
+      "description": "Gemini Embedding 2 is Google's first multimodal embedding model. We currently support mapping text and images into a unified vector space for semantic search and retrieval-augmented generation (RAG). It supports...",
+      "context_length": 8192,
+      "architecture": {
+        "modality": "text+image+file+audio+video->embeddings",
+        "input_modalities": ["text", "image", "file", "audio", "video"],
+        "output_modalities": ["embeddings"],
+        "tokenizer": "Gemini",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 1.515e-7,
+        "completion": 0.0,
+        "request": 0.0,
+        "image": 3.40875e-7,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.0,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 0.001241088,
+        "max_completion_cost": 0.0,
+        "max_cost": 0.001241088
+      },
+      "sats_pricing": {
+        "prompt": 0.00024749525409471914,
+        "completion": 0.0,
+        "request": 0.001,
+        "image": 0.0005568643217131181,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.0,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 2.0274811215439392,
+        "max_completion_cost": 0.0,
+        "max_cost": 2.0274811215439392
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 8192,
+        "max_completion_tokens": null,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "google/gemini-embedding-2",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gemma4:31b",
+      "name": "gemma4 31b",
+      "created": 1781126043,
+      "description": "Ollama gemma4 model (31.3B)",
+      "context_length": 2048,
+      "architecture": {
+        "modality": "text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "gguf",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 6.06e-7,
+        "completion": 6.06e-7,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.0,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 0.001241088,
+        "max_completion_cost": 0.000620544,
+        "max_cost": 0.001241088
+      },
+      "sats_pricing": {
+        "prompt": 0.0009899810163788766,
+        "completion": 0.0009899810163788766,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.0,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 2.0274811215439392,
+        "max_completion_cost": 1.0137405607719696,
+        "max_cost": 2.0274811215439392
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 2048,
+        "max_completion_tokens": 1024,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": null,
+      "alias_ids": null,
+      "forwarded_model_id": "gemma4:31b"
+    },
+    {
+      "id": "deepseek-v4-pro",
+      "name": "deepseek-v4-pro",
+      "created": 1781822958,
+      "description": "deepseek-v4-pro via deepseek",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "unknown",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 4.343e-7,
+        "completion": 8.787000000000001e-7,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 3.6612500000000004e-9,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 0.4553965568,
+        "max_completion_cost": 0.3374208,
+        "max_cost": 0.6260461568
+      },
+      "sats_pricing": {
+        "prompt": 0.0007094863950715283,
+        "completion": 0.0014354724737493712,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 5.981135307289047e-6,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 743.9504061985228,
+        "max_completion_cost": 551.2214299197585,
+        "max_cost": 1022.7290604108144
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 384000,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": null,
+      "alias_ids": null,
+      "forwarded_model_id": "deepseek-v4-pro"
+    },
+    {
+      "id": "qwen3.7-plus",
+      "name": "Qwen: Qwen3.7 Plus",
+      "created": 1780491783,
+      "description": "Qwen3.7-Plus is a cost-effective model in Alibaba's Qwen3.7 series. It supports text and image input with text output, building on the series' text capabilities with a comprehensive upgrade to its...",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"],
+        "tokenizer": "Qwen",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 2.4240000000000005e-7,
+        "completion": 9.696000000000002e-7,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 4.848000000000001e-8,
+        "input_cache_write": 3.03e-7,
+        "max_prompt_cost": 0.24240000000000006,
+        "max_completion_cost": 0.06354370560000001,
+        "max_cost": 0.2900577792000001
+      },
+      "sats_pricing": {
+        "prompt": 0.00039599240655155074,
+        "completion": 0.001583969626206203,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 7.919848131031014e-5,
+        "input_cache_write": 0.0004949905081894383,
+        "max_prompt_cost": 395.99240655155074,
+        "max_completion_cost": 103.80703342304972,
+        "max_cost": 473.84768161883807
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 65536,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "qwen/qwen3.7-plus-20260602",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "mistral-medium-3-5",
+      "name": "Mistral: Mistral Medium 3.5",
+      "created": 1777570439,
+      "description": "Mistral Medium 3.5 is a dense 128B instruction-following model from Mistral AI. It supports text and image inputs with text output, and is designed for agentic workflows, coding, and complex...",
+      "context_length": 262144,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Mistral",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 1.1362500000000001e-6,
+        "completion": 5.68125e-6,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.0,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 0.29786112000000003,
+        "max_completion_cost": 1.4893056,
+        "max_cost": 1.4893056
+      },
+      "sats_pricing": {
+        "prompt": 0.0018562144057103938,
+        "completion": 0.009281072028551968,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 0.0,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.0,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 486.59546917054547,
+        "max_completion_cost": 2432.977345852727,
+        "max_cost": 2432.977345852727
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 262144,
+        "max_completion_tokens": null,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "mistralai/mistral-medium-3.5-20260430",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "grok-latest",
+      "name": "xAI: Grok Latest",
+      "created": 1777591821,
+      "description": "Rolling alias: always redirects to the latest model in the Grok family (synthetic fixture row).",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Grok",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 9.468750000000001e-7,
+        "completion": 1.8937500000000003e-6,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.0037875,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 1.515e-7,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 0.9468750000000001,
+        "max_completion_cost": 1.8937500000000003,
+        "max_cost": 1.8937500000000003
+      },
+      "sats_pricing": {
+        "prompt": 0.001546845338091995,
+        "completion": 0.00309369067618399,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 6.1873813523679795,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 0.00024749525409471914,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 1546.845338091995,
+        "max_completion_cost": 3093.69067618399,
+        "max_cost": 3093.69067618399
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": null,
+        "is_moderated": false
+      },
+      "enabled": true,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "~x-ai/grok-latest",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    },
+    {
+      "id": "gpt-5.4-mini-disabled",
+      "name": "OpenAI: GPT-5.4 Mini (disabled)",
+      "created": 1773748178,
+      "description": "GPT-5.4 mini brings the core capabilities of GPT-5.4 to a faster, more efficient model optimized for high-throughput workloads. It supports text and image inputs with strong performance across reasoning, coding,...",
+      "context_length": 400000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["file", "image", "text"],
+        "output_modalities": ["text"],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": 5.681250000000001e-7,
+        "completion": 3.4087499999999998e-6,
+        "request": 0.0,
+        "image": 0.0,
+        "web_search": 0.007575,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 5.68125e-8,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 0.22725000000000004,
+        "max_completion_cost": 0.43632,
+        "max_cost": 0.59085
+      },
+      "sats_pricing": {
+        "prompt": 0.0009281072028551969,
+        "completion": 0.005568643217131181,
+        "request": 0.001,
+        "image": 0.0,
+        "web_search": 12.374762704735959,
+        "internal_reasoning": 0.0,
+        "input_cache_read": 9.281072028551968e-5,
+        "input_cache_write": 0.0,
+        "max_prompt_cost": 371.2428811420788,
+        "max_completion_cost": 712.7863317927912,
+        "max_cost": 965.2314909694047
+      },
+      "per_request_limits": null,
+      "top_provider": {
+        "context_length": 400000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "enabled": false,
+      "upstream_provider_id": "routstr",
+      "canonical_slug": "openai/gpt-5.4-mini-disabled",
+      "alias_ids": null,
+      "forwarded_model_id": null
+    }
+  ]
 }

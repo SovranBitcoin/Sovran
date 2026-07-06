@@ -1906,7 +1906,9 @@ function modeNetwork(entries: LogEntry[], opts: Options): string {
   if (paired.length > 0) {
     lines.push('REQUEST LATENCY (paired request → response):');
     lines.push('');
-    lines.push('  Request                                  Count   P50 ms   P95 ms    Max ms   Fail');
+    lines.push(
+      '  Request                                  Count   P50 ms   P95 ms    Max ms   Fail'
+    );
     lines.push('  ' + '-'.repeat(88));
     for (const agg of paired.slice(0, 15)) {
       const d = summarizeDurations(agg.samples);
@@ -3935,9 +3937,7 @@ export function pairSpans(entries: LogEntry[]): SpanAggregate[] {
 function modeSpans(entries: LogEntry[], _opts: Options): string {
   const aggregates = pairSpans(entries)
     .filter((a) => a.samples.length > 0)
-    .sort(
-      (a, b) => b.samples.reduce((s, v) => s + v, 0) - a.samples.reduce((s, v) => s + v, 0)
-    );
+    .sort((a, b) => b.samples.reduce((s, v) => s + v, 0) - a.samples.reduce((s, v) => s + v, 0));
 
   if (aggregates.length === 0)
     return 'No pairable .start/.done-style span events found. (Single-entry durations live in `perf`.)';
@@ -4120,7 +4120,10 @@ function modeTiers(entries: LogEntry[], _opts: Options): string {
     return fresh;
   };
 
-  const surfaces = new Map<string, { requests: number; doneByTier: Map<string, number>; exhausted: number }>();
+  const surfaces = new Map<
+    string,
+    { requests: number; doneByTier: Map<string, number>; exhausted: number }
+  >();
   const surfaceStats = (surface: string) => {
     const existing = surfaces.get(surface);
     if (existing) return existing;
@@ -4197,9 +4200,13 @@ function modeTiers(entries: LogEntry[], _opts: Options): string {
     const ans = summarizeDurations(stats.answered);
     const fail = summarizeDurations(stats.failed);
     const ansStr =
-      stats.answered.length > 0 ? `${ans.p50.toFixed(0)}/${ans.p95.toFixed(0)}`.padStart(12) : '—'.padStart(12);
+      stats.answered.length > 0
+        ? `${ans.p50.toFixed(0)}/${ans.p95.toFixed(0)}`.padStart(12)
+        : '—'.padStart(12);
     const failStr =
-      stats.failed.length > 0 ? `${fail.p50.toFixed(0)}/${fail.p95.toFixed(0)}`.padStart(12) : '—'.padStart(12);
+      stats.failed.length > 0
+        ? `${fail.p50.toFixed(0)}/${fail.p95.toFixed(0)}`.padStart(12)
+        : '—'.padStart(12);
     lines.push(
       `  ${tier.padEnd(8)} ${String(stats.tries).padStart(6)} ${String(stats.answered.length).padStart(9)} ${String(stats.failed.length).padStart(7)} ${String(stats.unsupported).padStart(6)} ${String(stats.cooldownSkips).padStart(5)}  ${ansStr}      ${failStr}`
     );
@@ -4227,9 +4234,12 @@ function modeTiers(entries: LogEntry[], _opts: Options): string {
   if (surfaces.size > 0) {
     lines.push('PER-SURFACE SERVING (which tier answered each read):');
     for (const [surface, stats] of surfaces) {
-      const byTier = [...stats.doneByTier.entries()].map(([tier, n]) => `${tier}×${n}`).join(', ') || '—';
+      const byTier =
+        [...stats.doneByTier.entries()].map(([tier, n]) => `${tier}×${n}`).join(', ') || '—';
       const exhausted = stats.exhausted > 0 ? `  exhausted×${stats.exhausted}` : '';
-      lines.push(`  ${surface.padEnd(20)} requests×${stats.requests}  answered: ${byTier}${exhausted}`);
+      lines.push(
+        `  ${surface.padEnd(20)} requests×${stats.requests}  answered: ${byTier}${exhausted}`
+      );
     }
     lines.push('');
   }

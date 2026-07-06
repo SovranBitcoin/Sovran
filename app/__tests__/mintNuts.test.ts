@@ -1,7 +1,11 @@
 /**
  * @jest-environment node
  */
-import { mintMethodsFromNuts, meltMethodsFromNuts, nutSupported } from '@/shared/lib/cashu/mintNuts';
+import {
+  mintMethodsFromNuts,
+  meltMethodsFromNuts,
+  nutSupported,
+} from '@/shared/lib/cashu/mintNuts';
 
 const NUTS = {
   '4': {
@@ -31,10 +35,14 @@ describe('mintNuts readers', () => {
   });
 
   it('is defensive against malformed shapes', () => {
+    const nutIsString: unknown = { '4': 'garbage' };
+    const methodsIsString: unknown = { '4': { methods: 'nope' } };
+    const methodEntriesMalformed: unknown = { '4': { methods: [null, { unit: 'sat' }] } };
+    const supportedIsString: unknown = { '7': { supported: 'yes' } };
     expect(mintMethodsFromNuts(undefined)).toEqual([]);
-    expect(mintMethodsFromNuts({ '4': 'garbage' } as never)).toEqual([]);
-    expect(mintMethodsFromNuts({ '4': { methods: 'nope' } } as never)).toEqual([]);
-    expect(mintMethodsFromNuts({ '4': { methods: [null, { unit: 'sat' }] } } as never)).toEqual([]);
-    expect(nutSupported({ '7': { supported: 'yes' } } as never, '7')).toBe(false);
+    expect(mintMethodsFromNuts(nutIsString as never)).toEqual([]);
+    expect(mintMethodsFromNuts(methodsIsString as never)).toEqual([]);
+    expect(mintMethodsFromNuts(methodEntriesMalformed as never)).toEqual([]);
+    expect(nutSupported(supportedIsString as never, '7')).toBe(false);
   });
 });

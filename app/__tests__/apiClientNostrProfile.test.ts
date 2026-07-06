@@ -34,21 +34,21 @@ describe('fetchNostrProfile', () => {
     Reflect.deleteProperty(globalThis, 'fetch');
   });
 
-  it('accepts live Vertex profile responses with null metrics', async () => {
+  it('accepts a v2 envelope with absent Vertex metrics (score/created_at map to null)', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
       statusText: 'OK',
+      // nagg v2 providers envelope: a young pubkey with no vertex score and no
+      // nagg firstEventAt — the mapper must yield nulls, not a parse failure.
       json: async () => ({
-        pubkey: PUBKEY,
-        npub: 'npub1sg6p7p0ak80lh3ugjjvn9yshrmgr4wldxj547gh4t7dkxutj8mnqalaspq',
-        rank: 0,
-        score: null,
-        followers: 0,
-        follows: 0,
-        created_at: null,
-        nodes: 502075,
-        topFollowers: [],
+        events: [],
+        aggregates: {},
+        providers: {
+          [PUBKEY]: {
+            vertex: { rank: 0, nodes: 502075 },
+          },
+        },
         fromCache: false,
       }),
     });

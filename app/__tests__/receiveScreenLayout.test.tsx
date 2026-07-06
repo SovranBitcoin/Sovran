@@ -25,8 +25,18 @@ jest.mock('wallet/react', () => ({
 }));
 
 jest.mock('@/shared/stores/profile/mintStore', () => ({
-  useMintStore: (selector: (state: { creqP2pkLock: boolean }) => unknown) =>
-    selector({ creqP2pkLock: false }),
+  useMintStore: (
+    selector: (state: {
+      creqP2pkLock: boolean;
+      creqExcludedMints: Record<string, boolean>;
+    }) => unknown
+  ) => selector({ creqP2pkLock: false, creqExcludedMints: {} }),
+}));
+
+// ReceiveScreen derives the advertised-mint selection from coco's trusted
+// mints; the node test environment has no CocoCashuProvider.
+jest.mock('@cashu/coco-react', () => ({
+  useMints: () => ({ trustedMints: [] }),
 }));
 
 jest.mock('@/features/receive/lib/standingQuoteIdentityStore', () => ({
@@ -68,6 +78,13 @@ jest.mock('@/features/receive/components/ReceiveUnifiedTab', () => ({
 }));
 
 jest.mock('@/shared/lib/logger', () => ({
+  // fadeRevealProbe (pulled in via SkeletonContentCrossfade) logs an armed
+  // marker at module load through the default `log`.
+  log: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  },
   paymentLog: {
     info: jest.fn(),
     warn: jest.fn(),
