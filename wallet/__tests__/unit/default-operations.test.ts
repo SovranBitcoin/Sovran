@@ -694,3 +694,39 @@ describe('executeMelt — onchain (coco v2)', () => {
     expect(create).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// createPaymentRequestReceive — fixed-amount "as Ecash" MUST be single-use
+// ---------------------------------------------------------------------------
+
+describe('createPaymentRequestReceive — single-use invariant', () => {
+  it('creates the fixed-amount request with singleUse: true', async () => {
+    const create = vi.fn().mockResolvedValue({
+      id: 'pr-op-1',
+      encodedRequest: 'creqAbc',
+      mints: [MINT1],
+      unit: 'sat',
+    });
+    const mockManager = createMockManager({
+      mint: {
+        getAllTrustedMints: vi.fn().mockResolvedValue([{ mintUrl: MINT1 }]),
+      },
+      paymentRequests: { incoming: { create } },
+    });
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+    });
+
+    await ops.createPaymentRequestReceive!({ amount: 100, unit: 'sat' });
+
+    // A fixed amount is a one-off — it must never be reusable, unlike the
+    // amountless standing QR-Display request (which is created singleUse:false).
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0][0]).toMatchObject({
+      amount: 100,
+      unit: 'sat',
+      singleUse: true,
+    });
+  });
+});
