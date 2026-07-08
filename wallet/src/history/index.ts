@@ -21,7 +21,13 @@ export {
 export type { TransactionBucket } from "./filters";
 export { inFlightReceiveToHistoryEntry } from "./inFlightReceives";
 export {
+  isPendingPaymentRequestEntry,
+  pendingPaymentRequestToHistoryEntry,
+  PAYMENT_REQUEST_PENDING_FLAG,
+} from "./pendingPaymentRequests";
+export {
   listInFlightReceiveEntries,
+  listPendingPaymentRequestEntries,
   mergeTransactionSources,
   sameTransactionList,
 } from "./aggregate";

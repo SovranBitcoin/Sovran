@@ -40,8 +40,26 @@ describe("encodeAnnotation / decodeAnnotation", () => {
       distribution: { source: "airdrop" },
       location: { lat: 51.5, lng: -0.12 },
       swap: { groupId: "g1", role: "mint", chainId: "c1", hopIndex: 2 },
+      creqCustomization: { p2pkLock: true, excludedMints: ["https://m1", "https://m2"] },
     };
     expect(decodeAnnotation(encodeAnnotation(annotation))).toEqual(annotation);
+  });
+
+  it("persists a per-request p2pkLock:false and empty exclusions (overrides global)", () => {
+    // A per-request 'off'/'advertise all' must be stored explicitly so it wins
+    // over a global default of 'on'/excluded — not fall back to the global.
+    const record = encodeAnnotation({
+      creqCustomization: { p2pkLock: false, excludedMints: [] },
+    });
+    expect(record).toEqual({ creqP2pkLock: "0", creqExcludedMints: "[]" });
+    expect(decodeAnnotation(record).creqCustomization).toEqual({
+      p2pkLock: false,
+      excludedMints: [],
+    });
+  });
+
+  it("treats a malformed creqExcludedMints JSON as absent on decode", () => {
+    expect(decodeAnnotation({ creqExcludedMints: "not-json" }).creqCustomization).toBeUndefined();
   });
 
   it("omits undefined and empty fields", () => {

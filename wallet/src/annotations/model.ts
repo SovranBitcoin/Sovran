@@ -38,6 +38,8 @@ export const ANNOTATION_KEYS = {
   swapRole: "swapRole",
   swapChainId: "swapChainId",
   swapHopIndex: "swapHopIndex",
+  creqP2pkLock: "creqP2pkLock",
+  creqExcludedMints: "creqExcludedMints",
 } as const;
 
 /** The flat, persisted/merged form. coco-metadata-compatible. */
@@ -82,6 +84,17 @@ export interface TransactionAnnotation {
     role?: SwapRole;
     chainId?: string;
     hopIndex?: number;
+  };
+  /**
+   * Per-request Cashu-payment-request advertise conditions for a single-use
+   * "Fixed Amount → as Ecash" request (keyed by `op:<operationId>`). Lets one
+   * request carry its own P2PK-lock / advertised-mint choices, seeded from the
+   * global `mintStore` default, without mutating that global. `excludedMints`
+   * is the explicit exclusion list (empty array = advertise all).
+   */
+  creqCustomization?: {
+    p2pkLock?: boolean;
+    excludedMints?: string[];
   };
 }
 
@@ -178,7 +191,36 @@ export function encodeAnnotation(
     }
   }
 
+  if (patch.creqCustomization) {
+    // Persist booleans/empty-arrays explicitly (not via setString) so a
+    // per-request `false` / "advertise all" overrides the global default
+    // instead of falling back to it.
+    if (typeof patch.creqCustomization.p2pkLock === "boolean") {
+      record[ANNOTATION_KEYS.creqP2pkLock] = patch.creqCustomization.p2pkLock
+        ? "1"
+        : "0";
+    }
+    if (Array.isArray(patch.creqCustomization.excludedMints)) {
+      record[ANNOTATION_KEYS.creqExcludedMints] = JSON.stringify(
+        patch.creqCustomization.excludedMints,
+      );
+    }
+  }
+
   return record;
+}
+
+function parseStringArray(value: string | undefined): string[] | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (Array.isArray(parsed) && parsed.every((v) => typeof v === "string")) {
+      return parsed as string[];
+    }
+  } catch {
+    // malformed persisted value → treat as absent
+  }
+  return undefined;
 }
 
 function parseOptionKinds(value: string | undefined): string[] | undefined {
@@ -276,6 +318,17 @@ export function decodeAnnotation(
       ...(swapRole ? { role: swapRole as SwapRole } : {}),
       ...(swapChainId ? { chainId: swapChainId } : {}),
       ...(swapHopIndex != null ? { hopIndex: swapHopIndex } : {}),
+    };
+  }
+
+  const creqP2pkLockRaw = record[ANNOTATION_KEYS.creqP2pkLock];
+  const creqExcludedMints = parseStringArray(
+    record[ANNOTATION_KEYS.creqExcludedMints],
+  );
+  if (creqP2pkLockRaw != null || creqExcludedMints != null) {
+    annotation.creqCustomization = {
+      ...(creqP2pkLockRaw != null ? { p2pkLock: creqP2pkLockRaw === "1" } : {}),
+      ...(creqExcludedMints != null ? { excludedMints: creqExcludedMints } : {}),
     };
   }
 

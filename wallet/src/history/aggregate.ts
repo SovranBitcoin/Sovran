@@ -13,10 +13,16 @@
 // + thin manager reads so any colada consumer (React or otherwise) shares one
 // implementation instead of re-deriving the merge/dedupe per wallet.
 
-import type { HistoryEntry, Manager, ReceiveOperation } from "@cashu/coco-core";
+import type {
+  HistoryEntry,
+  Manager,
+  PaymentRequestReceiveOperation,
+  ReceiveOperation,
+} from "@cashu/coco-core";
 
 import { logger } from "../logger";
 import { inFlightReceiveToHistoryEntry } from "./inFlightReceives";
+import { pendingPaymentRequestToHistoryEntry } from "./pendingPaymentRequests";
 
 /**
  * Synthetic history entries for received-but-unredeemed (executing) ecash.
@@ -29,9 +35,30 @@ export async function listInFlightReceiveEntries(
   return ops.map(inFlightReceiveToHistoryEntry);
 }
 
+/**
+ * Synthetic history entries for ACTIVE incoming payment requests (NUT-18)
+ * awaiting payment — the requests coco never projects into history.
+ */
+export async function listPendingPaymentRequestEntries(
+  manager: Manager,
+): Promise<HistoryEntry[]> {
+  const ops: PaymentRequestReceiveOperation[] =
+    await manager.paymentRequests.incoming.list({ state: "active" });
+  logger.debug("history.aggregate.pendingPaymentRequests", {
+    count: ops.length,
+  });
+  return ops.map(pendingPaymentRequestToHistoryEntry);
+}
+
 function operationId(entry: HistoryEntry): string | undefined {
   const opId = (entry as { operationId?: unknown }).operationId;
   return typeof opId === "string" && opId.length > 0 ? opId : undefined;
+}
+
+function requestOperationId(entry: HistoryEntry): string | undefined {
+  const reqId = (entry as { metadata?: Record<string, unknown> }).metadata
+    ?.requestOperationId;
+  return typeof reqId === "string" && reqId.length > 0 ? reqId : undefined;
 }
 
 /**
@@ -44,8 +71,10 @@ function operationId(entry: HistoryEntry): string | undefined {
 export function mergeTransactionSources(input: {
   cocoHistory: readonly HistoryEntry[];
   receiveEntries: readonly HistoryEntry[];
+  /** Synthetic pending incoming-payment-request rows (awaiting payment). */
+  pendingRequestEntries?: readonly HistoryEntry[];
 }): HistoryEntry[] {
-  const { cocoHistory, receiveEntries } = input;
+  const { cocoHistory, receiveEntries, pendingRequestEntries = [] } = input;
 
   const existingReceiveOpIds = new Set<string>();
   for (const entry of cocoHistory) {
@@ -60,11 +89,27 @@ export function mergeTransactionSources(input: {
     return opId ? !existingReceiveOpIds.has(opId) : true;
   });
 
-  if (newReceives.length === 0) return [...cocoHistory];
+  // A pending-request row hands off to the real receive once a payer pays: the
+  // request stays `active` until coco finalizes the child receive, so both can
+  // briefly coexist. Drop the pending row as soon as a receive that cites it
+  // (`metadata.requestOperationId`) appears in coco history or the in-flight
+  // supplement — the money movement supersedes the awaiting-payment stub.
+  const claimedRequestOpIds = new Set<string>();
+  for (const entry of [...cocoHistory, ...newReceives]) {
+    const reqId = requestOperationId(entry);
+    if (reqId) claimedRequestOpIds.add(reqId);
+  }
+  const newPendingRequests = pendingRequestEntries.filter((entry) => {
+    const opId = operationId(entry);
+    return opId ? !claimedRequestOpIds.has(opId) : true;
+  });
+
+  const supplements = [...newReceives, ...newPendingRequests];
+  if (supplements.length === 0) return [...cocoHistory];
   // Match coco's compareHistoryEntries (createdAt DESC, id DESC): without the
   // id tiebreaker, equal-timestamp rows would order differently depending on
-  // whether an in-flight receive happens to be present.
-  return [...cocoHistory, ...newReceives].sort((a, b) => {
+  // whether a supplement happens to be present.
+  return [...cocoHistory, ...supplements].sort((a, b) => {
     if (a.createdAt !== b.createdAt) return b.createdAt - a.createdAt;
     return b.id.localeCompare(a.id);
   });

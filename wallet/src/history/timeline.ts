@@ -428,6 +428,13 @@ function buildTimelineItems({
       switch (mintState) {
         case MintQuoteState.UNPAID:
           if (isOnchainMint && onchainConfirmationProgress?.hasPayment) {
+            // The deposit is visible on-chain (our own explorer), but the mint
+            // has NOT credited the quote yet (state still UNPAID). Do not claim
+            // "Payment received" here — that milestone is the mint marking the
+            // quote PAID. Until then the middle step reports the on-chain
+            // confirmation phase and, once confirmations are satisfied, that
+            // we're waiting on the mint to credit.
+            const satisfied = onchainConfirmationProgress.isSatisfied;
             return [
               {
                 state: MintQuoteState.UNPAID,
@@ -437,12 +444,16 @@ function buildTimelineItems({
               },
               {
                 state: MintQuoteState.PAID,
-                displayLabel: MINT_COPY.PAID.label,
+                displayLabel: satisfied
+                  ? paymentCopy.text("timeline.onchain.confirmedLabel")
+                  : paymentCopy.text("timeline.onchain.confirmingLabel"),
                 stepType: onchainPaidStepType(onchainConfirmationProgress),
-                info: getOnchainConfirmationInfo(
-                  onchainConfirmationProgress,
-                  paymentCopy,
-                ),
+                info: satisfied
+                  ? paymentCopy.text("timeline.onchain.waitingForMint")
+                  : getOnchainConfirmationInfo(
+                      onchainConfirmationProgress,
+                      paymentCopy,
+                    ),
               },
               {
                 state: MintQuoteState.ISSUED,
@@ -815,6 +826,81 @@ function buildTimelineItems({
 
     case "receive": {
       const receiveState = String(historyEntry.state);
+
+      // Incoming payment-request receive ("Fixed Amount → as Ecash"): a distinct
+      // milestone timeline that leads with "waiting for payment on nostr" — the
+      // step a normal token receive lacks. Detected off the synthetic pending
+      // row's flag (paymentRequestPending) or a claimed child receive's source.
+      const meta = historyEntry.metadata;
+      const isReceivePaymentRequestMode =
+        meta?.paymentRequestPending === "1" || meta?.source === "payment-request";
+      if (isReceivePaymentRequestMode) {
+        const PR = RECEIVE_COPY.paymentRequest;
+        const requestedComplete = {
+          state: "requested",
+          displayLabel: PR.requested.label,
+          stepType: "complete" as const,
+          timestamp: historyEntry.createdAt,
+        };
+        const added = (stepType: TimelineStepType): TimelineItem => ({
+          state: "added",
+          displayLabel: RECEIVE_COPY.redeemed.label,
+          stepType,
+          ...(stepType === "success"
+            ? { info: RECEIVE_COPY.redeemed.info(amountToNumber(historyEntry.amount)) }
+            : {}),
+        });
+
+        // The list pending row is `state:executing` + paymentRequestPending — it
+        // must ALWAYS read "waiting for payment", never the generic "redeeming".
+        if (meta?.paymentRequestPending === "1") {
+          return [
+            {
+              state: "requested",
+              displayLabel: PR.requested.label,
+              stepType: "next-pending",
+              info: PR.requested.info,
+            },
+            { state: "paid", displayLabel: PR.paid.label, stepType: "future-small" },
+            added("future-small"),
+          ];
+        }
+        if (receiveState === "rolledBack" || receiveState === "rolled_back") {
+          return [
+            requestedComplete,
+            {
+              state: "alreadySpent",
+              displayLabel: RECEIVE_COPY.alreadySpent.label,
+              stepType: "already-spent",
+              info: RECEIVE_COPY.alreadySpent.info,
+            },
+          ];
+        }
+        if (receiveState === "finalized") {
+          return [
+            requestedComplete,
+            {
+              state: "paid",
+              displayLabel: PR.paid.label,
+              stepType: "complete",
+              timestamp: historyEntry.createdAt,
+            },
+            added("success"),
+          ];
+        }
+        // prepared / executing: the payer paid, the claim is running.
+        return [
+          requestedComplete,
+          {
+            state: "paid",
+            displayLabel: PR.paid.label,
+            stepType: "current",
+            info: PR.paid.info,
+          },
+          added("future-small"),
+        ];
+      }
+
       if (receiveState === "rolledBack" || receiveState === "rolled_back") {
         return [
           {

@@ -4,10 +4,12 @@ import type { HistoryEntry, Manager } from "@cashu/coco-core";
 import { logger } from "../logger";
 import {
   listInFlightReceiveEntries,
+  listPendingPaymentRequestEntries,
   mergeTransactionSources,
   sameTransactionList,
 } from "../history/aggregate";
 import { normalizeHistoryEntries } from "../history/normalize";
+import { onPaymentRequestCreated } from "../paymentRequestEvents";
 import {
   candidateKeys,
   mergeAnnotationRecords,
@@ -108,6 +110,9 @@ export function useColadaTransactions(
 
   const [cocoHistory, setCocoHistory] = useState<HistoryEntry[]>([]);
   const [receiveEntries, setReceiveEntries] = useState<HistoryEntry[]>([]);
+  const [pendingRequestEntries, setPendingRequestEntries] = useState<
+    HistoryEntry[]
+  >([]);
   const [isFetching, setIsFetching] = useState(false);
   // Bumped whenever the annotation store changes so the merged list recomputes.
   const [annotationVersion, setAnnotationVersion] = useState(0);
@@ -205,9 +210,13 @@ export function useColadaTransactions(
 
   const fetchSupplements = useCallback(async () => {
     try {
-      const receives = await listInFlightReceiveEntries(managerRef.current);
+      const [receives, pendingRequests] = await Promise.all([
+        listInFlightReceiveEntries(managerRef.current),
+        listPendingPaymentRequestEntries(managerRef.current),
+      ]);
       if (!mountedRef.current) return;
       setReceiveEntries(receives);
+      setPendingRequestEntries(pendingRequests);
     } catch (err) {
       logger.warn("history.transactions.supplements_failed", {
         error: err instanceof Error ? err.message : String(err),
@@ -306,6 +315,11 @@ export function useColadaTransactions(
     };
   }, [manager, fetchSupplements]);
 
+  // Incoming payment request created -> re-list active requests. coco emits no
+  // event on incoming.create, so this in-package signal is the only trigger
+  // that surfaces a freshly created "as Ecash" request without a restart.
+  useEffect(() => onPaymentRequestCreated(() => void fetchSupplements()), [fetchSupplements]);
+
   const loadMore = useCallback(async () => {
     if (!hasMoreRef.current || fetchingRef.current) return;
     setFetching(true);
@@ -361,13 +375,14 @@ export function useColadaTransactions(
     const merged = mergeTransactionSources({
       cocoHistory,
       receiveEntries,
+      pendingRequestEntries,
     });
     if (sameTransactionList(prevMergedRef.current, merged)) {
       return prevMergedRef.current;
     }
     prevMergedRef.current = merged;
     return merged;
-  }, [cocoHistory, receiveEntries]);
+  }, [cocoHistory, receiveEntries, pendingRequestEntries]);
 
   // Merge per-transaction annotations into each entry's metadata. Un-annotated
   // rows keep their reference (mergeAnnotationsIntoEntry is identity on empty),

@@ -7,11 +7,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { decodePaymentRequest } from '@cashu/cashu-ts';
 
 import {
   decodePaymentRequestInfo,
   lockableMintsFromRequest,
 } from '../../src/payment-request';
+import { defaultDetectors } from '../../src/detectors';
 import { INPUTS, MINT1 } from '../_harness/fixtures';
 
 const LOCK_KEY = `02${'a'.repeat(64)}`;
@@ -35,6 +37,46 @@ describe('decodePaymentRequestInfo', () => {
   it('returns null for non-request input', () => {
     expect(decodePaymentRequestInfo(INPUTS.randomString)).toBeNull();
     expect(decodePaymentRequestInfo(INPUTS.cashuTokenV3)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Both encodings, both cases.
+//
+// We EMIT mixed-case creqA (NUT-18 base64url) to match cashu.me / the SDK
+// default — base64url is case-sensitive, so it must not be re-cased. But a
+// payer wallet may hand us a creqB (NUT-26 bech32m), which IS case-insensitive
+// and conventionally uppercase. The parser must accept creqA as-emitted AND
+// creqB in either case. These lock that contract.
+// ---------------------------------------------------------------------------
+describe('decodePaymentRequestInfo — creqA + creqB, both cases', () => {
+  // Re-encode the basic creqA fixture as creqB (uppercase CREQB…, per cashu-ts).
+  const creqBUpper = decodePaymentRequest(INPUTS.paymentRequestBasic).toEncodedCreqB();
+
+  it('decodes an uppercase creqB (NUT-26 bech32m) identically to creqA', () => {
+    const info = decodePaymentRequestInfo(creqBUpper);
+    expect(info).not.toBeNull();
+    expect(info!.mints).toEqual([MINT1]);
+    expect(info!.amount).toBe(100);
+    expect(info!.unit).toBe('sat');
+  });
+
+  it('decodes a lowercase creqB (bech32m is case-insensitive)', () => {
+    const info = decodePaymentRequestInfo(creqBUpper.toLowerCase());
+    expect(info).not.toBeNull();
+    expect(info!.mints).toEqual([MINT1]);
+    expect(info!.amount).toBe(100);
+  });
+
+  it('detector recognizes creqA (as emitted) and creqB in either case', () => {
+    // creqA base64url is never re-cased (case-sensitive); creqB bech32m is.
+    for (const s of [
+      INPUTS.paymentRequestBasic, // creqA… (mixed, as emitted)
+      creqBUpper, // CREQB… (uppercase)
+      creqBUpper.toLowerCase(), // creqb… (lowercase)
+    ]) {
+      expect(defaultDetectors.isPaymentRequest(s)).toBe(true);
+    }
   });
 });
 

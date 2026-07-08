@@ -53,6 +53,12 @@ export function getSwap(
   return getAnnotation(entry).swap ?? null;
 }
 
+export function getCreqCustomization(
+  entry: EntryWithMetadata,
+): TransactionAnnotation["creqCustomization"] | null {
+  return getAnnotation(entry).creqCustomization ?? null;
+}
+
 type EntryWithToken = EntryWithMetadata & { token?: unknown };
 
 /** Best-effort proof extraction from a (send) history entry's token. */

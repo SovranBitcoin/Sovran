@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { HistoryEntry } from '@cashu/coco-core';
 
-import { mergeTransactionSources, sameTransactionList } from '../../src/history';
+import {
+  inFlightReceiveToHistoryEntry,
+  isPendingPaymentRequestEntry,
+  mergeTransactionSources,
+  pendingPaymentRequestToHistoryEntry,
+  sameTransactionList,
+} from '../../src/history';
 import {
   normalizeHistoryEntries,
   normalizeHistoryEntryState,
@@ -62,6 +68,137 @@ describe('mergeTransactionSources', () => {
     ];
     const merged = mergeTransactionSources({ cocoHistory, receiveEntries });
     expect(merged.map((e) => e.id)).toEqual(['send:b', 'send:a', 'receive-op1']);
+  });
+});
+
+describe('pendingPaymentRequestToHistoryEntry', () => {
+  const op = {
+    id: 'req-op-1',
+    encodedRequest: 'creqAexample',
+    state: 'active' as const,
+    transport: 'nostr' as const,
+    amount: 100,
+    unit: 'sat',
+    mints: ['https://mint1.example.com', 'https://mint2.example.com'],
+    singleUse: true,
+    createdAt: 500,
+    updatedAt: 500,
+  };
+
+  it('synthesizes a pending receive-typed row keyed by the request op id', () => {
+    const e = pendingPaymentRequestToHistoryEntry(op as never);
+    expect(e.id).toBe('pr-req-op-1');
+    expect(e.type).toBe('receive');
+    expect((e as { operationId?: string }).operationId).toBe('req-op-1');
+    expect((e as { state?: string }).state).toBe('executing'); // buckets pending
+    expect(e.mintUrl).toBe('https://mint1.example.com');
+  });
+
+  it('carries everything the detail route needs in metadata', () => {
+    const e = pendingPaymentRequestToHistoryEntry(op as never);
+    expect(e.metadata).toMatchObject({
+      operationId: 'req-op-1',
+      source: 'payment-request',
+      paymentRequestPending: '1',
+      encodedRequest: 'creqAexample',
+      requestAmount: '100',
+      requestUnit: 'sat',
+      requestMints: JSON.stringify(op.mints),
+      singleUse: '1',
+    });
+    expect(isPendingPaymentRequestEntry(e)).toBe(true);
+  });
+});
+
+describe('inFlightReceiveToHistoryEntry — payment-request source', () => {
+  it('carries requestOperationId so the pending request row dedupes offline', () => {
+    const e = inFlightReceiveToHistoryEntry({
+      id: 'recv-op',
+      mintUrl: 'https://mint1.example.com',
+      unit: 'sat',
+      amount: 21,
+      createdAt: 300,
+      updatedAt: 300,
+      source: { type: 'payment-request', requestOperationId: 'req-1' },
+    } as never);
+    expect((e.metadata as Record<string, string>).requestOperationId).toBe('req-1');
+  });
+
+  it('omits requestOperationId for a non-payment-request receive', () => {
+    const e = inFlightReceiveToHistoryEntry({
+      id: 'recv-op',
+      mintUrl: 'https://mint1.example.com',
+      unit: 'sat',
+      amount: 21,
+      createdAt: 300,
+      updatedAt: 300,
+    } as never);
+    expect('requestOperationId' in (e.metadata as Record<string, string>)).toBe(false);
+  });
+});
+
+describe('mergeTransactionSources — pending payment requests', () => {
+  const pendingRequest = pendingPaymentRequestToHistoryEntry({
+    id: 'req-1',
+    encodedRequest: 'creqAx',
+    state: 'active',
+    transport: 'nostr',
+    amount: 21,
+    unit: 'sat',
+    mints: ['https://mint1.example.com'],
+    singleUse: true,
+    createdAt: 300,
+    updatedAt: 300,
+  } as never);
+
+  it('surfaces an active pending request as a row', () => {
+    const cocoHistory = [entry({ id: 'a', type: 'send', createdAt: 100 } as never)];
+    const merged = mergeTransactionSources({
+      cocoHistory,
+      receiveEntries: [],
+      pendingRequestEntries: [pendingRequest],
+    });
+    expect(merged.map((e) => e.id)).toEqual(['pr-req-1', 'a']);
+  });
+
+  it('drops the pending request once a child receive citing it appears (handoff)', () => {
+    // coco keeps the request `active` until the child receive finalizes, so
+    // both can momentarily coexist; the receive (metadata.requestOperationId)
+    // must supersede the awaiting-payment stub.
+    const cocoHistory = [
+      entry({
+        id: 'recv-final',
+        type: 'receive',
+        operationId: 'recv-op',
+        createdAt: 310,
+        metadata: { requestOperationId: 'req-1' },
+      } as never),
+    ];
+    const merged = mergeTransactionSources({
+      cocoHistory,
+      receiveEntries: [],
+      pendingRequestEntries: [pendingRequest],
+    });
+    expect(merged.map((e) => e.id)).toEqual(['recv-final']);
+  });
+
+  it('also dedupes against an in-flight (executing) child receive', () => {
+    const receiveEntries = [
+      entry({
+        id: 'receive-recv-op',
+        type: 'receive',
+        operationId: 'recv-op',
+        createdAt: 305,
+        state: 'executing',
+        metadata: { requestOperationId: 'req-1' },
+      } as never),
+    ];
+    const merged = mergeTransactionSources({
+      cocoHistory: [],
+      receiveEntries,
+      pendingRequestEntries: [pendingRequest],
+    });
+    expect(merged.map((e) => e.id)).toEqual(['receive-recv-op']);
   });
 });
 

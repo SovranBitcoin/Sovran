@@ -73,6 +73,47 @@ function generateRequestId(): string {
   return `sov${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * Narrow a request's advertised mint list to a display subset (intersection).
+ * An empty intersection would advertise "any mint" (m is optional in NUT-18) —
+ * worse than the un-narrowed list — so it falls back to the original list.
+ */
+function narrowDisplayMints(
+  mints: string[] | undefined,
+  displayMints: string[] | undefined,
+): string[] | undefined {
+  if (!displayMints || displayMints.length === 0) return mints;
+  if (!mints || mints.length === 0) return mints;
+  const allowed = new Set(displayMints);
+  const narrowed = mints.filter((m) => allowed.has(m));
+  if (narrowed.length > 0) return narrowed;
+  logger.warn("creq.display_mints_empty_intersection", {
+    opMintCount: mints.length,
+    displayMintCount: displayMints.length,
+  });
+  return mints;
+}
+
+/** Encode a PaymentRequest to both creqA and (best-effort) creqB. */
+function encodeDisplay(display: PaymentRequest): {
+  encodedRequest: string;
+  encodedRequestB: string;
+} {
+  const encodedA = display.toEncodedRequest();
+  let encodedB = encodedA;
+  try {
+    // creqB TLV-encodes the transport target (validates the nprofile);
+    // NUT-18 accepts creqA everywhere, so fall back to it if B encoding
+    // rejects the transport.
+    encodedB = display.toEncodedCreqB();
+  } catch (error) {
+    logger.warn("creq.creqb_encode_failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+  return { encodedRequest: encodedA, encodedRequestB: encodedB };
+}
+
 /** Re-encode coco's request without the floor amount (and optionally WITH a
  *  NUT-10 P2PK lock and/or a narrowed mint list) for display. */
 function toAmountlessEncodings(
@@ -84,47 +125,61 @@ function toAmountlessEncodings(
   encodedRequestB: string;
 } {
   const decoded = decodePaymentRequest(encodedRequest);
-  let mints = decoded.mints;
-  if (displayMints && displayMints.length > 0 && mints && mints.length > 0) {
-    const allowed = new Set(displayMints);
-    const narrowed = mints.filter((m) => allowed.has(m));
-    // An empty intersection would advertise "any mint" (m is optional in
-    // NUT-18) — worse than the un-narrowed list. Callers prevent this; keep
-    // the op's list as the defensive floor.
-    if (narrowed.length > 0) {
-      mints = narrowed;
-    } else {
-      logger.warn("creq.standing.display_mints_empty_intersection", {
-        opMintCount: mints.length,
-        displayMintCount: displayMints.length,
-      });
-    }
-  }
   const display = new PaymentRequest(
     decoded.transport,
     decoded.id,
     undefined, // amount — the whole point
     decoded.unit,
-    mints,
+    narrowDisplayMints(decoded.mints, displayMints),
     decoded.description,
     false, // singleUse
     lockP2pkPubkey
       ? { kind: "P2PK", data: lockP2pkPubkey, tags: [] }
       : undefined,
   );
-  const encodedA = display.toEncodedRequest();
-  let encodedB = encodedA;
-  try {
-    // creqB TLV-encodes the transport target (validates the nprofile);
-    // NUT-18 accepts creqA everywhere, so fall back to it if B encoding
-    // rejects the transport.
-    encodedB = display.toEncodedCreqB();
-  } catch (error) {
-    logger.warn("creq.standing.creqb_encode_failed", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-  return { encodedRequest: encodedA, encodedRequestB: encodedB };
+  return encodeDisplay(display);
+}
+
+export interface SingleUseReencodeOptions {
+  /**
+   * NUT-10 P2PK lock to advertise in the DISPLAYED encoding. coco's create()
+   * rejects nut10 input, so the durable single-use op stays lock-free — but its
+   * claim path signs P2PK proofs transparently PROVIDED this exact 02-prefixed
+   * pubkey is persisted in the keyring under purpose 'p2pk' (exact lookup).
+   */
+  lockP2pkPubkey?: string;
+  /**
+   * Narrowed mint list for display (intersected with the op's list, so the QR
+   * can only ever advertise a subset; the durable op keeps the FULL list so a
+   * payment from a de-advertised-but-trusted mint still claims).
+   */
+  displayMints?: string[];
+}
+
+/**
+ * Re-encode a SINGLE-USE incoming request ("as Ecash") for display, KEEPING its
+ * amount and `singleUse` flag (unlike the amountless standing rail) while
+ * optionally narrowing the advertised mints and attaching a NUT-10 P2PK lock.
+ * Pure — the durable coco op is untouched; only the displayed creq changes.
+ */
+export function reencodeSingleUsePaymentRequest(
+  encodedRequest: string,
+  options: SingleUseReencodeOptions = {},
+): { encodedRequest: string; encodedRequestB: string } {
+  const decoded = decodePaymentRequest(encodedRequest);
+  const display = new PaymentRequest(
+    decoded.transport,
+    decoded.id,
+    decoded.amount, // KEEP the requested amount
+    decoded.unit,
+    narrowDisplayMints(decoded.mints, options.displayMints),
+    decoded.description,
+    decoded.singleUse, // KEEP single-use
+    options.lockP2pkPubkey
+      ? { kind: "P2PK", data: options.lockP2pkPubkey, tags: [] }
+      : undefined,
+  );
+  return encodeDisplay(display);
 }
 
 type IncomingOp = Awaited<

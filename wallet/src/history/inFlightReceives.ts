@@ -23,6 +23,17 @@ const IN_FLIGHT_RECEIVE_STATE = "executing";
 export function inFlightReceiveToHistoryEntry(
   operation: ReceiveOperation,
 ): HistoryEntry {
+  // A payment-request-sourced receive carries the originating request's id on
+  // its `source`. Surfacing it as `requestOperationId` lets `mergeTransactionSources`
+  // dedupe the synthetic `pr-<id>` request row against this in-flight child
+  // receive too — coco only stamps it onto FINALIZED/rolled-back projections, so
+  // without this the request row and the executing child both show while a
+  // payment-request claim is stuck offline.
+  const source = (
+    operation as { source?: { type?: string; requestOperationId?: string } }
+  ).source;
+  const requestOperationId =
+    source?.type === "payment-request" ? source.requestOperationId : undefined;
   const entry = {
     id: `receive-${operation.id}`,
     type: "receive" as const,
@@ -37,6 +48,7 @@ export function inFlightReceiveToHistoryEntry(
     metadata: {
       operationId: operation.id,
       pendingReason: "network",
+      ...(requestOperationId ? { requestOperationId } : {}),
     },
   };
   // coco's `ReceiveHistoryState` only models `finalized`/`rolled_back`, so the

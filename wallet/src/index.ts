@@ -94,8 +94,11 @@ export {
   getStatusHeader,
   groupTimeline,
   inFlightReceiveToHistoryEntry,
+  isPendingPaymentRequestEntry,
   listInFlightReceiveEntries,
+  listPendingPaymentRequestEntries,
   mergeTransactionSources,
+  pendingPaymentRequestToHistoryEntry,
   sameTransactionList,
   serializeHistoryEntry,
   isCancellablePendingEcash,
@@ -245,8 +248,10 @@ export {
 // Reusable mint-quote singleton (standing bolt12 offer / onchain address)
 export {
   ensureStandingPaymentRequest,
+  reencodeSingleUsePaymentRequest,
   rotateStandingPaymentRequest,
   standingPaymentRequestKey,
+  type SingleUseReencodeOptions,
   type StandingPaymentRequest,
   type StandingPaymentRequestInput,
 } from "./payment-request-receive";

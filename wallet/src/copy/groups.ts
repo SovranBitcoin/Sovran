@@ -119,6 +119,16 @@ function buildPaymentCopyGroups(text: PaymentCopyText) {
         label: text("timeline.receive.alreadySpent.label"),
         info: text("timeline.receive.alreadySpent.info"),
       },
+      paymentRequest: {
+        requested: {
+          label: text("timeline.receiveRequest.requested.label"),
+          info: text("timeline.receiveRequest.requested.info"),
+        },
+        paid: {
+          label: text("timeline.receiveRequest.paid.label"),
+          info: text("timeline.receiveRequest.paid.info"),
+        },
+      },
     },
 
     TOAST_COPY: {

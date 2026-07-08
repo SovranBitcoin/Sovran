@@ -37,5 +37,6 @@ export {
   getDistribution,
   getLocation,
   getSwap,
+  getCreqCustomization,
   isP2PKLocked,
 } from "./selectors";
