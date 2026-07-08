@@ -12,7 +12,7 @@ import type {
   MintReviewsSummary,
 } from './mint-reviews';
 import type { SocialGraph, SocialGraphRequest } from './social-graph';
-import type { DmEnvelopesBundle, DmEnvelopesRequest } from './dm';
+import type { DmEnvelope, DmEnvelopesBundle, DmEnvelopesRequest } from './dm';
 import type { ProfilesBundle, ProfilesRequest } from './profiles';
 import type { ProfileStatsBundle, ProfileStatsRequest } from './profile-stats';
 import type { ProfileSearchBundle, SearchRequest } from './search';
@@ -48,6 +48,19 @@ export interface NostrTierStrategy {
   discoverMints?(request: DiscoverMintsRequest): Promise<TierOutcome<DiscoveredMint[]>>;
   getSocialGraph?(request: SocialGraphRequest): Promise<TierOutcome<SocialGraph>>;
   getDmEnvelopes?(request: DmEnvelopesRequest): Promise<TierOutcome<DmEnvelopesBundle>>;
+  /**
+   * Open a LIVE listener for DM envelopes (NIP-17 gift wraps / NIP-04) addressed
+   * to the viewer — the push counterpart of the one-shot `getDmEnvelopes`. Only
+   * the relay tier streams; other tiers omit it. Returns an unsubscribe.
+   *
+   * No auto-reconnect: the underlying REQ stops feeding on socket close, so
+   * callers that need at-least-once delivery must pair this with a poll backstop
+   * (the payment-request transport does exactly this).
+   */
+  dmLiveSubscribe?(
+    request: DmEnvelopesRequest,
+    onEnvelope: (envelope: DmEnvelope) => void,
+  ): () => void;
   getProfiles?(request: ProfilesRequest): Promise<TierOutcome<ProfilesBundle>>;
   getProfileStats?(request: ProfileStatsRequest): Promise<TierOutcome<ProfileStatsBundle>>;
   searchProfiles?(request: SearchRequest): Promise<TierOutcome<ProfileSearchBundle>>;

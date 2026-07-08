@@ -81,3 +81,57 @@ describe('getDmEnvelopes — relay floor', () => {
     expect('until' in f).toBe(false);
   });
 });
+
+describe('subscribeDmEnvelopes — relay live', () => {
+  test('opens a #p/1059 REQ and pushes mapped envelopes; unsubscribe closes it', () => {
+    let captured: NostrFilter[] | undefined;
+    let push: ((raw: RawRelayEvent) => void) | undefined;
+    let closed = false;
+    const connection: RelayConnection = {
+      request: (): Promise<Result<RawRelayEvent[], NaggError>> => Promise.resolve(ok([])),
+      subscribe: (filters, onEvent) => {
+        captured = filters;
+        push = onEvent;
+        return () => {
+          closed = true;
+        };
+      },
+    };
+    const layer = createNostrDataLayer({ tiers: [createRelayTier({ connection })] });
+
+    const received: string[] = [];
+    const unsubscribe = layer.subscribeDmEnvelopes({ viewerPubkey: ME }, (env) =>
+      received.push(env.id),
+    );
+
+    // Live filter: DM kinds + #p, NO since/limit (gift-wrap created_at is random).
+    const f = captured?.[0] ?? {};
+    expect(f.kinds).toEqual([4, 1059]);
+    expect(f['#p']).toEqual([ME]);
+    expect('since' in f).toBe(false);
+    expect('limit' in f).toBe(false);
+
+    // An arriving wrap is mapped and pushed.
+    push?.(wrap('1'.repeat(64), 222));
+    expect(received).toEqual(['1'.repeat(64)]);
+
+    // Malformed events (no id/pubkey) are dropped, not forwarded.
+    push?.({ kind: 1059, content: 'x', tags: [], created_at: 1 } as unknown as RawRelayEvent);
+    expect(received).toEqual(['1'.repeat(64)]);
+
+    unsubscribe();
+    expect(closed).toBe(true);
+  });
+
+  test('is a no-op when no relay tier is configured', () => {
+    const client = createNaggClient({
+      appView: { baseUrl: 'https://nagg.test' },
+      fetchImpl: (async () => ({ ok: true, status: 200, json: async () => ({}) })) as unknown as typeof fetch,
+    });
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+    const unsubscribe = layer.subscribeDmEnvelopes({ viewerPubkey: ME }, () => {
+      throw new Error('should not fire without a relay tier');
+    });
+    expect(() => unsubscribe()).not.toThrow();
+  });
+});

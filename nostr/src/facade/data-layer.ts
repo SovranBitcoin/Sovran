@@ -30,7 +30,7 @@ import type {
   ResolvedMintReviews,
 } from './mint-reviews';
 import type { SocialGraph, SocialGraphRequest, ResolvedSocialGraph } from './social-graph';
-import type { DmEnvelopesBundle, DmEnvelopesRequest, ResolvedDmEnvelopes } from './dm';
+import type { DmEnvelope, DmEnvelopesBundle, DmEnvelopesRequest, ResolvedDmEnvelopes } from './dm';
 import type { ProfileMetadata, ProfilesBundle, ProfilesRequest, ResolvedProfiles } from './profiles';
 import {
   profileStatsIsEmpty,
@@ -115,6 +115,15 @@ export interface NostrDataLayer {
   getDmEnvelopes(
     request: DmEnvelopesRequest,
   ): Promise<Result<ResolvedDmEnvelopes, TierResolutionError>>;
+  /**
+   * Live push of DM envelopes (gift wraps) addressed to the viewer — relay-only,
+   * a no-op when no relay tier is configured. Pairs with `getDmEnvelopes` for a
+   * poll backstop (no auto-reconnect). Returns an unsubscribe.
+   */
+  subscribeDmEnvelopes(
+    request: DmEnvelopesRequest,
+    onEnvelope: (envelope: DmEnvelope) => void,
+  ): () => void;
   getProfiles(request: ProfilesRequest): Promise<Result<ResolvedProfiles, TierResolutionError>>;
   getProfileStats(
     request: ProfileStatsRequest,
@@ -133,6 +142,7 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
   // explicit relay seam. Pages come from whichever tier answers; the delta is
   // relay-only.
   const liveTier = config.tiers.find((t) => typeof t.feedLiveSubscribe === 'function');
+  const dmLiveTier = config.tiers.find((t) => typeof t.dmLiveSubscribe === 'function');
 
   return {
     cache,
@@ -282,6 +292,10 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
         },
         (d) => ({ envelopes: d.envelopes.length }),
       );
+    },
+
+    subscribeDmEnvelopes(request, onEnvelope) {
+      return dmLiveTier ? dmLiveTier.dmLiveSubscribe!(request, onEnvelope) : () => {};
     },
 
     async getProfiles(request) {

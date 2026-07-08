@@ -290,6 +290,31 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
       );
     },
 
+    dmLiveSubscribe(
+      request: DmEnvelopesRequest,
+      onEnvelope: (envelope: DmEnvelope) => void,
+    ): () => void {
+      // Live counterpart of getDmEnvelopes: an open REQ for the viewer's DM
+      // wraps that stays past EOSE. Same NO since/limit reasoning (gift-wrap
+      // created_at is randomized). The relay `subscribe` dedupes by id, so
+      // repeat wraps never double-fire.
+      if (!config.connection.subscribe) return () => {};
+      const filters: NostrFilter[] = [
+        { kinds: DM_ENVELOPE_KINDS, '#p': [request.viewerPubkey] },
+      ];
+      return config.connection.subscribe(filters, (raw) => {
+        if (typeof raw.id !== 'string' || typeof raw.pubkey !== 'string') return;
+        onEnvelope({
+          id: raw.id,
+          pubkey: raw.pubkey,
+          kind: raw.kind,
+          content: typeof raw.content === 'string' ? raw.content : '',
+          tags: Array.isArray(raw.tags) ? (raw.tags as string[][]) : [],
+          createdAt: typeof raw.created_at === 'number' ? raw.created_at : 0,
+        });
+      });
+    },
+
     async getProfiles(request: ProfilesRequest): Promise<TierOutcome<ProfilesBundle>> {
       if (request.pubkeys.length === 0) return answered({ profiles: {} });
       const filter: NostrFilter = { kinds: [0], authors: request.pubkeys };
