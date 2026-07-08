@@ -22,6 +22,7 @@ import {
   TransactionLocationSection,
   useBip321Info,
   Bip321MethodIcons,
+  useIsTransactionHistoryView,
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -29,6 +30,7 @@ import type { ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Card } from '@/shared/ui/composed/Card';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
+import { CopyableValue } from '@/shared/ui/composed/CopyableValue';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
@@ -60,6 +62,8 @@ export function LightningReceiveScreen({
   }, [error]);
 
   const isPaid = isMintQuotePaymentObserved(entry);
+  // History view (transactions list) → fixed mint, non-clickable "Receiving with".
+  const isHistoryView = useIsTransactionHistoryView();
   const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
 
   useEffect(() => {
@@ -140,7 +144,7 @@ export function LightningReceiveScreen({
       }
       statusRow={
         <>
-          {!isPaid ? (
+          {!isPaid && !isHistoryView ? (
             <MintSelector
               width={quoteCardWidth}
               unit={entry.unit}
@@ -168,7 +172,16 @@ export function LightningReceiveScreen({
             value: formatAmount({ amount: entry.amount, unit: entry.unit }),
           },
           { title: 'State', value: entry.state },
-          entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
+          entry.quoteId && {
+            title: 'Quote ID',
+            value: (
+              <CopyableValue
+                value={entry.quoteId}
+                display={truncateMiddle(entry.quoteId, 7)}
+                copyTarget="quoteId"
+              />
+            ),
+          },
           mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
           {
             title: 'Invoice',

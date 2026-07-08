@@ -31,6 +31,10 @@ const COPY_CONFIGS = {
     title: 'Mint URL Copied',
     text: 'Mint URL has been copied to your clipboard.',
   },
+  quoteId: {
+    title: 'Quote ID Copied',
+    text: 'Quote ID has been copied to your clipboard.',
+  },
   p2pk: {
     title: 'P2PK Key Copied',
     text: 'P2PK public key has been copied to your clipboard.',

@@ -12,7 +12,6 @@
 
 import React, { useCallback } from 'react';
 import { Stack } from 'expo-router';
-import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 import { TransactionsScreen, useTransactionsFilter } from '@/features/transactions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
@@ -22,10 +21,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
-import {
-  getMeltDetailPathname,
-  getMintDetailPathname,
-} from '@/shared/lib/nav/transactionDetailRoutes';
+import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailRoutes';
 import opacity from 'hex-color-opacity';
 import { cashuLog } from '@/shared/lib/logger';
 
@@ -155,81 +151,7 @@ function TransactionsRoute() {
   // Handle transaction press — declared before the early-return so the hook
   // order stays stable across renders.
   const handleTransactionPress = useCallback((historyEntry: HistoryEntry) => {
-    const serializedHistoryEntry = JSON.stringify(historyEntry);
-    const entryState =
-      typeof (historyEntry as Record<string, unknown>).state === 'string'
-        ? (historyEntry as Record<string, unknown>).state
-        : null;
-
-    switch (historyEntry.type) {
-      case 'mint': {
-        const pathname = getMintDetailPathname(historyEntry);
-        cashuLog.info('transactions.route.open_detail', {
-          type: historyEntry.type,
-          state: entryState,
-          pathname,
-          serializedLength: serializedHistoryEntry.length,
-        });
-        router.navigate({
-          pathname,
-          params: {
-            mintHistoryEntry: serializedHistoryEntry,
-          },
-        });
-        return;
-      }
-      case 'melt': {
-        const pathname = getMeltDetailPathname(historyEntry);
-        cashuLog.info('transactions.route.open_detail', {
-          type: historyEntry.type,
-          state: entryState,
-          pathname,
-          serializedLength: serializedHistoryEntry.length,
-        });
-        router.navigate({
-          pathname,
-          params: {
-            meltHistoryEntry: serializedHistoryEntry,
-          },
-        });
-        return;
-      }
-      case 'send': {
-        cashuLog.info('transactions.route.open_detail', {
-          type: historyEntry.type,
-          state: entryState,
-          pathname: '/sendToken',
-          serializedLength: serializedHistoryEntry.length,
-        });
-        router.navigate({
-          pathname: '/sendToken',
-          params: {
-            sendHistoryEntry: serializedHistoryEntry,
-          },
-        });
-        return;
-      }
-      case 'receive': {
-        cashuLog.info('transactions.route.open_detail', {
-          type: historyEntry.type,
-          state: entryState,
-          pathname: '/receiveToken',
-          serializedLength: serializedHistoryEntry.length,
-        });
-        router.navigate({
-          pathname: '/receiveToken',
-          params: {
-            receiveHistoryEntry: serializedHistoryEntry,
-          },
-        });
-        return;
-      }
-      default:
-        cashuLog.warn('transactions.route.open_detail.unsupported', {
-          type: (historyEntry as Record<string, unknown>).type,
-          state: entryState,
-        });
-    }
+    navigateToTransactionDetail(historyEntry, 'transactions.route');
   }, []);
 
   if (!params) return null;

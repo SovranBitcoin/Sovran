@@ -23,6 +23,7 @@ export {
   TransactionsFilterProvider,
   useTransactionsFilter,
 } from './components/TransactionsFilterContext';
+export { useIsTransactionHistoryView } from './lib/transactionHistoryView';
 export {
   getTransactionActionDirection,
   getTransactionActionLabel,

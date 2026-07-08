@@ -34,10 +34,7 @@ import { TransactionDetailShell } from '@/features/transactions/components/detai
 import { useHistoryWithMelts } from '@/features/transactions';
 import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
-import {
-  getMeltDetailPathname,
-  getMintDetailPathname,
-} from '@/shared/lib/nav/transactionDetailRoutes';
+import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailRoutes';
 import {
   useSwapTransactionsStore,
   type SwapLeg,
@@ -58,10 +55,9 @@ import { getMintDisplayName } from '@/shared/lib/url';
 import { useMintManagement } from '@/features/mint';
 import { getTransactionActionDirection } from '@/features/transactions/lib/transactionPresentation';
 import Icon from 'assets/icons';
-import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { cashuLog, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 interface Props {
   groupId: string | undefined;
@@ -128,36 +124,7 @@ function buildSwapEntryRowProps(
   );
 
   const handlePress = () => {
-    const serializedHistoryEntry = JSON.stringify(historyEntry);
-    const entryState =
-      typeof (historyEntry as Record<string, unknown>).state === 'string'
-        ? (historyEntry as Record<string, unknown>).state
-        : null;
-    if (historyEntry.type === 'mint') {
-      const pathname = getMintDetailPathname(historyEntry);
-      cashuLog.info('swap.transaction.row.open_detail', {
-        type: historyEntry.type,
-        state: entryState,
-        pathname,
-        serializedLength: serializedHistoryEntry.length,
-      });
-      router.navigate({
-        pathname,
-        params: { mintHistoryEntry: serializedHistoryEntry },
-      });
-    } else {
-      const pathname = getMeltDetailPathname(historyEntry);
-      cashuLog.info('swap.transaction.row.open_detail', {
-        type: historyEntry.type,
-        state: entryState,
-        pathname,
-        serializedLength: serializedHistoryEntry.length,
-      });
-      router.navigate({
-        pathname,
-        params: { meltHistoryEntry: serializedHistoryEntry },
-      });
-    }
+    navigateToTransactionDetail(historyEntry, 'swap.transaction.row');
   };
 
   return {

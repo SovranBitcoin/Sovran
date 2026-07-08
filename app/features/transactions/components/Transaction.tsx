@@ -4,8 +4,6 @@ import Animated, { Easing, LinearTransition } from 'react-native-reanimated';
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import opacity from 'hex-color-opacity';
 
-import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-
 import Icon from 'assets/icons';
 import { SwipeableRow } from '@/features/transactions/components/SwipeableRow';
 import TransactionIcon from '@/features/transactions/components/TransactionIcon';
@@ -25,17 +23,12 @@ import { formatAmount } from '@/shared/lib/currency';
 import { formatDate } from '@/shared/lib/date';
 import { isOutgoingTransaction } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useMempoolAddressSummary } from '@/shared/hooks/useMempoolAddressSummary';
 import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
-import {
-  getMeltDetailPathname,
-  getMintDetailPathname,
-} from '@/shared/lib/nav/transactionDetailRoutes';
-import { cashuLog, log, Log } from '@/shared/lib/logger';
+import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailRoutes';
+import { log, Log } from '@/shared/lib/logger';
 import { useColadaTransactionAnnotation } from 'wallet/react';
 import type { DistributionSource, ScanMethod } from 'wallet';
-import { getOnchainTransactionStatusLabel } from '../lib/onchainTransactionStatus';
-import { getTransactionActionLabel } from '../lib/transactionPresentation';
+import { getTransactionRowLabel } from '../lib/transactionPresentation';
 
 /**
  * Unified source for the row badge. Combines inbound (scan source) and
@@ -121,78 +114,7 @@ const useTransactionRow = (historyEntry: HistoryEntry) => {
 
   const handlePress = useCallback((): void => {
     log.debug('transaction.press', { type: historyEntry.type, id: historyEntry.id });
-    const serializedHistoryEntry = JSON.stringify(historyEntry);
-    const entryState =
-      typeof (historyEntry as Record<string, unknown>).state === 'string'
-        ? (historyEntry as Record<string, unknown>).state
-        : null;
-
-    switch (historyEntry.type) {
-      case 'mint': {
-        const pathname = getMintDetailPathname(historyEntry);
-        cashuLog.info('transaction.row.open_detail', {
-          type: historyEntry.type,
-          state: entryState,
-          pathname,
-          serializedLength: serializedHistoryEntry.length,
-        });
-        router.navigate({
-          pathname,
-          params: {
-            mintHistoryEntry: serializedHistoryEntry,
-          },
-        });
-        return;
-      }
-      case 'melt': {
-        const pathname = getMeltDetailPathname(historyEntry);
-        cashuLog.info('transaction.row.open_detail', {
-          type: historyEntry.type,
-          state: entryState,
-          pathname,
-          serializedLength: serializedHistoryEntry.length,
-        });
-        router.navigate({
-          pathname,
-          params: {
-            meltHistoryEntry: serializedHistoryEntry,
-          },
-        });
-        return;
-      }
-      case 'send': {
-        // Coco uses 'send' for ecash sends
-        cashuLog.info('transaction.row.open_detail', {
-          type: historyEntry.type,
-          state: entryState,
-          pathname: '/sendToken',
-          serializedLength: serializedHistoryEntry.length,
-        });
-        router.navigate({
-          pathname: '/sendToken',
-          params: {
-            sendHistoryEntry: serializedHistoryEntry,
-          },
-        });
-        return;
-      }
-      case 'receive': {
-        // Coco uses 'receive' for ecash receives
-        cashuLog.info('transaction.row.open_detail', {
-          type: historyEntry.type,
-          state: entryState,
-          pathname: '/receiveToken',
-          serializedLength: serializedHistoryEntry.length,
-        });
-        router.navigate({
-          pathname: '/receiveToken',
-          params: {
-            receiveHistoryEntry: serializedHistoryEntry,
-          },
-        });
-        return;
-      }
-    }
+    navigateToTransactionDetail(historyEntry, 'transaction.row');
   }, [historyEntry]);
 
   return {
@@ -201,7 +123,7 @@ const useTransactionRow = (historyEntry: HistoryEntry) => {
     isRolledBack,
     fiatAmount,
     handlePress,
-    displayLabel: getTransactionActionLabel(historyEntry.type),
+    displayLabel: getTransactionRowLabel(historyEntry),
   };
 };
 
@@ -237,8 +159,6 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
   const transactionSource = useTransactionSource(historyEntry);
   const bip321Options = useBip321Options(historyEntry.id);
   const onchainAddress = getOnchainMintAddress(historyEntry);
-  const mempool = useMempoolAddressSummary(onchainAddress);
-  const onchainStatusLabel = getOnchainTransactionStatusLabel(mempool);
 
   // testID encodes both type and unique id so log-doctor `phone test`
   // can target a row by prefix (`transaction-mint-`, `transaction-send-`,
@@ -331,14 +251,6 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
                     />
                   ));
                 })()}
-              {onchainStatusLabel && (
-                <>
-                  <Icon name="hugeicons:blockchain-01" size={10} color={opacity(foreground, 0.8)} />
-                  <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
-                    {onchainStatusLabel}
-                  </UntranslatedText>
-                </>
-              )}
             </HStack>
             <UntranslatedText
               overpass

@@ -27,10 +27,12 @@ import {
   TransactionLocationSection,
   useBip321Info,
   Bip321MethodIcons,
+  useIsTransactionHistoryView,
 } from '@/features/transactions';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
+import { CopyableValue } from '@/shared/ui/composed/CopyableValue';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { formatAmount } from '@/shared/lib/currency';
@@ -62,6 +64,8 @@ export function LightningSendScreen({
   );
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
+  // History view (transactions list) → fixed mint, non-clickable "Sent with".
+  const isHistoryView = useIsTransactionHistoryView();
 
   // Recipient identity for the navigation header. The machine threads both
   // pubkey (NIP-05) and profile (kind-0) through `entry.metadata` via
@@ -211,7 +215,7 @@ export function LightningSendScreen({
       }
       beforeStatus={isPaid ? <TransactionLocationSection transactionId={entry.id} /> : null}
       statusRow={
-        isReadyToPay ? (
+        isReadyToPay && !isHistoryView ? (
           <MintSelector
             width={quoteCardWidth}
             unit={entry.unit}
@@ -233,7 +237,16 @@ export function LightningSendScreen({
           { title: 'Date', value: entry.createdAt.datetime },
           { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
           { title: 'State', value: entry.state },
-          entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
+          entry.quoteId && {
+            title: 'Quote ID',
+            value: (
+              <CopyableValue
+                value={entry.quoteId}
+                display={truncateMiddle(entry.quoteId, 7)}
+                copyTarget="quoteId"
+              />
+            ),
+          },
           entry.metadata?.meltTarget && {
             title: 'Destination',
             value: truncateMiddle(entry.metadata.meltTarget, 12),
