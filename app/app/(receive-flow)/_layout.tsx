@@ -29,6 +29,7 @@ const LIGHTNING_RECEIVE_OPTIONS = { title: 'Receive Lightning' };
 const ONCHAIN_RECEIVE_OPTIONS = { title: 'Receive onchain' };
 const MINT_QUOTE_OPTIONS = { title: 'Receive' };
 const RECEIVE_TOKEN_OPTIONS = { title: 'Receive ecash' };
+const RAIL_LIST_OPTIONS = { title: 'View all' };
 const CAMERA_HEADER_STYLE = { backgroundColor: 'transparent' };
 const CAMERA_OPTIONS = {
   title: 'Scan QR',
@@ -54,6 +55,7 @@ export default function ReceiveFlowLayout() {
         <Stack.Screen name="mintQuote" options={MINT_QUOTE_OPTIONS} />
         <Stack.Screen name="paymentRequest" options={MINT_QUOTE_OPTIONS} />
         <Stack.Screen name="receiveToken" options={RECEIVE_TOKEN_OPTIONS} />
+        <Stack.Screen name="railList" options={RAIL_LIST_OPTIONS} />
         <Stack.Screen name="camera" options={CAMERA_OPTIONS} />
       </Stack>
     </AndroidSheetRoot>

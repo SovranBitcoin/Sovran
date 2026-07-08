@@ -16,8 +16,8 @@ import React, { memo, useCallback, useEffect } from 'react';
 
 import { router } from 'expo-router';
 
-import { standingPaymentRequestKey, type WalletContext } from 'wallet';
-import { useColadaManager, type UseStandingPaymentRequestResult } from 'wallet/react';
+import { type WalletContext } from 'wallet';
+import { type UseStandingPaymentRequestResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { CreqCustomizationCard } from '@/features/receive/components/CreqCustomizationCard';
@@ -27,14 +27,8 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
-import { truncateMiddle } from '@/shared/lib/strings';
-import { setStringAsync } from 'expo-clipboard';
-import { copyPopup } from '@/shared/lib/popup';
-import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
 import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import type { CreqMintSelection } from '@/features/receive/lib/creqMintSelection';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import Icon from 'assets/icons';
 
@@ -81,8 +75,6 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   const mints = walletContext.trustedMintUrls;
 
   const { request, error, rotate } = creq;
-  const manager = useColadaManager();
-  const accent = useThemeColor('accent');
 
   const handleMintToggle = useCallback(
     (mintUrl: string, advertise: boolean) => {
@@ -109,37 +101,12 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
     await rotate();
   }, [rotate]);
 
-  // "View all": every payment-request receive operation coco has stored for
-  // this profile — unlike onchain quotes these carry real lifecycle states
-  // (active / completed / cancelled): rotations cancel, single-use claims
-  // complete. Tap to copy the encoded request.
-  const openRequestList = useCallback(async () => {
-    const operations = await manager.paymentRequests.incoming.list();
-    const standingId = useMintStore.getState().standingQuotes[standingPaymentRequestKey(unit)];
-    const rows = [...operations].sort((a, b) => b.createdAt - a.createdAt);
-    paymentLog.info('receive.creq.request_list_opened', { count: rows.length });
-    actionMenuSheet({
-      title: `Payment requests (${rows.length})`,
-      buttons: rows.map((op) => {
-        const isStanding = op.id === standingId;
-        const parts = [
-          op.state,
-          op.singleUse ? `${amountToNumber(op.amount as never)} ${op.unit}` : 'reusable',
-          `${op.mints.length} mint${op.mints.length === 1 ? '' : 's'}`,
-          new Date(op.createdAt).toLocaleString(),
-        ];
-        return {
-          text: truncateMiddle(op.encodedRequest, 12),
-          description: parts.join(' · '),
-          suffix: isStanding ? <Icon name="mdi:check" size={20} color={accent} /> : undefined,
-          onPress: async () => {
-            await setStringAsync(op.encodedRequest);
-            copyPopup('paymentRequest');
-          },
-        };
-      }),
-    });
-  }, [manager, unit, accent]);
+  // "View all": push the payment-requests list into this same (receive-flow)
+  // stack so a paid single-use request can open its transaction to the side.
+  const openRequestList = useCallback(() => {
+    paymentLog.info('receive.creq.request_list_opened', { unit });
+    router.navigate({ pathname: '/railList', params: { rail: 'paymentRequest', unit } });
+  }, [unit]);
 
   const renderEmptyState = (message: string, cta?: React.ReactNode) => (
     <View className="mx-4 mt-8">

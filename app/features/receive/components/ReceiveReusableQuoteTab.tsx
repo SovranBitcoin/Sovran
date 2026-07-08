@@ -13,7 +13,7 @@ import { router } from 'expo-router';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
 import { getMintMethodCapability, buildBip321OnchainUri, type WalletContext } from 'wallet';
-import { useColadaManager, useReusableMintQuote, type UseScreenActionsResult } from 'wallet/react';
+import { useReusableMintQuote, type UseScreenActionsResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
@@ -32,13 +32,8 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { setStringAsync } from 'expo-clipboard';
 import { copyPopup, staticPopup } from '@/shared/lib/popup';
-import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useMempoolAddressSummary } from '@/shared/hooks/useMempoolAddressSummary';
-import { getMintDisplayName } from '@/shared/lib/url';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
 import Icon from 'assets/icons';
 
 /** Manual "new address" throttle — long enough to stop QR-spamming the
@@ -129,8 +124,6 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
 
   // Manual address rotation (onchain only) with a short cooldown so the
   // button can't be spammed into a pile of orphan quotes at the mint.
-  const manager = useColadaManager();
-  const accent = useThemeColor('accent');
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cooldownActive = cooldownUntil > Date.now();
@@ -183,121 +176,14 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     void rotate('deposit_received');
   }, [onchainStandingAddress, depositObserved, rotate]);
 
-  // "View all": every pending onchain quote in this profile's coco DB,
-  // across all mints. coco stores no origin tag — both the standing rail and
-  // the fixed-amount flow call the same quotes.mint.create — so the labels
-  // are app-derived: "standing" = the id recorded in the identity map (any
-  // mint), fixed-amount quotes carry a prepared mint OPERATION with the
-  // requested amount, and orphans are retired/rotated addresses. coco never
-  // expires or GCs these rows; only ISSUED bolt11 quotes leave listPending.
-  const openAddressList = useCallback(async () => {
-    const pending = await manager.quotes.mint.listPending({ method: 'onchain' });
-    const standingIds = new Set(Object.values(useMintStore.getState().standingQuotes));
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    const rows = await Promise.all(
-      [...pending]
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .map(async (q) => ({
-          q,
-          ops: await manager.ops.mint.listByQuote({ mintUrl: q.mintUrl, quoteId: q.quoteId }),
-        }))
-    );
-    paymentLog.info('receive.onchain.debug_addresses_opened', {
-      count: rows.length,
-      mintCount: new Set(rows.map(({ q }) => q.mintUrl)).size,
-    });
-
-    // TEMP DEBUG (dev metro console only — full addresses stay out of the
-    // structured/redacted log stream): every onchain address coco knows
-    // about, from BOTH stores, diffed against the menu's pending-quote list.
-    // The quotes table is upserted by (mintUrl, method, quoteId) — a mint
-    // reusing a quote id OVERWRITES the stored request — while mint
-    // operations keep the request snapshot they were created with, so
-    // operation history can surface addresses the quotes table has lost.
-    if (__DEV__) {
-      const looksOnchain = (addr: string) => /^(bc1|tb1|bcrt1|[13])[a-z0-9]+$/i.test(addr);
-      const bareAddress = (req: string) =>
-        req.startsWith('bitcoin:') ? req.slice('bitcoin:'.length).split('?')[0] : req;
-      const opAddresses = new Map<string, { quoteId?: string; state?: string }[]>();
-      const PAGE = 200;
-      for (let offset = 0; ; offset += PAGE) {
-        const page = await manager.history.getPaginatedHistory(offset, PAGE);
-        for (const entry of page) {
-          if (entry.type !== 'mint') continue;
-          const e = entry as { paymentRequest?: string; quoteId?: string; state?: string };
-          const addr = e.paymentRequest ? bareAddress(e.paymentRequest) : null;
-          if (!addr || !looksOnchain(addr)) continue;
-          const list = opAddresses.get(addr) ?? [];
-          list.push({ quoteId: e.quoteId, state: e.state });
-          opAddresses.set(addr, list);
-        }
-        if (page.length < PAGE) break;
-      }
-      const quoteAddresses = new Map(rows.map(({ q }) => [bareAddress(q.request), q]));
-      /* eslint-disable no-console */
-      console.log(
-        `[onchain-debug] quotes table: ${quoteAddresses.size} address(es), ` +
-          `operation snapshots: ${opAddresses.size} address(es)`
-      );
-      for (const [addr, q] of quoteAddresses) {
-        console.log(
-          `[onchain-debug] quote ${addr} id=${q.quoteId} ` +
-            `created=${new Date(q.createdAt).toISOString()} ` +
-            `updated=${new Date(q.updatedAt).toISOString()}`
-        );
-      }
-      for (const [addr, entries] of opAddresses) {
-        console.log(
-          `[onchain-debug] op    ${addr} entries=${entries.length} ` +
-            `states=${entries.map((e) => e.state).join(',')} ` +
-            `inMenu=${quoteAddresses.has(addr)}`
-        );
-      }
-      const onlyInOps = [...opAddresses.keys()].filter((a) => !quoteAddresses.has(a));
-      console.log(
-        `[onchain-debug] addresses ONLY in operation history (lost from quotes table): ` +
-          `${onlyInOps.length}`,
-        onlyInOps
-      );
-      /* eslint-enable no-console */
-    }
-    actionMenuSheet({
-      title: `Onchain addresses (${rows.length})`,
-      buttons: rows.map(({ q, ops }) => {
-        const isStanding = standingIds.has(q.quoteId);
-        const isExpired = q.expiry != null && q.expiry > 0 && q.expiry <= nowSeconds;
-        const data = q.quoteData as { amountPaid?: unknown; amountIssued?: unknown };
-        const paid = data.amountPaid != null ? amountToNumber(data.amountPaid as never) : 0;
-        const lastOp = ops.at(-1) as { amount?: unknown } | undefined;
-        const opAmount = lastOp?.amount != null ? amountToNumber(lastOp.amount as never) : null;
-        const parts = [
-          getMintDisplayName(q.mintUrl, null),
-          isStanding ? 'standing' : ops.length > 0 ? 'fixed-amount' : 'orphan',
-          ...(opAmount != null ? [`${opAmount} ${q.unit}`] : []),
-          ...(__DEV__ ? [`ops ${ops.length}`] : []),
-          ...(paid > 0 ? [`paid ${paid}`] : []),
-          ...(isExpired ? ['expired'] : []),
-          new Date(q.createdAt).toLocaleString(),
-          // coco upserts quotes by (mintUrl, method, quoteId): if the mint
-          // answers repeated requests with the SAME quote, every "new"
-          // create collapses into one row and only bumps updatedAt — a big
-          // created→updated gap is the fingerprint of that collapse.
-          ...(__DEV__ && q.updatedAt - q.createdAt > 60_000
-            ? [`re-upserted until ${new Date(q.updatedAt).toLocaleString()}`]
-            : []),
-        ];
-        return {
-          text: truncateMiddle(q.request, 12),
-          description: parts.join(' · '),
-          suffix: isStanding ? <Icon name="mdi:check" size={20} color={accent} /> : undefined,
-          onPress: async () => {
-            await setStringAsync(q.request);
-            copyPopup('address');
-          },
-        };
-      }),
-    });
-  }, [manager, accent]);
+  // "View all": push the rail's list into this same (receive-flow) stack so a
+  // paid onchain address can open its deposit transaction to the side. The list
+  // screen classifies each row (reusable / paid / expired), marks the pinned
+  // standing one, and blocks copying a paid address for privacy.
+  const openList = useCallback(() => {
+    paymentLog.info(`receive.${method}.list_opened`, { method });
+    router.navigate({ pathname: '/railList', params: { rail: method, unit } });
+  }, [method, unit]);
 
   const handleCopy = useCallback(async () => {
     if (!request) return;
@@ -363,9 +249,11 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   return (
     <>
       <PaymentInfo data={qrData} copyTarget={copy.copyTarget} unit={unit} />
-      {method === 'onchain' && (
-        // Same 12px offset the QR speed controls use under the QR; the
-        // Section below brings its own py-3, keeping the gaps symmetric.
+      {/* Same 12px offset the QR speed controls use under the QR; the Section
+          below brings its own py-3, keeping the gaps symmetric. Onchain gets
+          New address + View all; bolt12 reuses one standing offer per mint, so
+          it only needs View all. */}
+      {method === 'onchain' ? (
         <View style={{ marginTop: 12 }}>
           <ActionSegmentsCard
             segments={[
@@ -379,8 +267,21 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
               {
                 icon: 'fluent:list-16-filled',
                 label: 'View all',
-                onPress: () => void openAddressList(),
+                onPress: openList,
                 testID: 'receive-onchain-view-addresses',
+              },
+            ]}
+          />
+        </View>
+      ) : (
+        <View style={{ marginTop: 12 }}>
+          <ActionSegmentsCard
+            segments={[
+              {
+                icon: 'fluent:list-16-filled',
+                label: 'View all',
+                onPress: openList,
+                testID: 'receive-bolt12-view-offers',
               },
             ]}
           />
