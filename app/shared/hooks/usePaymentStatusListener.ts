@@ -11,7 +11,12 @@ import { useEffect } from 'react';
 
 import { useManagerContext } from '@cashu/coco-react';
 
-import { reusableQuoteKey, rotateReusableMintQuote } from 'wallet';
+import {
+  reusableQuoteKey,
+  rotateReusableMintQuote,
+  rotateStandingPaymentRequest,
+  standingPaymentRequestKey,
+} from 'wallet';
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { isSwapStatusActive } from '@/shared/stores/runtime/swapStatusStore';
@@ -372,6 +377,41 @@ export function usePaymentStatusListener(): void {
         state: 'confirmed',
       });
       paymentStatusPopup({ variant: 'receive', id: op.id, mintUrl, amount, unit: op.unit });
+
+      // If this payment landed on the STANDING reusable request (the "QR Display"
+      // Cashu rail), rotate to a fresh one — same chokepoint + identity-store
+      // handoff as the onchain deposit rotation above, so the displayed QR is
+      // never a request that was already paid, and rotation happens even with the
+      // screen closed. Single-use "Fixed Amount" requests aren't recorded in
+      // standingQuotes, so they never match and correctly skip rotation.
+      const requestOpId = (source as { requestOperationId?: string }).requestOperationId;
+      if (requestOpId) {
+        const standingKey = standingPaymentRequestKey(op.unit);
+        if (useMintStore.getState().standingQuotes[standingKey] === requestOpId) {
+          paymentLog.info('hook.payment_status.creq_standing_rotation', {
+            requestOpId,
+            unit: op.unit,
+          });
+          void (async () => {
+            try {
+              const trusted = await manager.mint.getAllTrustedMints();
+              await rotateStandingPaymentRequest(
+                manager,
+                { unit: op.unit, mints: trusted.map((m) => m.mintUrl).slice(0, 5) },
+                {
+                  get: (key) => useMintStore.getState().standingQuotes[key],
+                  set: (key, id) => useMintStore.getState().setStandingQuote(key, id),
+                }
+              );
+            } catch (err) {
+              paymentLog.warn('hook.payment_status.creq_standing_rotation_failed', {
+                requestOpId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          })();
+        }
+      }
     });
 
     // The receiveEntryId enrichment used to race a 50ms setTimeout against

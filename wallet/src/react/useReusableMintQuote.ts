@@ -25,10 +25,11 @@ export interface UseReusableMintQuoteResult {
   refresh: () => void;
   /**
    * Retire the standing quote and record a fresh one (onchain address-reuse
-   * policy: user-initiated "new address"). Keeps showing the current quote
-   * until the replacement resolves.
+   * policy). Keeps showing the current quote until the replacement resolves.
+   * `reason` distinguishes a user "new address" tap (`"manual"`, default) from
+   * an automatic deposit-detected rotation (`"deposit_received"`).
    */
-  rotate: () => Promise<void>;
+  rotate: (reason?: "manual" | "deposit_received") => Promise<void>;
 }
 
 /**
@@ -140,27 +141,30 @@ export function useReusableMintQuote(
 
   const refresh = useCallback(() => setGeneration((g) => g + 1), []);
 
-  const rotate = useCallback(async () => {
-    if (!mintUrl || !method || !unit) return;
-    try {
-      const created = await rotateReusableMintQuote(
-        manager,
-        { mintUrl, method, unit },
-        identityStoreRef.current,
-        "manual",
-      );
-      if (mountedRef.current) setQuote(created);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      logger.warn("quotes.reusable.rotate_failed", {
-        ...mintUrlFields(mintUrl),
-        method,
-        unit,
-        error: message,
-      });
-      if (mountedRef.current) setError(message);
-    }
-  }, [manager, mintUrl, method, unit]);
+  const rotate = useCallback(
+    async (reason: "manual" | "deposit_received" = "manual") => {
+      if (!mintUrl || !method || !unit) return;
+      try {
+        const created = await rotateReusableMintQuote(
+          manager,
+          { mintUrl, method, unit },
+          identityStoreRef.current,
+          reason,
+        );
+        if (mountedRef.current) setQuote(created);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        logger.warn("quotes.reusable.rotate_failed", {
+          ...mintUrlFields(mintUrl),
+          method,
+          unit,
+          error: message,
+        });
+        if (mountedRef.current) setError(message);
+      }
+    },
+    [manager, mintUrl, method, unit],
+  );
 
   return { quote, isLoading, error, refresh, rotate };
 }

@@ -177,5 +177,10 @@ export function useStandingPaymentRequest(
     }
   }, [manager, unit, lockP2pkPubkey]);
 
+  // Auto-rotation when a payment lands on the CURRENT standing request is driven
+  // centrally by `usePaymentStatusListener` (the same chokepoint that rotates the
+  // onchain deposit rail): it writes a fresh op id into the identity store, which
+  // the observation effect above picks up and re-resolves. Keeping it there means
+  // rotation happens even when this screen is closed.
   return { request, isLoading, error, rotate };
 }

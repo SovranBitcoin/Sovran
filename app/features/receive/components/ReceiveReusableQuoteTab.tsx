@@ -35,6 +35,7 @@ import { copyPopup, staticPopup } from '@/shared/lib/popup';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { useMempoolAddressSummary } from '@/shared/hooks/useMempoolAddressSummary';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -156,6 +157,31 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     await EnhancedHaptics.copyHaptic();
     await rotate();
   }, [cooldownUntil, rotate]);
+
+  // Eager onchain address rotation. The standing address is single-use: the
+  // moment mempool.space sees ANY payment to it (0-conf included — we do NOT
+  // wait for the deposit to confirm or the mint to credit) we retire it and
+  // mint a fresh address for the next payer. Mirrors the P2PK rotate-on-receive
+  // policy, keeps one transaction per address (so its deposit txid is
+  // unambiguous), and the old quote stays pending in coco so the in-flight
+  // deposit still auto-mints. Bolt12 offers never watch/rotate.
+  const onchainStandingAddress = method === 'onchain' ? request : null;
+  const standingMempool = useMempoolAddressSummary(onchainStandingAddress);
+  const depositObserved =
+    !!standingMempool.summary && standingMempool.summary.totalReceivedSats > 0;
+  const rotatedForAddressRef = useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!onchainStandingAddress || !depositObserved) return;
+    // One rotation per observed address — the poll keeps reporting the payment
+    // until `request` swaps to the fresh (unpaid) address.
+    if (rotatedForAddressRef.current === onchainStandingAddress) return;
+    rotatedForAddressRef.current = onchainStandingAddress;
+    paymentLog.info('receive.onchain.rotate_requested', {
+      source: 'deposit_detected',
+      addressLength: onchainStandingAddress.length,
+    });
+    void rotate('deposit_received');
+  }, [onchainStandingAddress, depositObserved, rotate]);
 
   // "View all": every pending onchain quote in this profile's coco DB,
   // across all mints. coco stores no origin tag — both the standing rail and
