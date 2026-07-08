@@ -1609,6 +1609,17 @@ export function createSovranHandlers({
       });
     },
 
+    // Receive "as Ecash": the machine created the single-use NUT-18 request and
+    // handed us the encoded payload. Swap the amount screen for its display —
+    // same router.replace lane as mintQuoteCreated (a step-handler navigation,
+    // not a side-channel callback).
+    paymentRequestReceived: ({ entry }) => {
+      router.replace({
+        pathname: '/(receive-flow)/paymentRequest',
+        params: { paymentRequestEntry: entry },
+      });
+    },
+
     reviewMint: ({ mintUrl, token, mintInfo }) => {
       const entry = {
         ...(mintInfo ?? {}),

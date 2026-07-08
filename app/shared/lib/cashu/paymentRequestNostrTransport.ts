@@ -9,13 +9,15 @@
  *      `{ type: 'nostr', target: <nprofile>, tags: [['n','17']] }` per
  *      NUT-18's Nostr transport (senders deliver a PaymentRequestPayload as
  *      a NIP-17 gift-wrapped DM), and
- *   2. while any request operation is ACTIVE, polls the viewer's gift-wrap
- *      inbox (nagg DM index → relay floor via the shared nostr data layer —
- *      the same pull-based architecture as the payments DM screens), unwraps
- *      each kind-1059 envelope, and feeds NUT-18-looking rumor contents into
- *      `paymentRequestReceiveService.ingestPayload` with the wrap event id
- *      as `transportMessageId` (coco's idempotency key) and the rumor author
- *      as `senderPubkey`.
+ *   2. while any request operation is ACTIVE, watches the viewer's gift-wrap
+ *      inbox for NUT-18 payloads via TWO paths sharing one unwrap→ingest body
+ *      (`handleEnvelope`): a LIVE relay subscription (`subscribeDmEnvelopes`) so
+ *      a paid request is claimed the instant the wrap arrives, plus a 15s poll
+ *      (nagg DM index → relay floor) as the offline/reconnect backstop. Each
+ *      kind-1059 envelope is unwrapped and NUT-18-looking rumor contents fed to
+ *      `paymentRequestReceiveService.ingestPayload` with the wrap event id as
+ *      `transportMessageId` (coco's idempotency key, so poll+live can't
+ *      double-claim) and the rumor author as `senderPubkey`.
  *
  * Registration rides the coco plugin seam (ServiceMap.paymentRequestReceive-
  * Service) — the provider registry is not on the public Manager surface.
@@ -76,6 +78,62 @@ export function createPaymentRequestNostrTransportPlugin(
       let timer: ReturnType<typeof setInterval> | null = null;
       let polling = false;
       let disposed = false;
+      let liveUnsub: (() => void) | null = null;
+      let liveStarting = false;
+
+      const capSeenWraps = (): void => {
+        if (seenWraps.size <= SEEN_CAP) return;
+        for (const id of [...seenWraps].slice(0, seenWraps.size - SEEN_CAP)) {
+          seenWraps.delete(id);
+        }
+      };
+
+      /**
+       * Unwrap + ingest a single gift-wrap envelope. Shared by the poll and the
+       * live subscription so dedupe (`seenWraps`), the unwrap cache, and coco's
+       * `transportMessageId` idempotency are identical on both paths — a wrap
+       * that arrives on both is ingested at most once. Re-reads the signer key
+       * per call (the poll does too) so a profile switch never uses a stale key.
+       */
+      const handleEnvelope = async (
+        envelope: { id: string; kind: number; content: string; pubkey: string },
+        source: 'poll' | 'live'
+      ): Promise<boolean> => {
+        if (envelope.kind !== GIFT_WRAP_KIND || seenWraps.has(envelope.id)) return false;
+        const secretKey = config.getSignerKey();
+        if (!secretKey) return false;
+        const viewerPubkey = getPublicKey(secretKey);
+        seenWraps.add(envelope.id);
+        capSeenWraps();
+        const rumor = giftWrapCache.unwrap(
+          viewerPubkey,
+          { id: envelope.id, content: envelope.content, pubkey: envelope.pubkey },
+          secretKey
+        );
+        if (!rumor || !looksLikePaymentRequestPayload(rumor.content)) return false;
+        try {
+          await service.ingestPayload(rumor.content, {
+            transport: 'nostr',
+            transportMessageId: envelope.id,
+            senderPubkey: rumor.senderPubkey,
+          });
+          cashuLog.info('cashu.creq.transport.payload_ingested', {
+            source,
+            wrapIdLength: envelope.id.length,
+            contentLength: rumor.content.length,
+          });
+          return true;
+        } catch (error) {
+          // Payloads for unknown/cancelled requests (or plain chat DMs that
+          // happened to look like payloads) are expected — log and move on; the
+          // wrap is marked seen so we never retry it.
+          cashuLog.debug('cashu.creq.transport.payload_rejected', {
+            source,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return false;
+        }
+      };
 
       const pollOnce = async (): Promise<void> => {
         if (polling || disposed) return;
@@ -110,38 +168,7 @@ export function createPaymentRequestNostrTransportPlugin(
           let ingested = 0;
           for (const envelope of envelopes) {
             if (disposed || activeOps.size === 0) break;
-            if (envelope.kind !== GIFT_WRAP_KIND || seenWraps.has(envelope.id)) continue;
-            seenWraps.add(envelope.id);
-            const rumor = giftWrapCache.unwrap(
-              viewerPubkey,
-              { id: envelope.id, content: envelope.content, pubkey: envelope.pubkey },
-              secretKey
-            );
-            if (!rumor || !looksLikePaymentRequestPayload(rumor.content)) continue;
-            try {
-              await service.ingestPayload(rumor.content, {
-                transport: 'nostr',
-                transportMessageId: envelope.id,
-                senderPubkey: rumor.senderPubkey,
-              });
-              ingested += 1;
-              cashuLog.info('cashu.creq.transport.payload_ingested', {
-                wrapIdLength: envelope.id.length,
-                contentLength: rumor.content.length,
-              });
-            } catch (error) {
-              // Payloads for unknown/cancelled requests (or plain chat DMs
-              // that happened to look like payloads) are expected — log and
-              // move on; the wrap is marked seen so we never retry it.
-              cashuLog.debug('cashu.creq.transport.payload_rejected', {
-                error: error instanceof Error ? error.message : String(error),
-              });
-            }
-          }
-          if (seenWraps.size > SEEN_CAP) {
-            for (const id of [...seenWraps].slice(0, seenWraps.size - SEEN_CAP)) {
-              seenWraps.delete(id);
-            }
+            if (await handleEnvelope(envelope, 'poll')) ingested += 1;
           }
           cashuLog.debug('cashu.creq.transport.poll_done', {
             envelopeCount: envelopes.length,
@@ -169,6 +196,46 @@ export function createPaymentRequestNostrTransportPlugin(
         clearInterval(timer);
         timer = null;
         cashuLog.info('cashu.creq.transport.polling_stopped');
+      };
+
+      // Live push: a persistent relay REQ for the viewer's gift wraps, so a paid
+      // request is claimed the instant the wrap arrives instead of on the next
+      // 15s poll tick. The subscription has no auto-reconnect (relay socket drop
+      // just stops feeding), so the poll above stays as the offline/reconnect
+      // backstop — never remove it. Same unwrap→ingest path as the poll.
+      const startLive = () => {
+        if (liveUnsub || liveStarting || disposed) return;
+        liveStarting = true;
+        void (async () => {
+          try {
+            const secretKey = config.getSignerKey();
+            if (!secretKey) return;
+            const viewerPubkey = getPublicKey(secretKey);
+            const { buildNostrDataLayer } = await import('@/shared/lib/nostr/buildNostrDataLayer');
+            const layer = buildNostrDataLayer();
+            // Deactivated / disposed / lost the key while the layer resolved.
+            if (!layer || disposed || activeOps.size === 0) return;
+            await giftWrapCache.cache.hydrate(viewerPubkey);
+            if (disposed || activeOps.size === 0 || liveUnsub) return;
+            liveUnsub = layer.subscribeDmEnvelopes({ viewerPubkey }, (env) => {
+              void handleEnvelope(env, 'live');
+            });
+            cashuLog.info('cashu.creq.transport.live_started', { activeOps: activeOps.size });
+          } catch (error) {
+            cashuLog.warn('cashu.creq.transport.live_failed', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          } finally {
+            liveStarting = false;
+          }
+        })();
+      };
+
+      const stopLive = () => {
+        if (!liveUnsub) return;
+        liveUnsub();
+        liveUnsub = null;
+        cashuLog.info('cashu.creq.transport.live_stopped');
       };
 
       const handler: NostrTransportHandler = {
@@ -205,6 +272,7 @@ export function createPaymentRequestNostrTransportPlugin(
             singleUse: operation.singleUse,
           });
           startPolling();
+          startLive();
         },
         deactivate(operation) {
           activeOps.delete(operation.id);
@@ -212,7 +280,10 @@ export function createPaymentRequestNostrTransportPlugin(
             operationId: operation.id,
             activeOps: activeOps.size,
           });
-          if (activeOps.size === 0) stopPolling();
+          if (activeOps.size === 0) {
+            stopPolling();
+            stopLive();
+          }
         },
       };
 
@@ -222,6 +293,7 @@ export function createPaymentRequestNostrTransportPlugin(
       return () => {
         disposed = true;
         stopPolling();
+        stopLive();
         activeOps.clear();
         unregister();
       };

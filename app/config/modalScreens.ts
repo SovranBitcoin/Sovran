@@ -186,6 +186,7 @@ const standaloneScreens: ModalConfig[] = [
   modalWithBlur('lightningReceive', 'modal', 'Receive Lightning'),
   modalWithBlur('onchainReceive', 'modal', 'Receive Onchain'),
   modalWithBlur('mintQuote', 'modal', 'Receive Lightning'),
+  modalWithBlur('paymentRequest', 'modal', 'Receive Ecash'),
   modalWithBlur('sendToken', 'modal', 'Send Ecash'),
   cardFade('claimUsername', {
     headerShadowVisible: false,

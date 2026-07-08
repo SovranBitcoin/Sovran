@@ -12,19 +12,17 @@
  * simply "any trusted mint exists".
  */
 
-import React, { memo, useCallback, useEffect, useState } from 'react';
+import React, { memo, useCallback, useEffect } from 'react';
 
 import { router } from 'expo-router';
-import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
 
 import { standingPaymentRequestKey, type WalletContext } from 'wallet';
 import { useColadaManager, type UseStandingPaymentRequestResult } from 'wallet/react';
 import { paymentLog } from '@/shared/lib/logger';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
-import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { CreqCustomizationCard } from '@/features/receive/components/CreqCustomizationCard';
 import { ReceiveRailPlaceholder } from '@/features/receive/components/ReceiveRailPlaceholder';
 import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
-import { Section } from '@/shared/ui/composed/Section';
 import { Button } from '@/shared/ui/primitives/Button';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -38,7 +36,6 @@ import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import type { CreqMintSelection } from '@/features/receive/lib/creqMintSelection';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import Icon from 'assets/icons';
 
 interface ReceivePaymentRequestTabProps {
@@ -83,27 +80,20 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
   const setCreqMintExcluded = useMintStore((s) => s.setCreqMintExcluded);
   const mints = walletContext.trustedMintUrls;
 
-  // Advanced (mint toggles) — collapsed by default, chevron expander like
-  // DetailsSection.
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-
-  // Contradictory persisted state: the lock is on but every NUT-11-capable
-  // mint was toggled off earlier (while the lock was off). The selection
-  // already advertises the capable set (never an empty "any mint" list);
-  // clear the stale exclusions so the switches match what's advertised.
-  useEffect(() => {
-    if (!mintSelection.needsExclusionReset) return;
-    paymentLog.warn('receive.creq.exclusions_reset', {
-      count: mintSelection.options.filter((o) => o.enabled).length,
-    });
-    for (const option of mintSelection.options) {
-      if (option.enabled) setCreqMintExcluded(option.mintUrl, false);
-    }
-  }, [mintSelection, setCreqMintExcluded]);
-
   const { request, error, rotate } = creq;
   const manager = useColadaManager();
   const accent = useThemeColor('accent');
+
+  const handleMintToggle = useCallback(
+    (mintUrl: string, advertise: boolean) => {
+      paymentLog.info('receive.creq.mint_toggled', {
+        mintUrlLength: mintUrl.length,
+        advertise,
+      });
+      setCreqMintExcluded(mintUrl, !advertise);
+    },
+    [setCreqMintExcluded]
+  );
 
   useEffect(() => {
     onQrPayload?.(
@@ -150,32 +140,6 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
       }),
     });
   }, [manager, unit, accent]);
-
-  const handleCopy = useCallback(async () => {
-    if (!request) return;
-    await EnhancedHaptics.copyHaptic();
-    await setStringAsync(request.encodedRequest);
-    copyPopup('paymentRequest');
-    paymentLog.info('receive.creq.copied', { requestLength: request.encodedRequest.length });
-  }, [request]);
-
-  const handleAdvancedToggle = useCallback(() => {
-    setAdvancedOpen((open) => {
-      paymentLog.info('receive.creq.advanced_toggled', { open: !open });
-      return !open;
-    });
-  }, []);
-
-  const handleMintToggle = useCallback(
-    (mintUrl: string, advertise: boolean) => {
-      paymentLog.info('receive.creq.mint_toggled', {
-        mintUrlLength: mintUrl.length,
-        advertise,
-      });
-      setCreqMintExcluded(mintUrl, !advertise);
-    },
-    [setCreqMintExcluded]
-  );
 
   const renderEmptyState = (message: string, cta?: React.ReactNode) => (
     <View className="mx-4 mt-8">
@@ -241,121 +205,15 @@ export const ReceivePaymentRequestTab = memo(function ReceivePaymentRequestTab({
           ]}
         />
       </View>
-      <View className="mx-4">
-        <Section title="CASHU PAYMENT REQUEST">
-          <GradientCard>
-            <ListGroup variant="transparent">
-              <PressableFeedback animation={false} onPress={handleCopy}>
-                <PressableFeedback.Scale>
-                  <ListGroup.Item disabled>
-                    <ListGroup.ItemPrefix>
-                      <Icon name="ph:coins" size={20} color={muted} />
-                    </ListGroup.ItemPrefix>
-                    <ListGroup.ItemContent>
-                      <ListGroup.ItemTitle>
-                        {truncateMiddle(request.encodedRequest, 10)}
-                      </ListGroup.ItemTitle>
-                    </ListGroup.ItemContent>
-                    <ListGroup.ItemSuffix>
-                      <Icon name="lets-icons:copy" size={20} color={muted} />
-                    </ListGroup.ItemSuffix>
-                  </ListGroup.Item>
-                </PressableFeedback.Scale>
-                <PressableFeedback.Ripple />
-              </PressableFeedback>
-              <Separator className="mx-4" />
-              <ListGroup.Item>
-                <ListGroup.ItemPrefix>
-                  <Icon name="solar:key-bold" size={20} color={muted} />
-                </ListGroup.ItemPrefix>
-                <ListGroup.ItemContent>
-                  <ListGroup.ItemTitle>P2PK lock</ListGroup.ItemTitle>
-                  <ListGroup.ItemDescription>
-                    {!p2pkKey
-                      ? 'No P2PK key — generate one in Settings'
-                      : !mintSelection.hasP2pkCapableMint
-                        ? 'None of your mints support P2PK locks'
-                        : 'Payers lock ecash to your key'}
-                  </ListGroup.ItemDescription>
-                </ListGroup.ItemContent>
-                <ListGroup.ItemSuffix>
-                  <HeroSwitch
-                    isSelected={creqP2pkLock && !!p2pkKey && mintSelection.hasP2pkCapableMint}
-                    isDisabled={!p2pkKey || !mintSelection.hasP2pkCapableMint}
-                    onSelectedChange={(value) => {
-                      paymentLog.info('receive.creq.p2pk_lock_toggled', { enabled: value });
-                      setCreqP2pkLock(value);
-                    }}
-                  />
-                </ListGroup.ItemSuffix>
-              </ListGroup.Item>
-              <Separator className="mx-4" />
-              {/* Advanced — which trusted mints the request advertises. Rows
-                  the P2PK filter forces off carry the reason inline. */}
-              <PressableFeedback animation={false} onPress={handleAdvancedToggle}>
-                <PressableFeedback.Scale>
-                  <ListGroup.Item disabled>
-                    <ListGroup.ItemPrefix>
-                      {/* Must be a name present in .monicon/icons.js — mdi:tune
-                          wasn't bundled and rendered blank. */}
-                      <Icon name="material-symbols:settings-rounded" size={20} color={muted} />
-                    </ListGroup.ItemPrefix>
-                    <ListGroup.ItemContent>
-                      <ListGroup.ItemTitle>Advanced</ListGroup.ItemTitle>
-                      <ListGroup.ItemDescription>
-                        {`${mintSelection.advertisedCount} of ${mintSelection.totalCount} mint${
-                          mintSelection.totalCount === 1 ? '' : 's'
-                        } in this request`}
-                      </ListGroup.ItemDescription>
-                    </ListGroup.ItemContent>
-                    <ListGroup.ItemSuffix>
-                      <Icon
-                        name={advancedOpen ? 'mdi:chevron-down' : 'mdi:chevron-right'}
-                        size={20}
-                        color={muted}
-                      />
-                    </ListGroup.ItemSuffix>
-                  </ListGroup.Item>
-                </PressableFeedback.Scale>
-                <PressableFeedback.Ripple />
-              </PressableFeedback>
-              {advancedOpen
-                ? mintSelection.options.map((option) => (
-                    <React.Fragment key={option.mintUrl}>
-                      <Separator className="mx-4" />
-                      <ListGroup.Item>
-                        <ListGroup.ItemPrefix>
-                          {/* Same identity treatment as the Balance split
-                              cards: the mint's own icon with MintIcon's
-                              built-in fallback (ph:bank wasn't bundled). */}
-                          <MintIcon
-                            iconUrl={option.iconUrl}
-                            size={28}
-                            name={option.displayName}
-                            alt={`${option.displayName} icon`}
-                          />
-                        </ListGroup.ItemPrefix>
-                        <ListGroup.ItemContent>
-                          <ListGroup.ItemTitle>{option.displayName}</ListGroup.ItemTitle>
-                          {option.reason ? (
-                            <ListGroup.ItemDescription>{option.reason}</ListGroup.ItemDescription>
-                          ) : null}
-                        </ListGroup.ItemContent>
-                        <ListGroup.ItemSuffix>
-                          <HeroSwitch
-                            isSelected={option.enabled}
-                            isDisabled={option.switchDisabled}
-                            onSelectedChange={(value) => handleMintToggle(option.mintUrl, value)}
-                          />
-                        </ListGroup.ItemSuffix>
-                      </ListGroup.Item>
-                    </React.Fragment>
-                  ))
-                : null}
-            </ListGroup>
-          </GradientCard>
-        </Section>
-      </View>
+      <CreqCustomizationCard
+        encodedRequest={request.encodedRequest}
+        muted={muted}
+        p2pkKey={p2pkKey}
+        mintSelection={mintSelection}
+        p2pkLockOn={creqP2pkLock}
+        onP2pkLockChange={setCreqP2pkLock}
+        onMintToggle={handleMintToggle}
+      />
     </>
   );
 });
