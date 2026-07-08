@@ -36,9 +36,6 @@ export interface NavigationCallbacks {
   mintInfo?: (mintInfoEntry: string) => void;
   addMint?: () => void;
   goBack?: () => void;
-  /** Show a freshly created single-use incoming payment request (receive
-   *  "as Ecash"). `entry` is the JSON-serialized create result. */
-  paymentRequestReceive?: (entry: string) => void;
 }
 
 export interface DefaultScreenActionHandlersConfig {
@@ -843,30 +840,21 @@ export function createDefaultScreenActionHandlers(
           }
         } else if (variantId === "ecash") {
           if (entryDestination === "mintQuote") {
-            // Receive "as Ecash": a single-use NUT-18 request. No machine
-            // flow — the durable coco op claims the payload via the
-            // registered transport; we only create and display it (same
-            // persist-and-navigate shape as changeNpcMint).
-            const ops = getOperations();
-            if (!ops?.createPaymentRequestReceive) {
-              logger.warn(
-                "screenAction.amountEntry.next.ecashReceiveUnsupported",
-              );
-              return;
-            }
+            // Receive "as Ecash": a single-use NUT-18 request. Route it through
+            // the machine (createPaymentRequestReceive → paymentRequestReceived)
+            // so its display screen is reached by a machine step handler — the
+            // same reliable lane as Lightning/onchain receive. (Previously this
+            // created the request inline and hopped to the screen via a
+            // navigation callback, which silently no-op'd.)
             logger.info("screenAction.amountEntry.next.ecashReceive", {
               amount: effectiveAmount.value,
               unit: effectiveAmount.unit,
             });
-            const created = await ops.createPaymentRequestReceive({
-              amount: effectiveAmount.value,
-              unit: effectiveAmount.unit,
-            });
-            navigation.paymentRequestReceive?.(JSON.stringify(created));
-            return;
+            destination = "receivePaymentRequest";
+          } else {
+            // sendEcash / paymentRequest keep their destination; nothing to do.
+            destination = entryDestination;
           }
-          // sendEcash / paymentRequest keep their destination; nothing to do.
-          destination = entryDestination;
         } else if (variantId === "onchain") {
           if (entryDestination === "mintQuote") {
             destination = "mintQuote";

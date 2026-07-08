@@ -11,6 +11,7 @@ import {
   runMintListEnrichmentEffect,
   runMintReviewInfoEffect,
   runMintQuoteEffect,
+  runPaymentRequestReceiveEffect,
   runNfcWriteBackEffect,
   runRecipientProfileEffect,
   runRecipientPubkeyEffect,
@@ -1283,6 +1284,32 @@ export function createPaymentMachine(
             }
           } else {
             logger.warn("machine.createMintQuote.failed", {
+              error: errField(effect.error.cause),
+            });
+            setStep("error", effect.error.data);
+          }
+          handlerExecuting = false;
+          notify();
+        } else if (step === "createPaymentRequestReceive") {
+          const data = stepData as StepDataMap["createPaymentRequestReceive"];
+          logger.info("machine.createPaymentRequestReceive.start", {
+            amount: data.amount,
+            unit: data.unit,
+          });
+          handlerExecuting = true;
+          notify();
+          const effect = await runPaymentRequestReceiveEffect({
+            data,
+            operations,
+            isStale: (op) => isStaleGeneration(sendGeneration, op),
+          });
+
+          if (effect.isOk()) {
+            if (effect.value.kind === "stale") return;
+            logger.info("machine.createPaymentRequestReceive.success");
+            setStep(effect.value.step, effect.value.data);
+          } else {
+            logger.warn("machine.createPaymentRequestReceive.failed", {
               error: errField(effect.error.cause),
             });
             setStep("error", effect.error.data);

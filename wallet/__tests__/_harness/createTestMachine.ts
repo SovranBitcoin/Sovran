@@ -100,6 +100,8 @@ const ALL_STEPS: FlowStep[] = [
   'navigateToPaymentRequest',
   'createMintQuote',
   'mintQuoteCreated',
+  'createPaymentRequestReceive',
+  'paymentRequestReceived',
   'openMint',
   'openProfile',
   'navigateToReceive',

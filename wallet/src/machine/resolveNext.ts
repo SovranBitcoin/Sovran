@@ -410,6 +410,11 @@ function terminalStep(
           method: ctx.mintQuoteMethod,
         },
       };
+    case "receivePaymentRequest":
+      return {
+        step: "createPaymentRequestReceive",
+        data: { amount: amount!, unit },
+      };
     case "meltQuote":
       return {
         step: "navigateToMeltPreview",

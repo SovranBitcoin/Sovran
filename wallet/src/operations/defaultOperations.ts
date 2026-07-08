@@ -27,6 +27,7 @@ import type {
   SendHistoryEntry,
 } from "@cashu/coco-core";
 import { getEncodedToken } from "@cashu/coco-core";
+import { emitPaymentRequestCreated } from "../paymentRequestEvents";
 import type { MachineOperations, StepDataMap } from "../machine/types";
 import type {
   MintCatalogEntry,
@@ -1054,6 +1055,10 @@ export function createDefaultOperations(
         operationId: operation.id,
         encodedLength: operation.encodedRequest.length,
       });
+      // coco fires no event on incoming.create, so nudge the transactions list
+      // to re-list active requests (the pending row would otherwise only appear
+      // after an unrelated event / restart).
+      emitPaymentRequestCreated();
       return {
         operationId: operation.id,
         encodedRequest: operation.encodedRequest,

@@ -88,6 +88,20 @@ export type MintQuoteEffectError = {
   data: StepDataMap['error'];
 };
 
+export type PaymentRequestReceiveEffectSuccess =
+  | {
+      kind: 'completed';
+      step: 'paymentRequestReceived';
+      data: StepDataMap['paymentRequestReceived'];
+    }
+  | { kind: 'stale' };
+
+export type PaymentRequestReceiveEffectError = {
+  kind: 'failed';
+  cause: unknown;
+  data: StepDataMap['error'];
+};
+
 export type ConfirmSendEffectSuccess =
   | {
       kind: 'completed';
@@ -272,6 +286,12 @@ export interface RunMintQuoteEffectConfig {
   context: FlowContext;
   getOffline: () => boolean;
   getLocale: () => string;
+  isStale: (op: string) => boolean;
+}
+
+export interface RunPaymentRequestReceiveEffectConfig {
+  data: StepDataMap['createPaymentRequestReceive'];
+  operations: Pick<MachineOperations, 'createPaymentRequestReceive'>;
   isStale: (op: string) => boolean;
 }
 
@@ -1167,6 +1187,88 @@ export function runMintQuoteEffect({
         method: data.method ?? 'bolt11',
         error: errField(failure.cause),
       });
+      return errAsync(failure);
+    });
+}
+
+/**
+ * Auto-execution for receive "as Ecash": create a single-use NUT-18 request
+ * via the durable coco operation and re-target to `paymentRequestReceived`
+ * with the encoded payload. Mirrors `runMintQuoteEffect` — the app's step
+ * handler navigates off the resulting step, so delivery never depends on a
+ * side-channel navigation callback.
+ */
+export function runPaymentRequestReceiveEffect({
+  data,
+  operations,
+  isStale,
+}: RunPaymentRequestReceiveEffectConfig): ResultAsync<
+  PaymentRequestReceiveEffectSuccess,
+  PaymentRequestReceiveEffectError
+> {
+  logger.info('effects.paymentRequestReceive.start', {
+    amount: data.amount,
+    unit: data.unit,
+  });
+
+  const create = operations.createPaymentRequestReceive;
+  if (!create) {
+    logger.warn('effects.paymentRequestReceive.unsupported');
+    return errAsync({
+      kind: 'failed',
+      cause: new Error('createPaymentRequestReceive operation is unavailable'),
+      data: {
+        code: 'PAYMENT_REQUEST_FAILED',
+        message: 'Receiving as ecash is not available.',
+      },
+    });
+  }
+
+  return ResultAsync.fromThrowable(
+    () => create({ amount: data.amount, unit: data.unit }),
+    (cause): PaymentRequestReceiveEffectError => {
+      logger.warn('effects.paymentRequestReceive.threw', {
+        amount: data.amount,
+        unit: data.unit,
+        error: errField(cause),
+      });
+      return {
+        kind: 'failed',
+        cause,
+        data: {
+          code: 'PAYMENT_REQUEST_FAILED',
+          message:
+            cause instanceof Error
+              ? cause.message
+              : 'Could not create the ecash request.',
+        },
+      };
+    },
+  )()
+    .andThen((created) => {
+      if (isStale('createPaymentRequestReceive')) {
+        logger.info('effects.paymentRequestReceive.stale');
+        return okAsync({ kind: 'stale' } as const);
+      }
+      logger.info('effects.paymentRequestReceive.completed', {
+        operationId: created.operationId,
+        amount: created.amount,
+        unit: created.unit,
+        encodedLength: created.encodedRequest.length,
+      });
+      return okAsync({
+        kind: 'completed' as const,
+        step: 'paymentRequestReceived' as const,
+        data: { entry: JSON.stringify(created), unit: created.unit },
+      });
+    })
+    .orElse((failure) => {
+      if (isStale('createPaymentRequestReceive.catch')) {
+        logger.info('effects.paymentRequestReceive.stale', {
+          op: 'createPaymentRequestReceive.catch',
+        });
+        return okAsync({ kind: 'stale' } as const);
+      }
       return errAsync(failure);
     });
 }

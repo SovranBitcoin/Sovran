@@ -788,6 +788,32 @@ export function resolveFromContext(
     });
   }
 
+  if (destination === "receivePaymentRequest") {
+    // Receive "as Ecash": a single-use NUT-18 request. No per-mint pick — the
+    // operation embeds the trusted allow-list itself — so once we have an
+    // amount we go straight to the auto-execution step. Mirrors the mintQuote
+    // "enter amount first" guard.
+    if (amount == null || amount <= 0) {
+      return logContextResult("receive_payment_request_enter_amount", {
+        step: "enterAmount",
+        context: { ...ctx, destination },
+        data: {
+          unit,
+          preselectedMintUrl: mintUrl ?? walletCtx.preferredMintUrl,
+          constraints: {
+            destination,
+            methodContext: createAmountEntryMethodContext(walletCtx),
+          },
+        },
+      });
+    }
+    return logContextResult("receive_payment_request_create", {
+      step: "createPaymentRequestReceive",
+      context: { ...ctx, destination },
+      data: { amount, unit },
+    });
+  }
+
   if (destination === "meltQuote") {
     if (!ctx.meltTarget) {
       return logContextResult("melt_quote_missing_target", {

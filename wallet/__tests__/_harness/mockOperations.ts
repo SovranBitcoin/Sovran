@@ -46,7 +46,7 @@ import type { MachineOperations, StepDataMap } from '../../src/machine/types';
 import { compareMintDisplayOrder } from '../../src/mint-capabilities';
 import type { MintListItem } from '../../src/types';
 import type { OperationCall } from './types';
-import { MINT_METADATA } from './fixtures';
+import { MINT_METADATA, MINT1 } from './fixtures';
 
 // ---------------------------------------------------------------------------
 // Default stub responses
@@ -159,6 +159,20 @@ export function createMockOperations(
     executeMintQuote: wrap('executeMintQuote', async (_mintUrl, _amount, _unit) => ({
       historyEntry: stubHistoryEntry({ type: 'mint' }),
     })),
+
+    // createPaymentRequestReceive: creates a single-use NUT-18 request (receive
+    // "as Ecash"). Returns the encoded payload the paymentRequestReceived step
+    // hands to the display screen.
+    createPaymentRequestReceive: wrap(
+      'createPaymentRequestReceive',
+      async ({ amount, unit }: { amount: number; unit: string }) => ({
+        operationId: 'pr-op-1',
+        encodedRequest: 'creqAstubrequest',
+        amount,
+        unit,
+        mints: [MINT1],
+      })
+    ),
 
     // buildMintListItems: builds the UI data for the mint picker.
     // Default: mirrors candidates back as available MintListItems with

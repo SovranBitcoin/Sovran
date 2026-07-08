@@ -30,6 +30,8 @@ export type FlowStep =
   | "navigateToPaymentRequest"
   | "createMintQuote"
   | "mintQuoteCreated"
+  | "createPaymentRequestReceive"
+  | "paymentRequestReceived"
   | "openMint"
   | "openProfile"
   | "receiveHub"
@@ -234,6 +236,18 @@ export interface StepDataMap {
     method?: MintQuoteMethod;
   };
   mintQuoteCreated: { historyEntry: string; unit: string };
+  /**
+   * Auto-execution step for receive "as Ecash": the machine calls
+   * `operations.createPaymentRequestReceive` and re-targets to
+   * `paymentRequestReceived`. Mirrors `createMintQuote`.
+   */
+  createPaymentRequestReceive: { amount: number; unit: string };
+  /**
+   * Terminal display step for a freshly created single-use NUT-18 request.
+   * `entry` is the JSON-serialized create result (operationId, encodedRequest,
+   * amount, unit, mints) the receive-flow paymentRequest screen renders.
+   */
+  paymentRequestReceived: { entry: string; unit: string };
   openMint: {
     url: string;
     /** Pre-loaded mint info (populated when `operations.buildMintReviewInfo` is provided). */

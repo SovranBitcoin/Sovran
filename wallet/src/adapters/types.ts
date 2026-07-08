@@ -1,8 +1,15 @@
-import type { CocoLogger } from '../logger';
-import type { RecipientProfile, ScanSourceResult, URDecoderLike } from '../machine/types';
+import type { CocoLogger } from "../logger";
+import type {
+  RecipientProfile,
+  ScanSourceResult,
+  URDecoderLike,
+} from "../machine/types";
 
 export type JsonPrimitive = string | number | boolean | null;
-export type JsonValue = JsonPrimitive | JsonValue[] | { readonly [key: string]: JsonValue };
+export type JsonValue =
+  | JsonPrimitive
+  | JsonValue[]
+  | { readonly [key: string]: JsonValue };
 export type JsonRecord = { readonly [key: string]: JsonValue };
 
 /**
@@ -24,7 +31,11 @@ export interface ClipboardAdapter {
  * stay behind the consumer implementation.
  */
 export interface ShareAdapter {
-  share: (content: { message: string; url?: string; title?: string }) => Promise<void>;
+  share: (content: {
+    message: string;
+    url?: string;
+    title?: string;
+  }) => Promise<void>;
 }
 
 /**
@@ -55,8 +66,12 @@ export interface ImagePickerAdapter {
  * constants stay in the consumer.
  */
 export interface HapticsAdapter {
-  impact?: (style: 'light' | 'medium' | 'heavy' | 'soft' | 'rigid') => Promise<void> | void;
-  notification?: (kind: 'success' | 'warning' | 'error') => Promise<void> | void;
+  impact?: (
+    style: "light" | "medium" | "heavy" | "soft" | "rigid",
+  ) => Promise<void> | void;
+  notification?: (
+    kind: "success" | "warning" | "error",
+  ) => Promise<void> | void;
   selection?: () => Promise<void> | void;
 }
 
@@ -78,7 +93,10 @@ export interface NotificationsAdapter {
  */
 export interface NostrAdapter {
   sendDirectMessage?: (nprofile: string, message: string) => Promise<void>;
-  resolveProfile?: (pubkey: string, signal?: AbortSignal) => Promise<RecipientProfile | null>;
+  resolveProfile?: (
+    pubkey: string,
+    signal?: AbortSignal,
+  ) => Promise<RecipientProfile | null>;
 }
 
 /**
@@ -105,7 +123,7 @@ export interface NfcAdapter {
   isAvailable: () => Promise<boolean>;
 }
 
-export type ChainNetwork = 'mainnet' | 'testnet' | 'signet' | 'regtest';
+export type ChainNetwork = "mainnet" | "testnet" | "signet" | "regtest";
 
 export interface ChainFeeEstimate {
   fastestFee: number;
@@ -153,7 +171,15 @@ export interface ChainAddressSummary {
   unconfirmedReceivedSats: number;
   unconfirmedNetSats: number;
   totalReceivedSats: number;
+  /** Explorer page for the deposit ADDRESS (always available). */
   explorerUrl: string;
+  /**
+   * Explorer page for the specific funding TRANSACTION whose depth
+   * `confirmedFundingConfirmations` reports (the least-confirmed confirmed
+   * deposit). Null until a confirmed funding tx is known — callers fall back
+   * to `explorerUrl`.
+   */
+  transactionExplorerUrl: string | null;
 }
 
 /**
@@ -166,10 +192,14 @@ export interface ChainAddressSummary {
 export interface ChainAdapter {
   network: ChainNetwork;
   estimateFees: () => Promise<ChainFeeEstimate>;
-  getAddressTransactions: (address: string) => Promise<ChainTransactionStatus[]>;
+  getAddressTransactions: (
+    address: string,
+  ) => Promise<ChainTransactionStatus[]>;
   getAddressStats?: (address: string) => Promise<ChainAddressStats>;
   getAddressSummary?: (address: string) => Promise<ChainAddressSummary>;
-  getTransactionStatus: (txid: string) => Promise<ChainTransactionStatus | null>;
+  getTransactionStatus: (
+    txid: string,
+  ) => Promise<ChainTransactionStatus | null>;
   broadcastTransaction: (rawTxHex: string) => Promise<{ txid: string }>;
   subscribeAddress?: (
     address: string,
@@ -205,7 +235,7 @@ export interface SecureStorageAdapter extends StorageAdapter {}
  */
 export interface QrEncoderAdapter {
   encode: (text: string) => Promise<{
-    kind: 'svg' | 'pngDataUri' | 'utf8';
+    kind: "svg" | "pngDataUri" | "utf8";
     data: string;
     size?: number;
   }>;

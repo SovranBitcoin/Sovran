@@ -30,10 +30,17 @@
  * trusted mint to create the quote.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createTestMachine, runScenario } from '../_harness';
 import { WALLETS, MINT1, MINT2 } from '../_harness/fixtures';
-import type { FlowScenario } from '../_harness/types';
+import type { FlowScenario, HandlerCall } from '../_harness/types';
+import { createDefaultScreenActionHandlers } from '../../src/screen-actions/defaultHandlers';
+import { createScreenActionManager } from '../../src/screen-actions/createManager';
+import type {
+  ScreenActionContext,
+  ScreenActionManager,
+} from '../../src/screen-actions/types';
+import type { PaymentMachine } from '../../src/machine/types';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -410,5 +417,137 @@ describe('mint quote — notification timeline', () => {
 
     const keys = tm.notificationCalls.map((c) => c.key);
     expect(keys).not.toContain('onTransactionCreated');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fixed Amount — end-to-end through the REAL amountEntry screen action
+//
+// Drives the whole "Receive → Fixed Amount → type an amount → Next → <variant>"
+// path the way the app does: the machine's enterAmount step feeds an entrySeed
+// into a REAL screen-action manager (default handlers + amountConfig), the
+// keypad amount is typed via setInput, and Next fires through the real
+// amountEntry.next handler back into the SAME machine.
+//
+// This is the wallet-level reproduction harness for the Fixed-Amount bug. It
+// nails the invariant that governs where each variant delivers its result —
+// EVERY variant now advances the machine to a terminal step the app navigates
+// off (a step handler, never a side-channel callback):
+//   • lightning / plain → mintQuoteCreated (executeMintQuote);
+//   • ecash → paymentRequestReceived (createPaymentRequestReceive) — the lane
+//     added to fix "as Ecash" doing nothing (it used to hop to the screen via
+//     a navigate() callback that silently no-op'd).
+// ---------------------------------------------------------------------------
+
+function buildAmountEntrySeed(stepData: unknown): Record<string, unknown> {
+  const data = stepData as {
+    unit: string;
+    preselectedMintUrl?: string;
+    constraints?: { destination?: string; methodContext?: unknown };
+  };
+  const constraints = data.constraints ?? {};
+  return {
+    destination: constraints.destination,
+    unit: data.unit,
+    selectedMintUrl: data.preselectedMintUrl ?? '',
+    ...(constraints.methodContext ? { methodContext: constraints.methodContext } : {}),
+  };
+}
+
+interface WiredAmount {
+  mgr: ScreenActionManager<'amountEntry'>;
+}
+
+function wireRealAmountScreen(
+  machine: PaymentMachine,
+  entrySeed: Record<string, unknown>,
+  proofAmounts: Record<string, number[]>,
+): WiredAmount {
+  const handlers = createDefaultScreenActionHandlers({
+    getMachine: () => machine,
+    getOperations: () => ({}),
+    notify: () => {},
+    navigation: {},
+  });
+
+  let mgrRef: ScreenActionManager<'amountEntry'> | null = null;
+  const mgr = createScreenActionManager<'amountEntry'>({
+    screenType: 'amountEntry',
+    handlers: {},
+    defaultHandlers: handlers.amountEntry,
+    getContext: (): ScreenActionContext => ({
+      entry: mgrRef?.getEntry() ?? {},
+      manager: null,
+      setEntry: (e: Record<string, unknown>) => mgrRef?.setEntry(e),
+    }),
+    amountConfig: {
+      getMintUrl: () => machine.getContext().mintUrl,
+      getProofAmounts: () => {
+        const mint = machine.getContext().mintUrl;
+        return mint ? (proofAmounts[mint] ?? []) : [];
+      },
+      getBtcPrice: () => 0,
+      offlineOptimization: () => machine.getContext().destination === 'sendEcash',
+      unit: () => machine.getContext().unit,
+    },
+  });
+  mgrRef = mgr;
+  mgr.setEntry(entrySeed);
+  return { mgr };
+}
+
+async function openFixedAmount(): Promise<{
+  tm: ReturnType<typeof createTestMachine>;
+  wired: WiredAmount;
+}> {
+  const tm = createTestMachine();
+  await tm.machine.startReceiveLightning({ reset: true });
+  expect(tm.machine.getStep()).toBe('enterAmount');
+  const call = tm.handlerCalls.find((c) => c.step === 'enterAmount') as HandlerCall;
+  const seed = buildAmountEntrySeed(call.data);
+  const wired = wireRealAmountScreen(tm.machine, seed, WALLETS.default.proofAmounts);
+  // Type 100 (setInput replaces the whole raw string, mirroring CustomKeyboard).
+  await wired.mgr.execute('setInput', { input: '100' });
+  return { tm, wired };
+}
+
+describe('Fixed Amount — end-to-end amountEntry.next', () => {
+  it('offers both ecash and lightning variants once an amount is entered', async () => {
+    const { wired } = await openFixedAmount();
+    const next = wired.mgr.inspect().next;
+    expect(next.available).toBe(true);
+    const ids = Object.fromEntries(
+      (next.variants ?? []).map((v) => [v.id, v.available]),
+    );
+    expect(ids.ecash).toBe(true);
+    expect(ids.lightning).toBe(true);
+  });
+
+  it('Next → "as Lightning" advances the machine to mintQuoteCreated', async () => {
+    const { tm, wired } = await openFixedAmount();
+    await wired.mgr.execute('next', { variantId: 'lightning' });
+    expect(tm.machine.getStep()).toBe('mintQuoteCreated');
+    expect(tm.operationCalls.find((c) => c.name === 'executeMintQuote')).toBeDefined();
+  });
+
+  it('Next → "as Ecash" advances the machine to paymentRequestReceived', async () => {
+    const { tm, wired } = await openFixedAmount();
+    await wired.mgr.execute('next', { variantId: 'ecash' });
+
+    // The machine drove the receive-request lane (auto-exec) to its terminal
+    // display step — the app navigates off THIS step handler, not a callback.
+    expect(tm.machine.getStep()).toBe('paymentRequestReceived');
+
+    const opCall = tm.operationCalls.find((c) => c.name === 'createPaymentRequestReceive');
+    expect(opCall).toBeDefined();
+    expect(opCall!.args[0]).toEqual({ amount: 100, unit: 'sat' });
+    // Ecash must not mint a Lightning quote.
+    expect(tm.operationCalls.find((c) => c.name === 'executeMintQuote')).toBeUndefined();
+
+    // The terminal step carries the encoded request the display screen renders.
+    const handlerCall = tm.handlerCalls.find((c) => c.step === 'paymentRequestReceived');
+    expect(handlerCall).toBeDefined();
+    const entry = JSON.parse((handlerCall!.data as { entry: string }).entry);
+    expect(entry).toMatchObject({ amount: 100, unit: 'sat', operationId: 'pr-op-1' });
   });
 });

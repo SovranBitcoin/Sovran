@@ -284,7 +284,17 @@ export interface AmountEntryConstraints {
    */
   recipientProfile?: import('./machine/types').RecipientProfile;
   methodContext?: AmountEntryMethodContext;
-  destination: 'paymentRequest' | 'meltQuote' | 'sendEcash' | 'mintQuote';
+  // 'receivePaymentRequest' = receive "as Ecash": a single-use NUT-18 request.
+  // It shares the mintQuote amount screen (same "receive a fixed amount" intent)
+  // but resolves to its own machine lane (createPaymentRequestReceive →
+  // paymentRequestReceived) so delivery rides a machine step handler, not a
+  // side-channel navigation callback.
+  destination:
+    | 'paymentRequest'
+    | 'meltQuote'
+    | 'sendEcash'
+    | 'mintQuote'
+    | 'receivePaymentRequest';
   /**
    * How the flow was entered (Create Ecash / scan / paste / contact) — lets
    * the amount screen render entry-appropriate chrome, e.g. a single

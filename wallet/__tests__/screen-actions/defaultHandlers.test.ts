@@ -1237,6 +1237,74 @@ describe('amountEntry default handlers', () => {
     });
   });
 
+  // ── Receive "as Ecash" (Fixed Amount → Next → as Ecash) ────────────────
+  //
+  // The receive-side ecash variant drives the machine into its own lane
+  // (destination 'receivePaymentRequest' → createPaymentRequestReceive →
+  // paymentRequestReceived) so its display screen is reached by a machine step
+  // handler — NOT a side-channel navigation callback. These lock that the
+  // handler hands off to the machine with the receive-request destination (the
+  // app bug where "as Ecash" did nothing traced to a navigate() no-op that the
+  // machine lane replaces).
+  describe('next — receive "as Ecash" (mintQuote + ecash variant)', () => {
+    const bolt11MintContext = {
+      trustedMintUrls: [MINT1],
+      mintBalances: { [MINT1]: 0 },
+      mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+        {
+          mintUrl: MINT1,
+          mintInfo: { nuts: { '4': { methods: [{ method: 'bolt11', unit: 'sat' }] } } },
+        },
+      ]),
+    };
+
+    function ecashReceiveEntry() {
+      return {
+        effectiveAmount: { value: 100, unit: 'sat' },
+        selectedMintUrl: MINT1,
+        destination: 'mintQuote',
+        unit: 'sat',
+        methodContext: bolt11MintContext,
+      };
+    }
+
+    it('hands off to the machine with the receivePaymentRequest destination', async () => {
+      const { handlers, machine } = createMockConfig();
+      const { mgr } = createManager('amountEntry', handlers, ecashReceiveEntry());
+
+      await mgr.execute('next', { variantId: 'ecash' });
+
+      expect(machine.enterAmount).toHaveBeenCalledWith(
+        { value: 100, unit: 'sat' },
+        MINT1,
+        expect.objectContaining({ destination: 'receivePaymentRequest' })
+      );
+    });
+
+    it('does not carry a mint-quote/melt method into the receive-request lane', async () => {
+      const { handlers, machine } = createMockConfig();
+      const { mgr } = createManager('amountEntry', handlers, ecashReceiveEntry());
+
+      await mgr.execute('next', { variantId: 'ecash' });
+
+      const opts = (machine.enterAmount as MockFn).mock.calls[0][2] as Record<string, unknown>;
+      expect(opts.mintQuoteMethod).toBeUndefined();
+      expect(opts.meltQuoteMethod).toBeUndefined();
+    });
+
+    it('does nothing when the effective amount is zero (gate closed)', async () => {
+      const { handlers, machine } = createMockConfig();
+      const { mgr } = createManager('amountEntry', handlers, {
+        ...ecashReceiveEntry(),
+        effectiveAmount: { value: 0, unit: 'sat' },
+      });
+
+      await mgr.execute('next', { variantId: 'ecash' });
+
+      expect(machine.enterAmount).not.toHaveBeenCalled();
+    });
+  });
+
   describe('paste', () => {
     it('delegates to machine.scan for sendEcash', async () => {
       const { handlers, machine } = createMockConfig();
