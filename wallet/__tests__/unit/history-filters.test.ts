@@ -68,6 +68,12 @@ describe('history state filters', () => {
     );
     expect(isSettledReceiveHistoryEntry({ type: 'mint', state: 'PAID' } as never)).toBe(true);
     expect(isSettledReceiveHistoryEntry({ type: 'mint', state: 'UNPAID' } as never)).toBe(false);
+    // A fully-credited deposit settles to ISSUED (v2 finalized), NOT PAID — it
+    // must still count as received. Regression: "Received this month" dropped
+    // every completed Lightning/bolt12/onchain deposit.
+    expect(isSettledReceiveHistoryEntry({ type: 'mint', state: 'ISSUED' } as never)).toBe(true);
+    expect(isSettledReceiveHistoryEntry({ type: 'mint', state: 'finalized' } as never)).toBe(true);
+    expect(isSettledReceiveHistoryEntry({ type: 'mint', state: 'executing' } as never)).toBe(true);
   });
 });
 

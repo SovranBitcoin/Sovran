@@ -99,7 +99,13 @@ export function isSettledReceiveHistoryEntry(
   return historyEntry.type === "receive"
     ? true
     : historyEntry.type === "mint"
-      ? String(historyEntry.state) === "PAID"
+      ? // A mint quote (Lightning / bolt12 / onchain deposit) counts as received
+        // once the mint has observed the payment. This spans BOTH the transient
+        // legacy `PAID` (v2 `executing`, minting) and the terminal `ISSUED` (v2
+        // `finalized`, ecash credited) — matching `isMintQuotePaymentObserved`.
+        // Matching only `PAID` dropped every fully-credited deposit (which ends
+        // at `ISSUED`) from "Received this month".
+        isMintQuotePaymentObserved(historyEntry)
       : false;
 }
 
