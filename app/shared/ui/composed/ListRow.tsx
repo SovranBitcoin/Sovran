@@ -97,6 +97,18 @@ interface ListRowProps {
   /** Trailing slot — chevron, icon, checkbox, spinner, button. */
   trailing?: ReactNode;
 
+  /**
+   * Set when `trailing` is its own tappable control (e.g. the mint row's
+   * 3-dot inspect button) on a row that also has `onPress`. heroui
+   * PressableFeedback's `Ripple` compound is an `absolute inset-0` overlay
+   * stacked ABOVE the row content whose container (not `pointerEvents:
+   * 'none'`) is the row's actual touch target — so a trailing button under
+   * it can never receive a touch and every tap fires the ROW action. This
+   * flag drops the ripple overlay (scale feedback remains) so the trailing
+   * control can win the tap.
+   */
+  trailingInteractive?: boolean;
+
   onPress?: () => void;
   disabled?: boolean;
   /** When true, render loading placeholders for string title/subtitle. */
@@ -152,6 +164,7 @@ export function ListRow({
   accent,
   accentPosition = 'inline',
   trailing,
+  trailingInteractive = false,
   onPress,
   disabled = false,
   loading = false,
@@ -336,7 +349,10 @@ export function ListRow({
       accessibilityState={{ disabled }}
       style={[disabled && styles.disabled, style]}>
       <PressableFeedback.Scale>{body}</PressableFeedback.Scale>
-      <PressableFeedback.Ripple />
+      {/* See `trailingInteractive` doc: the ripple overlay is the row's touch
+          target and sits above the trailing slot, so it must go when the
+          trailing node needs to receive taps itself. */}
+      {trailingInteractive ? null : <PressableFeedback.Ripple />}
     </PressableFeedback>
   );
 }

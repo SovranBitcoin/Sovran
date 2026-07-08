@@ -310,6 +310,11 @@ interface ContactRowProps {
 
   /** Full trailing override; beats every variant / kind default. */
   trailing?: ReactNode;
+  /** Set when a `trailing` override is its own tappable control on a row
+   *  that also has `onPress` — forwarded to ListRow so the row's ripple
+   *  overlay doesn't swallow the button's taps. Auto-set for the built-in
+   *  inspect button. */
+  trailingInteractive?: boolean;
   trailingVariant?: 'chevron' | 'spinner' | 'none';
   /** When set, a 3-dot button appears in the trailing slot if nothing else
    *  higher-priority takes it. */
@@ -642,6 +647,7 @@ export function ContactRow({
   selectionVariant = 'circle-check',
   accentPosition,
   trailing: trailingOverride,
+  trailingInteractive = false,
   trailingVariant,
   onInspectPress,
   onPress,
@@ -906,6 +912,7 @@ export function ContactRow({
 
   let trailingNode: ReactNode;
   let trailingSource: string;
+  let trailingIsInteractive = trailingInteractive;
   if (trailingOverride !== undefined) {
     trailingNode = trailingOverride;
     trailingSource = 'override';
@@ -924,6 +931,7 @@ export function ContactRow({
   } else if (inspectNode) {
     trailingNode = inspectNode;
     trailingSource = 'inspect';
+    trailingIsInteractive = true;
   } else if (geohash) {
     trailingNode = chevronNode;
     trailingSource = 'geohash-chevron';
@@ -1074,6 +1082,7 @@ export function ContactRow({
       accent={accentNode}
       accentPosition={accentPosition}
       trailing={trailingNode}
+      trailingInteractive={trailingIsInteractive && trailingNode != null}
       onPress={trackedPress}
       loading={resolvedLoading}
       disabled={disabled}

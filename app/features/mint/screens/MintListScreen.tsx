@@ -17,15 +17,12 @@ import { List } from '@/shared/ui/composed/List';
 import type { MintListItem } from 'wallet';
 import type { MintRow } from '@/features/mint/hooks/useMintRowsWithCache';
 
-import Icon from 'assets/icons';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import opacity from 'hex-color-opacity';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
-import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
-import { SquircleView } from '@/shared/ui/primitives/SquircleView';
+import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import {
   MintCurrencyTabs,
   MINT_CURRENCY_TABS_HEIGHT,
@@ -36,16 +33,12 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
-import { zIndex } from '@/shared/styles/tokens';
-
-// Inspect-button shape mirrors QRButton (rounded-square with continuous border
-// curve, borderRadius ≈ size × 0.18), but in a neutral surface color so it
-// reads as secondary action rather than the wallet's primary CTA. Sized to
-// match the avatar height so the [pfp][name/balance][button] row is balanced.
-const INSPECT_BUTTON_SIZE = 44;
-const INSPECT_BUTTON_RADIUS = Math.round(INSPECT_BUTTON_SIZE * 0.18);
 
 const CURRENCY_TABS_HEIGHT = MINT_CURRENCY_TABS_HEIGHT;
+
+// The currency badge ('units') is intentionally omitted: this screen already
+// has currency filter tabs, so a per-row BTC·USD pill is redundant noise.
+const MINT_ROW_STATS = ['score', 'audit', 'reputation', 'followers', 'offline'] as const;
 
 // Placeholder rows shown while the selector's items are still resolving. Stable
 // synthetic urls keep keys deterministic; their values are never read (the rows
@@ -94,49 +87,18 @@ function getMintDisabledReasonLabel(reason: MintListItem['reason']): string | nu
   return reason?.message ?? null;
 }
 
-// Reuses the same primitive as the transactions "View all" button: a
-// continuous-curve rounded rectangle with a `muted`-tinted border and a
-// `BlurCardFrame` background. Corner glows are suppressed (`glow={false}`)
-// because BlurCardFrame's gradients are calibrated to a 70 px box with a
-// 40 px diagonal fade — on a 44 px container the two opposite glows overlap
-// across the whole face and the 0.6-alpha corner pixel reads as a hotspot.
-// Without glows the button keeps the blur surface + soft border treatment
-// that ties it to the View-all family while still mirroring QRButton's shape.
+// Same liquid-glass circle as the send/receive modal action rows (icon-only,
+// `tabler:dots` + `ellipsis` mirrors CircleActionRow's "More" button). The
+// liquid variant renders scroll-safe GlassView glass on supported devices and
+// the shared flat chip elsewhere.
 function MintInspectButton({ onPress }: { onPress: () => void }) {
-  const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
-  const borderColor = opacity(muted, 0.3);
   return (
-    <Pressable
+    <CircleActionButton
+      icon="tabler:dots"
+      systemIcon="ellipsis"
       onPress={onPress}
-      hitSlop={6}
-      accessibilityRole="button"
       accessibilityLabel="Open mint page"
-      style={{
-        width: INSPECT_BUTTON_SIZE,
-        height: INSPECT_BUTTON_SIZE,
-      }}>
-      <SquircleView
-        style={{
-          flex: 1,
-          borderRadius: INSPECT_BUTTON_RADIUS,
-          borderCurve: 'continuous',
-          overflow: 'hidden',
-          borderWidth: 1,
-          borderColor,
-        }}>
-        <BlurCardFrame accentColor={muted} glow={false}>
-          <View
-            style={{
-              flex: 1,
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: zIndex.raised,
-            }}>
-            <Icon name="bx:dots-vertical-rounded" size={20} color={foreground} />
-          </View>
-        </BlurCardFrame>
-      </SquircleView>
-    </Pressable>
+    />
   );
 }
 
@@ -299,9 +261,11 @@ export const MintListScreen = memo(function MintListScreen({
       return (
         <ContactRow
           identity={mintIdentity(item)}
+          stats={MINT_ROW_STATS}
           disabled={isExecuting || item.status !== 'available'}
           disabledReason={getMintDisabledReasonLabel(item.reason) ?? undefined}
           trailing={trailing}
+          trailingInteractive={inspectable}
           trailingVariant={inspectable ? undefined : 'none'}
           accentPosition="below"
           // Stats roll in when cached values are replaced by fresh ones; the

@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { StyleSheet } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { GlassView } from 'expo-glass-effect';
@@ -49,19 +49,31 @@ export function CircleActionButtonLiquid(props: CircleActionButtonProps): React.
     [interactive, onPressIn, onPressOut, guardedPress]
   );
 
+  // The RNGH Tap above lives entirely OUTSIDE React Native's JS responder
+  // system, so an ancestor RN Pressable (e.g. a tappable list row embedding
+  // this button in its trailing slot, like the mint selector's ContactRow)
+  // sees no competing child, claims the touch, and fires ITS onPress for a
+  // tap meant for this button. Claiming the responder on a plain RN View
+  // (Expo's native GlassView may not deliver responder callbacks) blocks the
+  // ancestor press while the RNGH recognizer still fires natively. Termination
+  // stays allowed (default) so a drag that starts on the button still scrolls.
+  const claimResponder = useCallback(() => true, []);
+
   return (
     <CircleActionButtonShell {...props}>
-      <GestureDetector gesture={tap}>
-        <GlassView
-          glassEffectStyle="regular"
-          isInteractive={interactive}
-          style={[
-            styles.circle,
-            { width: CIRCLE_SIZE, height: CIRCLE_SIZE, borderRadius: CIRCLE_SIZE / 2 },
-          ]}>
-          <Icon name={icon} size={ICON_SIZE} color={iconColor} />
-        </GlassView>
-      </GestureDetector>
+      <View onStartShouldSetResponder={interactive ? claimResponder : undefined}>
+        <GestureDetector gesture={tap}>
+          <GlassView
+            glassEffectStyle="regular"
+            isInteractive={interactive}
+            style={[
+              styles.circle,
+              { width: CIRCLE_SIZE, height: CIRCLE_SIZE, borderRadius: CIRCLE_SIZE / 2 },
+            ]}>
+            <Icon name={icon} size={ICON_SIZE} color={iconColor} />
+          </GlassView>
+        </GestureDetector>
+      </View>
     </CircleActionButtonShell>
   );
 }
