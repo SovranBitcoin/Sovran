@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 import type {
   ChainAdapter,
@@ -6,11 +6,11 @@ import type {
   ChainAddressSummary,
   ChainFeeEstimate,
   ChainTransactionStatus,
-} from '../adapters';
-import { errField, logger } from '../logger';
-import { safeFetch, type RequestControls } from '../safeFetch';
+} from "../adapters";
+import { errField, logger } from "../logger";
+import { safeFetch, type RequestControls } from "../safeFetch";
 
-const MEMPOOL_API_BASE_URL = 'https://mempool.space/api';
+const MEMPOOL_API_BASE_URL = "https://mempool.space/api";
 const MEMPOOL_TIMEOUT_MS = 5_000;
 
 const AddressStats = z.object({
@@ -85,7 +85,7 @@ function loggableIssues(error: z.ZodError): Array<{
   code: string;
 }> {
   return error.issues.map((issue) => ({
-    path: issue.path.join('.'),
+    path: issue.path.join("."),
     code: issue.code,
   }));
 }
@@ -110,8 +110,8 @@ async function fetchJson<T>(
   init: RequestInit = {},
 ): Promise<T> {
   const startedAt = Date.now();
-  const method = init.method ?? 'GET';
-  logger.debug('chain.mempool.fetchJson.start', {
+  const method = init.method ?? "GET";
+  logger.debug("chain.mempool.fetchJson.start", {
     where,
     method,
     ...summarizeControls(controls),
@@ -121,10 +121,10 @@ async function fetchJson<T>(
     response = await safeFetch(
       url,
       { timeoutMs: MEMPOOL_TIMEOUT_MS, ...controls },
-      { headers: { Accept: 'application/json', ...init.headers }, ...init },
+      { headers: { Accept: "application/json", ...init.headers }, ...init },
     );
   } catch (error) {
-    logger.warn('chain.mempool.fetchJson.failed', {
+    logger.warn("chain.mempool.fetchJson.failed", {
       where,
       method,
       durationMs: Date.now() - startedAt,
@@ -132,7 +132,7 @@ async function fetchJson<T>(
     });
     throw error;
   }
-  logger.debug('chain.mempool.fetchJson.response', {
+  logger.debug("chain.mempool.fetchJson.response", {
     where,
     method,
     status: response.status,
@@ -140,7 +140,7 @@ async function fetchJson<T>(
     durationMs: Date.now() - startedAt,
   });
   if (!response.ok) {
-    logger.warn('chain.mempool.fetchJson.httpError', {
+    logger.warn("chain.mempool.fetchJson.httpError", {
       where,
       method,
       status: response.status,
@@ -152,7 +152,7 @@ async function fetchJson<T>(
   try {
     json = await response.json();
   } catch (error) {
-    logger.warn('chain.mempool.fetchJson.invalidJson', {
+    logger.warn("chain.mempool.fetchJson.invalidJson", {
       where,
       method,
       durationMs: Date.now() - startedAt,
@@ -162,7 +162,7 @@ async function fetchJson<T>(
   }
   const parsed = schema.safeParse(json);
   if (!parsed.success) {
-    logger.warn('chain.mempool.fetchJson.invalidShape', {
+    logger.warn("chain.mempool.fetchJson.invalidShape", {
       where,
       method,
       durationMs: Date.now() - startedAt,
@@ -170,7 +170,7 @@ async function fetchJson<T>(
     });
     throw new Error(`${where} response did not match expected schema`);
   }
-  logger.debug('chain.mempool.fetchJson.done', {
+  logger.debug("chain.mempool.fetchJson.done", {
     where,
     method,
     durationMs: Date.now() - startedAt,
@@ -185,8 +185,8 @@ async function fetchText(
   init: RequestInit = {},
 ): Promise<string> {
   const startedAt = Date.now();
-  const method = init.method ?? 'GET';
-  logger.debug('chain.mempool.fetchText.start', {
+  const method = init.method ?? "GET";
+  logger.debug("chain.mempool.fetchText.start", {
     where,
     method,
     ...summarizeControls(controls),
@@ -196,10 +196,10 @@ async function fetchText(
     response = await safeFetch(
       url,
       { timeoutMs: MEMPOOL_TIMEOUT_MS, ...controls },
-      { headers: { Accept: 'text/plain', ...init.headers }, ...init },
+      { headers: { Accept: "text/plain", ...init.headers }, ...init },
     );
   } catch (error) {
-    logger.warn('chain.mempool.fetchText.failed', {
+    logger.warn("chain.mempool.fetchText.failed", {
       where,
       method,
       durationMs: Date.now() - startedAt,
@@ -207,7 +207,7 @@ async function fetchText(
     });
     throw error;
   }
-  logger.debug('chain.mempool.fetchText.response', {
+  logger.debug("chain.mempool.fetchText.response", {
     where,
     method,
     status: response.status,
@@ -215,7 +215,7 @@ async function fetchText(
     durationMs: Date.now() - startedAt,
   });
   if (!response.ok) {
-    logger.warn('chain.mempool.fetchText.httpError', {
+    logger.warn("chain.mempool.fetchText.httpError", {
       where,
       method,
       status: response.status,
@@ -224,7 +224,7 @@ async function fetchText(
     throw new Error(`${where} failed with HTTP ${response.status}`);
   }
   const text = await response.text();
-  logger.debug('chain.mempool.fetchText.done', {
+  logger.debug("chain.mempool.fetchText.done", {
     where,
     method,
     textLength: text.length,
@@ -240,7 +240,7 @@ async function fetchMempoolAddressTxs(
   return fetchJson(
     `${MEMPOOL_API_BASE_URL}/address/${encodeURIComponent(address)}/txs`,
     MempoolTxsSchema,
-    'mempool/address/txs',
+    "mempool/address/txs",
     controls,
   );
 }
@@ -250,13 +250,13 @@ async function fetchMempoolTipHeight(
 ): Promise<number> {
   const text = await fetchText(
     `${MEMPOOL_API_BASE_URL}/blocks/tip/height`,
-    'mempool/blocks/tip/height',
+    "mempool/blocks/tip/height",
     controls,
   );
   const parsed = MempoolTipHeightSchema.safeParse(Number(text));
   if (!parsed.success) {
     throw new Error(
-      'mempool/blocks/tip/height response did not match expected schema',
+      "mempool/blocks/tip/height response did not match expected schema",
     );
   }
   return parsed.data;
@@ -266,7 +266,7 @@ function getFundingTxs(
   txs: MempoolTx[],
   address: string,
   tipHeight: number,
-): MempoolAddressStats['fundingTxs'] {
+): MempoolAddressStats["fundingTxs"] {
   const fundingTxs = txs
     .filter((tx) => tx.status.confirmed && tx.status.block_height != null)
     .map((tx) => {
@@ -283,7 +283,7 @@ function getFundingTxs(
       };
     })
     .filter(
-      (tx): tx is NonNullable<MempoolAddressStats['fundingTxs']>[number] =>
+      (tx): tx is NonNullable<MempoolAddressStats["fundingTxs"]>[number] =>
         tx !== null,
     );
 
@@ -313,17 +313,17 @@ export async function fetchMempoolAddressStats(
   address: string,
   controls: RequestControls = {},
 ): Promise<MempoolAddressStats> {
-  logger.info('chain.mempool.addressStats.start', {
+  logger.info("chain.mempool.addressStats.start", {
     ...summarizeAddress(address),
     ...summarizeControls(controls),
   });
   const stats = await fetchJson(
     `${MEMPOOL_API_BASE_URL}/address/${encodeURIComponent(address)}`,
     MempoolAddressStatsSchema,
-    'mempool/address',
+    "mempool/address",
     controls,
   );
-  logger.info('chain.mempool.addressStats.base', {
+  logger.info("chain.mempool.addressStats.base", {
     ...summarizeAddress(address),
     confirmedTxCount: stats.chain_stats.tx_count,
     mempoolTxCount: stats.mempool_stats.tx_count,
@@ -332,10 +332,10 @@ export async function fetchMempoolAddressStats(
   });
 
   if (stats.chain_stats.tx_count === 0) {
-    logger.info('chain.mempool.addressStats.done', {
+    logger.info("chain.mempool.addressStats.done", {
       ...summarizeAddress(address),
       enriched: false,
-      reason: 'no_confirmed_txs',
+      reason: "no_confirmed_txs",
     });
     return stats;
   }
@@ -346,7 +346,7 @@ export async function fetchMempoolAddressStats(
       fetchMempoolTipHeight(controls),
     ]);
     const fundingTxs = getFundingTxs(txs, stats.address, tipHeight);
-    logger.info('chain.mempool.addressStats.enriched', {
+    logger.info("chain.mempool.addressStats.enriched", {
       ...summarizeAddress(address),
       txCount: txs.length,
       tipHeight,
@@ -361,7 +361,7 @@ export async function fetchMempoolAddressStats(
       fundingTxs,
     };
   } catch (error) {
-    logger.warn('chain.mempool.addressStats.enrichmentFailed', {
+    logger.warn("chain.mempool.addressStats.enrichmentFailed", {
       ...summarizeAddress(address),
       error: errField(error),
     });
@@ -377,8 +377,18 @@ export function summarizeMempoolAddress(
     stats.chain_stats.funded_txo_sum - stats.chain_stats.spent_txo_sum;
   const unconfirmedNetSats =
     stats.mempool_stats.funded_txo_sum - stats.mempool_stats.spent_txo_sum;
-  const fundingConfirmations =
-    stats.fundingTxs?.map((tx) => tx.confirmations) ?? [];
+  const fundingTxs = stats.fundingTxs ?? [];
+  const fundingConfirmations = fundingTxs.map((tx) => tx.confirmations);
+  // The funding tx we report a depth for is the least-confirmed confirmed
+  // deposit (matches `confirmedFundingConfirmations`); link straight to it so
+  // "Open in explorer" lands on the transaction being confirmed.
+  const trackedFundingTx = fundingTxs.reduce<
+    (typeof fundingTxs)[number] | null
+  >(
+    (lowest, tx) =>
+      lowest == null || tx.confirmations < lowest.confirmations ? tx : lowest,
+    null,
+  );
 
   return {
     address: stats.address,
@@ -395,28 +405,31 @@ export function summarizeMempoolAddress(
     totalReceivedSats:
       confirmedReceivedSats + stats.mempool_stats.funded_txo_sum,
     explorerUrl: `https://mempool.space/address/${encodeURIComponent(stats.address)}`,
+    transactionExplorerUrl: trackedFundingTx
+      ? `https://mempool.space/tx/${encodeURIComponent(trackedFundingTx.txid)}`
+      : null,
   };
 }
 
 export interface MempoolSpaceChainAdapterOptions {
-  network?: ChainAdapter['network'];
+  network?: ChainAdapter["network"];
 }
 
 export function createMempoolSpaceChainAdapter(
   options: MempoolSpaceChainAdapterOptions = {},
 ): ChainAdapter {
-  const network = options.network ?? 'mainnet';
-  logger.info('chain.mempool.adapter.create', { network });
+  const network = options.network ?? "mainnet";
+  logger.info("chain.mempool.adapter.create", { network });
   return {
     network,
     estimateFees: async (): Promise<ChainFeeEstimate> => {
-      logger.info('chain.mempool.estimateFees.start', { network });
+      logger.info("chain.mempool.estimateFees.start", { network });
       const fees = await fetchJson(
         `${MEMPOOL_API_BASE_URL}/v1/fees/recommended`,
         MempoolFeeEstimateSchema,
-        'mempool/fees',
+        "mempool/fees",
       );
-      logger.info('chain.mempool.estimateFees.done', {
+      logger.info("chain.mempool.estimateFees.done", {
         network,
         fastestFee: fees.fastestFee,
         minimumFee: fees.minimumFee,
@@ -426,7 +439,7 @@ export function createMempoolSpaceChainAdapter(
     getAddressTransactions: async (
       address,
     ): Promise<ChainTransactionStatus[]> => {
-      logger.info('chain.mempool.addressTransactions.start', {
+      logger.info("chain.mempool.addressTransactions.start", {
         network,
         ...summarizeAddress(address),
       });
@@ -437,7 +450,7 @@ export function createMempoolSpaceChainAdapter(
       const transactions = txs.map((tx) =>
         toChainTransactionStatus(tx, tipHeight),
       );
-      logger.info('chain.mempool.addressTransactions.done', {
+      logger.info("chain.mempool.addressTransactions.done", {
         network,
         ...summarizeAddress(address),
         txCount: transactions.length,
@@ -453,14 +466,14 @@ export function createMempoolSpaceChainAdapter(
     getTransactionStatus: async (
       txid,
     ): Promise<ChainTransactionStatus | null> => {
-      logger.info('chain.mempool.txStatus.start', {
+      logger.info("chain.mempool.txStatus.start", {
         network,
         txidLength: txid.length,
       });
       const status = await fetchJson(
         `${MEMPOOL_API_BASE_URL}/tx/${encodeURIComponent(txid)}/status`,
         MempoolTxStatusSchema,
-        'mempool/tx/status',
+        "mempool/tx/status",
       );
       const tipHeight = status.confirmed
         ? await fetchMempoolTipHeight().catch(() => null)
@@ -477,7 +490,7 @@ export function createMempoolSpaceChainAdapter(
         ...(status.block_hash ? { blockHash: status.block_hash } : {}),
         confirmations,
       };
-      logger.info('chain.mempool.txStatus.done', {
+      logger.info("chain.mempool.txStatus.done", {
         network,
         txidLength: txid.length,
         confirmed: result.confirmed,
@@ -487,22 +500,22 @@ export function createMempoolSpaceChainAdapter(
       return result;
     },
     broadcastTransaction: async (rawTxHex): Promise<{ txid: string }> => {
-      logger.info('chain.mempool.broadcast.start', {
+      logger.info("chain.mempool.broadcast.start", {
         network,
         rawTxHexLength: rawTxHex.length,
       });
       const txid = await fetchText(
         `${MEMPOOL_API_BASE_URL}/tx`,
-        'mempool/tx',
+        "mempool/tx",
         {},
         {
-          method: 'POST',
+          method: "POST",
           body: rawTxHex,
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { "Content-Type": "text/plain" },
         },
       );
       const trimmed = txid.trim();
-      logger.info('chain.mempool.broadcast.done', {
+      logger.info("chain.mempool.broadcast.done", {
         network,
         txidLength: trimmed.length,
       });

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo } from 'react';
-import { useWindowDimensions } from 'react-native';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { StyleSheet, useWindowDimensions } from 'react-native';
 
 import type { MintInfo } from '@cashu/cashu-ts';
 import type { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
@@ -14,6 +14,7 @@ import {
   TransactionDetailShell,
   TransactionLocationSection,
   useBip321Info,
+  useIsTransactionHistoryView,
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { useMempoolAddressSummary } from '@/shared/hooks/useMempoolAddressSummary';
@@ -26,7 +27,12 @@ import {
 } from '@/shared/lib/cashu/onchainMint';
 import { formatAmount } from '@/shared/lib/currency';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { openExternalUrl } from '@/shared/lib/url';
 import { truncateMiddle } from '@/shared/lib/strings';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import Icon from 'assets/icons';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { Text } from '@/shared/ui/primitives/Text';
 import type { ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -66,6 +72,9 @@ export function OnchainReceiveScreen({
   const mempool = useMempoolAddressSummary(onchainAddress);
   const bip321 = useBip321Info(entry.id);
   const isPaid = isMintQuotePaymentObserved(entry);
+  // Opened from the transactions (history) list, not the live receive flow —
+  // the mint is fixed, so show the non-clickable "Receiving with" row.
+  const isHistoryView = useIsTransactionHistoryView();
   const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
   const requiredConfirmations = getOnchainMintQuoteRequiredConfirmations(
     entry as unknown as HistoryEntry,
@@ -86,6 +95,13 @@ export function OnchainReceiveScreen({
   );
   const paymentInfoValue =
     getMintQuotePaymentValue(entry as unknown as HistoryEntry) ?? entry.paymentRequest;
+  // Once the deposit is visible on our own explorer, offer a deep link to the
+  // funding transaction (falling back to the address page) so the user can
+  // watch confirmations at the source. Gated on an observed payment so the link
+  // only appears alongside the on-chain confirmation status.
+  const explorerLinkUrl = observedConfirmationProgress
+    ? (mempool.summary?.transactionExplorerUrl ?? mempool.summary?.explorerUrl ?? null)
+    : null;
 
   useEffect(() => {
     paymentLog.debug('receive.onchain.screen.render', {
@@ -201,7 +217,7 @@ export function OnchainReceiveScreen({
       }
       statusRow={
         <>
-          {!isPaid ? (
+          {!isPaid && !isHistoryView ? (
             <MintSelector
               width={quoteCardWidth}
               unit={entry.unit}
@@ -218,10 +234,13 @@ export function OnchainReceiveScreen({
         </>
       }
       timeline={
-        <HistoryEntryTimeline
-          historyEntry={entry as unknown as HistoryEntry}
-          onchainConfirmationProgress={onchainConfirmationProgress}
-        />
+        <>
+          <HistoryEntryTimeline
+            historyEntry={entry as unknown as HistoryEntry}
+            onchainConfirmationProgress={onchainConfirmationProgress}
+          />
+          {explorerLinkUrl && <OpenInExplorerLink url={explorerLinkUrl} />}
+        </>
       }>
       <DetailsSection
         items={[
@@ -253,3 +272,37 @@ export function OnchainReceiveScreen({
     </TransactionDetailShell>
   );
 }
+
+function OpenInExplorerLink({ url }: { url: string }) {
+  const linkColor = useThemeColor('link');
+  const handlePress = useCallback(() => {
+    paymentLog.info('receive.onchain.explorer.open', { urlLength: url.length });
+    void openExternalUrl(url).mapErr((error) => {
+      paymentLog.warn('receive.onchain.explorer.open_failed', { reason: error.type });
+      return error;
+    });
+  }, [url]);
+  return (
+    <Pressable
+      haptics
+      accessibilityRole="link"
+      accessibilityLabel="Open in explorer"
+      onPress={handlePress}
+      style={styles.explorerLink}>
+      <Text size={13} color={linkColor}>
+        Open in explorer
+      </Text>
+      <Icon name="lucide:arrow-up-right" size={14} color={linkColor} />
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  explorerLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 10,
+  },
+});

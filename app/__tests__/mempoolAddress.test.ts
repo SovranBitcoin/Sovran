@@ -66,6 +66,53 @@ describe('mempool address summaries', () => {
     );
 
     expect(summary.confirmedFundingConfirmations).toBe(2);
+    // Deep-links to the tx whose depth we report (the least-confirmed one).
+    expect(summary.transactionExplorerUrl).toBe('https://mempool.space/tx/b');
+  });
+
+  it('has no transaction explorer link until a confirmed funding tx is known', () => {
+    expect(summarizeMempoolAddress(stats()).transactionExplorerUrl).toBeNull();
+  });
+
+  it('carries funding-tx confirmations forward when a later poll drops enrichment', () => {
+    const cache = useMempoolAddressCache.getState();
+    // First poll enriched: 2/2 confirmations observed.
+    cache.setAddressStats(
+      ADDRESS,
+      stats({ fundingTxs: [{ txid: 'a', valueSats: 5_000, confirmations: 2 }] })
+    );
+    // Later poll's /txs enrichment failed → base stats only, no fundingTxs.
+    cache.setAddressStats(ADDRESS, stats());
+
+    const retained = useMempoolAddressCache.getState().byAddress[ADDRESS]?.stats;
+    // The confirmation count must NOT regress to "unknown" (which would flap the
+    // onchain timeline from "2/2 confirmations" back to a pulsing segment).
+    expect(retained?.fundingTxs).toEqual([{ txid: 'a', valueSats: 5_000, confirmations: 2 }]);
+    expect(summarizeMempoolAddress(retained!).confirmedFundingConfirmations).toBe(2);
+  });
+
+  it('does not resurrect funding once the address reads unfunded', () => {
+    const cache = useMempoolAddressCache.getState();
+    cache.setAddressStats(
+      ADDRESS,
+      stats({ fundingTxs: [{ txid: 'a', valueSats: 5_000, confirmations: 2 }] })
+    );
+    // Address now reports no confirmed txs — don't carry stale funding forward.
+    cache.setAddressStats(
+      ADDRESS,
+      stats({
+        chain_stats: {
+          tx_count: 0,
+          funded_txo_count: 0,
+          funded_txo_sum: 0,
+          spent_txo_count: 0,
+          spent_txo_sum: 0,
+        },
+      })
+    );
+
+    const retained = useMempoolAddressCache.getState().byAddress[ADDRESS]?.stats;
+    expect(retained?.fundingTxs).toBeUndefined();
   });
 
   it('returns a fresh cached value without refetching', async () => {

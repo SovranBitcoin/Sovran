@@ -44,6 +44,7 @@ describe('mint quote screen presentation', () => {
     unconfirmedNetSats: 0,
     totalReceivedSats: 0,
     explorerUrl: 'https://mempool.space/address/bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
+    transactionExplorerUrl: null,
   };
 
   it('titles onchain mint quotes separately from Lightning quotes', () => {

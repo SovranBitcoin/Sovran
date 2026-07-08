@@ -145,11 +145,42 @@ describe('buildTimeline (audit 61.json F-006)', () => {
       });
 
       expect(t.map((s) => s.stepType)).toEqual(['complete', 'current', 'future-small']);
+      // Mint quote is still UNPAID (coco op pending) — do NOT claim the payment
+      // was received; the mint hasn't credited the quote yet.
       expect(t[1]).toMatchObject({
         state: MintQuoteState.PAID,
-        displayLabel: 'Payment received',
+        displayLabel: 'Confirming on-chain',
         info: '1/6 confirmations',
       });
+      expect(t[1].displayLabel).not.toBe('Payment received');
+    });
+
+    it('onchain mint confirmed on-chain but not yet credited waits on the mint', () => {
+      // Regression: chain confirmations satisfied (2/2) while the mint quote is
+      // still UNPAID must not read as "Payment received". The terminal received
+      // milestone is gated on the mint marking the quote PAID (state executing/
+      // PAID/ISSUED), not on our own explorer's confirmation count.
+      const t = buildTimeline({
+        historyEntry: operationMintEntry({ state: 'pending' }),
+        currentTime: NOW,
+        onchainConfirmationProgress: {
+          hasPayment: true,
+          hasUnconfirmedPayment: false,
+          receivedSats: 25000,
+          currentConfirmations: 2,
+          requiredConfirmations: 2,
+          isSatisfied: true,
+        },
+      });
+
+      expect(t.map((s) => s.stepType)).toEqual(['complete', 'current', 'future-small']);
+      expect(t[1]).toMatchObject({
+        state: MintQuoteState.PAID,
+        displayLabel: 'Confirmed on-chain',
+        info: 'Waiting for mint to credit',
+      });
+      expect(t[1].displayLabel).not.toBe('Payment received');
+      expect(getStatusHeader(t)).toBe('CONFIRMED ON-CHAIN');
     });
 
     it('operation-backed executing mint maps to payment received', () => {

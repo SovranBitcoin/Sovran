@@ -71,15 +71,32 @@ export const useMempoolAddressCache = create<MempoolAddressCacheState>()(
           return;
         }
         set((state) => {
+          // Confirmation depth (`fundingTxs`) comes only from the enriched
+          // `/txs` + tip-height calls. A periodic poll whose enrichment failed
+          // returns base stats with NO `fundingTxs`, which would otherwise
+          // overwrite a known count and collapse the onchain timeline from
+          // "2/2 confirmations" back to a pulsing "confirming" segment. Carry
+          // the last-known funding txs forward so the count never regresses to
+          // "unknown" on a transient failure — a later successful poll (or a
+          // genuinely unfunded address, tx_count 0) supersedes them.
+          const prior = state.byAddress[key]?.stats;
+          const priorFunding = prior?.fundingTxs;
+          const carryForwardFunding =
+            (!stats.fundingTxs || stats.fundingTxs.length === 0) &&
+            !!priorFunding &&
+            priorFunding.length > 0 &&
+            stats.chain_stats.tx_count > 0;
+          const mergedStats = carryForwardFunding ? { ...stats, fundingTxs: priorFunding } : stats;
           const next = {
             ...state.byAddress,
-            [key]: { stats, fetchedAt: Date.now() },
+            [key]: { stats: mergedStats, fetchedAt: Date.now() },
           };
           evictIfOverCap(next);
           storeLog.debug('store.mempool_address.set', {
             ...summarizeAddress(address),
-            confirmedTxCount: stats.chain_stats.tx_count,
-            mempoolTxCount: stats.mempool_stats.tx_count,
+            confirmedTxCount: mergedStats.chain_stats.tx_count,
+            mempoolTxCount: mergedStats.mempool_stats.tx_count,
+            carriedForwardFundingTxs: carryForwardFunding,
             totalCached: Object.keys(next).length,
           });
           return { byAddress: next };
