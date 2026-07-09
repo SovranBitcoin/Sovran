@@ -685,16 +685,70 @@ export function usePaymentStatusListener(): void {
       paymentStatusPopup({ variant: 'send', id: operationId, mintUrl, amount, unit });
     });
 
-    const offMeltRolledBack = manager.on('melt-op:rolled-back', ({ operation }) => {
+    const offMeltRolledBack = manager.on('melt-op:rolled-back', ({ mintUrl, operation }) => {
       paymentLog.warn('hook.payment_status.melt_rolled_back', { error: operation.error });
+      if (!('amount' in operation)) {
+        paymentLog.warn('hook.payment_status.melt_rolled_back_missing_amount', {
+          operationId: operation.id,
+        });
+        return;
+      }
       const store = usePaymentStatusStore.getState();
-      if (store.active?.variant === 'melt' && store.active?.state === 'processing') {
+      const amount = amountToNumber(operation.amount);
+      const unit = operation.unit;
+      const activeMatches =
+        store.active?.variant === 'melt' &&
+        store.active.mintUrl === mintUrl &&
+        store.active.amount === amount &&
+        store.active.unit === unit;
+      if (activeMatches && store.active?.state === 'processing') {
         paymentLog.error('hook.payment_status.melt_failed', {
           id: store.active.id,
           error: operation.error,
         });
         store.setFailed(store.active.id, new Error(operation.error ?? 'Payment was rolled back'));
+        return;
       }
+      // Another melt toast already owns the surface (e.g. the fresh failed
+      // toast onPaymentFailed just created for this same rollback) — don't
+      // stack a duplicate.
+      if (activeMatches) {
+        paymentLog.info('hook.payment_status.melt_rolled_back_deduped', {
+          activeId: store.active?.id ?? null,
+          activeState: store.active?.state ?? null,
+        });
+        return;
+      }
+      // No active processing toast (onchain melts suppress it; the rollback
+      // may also land after the toast dismissed). A rollback returns funds
+      // silently otherwise — surface a fresh failed toast. Swap legs are
+      // melts too: while the unified swap toast owns the surface, stay quiet.
+      if (isSwapStatusActive()) {
+        paymentLog.info('hook.payment_status.suppressed_for_swap', {
+          phase: 'melt_rolled_back',
+        });
+        return;
+      }
+      const quoteId =
+        'quoteId' in operation && typeof operation.quoteId === 'string' ? operation.quoteId : null;
+      const id = quoteId ?? `melt-rolled-back-${Date.now()}`;
+      paymentLog.error('hook.payment_status.melt_new_failed_toast', {
+        quoteId,
+        ...mintUrlLogFields(mintUrl),
+        amount,
+        error: operation.error,
+        reason: 'no_matching_active_toast',
+      });
+      store.setActive({
+        variant: 'melt',
+        id,
+        mintUrl,
+        amount,
+        unit,
+        state: 'failed',
+        errorMessage: operation.error ?? 'Payment was rolled back',
+      });
+      paymentStatusPopup({ variant: 'melt', id, mintUrl, amount, unit });
     });
 
     const offMeltFinalized = manager.on(
