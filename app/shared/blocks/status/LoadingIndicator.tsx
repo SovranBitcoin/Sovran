@@ -37,6 +37,21 @@ import {
   type VisualLayoutConfig,
 } from '@/shared/lib/contentShiftLog';
 
+import {
+  CIRC,
+  IDLE_SEGMENT_DASH,
+  IDLE_SEGMENT_GAP,
+  RING_R,
+  RING_STROKE,
+  effectiveSegmentStroke,
+  idleDashPattern,
+  pendingStrokeScale,
+  resultDiscRadius,
+  segmentDash,
+  segmentStroke,
+  strokeUnitsForPx,
+} from './ringGeometry';
+
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
@@ -112,66 +127,26 @@ export interface LoadingIndicatorProps extends LoadingIndicatorVisualProps {
    *  width so rings and rail read as one weight. Dense segment rings clamp
    *  below the target to keep the seams between segments visible. */
   strokeWidthPx?: number;
+  /** Verbose diagnostics: when provided, the indicator reports every
+   *  transition it schedules — phase/result choreography (dash targets, spin
+   *  speed, disc fill, glyph draw-in and their delays), segmented-ring fills,
+   *  and per-segment breathe pulses. The caller owns the log sink and any
+   *  identifying context (e.g. HistoryEntryTimeline prefixes row/entry). */
+  onDebugEvent?: (event: string, params: Record<string, unknown>) => void;
 }
 
-// Geometry tuned so the disc fills ~76% of the size box (matches the
-// legacy PaymentStatusIcon's 75% disc-to-box ratio). The original demo
-// used r=22 (44% of size) which made the icons render visibly smaller
-// than the static `mdi:check-circle` Icon at the same size.
-const RING_R = 38;
-const CIRC = 2 * Math.PI * RING_R;
-const RING_STROKE = 3.5;
-// Segment arc thickness scales inversely with the segment count: a handful
-// of onchain-confirmation segments render thick and chunky, while a dense
-// 24-segment ring stays legible. See `segmentStroke()`.
-const SEGMENT_STROKE_MIN = 4.5;
-const SEGMENT_STROKE_MAX = 8.5;
-
-function segmentStroke(segmentCount: number): number {
-  return Math.max(SEGMENT_STROKE_MIN, Math.min(SEGMENT_STROKE_MAX, 54 / segmentCount));
-}
-
-/** Segment stroke in viewBox units, honouring a `strokeWidthPx` override.
- *  The override is clamped so round line caps (which extend each dash by
- *  stroke/2 per end) cannot swallow the seams on dense rings. */
-function effectiveSegmentStroke(segmentCount: number, overrideUnits: number | null): number {
-  const base = segmentStroke(segmentCount);
-  if (overrideUnits == null) return base;
-  const step = CIRC / segmentCount;
-  return Math.min(overrideUnits, Math.max(base, step * 0.5 - 2));
-}
-
-/** Dasharray gap between arc segments. Round caps extend each dash by
- *  stroke/2 per end, so the gap the eye sees is `gap - stroke`. Px-targeted
- *  strokes scale that visible gap with the stroke (0.75×, matching the
- *  sparse-ring look) so every ring style — idle dashes and segment rings of
- *  any count — shows the same seam weight; the default keeps the legacy
- *  proportional policy. */
-function segmentGapUnits(step: number, stroke: number, pxTargeted: boolean): number {
-  if (!pxTargeted) return Math.min(step * 0.5, Math.max(stroke + 4, step * 0.22));
-  const visibleGap = Math.max(4, stroke * 0.75);
-  return stroke + Math.max(0, Math.min(visibleGap, step - stroke - 1));
-}
+// Ring/seam/dash geometry (RING_R, stroke clamps, the shared seam-gap
+// policy, dash patterns) lives in `./ringGeometry` — both ring
+// implementations below consume it exclusively so they cannot drift apart.
 const ICON_STROKE = 6.5;
 const DEFAULT_SEGMENT_COUNT = 6;
 const MAX_SEGMENT_COUNT = 24;
 const SEGMENT_ANIM_MS = 340;
 const SEGMENT_STAGGER_MS = 55;
 const SEGMENT_PULSE_MS = 180;
-// Pending arcs render thinner than completed ones so a filling segment reads
-// as growing to full weight.
-const SEGMENT_PENDING_SCALE = 0.72;
 // The next-to-complete segment breathes a subtle colour/opacity pulse to signal
 // "this step is in progress". One half-cycle duration; loops (reversing).
 const SEGMENT_ACTIVE_PULSE_MS = 760;
-
-// Idle ring reads as a handful of discrete arc segments (echoing the
-// segmented confirmation ring) rather than a fine dotted hairline. Six
-// evenly spaced dashes around the circumference — `dash + gap` divides
-// CIRC exactly, so the seams land symmetrically and don't drift.
-const IDLE_SEGMENT_COUNT = 6;
-const IDLE_SEGMENT_GAP = 13;
-const IDLE_SEGMENT_DASH = CIRC / IDLE_SEGMENT_COUNT - IDLE_SEGMENT_GAP;
 
 const DASH: Record<Phase, [number, number]> = {
   idle: [IDLE_SEGMENT_DASH, IDLE_SEGMENT_GAP],
@@ -283,6 +258,52 @@ export function normalizeConfirmationProgress(
   };
 }
 
+interface SegmentCascade {
+  /** Completed count before the latest change — the base of the current
+   *  batch, i.e. the value the previous committed render showed. */
+  batchBase: number;
+  /** Cascade slot (0-based) for a segment index: its position within the
+   *  newly-completing batch, or 0 for segments outside the batch. */
+  cascadeOrderFor: (index: number) => number;
+  /** Extra stagger so the last segment of the final batch has started its
+   *  fill before the success disc resolves. */
+  finalBatchTailMs: number;
+}
+
+/**
+ * Cascade trick: when several segments complete in the same frame, fill them
+ * one at a time. Track the completed count before the latest change so each
+ * newly-completing segment can be delayed by its position within the batch —
+ * purely a visual stagger, the leg state still flips all at once.
+ *
+ * Render-adjust previous-value pattern: the batch base is captured in the
+ * SAME render the count flips and stays put until the next flip. The old
+ * version wrote the previous count to a ref from a useEffect, so the first
+ * re-render after the effect flush recomputed the cascade delays and
+ * `resultDelayMs` with a caught-up base — shrinking the delays mid-flight
+ * and re-firing the phase choreography with the mistimed values.
+ */
+function useSegmentCascade(completedSegments: number): SegmentCascade {
+  const [prevCompleted, setPrevCompleted] = React.useState(completedSegments);
+  // The base starts at 0 so a fresh mount with already-completed segments
+  // still cascades them in (legacy mount behavior).
+  const [batchBase, setBatchBase] = React.useState(0);
+  if (completedSegments !== prevCompleted) {
+    // Adjusting state during render: React restarts the render immediately,
+    // so the committed output always sees a base consistent with the new
+    // count — never a stale ref waiting on an effect flush.
+    setPrevCompleted(completedSegments);
+    setBatchBase(prevCompleted);
+  }
+  const base = completedSegments !== prevCompleted ? prevCompleted : batchBase;
+  return {
+    batchBase: base,
+    cascadeOrderFor: (index: number) =>
+      index >= base && index < completedSegments ? index - base : 0,
+    finalBatchTailMs: Math.max(0, completedSegments - base - 1) * SEGMENT_STAGGER_MS,
+  };
+}
+
 interface ConfirmationSegmentProps {
   index: number;
   segmentCount: number;
@@ -298,6 +319,7 @@ interface ConfirmationSegmentProps {
    *  neighbouring strokes: pending arcs keep full weight (instead of the
    *  grow-on-fill thinning) and seams scale with the stroke. */
   pxTargeted: boolean;
+  onDebugEvent?: (event: string, params: Record<string, unknown>) => void;
 }
 
 function ConfirmationSegment({
@@ -310,7 +332,18 @@ function ConfirmationSegment({
   delayMs,
   stroke,
   pxTargeted,
+  onDebugEvent,
 }: ConfirmationSegmentProps): React.ReactElement {
+  // Latest-callback ref: the parent recreates the closure every render; the
+  // ref keeps it out of the animation effects' dependency arrays so logging
+  // can never re-trigger a fill or breathe.
+  const debugEventRef = React.useRef(onDebugEvent);
+  debugEventRef.current = onDebugEvent;
+  // Render-time snapshot of geometry for the logs — kept in a ref so logging
+  // extra fields never widens the animation effects' dependency arrays.
+  const debugMetaRef = React.useRef({ index, segmentCount, stroke, pxTargeted });
+  debugMetaRef.current = { index, segmentCount, stroke, pxTargeted };
+  const wasBreathingRef = React.useRef(false);
   const progress = useSharedValue(completed ? 1 : 0);
   const pulse = useSharedValue(0);
   // Looping breathe for the active (next) segment; 0 when inactive/completed.
@@ -318,17 +351,23 @@ function ConfirmationSegment({
   const wasCompletedRef = React.useRef(completed);
   const mountedRef = React.useRef(false);
   // Read the latest delay at flip time without making it an effect dependency:
-  // the parent recomputes the cascade delay on every render, but only an actual
-  // completed→ transition should (re)fire the fill+pulse — otherwise a later,
-  // unrelated re-render would re-pulse an already-filled segment.
+  // the parent's cascade delay for this segment is stable between batches but
+  // changes again on the next batch flip (its cascade slot resets to 0), and
+  // only an actual completed→ transition should (re)fire the fill+pulse —
+  // otherwise a delay change alone would re-pulse an already-filled segment.
+  // Together with wasCompletedRef/mountedRef this keeps the fill effect keyed
+  // to real `completed` flips, not to dependency identity.
   const delayRef = React.useRef(delayMs);
   delayRef.current = delayMs;
-  const step = CIRC / segmentCount;
-  // Widen the gap with the stroke so round line caps don't close the seams
-  // between thick segments and blur the ring into one continuous arc.
-  const gap = segmentCount === 1 ? 0 : segmentGapUnits(step, stroke, pxTargeted);
-  const dash = Math.max(1, step - gap);
-  const pendingScale = pxTargeted ? 1 : SEGMENT_PENDING_SCALE;
+  // Dash/seam geometry comes from the shared module — see `segmentDash` for
+  // the seam policy and the dash-centering rationale.
+  const { strokeDasharray, strokeDashoffset } = segmentDash(
+    index,
+    segmentCount,
+    stroke,
+    pxTargeted
+  );
+  const pendingScale = pendingStrokeScale(pxTargeted);
 
   useEffect(() => {
     const firstMount = !mountedRef.current;
@@ -340,6 +379,20 @@ function ConfirmationSegment({
     // of segments completing in the same frame still fills one at a time.
     if (!transitioned && !firstMount) return;
     const segmentDelay = delayRef.current;
+
+    debugEventRef.current?.('dot.segment_fill', {
+      segmentIndex: debugMetaRef.current.index,
+      segmentCount: debugMetaRef.current.segmentCount,
+      strokeUnits: debugMetaRef.current.stroke,
+      pxTargeted: debugMetaRef.current.pxTargeted,
+      completed,
+      firstMount,
+      transitioned,
+      delayMs: segmentDelay,
+      fillDurationMs: SEGMENT_ANIM_MS,
+      completionPulse: completed,
+      pulseMs: SEGMENT_PULSE_MS,
+    });
 
     progress.set(
       withDelay(
@@ -373,6 +426,13 @@ function ConfirmationSegment({
 
   useEffect(() => {
     if (active && !completed) {
+      wasBreathingRef.current = true;
+      debugEventRef.current?.('dot.segment_breathe', {
+        segmentIndex: debugMetaRef.current.index,
+        segmentCount: debugMetaRef.current.segmentCount,
+        breathing: true,
+        halfCycleMs: SEGMENT_ACTIVE_PULSE_MS,
+      });
       activePulse.set(
         withRepeat(
           withTiming(1, { duration: SEGMENT_ACTIVE_PULSE_MS, easing: Easing.inOut(Easing.ease) }),
@@ -381,6 +441,16 @@ function ConfirmationSegment({
         )
       );
     } else {
+      if (wasBreathingRef.current) {
+        wasBreathingRef.current = false;
+        debugEventRef.current?.('dot.segment_breathe', {
+          segmentIndex: debugMetaRef.current.index,
+          segmentCount: debugMetaRef.current.segmentCount,
+          breathing: false,
+          reason: completed ? 'completed' : 'no-longer-active',
+          settleMs: SEGMENT_PULSE_MS,
+        });
+      }
       activePulse.set(
         withTiming(0, { duration: SEGMENT_PULSE_MS, easing: Easing.inOut(Easing.ease) })
       );
@@ -415,12 +485,8 @@ function ConfirmationSegment({
       r={RING_R}
       fill="none"
       strokeLinecap="round"
-      strokeDasharray={[dash, CIRC - dash]}
-      // Center each dash within its step so the seams straddle the step
-      // boundaries (12 o'clock and every step after it). Starting the dash AT
-      // the boundary would push the whole gap to the trailing side and the
-      // ring would read as rotated by half a gap.
-      strokeDashoffset={-(index * step + gap / 2)}
+      strokeDasharray={strokeDasharray}
+      strokeDashoffset={strokeDashoffset}
       transform="rotate(-90 50 50)"
       animatedProps={animatedProps}
     />
@@ -443,6 +509,7 @@ export function LoadingIndicator({
   segmentedInProgress = true,
   strokeWidthPx,
   pendingColor,
+  onDebugEvent,
   visualScope = 'loading.status_indicator',
   visualKey,
   visualSurface = 'shared',
@@ -481,17 +548,24 @@ export function LoadingIndicator({
           requiredConfirmations: confirmationRequired,
         });
   }, [confirmationCurrent, confirmationRequired, segmentCompleted, segmentCount]);
-  // Cascade trick: when several segments complete in the same frame, fill them
-  // one at a time. Track the previously-completed count (the value before this
-  // render committed) so each newly-completing segment can be delayed by its
-  // position within the batch — purely a visual stagger, the leg state still
-  // flips all at once.
+  // Segment fill stagger + result-disc hold — see `useSegmentCascade`. The
+  // batch base is computed in the same render the completed count flips, so
+  // the delays it feeds ConfirmationSegment and `resultDelayMs` can never
+  // read a stale previous value.
   const segCompleted = normalizedSegmentedProgress?.completedSegments ?? 0;
-  const prevSegCompletedRef = React.useRef(0);
-  const prevSegCompleted = prevSegCompletedRef.current;
-  React.useEffect(() => {
-    prevSegCompletedRef.current = segCompleted;
-  }, [segCompleted]);
+  const {
+    batchBase: prevSegCompleted,
+    cascadeOrderFor,
+    finalBatchTailMs,
+  } = useSegmentCascade(segCompleted);
+
+  // ── Verbose diagnostics ────────────────────────────────────────────────
+  // Latest-callback + render-snapshot refs: logging must never widen an
+  // animation effect's dependency array (that would re-fire choreography on
+  // unrelated re-renders), so effects read these refs instead of props.
+  const debugEventRef = React.useRef(onDebugEvent);
+  debugEventRef.current = onDebugEvent;
+  const debugSnapshotRef = React.useRef<Record<string, unknown>>({});
 
   // ── Unfilled-stroke chrome ─────────────────────────────────────────────
   // Single owner for how non-result strokes render — the idle dash ring, the
@@ -499,17 +573,17 @@ export function LoadingIndicator({
   // the whole indicator into chrome-matching mode (weight, seams, full
   // opacity) and `pendingColor` supplies the chrome colour; keep every such
   // decision here so the two ring implementations cannot drift apart again.
-  const strokeUnits =
-    strokeWidthPx != null && strokeWidthPx > 0 && size > 0 ? (strokeWidthPx * 100) / size : null;
+  const strokeUnits = strokeUnitsForPx(strokeWidthPx, size);
   const pxTargeted = strokeUnits != null;
   const unfilledColor = pendingColor ?? ringColor;
   const ringStrokeUnits = strokeUnits ?? RING_STROKE;
-  // Round caps extend each idle dash by stroke/2 per end, so a px-targeted
-  // ring recomputes the dash gap from the stroke — same seam policy as the
-  // segment rings — or the six dashes merge into a solid circle.
-  const idleGapUnits = pxTargeted
-    ? segmentGapUnits(CIRC / IDLE_SEGMENT_COUNT, ringStrokeUnits, true)
-    : IDLE_SEGMENT_GAP;
+  // Idle dash/gap/offset from the shared seam policy — same geometry source
+  // as the segment rings, so the two ring styles cannot drift apart.
+  const {
+    dash: idleDash,
+    gap: idleGap,
+    strokeDashoffset: idleDashOffset,
+  } = idleDashPattern(ringStrokeUnits, pxTargeted);
   // Chrome-matching renders unfilled strokes at full opacity — the muted
   // chrome colour carries the "not yet" signal, exactly like the unfilled
   // track of a neighbouring connector rail.
@@ -531,9 +605,7 @@ export function LoadingIndicator({
   // Hold the success disc until the last segment of the final batch has cascaded
   // in, so completing the whole ring in one frame still reads as a stagger
   // rather than an instant flip to the disc.
-  const finalBatchTail = segmentedComplete
-    ? Math.max(0, segCompleted - prevSegCompleted - 1) * SEGMENT_STAGGER_MS
-    : 0;
+  const finalBatchTail = segmentedComplete ? finalBatchTailMs : 0;
   const resultDelayMs = segmentedComplete ? SEGMENT_ANIM_MS + finalBatchTail : 0;
   const resultColor =
     effectiveResult === 'error'
@@ -543,6 +615,21 @@ export function LoadingIndicator({
         : effectiveResult === 'warning'
           ? warnColor
           : okColor;
+
+  debugSnapshotRef.current = {
+    size,
+    strokeWidthPx: strokeWidthPx ?? null,
+    pxTargeted,
+    ringColor,
+    unfilledColor,
+    resultColor,
+    idleRingOpacity,
+    segmentStrokeUnits,
+    playOnMount,
+    rawPhaseProp: phase,
+    rawResultProp: result,
+  };
+
   const visualInstanceKeyRef = React.useRef<string | null>(null);
   if (visualInstanceKeyRef.current === null) {
     loadingIndicatorVisualInstance += 1;
@@ -590,10 +677,60 @@ export function LoadingIndicator({
   const startedReverted = startedDone && startedResult === 'reverted';
   const startedWarning = startedDone && startedResult === 'warning';
 
-  const dashA = useSharedValue(
-    startedDone ? DASH.done[0] : CIRC / IDLE_SEGMENT_COUNT - idleGapUnits
-  );
-  const dashB = useSharedValue(startedDone ? DASH.done[1] : idleGapUnits);
+  React.useEffect(() => {
+    debugEventRef.current?.('dot.mount', {
+      // startedDone = mounted already-terminal: the draw-in choreography is
+      // skipped and the resolved frame paints immediately.
+      mountedTerminal: startedDone,
+      mountedResult: startedResult,
+      ...debugSnapshotRef.current,
+    });
+    return () => {
+      debugEventRef.current?.('dot.unmount', {});
+    };
+  }, [startedDone, startedResult]);
+
+  // One entry per segmented-ring change: which segments newly fill, the
+  // cascade stagger, and which segment breathes "in progress".
+  const lastLoggedSegmentsRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!normalizedSegmentedProgress) return;
+    const signature = `${normalizedSegmentedProgress.completedSegments}/${normalizedSegmentedProgress.segmentCount}|${segmentedInProgress}|${segmentedComplete}`;
+    if (lastLoggedSegmentsRef.current === signature) return;
+    const firstLog = lastLoggedSegmentsRef.current === null;
+    lastLoggedSegmentsRef.current = signature;
+    debugEventRef.current?.('dot.segments', {
+      firstLog,
+      completedSegments: normalizedSegmentedProgress.completedSegments,
+      segmentCount: normalizedSegmentedProgress.segmentCount,
+      prevCompletedSegments: prevSegCompleted,
+      newlyCompleting: Math.max(
+        0,
+        normalizedSegmentedProgress.completedSegments - prevSegCompleted
+      ),
+      cascadeStaggerMs: SEGMENT_STAGGER_MS,
+      fillDurationMs: SEGMENT_ANIM_MS,
+      segmentedInProgress,
+      breathingSegmentIndex:
+        segmentedInProgress &&
+        normalizedSegmentedProgress.completedSegments < normalizedSegmentedProgress.segmentCount
+          ? normalizedSegmentedProgress.completedSegments
+          : null,
+      ringComplete: segmentedComplete,
+      resultDelayMs,
+      transitionDelayMs,
+    });
+  }, [
+    normalizedSegmentedProgress,
+    prevSegCompleted,
+    segmentedInProgress,
+    segmentedComplete,
+    resultDelayMs,
+    transitionDelayMs,
+  ]);
+
+  const dashA = useSharedValue(startedDone ? DASH.done[0] : idleDash);
+  const dashB = useSharedValue(startedDone ? DASH.done[1] : idleGap);
   const ringOpac = useSharedValue(startedDone ? RING_OPAC.done : idleRingOpacity);
   const colorProgress = useSharedValue(startedDone ? 1 : 0);
 
@@ -631,10 +768,7 @@ export function LoadingIndicator({
       config: { duration: number; easing: EasingFunction | EasingFunctionFactory }
     ) => (d > 0 ? withDelay(d, withTiming(target, config)) : withTiming(target, config));
 
-    const [a, b] =
-      effectivePhase === 'idle'
-        ? [CIRC / IDLE_SEGMENT_COUNT - idleGapUnits, idleGapUnits]
-        : DASH[effectivePhase];
+    const [a, b] = effectivePhase === 'idle' ? [idleDash, idleGap] : DASH[effectivePhase];
     dashA.set(t(a, { duration: D_RING, easing: E_RING }));
     dashB.set(t(b, { duration: D_RING, easing: E_RING }));
     ringOpac.set(
@@ -644,6 +778,32 @@ export function LoadingIndicator({
       })
     );
     const nextSpeed = isSegmentedMode ? 0 : SPEED[effectivePhase];
+
+    debugEventRef.current?.('dot.transition', {
+      effectivePhase,
+      effectiveResult,
+      transitionDelayMs: d,
+      segmentedMode: isSegmentedMode,
+      // What this run schedules on the UI thread:
+      ringDashTarget: [a, b],
+      ringDashDurationMs: D_RING,
+      ringOpacityTarget: effectivePhase === 'idle' ? idleRingOpacity : RING_OPAC[effectivePhase],
+      spinTargetSpeed: nextSpeed,
+      showsResult: shouldShowResult,
+      resultDelayMs,
+      // Disc + glyph choreography (only meaningful when showsResult):
+      discAnim: shouldShowResult
+        ? {
+            startsAtMs: d + resultDelayMs + T_FILL,
+            fadeInMs: D_FILL_IN,
+            scaleInMs: D_FILL_SCALE,
+          }
+        : { fadeOutMs: D_FILL_OUT },
+      glyphDrawnIn: shouldShowResult ? effectiveResult : null,
+      glyphStartsAtMs: shouldShowResult ? d + resultDelayMs + T_ICON : null,
+      glyphDrawMs: shouldShowResult ? D_ICON_IN : D_ICON_OUT,
+      ...debugSnapshotRef.current,
+    });
 
     let speedTimer: ReturnType<typeof setTimeout> | null = null;
     if (d > 0) {
@@ -710,7 +870,8 @@ export function LoadingIndicator({
     shouldShowResult,
     resultDelayMs,
     normalizedSegmentedProgress,
-    idleGapUnits,
+    idleDash,
+    idleGap,
     idleRingOpacity,
     colorProgress,
     fillOpac,
@@ -754,10 +915,9 @@ export function LoadingIndicator({
   const revertAP = useAnimatedProps(() => ({ strokeDashoffset: revertOff.get() }));
   const wifiAP = useAnimatedProps(() => ({ strokeDashoffset: wifiOff.get() }));
   // The success disc must still cover the thickest arc it replaces, including
-  // an override-thickened segment ring.
-  const resultDiscRadius = isSegmentedMode
-    ? RING_R + Math.max(SEGMENT_STROKE_MAX, segmentStrokeUnits ?? 0) / 2
-    : RING_R;
+  // an override-thickened segment ring. `segmentStrokeUnits` is null exactly
+  // when the indicator is not segmented, so the plain ring keeps RING_R.
+  const discRadius = resultDiscRadius(segmentStrokeUnits);
 
   return (
     <View
@@ -842,7 +1002,7 @@ export function LoadingIndicator({
           <AnimatedCircle
             cx={50}
             cy={50}
-            r={resultDiscRadius}
+            r={discRadius}
             mask="url(#iconMask)"
             animatedProps={fillCircleAP}
           />
@@ -857,10 +1017,7 @@ export function LoadingIndicator({
               Array.from({ length: normalizedSegmentedProgress.segmentCount }, (_, index) => {
                 // Stagger only the segments newly completing in this batch; ones
                 // already filled (or still pending) keep the base delay.
-                const isNewlyCompleting =
-                  index >= prevSegCompleted &&
-                  index < normalizedSegmentedProgress.completedSegments;
-                const cascadeOrder = isNewlyCompleting ? index - prevSegCompleted : 0;
+                const cascadeOrder = cascadeOrderFor(index);
                 return (
                   <ConfirmationSegment
                     key={index}
@@ -880,6 +1037,7 @@ export function LoadingIndicator({
                       segmentStrokeUnits ?? segmentStroke(normalizedSegmentedProgress.segmentCount)
                     }
                     pxTargeted={pxTargeted}
+                    onDebugEvent={onDebugEvent}
                   />
                 );
               })
@@ -897,7 +1055,7 @@ export function LoadingIndicator({
               // symmetrically instead of trailing from the SVG path start at
               // 3 o'clock. Loading spins via the wrapper and done is a full
               // circle, so the offset is inert outside idle.
-              strokeDashoffset={-idleGapUnits / 2}
+              strokeDashoffset={idleDashOffset}
               transform="rotate(-90 50 50)"
               animatedProps={ringStrokeAP}
             />
