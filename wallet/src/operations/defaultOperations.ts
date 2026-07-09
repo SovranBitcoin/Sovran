@@ -248,7 +248,15 @@ async function executeOnchainMelt(
   }
 
   let feeIndex: number | null;
-  if (input.selectFeeIndex) {
+  if (feeOptions.length === 1) {
+    // A single option means there's nothing to choose (NUT-30 requires the
+    // wallet to echo a fee_index, not that the user pick one) — don't show a
+    // one-button sheet.
+    feeIndex = feeOptions[0]!.fee_index;
+    logger.info("operations.executeMeltOnchain.fee_auto_selected", {
+      feeIndex,
+    });
+  } else if (input.selectFeeIndex) {
     logger.info("operations.executeMeltOnchain.fee_options_shown", {
       optionCount: feeOptions.length,
     });

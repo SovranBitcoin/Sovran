@@ -620,6 +620,36 @@ describe('executeMelt — onchain (coco v2)', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it('auto-selects a lone fee option without showing the picker', async () => {
+    const { create, prepare, execute } = onchainMocks();
+    const soleOption = [{ fee_index: 3, fee_reserve: 450, estimated_blocks: 6 }];
+    create.mockResolvedValue({
+      mintUrl: MINT1,
+      method: 'onchain',
+      quoteId: 'omq-1',
+      fee_options: soleOption,
+    });
+    const selectOnchainFeeIndex = vi.fn().mockResolvedValue(0);
+    const mockManager = createMockManager({
+      quotes: { melt: { create } },
+      ops: { melt: { prepare, execute, cancel: vi.fn() } },
+    });
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      selectOnchainFeeIndex,
+    });
+
+    await ops.executeMelt!(MINT1, ADDRESS, 500, 'sat');
+    // NUT-30 requires echoing a fee_index, not that the user pick one — a
+    // one-button sheet is noise.
+    expect(selectOnchainFeeIndex).not.toHaveBeenCalled();
+    expect(prepare).toHaveBeenCalledWith({
+      quote: expect.objectContaining({ quoteId: 'omq-1' }),
+      feeIndex: 3,
+    });
+  });
+
   it('falls back to the cheapest fee option without a picker', async () => {
     const { quote, create, prepare, execute } = onchainMocks();
     const mockManager = createMockManager({
