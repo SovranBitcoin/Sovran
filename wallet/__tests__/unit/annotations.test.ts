@@ -86,12 +86,35 @@ describe("encodeAnnotation / decodeAnnotation", () => {
     const annotation: TransactionAnnotation = {
       onchainMelt: {
         outpoint: `${"ab".repeat(32)}:0`,
+        outpointSource: "heuristic",
         feeIndex: 1,
         feeReserveSats: 2000,
         effectiveFeeSats: 1450,
+        settledOffchain: true,
+        address: "bc1qexampledestination",
+        amountSats: 5000,
+        accelerated: true,
       },
     };
     expect(decodeAnnotation(encodeAnnotation(annotation))).toEqual(annotation);
+  });
+
+  it("omits settledOffchain:false entirely (absence means unknown/on-chain)", () => {
+    const record = encodeAnnotation({
+      onchainMelt: { settledOffchain: false, outpoint: "deadbeef:0" },
+    });
+    expect(record.onchainSettledOffchain).toBeUndefined();
+    expect(decodeAnnotation(record).onchainMelt).toEqual({
+      outpoint: "deadbeef:0",
+    });
+  });
+
+  it("treats an unknown outpointSource value as absent on decode", () => {
+    const decoded = decodeAnnotation({
+      onchainOutpoint: "deadbeef:1",
+      onchainOutpointSource: "garbage",
+    });
+    expect(decoded.onchainMelt).toEqual({ outpoint: "deadbeef:1" });
   });
 
   it("keeps a partial onchainMelt (outpoint only) and drops non-finite fees", () => {

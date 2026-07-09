@@ -41,9 +41,14 @@ export const ANNOTATION_KEYS = {
   creqP2pkLock: "creqP2pkLock",
   creqExcludedMints: "creqExcludedMints",
   onchainOutpoint: "onchainOutpoint",
+  onchainOutpointSource: "onchainOutpointSource",
   onchainFeeIndex: "onchainFeeIndex",
   onchainFeeReserveSats: "onchainFeeReserveSats",
   onchainEffectiveFeeSats: "onchainEffectiveFeeSats",
+  onchainSettledOffchain: "onchainSettledOffchain",
+  onchainAddress: "onchainAddress",
+  onchainAmountSats: "onchainAmountSats",
+  onchainAccelerated: "onchainAccelerated",
 } as const;
 
 /** The flat, persisted/merged form. coco-metadata-compatible. */
@@ -54,6 +59,9 @@ export type ScanMethod = "qr" | "nfc" | "paste" | "deeplink" | "ble";
 export type LockDirection = "incoming" | "outgoing";
 export type DistributionSource = "copy" | "share" | "airdrop" | "displayed";
 export type SwapRole = "mint" | "melt";
+/** Who produced a persisted onchain-melt outpoint: the mint's quote row, or
+ *  our own mempool.space destination-address match (best-effort). */
+export type OnchainOutpointSource = "mint" | "heuristic";
 
 /** The rich, decoded form callers read and write. Every field is optional. */
 export interface TransactionAnnotation {
@@ -107,12 +115,26 @@ export interface TransactionAnnotation {
    * `outpoint` is the spec `txid:vout`; `feeReserveSats` is the SELECTED
    * option's maximum fee; `effectiveFeeSats` is the actual settled cost when
    * coco reports one.
+   *
+   * `settledOffchain` persists the off-chain (internal) settlement verdict so
+   * reopening a completed send never re-derives it from live polling. A
+   * mint-provided `outpoint` always outranks it: readers must derive
+   * `settledInternally = settledOffchain && !outpoint`, and a `heuristic`
+   * `outpointSource` must be overwritten whenever the mint reports the real
+   * outpoint. `address`/`amountSats` are the melt destination facts needed to
+   * find the tx ourselves when the mint withholds the outpoint.
    */
   onchainMelt?: {
     outpoint?: string;
+    outpointSource?: OnchainOutpointSource;
     feeIndex?: number;
     feeReserveSats?: number;
     effectiveFeeSats?: number;
+    settledOffchain?: boolean;
+    address?: string;
+    amountSats?: number;
+    /** The tx was boosted via the mempool.space Accelerator. */
+    accelerated?: boolean;
   };
 }
 
@@ -227,6 +249,11 @@ export function encodeAnnotation(
 
   if (patch.onchainMelt) {
     setString(record, ANNOTATION_KEYS.onchainOutpoint, patch.onchainMelt.outpoint);
+    setString(
+      record,
+      ANNOTATION_KEYS.onchainOutpointSource,
+      patch.onchainMelt.outpointSource,
+    );
     setFiniteNumber(record, ANNOTATION_KEYS.onchainFeeIndex, patch.onchainMelt.feeIndex);
     setFiniteNumber(
       record,
@@ -238,6 +265,20 @@ export function encodeAnnotation(
       ANNOTATION_KEYS.onchainEffectiveFeeSats,
       patch.onchainMelt.effectiveFeeSats,
     );
+    // The verdict only ever flips one way (settled off-chain); absence means
+    // "unknown / on-chain", so only `true` is written.
+    if (patch.onchainMelt.settledOffchain === true) {
+      record[ANNOTATION_KEYS.onchainSettledOffchain] = "1";
+    }
+    setString(record, ANNOTATION_KEYS.onchainAddress, patch.onchainMelt.address);
+    setFiniteNumber(
+      record,
+      ANNOTATION_KEYS.onchainAmountSats,
+      patch.onchainMelt.amountSats,
+    );
+    if (patch.onchainMelt.accelerated === true) {
+      record[ANNOTATION_KEYS.onchainAccelerated] = "1";
+    }
   }
 
   return record;
@@ -376,6 +417,11 @@ export function decodeAnnotation(
   }
 
   const onchainOutpoint = record[ANNOTATION_KEYS.onchainOutpoint];
+  const onchainOutpointSourceRaw = record[ANNOTATION_KEYS.onchainOutpointSource];
+  const onchainOutpointSource =
+    onchainOutpointSourceRaw === "mint" || onchainOutpointSourceRaw === "heuristic"
+      ? (onchainOutpointSourceRaw as OnchainOutpointSource)
+      : undefined;
   const onchainFeeIndex = parseFiniteNumber(record[ANNOTATION_KEYS.onchainFeeIndex]);
   const onchainFeeReserveSats = parseFiniteNumber(
     record[ANNOTATION_KEYS.onchainFeeReserveSats],
@@ -383,19 +429,36 @@ export function decodeAnnotation(
   const onchainEffectiveFeeSats = parseFiniteNumber(
     record[ANNOTATION_KEYS.onchainEffectiveFeeSats],
   );
+  const onchainSettledOffchain =
+    record[ANNOTATION_KEYS.onchainSettledOffchain] === "1";
+  const onchainAddress = record[ANNOTATION_KEYS.onchainAddress];
+  const onchainAmountSats = parseFiniteNumber(
+    record[ANNOTATION_KEYS.onchainAmountSats],
+  );
+  const onchainAccelerated = record[ANNOTATION_KEYS.onchainAccelerated] === "1";
   if (
     onchainOutpoint ||
+    onchainOutpointSource ||
     onchainFeeIndex != null ||
     onchainFeeReserveSats != null ||
-    onchainEffectiveFeeSats != null
+    onchainEffectiveFeeSats != null ||
+    onchainSettledOffchain ||
+    onchainAddress ||
+    onchainAmountSats != null ||
+    onchainAccelerated
   ) {
     annotation.onchainMelt = {
       ...(onchainOutpoint ? { outpoint: onchainOutpoint } : {}),
+      ...(onchainOutpointSource ? { outpointSource: onchainOutpointSource } : {}),
       ...(onchainFeeIndex != null ? { feeIndex: onchainFeeIndex } : {}),
       ...(onchainFeeReserveSats != null ? { feeReserveSats: onchainFeeReserveSats } : {}),
       ...(onchainEffectiveFeeSats != null
         ? { effectiveFeeSats: onchainEffectiveFeeSats }
         : {}),
+      ...(onchainSettledOffchain ? { settledOffchain: true } : {}),
+      ...(onchainAddress ? { address: onchainAddress } : {}),
+      ...(onchainAmountSats != null ? { amountSats: onchainAmountSats } : {}),
+      ...(onchainAccelerated ? { accelerated: true } : {}),
     };
   }
 
