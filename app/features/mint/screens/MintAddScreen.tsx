@@ -325,15 +325,24 @@ export function MintAddScreen() {
 
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
   const [isAdding, setIsAdding] = useState(false);
-  const [selectedCurrency, setSelectedCurrency] = useState('ALL');
 
   // Receive-rail discovery CTAs deep-link here pre-filtered by the payment
-  // method the rail needs (?method=bolt12|onchain). Matching keys off nagg's
-  // per-mint supportedMethods field.
-  const { method: methodParam } = useLocalSearchParams<{ method?: string }>();
+  // method AND unit the rail needs (?method=bolt12|onchain&unit=sat). Matching
+  // keys off nagg's per-mint NUT-04 (method, unit) pairs; the unit seeds the
+  // currency tab so discovery opens on that unit and the method filter binds to
+  // the (method, unit) pair (see `discoveryMethodMatches`).
+  const { method: methodParam, unit: unitParam } = useLocalSearchParams<{
+    method?: string;
+    unit?: string;
+  }>();
   const methodFilter =
     methodParam === 'bolt12' || methodParam === 'onchain' ? methodParam : undefined;
   const methodLabel = methodFilter === 'bolt12' ? 'BOLT 12' : 'Onchain';
+  // Currency-tab values are uppercase unit codes ('SAT', 'USD', …) with 'ALL' as
+  // the no-filter sentinel; the rail unit is lowercase ('sat').
+  const [selectedCurrency, setSelectedCurrency] = useState(
+    unitParam ? unitParam.trim().toUpperCase() : 'ALL'
+  );
   useEffect(() => {
     if (methodFilter) cashuLog.info('mint.add.method_filter', { method: methodFilter });
   }, [methodFilter]);

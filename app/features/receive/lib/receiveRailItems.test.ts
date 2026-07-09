@@ -1,6 +1,7 @@
 import {
   classifyOnchainQuote,
   classifyPaymentRequest,
+  isExpiryElapsed,
   isRailItemCopyable,
 } from '@/features/receive/lib/receiveRailItems';
 
@@ -40,6 +41,25 @@ describe('receiveRailItems classification', () => {
 
     it('marks an unpaid live quote as reusable', () => {
       expect(classifyOnchainQuote(0, false)).toBe('reusable');
+    });
+  });
+
+  describe('isExpiryElapsed (mirrors coco isExpiredMintQuoteSnapshot)', () => {
+    const now = 1_783_520_800; // fixed "now" in seconds
+
+    it('treats expiry 0 as expired — coco reads 0 <= now, so bolt12 offers (expiry 0) are never watched', () => {
+      expect(isExpiryElapsed(0, now)).toBe(true);
+    });
+
+    it('treats null / undefined expiry as never-expiring', () => {
+      expect(isExpiryElapsed(null, now)).toBe(false);
+      expect(isExpiryElapsed(undefined, now)).toBe(false);
+    });
+
+    it('marks a past absolute expiry as elapsed and a future one as live', () => {
+      expect(isExpiryElapsed(now - 1, now)).toBe(true);
+      expect(isExpiryElapsed(now, now)).toBe(true);
+      expect(isExpiryElapsed(now + 1, now)).toBe(false);
     });
   });
 

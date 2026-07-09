@@ -120,6 +120,8 @@ vi.mock('../../src/detectors', () => ({
     // onchain addresses fall through to the built-in address recognizer.
     parseNpub: vi.fn(() => null),
     isLightningInvoice: vi.fn(() => false),
+    isBolt12Offer: vi.fn(() => false),
+    getBolt12Amount: vi.fn(() => null),
     isLightningAddress: vi.fn(() => false),
     isLnurlp: vi.fn(() => false),
     isPaymentRequest: vi.fn(() => false),
@@ -692,6 +694,60 @@ describe('executeMelt — onchain (coco v2)', () => {
       name: 'UnitRateUnavailableError',
     });
     expect(create).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// executeMelt — bolt12 (coco v2, NUT-25)
+// ---------------------------------------------------------------------------
+
+describe('executeMelt — bolt12 (coco v2)', () => {
+  const OFFER = 'lno1pqps7sjqpgtyzm3qv4uxzmtsd3jjqer9wd3hy6tsw35k7msjz';
+
+  it('creates a bolt12 melt quote (quote-first, no fee picker) and books the entry', async () => {
+    // The offer must classify as bolt12Offer — override the module-level mock.
+    (defaultDetectors.isBolt12Offer as ReturnType<typeof vi.fn>).mockImplementation(
+      (v: string) => v.toLowerCase().startsWith('lno1'),
+    );
+    const quote = { mintUrl: MINT1, method: 'bolt12', quoteId: 'b12q-1' };
+    const create = vi.fn().mockResolvedValue(quote);
+    const prepare = vi.fn().mockResolvedValue({ id: 'melt-op-b12', quoteId: 'b12q-1' });
+    const execute = vi.fn().mockResolvedValue({
+      id: 'melt-op-b12',
+      quoteId: 'b12q-1',
+      mintUrl: MINT1,
+      createdAt: 2222,
+      state: 'pending',
+      amount: 400,
+    });
+    const mockManager = createMockManager({
+      quotes: { melt: { create } },
+      ops: { melt: { prepare, execute, cancel: vi.fn() } },
+    });
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+    });
+
+    const result = await ops.executeMelt!(MINT1, OFFER, 400, 'sat');
+
+    // amountSats always supplied (required for amountless, validated for fixed).
+    expect(create).toHaveBeenCalledWith({
+      mintUrl: MINT1,
+      method: 'bolt12',
+      methodData: { offer: OFFER, amountSats: 400 },
+      unit: 'sat',
+    });
+    // Single fee_reserve → no feeIndex, unlike onchain.
+    expect(prepare).toHaveBeenCalledWith({ quote });
+    const entry = JSON.parse(result.historyEntry);
+    expect(entry).toMatchObject({
+      type: 'melt',
+      state: 'PENDING',
+      amount: 400,
+      metadata: { method: 'bolt12', meltTarget: OFFER },
+    });
+
+    (defaultDetectors.isBolt12Offer as ReturnType<typeof vi.fn>).mockReturnValue(false);
   });
 });
 

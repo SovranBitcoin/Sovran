@@ -127,7 +127,10 @@ function mapMeltOperationState(state: string): string {
 async function executeMeltWithRescue(
   mgr: Manager,
   operation: { id: string },
-  input: { mockFail: boolean; logPrefix: "executeMelt" | "executeMeltOnchain" },
+  input: {
+    mockFail: boolean;
+    logPrefix: "executeMelt" | "executeMeltOnchain" | "executeMeltBolt12";
+  },
 ): Promise<Awaited<ReturnType<Manager["ops"]["melt"]["execute"]>>> {
   const { logPrefix } = input;
   let result: Awaited<ReturnType<Manager["ops"]["melt"]["execute"]>>;
@@ -184,6 +187,13 @@ function buildMeltEntry(
 function extractOnchainAddress(meltTarget: string): string | null {
   const parsed = parsePaymentInput(meltTarget, defaultDetectors);
   const option = parsed?.options.find((o) => o.kind === "onchainAddress");
+  return option?.value ?? null;
+}
+
+/** Bare BOLT-12 offer from a melt target (`lno1…` or a bitcoin:?lno= URI). */
+function extractBolt12Offer(meltTarget: string): string | null {
+  const parsed = parsePaymentInput(meltTarget, defaultDetectors);
+  const option = parsed?.options.find((o) => o.kind === "bolt12Offer");
   return option?.value ?? null;
 }
 
@@ -1295,6 +1305,37 @@ export function createDefaultOperations(
           selectFeeIndex: config.selectOnchainFeeIndex,
           mockFail: mockFailEnabled("melt"),
         });
+      }
+
+      // BOLT-12 offer (`lno1…` or bitcoin:?lno=) — quote-first via coco's
+      // MeltBolt12Handler. Single fee_reserve (like bolt11), so no fee picker.
+      // `amountSats` is always supplied: required for an amountless offer, and a
+      // fixed offer's amount is validated by the mint against it.
+      const bolt12Offer = extractBolt12Offer(meltTarget);
+      if (bolt12Offer) {
+        logger.info("operations.executeMelt.bolt12.start", {
+          ...mintUrlFields(mintUrl),
+          amount,
+          unit,
+          offerLength: bolt12Offer.length,
+        });
+        const quote = await mgr.quotes.melt.create({
+          mintUrl,
+          method: "bolt12",
+          methodData: { offer: bolt12Offer, amountSats: toSatDenominated(amount) },
+          unit,
+        });
+        logger.info("operations.executeMelt.bolt12.quoteCreated", {
+          ...mintUrlFields(mintUrl),
+          quoteId: quote.quoteId,
+          unit,
+        });
+        const operation = await mgr.ops.melt.prepare({ quote });
+        const result = await executeMeltWithRescue(mgr, operation, {
+          mockFail: mockFailEnabled("melt"),
+          logPrefix: "executeMeltBolt12",
+        });
+        return buildMeltEntry(result, unit, { meltTarget, method: "bolt12" });
       }
 
       const targetKind = isLightningInvoiceBolt11(meltTarget)

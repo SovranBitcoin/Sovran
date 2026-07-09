@@ -62,6 +62,20 @@ export interface ReceiveRailItem {
   createdAt: number;
   /** Resolved child transaction for a paid fixed-amount row (tap → detail). */
   linkEntry?: HistoryEntry;
+  /**
+   * Whether coco is actively watching this reusable surface for an incoming
+   * payment right now. coco exposes no public per-quote "is watched" accessor
+   * (its `MintOperationWatcherService` registry is private), but its watch
+   * policy is deterministic: a pending mint quote for a trusted mint is watched
+   * until `shouldStopWatching` — exactly `isExpiredMintQuoteSnapshot` — so the
+   * honest per-row signal is "not expired by coco's own rule" (see
+   * `isExpiryElapsed`, which mirrors that gate incl. `expiry: 0` = expired).
+   * Verified against runtime logs: coco sends `onchain_mint_quote` subscriptions
+   * but ZERO `bolt12_mint_quote` ones, because bolt12 offers carry `expiry: 0`
+   * and coco reads that as expired. Left undefined for payment requests (a
+   * different, Nostr-based transport not governed by this watcher).
+   */
+  listening?: boolean;
 }
 
 /** Reusable/awaiting surfaces are safe to copy; settled/dead ones are not. */
@@ -89,8 +103,23 @@ function quoteAmountPaid(quote: MintQuote): number {
   return data?.amountPaid != null ? amountToNumber(data.amountPaid as never) : 0;
 }
 
+/**
+ * Whether an absolute-seconds `expiry` has elapsed, matching coco's own
+ * `isExpiredMintQuoteSnapshot` EXACTLY — including treating `0` as expired
+ * (`0 <= now`). This is deliberately coco's gate, NOT the app's reusable-QR
+ * `expiry <= 0 = never-expires` convention (`wallet/src/quotes/reusable.ts`),
+ * because it is precisely what coco's `MintOperationWatcherService` uses to
+ * decide whether to subscribe. So it is the ground truth for "is the wallet
+ * actually listening": bolt12 offers arrive with `expiry: 0` from the mint,
+ * coco reads that as expired and never watches them, so the rail must show them
+ * as expired / not listening to reflect reality.
+ */
+export function isExpiryElapsed(expiry: number | null | undefined, nowSeconds: number): boolean {
+  return expiry != null && expiry <= nowSeconds;
+}
+
 function isQuoteExpired(quote: MintQuote, nowSeconds: number): boolean {
-  return quote.expiry != null && quote.expiry > 0 && quote.expiry <= nowSeconds;
+  return isExpiryElapsed(quote.expiry, nowSeconds);
 }
 
 /** Non-reactive read of the global mint-metadata cache (safe outside React /
@@ -194,7 +223,8 @@ export async function buildOnchainItems(
   }
   return sorted.map((q) => {
     const paid = quoteAmountPaid(q);
-    const status = classifyOnchainQuote(paid, isQuoteExpired(q, nowSeconds));
+    const expired = isQuoteExpired(q, nowSeconds);
+    const status = classifyOnchainQuote(paid, expired);
     const mint = resolveMintDisplay(q.mintUrl);
     return {
       key: `onchain-${q.mintUrl}-${q.quoteId}`,
@@ -209,6 +239,10 @@ export async function buildOnchainItems(
       amount: paid > 0 ? { value: paid, unit: q.unit } : undefined,
       createdAt: q.createdAt,
       linkEntry: status === 'paid' ? index?.byQuoteId.get(q.quoteId) : undefined,
+      // coco watches until expiry (see `listening` docs); a reusable onchain
+      // address keeps being watched even after a deposit, so this is `!expired`
+      // (not tied to paid state).
+      listening: !expired,
     };
   });
 }
@@ -220,24 +254,31 @@ export async function buildBolt12Items(
   const pending = (await manager.quotes.mint.listPending({
     method: 'bolt12',
   })) as MintQuote[];
+  const nowSeconds = Math.floor(Date.now() / 1000);
   const sorted = [...pending].sort((a, b) => b.createdAt - a.createdAt);
-  // Bolt12 offers are one-per-mint and reusable: always copyable, never a
-  // privacy concern, so no history-link scan and status is always `reusable`.
+  // Bolt12 offers are one-per-mint and reusable, so no history-link scan. Status
+  // follows coco's own watch gate (`isExpiryElapsed`): mints issue bolt12 offers
+  // with `expiry: 0`, which coco reads as expired and never watches — so those
+  // read `expired` (not listening, not copyable), matching that coco isn't
+  // subscribed to them. A genuinely live offer (null/future expiry) is
+  // `reusable` (copyable, "Listening").
   return sorted.map((q) => {
     const paid = quoteAmountPaid(q);
+    const expired = isQuoteExpired(q, nowSeconds);
     const mint = resolveMintDisplay(q.mintUrl);
     return {
       key: `bolt12-${q.mintUrl}-${q.quoteId}`,
       rail: 'bolt12',
       request: q.request,
       copyTarget: 'bolt12Offer',
-      status: 'reusable',
+      status: expired ? 'expired' : 'reusable',
       isCurrent: opts.standingIds.has(q.quoteId),
       mintUrl: q.mintUrl,
       mintName: mint.name,
       mintIconUrl: mint.iconUrl,
       amount: paid > 0 ? { value: paid, unit: q.unit } : undefined,
       createdAt: q.createdAt,
+      listening: !expired,
     };
   });
 }

@@ -56,6 +56,9 @@ interface HistoryEntryTimelineProps {
   nostrSent?: boolean;
   /** For onchain mint quotes - network confirmations observed for the funding tx. */
   onchainConfirmationProgress?: OnchainConfirmationProgress | null;
+  /** For onchain SEND (melt) - true when the mint settled PAID internally (no
+   *  outpoint / on-chain tx), so the terminal copy must not claim "on-chain". */
+  onchainSettledInternally?: boolean;
 }
 
 const LINE_WIDTH = 3;
@@ -163,6 +166,7 @@ export function HistoryEntryTimeline({
   tokenCreated,
   nostrSent,
   onchainConfirmationProgress,
+  onchainSettledInternally,
 }: HistoryEntryTimelineProps) {
   const [foreground, mutedColor, successColor, dangerColor, warningColor] = useThemeColor([
     'foreground',
@@ -210,6 +214,7 @@ export function HistoryEntryTimeline({
         tokenCreated,
         nostrSent,
         onchainConfirmationProgress,
+        onchainSettledInternally,
         paymentCopy,
       }),
     [
@@ -219,6 +224,7 @@ export function HistoryEntryTimeline({
       tokenCreated,
       nostrSent,
       onchainConfirmationProgress,
+      onchainSettledInternally,
       paymentCopy,
     ]
   );
@@ -377,8 +383,14 @@ export function HistoryEntryTimeline({
             const lineType = nextItem ? getLineType(item, nextItem) : null;
             const isFutureState =
               item.stepType === 'next-pending' || item.stepType === 'future-small';
+            // The segmented block-confirmation ring renders on the row that owns
+            // it: the onchain mint deposit's PAID row, or any row buildTimeline
+            // explicitly flags (the onchain melt "In mempool" row).
+            const showConfirmationRing =
+              !!onchainConfirmationProgress &&
+              (item.confirmationRing || (isOnchainMint && item.state === MintQuoteState.PAID));
             const confirmationProgress =
-              isOnchainMint && item.state === MintQuoteState.PAID && onchainConfirmationProgress
+              showConfirmationRing && onchainConfirmationProgress
                 ? {
                     currentConfirmations: onchainConfirmationProgress.currentConfirmations,
                     requiredConfirmations: onchainConfirmationProgress.requiredConfirmations,

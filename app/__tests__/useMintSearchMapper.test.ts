@@ -1,4 +1,7 @@
-import { discoverMintToSearchResult } from '@/features/mint/hooks/useMintSearch';
+import {
+  discoverMintToSearchResult,
+  discoveryMethodMatches,
+} from '@/features/mint/hooks/useMintSearch';
 import type { DiscoverMint } from '@/shared/lib/apiClient';
 
 const base: DiscoverMint = {
@@ -47,6 +50,12 @@ describe('discoverMintToSearchResult', () => {
       review_count: 12,
       // Derived from nuts['4'].methods (deduped, order-preserving).
       supported_methods: ['bolt11', 'bolt12'],
+      // Full (method, unit) pairs retained for unit-aware discovery filtering.
+      supported_method_units: [
+        { method: 'bolt11', unit: 'sat' },
+        { method: 'bolt12', unit: 'sat' },
+        { method: 'bolt11', unit: 'usd' },
+      ],
     });
     // operator pubkey surfaced as a NUT-06 nostr contact for the profile path
     expect((r.info as { contact: { method: string; info: string }[] }).contact).toEqual([
@@ -73,5 +82,36 @@ describe('discoverMintToSearchResult', () => {
       review_count: 1,
     });
     expect((r.info as { contact: unknown[] }).contact).toEqual([]);
+  });
+});
+
+describe('discoveryMethodMatches — unit-aware (method, unit) pair filter', () => {
+  const mint = (mintUrl: string, methods: Array<{ method: string; unit: string }>) =>
+    discoverMintToSearchResult({
+      mintUrl,
+      averageScore: null,
+      reviewCount: 0,
+      nuts: { '4': { methods } },
+    });
+
+  const satBolt12 = mint('https://sat', [{ method: 'bolt12', unit: 'sat' }]);
+  const eurBolt12 = mint('https://eur', [{ method: 'bolt12', unit: 'eur' }]);
+
+  it('excludes a bolt12+eur-only mint for a (bolt12, SAT) rail, keeps bolt12+sat', () => {
+    expect(discoveryMethodMatches(satBolt12, 'bolt12', 'SAT')).toBe(true);
+    expect(discoveryMethodMatches(eurBolt12, 'bolt12', 'SAT')).toBe(false);
+  });
+
+  it("currency 'ALL' falls back to method-only (browse every unit)", () => {
+    expect(discoveryMethodMatches(eurBolt12, 'bolt12', 'ALL')).toBe(true);
+  });
+
+  it('no method filter leaves rows unfiltered', () => {
+    expect(discoveryMethodMatches(eurBolt12, undefined, 'SAT')).toBe(true);
+  });
+
+  it('matches case-insensitively and rejects the wrong method on the right unit', () => {
+    expect(discoveryMethodMatches(satBolt12, 'BOLT12', 'sat')).toBe(true);
+    expect(discoveryMethodMatches(satBolt12, 'onchain', 'SAT')).toBe(false);
   });
 });

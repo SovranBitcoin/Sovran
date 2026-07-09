@@ -103,10 +103,31 @@ async function loadRailItems(
     : buildBolt12Items(manager, { standingIds });
 }
 
+// Live "coco is watching this for a payment" indicator for the reusable rails
+// (onchain / bolt12), shown only when `item.listening === true` (see
+// `receiveRailItems` — it mirrors coco's own watch gate). A row coco isn't
+// watching falls through to its status badge instead ("Expired" / "Paid"), so
+// this pill is always the affirmative "Listening" state. The green dot pulses
+// (nativewind `animate-pulse`, the same utility the Skeleton primitive uses).
+const ListeningPill = memo(function ListeningPill({ green }: { green: string }) {
+  return (
+    <HStack align="center" gap={5}>
+      <View
+        className="animate-pulse"
+        style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: green }}
+      />
+      <Text size={12} bold color={green}>
+        Listening
+      </Text>
+    </HStack>
+  );
+});
+
 interface ReceiveRailRowProps {
   item: ReceiveRailItem;
   muted: string;
   accent: string;
+  green: string;
   onPress: (item: ReceiveRailItem) => void;
 }
 
@@ -114,6 +135,7 @@ const ReceiveRailRow = memo(function ReceiveRailRow({
   item,
   muted,
   accent,
+  green,
   onPress,
 }: ReceiveRailRowProps) {
   const badge = STATUS_BADGE[item.status];
@@ -152,9 +174,18 @@ const ReceiveRailRow = memo(function ReceiveRailRow({
           <ListGroup.ItemSuffix>
             <HStack align="center" gap={8}>
               {item.isCurrent ? <Icon name="mdi:check" size={18} color={accent} /> : null}
-              <Badge variant={badge.variant} icon={badge.icon} size={12}>
-                {badge.label}
-              </Badge>
+              {/* Reusable rails (onchain/bolt12) show the live "Listening" pill
+                  only when coco is actually watching. Not-watched rows fall to
+                  their status badge: "Expired" (e.g. bolt12 `expiry: 0`, which
+                  coco treats as expired) or "Paid" + tap-through. Payment
+                  requests keep their status badge (different transport). */}
+              {item.listening === true && item.status !== 'paid' ? (
+                <ListeningPill green={green} />
+              ) : (
+                <Badge variant={badge.variant} icon={badge.icon} size={12}>
+                  {badge.label}
+                </Badge>
+              )}
               {copyable ? (
                 <Icon name="lets-icons:copy" size={18} color={muted} />
               ) : item.linkEntry ? (
@@ -211,11 +242,12 @@ export function ReceiveRailListScreen() {
   const params = useRouteParams(ParamsSchema, { where: 'receive-flow.railList' });
   const manager = useColadaManager();
   const insets = useSafeAreaInsets();
-  const [background, foreground, accent, skeletonColor] = useThemeColor([
+  const [background, foreground, accent, skeletonColor, green] = useThemeColor([
     'background',
     'foreground',
     'accent',
     'surface-secondary',
+    'success',
   ] as const);
   const muted = opacity(foreground, 0.4);
 
@@ -306,7 +338,13 @@ export function ReceiveRailListScreen() {
               {state.items.map((item, index) => (
                 <React.Fragment key={item.key}>
                   {index > 0 ? <Separator className="mx-4" /> : null}
-                  <ReceiveRailRow item={item} muted={muted} accent={accent} onPress={handlePress} />
+                  <ReceiveRailRow
+                    item={item}
+                    muted={muted}
+                    accent={accent}
+                    green={green}
+                    onPress={handlePress}
+                  />
                 </React.Fragment>
               ))}
             </ListGroup>

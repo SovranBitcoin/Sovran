@@ -41,6 +41,7 @@ function summarizeIntent(intent: ResolvedIntent): Record<string, unknown> {
   switch (intent.type) {
     case "receiveToken":
     case "meltLightningInvoice":
+    case "meltBolt12Offer":
     case "meltLightningAddress":
     case "meltLnurlp":
     case "meltOnchainAddress":
@@ -100,6 +101,9 @@ function resolveForSingleOption(
 
     case "lightningInvoice":
       return { type: "meltLightningInvoice", option };
+
+    case "bolt12Offer":
+      return { type: "meltBolt12Offer", option };
 
     case "lightningAddress":
       return { type: "meltLightningAddress", option };

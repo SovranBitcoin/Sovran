@@ -53,6 +53,7 @@ function summarizeIntent(intent: ResolvedIntent): Record<string, unknown> {
           intent.info.transports?.map((transport) => transport.type) ?? [],
       };
     case "meltLightningInvoice":
+    case "meltBolt12Offer":
     case "meltLightningAddress":
     case "meltLnurlp":
     case "meltOnchainAddress":

@@ -164,6 +164,7 @@ function getDestination(intent: ResolvedIntent, ctx: FlowContext): Destination {
     case "sendPaymentRequest":
       return "paymentRequest";
     case "meltLightningInvoice":
+    case "meltBolt12Offer":
     case "meltLightningAddress":
     case "meltLnurlp":
     case "meltOnchainAddress":
@@ -541,6 +542,26 @@ export function resolveNext(
         errorResult(
           "NO_VALID_MINT",
           "No trusted mint supports onchain sending",
+        ),
+        {
+          reason: "no-trusted-mint-support",
+          unit: ctx.unit,
+        },
+      );
+    }
+  }
+  if (intent.type === "meltBolt12Offer") {
+    const requirement: MintMethodRequirement = {
+      operation: "melt",
+      method: "bolt12",
+      unit: ctx.unit,
+    };
+    if (!hasMintSupportingMethod(walletCtx, requirement)) {
+      return logStepResult(
+        "resolveNext.bolt12Unsupported",
+        errorResult(
+          "NO_VALID_MINT",
+          "No trusted mint supports BOLT 12 sending",
         ),
         {
           reason: "no-trusted-mint-support",

@@ -33,6 +33,7 @@ export {
 } from "./aggregate";
 export {
   normalizeHistoryEntries,
+  normalizeHistoryEntry,
   normalizeHistoryEntryState,
   serializeHistoryEntry,
 } from "./normalize";
@@ -44,6 +45,7 @@ export {
 export {
   buildTimeline,
   getCardLabel,
+  getHistoryEntryOnchainMeltAddress,
   getHistoryEntryOnchainMintAddress,
   getStatusColorType,
   getStatusHeader,

@@ -43,6 +43,137 @@ describe('history timeline', () => {
   });
 });
 
+describe('history timeline — onchain SEND (melt)', () => {
+  const meltEntry = (state: string) =>
+    ({
+      id: 'melt-op-1',
+      type: 'melt',
+      state,
+      mintUrl: 'https://mint.example.com',
+      amount: 5_000,
+      unit: 'sat',
+      createdAt: 1_700_000_000_000,
+      updatedAt: 1_700_000_000_000,
+      operationId: 'op-1',
+      quoteId: 'mq-1',
+      metadata: { method: 'onchain', onchainAddress: 'bc1qexample' },
+    }) as never;
+
+  const progress = (over: Record<string, unknown>) => ({
+    hasPayment: false,
+    hasUnconfirmedPayment: false,
+    receivedSats: 0,
+    currentConfirmations: null,
+    requiredConfirmations: 6,
+    isSatisfied: false,
+    ...over,
+  });
+
+  it('PENDING, not yet broadcast → Paid / Broadcasting… / Confirmed', () => {
+    const timeline = buildTimeline({
+      historyEntry: meltEntry('pending'),
+      currentTime: 1_700_000_000_000,
+      onchainConfirmationProgress: progress({ hasPayment: false }),
+    });
+    expect(timeline).toEqual([
+      expect.objectContaining({ displayLabel: 'Paid', stepType: 'complete' }),
+      expect.objectContaining({
+        displayLabel: 'Broadcasting…',
+        stepType: 'current',
+        info: 'Sending the transaction to the network',
+      }),
+      expect.objectContaining({ displayLabel: 'Confirmed', stepType: 'future-small' }),
+    ]);
+    // The broadcasting row shows no confirmation ring yet (no tx to count).
+    expect(timeline[1].confirmationRing).toBeUndefined();
+  });
+
+  it('broadcast + confirming → "In mempool · N/6 blocks" with the ring', () => {
+    const timeline = buildTimeline({
+      historyEntry: meltEntry('PAID'),
+      currentTime: 1_700_000_000_000,
+      onchainConfirmationProgress: progress({ hasPayment: true, currentConfirmations: 3 }),
+    });
+    expect(timeline[1]).toMatchObject({
+      displayLabel: 'In mempool',
+      stepType: 'current',
+      info: '3/6 blocks',
+      confirmationRing: true,
+    });
+    expect(timeline[2]).toMatchObject({ displayLabel: 'Confirmed', stepType: 'future-small' });
+  });
+
+  it('fully confirmed → "Confirmed" success, mempool row complete', () => {
+    const timeline = buildTimeline({
+      historyEntry: meltEntry('PAID'),
+      currentTime: 1_700_000_000_000,
+      onchainConfirmationProgress: progress({
+        hasPayment: true,
+        currentConfirmations: 6,
+        isSatisfied: true,
+      }),
+    });
+    expect(timeline[1]).toMatchObject({ displayLabel: 'In mempool', stepType: 'complete' });
+    expect(timeline[2]).toMatchObject({ displayLabel: 'Confirmed', stepType: 'success' });
+  });
+
+  // The mint can settle an onchain melt OFF-CHAIN (no outpoint / no broadcast).
+  // The network phase collapses to one row and no step label claims on-chain.
+  it('PAID + off-chain settlement → "Paid" / "Settled off-chain"', () => {
+    const timeline = buildTimeline({
+      historyEntry: meltEntry('PAID'),
+      currentTime: 1_700_000_000_000,
+      onchainConfirmationProgress: progress({ hasPayment: false, isSatisfied: true }),
+      onchainSettledInternally: true,
+    });
+    expect(timeline).toHaveLength(2);
+    expect(timeline[0]).toMatchObject({ displayLabel: 'Paid', stepType: 'complete' });
+    expect(timeline[1]).toMatchObject({
+      displayLabel: 'Settled off-chain',
+      stepType: 'success',
+      info: 'No on-chain transaction',
+    });
+    const labelClaimsOnChain = timeline.some((item) => /on-chain|mempool/i.test(item.displayLabel));
+    expect(labelClaimsOnChain).toBe(false);
+  });
+
+  // Device bug: a mint (cdk-ldk-bdk) settled off-chain but reported a state the
+  // melt-state mapping didn't recognise, so meltState fell to UNPAID and "Paid"
+  // rendered as a grey idle dot (with a grey connector) ABOVE the green "Settled
+  // off-chain". onchainSettledInternally must force "Paid" complete regardless.
+  it('off-chain settle with an unrecognised state → "Paid" still complete', () => {
+    const timeline = buildTimeline({
+      historyEntry: meltEntry('UNPAID'),
+      currentTime: 1_700_000_000_000,
+      onchainConfirmationProgress: progress({ hasPayment: false, isSatisfied: false }),
+      onchainSettledInternally: true,
+    });
+    expect(timeline[0]).toMatchObject({ displayLabel: 'Paid', stepType: 'complete' });
+    expect(timeline[1]).toMatchObject({ displayLabel: 'Settled off-chain', stepType: 'success' });
+  });
+
+  // coco v2 spells a reversed melt `rolled_back` (normalized to `rolledBack`);
+  // without dedicated handling it collapsed to the UNPAID default and a
+  // cancelled send rendered as if it were still waiting to be sent.
+  it.each(['rolled_back', 'rolledBack', 'rolling_back', 'failed'])(
+    '%s → Cancelled, funds returned (short-circuits before the onchain branch)',
+    (state) => {
+      const timeline = buildTimeline({
+        historyEntry: meltEntry(state),
+        currentTime: 1_700_000_000_000,
+      });
+      expect(timeline).toEqual([
+        expect.objectContaining({ stepType: 'complete' }),
+        expect.objectContaining({
+          displayLabel: 'Cancelled',
+          stepType: 'rolled-back',
+          info: 'Funds returned to your balance',
+        }),
+      ]);
+    }
+  );
+});
+
 describe('history timeline — incoming payment request (receive)', () => {
   const base = {
     id: 'pr-op-1',

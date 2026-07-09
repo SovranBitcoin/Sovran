@@ -38,7 +38,7 @@ import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog } from '@/shared/lib/logger';
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
 import { publishGiftWrappedDM } from '@/shared/lib/nostr/publishGiftWrappedDM';
@@ -209,6 +209,9 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         getActiveUnit: () => useMintStore.getState().activeUnit,
         // NUT-30 onchain melt fee picker. Runs BEFORE prepare (no proofs
         // reserved while the sheet is open); dismiss resolves null = cancel.
+        // Routed through the FullWindowOverlay-backed action-menu SHEET (not the
+        // menu-lane `actionMenuPopup`, which mounts BELOW the send-flow route
+        // modal + "Sending…" popup, leaving the fee buttons unclickable).
         selectOnchainFeeIndex: (options) =>
           new Promise((resolve) => {
             let settled = false;
@@ -220,7 +223,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
             paymentLog.info('send.onchain.fee_options_shown', {
               optionCount: options.length,
             });
-            actionMenuPopup({
+            actionMenuSheet({
               title: 'Network fee',
               onDismiss: () => {
                 paymentLog.info('send.onchain.fee_cancelled');

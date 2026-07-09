@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildOnchainConfirmationProgressFromTx,
   getOnchainConfirmationProgress,
+  parseOutpoint,
   summarizeMempoolAddress,
   type MempoolAddressStats,
 } from '../../src/chain';
@@ -69,6 +71,51 @@ describe('chain address summaries', () => {
       currentConfirmations: null,
       requiredConfirmations: 6,
       isSatisfied: false,
+    });
+  });
+});
+
+describe('parseOutpoint (onchain melt txid:vout)', () => {
+  const TXID = 'a'.repeat(64);
+
+  it('splits a valid outpoint into txid + vout', () => {
+    expect(parseOutpoint(`${TXID.toUpperCase()}:2`)).toEqual({ txid: TXID, vout: 2 });
+    expect(parseOutpoint(`${TXID}:0`)).toEqual({ txid: TXID, vout: 0 });
+  });
+
+  it('rejects null / malformed outpoints', () => {
+    expect(parseOutpoint(null)).toBeNull();
+    expect(parseOutpoint(undefined)).toBeNull();
+    expect(parseOutpoint(TXID)).toBeNull(); // no vout
+    expect(parseOutpoint(`${TXID}:x`)).toBeNull(); // non-numeric vout
+    expect(parseOutpoint('deadbeef:0')).toBeNull(); // short txid
+  });
+});
+
+describe('buildOnchainConfirmationProgressFromTx (onchain SEND)', () => {
+  it('returns null when the tx is not observable yet', () => {
+    expect(buildOnchainConfirmationProgressFromTx(null, 6)).toBeNull();
+  });
+
+  it('treats a mempool (0-conf) tx as an unconfirmed payment', () => {
+    expect(buildOnchainConfirmationProgressFromTx({ confirmed: false, confirmations: 0 }, 6)).toMatchObject({
+      hasPayment: true,
+      hasUnconfirmedPayment: true,
+      currentConfirmations: null,
+      requiredConfirmations: 6,
+      isSatisfied: false,
+    });
+  });
+
+  it('counts confirmations, capping at the required target', () => {
+    expect(buildOnchainConfirmationProgressFromTx({ confirmed: true, confirmations: 3 }, 6)).toMatchObject({
+      hasUnconfirmedPayment: false,
+      currentConfirmations: 3,
+      isSatisfied: false,
+    });
+    expect(buildOnchainConfirmationProgressFromTx({ confirmed: true, confirmations: 9 }, 6)).toMatchObject({
+      currentConfirmations: 6, // capped
+      isSatisfied: true,
     });
   });
 });

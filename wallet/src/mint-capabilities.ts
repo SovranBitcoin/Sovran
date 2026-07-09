@@ -391,11 +391,11 @@ export function getMintMethodCapability(
 }
 
 export function isMethodImplemented(
-  requirement: MintMethodRequirement,
+  _requirement: MintMethodRequirement,
 ): boolean {
   // coco v2: bolt11 mint+melt, onchain mint+melt, bolt12 mint (reusable
-  // offers). Bolt12 SEND (paying an offer) is not wired into the app yet.
-  if (requirement.method === "bolt12") return requirement.operation === "mint";
+  // offers) + melt (paying an offer, wired via the bolt12 melt path in
+  // defaultOperations.executeMelt). All method/operation pairs are implemented.
   return true;
 }
 
@@ -770,6 +770,13 @@ export function getUnitAmountEnvelope(
   ctx: Pick<WalletContext, "trustedMintUrls" | "mintMethodCapabilities">,
   unit: string,
   destination: AmountEntryConstraints["destination"] | undefined,
+  /**
+   * The method actually in play for this destination — `meltQuoteMethod` for a
+   * melt, `mintQuoteMethod` for a mint. When known, the envelope reflects that
+   * one rail's NUT-04/05 bounds; when omitted, it unions across all implemented
+   * rails (loosest envelope).
+   */
+  method?: MintPaymentMethod,
 ): AmountEntryEnvelope {
   const normalizedUnit = normalizeUnit(unit);
   const uncapped: AmountEntryEnvelope = {
@@ -780,11 +787,20 @@ export function getUnitAmountEnvelope(
 
   let requirements: MintMethodRequirement[];
   if (destination === "meltQuote") {
-    // Lightning is the only executable spend rail; onchain send is listed
-    // but forced unavailable ("not supported yet") and must not constrain.
-    requirements = [
-      { operation: "melt", method: "bolt11", unit: normalizedUnit },
-    ];
+    // The envelope reflects the melt method actually being spent — a bolt11
+    // invoice, a bolt12 offer, or an onchain address (set on the flow ctx at
+    // scan time). onchain/bolt12 melts are first-class now, so their advertised
+    // NUT-05 min/max (e.g. onchain's higher floor) apply to typing exactly like
+    // Lightning's. Method unknown → union across all melt rails so the keypad
+    // only clamps where NO rail could serve.
+    const meltMethods: MintPaymentMethod[] = method
+      ? [method]
+      : ["bolt11", "bolt12", "onchain"];
+    requirements = meltMethods.map((m) => ({
+      operation: "melt",
+      method: m,
+      unit: normalizedUnit,
+    }));
   } else if (destination === "mintQuote") {
     // Receive offers "as Ecash" (NUT-18 payment request — unbounded)
     // whenever a trusted mint exists, so the envelope only bites when the

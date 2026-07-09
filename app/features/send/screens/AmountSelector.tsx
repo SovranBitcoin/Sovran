@@ -263,7 +263,14 @@ export function AmountSelector({
 
   const nextLoading = machineBusy || actions.next.loading;
   const nextDisabled = !actions.next.available;
-  const nextNoticeText = nextDisabled ? actions.next.reason : undefined;
+  // A below-minimum amount is a transient typing state (e.g. mid-entry on an
+  // onchain send whose mint floors at 1,000 sat) — not an error. Surface it as
+  // the neutral warning hint ("Minimum X"), like the max cap, instead of the
+  // red problem notice. Every other disable reason stays red.
+  const nextReasonBelowMin = actions.next.reasonCode === 'AMOUNT_BELOW_MINT_MIN';
+  const nextNoticeText =
+    nextDisabled && !nextReasonBelowMin ? actions.next.reason : undefined;
+  const minNoticeText = nextReasonBelowMin ? actions.next.reason : null;
   // Typing hit the cross-method envelope max and was capped — tell the user
   // why the digits stopped. Warning-tinted (the capped amount is valid).
   const clampNoticeText = useMemo(() => {
@@ -359,7 +366,7 @@ export function AmountSelector({
         secondaryDisplay={secondaryDisplay}
         onToggleMode={handleToggle}
         unitIndicator={unitIndicator}
-        warningText={clampNoticeText}
+        warningText={clampNoticeText ?? minNoticeText}
         suggestions={suggestions}
         onSuggestionTap={handleSuggestionTap}
         extraButtons={extraButtons}

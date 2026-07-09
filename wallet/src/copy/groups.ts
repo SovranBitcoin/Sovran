@@ -57,6 +57,27 @@ function buildPaymentCopyGroups(text: PaymentCopyText) {
         label: text("timeline.melt.expired.label"),
         info: text("timeline.melt.expired.info"),
       },
+      rolledBack: {
+        label: text("timeline.melt.rolledBack.label"),
+        info: text("timeline.melt.rolledBack.info"),
+      },
+      // Onchain SEND (NUT-30): "Paid" (ecash spent) → the bitcoin network phase
+      // ("Broadcasting…" → "In mempool · N/6 blocks", segmented ring) →
+      // "Confirmed". If the mint settles off-chain (no outpoint) the network
+      // phase collapses to "Settled off-chain".
+      onchain: {
+        paid: { label: text("timeline.melt.onchain.paid.label") },
+        broadcasting: {
+          label: text("timeline.melt.onchain.broadcasting.label"),
+          info: text("timeline.melt.onchain.broadcasting.info"),
+        },
+        mempool: { label: text("timeline.melt.onchain.mempool.label") },
+        confirmed: { label: text("timeline.melt.onchain.confirmed.label") },
+        offchain: {
+          label: text("timeline.melt.onchain.offchain.label"),
+          info: text("timeline.melt.onchain.offchain.info"),
+        },
+      },
     },
 
     SEND_COPY: {

@@ -191,6 +191,21 @@ export function extractWebWalletToken(value: string): string | null {
   return null;
 }
 
+// QR codes encode bech32/Lightning payloads in UPPERCASE (denser alphanumeric
+// mode). bolt11/bolt12/LNURL/bech32-addresses are single-case and
+// case-insensitive, so an all-caps one must be lowercased before its decoder
+// will accept it. base64url payloads (cashu `cashuA/B`, NUT-18 `creq`) are
+// case-SENSITIVE and always contain lowercase, so they never match this and are
+// left untouched.
+const LN_BECH32_UPPER_PREFIX = /^(LNBC|LNTB|LNTBS|LNBCRT|LNO1|LNURL1|BC1|TB1|BCRT1)/;
+
+function lowercaseLnBech32Variant(value: string): string | null {
+  if (/[a-z]/.test(value)) return null; // has lowercase → not an all-caps QR body
+  if (!LN_BECH32_UPPER_PREFIX.test(value)) return null;
+  const lowered = value.toLowerCase();
+  return lowered !== value ? lowered : null;
+}
+
 /**
  * Produce a set of input variants for detection: raw, stripped, decoded,
  * and decoded-stripped. Deduplicates automatically.
@@ -206,6 +221,12 @@ export function inputVariants(raw: string): Set<string> {
   variants.add(stripped);
   variants.add(decodedRaw);
   variants.add(decodedStripped);
+
+  // Uppercase QR bech32/LN bodies → lowercase so decoders accept them.
+  for (const v of [sanitized, stripped]) {
+    const lowered = lowercaseLnBech32Variant(v);
+    if (lowered) variants.add(lowered);
+  }
 
   const webWalletToken = extractWebWalletToken(sanitized);
   if (webWalletToken) {

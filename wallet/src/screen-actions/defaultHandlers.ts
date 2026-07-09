@@ -15,6 +15,7 @@ import { getEncodedToken, getTokenMetadata } from "@cashu/cashu-ts";
 
 import { isMintOfflineError } from "../errors";
 import { errField, logger, mintUrlFields } from "../logger";
+import { meltMethodForTarget } from "../melt-target";
 import type {
   AmountEntryDisplayMetadata,
   Destination,
@@ -816,6 +817,14 @@ export function createDefaultScreenActionHandlers(
         let meltTarget: string | undefined;
 
         if (variantId === "lightning") {
+          // A bolt12 offer is a Lightning-family target but melts via bolt12,
+          // not bolt11 — preserve its method so we don't try to pay an `lno1…`
+          // as a bolt11 invoice.
+          const lnMeltMethod: MeltQuoteMethod =
+            meltTargetFromEntry &&
+            meltMethodForTarget(meltTargetFromEntry) === "bolt12"
+              ? "bolt12"
+              : "bolt11";
           if (
             entryDestination === "meltQuote" ||
             entryDestination === "mintQuote"
@@ -825,12 +834,12 @@ export function createDefaultScreenActionHandlers(
             if (entryDestination === "mintQuote") {
               mintQuoteMethod = "bolt11";
             } else {
-              meltQuoteMethod = "bolt11";
+              meltQuoteMethod = lnMeltMethod;
             }
           } else if (meltTargetFromEntry) {
             // Send-money path: switch sendEcash → meltQuote, seed meltTarget.
             destination = "meltQuote";
-            meltQuoteMethod = "bolt11";
+            meltQuoteMethod = lnMeltMethod;
             meltTarget = meltTargetFromEntry;
           } else {
             logger.warn(
@@ -859,8 +868,14 @@ export function createDefaultScreenActionHandlers(
           if (entryDestination === "mintQuote") {
             destination = "mintQuote";
             mintQuoteMethod = "onchain";
+          } else if (meltTargetFromEntry) {
+            // Onchain SEND: pay a scanned/pasted bitcoin address via the NUT-30
+            // onchain melt (coco MeltOnchainHandler).
+            destination = "meltQuote";
+            meltQuoteMethod = "onchain";
+            meltTarget = meltTargetFromEntry;
           } else {
-            logger.info("screenAction.amountEntry.next.onchainNotSupported");
+            logger.warn("screenAction.amountEntry.next.onchainWithoutTarget");
             return;
           }
         }

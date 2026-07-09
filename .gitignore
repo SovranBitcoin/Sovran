@@ -22,3 +22,7 @@ log.txt
 # VitePress build output
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+app/old_log_2.txt
+app/old_log.txt
+FEEDBACK.md
+app/old_log_3.txt

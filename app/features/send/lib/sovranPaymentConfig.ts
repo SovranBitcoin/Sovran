@@ -40,6 +40,7 @@ import {
   type ScreenActionHandlerMap,
   type StepHandlerMap,
   type NfcIOAdapter,
+  meltMethodForTarget,
   rawAnnotationKey,
   serializeHistoryEntry,
 } from 'wallet';
@@ -824,6 +825,7 @@ export function createSovranNotifications(
       > = {
         receiveToken: 'ecash',
         meltLightningInvoice: 'lightning',
+        meltBolt12Offer: 'lightning',
         meltLightningAddress: 'lightning',
         meltLnurlp: 'lightning',
         sendPaymentRequest: 'paymentRequest',
@@ -1560,6 +1562,11 @@ export function createSovranHandlers({
       // `LightningSendScreen` re-assembles them on read.
       const id = mintLocalId('melt-preview');
       const now = Date.now();
+      // A bitcoin-address target melts onchain (NUT-30) — route to the onchain
+      // send screen (its own timeline + "Send onchain" title) and stamp the
+      // method so the screen + classifier resolve onchain. `method:'onchain'`
+      // survives the melt-op merge onto the real quote row.
+      const isOnchain = meltMethodForTarget(meltTarget) === 'onchain';
       const entry: SyntheticMeltHistoryEntry = {
         id,
         type: 'melt',
@@ -1575,6 +1582,7 @@ export function createSovranHandlers({
         metadata: {
           phase: 'preview',
           meltTarget,
+          ...(isOnchain ? { method: 'onchain', onchainAddress: meltTarget } : {}),
           ...(recipientPubkey ? { recipientPubkey } : {}),
           ...(recipientProfile?.displayName
             ? { recipientDisplayName: recipientProfile.displayName }
@@ -1588,7 +1596,7 @@ export function createSovranHandlers({
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
       nav({
-        pathname: '/(send-flow)/lightningSend',
+        pathname: isOnchain ? '/(send-flow)/onchainSend' : '/(send-flow)/lightningSend',
         params: { meltHistoryEntry: JSON.stringify(entry) },
       });
     },

@@ -12,6 +12,12 @@ import type { ActionMenuItem } from './popups/actionMenu';
 type ActionMenuSheetPayload = {
   title?: string;
   buttons: readonly ActionMenuItem[];
+  /**
+   * Called when the sheet is dismissed WITHOUT a button press (swipe-down /
+   * overlay tap). Lets a caller that awaits a choice — e.g. the onchain
+   * network-fee picker — resolve as "cancelled" instead of hanging.
+   */
+  onDismiss?: () => void;
 };
 
 export type ProfileSwitcherAction =

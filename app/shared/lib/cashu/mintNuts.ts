@@ -45,6 +45,32 @@ export function meltMethodsFromNuts(nuts: MintNuts | undefined): string[] {
 }
 
 /**
+ * (method, unit) pairs the mint advertises — NUT-04 (`'4'`, minting) by default,
+ * NUT-05 (`'5'`, melting) on request. This pair is the spec's canonical
+ * capability granularity: a mint can support `bolt11`+`sat` but not `bolt11`+`usd`
+ * (NUT-04/05 "Settings"). Both fields are lowercased and deduped; entries missing
+ * either are dropped. Used to filter mint discovery to a rail's exact
+ * (method, unit) rather than the method alone.
+ */
+export function mintMethodUnitPairsFromNuts(
+  nuts: MintNuts | undefined,
+  nut = '4'
+): Array<{ method: string; unit: string }> {
+  const seen = new Set<string>();
+  const out: Array<{ method: string; unit: string }> = [];
+  for (const m of methodsOf(nuts, nut)) {
+    const method = (m.method ?? '').trim().toLowerCase();
+    const unit = (m.unit ?? '').trim().toLowerCase();
+    if (!method || !unit) continue;
+    const key = `${method}|${unit}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ method, unit });
+  }
+  return out;
+}
+
+/**
  * Whether the mint advertises a boolean-style NUT (e.g. '7' state check,
  * '9' restore, '10'/'11' P2PK, '12' DLEQ, '20' signed mint quotes). NUT-17
  * (websockets) expresses support as a non-empty `supported` array — both

@@ -101,6 +101,13 @@ export interface ActionAvailability {
   available: boolean;
   reason?: string;
   /**
+   * Machine-readable code for `reason` when it comes from a known cause. The UI
+   * uses it to present *soft* reasons differently — notably a below-minimum
+   * amount, which is a transient typing state (the user is on their way up to
+   * the minimum) and should read as a neutral hint, not a red error.
+   */
+  reasonCode?: string;
+  /**
    * Optional alternate forms of this action. When present, the UI can surface a
    * split-button menu and pass `{ variantId }` to `execute`.
    */

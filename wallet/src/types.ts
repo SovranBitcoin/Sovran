@@ -10,9 +10,17 @@ export interface Detectors {
   isValidEcashToken(value: string): boolean;
   isPaymentRequest(value: string): boolean;
   isLightningInvoice(value: string): boolean;
+  /** A BOLT-12 offer (`lno1…`). Shape-only — offers carry no checksum. */
+  isBolt12Offer(value: string): boolean;
   isLightningAddress(value: string): boolean;
   isLnurlp(value: string): boolean;
   getLightningAmount(invoice: string): number | null;
+  /**
+   * A fixed BOLT-12 offer's amount in sats, or null when the offer is
+   * amountless (payer chooses) or can't be decoded. Absence routes the send
+   * through amount entry, exactly like an amountless bolt11 invoice.
+   */
+  getBolt12Amount(offer: string): number | null;
   getPaymentRequestInfo(value: string): PaymentRequestInfo | null;
   parseNpub(value: string): string | null;
 }
@@ -115,6 +123,7 @@ export type PaymentOptionKind =
   | 'ecashToken'
   | 'paymentRequest'
   | 'lightningInvoice'
+  | 'bolt12Offer'
   | 'lightningAddress'
   | 'lnurlp'
   | 'onchainAddress';
@@ -172,6 +181,7 @@ export type ResolvedIntent =
   | { type: 'receiveToken'; option: PaymentOption }
   | { type: 'sendPaymentRequest'; option: PaymentOption; info: PaymentRequestInfo }
   | { type: 'meltLightningInvoice'; option: PaymentOption }
+  | { type: 'meltBolt12Offer'; option: PaymentOption }
   | { type: 'meltLightningAddress'; option: PaymentOption }
   | { type: 'meltLnurlp'; option: PaymentOption }
   | { type: 'meltOnchainAddress'; option: PaymentOption }
@@ -194,6 +204,7 @@ export type DestinationKind =
   | 'ecash' // cashu bearer token (redeem)
   | 'paymentRequest' // NUT-18 creq
   | 'lightningInvoice' // bolt11
+  | 'bolt12Offer' // BOLT-12 offer (lno1…), paid via a bolt12 melt
   | 'lightningAddress' // lnurlp endpoint paid via Lightning (NOT an identity)
   | 'onchain' // bitcoin address
   | 'person' // payable Nostr identity (npub / nprofile / lightning address)
@@ -213,6 +224,7 @@ export type DestinationAction =
   | 'receiveToken' // redeem a bearer ecash token
   | 'sendPaymentRequest' // fulfill a creq
   | 'meltInvoice' // pay a bolt11
+  | 'meltBolt12' // pay a bolt12 offer
   | 'meltLnurl' // pay an lnurlp endpoint
   | 'meltOnchain' // pay a btc address
   | 'startContactSend' // person: app resolves profile, then contact send

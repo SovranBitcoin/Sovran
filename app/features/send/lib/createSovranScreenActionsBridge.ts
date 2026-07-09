@@ -1,5 +1,7 @@
 import type { MutableRefObject } from 'react';
 
+import type { HistoryEntry } from '@cashu/coco-core';
+
 import type {
   ColadaSubscriptionBus,
   ColadaSubscriptionEvent,
@@ -14,6 +16,7 @@ import {
   isMintQuotePaymentObserved,
   meltOperationToScreenActionEntry,
   mergeEntryUpdate as defaultMerge,
+  normalizeHistoryEntry,
   shouldApplyEntryUpdate as defaultShouldApply,
 } from 'wallet';
 
@@ -75,8 +78,16 @@ function getHistoryType(
 }
 
 function publishHistoryUpdated(bus: ColadaSubscriptionBus, updated: unknown): void {
-  const entry = asEntryRecord(updated);
-  if (!entry) return;
+  const raw = asEntryRecord(updated);
+  if (!raw) return;
+  // Normalize the raw coco entry to the legacy state vocabulary AND a numeric
+  // amount before it hits the bus. coco v2 entries carry `amount` as an Amount
+  // OBJECT and operation-family states (prepared/finalized/rolled_back); the
+  // screen-actions preview match (shouldApplyEntryUpdate) compares amounts by
+  // strict equality, so without this every live melt update was silently
+  // dropped and the timeline never advanced past UNPAID. This mirrors the
+  // transaction-list read model, which normalizes at its own boundary.
+  const entry = normalizeHistoryEntry(raw as unknown as HistoryEntry) as unknown as EntryRecord;
   bus.publish({
     type: 'history.updated',
     entry: entry as JsonRecord,

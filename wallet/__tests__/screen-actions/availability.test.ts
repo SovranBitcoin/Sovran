@@ -19,7 +19,7 @@ import {
   isPaymentRequestPreview,
 } from "../../src/screen-actions/availability";
 import { deriveMintMethodCapabilityMapFromTrustedMints } from "../../src/mint-capabilities";
-import { MINT1, MINT2 } from "../_harness/fixtures";
+import { INPUTS, MINT1, MINT2 } from "../_harness/fixtures";
 
 describe("screen action availability — back", () => {
   const screens = [
@@ -426,6 +426,87 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     expect(
       actions.next.variants?.some((variant) => variant.id === "onchain"),
     ).toBe(true);
+  });
+
+  // ── Onchain SEND (NUT-30 melt) — a scanned bitcoin address ──────────────
+  const BC1 = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080";
+  const meltCtx = (
+    methods: {
+      method: string;
+      unit: string;
+      min_amount?: number;
+      max_amount?: number;
+    }[],
+  ) => ({
+    trustedMintUrls: [MINT1],
+    mintBalances: { [MINT1]: 1_000_000 },
+    mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+      { mintUrl: MINT1, mintInfo: { nuts: { "5": { methods } } } },
+    ]),
+  });
+
+  it("offers onchain send and NOT Lightning for a scanned bitcoin address", () => {
+    const actions = getAvailableActions("amountEntry", {
+      destination: "meltQuote",
+      meltTarget: BC1,
+      effectiveAmount: { value: 5_000, unit: "sat" },
+      unit: "sat",
+      methodContext: meltCtx([{ method: "onchain", unit: "sat" }]),
+    });
+    const onchain = actions.next.variants?.find((v) => v.id === "onchain");
+    const lightning = actions.next.variants?.find((v) => v.id === "lightning");
+    expect(onchain?.available).toBe(true);
+    expect(onchain?.reason).toBeUndefined();
+    // Bug: a bc1 address must never be "Pay <bc1…> over Lightning".
+    expect(lightning?.available).toBe(false);
+    expect(lightning?.description ?? "").not.toMatch(/over Lightning/i);
+  });
+
+  it('shows "No trusted mint supports onchain sending" ONLY when no mint can melt onchain', () => {
+    const actions = getAvailableActions("amountEntry", {
+      destination: "meltQuote",
+      meltTarget: BC1,
+      effectiveAmount: { value: 5_000, unit: "sat" },
+      unit: "sat",
+      methodContext: meltCtx([{ method: "bolt11", unit: "sat" }]), // no onchain melt
+    });
+    const onchain = actions.next.variants?.find((v) => v.id === "onchain");
+    expect(onchain?.available).toBe(false);
+    expect(onchain?.reason).toBe("No trusted mint supports onchain sending");
+  });
+
+  it("flags a below-minimum onchain amount as a SOFT reason (neutral hint, not red)", () => {
+    const actions = getAvailableActions("amountEntry", {
+      destination: "meltQuote",
+      meltTarget: BC1,
+      effectiveAmount: { value: 500, unit: "sat" }, // below the 1,000-sat floor
+      unit: "sat",
+      methodContext: meltCtx([
+        { method: "onchain", unit: "sat", min_amount: 1000 },
+      ]),
+    });
+    // Next is gated, but the reason is the soft below-min code so the UI renders
+    // "Minimum 1000 sat" as a neutral hint rather than a red problem.
+    expect(actions.next.available).toBe(false);
+    expect(actions.next.reasonCode).toBe("AMOUNT_BELOW_MINT_MIN");
+  });
+
+  it("offers Lightning (not onchain) for a bolt11 invoice target", () => {
+    const actions = getAvailableActions("amountEntry", {
+      destination: "meltQuote",
+      meltTarget: INPUTS.bolt11WithAmount,
+      effectiveAmount: { value: 250_000, unit: "sat" },
+      unit: "sat",
+      methodContext: meltCtx([
+        { method: "bolt11", unit: "sat" },
+        { method: "onchain", unit: "sat" },
+      ]),
+    });
+    const lightning = actions.next.variants?.find((v) => v.id === "lightning");
+    const onchain = actions.next.variants?.find((v) => v.id === "onchain");
+    expect(lightning?.available).toBe(true);
+    // A bolt11 invoice is not an onchain-send target — no onchain variant.
+    expect(onchain).toBeUndefined();
   });
 
   it("disables Lightning receive when no trusted mint advertises NUT-04 bolt11", () => {

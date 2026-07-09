@@ -418,6 +418,7 @@ export function useScreenActions(
     walletCtx: unknown;
     unit: string;
     destination: unknown;
+    method: unknown;
     envelope: AmountEntryEnvelope | null;
   } | null>(null);
 
@@ -447,17 +448,26 @@ export function useScreenActions(
         const walletCtx = walletContextRef.current;
         if (!walletCtx) return null;
         const machineCtx = machineRef.current.getContext();
+        // The method actually in play (bolt11/bolt12/onchain) governs the
+        // melt/mint bounds, so it's part of the envelope's identity.
+        const method =
+          machineCtx.destination === 'meltQuote'
+            ? machineCtx.meltQuoteMethod
+            : machineCtx.destination === 'mintQuote'
+              ? machineCtx.mintQuoteMethod
+              : undefined;
         // The manager re-reads this on every keystroke AND every inspect
         // (useSyncExternalStore getSnapshot runs 2+× per render), while the
-        // envelope only changes with the wallet context, unit, or
-        // destination — memoize on those so typing doesn't re-derive
-        // per-mint bounds several times per key.
+        // envelope only changes with the wallet context, unit, destination, or
+        // method — memoize on those so typing doesn't re-derive per-mint bounds
+        // several times per key.
         const cached = envelopeCacheRef.current;
         if (
           cached &&
           cached.walletCtx === walletCtx &&
           cached.unit === machineCtx.unit &&
-          cached.destination === machineCtx.destination
+          cached.destination === machineCtx.destination &&
+          cached.method === method
         ) {
           return cached.envelope;
         }
@@ -465,11 +475,13 @@ export function useScreenActions(
           walletCtx,
           machineCtx.unit,
           machineCtx.destination,
+          method,
         );
         envelopeCacheRef.current = {
           walletCtx,
           unit: machineCtx.unit,
           destination: machineCtx.destination,
+          method,
           envelope,
         };
         return envelope;

@@ -83,6 +83,16 @@ describe('resolveIntent — single option', () => {
     expect(intent.type).toBe('meltLightningAddress');
   });
 
+  it('resolves a bolt12 offer to meltBolt12Offer', () => {
+    const parsed = parse(INPUTS.bolt12Offer);
+    const intent = resolveIntent(parsed, defaultDetectors);
+    expect(intent.type).toBe('meltBolt12Offer');
+    if (intent.type === 'meltBolt12Offer') {
+      expect(intent.option.kind).toBe('bolt12Offer');
+      expect(intent.option.value).toBe(INPUTS.bolt12Offer);
+    }
+  });
+
   it('resolves lnurlp to meltLnurlp', () => {
     // LNURL-pay works similarly to lightning addresses — amount needed first.
     // Note: we use the lnurlp:// scheme because raw URLs are classified as mintUrl.

@@ -99,6 +99,16 @@ function handleExecute(
     case "meltLnurlp":
       ctx.meltTarget = intent.option.value;
       break;
+    case "meltBolt12Offer":
+      ctx.destination = "meltQuote";
+      ctx.meltQuoteMethod = "bolt12";
+      ctx.meltTarget = intent.option.value;
+      // Null today (amountless / quote-first → user enters it). A decoded fixed
+      // offer seeds it here, exactly like the fixed bolt11 invoice arm above.
+      if (isValidSatAmount(intent.option.amount)) {
+        ctx.amount = intent.option.amount;
+      }
+      break;
     case "meltOnchainAddress":
       ctx.destination = "meltQuote";
       ctx.meltQuoteMethod = "onchain";
@@ -177,6 +187,14 @@ function handleOptionChosen(
     case "meltLightningAddress":
     case "meltLnurlp":
       ctx.meltTarget = intent.option.value;
+      break;
+    case "meltBolt12Offer":
+      ctx.destination = "meltQuote";
+      ctx.meltQuoteMethod = "bolt12";
+      ctx.meltTarget = intent.option.value;
+      if (isValidSatAmount(intent.option.amount)) {
+        ctx.amount = intent.option.amount;
+      }
       break;
     case "meltOnchainAddress":
       ctx.destination = "meltQuote";

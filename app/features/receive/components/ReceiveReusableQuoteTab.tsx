@@ -22,6 +22,7 @@ import { Section } from '@/shared/ui/composed/Section';
 import { HistoryEntryRefresh } from '@/features/transactions';
 import { ActionSegmentsCard } from '@/shared/ui/composed/ActionSegmentsCard';
 import { useReceiveMethodMint } from '@/features/receive/hooks/useReceiveMethodMint';
+import { isExpiryElapsed } from '@/features/receive/lib/receiveRailItems';
 import type { OnReceiveQrPayload } from '@/features/receive/lib/qrPayload';
 import { standingQuoteIdentityStore } from '@/features/receive/lib/standingQuoteIdentityStore';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -117,10 +118,20 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   // amounts belong to the fixed-amount flow (fresh address per request).
   const qrData = request && method === 'onchain' ? buildBip321OnchainUri(request) : request;
 
-  // Footer Copy copies the same bare value the in-card copy row does.
+  // Match coco's OWN watch gate (`isExpiryElapsed`, incl. `expiry: 0`): a quote
+  // coco treats as expired is not being watched, so deposits to it won't be
+  // received. Don't show that QR — offer a fresh one instead. bolt12 offers
+  // arrive with `expiry: 0`, so this surfaces coco's not-watched state rather
+  // than presenting an address that silently won't collect.
+  const quoteExpired = !!quote && isExpiryElapsed(quote.expiry, Math.floor(Date.now() / 1000));
+
+  // Footer Copy copies the same bare value the in-card copy row does — but never
+  // an expired quote (coco isn't listening to it).
   React.useEffect(() => {
-    onQrPayload?.(request ? { value: request, copyTarget: copy.copyTarget } : null);
-  }, [request, copy.copyTarget, onQrPayload]);
+    onQrPayload?.(
+      request && !quoteExpired ? { value: request, copyTarget: copy.copyTarget } : null
+    );
+  }, [request, quoteExpired, copy.copyTarget, onQrPayload]);
 
   // Manual address rotation (onchain only) with a short cooldown so the
   // button can't be spammed into a pile of orphan quotes at the mint.
@@ -150,6 +161,20 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
     await EnhancedHaptics.copyHaptic();
     await rotate();
   }, [cooldownUntil, rotate]);
+
+  // "Generate new" for an expired standing quote — works for both rails (unlike
+  // the onchain-only "New address" segment). Same cooldown so a rapid tap can't
+  // pile up orphan quotes at the mint; the button is also disabled while cooling
+  // down, so a silent early-return is enough here.
+  const handleGenerateNew = useCallback(async () => {
+    if (cooldownUntil > Date.now()) return;
+    setCooldownUntil(Date.now() + ROTATE_COOLDOWN_MS);
+    if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+    cooldownTimerRef.current = setTimeout(() => setCooldownUntil(0), ROTATE_COOLDOWN_MS);
+    paymentLog.info(`receive.${method}.generate_new_requested`, { source: 'expired_quote' });
+    await EnhancedHaptics.copyHaptic();
+    await rotate('manual');
+  }, [cooldownUntil, method, rotate]);
 
   // Eager onchain address rotation. The standing address is single-use: the
   // moment mempool.space sees ANY payment to it (0-conf included — we do NOT
@@ -195,7 +220,9 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
 
   const openMintDiscovery = useCallback(() => {
     paymentLog.info(`receive.${method}.discovery_opened`, { unit });
-    router.push({ pathname: '/(mint-flow)/add', params: { method } });
+    // Thread the rail's unit so discovery filters to the (method, unit) pair
+    // (e.g. bolt12+sat), not just the method — see MintAddScreen / useMintSearch.
+    router.push({ pathname: '/(mint-flow)/add', params: { method, unit } });
   }, [method, unit]);
 
   const renderEmptyState = (message: string, cta?: React.ReactNode) => (
@@ -244,6 +271,39 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
 
   if (!request || !qrData) {
     return <ReceiveRailPlaceholder sectionTitle={copy.sectionTitle} />;
+  }
+
+  // Expired per coco's own gate → no QR (deposits wouldn't be watched); offer a
+  // fresh quote, but keep "View all" reachable so the rail list isn't orphaned.
+  if (quoteExpired) {
+    return (
+      <>
+        {renderEmptyState(
+          `This ${method === 'bolt12' ? 'offer' : 'address'} has expired.`,
+          <Button
+            text="Generate new"
+            variant="primary"
+            size="compact"
+            onPress={() => void handleGenerateNew()}
+            style={{ marginTop: 16 }}
+            disabled={cooldownActive}
+            testID={`receive-${method}-generate-new`}
+          />
+        )}
+        <View style={{ marginTop: 12 }}>
+          <ActionSegmentsCard
+            segments={[
+              {
+                icon: 'fluent:list-16-filled',
+                label: 'View all',
+                onPress: openList,
+                testID: `receive-${method}-view-all-expired`,
+              },
+            ]}
+          />
+        </View>
+      </>
+    );
   }
 
   return (

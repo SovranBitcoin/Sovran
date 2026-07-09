@@ -48,6 +48,9 @@ export interface TimelineItem {
   stepType: TimelineStepType;
   timestamp?: number;
   info?: string;
+  /** Render the segmented on-chain confirmation ring on this row's dot (the
+   *  onchain melt "In mempool" row and onchain mint deposit row). */
+  confirmationRing?: boolean;
 }
 
 export interface BuildTimelineInput {
@@ -57,6 +60,15 @@ export interface BuildTimelineInput {
   tokenCreated?: boolean;
   nostrSent?: boolean;
   onchainConfirmationProgress?: OnchainConfirmationProgress | null;
+  /**
+   * True when an onchain SEND (melt) settled PAID with NO outpoint — the mint
+   * paid it off-chain rather than broadcasting a transaction. The network phase
+   * then collapses to a single "Settled off-chain" row (no mempool/confirming/
+   * "Confirmed" claim). Only assert this once the quote itself reports PAID and
+   * carries no outpoint (both come from the same quote row, so there is no
+   * outpoint-lagging-state race).
+   */
+  onchainSettledInternally?: boolean;
   paymentCopy?: PaymentCopyResolver;
 }
 
@@ -164,6 +176,25 @@ export function getHistoryEntryOnchainMintAddress(
     addressLength: directAddress?.length ?? null,
   });
   return directAddress;
+}
+
+/** The recipient bitcoin address of an onchain MELT (send) history entry, or
+ *  null. Fresh/synthetic entries carry it in `metadata` (method 'onchain' +
+ *  onchainAddress/meltTarget); persisted coco melt rows carry no metadata, so
+ *  callers pass `onchainConfirmationProgress` to signal onchain-ness instead. */
+export function getHistoryEntryOnchainMeltAddress(
+  entry: HistoryEntry | null | undefined,
+): string | null {
+  if (!entry || entry.type !== "melt") return null;
+  const metadata = (entry as EntryRecord).metadata;
+  const meta =
+    metadata && typeof metadata === "object"
+      ? (metadata as EntryRecord)
+      : undefined;
+  if (meta?.method !== "onchain") return null;
+  const target = meta.onchainAddress ?? meta.meltTarget ?? meta.destination;
+  const address = typeof target === "string" ? target.trim() : "";
+  return address || null;
 }
 
 function getOnchainConfirmationInfo(
@@ -367,6 +398,7 @@ function buildTimelineItems({
   tokenCreated,
   nostrSent,
   onchainConfirmationProgress,
+  onchainSettledInternally,
   paymentCopy = DEFAULT_PAYMENT_COPY,
 }: BuildTimelineInput): TimelineItem[] {
   const {
@@ -537,6 +569,31 @@ function buildTimelineItems({
 
     case "melt": {
       const rawMeltState = String(historyEntry.state);
+      // A failed/reversed melt returns the ecash to the balance. coco v2 spells
+      // this `rolled_back`/`rolling_back`/`failed` (normalized to `rolledBack`);
+      // without this the state falls to the UNPAID default below and a
+      // cancelled send renders as if it were still waiting to be sent.
+      if (
+        rawMeltState === "rolledBack" ||
+        rawMeltState === "rolled_back" ||
+        rawMeltState === "rolling_back" ||
+        rawMeltState === "failed"
+      ) {
+        return [
+          {
+            state: MeltQuoteState.PENDING,
+            displayLabel: MELT_COPY.PENDING.label,
+            stepType: "complete",
+            timestamp: historyEntry.createdAt,
+          },
+          {
+            state: "rolledBack",
+            displayLabel: MELT_COPY.rolledBack.label,
+            stepType: "rolled-back",
+            info: MELT_COPY.rolledBack.info,
+          },
+        ];
+      }
       const meltState =
         rawMeltState === "finalized"
           ? MeltQuoteState.PAID
@@ -567,6 +624,89 @@ function buildTimelineItems({
             info: MELT_COPY.expired.info,
           },
         ];
+      }
+
+      // Onchain SEND (NUT-30) — three milestones:
+      //   "Paid" (ecash spent) → the bitcoin network phase ("Broadcasting…" then
+      //   "In mempool · N/6 blocks" with the segmented confirmation ring) →
+      //   "Confirmed". If the mint settles off-chain (PAID, no outpoint) the
+      //   network phase collapses to a single "Settled off-chain" row — the
+      //   shared "Paid" row keeps its identity so the 3→2 change fades smoothly.
+      // Onchain-ness is signalled by the entry metadata (fresh sends) or by the
+      // caller passing a progress object (persisted rows on the send screen).
+      const isOnchainMelt =
+        !!getHistoryEntryOnchainMeltAddress(historyEntry) ||
+        !!onchainConfirmationProgress;
+      if (isOnchainMelt) {
+        const progress = onchainConfirmationProgress;
+        // The tx is in the mempool once the confirmation watcher sees it; before
+        // that the mint is still broadcasting.
+        const broadcast = !!progress?.hasPayment;
+        const confirmed = !!progress?.isSatisfied;
+        // "Paid" = the ecash has left the wallet. That is true past UNPAID, but
+        // ALSO whenever a later milestone has been reached — a broadcast tx, an
+        // on-chain confirmation, or an off-chain settlement. Keying only on the
+        // melt-state string let "Paid" render as still-pending under a completed
+        // terminal when a mint reported a settled state the mapping didn't
+        // recognise (e.g. the cdk-ldk-bdk off-chain settle): a grey idle "Paid"
+        // above a green "Settled off-chain". Deriving it from "have we reached a
+        // later step" makes that impossible.
+        const paidMint =
+          meltState === MeltQuoteState.PENDING ||
+          meltState === MeltQuoteState.PAID;
+        const paid =
+          paidMint || broadcast || confirmed || !!onchainSettledInternally;
+
+        const paidRow: TimelineItem = {
+          state: MeltQuoteState.UNPAID,
+          displayLabel: MELT_COPY.onchain.paid.label,
+          stepType: paid ? "complete" : "next-pending",
+          ...(paid ? { timestamp: historyEntry.createdAt } : {}),
+        };
+
+        // Off-chain settlement: PAID with no outpoint — the mint paid without a
+        // transaction, so there is no network phase to show.
+        if (onchainSettledInternally) {
+          return [
+            paidRow,
+            {
+              state: MeltQuoteState.PAID,
+              displayLabel: MELT_COPY.onchain.offchain.label,
+              stepType: "success",
+              info: MELT_COPY.onchain.offchain.info,
+              timestamp: historyEntry.createdAt,
+            },
+          ];
+        }
+
+        const networkRow: TimelineItem =
+          broadcast && progress
+            ? {
+                state: MeltQuoteState.PENDING,
+                displayLabel: MELT_COPY.onchain.mempool.label,
+                stepType: confirmed ? "complete" : "current",
+                info: paymentCopy.text("timeline.melt.onchain.blocks", {
+                  current: String(progress.currentConfirmations ?? 0),
+                  required: String(progress.requiredConfirmations),
+                }),
+                confirmationRing: true,
+                ...(confirmed ? { timestamp: historyEntry.createdAt } : {}),
+              }
+            : {
+                state: MeltQuoteState.PENDING,
+                displayLabel: MELT_COPY.onchain.broadcasting.label,
+                stepType: paid ? "current" : "future-small",
+                info: MELT_COPY.onchain.broadcasting.info,
+              };
+
+        const confirmedRow: TimelineItem = {
+          state: MeltQuoteState.PAID,
+          displayLabel: MELT_COPY.onchain.confirmed.label,
+          stepType: confirmed ? "success" : "future-small",
+          ...(confirmed ? { timestamp: historyEntry.createdAt } : {}),
+        };
+
+        return [paidRow, networkRow, confirmedRow];
       }
 
       switch (meltState) {
@@ -1055,7 +1195,14 @@ export function getCardLabel(
       return label;
     }
     case "melt": {
-      if (isFailed) {
+      const meltRolledBack =
+        historyEntry.state === "rolledBack" ||
+        historyEntry.state === "rolled_back" ||
+        historyEntry.state === "rolling_back" ||
+        historyEntry.state === "failed";
+      if (meltRolledBack) {
+        status = text("timeline.status.cancelled");
+      } else if (isFailed) {
         status = text("timeline.status.failed");
       } else if (historyEntry.state === MeltQuoteState.PAID) {
         status = text("timeline.status.complete");

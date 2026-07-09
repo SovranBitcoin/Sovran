@@ -72,6 +72,15 @@ describe('describeDestination', () => {
     expect(d.label).toBe('Pay 250000 sats');
   });
 
+  it('bolt12 offer → bolt12 melt, null amount (quote-first)', () => {
+    const d = describeInput('bolt12Offer');
+    expect(d.kind).toBe('bolt12Offer');
+    expect(d.action).toBe('meltBolt12');
+    expect(d.icon).toBe('lightning');
+    expect(d.amount).toBeNull();
+    expect(d.label).toBe('Pay');
+  });
+
   it('lightning address → payable person (startContactSend)', () => {
     const d = describeInput('lightningAddress');
     expect(d.kind).toBe('person');

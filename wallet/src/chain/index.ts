@@ -10,7 +10,9 @@ export {
 } from './mempool';
 export {
   DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
+  buildOnchainConfirmationProgressFromTx,
   getOnchainConfirmationInfo,
   getOnchainConfirmationProgress,
+  parseOutpoint,
   type OnchainConfirmationProgress,
 } from './onchain';

@@ -328,6 +328,49 @@ describe('getUnitAmountEnvelope', () => {
     });
   });
 
+  // A mint advertising bolt11/bolt12/onchain melt with DIFFERENT bounds per
+  // method (onchain floors higher) — mirrors the cdk LDK/BDK test mint.
+  const multiMethodMelt = {
+    nuts: {
+      '5': {
+        methods: [
+          { method: 'bolt11', unit: 'sat', min_amount: 1, max_amount: 500_000 },
+          { method: 'bolt12', unit: 'sat', min_amount: 1, max_amount: 500_000 },
+          { method: 'onchain', unit: 'sat', min_amount: 1_000, max_amount: 500_000 },
+        ],
+      },
+    },
+  };
+
+  it('meltQuote reflects the SPECIFIC melt method bounds (onchain floor differs)', () => {
+    const ctx = ctxFor([{ mintUrl: MINT1, mintInfo: multiMethodMelt }]);
+    // onchain's advertised NUT-05 floor (1000) applies to typing, not bolt11's 1.
+    expect(getUnitAmountEnvelope(ctx, 'sat', 'meltQuote', 'onchain')).toEqual({
+      unit: 'sat',
+      minAmount: 1_000,
+      maxAmount: 500_000,
+    });
+    expect(getUnitAmountEnvelope(ctx, 'sat', 'meltQuote', 'bolt12')).toEqual({
+      unit: 'sat',
+      minAmount: 1,
+      maxAmount: 500_000,
+    });
+    expect(getUnitAmountEnvelope(ctx, 'sat', 'meltQuote', 'bolt11')).toEqual({
+      unit: 'sat',
+      minAmount: 1,
+      maxAmount: 500_000,
+    });
+  });
+
+  it('meltQuote without a method unions all melt rails (loosest envelope)', () => {
+    const ctx = ctxFor([{ mintUrl: MINT1, mintInfo: multiMethodMelt }]);
+    expect(getUnitAmountEnvelope(ctx, 'sat', 'meltQuote')).toEqual({
+      unit: 'sat',
+      minAmount: 1,
+      maxAmount: 500_000,
+    });
+  });
+
   it('a supporting mint without an advertised bound unbounds that side', () => {
     const ctx = ctxFor([
       { mintUrl: MINT1, mintInfo: boundedMelt(10, 50_000) },

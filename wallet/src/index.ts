@@ -43,12 +43,14 @@ export { setLogger, type CocoLogger } from "./logger";
 // Copy / i18n
 export {
   DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
+  buildOnchainConfirmationProgressFromTx,
   createMempoolSpaceChainAdapter,
   defaultChainAdapter,
   fetchMempoolAddressStats,
   getOnchainConfirmationInfo,
   getOnchainConfirmationProgress,
   MempoolAddressStatsSchema,
+  parseOutpoint,
   summarizeMempoolAddress,
 } from "./chain";
 export type {
@@ -89,6 +91,7 @@ export {
   getCardLabel,
   getHistoryEntryRefreshLabel,
   getSendTokenReachabilityWarning,
+  getHistoryEntryOnchainMeltAddress,
   getHistoryEntryOnchainMintAddress,
   getStatusColorType,
   getStatusHeader,
@@ -100,6 +103,7 @@ export {
   mergeTransactionSources,
   pendingPaymentRequestToHistoryEntry,
   sameTransactionList,
+  normalizeHistoryEntry,
   serializeHistoryEntry,
   isCancellablePendingEcash,
   isMeltQuotePaid,
@@ -134,6 +138,8 @@ export type {
   TransactionDirection,
   TransactionPaymentType,
 } from "./history";
+
+export { meltMethodForTarget } from "./melt-target";
 
 // Transaction annotations (per-transaction side-data: counterparty, scan
 // source, P2PK lock, distribution, location, swap grouping). colada owns the

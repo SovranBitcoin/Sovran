@@ -62,7 +62,14 @@ type PopupStore = {
   /** When true, PopupHost must fully unmount the BottomSheet tree to tear down native overlays. */
   destroyed: boolean;
   open: (payload: SheetPayload) => void;
-  close: () => void;
+  /**
+   * Close the current sheet. Pass the `openSeq` captured when THIS sheet was
+   * presented to make the close a no-op if a newer sheet has since replaced it
+   * — so a stale close (a torn-down sheet's late animation callback, or a
+   * chooser's trailing close) can't clobber a freshly-opened follow-on sheet
+   * (e.g. the onchain "Network fee" picker). Omit for an unconditional close.
+   */
+  close: (expectedSeq?: number) => void;
   /** Like close(), but also sets `destroyed` so PopupHost unmounts the BottomSheet (and its FullWindowOverlay). */
   destroySheet: () => void;
   update: (partial: Partial<StandardSheetPayload>) => void;
@@ -104,7 +111,14 @@ export const usePopupStore = create<PopupStore>((set, get) => {
       storeLog.debug('store.popup.update');
       set({ current: { ...current, ...partial } });
     },
-    close: () => {
+    close: (expectedSeq?: number) => {
+      if (expectedSeq != null && expectedSeq !== get().openSeq) {
+        storeLog.debug('store.popup.close.stale', {
+          expectedSeq,
+          currentSeq: get().openSeq,
+        });
+        return;
+      }
       storeLog.debug('store.popup.close');
       fireOnClose('dismiss');
       set({ current: null, isOpen: false });

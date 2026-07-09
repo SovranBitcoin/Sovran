@@ -55,9 +55,10 @@ const OPTION_PRIORITY: Record<PaymentOptionKind, number> = {
   paymentRequest: 0,
   ecashToken: 1,
   lightningInvoice: 2,
-  lightningAddress: 3,
-  lnurlp: 4,
-  onchainAddress: 5,
+  bolt12Offer: 3,
+  lightningAddress: 4,
+  lnurlp: 5,
+  onchainAddress: 6,
 };
 
 // ---------------------------------------------------------------------------
@@ -229,6 +230,24 @@ function extractOptions(
           kind: "lightningInvoice",
           value: lightningCandidate,
           amount: detectors.getLightningAmount(lightningCandidate),
+          source,
+          paramKey,
+        },
+        seen,
+      );
+      continue;
+    }
+
+    // BOLT-12 offer (`lno1…`) — standalone OR a BIP-321 `lno=`/`lightning=lno1…`
+    // param value (both reach here per-value). Fixes the builder/parser
+    // asymmetry where `buildUnifiedBip321Uri` emitted `lno` we never read back.
+    if (lightningCandidate && detectors.isBolt12Offer(lightningCandidate)) {
+      pushOption(
+        options,
+        {
+          kind: "bolt12Offer",
+          value: lightningCandidate,
+          amount: detectors.getBolt12Amount(lightningCandidate),
           source,
           paramKey,
         },

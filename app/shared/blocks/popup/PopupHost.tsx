@@ -573,6 +573,15 @@ function SheetPopup() {
   const close = usePopupStore((s) => s.close);
   const update = usePopupStore((s) => s.update);
 
+  // Close bound to the sequence current at THIS render. A sheet button whose
+  // onPress opens a follow-on sheet (e.g. the onchain amount chooser launching
+  // the "Network fee" picker) still fires its trailing close() after onPress —
+  // that close carries the chooser's seq, so once the fee sheet has bumped
+  // openSeq it no-ops instead of tearing the fresh sheet down. Same guard on
+  // the gorhom close path below. This is what makes the fee sheet open reliably
+  // rather than intermittently losing the race on a fast/cached quote.
+  const scopedClose = useCallback(() => close(openSeq), [close, openSeq]);
+
   const lastPayloadRef = useRef<typeof current>(null);
   const wasOpenRef = useRef(false);
   const [openCycle, setOpenCycle] = useState(0);
@@ -839,7 +848,7 @@ function SheetPopup() {
       // rendered-closed frame settling, not a user dismissal.
       if (representingRef.current) return;
       Keyboard.dismiss();
-      close();
+      scopedClose();
     }
   };
 
@@ -999,7 +1008,7 @@ function SheetPopup() {
             <SheetContent
               payload={payload}
               activeCustomPage={activeCustomPage}
-              close={close}
+              close={scopedClose}
               openCycle={openCycle}
               confirmedAnimation={confirmedAnimation}
               customNavDirection={customNavDirection}

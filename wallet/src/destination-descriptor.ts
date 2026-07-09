@@ -131,6 +131,27 @@ function describePaymentOption(
       };
     }
 
+    case "bolt12Offer": {
+      // A BOLT-12 offer paid via a bolt12 melt. Amount is null today
+      // (quote-first → user enters it, like an amountless invoice); a decoded
+      // fixed offer would seed `option.amount` and render "Pay N sats".
+      const amount =
+        option.amount != null ? { value: option.amount, unit: "sat" } : null;
+      return {
+        kind: "bolt12Offer",
+        label: amountLabel(
+          copy,
+          amount,
+          "send.destination.payAmount",
+          "send.destination.pay",
+        ),
+        amount,
+        icon: "lightning",
+        action: "meltBolt12",
+        hasAlternatives: false,
+      };
+    }
+
     case "lightningAddress":
       // A typed lightning address is treated as a payable person (mirrors
       // selecting a contact); the app resolves NIP-05 → profile.
@@ -206,6 +227,7 @@ export function describeDestination(
   switch (intent.type) {
     case "receiveToken":
     case "meltLightningInvoice":
+    case "meltBolt12Offer":
     case "meltLightningAddress":
     case "meltLnurlp":
     case "meltOnchainAddress":

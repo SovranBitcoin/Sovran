@@ -10,6 +10,7 @@ import {
   type MintMethodAmountAvailability,
 } from "../mint-capabilities";
 import { logger } from "../logger";
+import { meltMethodForTarget } from "../melt-target";
 import type { AmountEntryMethodContext, MintMethodRequirement } from "../types";
 
 type AvailabilityMap<S extends ScreenType> = Record<
@@ -420,6 +421,24 @@ function amountEntryAvailability(
     methodContext,
     sendOnchainRequirement,
   );
+  const sendOnchainAvailability = getAmountAvailability(
+    methodContext,
+    sendOnchainRequirement,
+    effectiveAmount,
+    selectedMintUrl,
+    { requireBalance: true },
+  );
+  const sendOnchainCompatible = hasCompatibleCandidate(
+    sendOnchainAvailability,
+    true,
+  );
+
+  // A scanned/pasted melt target has a FIXED method — an onchain address is
+  // paid onchain, never "over Lightning". Drives which Next variants apply so
+  // the menu never offers Lightning for a bc1 (or vice-versa).
+  const meltTargetMethod =
+    isMeltQuote && hasMeltTarget ? meltMethodForTarget(meltTarget) : null;
+  const meltTargetIsOnchain = meltTargetMethod === "onchain";
 
   // ── ecash ──────────────────────────────────────────────────────────
   let ecashAvailable = false;
@@ -434,7 +453,9 @@ function amountEntryAvailability(
     ecashDescription = "Request as a Cashu payment request";
     if (!hasTrustedMint) ecashReason = "No trusted mints";
   } else if (isMeltQuote) {
-    ecashReason = "Lightning destination";
+    ecashReason = meltTargetIsOnchain
+      ? "Onchain destination"
+      : "Lightning destination";
   } else if (isPaymentRequest) {
     ecashAvailable = nextCanFire;
     ecashDescription = "Send a Cashu payment request";
@@ -470,15 +491,21 @@ function amountEntryAvailability(
       );
     }
   } else if (isMeltQuote) {
-    lightningAvailable = nextCanFire && sendLightningCompatible;
-    lightningDescription = hasMeltTarget
-      ? `Pay ${formatLightningTarget(meltTarget)} over Lightning`
-      : "Pay over Lightning";
-    if (!sendLightningCompatible) {
-      lightningReason = methodAmountReason(
-        sendLightningAvailability,
-        "No trusted mint can pay over Lightning",
-      );
+    if (meltTargetIsOnchain) {
+      // A bitcoin address is paid onchain, not over Lightning — leave the
+      // Lightning variant simply disabled (no reason text; the onchain variant
+      // carries the action).
+    } else {
+      lightningAvailable = nextCanFire && sendLightningCompatible;
+      lightningDescription = hasMeltTarget
+        ? `Pay ${formatLightningTarget(meltTarget)} over Lightning`
+        : "Pay over Lightning";
+      if (!sendLightningCompatible) {
+        lightningReason = methodAmountReason(
+          sendLightningAvailability,
+          "No trusted mint can pay over Lightning",
+        );
+      }
     }
   } else if (isPaymentRequest) {
     lightningReason = "Not supported for payment requests";
@@ -500,19 +527,20 @@ function amountEntryAvailability(
   }
 
   // ── onchain ────────────────────────────────────────────────────────
-  // Coco currently supports reusable onchain mint quotes only. Only surface
-  // onchain when at least one trusted mint advertises the relevant NUT method.
+  // Surface onchain receive when a mint advertises onchain minting; surface
+  // onchain SEND (NUT-30 melt) whenever the melt target IS a bitcoin address,
+  // with availability gated on a trusted mint that can serve it.
   const receiveOnchainImplemented = isMethodImplemented(
     receiveOnchainRequirement,
   );
-  const sendOnchainImplemented = isMethodImplemented(sendOnchainRequirement);
   const showOnchainReceive =
     isMintQuote && receiveOnchainImplemented && receiveOnchainSupported;
-  const showOnchainSend =
-    !isMintQuote && sendOnchainImplemented && sendOnchainSupported;
+  const showOnchainSend = isMeltQuote && meltTargetIsOnchain;
   const onchainAvailable = showOnchainReceive
     ? nextCanFire && receiveOnchainCompatible
-    : false;
+    : showOnchainSend
+      ? nextCanFire && sendOnchainSupported && sendOnchainCompatible
+      : false;
   const onchainDescription = showOnchainReceive
     ? "Create an onchain receive address"
     : showOnchainSend
@@ -526,7 +554,16 @@ function amountEntryAvailability(
           "No trusted mint can create an onchain receive address",
         )
     : showOnchainSend
-      ? "Onchain send is not supported yet"
+      ? // The "not supported" message shows ONLY when no trusted mint can melt
+        // onchain — never as a blanket "coming soon".
+        !sendOnchainSupported
+        ? "No trusted mint supports onchain sending"
+        : !sendOnchainCompatible
+          ? methodAmountReason(
+              sendOnchainAvailability,
+              "No trusted mint can send onchain",
+            )
+          : undefined
       : undefined;
 
   // Base order — available entries bubble to the top via a stable sort below
@@ -579,6 +616,17 @@ function amountEntryAvailability(
     )?.reason ??
     nextVariants.find((variant) => !variant.available && variant.reason)
       ?.reason;
+  // A below-minimum amount is a transient typing state, not an error — the user
+  // is on their way up to the minimum. Flag it so the UI renders a neutral hint
+  // ("Minimum X") instead of a red problem, matching how onchain receive only
+  // surfaces the floor at submit time. Keyed off the bounds reason CODE (not the
+  // localized string) across the rails that back the shown send variants.
+  const nextReasonBelowMin =
+    !hasAvailableNextVariant &&
+    [sendLightningAvailability, sendOnchainAvailability].some(
+      (availability) =>
+        availability?.amountBoundsReason?.code === "AMOUNT_BELOW_MINT_MIN",
+    );
   logger.info("screenActions.availability.amountEntry.result", {
     destination: destination ?? null,
     effectiveAmount,
@@ -603,6 +651,9 @@ function amountEntryAvailability(
       available: nextCanFire && hasAvailableNextVariant,
       ...(nextCanFire && !hasAvailableNextVariant && nextUnavailableReason
         ? { reason: nextUnavailableReason }
+        : {}),
+      ...(nextCanFire && nextReasonBelowMin
+        ? { reasonCode: "AMOUNT_BELOW_MINT_MIN" }
         : {}),
       exceedsBalance,
       variants: nextVariants,

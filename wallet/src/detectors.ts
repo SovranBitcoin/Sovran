@@ -46,6 +46,29 @@ const isLightningInvoice = (v: string) => decodeBolt11Invoice(v) !== null;
 const getLightningAmount = (inv: string): number | null =>
   decodeBolt11Invoice(inv)?.amountSat ?? null;
 
+// BOLT-12 offer: HRP `lno`, `1` separator, then a bech32-style data string.
+// Unlike bolt11 the offer carries NO checksum (BOLT-12 §"Encoding"), so this is
+// a permissive shape guard (superset charset incl. the optional `+` splitter);
+// the mint validates the real offer at melt-quote time. Case-insensitive for
+// uppercase QR.
+const BOLT12_OFFER_REGEX = /^lno1[a-z0-9+]+$/i;
+
+const isBolt12Offer = (v: string) => {
+  const valid = !!v && v.length > 12 && BOLT12_OFFER_REGEX.test(v);
+  if (valid) logger.debug("detectors.bolt12Offer.valid", { inputLength: v.length });
+  return valid;
+};
+
+const getBolt12Amount = (_offer: string): number | null => {
+  // Baseline (quote-first): no client-side BOLT-12 decoder is installed, so we
+  // treat every offer as amountless and route it through amount entry — correct
+  // for amountless offers, and a fixed offer is still payable (the mint
+  // validates the entered amount against the offer). Seeding a fixed offer's
+  // amount up front (to skip entry, like a fixed bolt11 invoice) is a deferred
+  // enhancement that needs a decoder dependency — see plan A.1.
+  return null;
+};
+
 const isLightningAddress = (v: string) => {
   const valid = !!v && LN_ADDRESS_REGEX.test(v);
   if (valid)
@@ -125,6 +148,8 @@ export const defaultDetectors: Detectors = {
   getPaymentRequestInfo,
   isLightningInvoice,
   getLightningAmount,
+  isBolt12Offer,
+  getBolt12Amount,
   isLightningAddress,
   isLnurlp,
   parseNpub,

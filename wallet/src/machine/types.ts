@@ -51,7 +51,10 @@ export type Destination = AmountEntryConstraints["destination"];
  */
 export type SendEntrySource = "createEcash" | "scan" | "paste" | "contact";
 
-export type PaymentQuoteMethod = "bolt11" | "onchain";
+// Additive: coco supports bolt11/bolt12/onchain for both mint and melt. bolt12
+// is a first-class SEND (melt) method here; widening is safe (union values are
+// only added, never removed/renamed — no persisted-enum break).
+export type PaymentQuoteMethod = "bolt11" | "bolt12" | "onchain";
 export type MintQuoteMethod = PaymentQuoteMethod;
 export type MeltQuoteMethod = PaymentQuoteMethod;
 

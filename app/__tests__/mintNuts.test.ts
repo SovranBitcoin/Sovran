@@ -4,6 +4,7 @@
 import {
   mintMethodsFromNuts,
   meltMethodsFromNuts,
+  mintMethodUnitPairsFromNuts,
   nutSupported,
 } from '@/shared/lib/cashu/mintNuts';
 
@@ -25,6 +26,26 @@ describe('mintNuts readers', () => {
   it('derives mint/melt methods with case-insensitive dedupe', () => {
     expect(mintMethodsFromNuts(NUTS)).toEqual(['bolt11', 'bolt12']);
     expect(meltMethodsFromNuts(NUTS)).toEqual(['bolt11']);
+  });
+
+  it('extracts NUT-04 (method, unit) pairs, lowercased and deduped', () => {
+    expect(mintMethodUnitPairsFromNuts(NUTS)).toEqual([
+      { method: 'bolt11', unit: 'sat' },
+      { method: 'bolt11', unit: 'usd' }, // BOLT11 lowercased
+      { method: 'bolt12', unit: 'sat' },
+    ]);
+    // NUT-05 on request
+    expect(mintMethodUnitPairsFromNuts(NUTS, '5')).toEqual([{ method: 'bolt11', unit: 'sat' }]);
+  });
+
+  it('drops pair entries missing a method or unit (and is defensive)', () => {
+    const partial: unknown = {
+      '4': { methods: [{ method: 'bolt12' }, { unit: 'sat' }, { method: 'onchain', unit: 'SAT' }] },
+    };
+    expect(mintMethodUnitPairsFromNuts(partial as never)).toEqual([
+      { method: 'onchain', unit: 'sat' },
+    ]);
+    expect(mintMethodUnitPairsFromNuts(undefined)).toEqual([]);
   });
 
   it('reads boolean and array-form supported flags', () => {

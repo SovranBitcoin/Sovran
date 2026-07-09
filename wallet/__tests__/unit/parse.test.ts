@@ -221,6 +221,61 @@ describe('parsePaymentInput — onchain addresses', () => {
 });
 
 // ---------------------------------------------------------------------------
+// BOLT-12 offers
+// ---------------------------------------------------------------------------
+
+describe('parsePaymentInput — bolt12 offers', () => {
+  it('detects a standalone lno1 offer as a bolt12Offer option', () => {
+    const result = parse(INPUTS.bolt12Offer);
+    expect(result.type).toBe('payment');
+    expect(result.container).toBe('standalone');
+    expect(result.options).toEqual([
+      expect.objectContaining({
+        kind: 'bolt12Offer',
+        value: INPUTS.bolt12Offer,
+        source: 'standalone',
+      }),
+    ]);
+    // Amountless (quote-first) — no static amount seeded.
+    expect(result.options[0].amount ?? null).toBeNull();
+  });
+
+  it('reads a bolt12 offer from a BIP-321 lno= param (builder/parser symmetry)', () => {
+    const result = parse(INPUTS.bip321Bolt12);
+    expect(result.options.some((o) => o.kind === 'bolt12Offer')).toBe(true);
+    const offer = result.options.find((o) => o.kind === 'bolt12Offer');
+    expect(offer?.source).toBe('bip321');
+    expect(offer?.paramKey).toBe('lno');
+  });
+
+  it('accepts an UPPERCASE lno1 offer (QR alphanumeric mode)', () => {
+    const result = parse(INPUTS.bolt12Offer.toUpperCase());
+    expect(result.options.some((o) => o.kind === 'bolt12Offer')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Uppercase-QR tolerance (bech32 / Lightning bodies)
+// ---------------------------------------------------------------------------
+
+describe('parsePaymentInput — uppercase QR bodies', () => {
+  it('decodes an UPPERCASE bolt11 invoice (case-insensitive bech32)', () => {
+    const lower = parse(INPUTS.bolt11UppercaseQr.toLowerCase());
+    const upper = parse(INPUTS.bolt11UppercaseQr);
+    expect(lower.options[0]?.kind).toBe('lightningInvoice');
+    expect(upper.options[0]?.kind).toBe('lightningInvoice');
+  });
+
+  it('does NOT lowercase a case-sensitive cashu token (base64url)', () => {
+    // A cashuB/cashuA token contains lowercase, so the uppercase-QR path never
+    // fires on it — round-trips unchanged.
+    const result = parse(INPUTS.cashuTokenV3);
+    expect(result.options[0]?.kind).toBe('ecashToken');
+    expect(result.options[0]?.value).toBe(INPUTS.cashuTokenV3);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // LNURL-pay
 // ---------------------------------------------------------------------------
 

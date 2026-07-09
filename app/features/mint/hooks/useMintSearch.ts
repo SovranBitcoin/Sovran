@@ -2,14 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { discoverMints, type DiscoverMint, type MintSearchResult } from '@/shared/lib/apiClient';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
-import { mintMethodsFromNuts } from '@/shared/lib/cashu/mintNuts';
+import { mintMethodsFromNuts, mintMethodUnitPairsFromNuts } from '@/shared/lib/cashu/mintNuts';
 import { cashuLog } from '@/shared/lib/logger';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 
 /** Discovery row + the app-local method field (the shared MintSearchResult
  *  schema predates the capability data; extend locally rather than changing
  *  the cross-repo contract). */
-export type MintSearchRow = MintSearchResult & { supported_methods: string[] };
+export type MintSearchRow = MintSearchResult & {
+  supported_methods: string[];
+  /** NUT-04 (method, unit) pairs (lowercased) — the discovery filter matches the
+   *  rail's exact pair, e.g. (bolt12, sat), not the method alone. */
+  supported_method_units: Array<{ method: string; unit: string }>;
+};
 
 interface UseMintSearchReturn {
   results: MintSearchRow[];
@@ -32,6 +37,7 @@ export function discoverMintToSearchResult(m: DiscoverMint): MintSearchRow {
     // Derived from the raw NUT-06 nuts map (nuts['4'].methods) — nagg ships
     // capabilities undistilled by design.
     supported_methods: mintMethodsFromNuts(m.nuts),
+    supported_method_units: mintMethodUnitPairsFromNuts(m.nuts, '4'),
     state: m.state ?? 'unknown',
     n_mints: m.nMints ?? 0,
     n_melts: m.nMelts ?? 0,
@@ -62,12 +68,33 @@ function matchesCurrency(result: MintSearchResult, currency: string): boolean {
   return result.supported_units.some((u) => units.includes(u.toLowerCase()));
 }
 
-/** Method filter (receive-rail discovery CTAs): a mint matches only when
- *  nagg reported it advertises the method — absence means "not known to
- *  support", so rows without the field are excluded while the filter is on. */
-function matchesMethod(result: MintSearchRow, method: string | undefined): boolean {
+/**
+ * Method filter for receive-rail discovery CTAs. A mint matches only when nagg
+ * reported it advertises the method — absence means "not known to support", so
+ * rows without the field are excluded while the filter is on.
+ *
+ * When a concrete currency (unit) is selected, matching is on the NUT-04
+ * (method, unit) PAIR: a mint that advertises `bolt12` only for `eur` must NOT
+ * match a `sat` rail. `currency === 'ALL'` (or empty) falls back to method-only
+ * — the user explicitly chose to browse every unit. Exported for testing.
+ */
+export function discoveryMethodMatches(
+  result: MintSearchRow,
+  method: string | undefined,
+  currency: string
+): boolean {
   if (!method) return true;
-  return result.supported_methods.some((m) => m.toLowerCase() === method.toLowerCase());
+  const wantMethod = method.toLowerCase();
+  const units = currency
+    .split(',')
+    .map((u) => u.trim().toLowerCase())
+    .filter((u) => u && u !== 'all');
+  if (units.length === 0) {
+    return result.supported_methods.some((m) => m.toLowerCase() === wantMethod);
+  }
+  return result.supported_method_units.some(
+    (p) => p.method === wantMethod && units.includes(p.unit)
+  );
 }
 
 /**
@@ -153,7 +180,10 @@ export function useMintSearch(
   const results = useMemo(() => {
     const q = query.trim();
     return allMints.filter(
-      (m) => matchesQuery(m, q) && matchesCurrency(m, currency) && matchesMethod(m, method)
+      (m) =>
+        matchesQuery(m, q) &&
+        matchesCurrency(m, currency) &&
+        discoveryMethodMatches(m, method, currency)
     );
   }, [allMints, query, currency, method]);
 

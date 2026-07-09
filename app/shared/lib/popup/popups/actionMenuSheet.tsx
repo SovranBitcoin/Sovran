@@ -16,7 +16,7 @@
  * `actionMenuPopup` lane). Each item's `onPress` receives the sheet `close`.
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { BottomSheet, Menu } from 'heroui-native';
 
@@ -33,7 +33,7 @@ interface ActionMenuSheetContentProps extends CustomSheetSharedProps {
 }
 
 export function ActionMenuSheetContent({ payload, close }: ActionMenuSheetContentProps) {
-  const { title, buttons } = payload;
+  const { title, buttons, onDismiss } = payload;
 
   useEffect(() => {
     log.info('ui.action_menu.sheet.presented', {
@@ -41,6 +41,16 @@ export function ActionMenuSheetContent({ payload, close }: ActionMenuSheetConten
       buttonCount: buttons.length,
     });
   }, [title, buttons.length]);
+
+  // Distinguish a button pick from a swipe/overlay dismiss so an awaiting caller
+  // (e.g. the onchain fee picker) can resolve as cancelled on genuine dismiss.
+  const pickedRef = useRef(false);
+  useEffect(
+    () => () => {
+      if (!pickedRef.current) onDismiss?.();
+    },
+    [onDismiss]
+  );
 
   return (
     <View>
@@ -67,6 +77,7 @@ export function ActionMenuSheetContent({ payload, close }: ActionMenuSheetConten
               variant={isDanger ? 'danger' : 'default'}
               onPress={() => {
                 if (disabled) return;
+                pickedRef.current = true;
                 void (async () => {
                   try {
                     await button.onPress?.(close);

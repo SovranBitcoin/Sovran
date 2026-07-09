@@ -17,7 +17,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import type { HistoryEntry } from '@cashu/coco-core';
 import { shouldApplyEntryUpdate, mergeEntryUpdate } from '../../src/screen-actions/createManager';
+import { normalizeHistoryEntry } from '../../src/history/normalize';
 
 const MINT1 = 'https://mint1.example.com';
 const MINT2 = 'https://mint2.example.com';
@@ -101,6 +103,21 @@ describe('shouldApplyEntryUpdate — melt preview fallback', () => {
 
   it('does NOT match preview with different amount', () => {
     expect(shouldApplyEntryUpdate(makePreview(), makeReal({ amount: 300 }))).toBe(false);
+  });
+
+  // Regression: coco v2 delivers `amount` as an Amount OBJECT. The mintUrl +
+  // amount fallback compares by strict equality, so a raw object amount fails
+  // the match and the live timeline never advances. normalizeHistoryEntry (run
+  // at the bridge boundary) coerces it to a number, restoring the match.
+  it('does NOT match a raw coco-v2 object amount, but DOES after normalize', () => {
+    const objectAmount = makeReal({ amount: { toNumber: () => 200 } });
+    expect(shouldApplyEntryUpdate(makePreview(), objectAmount)).toBe(false);
+    expect(
+      shouldApplyEntryUpdate(
+        makePreview(),
+        normalizeHistoryEntry(objectAmount as unknown as HistoryEntry) as never
+      )
+    ).toBe(true);
   });
 
   it('does NOT match non-preview entries by mintUrl + amount alone', () => {

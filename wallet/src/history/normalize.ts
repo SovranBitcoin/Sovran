@@ -76,15 +76,35 @@ export function normalizeHistoryEntries(
 }
 
 /**
+ * Normalize a coco-read entry into colada's in-memory history contract: legacy
+ * state vocabulary AND a PLAIN NUMERIC amount. coco v2 entries carry `amount`
+ * as an `Amount` OBJECT (`{ toNumber() }`), not a number — screen-actions
+ * matching (`shouldApplyEntryUpdate`'s preview `mintUrl + amount` fallback)
+ * compares amounts by strict numeric equality, so an object amount silently
+ * fails every match and live updates get dropped. Run this at every boundary
+ * where a raw coco entry crosses into consumer/contract code (the live
+ * screen-actions bridge as well as the transaction-list read model). Returns
+ * the same reference when nothing changed.
+ */
+export function normalizeHistoryEntry(entry: HistoryEntry): HistoryEntry {
+  const stateNormalized = normalizeHistoryEntryState(entry);
+  const rawAmount = (stateNormalized as { amount?: AmountLike }).amount;
+  const numericAmount = amountToNumber(rawAmount);
+  if (rawAmount === numericAmount) return stateNormalized;
+  // coco types `amount` as an `Amount` object; we deliberately downcast to a
+  // plain number at this contract boundary (consumers read via amountToNumber).
+  return {
+    ...stateNormalized,
+    amount: numericAmount,
+  } as unknown as HistoryEntry;
+}
+
+/**
  * Serialize an entry into colada's JSON history contract: legacy state
  * vocabulary and a PLAIN NUMERIC amount (a live cashu-ts Amount would
  * stringify to a quoted string). Use this instead of raw JSON.stringify
  * whenever a coco-read entry crosses into the serialized contract.
  */
 export function serializeHistoryEntry(entry: HistoryEntry): string {
-  const normalized = normalizeHistoryEntryState(entry);
-  return JSON.stringify({
-    ...normalized,
-    amount: amountToNumber((normalized as { amount?: AmountLike }).amount),
-  });
+  return JSON.stringify(normalizeHistoryEntry(entry));
 }

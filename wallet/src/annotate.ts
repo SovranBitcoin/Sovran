@@ -68,6 +68,10 @@ function onchainMeltRequirement(): MintMethodRequirement {
   return { operation: "melt", method: "onchain", unit: "sat" };
 }
 
+function bolt12MeltRequirement(): MintMethodRequirement {
+  return { operation: "melt", method: "bolt12", unit: "sat" };
+}
+
 function compatibleMeltCandidates(
   option: PaymentOption,
   ctx: WalletContext,
@@ -110,6 +114,7 @@ function hasLightningOption(options: PaymentOption[]): boolean {
   return options.some(
     (option) =>
       option.kind === "lightningInvoice" ||
+      option.kind === "bolt12Offer" ||
       option.kind === "lightningAddress" ||
       option.kind === "lnurlp",
   );
@@ -210,9 +215,44 @@ const ONCHAIN_RULES: RecommendationRule[] = [
   },
 ];
 
+// BOLT-12 offers pay via a bolt12 melt — same shape as onchain (gate on a
+// trusted mint advertising the method), minus the fee picker.
+const BOLT12_RULES: RecommendationRule[] = [
+  {
+    applies: (_option, ctx) =>
+      !hasMintSupportingMethod(ctx, bolt12MeltRequirement()),
+    status: "disabled",
+    reason: (_o, _c, _i, locale) => ({
+      code: "MINT_METHOD_UNSUPPORTED",
+      message:
+        locale === "en"
+          ? "No trusted mint supports BOLT 12 sending"
+          : "No trusted mint supports BOLT 12 sending",
+    }),
+  },
+  {
+    applies: (option, ctx) =>
+      hasCompatibleMeltMethod(option, ctx, bolt12MeltRequirement()),
+    status: "available",
+    reason: () => null,
+  },
+  {
+    applies: () => true,
+    status: "disabled",
+    reason: (option, ctx, _i, locale) =>
+      firstMeltMethodReason(
+        option,
+        ctx,
+        bolt12MeltRequirement(),
+        locale ?? "en",
+      ),
+  },
+];
+
 const RULES_BY_KIND: Partial<Record<string, RecommendationRule[]>> = {
   paymentRequest: PAYMENT_REQUEST_RULES,
   lightningInvoice: LIGHTNING_RULES,
+  bolt12Offer: BOLT12_RULES,
   lightningAddress: LIGHTNING_RULES,
   lnurlp: LIGHTNING_RULES,
   onchainAddress: ONCHAIN_RULES,
@@ -230,6 +270,7 @@ const STATUS_SORT: Record<OptionStatus, number> = {
 
 const PROMOTION_SORT: Partial<Record<PaymentOption["kind"], number>> = {
   lightningInvoice: 0,
+  bolt12Offer: 0,
   lightningAddress: 0,
   lnurlp: 0,
   ecashToken: 1,

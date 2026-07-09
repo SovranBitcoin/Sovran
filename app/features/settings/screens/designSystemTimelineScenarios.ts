@@ -285,6 +285,45 @@ export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
       ],
     },
     {
+      id: 'onchain-send',
+      label: 'Onchain · Send (mempool)',
+      group: 'Onchain',
+      variant: 'Send',
+      frames: [
+        {
+          note: 'Broadcasting…',
+          historyEntry: meltEntry('pending', base),
+          onchainConfirmationProgress:
+            buildOnchainRequiredConfirmationProgress(REQUIRED_CONFIRMATIONS),
+        },
+        {
+          note: 'Detected in mempool',
+          historyEntry: meltEntry('pending', base),
+          onchainConfirmationProgress: onchainObserved(null),
+        },
+        ...Array.from({ length: REQUIRED_CONFIRMATIONS - 1 }, (_, i) => {
+          const confirmations = i + 1;
+          return {
+            note: `${confirmations}/${REQUIRED_CONFIRMATIONS} confirmations`,
+            historyEntry: meltEntry('pending', base),
+            onchainConfirmationProgress: onchainObserved(confirmations),
+          };
+        }),
+        {
+          note: `${REQUIRED_CONFIRMATIONS}/${REQUIRED_CONFIRMATIONS} confirmations`,
+          historyEntry: meltEntry('pending', base),
+          onchainConfirmationProgress:
+            buildSatisfiedOnchainConfirmationProgress(REQUIRED_CONFIRMATIONS),
+        },
+        {
+          note: 'Confirmed',
+          historyEntry: meltEntry('PAID', base),
+          onchainConfirmationProgress:
+            buildSatisfiedOnchainConfirmationProgress(REQUIRED_CONFIRMATIONS),
+        },
+      ],
+    },
+    {
       id: 'payment-request',
       label: 'Payment Request (Nostr)',
       group: 'Request',
