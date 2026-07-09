@@ -33,6 +33,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
 import { createTestMachine, runScenario } from '../_harness';
 import { WALLETS, MINT1, MINT2, MINT3, INPUTS } from '../_harness/fixtures';
 import type { FlowScenario } from '../_harness/types';
@@ -349,6 +350,9 @@ describe('lightning melt — confirmMelt notification sequence', () => {
       amount: 200,
       unit: 'sat',
     });
+    // bolt11 never sets meltQuoteMethod — `method` must stay absent so the
+    // app's onchain-only toast gate can't misfire on lightning sends.
+    expect((processing!.data as Record<string, unknown>).method).toBeUndefined();
 
     // onPaymentConfirmed should fire after executeMelt succeeds
     const confirmed = tm.notificationCalls.find((c) => c.key === 'onPaymentConfirmed');
@@ -366,6 +370,41 @@ describe('lightning melt — confirmMelt notification sequence', () => {
     const processingIdx = tm.notificationCalls.findIndex((c) => c.key === 'onPaymentProcessing');
     const confirmedIdx = tm.notificationCalls.findIndex((c) => c.key === 'onPaymentConfirmed');
     expect(processingIdx).toBeLessThan(confirmedIdx);
+  });
+
+  // The app suppresses the in-progress toast for onchain melts (they settle
+  // in minutes-to-hours); it keys off `method` in the processing payload.
+  it('carries method: "onchain" in onPaymentProcessing for an onchain melt', async () => {
+    // The default fixture mints are bolt11-only; grant MINT1 onchain melt.
+    const tm = createTestMachine({
+      wallet: {
+        mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+          {
+            mintUrl: MINT1,
+            mintInfo: {
+              nuts: {
+                '4': { methods: [{ method: 'bolt11', unit: 'sat' }] },
+                '5': {
+                  methods: [
+                    { method: 'bolt11', unit: 'sat' },
+                    { method: 'onchain', unit: 'sat' },
+                  ],
+                },
+              },
+            },
+          },
+        ]),
+      },
+    });
+    await tm.machine.execute(INPUTS.onchainAddress, { reset: true });
+    await tm.machine.enterAmount({ value: 200, unit: 'sat' }, MINT1);
+    tm.assertStep('navigateToMeltPreview');
+
+    await tm.machine.confirmMelt();
+
+    const processing = tm.notificationCalls.find((c) => c.key === 'onPaymentProcessing');
+    expect(processing).toBeTruthy();
+    expect(processing!.data).toMatchObject({ variant: 'melt', method: 'onchain' });
   });
 
   it('fires onPaymentProcessing then onPaymentFailed on error', async () => {

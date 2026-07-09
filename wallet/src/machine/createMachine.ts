@@ -713,6 +713,9 @@ export function createPaymentMachine(
         mintUrl: data.mintUrl,
         amount: data.amount,
         unit: data.unit,
+        // The quote method lives on the flow context, not the step data —
+        // lets the wallet gate the in-progress indicator per method.
+        ...(flowCtx.meltQuoteMethod ? { method: flowCtx.meltQuoteMethod } : {}),
       });
 
       commitInFlight = true;

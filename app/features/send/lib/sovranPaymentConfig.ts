@@ -666,6 +666,18 @@ export function createSovranNotifications(
       paramPopup('nfc-error', { title: 'NFC Read Failed', message });
     },
     onPaymentProcessing: (data) => {
+      // Onchain melts settle in minutes-to-hours — an amber "Sending…" toast
+      // pinned from Pay until confirmation is noise. Skip the processing
+      // toast; the melt-op:finalized listener's no-active fallback shows the
+      // single terminal toast, and onPaymentFailed shows failures.
+      if (data.variant === 'melt' && data.method === 'onchain') {
+        paymentLog.info('payment.processing.skipped', {
+          variant: data.variant,
+          method: data.method,
+          reason: 'onchain_terminal_toast_only',
+        });
+        return;
+      }
       const store = usePaymentStatusStore.getState();
       const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
       const id = `${data.variant}-${Date.now()}`;
@@ -785,24 +797,56 @@ export function createSovranNotifications(
         activeId: store.active?.id ?? null,
         activeState: store.active?.state ?? null,
       });
-      if (!store.active) {
-        paymentLog.warn('payment.failed.skipped', {
-          variant: data.variant,
-          reason: 'no_active_status_toast',
-        });
-        return;
-      }
       const msg = data.rolledBack
         ? `${data.message}\nYour funds have been returned.`
         : data.message;
+      const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
+      const active = store.active;
+      if (
+        !active ||
+        active.variant !== variant ||
+        active.mintUrl !== data.mintUrl ||
+        active.amount !== data.amount ||
+        active.unit !== data.unit
+      ) {
+        // No matching processing toast to flip (onchain melts suppress it,
+        // and another payment may currently own the surface). A failure must
+        // still surface as its own terminal toast rather than mutating an
+        // unrelated payment.
+        const id = `${data.variant}-${Date.now()}`;
+        paymentLog.info('payment.failed.route', {
+          variant: data.variant,
+          action: 'new_failed_toast',
+          id,
+          reason: active ? 'active_status_mismatch' : 'no_active_status_toast',
+          rolledBack: data.rolledBack,
+        });
+        store.setActive({
+          variant,
+          id,
+          mintUrl: data.mintUrl,
+          amount: data.amount,
+          unit: data.unit,
+          state: 'failed',
+          errorMessage: msg,
+        });
+        paymentStatusPopup({
+          variant,
+          id,
+          mintUrl: data.mintUrl,
+          amount: data.amount,
+          unit: data.unit,
+        });
+        return;
+      }
       paymentLog.info('payment.failed.route', {
         variant: data.variant,
         action: 'set_failed',
-        activeId: store.active.id,
-        activeState: store.active.state,
+        activeId: active.id,
+        activeState: active.state,
         rolledBack: data.rolledBack,
       });
-      store.setFailed(store.active.id, new Error(msg));
+      store.setFailed(active.id, new Error(msg));
     },
     onScanEmpty: (source) => {
       if (source === 'clipboard') staticPopup('no-clipboard-address');

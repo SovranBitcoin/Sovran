@@ -629,6 +629,12 @@ export type NotificationHandlerMap = {
     mintUrl: string;
     amount: number;
     unit: string;
+    /**
+     * Melt quote method when known (`"bolt11"` stays undefined for legacy
+     * callers). Lets the wallet suppress the in-progress indicator for
+     * slow-settling methods (onchain) and show only the terminal one.
+     */
+    method?: MeltQuoteMethod;
   }) => MaybeAsync;
   /**
    * Called when a multi-step operation completes successfully.
