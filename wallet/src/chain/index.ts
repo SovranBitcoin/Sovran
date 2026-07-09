@@ -1,9 +1,12 @@
 export {
+  addressExplorerUrl,
   createMempoolSpaceChainAdapter,
   defaultChainAdapter,
   fetchMempoolAddressStats,
   MempoolAddressStatsSchema,
+  MempoolHttpError,
   summarizeMempoolAddress,
+  transactionExplorerUrlForTxid,
   type MempoolAddressSummary,
   type MempoolAddressStats,
   type MempoolSpaceChainAdapterOptions,

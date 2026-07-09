@@ -43,6 +43,7 @@ export { setLogger, type CocoLogger } from "./logger";
 // Copy / i18n
 export {
   DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
+  addressExplorerUrl,
   buildOnchainConfirmationProgressFromTx,
   createMempoolSpaceChainAdapter,
   defaultChainAdapter,
@@ -50,8 +51,10 @@ export {
   getOnchainConfirmationInfo,
   getOnchainConfirmationProgress,
   MempoolAddressStatsSchema,
+  MempoolHttpError,
   parseOutpoint,
   summarizeMempoolAddress,
+  transactionExplorerUrlForTxid,
 } from "./chain";
 export type {
   MempoolAddressSummary,

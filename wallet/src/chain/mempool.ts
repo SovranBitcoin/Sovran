@@ -11,7 +11,28 @@ import { errField, logger } from "../logger";
 import { safeFetch, type RequestControls } from "../safeFetch";
 
 const MEMPOOL_API_BASE_URL = "https://mempool.space/api";
+const MEMPOOL_WEB_BASE_URL = "https://mempool.space";
 const MEMPOOL_TIMEOUT_MS = 5_000;
+
+/** HTTP failure from the mempool API, carrying the status code so callers can
+ *  distinguish "not indexed (yet)" 404s from real errors. */
+export class MempoolHttpError extends Error {
+  readonly status: number;
+
+  constructor(where: string, status: number) {
+    super(`${where} failed with HTTP ${status}`);
+    this.name = "MempoolHttpError";
+    this.status = status;
+  }
+}
+
+export function transactionExplorerUrlForTxid(txid: string): string {
+  return `${MEMPOOL_WEB_BASE_URL}/tx/${encodeURIComponent(txid)}`;
+}
+
+export function addressExplorerUrl(address: string): string {
+  return `${MEMPOOL_WEB_BASE_URL}/address/${encodeURIComponent(address)}`;
+}
 
 const AddressStats = z.object({
   tx_count: z.number().int().nonnegative(),
@@ -146,7 +167,7 @@ async function fetchJson<T>(
       status: response.status,
       durationMs: Date.now() - startedAt,
     });
-    throw new Error(`${where} failed with HTTP ${response.status}`);
+    throw new MempoolHttpError(where, response.status);
   }
   let json: unknown;
   try {
@@ -221,7 +242,7 @@ async function fetchText(
       status: response.status,
       durationMs: Date.now() - startedAt,
     });
-    throw new Error(`${where} failed with HTTP ${response.status}`);
+    throw new MempoolHttpError(where, response.status);
   }
   const text = await response.text();
   logger.debug("chain.mempool.fetchText.done", {
@@ -404,9 +425,9 @@ export function summarizeMempoolAddress(
     unconfirmedNetSats: Math.max(0, unconfirmedNetSats),
     totalReceivedSats:
       confirmedReceivedSats + stats.mempool_stats.funded_txo_sum,
-    explorerUrl: `https://mempool.space/address/${encodeURIComponent(stats.address)}`,
+    explorerUrl: addressExplorerUrl(stats.address),
     transactionExplorerUrl: trackedFundingTx
-      ? `https://mempool.space/tx/${encodeURIComponent(trackedFundingTx.txid)}`
+      ? transactionExplorerUrlForTxid(trackedFundingTx.txid)
       : null,
   };
 }
@@ -470,11 +491,26 @@ export function createMempoolSpaceChainAdapter(
         network,
         txidLength: txid.length,
       });
-      const status = await fetchJson(
-        `${MEMPOOL_API_BASE_URL}/tx/${encodeURIComponent(txid)}/status`,
-        MempoolTxStatusSchema,
-        "mempool/tx/status",
-      );
+      let status: z.infer<typeof MempoolTxStatusSchema>;
+      try {
+        status = await fetchJson(
+          `${MEMPOOL_API_BASE_URL}/tx/${encodeURIComponent(txid)}/status`,
+          MempoolTxStatusSchema,
+          "mempool/tx/status",
+        );
+      } catch (error) {
+        // A just-broadcast txid is legitimately unindexed for a short window;
+        // report "not found" as null instead of an error the caller retries as
+        // a failure.
+        if (error instanceof MempoolHttpError && error.status === 404) {
+          logger.info("chain.mempool.txStatus.notFound", {
+            network,
+            txidLength: txid.length,
+          });
+          return null;
+        }
+        throw error;
+      }
       const tipHeight = status.confirmed
         ? await fetchMempoolTipHeight().catch(() => null)
         : null;

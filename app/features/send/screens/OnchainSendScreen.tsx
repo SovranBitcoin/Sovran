@@ -17,6 +17,7 @@ import type { HistoryEntry, MeltHistoryEntry } from '@cashu/coco-core';
 import {
   buildOnchainConfirmationProgressFromTx,
   parseOutpoint,
+  transactionExplorerUrlForTxid,
   type ChainOnchainConfirmationProgress,
 } from 'wallet';
 import { useScreenActions } from 'wallet/react';
@@ -132,7 +133,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
   const anyLoading = actions.pay.loading || actions.cancel.loading;
   const onchainAddress = getOnchainMeltAddress(entry) ?? quote.request;
   const explorerLinkUrl = outpoint
-    ? `https://mempool.space/tx/${encodeURIComponent(outpoint.txid)}`
+    ? transactionExplorerUrlForTxid(outpoint.txid)
     : null;
 
   const bottomButtons = (

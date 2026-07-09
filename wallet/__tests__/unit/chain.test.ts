@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  addressExplorerUrl,
   buildOnchainConfirmationProgressFromTx,
+  createMempoolSpaceChainAdapter,
   getOnchainConfirmationProgress,
   parseOutpoint,
   summarizeMempoolAddress,
+  transactionExplorerUrlForTxid,
   type MempoolAddressStats,
 } from '../../src/chain';
 
@@ -117,5 +120,54 @@ describe('buildOnchainConfirmationProgressFromTx (onchain SEND)', () => {
       currentConfirmations: 6, // capped
       isSatisfied: true,
     });
+  });
+});
+
+describe('explorer URL helpers', () => {
+  const TXID = 'ab'.repeat(32);
+
+  it('builds the transaction explorer URL', () => {
+    expect(transactionExplorerUrlForTxid(TXID)).toBe(`https://mempool.space/tx/${TXID}`);
+  });
+
+  it('builds the address explorer URL', () => {
+    expect(addressExplorerUrl(ADDRESS)).toBe(`https://mempool.space/address/${ADDRESS}`);
+  });
+
+  it('is the same URL the address summary links to', () => {
+    const summary = summarizeMempoolAddress(
+      stats({ fundingTxs: [{ txid: TXID, valueSats: 1_000, confirmations: 1 }] }),
+    );
+    expect(summary.explorerUrl).toBe(addressExplorerUrl(ADDRESS));
+    expect(summary.transactionExplorerUrl).toBe(transactionExplorerUrlForTxid(TXID));
+  });
+});
+
+describe('getTransactionStatus HTTP contract', () => {
+  const TXID = 'cd'.repeat(32);
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stubFetchStatus(status: number, body?: unknown) {
+    vi.stubGlobal('fetch', async () => ({
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => body,
+      text: async () => JSON.stringify(body ?? ''),
+    }));
+  }
+
+  it('returns null for an unindexed (404) txid instead of throwing', async () => {
+    stubFetchStatus(404);
+    const adapter = createMempoolSpaceChainAdapter();
+    await expect(adapter.getTransactionStatus(TXID)).resolves.toBeNull();
+  });
+
+  it('still throws on non-404 HTTP errors', async () => {
+    stubFetchStatus(500);
+    const adapter = createMempoolSpaceChainAdapter();
+    await expect(adapter.getTransactionStatus(TXID)).rejects.toThrow('HTTP 500');
   });
 });
