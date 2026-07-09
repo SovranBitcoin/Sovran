@@ -83,6 +83,70 @@ function onchainMeltStateRank(state: string | null | undefined): number {
   return rank == null ? -1 : rank;
 }
 
+export interface OnchainMeltFeeOption {
+  feeIndex: number;
+  feeReserveSats: number;
+  estimatedBlocks: number | null;
+}
+
+/** Normalize a quote row's raw NUT-30 `fee_options` array (unknown-shaped). */
+export function normalizeOnchainFeeOptions(raw: unknown): OnchainMeltFeeOption[] {
+  if (!Array.isArray(raw)) return [];
+  const options: OnchainMeltFeeOption[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const record = item as EntryRecord;
+    const feeIndex = typeof record.fee_index === 'number' ? record.fee_index : null;
+    const feeReserve =
+      typeof record.fee_reserve === 'number'
+        ? record.fee_reserve
+        : typeof (record.fee_reserve as { toNumber?: () => number })?.toNumber === 'function'
+          ? (record.fee_reserve as { toNumber: () => number }).toNumber()
+          : null;
+    if (feeIndex == null || feeReserve == null || !Number.isFinite(feeReserve)) continue;
+    const estimatedBlocks =
+      typeof record.estimated_blocks === 'number' && Number.isFinite(record.estimated_blocks)
+        ? record.estimated_blocks
+        : null;
+    options.push({ feeIndex, feeReserveSats: feeReserve, estimatedBlocks });
+  }
+  return options;
+}
+
+export interface OnchainMeltFeeDisplay {
+  /** 'Network fee' when the settled cost is known, else 'Fee reserve (max)'. */
+  title: 'Network fee' | 'Fee reserve (max)';
+  sats: number;
+}
+
+/**
+ * The fee line for an onchain send detail. Prefers the actual settled cost
+ * (annotation `effectiveFeeSats`, from coco's post-settlement accounting),
+ * falling back to the SELECTED option's `fee_reserve` labeled as a maximum —
+ * NUT-30 entitles the mint to keep the full reserve (batching), so the
+ * reserve must never be presented as the final cost or a promised refund.
+ */
+export function resolveOnchainMeltFeeDisplay(
+  annotation: {
+    feeIndex?: number;
+    feeReserveSats?: number;
+    effectiveFeeSats?: number;
+  } | null | undefined,
+  liveFeeOptions: OnchainMeltFeeOption[] | null | undefined
+): OnchainMeltFeeDisplay | null {
+  if (annotation?.effectiveFeeSats != null && Number.isFinite(annotation.effectiveFeeSats)) {
+    return { title: 'Network fee', sats: annotation.effectiveFeeSats };
+  }
+  if (annotation?.feeReserveSats != null && Number.isFinite(annotation.feeReserveSats)) {
+    return { title: 'Fee reserve (max)', sats: annotation.feeReserveSats };
+  }
+  if (annotation?.feeIndex != null && liveFeeOptions) {
+    const option = liveFeeOptions.find((o) => o.feeIndex === annotation.feeIndex);
+    if (option) return { title: 'Fee reserve (max)', sats: option.feeReserveSats };
+  }
+  return null;
+}
+
 /**
  * Whether an onchain melt quote's `expiry` still means anything: only a quote
  * that never advanced past UNPAID/prepared (rank ≤ 0) can expire — once the

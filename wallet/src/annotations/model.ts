@@ -40,6 +40,10 @@ export const ANNOTATION_KEYS = {
   swapHopIndex: "swapHopIndex",
   creqP2pkLock: "creqP2pkLock",
   creqExcludedMints: "creqExcludedMints",
+  onchainOutpoint: "onchainOutpoint",
+  onchainFeeIndex: "onchainFeeIndex",
+  onchainFeeReserveSats: "onchainFeeReserveSats",
+  onchainEffectiveFeeSats: "onchainEffectiveFeeSats",
 } as const;
 
 /** The flat, persisted/merged form. coco-metadata-compatible. */
@@ -95,6 +99,20 @@ export interface TransactionAnnotation {
   creqCustomization?: {
     p2pkLock?: boolean;
     excludedMints?: string[];
+  };
+  /**
+   * Onchain melt (NUT-30 send) settlement facts, persisted so the detail
+   * screen keeps its explorer link and fee line after the mint stops serving
+   * the quote row (coco's MeltHistoryEntry never carries the outpoint).
+   * `outpoint` is the spec `txid:vout`; `feeReserveSats` is the SELECTED
+   * option's maximum fee; `effectiveFeeSats` is the actual settled cost when
+   * coco reports one.
+   */
+  onchainMelt?: {
+    outpoint?: string;
+    feeIndex?: number;
+    feeReserveSats?: number;
+    effectiveFeeSats?: number;
   };
 }
 
@@ -207,7 +225,32 @@ export function encodeAnnotation(
     }
   }
 
+  if (patch.onchainMelt) {
+    setString(record, ANNOTATION_KEYS.onchainOutpoint, patch.onchainMelt.outpoint);
+    setFiniteNumber(record, ANNOTATION_KEYS.onchainFeeIndex, patch.onchainMelt.feeIndex);
+    setFiniteNumber(
+      record,
+      ANNOTATION_KEYS.onchainFeeReserveSats,
+      patch.onchainMelt.feeReserveSats,
+    );
+    setFiniteNumber(
+      record,
+      ANNOTATION_KEYS.onchainEffectiveFeeSats,
+      patch.onchainMelt.effectiveFeeSats,
+    );
+  }
+
   return record;
+}
+
+function setFiniteNumber(
+  record: AnnotationRecord,
+  key: string,
+  value: number | undefined | null,
+): void {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    record[key] = String(value);
+  }
 }
 
 function parseStringArray(value: string | undefined): string[] | undefined {
@@ -329,6 +372,30 @@ export function decodeAnnotation(
     annotation.creqCustomization = {
       ...(creqP2pkLockRaw != null ? { p2pkLock: creqP2pkLockRaw === "1" } : {}),
       ...(creqExcludedMints != null ? { excludedMints: creqExcludedMints } : {}),
+    };
+  }
+
+  const onchainOutpoint = record[ANNOTATION_KEYS.onchainOutpoint];
+  const onchainFeeIndex = parseFiniteNumber(record[ANNOTATION_KEYS.onchainFeeIndex]);
+  const onchainFeeReserveSats = parseFiniteNumber(
+    record[ANNOTATION_KEYS.onchainFeeReserveSats],
+  );
+  const onchainEffectiveFeeSats = parseFiniteNumber(
+    record[ANNOTATION_KEYS.onchainEffectiveFeeSats],
+  );
+  if (
+    onchainOutpoint ||
+    onchainFeeIndex != null ||
+    onchainFeeReserveSats != null ||
+    onchainEffectiveFeeSats != null
+  ) {
+    annotation.onchainMelt = {
+      ...(onchainOutpoint ? { outpoint: onchainOutpoint } : {}),
+      ...(onchainFeeIndex != null ? { feeIndex: onchainFeeIndex } : {}),
+      ...(onchainFeeReserveSats != null ? { feeReserveSats: onchainFeeReserveSats } : {}),
+      ...(onchainEffectiveFeeSats != null
+        ? { effectiveFeeSats: onchainEffectiveFeeSats }
+        : {}),
     };
   }
 

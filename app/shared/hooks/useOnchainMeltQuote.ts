@@ -1,8 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useManagerContext } from '@cashu/coco-react';
 
-import { isOnchainMeltQuoteExpired } from '@/shared/lib/cashu/onchainMelt';
+import { annotationKey } from 'wallet';
+
+import {
+  isOnchainMeltQuoteExpired,
+  normalizeOnchainFeeOptions,
+  type OnchainMeltFeeOption,
+} from '@/shared/lib/cashu/onchainMelt';
+import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { paymentLog } from '@/shared/lib/logger';
 
 // The onchain melt quote is the source of truth for the outpoint (txid:vout) and
@@ -28,11 +35,15 @@ export function useOnchainMeltQuote(
   state: string | null;
   request: string | null;
   expiry: number | null;
+  feeOptions: OnchainMeltFeeOption[];
   isLoading: boolean;
 } {
   const { manager } = useManagerContext();
   const [quote, setQuote] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  // One annotation write per quote — covers mints that broadcast AFTER the
+  // operation finalized (the melt-op:finalized writer saw no outpoint yet).
+  const annotatedOutpointForQuoteRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!manager || !mintUrl || !quoteId) {
@@ -57,6 +68,18 @@ export function useOnchainMeltQuote(
         setQuote(record);
         const state = typeof record?.state === 'string' ? record.state : null;
         const expiry = typeof record?.expiry === 'number' ? record.expiry : null;
+        const outpoint =
+          typeof record?.outpoint === 'string' && record.outpoint.trim()
+            ? record.outpoint.trim()
+            : null;
+        // Persist the outpoint the first time the mint surfaces it, so the
+        // explorer link survives the mint pruning this quote row later.
+        if (outpoint && annotatedOutpointForQuoteRef.current !== quoteId) {
+          annotatedOutpointForQuoteRef.current = quoteId;
+          setTransactionAnnotation(annotationKey({ type: 'melt', quoteId }), {
+            onchainMelt: { outpoint },
+          });
+        }
         paymentLog.debug('onchain.melt.quote.result', {
           found: !!record,
           hasOutpoint: typeof (record as { outpoint?: unknown })?.outpoint === 'string',
@@ -97,6 +120,7 @@ export function useOnchainMeltQuote(
     state: readString('state'),
     request: readString('request'),
     expiry: typeof expiryValue === 'number' && Number.isFinite(expiryValue) ? expiryValue : null,
+    feeOptions: normalizeOnchainFeeOptions(quote?.fee_options),
     isLoading,
   };
 }

@@ -59,6 +59,12 @@ export function getCreqCustomization(
   return getAnnotation(entry).creqCustomization ?? null;
 }
 
+export function getOnchainMelt(
+  entry: EntryWithMetadata,
+): TransactionAnnotation["onchainMelt"] | null {
+  return getAnnotation(entry).onchainMelt ?? null;
+}
+
 type EntryWithToken = EntryWithMetadata & { token?: unknown };
 
 /** Best-effort proof extraction from a (send) history entry's token. */

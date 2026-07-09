@@ -82,6 +82,27 @@ describe("encodeAnnotation / decodeAnnotation", () => {
     ).toBeUndefined();
   });
 
+  it("round-trips onchain melt settlement facts", () => {
+    const annotation: TransactionAnnotation = {
+      onchainMelt: {
+        outpoint: `${"ab".repeat(32)}:0`,
+        feeIndex: 1,
+        feeReserveSats: 2000,
+        effectiveFeeSats: 1450,
+      },
+    };
+    expect(decodeAnnotation(encodeAnnotation(annotation))).toEqual(annotation);
+  });
+
+  it("keeps a partial onchainMelt (outpoint only) and drops non-finite fees", () => {
+    const decoded = decodeAnnotation(
+      encodeAnnotation({
+        onchainMelt: { outpoint: "deadbeef:1", feeReserveSats: Number.NaN },
+      }),
+    );
+    expect(decoded.onchainMelt).toEqual({ outpoint: "deadbeef:1" });
+  });
+
   it("produces no sub-objects for an empty record", () => {
     expect(decodeAnnotation({})).toEqual({});
   });

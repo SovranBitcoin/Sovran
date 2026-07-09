@@ -20,7 +20,7 @@ import {
   transactionExplorerUrlForTxid,
   type ChainOnchainConfirmationProgress,
 } from 'wallet';
-import { useScreenActions } from 'wallet/react';
+import { useColadaTransactionAnnotation, useScreenActions } from 'wallet/react';
 
 import {
   Bip321MethodIcons,
@@ -33,6 +33,7 @@ import {
   getOnchainMeltAddress,
   getOnchainMeltRequiredConfirmations,
   isOnchainMeltSettled,
+  resolveOnchainMeltFeeDisplay,
   resolveOnchainMeltTimelineState,
 } from '@/shared/lib/cashu/onchainMelt';
 import {
@@ -77,9 +78,13 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
     entry?.unit ?? 'sat'
   );
   // Canonical quote = source of truth for the outpoint + mint state + address
-  // (a persisted, metadata-less entry carries none of these).
+  // (a persisted, metadata-less entry carries none of these). The annotation is
+  // the durable fallback: once a send settles, the outpoint + fee are persisted
+  // there so this detail keeps its explorer link and fee line after the mint
+  // stops serving the quote row.
   const quote = useOnchainMeltQuote(mintUrl, entry?.quoteId);
-  const outpoint = parseOutpoint(quote.outpoint);
+  const annotation = useColadaTransactionAnnotation(entry);
+  const outpoint = parseOutpoint(quote.outpoint ?? annotation.onchainMelt?.outpoint ?? null);
   const txStatus = useMempoolTxConfirmations(outpoint?.txid ?? null, { requiredConfirmations });
   // Internal settlement: the mint reports the melt PAID but gives no outpoint —
   // it paid off-chain, so there is no on-chain transaction. Gate on the QUOTE's
@@ -132,6 +137,9 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
 
   const anyLoading = actions.pay.loading || actions.cancel.loading;
   const onchainAddress = getOnchainMeltAddress(entry) ?? quote.request;
+  // Settled cost when coco reported one, else the selected option's reserve
+  // labeled as a maximum — NUT-30 lets the mint keep the full reserve.
+  const feeDisplay = resolveOnchainMeltFeeDisplay(annotation.onchainMelt, quote.feeOptions);
   // The explorer link is mempool.space (mainnet); suppress it where it could
   // only 404.
   const explorerLinkUrl =
@@ -219,6 +227,10 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
           },
           { title: 'Date', value: entry.createdAt.datetime },
           { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+          feeDisplay && {
+            title: feeDisplay.title,
+            value: formatAmount({ amount: feeDisplay.sats, unit: 'sat' }),
+          },
           { title: 'State', value: meltState ?? entry.state },
           entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
           onchainAddress && {

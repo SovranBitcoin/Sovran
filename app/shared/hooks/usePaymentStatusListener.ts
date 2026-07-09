@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { useManagerContext } from '@cashu/coco-react';
 
 import {
+  annotationKey,
   reusableQuoteKey,
   rotateReusableMintQuote,
   rotateStandingPaymentRequest,
@@ -21,10 +22,100 @@ import { paymentStatusPopup } from '@/shared/lib/popup';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { isSwapStatusActive } from '@/shared/stores/runtime/swapStatusStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { paymentLog } from '@/shared/lib/logger';
 
 const NPC_RECEIVE_POPUP_MAX_AGE_MS = 5 * 60 * 1000;
+
+/**
+ * Persist the durable settlement facts of an onchain melt (NUT-30 send) into
+ * the transaction annotation store under `quote:<quoteId>`: the outpoint
+ * (txid:vout) and the fee the user agreed to. The mint may stop serving the
+ * quote row later (pruning, offline) and coco's MeltHistoryEntry never carries
+ * the outpoint — without this the history detail loses its explorer link and
+ * fee line forever. Best-effort: must never block or fail the toast path.
+ */
+async function persistOnchainMeltAnnotation(
+  manager: {
+    quotes: { melt: { get: (args: { mintUrl: string; quoteId: string }) => Promise<unknown> } };
+  },
+  mintUrl: string,
+  operation: Record<string, unknown>
+): Promise<void> {
+  try {
+    if (operation.method !== 'onchain') return;
+    const quoteId = typeof operation.quoteId === 'string' && operation.quoteId ? operation.quoteId : null;
+    if (!quoteId) return;
+
+    const finalizedData =
+      operation.finalizedData && typeof operation.finalizedData === 'object'
+        ? (operation.finalizedData as Record<string, unknown>)
+        : null;
+    const outpoint =
+      typeof finalizedData?.outpoint === 'string' && finalizedData.outpoint
+        ? finalizedData.outpoint
+        : undefined;
+    const methodData =
+      operation.methodData && typeof operation.methodData === 'object'
+        ? (operation.methodData as Record<string, unknown>)
+        : null;
+    const feeIndex = typeof methodData?.feeIndex === 'number' ? methodData.feeIndex : undefined;
+    const effectiveFeeSats =
+      operation.effectiveFee != null
+        ? amountToNumber(operation.effectiveFee as Parameters<typeof amountToNumber>[0])
+        : undefined;
+
+    // The selected option's fee_reserve lives on the quote row (a LOCAL read —
+    // no network); resolve it so the fee line can show "max" before coco
+    // reports an effective fee.
+    let feeReserveSats: number | undefined;
+    if (feeIndex != null) {
+      try {
+        const quote = (await manager.quotes.melt.get({ mintUrl, quoteId })) as {
+          fee_options?: Array<{ fee_index?: number; fee_reserve?: unknown }>;
+        } | null;
+        const option = quote?.fee_options?.find((o) => o?.fee_index === feeIndex);
+        if (option?.fee_reserve != null) {
+          feeReserveSats = amountToNumber(
+            option.fee_reserve as Parameters<typeof amountToNumber>[0]
+          );
+        }
+      } catch {
+        // Local quote row unavailable — the reserve just stays unknown.
+      }
+    }
+
+    if (
+      outpoint == null &&
+      feeIndex == null &&
+      effectiveFeeSats == null &&
+      feeReserveSats == null
+    ) {
+      return;
+    }
+    setTransactionAnnotation(annotationKey({ type: 'melt', quoteId }), {
+      onchainMelt: {
+        ...(outpoint ? { outpoint } : {}),
+        ...(feeIndex != null ? { feeIndex } : {}),
+        ...(feeReserveSats != null && Number.isFinite(feeReserveSats) ? { feeReserveSats } : {}),
+        ...(effectiveFeeSats != null && Number.isFinite(effectiveFeeSats)
+          ? { effectiveFeeSats }
+          : {}),
+      },
+    });
+    paymentLog.info('hook.payment_status.onchain_melt_annotated', {
+      hasOutpoint: !!outpoint,
+      feeIndex: feeIndex ?? null,
+      hasFeeReserve: feeReserveSats != null,
+      hasEffectiveFee: effectiveFeeSats != null,
+    });
+  } catch (error) {
+    paymentLog.warn('hook.payment_status.onchain_melt_annotate_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
   return {
@@ -615,6 +706,13 @@ export function usePaymentStatusListener(): void {
           quoteId: operation.quoteId,
           amount: amountToNumber(operation.amount),
         });
+        // Durable side-data (outpoint + fee) for onchain sends — fire and
+        // forget; the toast flow below must not wait on it.
+        void persistOnchainMeltAnnotation(
+          manager,
+          mintUrl,
+          operation as unknown as Record<string, unknown>
+        );
         if (isSwapStatusActive()) {
           paymentLog.info('hook.payment_status.suppressed_for_swap', {
             operationId,

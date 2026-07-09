@@ -160,6 +160,7 @@ export {
   getCounterparty,
   getDistribution,
   getLocation,
+  getOnchainMelt,
   getScanSource,
   getSwap,
   isP2PKLocked,

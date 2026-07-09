@@ -38,5 +38,6 @@ export {
   getLocation,
   getSwap,
   getCreqCustomization,
+  getOnchainMelt,
   isP2PKLocked,
 } from "./selectors";
