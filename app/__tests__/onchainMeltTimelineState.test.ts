@@ -2,6 +2,8 @@
  * @jest-environment node
  */
 import {
+  canOnchainMeltQuoteExpire,
+  isOnchainMeltQuoteExpired,
   isOnchainMeltSettled,
   resolveOnchainMeltTimelineState,
 } from '@/shared/lib/cashu/onchainMelt';
@@ -41,6 +43,40 @@ describe('resolveOnchainMeltTimelineState', () => {
     expect(resolveOnchainMeltTimelineState(null, null)).toBeNull();
     expect(resolveOnchainMeltTimelineState('weird', undefined)).toBe('weird');
     expect(resolveOnchainMeltTimelineState(undefined, 'mystery')).toBe('mystery');
+  });
+});
+
+describe('onchain melt quote expiry', () => {
+  const EXPIRY = 1_700_000_000; // unix seconds
+  const BEFORE_MS = (EXPIRY - 60) * 1000;
+  const AFTER_MS = (EXPIRY + 60) * 1000;
+
+  it('only pre-flight states can expire', () => {
+    expect(canOnchainMeltQuoteExpire('UNPAID')).toBe(true);
+    expect(canOnchainMeltQuoteExpire('prepared')).toBe(true);
+    expect(canOnchainMeltQuoteExpire(null)).toBe(true);
+    expect(canOnchainMeltQuoteExpire('PENDING')).toBe(false);
+    expect(canOnchainMeltQuoteExpire('executing')).toBe(false);
+    expect(canOnchainMeltQuoteExpire('PAID')).toBe(false);
+    expect(canOnchainMeltQuoteExpire('finalized')).toBe(false);
+    expect(canOnchainMeltQuoteExpire('rolledBack')).toBe(false);
+  });
+
+  it('expires an UNPAID quote once the expiry moment passes', () => {
+    expect(isOnchainMeltQuoteExpired('UNPAID', EXPIRY, BEFORE_MS)).toBe(false);
+    expect(isOnchainMeltQuoteExpired('UNPAID', EXPIRY, AFTER_MS)).toBe(true);
+  });
+
+  it('never expires an in-flight or settled melt off a stale expiry', () => {
+    expect(isOnchainMeltQuoteExpired('PENDING', EXPIRY, AFTER_MS)).toBe(false);
+    expect(isOnchainMeltQuoteExpired('PAID', EXPIRY, AFTER_MS)).toBe(false);
+    expect(isOnchainMeltQuoteExpired('finalized', EXPIRY, AFTER_MS)).toBe(false);
+  });
+
+  it('treats a missing/invalid expiry as never-expired', () => {
+    expect(isOnchainMeltQuoteExpired('UNPAID', null, AFTER_MS)).toBe(false);
+    expect(isOnchainMeltQuoteExpired('UNPAID', 0, AFTER_MS)).toBe(false);
+    expect(isOnchainMeltQuoteExpired('UNPAID', Number.NaN, AFTER_MS)).toBe(false);
   });
 });
 

@@ -29,6 +29,7 @@ import {
   useBip321Info,
 } from '@/features/transactions';
 import {
+  canOnchainMeltQuoteExpire,
   getOnchainMeltAddress,
   getOnchainMeltRequiredConfirmations,
   isOnchainMeltSettled,
@@ -188,6 +189,18 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
         <>
           <HistoryEntryTimeline
             historyEntry={(timelineEntry ?? entry) as unknown as HistoryEntry}
+            // Only `expiry` is read for melts: it drives the countdown badge
+            // while UNPAID and flips the timeline to "Expired" once passed.
+            // Gated on the RESOLVED state so a settled/in-flight send never
+            // shows a countdown or regresses to "Expired" off a stale expiry.
+            // (Prop is typed for bolt11; redesign will retype it.)
+            meltQuote={
+              quote.expiry != null && canOnchainMeltQuoteExpire(meltState)
+                ? ({ expiry: quote.expiry } as unknown as React.ComponentProps<
+                    typeof HistoryEntryTimeline
+                  >['meltQuote'])
+                : undefined
+            }
             onchainConfirmationProgress={onchainConfirmationProgress}
             onchainSettledInternally={settledInternally}
           />

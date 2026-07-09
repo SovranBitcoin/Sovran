@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { useManagerContext } from '@cashu/coco-react';
 
+import { isOnchainMeltQuoteExpired } from '@/shared/lib/cashu/onchainMelt';
 import { paymentLog } from '@/shared/lib/logger';
 
 // The onchain melt quote is the source of truth for the outpoint (txid:vout) and
@@ -26,6 +27,7 @@ export function useOnchainMeltQuote(
   outpoint: string | null;
   state: string | null;
   request: string | null;
+  expiry: number | null;
   isLoading: boolean;
 } {
   const { manager } = useManagerContext();
@@ -54,14 +56,19 @@ export function useOnchainMeltQuote(
         const record = (result as unknown as Record<string, unknown> | null) ?? null;
         setQuote(record);
         const state = typeof record?.state === 'string' ? record.state : null;
+        const expiry = typeof record?.expiry === 'number' ? record.expiry : null;
         paymentLog.debug('onchain.melt.quote.result', {
           found: !!record,
           hasOutpoint: typeof (record as { outpoint?: unknown })?.outpoint === 'string',
           state,
+          hasExpiry: expiry != null,
         });
         // PAID is terminal (coco's merge is PAID-sticky) — stop re-checking the
-        // mint while the detail stays open.
-        if (state === 'PAID') stopPolling();
+        // mint while the detail stays open. An expired quote that never left
+        // UNPAID is equally terminal: the mint won't execute it anymore.
+        if (state === 'PAID' || isOnchainMeltQuoteExpired(state, expiry, Date.now())) {
+          stopPolling();
+        }
       } catch (err) {
         paymentLog.warn('onchain.melt.quote.refresh_failed', {
           error: err instanceof Error ? err.message : String(err),
@@ -83,10 +90,13 @@ export function useOnchainMeltQuote(
     return typeof value === 'string' && value.trim() ? value.trim() : null;
   };
 
+  const expiryValue = quote?.expiry;
+
   return {
     outpoint: readString('outpoint'),
     state: readString('state'),
     request: readString('request'),
+    expiry: typeof expiryValue === 'number' && Number.isFinite(expiryValue) ? expiryValue : null,
     isLoading,
   };
 }

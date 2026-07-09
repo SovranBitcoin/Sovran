@@ -84,6 +84,29 @@ function onchainMeltStateRank(state: string | null | undefined): number {
 }
 
 /**
+ * Whether an onchain melt quote's `expiry` still means anything: only a quote
+ * that never advanced past UNPAID/prepared (rank ≤ 0) can expire — once the
+ * mint is executing or has settled the payment, `expiry` is irrelevant and a
+ * stale value must not paint the timeline "Expired" (or show a countdown). A
+ * rolled-back state is terminal in its own right, never "expired".
+ */
+export function canOnchainMeltQuoteExpire(resolvedState: string | null | undefined): boolean {
+  if (isRolledBackMeltState(resolvedState)) return false;
+  return onchainMeltStateRank(resolvedState) <= 0;
+}
+
+/** `canOnchainMeltQuoteExpire` AND the expiry moment has actually passed. */
+export function isOnchainMeltQuoteExpired(
+  resolvedState: string | null | undefined,
+  expiry: number | null | undefined,
+  nowMs: number
+): boolean {
+  if (expiry == null || !Number.isFinite(expiry) || expiry <= 0) return false;
+  if (!canOnchainMeltQuoteExpire(resolvedState)) return false;
+  return Math.floor(nowMs / 1000) > expiry;
+}
+
+/**
  * The onchain-send timeline state, taking the MOST-ADVANCED of the polled
  * melt-quote row state and the live history-entry (operation) state.
  *
