@@ -9,7 +9,7 @@
 
 import { Easing, FadeIn, FadeOut } from 'react-native-reanimated';
 
-import type { TimelineStep } from 'wallet';
+import { isSettledStepType, type TimelineStep } from 'wallet';
 
 /** Stroke thickness shared by the connector rail AND the LoadingIndicator's
  *  `strokeWidthPx` so dot rings/segments and the rail read as one weight. */
@@ -35,21 +35,11 @@ export const LINE_TIMING = {
 
 export type TimelineLineType = 'complete' | 'future' | 'expired-gradient' | 'rolled-back-gradient';
 
-// Mirrors wallet's isSettledStepType (wallet/src/history/timeline/classify.ts):
-// the "completed-ish" step types the flow has arrived at or passed. The wallet
-// helper is not exported from the package root (types are frozen for P4), so
-// the set is duplicated here — keep it in sync with SETTLED_STEP_TYPES.
-const SETTLED_STEP_TYPES: ReadonlySet<TimelineStep['stepType']> = new Set([
-  'complete',
-  'current',
-  'waiting',
-  'success',
-]);
-
 /** Connector rail style between a row and the row below it. Expired /
  *  rolled-back / already-spent rows pull a gradient fill into the outcome
  *  colour; two settled-ish rows share a solid success fill; anything else
- *  leaves the rail unfilled. */
+ *  leaves the rail unfilled. The "settled-ish" set is wallet's
+ *  isSettledStepType — the one classification owner. */
 export function connectorType(
   prev: Pick<TimelineStep, 'stepType'>,
   next: Pick<TimelineStep, 'stepType'>
@@ -57,7 +47,7 @@ export function connectorType(
   if (next.stepType === 'expired') return 'expired-gradient';
   if (next.stepType === 'already-spent') return 'rolled-back-gradient';
   if (next.stepType === 'rolled-back') return 'rolled-back-gradient';
-  if (SETTLED_STEP_TYPES.has(prev.stepType) && SETTLED_STEP_TYPES.has(next.stepType)) {
+  if (isSettledStepType(prev.stepType) && isSettledStepType(next.stepType)) {
     return 'complete';
   }
   return 'future';

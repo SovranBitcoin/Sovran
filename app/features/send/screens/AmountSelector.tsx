@@ -268,8 +268,7 @@ export function AmountSelector({
   // the neutral warning hint ("Minimum X"), like the max cap, instead of the
   // red problem notice. Every other disable reason stays red.
   const nextReasonBelowMin = actions.next.reasonCode === 'AMOUNT_BELOW_MINT_MIN';
-  const nextNoticeText =
-    nextDisabled && !nextReasonBelowMin ? actions.next.reason : undefined;
+  const nextNoticeText = nextDisabled && !nextReasonBelowMin ? actions.next.reason : undefined;
   const minNoticeText = nextReasonBelowMin ? actions.next.reason : null;
   // Typing hit the cross-method envelope max and was capped — tell the user
   // why the digits stopped. Warning-tinted (the capped amount is valid).

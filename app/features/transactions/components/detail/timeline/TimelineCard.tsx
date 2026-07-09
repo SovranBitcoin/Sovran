@@ -20,7 +20,6 @@ import {
   getStatusHeader,
   type ChainOnchainConfirmationProgress as OnchainConfirmationProgress,
   type TimelineStep,
-  type TimelineStepType,
 } from 'wallet';
 import opacity from 'hex-color-opacity';
 
@@ -177,31 +176,23 @@ export function HistoryEntryTimeline({
   );
   const timeline = model.steps;
 
-  // The segmented block-confirmation ring renders on the row that owns it.
-  // The engine flags the onchain melt "In mempool" row via confirmationRing;
-  // the onchain mint deposit's PAID row is still app-derived (the frozen
-  // engine does not set the flag on the mint flow).
+  // The segmented block-confirmation ring renders on the row that owns it:
+  // the engine's flow declarations flag it (onchain melt "In mempool" row,
+  // onchain mint deposit row) — the view only gates on progress presence.
   const ownsConfirmationRing = (step: TimelineStep): boolean =>
-    !!onchainConfirmationProgress &&
-    (!!step.confirmationRing || (isOnchainMint && step.state === MintQuoteState.PAID));
+    !!onchainConfirmationProgress && !!step.confirmationRing;
 
   const cardLabel = getCardLabel(historyEntry, timeline, tokenCreated, nostrSent, paymentCopy);
   const statusHeader = getStatusHeader(timeline);
   const statusColorType = getStatusColorType(timeline);
+  // Change signature for the render log's effect gate (fires on real timeline
+  // shape changes, not object identity). Step types read straight off the
+  // model — no string round-trip.
   const timelineSignature = useMemo(
     () => timeline.map((item) => `${item.state}:${item.stepType}`).join('|'),
     [timeline]
   );
-  const timelineStepTypes = useMemo(
-    () =>
-      timelineSignature
-        ? timelineSignature.split('|').map((part) => {
-            const segments = part.split(':');
-            return segments[segments.length - 1] as TimelineStepType;
-          })
-        : [],
-    [timelineSignature]
-  );
+  const timelineStepTypes = useMemo(() => timeline.map((item) => item.stepType), [timeline]);
 
   useEffect(() => {
     paymentLog.debug('tx.history_timeline.render', {
@@ -256,9 +247,7 @@ export function HistoryEntryTimeline({
         const indicator = mapCheckpointStatusToIndicator(
           timelineStepTypeToCheckpointStatus(step.stepType)
         );
-        const showConfirmationRing =
-          !!onchainConfirmationProgress &&
-          (!!step.confirmationRing || (isOnchainMint && step.state === MintQuoteState.PAID));
+        const showConfirmationRing = ownsConfirmationRing(step);
         const { dotDelayMs, lineDelayMs } = rowDelays(index);
         return {
           row: index,

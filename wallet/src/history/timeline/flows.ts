@@ -77,6 +77,9 @@ function makeMintFlow(onchain: boolean): FlowDef {
       reached: paidReached,
       activeStyle: (ctx) =>
         onchain ? onchainPaidStepType(ctx.progress) : "next-pending",
+      // The onchain deposit's middle row owns the segmented block-confirmation
+      // ring (the renderer still gates on progress actually being present).
+      ...(onchain ? { ring: (ctx: TimelineContext) => !!ctx.progress } : {}),
       copy: (ctx) => {
         const { MINT_COPY } = ctx.copy;
         if (issuedReached(ctx)) {

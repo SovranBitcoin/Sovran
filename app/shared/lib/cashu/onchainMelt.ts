@@ -101,7 +101,7 @@ export function normalizeOnchainFeeOptions(raw: unknown): OnchainMeltFeeOption[]
   return options;
 }
 
-export interface OnchainMeltFeeDisplay {
+interface OnchainMeltFeeDisplay {
   /** 'Network fee' when the settled cost is known, else 'Fee reserve (max)'. */
   title: 'Network fee' | 'Fee reserve (max)';
   sats: number;
@@ -150,7 +150,7 @@ export function resolveOnchainMeltFeeDisplay(
 // repeat before it is believed, and once ANY outpoint has been seen the
 // off-chain verdict is permanently off the table.
 
-export interface OffchainSettlementState {
+interface OffchainSettlementState {
   /** Consecutive quote reads that said PAID with no outpoint. */
   paidNoOutpointReads: number;
   /** Sticky: an outpoint was observed at least once — never off-chain. */

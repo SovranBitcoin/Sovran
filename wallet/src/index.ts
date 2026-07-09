@@ -101,6 +101,7 @@ export {
   getStatusColorType,
   getStatusHeader,
   groupTimeline,
+  isSettledStepType,
   inFlightReceiveToHistoryEntry,
   isPendingPaymentRequestEntry,
   listInFlightReceiveEntries,
