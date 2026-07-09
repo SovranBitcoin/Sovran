@@ -83,7 +83,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
   const settledInternally = quote.state === 'PAID' && !outpoint;
 
   const requiredConfirmations = getOnchainMeltRequiredConfirmations(
-    undefined,
+    mintInfo,
     entry?.unit ?? 'sat'
   );
   const observedProgress = buildOnchainConfirmationProgressFromTx(
