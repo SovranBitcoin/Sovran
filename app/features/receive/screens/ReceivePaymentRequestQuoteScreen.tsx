@@ -269,10 +269,9 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
         ) : null}
         <PaymentInfo data={displayedRequest} copyTarget="paymentRequest" unit={entry.unit} />
         {syntheticEntry ? (
-          // key={prState}: remount on each milestone so completed dots MOUNT in
-          // their `done` state (static checkmark) rather than animating
-          // idle→done live (whose checkmark draw-in fails to settle here).
-          <HistoryEntryTimeline key={prState} historyEntry={syntheticEntry} />
+          // No key={prState} remount: the P3 cascade fix + rowKey-keyed
+          // in-place dot transitions let the idle→done settle play live.
+          <HistoryEntryTimeline historyEntry={syntheticEntry} />
         ) : null}
         {/* Once paid, the request is settled — hide the customization (a paid
             single-use request can't be re-shaped). */}

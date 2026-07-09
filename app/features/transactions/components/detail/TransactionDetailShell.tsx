@@ -7,7 +7,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HistoryEntryHeader } from '@/features/transactions/components/detail/HistoryEntryHeader';
 import { HistoryEntryRefresh } from '@/features/transactions/components/detail/HistoryEntryRefresh';
-import { HistoryEntryTimeline } from '@/features/transactions/components/detail/HistoryEntryTimeline';
+import { HistoryEntryTimeline } from '@/features/transactions/components/detail/timeline';
 import { CounterpartyTransactions } from '@/features/transactions/components/CounterpartyTransactions';
 
 type DetailEntry = React.ComponentProps<typeof HistoryEntryTimeline>['historyEntry'];

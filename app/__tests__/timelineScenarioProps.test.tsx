@@ -11,7 +11,7 @@
 
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { HistoryEntryTimeline } from '@/features/transactions/components/detail/HistoryEntryTimeline';
+import { HistoryEntryTimeline } from '@/features/transactions/components/detail/timeline';
 import { buildTimelineScenarios } from '@/features/settings/screens/designSystemTimelineScenarios';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -116,7 +116,7 @@ jest.mock('react-native-svg', () => {
 interface JsonElement {
   type: string;
   props: Record<string, unknown>;
-  children?: Array<JsonElement | string> | null;
+  children?: (JsonElement | string)[] | null;
 }
 type JsonNode = JsonElement | JsonElement[] | string | null | undefined;
 

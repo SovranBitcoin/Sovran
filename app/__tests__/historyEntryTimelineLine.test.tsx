@@ -6,7 +6,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import type { HistoryEntry } from '@cashu/coco-core';
-import { HistoryEntryTimeline } from '@/features/transactions/components/detail/HistoryEntryTimeline';
+import { HistoryEntryTimeline } from '@/features/transactions/components/detail/timeline';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
