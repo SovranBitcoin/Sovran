@@ -14,6 +14,11 @@ import {
   type PaymentCopyResolver,
 } from "../copy";
 import { logger } from "../logger";
+import {
+  isTerminalFailureState,
+  normalizeTimelineMeltState,
+  normalizeTimelineMintState,
+} from "./states";
 
 const EXPIRED_STATE = "expired";
 const FAILED_STATE = "failed";
@@ -310,85 +315,12 @@ function meltQuoteExpired(
 
 type MintTimelineState = MintQuoteState | typeof FAILED_STATE | string;
 
-function isMintQuoteState(value: unknown): value is MintQuoteState {
-  return (
-    value === MintQuoteState.UNPAID ||
-    value === MintQuoteState.PAID ||
-    value === MintQuoteState.ISSUED
-  );
-}
-
 function getMintTimelineState(historyEntry: HistoryEntry): MintTimelineState {
   if (historyEntry.type !== "mint") return String(historyEntry.state);
-
-  const rawState = String(historyEntry.state);
-  if (rawState === "finalized") {
-    logger.debug("history.timeline.mintState.result", {
-      rawState,
-      remoteState:
-        "remoteState" in historyEntry ? historyEntry.remoteState : null,
-      timelineState: MintQuoteState.ISSUED,
-      reason: "finalized-alias",
-    });
-    return MintQuoteState.ISSUED;
-  }
-  if (rawState === "executing") {
-    logger.debug("history.timeline.mintState.result", {
-      rawState,
-      remoteState:
-        "remoteState" in historyEntry ? historyEntry.remoteState : null,
-      timelineState: MintQuoteState.PAID,
-      reason: "executing-alias",
-    });
-    return MintQuoteState.PAID;
-  }
-  if (rawState === "failed") {
-    logger.debug("history.timeline.mintState.result", {
-      rawState,
-      remoteState:
-        "remoteState" in historyEntry ? historyEntry.remoteState : null,
-      timelineState: FAILED_STATE,
-      reason: "failed-alias",
-    });
-    return FAILED_STATE;
-  }
-
   const remoteState =
     "remoteState" in historyEntry ? historyEntry.remoteState : undefined;
-  if (isMintQuoteState(remoteState)) {
-    logger.debug("history.timeline.mintState.result", {
-      rawState,
-      remoteState,
-      timelineState: remoteState,
-      reason: "remote-state",
-    });
-    return remoteState;
-  }
-  if (rawState === "pending") {
-    logger.debug("history.timeline.mintState.result", {
-      rawState,
-      remoteState: remoteState ?? null,
-      timelineState: MintQuoteState.UNPAID,
-      reason: "pending-alias",
-    });
-    return MintQuoteState.UNPAID;
-  }
-  if (isMintQuoteState(rawState)) {
-    logger.debug("history.timeline.mintState.result", {
-      rawState,
-      remoteState: remoteState ?? null,
-      timelineState: rawState,
-      reason: "native-state",
-    });
-    return rawState;
-  }
-  logger.debug("history.timeline.mintState.result", {
-    rawState,
-    remoteState: remoteState ?? null,
-    timelineState: rawState,
-    reason: "unknown-state",
-  });
-  return rawState;
+  // Aliasing + remoteState precedence live in history/states.ts (one owner).
+  return normalizeTimelineMintState(String(historyEntry.state), remoteState);
 }
 
 function buildTimelineItems({
@@ -573,12 +505,7 @@ function buildTimelineItems({
       // this `rolled_back`/`rolling_back`/`failed` (normalized to `rolledBack`);
       // without this the state falls to the UNPAID default below and a
       // cancelled send renders as if it were still waiting to be sent.
-      if (
-        rawMeltState === "rolledBack" ||
-        rawMeltState === "rolled_back" ||
-        rawMeltState === "rolling_back" ||
-        rawMeltState === "failed"
-      ) {
+      if (isTerminalFailureState(rawMeltState)) {
         return [
           {
             state: MeltQuoteState.PENDING,
@@ -594,16 +521,7 @@ function buildTimelineItems({
           },
         ];
       }
-      const meltState =
-        rawMeltState === "finalized"
-          ? MeltQuoteState.PAID
-          : rawMeltState === "pending" || rawMeltState === "executing"
-            ? MeltQuoteState.PENDING
-            : rawMeltState === "PAID" ||
-                rawMeltState === "PENDING" ||
-                rawMeltState === "UNPAID"
-              ? rawMeltState
-              : MeltQuoteState.UNPAID;
+      const meltState = normalizeTimelineMeltState(rawMeltState) as MeltQuoteState;
       const isExpired =
         meltQuote &&
         meltState === MeltQuoteState.UNPAID &&

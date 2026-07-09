@@ -12,12 +12,20 @@
 
 import { getEncodedToken } from "@cashu/cashu-ts";
 
+import { amountToNumber, type AmountLike } from "../amount";
 import { createAmountActionManager } from "../amount-actions/createManager";
 import type {
   AmountResolution,
   CreateAmountActionManagerConfig,
 } from "../amount-actions/types";
 import { buildBip321OnchainUri } from "../bip321";
+import {
+  entryStateRank,
+  isTerminalFailureState,
+  isTimelineFlow,
+  normalizeContractState,
+  resolveEntryState,
+} from "../history/states";
 import { defaultDetectors } from "../detectors";
 import { FormattedString } from "../formatting/FormattedString";
 import { FormattedTimestamp } from "../formatting/FormattedTimestamp";
@@ -716,6 +724,37 @@ export function mergeEntryUpdate(
     ...((cm || um) && { metadata: { ...(cm ?? {}), ...(um ?? {}) } }),
   };
 
+  // Rank guard: live events arrive on independent streams (quote row vs
+  // operation lifecycle) with no ordering guarantee, so a late lower-rank
+  // state (e.g. `executing` after `finalized`) must not regress the merged
+  // entry. Only applied when BOTH states rank on the flow's progression (or
+  // are terminal failures) — unknown/synthetic states keep today's
+  // updated-wins behavior. Live-merge scope only; a full refetch replaces
+  // entries wholesale, so genuine server-side resets still land.
+  const flow = getStringField(merged, "type");
+  const currentState = getStringField(currentEntry, "state");
+  const updatedState = getStringField(updatedEntry, "state");
+  if (
+    isTimelineFlow(flow) &&
+    currentState &&
+    updatedState &&
+    currentState !== updatedState &&
+    (entryStateRank(flow, currentState) >= 0 || isTerminalFailureState(currentState)) &&
+    (entryStateRank(flow, updatedState) >= 0 || isTerminalFailureState(updatedState))
+  ) {
+    const resolved = resolveEntryState(flow, updatedState, currentState);
+    if (resolved && resolved !== updatedState) {
+      (merged as Record<string, unknown>).state = resolved;
+      logger.info("mergeEntryUpdate.state.resolvedBy", {
+        resolvedBy: "rank",
+        flow,
+        currentState,
+        updatedState,
+        resolved,
+      });
+    }
+  }
+
   // When a real operationId arrives, stale phase:'preview' must be upgraded.
   // The real entry from the DB carries operationId but no metadata, so the
   // merge preserves the preview entry's phase. Fix it here to keep the
@@ -855,21 +894,22 @@ export interface MeltOperationLike {
   createdAt: number;
   state?: string;
   quoteId?: string;
-  amount?: number;
+  /** Plain number or a coco v2 `Amount` object — downcast at the boundary. */
+  amount?: number | AmountLike;
   /** Unit of `amount` (coco melt operations carry it; default 'sat'). */
   unit?: string;
-}
-
-function mapMeltOperationState(state?: string): "UNPAID" | "PENDING" | "PAID" {
-  if (state === "finalized") return "PAID";
-  if (state === "pending" || state === "executing") return "PENDING";
-  return "UNPAID";
 }
 
 export function meltOperationToScreenActionEntry(
   operation: MeltOperationLike,
 ): EntryRecord | null {
-  if (!operation.quoteId || typeof operation.amount !== "number") return null;
+  if (!operation.quoteId || operation.amount == null) return null;
+  // coco v2 operations carry `amount` as an Amount OBJECT — downcast to the
+  // numeric contract here. Returning null for an object amount was the melt
+  // twin of the history-path live-update drop: the fallback publish carried
+  // no mintUrl/amount, so the preview match could never fire.
+  const amount = amountToNumber(operation.amount as AmountLike);
+  if (!Number.isFinite(amount)) return null;
 
   return {
     id: operation.id,
@@ -878,8 +918,11 @@ export function meltOperationToScreenActionEntry(
     mintUrl: operation.mintUrl,
     unit: operation.unit ?? "sat",
     quoteId: operation.quoteId,
-    amount: operation.amount,
-    state: mapMeltOperationState(operation.state),
+    amount,
+    // Contract vocabulary from the ONE state owner. The old private mapper
+    // dropped rollback/failure to "UNPAID": a live melt-op:rolled-back
+    // published a cancelled send as "Ready to send".
+    state: operation.state ? normalizeContractState("melt", operation.state) : "UNPAID",
     metadata: { operationId: operation.id },
   };
 }

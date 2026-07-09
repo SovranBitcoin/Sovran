@@ -17,45 +17,21 @@
 import type { HistoryEntry } from "@cashu/coco-core";
 
 import { amountToNumber, type AmountLike } from "../amount";
-
-const MINT_OP_STATE_TO_LEGACY: Record<string, string> = {
-  // pending = quote created, payment not yet observed.
-  pending: "UNPAID",
-  // executing = payment observed, proofs being minted.
-  executing: "PAID",
-  finalized: "ISSUED",
-  // Conscious v1 compromise: terminal failure has no legacy equivalent, so a
-  // mint quote that fails BEFORE expiry renders as still-waiting. Funds never
-  // moved, and the timeline's expiry handling covers the common timeout case.
-  failed: "UNPAID",
-};
-
-const MELT_OP_STATE_TO_LEGACY: Record<string, string> = {
-  prepared: "UNPAID",
-  pending: "PENDING",
-  executing: "PENDING",
-  finalized: "PAID",
-};
+import { isTimelineFlow, normalizeContractState } from "./states";
 
 /**
  * Map a v2 operation-projected state to the legacy vocabulary. Legacy states
  * (and unknown values) pass through unchanged; returns the same reference
- * when nothing changes.
+ * when nothing changes. The aliasing tables live in history/states.ts — the
+ * one owner of state vocabulary.
  */
 export function normalizeHistoryEntryState(entry: HistoryEntry): HistoryEntry {
   const state = (entry as { state?: unknown }).state;
   if (typeof state !== "string") return entry;
+  if (!isTimelineFlow(entry.type)) return entry;
 
-  let next: string | undefined;
-  if (state === "rolled_back") {
-    next = "rolledBack";
-  } else if (entry.type === "mint") {
-    next = MINT_OP_STATE_TO_LEGACY[state];
-  } else if (entry.type === "melt") {
-    next = MELT_OP_STATE_TO_LEGACY[state];
-  }
-
-  if (!next || next === state) return entry;
+  const next = normalizeContractState(entry.type, state);
+  if (next === state) return entry;
   return { ...entry, state: next } as HistoryEntry;
 }
 

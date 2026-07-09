@@ -1,5 +1,9 @@
 import { MeltQuoteState, MintQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
-import type { ChainOnchainConfirmationProgress } from 'wallet';
+import {
+  normalizeTimelineMeltState,
+  normalizeTimelineMintState,
+  type ChainOnchainConfirmationProgress,
+} from 'wallet';
 import type { HistoryEntry } from '@cashu/coco-core';
 
 import {
@@ -377,22 +381,10 @@ function isOnchainEntry(entry: HistoryEntry): boolean {
   return meta?.method === 'onchain';
 }
 
-/** Mirror of colada's `getMintTimelineState` for the states the fixtures produce. */
-function normalizeMintState(raw: string): string {
-  if (raw === 'finalized') return MintQuoteState.ISSUED;
-  if (raw === 'executing') return MintQuoteState.PAID;
-  if (raw === 'failed') return 'failed';
-  if (raw === 'pending') return MintQuoteState.UNPAID;
-  return raw; // UNPAID / PAID / ISSUED pass through unchanged.
-}
-
-/** Mirror of colada's melt-state normalization. */
-function normalizeMeltState(raw: string): string {
-  if (raw === 'finalized') return MeltQuoteState.PAID;
-  if (raw === 'pending' || raw === 'executing') return MeltQuoteState.PENDING;
-  if (raw === 'PAID' || raw === 'PENDING' || raw === 'UNPAID') return raw;
-  return MeltQuoteState.UNPAID;
-}
+// The real normalizers from colada's one state owner — the debug readout can
+// never drift from what buildTimeline actually renders.
+const normalizeMintState = (raw: string): string => normalizeTimelineMintState(raw);
+const normalizeMeltState = (raw: string): string => normalizeTimelineMeltState(raw);
 
 const BOLT11_MINT_MEANING: Record<string, string> = {
   [MintQuoteState.UNPAID]: 'Mint quote issued — the Lightning invoice has not been paid yet.',

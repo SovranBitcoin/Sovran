@@ -45,7 +45,8 @@ async function persistOnchainMeltAnnotation(
 ): Promise<void> {
   try {
     if (operation.method !== 'onchain') return;
-    const quoteId = typeof operation.quoteId === 'string' && operation.quoteId ? operation.quoteId : null;
+    const quoteId =
+      typeof operation.quoteId === 'string' && operation.quoteId ? operation.quoteId : null;
     if (!quoteId) return;
 
     const finalizedData =
@@ -73,7 +74,7 @@ async function persistOnchainMeltAnnotation(
     if (feeIndex != null) {
       try {
         const quote = (await manager.quotes.melt.get({ mintUrl, quoteId })) as {
-          fee_options?: Array<{ fee_index?: number; fee_reserve?: unknown }>;
+          fee_options?: { fee_index?: number; fee_reserve?: unknown }[];
         } | null;
         const option = quote?.fee_options?.find((o) => o?.fee_index === feeIndex);
         if (option?.fee_reserve != null) {

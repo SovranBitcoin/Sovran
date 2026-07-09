@@ -16,6 +16,7 @@ import {
   isMintQuotePaymentObserved,
   meltOperationToScreenActionEntry,
   mergeEntryUpdate as defaultMerge,
+  normalizeContractState,
   normalizeHistoryEntry,
   shouldApplyEntryUpdate as defaultShouldApply,
 } from 'wallet';
@@ -103,7 +104,15 @@ function publishMeltUpdated(
   bus: ColadaSubscriptionBus,
   operation: MeltOperationLike | unknown
 ): void {
-  const entry = meltOperationToScreenActionEntry(operation as unknown as MeltOperationLike);
+  // meltOperationToScreenActionEntry already emits the normalized contract
+  // (legacy state vocabulary + numeric amount) — same guarantee as
+  // publishHistoryUpdated's normalizeHistoryEntry. Belt-and-braces: run the
+  // entry through normalizeHistoryEntry anyway so this publisher can never
+  // regress into the object-amount/raw-state drop again.
+  const mapped = meltOperationToScreenActionEntry(operation as unknown as MeltOperationLike);
+  const entry = mapped
+    ? (normalizeHistoryEntry(mapped as unknown as HistoryEntry) as unknown as EntryRecord)
+    : null;
   const operationRecord = asEntryRecord(operation);
   const operationId = getStringField(operationRecord, 'id');
   const mintUrl = getStringField(operationRecord, 'mintUrl');
@@ -114,7 +123,7 @@ function publishMeltUpdated(
       entry: {
         type: 'melt',
         ...(operationId ? { operationId } : {}),
-        ...(state ? { state } : {}),
+        ...(state ? { state: normalizeContractState('melt', state) } : {}),
       },
       operationId,
       mintUrl,
@@ -353,7 +362,13 @@ export function createSovranScreenActionsBridge({
             paymentLog.info('send.mint_op_finalized', { operationId });
             bus.publish({
               type: 'mint.updated',
-              entry: { type: 'mint', operationId, state: 'finalized' },
+              // Contract vocabulary ('finalized' → ISSUED) so bus consumers and
+              // the merge rank guard see one vocabulary.
+              entry: {
+                type: 'mint',
+                operationId,
+                state: normalizeContractState('mint', 'finalized'),
+              },
               operationId,
             });
           }

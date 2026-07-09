@@ -113,12 +113,14 @@ jest.mock('react-native-svg', () => {
   };
 });
 
-type JsonNode = ReturnType<TestRenderer.ReactTestRenderer['toJSON']>;
-type JsonElement = Exclude<JsonNode, null | string> extends Array<infer _>
-  ? never
-  : Exclude<JsonNode, null | string>;
+interface JsonElement {
+  type: string;
+  props: Record<string, unknown>;
+  children?: Array<JsonElement | string> | null;
+}
+type JsonNode = JsonElement | JsonElement[] | string | null | undefined;
 
-function isElement(node: JsonNode | string | undefined): node is JsonElement {
+function isElement(node: JsonNode): node is JsonElement {
   return !!node && typeof node !== 'string' && !Array.isArray(node);
 }
 
@@ -133,7 +135,7 @@ function walk(node: JsonNode, visit: (node: JsonElement | string) => void): void
     return;
   }
   visit(node);
-  node.children?.forEach((child) => walk(child as JsonNode, visit));
+  node.children?.forEach((child) => walk(child, visit));
 }
 
 /** Normalize live countdown badges so snapshots stay time-independent. */
@@ -254,7 +256,7 @@ describe('timeline scenario pins (redesign acceptance surface)', () => {
             );
           });
 
-          expect(pinFrame(renderer!.toJSON())).toMatchSnapshot();
+          expect(pinFrame(renderer!.toJSON() as unknown as JsonNode)).toMatchSnapshot();
 
           act(() => {
             renderer.unmount();

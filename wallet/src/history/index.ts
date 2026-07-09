@@ -37,6 +37,16 @@ export {
   normalizeHistoryEntryState,
   serializeHistoryEntry,
 } from "./normalize";
+export {
+  entryStateRank,
+  isTerminalFailureState,
+  isTimelineFlow,
+  normalizeContractState,
+  normalizeTimelineMeltState,
+  normalizeTimelineMintState,
+  resolveEntryState,
+} from "./states";
+export type { TimelineFlow } from "./states";
 export { getHistoryEntryRefreshLabel } from "./refresh";
 export {
   getSendTokenReachabilityWarning,

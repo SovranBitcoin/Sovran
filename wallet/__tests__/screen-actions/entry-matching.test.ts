@@ -18,7 +18,11 @@
 
 import { describe, it, expect } from 'vitest';
 import type { HistoryEntry } from '@cashu/coco-core';
-import { shouldApplyEntryUpdate, mergeEntryUpdate } from '../../src/screen-actions/createManager';
+import {
+  meltOperationToScreenActionEntry,
+  mergeEntryUpdate,
+  shouldApplyEntryUpdate,
+} from '../../src/screen-actions/createManager';
 import { normalizeHistoryEntry } from '../../src/history/normalize';
 
 const MINT1 = 'https://mint1.example.com';
@@ -353,5 +357,102 @@ describe('mergeEntryUpdate — phase upgrade on operationId', () => {
     const merged = mergeEntryUpdate(current, updated);
     expect((merged.metadata as any).paymentRequest).toBe('creq...');
     expect((merged.metadata as any).phase).toBe('delivered');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// meltOperationToScreenActionEntry — contract normalization at the adapter
+// ---------------------------------------------------------------------------
+
+describe('meltOperationToScreenActionEntry', () => {
+  const baseOp = {
+    id: 'melt-op-1',
+    mintUrl: 'https://mint.example',
+    createdAt: 1_700_000_000_000,
+    quoteId: 'mq-1',
+  };
+
+  it('publishes a rolled-back melt as rolledBack, never UNPAID', () => {
+    // The old private mapper fell through to "UNPAID": a live
+    // melt-op:rolled-back rendered a cancelled send as "Ready to send".
+    const entry = meltOperationToScreenActionEntry({
+      ...baseOp,
+      state: 'rolled_back',
+      amount: 500,
+    });
+    expect(entry?.state).toBe('rolledBack');
+  });
+
+  it('downcasts a coco-v2 object Amount instead of dropping the entry', () => {
+    // Returning null for object amounts was the melt twin of the history-path
+    // live-update drop: the fallback publish carried no mintUrl/amount, so the
+    // melt-preview match could never fire.
+    const entry = meltOperationToScreenActionEntry({
+      ...baseOp,
+      state: 'pending',
+      amount: { toNumber: () => 500 },
+    });
+    expect(entry).toMatchObject({
+      type: 'melt',
+      quoteId: 'mq-1',
+      amount: 500,
+      state: 'PENDING',
+    });
+  });
+
+  it('maps the operation vocabulary onto the legacy contract', () => {
+    const stateOf = (state: string) =>
+      meltOperationToScreenActionEntry({ ...baseOp, state, amount: 1 })?.state;
+    expect(stateOf('prepared')).toBe('UNPAID');
+    expect(stateOf('pending')).toBe('PENDING');
+    expect(stateOf('executing')).toBe('PENDING');
+    expect(stateOf('finalized')).toBe('PAID');
+  });
+
+  it('still requires a quoteId and an amount', () => {
+    expect(meltOperationToScreenActionEntry({ ...baseOp, quoteId: '', amount: 5 })).toBeNull();
+    expect(meltOperationToScreenActionEntry({ ...baseOp, state: 'pending' })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mergeEntryUpdate — rank guard against out-of-order live events
+// ---------------------------------------------------------------------------
+
+describe('mergeEntryUpdate — rank guard', () => {
+  it('a late lower-rank mint update cannot regress a finalized entry', () => {
+    const current = { id: 'e1', type: 'mint', quoteId: 'q1', state: 'ISSUED' };
+    const updated = { id: 'e1', type: 'mint', quoteId: 'q1', state: 'PAID' };
+    expect(mergeEntryUpdate(current, updated).state).toBe('ISSUED');
+  });
+
+  it('a forward mint update still applies', () => {
+    const current = { id: 'e1', type: 'mint', quoteId: 'q1', state: 'UNPAID' };
+    const updated = { id: 'e1', type: 'mint', quoteId: 'q1', state: 'ISSUED' };
+    expect(mergeEntryUpdate(current, updated).state).toBe('ISSUED');
+  });
+
+  it('ranks across BOTH vocabularies (late executing after ISSUED)', () => {
+    const current = { id: 'e1', type: 'mint', quoteId: 'q1', state: 'ISSUED' };
+    const updated = { id: 'e1', type: 'mint', quoteId: 'q1', state: 'executing' };
+    expect(mergeEntryUpdate(current, updated).state).toBe('ISSUED');
+  });
+
+  it('terminal failure always wins, even against a settled state', () => {
+    const current = { id: 'e1', type: 'melt', quoteId: 'q1', state: 'PENDING' };
+    const updated = { id: 'e1', type: 'melt', quoteId: 'q1', state: 'rolledBack' };
+    expect(mergeEntryUpdate(current, updated).state).toBe('rolledBack');
+  });
+
+  it('a settled update can never overwrite a recorded rollback', () => {
+    const current = { id: 'e1', type: 'melt', quoteId: 'q1', state: 'rolledBack' };
+    const updated = { id: 'e1', type: 'melt', quoteId: 'q1', state: 'PAID' };
+    expect(mergeEntryUpdate(current, updated).state).toBe('rolledBack');
+  });
+
+  it('unknown / synthetic states keep the updated-wins behavior', () => {
+    const current = { id: 'e1', type: 'send', operationId: 'op-1', state: 'finalized' };
+    const updated = { id: 'e1', type: 'send', operationId: 'op-1', state: 'paymentRequestPending' };
+    expect(mergeEntryUpdate(current, updated).state).toBe('paymentRequestPending');
   });
 });

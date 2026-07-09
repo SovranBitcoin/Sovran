@@ -73,10 +73,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
   // name + icon (without it the row skeletons forever).
   const mintInfo = useMintInfo(mintUrl);
 
-  const requiredConfirmations = getOnchainMeltRequiredConfirmations(
-    mintInfo,
-    entry?.unit ?? 'sat'
-  );
+  const requiredConfirmations = getOnchainMeltRequiredConfirmations(mintInfo, entry?.unit ?? 'sat');
   // Canonical quote = source of truth for the outpoint + mint state + address
   // (a persisted, metadata-less entry carries none of these). The annotation is
   // the durable fallback: once a send settles, the outpoint + fee are persisted
@@ -145,9 +142,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
   // The explorer link is mempool.space (mainnet); suppress it where it could
   // only 404.
   const explorerLinkUrl =
-    outpoint && !txStatus.unsupportedNetwork
-      ? transactionExplorerUrlForTxid(outpoint.txid)
-      : null;
+    outpoint && !txStatus.unsupportedNetwork ? transactionExplorerUrlForTxid(outpoint.txid) : null;
 
   const bottomButtons = (
     <BottomButtons>

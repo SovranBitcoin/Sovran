@@ -1,5 +1,7 @@
 import type { HistoryEntry } from '@cashu/coco-core';
 
+import { entryStateRank, isTerminalFailureState } from 'wallet';
+
 import { cashuLog } from '@/shared/lib/logger';
 
 type EntryRecord = Record<string, unknown>;
@@ -58,30 +60,16 @@ export function getOnchainMeltAddress(entry: HistoryEntry | null | undefined): s
   return address;
 }
 
-/**
- * Rank of an onchain melt state along the UNPAID → PENDING → PAID progression.
- * Accepts BOTH vocabularies the timeline understands: the melt-quote state
- * (`UNPAID`/`PENDING`/`PAID`) and the coco operation/history state
- * (`prepared`/`executing`/`pending`/`finalized`). `-1` = unknown.
- */
-const ONCHAIN_MELT_STATE_RANK: Record<string, number> = {
-  unpaid: 0,
-  prepared: 0,
-  pending: 1,
-  executing: 1,
-  paid: 2,
-  finalized: 2,
-};
+// State vocabulary, ranks, and the terminal-failure set live in wallet's
+// history/states.ts (the one owner). Note isTerminalFailureState also covers
+// `rolling_back`, which the old app-local set missed — a melt observed
+// mid-rollback now resolves to its rollback arm instead of falling to the
+// rank compare.
+const isRolledBackMeltState = (state: string | null | undefined): boolean =>
+  isTerminalFailureState(state);
 
-function isRolledBackMeltState(state: string | null | undefined): boolean {
-  return state === 'rolledBack' || state === 'rolled_back' || state === 'failed';
-}
-
-function onchainMeltStateRank(state: string | null | undefined): number {
-  if (state == null) return -1;
-  const rank = ONCHAIN_MELT_STATE_RANK[state.toLowerCase()];
-  return rank == null ? -1 : rank;
-}
+const onchainMeltStateRank = (state: string | null | undefined): number =>
+  entryStateRank('melt', state);
 
 export interface OnchainMeltFeeOption {
   feeIndex: number;
@@ -127,11 +115,14 @@ export interface OnchainMeltFeeDisplay {
  * reserve must never be presented as the final cost or a promised refund.
  */
 export function resolveOnchainMeltFeeDisplay(
-  annotation: {
-    feeIndex?: number;
-    feeReserveSats?: number;
-    effectiveFeeSats?: number;
-  } | null | undefined,
+  annotation:
+    | {
+        feeIndex?: number;
+        feeReserveSats?: number;
+        effectiveFeeSats?: number;
+      }
+    | null
+    | undefined,
   liveFeeOptions: OnchainMeltFeeOption[] | null | undefined
 ): OnchainMeltFeeDisplay | null {
   if (annotation?.effectiveFeeSats != null && Number.isFinite(annotation.effectiveFeeSats)) {
