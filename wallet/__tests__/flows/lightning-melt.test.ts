@@ -287,7 +287,11 @@ describe('lightning melt — pasted invoice mint selection', () => {
     });
   });
 
-  it('uses the highest partial mint for the Lightning round-down fallback', async () => {
+  // A fixed-amount invoice can never be paid partially, so "round down" is
+  // not a valid fallback — insufficient balance must be terminal. (This used
+  // to route to chooseProofs with a roundDown suggestion; a 1000-sat invoice
+  // was offered as "990".)
+  it('NEVER offers round-down for a fixed-amount invoice — insufficient balance errors instead', async () => {
     const tm = createTestMachine({
       wallet: {
         trustedMintUrls: [MINT1, MINT2],
@@ -303,26 +307,14 @@ describe('lightning melt — pasted invoice mint selection', () => {
 
     await tm.machine.execute(USER_LIGHTNING_INVOICE, { reset: true });
 
-    tm.assertStep('chooseProofs');
-    tm.assertContext({
-      amount: 1000,
-      mintUrl: MINT2,
-      destination: 'meltQuote',
-      meltTarget: USER_LIGHTNING_INVOICE,
-    });
-    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
-    expect(lastHandler).toMatchObject({
-      step: 'chooseProofs',
-      data: {
-        mintUrl: MINT2,
-        meltTarget: USER_LIGHTNING_INVOICE,
-        suggestions: {
-          roundDown: { amount: 990 },
-          roundUp: null,
-        },
-      },
-    });
+    tm.assertStep('error');
+    const choseProofs = tm.handlerCalls.some((c) => c.step === 'chooseProofs');
+    expect(choseProofs).toBe(false);
   });
+
+  // The user picks the amount for a lightning ADDRESS, so rounding down to
+  // what the wallet can cover stays a valid fallback there (pinned by
+  // 'shows chooseProofs with balance round-down…' above).
 });
 
 // ---------------------------------------------------------------------------

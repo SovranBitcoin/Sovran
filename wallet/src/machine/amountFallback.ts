@@ -185,6 +185,19 @@ export function buildChooseAmountFallback(args: {
     });
     return null;
   }
+  // A fixed-amount Lightning target (bolt11 invoice / bolt12 offer with the
+  // amount baked in) cannot be paid partially — a rounded-down melt would
+  // underpay an invoice the network rejects. Insufficient balance is terminal
+  // there; only user-chosen-amount targets (lightning address, LNURL,
+  // amountless invoice) get the choose-amount fallback.
+  if (args.destination === 'meltQuote' && hasFixedLightningAmount(args.ctx)) {
+    logger.info('amountFallback.chooseAmount.skip', {
+      destination: args.destination,
+      amount: args.amount,
+      reason: 'fixed_lightning_amount',
+    });
+    return null;
+  }
 
   const fallbackMint =
     args.destination === 'meltQuote'
@@ -253,6 +266,18 @@ export function buildChooseAmountFallback(args: {
     proofAmounts: fallbackMint.proofAmounts,
     suggestions: built.suggestions,
   };
+}
+
+function hasFixedLightningAmount(ctx: FlowContext): boolean {
+  const intent = ctx.intent;
+  if (!intent) return false;
+  if (
+    intent.type !== 'meltLightningInvoice' &&
+    intent.type !== 'meltBolt12Offer'
+  ) {
+    return false;
+  }
+  return intent.option.amount != null && intent.option.amount > 0;
 }
 
 function pickFallbackMint(
