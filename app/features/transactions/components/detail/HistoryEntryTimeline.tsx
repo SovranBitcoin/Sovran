@@ -73,6 +73,28 @@ const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
 type TimelineLineType = 'complete' | 'future' | 'expired-gradient' | 'rolled-back-gradient';
 
+function getLineType(currentItem: TimelineItem, nextItem: TimelineItem): TimelineLineType {
+  if (nextItem.stepType === 'expired') return 'expired-gradient';
+  if (nextItem.stepType === 'already-spent') return 'rolled-back-gradient';
+  if (nextItem.stepType === 'rolled-back') return 'rolled-back-gradient';
+  if (
+    currentItem.stepType === 'complete' ||
+    currentItem.stepType === 'current' ||
+    currentItem.stepType === 'waiting' ||
+    currentItem.stepType === 'success'
+  ) {
+    if (
+      nextItem.stepType === 'complete' ||
+      nextItem.stepType === 'current' ||
+      nextItem.stepType === 'waiting' ||
+      nextItem.stepType === 'success'
+    ) {
+      return 'complete';
+    }
+  }
+  return 'future';
+}
+
 interface AnimatedTimelineLineProps {
   lineType: TimelineLineType;
   delayMs?: number;
@@ -80,6 +102,10 @@ interface AnimatedTimelineLineProps {
   dangerColor: string;
   warningColor: string;
   mutedColor: string;
+  /** Diagnostics: index of the row ABOVE this connector, and the entry it
+   *  belongs to. Primitives so React.memo still bails out on no-op renders. */
+  debugRow?: number;
+  debugEntryId?: string;
 }
 
 const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
@@ -89,6 +115,8 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
   dangerColor,
   warningColor,
   mutedColor,
+  debugRow,
+  debugEntryId,
 }: AnimatedTimelineLineProps) {
   // Expired/rolled-back gradients are terminal fills too: they animate down
   // the rail exactly like a success fill, just with a gradient into the
@@ -96,14 +124,33 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
   const isFilled = lineType !== 'future';
   const fillHeight = useSharedValue(isFilled ? 1 : 0);
   const gradientId = React.useId().replace(/:/g, '');
+  const isFirstRunRef = useRef(true);
 
   useEffect(() => {
     const target = lineType === 'future' ? 0 : 1;
+    paymentLog.debug('tx.history_timeline.line_anim', {
+      entryId: debugEntryId,
+      rowAbove: debugRow,
+      lineType,
+      fillTarget: target,
+      // On mount the shared value already starts at the target, so the first
+      // withTiming is a visual no-op; only later lineType flips actually draw.
+      firstRun: isFirstRunRef.current,
+      delayMs,
+      durationMs: LINE_ANIM_MS,
+      gradient:
+        lineType === 'expired-gradient'
+          ? 'success->danger'
+          : lineType === 'rolled-back-gradient'
+            ? 'success->warning'
+            : null,
+    });
+    isFirstRunRef.current = false;
     fillHeight.value =
       delayMs > 0
         ? withDelay(delayMs, withTiming(target, LINE_TIMING))
         : withTiming(target, LINE_TIMING);
-  }, [lineType, delayMs, fillHeight]);
+  }, [lineType, delayMs, fillHeight, debugEntryId, debugRow]);
 
   const fillProps = useAnimatedProps(() => ({
     height: fillHeight.value * LINE_HEIGHT,
@@ -183,6 +230,24 @@ export function HistoryEntryTimeline({
   useEffect(() => {
     hasMountedRef.current = true;
   }, []);
+
+  // ── Verbose diagnostics ──────────────────────────────────────────────────
+  // Everything logs under tx.history_timeline.* (module: payment) and is
+  // change-gated: the 1s countdown re-render never floods the log; only
+  // actual visual transitions (rows, dots, lines, labels, badge) emit.
+  const entryId = String((historyEntry as { id?: unknown }).id ?? 'no-id');
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+
+  useEffect(() => {
+    paymentLog.debug('tx.history_timeline.mount', {
+      entryId,
+      entryType: historyEntry.type,
+    });
+    return () => {
+      paymentLog.debug('tx.history_timeline.unmount', { entryId });
+    };
+  }, [entryId, historyEntry.type]);
 
   const foreground66 = opacity(foreground, 0.66);
   const foreground50 = opacity(foreground, 0.5);
@@ -303,27 +368,202 @@ export function HistoryEntryTimeline({
 
   const expiryBadge = getExpiryBadge();
 
-  const getLineType = (currentItem: TimelineItem, nextItem: TimelineItem): TimelineLineType => {
-    if (nextItem.stepType === 'expired') return 'expired-gradient';
-    if (nextItem.stepType === 'already-spent') return 'rolled-back-gradient';
-    if (nextItem.stepType === 'rolled-back') return 'rolled-back-gradient';
-    if (
-      currentItem.stepType === 'complete' ||
-      currentItem.stepType === 'current' ||
-      currentItem.stepType === 'waiting' ||
-      currentItem.stepType === 'success'
-    ) {
-      if (
-        nextItem.stepType === 'complete' ||
-        nextItem.stepType === 'current' ||
-        nextItem.stepType === 'waiting' ||
-        nextItem.stepType === 'success'
-      ) {
-        return 'complete';
-      }
+  // Full per-row visual state, exactly as the render below will draw it:
+  // step, label/sublabel text, dot phase+result, colour roles, connector
+  // line type, confirmation ring, and the cascade delays each row inherits.
+  const rowsDiag = useMemo(
+    () =>
+      timeline.map((item, index) => {
+        const isLast = index === timeline.length - 1;
+        const nextItem = !isLast ? timeline[index + 1] : null;
+        const lineType = nextItem ? getLineType(item, nextItem) : null;
+        const isFutureState = item.stepType === 'next-pending' || item.stepType === 'future-small';
+        const indicator = mapCheckpointStatusToIndicator(
+          timelineStepTypeToCheckpointStatus(item.stepType)
+        );
+        const showConfirmationRing =
+          !!onchainConfirmationProgress &&
+          (item.confirmationRing || (isOnchainMint && item.state === MintQuoteState.PAID));
+        return {
+          row: index,
+          state: item.state,
+          stepType: item.stepType,
+          label: item.displayLabel,
+          info: item.info ?? null,
+          timestamp: item.timestamp ?? null,
+          dotPhase: indicator.phase,
+          dotResult: indicator.result,
+          dotColorRole: item.stepType === 'waiting' ? 'warning' : 'theme-foreground',
+          dotPendingColorRole: item.stepType === 'waiting' ? 'warning' : 'muted-rail',
+          textColorRole: isFutureState
+            ? 'foreground-50'
+            : item.stepType === 'expired'
+              ? 'danger'
+              : item.stepType === 'waiting' ||
+                  item.stepType === 'already-spent' ||
+                  item.stepType === 'rolled-back'
+                ? 'warning'
+                : 'foreground',
+          isFutureState,
+          lineTypeToNext: lineType,
+          showConfirmationRing,
+          confirmations:
+            showConfirmationRing && onchainConfirmationProgress
+              ? `${onchainConfirmationProgress.currentConfirmations ?? 'null'}/${onchainConfirmationProgress.requiredConfirmations}`
+              : null,
+          ringBreathes: showConfirmationRing ? !!onchainConfirmationProgress?.hasPayment : null,
+          dotDelayMs: index * 300,
+          lineDelayMs: index * 300 + 150,
+        };
+      }),
+    [timeline, onchainConfirmationProgress, isOnchainMint]
+  );
+  const rowsSignature = useMemo(() => JSON.stringify(rowsDiag), [rowsDiag]);
+  const headerSignature = `${cardLabel}|${statusHeader}|${statusColorType}`;
+  const prevRowsRef = useRef<typeof rowsDiag | null>(null);
+  const lastLoggedStateRef = useRef<string>('');
+
+  useEffect(() => {
+    // `timeline` (and so rowsDiag) gets a fresh identity every countdown tick;
+    // the signature gate keeps this to genuine visual changes only.
+    const combined = `${rowsSignature}#${headerSignature}`;
+    if (lastLoggedStateRef.current === combined) return;
+    const prev = prevRowsRef.current;
+    lastLoggedStateRef.current = combined;
+    prevRowsRef.current = rowsDiag;
+
+    paymentLog.debug('tx.history_timeline.state', {
+      entryId,
+      entryType: historyEntry.type,
+      entryState: String((historyEntry as { state?: unknown }).state ?? ''),
+      renderCount: renderCountRef.current,
+      firstPaint: prev === null,
+      // Row/label FadeIn(220ms) only plays after the initial mount.
+      entranceFadesActive: hasMountedRef.current,
+      cardLabel,
+      statusHeader,
+      statusColorType,
+      statusHeaderColorRole:
+        statusColorType === 'success' ||
+        statusColorType === 'error' ||
+        statusColorType === 'warning'
+          ? statusColorType
+          : 'foreground-66',
+      expiryBadgeVisible: expiryBadge != null,
+      rowCount: rowsDiag.length,
+      rows: rowsDiag,
+      inputs: {
+        hasMeltQuote: !!meltQuote,
+        meltQuoteState: meltQuote?.state ?? null,
+        meltQuoteExpiry: meltQuote?.expiry ?? null,
+        tokenCreated: tokenCreated ?? null,
+        nostrSent: nostrSent ?? null,
+        isOnchainMint,
+        onchainSettledInternally: onchainSettledInternally ?? null,
+        onchainConfirmations: onchainConfirmationProgress
+          ? {
+              current: onchainConfirmationProgress.currentConfirmations,
+              required: onchainConfirmationProgress.requiredConfirmations,
+              hasPayment: onchainConfirmationProgress.hasPayment,
+              hasUnconfirmedPayment: onchainConfirmationProgress.hasUnconfirmedPayment,
+              isSatisfied: onchainConfirmationProgress.isSatisfied,
+            }
+          : null,
+      },
+    });
+
+    if (!prev) return;
+    if (prev.length !== rowsDiag.length) {
+      paymentLog.debug('tx.history_timeline.rows_resized', {
+        entryId,
+        prevCount: prev.length,
+        nextCount: rowsDiag.length,
+        note: 'added rows FadeIn 220ms, removed rows FadeOut 220ms (opacity only, keyed by index)',
+      });
     }
-    return 'future';
-  };
+    const maxRows = Math.max(prev.length, rowsDiag.length);
+    for (let i = 0; i < maxRows; i++) {
+      const before = prev[i];
+      const after = rowsDiag[i];
+      if (!before && after) {
+        paymentLog.debug('tx.history_timeline.row_added', { entryId, ...after });
+        continue;
+      }
+      if (before && !after) {
+        paymentLog.debug('tx.history_timeline.row_removed', {
+          entryId,
+          row: i,
+          prevStepType: before.stepType,
+          prevLabel: before.label,
+        });
+        continue;
+      }
+      if (!before || !after) continue;
+      if (JSON.stringify(before) === JSON.stringify(after)) continue;
+      const changed = (Object.keys(after) as (keyof typeof after)[]).filter(
+        (key) => JSON.stringify(before[key]) !== JSON.stringify(after[key])
+      );
+      paymentLog.debug('tx.history_timeline.row_change', {
+        entryId,
+        row: i,
+        changedFields: changed,
+        stepType:
+          before.stepType === after.stepType
+            ? after.stepType
+            : `${before.stepType} -> ${after.stepType}`,
+        label: before.label === after.label ? after.label : `${before.label} -> ${after.label}`,
+        // The label block is keyed by displayLabel, so a label change remounts
+        // it with a 220ms crossfade; info/timestamp-only changes mutate in place.
+        labelCrossfade: before.label !== after.label,
+        dot: `${before.dotPhase}/${before.dotResult} -> ${after.dotPhase}/${after.dotResult}`,
+        lineTypeToNext:
+          before.lineTypeToNext === after.lineTypeToNext
+            ? after.lineTypeToNext
+            : `${before.lineTypeToNext} -> ${after.lineTypeToNext}`,
+        info: before.info === after.info ? after.info : `${before.info} -> ${after.info}`,
+        confirmations:
+          before.confirmations === after.confirmations
+            ? after.confirmations
+            : `${before.confirmations} -> ${after.confirmations}`,
+        textColorRole:
+          before.textColorRole === after.textColorRole
+            ? after.textColorRole
+            : `${before.textColorRole} -> ${after.textColorRole}`,
+      });
+    }
+  }, [
+    rowsSignature,
+    headerSignature,
+    rowsDiag,
+    entryId,
+    historyEntry,
+    cardLabel,
+    statusHeader,
+    statusColorType,
+    expiryBadge,
+    meltQuote,
+    tokenCreated,
+    nostrSent,
+    isOnchainMint,
+    onchainSettledInternally,
+    onchainConfirmationProgress,
+  ]);
+
+  // Countdown badge: log appear/disappear (with the value at the flip), not
+  // every one-second tick.
+  const expiryBadgeVisible = expiryBadge != null;
+  const prevBadgeVisibleRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (prevBadgeVisibleRef.current === expiryBadgeVisible) return;
+    const firstRun = prevBadgeVisibleRef.current === null;
+    prevBadgeVisibleRef.current = expiryBadgeVisible;
+    paymentLog.debug('tx.history_timeline.expiry_badge', {
+      entryId,
+      visible: expiryBadgeVisible,
+      valueAtFlip: expiryBadge,
+      firstRun,
+    });
+  }, [expiryBadgeVisible, expiryBadge, entryId]);
 
   const getStatusHeaderColor = () => {
     switch (statusColorType) {
@@ -439,6 +679,19 @@ export function HistoryEntryTimeline({
                       // required confirmations — nothing is in progress yet, so
                       // the next segment must not breathe.
                       segmentedInProgress={onchainConfirmationProgress?.hasPayment}
+                      // Verbose dot diagnostics: every phase/result transition,
+                      // segment fill, and breathe pulse this dot schedules lands
+                      // in the payment log tagged with its row + step.
+                      onDebugEvent={(event, params) =>
+                        paymentLog.debug(`tx.history_timeline.${event}`, {
+                          entryId,
+                          row: index,
+                          state: item.state,
+                          stepType: item.stepType,
+                          label: item.displayLabel,
+                          ...params,
+                        })
+                      }
                       {...mapCheckpointStatusToIndicator(
                         timelineStepTypeToCheckpointStatus(item.stepType)
                       )}
@@ -451,6 +704,8 @@ export function HistoryEntryTimeline({
                         dangerColor={dangerColor}
                         warningColor={warningColor}
                         mutedColor={mutedColor}
+                        debugRow={index}
+                        debugEntryId={entryId}
                       />
                     )}
                   </VStack>
