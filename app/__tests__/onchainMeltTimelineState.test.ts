@@ -3,8 +3,11 @@
  */
 import {
   canOnchainMeltQuoteExpire,
+  INITIAL_OFFCHAIN_SETTLEMENT_STATE,
+  isConfirmedOffchainSettlement,
   isOnchainMeltQuoteExpired,
   isOnchainMeltSettled,
+  nextOffchainSettlementState,
   resolveOnchainMeltTimelineState,
 } from '@/shared/lib/cashu/onchainMelt';
 
@@ -77,6 +80,36 @@ describe('onchain melt quote expiry', () => {
     expect(isOnchainMeltQuoteExpired('UNPAID', null, AFTER_MS)).toBe(false);
     expect(isOnchainMeltQuoteExpired('UNPAID', 0, AFTER_MS)).toBe(false);
     expect(isOnchainMeltQuoteExpired('UNPAID', Number.NaN, AFTER_MS)).toBe(false);
+  });
+});
+
+describe('off-chain settlement debounce', () => {
+  const step = nextOffchainSettlementState;
+
+  it('one PAID-no-outpoint read is NOT yet an off-chain settle', () => {
+    const s1 = step(INITIAL_OFFCHAIN_SETTLEMENT_STATE, { state: 'PAID', hasOutpoint: false });
+    expect(isConfirmedOffchainSettlement(s1)).toBe(false);
+  });
+
+  it('two consecutive PAID-no-outpoint reads confirm the off-chain settle', () => {
+    const s1 = step(INITIAL_OFFCHAIN_SETTLEMENT_STATE, { state: 'PAID', hasOutpoint: false });
+    const s2 = step(s1, { state: 'PAID', hasOutpoint: false });
+    expect(isConfirmedOffchainSettlement(s2)).toBe(true);
+  });
+
+  it('an outpoint permanently rules out the off-chain verdict (sticky)', () => {
+    const s1 = step(INITIAL_OFFCHAIN_SETTLEMENT_STATE, { state: 'PENDING', hasOutpoint: true });
+    // A later PAID read that (bogusly) drops the outpoint must not flip it.
+    const s2 = step(s1, { state: 'PAID', hasOutpoint: false });
+    const s3 = step(s2, { state: 'PAID', hasOutpoint: false });
+    expect(isConfirmedOffchainSettlement(s3)).toBe(false);
+  });
+
+  it('a non-PAID read resets the consecutive counter', () => {
+    const s1 = step(INITIAL_OFFCHAIN_SETTLEMENT_STATE, { state: 'PAID', hasOutpoint: false });
+    const s2 = step(s1, { state: 'PENDING', hasOutpoint: false });
+    const s3 = step(s2, { state: 'PAID', hasOutpoint: false });
+    expect(isConfirmedOffchainSettlement(s3)).toBe(false);
   });
 });
 

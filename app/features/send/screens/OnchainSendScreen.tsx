@@ -87,10 +87,12 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
   const outpoint = parseOutpoint(quote.outpoint ?? annotation.onchainMelt?.outpoint ?? null);
   const txStatus = useMempoolTxConfirmations(outpoint?.txid ?? null, { requiredConfirmations });
   // Internal settlement: the mint reports the melt PAID but gives no outpoint —
-  // it paid off-chain, so there is no on-chain transaction. Gate on the QUOTE's
-  // own PAID state (not entry.state) so state + outpoint come from the same row
-  // and the timeline never briefly asserts "internal" before the quote loads.
-  const settledInternally = quote.state === 'PAID' && !outpoint;
+  // it paid off-chain, so there is no on-chain transaction. `offchainSettled`
+  // is debounced upstream (two consecutive PAID-no-outpoint reads, sticky
+  // once any outpoint was seen) so PAID landing one poll before the outpoint
+  // can't flash "Settled off-chain"; the annotation-persisted outpoint keeps
+  // it impossible across remounts too.
+  const settledInternally = quote.offchainSettled && !outpoint;
   const observedProgress = buildOnchainConfirmationProgressFromTx(
     txStatus.status,
     requiredConfirmations

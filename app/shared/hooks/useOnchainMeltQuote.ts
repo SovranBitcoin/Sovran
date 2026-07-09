@@ -5,7 +5,10 @@ import { useManagerContext } from '@cashu/coco-react';
 import { annotationKey } from 'wallet';
 
 import {
+  INITIAL_OFFCHAIN_SETTLEMENT_STATE,
+  isConfirmedOffchainSettlement,
   isOnchainMeltQuoteExpired,
+  nextOffchainSettlementState,
   normalizeOnchainFeeOptions,
   type OnchainMeltFeeOption,
 } from '@/shared/lib/cashu/onchainMelt';
@@ -18,6 +21,9 @@ import { paymentLog } from '@/shared/lib/logger';
 // `refresh` instead, which re-checks the mint and cascades the row → PAID +
 // finalize. Polled while the detail is open, then stopped once settled.
 const MELT_QUOTE_POLL_MS = 12_000;
+// One quick confirm re-check after the FIRST PAID-without-outpoint read — the
+// mint may publish the outpoint a beat after flipping PAID.
+const OFFCHAIN_CONFIRM_REFETCH_MS = 3_000;
 
 /**
  * Live onchain melt-quote fields for the send-detail timeline — the `outpoint`
@@ -36,11 +42,14 @@ export function useOnchainMeltQuote(
   request: string | null;
   expiry: number | null;
   feeOptions: OnchainMeltFeeOption[];
+  /** Debounced "PAID with no outpoint" verdict — see nextOffchainSettlementState. */
+  offchainSettled: boolean;
   isLoading: boolean;
 } {
   const { manager } = useManagerContext();
   const [quote, setQuote] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [offchainSettled, setOffchainSettled] = useState(false);
   // One annotation write per quote — covers mints that broadcast AFTER the
   // operation finalized (the melt-op:finalized writer saw no outpoint yet).
   const annotatedOutpointForQuoteRef = useRef<string | null>(null);
@@ -49,10 +58,14 @@ export function useOnchainMeltQuote(
     if (!manager || !mintUrl || !quoteId) {
       setQuote(null);
       setIsLoading(false);
+      setOffchainSettled(false);
       return;
     }
     let mounted = true;
     let interval: ReturnType<typeof setInterval> | null = null;
+    let confirmTimeout: ReturnType<typeof setTimeout> | null = null;
+    let settlement = INITIAL_OFFCHAIN_SETTLEMENT_STATE;
+    setOffchainSettled(false);
     const stopPolling = () => {
       if (interval) {
         clearInterval(interval);
@@ -80,16 +93,32 @@ export function useOnchainMeltQuote(
             onchainMelt: { outpoint },
           });
         }
+        settlement = nextOffchainSettlementState(settlement, {
+          state,
+          hasOutpoint: !!outpoint,
+        });
+        setOffchainSettled(isConfirmedOffchainSettlement(settlement));
         paymentLog.debug('onchain.melt.quote.result', {
           found: !!record,
-          hasOutpoint: typeof (record as { outpoint?: unknown })?.outpoint === 'string',
+          hasOutpoint: !!outpoint,
           state,
           hasExpiry: expiry != null,
+          paidNoOutpointReads: settlement.paidNoOutpointReads,
         });
         // PAID is terminal (coco's merge is PAID-sticky) — stop re-checking the
-        // mint while the detail stays open. An expired quote that never left
-        // UNPAID is equally terminal: the mint won't execute it anymore.
-        if (state === 'PAID' || isOnchainMeltQuoteExpired(state, expiry, Date.now())) {
+        // mint while the detail stays open. Exception: the FIRST
+        // PAID-without-outpoint read gets one quick confirm re-check before the
+        // off-chain verdict is believed (the outpoint may land a beat later).
+        // An expired quote that never left UNPAID is equally terminal.
+        if (state === 'PAID') {
+          stopPolling();
+          if (!outpoint && !isConfirmedOffchainSettlement(settlement) && !confirmTimeout) {
+            confirmTimeout = setTimeout(() => {
+              confirmTimeout = null;
+              void fetchQuote();
+            }, OFFCHAIN_CONFIRM_REFETCH_MS);
+          }
+        } else if (isOnchainMeltQuoteExpired(state, expiry, Date.now())) {
           stopPolling();
         }
       } catch (err) {
@@ -105,6 +134,10 @@ export function useOnchainMeltQuote(
     return () => {
       mounted = false;
       stopPolling();
+      if (confirmTimeout) {
+        clearTimeout(confirmTimeout);
+        confirmTimeout = null;
+      }
     };
   }, [manager, mintUrl, quoteId]);
 
@@ -121,6 +154,7 @@ export function useOnchainMeltQuote(
     request: readString('request'),
     expiry: typeof expiryValue === 'number' && Number.isFinite(expiryValue) ? expiryValue : null,
     feeOptions: normalizeOnchainFeeOptions(quote?.fee_options),
+    offchainSettled,
     isLoading,
   };
 }

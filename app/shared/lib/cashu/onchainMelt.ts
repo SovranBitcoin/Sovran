@@ -147,6 +147,47 @@ export function resolveOnchainMeltFeeDisplay(
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Off-chain settlement detection (PAID with no outpoint)
+// ---------------------------------------------------------------------------
+//
+// A mint can settle an onchain melt internally (PAID, no broadcast, no
+// outpoint — off-spec but observed live). Naively reading `PAID && !outpoint`
+// races the mint publishing the two fields: PAID can land one poll before the
+// outpoint, briefly collapsing the timeline to "Settled off-chain" and then
+// re-expanding. This reducer requires the PAID-no-outpoint observation to
+// repeat before it is believed, and once ANY outpoint has been seen the
+// off-chain verdict is permanently off the table.
+
+export interface OffchainSettlementState {
+  /** Consecutive quote reads that said PAID with no outpoint. */
+  paidNoOutpointReads: number;
+  /** Sticky: an outpoint was observed at least once — never off-chain. */
+  sawOutpoint: boolean;
+}
+
+export const INITIAL_OFFCHAIN_SETTLEMENT_STATE: OffchainSettlementState = {
+  paidNoOutpointReads: 0,
+  sawOutpoint: false,
+};
+
+export function nextOffchainSettlementState(
+  prev: OffchainSettlementState,
+  read: { state: string | null | undefined; hasOutpoint: boolean }
+): OffchainSettlementState {
+  if (read.hasOutpoint) return { paidNoOutpointReads: 0, sawOutpoint: true };
+  if (prev.sawOutpoint) return prev;
+  if (read.state === 'PAID') {
+    return { ...prev, paidNoOutpointReads: prev.paidNoOutpointReads + 1 };
+  }
+  return { ...prev, paidNoOutpointReads: 0 };
+}
+
+/** ≥2 consecutive PAID-no-outpoint reads and no outpoint ever observed. */
+export function isConfirmedOffchainSettlement(state: OffchainSettlementState): boolean {
+  return !state.sawOutpoint && state.paidNoOutpointReads >= 2;
+}
+
 /**
  * Whether an onchain melt quote's `expiry` still means anything: only a quote
  * that never advanced past UNPAID/prepared (rank ≤ 0) can expire — once the
