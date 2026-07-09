@@ -1,0 +1,2488 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`timeline scenario pins (redesign acceptance surface) ecash-receive (Cashu · Receive) frame 0: Receiving token 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • Pending",
+    "PENDING",
+    "Pending",
+    "Tap Redeem to add to wallet",
+    "Added to wallet",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) ecash-receive (Cashu · Receive) frame 1: Redeemed 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • Complete",
+    "ADDED TO WALLET",
+    "Pending",
+    "2026-05-22",
+    "Added to wallet",
+    "+21000 sats added to wallet",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) ecash-send (Cashu · Send) frame 0: Preparing token 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "CREATED",
+    "Created",
+    "Ready to share",
+    "Pending",
+    "Claimed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) ecash-send (Cashu · Send) frame 1: Sending 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • In Progress",
+    "PENDING",
+    "Created",
+    "2026-05-22",
+    "Pending",
+    "Waiting for recipient",
+    "Claimed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) ecash-send (Cashu · Send) frame 2: Sent 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Complete",
+    "CLAIMED",
+    "Created",
+    "2026-05-22",
+    "Pending",
+    "2026-05-22",
+    "Claimed",
+    "Claimed by recipient",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) ln-receive (Lightning · Receive) frame 0: Waiting for payment 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • Awaiting Payment",
+    "WAITING FOR PAYMENT",
+    "Waiting for payment",
+    "Pay the invoice to receive funds",
+    "Payment received",
+    "Complete",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) ln-receive (Lightning · Receive) frame 1: Payment received 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • In Progress",
+    "PAYMENT RECEIVED",
+    "Waiting for payment",
+    "2026-05-22",
+    "Payment received",
+    "Adding to wallet...",
+    "Complete",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) ln-receive (Lightning · Receive) frame 2: Funds received 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • Complete",
+    "COMPLETE",
+    "Waiting for payment",
+    "2026-05-22",
+    "Payment received",
+    "2026-05-22",
+    "Complete",
+    "+21000 sats added to wallet",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) ln-send (Lightning · Send) frame 0: Ready to send 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "READY TO SEND",
+    "•",
+    "expires in <countdown>",
+    "Ready to send",
+    "Tap Send to complete payment",
+    "Sending",
+    "Sent",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) ln-send (Lightning · Send) frame 1: Processing payment 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • In Progress",
+    "SENDING",
+    "Ready to send",
+    "2026-05-22",
+    "Sending",
+    "Payment in progress...",
+    "Sent",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) ln-send (Lightning · Send) frame 2: Sent 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Complete",
+    "SENT",
+    "Ready to send",
+    "2026-05-22",
+    "Sending",
+    "2026-05-22",
+    "Sent",
+    "Payment complete",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) ln-send-expired (Lightning · Expired) frame 0: Ready to send 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "READY TO SEND",
+    "•",
+    "expires in <countdown>",
+    "Ready to send",
+    "Tap Send to complete payment",
+    "Sending",
+    "Sent",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) ln-send-expired (Lightning · Expired) frame 1: Quote expired 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-error",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "url(#_r_t_)",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [
+        "success",
+        "danger",
+      ],
+    },
+  ],
+  "texts": [
+    "Send • Failed",
+    "EXPIRED",
+    "Ready to send",
+    "2026-05-22",
+    "Expired",
+    "Quote expired",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) mint-failed (Lightning · Failed) frame 0: Waiting for payment 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • Awaiting Payment",
+    "WAITING FOR PAYMENT",
+    "Waiting for payment",
+    "Pay the invoice to receive funds",
+    "Payment received",
+    "Complete",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) mint-failed (Lightning · Failed) frame 1: Mint failed 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-error",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "url(#_r_10_)",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [
+        "success",
+        "danger",
+      ],
+    },
+  ],
+  "texts": [
+    "Receive • Failed",
+    "FAILED",
+    "Waiting for payment",
+    "2026-05-22",
+    "Failed",
+    "Receive could not be completed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-receive (Onchain · Receive) frame 0: Waiting for payment 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": null,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • Awaiting Payment",
+    "WAITING FOR PAYMENT",
+    "Waiting for payment",
+    "Pay the address to receive funds",
+    "Payment received",
+    "Complete",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-receive (Onchain · Receive) frame 1: Payment detected in mempool 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": null,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • In Progress",
+    "CONFIRMING ON-CHAIN",
+    "Waiting for payment",
+    "2026-05-22",
+    "Confirming on-chain",
+    "Waiting for first confirmation",
+    "Complete",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-receive (Onchain · Receive) frame 2: 1/6 confirmations 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 1,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • In Progress",
+    "CONFIRMING ON-CHAIN",
+    "Waiting for payment",
+    "2026-05-22",
+    "Confirming on-chain",
+    "1/6 confirmations",
+    "Complete",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-receive (Onchain · Receive) frame 3: 2/6 confirmations 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 2,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • In Progress",
+    "CONFIRMING ON-CHAIN",
+    "Waiting for payment",
+    "2026-05-22",
+    "Confirming on-chain",
+    "2/6 confirmations",
+    "Complete",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-receive (Onchain · Receive) frame 4: 3/6 confirmations 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 3,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • In Progress",
+    "CONFIRMING ON-CHAIN",
+    "Waiting for payment",
+    "2026-05-22",
+    "Confirming on-chain",
+    "3/6 confirmations",
+    "Complete",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-receive (Onchain · Receive) frame 5: 4/6 confirmations 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 4,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • In Progress",
+    "CONFIRMING ON-CHAIN",
+    "Waiting for payment",
+    "2026-05-22",
+    "Confirming on-chain",
+    "4/6 confirmations",
+    "Complete",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-receive (Onchain · Receive) frame 6: 5/6 confirmations 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 5,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • In Progress",
+    "CONFIRMING ON-CHAIN",
+    "Waiting for payment",
+    "2026-05-22",
+    "Confirming on-chain",
+    "5/6 confirmations",
+    "Complete",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-receive (Onchain · Receive) frame 7: 6/6 confirmations 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 6,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • In Progress",
+    "PAYMENT RECEIVED",
+    "Waiting for payment",
+    "2026-05-22",
+    "Payment received",
+    "6/6 confirmations",
+    "Complete",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-receive (Onchain · Receive) frame 8: Funds received 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 6,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • Complete",
+    "COMPLETE",
+    "Waiting for payment",
+    "2026-05-22",
+    "Payment received",
+    "2026-05-22",
+    "Complete",
+    "+21000 sats added to wallet",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 0: Broadcasting… 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "BROADCASTING…",
+    "Paid",
+    "2026-05-22",
+    "Broadcasting…",
+    "Sending the transaction to the network",
+    "Confirmed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 1: Detected in mempool 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": null,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "IN MEMPOOL",
+    "Paid",
+    "2026-05-22",
+    "In mempool",
+    "0/6 blocks",
+    "Confirmed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 2: 1/6 confirmations 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 1,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "IN MEMPOOL",
+    "Paid",
+    "2026-05-22",
+    "In mempool",
+    "1/6 blocks",
+    "Confirmed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 3: 2/6 confirmations 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 2,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "IN MEMPOOL",
+    "Paid",
+    "2026-05-22",
+    "In mempool",
+    "2/6 blocks",
+    "Confirmed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 4: 3/6 confirmations 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 3,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "IN MEMPOOL",
+    "Paid",
+    "2026-05-22",
+    "In mempool",
+    "3/6 blocks",
+    "Confirmed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 5: 4/6 confirmations 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 4,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "IN MEMPOOL",
+    "Paid",
+    "2026-05-22",
+    "In mempool",
+    "4/6 blocks",
+    "Confirmed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 6: 5/6 confirmations 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 5,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "IN MEMPOOL",
+    "Paid",
+    "2026-05-22",
+    "In mempool",
+    "5/6 blocks",
+    "Confirmed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 7: 6/6 confirmations 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 6,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "CONFIRMED",
+    "Paid",
+    "2026-05-22",
+    "In mempool",
+    "2026-05-22",
+    "6/6 blocks",
+    "Confirmed",
+    "2026-05-22",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 8: Confirmed 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": {
+        "currentConfirmations": 6,
+        "requiredConfirmations": 6,
+      },
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": true,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Complete",
+    "CONFIRMED",
+    "Paid",
+    "2026-05-22",
+    "In mempool",
+    "2026-05-22",
+    "6/6 blocks",
+    "Confirmed",
+    "2026-05-22",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) payment-request (Request · Nostr send) frame 0: Creating token 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Payment • Ready",
+    "CREATED",
+    "Created",
+    "Creating token...",
+    "Delivered",
+    "Claimed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) payment-request (Request · Nostr send) frame 1: Token created 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Payment • Ready",
+    "CLAIMED",
+    "Created",
+    "2026-05-22",
+    "Creating token...",
+    "Delivered",
+    "Claimed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) payment-request (Request · Nostr send) frame 2: Sending via Nostr 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Payment • In Progress",
+    "DELIVERED",
+    "Created",
+    "2026-05-22",
+    "Delivered",
+    "Sending...",
+    "Claimed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) payment-request (Request · Nostr send) frame 3: Delivered 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Payment • In Progress",
+    "CLAIMED",
+    "Created",
+    "2026-05-22",
+    "Delivered",
+    "2026-05-22",
+    "Sent via Nostr",
+    "Claimed",
+    "Waiting for recipient",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) payment-request (Request · Nostr send) frame 4: Sent 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Payment • Complete",
+    "CLAIMED",
+    "Created",
+    "2026-05-22",
+    "Delivered",
+    "2026-05-22",
+    "Sent via Nostr",
+    "Claimed",
+    "Claimed by recipient",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) receive-already-spent (Cashu · Already spent) frame 0: Receiving token 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Receive • Pending",
+    "PENDING",
+    "Pending",
+    "Tap Redeem to add to wallet",
+    "Added to wallet",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) receive-already-spent (Cashu · Already spent) frame 1: Already spent 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-reverted",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "url(#_r_e_)",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [
+        "success",
+        "warning",
+      ],
+    },
+  ],
+  "texts": [
+    "Receive • Already Spent",
+    "ALREADY SPENT",
+    "Pending",
+    "2026-05-22",
+    "Already spent",
+    "Token was already redeemed elsewhere",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) send-rolled-back (Cashu · Rollback) frame 0: Preparing token 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "CREATED",
+    "Created",
+    "Ready to share",
+    "Pending",
+    "Claimed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) send-rolled-back (Cashu · Rollback) frame 1: Sending 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • In Progress",
+    "PENDING",
+    "Created",
+    "2026-05-22",
+    "Pending",
+    "Waiting for recipient",
+    "Claimed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) send-rolled-back (Cashu · Rollback) frame 2: Returned to balance 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-reverted",
+      "pendingColor": "muted",
+      "segmentedInProgress": null,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "url(#_r_c_)",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [
+        "success",
+        "warning",
+      ],
+    },
+  ],
+  "texts": [
+    "Send • Cancelled",
+    "CANCELLED",
+    "Created",
+    "2026-05-22",
+    "Cancelled",
+    "Funds returned to your balance",
+  ],
+}
+`;
