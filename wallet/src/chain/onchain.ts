@@ -134,6 +134,25 @@ export function buildOnchainConfirmationProgressFromTx(
   return progress;
 }
 
+/**
+ * Whether a tx-status poller can stop: the tx is mined AND has reached the
+ * required depth. The UI caps its display at the required count, so further
+ * polling can never change what's rendered. Deliberately ignores the mint's
+ * own PAID flag — the ring is driven by OUR observed count, which may lag the
+ * mint's threshold, and must keep counting until it catches up.
+ */
+export function shouldStopTxConfirmationPolling(
+  status: { confirmed: boolean; confirmations: number } | null | undefined,
+  requiredConfirmations = DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
+): boolean {
+  if (!status?.confirmed) return false;
+  const normalizedRequired =
+    Number.isSafeInteger(requiredConfirmations) && requiredConfirmations > 0
+      ? requiredConfirmations
+      : DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS;
+  return status.confirmations >= normalizedRequired;
+}
+
 export function getOnchainConfirmationInfo(
   progress: OnchainConfirmationProgress,
 ): string {

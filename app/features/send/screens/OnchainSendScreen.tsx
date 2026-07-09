@@ -72,21 +72,20 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
   // name + icon (without it the row skeletons forever).
   const mintInfo = useMintInfo(mintUrl);
 
+  const requiredConfirmations = getOnchainMeltRequiredConfirmations(
+    mintInfo,
+    entry?.unit ?? 'sat'
+  );
   // Canonical quote = source of truth for the outpoint + mint state + address
   // (a persisted, metadata-less entry carries none of these).
   const quote = useOnchainMeltQuote(mintUrl, entry?.quoteId);
   const outpoint = parseOutpoint(quote.outpoint);
-  const txStatus = useMempoolTxConfirmations(outpoint?.txid ?? null);
+  const txStatus = useMempoolTxConfirmations(outpoint?.txid ?? null, { requiredConfirmations });
   // Internal settlement: the mint reports the melt PAID but gives no outpoint —
   // it paid off-chain, so there is no on-chain transaction. Gate on the QUOTE's
   // own PAID state (not entry.state) so state + outpoint come from the same row
   // and the timeline never briefly asserts "internal" before the quote loads.
   const settledInternally = quote.state === 'PAID' && !outpoint;
-
-  const requiredConfirmations = getOnchainMeltRequiredConfirmations(
-    mintInfo,
-    entry?.unit ?? 'sat'
-  );
   const observedProgress = buildOnchainConfirmationProgressFromTx(
     txStatus.status,
     requiredConfirmations
@@ -133,9 +132,12 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
 
   const anyLoading = actions.pay.loading || actions.cancel.loading;
   const onchainAddress = getOnchainMeltAddress(entry) ?? quote.request;
-  const explorerLinkUrl = outpoint
-    ? transactionExplorerUrlForTxid(outpoint.txid)
-    : null;
+  // The explorer link is mempool.space (mainnet); suppress it where it could
+  // only 404.
+  const explorerLinkUrl =
+    outpoint && !txStatus.unsupportedNetwork
+      ? transactionExplorerUrlForTxid(outpoint.txid)
+      : null;
 
   const bottomButtons = (
     <BottomButtons>

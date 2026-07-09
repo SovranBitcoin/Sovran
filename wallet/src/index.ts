@@ -53,6 +53,7 @@ export {
   MempoolAddressStatsSchema,
   MempoolHttpError,
   parseOutpoint,
+  shouldStopTxConfirmationPolling,
   summarizeMempoolAddress,
   transactionExplorerUrlForTxid,
 } from "./chain";

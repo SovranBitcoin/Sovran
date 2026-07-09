@@ -17,5 +17,6 @@ export {
   getOnchainConfirmationInfo,
   getOnchainConfirmationProgress,
   parseOutpoint,
+  shouldStopTxConfirmationPolling,
   type OnchainConfirmationProgress,
 } from './onchain';

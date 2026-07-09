@@ -6,6 +6,7 @@ import {
   createMempoolSpaceChainAdapter,
   getOnchainConfirmationProgress,
   parseOutpoint,
+  shouldStopTxConfirmationPolling,
   summarizeMempoolAddress,
   transactionExplorerUrlForTxid,
   type MempoolAddressStats,
@@ -120,6 +121,24 @@ describe('buildOnchainConfirmationProgressFromTx (onchain SEND)', () => {
       currentConfirmations: 6, // capped
       isSatisfied: true,
     });
+  });
+});
+
+describe('shouldStopTxConfirmationPolling', () => {
+  it('keeps polling while unmined or below the required depth', () => {
+    expect(shouldStopTxConfirmationPolling(null, 6)).toBe(false);
+    expect(shouldStopTxConfirmationPolling({ confirmed: false, confirmations: 0 }, 6)).toBe(false);
+    expect(shouldStopTxConfirmationPolling({ confirmed: true, confirmations: 5 }, 6)).toBe(false);
+  });
+
+  it('stops exactly at the required depth (display is capped there)', () => {
+    expect(shouldStopTxConfirmationPolling({ confirmed: true, confirmations: 6 }, 6)).toBe(true);
+    expect(shouldStopTxConfirmationPolling({ confirmed: true, confirmations: 9 }, 6)).toBe(true);
+  });
+
+  it('normalizes an invalid required count to the default of 6', () => {
+    expect(shouldStopTxConfirmationPolling({ confirmed: true, confirmations: 5 }, 0)).toBe(false);
+    expect(shouldStopTxConfirmationPolling({ confirmed: true, confirmations: 6 }, -2)).toBe(true);
   });
 });
 
