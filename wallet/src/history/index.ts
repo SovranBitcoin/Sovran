@@ -54,11 +54,13 @@ export {
 } from "./sendTokenWarning";
 export {
   buildTimeline,
+  buildTimelineModel,
   getCardLabel,
   getHistoryEntryOnchainMeltAddress,
   getHistoryEntryOnchainMintAddress,
   getStatusColorType,
   getStatusHeader,
+  isSettledStepType,
 } from "./timeline";
 export { groupTimeline } from "./grouping";
 export type { ColadaTimelineItem, SwapTimelineState } from "./grouping";
@@ -71,6 +73,11 @@ export type { TransactionDirection, TransactionPaymentType } from "./filters";
 export type {
   BuildTimelineInput,
   OnchainConfirmationProgress,
+  TimelineFlowVariant,
   TimelineItem,
+  TimelineModel,
+  TimelineOutcome,
+  TimelineOutcomeKind,
+  TimelineStep,
   TimelineStepType,
 } from "./timeline";

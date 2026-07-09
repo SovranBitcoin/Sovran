@@ -91,6 +91,7 @@ export type {
 // History / payment-state timeline
 export {
   buildTimeline,
+  buildTimelineModel,
   bucketTransaction,
   getCardLabel,
   getHistoryEntryRefreshLabel,
@@ -144,7 +145,12 @@ export type {
   SendTokenWarningCopy,
   SwapTimelineState,
   TimelineFlow,
+  TimelineFlowVariant,
   TimelineItem,
+  TimelineModel,
+  TimelineOutcome,
+  TimelineOutcomeKind,
+  TimelineStep,
   TimelineStepType,
   TransactionBucket,
   TransactionDirection,
