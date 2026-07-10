@@ -12,6 +12,14 @@ function logValue(value: unknown): { brand: unknown; json: string } {
   return { brand, json: JSON.stringify(brand) };
 }
 
+function logField(field: string, value: unknown): { brand: unknown; json: string } {
+  const log = createLogger({ level: 'debug', async: false, transports: [], pretty: false });
+  log.info('redaction.field-test', { [field]: value });
+  const entry = log.getRecentLogs().find((e) => e.event === 'redaction.field-test');
+  const brand = (entry?.params as Record<string, unknown> | undefined)?.[field];
+  return { brand, json: JSON.stringify(brand) };
+}
+
 describe('logger redaction — private key material is never shown', () => {
   it('brands a WIF private key (base58) as a secret, no value', () => {
     const wif = '5' + 'K'.repeat(50); // 51 chars, mainnet-shaped
@@ -80,5 +88,26 @@ describe('logger redaction — private key material is never shown', () => {
     const { brand } = logValue(`restore failed for seed: ${mnemonic} (aborting)`);
     expect(String(brand)).toContain('<REDACTED:mnemonic>');
     expect(String(brand)).not.toContain('sausage');
+  });
+
+  it.each(['privateKeyHex', 'signerKey', 'nsec'])(
+    'redacts short strings under sensitive field %s',
+    (field) => {
+      const { brand, json } = logField(field, 'abc');
+      expect(brand).toEqual({ _kind: 'private_key', len: 3 });
+      expect(json).not.toContain('abc');
+    }
+  );
+
+  it('redacts raw seed bytes under a sensitive field name', () => {
+    const { brand, json } = logField('cashuSeed', new Uint8Array([1, 2, 3, 4]));
+    expect(brand).toEqual({ _kind: 'secret', bytes: 4 });
+    expect(json).not.toContain('1,2,3,4');
+  });
+
+  it('keeps a value-derived nsec brand when it is more specific than the field', () => {
+    const nsec = `nsec1${'q'.repeat(58)}`;
+    const { brand } = logField('signerKey', nsec);
+    expect(brand).toEqual({ _kind: 'nsec', len: nsec.length });
   });
 });

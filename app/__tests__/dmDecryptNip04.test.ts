@@ -6,6 +6,7 @@
 import { finalizeEvent, generateSecretKey, getPublicKey, nip04 } from 'nostr-tools';
 import { decryptDmEnvelopes } from '@/features/payments/data/dmDecryptPipeline';
 import type { DmEnvelope } from '@/features/payments/data/dmEnvelopeClient';
+import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
@@ -62,6 +63,10 @@ function sentDm(content: string): DmEnvelope {
 }
 
 describe('decryptDmEnvelopes — NIP-04 (kind 4)', () => {
+  afterAll(async () => {
+    await nip04Cache.clear(viewerPk);
+  });
+
   it('decrypts a received DM with counterparty = author', () => {
     const out = decryptDmEnvelopes([receivedDm('hello from peer')], viewerPk, viewerSk);
     expect(out).toHaveLength(1);
