@@ -19,6 +19,7 @@ in-repo gates (type-check, lint, jest, expo-doctor, Metro bundle, prebuild confi
 dry-run). The native build + on-device pass is owned by the release engineer.
 
 ### React Navigation → Expo Router
+
 - Ran `expo-codemod sdk-56-expo-router-react-navigation-replace` over the source.
   22 import sites moved automatically to `expo-router/react-navigation`,
   `expo-router/js-tabs`, etc.
@@ -33,9 +34,11 @@ dry-run). The native build + on-device pass is owned by the release engineer.
   so patch-package continues to reach them.
 
 ### Patches re-targeted to expo-router's react-navigation fork
+
 Because expo-router 56 forked react-navigation, patches against
 `node_modules/@react-navigation/*` no longer affect the navigators the app
 renders. Therefore:
+
 - **drawer `overlayStyle`** (custom rounded-scrim option): re-targeted to
   expo-router's forked `DrawerView.js` + `types.d.ts`
   (`patches/expo-router+56.2.11.patch`). The fork hardcoded the overlay style; the
@@ -52,6 +55,7 @@ renders. Therefore:
   scripted `cashu-kym` patch are retained.
 
 ### API / style deltas
+
 - `StyleSheet.absoluteFillObject` was removed in RN 0.85 → swept 81 sites to
   `StyleSheet.absoluteFill` (an identical frozen object, safe for direct + spread).
 - `expo-file-system` `File.move()` is now async → `loggerFile.rotateIfNeeded`
@@ -64,6 +68,7 @@ renders. Therefore:
   auto-includes `react-native-worklets/plugin` in SDK 56.
 
 ### Jest (RN 0.85 under jest-expo/node)
+
 - Added `standard-navigation` (new expo-router dep) to `transformIgnorePatterns`.
 - RN 0.85 eagerly resolves native modules when a component is required, which the
   `jest-expo/node` preset doesn't mock. Added React Native's own jest setup
@@ -73,6 +78,7 @@ renders. Therefore:
   `requireMock`.
 
 ### Deliberate version holds (recorded in `expo.install.exclude`)
+
 - **typescript 5.9.3** — SDK 56's TS 6.0.3 is opt-out; deferred (separate, risky).
 - **jest 30 / @types/jest 30** — pre-existing intentional ahead-pin; tests pass.
 - **react-native-quick-crypto 1.1.0** — held; 1.1.5 drags a `react-native-quick-base64`
@@ -80,9 +86,12 @@ renders. Therefore:
 - **react-native-keyboard-controller 1.21.12** — hygiene bump (ahead of bundle).
 
 ## Consequences
-- The app is New-Architecture-only and Hermes-v1 by default; minimum iOS 16.4,
-  Xcode 26.4 (EAS default image already provides it; local builds require it for
-  the liquid-glass modules).
+
+- The app is New-Architecture-only and Hermes-v1 by default; minimum iOS 16.4.
+  Local Xcode 26.1 builds are supported by
+  `patches/expo-modules-jsi+56.0.10.patch`; the EAS Xcode 26.4 image also builds
+  with it. Remove the compatibility patch once Xcode 26.4+ is the minimum local
+  toolchain.
 - Device QA must confirm: iOS 26 custom-header chrome (dropped native-stack patch),
   the drawer rounded scrim, the chat composer text seed/reset, and the heavy
   native modules (skia 2.6.2, reanimated 4.3.1 + worklets 0.8.3, view-shot 5,
@@ -122,6 +131,7 @@ Device testing surfaced three regressions; all fixed on the same branch.
    `QRButton` boot log.
 
 ### eslint-config-expo held at ~55
+
 The SDK-56 hygiene bump of `eslint-config-expo` to ~56 pulled
 `eslint-plugin-react-hooks@7` (React-Compiler-era rules), which (a) imports
 `zod-validation-error/v4` while allowing a 3.x that lacks it, breaking config
