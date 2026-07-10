@@ -281,10 +281,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
             onchainSettledInternally={settledInternally}
           />
           {explorerLinkUrl && (
-            <OpenInExplorerLink
-              url={explorerLinkUrl}
-              inferred={outpointIsHeuristic}
-            />
+            <OpenInExplorerLink url={explorerLinkUrl} inferred={outpointIsHeuristic} />
           )}
           <AccelerateSection
             offer={acceleration.offer}

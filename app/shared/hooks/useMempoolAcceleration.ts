@@ -187,8 +187,7 @@ export function useMempoolAcceleration(params: {
     return promise;
   }, [txid, markAccelerated, stopStatusPoll]);
 
-  const accelerating =
-    enabled && !!txid && (alreadyAccelerated || acceleratingTxid === txid);
+  const accelerating = enabled && !!txid && (alreadyAccelerated || acceleratingTxid === txid);
   const offer = enabled && offerState?.txid === txid ? offerState.offer : null;
 
   return {
