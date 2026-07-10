@@ -27,6 +27,14 @@ export const DOT_STAGGER_MS = 300;
 export const LINE_OFFSET_MS = 150;
 /** Row / label-block entrance+exit crossfade duration. */
 export const FADE_MS = 220;
+/** First-paint entrance: every row fades in over this duration… */
+export const ENTRANCE_FADE_MS = 350;
+/** …offset by one stagger per row index. A uniform entrance regardless of
+ *  data readiness: labels that resolve within the window (e.g. the onchain
+ *  network row correcting "Broadcasting…" → "Settled off-chain" after the
+ *  first quote read) change while the row is still translucent instead of
+ *  hard-swapping at full opacity. */
+export const ENTRANCE_STAGGER_MS = 120;
 export const LINE_ANIM_MS = 400;
 export const LINE_TIMING = {
   duration: LINE_ANIM_MS,
@@ -60,16 +68,22 @@ export function rowDelays(index: number): { dotDelayMs: number; lineDelayMs: num
   return { dotDelayMs, lineDelayMs: dotDelayMs + LINE_OFFSET_MS };
 }
 
-/** Symmetric row / label-block transitions. Entrance fades only play after
- *  the initial mount (opening the screen paints the timeline statically);
- *  exits always fade — preserving the old renderer's observable behavior,
- *  just centralized. */
-export function rowTransitions(hasMounted: boolean): {
-  entering: ReturnType<typeof FadeIn.duration> | undefined;
+/** Symmetric row / label-block transitions. The first paint gets a uniform
+ *  staggered entrance (every row fades in whether or not its data has
+ *  settled — late-resolving labels correct themselves under the fade); rows
+ *  and label blocks added by LATER timeline changes crossfade at FADE_MS;
+ *  exits always fade. */
+export function rowTransitions(
+  hasMounted: boolean,
+  index: number
+): {
+  entering: ReturnType<typeof FadeIn.duration>;
   exiting: ReturnType<typeof FadeOut.duration>;
 } {
   return {
-    entering: hasMounted ? FadeIn.duration(FADE_MS) : undefined,
+    entering: hasMounted
+      ? FadeIn.duration(FADE_MS)
+      : FadeIn.duration(ENTRANCE_FADE_MS).delay(index * ENTRANCE_STAGGER_MS),
     exiting: FadeOut.duration(FADE_MS),
   };
 }

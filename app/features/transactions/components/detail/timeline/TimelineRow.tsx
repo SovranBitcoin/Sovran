@@ -197,8 +197,8 @@ interface TimelineRowProps {
   isLast: boolean;
   /** Connector rail style to the row below, or null on the last row. */
   connector: TimelineLineType | null;
-  /** False during the very first render so opening the screen paints the
-   *  timeline without entrance fades. */
+  /** False during the very first render: rows get the uniform staggered
+   *  first-paint entrance; later additions crossfade at FADE_MS. */
   hasMounted: boolean;
   /** Present only on the row that owns the segmented confirmation ring. */
   confirmationProgress?: ConfirmationProgress;
@@ -230,7 +230,7 @@ export function TimelineRow({
   const isFutureState = step.stepType === 'next-pending' || step.stepType === 'future-small';
   const isWaitingStep = step.stepType === 'waiting';
   const { dotDelayMs, lineDelayMs } = rowDelays(index);
-  const { entering, exiting } = rowTransitions(hasMounted);
+  const { entering, exiting } = rowTransitions(hasMounted, index);
 
   const getStateTextColor = (stepType: TimelineStepType, isFuture: boolean) => {
     if (isFuture) return foreground50;

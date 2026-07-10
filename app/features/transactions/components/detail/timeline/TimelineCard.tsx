@@ -102,8 +102,10 @@ export function HistoryEntryTimeline({
     'warning',
   ] as const);
   const paymentCopy = usePaymentCopyResolver();
-  // False for the very first render so opening the screen paints the timeline
-  // without entrance fades; rows/labels added by LATER timeline changes fade.
+  // False for the very first render: first-paint rows get the uniform
+  // staggered entrance fade (regardless of data readiness — late-resolving
+  // labels correct under the fade); rows/labels added by LATER timeline
+  // changes crossfade at FADE_MS.
   const hasMountedRef = useRef(false);
   useEffect(() => {
     hasMountedRef.current = true;

@@ -79,7 +79,9 @@ jest.mock('@/shared/blocks/status', () => {
 jest.mock('react-native-reanimated', () => {
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   const easingFn = (value: number) => value;
-  const entering = { duration: () => entering };
+  const entering: Record<string, unknown> = {};
+  entering.duration = () => entering;
+  entering.delay = () => entering;
   return {
     __esModule: true,
     default: {
@@ -87,8 +89,8 @@ jest.mock('react-native-reanimated', () => {
       createAnimatedComponent: <P extends object>(Component: React.ComponentType<P>) => Component,
     },
     Easing: { cubic: easingFn, out: <T,>(fn: T) => fn },
-    FadeIn: { duration: () => entering },
-    FadeOut: { duration: () => entering },
+    FadeIn: { duration: () => entering, delay: () => entering },
+    FadeOut: { duration: () => entering, delay: () => entering },
     useSharedValue: <T,>(value: T) => ({ value }),
     useAnimatedProps: <T extends object>(factory: () => T) => factory(),
     withDelay: <T,>(_delayMs: number, value: T) => value,
