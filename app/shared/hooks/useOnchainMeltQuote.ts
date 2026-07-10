@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useManagerContext } from '@cashu/coco-react';
 
-import { annotationKey } from 'wallet';
+import { annotationKey, type TransactionAnnotation } from 'wallet';
 
 import {
   INITIAL_OFFCHAIN_SETTLEMENT_STATE,
@@ -35,7 +35,25 @@ const OFFCHAIN_CONFIRM_REFETCH_MS = 3_000;
  */
 export function useOnchainMeltQuote(
   mintUrl: string | null | undefined,
-  quoteId: string | null | undefined
+  quoteId: string | null | undefined,
+  opts?: {
+    /**
+     * The persisted `onchainMelt` annotation for this quote, when the caller
+     * already has it. A persisted `settledOffchain` verdict (with no outpoint)
+     * is believed immediately — the hook then does a single self-heal refresh
+     * instead of interval polling, so reopening a settled transaction never
+     * re-derives the verdict from live reads.
+     */
+    persistedOnchainMelt?: TransactionAnnotation['onchainMelt'] | null;
+    /**
+     * The coco operation was already finalized when the screen opened. coco's
+     * own finalize-time quote check found no outpoint (else it would have been
+     * annotated), which counts as the first PAID-no-outpoint observation — so
+     * ONE fresh read confirms the off-chain verdict instead of the 2-read /
+     * 3s-refetch debounce reserved for melts settling live.
+     */
+    entrySettledAtMount?: boolean;
+  }
 ): {
   outpoint: string | null;
   state: string | null;
@@ -49,10 +67,23 @@ export function useOnchainMeltQuote(
   const { manager } = useManagerContext();
   const [quote, setQuote] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [offchainSettled, setOffchainSettled] = useState(false);
+  // Persisted verdict (annotation) — believed immediately, no re-derivation.
+  // A persisted outpoint always outranks it (the mint may publish late).
+  const persistedVerdict =
+    opts?.persistedOnchainMelt?.settledOffchain === true && !opts.persistedOnchainMelt.outpoint;
+  const [offchainSettled, setOffchainSettled] = useState(persistedVerdict);
   // One annotation write per quote — covers mints that broadcast AFTER the
   // operation finalized (the melt-op:finalized writer saw no outpoint yet).
   const annotatedOutpointForQuoteRef = useRef<string | null>(null);
+  // One verdict + one address/amount annotation write per quote.
+  const annotatedVerdictForQuoteRef = useRef<string | null>(null);
+  const annotatedDestinationForQuoteRef = useRef<string | null>(null);
+  // Read inside the effect without restarting polling when the annotation
+  // lands mid-session (e.g. the melt-op:finalized writer fires while open).
+  const persistedVerdictRef = useRef(persistedVerdict);
+  persistedVerdictRef.current = persistedVerdict;
+  const entrySettledRef = useRef(opts?.entrySettledAtMount === true);
+  entrySettledRef.current = opts?.entrySettledAtMount === true;
 
   useEffect(() => {
     if (!manager || !mintUrl || !quoteId) {
@@ -65,7 +96,15 @@ export function useOnchainMeltQuote(
     let interval: ReturnType<typeof setInterval> | null = null;
     let confirmTimeout: ReturnType<typeof setTimeout> | null = null;
     let settlement = INITIAL_OFFCHAIN_SETTLEMENT_STATE;
-    setOffchainSettled(false);
+    // Captured once per quote: an entry that was already finalized needs only
+    // one fresh PAID-no-outpoint read (coco's finalize check was the other).
+    const requiredVerdictReads = entrySettledRef.current ? 1 : 2;
+    setOffchainSettled(persistedVerdictRef.current);
+    paymentLog.debug('onchain.melt.quote.watch_start', {
+      persistedVerdict: persistedVerdictRef.current,
+      entrySettledAtMount: entrySettledRef.current,
+      requiredVerdictReads,
+    });
     const stopPolling = () => {
       if (interval) {
         clearInterval(interval);
@@ -90,14 +129,48 @@ export function useOnchainMeltQuote(
         if (outpoint && annotatedOutpointForQuoteRef.current !== quoteId) {
           annotatedOutpointForQuoteRef.current = quoteId;
           setTransactionAnnotation(annotationKey({ type: 'melt', quoteId }), {
-            onchainMelt: { outpoint },
+            onchainMelt: { outpoint, outpointSource: 'mint' },
+          });
+        }
+        // Persist the destination (address + sats) once — the facts the
+        // heuristic outpoint discovery needs when a persisted coco row carries
+        // no metadata.
+        const request =
+          typeof record?.request === 'string' && record.request.trim()
+            ? record.request.trim()
+            : null;
+        if (request && annotatedDestinationForQuoteRef.current !== quoteId) {
+          annotatedDestinationForQuoteRef.current = quoteId;
+          const amount = record?.amount;
+          const unit = typeof record?.unit === 'string' ? record.unit : null;
+          const amountSats =
+            typeof amount === 'number' && Number.isFinite(amount) && unit === 'sat'
+              ? amount
+              : undefined;
+          setTransactionAnnotation(annotationKey({ type: 'melt', quoteId }), {
+            onchainMelt: {
+              address: request,
+              ...(amountSats != null ? { amountSats } : {}),
+            },
           });
         }
         settlement = nextOffchainSettlementState(settlement, {
           state,
           hasOutpoint: !!outpoint,
         });
-        setOffchainSettled(isConfirmedOffchainSettlement(settlement));
+        const liveVerdict = isConfirmedOffchainSettlement(settlement, requiredVerdictReads);
+        setOffchainSettled(liveVerdict || (persistedVerdictRef.current && !outpoint));
+        // Persist the debounced live verdict so the next mount is instant.
+        if (liveVerdict && annotatedVerdictForQuoteRef.current !== quoteId) {
+          annotatedVerdictForQuoteRef.current = quoteId;
+          paymentLog.info('onchain.melt.quote.verdict_persisted', {
+            reads: settlement.paidNoOutpointReads,
+            requiredVerdictReads,
+          });
+          setTransactionAnnotation(annotationKey({ type: 'melt', quoteId }), {
+            onchainMelt: { settledOffchain: true },
+          });
+        }
         paymentLog.debug('onchain.melt.quote.result', {
           found: !!record,
           hasOutpoint: !!outpoint,
@@ -112,7 +185,11 @@ export function useOnchainMeltQuote(
         // An expired quote that never left UNPAID is equally terminal.
         if (state === 'PAID') {
           stopPolling();
-          if (!outpoint && !isConfirmedOffchainSettlement(settlement) && !confirmTimeout) {
+          if (
+            !outpoint &&
+            !isConfirmedOffchainSettlement(settlement, requiredVerdictReads) &&
+            !confirmTimeout
+          ) {
             confirmTimeout = setTimeout(() => {
               confirmTimeout = null;
               void fetchQuote();
@@ -130,7 +207,11 @@ export function useOnchainMeltQuote(
       }
     };
     void fetchQuote();
-    interval = setInterval(() => void fetchQuote(), MELT_QUOTE_POLL_MS);
+    // A persisted settled-off-chain verdict is terminal: one self-heal refresh
+    // (in case the mint published the outpoint late) instead of polling.
+    if (!persistedVerdictRef.current) {
+      interval = setInterval(() => void fetchQuote(), MELT_QUOTE_POLL_MS);
+    }
     return () => {
       mounted = false;
       stopPolling();
@@ -154,7 +235,9 @@ export function useOnchainMeltQuote(
     request: readString('request'),
     expiry: typeof expiryValue === 'number' && Number.isFinite(expiryValue) ? expiryValue : null,
     feeOptions: normalizeOnchainFeeOptions(quote?.fee_options),
-    offchainSettled,
+    // OR in the persisted verdict so a late-hydrating annotation still lands
+    // without waiting on a live read. Callers gate on `!outpoint` themselves.
+    offchainSettled: offchainSettled || persistedVerdict,
     isLoading,
   };
 }

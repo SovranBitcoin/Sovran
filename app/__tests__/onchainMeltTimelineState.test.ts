@@ -111,6 +111,22 @@ describe('off-chain settlement debounce', () => {
     const s3 = step(s2, { state: 'PAID', hasOutpoint: false });
     expect(isConfirmedOffchainSettlement(s3)).toBe(false);
   });
+
+  // An already-finalized coco op counts coco's own finalize-time quote check
+  // as the first observation — one fresh read completes the pair, so an old
+  // settled transaction shows "Settled off-chain" after a single round-trip
+  // instead of read + 3s + read.
+  it('a single read confirms when the entry was already finalized (requiredReads=1)', () => {
+    const s1 = step(INITIAL_OFFCHAIN_SETTLEMENT_STATE, { state: 'PAID', hasOutpoint: false });
+    expect(isConfirmedOffchainSettlement(s1, 1)).toBe(true);
+    expect(isConfirmedOffchainSettlement(s1, 2)).toBe(false);
+  });
+
+  it('requiredReads=1 still never overrides an observed outpoint', () => {
+    const s1 = step(INITIAL_OFFCHAIN_SETTLEMENT_STATE, { state: 'PAID', hasOutpoint: true });
+    const s2 = step(s1, { state: 'PAID', hasOutpoint: false });
+    expect(isConfirmedOffchainSettlement(s2, 1)).toBe(false);
+  });
 });
 
 describe('isOnchainMeltSettled', () => {

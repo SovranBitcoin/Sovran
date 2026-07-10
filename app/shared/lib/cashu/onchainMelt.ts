@@ -174,9 +174,19 @@ export function nextOffchainSettlementState(
   return { ...prev, paidNoOutpointReads: 0 };
 }
 
-/** ≥2 consecutive PAID-no-outpoint reads and no outpoint ever observed. */
-export function isConfirmedOffchainSettlement(state: OffchainSettlementState): boolean {
-  return !state.sawOutpoint && state.paidNoOutpointReads >= 2;
+/**
+ * ≥`requiredReads` consecutive PAID-no-outpoint reads and no outpoint ever
+ * observed. Defaults to 2 — the debounce that guards a mint publishing PAID a
+ * beat before the outpoint while a melt settles LIVE. For an operation that
+ * coco already finalized, coco's own finalize-time quote check (which found no
+ * outpoint — else it would have been annotated) counts as the first
+ * observation, so a single fresh read completes the pair: pass 1.
+ */
+export function isConfirmedOffchainSettlement(
+  state: OffchainSettlementState,
+  requiredReads: number = 2
+): boolean {
+  return !state.sawOutpoint && state.paidNoOutpointReads >= requiredReads;
 }
 
 /**

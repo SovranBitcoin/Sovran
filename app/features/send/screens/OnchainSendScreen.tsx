@@ -76,11 +76,18 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
   const requiredConfirmations = getOnchainMeltRequiredConfirmations(mintInfo, entry?.unit ?? 'sat');
   // Canonical quote = source of truth for the outpoint + mint state + address
   // (a persisted, metadata-less entry carries none of these). The annotation is
-  // the durable fallback: once a send settles, the outpoint + fee are persisted
-  // there so this detail keeps its explorer link and fee line after the mint
-  // stops serving the quote row.
-  const quote = useOnchainMeltQuote(mintUrl, entry?.quoteId);
+  // the durable fallback: once a send settles, the outpoint + fee + off-chain
+  // verdict are persisted there so this detail keeps its explorer link, fee
+  // line, and instant "Settled off-chain" after the mint stops serving the
+  // quote row. Annotation-first: the persisted verdict short-circuits the
+  // hook's live re-derivation entirely.
   const annotation = useColadaTransactionAnnotation(entry);
+  const quote = useOnchainMeltQuote(mintUrl, entry?.quoteId, {
+    persistedOnchainMelt: annotation.onchainMelt,
+    // The coco op state, NOT the resolved timeline state — a quote flipping
+    // PAID live must keep the full 2-read debounce.
+    entrySettledAtMount: isOnchainMeltSettled(entry?.state as string | undefined),
+  });
   const outpoint = parseOutpoint(quote.outpoint ?? annotation.onchainMelt?.outpoint ?? null);
   const txStatus = useMempoolTxConfirmations(outpoint?.txid ?? null, { requiredConfirmations });
   // Internal settlement: the mint reports the melt PAID but gives no outpoint —

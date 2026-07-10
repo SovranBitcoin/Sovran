@@ -62,6 +62,14 @@ async function persistOnchainMeltAnnotation(
         ? (operation.methodData as Record<string, unknown>)
         : null;
     const feeIndex = typeof methodData?.feeIndex === 'number' ? methodData.feeIndex : undefined;
+    const address =
+      typeof methodData?.address === 'string' && methodData.address
+        ? methodData.address
+        : undefined;
+    const amountSats =
+      methodData?.amountSats != null
+        ? amountToNumber(methodData.amountSats as Parameters<typeof amountToNumber>[0])
+        : undefined;
     const effectiveFeeSats =
       operation.effectiveFee != null
         ? amountToNumber(operation.effectiveFee as Parameters<typeof amountToNumber>[0])
@@ -87,22 +95,24 @@ async function persistOnchainMeltAnnotation(
       }
     }
 
-    if (
-      outpoint == null &&
-      feeIndex == null &&
-      effectiveFeeSats == null &&
-      feeReserveSats == null
-    ) {
-      return;
-    }
+    // A melt that finalized WITHOUT an outpoint settled off-chain (internal
+    // settlement: the mint paid without a transaction). Persisting the verdict
+    // here makes it instant on every later mount — no re-polling. A mint that
+    // publishes the outpoint late self-heals: the outpoint always outranks
+    // this flag (`settledInternally = settledOffchain && !outpoint`).
+    const settledOffchain = outpoint == null;
+
     setTransactionAnnotation(annotationKey({ type: 'melt', quoteId }), {
       onchainMelt: {
-        ...(outpoint ? { outpoint } : {}),
+        ...(outpoint ? { outpoint, outpointSource: 'mint' as const } : {}),
         ...(feeIndex != null ? { feeIndex } : {}),
         ...(feeReserveSats != null && Number.isFinite(feeReserveSats) ? { feeReserveSats } : {}),
         ...(effectiveFeeSats != null && Number.isFinite(effectiveFeeSats)
           ? { effectiveFeeSats }
           : {}),
+        ...(settledOffchain ? { settledOffchain: true } : {}),
+        ...(address ? { address } : {}),
+        ...(amountSats != null && Number.isFinite(amountSats) ? { amountSats } : {}),
       },
     });
     paymentLog.info('hook.payment_status.onchain_melt_annotated', {
@@ -110,6 +120,9 @@ async function persistOnchainMeltAnnotation(
       feeIndex: feeIndex ?? null,
       hasFeeReserve: feeReserveSats != null,
       hasEffectiveFee: effectiveFeeSats != null,
+      settledOffchain,
+      hasAddress: !!address,
+      hasAmountSats: amountSats != null,
     });
   } catch (error) {
     paymentLog.warn('hook.payment_status.onchain_melt_annotate_failed', {
