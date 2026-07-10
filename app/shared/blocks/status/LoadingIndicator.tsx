@@ -690,6 +690,15 @@ export function LoadingIndicator({
     };
   }, [startedDone, startedResult]);
 
+  // Settle-to-static: once a live transition's done choreography has fully
+  // played, swap the animated SVG for a static terminal frame. A Fabric
+  // commit racing the UI-thread animatedProps can clobber them mid-flight
+  // (observed live: a "Sent" dot stuck as a spinning grey arc under a settled
+  // "Settled off-chain" row while every scheduled target was correct) — a
+  // static frame cannot stay wrong. Mounted-already-terminal dots keep the
+  // existing initialized-values render (no scheduled animation to clobber).
+  const [settledStatic, setSettledStatic] = React.useState(false);
+
   // One entry per segmented-ring change: which segments newly fill, the
   // cascade stagger, and which segment breathes "in progress".
   const lastLoggedSegmentsRef = React.useRef<string | null>(null);
@@ -762,6 +771,26 @@ export function LoadingIndicator({
   });
 
   useEffect(() => {
+    if (!shouldShowResult || startedDone) {
+      setSettledStatic(false);
+      return;
+    }
+    // The full done choreography: ring close (750ms overlaps), disc, then the
+    // glyph finishes at d + resultDelay + T_ICON + D_ICON_IN. Small margin,
+    // then freeze the frame statically.
+    const settleAtMs = transitionDelayMs + resultDelayMs + T_ICON + D_ICON_IN + 200;
+    const timer = setTimeout(() => {
+      debugEventRef.current?.('dot.settled_static', { settleAtMs });
+      // Park the spin loop — the static frame doesn't rotate, and settled
+      // dots shouldn't keep the frame callback busy.
+      targetSpeed.set(0);
+      speed.set(0);
+      setSettledStatic(true);
+    }, settleAtMs);
+    return () => clearTimeout(timer);
+  }, [shouldShowResult, startedDone, transitionDelayMs, resultDelayMs, targetSpeed, speed]);
+
+  useEffect(() => {
     const d = transitionDelayMs;
     const t = (
       target: number,
@@ -778,6 +807,24 @@ export function LoadingIndicator({
       })
     );
     const nextSpeed = isSegmentedMode ? 0 : SPEED[effectivePhase];
+
+    // Segmented rings are anchored: segment 0 starts at 12 o'clock and fills
+    // clockwise (the segment dash geometry pairs with rotate(-90)). A leftover
+    // spin angle from a preceding loading phase (e.g. "Broadcasting…" →
+    // mempool ring) would rotate the WHOLE ring — and the breathing segment
+    // with it — to wherever the spinner happened to stop. Kill the spin loop
+    // and settle the wrapper to the nearest upright turn.
+    if (isSegmentedMode) {
+      // Immediately, not behind transitionDelayMs — otherwise the frame
+      // callback sees the stale nonzero targetSpeed and spins back up,
+      // fighting the settle animation below.
+      speed.set(0);
+      targetSpeed.set(0);
+      const leftover = rotation.get() % 360;
+      if (leftover !== 0) {
+        rotation.set(withTiming(leftover > 180 ? 360 : 0, { duration: D_OPAC, easing: E_DEF }));
+      }
+    }
 
     debugEventRef.current?.('dot.transition', {
       effectivePhase,
@@ -865,6 +912,8 @@ export function LoadingIndicator({
     dashA,
     dashB,
     ringOpac,
+    speed,
+    rotation,
     targetSpeed,
     isSegmentedMode,
     shouldShowResult,
@@ -918,6 +967,103 @@ export function LoadingIndicator({
   // an override-thickened segment ring. `segmentStrokeUnits` is null exactly
   // when the indicator is not segmented, so the plain ring keeps RING_R.
   const discRadius = resultDiscRadius(segmentStrokeUnits);
+
+  // Static terminal frame (see the settle effect above): the exact end state
+  // of the done choreography — result-colored ring halo (non-segmented; the
+  // disc covers segment arcs), filled disc, fully-drawn glyph cut out via
+  // mask — with zero animated nodes left to go stale.
+  if (settledStatic && shouldShowResult) {
+    return (
+      <View
+        ref={visualLayout.ref}
+        collapsable={false}
+        style={{ width: size, height: size }}
+        onLayout={handleVisualLayout}>
+        <Svg width={size} height={size} viewBox="0 0 100 100">
+          <Defs>
+            <Mask id="iconMaskStatic">
+              <Rect width={100} height={100} fill="white" />
+              {effectiveResult === 'success' && (
+                <Path
+                  d={ICON.check.d}
+                  stroke="black"
+                  strokeWidth={ICON_STROKE}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              )}
+              {effectiveResult === 'error' && (
+                <>
+                  <Path
+                    d={ICON.xA.d}
+                    stroke="black"
+                    strokeWidth={ICON_STROKE}
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                  <Path
+                    d={ICON.xB.d}
+                    stroke="black"
+                    strokeWidth={ICON_STROKE}
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                </>
+              )}
+              {effectiveResult === 'reverted' && (
+                <Path
+                  d={ICON.revert.d}
+                  stroke="black"
+                  strokeWidth={ICON_STROKE}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                  transform={ICON.revert.transform}
+                />
+              )}
+              {effectiveResult === 'warning' && (
+                <>
+                  <Path
+                    d={ICON.wifiA.d}
+                    stroke="black"
+                    strokeWidth={ICON_STROKE}
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                  <Path
+                    d={ICON.wifiB.d}
+                    stroke="black"
+                    strokeWidth={ICON_STROKE}
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                  <Path
+                    d={ICON.wifiC.d}
+                    stroke="black"
+                    strokeWidth={ICON_STROKE}
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                </>
+              )}
+            </Mask>
+          </Defs>
+          {!isSegmentedMode && (
+            <Circle
+              cx={50}
+              cy={50}
+              r={RING_R}
+              fill="none"
+              stroke={resultColor}
+              strokeWidth={ringStrokeUnits}
+            />
+          )}
+          <Circle cx={50} cy={50} r={discRadius} fill={resultColor} mask="url(#iconMaskStatic)" />
+        </Svg>
+      </View>
+    );
+  }
 
   return (
     <View

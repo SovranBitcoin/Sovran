@@ -86,6 +86,11 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
   const fillHeight = useSharedValue(isFilled ? 1 : 0);
   const gradientId = React.useId().replace(/:/g, '');
   const isFirstRunRef = useRef(true);
+  // Settle-to-static: once a fill animation has fully played, render the fill
+  // as a plain Rect. A Fabric commit racing the UI-thread animatedProps can
+  // leave the animated fill visually stale (observed live: a grey rail under
+  // a settled row while fillTarget was 1) — a static full-height fill cannot.
+  const [settledStatic, setSettledStatic] = React.useState(false);
 
   useEffect(() => {
     const target = lineType === 'future' ? 0 : 1;
@@ -106,11 +111,21 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
             ? 'success->warning'
             : null,
     });
+    const firstRun = isFirstRunRef.current;
     isFirstRunRef.current = false;
     fillHeight.value =
       delayMs > 0
         ? withDelay(delayMs, withTiming(target, LINE_TIMING))
         : withTiming(target, LINE_TIMING);
+    if (target === 1) {
+      // Mounted-filled starts at the target (visual no-op) — settle at once;
+      // a live fill settles after its delay + animation.
+      const settleAtMs = firstRun ? 0 : delayMs + LINE_ANIM_MS + 150;
+      const timer = setTimeout(() => setSettledStatic(true), settleAtMs);
+      return () => clearTimeout(timer);
+    }
+    setSettledStatic(false);
+    return undefined;
   }, [lineType, delayMs, fillHeight, debugEntryId, debugRow]);
 
   const fillProps = useAnimatedProps(() => ({
@@ -151,15 +166,27 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
         ry={STROKE_PX / 2}
         fill={mutedColor}
       />
-      <AnimatedRect
-        x={0}
-        y={0}
-        width={STROKE_PX}
-        rx={STROKE_PX / 2}
-        ry={STROKE_PX / 2}
-        fill={isGradient ? `url(#${gradientId})` : successColor}
-        animatedProps={fillProps}
-      />
+      {settledStatic && isFilled ? (
+        <Rect
+          x={0}
+          y={0}
+          width={STROKE_PX}
+          height={RAIL_HEIGHT}
+          rx={STROKE_PX / 2}
+          ry={STROKE_PX / 2}
+          fill={isGradient ? `url(#${gradientId})` : successColor}
+        />
+      ) : (
+        <AnimatedRect
+          x={0}
+          y={0}
+          width={STROKE_PX}
+          rx={STROKE_PX / 2}
+          ry={STROKE_PX / 2}
+          fill={isGradient ? `url(#${gradientId})` : successColor}
+          animatedProps={fillProps}
+        />
+      )}
     </Svg>
   );
 });
