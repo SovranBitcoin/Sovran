@@ -124,7 +124,9 @@ function summarizeAddress(address: string): Record<string, unknown> {
   return { addressLength: address.length };
 }
 
-async function fetchJson<T>(
+// Shared with sibling chain modules (mempoolAccelerator) — not part of the
+// package surface.
+export async function fetchJson<T>(
   url: string,
   schema: z.ZodType<T>,
   where: string,

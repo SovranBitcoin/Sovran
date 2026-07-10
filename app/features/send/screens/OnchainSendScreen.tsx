@@ -21,9 +21,14 @@ import {
   transactionExplorerUrlForTxid,
   type ChainOnchainConfirmationProgress,
 } from 'wallet';
-import { useColadaTransactionAnnotation, useScreenActions } from 'wallet/react';
+import {
+  useColadaTransactionAnnotation,
+  usePaymentFlowMachine,
+  useScreenActions,
+} from 'wallet/react';
 
 import {
+  AccelerateSection,
   Bip321MethodIcons,
   HistoryEntryTimeline,
   TransactionDetailShell,
@@ -41,11 +46,14 @@ import {
   buildOnchainRequiredConfirmationProgress,
   buildSatisfiedOnchainConfirmationProgress,
 } from '@/shared/lib/cashu/onchainMint';
+import { useMempoolAcceleration } from '@/shared/hooks/useMempoolAcceleration';
 import { useMempoolTxConfirmations } from '@/shared/hooks/useMempoolTxConfirmations';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useOnchainMeltOutpointDiscovery } from '@/shared/hooks/useOnchainMeltOutpointDiscovery';
 import { useOnchainMeltQuote } from '@/shared/hooks/useOnchainMeltQuote';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { staticPopup } from '@/shared/lib/popup';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { formatAmount } from '@/shared/lib/currency';
 import { openExternalUrl } from '@/shared/lib/url';
 import { log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -158,6 +166,32 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
     quoteCreatedAtSec: entry ? Math.floor(entry.createdAt.valueOf() / 1000) : null,
     enabled: meltState === 'PENDING' && !outpoint && !settledInternally,
   });
+  // mempool.space Accelerator: offered while the broadcast tx sits
+  // unconfirmed. Paying the acceleration invoice rides the app's normal
+  // lightning send flow (machine.scan), which also owns the
+  // insufficient-balance errors.
+  const walletContext = useWalletContext();
+  const machine = usePaymentFlowMachine({ walletContext });
+  const acceleration = useMempoolAcceleration({
+    txid: outpoint?.txid ?? null,
+    quoteId: entry?.quoteId,
+    alreadyAccelerated: annotation.onchainMelt?.accelerated === true,
+    enabled:
+      !!outpoint &&
+      meltState === 'PENDING' &&
+      !settledInternally &&
+      !outpointIsHeuristic &&
+      !txStatus.unsupportedNetwork &&
+      txStatus.status?.confirmed !== true,
+  });
+  const handleAccelerate = useCallback(async () => {
+    const bolt11 = await acceleration.requestInvoice();
+    if (!bolt11) {
+      staticPopup('general-error', { text: 'Could not create the acceleration invoice.' });
+      return;
+    }
+    void machine.scan?.(bolt11, { source: 'paste', reset: true });
+  }, [acceleration, machine]);
 
   if (error) {
     log.warn('send.onchain.error', { error });
@@ -250,6 +284,11 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
               inferred={outpointIsHeuristic}
             />
           )}
+          <AccelerateSection
+            offer={acceleration.offer}
+            accelerating={acceleration.accelerating}
+            onAccelerate={handleAccelerate}
+          />
         </>
       }>
       <DetailsSection
@@ -267,6 +306,10 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
             value: formatAmount({ amount: feeDisplay.sats, unit: 'sat' }),
           },
           { title: 'State', value: meltState ?? entry.state },
+          annotation.onchainMelt?.accelerated === true && {
+            title: 'Accelerated',
+            value: 'mempool.space',
+          },
           entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
           onchainAddress && {
             title: 'Destination',

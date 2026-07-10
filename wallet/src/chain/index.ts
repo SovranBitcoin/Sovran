@@ -18,6 +18,18 @@ export {
   type OutpointMatchCriteria,
 } from './outpointDiscovery';
 export {
+  accelerationTotalSats,
+  createAccelerationInvoice,
+  defaultAccelerationBidSats,
+  fetchAccelerationEstimate,
+  fetchAccelerationStatus,
+  fetchAverageBlockTimeMinutes,
+  isAcknowledgedAccelerationStatus,
+  type AccelerationEstimate,
+  type AccelerationInvoice,
+  type AccelerationStatus,
+} from './mempoolAccelerator';
+export {
   DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
   buildOnchainConfirmationProgressFromTx,
   getOnchainConfirmationInfo,
