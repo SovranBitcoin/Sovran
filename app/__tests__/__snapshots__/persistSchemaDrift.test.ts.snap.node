@@ -23,6 +23,44 @@ exports[`persisted schema drift data-migration-store schema matches the golden s
 }
 `;
 
+exports[`persisted schema drift mint-distribution-store schema matches the golden snapshot for its version: mint-distribution-store 1`] = `
+{
+  "name": "mint-distribution-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "distributions": {
+        "additionalProperties": {
+          "additionalProperties": {
+            "default": 0,
+            "maximum": 10000,
+            "minimum": 0,
+            "type": "integer",
+          },
+          "propertyNames": {
+            "maxLength": 2048,
+            "type": "string",
+          },
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 16,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "distributions",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift mint-metadata-store schema matches the golden snapshot for its version: mint-metadata-store 1`] = `
 {
   "name": "mint-metadata-store",
@@ -511,6 +549,225 @@ exports[`persisted schema drift nostr-social-store schema matches the golden sna
 }
 `;
 
+exports[`persisted schema drift npc-mint-store schema matches the golden snapshot for its version: npc-mint-store 1`] = `
+{
+  "name": "npc-mint-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "mintUrl": {
+        "maxLength": 2048,
+        "type": "string",
+      },
+    },
+    "type": "object",
+  },
+  "version": 2,
+}
+`;
+
+exports[`persisted schema drift nut-drop-redeem-queue schema matches the golden snapshot for its version: nut-drop-redeem-queue 1`] = `
+{
+  "name": "nut-drop-redeem-queue",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "byTokenHash": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "amount": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "attempts": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "lastError": {
+              "maxLength": 500,
+              "type": "string",
+            },
+            "mintUrl": {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string",
+            },
+            "nextAttemptAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "paymentId": {
+              "maxLength": 128,
+              "type": "string",
+            },
+            "receivedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "senderPeerID": {
+              "maxLength": 128,
+              "type": "string",
+            },
+            "status": {
+              "default": "pending",
+              "enum": [
+                "pending",
+                "redeeming",
+                "redeemed",
+                "spent",
+                "untrusted-mint",
+                "failed",
+              ],
+              "type": "string",
+            },
+            "token": {
+              "maxLength": 60000,
+              "minLength": 1,
+              "type": "string",
+            },
+            "unit": {
+              "maxLength": 16,
+              "type": "string",
+            },
+          },
+          "required": [
+            "token",
+            "mintUrl",
+            "amount",
+            "unit",
+            "status",
+            "attempts",
+            "nextAttemptAt",
+            "receivedAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 64,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "byTokenHash",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift own-content-store schema matches the golden snapshot for its version: own-content-store 1`] = `
+{
+  "name": "own-content-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "byId": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "authorPubkey": {
+              "maxLength": 128,
+              "type": "string",
+            },
+            "event": {
+              "additionalProperties": {},
+              "properties": {
+                "content": {
+                  "maxLength": 65536,
+                  "type": "string",
+                },
+                "created_at": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "id": {
+                  "maxLength": 128,
+                  "type": "string",
+                },
+                "kind": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+                "pubkey": {
+                  "maxLength": 128,
+                  "type": "string",
+                },
+                "tags": {
+                  "items": {
+                    "items": {
+                      "maxLength": 8192,
+                      "type": "string",
+                    },
+                    "maxItems": 200,
+                    "type": "array",
+                  },
+                  "maxItems": 5000,
+                  "type": "array",
+                },
+              },
+              "required": [
+                "id",
+                "kind",
+                "pubkey",
+                "content",
+                "tags",
+                "created_at",
+              ],
+              "type": "object",
+            },
+            "status": {
+              "enum": [
+                "pending",
+                "local",
+                "confirmed",
+              ],
+              "type": "string",
+            },
+            "updatedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "event",
+            "authorPubkey",
+            "status",
+            "updatedAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 128,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "byId",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift owned-media-store schema matches the golden snapshot for its version: owned-media-store 1`] = `
 {
   "name": "owned-media-store",
@@ -662,6 +919,7 @@ exports[`persisted schema drift profile-store schema matches the golden snapshot
               "type": "string",
             },
             "source": {
+              "default": "derived",
               "enum": [
                 "derived",
                 "imported",
@@ -2554,6 +2812,259 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
 }
 `;
 
+exports[`persisted schema drift search-history-store schema matches the golden snapshot for its version: search-history-store 1`] = `
+{
+  "name": "search-history-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "recentSearches": {
+        "additionalProperties": {
+          "items": {
+            "additionalProperties": {},
+            "properties": {
+              "context": {
+                "maxLength": 64,
+                "type": "string",
+              },
+              "query": {
+                "maxLength": 2048,
+                "type": "string",
+              },
+              "timestamp": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+            },
+            "required": [
+              "query",
+              "timestamp",
+            ],
+            "type": "object",
+          },
+          "maxItems": 10,
+          "type": "array",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 64,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "recentSearches",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift send-reachability-store schema matches the golden snapshot for its version: send-reachability-store 1`] = `
+{
+  "name": "send-reachability-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "byTransactionId": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "mintUrl": {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string",
+            },
+            "status": {
+              "enum": [
+                "checking",
+                "device-offline",
+                "mint-unreachable",
+                "mint-reachable",
+              ],
+              "type": "string",
+            },
+            "updatedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "status",
+            "mintUrl",
+            "updatedAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 256,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "byTransactionId",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift swap-transactions-store schema matches the golden snapshot for its version: swap-transactions-store 1`] = `
+{
+  "name": "swap-transactions-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "groups": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "createdAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "id": {
+              "maxLength": 128,
+              "type": "string",
+            },
+            "legs": {
+              "items": {
+                "additionalProperties": {},
+                "properties": {
+                  "amount": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "chainHopIndex": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "chainId": {
+                    "maxLength": 128,
+                    "type": "string",
+                  },
+                  "chainPath": {
+                    "items": {
+                      "maxLength": 2048,
+                      "type": "string",
+                    },
+                    "maxItems": 16,
+                    "type": "array",
+                  },
+                  "errorMessage": {
+                    "maxLength": 2048,
+                    "type": "string",
+                  },
+                  "fromMintUrl": {
+                    "maxLength": 2048,
+                    "type": "string",
+                  },
+                  "id": {
+                    "maxLength": 128,
+                    "type": "string",
+                  },
+                  "localStatus": {
+                    "default": "failed",
+                    "enum": [
+                      "pending",
+                      "creatingInvoice",
+                      "invoiceReady",
+                      "melting",
+                      "verifying",
+                      "done",
+                      "failed",
+                    ],
+                    "type": "string",
+                  },
+                  "meltOperationId": {
+                    "maxLength": 256,
+                    "type": "string",
+                  },
+                  "meltQuoteId": {
+                    "maxLength": 256,
+                    "type": "string",
+                  },
+                  "mintQuoteId": {
+                    "maxLength": 256,
+                    "type": "string",
+                  },
+                  "toMintUrl": {
+                    "maxLength": 2048,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "id",
+                  "fromMintUrl",
+                  "toMintUrl",
+                  "amount",
+                ],
+                "type": "object",
+              },
+              "maxItems": 256,
+              "type": "array",
+            },
+            "state": {
+              "default": "cancelled",
+              "enum": [
+                "running",
+                "finished",
+                "cancelled",
+              ],
+              "type": "string",
+            },
+            "title": {
+              "maxLength": 512,
+              "type": "string",
+            },
+            "unit": {
+              "maxLength": 16,
+              "type": "string",
+            },
+          },
+          "required": [
+            "id",
+            "unit",
+            "createdAt",
+            "title",
+            "state",
+            "legs",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 128,
+          "type": "string",
+        },
+        "type": "object",
+      },
+      "quoteIdToGroup": {},
+    },
+    "required": [
+      "groups",
+      "quoteIdToGroup",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift transaction-annotation-store schema matches the golden snapshot for its version: transaction-annotation-store 1`] = `
 {
   "name": "transaction-annotation-store",
@@ -2583,6 +3094,176 @@ exports[`persisted schema drift transaction-annotation-store schema matches the 
     },
     "required": [
       "annotations",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift transaction-distribution-store schema matches the golden snapshot for its version: transaction-distribution-store 1`] = `
+{
+  "name": "transaction-distribution-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "distributions": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "recordedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "source": {
+              "enum": [
+                "copy",
+                "share",
+                "airdrop",
+                "displayed",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "source",
+            "recordedAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 256,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "distributions",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift transaction-location-store schema matches the golden snapshot for its version: transaction-location-store 1`] = `
+{
+  "name": "transaction-location-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "locations": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "createdAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "latitude": {
+              "maximum": 90,
+              "minimum": -90,
+              "type": "number",
+            },
+            "longitude": {
+              "maximum": 180,
+              "minimum": -180,
+              "type": "number",
+            },
+          },
+          "required": [
+            "latitude",
+            "longitude",
+            "createdAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 256,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "locations",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift wallet-lifecycle schema matches the golden snapshot for its version: wallet-lifecycle 1`] = `
+{
+  "name": "wallet-lifecycle",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "lastRestoreAt": {
+        "anyOf": [
+          {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer",
+          },
+          {
+            "type": "null",
+          },
+        ],
+        "default": null,
+      },
+      "lastRestoreError": {
+        "anyOf": [
+          {
+            "maxLength": 500,
+            "type": "string",
+          },
+          {
+            "type": "null",
+          },
+        ],
+        "default": null,
+      },
+      "restoreStatus": {
+        "default": "unknown",
+        "enum": [
+          "unknown",
+          "not-needed",
+          "pending",
+          "in-progress",
+          "complete",
+          "failed",
+        ],
+        "type": "string",
+      },
+      "seedCreatedAt": {
+        "anyOf": [
+          {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer",
+          },
+          {
+            "type": "null",
+          },
+        ],
+        "default": null,
+      },
+    },
+    "required": [
+      "seedCreatedAt",
+      "restoreStatus",
+      "lastRestoreAt",
+      "lastRestoreError",
     ],
     "type": "object",
   },

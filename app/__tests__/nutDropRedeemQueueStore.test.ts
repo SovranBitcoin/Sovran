@@ -1,4 +1,5 @@
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
+import { persistRegistry } from '@/shared/lib/persist/persistConfig';
 
 jest.mock('@sovranbitcoin/schemas', () => ({
   loggableIssues: () => [],
@@ -108,5 +109,27 @@ describe('nutDropRedeemQueueStore', () => {
     useNutDropRedeemQueueStore.getState().prune();
     const remaining = Object.keys(useNutDropRedeemQueueStore.getState().byTokenHash);
     expect(remaining).toEqual(['a'.repeat(64)]);
+  });
+
+  it('degrades an unknown persisted status without discarding queued ecash', () => {
+    const schema = persistRegistry.find((entry) => entry.name === 'nut-drop-redeem-queue')?.schema;
+    if (!schema) throw new Error('nut-drop-redeem-queue missing from persistRegistry');
+
+    const parsed = schema.parse({
+      byTokenHash: {
+        [HASH]: {
+          ...ENTRY,
+          status: 'future-retry-state',
+          attempts: 2,
+          nextAttemptAt: 123,
+          receivedAt: 456,
+        },
+      },
+    }) as { byTokenHash: Record<string, { token: string; status: string }> };
+
+    expect(parsed.byTokenHash[HASH]).toMatchObject({
+      token: ENTRY.token,
+      status: 'pending',
+    });
   });
 });

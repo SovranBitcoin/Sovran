@@ -88,7 +88,11 @@ const PersistedProfileEntry = z.looseObject({
   pubkey: z.string().max(128),
   addedAt: z.number().int().nonnegative(),
   cachedBalanceSats: z.number().int().nonnegative().optional(),
-  source: z.enum(['derived', 'imported']).optional(),
+  // `source` was historically absent and therefore means derived. Preserve
+  // that same conservative fallback for a value written by a newer build;
+  // rejecting one entry would otherwise discard the entire global profile
+  // store, including coco migration completion flags.
+  source: z.enum(['derived', 'imported']).catch('derived').optional(),
   externalChain: z.number().int().nonnegative().optional(),
   cachedDisplayName: z.string().max(512).optional(),
   cachedPicture: z.string().max(2048).optional(),

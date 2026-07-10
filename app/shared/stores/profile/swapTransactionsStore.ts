@@ -101,16 +101,10 @@ interface SwapTransactionsActions {
 type SwapTransactionsStore = SwapTransactionsState & SwapTransactionsActions;
 
 // Persisted-shape schema (defensive rehydrate validation).
-const SwapLegLocalStatusSchema = z.enum([
-  'pending',
-  'creatingInvoice',
-  'invoiceReady',
-  'melting',
-  'verifying',
-  'done',
-  'failed',
-]);
-const SwapGroupStateSchema = z.enum(['running', 'finished', 'cancelled']);
+const SwapLegLocalStatusSchema = z
+  .enum(['pending', 'creatingInvoice', 'invoiceReady', 'melting', 'verifying', 'done', 'failed'])
+  .catch('failed');
+const SwapGroupStateSchema = z.enum(['running', 'finished', 'cancelled']).catch('cancelled');
 
 const PersistedLeg = z.looseObject({
   id: z.string().max(128),
@@ -136,18 +130,30 @@ const PersistedSwapGroup = z.looseObject({
   legs: z.array(PersistedLeg).max(256),
 });
 
-const PersistedSwapStore = z.object({
-  groups: z.record(z.string().max(128), PersistedSwapGroup).default({}),
-  quoteIdToGroup: z
-    .record(
-      z.string().max(256),
-      z.looseObject({
-        groupId: z.string().max(128),
-        legId: z.string().max(128),
-        kind: z.enum(['mint', 'melt']),
+const PersistedQuoteIndexEntry = z.looseObject({
+  groupId: z.string().max(128),
+  legId: z.string().max(128),
+  kind: z.enum(['mint', 'melt']),
+});
+
+const PersistedQuoteIndex = z
+  .record(z.string().max(256), z.unknown())
+  .default({})
+  .transform((entries) =>
+    Object.fromEntries(
+      Object.entries(entries).flatMap(([quoteId, value]) => {
+        const parsed = PersistedQuoteIndexEntry.safeParse(value);
+        return parsed.success ? [[quoteId, parsed.data] as const] : [];
       })
     )
-    .default({}),
+  );
+
+const PersistedSwapStore = z.object({
+  groups: z.record(z.string().max(128), PersistedSwapGroup).default({}),
+  // A future/unknown index entry cannot safely be guessed as mint or melt.
+  // Drop only that derived correlation; the swap groups themselves remain
+  // available for recovery and the rest of the quote index stays intact.
+  quoteIdToGroup: PersistedQuoteIndex,
 });
 
 export const useSwapTransactionsStore = create<SwapTransactionsStore>()(

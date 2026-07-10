@@ -97,7 +97,11 @@ const PersistedNutDropRedeemQueueStore = z.object({
         mintUrl: z.string().min(1).max(2048),
         amount: z.number().int().nonnegative(),
         unit: z.string().max(16),
-        status: z.enum(STATUS_VALUES),
+        // Forward-compatible persisted status: an older build that opens a
+        // queue written by a newer build must keep the locked ecash and retry
+        // it, not reject the whole profile-scoped blob. Mint redemption is
+        // idempotent, so `pending` is the funds-safe fallback.
+        status: z.enum(STATUS_VALUES).default('pending').catch('pending'),
         attempts: z.number().int().nonnegative(),
         nextAttemptAt: z.number().int().nonnegative(),
         receivedAt: z.number().int().nonnegative(),

@@ -28,12 +28,23 @@ import '@/shared/stores/profile/mintStore';
 // AI chat: apiKey + sessions (now incl. message attachments) + the
 // last-known model lineup — none cheaply refetchable.
 import '@/shared/stores/profile/routstrStore';
+import '@/shared/stores/global/profileStore';
+import '@/shared/stores/global/walletLifecycleStore';
+import '@/shared/stores/profile/mintDistributionStore';
+import '@/shared/stores/profile/npcMintStore';
+import '@/shared/stores/profile/nutDropRedeemQueueStore';
+import '@/shared/stores/profile/ownContentStore';
+import '@/shared/stores/profile/searchHistoryStore';
+import '@/shared/stores/profile/sendReachabilityStore';
+import '@/shared/stores/profile/swapTransactionsStore';
+import '@/shared/stores/profile/transactionDistributionStore';
+import '@/shared/stores/profile/transactionLocationStore';
 
 import { persistRegistry } from '@/shared/lib/persist/persistConfig';
 
 describe('persisted schema drift', () => {
   it('registered at least the durable stores under test', () => {
-    expect(persistRegistry.length).toBeGreaterThanOrEqual(7);
+    expect(persistRegistry.length).toBeGreaterThanOrEqual(18);
   });
 
   it.each(

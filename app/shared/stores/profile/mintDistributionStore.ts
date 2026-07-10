@@ -67,7 +67,7 @@ const PersistedMintDistributionStore = z.object({
   distributions: z
     .record(
       z.string().max(16),
-      z.record(z.string().max(2048), z.number().int().min(0).max(TOTAL_BASIS_POINTS))
+      z.record(z.string().max(2048), z.number().int().min(0).max(TOTAL_BASIS_POINTS).catch(0))
     )
     .default({}),
 });
