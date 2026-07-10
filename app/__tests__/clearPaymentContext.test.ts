@@ -4,6 +4,7 @@
  * the next flow. Regression guard for the "Top up → Send pays Routstr" bug.
  */
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
+import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
@@ -38,5 +39,19 @@ describe('clearPaymentContext', () => {
     clearPaymentContext('test');
 
     expect(useContactSendStore.getState().active).toBeNull();
+  });
+
+  it('clears an amount draft left by an abandoned mint-selector round trip', () => {
+    useAmountDraftStore.getState().stash({
+      rawInput: '42',
+      inputMode: 'unit',
+      scope: 'sendEcash',
+      unit: 'sat',
+    });
+    expect(useAmountDraftStore.getState().pending).not.toBeNull();
+
+    clearPaymentContext('test');
+
+    expect(useAmountDraftStore.getState().pending).toBeNull();
   });
 });

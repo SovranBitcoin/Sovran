@@ -92,6 +92,11 @@ export interface DeepLinkConfig {
   customSchemes?: string[];
   /** Hostnames to ignore (e.g. router-handled paths like 'camera'). */
   ignoredHosts?: string[];
+  /**
+   * Called after URL validation and immediately before the machine scan. Apps
+   * can use this dependency-inverted seam to clear app-owned routing context.
+   */
+  onBeforeScan?: () => void;
   /** Called when deep link processing fails. */
   onError?: (error: Error) => void;
 }
@@ -656,6 +661,7 @@ export function ColadaProvider({
       hostLength: host.length,
       customSchemeCount: deepLinks.customSchemes?.length ?? 0,
     });
+    deepLinks.onBeforeScan?.();
     machineRef.current.scan(host, { source: "deeplink" }).catch((err) => {
       logger.warn("deepLink.scan.failed", {
         scheme,

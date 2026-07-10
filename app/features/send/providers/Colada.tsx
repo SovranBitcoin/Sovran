@@ -68,6 +68,7 @@ import { backendConfig } from '@/shared/config/backend';
 import { getCachedMintInfo } from '@/shared/stores/global/mintMetadataStore';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
+import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 
 const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' };
 
@@ -343,7 +344,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     () =>
       ({
         ...instance.operations,
-        executeReceive: createSovranExecuteReceive(() => manager),
+        executeReceive: createSovranExecuteReceive(() => manager, getOffline),
         executeMintQuote: createSovranExecuteMintQuote(() => manager),
         // Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
         // Stage 1 (NIP-05 → pubkey) is shipped by colada's default
@@ -415,7 +416,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
           }
         },
       }) as MachineOperations,
-    [instance, manager, ndkRef]
+    [getOffline, instance, manager, ndkRef]
   );
 
   const actions = useMemo(() => createSovranScreenActionHandlers(), []);
@@ -459,6 +460,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       url: keys?.pubkey ? deepLinkUrl : null,
       customSchemes: ['sovran'],
       ignoredHosts: ['camera', 'expo-development-client'],
+      onBeforeScan: () => clearPaymentContext('send.deeplink'),
       onError: (err) => staticPopup('deeplink-failed', { text: err.message }),
     }),
     [deepLinkUrl, keys?.pubkey]

@@ -231,7 +231,7 @@ export function createPaymentMachine(
 
   let urDecoder: ReturnType<NonNullable<typeof createURDecoder>> | null =
     createURDecoder?.() ?? null;
-  let processedRef = false;
+  let processedScanInput: string | null = null;
   let lastScanSource: string | undefined;
 
   // `step` and `stepData` are written together via `setStep<S>(s, d)` so the
@@ -251,7 +251,10 @@ export function createPaymentMachine(
   // "locked because money is moving" (events must drop) from "locked because
   // a resolve effect is slow" (fresh user intent supersedes, see
   // INTENT_EVENTS).
-  let commitInFlight = false;
+  // Generation that currently owns an irreversible operation. A reset may
+  // start a newer flow before the old promise settles, so an older finally
+  // must never clear the newer generation's commit guard.
+  let commitGeneration: number | null = null;
   let flowGeneration = 0;
   // Per-call result holders for `confirmPaymentRequest`. Each invocation
   // pushes its own holder before awaiting `send`; the CONFIRM_PAYMENT_REQUEST
@@ -277,7 +280,8 @@ export function createPaymentMachine(
     setStep("idle", {});
     handlerExecuting = false;
     sendLocked = false;
-    processedRef = false;
+    processedScanInput = null;
+    lastScanSource = undefined;
     pendingPaymentRequestConfirms = [];
     if (createURDecoder) {
       urDecoder = createURDecoder();
@@ -630,6 +634,7 @@ export function createPaymentMachine(
 
   const send = async (event: import("./types").FlowEvent): Promise<void> => {
     if (sendLocked) {
+      const commitInFlight = commitGeneration === flowGeneration;
       if (commitInFlight || !INTENT_EVENTS.has(event.type)) {
         logger.info("machine.event.ignored", {
           reason: commitInFlight ? "commit-in-flight" : "locked",
@@ -718,7 +723,7 @@ export function createPaymentMachine(
         ...(flowCtx.meltQuoteMethod ? { method: flowCtx.meltQuoteMethod } : {}),
       });
 
-      commitInFlight = true;
+      commitGeneration = sendGeneration;
       let effect: Awaited<ReturnType<typeof runConfirmMeltEffect>>;
       try {
         effect = await runConfirmMeltEffect({
@@ -728,7 +733,7 @@ export function createPaymentMachine(
           isStale: (op) => isStaleGeneration(sendGeneration, op),
         });
       } finally {
-        commitInFlight = false;
+        if (commitGeneration === sendGeneration) commitGeneration = null;
       }
 
       if (effect.isOk()) {
@@ -817,7 +822,7 @@ export function createPaymentMachine(
         unit: data.unit,
       });
 
-      commitInFlight = true;
+      commitGeneration = sendGeneration;
       let effect: Awaited<ReturnType<typeof runConfirmPaymentRequestEffect>>;
       try {
         effect = await runConfirmPaymentRequestEffect({
@@ -827,7 +832,7 @@ export function createPaymentMachine(
           isStale: (op) => isStaleGeneration(sendGeneration, op),
         });
       } finally {
-        commitInFlight = false;
+        if (commitGeneration === sendGeneration) commitGeneration = null;
       }
 
       if (effect.isOk()) {
@@ -982,14 +987,14 @@ export function createPaymentMachine(
       }
 
       // Clear the scan dedup guard once we leave option-selection (e.g. user
-      // picked an option, flow errored, etc.). Without this, processedRef stays
-      // true after a BIP321 flow and all subsequent scan() calls are silently dropped.
+      // picked an option, flow errored, etc.). While selection is pending, only
+      // the same camera payload is suppressed; a distinct scan is fresh intent.
       if (
-        processedRef &&
+        processedScanInput !== null &&
         step !== "chooseOption" &&
         step !== "chooseFallbackOption"
       ) {
-        processedRef = false;
+        processedScanInput = null;
       }
 
       if (event.type === "EXECUTE") {
@@ -1126,7 +1131,7 @@ export function createPaymentMachine(
             handlerExecuting = true;
             notify();
 
-            commitInFlight = true;
+            commitGeneration = sendGeneration;
             let effect: Awaited<ReturnType<typeof runNfcWriteBackEffect>>;
             try {
               effect = await runNfcWriteBackEffect({
@@ -1141,7 +1146,7 @@ export function createPaymentMachine(
                 isStale: (op) => isStaleGeneration(sendGeneration, op),
               });
             } finally {
-              commitInFlight = false;
+              if (commitGeneration === sendGeneration) commitGeneration = null;
             }
 
             if (effect.isOk()) {
@@ -1204,7 +1209,7 @@ export function createPaymentMachine(
           });
           handlerExecuting = true;
           notify();
-          commitInFlight = true;
+          commitGeneration = sendGeneration;
           let effect: Awaited<ReturnType<typeof runConfirmSendEffect>>;
           try {
             effect = await runConfirmSendEffect({
@@ -1217,14 +1222,14 @@ export function createPaymentMachine(
               isStale: (op) => isStaleGeneration(sendGeneration, op),
             });
           } finally {
-            commitInFlight = false;
+            if (commitGeneration === sendGeneration) commitGeneration = null;
           }
 
           if (effect.isOk()) {
+            if (effect.value.kind === "stale") return;
             if (effect.value.context) {
               flowCtx = { ...flowCtx, ...effect.value.context };
             }
-            if (effect.value.kind === "stale") return;
 
             if (effect.value.kind === "completed") {
               if (effect.value.path === "localFirst") {
@@ -1482,11 +1487,11 @@ export function createPaymentMachine(
       return { urInProgress: true, progress: nextProgress };
     }
 
-    if (processedRef) {
+    if (processedScanInput === data) {
       return { urInProgress: false };
     }
 
-    processedRef = true;
+    processedScanInput = data;
     await execute(data);
     const state = cachedSnapshot;
 
@@ -1494,7 +1499,7 @@ export function createPaymentMachine(
       state.status !== "needsInput" ||
       state.code !== "OPTION_SELECTION_REQUIRED"
     ) {
-      processedRef = false;
+      processedScanInput = null;
     }
 
     return {

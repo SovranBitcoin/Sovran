@@ -47,6 +47,7 @@ import {
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
+import { requirePreparedOfflineReceiveDleq } from '@/shared/lib/cashu/offlineReceiveDleq';
 import type {
   SyntheticMeltHistoryEntry,
   SyntheticMintHistoryEntry,
@@ -272,7 +273,8 @@ function buildFallbackFinalizedReceiveEntry(
  * immediately, we still poll Coco history and use its real persisted id.
  */
 export function createSovranExecuteReceive(
-  getManager: () => Manager | null
+  getManager: () => Manager | null,
+  getOffline: () => boolean = () => false
 ): NonNullable<MachineOperations['executeReceive']> {
   return async (tokenString, mintUrl, _amount) => {
     const manager = getManager();
@@ -332,6 +334,17 @@ export function createSovranExecuteReceive(
     });
 
     const prepared = await manager.ops.receive.prepare({ token: tokenString });
+    // Calculate the offline verdict before any irreversible/network-facing
+    // receive work. Online receives may still redeem legacy tokens without
+    // DLEQ, but if this run is already offline — or later falls into pending
+    // recovery — the cached verdict must be valid before Sovran accepts it.
+    let offlineVerificationError: unknown = null;
+    try {
+      await requirePreparedOfflineReceiveDleq(manager, prepared);
+    } catch (error) {
+      offlineVerificationError = error;
+      if (getOffline()) throw error;
+    }
     paymentLog.info('payment.execute_receive.prepared', {
       ...mintUrlLogFields(mintUrl),
       operationId: prepared.id,
@@ -418,6 +431,11 @@ export function createSovranExecuteReceive(
       }
 
       if (latest?.state === 'executing' && isRecoverableReceiveError(err)) {
+        // Online receives remain compatible with tokens that omit optional
+        // NUT-12 data. Crossing into the offline/pending state is stricter:
+        // without a valid DLEQ we cannot know locally that these proofs were
+        // issued by this mint, so never present or persist them as accepted.
+        if (offlineVerificationError) throw offlineVerificationError;
         paymentLog.info('payment.execute_receive.pending_recovery', {
           ...mintUrlLogFields(latest.mintUrl),
           operationId: latest.id,

@@ -84,6 +84,7 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useVisualStateLogger } from '@/shared/lib/contentShiftLog';
 import { Log, nostrLog, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 
 const BANNER_HEIGHT = 150;
 const AVATAR_SIZE = 90;
@@ -908,6 +909,7 @@ export function UserProfileScreen() {
       });
       return;
     }
+    clearPaymentContext('user.profile.send_money');
     paymentLog.info('user.profile.send_money.start', {
       recipientPubkeyLength: pubkey.length,
       meltTargetLength: lud16.length,

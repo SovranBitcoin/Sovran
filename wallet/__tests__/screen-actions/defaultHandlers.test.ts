@@ -18,30 +18,39 @@
  * and exercises the handler through the ScreenActionManager's execute().
  */
 
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { getDecodedToken } from "@cashu/cashu-ts";
 
-import { createDefaultScreenActionHandlers } from '../../src/screen-actions/defaultHandlers';
-import { createScreenActionManager } from '../../src/screen-actions/createManager';
-import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
-import { setLogger } from '../../src/logger';
-import type { MachineOperations, PaymentMachine, ProcessResult } from '../../src/machine/types';
+import { createDefaultScreenActionHandlers } from "../../src/screen-actions/defaultHandlers";
+import { createScreenActionManager } from "../../src/screen-actions/createManager";
+import { deriveMintMethodCapabilityMapFromTrustedMints } from "../../src/mint-capabilities";
+import { setLogger } from "../../src/logger";
+import type {
+  MachineOperations,
+  PaymentMachine,
+  ProcessResult,
+} from "../../src/machine/types";
 import type {
   ScreenActionContext,
   ScreenActionHandlerMap,
   ScreenActionManager,
   ScreenType,
-} from '../../src/screen-actions/types';
+} from "../../src/screen-actions/types";
 import type {
   DefaultScreenActionHandlersConfig,
   NavigationCallbacks,
-} from '../../src/screen-actions/defaultHandlers';
+} from "../../src/screen-actions/defaultHandlers";
+import {
+  LEGACY_BASE64_KEYSET_V3_TOKEN,
+  NUT00_V3_TOKEN,
+} from "../_harness/tokenVectors";
 
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 
-const MINT1 = 'https://mint1.example.com';
-const MINT2 = 'https://mint2.example.com';
+const MINT1 = "https://mint1.example.com";
+const MINT2 = "https://mint2.example.com";
 type MockFn = ReturnType<typeof vi.fn>;
 
 afterEach(() => {
@@ -56,10 +65,15 @@ function createMockConfig(overrides?: {
 }) {
   const notifications: { event: string; args: unknown[] }[] = [];
   const ops: Partial<MachineOperations> = {
-    checkSendStatus: vi.fn(async () => ({ state: 'pending' })),
+    checkSendStatus: vi.fn(async () => ({ state: "pending" })),
     rollbackSend: vi.fn(async () => {}),
     executeReceive: vi.fn(async () => ({
-      historyEntry: JSON.stringify({ id: 'rx-1', type: 'receive', mintUrl: MINT1, amount: 100 }),
+      historyEntry: JSON.stringify({
+        id: "rx-1",
+        type: "receive",
+        mintUrl: MINT1,
+        amount: 100,
+      }),
     })),
     isMintTrusted: vi.fn(async () => true),
     trustMint: vi.fn(async () => {}),
@@ -68,10 +82,10 @@ function createMockConfig(overrides?: {
       mintUrl,
       displayName: mintUrl,
       balance: 0,
-      unit: 'sat',
+      unit: "sat",
       isPreferred: false,
       isTrusted: true,
-    })) as MachineOperations['buildMintReviewInfo'],
+    })) as MachineOperations["buildMintReviewInfo"],
     linkTransaction: vi.fn(() => {}),
     ...overrides?.operations,
   };
@@ -86,7 +100,7 @@ function createMockConfig(overrides?: {
     changeMint: vi.fn(async () => {}),
     enterAmount: vi.fn(async () => {}),
     reviewMint: vi.fn(async () => {}),
-    getContext: vi.fn(() => ({ unit: 'sat' })),
+    getContext: vi.fn(() => ({ unit: "sat" })),
     ...overrides?.machine,
   };
 
@@ -117,7 +131,7 @@ function createManager(
   screenType: ScreenType,
   handlers: ScreenActionHandlerMap,
   entry: Record<string, unknown>,
-  extraContext?: Record<string, unknown>
+  extraContext?: Record<string, unknown>,
 ) {
   const setEntry = vi.fn();
   let mgrRef: ScreenActionManager<ScreenType> | null = null;
@@ -144,35 +158,35 @@ function createManager(
 // built-in copy/share targets
 // ---------------------------------------------------------------------------
 
-describe('back default handlers', () => {
+describe("back default handlers", () => {
   const screens: ScreenType[] = [
-    'sendToken',
-    'receiveToken',
-    'mintQuote',
-    'meltQuote',
-    'paymentRequest',
-    'receive',
-    'mintInfo',
-    'amountEntry',
-    'mintSelector',
+    "sendToken",
+    "receiveToken",
+    "mintQuote",
+    "meltQuote",
+    "paymentRequest",
+    "receive",
+    "mintInfo",
+    "amountEntry",
+    "mintSelector",
   ];
 
-  it.each(screens)('%s delegates to navigation.goBack', async (screenType) => {
+  it.each(screens)("%s delegates to navigation.goBack", async (screenType) => {
     const { handlers, navigation } = createMockConfig();
     const { mgr } = createManager(screenType, handlers, {});
 
-    await mgr.execute('back');
+    await mgr.execute("back");
 
     expect(navigation.goBack).toHaveBeenCalled();
   });
 });
 
-describe('built-in copy/share targets', () => {
-  it('labels mint quote clipboard copies as Lightning invoices', async () => {
+describe("built-in copy/share targets", () => {
+  it("labels mint quote clipboard copies as Lightning invoices", async () => {
     const writeClipboard = vi.fn(async () => {});
     const notify = vi.fn();
     const mgr = createScreenActionManager({
-      screenType: 'mintQuote',
+      screenType: "mintQuote",
       handlers: {},
       getContext: () => {
         const context: ScreenActionContext = {
@@ -186,19 +200,23 @@ describe('built-in copy/share targets', () => {
       },
     });
 
-    mgr.setEntry({ paymentRequest: 'lnbc1invoice' });
+    mgr.setEntry({ paymentRequest: "lnbc1invoice" });
 
-    await mgr.execute('copy');
+    await mgr.execute("copy");
 
-    expect(writeClipboard).toHaveBeenCalledWith('lnbc1invoice');
-    expect(notify).toHaveBeenCalledWith('onCopied', 'lightningInvoice', 'lnbc1invoice');
+    expect(writeClipboard).toHaveBeenCalledWith("lnbc1invoice");
+    expect(notify).toHaveBeenCalledWith(
+      "onCopied",
+      "lightningInvoice",
+      "lnbc1invoice",
+    );
   });
 
-  it('copies operation-backed onchain mint quotes as exact-amount BIP321 URIs', async () => {
+  it("copies operation-backed onchain mint quotes as exact-amount BIP321 URIs", async () => {
     const writeClipboard = vi.fn(async () => {});
     const notify = vi.fn();
     const mgr = createScreenActionManager({
-      screenType: 'mintQuote',
+      screenType: "mintQuote",
       handlers: {},
       getContext: () => {
         const context: ScreenActionContext = {
@@ -211,32 +229,32 @@ describe('built-in copy/share targets', () => {
         return context;
       },
     });
-    const address = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080';
+    const address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080";
     const bip321 = `bitcoin:${address}?amount=0.00001234&message=For%20coffee`;
 
     mgr.setEntry({
       paymentRequest: address,
       amount: 0,
-      unit: 'sat',
+      unit: "sat",
       metadata: {
-        method: 'onchain',
+        method: "onchain",
         onchainAddress: address,
-        requestedAmount: '1234',
-        memo: 'For coffee',
+        requestedAmount: "1234",
+        memo: "For coffee",
       },
     });
 
-    await mgr.execute('copy');
+    await mgr.execute("copy");
 
     expect(writeClipboard).toHaveBeenCalledWith(bip321);
-    expect(notify).toHaveBeenCalledWith('onCopied', 'address', bip321);
+    expect(notify).toHaveBeenCalledWith("onCopied", "address", bip321);
   });
 
-  it('labels mint quote shares as Lightning invoices', async () => {
+  it("labels mint quote shares as Lightning invoices", async () => {
     const shareContent = vi.fn(async () => {});
     const notify = vi.fn();
     const mgr = createScreenActionManager({
-      screenType: 'mintQuote',
+      screenType: "mintQuote",
       handlers: {},
       getContext: () => {
         const context: ScreenActionContext = {
@@ -250,19 +268,26 @@ describe('built-in copy/share targets', () => {
       },
     });
 
-    mgr.setEntry({ paymentRequest: 'lnbc1invoice' });
+    mgr.setEntry({ paymentRequest: "lnbc1invoice" });
 
-    await mgr.execute('share');
+    await mgr.execute("share");
 
-    expect(shareContent).toHaveBeenCalledWith({ message: 'lnbc1invoice', url: undefined });
-    expect(notify).toHaveBeenCalledWith('onShared', 'lightningInvoice', 'lnbc1invoice');
+    expect(shareContent).toHaveBeenCalledWith({
+      message: "lnbc1invoice",
+      url: undefined,
+    });
+    expect(notify).toHaveBeenCalledWith(
+      "onShared",
+      "lightningInvoice",
+      "lnbc1invoice",
+    );
   });
 
-  it('shares operation-backed onchain mint quotes as exact-amount BIP321 URIs', async () => {
+  it("shares operation-backed onchain mint quotes as exact-amount BIP321 URIs", async () => {
     const shareContent = vi.fn(async () => {});
     const notify = vi.fn();
     const mgr = createScreenActionManager({
-      screenType: 'mintQuote',
+      screenType: "mintQuote",
       handlers: {},
       getContext: () => {
         const context: ScreenActionContext = {
@@ -275,20 +300,27 @@ describe('built-in copy/share targets', () => {
         return context;
       },
     });
-    const address = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080';
+    const address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080";
     const bip321 = `bitcoin:${address}?amount=0.00001234`;
 
     mgr.setEntry({
       paymentRequest: address,
       amount: 0,
-      unit: 'sat',
-      metadata: { method: 'onchain', onchainAddress: address, requestedAmount: '1234' },
+      unit: "sat",
+      metadata: {
+        method: "onchain",
+        onchainAddress: address,
+        requestedAmount: "1234",
+      },
     });
 
-    await mgr.execute('share');
+    await mgr.execute("share");
 
-    expect(shareContent).toHaveBeenCalledWith({ message: bip321, url: undefined });
-    expect(notify).toHaveBeenCalledWith('onShared', 'address', bip321);
+    expect(shareContent).toHaveBeenCalledWith({
+      message: bip321,
+      url: undefined,
+    });
+    expect(notify).toHaveBeenCalledWith("onShared", "address", bip321);
   });
 });
 
@@ -296,126 +328,132 @@ describe('built-in copy/share targets', () => {
 // sendToken
 // ---------------------------------------------------------------------------
 
-describe('sendToken default handlers', () => {
-  describe('checkStatus', () => {
-    it('calls checkSendStatus and notifies with result', async () => {
+describe("sendToken default handlers", () => {
+  describe("checkStatus", () => {
+    it("calls checkSendStatus and notifies with result", async () => {
       const { handlers, ops, notifications } = createMockConfig({
         operations: {
-          checkSendStatus: vi.fn(async () => ({ state: 'finalized' })),
+          checkSendStatus: vi.fn(async () => ({ state: "finalized" })),
         },
       });
 
-      const { mgr } = createManager('sendToken', handlers, {
-        type: 'send',
-        operationId: 'op-123',
+      const { mgr } = createManager("sendToken", handlers, {
+        type: "send",
+        operationId: "op-123",
         token: null,
       });
 
-      await mgr.execute('checkStatus');
+      await mgr.execute("checkStatus");
 
-      expect(ops.checkSendStatus).toHaveBeenCalledWith('op-123');
+      expect(ops.checkSendStatus).toHaveBeenCalledWith("op-123");
       expect(notifications).toContainEqual({
-        event: 'onSendStatusChecked',
-        args: [{ operationId: 'op-123', state: 'finalized', redeemed: true }],
+        event: "onSendStatusChecked",
+        args: [{ operationId: "op-123", state: "finalized", redeemed: true }],
       });
     });
 
-    it('reports non-finalized as not redeemed', async () => {
+    it("reports non-finalized as not redeemed", async () => {
       const { handlers, notifications } = createMockConfig({
         operations: {
-          checkSendStatus: vi.fn(async () => ({ state: 'pending' })),
+          checkSendStatus: vi.fn(async () => ({ state: "pending" })),
         },
       });
 
-      const { mgr } = createManager('sendToken', handlers, {
-        type: 'send',
-        operationId: 'op-456',
+      const { mgr } = createManager("sendToken", handlers, {
+        type: "send",
+        operationId: "op-456",
         token: null,
       });
 
-      await mgr.execute('checkStatus');
+      await mgr.execute("checkStatus");
 
       expect(notifications).toContainEqual({
-        event: 'onSendStatusChecked',
-        args: [{ operationId: 'op-456', state: 'pending', redeemed: false }],
+        event: "onSendStatusChecked",
+        args: [{ operationId: "op-456", state: "pending", redeemed: false }],
       });
     });
 
-    it('does nothing without operationId', async () => {
+    it("does nothing without operationId", async () => {
       const { handlers, ops } = createMockConfig();
-      const { mgr } = createManager('sendToken', handlers, {
-        type: 'send',
+      const { mgr } = createManager("sendToken", handlers, {
+        type: "send",
         token: null,
       });
 
-      await mgr.execute('checkStatus');
+      await mgr.execute("checkStatus");
       expect(ops.checkSendStatus).not.toHaveBeenCalled();
     });
   });
 
-  describe('cancel', () => {
-    it('calls rollbackSend and notifies on success', async () => {
+  describe("cancel", () => {
+    it("calls rollbackSend and notifies on success", async () => {
       const { handlers, ops, notifications } = createMockConfig();
-      const { mgr } = createManager('sendToken', handlers, {
-        type: 'send',
-        operationId: 'op-789',
+      const { mgr } = createManager("sendToken", handlers, {
+        type: "send",
+        operationId: "op-789",
         token: null,
       });
 
-      await mgr.execute('cancel');
+      await mgr.execute("cancel");
 
-      expect(ops.rollbackSend).toHaveBeenCalledWith('op-789');
+      expect(ops.rollbackSend).toHaveBeenCalledWith("op-789");
       expect(notifications).toContainEqual({
-        event: 'onSendCancelled',
-        args: [{ operationId: 'op-789' }],
+        event: "onSendCancelled",
+        args: [{ operationId: "op-789" }],
       });
     });
 
-    it('blocks cancellation while offline', async () => {
+    it("blocks cancellation while offline", async () => {
       const { handlers, ops, notifications } = createMockConfig({
         getOffline: () => true,
       });
-      const { mgr } = createManager('sendToken', handlers, {
-        type: 'send',
-        operationId: 'op-offline',
+      const { mgr } = createManager("sendToken", handlers, {
+        type: "send",
+        operationId: "op-offline",
         token: null,
       });
 
-      await mgr.execute('cancel');
+      await mgr.execute("cancel");
 
       expect(ops.rollbackSend).not.toHaveBeenCalled();
       expect(notifications).toContainEqual({
-        event: 'onSendCancelFailed',
+        event: "onSendCancelFailed",
         args: [
           {
-            operationId: 'op-offline',
-            message: 'Cancel transaction is not possible while offline.',
+            operationId: "op-offline",
+            message: "Cancel transaction is not possible while offline.",
             offline: true,
           },
         ],
       });
     });
 
-    it('notifies onSendCancelFailed on error', async () => {
+    it("notifies onSendCancelFailed on error", async () => {
       const { handlers, notifications } = createMockConfig({
         operations: {
           rollbackSend: vi.fn(async () => {
-            throw new Error('Cannot rollback');
+            throw new Error("Cannot rollback");
           }),
         },
       });
 
-      const { mgr } = createManager('sendToken', handlers, {
-        type: 'send',
-        operationId: 'op-fail',
+      const { mgr } = createManager("sendToken", handlers, {
+        type: "send",
+        operationId: "op-fail",
         token: null,
       });
 
-      await mgr.execute('cancel');
+      await mgr.execute("cancel");
 
       expect(notifications).toContainEqual({
-        event: 'onSendCancelFailed',
-        args: [{ operationId: 'op-fail', message: 'Cannot rollback', mintUnreachable: false }],
+        event: "onSendCancelFailed",
+        args: [
+          {
+            operationId: "op-fail",
+            message: "Cannot rollback",
+            mintUnreachable: false,
+          },
+        ],
       });
     });
   });
@@ -425,113 +463,173 @@ describe('sendToken default handlers', () => {
 // receiveToken
 // ---------------------------------------------------------------------------
 
-describe('receiveToken default handlers', () => {
+describe("receiveToken default handlers", () => {
   const VALID_TOKEN = {
     mint: MINT1,
     proofs: [
       {
         amount: 1,
-        secret: 'test-secret-string',
-        C: '02' + '0'.repeat(64),
-        id: '00' + '0'.repeat(14),
+        secret: "test-secret-string",
+        C: "02" + "0".repeat(64),
+        id: "00" + "0".repeat(14),
       },
     ],
-    unit: 'sat',
+    unit: "sat",
   };
 
   function tokenEntry() {
     return {
-      id: 'receive-preview-1',
-      type: 'receive',
+      id: "receive-preview-1",
+      type: "receive",
       mintUrl: MINT1,
       amount: 1,
-      unit: 'sat',
+      unit: "sat",
       token: VALID_TOKEN,
     };
   }
 
-  describe('redeem — happy path', () => {
-    it('calls executeReceive and notifies on success', async () => {
+  describe("redeem — happy path", () => {
+    it("calls executeReceive and notifies on success", async () => {
       const { handlers, ops, notifications } = createMockConfig();
-      const { mgr } = createManager('receiveToken', handlers, tokenEntry());
+      const { mgr } = createManager("receiveToken", handlers, tokenEntry());
 
-      await mgr.execute('redeem');
+      await mgr.execute("redeem");
 
       expect(ops.isMintTrusted).toHaveBeenCalledWith(MINT1);
       expect(ops.executeReceive).toHaveBeenCalled();
-      expect(notifications.find((n) => n.event === 'onReceiveProcessing')).toBeTruthy();
-      expect(notifications.find((n) => n.event === 'onReceiveConfirmed')).toBeTruthy();
+      expect(
+        notifications.find((n) => n.event === "onReceiveProcessing"),
+      ).toBeTruthy();
+      expect(
+        notifications.find((n) => n.event === "onReceiveConfirmed"),
+      ).toBeTruthy();
     });
 
-    it('redeems an entry whose token is only in metadata.rawToken (scan/paste)', async () => {
+    it("redeems an entry whose token is only in metadata.rawToken (scan/paste)", async () => {
       const { handlers, ops } = createMockConfig();
-      const rawToken = 'cashuBexampletoken';
-      const { mgr } = createManager('receiveToken', handlers, {
-        id: 'receive-preview-2',
-        type: 'receive',
+      const rawToken = "cashuBexampletoken";
+      const { mgr } = createManager("receiveToken", handlers, {
+        id: "receive-preview-2",
+        type: "receive",
         mintUrl: MINT1,
         amount: 1,
-        unit: 'sat',
+        unit: "sat",
         metadata: { rawToken },
       });
 
-      await mgr.execute('redeem');
+      await mgr.execute("redeem");
 
       expect(ops.executeReceive).toHaveBeenCalledWith(rawToken, MINT1, 1);
     });
 
-    it('notification sequence: onReceiveProcessing → onReceiveConfirmed → onTransactionCreated', async () => {
-      const { handlers, notifications } = createMockConfig();
-      const { mgr } = createManager('receiveToken', handlers, tokenEntry());
+    it("upgrades a decoded V3 entry to V4 at the redeem boundary", async () => {
+      const { handlers, ops } = createMockConfig();
+      const { mgr } = createManager("receiveToken", handlers, {
+        id: "receive-v3",
+        type: "receive",
+        mintUrl: "https://8333.space:3338",
+        amount: 10,
+        unit: "sat",
+        token: getDecodedToken(NUT00_V3_TOKEN, []),
+      });
 
-      await mgr.execute('redeem');
+      await mgr.execute("redeem");
+
+      const [upgraded, mintUrl, amount] = (ops.executeReceive as MockFn).mock
+        .calls[0]!;
+      expect(upgraded).toMatch(/^cashuB/);
+      expect(mintUrl).toBe("https://8333.space:3338");
+      expect(amount).toBe(10);
+    });
+
+    it("keeps a legacy base64-keyset token in V3 when V4 encoding is impossible", async () => {
+      const { handlers, ops } = createMockConfig();
+      const { mgr } = createManager("receiveToken", handlers, {
+        id: "receive-legacy-v3",
+        type: "receive",
+        mintUrl: "https://legacy.example",
+        amount: 1,
+        unit: "sat",
+        token: getDecodedToken(LEGACY_BASE64_KEYSET_V3_TOKEN, []),
+        metadata: { rawToken: LEGACY_BASE64_KEYSET_V3_TOKEN },
+      });
+
+      await mgr.execute("redeem");
+
+      expect(ops.executeReceive).toHaveBeenCalledWith(
+        LEGACY_BASE64_KEYSET_V3_TOKEN,
+        "https://legacy.example",
+        1,
+      );
+    });
+
+    it("notification sequence: onReceiveProcessing → onReceiveConfirmed → onTransactionCreated", async () => {
+      const { handlers, notifications } = createMockConfig();
+      const { mgr } = createManager("receiveToken", handlers, tokenEntry());
+
+      await mgr.execute("redeem");
 
       const events = notifications.map((n) => n.event);
-      expect(events).toEqual(['onReceiveProcessing', 'onReceiveConfirmed', 'onTransactionCreated']);
+      expect(events).toEqual([
+        "onReceiveProcessing",
+        "onReceiveConfirmed",
+        "onTransactionCreated",
+      ]);
     });
 
-    it('onReceiveProcessing carries id, mintUrl, amount, unit', async () => {
+    it("onReceiveProcessing carries id, mintUrl, amount, unit", async () => {
       const { handlers, notifications } = createMockConfig();
-      const { mgr } = createManager('receiveToken', handlers, tokenEntry());
+      const { mgr } = createManager("receiveToken", handlers, tokenEntry());
 
-      await mgr.execute('redeem');
+      await mgr.execute("redeem");
 
-      const processing = notifications.find((n) => n.event === 'onReceiveProcessing');
+      const processing = notifications.find(
+        (n) => n.event === "onReceiveProcessing",
+      );
       expect(processing!.args[0]).toMatchObject({
-        id: 'receive-preview-1',
+        id: "receive-preview-1",
         mintUrl: MINT1,
         amount: 1,
-        unit: 'sat',
+        unit: "sat",
       });
     });
 
-    it('onReceiveConfirmed carries historyEntry', async () => {
+    it("onReceiveConfirmed carries historyEntry", async () => {
       const { handlers, notifications } = createMockConfig();
-      const { mgr } = createManager('receiveToken', handlers, tokenEntry());
+      const { mgr } = createManager("receiveToken", handlers, tokenEntry());
 
-      await mgr.execute('redeem');
+      await mgr.execute("redeem");
 
-      const confirmed = notifications.find((n) => n.event === 'onReceiveConfirmed');
+      const confirmed = notifications.find(
+        (n) => n.event === "onReceiveConfirmed",
+      );
       const data = confirmed!.args[0] as Record<string, unknown>;
       expect(data.historyEntry).toEqual(expect.any(String));
-      expect(data.id).toBe('receive-preview-1');
+      expect(data.id).toBe("receive-preview-1");
     });
 
-    it('onTransactionCreated carries type=receive', async () => {
+    it("onTransactionCreated carries type=receive", async () => {
       const { handlers, notifications } = createMockConfig();
-      const { mgr } = createManager('receiveToken', handlers, tokenEntry());
+      const { mgr } = createManager("receiveToken", handlers, tokenEntry());
 
-      await mgr.execute('redeem');
+      await mgr.execute("redeem");
 
-      const txCreated = notifications.find((n) => n.event === 'onTransactionCreated');
+      const txCreated = notifications.find(
+        (n) => n.event === "onTransactionCreated",
+      );
       expect(txCreated!.args[0]).toMatchObject({
-        type: 'receive',
+        type: "receive",
         mintUrl: MINT1,
       });
     });
 
-    it('updates entry with real history data', async () => {
-      const realEntry = { id: 'rx-real', type: 'receive', mintUrl: MINT1, amount: 1 };
+    it("updates entry with real history data", async () => {
+      const realEntry = {
+        id: "rx-real",
+        type: "receive",
+        mintUrl: MINT1,
+        amount: 1,
+      };
       const { handlers } = createMockConfig({
         operations: {
           executeReceive: vi.fn(async () => ({
@@ -541,14 +639,23 @@ describe('receiveToken default handlers', () => {
         },
       });
 
-      const { mgr, setEntry } = createManager('receiveToken', handlers, tokenEntry());
-      await mgr.execute('redeem');
+      const { mgr, setEntry } = createManager(
+        "receiveToken",
+        handlers,
+        tokenEntry(),
+      );
+      await mgr.execute("redeem");
 
       expect(setEntry).toHaveBeenCalledWith(realEntry);
     });
 
-    it('calls linkTransaction when available', async () => {
-      const realEntry = { id: 'rx-link', type: 'receive', mintUrl: MINT1, amount: 1 };
+    it("calls linkTransaction when available", async () => {
+      const realEntry = {
+        id: "rx-link",
+        type: "receive",
+        mintUrl: MINT1,
+        amount: 1,
+      };
       const { handlers, ops } = createMockConfig({
         operations: {
           executeReceive: vi.fn(async () => ({
@@ -559,35 +666,39 @@ describe('receiveToken default handlers', () => {
         },
       });
 
-      const { mgr } = createManager('receiveToken', handlers, tokenEntry());
-      await mgr.execute('redeem');
+      const { mgr } = createManager("receiveToken", handlers, tokenEntry());
+      await mgr.execute("redeem");
 
       expect(ops.linkTransaction).toHaveBeenCalled();
     });
 
-    it('updates entry and notifies pending without failing for recoverable receives', async () => {
-      const logs: Array<{ level: string; event: string; fields?: Record<string, unknown> }> = [];
+    it("updates entry and notifies pending without failing for recoverable receives", async () => {
+      const logs: Array<{
+        level: string;
+        event: string;
+        fields?: Record<string, unknown>;
+      }> = [];
       setLogger({
-        debug: (event, fields) => logs.push({ level: 'debug', event, fields }),
-        info: (event, fields) => logs.push({ level: 'info', event, fields }),
-        warn: (event, fields) => logs.push({ level: 'warn', event, fields }),
-        error: (event, fields) => logs.push({ level: 'error', event, fields }),
+        debug: (event, fields) => logs.push({ level: "debug", event, fields }),
+        info: (event, fields) => logs.push({ level: "info", event, fields }),
+        warn: (event, fields) => logs.push({ level: "warn", event, fields }),
+        error: (event, fields) => logs.push({ level: "error", event, fields }),
       });
       const pendingEntry = {
-        id: 'receive-op-1',
-        type: 'receive',
+        id: "receive-op-1",
+        type: "receive",
         mintUrl: MINT1,
         amount: 1,
-        unit: 'sat',
-        state: 'executing',
-        operationId: 'op-1',
+        unit: "sat",
+        state: "executing",
+        operationId: "op-1",
       };
       const { handlers, notifications } = createMockConfig({
         operations: {
           executeReceive: vi.fn(async () => ({
-            status: 'pending',
-            operationId: 'op-1',
-            pendingReason: 'network',
+            status: "pending",
+            operationId: "op-1",
+            pendingReason: "network",
             historyEntry: JSON.stringify(pendingEntry),
             message: "We'll add it to your wallet when you're back online.",
           })),
@@ -595,33 +706,37 @@ describe('receiveToken default handlers', () => {
         },
       });
 
-      const { mgr, setEntry } = createManager('receiveToken', handlers, tokenEntry());
-      await mgr.execute('redeem');
+      const { mgr, setEntry } = createManager(
+        "receiveToken",
+        handlers,
+        tokenEntry(),
+      );
+      await mgr.execute("redeem");
 
       expect(setEntry).toHaveBeenCalledWith(pendingEntry);
       expect(notifications.map((n) => n.event)).toEqual([
-        'onReceiveProcessing',
-        'onReceivePending',
+        "onReceiveProcessing",
+        "onReceivePending",
       ]);
       expect(logs).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            event: 'screenAction.receiveToken.redeem.pending',
+            event: "screenAction.receiveToken.redeem.pending",
             fields: expect.objectContaining({
-              id: 'receive-preview-1',
-              operationId: 'op-1',
-              pendingReason: 'network',
-              expectedNext: 'wallet_core_recovery_finalizes_receive',
+              id: "receive-preview-1",
+              operationId: "op-1",
+              pendingReason: "network",
+              expectedNext: "wallet_core_recovery_finalizes_receive",
             }),
           }),
-        ])
+        ]),
       );
-      expect(JSON.stringify(logs)).not.toContain('test-secret-string');
+      expect(JSON.stringify(logs)).not.toContain("test-secret-string");
     });
   });
 
-  describe('redeem — untrusted mint', () => {
-    it('calls machine.reviewMint instead of receiving', async () => {
+  describe("redeem — untrusted mint", () => {
+    it("calls machine.reviewMint instead of receiving", async () => {
       const { handlers, ops, machine } = createMockConfig({
         operations: {
           isMintTrusted: vi.fn(async () => false),
@@ -629,46 +744,50 @@ describe('receiveToken default handlers', () => {
       });
 
       const entry = tokenEntry();
-      const { mgr } = createManager('receiveToken', handlers, entry);
-      await mgr.execute('redeem');
+      const { mgr } = createManager("receiveToken", handlers, entry);
+      await mgr.execute("redeem");
 
       expect(machine.reviewMint).toHaveBeenCalled();
       expect(ops.executeReceive).not.toHaveBeenCalled();
     });
   });
 
-  describe('redeem — failure', () => {
-    it('notifies onReceiveFailed and re-throws', async () => {
+  describe("redeem — failure", () => {
+    it("notifies onReceiveFailed and re-throws", async () => {
       const { handlers, notifications } = createMockConfig({
         operations: {
           executeReceive: vi.fn(async () => {
-            throw new Error('Token already spent');
+            throw new Error("Token already spent");
           }),
           isMintTrusted: vi.fn(async () => true),
         },
       });
 
-      const { mgr } = createManager('receiveToken', handlers, tokenEntry());
+      const { mgr } = createManager("receiveToken", handlers, tokenEntry());
 
-      await expect(mgr.execute('redeem')).rejects.toThrow('Token already spent');
-      expect(notifications.find((n) => n.event === 'onReceiveFailed')).toBeTruthy();
+      await expect(mgr.execute("redeem")).rejects.toThrow(
+        "Token already spent",
+      );
+      expect(
+        notifications.find((n) => n.event === "onReceiveFailed"),
+      ).toBeTruthy();
     });
 
-    it('notification sequence on failure: onReceiveProcessing → onReceiveFailed (no confirmed/txCreated)', async () => {
+    it("notification sequence on failure: onReceiveProcessing → onReceiveFailed (no confirmed/txCreated)", async () => {
       const { handlers, notifications } = createMockConfig({
         operations: {
           executeReceive: vi.fn(async () => {
-            throw new Error('Already spent');
+            throw new Error("Already spent");
           }),
           isMintTrusted: vi.fn(async () => true),
         },
       });
 
-      const { mgr } = createManager('receiveToken', handlers, tokenEntry());
-      await expect(mgr.execute('redeem')).rejects.toThrow();
+      const { mgr } = createManager("receiveToken", handlers, tokenEntry());
+      await expect(mgr.execute("redeem")).rejects.toThrow();
 
       const events = notifications.map((n) => n.event);
-      expect(events).toEqual(['onReceiveProcessing', 'onReceiveFailed']);
+      expect(events).toEqual(["onReceiveProcessing", "onReceiveFailed"]);
     });
   });
 });
@@ -677,84 +796,88 @@ describe('receiveToken default handlers', () => {
 // meltQuote
 // ---------------------------------------------------------------------------
 
-describe('meltQuote default handlers', () => {
-  describe('pay', () => {
-    it('delegates to machine.confirmMelt', async () => {
+describe("meltQuote default handlers", () => {
+  describe("pay", () => {
+    it("delegates to machine.confirmMelt", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('meltQuote', handlers, {
-        type: 'melt',
-        quoteId: 'q-1',
-        state: 'UNPAID',
+      const { mgr } = createManager("meltQuote", handlers, {
+        type: "melt",
+        quoteId: "q-1",
+        state: "UNPAID",
       });
 
-      await mgr.execute('pay');
+      await mgr.execute("pay");
       expect(machine.confirmMelt).toHaveBeenCalled();
     });
   });
 
-  describe('cancel', () => {
-    it('calls rollbackMelt and notifies on success', async () => {
+  describe("cancel", () => {
+    it("calls rollbackMelt and notifies on success", async () => {
       const { handlers, ops, notifications } = createMockConfig();
-      const { mgr } = createManager('meltQuote', handlers, {
-        type: 'melt',
-        quoteId: 'q-cancel',
-        metadata: { operationId: 'melt-op-1' },
+      const { mgr } = createManager("meltQuote", handlers, {
+        type: "melt",
+        quoteId: "q-cancel",
+        metadata: { operationId: "melt-op-1" },
       });
 
-      await mgr.execute('cancel');
+      await mgr.execute("cancel");
 
-      expect(ops.rollbackMelt).toHaveBeenCalledWith('melt-op-1');
+      expect(ops.rollbackMelt).toHaveBeenCalledWith("melt-op-1");
       expect(notifications).toContainEqual({
-        event: 'onMeltCancelled',
-        args: [{ operationId: 'melt-op-1' }],
+        event: "onMeltCancelled",
+        args: [{ operationId: "melt-op-1" }],
       });
     });
 
-    it('falls back to quoteId when no operationId', async () => {
+    it("falls back to quoteId when no operationId", async () => {
       const { handlers, ops } = createMockConfig();
-      const { mgr } = createManager('meltQuote', handlers, {
-        type: 'melt',
-        quoteId: 'q-fallback',
+      const { mgr } = createManager("meltQuote", handlers, {
+        type: "melt",
+        quoteId: "q-fallback",
       });
 
-      await mgr.execute('cancel');
-      expect(ops.rollbackMelt).toHaveBeenCalledWith('q-fallback');
+      await mgr.execute("cancel");
+      expect(ops.rollbackMelt).toHaveBeenCalledWith("q-fallback");
     });
 
     it('silently ignores "not found" errors', async () => {
       const { handlers, notifications } = createMockConfig({
         operations: {
           rollbackMelt: vi.fn(async () => {
-            throw new Error('No melt operation found');
+            throw new Error("No melt operation found");
           }),
         },
       });
 
-      const { mgr } = createManager('meltQuote', handlers, {
-        type: 'melt',
-        quoteId: 'q-gone',
+      const { mgr } = createManager("meltQuote", handlers, {
+        type: "melt",
+        quoteId: "q-gone",
       });
 
-      await mgr.execute('cancel');
-      expect(notifications.find((n) => n.event === 'onMeltCancelFailed')).toBeFalsy();
+      await mgr.execute("cancel");
+      expect(
+        notifications.find((n) => n.event === "onMeltCancelFailed"),
+      ).toBeFalsy();
     });
 
-    it('notifies on non-ignorable errors', async () => {
+    it("notifies on non-ignorable errors", async () => {
       const { handlers, notifications } = createMockConfig({
         operations: {
           rollbackMelt: vi.fn(async () => {
-            throw new Error('Network timeout');
+            throw new Error("Network timeout");
           }),
         },
       });
 
-      const { mgr } = createManager('meltQuote', handlers, {
-        type: 'melt',
-        quoteId: 'q-err',
+      const { mgr } = createManager("meltQuote", handlers, {
+        type: "melt",
+        quoteId: "q-err",
       });
 
-      await mgr.execute('cancel');
-      expect(notifications.find((n) => n.event === 'onMeltCancelFailed')).toBeTruthy();
+      await mgr.execute("cancel");
+      expect(
+        notifications.find((n) => n.event === "onMeltCancelFailed"),
+      ).toBeTruthy();
     });
   });
 });
@@ -763,28 +886,28 @@ describe('meltQuote default handlers', () => {
 // paymentRequest
 // ---------------------------------------------------------------------------
 
-describe('paymentRequest default handlers', () => {
-  describe('confirm', () => {
-    it('delegates to machine.confirmPaymentRequest', async () => {
+describe("paymentRequest default handlers", () => {
+  describe("confirm", () => {
+    it("delegates to machine.confirmPaymentRequest", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('paymentRequest', handlers, {
-        type: 'send',
-        metadata: { paymentRequest: 'pr-1' },
+      const { mgr } = createManager("paymentRequest", handlers, {
+        type: "send",
+        metadata: { paymentRequest: "pr-1" },
       });
 
-      await mgr.execute('confirm');
+      await mgr.execute("confirm");
       expect(machine.confirmPaymentRequest).toHaveBeenCalled();
     });
   });
 
-  describe('cancel', () => {
-    it('calls navigation.goBack', async () => {
+  describe("cancel", () => {
+    it("calls navigation.goBack", async () => {
       const { handlers, navigation } = createMockConfig();
-      const { mgr } = createManager('paymentRequest', handlers, {
-        type: 'send',
+      const { mgr } = createManager("paymentRequest", handlers, {
+        type: "send",
       });
 
-      await mgr.execute('cancel');
+      await mgr.execute("cancel");
       expect(navigation.goBack).toHaveBeenCalled();
     });
   });
@@ -794,50 +917,55 @@ describe('paymentRequest default handlers', () => {
 // receiveHub — the receive modal's method chooser
 // ---------------------------------------------------------------------------
 
-describe('receiveHub default handlers', () => {
+describe("receiveHub default handlers", () => {
   const hubEntry = {
-    type: 'receive',
-    id: 'receive-hub',
-    unit: 'sat',
+    type: "receive",
+    id: "receive-hub",
+    unit: "sat",
   };
 
-  describe('qrDisplay', () => {
-    it('opens the QR display via machine.showReceiveQr with reset', async () => {
+  describe("qrDisplay", () => {
+    it("opens the QR display via machine.showReceiveQr with reset", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('receiveHub', handlers, hubEntry);
+      const { mgr } = createManager("receiveHub", handlers, hubEntry);
 
-      await mgr.execute('qrDisplay');
+      await mgr.execute("qrDisplay");
       expect(machine.showReceiveQr).toHaveBeenCalledWith({ reset: true });
     });
   });
 
-  describe('paste', () => {
-    it('delegates to machine.scan with reset (fresh flow from the hub)', async () => {
+  describe("paste", () => {
+    it("delegates to machine.scan with reset (fresh flow from the hub)", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('receiveHub', handlers, hubEntry);
+      const { mgr } = createManager("receiveHub", handlers, hubEntry);
 
-      await mgr.execute('paste');
+      await mgr.execute("paste");
       expect(machine.scan).toHaveBeenCalledWith(undefined, { reset: true });
     });
   });
 
-  describe('fixedAmount', () => {
-    it('delegates to machine.startReceiveLightning', async () => {
+  describe("fixedAmount", () => {
+    it("delegates to machine.startReceiveLightning", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('receiveHub', handlers, hubEntry);
+      const { mgr } = createManager("receiveHub", handlers, hubEntry);
 
-      await mgr.execute('fixedAmount');
-      expect(machine.startReceiveLightning).toHaveBeenCalledWith({ reset: true });
+      await mgr.execute("fixedAmount");
+      expect(machine.startReceiveLightning).toHaveBeenCalledWith({
+        reset: true,
+      });
     });
   });
 
-  describe('scanQr', () => {
-    it('calls navigation.scanQr with receive context', async () => {
+  describe("scanQr", () => {
+    it("calls navigation.scanQr with receive context", async () => {
       const { handlers, navigation } = createMockConfig();
-      const { mgr } = createManager('receiveHub', handlers, hubEntry);
+      const { mgr } = createManager("receiveHub", handlers, hubEntry);
 
-      await mgr.execute('scanQr');
-      expect(navigation.scanQr).toHaveBeenCalledWith({ unit: 'sat', context: 'receive' });
+      await mgr.execute("scanQr");
+      expect(navigation.scanQr).toHaveBeenCalledWith({
+        unit: "sat",
+        context: "receive",
+      });
     });
   });
 });
@@ -846,20 +974,22 @@ describe('receiveHub default handlers', () => {
 // receive — the QR display
 // ---------------------------------------------------------------------------
 
-describe('receive default handlers', () => {
+describe("receive default handlers", () => {
   const receiveEntry = {
-    type: 'receive',
-    unit: 'sat',
+    type: "receive",
+    unit: "sat",
     selectedMintUrl: MINT1,
   };
 
-  describe('changeNpcMint', () => {
-    it('delegates to machine.requestMintSelector with npc scope', async () => {
+  describe("changeNpcMint", () => {
+    it("delegates to machine.requestMintSelector with npc scope", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('receive', handlers, receiveEntry);
+      const { mgr } = createManager("receive", handlers, receiveEntry);
 
-      await mgr.execute('changeNpcMint');
-      expect(machine.requestMintSelector).toHaveBeenCalledWith({ scope: 'npc' });
+      await mgr.execute("changeNpcMint");
+      expect(machine.requestMintSelector).toHaveBeenCalledWith({
+        scope: "npc",
+      });
     });
   });
 });
@@ -868,34 +998,34 @@ describe('receive default handlers', () => {
 // mintInfo
 // ---------------------------------------------------------------------------
 
-describe('mintInfo default handlers', () => {
-  describe('trust', () => {
-    it('calls trustMint and notifies', async () => {
+describe("mintInfo default handlers", () => {
+  describe("trust", () => {
+    it("calls trustMint and notifies", async () => {
       const { handlers, ops, notifications } = createMockConfig();
-      const { mgr } = createManager('mintInfo', handlers, {
+      const { mgr } = createManager("mintInfo", handlers, {
         mintUrl: MINT1,
         fromAccepter: true,
       });
 
-      await mgr.execute('trust');
+      await mgr.execute("trust");
 
       expect(ops.trustMint).toHaveBeenCalledWith(MINT1);
       expect(notifications).toContainEqual({
-        event: 'onMintTrustedFromScreen',
+        event: "onMintTrustedFromScreen",
         args: [{ mintUrl: MINT1, fromAccepter: true }],
       });
     });
 
-    it('sets fromAccepter false when not present', async () => {
+    it("sets fromAccepter false when not present", async () => {
       const { handlers, notifications } = createMockConfig();
-      const { mgr } = createManager('mintInfo', handlers, {
+      const { mgr } = createManager("mintInfo", handlers, {
         mintUrl: MINT1,
       });
 
-      await mgr.execute('trust');
+      await mgr.execute("trust");
 
       expect(notifications).toContainEqual({
-        event: 'onMintTrustedFromScreen',
+        event: "onMintTrustedFromScreen",
         args: [{ mintUrl: MINT1, fromAccepter: false }],
       });
     });
@@ -906,37 +1036,39 @@ describe('mintInfo default handlers', () => {
 // mintSelector
 // ---------------------------------------------------------------------------
 
-describe('mintSelector default handlers', () => {
-  describe('select', () => {
-    it('delegates to machine.changeMint', async () => {
+describe("mintSelector default handlers", () => {
+  describe("select", () => {
+    it("delegates to machine.changeMint", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('mintSelector', handlers, {
-        scope: 'selected',
+      const { mgr } = createManager("mintSelector", handlers, {
+        scope: "selected",
       });
 
-      await mgr.execute('select', { mintUrl: MINT1 });
-      expect(machine.changeMint).toHaveBeenCalledWith(MINT1, { scope: 'selected' });
+      await mgr.execute("select", { mintUrl: MINT1 });
+      expect(machine.changeMint).toHaveBeenCalledWith(MINT1, {
+        scope: "selected",
+      });
     });
   });
 
-  describe('getInfo', () => {
-    it('calls buildMintReviewInfo and navigates to mintInfo', async () => {
+  describe("getInfo", () => {
+    it("calls buildMintReviewInfo and navigates to mintInfo", async () => {
       const { handlers, ops, navigation } = createMockConfig();
-      const { mgr } = createManager('mintSelector', handlers, {});
+      const { mgr } = createManager("mintSelector", handlers, {});
 
-      await mgr.execute('getInfo', { mintUrl: MINT1 });
+      await mgr.execute("getInfo", { mintUrl: MINT1 });
 
       expect(ops.buildMintReviewInfo).toHaveBeenCalledWith(MINT1, undefined);
       expect(navigation.mintInfo).toHaveBeenCalled();
     });
 
-    it('navigates with bare mintUrl when buildMintReviewInfo is unavailable', async () => {
+    it("navigates with bare mintUrl when buildMintReviewInfo is unavailable", async () => {
       const { handlers, navigation } = createMockConfig({
         operations: { buildMintReviewInfo: undefined },
       });
-      const { mgr } = createManager('mintSelector', handlers, {});
+      const { mgr } = createManager("mintSelector", handlers, {});
 
-      await mgr.execute('getInfo', { mintUrl: MINT1 });
+      await mgr.execute("getInfo", { mintUrl: MINT1 });
 
       const call = (navigation.mintInfo as MockFn).mock.calls[0];
       const parsed = JSON.parse(call[0]);
@@ -944,22 +1076,22 @@ describe('mintSelector default handlers', () => {
     });
   });
 
-  describe('addMint', () => {
-    it('calls navigation.addMint', async () => {
+  describe("addMint", () => {
+    it("calls navigation.addMint", async () => {
       const { handlers, navigation } = createMockConfig();
-      const { mgr } = createManager('mintSelector', handlers, {});
+      const { mgr } = createManager("mintSelector", handlers, {});
 
-      await mgr.execute('addMint');
+      await mgr.execute("addMint");
       expect(navigation.addMint).toHaveBeenCalled();
     });
   });
 
-  describe('cancel', () => {
-    it('calls navigation.goBack', async () => {
+  describe("cancel", () => {
+    it("calls navigation.goBack", async () => {
       const { handlers, navigation } = createMockConfig();
-      const { mgr } = createManager('mintSelector', handlers, {});
+      const { mgr } = createManager("mintSelector", handlers, {});
 
-      await mgr.execute('cancel');
+      await mgr.execute("cancel");
       expect(navigation.goBack).toHaveBeenCalled();
     });
   });
@@ -969,270 +1101,304 @@ describe('mintSelector default handlers', () => {
 // amountEntry
 // ---------------------------------------------------------------------------
 
-describe('amountEntry default handlers', () => {
-  describe('cancel', () => {
-    it('calls navigation.goBack', async () => {
+describe("amountEntry default handlers", () => {
+  describe("cancel", () => {
+    it("calls navigation.goBack", async () => {
       const { handlers, navigation } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
-        destination: 'sendEcash',
+      const { mgr } = createManager("amountEntry", handlers, {
+        destination: "sendEcash",
       });
 
-      await mgr.execute('cancel');
+      await mgr.execute("cancel");
       expect(navigation.goBack).toHaveBeenCalled();
     });
   });
 
-  describe('next', () => {
-    it('delegates to machine.enterAmount', async () => {
+  describe("next", () => {
+    it("delegates to machine.enterAmount", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
-        effectiveAmount: { value: 100, unit: 'sat' },
+      const { mgr } = createManager("amountEntry", handlers, {
+        effectiveAmount: { value: 100, unit: "sat" },
         selectedMintUrl: MINT1,
-        destination: 'sendEcash',
+        destination: "sendEcash",
       });
 
-      await mgr.execute('next');
-      expect(machine.enterAmount).toHaveBeenCalledWith({ value: 100, unit: 'sat' }, MINT1, {
-        destination: 'sendEcash',
-        meltTarget: undefined,
-        recipientPubkey: undefined,
-        recipientProfile: undefined,
-        amountEntryDisplay: {
-          inputMode: 'unit',
-          rawInput: '',
-          fiatCurrency: null,
-          fiatSymbol: null,
-          btcPrice: 0,
-          displayFiat: null,
-          displayAmount: 100,
-          unit: 'sat',
-          autoOptimized: false,
+      await mgr.execute("next");
+      expect(machine.enterAmount).toHaveBeenCalledWith(
+        { value: 100, unit: "sat" },
+        MINT1,
+        {
+          destination: "sendEcash",
+          meltTarget: undefined,
+          recipientPubkey: undefined,
+          recipientProfile: undefined,
+          amountEntryDisplay: {
+            inputMode: "unit",
+            rawInput: "",
+            fiatCurrency: null,
+            fiatSymbol: null,
+            btcPrice: 0,
+            displayFiat: null,
+            displayAmount: 100,
+            unit: "sat",
+            autoOptimized: false,
+          },
         },
-      });
+      );
     });
 
-    it('carries amount-entry display metadata to machine.enterAmount', async () => {
+    it("carries amount-entry display metadata to machine.enterAmount", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
-        effectiveAmount: { value: 20, unit: 'sat' },
+      const { mgr } = createManager("amountEntry", handlers, {
+        effectiveAmount: { value: 20, unit: "sat" },
         selectedMintUrl: MINT1,
-        destination: 'sendEcash',
-        inputMode: 'fiat',
-        rawInput: '0.01',
-        fiatCurrency: 'usd',
-        fiatSymbol: '$',
+        destination: "sendEcash",
+        inputMode: "fiat",
+        rawInput: "0.01",
+        fiatCurrency: "usd",
+        fiatSymbol: "$",
         btcPrice: 47_619,
         displayFiat: 0.01,
         displayAmount: 20,
         autoOptimized: true,
       });
 
-      await mgr.execute('next');
-      expect(machine.enterAmount).toHaveBeenCalledWith({ value: 20, unit: 'sat' }, MINT1, {
-        destination: 'sendEcash',
-        meltTarget: undefined,
-        recipientPubkey: undefined,
-        recipientProfile: undefined,
-        amountEntryDisplay: {
-          inputMode: 'fiat',
-          rawInput: '0.01',
-          fiatCurrency: 'usd',
-          fiatSymbol: '$',
-          btcPrice: 47_619,
-          displayFiat: 0.01,
-          displayAmount: 20,
-          unit: 'sat',
-          autoOptimized: true,
+      await mgr.execute("next");
+      expect(machine.enterAmount).toHaveBeenCalledWith(
+        { value: 20, unit: "sat" },
+        MINT1,
+        {
+          destination: "sendEcash",
+          meltTarget: undefined,
+          recipientPubkey: undefined,
+          recipientProfile: undefined,
+          amountEntryDisplay: {
+            inputMode: "fiat",
+            rawInput: "0.01",
+            fiatCurrency: "usd",
+            fiatSymbol: "$",
+            btcPrice: 47_619,
+            displayFiat: 0.01,
+            displayAmount: 20,
+            unit: "sat",
+            autoOptimized: true,
+          },
         },
-      });
+      );
     });
 
-    it('forwards recipientPubkey from the entry to machine.enterAmount', async () => {
+    it("forwards recipientPubkey from the entry to machine.enterAmount", async () => {
       const { handlers, machine } = createMockConfig();
-      const recipientPubkey = 'a'.repeat(64);
-      const { mgr } = createManager('amountEntry', handlers, {
-        effectiveAmount: { value: 100, unit: 'sat' },
+      const recipientPubkey = "a".repeat(64);
+      const { mgr } = createManager("amountEntry", handlers, {
+        effectiveAmount: { value: 100, unit: "sat" },
         selectedMintUrl: MINT1,
-        destination: 'sendEcash',
+        destination: "sendEcash",
         recipientPubkey,
       });
 
-      await mgr.execute('next');
-      expect(machine.enterAmount).toHaveBeenCalledWith({ value: 100, unit: 'sat' }, MINT1, {
-        destination: 'sendEcash',
-        meltTarget: undefined,
-        recipientPubkey,
-        amountEntryDisplay: expect.any(Object),
-      });
+      await mgr.execute("next");
+      expect(machine.enterAmount).toHaveBeenCalledWith(
+        { value: 100, unit: "sat" },
+        MINT1,
+        {
+          destination: "sendEcash",
+          meltTarget: undefined,
+          recipientPubkey,
+          amountEntryDisplay: expect.any(Object),
+        },
+      );
     });
 
-    it('prioritizes per-call recipient identity over entry identity', async () => {
+    it("prioritizes per-call recipient identity over entry identity", async () => {
       const { handlers, machine } = createMockConfig();
       const entryProfile = {
-        displayName: 'Entry Alice',
+        displayName: "Entry Alice",
         avatarUrl: null,
-        nip05: 'entry@example.com',
+        nip05: "entry@example.com",
       };
       const ctxProfile = {
-        displayName: 'Fresh Alice',
-        avatarUrl: 'https://example.com/alice.png',
-        nip05: 'fresh@example.com',
+        displayName: "Fresh Alice",
+        avatarUrl: "https://example.com/alice.png",
+        nip05: "fresh@example.com",
       };
-      const { mgr } = createManager('amountEntry', handlers, {
-        effectiveAmount: { value: 100, unit: 'sat' },
+      const { mgr } = createManager("amountEntry", handlers, {
+        effectiveAmount: { value: 100, unit: "sat" },
         selectedMintUrl: MINT1,
-        destination: 'sendEcash',
-        recipientPubkey: 'a'.repeat(64),
+        destination: "sendEcash",
+        recipientPubkey: "a".repeat(64),
         recipientProfile: entryProfile,
       });
 
-      await mgr.execute('next', {
-        recipientPubkey: 'b'.repeat(64),
+      await mgr.execute("next", {
+        recipientPubkey: "b".repeat(64),
         recipientProfile: ctxProfile,
       });
 
-      expect(machine.enterAmount).toHaveBeenCalledWith({ value: 100, unit: 'sat' }, MINT1, {
-        destination: 'sendEcash',
-        meltTarget: undefined,
-        recipientPubkey: 'b'.repeat(64),
-        recipientProfile: ctxProfile,
-        amountEntryDisplay: expect.any(Object),
-      });
+      expect(machine.enterAmount).toHaveBeenCalledWith(
+        { value: 100, unit: "sat" },
+        MINT1,
+        {
+          destination: "sendEcash",
+          meltTarget: undefined,
+          recipientPubkey: "b".repeat(64),
+          recipientProfile: ctxProfile,
+          amountEntryDisplay: expect.any(Object),
+        },
+      );
     });
 
-    it('switches send-money to lightning with recipient identity intact', async () => {
+    it("switches send-money to lightning with recipient identity intact", async () => {
       const { handlers, machine } = createMockConfig();
       const recipientProfile = {
-        displayName: 'Alice',
-        avatarUrl: 'https://example.com/alice.png',
-        nip05: 'alice@example.com',
+        displayName: "Alice",
+        avatarUrl: "https://example.com/alice.png",
+        nip05: "alice@example.com",
       };
-      const recipientPubkey = 'a'.repeat(64);
-      const { mgr } = createManager('amountEntry', handlers, {
-        effectiveAmount: { value: 100, unit: 'sat' },
+      const recipientPubkey = "a".repeat(64);
+      const { mgr } = createManager("amountEntry", handlers, {
+        effectiveAmount: { value: 100, unit: "sat" },
         selectedMintUrl: MINT1,
-        destination: 'sendEcash',
-        meltTarget: 'alice@example.com',
+        destination: "sendEcash",
+        meltTarget: "alice@example.com",
         recipientPubkey,
         recipientProfile,
       });
 
-      await mgr.execute('next', { variantId: 'lightning' });
+      await mgr.execute("next", { variantId: "lightning" });
 
-      expect(machine.enterAmount).toHaveBeenCalledWith({ value: 100, unit: 'sat' }, MINT1, {
-        destination: 'meltQuote',
-        meltQuoteMethod: 'bolt11',
-        meltTarget: 'alice@example.com',
-        recipientPubkey,
-        recipientProfile,
-        amountEntryDisplay: expect.any(Object),
-      });
+      expect(machine.enterAmount).toHaveBeenCalledWith(
+        { value: 100, unit: "sat" },
+        MINT1,
+        {
+          destination: "meltQuote",
+          meltQuoteMethod: "bolt11",
+          meltTarget: "alice@example.com",
+          recipientPubkey,
+          recipientProfile,
+          amountEntryDisplay: expect.any(Object),
+        },
+      );
     });
 
-    it('enters onchain receive from the default next handler (coco v2)', async () => {
+    it("enters onchain receive from the default next handler (coco v2)", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
-        effectiveAmount: { value: 500, unit: 'sat' },
+      const { mgr } = createManager("amountEntry", handlers, {
+        effectiveAmount: { value: 500, unit: "sat" },
         selectedMintUrl: MINT1,
-        destination: 'mintQuote',
-        unit: 'sat',
+        destination: "mintQuote",
+        unit: "sat",
         methodContext: {
           trustedMintUrls: [MINT1],
           mintBalances: { [MINT1]: 0 },
-          mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
-            {
-              mintUrl: MINT1,
-              mintInfo: {
-                nuts: {
-                  '4': {
-                    methods: [
-                      { method: 'bolt11', unit: 'sat', min_amount: 1 },
-                      // 500 sat clears the onchain minimum — bounds gating has
-                      // its own tests; this one exercises the happy-path handler.
-                      { method: 'onchain', unit: 'sat', min_amount: 100 },
-                    ],
+          mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints(
+            [
+              {
+                mintUrl: MINT1,
+                mintInfo: {
+                  nuts: {
+                    "4": {
+                      methods: [
+                        { method: "bolt11", unit: "sat", min_amount: 1 },
+                        // 500 sat clears the onchain minimum — bounds gating has
+                        // its own tests; this one exercises the happy-path handler.
+                        { method: "onchain", unit: "sat", min_amount: 100 },
+                      ],
+                    },
                   },
                 },
               },
-            },
-          ]),
+            ],
+          ),
         },
       });
 
-      await mgr.execute('next', { variantId: 'onchain' });
+      await mgr.execute("next", { variantId: "onchain" });
 
       expect(machine.enterAmount).toHaveBeenCalledWith(
-        { value: 500, unit: 'sat' },
+        { value: 500, unit: "sat" },
         MINT1,
-        expect.objectContaining({ destination: 'mintQuote', mintQuoteMethod: 'onchain' })
+        expect.objectContaining({
+          destination: "mintQuote",
+          mintQuoteMethod: "onchain",
+        }),
       );
     });
 
-    it('enters onchain receive when an alternate mint also advertises it (coco v2)', async () => {
+    it("enters onchain receive when an alternate mint also advertises it (coco v2)", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
-        effectiveAmount: { value: 500, unit: 'sat' },
+      const { mgr } = createManager("amountEntry", handlers, {
+        effectiveAmount: { value: 500, unit: "sat" },
         selectedMintUrl: MINT1,
-        destination: 'mintQuote',
-        unit: 'sat',
+        destination: "mintQuote",
+        unit: "sat",
         methodContext: {
           trustedMintUrls: [MINT1, MINT2],
           mintBalances: { [MINT1]: 0, [MINT2]: 0 },
-          mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
-            {
-              mintUrl: MINT1,
-              mintInfo: {
-                nuts: {
-                  '4': {
-                    methods: [
-                      { method: 'bolt11', unit: 'sat', min_amount: 1 },
-                      { method: 'onchain', unit: 'sat', min_amount: 1_000 },
-                    ],
+          mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints(
+            [
+              {
+                mintUrl: MINT1,
+                mintInfo: {
+                  nuts: {
+                    "4": {
+                      methods: [
+                        { method: "bolt11", unit: "sat", min_amount: 1 },
+                        { method: "onchain", unit: "sat", min_amount: 1_000 },
+                      ],
+                    },
                   },
                 },
               },
-            },
-            {
-              mintUrl: MINT2,
-              mintInfo: {
-                nuts: {
-                  '4': { methods: [{ method: 'onchain', unit: 'sat', min_amount: 100 }] },
+              {
+                mintUrl: MINT2,
+                mintInfo: {
+                  nuts: {
+                    "4": {
+                      methods: [
+                        { method: "onchain", unit: "sat", min_amount: 100 },
+                      ],
+                    },
+                  },
                 },
               },
-            },
-          ]),
+            ],
+          ),
         },
       });
 
-      await mgr.execute('next', { variantId: 'onchain' });
+      await mgr.execute("next", { variantId: "onchain" });
 
       expect(machine.enterAmount).toHaveBeenCalledWith(
-        { value: 500, unit: 'sat' },
+        { value: 500, unit: "sat" },
         MINT1,
-        expect.objectContaining({ destination: 'mintQuote', mintQuoteMethod: 'onchain' })
+        expect.objectContaining({
+          destination: "mintQuote",
+          mintQuoteMethod: "onchain",
+        }),
       );
     });
 
-    it('does nothing when effectiveSatAmount is 0', async () => {
+    it("does nothing when effectiveSatAmount is 0", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
-        effectiveAmount: { value: 0, unit: 'sat' },
+      const { mgr } = createManager("amountEntry", handlers, {
+        effectiveAmount: { value: 0, unit: "sat" },
         selectedMintUrl: MINT1,
-        destination: 'sendEcash',
+        destination: "sendEcash",
       });
 
-      await mgr.execute('next');
+      await mgr.execute("next");
       expect(machine.enterAmount).not.toHaveBeenCalled();
     });
 
-    it('does nothing without destination', async () => {
+    it("does nothing without destination", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
-        effectiveAmount: { value: 100, unit: 'sat' },
+      const { mgr } = createManager("amountEntry", handlers, {
+        effectiveAmount: { value: 100, unit: "sat" },
         selectedMintUrl: MINT1,
       });
 
-      await mgr.execute('next');
+      await mgr.execute("next");
       expect(machine.enterAmount).not.toHaveBeenCalled();
     });
   });
@@ -1253,121 +1419,140 @@ describe('amountEntry default handlers', () => {
       mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
         {
           mintUrl: MINT1,
-          mintInfo: { nuts: { '4': { methods: [{ method: 'bolt11', unit: 'sat' }] } } },
+          mintInfo: {
+            nuts: { "4": { methods: [{ method: "bolt11", unit: "sat" }] } },
+          },
         },
       ]),
     };
 
     function ecashReceiveEntry() {
       return {
-        effectiveAmount: { value: 100, unit: 'sat' },
+        effectiveAmount: { value: 100, unit: "sat" },
         selectedMintUrl: MINT1,
-        destination: 'mintQuote',
-        unit: 'sat',
+        destination: "mintQuote",
+        unit: "sat",
         methodContext: bolt11MintContext,
       };
     }
 
-    it('hands off to the machine with the receivePaymentRequest destination', async () => {
+    it("hands off to the machine with the receivePaymentRequest destination", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, ecashReceiveEntry());
+      const { mgr } = createManager(
+        "amountEntry",
+        handlers,
+        ecashReceiveEntry(),
+      );
 
-      await mgr.execute('next', { variantId: 'ecash' });
+      await mgr.execute("next", { variantId: "ecash" });
 
       expect(machine.enterAmount).toHaveBeenCalledWith(
-        { value: 100, unit: 'sat' },
+        { value: 100, unit: "sat" },
         MINT1,
-        expect.objectContaining({ destination: 'receivePaymentRequest' })
+        expect.objectContaining({ destination: "receivePaymentRequest" }),
       );
     });
 
-    it('does not carry a mint-quote/melt method into the receive-request lane', async () => {
+    it("does not carry a mint-quote/melt method into the receive-request lane", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, ecashReceiveEntry());
+      const { mgr } = createManager(
+        "amountEntry",
+        handlers,
+        ecashReceiveEntry(),
+      );
 
-      await mgr.execute('next', { variantId: 'ecash' });
+      await mgr.execute("next", { variantId: "ecash" });
 
-      const opts = (machine.enterAmount as MockFn).mock.calls[0][2] as Record<string, unknown>;
+      const opts = (machine.enterAmount as MockFn).mock.calls[0][2] as Record<
+        string,
+        unknown
+      >;
       expect(opts.mintQuoteMethod).toBeUndefined();
       expect(opts.meltQuoteMethod).toBeUndefined();
     });
 
-    it('does nothing when the effective amount is zero (gate closed)', async () => {
+    it("does nothing when the effective amount is zero (gate closed)", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
+      const { mgr } = createManager("amountEntry", handlers, {
         ...ecashReceiveEntry(),
-        effectiveAmount: { value: 0, unit: 'sat' },
+        effectiveAmount: { value: 0, unit: "sat" },
       });
 
-      await mgr.execute('next', { variantId: 'ecash' });
+      await mgr.execute("next", { variantId: "ecash" });
 
       expect(machine.enterAmount).not.toHaveBeenCalled();
     });
   });
 
-  describe('paste', () => {
-    it('delegates to machine.scan for sendEcash', async () => {
+  describe("paste", () => {
+    it("delegates to machine.scan for sendEcash", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
-        destination: 'sendEcash',
+      const { mgr } = createManager("amountEntry", handlers, {
+        destination: "sendEcash",
       });
 
-      await mgr.execute('paste');
+      await mgr.execute("paste");
       expect(machine.scan).toHaveBeenCalled();
     });
 
-    it('delegates to machine.scan for meltQuote', async () => {
+    it("delegates to machine.scan for meltQuote", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
-        destination: 'meltQuote',
+      const { mgr } = createManager("amountEntry", handlers, {
+        destination: "meltQuote",
       });
 
-      await mgr.execute('paste');
+      await mgr.execute("paste");
       expect(machine.scan).toHaveBeenCalled();
     });
 
-    it('does nothing for receive destinations', async () => {
+    it("does nothing for receive destinations", async () => {
       const { handlers, machine } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
-        destination: 'mintQuote',
+      const { mgr } = createManager("amountEntry", handlers, {
+        destination: "mintQuote",
       });
 
-      await mgr.execute('paste');
+      await mgr.execute("paste");
       expect(machine.scan).not.toHaveBeenCalled();
     });
   });
 
-  describe('scanQr', () => {
-    it('calls navigation.scanQr for sendEcash', async () => {
+  describe("scanQr", () => {
+    it("calls navigation.scanQr for sendEcash", async () => {
       const { handlers, navigation } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
-        destination: 'sendEcash',
-        unit: 'sat',
+      const { mgr } = createManager("amountEntry", handlers, {
+        destination: "sendEcash",
+        unit: "sat",
       });
 
-      await mgr.execute('scanQr');
-      expect(navigation.scanQr).toHaveBeenCalledWith({ unit: 'sat', context: 'amount' });
+      await mgr.execute("scanQr");
+      expect(navigation.scanQr).toHaveBeenCalledWith({
+        unit: "sat",
+        context: "amount",
+      });
     });
 
-    it('calls navigation.scanQr for meltQuote', async () => {
+    it("calls navigation.scanQr for meltQuote", async () => {
       const { handlers, navigation } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
-        destination: 'meltQuote',
-        unit: 'sat',
+      const { mgr } = createManager("amountEntry", handlers, {
+        destination: "meltQuote",
+        unit: "sat",
       });
 
-      await mgr.execute('scanQr');
-      expect(navigation.scanQr).toHaveBeenCalledWith({ unit: 'sat', context: 'amount' });
+      await mgr.execute("scanQr");
+      expect(navigation.scanQr).toHaveBeenCalledWith({
+        unit: "sat",
+        context: "amount",
+      });
     });
 
-    it('does nothing for receive destinations', async () => {
+    it("does nothing for receive destinations", async () => {
       const { handlers, navigation } = createMockConfig();
-      const { mgr } = createManager('amountEntry', handlers, {
-        destination: 'mintQuote',
-        unit: 'sat',
+      const { mgr } = createManager("amountEntry", handlers, {
+        destination: "mintQuote",
+        unit: "sat",
       });
 
-      await mgr.execute('scanQr');
+      await mgr.execute("scanQr");
       expect(navigation.scanQr).not.toHaveBeenCalled();
     });
   });
@@ -1377,14 +1562,14 @@ describe('amountEntry default handlers', () => {
 // Three-tier fallback
 // ---------------------------------------------------------------------------
 
-describe('three-tier fallback', () => {
-  it('wallet override takes priority over default handler', async () => {
+describe("three-tier fallback", () => {
+  it("wallet override takes priority over default handler", async () => {
     const walletHandler = vi.fn();
     const { handlers } = createMockConfig();
 
-    let mgrRef: ScreenActionManager<'mintInfo'> | null = null;
-    const mgr: ScreenActionManager<'mintInfo'> = createScreenActionManager({
-      screenType: 'mintInfo',
+    let mgrRef: ScreenActionManager<"mintInfo"> | null = null;
+    const mgr: ScreenActionManager<"mintInfo"> = createScreenActionManager({
+      screenType: "mintInfo",
       handlers: { trust: walletHandler },
       defaultHandlers: handlers.mintInfo,
       getContext: (): ScreenActionContext => ({
@@ -1396,17 +1581,17 @@ describe('three-tier fallback', () => {
     mgrRef = mgr;
     mgr.setEntry({ mintUrl: MINT1 });
 
-    await mgr.execute('trust');
+    await mgr.execute("trust");
 
     expect(walletHandler).toHaveBeenCalled();
   });
 
-  it('default handler is used when no wallet handler exists', async () => {
+  it("default handler is used when no wallet handler exists", async () => {
     const { handlers, ops } = createMockConfig();
 
-    let mgrRef: ScreenActionManager<'mintInfo'> | null = null;
-    const mgr: ScreenActionManager<'mintInfo'> = createScreenActionManager({
-      screenType: 'mintInfo',
+    let mgrRef: ScreenActionManager<"mintInfo"> | null = null;
+    const mgr: ScreenActionManager<"mintInfo"> = createScreenActionManager({
+      screenType: "mintInfo",
       handlers: {},
       defaultHandlers: handlers.mintInfo,
       getContext: (): ScreenActionContext => ({
@@ -1418,7 +1603,7 @@ describe('three-tier fallback', () => {
     mgrRef = mgr;
     mgr.setEntry({ mintUrl: MINT1 });
 
-    await mgr.execute('trust');
+    await mgr.execute("trust");
 
     expect(ops.trustMint).toHaveBeenCalledWith(MINT1);
   });

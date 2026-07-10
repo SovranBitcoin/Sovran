@@ -8,6 +8,7 @@ import { createDefaultOperations } from 'wallet/operations';
 import { getBLEPeers } from 'bitchat-module';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { requireOfflineTokenDleq } from '@/shared/lib/cashu/offlineReceiveDleq';
 import { peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
@@ -55,8 +56,17 @@ function getOrchestrator(): MeshRedeemOrchestrator {
   // the colada React instance lives in the provider tree and this drain
   // must run with no screen mounted.
   const operations = createDefaultOperations({ getManager });
-  const executeAutoRedeem = operations.executeAutoRedeem;
-  if (!executeAutoRedeem) throw new Error('colada executeAutoRedeem operation missing');
+  const executeAutoRedeemBase = operations.executeAutoRedeem;
+  if (!executeAutoRedeemBase) throw new Error('colada executeAutoRedeem operation missing');
+  const executeAutoRedeem: typeof executeAutoRedeemBase = async (token, mintUrl) => {
+    const manager = getManager();
+    if (!manager) throw new Error('Wallet manager is not available');
+    // Nut Drop is an offline transport even when internet happens to be
+    // available at redemption time. Verify every proof locally before the
+    // orchestrator can treat the queued bearer value as received.
+    await requireOfflineTokenDleq(manager, token, mintUrl);
+    return executeAutoRedeemBase(token, mintUrl);
+  };
 
   orchestrator = createMeshRedeemOrchestrator({
     getManager,

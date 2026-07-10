@@ -42,6 +42,7 @@ import { LightningAddress } from '@sovranbitcoin/schemas';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 
 const SURFACE = 'nostr-dm' as const;
 
@@ -375,6 +376,7 @@ export function UserMessagesScreen({
 
     // Enter through colada's normal Send entrypoint so no-balance and
     // multi-mint selection behavior stays identical to the wallet Send button.
+    clearPaymentContext('user.messages.send_money');
     void (machine as SendMoneyPaymentMachine).startSendEcash({
       reset: true,
       meltTarget: lud16,

@@ -1,4 +1,5 @@
 import type {
+  CounterRepository,
   Keypair,
   KeypairPurpose,
   KeyRingRepository,
@@ -129,11 +130,73 @@ interface SovranCocoRepositoriesOptions {
 
 function overlayRepositoryScope(
   scope: RepositoryTransactionScope,
-  keyRing: KeyRingRepository | null
+  keyRing: KeyRingRepository | null,
+  counter: CounterRepository
 ): RepositoryTransactionScope {
   return {
     ...scope,
     ...(keyRing ? { keyRingRepository: keyRing } : {}),
+    counterRepository: counter,
+  };
+}
+
+type CounterTask = () => Promise<void>;
+
+/** Serialize writes for one mint/keyset on a repository surface. Coco currently
+ * performs counter read/modify/write as separate calls, so the app boundary
+ * must at least prevent a stale writer from landing after a newer high-water
+ * mark. Transaction scopes get their own queue because holding a root queue
+ * while waiting on SQLite's exclusive transaction lock could deadlock. */
+function createCounterWriteQueue(): (key: string, task: CounterTask) => Promise<void> {
+  const tails = new Map<string, Promise<void>>();
+
+  return async (key, task) => {
+    const previous = tails.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.catch(() => undefined).then(() => gate);
+    tails.set(key, tail);
+
+    await previous.catch(() => undefined);
+    try {
+      await task();
+    } finally {
+      release();
+      if (tails.get(key) === tail) tails.delete(key);
+    }
+  };
+}
+
+/** MAX-on-conflict counter repository. A restore, migration replay, or stale
+ * service write may skip derivation indices, but can never reuse one by
+ * lowering the persisted high-water mark. */
+function wrapCounterRepository(
+  repository: CounterRepository,
+  enqueue: (key: string, task: CounterTask) => Promise<void>
+): CounterRepository {
+  return {
+    getCounter: (mintUrl, keysetId) => repository.getCounter(mintUrl, keysetId),
+    setCounter: async (mintUrl, keysetId, counter) => {
+      await enqueue(`${mintUrl}\u0000${keysetId}`, async () => {
+        const current = await repository.getCounter(mintUrl, keysetId);
+        if (current && current.counter >= counter) {
+          cashuLog.debug('cashu.repository.counter.write_skipped', {
+            keysetId,
+            current: current.counter,
+            requested: counter,
+          });
+          return;
+        }
+        await repository.setCounter(mintUrl, keysetId, counter);
+        cashuLog.debug('cashu.repository.counter.write_applied', {
+          keysetId,
+          previous: current?.counter ?? null,
+          counter,
+        });
+      });
+    },
   };
 }
 
@@ -154,9 +217,11 @@ export function createSovranCocoRepositories(
     ephemeralPubkeys.size > 0
       ? wrapKeyRingRepository(repositories.keyRingRepository, ephemeralPubkeys, overlay)
       : null;
+  const enqueueCounterWrite = createCounterWriteQueue();
+  const counter = wrapCounterRepository(repositories.counterRepository, enqueueCounterWrite);
 
   return {
-    ...overlayRepositoryScope(repositories, keyRing),
+    ...overlayRepositoryScope(repositories, keyRing, counter),
     init: () => repositories.init(),
     withTransaction: async (fn) => {
       const startedAt = Date.now();
@@ -164,9 +229,13 @@ export function createSovranCocoRepositories(
         hasEphemeralKeyring: ephemeralPubkeys.size > 0,
       });
       try {
-        const result = await repositories.withTransaction((scope) =>
-          fn(overlayRepositoryScope(scope, keyRing))
-        );
+        const result = await repositories.withTransaction((scope) => {
+          const transactionCounter = wrapCounterRepository(
+            scope.counterRepository,
+            createCounterWriteQueue()
+          );
+          return fn(overlayRepositoryScope(scope, keyRing, transactionCounter));
+        });
         cashuLog.debug('cashu.repository.transaction.done', {
           duration_ms: Date.now() - startedAt,
         });

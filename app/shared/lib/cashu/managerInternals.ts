@@ -45,6 +45,10 @@ interface ManagerInternals {
     getWallet(mintUrl: string, unit: string): Promise<Wallet>;
   };
   counterService: {
+    getCounter(
+      mintUrl: string,
+      keysetId: string
+    ): Promise<{ mintUrl: string; keysetId: string; counter: number }>;
     overwriteCounter(
       mintUrl: string,
       keysetId: string,
@@ -234,9 +238,11 @@ export async function saveProofs(
 }
 
 /**
- * Force-set a deterministic counter for a (mint, keyset) pair, via the private
+ * Raise a deterministic counter for a (mint, keyset) pair, via the private
  * CounterService. Used by the legacy Redux→Coco migration to recover counters
- * the user already burnt before installing the Coco-backed build.
+ * the user already burnt before installing the Coco-backed build. This is
+ * MAX-on-conflict: a stale migration snapshot may skip nothing or move the
+ * high-water mark forward, but can never lower it and reuse derivation indices.
  */
 export async function overwriteCounter(
   manager: Manager,
@@ -244,17 +250,23 @@ export async function overwriteCounter(
   keysetId: string,
   counter: number
 ): Promise<{ mintUrl: string; keysetId: string; counter: number }> {
+  if (!Number.isSafeInteger(counter) || counter < 0) {
+    throw new RangeError('counter must be a non-negative safe integer');
+  }
   cashuLog.info('cashu.manager_internals.counter_overwrite.start', {
     ...mintUrlLogFields(mintUrl),
     keysetId,
     counter,
   });
   try {
-    const result = await internals(manager).counterService.overwriteCounter(
-      mintUrl,
-      keysetId,
-      counter
-    );
+    const counterService = internals(manager).counterService;
+    const current = await counterService.getCounter(mintUrl, keysetId);
+    if (counter > current.counter) {
+      await counterService.overwriteCounter(mintUrl, keysetId, counter);
+    }
+    // Read back through the service because the Sovran repository wrapper is
+    // also MAX-on-conflict and may have rejected a racing stale write.
+    const result = await counterService.getCounter(mintUrl, keysetId);
     cashuLog.info('cashu.manager_internals.counter_overwrite.done', {
       ...mintUrlLogFields(mintUrl),
       keysetId,

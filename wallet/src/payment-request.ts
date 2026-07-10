@@ -14,6 +14,7 @@ import { logger } from "./logger";
 import type { PaymentRequestInfo, PaymentRequestTransport } from "./types";
 
 const CREQ_PREFIX = /^creq[ab]/i;
+const CREQB_PREFIX = /^creqb1/i;
 const P2PK_PUBKEY_RE = /^02[0-9a-f]{64}$/i;
 
 const tryDecode = <T>(fn: () => T): T | null => {
@@ -34,9 +35,25 @@ export function decodePaymentRequestInfo(
 ): PaymentRequestInfo | null {
   const trimmed = value.trim();
   if (!CREQ_PREFIX.test(trimmed)) return null;
+  // NUT-26 is bech32m: an all-upper or all-lower string is valid, but mixed
+  // case must be rejected. cashu-ts 4.5.1 lowercases before its bech32m
+  // decoder, so enforce the wire invariant at Sovran's untrusted-input seam.
+  if (
+    CREQB_PREFIX.test(trimmed) &&
+    trimmed !== trimmed.toLowerCase() &&
+    trimmed !== trimmed.toUpperCase()
+  ) {
+    logger.warn("paymentRequest.decode.failed", {
+      inputLength: trimmed.length,
+      reason: "mixed_case_creqb",
+    });
+    return null;
+  }
   const decoded = tryDecode(() => decodePaymentRequest(trimmed));
   if (!decoded) {
-    logger.warn("paymentRequest.decode.failed", { inputLength: trimmed.length });
+    logger.warn("paymentRequest.decode.failed", {
+      inputLength: trimmed.length,
+    });
     return null;
   }
 

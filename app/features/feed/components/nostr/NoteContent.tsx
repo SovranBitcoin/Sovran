@@ -37,6 +37,7 @@ import { formatRelative } from '@/shared/lib/date';
 import { sharedStyles } from './feedStyles';
 import { fontSize } from '@/shared/styles/tokens';
 import { NOTE_CONTENT_LINE_HEIGHT } from '@/features/feed/lib/threadListLayout';
+import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 
 // Re-exported so `NoteContent` stays the import site for note-rendering
 // consumers (PostCard); the value's source of truth lives in `threadListLayout`
@@ -272,6 +273,7 @@ const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { melt
   return (
     <Pressable
       onPress={() => {
+        clearPaymentContext('feed.lightning_invoice');
         void machine.execute(meltTarget, { reset: true });
       }}
       style={[sharedStyles.mediaCard, { backgroundColor: surface, borderColor: surfaceTertiary }]}>

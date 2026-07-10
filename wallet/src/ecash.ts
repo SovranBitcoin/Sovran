@@ -22,6 +22,22 @@ export interface EcashTokenMetadata {
   p2pkPubkey: string | null;
 }
 
+/**
+ * Cashu proofs are bearer instruments identified by their secret. Counting the
+ * same secret twice inflates the preview amount even though the mint can only
+ * redeem it once.
+ */
+export function hasDuplicateProofSecrets(
+  proofs: readonly { secret: string }[],
+): boolean {
+  const seen = new Set<string>();
+  for (const proof of proofs) {
+    if (seen.has(proof.secret)) return true;
+    seen.add(proof.secret);
+  }
+  return false;
+}
+
 const tryDecode = <T>(fn: () => T): T | null => {
   try {
     return fn();
@@ -60,6 +76,13 @@ export function decodeEcashTokenMetadata(
   const decoded = tryDecode(() => getTokenMetadata(token));
   if (!decoded) {
     logger.debug("ecash.decode.failed", { inputLength: token.length });
+    return null;
+  }
+  if (hasDuplicateProofSecrets(decoded.incompleteProofs)) {
+    logger.debug("ecash.decode.duplicateProofSecret", {
+      inputLength: token.length,
+      proofCount: decoded.incompleteProofs.length,
+    });
     return null;
   }
   const metadata: EcashTokenMetadata = {

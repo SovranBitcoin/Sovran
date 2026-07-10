@@ -16,6 +16,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
 import { amountToNumber } from "../amount";
+import { hasDuplicateProofSecrets } from "../ecash";
 import { logger, mintUrlFields } from "../logger";
 
 /**
@@ -56,7 +57,9 @@ function getP2PKRequiredSigs(secret: Secret): number {
   // would let an unspendable token classify as receivable.
   if (nSigs === undefined) return 1;
   const parsed = Number(nSigs);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : Number.POSITIVE_INFINITY;
+  return Number.isFinite(parsed) && parsed > 0
+    ? parsed
+    : Number.POSITIVE_INFINITY;
 }
 
 /**
@@ -105,6 +108,19 @@ export function classifyMeshToken(
         proofCount: Array.isArray(token.proofs) ? token.proofs.length : null,
       });
       return result;
+    }
+    if (hasDuplicateProofSecrets(token.proofs)) {
+      logger.warn("transport.classifyMeshToken.duplicateProofSecret", {
+        ...mintUrlFields(mintUrl),
+        unit,
+        proofCount: token.proofs.length,
+      });
+      return {
+        classification: "invalid",
+        mintUrl,
+        amount,
+        unit,
+      };
     }
 
     for (const proof of token.proofs) {

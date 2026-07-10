@@ -36,20 +36,25 @@
  * (`machine.event.ignored reason:locked`).
  */
 
-import { describe, it, expect } from 'vitest';
-import { createTestMachine } from '../_harness';
-import { MINT1, MINT2 } from '../_harness/fixtures';
+import { describe, it, expect } from "vitest";
+import {
+  createPaymentMachine,
+  defaultDetectors,
+  type MachineOperations,
+} from "../../src";
+import { createTestMachine } from "../_harness";
+import { MINT1, MINT2, WALLETS } from "../_harness/fixtures";
 
 function quoteEntry(id: string, amount: number, mintUrl: string = MINT1) {
   return {
     historyEntry: JSON.stringify({
       id,
-      type: 'mint',
+      type: "mint",
       createdAt: 1,
       mintUrl,
-      unit: 'sat',
+      unit: "sat",
       quoteId: id,
-      state: 'UNPAID',
+      state: "UNPAID",
       amount,
       paymentRequest: `lnbc-${id}`,
       metadata: { operationId: id },
@@ -71,64 +76,64 @@ function deferred<T>() {
 // 1. Settled re-entry — accepted from any step, context updates
 // ---------------------------------------------------------------------------
 
-describe('back-nav re-entry — settled state', () => {
-  it('AMOUNT_ENTERED after mintQuoteCreated creates a new quote with the new amount', async () => {
+describe("back-nav re-entry — settled state", () => {
+  it("AMOUNT_ENTERED after mintQuoteCreated creates a new quote with the new amount", async () => {
     const tm = createTestMachine();
     await tm.machine.startReceiveLightning({ reset: true });
-    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1, {
-      destination: 'mintQuote',
+    await tm.machine.enterAmount({ value: 1000, unit: "sat" }, MINT1, {
+      destination: "mintQuote",
     });
-    tm.assertStep('mintQuoteCreated');
+    tm.assertStep("mintQuoteCreated");
 
     // back gesture — the machine hears nothing — then the re-driven amount
     // screen submits a new amount
-    await tm.machine.enterAmount({ value: 2000, unit: 'sat' }, MINT1, {
-      destination: 'mintQuote',
+    await tm.machine.enterAmount({ value: 2000, unit: "sat" }, MINT1, {
+      destination: "mintQuote",
     });
 
-    tm.assertStep('mintQuoteCreated');
+    tm.assertStep("mintQuoteCreated");
     tm.assertContext({ amount: 2000 });
     expect(
-      tm.operationCalls.filter((c) => c.name === 'executeMintQuote')
+      tm.operationCalls.filter((c) => c.name === "executeMintQuote"),
     ).toHaveLength(2);
     // the handler re-navigated for the new quote
     expect(
-      tm.handlerCalls.filter((h) => h.step === 'mintQuoteCreated')
+      tm.handlerCalls.filter((h) => h.step === "mintQuoteCreated"),
     ).toHaveLength(2);
   });
 
-  it('re-entry preserves an in-flow mint choice (context is not reset)', async () => {
+  it("re-entry preserves an in-flow mint choice (context is not reset)", async () => {
     const tm = createTestMachine();
     await tm.machine.startReceiveLightning({ reset: true });
     // user swapped the quote mint mid-flow
-    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT2, {
-      destination: 'mintQuote',
+    await tm.machine.enterAmount({ value: 1000, unit: "sat" }, MINT2, {
+      destination: "mintQuote",
     });
-    tm.assertStep('mintQuoteCreated');
+    tm.assertStep("mintQuoteCreated");
     tm.assertContext({ mintUrl: MINT2 });
 
     // back → new amount, screen resubmits with the mint it shows (MINT2)
-    await tm.machine.enterAmount({ value: 500, unit: 'sat' }, MINT2, {
-      destination: 'mintQuote',
+    await tm.machine.enterAmount({ value: 500, unit: "sat" }, MINT2, {
+      destination: "mintQuote",
     });
-    tm.assertStep('mintQuoteCreated');
+    tm.assertStep("mintQuoteCreated");
     tm.assertContext({ amount: 500, mintUrl: MINT2 });
   });
 
-  it('re-entering via the hub reset path still works', async () => {
+  it("re-entering via the hub reset path still works", async () => {
     const tm = createTestMachine();
     await tm.machine.startReceiveLightning({ reset: true });
-    await tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1, {
-      destination: 'mintQuote',
+    await tm.machine.enterAmount({ value: 1000, unit: "sat" }, MINT1, {
+      destination: "mintQuote",
     });
-    tm.assertStep('mintQuoteCreated');
+    tm.assertStep("mintQuoteCreated");
 
     await tm.machine.startReceiveLightning({ reset: true });
-    tm.assertStep('enterAmount');
-    await tm.machine.enterAmount({ value: 2000, unit: 'sat' }, MINT1, {
-      destination: 'mintQuote',
+    tm.assertStep("enterAmount");
+    await tm.machine.enterAmount({ value: 2000, unit: "sat" }, MINT1, {
+      destination: "mintQuote",
     });
-    tm.assertStep('mintQuoteCreated');
+    tm.assertStep("mintQuoteCreated");
     tm.assertContext({ amount: 2000 });
   });
 });
@@ -137,8 +142,8 @@ describe('back-nav re-entry — settled state', () => {
 // 2. In-flight supersede — latest intent wins over pending resolution
 // ---------------------------------------------------------------------------
 
-describe('back-nav re-entry — supersedes in-flight resolve work', () => {
-  it('AMOUNT_ENTERED during a pending createMintQuote is NOT dropped', async () => {
+describe("back-nav re-entry — supersedes in-flight resolve work", () => {
+  it("AMOUNT_ENTERED during a pending createMintQuote is NOT dropped", async () => {
     const first = deferred<{ historyEntry: string }>();
     let calls = 0;
     const tm = createTestMachine({
@@ -152,30 +157,34 @@ describe('back-nav re-entry — supersedes in-flight resolve work', () => {
     });
 
     await tm.machine.startReceiveLightning({ reset: true });
-    const firstPress = tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1, {
-      destination: 'mintQuote',
-    });
+    const firstPress = tm.machine.enterAmount(
+      { value: 1000, unit: "sat" },
+      MINT1,
+      {
+        destination: "mintQuote",
+      },
+    );
 
     // user backs out while the mint is slow and submits a new amount
-    await tm.machine.enterAmount({ value: 2000, unit: 'sat' }, MINT1, {
-      destination: 'mintQuote',
+    await tm.machine.enterAmount({ value: 2000, unit: "sat" }, MINT1, {
+      destination: "mintQuote",
     });
 
     // the second press took over: new quote created for 2000
-    tm.assertStep('mintQuoteCreated');
+    tm.assertStep("mintQuoteCreated");
     tm.assertContext({ amount: 2000 });
     expect(calls).toBe(2);
 
     // the slow first quote finally lands — it must be discarded, not navigate
     const handlerCallsBefore = tm.handlerCalls.length;
-    first.resolve(quoteEntry('q1', 1000));
+    first.resolve(quoteEntry("q1", 1000));
     await firstPress;
-    tm.assertStep('mintQuoteCreated');
+    tm.assertStep("mintQuoteCreated");
     tm.assertContext({ amount: 2000 });
     expect(tm.handlerCalls.length).toBe(handlerCallsBefore);
   });
 
-  it('a superseded quote that later FAILS does not clobber the new flow', async () => {
+  it("a superseded quote that later FAILS does not clobber the new flow", async () => {
     const first = deferred<{ historyEntry: string }>();
     let calls = 0;
     const tm = createTestMachine({
@@ -189,22 +198,26 @@ describe('back-nav re-entry — supersedes in-flight resolve work', () => {
     });
 
     await tm.machine.startReceiveLightning({ reset: true });
-    const firstPress = tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1, {
-      destination: 'mintQuote',
+    const firstPress = tm.machine.enterAmount(
+      { value: 1000, unit: "sat" },
+      MINT1,
+      {
+        destination: "mintQuote",
+      },
+    );
+    await tm.machine.enterAmount({ value: 2000, unit: "sat" }, MINT1, {
+      destination: "mintQuote",
     });
-    await tm.machine.enterAmount({ value: 2000, unit: 'sat' }, MINT1, {
-      destination: 'mintQuote',
-    });
-    tm.assertStep('mintQuoteCreated');
+    tm.assertStep("mintQuoteCreated");
 
-    first.reject(new Error('mint exploded'));
+    first.reject(new Error("mint exploded"));
     await firstPress;
     // stale failure is discarded — no error step, no error notification
-    tm.assertStep('mintQuoteCreated');
+    tm.assertStep("mintQuoteCreated");
     tm.assertContext({ amount: 2000 });
   });
 
-  it('MINT_SELECTED during a pending createMintQuote is NOT dropped', async () => {
+  it("MINT_SELECTED during a pending createMintQuote is NOT dropped", async () => {
     const first = deferred<{ historyEntry: string }>();
     let calls = 0;
     const tm = createTestMachine({
@@ -218,60 +231,124 @@ describe('back-nav re-entry — supersedes in-flight resolve work', () => {
     });
 
     await tm.machine.startReceiveLightning({ reset: true });
-    const firstPress = tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1, {
-      destination: 'mintQuote',
-    });
+    const firstPress = tm.machine.enterAmount(
+      { value: 1000, unit: "sat" },
+      MINT1,
+      {
+        destination: "mintQuote",
+      },
+    );
 
     // user backs to the mint selector and picks another mint
     await tm.machine.changeMint(MINT2);
     tm.assertContext({ mintUrl: MINT2 });
 
-    first.resolve(quoteEntry('q1', 1000, MINT1));
+    first.resolve(quoteEntry("q1", 1000, MINT1));
     await firstPress;
     tm.assertContext({ mintUrl: MINT2 });
   });
 
-  it('starting a new flow during a pending quote is NOT dropped (no reset needed)', async () => {
+  it("starting a new flow during a pending quote is NOT dropped (no reset needed)", async () => {
     const first = deferred<{ historyEntry: string }>();
     const tm = createTestMachine({
       operations: { executeMintQuote: () => first.promise },
     });
 
     await tm.machine.startReceiveLightning({ reset: true });
-    const firstPress = tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1, {
-      destination: 'mintQuote',
-    });
+    const firstPress = tm.machine.enterAmount(
+      { value: 1000, unit: "sat" },
+      MINT1,
+      {
+        destination: "mintQuote",
+      },
+    );
 
     // plain flow start (no reset opts) — e.g. a different entry point
     await tm.machine.startSendEcash();
-    tm.assertStep('enterAmount');
-    tm.assertContext({ destination: 'sendEcash' });
+    tm.assertStep("enterAmount");
+    tm.assertContext({ destination: "sendEcash" });
 
-    first.resolve(quoteEntry('q1', 1000));
+    first.resolve(quoteEntry("q1", 1000));
     await firstPress;
-    tm.assertStep('enterAmount');
-    tm.assertContext({ destination: 'sendEcash' });
+    tm.assertStep("enterAmount");
+    tm.assertContext({ destination: "sendEcash" });
   });
 
-  it('reset during a pending quote still recovers (existing behavior)', async () => {
+  it("reset during a pending quote still recovers (existing behavior)", async () => {
     const first = deferred<{ historyEntry: string }>();
     const tm = createTestMachine({
       operations: { executeMintQuote: () => first.promise },
     });
     await tm.machine.startReceiveLightning({ reset: true });
-    const firstPress = tm.machine.enterAmount({ value: 1000, unit: 'sat' }, MINT1, {
-      destination: 'mintQuote',
-    });
+    const firstPress = tm.machine.enterAmount(
+      { value: 1000, unit: "sat" },
+      MINT1,
+      {
+        destination: "mintQuote",
+      },
+    );
 
     await tm.machine.startReceiveLightning({ reset: true });
-    tm.assertStep('enterAmount');
+    tm.assertStep("enterAmount");
 
-    first.resolve(quoteEntry('q1', 1000));
+    first.resolve(quoteEntry("q1", 1000));
     await firstPress;
-    tm.assertStep('enterAmount');
+    tm.assertStep("enterAmount");
     expect(
-      tm.handlerCalls.filter((h) => h.step === 'mintQuoteCreated')
+      tm.handlerCalls.filter((h) => h.step === "mintQuoteCreated"),
     ).toHaveLength(0);
+  });
+});
+
+describe("flow generations — stale send results", () => {
+  it("a stale offline fallback cannot patch the replacement flow context", async () => {
+    const onlineGate = deferred<{ historyEntry: string }>();
+    const fallbackGate = deferred<{ historyEntry: string }>();
+    const fallbackStarted = deferred<void>();
+    const historyEntry = JSON.stringify({
+      id: "send-1",
+      type: "send",
+      createdAt: 1,
+      mintUrl: MINT1,
+      unit: "sat",
+      amount: 100,
+      state: "PENDING",
+      metadata: {},
+    });
+    const operations: MachineOperations = {
+      executeSend: () => onlineGate.promise,
+    };
+    const machine = createPaymentMachine({
+      handlers: {},
+      detectors: defaultDetectors,
+      getContext: () => WALLETS.default,
+      operations,
+    });
+
+    await machine.startSendEcash({ reset: true });
+    const oldCommit = machine.enterAmount({ value: 100, unit: "sat" }, MINT1, {
+      destination: "sendEcash",
+    });
+
+    // Operations are an injected runtime boundary. Make local recovery become
+    // available after the online attempt has begun, then hold that fallback so
+    // reset can replace the flow before its result arrives.
+    operations.executeOfflineSend = async () => {
+      fallbackStarted.resolve();
+      return fallbackGate.promise;
+    };
+    const mintOffline = new Error("mint offline");
+    mintOffline.name = "MintFetchError";
+    onlineGate.reject(mintOffline);
+    await fallbackStarted.promise;
+
+    machine.reset();
+    await machine.startReceive();
+    fallbackGate.resolve({ historyEntry });
+    await oldCommit;
+
+    expect(machine.getStep()).toBe("receiveHub");
+    expect(machine.getContext().mintUnreachableConfirmed).toBeUndefined();
   });
 });
 
@@ -279,8 +356,8 @@ describe('back-nav re-entry — supersedes in-flight resolve work', () => {
 // 3. Commit protection — events are still dropped while money moves
 // ---------------------------------------------------------------------------
 
-describe('back-nav re-entry — commits stay locked', () => {
-  it('AMOUNT_ENTERED while an ecash send is executing is dropped', async () => {
+describe("back-nav re-entry — commits stay locked", () => {
+  it("AMOUNT_ENTERED while an ecash send is executing is dropped", async () => {
     const sendGate = deferred<{ token: string; historyEntry: string }>();
     let sendCalls = 0;
     const hang = async () => {
@@ -292,28 +369,28 @@ describe('back-nav re-entry — commits stay locked', () => {
     });
 
     await tm.machine.startSendEcash({ reset: true });
-    const commit = tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1, {
-      destination: 'sendEcash',
+    const commit = tm.machine.enterAmount({ value: 100, unit: "sat" }, MINT1, {
+      destination: "sendEcash",
     });
 
     // token is being cut — a re-driven amount screen must NOT restart the flow
-    await tm.machine.enterAmount({ value: 999, unit: 'sat' }, MINT1, {
-      destination: 'sendEcash',
+    await tm.machine.enterAmount({ value: 999, unit: "sat" }, MINT1, {
+      destination: "sendEcash",
     });
     expect(sendCalls).toBe(1);
     tm.assertContext({ amount: 100 });
 
     sendGate.resolve({
-      token: 'cashuAtoken',
+      token: "cashuAtoken",
       historyEntry: JSON.stringify({
-        id: 'send-1',
-        type: 'send',
+        id: "send-1",
+        type: "send",
         createdAt: 1,
         mintUrl: MINT1,
-        unit: 'sat',
+        unit: "sat",
         amount: 100,
-        state: 'PENDING',
-        token: 'cashuAtoken',
+        state: "PENDING",
+        token: "cashuAtoken",
         metadata: {},
       }),
     });
@@ -322,7 +399,7 @@ describe('back-nav re-entry — commits stay locked', () => {
     tm.assertContext({ amount: 100 });
   });
 
-  it('CONFIRM_MELT double-press stays a single melt', async () => {
+  it("CONFIRM_MELT double-press stays a single melt", async () => {
     const meltGate = deferred<Record<string, unknown>>();
     let meltCalls = 0;
     const tm = createTestMachine({
@@ -335,12 +412,15 @@ describe('back-nav re-entry — commits stay locked', () => {
     });
 
     // drive to the melt preview via a lightning-address style flow
-    await tm.machine.startSendEcash({ reset: true, meltTarget: 'user@ln.example' });
-    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1, {
-      destination: 'meltQuote',
-      meltTarget: 'user@ln.example',
+    await tm.machine.startSendEcash({
+      reset: true,
+      meltTarget: "user@ln.example",
     });
-    tm.assertStep('navigateToMeltPreview');
+    await tm.machine.enterAmount({ value: 100, unit: "sat" }, MINT1, {
+      destination: "meltQuote",
+      meltTarget: "user@ln.example",
+    });
+    tm.assertStep("navigateToMeltPreview");
 
     const firstConfirm = tm.machine.confirmMelt();
     await tm.machine.confirmMelt(); // impatient double-tap
@@ -348,18 +428,80 @@ describe('back-nav re-entry — commits stay locked', () => {
 
     meltGate.resolve({
       historyEntry: JSON.stringify({
-        id: 'melt-1',
-        type: 'melt',
+        id: "melt-1",
+        type: "melt",
         createdAt: 1,
         mintUrl: MINT1,
-        unit: 'sat',
+        unit: "sat",
         amount: 100,
-        state: 'PAID',
-        quoteId: 'melt-1',
+        state: "PAID",
+        quoteId: "melt-1",
         metadata: {},
       }),
     });
     await firstConfirm;
     expect(meltCalls).toBe(1);
+  });
+
+  it("an older commit finishing cannot unlock a newer commit", async () => {
+    const firstGate = deferred<{ historyEntry: string }>();
+    const secondGate = deferred<{ historyEntry: string }>();
+    let sendCalls = 0;
+    const result = (id: string, amount: number) => ({
+      historyEntry: JSON.stringify({
+        id,
+        type: "send",
+        createdAt: 1,
+        mintUrl: MINT1,
+        unit: "sat",
+        amount,
+        state: "PENDING",
+        metadata: {},
+      }),
+    });
+    const executeSend = async (_mintUrl: string, amount: number) => {
+      sendCalls += 1;
+      if (sendCalls === 1) return firstGate.promise;
+      if (sendCalls === 2) return secondGate.promise;
+      return result(`send-${sendCalls}`, amount);
+    };
+    const tm = createTestMachine({
+      operations: { executeSend, executeOfflineSend: executeSend },
+    });
+
+    await tm.machine.startSendEcash({ reset: true });
+    const firstCommit = tm.machine.enterAmount(
+      { value: 100, unit: "sat" },
+      MINT1,
+      {
+        destination: "sendEcash",
+      },
+    );
+
+    // A root reset is allowed to begin a new generation while the old async
+    // operation settles. The second generation now owns the commit lock.
+    tm.machine.reset();
+    await tm.machine.startSendEcash();
+    const secondCommit = tm.machine.enterAmount(
+      { value: 200, unit: "sat" },
+      MINT1,
+      {
+        destination: "sendEcash",
+      },
+    );
+    expect(sendCalls).toBe(2);
+
+    firstGate.resolve(result("send-1", 100));
+    await firstCommit;
+
+    // Re-driven input must remain blocked until the second commit finishes.
+    await tm.machine.enterAmount({ value: 999, unit: "sat" }, MINT1, {
+      destination: "sendEcash",
+    });
+    expect(sendCalls).toBe(2);
+    tm.assertContext({ amount: 200 });
+
+    secondGate.resolve(result("send-2", 200));
+    await secondCommit;
   });
 });

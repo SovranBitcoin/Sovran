@@ -28,10 +28,10 @@
  *   - Single option in BIP-321 → auto-selects (no picker needed)
  */
 
-import { describe, it, expect } from 'vitest';
-import { createTestMachine, runScenario } from '../_harness';
-import { WALLETS, MINT1, INPUTS } from '../_harness/fixtures';
-import type { FlowScenario } from '../_harness/types';
+import { describe, it, expect } from "vitest";
+import { createTestMachine, runScenario } from "../_harness";
+import { WALLETS, MINT1, INPUTS } from "../_harness/fixtures";
+import type { FlowScenario } from "../_harness/types";
 
 // ---------------------------------------------------------------------------
 // BIP-321 with multiple options → chooseOption
@@ -41,17 +41,17 @@ import type { FlowScenario } from '../_harness/types';
  * The core multi-option test: a BIP-321 URI with both a cashu token and
  * a lightning address should present the user with a choice.
  */
-describe('BIP-321 multi-option', () => {
-  it('routes to chooseOption when cashu + lightning present', async () => {
+describe("BIP-321 multi-option", () => {
+  it("routes to chooseOption when cashu + lightning present", async () => {
     // bitcoin:?cashu=<token>&lightning=<address> → 2 options detected
     const input = `bitcoin:?cashu=${INPUTS.cashuTokenV3}&lightning=${INPUTS.lightningAddress}`;
     const tm = createTestMachine();
     await tm.machine.execute(input, { reset: true });
     // Machine should pause at chooseOption waiting for user selection
-    tm.assertStep('chooseOption');
+    tm.assertStep("chooseOption");
   });
 
-  it('annotates options with wallet context', async () => {
+  it("annotates options with wallet context", async () => {
     // Each option should have a status (recommended/available/disabled)
     // based on the wallet state. With WALLETS.default (has balance),
     // both options should be available.
@@ -60,12 +60,35 @@ describe('BIP-321 multi-option', () => {
     await tm.machine.execute(input, { reset: true });
 
     const ctx = tm.machine.getContext();
-    if (ctx.intent?.type === 'chooseOption') {
+    if (ctx.intent?.type === "chooseOption") {
       // At least 2 options (cashu + lightning)
       expect(ctx.intent.options.length).toBeGreaterThanOrEqual(2);
       // Every option should have a 'status' field from annotation
-      expect(ctx.intent.options.every((o) => 'status' in o)).toBe(true);
+      expect(ctx.intent.options.every((o) => "status" in o)).toBe(true);
     }
+  });
+
+  it("accepts a distinct scan while an earlier option choice is still pending", async () => {
+    const input = `bitcoin:?cashu=${INPUTS.cashuTokenV3}&lightning=${INPUTS.lightningAddress}`;
+    const tm = createTestMachine();
+
+    const first = await tm.machine.scan?.(input, { source: "qr" });
+    expect(first?.lockedPending).toBe(true);
+    tm.assertStep("chooseOption");
+
+    // Camera frames repeat while the option popup is open. The same payload is
+    // still deduplicated, but a genuinely new QR is fresh user intent and must
+    // not be swallowed after the popup has been dismissed.
+    await tm.machine.scan?.(input, { source: "qr" });
+    expect(
+      tm.notificationCalls.filter((call) => call.key === "onScanResolved"),
+    ).toHaveLength(1);
+
+    await tm.machine.scan?.(INPUTS.cashuTokenV3, { source: "qr" });
+    tm.assertStep("receiveToken");
+    expect(
+      tm.notificationCalls.filter((call) => call.key === "onScanResolved"),
+    ).toHaveLength(2);
   });
 });
 
@@ -78,20 +101,22 @@ describe('BIP-321 multi-option', () => {
  * This should route to receiveToken — the same as if they'd scanned
  * a bare cashu token.
  */
-describe('BIP-321 — choose ecash option', () => {
-  it('chooseOption(ecashToken) → receiveToken', async () => {
+describe("BIP-321 — choose ecash option", () => {
+  it("chooseOption(ecashToken) → receiveToken", async () => {
     const input = `bitcoin:?cashu=${INPUTS.cashuTokenV3}&lightning=${INPUTS.lightningAddress}`;
     const tm = createTestMachine();
     await tm.machine.execute(input, { reset: true });
-    tm.assertStep('chooseOption');
+    tm.assertStep("chooseOption");
 
     // Find and select the ecash option from the parsed options
     const ctx = tm.machine.getContext();
-    const ecashOption = ctx.parsed?.options.find((o) => o.kind === 'ecashToken');
+    const ecashOption = ctx.parsed?.options.find(
+      (o) => o.kind === "ecashToken",
+    );
     if (ecashOption) {
       await tm.machine.chooseOption(ecashOption);
       // Should route to receiveToken just like a bare cashu token
-      tm.assertStep('receiveToken');
+      tm.assertStep("receiveToken");
     }
   });
 });
@@ -104,19 +129,21 @@ describe('BIP-321 — choose ecash option', () => {
  * User selects the lightningAddress option. This needs an amount (addresses
  * don't include amounts), so the machine routes to enterAmount.
  */
-describe('BIP-321 — choose lightning option', () => {
-  it('chooseOption(lightningAddress) → enterAmount', async () => {
+describe("BIP-321 — choose lightning option", () => {
+  it("chooseOption(lightningAddress) → enterAmount", async () => {
     const input = `bitcoin:?cashu=${INPUTS.cashuTokenV3}&lightning=${INPUTS.lightningAddress}`;
     const tm = createTestMachine();
     await tm.machine.execute(input, { reset: true });
-    tm.assertStep('chooseOption');
+    tm.assertStep("chooseOption");
 
     const ctx = tm.machine.getContext();
-    const lnOption = ctx.parsed?.options.find((o) => o.kind === 'lightningAddress');
+    const lnOption = ctx.parsed?.options.find(
+      (o) => o.kind === "lightningAddress",
+    );
     if (lnOption) {
       await tm.machine.chooseOption(lnOption);
       // Lightning address needs amount → enterAmount step
-      tm.assertStep('enterAmount');
+      tm.assertStep("enterAmount");
     }
   });
 });
@@ -131,12 +158,12 @@ describe('BIP-321 — choose lightning option', () => {
  * The machine recognizes the BIP-321 format but routes to error because
  * it can't do anything with just a Bitcoin address.
  */
-describe('BIP-321 — no supported options', () => {
-  it('routes to error for bitcoin: URI with no supported params', async () => {
+describe("BIP-321 — no supported options", () => {
+  it("routes to error for bitcoin: URI with no supported params", async () => {
     const tm = createTestMachine();
     // bitcoin:bc1qtest123 — on-chain address only, no lightning or cashu
-    await tm.machine.execute('bitcoin:bc1qtest123', { reset: true });
-    tm.assertStep('error');
+    await tm.machine.execute("bitcoin:bc1qtest123", { reset: true });
+    tm.assertStep("error");
   });
 });
 
@@ -149,8 +176,8 @@ describe('BIP-321 — no supported options', () => {
  * wallet has none), the machine either shows the options as disabled
  * (letting the user see what's wrong) or routes directly to error.
  */
-describe('BIP-321 — all disabled', () => {
-  it('routes to error when all options disabled (no balance)', async () => {
+describe("BIP-321 — all disabled", () => {
+  it("routes to error when all options disabled (no balance)", async () => {
     // Single lightning option with no balance → lightning is disabled
     // (needs balance to melt), but since lightning addresses always
     // need amount first, it might still route to enterAmount.
@@ -159,7 +186,7 @@ describe('BIP-321 — all disabled', () => {
     await tm.machine.execute(input, { reset: true });
     const step = tm.machine.getStep();
     // Either enterAmount (error surfaces later) or error (fail-fast)
-    expect(['enterAmount', 'error']).toContain(step);
+    expect(["enterAmount", "error"]).toContain(step);
   });
 });
 
@@ -172,47 +199,53 @@ describe('BIP-321 — all disabled', () => {
  */
 
 const BIP321_ECASH_FALLBACK: FlowScenario = {
-  name: 'BIP-321: choose ecash from multi-option → receiveToken',
+  name: "BIP-321: choose ecash from multi-option → receiveToken",
   steps: [
     // Step 0: Execute BIP-321 URI with cashu + lightning → chooseOption
-    { type: 'execute', input: `bitcoin:?cashu=${INPUTS.cashuTokenV3}&lightning=${INPUTS.lightningAddress}` },
+    {
+      type: "execute",
+      input: `bitcoin:?cashu=${INPUTS.cashuTokenV3}&lightning=${INPUTS.lightningAddress}`,
+    },
     // Step 1: User picks the ecash option → receiveToken
-    { type: 'chooseOption', optionKind: 'ecashToken' },
+    { type: "chooseOption", optionKind: "ecashToken" },
   ],
   waypoints: [
     // After parsing, the machine should be waiting for user choice
-    { afterStep: 0, step: 'chooseOption' },
+    { afterStep: 0, step: "chooseOption" },
   ],
   expect: {
-    step: 'receiveToken',
+    step: "receiveToken",
   },
 };
 
 const BIP321_LIGHTNING_FLOW: FlowScenario = {
-  name: 'BIP-321: choose lightning from multi-option → enterAmount → melt',
+  name: "BIP-321: choose lightning from multi-option → enterAmount → melt",
   steps: [
     // Step 0: Execute BIP-321 → chooseOption
-    { type: 'execute', input: `bitcoin:?cashu=${INPUTS.cashuTokenV3}&lightning=${INPUTS.lightningAddress}` },
+    {
+      type: "execute",
+      input: `bitcoin:?cashu=${INPUTS.cashuTokenV3}&lightning=${INPUTS.lightningAddress}`,
+    },
     // Step 1: User picks lightning address → enterAmount
-    { type: 'chooseOption', optionKind: 'lightningAddress' },
+    { type: "chooseOption", optionKind: "lightningAddress" },
     // Step 2: User enters amount → navigateToMeltPreview
-    { type: 'enterAmount', amount: 100, mintUrl: MINT1 },
+    { type: "enterAmount", amount: 100, mintUrl: MINT1 },
   ],
   waypoints: [
-    { afterStep: 0, step: 'chooseOption' },
+    { afterStep: 0, step: "chooseOption" },
     // After choosing lightning, we need amount input
-    { afterStep: 1, step: 'enterAmount' },
+    { afterStep: 1, step: "enterAmount" },
   ],
   expect: {
-    step: 'navigateToMeltPreview',
+    step: "navigateToMeltPreview",
   },
 };
 
-describe('BIP-321 — table-driven scenarios', () => {
-  it.each([
-    BIP321_ECASH_FALLBACK,
-    BIP321_LIGHTNING_FLOW,
-  ])('$name', async (scenario) => {
-    await runScenario(scenario);
-  });
+describe("BIP-321 — table-driven scenarios", () => {
+  it.each([BIP321_ECASH_FALLBACK, BIP321_LIGHTNING_FLOW])(
+    "$name",
+    async (scenario) => {
+      await runScenario(scenario);
+    },
+  );
 });
