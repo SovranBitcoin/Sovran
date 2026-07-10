@@ -25,10 +25,34 @@
  */
 
 import { spawnSync } from 'child_process';
+import path from 'node:path';
 import type { WalletStep } from './ast';
 import { interpolateString } from './interpolate';
 
 const COCOD_BIN = process.env.COCOD_BIN || 'cocod';
+
+/**
+ * Build the environment for cocod without changing the test runner's own HOME.
+ * cocod currently stores its mnemonic, database, socket, and pid under
+ * `$HOME/.cocod`; the explicit Sovran variable gives device runs a dedicated
+ * counterparty wallet while leaving Xcode/WDA and developer tooling on the
+ * real home directory.
+ */
+export function cocodProcessEnv(
+  base: Record<string, string | undefined> = process.env
+): Record<string, string | undefined> {
+  const requestedHome = base.SOVRAN_TEST_COCOD_HOME?.trim();
+  if (!requestedHome) return base;
+
+  const home = path.resolve(requestedHome);
+  const configDir = path.join(home, '.cocod');
+  return {
+    ...base,
+    HOME: home,
+    COCOD_SOCKET: base.COCOD_SOCKET || path.join(configDir, 'cocod.sock'),
+    COCOD_PID: base.COCOD_PID || path.join(configDir, 'cocod.pid'),
+  };
+}
 
 // ─── Spawn helper ──────────────────────────────────────────────────────────
 
@@ -51,8 +75,8 @@ interface CocodResult {
 function runCocod(args: string[]): CocodResult {
   const result = spawnSync(COCOD_BIN, args, {
     encoding: 'utf-8',
-    // Inherit env so the daemon socket lookup works.
-    env: process.env,
+    // Inherit the runner environment, optionally isolating only cocod's HOME.
+    env: cocodProcessEnv() as NodeJS.ProcessEnv,
   });
   if (result.error) {
     // Most common: ENOENT — cocod not installed or not on PATH.

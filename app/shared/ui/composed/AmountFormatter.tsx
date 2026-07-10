@@ -44,6 +44,12 @@ export const AMOUNT_FONT_FAMILY: Record<FontWeight, string> = {
 interface AmountFormatterProps {
   amount: AmountValue;
   unit: CurrencyUnit;
+  /**
+   * Explicit BTC/sats display preference. Defaults to the persisted setting;
+   * pass a value when the same component must render reproducibly in an
+   * exported image, preview, or test fixture.
+   */
+  displayPreference?: number;
   size?: number;
   lineHeight?: number;
   weight?: FontWeight;
@@ -85,6 +91,7 @@ interface AmountFormatterProps {
 export function AmountFormatter({
   amount,
   unit,
+  displayPreference,
   size = 42,
   lineHeight,
   weight = 'heavy',
@@ -98,11 +105,12 @@ export function AmountFormatter({
   sign,
 }: AmountFormatterProps) {
   const foreground = useThemeColor('foreground');
-  const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
+  const storedDisplayPreference = useSettingsStore((state) => state.getDisplayBtc());
+  const displayBtc = displayPreference ?? storedDisplayPreference;
   const numericAmount = amountToNumber(amount);
 
   const decorated = decorate(
-    formatAmount({ amount, unit }, { useUserPreference: true }),
+    formatAmount({ amount, unit }, { useUserPreference: true, displayPreference: displayBtc }),
     unit,
     displayBtc
   );

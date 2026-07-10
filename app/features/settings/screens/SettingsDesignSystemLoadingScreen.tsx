@@ -3,6 +3,10 @@ import { ScrollView } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 
+import {
+  LOADING_INDICATOR_PREVIEW_SIZE,
+  LOADING_INDICATOR_SIZES,
+} from '@/features/settings/design-system/loadingIndicator';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -105,7 +109,11 @@ export function SettingsDesignSystemLoadingScreen() {
                 height: 200,
                 backgroundColor: surfaceSecondary,
               }}>
-              <LoadingIndicator size={140} phase={phase} result={result} />
+              <LoadingIndicator
+                size={LOADING_INDICATOR_PREVIEW_SIZE}
+                phase={phase}
+                result={result}
+              />
             </View>
             <VStack align="center" spacing={2}>
               <Text size={11} bold className="text-foreground/50 tracking-widest">
@@ -188,7 +196,7 @@ export function SettingsDesignSystemLoadingScreen() {
               The same component at different render sizes.
             </Text>
             <HStack gap={16} wrap="wrap" align="flex-end" justify="space-around" className="py-4">
-              {[16, 20, 32, 48, 72].map((size) => (
+              {LOADING_INDICATOR_SIZES.map((size) => (
                 <VStack key={size} align="center" spacing={6}>
                   <LoadingIndicator size={size} phase={phase} result={result} />
                   <Text size={10} className="text-foreground/50">

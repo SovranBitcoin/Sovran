@@ -352,6 +352,10 @@ describe('ReceiveScreen layout stability', () => {
     // Default tab is Unified and its (mocked) rail reported no payload yet,
     // so Copy renders disabled until a payload lands.
     expect(copyButton.props.disabled).toBe(true);
+
+    act(() => {
+      renderer!.unmount();
+    });
   });
 
   it('keeps an in-place QR-sized placeholder instead of swapping to a loading screen', () => {
@@ -380,5 +384,9 @@ describe('ReceiveScreen layout stability', () => {
       })
     );
     expect(findByTestID(renderer!, 'receive-copy').props.disabled).toBe(true);
+
+    act(() => {
+      renderer!.unmount();
+    });
   });
 });

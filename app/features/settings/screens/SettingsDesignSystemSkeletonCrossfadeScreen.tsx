@@ -3,39 +3,18 @@ import { ScrollView } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 
+import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
+import { DesignSystemProfileRow } from '@/features/settings/design-system/skeletonCrossfade';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
+import { Section } from '@/shared/ui/composed/Section';
 import { Text } from '@/shared/ui/primitives/Text';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 
 const STEP_DURATION_MS = 2200;
-
-/** Profile-style row: SAME chrome in both branches (only the `loading` bars
- *  differ), so the crossfade reveals content under a fading skeleton with zero
- *  layout shift. */
-function DemoProfileRow({ loading, pictureUrl }: { loading: boolean; pictureUrl?: string }) {
-  return (
-    <HStack align="center" gap={12}>
-      <Avatar
-        state={loading ? 'loading' : pictureUrl ? 'image' : 'fallback'}
-        size={44}
-        picture={pictureUrl}
-        name="Sovran"
-      />
-      <VStack spacing={4} className="flex-1">
-        <Text loading={loading} placeholder="Display Name" bold size={15}>
-          Satoshi Nakamoto
-        </Text>
-        <Text loading={loading} placeholder="@handle@relay.example" size={13}>
-          @satoshi@sovran.money
-        </Text>
-      </VStack>
-    </HStack>
-  );
-}
+const SKELETON_CROSSFADE_FAMILY = getDesignSystemFamily('skeleton-crossfade');
+const CONTENT_CONTAINER_STYLE = { paddingBottom: 32 };
 
 export function SettingsDesignSystemSkeletonCrossfadeScreen() {
   // The demo cards are `Card variant="secondary"` — the wave must match THAT
@@ -80,7 +59,7 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
 
   return (
     <ScreenWrapper name="SettingsDesignSystemSkeletonCrossfadeScreen" scroll="custom" safeArea>
-      <ScrollView className="px-4">
+      <ScrollView className="px-4" contentContainerStyle={CONTENT_CONTAINER_STYLE}>
         <Text size={12} className="text-foreground/60 mb-4 mt-2">
           The canonical{' '}
           <Text size={12} bold className="text-foreground">
@@ -101,8 +80,10 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
               loading={loading}
               wave="region"
               surfaceColor={surfaceSecondary}
-              renderSkeleton={() => <DemoProfileRow loading />}
-              renderContent={() => <DemoProfileRow loading={false} pictureUrl={pictureUrl} />}
+              renderSkeleton={() => <DesignSystemProfileRow loading />}
+              renderContent={() => (
+                <DesignSystemProfileRow loading={false} pictureUrl={pictureUrl} />
+              )}
             />
           </Card.Body>
         </Card>
@@ -139,7 +120,7 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
               Text settles immediately; the avatar image fades in on its own when it finishes
               loading — the crossfade never waits on it.
             </Text>
-            <DemoProfileRow loading={false} pictureUrl={pictureUrl} />
+            <DesignSystemProfileRow loading={false} pictureUrl={pictureUrl} />
           </Card.Body>
         </Card>
 
@@ -160,6 +141,14 @@ export function SettingsDesignSystemSkeletonCrossfadeScreen() {
             </Button>
           </Card.Body>
         </Card>
+
+        {SKELETON_CROSSFADE_FAMILY.scenarios.map((scenario) => (
+          <Section key={scenario.id} title={scenario.title}>
+            <View testID={`design-system-scenario-skeleton-crossfade-${scenario.id}`}>
+              {scenario.render()}
+            </View>
+          </Section>
+        ))}
       </ScrollView>
     </ScreenWrapper>
   );

@@ -192,6 +192,8 @@ export const icons: string[] = [
   'fluent:split-vertical-24-filled',
   'lucide:clipboard-paste',
   'lucide:link',
+  'lucide:scan-line',
+  'lucide:wifi-off',
   'material-symbols:arrow-downward',
   'material-symbols:keyboard-arrow-down-rounded',
   'material-symbols:search-rounded',

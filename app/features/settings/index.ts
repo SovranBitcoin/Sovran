@@ -9,6 +9,8 @@ export { SettingsNetworkScreen } from './screens/SettingsNetworkScreen';
 export { SettingsStorageScreen } from './screens/SettingsStorageScreen';
 export { SettingsMediaScreen } from './screens/SettingsMediaScreen';
 export { SettingsDesignSystemScreen } from './screens/SettingsDesignSystemScreen';
+export { SettingsDesignSystemFoundationsScreen } from './screens/SettingsDesignSystemFoundationsScreen';
+export { SettingsDesignSystemWalletControlsScreen } from './screens/SettingsDesignSystemWalletControlsScreen';
 export { SettingsDesignSystemLoadingScreen } from './screens/SettingsDesignSystemLoadingScreen';
 export { SettingsDesignSystemSegmentedScreen } from './screens/SettingsDesignSystemSegmentedScreen';
 export { SettingsDesignSystemTimelineScreen } from './screens/SettingsDesignSystemTimelineScreen';

@@ -25,6 +25,8 @@ const KEYRING_OPTIONS = { title: 'P2PK Keys' };
 const STORAGE_OPTIONS = { title: 'Storage inventory' };
 const MEDIA_OPTIONS = { title: 'My media' };
 const DESIGN_SYSTEM_OPTIONS = { title: 'Design system' };
+const DESIGN_SYSTEM_FOUNDATIONS_OPTIONS = { title: 'Foundations' };
+const DESIGN_SYSTEM_WALLET_CONTROLS_OPTIONS = { title: 'Wallet controls' };
 const DESIGN_SYSTEM_LOADING_OPTIONS = { title: 'Loading indicator' };
 const DESIGN_SYSTEM_SEGMENTED_OPTIONS = { title: 'Segmented progress' };
 const DESIGN_SYSTEM_TIMELINE_OPTIONS = { title: 'Timeline' };
@@ -72,6 +74,11 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="storage" options={STORAGE_OPTIONS} />
       <Stack.Screen name="media" options={MEDIA_OPTIONS} />
       <Stack.Screen name="design-system" options={DESIGN_SYSTEM_OPTIONS} />
+      <Stack.Screen name="design-system-foundations" options={DESIGN_SYSTEM_FOUNDATIONS_OPTIONS} />
+      <Stack.Screen
+        name="design-system-wallet-controls"
+        options={DESIGN_SYSTEM_WALLET_CONTROLS_OPTIONS}
+      />
       <Stack.Screen name="design-system-loading" options={DESIGN_SYSTEM_LOADING_OPTIONS} />
       <Stack.Screen name="design-system-segmented" options={DESIGN_SYSTEM_SEGMENTED_OPTIONS} />
       <Stack.Screen name="design-system-timeline" options={DESIGN_SYSTEM_TIMELINE_OPTIONS} />

@@ -16,6 +16,16 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+jest.mock('@monicon/native', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+
+  return {
+    Monicon: ({ name, ...props }: { name: string }) =>
+      ReactActual.createElement(View, { testID: `icon-${name}`, ...props }),
+  };
+});
+
 jest.mock('@mealection/react-native-boring-avatars', () => ({
   __esModule: true,
   default: (props: Record<string, unknown>) => {

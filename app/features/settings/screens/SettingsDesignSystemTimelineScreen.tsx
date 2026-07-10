@@ -3,7 +3,9 @@ import { ScrollView, StyleSheet } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 
+import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
+import { Section } from '@/shared/ui/composed/Section';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -21,6 +23,7 @@ import {
 
 const TIMELINE_FRAME_DURATION_MS = 1500;
 const TIMELINE_COMPLETE_HOLD_STEPS = 2;
+const TIMELINE_FAMILY = getDesignSystemFamily('timeline');
 
 export function SettingsDesignSystemTimelineScreen() {
   // Fixed createdAt so the simulated timestamps don't churn on re-render.
@@ -221,6 +224,14 @@ export function SettingsDesignSystemTimelineScreen() {
             </HStack>
           </Card.Body>
         </Card>
+
+        {TIMELINE_FAMILY.scenarios.map((scenario) => (
+          <Section key={scenario.id} title={scenario.title}>
+            <View testID={`design-system-scenario-timeline-${scenario.id}`}>
+              {scenario.render()}
+            </View>
+          </Section>
+        ))}
       </ScrollView>
     </ScreenWrapper>
   );

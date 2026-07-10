@@ -21,6 +21,12 @@ interface FormatAmountOptions {
   currencyDisplay?: 'symbol' | 'name' | 'none';
   /** When true and unit is sats, respects user's BTC/sats display preference. */
   useUserPreference?: boolean;
+  /**
+   * Explicit BTC/sats display preference for deterministic callers such as
+   * previews and exported images. When omitted, the persisted preference is
+   * read exactly as before.
+   */
+  displayPreference?: number;
 }
 
 const SYMBOLS: Record<string, string> = {
@@ -78,7 +84,7 @@ export function formatAmount(input: AmountWithUnit, options: FormatAmountOptions
   const amount = amountToNumber(input.amount);
 
   if (options.useUserPreference && inputUnit === 'sats') {
-    const displayBtc = useSettingsStore.getState().getDisplayBtc();
+    const displayBtc = options.displayPreference ?? useSettingsStore.getState().getDisplayBtc();
     const asBtc = displayBtc === 0;
     const value = asBtc ? amount / 100_000_000 : amount;
     const formatted = (asBtc ? btcFormatter : satsFormatter).format(value);

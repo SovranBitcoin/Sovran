@@ -3,7 +3,10 @@ import { ScrollView } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 
+import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
+import { SEGMENT_COUNT_OPTIONS } from '@/features/settings/design-system/segmentedProgress';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
+import { Section } from '@/shared/ui/composed/Section';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -13,7 +16,8 @@ import { LoadingIndicator, type Phase } from '@/shared/blocks/status';
 
 const SEGMENT_STEP_DURATION_MS = 850;
 const SEGMENT_COMPLETE_HOLD_STEPS = 2;
-const SEGMENT_COUNT_OPTIONS = [2, 3, 4, 5, 6, 10, 16, 24] as const;
+const SEGMENTED_PROGRESS_FAMILY = getDesignSystemFamily('segmented-progress');
+const CONTENT_CONTAINER_STYLE = { paddingBottom: 32 };
 
 export function SettingsDesignSystemSegmentedScreen() {
   const surfaceSecondary = useThemeColor('surface-secondary');
@@ -74,7 +78,7 @@ export function SettingsDesignSystemSegmentedScreen() {
 
   return (
     <ScreenWrapper name="SettingsDesignSystemSegmentedScreen" scroll="custom" safeArea>
-      <ScrollView className="px-4">
+      <ScrollView className="px-4" contentContainerStyle={CONTENT_CONTAINER_STYLE}>
         <Text size={12} className="text-foreground/60 mb-4 mt-2">
           The{' '}
           <Text size={12} bold className="text-foreground">
@@ -150,6 +154,14 @@ export function SettingsDesignSystemSegmentedScreen() {
             </HStack>
           </Card.Body>
         </Card>
+
+        {SEGMENTED_PROGRESS_FAMILY.scenarios.map((scenario) => (
+          <Section key={scenario.id} title={scenario.title}>
+            <View testID={`design-system-scenario-segmented-progress-${scenario.id}`}>
+              {scenario.render()}
+            </View>
+          </Section>
+        ))}
       </ScrollView>
     </ScreenWrapper>
   );

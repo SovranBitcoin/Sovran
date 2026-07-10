@@ -2,24 +2,23 @@
  * screenshot targets for the pixel-count loop; they must NOT follow the theme. */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withTiming,
-} from 'react-native-reanimated';
 
 import { Button, Card } from 'heroui-native';
 
-import { CurrencyIcon } from 'assets/icons';
+import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';
+import {
+  FADE_STRESS_CYCLE_MS,
+  FADE_STRESS_TILE_COUNT,
+  FADE_STRESS_TILE_VARIANTS,
+  FadeStressTile,
+} from '@/features/settings/design-system/fadeRevealStress';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
+import { Section } from '@/shared/ui/composed/Section';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useFadeRevealProbe } from '@/shared/lib/debug/fadeRevealProbe';
 import { log } from '@/shared/lib/logger';
 
 /**
@@ -39,114 +38,7 @@ import { log } from '@/shared/lib/logger';
  *    field so a pixel count of the grid area gives ground truth.
  */
 
-const TILE_VARIANTS = ['plain', 'scale', 'delayed', 'quick', 'svg'] as const;
-type TileVariant = (typeof TILE_VARIANTS)[number];
-
-const TILES = 45;
-const CYCLE_MS = 2000;
-/** Latest reveal: withDelay caps at 300ms + 350ms timing → 650ms; probe well past it. */
-const PROBE_DEADLINE_MS = 1200;
-
-function StressTile({
-  index,
-  variant,
-  size,
-  onResult,
-}: {
-  index: number;
-  variant: TileVariant;
-  size: number;
-  onResult: (stuck: boolean) => void;
-}) {
-  const progress = useSharedValue(0);
-
-  useEffect(() => {
-    switch (variant) {
-      case 'plain':
-        // top-followers idiom (UserProfileScreen:350)
-        progress.set(withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) }));
-        break;
-      case 'scale':
-        // avatar idiom (UserProfileScreen:536)
-        progress.set(withTiming(1, { duration: 500, easing: Easing.out(Easing.cubic) }));
-        break;
-      case 'delayed':
-        // feed-card idiom (UserFeed:176)
-        progress.set(
-          withDelay(
-            Math.min(index * 20, 300),
-            withTiming(1, { duration: 350, easing: Easing.out(Easing.cubic) })
-          )
-        );
-        break;
-      case 'quick':
-        // QR-button idiom (QRButton.ios:103)
-        progress.set(withTiming(1, { duration: 180 }));
-        break;
-      case 'svg':
-        // fade + react-native-svg child (swapped-Svg repaint hazard)
-        progress.set(withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) }));
-        break;
-    }
-  }, [progress, variant, index]);
-
-  // A stuck tile is repainted solid red by a state flip so it is visible even
-  // though its animated opacity is 0 — the red square is the loop "going red".
-  const [flaggedStuck, setFlaggedStuck] = useState(false);
-  useFadeRevealProbe(`stress:${variant}:${index}`, progress, {
-    deadlineMs: PROBE_DEADLINE_MS,
-    onResult: useCallback(
-      (stuck: boolean) => {
-        setFlaggedStuck(stuck);
-        onResult(stuck);
-      },
-      [onResult]
-    ),
-  });
-
-  const animStyle = useAnimatedStyle(() => {
-    const p = progress.get();
-    return {
-      opacity: p,
-      transform: [
-        ...(variant === 'scale' ? [{ scale: p }] : []),
-        ...(variant === 'delayed' ? [{ translateY: (1 - p) * 12 }] : []),
-      ],
-    };
-  });
-
-  if (flaggedStuck) {
-    return (
-      <View style={[styles.tile, { width: size, height: size, backgroundColor: '#ff2d2d' }]} />
-    );
-  }
-
-  return (
-    <Animated.View
-      style={[
-        styles.tile,
-        { width: size, height: size, backgroundColor: variantColor(variant) },
-        animStyle,
-      ]}>
-      {variant === 'svg' ? <CurrencyIcon width={size * 0.6} currency="sat" /> : null}
-    </Animated.View>
-  );
-}
-
-function variantColor(variant: TileVariant): string {
-  switch (variant) {
-    case 'plain':
-      return '#31d0aa';
-    case 'scale':
-      return '#4f9cf9';
-    case 'delayed':
-      return '#f9a94f';
-    case 'quick':
-      return '#c56bf0';
-    case 'svg':
-      return '#e05c8a';
-  }
-}
+const FADE_REVEAL_STRESS_FAMILY = getDesignSystemFamily('fade-reveal-stress');
 
 export function SettingsDesignSystemFadeStressScreen() {
   const { width: screenWidth } = useWindowDimensions();
@@ -182,13 +74,16 @@ export function SettingsDesignSystemFadeStressScreen() {
     const tally = cycleTally.current;
     tally.reported += 1;
     if (stuck) tally.stuck += 1;
-    if (tally.reported === TILES) {
+    if (tally.reported === FADE_STRESS_TILE_COUNT) {
       log[tally.stuck > 0 ? 'warn' : 'info']('visual.fadeprobe.cycle', {
         cycle: tally.cycle,
-        tiles: TILES,
+        tiles: FADE_STRESS_TILE_COUNT,
         stuck: tally.stuck,
       });
-      setTotals((prev) => ({ mounted: prev.mounted + TILES, stuck: prev.stuck + tally.stuck }));
+      setTotals((prev) => ({
+        mounted: prev.mounted + FADE_STRESS_TILE_COUNT,
+        stuck: prev.stuck + tally.stuck,
+      }));
     }
   }, []);
 
@@ -199,7 +94,7 @@ export function SettingsDesignSystemFadeStressScreen() {
         cycleTally.current = { cycle: c + 1, reported: 0, stuck: 0 };
         return c + 1;
       });
-    }, CYCLE_MS);
+    }, FADE_STRESS_CYCLE_MS);
     return () => clearInterval(interval);
   }, [auto]);
 
@@ -237,16 +132,24 @@ export function SettingsDesignSystemFadeStressScreen() {
               vs the reanimated update batch, exactly like navigating to the
               profile / wallet screens does. */}
           <View key={cycle} style={[styles.grid, { gap: GRID_GAP }]} testID="fade-stress-grid">
-            {Array.from({ length: TILES }, (_, i) => (
-              <StressTile
+            {Array.from({ length: FADE_STRESS_TILE_COUNT }, (_, i) => (
+              <FadeStressTile
                 key={i}
                 index={i}
-                variant={TILE_VARIANTS[i % TILE_VARIANTS.length]}
+                variant={FADE_STRESS_TILE_VARIANTS[i % FADE_STRESS_TILE_VARIANTS.length]}
                 size={tileSize}
                 onResult={handleResult}
               />
             ))}
           </View>
+
+          {FADE_REVEAL_STRESS_FAMILY.scenarios.map((scenario) => (
+            <Section key={scenario.id} title={scenario.title}>
+              <View testID={`design-system-scenario-fade-reveal-stress-${scenario.id}`}>
+                {scenario.render()}
+              </View>
+            </Section>
+          ))}
         </VStack>
       </ScrollView>
     </ScreenWrapper>
@@ -266,10 +169,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#101014',
     borderRadius: 12,
     padding: 8,
-  },
-  tile: {
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

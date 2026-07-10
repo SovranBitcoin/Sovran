@@ -10,6 +10,8 @@ wda.log
 .screenshots/
 tests/
 .test-drafts/
+# Ephemeral simulator inputs and captures. These can contain live payment data.
+.device-artifacts/
 scripts/start-wda.sh
 scripts/dev.sh
 docs/device-automation.md

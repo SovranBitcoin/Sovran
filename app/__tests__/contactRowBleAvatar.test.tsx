@@ -117,6 +117,10 @@ jest.mock('@/shared/ui/composed/AmountFormatter', () => ({
   AmountFormatter: () => null,
 }));
 
+jest.mock('@/shared/ui/composed/MintIcon', () => ({
+  MintIcon: () => null,
+}));
+
 jest.mock('@/shared/ui/composed/RowStatsAccent', () => ({
   RowStatsAccent: () => null,
   STAT_ICONS: {

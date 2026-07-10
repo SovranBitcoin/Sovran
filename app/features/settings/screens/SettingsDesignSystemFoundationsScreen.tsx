@@ -7,19 +7,20 @@ import { Section } from '@/shared/ui/composed/Section';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 
-const EMPTY_STATES_FAMILY = getDesignSystemFamily('empty-states');
+const FOUNDATIONS_FAMILY = getDesignSystemFamily('foundations');
 const CONTENT_CONTAINER_STYLE = { paddingBottom: 32 };
 
-export function SettingsDesignSystemEmptyStatesScreen() {
+export function SettingsDesignSystemFoundationsScreen() {
   return (
-    <ScreenWrapper name="SettingsDesignSystemEmptyStatesScreen" scroll="custom" safeArea>
+    <ScreenWrapper name="SettingsDesignSystemFoundationsScreen" scroll="custom" safeArea>
       <ScrollView className="px-4" contentContainerStyle={CONTENT_CONTAINER_STYLE}>
         <Text size={12} className="text-foreground/60 mb-4 mt-2">
-          Every empty surface in the app rendered through the shared `EmptyState` component.
+          Deterministic states for the shared primitives that shape Sovran. Each section is also an
+          exact structural snapshot and a stable future device-screenshot target.
         </Text>
-        {EMPTY_STATES_FAMILY.scenarios.map((scenario) => (
+        {FOUNDATIONS_FAMILY.scenarios.map((scenario) => (
           <Section key={scenario.id} title={scenario.title}>
-            <View testID={`design-system-scenario-empty-states-${scenario.id}`}>
+            <View testID={`design-system-scenario-foundations-${scenario.id}`}>
               {scenario.render()}
             </View>
           </Section>
