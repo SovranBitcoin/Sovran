@@ -47,9 +47,11 @@ export {
   buildOnchainConfirmationProgressFromTx,
   createMempoolSpaceChainAdapter,
   defaultChainAdapter,
+  fetchAddressOutpointCandidates,
   fetchMempoolAddressStats,
   getOnchainConfirmationInfo,
   getOnchainConfirmationProgress,
+  matchUniqueSendOutpoint,
   MempoolAddressStatsSchema,
   MempoolHttpError,
   parseOutpoint,
@@ -58,10 +60,12 @@ export {
   transactionExplorerUrlForTxid,
 } from "./chain";
 export type {
+  AddressOutpointCandidateTx,
   MempoolAddressSummary,
   MempoolAddressStats,
   MempoolSpaceChainAdapterOptions,
   OnchainConfirmationProgress as ChainOnchainConfirmationProgress,
+  OutpointMatchCriteria,
 } from "./chain";
 
 export {

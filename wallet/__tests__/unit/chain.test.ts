@@ -5,10 +5,12 @@ import {
   buildOnchainConfirmationProgressFromTx,
   createMempoolSpaceChainAdapter,
   getOnchainConfirmationProgress,
+  matchUniqueSendOutpoint,
   parseOutpoint,
   shouldStopTxConfirmationPolling,
   summarizeMempoolAddress,
   transactionExplorerUrlForTxid,
+  type AddressOutpointCandidateTx,
   type MempoolAddressStats,
 } from '../../src/chain';
 
@@ -93,6 +95,84 @@ describe('parseOutpoint (onchain melt txid:vout)', () => {
     expect(parseOutpoint(TXID)).toBeNull(); // no vout
     expect(parseOutpoint(`${TXID}:x`)).toBeNull(); // non-numeric vout
     expect(parseOutpoint('deadbeef:0')).toBeNull(); // short txid
+  });
+});
+
+describe('matchUniqueSendOutpoint (heuristic outpoint discovery)', () => {
+  const TXID_A = 'a'.repeat(64);
+  const TXID_B = 'b'.repeat(64);
+  const CRITERIA = { address: ADDRESS, amountSats: 5_000, notBeforeSec: 1_000 };
+
+  const tx = (
+    txid: string,
+    vout: AddressOutpointCandidateTx['vout'],
+    over: Partial<AddressOutpointCandidateTx> = {}
+  ): AddressOutpointCandidateTx => ({ txid, confirmed: false, vout, ...over });
+
+  it('adopts a unique exact-amount match (correct vout index)', () => {
+    const txs = [
+      tx(TXID_A, [
+        { address: 'bc1qother', valueSats: 5_000 }, // right amount, wrong address
+        { address: ADDRESS, valueSats: 123 }, // right address, wrong amount (batch change)
+        { address: ADDRESS, valueSats: 5_000 }, // ours — index 2
+      ]),
+    ];
+    expect(matchUniqueSendOutpoint(txs, CRITERIA)).toBe(`${TXID_A}:2`);
+  });
+
+  it('returns null when two transactions both match (ambiguous)', () => {
+    const txs = [
+      tx(TXID_A, [{ address: ADDRESS, valueSats: 5_000 }]),
+      tx(TXID_B, [{ address: ADDRESS, valueSats: 5_000 }]),
+    ];
+    expect(matchUniqueSendOutpoint(txs, CRITERIA)).toBeNull();
+  });
+
+  it('returns null when one transaction has two matching outputs', () => {
+    const txs = [
+      tx(TXID_A, [
+        { address: ADDRESS, valueSats: 5_000 },
+        { address: ADDRESS, valueSats: 5_000 },
+      ]),
+    ];
+    expect(matchUniqueSendOutpoint(txs, CRITERIA)).toBeNull();
+  });
+
+  it('returns null when no output pays the exact amount', () => {
+    const txs = [tx(TXID_A, [{ address: ADDRESS, valueSats: 4_999 }])];
+    expect(matchUniqueSendOutpoint(txs, CRITERIA)).toBeNull();
+  });
+
+  it('ignores a tx confirmed before the quote existed (address reuse)', () => {
+    const txs = [
+      tx(TXID_A, [{ address: ADDRESS, valueSats: 5_000 }], {
+        confirmed: true,
+        blockTimeSec: 500, // mined before notBeforeSec
+      }),
+      tx(TXID_B, [{ address: ADDRESS, valueSats: 5_000 }]),
+    ];
+    expect(matchUniqueSendOutpoint(txs, CRITERIA)).toBe(`${TXID_B}:0`);
+  });
+
+  it('accepts an unconfirmed tx when Esplora provides no first-seen timestamp', () => {
+    const txs = [tx(TXID_A, [{ address: ADDRESS, valueSats: 5_000 }])];
+    expect(matchUniqueSendOutpoint(txs, CRITERIA)).toBe(`${TXID_A}:0`);
+  });
+
+  it('accepts a confirmed tx mined after the quote', () => {
+    const txs = [
+      tx(TXID_A, [{ address: ADDRESS, valueSats: 5_000 }], {
+        confirmed: true,
+        blockTimeSec: 2_000,
+      }),
+    ];
+    expect(matchUniqueSendOutpoint(txs, CRITERIA)).toBe(`${TXID_A}:0`);
+  });
+
+  it('rejects invalid criteria', () => {
+    const txs = [tx(TXID_A, [{ address: ADDRESS, valueSats: 5_000 }])];
+    expect(matchUniqueSendOutpoint(txs, { ...CRITERIA, amountSats: 0 })).toBeNull();
+    expect(matchUniqueSendOutpoint(txs, { ...CRITERIA, address: '' })).toBeNull();
   });
 });
 

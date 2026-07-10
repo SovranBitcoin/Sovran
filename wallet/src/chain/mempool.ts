@@ -68,6 +68,7 @@ const MempoolTxSchema = z
         confirmed: z.boolean(),
         block_height: z.number().int().nonnegative().optional(),
         block_hash: z.string().optional(),
+        block_time: z.number().int().nonnegative().optional(),
       })
       .passthrough(),
     vout: z
@@ -264,6 +265,42 @@ async function fetchMempoolAddressTxs(
     "mempool/address/txs",
     controls,
   );
+}
+
+/** A transaction touching a watched address, shaped for outpoint discovery:
+ *  vout order preserved (vout index = array position). */
+export interface AddressOutpointCandidateTx {
+  txid: string;
+  confirmed: boolean;
+  /** Block timestamp (seconds) for confirmed txs; esplora gives no
+   *  first-seen time for unconfirmed ones. */
+  blockTimeSec?: number;
+  vout: { address?: string; valueSats: number }[];
+}
+
+/**
+ * Fetch the transactions touching `address` with their outputs intact —
+ * `ChainAdapter.getAddressTransactions` drops vout data, which outpoint
+ * discovery (matching an exact payment to a destination) needs.
+ */
+export async function fetchAddressOutpointCandidates(
+  address: string,
+  controls: RequestControls = {},
+): Promise<AddressOutpointCandidateTx[]> {
+  const txs = await fetchMempoolAddressTxs(address, controls);
+  return txs.map((tx) => ({
+    txid: tx.txid,
+    confirmed: tx.status.confirmed,
+    ...(tx.status.block_time != null
+      ? { blockTimeSec: tx.status.block_time }
+      : {}),
+    vout: tx.vout.map((output) => ({
+      ...(output.scriptpubkey_address
+        ? { address: output.scriptpubkey_address }
+        : {}),
+      valueSats: output.value,
+    })),
+  }));
 }
 
 async function fetchMempoolTipHeight(

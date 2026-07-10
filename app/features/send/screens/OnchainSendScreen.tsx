@@ -12,6 +12,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
+import opacity from 'hex-color-opacity';
 
 import type { HistoryEntry, MeltHistoryEntry } from '@cashu/coco-core';
 import {
@@ -42,7 +43,9 @@ import {
 } from '@/shared/lib/cashu/onchainMint';
 import { useMempoolTxConfirmations } from '@/shared/hooks/useMempoolTxConfirmations';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { useOnchainMeltOutpointDiscovery } from '@/shared/hooks/useOnchainMeltOutpointDiscovery';
 import { useOnchainMeltQuote } from '@/shared/hooks/useOnchainMeltQuote';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { formatAmount } from '@/shared/lib/currency';
 import { openExternalUrl } from '@/shared/lib/url';
 import { log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -89,6 +92,13 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
     entrySettledAtMount: isOnchainMeltSettled(entry?.state as string | undefined),
   });
   const outpoint = parseOutpoint(quote.outpoint ?? annotation.onchainMelt?.outpoint ?? null);
+  // A heuristic match is useful for progress/explorer visibility, but it is
+  // not authoritative enough to spend money accelerating: Esplora does not
+  // expose first-seen time for unconfirmed transactions, so an older exact
+  // address+amount match can survive in the mempool. A live mint outpoint
+  // immediately upgrades the match even before the annotation write lands.
+  const outpointIsHeuristic =
+    !quote.outpoint && annotation.onchainMelt?.outpointSource === 'heuristic';
   const txStatus = useMempoolTxConfirmations(outpoint?.txid ?? null, { requiredConfirmations });
   // Internal settlement: the mint reports the melt PAID but gives no outpoint —
   // it paid off-chain, so there is no on-chain transaction. `offchainSettled`
@@ -132,6 +142,22 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
     () => (entry ? { ...entry, state: meltState ?? entry.state } : null),
     [entry, meltState]
   );
+  // While the mint is PENDING and withholds the outpoint (cdk-bdk publishes
+  // it only after confirmation), find the tx ourselves: destination address +
+  // exact amount, adopted only on a unique match; confirmed candidates must
+  // also postdate the quote.
+  const discoveryAddress =
+    getOnchainMeltAddress(entry) ?? annotation.onchainMelt?.address ?? quote.request;
+  const discoveryAmountSats =
+    annotation.onchainMelt?.amountSats ??
+    (entry?.unit === 'sat' ? amountToNumber(entry.amount) : null);
+  useOnchainMeltOutpointDiscovery({
+    quoteId: entry?.quoteId,
+    address: discoveryAddress,
+    amountSats: discoveryAmountSats,
+    quoteCreatedAtSec: entry ? Math.floor(entry.createdAt.valueOf() / 1000) : null,
+    enabled: meltState === 'PENDING' && !outpoint && !settledInternally,
+  });
 
   if (error) {
     log.warn('send.onchain.error', { error });
@@ -142,7 +168,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
   }
 
   const anyLoading = actions.pay.loading || actions.cancel.loading;
-  const onchainAddress = getOnchainMeltAddress(entry) ?? quote.request;
+  const onchainAddress = discoveryAddress;
   // Settled cost when coco reported one, else the selected option's reserve
   // labeled as a maximum — NUT-30 lets the mint keep the full reserve.
   const feeDisplay = resolveOnchainMeltFeeDisplay(annotation.onchainMelt, quote.feeOptions);
@@ -218,7 +244,12 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
             onchainConfirmationProgress={onchainConfirmationProgress}
             onchainSettledInternally={settledInternally}
           />
-          {explorerLinkUrl && <OpenInExplorerLink url={explorerLinkUrl} />}
+          {explorerLinkUrl && (
+            <OpenInExplorerLink
+              url={explorerLinkUrl}
+              inferred={outpointIsHeuristic}
+            />
+          )}
         </>
       }>
       <DetailsSection
@@ -249,27 +280,36 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
   );
 }
 
-function OpenInExplorerLink({ url }: { url: string }) {
+function OpenInExplorerLink({ url, inferred }: { url: string; inferred?: boolean }) {
   const linkColor = useThemeColor('link');
+  const foreground = useThemeColor('foreground');
   const handlePress = useCallback(() => {
-    paymentLog.info('send.onchain.explorer.open', { urlLength: url.length });
+    paymentLog.info('send.onchain.explorer.open', { urlLength: url.length, inferred: !!inferred });
     void openExternalUrl(url).mapErr((error) => {
       paymentLog.warn('send.onchain.explorer.open_failed', { reason: error.type });
       return error;
     });
-  }, [url]);
+  }, [url, inferred]);
   return (
-    <Pressable
-      haptics
-      accessibilityRole="link"
-      accessibilityLabel="Open in explorer"
-      onPress={handlePress}
-      style={styles.explorerLink}>
-      <Text size={13} color={linkColor}>
-        Open in explorer
-      </Text>
-      <Icon name="lucide:arrow-up-right" size={14} color={linkColor} />
-    </Pressable>
+    <>
+      <Pressable
+        haptics
+        accessibilityRole="link"
+        accessibilityLabel="Open in explorer"
+        onPress={handlePress}
+        style={styles.explorerLink}>
+        <Text size={13} color={linkColor}>
+          Open in explorer
+        </Text>
+        <Icon name="lucide:arrow-up-right" size={14} color={linkColor} />
+      </Pressable>
+      {inferred && (
+        <Text size={11} color={opacity(foreground, 0.5)} style={styles.explorerCaption}>
+          Matched by amount and destination — the mint hasn&apos;t confirmed this is the exact
+          transaction.
+        </Text>
+      )}
+    </>
   );
 }
 
@@ -280,5 +320,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 8,
+  },
+  explorerCaption: {
+    textAlign: 'center',
+    paddingHorizontal: 32,
+    paddingBottom: 8,
+    marginTop: -2,
   },
 });
