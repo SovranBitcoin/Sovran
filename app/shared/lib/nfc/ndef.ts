@@ -100,6 +100,13 @@ export function decodeTextRecord(ndef: number[]): string {
     throw new NfcError('Invalid NDEF: type field offset out of bounds', 'INVALID_NDEF_FORMAT');
   }
 
+  if (typeLen !== 1 || typeFieldStart + typeLen > ndef.length) {
+    throw new NfcError(
+      `Invalid NDEF: Text record type length must be 1 (received ${typeLen})`,
+      'INVALID_NDEF_FORMAT'
+    );
+  }
+
   const type = ndef[typeFieldStart];
   if (type !== 0x54) {
     throw new NfcError(
@@ -109,7 +116,7 @@ export function decodeTextRecord(ndef: number[]): string {
   }
 
   const payloadStart = typeFieldStart + typeLen;
-  if (payloadStart >= ndef.length) {
+  if (payloadStart >= ndef.length || payloadStart + payloadLen > ndef.length) {
     throw new NfcError('Invalid NDEF: payload start out of bounds', 'INVALID_NDEF_FORMAT');
   }
 
@@ -117,6 +124,13 @@ export function decodeTextRecord(ndef: number[]): string {
   const langLen = status & 0x3f;
   const isUtf16 = (status & 0x80) !== 0;
   nfcLog.debug('nfc.ndef.text_record', { status: `0x${status.toString(16)}`, langLen, isUtf16 });
+
+  if (payloadLen < 1 + langLen) {
+    throw new NfcError(
+      `Invalid NDEF: language tag exceeds payload (langLen=${langLen}, payloadLen=${payloadLen})`,
+      'INVALID_NDEF_FORMAT'
+    );
+  }
 
   const textStart = payloadStart + 1 + langLen;
   const textLen = payloadLen - 1 - langLen;

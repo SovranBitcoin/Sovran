@@ -2,6 +2,13 @@ import { Buffer } from 'buffer';
 
 import { buildTextNdef, decodeTextRecord } from '@/shared/lib/nfc/ndef';
 
+jest.mock('@/shared/lib/logger', () => ({
+  nfcLog: {
+    debug: jest.fn(),
+    warn: jest.fn(),
+  },
+}));
+
 function utf16beBytes(text: string): number[] {
   const out: number[] = [];
   for (const codeUnit of Buffer.from(text, 'utf16le')) {
@@ -43,6 +50,15 @@ describe('NFC NDEF Text record (audit 48.json F-007 / F-012)', () => {
     expect(decodeTextRecord(recordBytes)).toBe(longText);
   });
 
+  it('switches to a normal record at the exact 256-byte payload boundary', () => {
+    // status + "en" + 253 ASCII bytes = a 256-byte payload.
+    const text = 'x'.repeat(253);
+    const recordBytes = buildTextNdef(text).slice(2);
+
+    expect(recordBytes[0]).toBe(0xc1);
+    expect(decodeTextRecord(recordBytes)).toBe(text);
+  });
+
   it('decodes UTF-16 with no BOM as big-endian per NDEF Text RTD (F-007)', () => {
     const recordBytes = buildRecordBytes({
       textBytes: utf16beBytes('héllo'),
@@ -81,5 +97,35 @@ describe('NFC NDEF Text record (audit 48.json F-007 / F-012)', () => {
     expect(recordBytes[5]).toBe('f'.charCodeAt(0));
     expect(recordBytes[6]).toBe('r'.charCodeAt(0));
     expect(decodeTextRecord(recordBytes)).toBe('bonjour');
+  });
+
+  it('rejects a normal-record header shorter than seven bytes', () => {
+    expect(() => decodeTextRecord([0xc1, 0x01, 0, 0, 0, 1])).toThrow(
+      expect.objectContaining({ code: 'INVALID_NDEF_FORMAT' })
+    );
+  });
+
+  it('rejects declared type or payload lengths that extend past the input', () => {
+    expect(() => decodeTextRecord([0xd1, 0x04, 0x01, 0x54, 0])).toThrow(
+      expect.objectContaining({ code: 'INVALID_NDEF_FORMAT' })
+    );
+    expect(() => decodeTextRecord([0xd1, 0x01, 0x08, 0x54, 0x02, 0x65, 0x6e])).toThrow(
+      expect.objectContaining({ code: 'INVALID_NDEF_FORMAT' })
+    );
+  });
+
+  it('rejects a language length larger than the declared payload', () => {
+    expect(() => decodeTextRecord([0xd1, 0x01, 0x01, 0x54, 0x3f])).toThrow(
+      expect.objectContaining({ code: 'INVALID_NDEF_FORMAT' })
+    );
+  });
+
+  it('rejects non-Text records and overlong language tags', () => {
+    expect(() => decodeTextRecord([0xd1, 0x01, 0x01, 0x55, 0])).toThrow(
+      expect.objectContaining({ code: 'NOT_TEXT_RECORD' })
+    );
+    expect(() => buildTextNdef('hello', { lang: 'x'.repeat(64) })).toThrow(
+      expect.objectContaining({ code: 'INVALID_LANG_TAG' })
+    );
   });
 });
