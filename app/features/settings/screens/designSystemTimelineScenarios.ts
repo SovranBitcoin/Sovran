@@ -34,6 +34,8 @@ interface TimelineFrame {
   tokenCreated?: boolean;
   nostrSent?: boolean;
   onchainConfirmationProgress?: ChainOnchainConfirmationProgress | null;
+  /** Off-chain (internal) settlement verdict for onchain sends. */
+  onchainSettledInternally?: boolean;
 }
 
 /** Top-level tab on the Design System Timeline screen (payment method). */
@@ -295,6 +297,12 @@ export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
       variant: 'Send',
       frames: [
         {
+          note: 'Submitting to mint',
+          historyEntry: meltEntry(MeltQuoteState.UNPAID, base),
+          onchainConfirmationProgress:
+            buildOnchainRequiredConfirmationProgress(REQUIRED_CONFIRMATIONS),
+        },
+        {
           note: 'Broadcasting…',
           historyEntry: meltEntry('pending', base),
           onchainConfirmationProgress:
@@ -324,6 +332,33 @@ export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
           historyEntry: meltEntry('PAID', base),
           onchainConfirmationProgress:
             buildSatisfiedOnchainConfirmationProgress(REQUIRED_CONFIRMATIONS),
+        },
+      ],
+    },
+    {
+      id: 'onchain-send-offchain',
+      label: 'Onchain · Send → settled off-chain',
+      group: 'Onchain',
+      variant: 'Off-chain',
+      frames: [
+        {
+          note: 'Submitting to mint',
+          historyEntry: meltEntry(MeltQuoteState.UNPAID, base),
+          onchainConfirmationProgress:
+            buildOnchainRequiredConfirmationProgress(REQUIRED_CONFIRMATIONS),
+        },
+        {
+          note: 'Broadcasting…',
+          historyEntry: meltEntry('pending', base),
+          onchainConfirmationProgress:
+            buildOnchainRequiredConfirmationProgress(REQUIRED_CONFIRMATIONS),
+        },
+        {
+          note: 'Settled off-chain (no outpoint)',
+          historyEntry: meltEntry('PAID', base),
+          onchainConfirmationProgress:
+            buildOnchainRequiredConfirmationProgress(REQUIRED_CONFIRMATIONS),
+          onchainSettledInternally: true,
         },
       ],
     },

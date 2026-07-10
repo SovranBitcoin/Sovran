@@ -74,14 +74,37 @@ describe('history timeline — onchain SEND (melt)', () => {
     ...over,
   });
 
-  it('PENDING, not yet broadcast → Paid / Broadcasting… / Confirmed', () => {
+  // Before the mint accepts (still UNPAID / submitting), the first row spins
+  // as "Sending" — nothing may pre-claim completion.
+  it('UNPAID (submitting) → "Sending" active, nothing pre-completed', () => {
+    const timeline = buildTimeline({
+      historyEntry: meltEntry('UNPAID'),
+      currentTime: 1_700_000_000_000,
+      onchainConfirmationProgress: progress({ hasPayment: false }),
+    });
+    expect(timeline).toEqual([
+      expect.objectContaining({
+        displayLabel: 'Sending',
+        stepType: 'current',
+        info: 'Submitting payment…',
+      }),
+      expect.objectContaining({
+        displayLabel: 'Broadcasting…',
+        stepType: 'future-small',
+      }),
+      expect.objectContaining({ displayLabel: 'Confirmed', stepType: 'future-small' }),
+    ]);
+    expect(timeline[0].timestamp).toBeUndefined();
+  });
+
+  it('PENDING, not yet broadcast → Sent / Broadcasting… / Confirmed', () => {
     const timeline = buildTimeline({
       historyEntry: meltEntry('pending'),
       currentTime: 1_700_000_000_000,
       onchainConfirmationProgress: progress({ hasPayment: false }),
     });
     expect(timeline).toEqual([
-      expect.objectContaining({ displayLabel: 'Paid', stepType: 'complete' }),
+      expect.objectContaining({ displayLabel: 'Sent', stepType: 'complete' }),
       expect.objectContaining({
         displayLabel: 'Broadcasting…',
         stepType: 'current',
@@ -124,7 +147,7 @@ describe('history timeline — onchain SEND (melt)', () => {
 
   // The mint can settle an onchain melt OFF-CHAIN (no outpoint / no broadcast).
   // The network phase collapses to one row and no step label claims on-chain.
-  it('PAID + off-chain settlement → "Paid" / "Settled off-chain"', () => {
+  it('PAID + off-chain settlement → "Sent" / "Settled off-chain"', () => {
     const timeline = buildTimeline({
       historyEntry: meltEntry('PAID'),
       currentTime: 1_700_000_000_000,
@@ -132,7 +155,7 @@ describe('history timeline — onchain SEND (melt)', () => {
       onchainSettledInternally: true,
     });
     expect(timeline).toHaveLength(2);
-    expect(timeline[0]).toMatchObject({ displayLabel: 'Paid', stepType: 'complete' });
+    expect(timeline[0]).toMatchObject({ displayLabel: 'Sent', stepType: 'complete' });
     expect(timeline[1]).toMatchObject({
       displayLabel: 'Settled off-chain',
       stepType: 'success',
@@ -143,17 +166,18 @@ describe('history timeline — onchain SEND (melt)', () => {
   });
 
   // Device bug: a mint (cdk-ldk-bdk) settled off-chain but reported a state the
-  // melt-state mapping didn't recognise, so meltState fell to UNPAID and "Paid"
-  // rendered as a grey idle dot (with a grey connector) ABOVE the green "Settled
-  // off-chain". onchainSettledInternally must force "Paid" complete regardless.
-  it('off-chain settle with an unrecognised state → "Paid" still complete', () => {
+  // melt-state mapping didn't recognise, so meltState fell to UNPAID and the
+  // first row rendered as a grey idle dot (with a grey connector) ABOVE the
+  // green "Settled off-chain". onchainSettledInternally must force the "Sent"
+  // row complete regardless.
+  it('off-chain settle with an unrecognised state → "Sent" still complete', () => {
     const timeline = buildTimeline({
       historyEntry: meltEntry('UNPAID'),
       currentTime: 1_700_000_000_000,
       onchainConfirmationProgress: progress({ hasPayment: false, isSatisfied: false }),
       onchainSettledInternally: true,
     });
-    expect(timeline[0]).toMatchObject({ displayLabel: 'Paid', stepType: 'complete' });
+    expect(timeline[0]).toMatchObject({ displayLabel: 'Sent', stepType: 'complete' });
     expect(timeline[1]).toMatchObject({ displayLabel: 'Settled off-chain', stepType: 'success' });
   });
 

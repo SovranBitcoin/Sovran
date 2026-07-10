@@ -3,11 +3,13 @@
  *
  * The underlying Cashu operation is an onchain melt: the mint takes the ecash,
  * then either broadcasts an on-chain payment or settles it off-chain. The
- * timeline runs "Paid" (ecash spent) → the bitcoin network phase
- * ("Broadcasting…" → "In mempool · N/6 blocks", a segmented ring fed by the
- * tx's live mempool.space confirmations) → "Confirmed", with a deep link once
- * coco surfaces the outpoint. If the mint settles off-chain (PAID, no outpoint)
- * the network phase collapses to a single "Settled off-chain" row.
+ * timeline runs "Sending" (submitting to the mint; completes as "Sent") → the
+ * bitcoin network phase ("Broadcasting…" → "In mempool · N/6 blocks", a
+ * segmented ring fed by the tx's live mempool.space confirmations) →
+ * "Confirmed", with a deep link once an outpoint is known. If the mint settles
+ * off-chain (PAID, no outpoint) the network phase collapses to a single
+ * "Settled off-chain" row; that verdict persists as an annotation so reopening
+ * the detail is instant.
  */
 
 import React, { useCallback, useMemo } from 'react';

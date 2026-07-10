@@ -1382,7 +1382,66 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-receive (O
 }
 `;
 
-exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 0: Broadcasting… 1`] = `
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 0: Submitting to mint 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "SENDING",
+    "Sending",
+    "Submitting payment…",
+    "Broadcasting…",
+    "Sending the transaction to the network",
+    "Confirmed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 1: Broadcasting… 1`] = `
 {
   "indicators": [
     {
@@ -1432,7 +1491,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
   "texts": [
     "Send • Ready",
     "BROADCASTING…",
-    "Paid",
+    "Sent",
     "2026-05-22",
     "Broadcasting…",
     "Sending the transaction to the network",
@@ -1441,7 +1500,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
 }
 `;
 
-exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 1: Detected in mempool 1`] = `
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 2: Detected in mempool 1`] = `
 {
   "indicators": [
     {
@@ -1494,7 +1553,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
   "texts": [
     "Send • Ready",
     "IN MEMPOOL",
-    "Paid",
+    "Sent",
     "2026-05-22",
     "In mempool",
     "0/6 blocks",
@@ -1503,7 +1562,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
 }
 `;
 
-exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 2: 1/6 confirmations 1`] = `
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 3: 1/6 confirmations 1`] = `
 {
   "indicators": [
     {
@@ -1556,7 +1615,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
   "texts": [
     "Send • Ready",
     "IN MEMPOOL",
-    "Paid",
+    "Sent",
     "2026-05-22",
     "In mempool",
     "1/6 blocks",
@@ -1565,7 +1624,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
 }
 `;
 
-exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 3: 2/6 confirmations 1`] = `
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 4: 2/6 confirmations 1`] = `
 {
   "indicators": [
     {
@@ -1618,7 +1677,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
   "texts": [
     "Send • Ready",
     "IN MEMPOOL",
-    "Paid",
+    "Sent",
     "2026-05-22",
     "In mempool",
     "2/6 blocks",
@@ -1627,7 +1686,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
 }
 `;
 
-exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 4: 3/6 confirmations 1`] = `
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 5: 3/6 confirmations 1`] = `
 {
   "indicators": [
     {
@@ -1680,7 +1739,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
   "texts": [
     "Send • Ready",
     "IN MEMPOOL",
-    "Paid",
+    "Sent",
     "2026-05-22",
     "In mempool",
     "3/6 blocks",
@@ -1689,7 +1748,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
 }
 `;
 
-exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 5: 4/6 confirmations 1`] = `
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 6: 4/6 confirmations 1`] = `
 {
   "indicators": [
     {
@@ -1742,7 +1801,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
   "texts": [
     "Send • Ready",
     "IN MEMPOOL",
-    "Paid",
+    "Sent",
     "2026-05-22",
     "In mempool",
     "4/6 blocks",
@@ -1751,7 +1810,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
 }
 `;
 
-exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 6: 5/6 confirmations 1`] = `
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 7: 5/6 confirmations 1`] = `
 {
   "indicators": [
     {
@@ -1804,7 +1863,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
   "texts": [
     "Send • Ready",
     "IN MEMPOOL",
-    "Paid",
+    "Sent",
     "2026-05-22",
     "In mempool",
     "5/6 blocks",
@@ -1813,7 +1872,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
 }
 `;
 
-exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 7: 6/6 confirmations 1`] = `
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 8: 6/6 confirmations 1`] = `
 {
   "indicators": [
     {
@@ -1866,7 +1925,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
   "texts": [
     "Send • Ready",
     "CONFIRMED",
-    "Paid",
+    "Sent",
     "2026-05-22",
     "In mempool",
     "2026-05-22",
@@ -1877,7 +1936,7 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
 }
 `;
 
-exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 8: Confirmed 1`] = `
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onchain · Send) frame 9: Confirmed 1`] = `
 {
   "indicators": [
     {
@@ -1930,13 +1989,174 @@ exports[`timeline scenario pins (redesign acceptance surface) onchain-send (Onch
   "texts": [
     "Send • Complete",
     "CONFIRMED",
-    "Paid",
+    "Sent",
     "2026-05-22",
     "In mempool",
     "2026-05-22",
     "6/6 blocks",
     "Confirmed",
     "2026-05-22",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send-offchain (Onchain · Off-chain) frame 0: Submitting to mint 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "SENDING",
+    "Sending",
+    "Submitting payment…",
+    "Broadcasting…",
+    "Sending the transaction to the network",
+    "Confirmed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send-offchain (Onchain · Off-chain) frame 1: Broadcasting… 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-loading-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-idle-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 600,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 0,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Ready",
+    "BROADCASTING…",
+    "Sent",
+    "2026-05-22",
+    "Broadcasting…",
+    "Sending the transaction to the network",
+    "Confirmed",
+  ],
+}
+`;
+
+exports[`timeline scenario pins (redesign acceptance surface) onchain-send-offchain (Onchain · Off-chain) frame 2: Settled off-chain (no outpoint) 1`] = `
+{
+  "indicators": [
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 0,
+    },
+    {
+      "color": null,
+      "confirmationProgress": null,
+      "id": "indicator-done-success",
+      "pendingColor": "muted",
+      "segmentedInProgress": false,
+      "strokeWidthPx": 3,
+      "transitionDelayMs": 300,
+    },
+  ],
+  "lines": [
+    {
+      "fill": "success",
+      "filledHeight": {
+        "height": 50,
+      },
+      "gradientStops": [],
+    },
+  ],
+  "texts": [
+    "Send • Complete",
+    "SETTLED OFF-CHAIN",
+    "Sent",
+    "2026-05-22",
+    "Settled off-chain",
+    "2026-05-22",
+    "No on-chain transaction",
   ],
 }
 `;

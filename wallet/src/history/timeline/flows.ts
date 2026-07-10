@@ -341,25 +341,26 @@ const lightningMeltFlow: FlowDef = {
 // Onchain melt (NUT-30 send)
 // ---------------------------------------------------------------------------
 //
-// Three milestones: "Paid" (ecash spent) → the bitcoin network phase
-// ("Broadcasting…" then "In mempool · N/6 blocks" with the segmented
-// confirmation ring) → "Confirmed". If the mint settles off-chain (PAID, no
-// outpoint) the network phase collapses to a single "Settled off-chain" row —
-// the shared "Paid" row keeps its identity so the 3→2 change fades smoothly.
+// Three milestones: "Sending" (submitting the melt to the mint; completes as
+// "Sent" once the mint accepts) → the bitcoin network phase ("Broadcasting…"
+// then "In mempool · N/6 blocks" with the segmented confirmation ring) →
+// "Confirmed". If the mint settles off-chain (PAID, no outpoint) the network
+// phase collapses to a single "Settled off-chain" row — the shared "Sent" row
+// keeps its identity so the 3→2 change fades smoothly.
 
 // The tx is in the mempool once the confirmation watcher sees it; before that
 // the mint is still broadcasting.
 const onchainBroadcast = (ctx: TimelineContext) => !!ctx.progress?.hasPayment;
 const onchainConfirmed = (ctx: TimelineContext) => !!ctx.progress?.isSatisfied;
-// "Paid" = the ecash has left the wallet. That is true past UNPAID, but ALSO
-// whenever a later milestone has been reached — a broadcast tx, an on-chain
-// confirmation, or an off-chain settlement. Keying only on the melt-state
-// string let "Paid" render as still-pending under a completed terminal when a
-// mint reported a settled state the mapping didn't recognise (e.g. the
-// cdk-ldk-bdk off-chain settle): a grey idle "Paid" above a green "Settled
-// off-chain". Deriving it from "have we reached a later step" makes that
-// impossible.
-const onchainPaid = (ctx: TimelineContext) =>
+// "Sent" = the mint accepted the melt (the ecash has left the wallet). That
+// is true past UNPAID, but ALSO whenever a later milestone has been reached —
+// a broadcast tx, an on-chain confirmation, or an off-chain settlement.
+// Keying only on the melt-state string let the first row render as
+// still-pending under a completed terminal when a mint reported a settled
+// state the mapping didn't recognise (e.g. the cdk-ldk-bdk off-chain settle):
+// a grey idle row above a green "Settled off-chain". Deriving it from "have
+// we reached a later step" makes that impossible.
+const onchainSent = (ctx: TimelineContext) =>
   ctx.meltState === MeltQuoteState.PENDING ||
   ctx.meltState === MeltQuoteState.PAID ||
   onchainBroadcast(ctx) ||
@@ -370,7 +371,7 @@ const onchainMeltFlow: FlowDef = {
   variant: "onchain-melt",
   outcomes: [
     meltRolledBackOutcome({ kept: "network", terminal: "confirmed" }),
-    meltExpiredOutcome({ kept: "paid", terminal: "network" }),
+    meltExpiredOutcome({ kept: "sending", terminal: "network" }),
     // Off-chain settlement: PAID with no outpoint — the mint paid without a
     // transaction, so there is no network phase to show. The terminal row
     // shares the 'network' slot's rowKey (it collapses that phase in place).
@@ -380,9 +381,9 @@ const onchainMeltFlow: FlowDef = {
       when: (ctx) => !!ctx.onchainSettledInternally,
       rows: (ctx) => [
         {
-          slot: "paid",
+          slot: "sending",
           state: MeltQuoteState.UNPAID,
-          label: ctx.copy.MELT_COPY.onchain.paid.label,
+          label: ctx.copy.MELT_COPY.onchain.sent.label,
           stepType: "complete",
           timestamp: ctx.createdAt,
         },
@@ -400,27 +401,31 @@ const onchainMeltFlow: FlowDef = {
   ],
   milestones: [
     {
-      id: "paid",
+      // Entry milestone: always shown (the timeline only exists once the user
+      // taps Pay). It spins as "Sending" while the melt is being submitted to
+      // the mint and completes as "Sent" once the mint accepts (PENDING+).
+      id: "sending",
       reached: () => true,
-      activeStyle: () => "next-pending",
+      activeStyle: () => "current",
       copy: (ctx) => {
         const { MELT_COPY } = ctx.copy;
-        if (onchainPaid(ctx)) {
+        if (onchainSent(ctx)) {
           return {
             state: MeltQuoteState.UNPAID,
-            label: MELT_COPY.onchain.paid.label,
+            label: MELT_COPY.onchain.sent.label,
             timestamp: ctx.createdAt,
           };
         }
         return {
           state: MeltQuoteState.UNPAID,
-          label: MELT_COPY.onchain.paid.label,
+          label: MELT_COPY.onchain.sending.label,
+          info: MELT_COPY.onchain.sending.info,
         };
       },
     },
     {
       id: "network",
-      reached: onchainPaid,
+      reached: onchainSent,
       activeStyle: () => "current",
       ring: (ctx) => onchainBroadcast(ctx) && !!ctx.progress,
       copy: (ctx) => {

@@ -148,6 +148,7 @@ export function SettingsDesignSystemTimelineScreen() {
             tokenCreated={currentFrame.tokenCreated}
             nostrSent={currentFrame.nostrSent}
             onchainConfirmationProgress={currentFrame.onchainConfirmationProgress}
+            onchainSettledInternally={currentFrame.onchainSettledInternally}
           />
         </View>
 

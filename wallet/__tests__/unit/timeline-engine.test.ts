@@ -70,10 +70,10 @@ const progress = (over: Record<string, unknown> = {}) => ({
 });
 
 describe('timeline engine — monotonicity (max reached index)', () => {
-  // The onchain-melt "Paid" row must be complete whenever ANY later milestone
+  // The onchain-melt "Sent" row must be complete whenever ANY later milestone
   // has been reached, even when the melt-state string itself is stale or
   // unrecognised (out-of-order live observations can only advance the flow).
-  it('stale UNPAID melt state + confirmed watcher → Paid and network both complete', () => {
+  it('stale UNPAID melt state + confirmed watcher → Sent and network both complete', () => {
     const model = buildTimelineModel({
       historyEntry: meltEntry('UNPAID'),
       currentTime: CREATED_AT,
@@ -84,21 +84,21 @@ describe('timeline engine — monotonicity (max reached index)', () => {
       }),
     });
     expect(model.steps.map((s) => [s.id, s.stepType])).toEqual([
-      ['paid', 'complete'],
+      ['sending', 'complete'],
       ['network', 'complete'],
       ['confirmed', 'success'],
     ]);
     expect(model.outcome.kind).toBe('settled');
   });
 
-  it('broadcast without a state advance still marks Paid complete', () => {
+  it('broadcast without a state advance still marks Sent complete', () => {
     const model = buildTimelineModel({
       historyEntry: meltEntry('UNPAID'),
       currentTime: CREATED_AT,
       onchainConfirmationProgress: progress({ hasPayment: true, currentConfirmations: 0 }),
     });
     expect(model.steps.map((s) => [s.id, s.stepType])).toEqual([
-      ['paid', 'complete'],
+      ['sending', 'complete'],
       ['network', 'current'],
       ['confirmed', 'future-small'],
     ]);
@@ -216,7 +216,7 @@ describe('timeline engine — off-chain settlement collapse', () => {
       onchainSettledInternally: true,
     });
     expect(model.steps.map((s) => [s.id, s.rowKey, s.stepType])).toEqual([
-      ['paid', 'paid', 'complete'],
+      ['sending', 'sending', 'complete'],
       ['settled-offchain', 'network', 'success'],
     ]);
     expect(model.outcome.kind).toBe('settled');

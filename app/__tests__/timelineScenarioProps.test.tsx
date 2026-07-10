@@ -252,6 +252,7 @@ describe('timeline scenario pins (redesign acceptance surface)', () => {
                 tokenCreated={frame.tokenCreated}
                 nostrSent={frame.nostrSent}
                 onchainConfirmationProgress={frame.onchainConfirmationProgress}
+                onchainSettledInternally={frame.onchainSettledInternally}
               />
             );
           });
