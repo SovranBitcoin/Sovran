@@ -370,6 +370,15 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     ).toBe(false);
   });
 
+  it("hides paste and scan once a detected destination is fixed on the entry", () => {
+    const entry = {
+      destination: "meltQuote",
+      meltTarget: "lnbc1detecteddestination",
+    };
+    expect(getAvailableActions("amountEntry", entry).paste.available).toBe(false);
+    expect(getAvailableActions("amountEntry", entry).scanQr.available).toBe(false);
+  });
+
   it("hides onchain receive when no trusted mint advertises NUT-04 onchain", () => {
     const entry = {
       destination: "mintQuote",

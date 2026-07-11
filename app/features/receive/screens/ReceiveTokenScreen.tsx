@@ -101,7 +101,9 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
             text: 'Cancel',
             variant: 'secondary',
             onPress: async () => actions.back.execute(),
-            condition: !canClose,
+            // Fallback exit only: while the token is redeemable, Redeem is the
+            // sole button (back nav still exits); Close takes over once settled.
+            condition: !canClose && !actions.redeem.available,
           },
           {
             testID: 'receive-token-redeem',

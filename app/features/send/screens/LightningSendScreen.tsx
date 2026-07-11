@@ -178,7 +178,9 @@ export function LightningSendScreen({
                 await actions.cancel.execute();
                 onCancel();
               },
-              condition: actions.cancel.available,
+              // Hidden while the pay is in flight — a disabled X mid-payment
+              // reads as a broken button. Stays visible during its own cancel.
+              condition: actions.cancel.available && !actions.pay.loading,
               disabled: anyLoading,
             },
           ]}

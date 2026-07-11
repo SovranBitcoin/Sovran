@@ -658,8 +658,10 @@ function amountEntryAvailability(
       exceedsBalance,
       variants: nextVariants,
     },
-    paste: { available: isSendSideAmountEntry },
-    scanQr: { available: isSendSideAmountEntry },
+    // Paste / Scan QR re-route the flow to a new destination; once a scanned
+    // or pasted target is already fixed on the entry they no longer apply.
+    paste: { available: isSendSideAmountEntry && !hasMeltTarget },
+    scanQr: { available: isSendSideAmountEntry && !hasMeltTarget },
     cancel: { available: true },
     back: { available: true },
   };
