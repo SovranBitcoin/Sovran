@@ -78,6 +78,7 @@ describe("NUT-18 creqA installed-codec boundary", () => {
     expect(decoded.singleUse).toBe(true);
     expect(decoded.nut10).toEqual(lock);
     expect(sovranInfo).toEqual({
+      requestId: "request-18",
       amount: 4_200,
       unit: "usd",
       mints: MINTS,

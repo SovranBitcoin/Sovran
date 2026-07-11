@@ -10,7 +10,7 @@ import React, { useEffect } from 'react';
 
 import type { ReceiveHistoryEntry } from '@cashu/coco-core';
 import { isReceiveTokenPending, isReceiveTokenRedeemed } from 'wallet';
-import { useScreenActions } from 'wallet/react';
+import { useScreenActions, useColadaTransactionAnnotation } from 'wallet/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   TransactionDetailShell,
@@ -38,6 +38,10 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
   );
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
+  // Receives claimed via a NUT-18 payment request carry a persisted
+  // paymentRequest annotation (written when the claim finalizes) — surface it
+  // so the entry isn't read as plain redeemed ecash.
+  const paymentRequest = useColadaTransactionAnnotation(entry).paymentRequest;
 
   useEffect(() => {
     if (error) paymentLog.warn('receive.token.error', { error });
@@ -130,6 +134,11 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
       beforeStatus={isRedeemed ? <TransactionLocationSection transactionId={entry.id} /> : null}>
       <DetailsSection
         items={[
+          paymentRequest && { title: 'Type', value: 'Payment Request' },
+          paymentRequest?.requestId && {
+            title: 'Request ID',
+            value: truncateMiddle(paymentRequest.requestId, 8),
+          },
           source && { title: 'Source', value: source },
           bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
           bip321.optionKinds && {

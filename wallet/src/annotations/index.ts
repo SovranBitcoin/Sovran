@@ -11,6 +11,8 @@ export type {
   LockDirection,
   DistributionSource,
   SwapRole,
+  PaymentRequestRole,
+  PaymentRequestAnnotationTransport,
 } from "./model";
 
 export {
@@ -38,6 +40,7 @@ export {
   getLocation,
   getSwap,
   getCreqCustomization,
+  getPaymentRequest,
   getOnchainMelt,
   isP2PKLocked,
 } from "./selectors";

@@ -41,6 +41,8 @@ import {
   type StepHandlerMap,
   type NfcIOAdapter,
   meltMethodForTarget,
+  annotationKey,
+  decodePaymentRequestInfo,
   rawAnnotationKey,
   serializeHistoryEntry,
 } from 'wallet';
@@ -737,6 +739,42 @@ export function createSovranNotifications(
         activeState: store.active?.state ?? null,
         historyEntryLength: data.historyEntry.length,
       });
+      // Persist the payment-request linkage onto the transaction. The
+      // executePaymentRequest metadata (creq, transportType) only rides the
+      // live synthetic entry — the persisted coco send row never carries it —
+      // so the history detail needs this annotation to present the send as a
+      // payment-request payment instead of plain bearer ecash. Written before
+      // the toast guard: the linkage must land even without an active toast.
+      if (data.variant === 'paymentRequest' && data.historyEntry) {
+        try {
+          const parsed = JSON.parse(data.historyEntry) as {
+            id?: string;
+            operationId?: string;
+            metadata?: Record<string, string>;
+          };
+          const transportType = parsed.metadata?.transportType;
+          const requestId = parsed.metadata?.paymentRequest
+            ? decodePaymentRequestInfo(parsed.metadata.paymentRequest)?.requestId
+            : undefined;
+          setTransactionAnnotation(
+            annotationKey({ type: 'send', id: parsed.id, operationId: parsed.operationId }),
+            {
+              paymentRequest: {
+                role: 'payer',
+                ...(requestId ? { requestId } : {}),
+                ...(transportType === 'nostr' || transportType === 'http'
+                  ? { transport: transportType }
+                  : {}),
+              },
+            }
+          );
+        } catch (error) {
+          paymentLog.warn('payment.confirmed.pr_annotation_failed', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
       if (!store.active) {
         paymentLog.warn('payment.confirmed.skipped', {
           variant: data.variant,

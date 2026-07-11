@@ -473,6 +473,26 @@ export function usePaymentStatusListener(): void {
         amount,
         unit: op.unit,
       });
+
+      // Persist the payment-request linkage onto the receive so the history
+      // detail presents it as a payment-request claim, not plain redeemed
+      // ecash. coco's `source` only lives on the operation row — the merged
+      // history entry keys off `op:<operationId>` via candidateKeys.
+      const prSource = source as {
+        requestId?: string;
+        transport?: string;
+      };
+      setTransactionAnnotation(`op:${op.id}`, {
+        paymentRequest: {
+          role: 'payee',
+          ...(prSource.requestId ? { requestId: prSource.requestId } : {}),
+          ...(prSource.transport === 'nostr' ||
+          prSource.transport === 'inband' ||
+          prSource.transport === 'post'
+            ? { transport: prSource.transport }
+            : {}),
+        },
+      });
       usePaymentStatusStore.getState().setActive({
         variant: 'receive',
         id: op.id,

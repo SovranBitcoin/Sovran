@@ -11,7 +11,7 @@ import { StyleSheet } from 'react-native';
 
 import { Alert } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
-import { useScreenActions } from 'wallet/react';
+import { useScreenActions, useColadaTransactionAnnotation } from 'wallet/react';
 import {
   getSendTokenReachabilityWarning,
   isSendTokenCancelled,
@@ -73,6 +73,9 @@ export function SendTokenScreen({
   );
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
+  // Sends that paid a NUT-18 creq carry a persisted paymentRequest annotation
+  // (written at confirm time) — surface it so this isn't read as plain ecash.
+  const paymentRequest = useColadaTransactionAnnotation(entry).paymentRequest;
   const { isOffline } = useOfflineStatus();
   const muted = useThemeColor('muted');
   const transactionId = typeof entry?.id === 'string' ? entry.id : undefined;
@@ -305,6 +308,11 @@ export function SendTokenScreen({
       }>
       <DetailsSection
         items={[
+          paymentRequest && { title: 'Type', value: 'Payment Request' },
+          paymentRequest?.requestId && {
+            title: 'Request ID',
+            value: truncateMiddle(paymentRequest.requestId, 8),
+          },
           source && { title: 'Source', value: source },
           bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
           bip321.optionKinds && {

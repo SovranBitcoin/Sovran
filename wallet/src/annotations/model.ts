@@ -40,6 +40,9 @@ export const ANNOTATION_KEYS = {
   swapHopIndex: "swapHopIndex",
   creqP2pkLock: "creqP2pkLock",
   creqExcludedMints: "creqExcludedMints",
+  paymentRequestRole: "paymentRequestRole",
+  paymentRequestId: "paymentRequestId",
+  paymentRequestTransport: "paymentRequestTransport",
   onchainOutpoint: "onchainOutpoint",
   onchainOutpointSource: "onchainOutpointSource",
   onchainFeeIndex: "onchainFeeIndex",
@@ -59,6 +62,16 @@ export type ScanMethod = "qr" | "nfc" | "paste" | "deeplink" | "ble";
 export type LockDirection = "incoming" | "outgoing";
 export type DistributionSource = "copy" | "share" | "airdrop" | "displayed";
 export type SwapRole = "mint" | "melt";
+/** Which side of a NUT-18 payment request this transaction was. */
+export type PaymentRequestRole = "payer" | "payee";
+/** How the token travelled (`http` = POST transport on the send side; coco's
+ *  receive ingest reports `inband`/`post`). Distinct name from types.ts's
+ *  `PaymentRequestTransport` (the decoded `{type, target}` transport entry). */
+export type PaymentRequestAnnotationTransport =
+  | "nostr"
+  | "http"
+  | "inband"
+  | "post";
 /** Who produced a persisted onchain-melt outpoint: the mint's quote row, or
  *  our own mempool.space destination-address match (best-effort). */
 export type OnchainOutpointSource = "mint" | "heuristic";
@@ -107,6 +120,21 @@ export interface TransactionAnnotation {
   creqCustomization?: {
     p2pkLock?: boolean;
     excludedMints?: string[];
+  };
+  /**
+   * Marks a send/receive as having been settled via a NUT-18 Cashu payment
+   * request, so the history detail can say "payment request" instead of
+   * presenting it as plain bearer ecash. `role` is which side we were
+   * (`payer` = we paid someone's creq, `payee` = a payment arrived on our
+   * creq); `requestId` is the short NUT-18 `i` field for cross-referencing;
+   * `transport` is how the token travelled. The creq string itself is
+   * deliberately NOT persisted here (it's large and reconstructible facts
+   * only belong in coco).
+   */
+  paymentRequest?: {
+    role?: PaymentRequestRole;
+    requestId?: string;
+    transport?: PaymentRequestAnnotationTransport;
   };
   /**
    * Onchain melt (NUT-30 send) settlement facts, persisted so the detail
@@ -245,6 +273,16 @@ export function encodeAnnotation(
         patch.creqCustomization.excludedMints,
       );
     }
+  }
+
+  if (patch.paymentRequest) {
+    setString(record, ANNOTATION_KEYS.paymentRequestRole, patch.paymentRequest.role);
+    setString(record, ANNOTATION_KEYS.paymentRequestId, patch.paymentRequest.requestId);
+    setString(
+      record,
+      ANNOTATION_KEYS.paymentRequestTransport,
+      patch.paymentRequest.transport,
+    );
   }
 
   if (patch.onchainMelt) {
@@ -413,6 +451,28 @@ export function decodeAnnotation(
     annotation.creqCustomization = {
       ...(creqP2pkLockRaw != null ? { p2pkLock: creqP2pkLockRaw === "1" } : {}),
       ...(creqExcludedMints != null ? { excludedMints: creqExcludedMints } : {}),
+    };
+  }
+
+  const prRoleRaw = record[ANNOTATION_KEYS.paymentRequestRole];
+  const prRole =
+    prRoleRaw === "payer" || prRoleRaw === "payee"
+      ? (prRoleRaw as PaymentRequestRole)
+      : undefined;
+  const prRequestId = record[ANNOTATION_KEYS.paymentRequestId];
+  const prTransportRaw = record[ANNOTATION_KEYS.paymentRequestTransport];
+  const prTransport =
+    prTransportRaw === "nostr" ||
+    prTransportRaw === "http" ||
+    prTransportRaw === "inband" ||
+    prTransportRaw === "post"
+      ? (prTransportRaw as PaymentRequestAnnotationTransport)
+      : undefined;
+  if (prRole || prRequestId || prTransport) {
+    annotation.paymentRequest = {
+      ...(prRole ? { role: prRole } : {}),
+      ...(prRequestId ? { requestId: prRequestId } : {}),
+      ...(prTransport ? { transport: prTransport } : {}),
     };
   }
 

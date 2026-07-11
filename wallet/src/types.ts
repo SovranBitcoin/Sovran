@@ -26,6 +26,8 @@ export interface Detectors {
 }
 
 export interface PaymentRequestInfo {
+  /** The NUT-18 `i` payment id, when the request carries one. */
+  requestId?: string;
   mints: string[];
   amount: number | undefined;
   unit: string;

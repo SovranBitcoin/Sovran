@@ -70,6 +70,9 @@ export function decodePaymentRequestInfo(
       : null;
 
   const info: PaymentRequestInfo = {
+    ...(typeof decoded.id === "string" && decoded.id.length > 0
+      ? { requestId: decoded.id }
+      : {}),
     mints: (decoded.mints ?? []).filter(Boolean),
     amount: amountToNumberOrUndefined(decoded.amount),
     unit: decoded.unit ?? "sat",

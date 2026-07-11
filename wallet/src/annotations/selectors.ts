@@ -59,6 +59,12 @@ export function getCreqCustomization(
   return getAnnotation(entry).creqCustomization ?? null;
 }
 
+export function getPaymentRequest(
+  entry: EntryWithMetadata,
+): TransactionAnnotation["paymentRequest"] | null {
+  return getAnnotation(entry).paymentRequest ?? null;
+}
+
 export function getOnchainMelt(
   entry: EntryWithMetadata,
 ): TransactionAnnotation["onchainMelt"] | null {

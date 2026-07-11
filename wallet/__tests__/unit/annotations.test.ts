@@ -126,6 +126,27 @@ describe("encodeAnnotation / decodeAnnotation", () => {
     expect(decoded.onchainMelt).toEqual({ outpoint: "deadbeef:1" });
   });
 
+  it("round-trips a payment-request linkage (payer and payee)", () => {
+    const payer: TransactionAnnotation = {
+      paymentRequest: { role: "payer", requestId: "sovabc123", transport: "nostr" },
+    };
+    expect(decodeAnnotation(encodeAnnotation(payer))).toEqual(payer);
+
+    const payee: TransactionAnnotation = {
+      paymentRequest: { role: "payee", transport: "inband" },
+    };
+    expect(decodeAnnotation(encodeAnnotation(payee))).toEqual(payee);
+  });
+
+  it("treats unknown payment-request role/transport values as absent on decode", () => {
+    const decoded = decodeAnnotation({
+      paymentRequestRole: "garbage",
+      paymentRequestId: "sovabc123",
+      paymentRequestTransport: "carrier-pigeon",
+    });
+    expect(decoded.paymentRequest).toEqual({ requestId: "sovabc123" });
+  });
+
   it("produces no sub-objects for an empty record", () => {
     expect(decodeAnnotation({})).toEqual({});
   });
