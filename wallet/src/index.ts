@@ -120,6 +120,7 @@ export {
   isPendingPaymentRequestEntry,
   listInFlightReceiveEntries,
   listPendingPaymentRequestEntries,
+  PENDING_PAYMENT_REQUEST_MAX_AGE_MS,
   mergeTransactionSources,
   pendingPaymentRequestToHistoryEntry,
   sameTransactionList,

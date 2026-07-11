@@ -4,7 +4,9 @@ import type { HistoryEntry } from '@cashu/coco-core';
 import {
   inFlightReceiveToHistoryEntry,
   isPendingPaymentRequestEntry,
+  listPendingPaymentRequestEntries,
   mergeTransactionSources,
+  PENDING_PAYMENT_REQUEST_MAX_AGE_MS,
   pendingPaymentRequestToHistoryEntry,
   sameTransactionList,
 } from '../../src/history';
@@ -107,6 +109,43 @@ describe('pendingPaymentRequestToHistoryEntry', () => {
       singleUse: '1',
     });
     expect(isPendingPaymentRequestEntry(e)).toBe(true);
+  });
+});
+
+describe('listPendingPaymentRequestEntries — 24h display cutoff', () => {
+  const NOW = 1_800_000_000_000; // fixed epoch ms
+  const requestOp = (id: string, createdAt: number) => ({
+    id,
+    encodedRequest: 'creqAexample',
+    state: 'active' as const,
+    transport: 'nostr' as const,
+    amount: 100,
+    unit: 'sat',
+    mints: ['https://mint1.example.com'],
+    singleUse: true,
+    createdAt,
+    updatedAt: createdAt,
+  });
+  const managerWith = (ops: unknown[]) =>
+    ({
+      paymentRequests: { incoming: { list: async () => ops } },
+    }) as never;
+
+  it('shows requests created within the last 24h and hides older ones', async () => {
+    const fresh = requestOp('fresh', NOW - PENDING_PAYMENT_REQUEST_MAX_AGE_MS + 1);
+    const boundary = requestOp('boundary', NOW - PENDING_PAYMENT_REQUEST_MAX_AGE_MS);
+    const stale = requestOp('stale', NOW - PENDING_PAYMENT_REQUEST_MAX_AGE_MS - 1);
+
+    const entries = await listPendingPaymentRequestEntries(
+      managerWith([fresh, boundary, stale]),
+      NOW,
+    );
+    expect(entries.map((e) => e.id)).toEqual(['pr-fresh', 'pr-boundary']);
+  });
+
+  it('returns nothing when every active request is stale', async () => {
+    const stale = requestOp('stale', NOW - 2 * PENDING_PAYMENT_REQUEST_MAX_AGE_MS);
+    expect(await listPendingPaymentRequestEntries(managerWith([stale]), NOW)).toEqual([]);
   });
 });
 

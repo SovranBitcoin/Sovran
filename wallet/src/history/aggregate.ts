@@ -36,18 +36,32 @@ export async function listInFlightReceiveEntries(
 }
 
 /**
+ * Pending requests older than this are hidden from the transaction list. The
+ * operation stays `active` in coco (a payer holding the creq can still pay it
+ * and the claim will surface as a real receive) — this is a display cutoff
+ * only, so week-old unpaid requests don't sit in history forever.
+ */
+export const PENDING_PAYMENT_REQUEST_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/**
  * Synthetic history entries for ACTIVE incoming payment requests (NUT-18)
- * awaiting payment — the requests coco never projects into history.
+ * awaiting payment — the requests coco never projects into history. Limited
+ * to requests created within {@link PENDING_PAYMENT_REQUEST_MAX_AGE_MS}
+ * (coco stamps `createdAt` in epoch ms at create time).
  */
 export async function listPendingPaymentRequestEntries(
   manager: Manager,
+  now: number = Date.now(),
 ): Promise<HistoryEntry[]> {
   const ops: PaymentRequestReceiveOperation[] =
     await manager.paymentRequests.incoming.list({ state: "active" });
+  const cutoff = now - PENDING_PAYMENT_REQUEST_MAX_AGE_MS;
+  const fresh = ops.filter((op) => op.createdAt >= cutoff);
   logger.debug("history.aggregate.pendingPaymentRequests", {
     count: ops.length,
+    shown: fresh.length,
   });
-  return ops.map(pendingPaymentRequestToHistoryEntry);
+  return fresh.map(pendingPaymentRequestToHistoryEntry);
 }
 
 function operationId(entry: HistoryEntry): string | undefined {

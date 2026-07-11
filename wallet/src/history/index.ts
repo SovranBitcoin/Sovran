@@ -29,6 +29,7 @@ export {
   listInFlightReceiveEntries,
   listPendingPaymentRequestEntries,
   mergeTransactionSources,
+  PENDING_PAYMENT_REQUEST_MAX_AGE_MS,
   sameTransactionList,
 } from "./aggregate";
 export {
