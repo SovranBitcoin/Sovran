@@ -1,6 +1,8 @@
 import type { HistoryEntry, SendHistoryEntry } from "@cashu/coco-core";
 
+import { getOnchainMelt } from "../annotations/selectors";
 import {
+  getHistoryEntryOnchainMeltAddress,
   getHistoryEntryOnchainMintAddress,
   mintHistoryEntryExpired,
 } from "./timeline";
@@ -110,7 +112,20 @@ export function isSettledReceiveHistoryEntry(
 }
 
 export function isOnchainHistoryEntry(historyEntry: HistoryEntry): boolean {
-  return !!getHistoryEntryOnchainMintAddress(historyEntry);
+  if (historyEntry.type === "mint") {
+    return !!getHistoryEntryOnchainMintAddress(historyEntry);
+  }
+  if (historyEntry.type === "melt") {
+    // Fresh/synthetic melt entries carry `method: 'onchain'` in metadata;
+    // persisted coco melt rows carry NO metadata, so the merged onchainMelt
+    // annotation (outpoint/fee/address, written by the onchain send flow) is
+    // the durable signal. Pre-annotation historical rows stay undetectable.
+    return (
+      !!getHistoryEntryOnchainMeltAddress(historyEntry) ||
+      getOnchainMelt(historyEntry) !== null
+    );
+  }
+  return false;
 }
 
 export function matchesTransactionPaymentType(
@@ -120,7 +135,7 @@ export function matchesTransactionPaymentType(
   if (paymentType === "all") return true;
   if (paymentType === "onchain") return isOnchainHistoryEntry(historyEntry);
   if (paymentType === "lightning") {
-    if (historyEntry.type === "melt") return true;
+    if (historyEntry.type === "melt") return !isOnchainHistoryEntry(historyEntry);
     return historyEntry.type === "mint" && !isOnchainHistoryEntry(historyEntry);
   }
   return historyEntry.type === "send" || historyEntry.type === "receive";
@@ -167,7 +182,17 @@ export function isPendingTransaction(
     return state === "unpaid";
   }
   if (historyEntry.type === "melt") {
-    return String(historyEntry.state).toLowerCase() === "unpaid";
+    // In-flight melts belong in Pending too: an onchain send can sit PENDING
+    // for an hour awaiting confirmations. Covers both the legacy vocabulary
+    // (UNPAID/PENDING) and raw v2 op states (prepared/pending/executing) like
+    // the mint branch above; terminal failures are excluded.
+    const state = String(historyEntry.state).toLowerCase();
+    return (
+      state === "unpaid" ||
+      state === "prepared" ||
+      state === "pending" ||
+      state === "executing"
+    );
   }
   // A receive in `executing` state is a received-but-not-yet-redeemed token
   // (e.g. a P2PK token accepted while the mint was unreachable). It is not

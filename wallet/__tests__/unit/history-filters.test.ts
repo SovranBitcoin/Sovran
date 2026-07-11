@@ -14,8 +14,10 @@ import {
   isReservedSendHistoryEntry,
   isSendTokenCancelled,
   isSendTokenComplete,
+  isOnchainHistoryEntry,
   isSettledReceiveHistoryEntry,
   isSettledSpendHistoryEntry,
+  matchesTransactionPaymentType,
 } from '../../src/history';
 
 describe('history state filters', () => {
@@ -93,17 +95,70 @@ describe('transaction bucketing', () => {
     expect(isMintExpired({ type: 'mint', state: 'UNPAID' } as never)).toBe(false);
   });
 
+  it('treats an in-flight melt as pending (legacy and raw v2 vocabularies)', () => {
+    expect(isPendingTransaction({ type: 'melt', state: 'UNPAID' } as never)).toBe(true);
+    expect(isPendingTransaction({ type: 'melt', state: 'PENDING' } as never)).toBe(true);
+    expect(isPendingTransaction({ type: 'melt', state: 'prepared' } as never)).toBe(true);
+    expect(isPendingTransaction({ type: 'melt', state: 'executing' } as never)).toBe(true);
+
+    expect(isPendingTransaction({ type: 'melt', state: 'PAID' } as never)).toBe(false);
+    expect(isPendingTransaction({ type: 'melt', state: 'finalized' } as never)).toBe(false);
+    expect(isPendingTransaction({ type: 'melt', state: 'rolledBack' } as never)).toBe(false);
+  });
+
   it('buckets entries into pending / confirmed / expired', () => {
     expect(bucketTransaction({ type: 'receive', state: 'executing' } as never)).toBe('pending');
     expect(bucketTransaction({ type: 'send', state: 'pending' } as never)).toBe('pending');
+    expect(bucketTransaction({ type: 'melt', state: 'PENDING' } as never)).toBe('pending');
     expect(bucketTransaction({ type: 'receive', state: 'finalized' } as never)).toBe('confirmed');
     expect(bucketTransaction({ type: 'send', state: 'finalized' } as never)).toBe('confirmed');
+    expect(bucketTransaction({ type: 'melt', state: 'PAID' } as never)).toBe('confirmed');
     // collapsing-ghost override keeps a settled send pinned in pending
     expect(
       bucketTransaction({ type: 'send', state: 'rolled_back' } as never, {
         isCollapsingGhost: true,
       }),
     ).toBe('pending');
+  });
+});
+
+describe('payment-type filter — onchain melt detection', () => {
+  // Fresh/synthetic melt entries mark onchain-ness in metadata directly.
+  const freshOnchainMelt = {
+    type: 'melt',
+    state: 'PENDING',
+    metadata: { method: 'onchain', onchainAddress: 'bc1qdestination' },
+  } as never;
+  // Persisted coco melt rows carry no metadata; the merged onchainMelt
+  // annotation (flat keys) is the durable signal.
+  const annotatedOnchainMelt = {
+    type: 'melt',
+    state: 'PAID',
+    metadata: { onchainOutpoint: `${'ab'.repeat(32)}:0`, onchainFeeReserveSats: '2000' },
+  } as never;
+  const lightningMelt = { type: 'melt', state: 'PAID' } as never;
+
+  it('detects onchain melts via metadata method and via merged annotation', () => {
+    expect(isOnchainHistoryEntry(freshOnchainMelt)).toBe(true);
+    expect(isOnchainHistoryEntry(annotatedOnchainMelt)).toBe(true);
+    expect(isOnchainHistoryEntry(lightningMelt)).toBe(false);
+  });
+
+  it("matches onchain melts under 'onchain' and excludes them from 'lightning'", () => {
+    expect(matchesTransactionPaymentType(freshOnchainMelt, 'onchain')).toBe(true);
+    expect(matchesTransactionPaymentType(annotatedOnchainMelt, 'onchain')).toBe(true);
+    expect(matchesTransactionPaymentType(freshOnchainMelt, 'lightning')).toBe(false);
+    expect(matchesTransactionPaymentType(annotatedOnchainMelt, 'lightning')).toBe(false);
+
+    expect(matchesTransactionPaymentType(lightningMelt, 'lightning')).toBe(true);
+    expect(matchesTransactionPaymentType(lightningMelt, 'onchain')).toBe(false);
+  });
+
+  it("keeps ecash sends/receives out of both 'lightning' and 'onchain'", () => {
+    const send = { type: 'send', state: 'finalized' } as never;
+    expect(matchesTransactionPaymentType(send, 'ecash')).toBe(true);
+    expect(matchesTransactionPaymentType(send, 'lightning')).toBe(false);
+    expect(matchesTransactionPaymentType(send, 'onchain')).toBe(false);
   });
 });
 

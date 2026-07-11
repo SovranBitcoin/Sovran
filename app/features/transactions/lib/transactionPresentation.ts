@@ -1,8 +1,7 @@
 import type { HistoryEntry } from '@cashu/coco-core';
-import { isPendingPaymentRequestEntry } from 'wallet';
 
 type TransactionActionDirection = 'send' | 'receive';
-type TransactionActionLabel = 'Send' | 'Receive' | 'Request';
+type TransactionActionLabel = 'Send' | 'Receive';
 
 const TRANSACTION_ACTION_DIRECTION_BY_TYPE = {
   melt: 'send',
@@ -30,10 +29,10 @@ export function getTransactionActionLabel(type: HistoryEntry['type']): Transacti
 
 /**
  * Row label for a full history entry. A pending incoming payment request is a
- * synthetic `receive` row awaiting payment — it reads "Request", not "Receive",
- * so the list distinguishes "I asked for ecash" from "ecash arrived".
+ * synthetic `receive` row awaiting payment and reads "Receive" like any other
+ * incoming row — its awaiting-payment treatment comes from the pending bucket,
+ * not the label.
  */
 export function getTransactionRowLabel(entry: HistoryEntry): TransactionActionLabel {
-  if (isPendingPaymentRequestEntry(entry)) return 'Request';
   return TRANSACTION_ACTION_LABEL_BY_TYPE[entry.type];
 }
