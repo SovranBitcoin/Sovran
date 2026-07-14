@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "id": "recovery.reinstall",
+  "name": "Recover wallet (reinstall)",
+  "description": "Capture the preceding onboarding scenario's drawer profile name, reinstall while preserving the keychain, pass Terms and RestoreGate, recover known mints, and prove the inherited profile name is unchanged",
+  "lane": "simulator",
+  "tags": ["flow:recovery"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"action":"tap","selector":{"id":"header-profile-avatar"}},
+    {"action":"waitFor","selector":{"id":"drawer-profile-name"},"timeoutMs":30000},
+    {"action":"capture","as":"profileNameBefore","fromSelector":{"id":"drawer-profile-name"},"attribute":"label"},
+    {"action":"screenshot","name":"drawer","stable":true,"tolerance":0.001}
+  ],
+  "steps": [
+    {"action":"launch","reset":"reinstall"},
+    {"action":"waitFor","selector":{"label":"I have read and agree to the Terms and Conditions"},"timeoutMs":240000},
+    {"action":"tap","selector":{"label":"I have read and agree to the Terms and Conditions"}},
+    {"action":"waitFor","selector":{"label":"Next"},"state":"enabled","timeoutMs":30000},
+    {"action":"tap","selector":{"label":"Next"}},
+    {"action":"waitFor","selector":{"label":"Recover Wallet"},"timeoutMs":180000},
+    {"action":"assert","that":"visible","selector":{"id":"slide-to-confirm"}},
+    {"action":"screenshot","name":"restore-gate","stable":true,"tolerance":0.001},
+    {"action":"drag","selector":{"id":"slide-to-confirm"},"from":{"x":0.07,"y":0.5},"to":{"x":0.97,"y":0.5},"durationMs":800},
+    {"action":"waitFor","selector":{"label":"Recovery Complete"},"timeoutMs":300000},
+    {"action":"screenshot","name":"recovery-complete","stable":true,"tolerance":0.001},
+    {"action":"tap","selector":{"label":"Continue"}},
+    {"action":"waitFor","selector":{"id":"header-profile-avatar"},"timeoutMs":180000},
+    {"action":"tap","selector":{"id":"header-profile-avatar"}},
+    {"action":"waitFor","selector":{"id":"drawer-profile-name"},"timeoutMs":30000},
+    {"action":"assert","that":"ax","selector":{"id":"drawer-profile-name"},"label":"${profileNameBefore}"},
+    {"action":"screenshot","name":"drawer","stable":true,"tolerance":0.001},
+    {"action":"tapAt","x":0.95,"y":0.5}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":60000},
+    {"action":"screenshot","name":"wallet","stable":true,"tolerance":0.001}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

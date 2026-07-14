@@ -16,6 +16,10 @@ scripts/start-wda.sh
 scripts/dev.sh
 docs/device-automation.md
 
+# JSON-native e2e evidence: screenshots, ax snapshots, metro.log, and custody
+# material (legacy-SEEDS.json + custody/ hold LIVE test mnemonics) — never commit
+e2e/artifacts/
+
 # BitChat / BLE local identity (contains a private key — never commit)
 selfIdentity.plist
 

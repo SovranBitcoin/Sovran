@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "id": "onboarding.fresh",
+  "name": "Onboard (fresh install)",
+  "description": "Splash, terms, all four intro slides (bitcoin, nostr, privacy, sovereign), Welcome to Sovran, and wallet home on a factory-clean install. The e2e Metro slows the carousel (EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS) and each slide is advanced by tapping it; slide 4 is left un-tapped because its next index is the loop clone of slide 1.",
+  "lane": "simulator",
+  "tags": ["flow:onboarding"],
+  "requires": ["fresh-install"],
+  "setup": [],
+  "steps": [
+    {"action":"launch","reset":"erase"},
+    {"action":"tapAt","x":0.68,"y":0.54},
+    {"action":"screenshot","name":"splash","delayMs":2500},
+    {"action":"waitFor","selector":{"label":"I have read and agree to the Terms and Conditions"},"timeoutMs":240000},
+    {"action":"screenshot","name":"terms"},
+    {"action":"tap","selector":{"label":"I have read and agree to the Terms and Conditions"}},
+    {"action":"waitFor","selector":{"label":"Next"},"state":"enabled"},
+    {"action":"tap","selector":{"label":"Next"}},
+    {"action":"waitFor","selector":{"label":"Bitcoin that feels like cash"},"timeoutMs":60000},
+    {"action":"screenshot","name":"onboarding-carousel"},
+    {"action":"tap","selector":{"label":"Bitcoin that feels like cash"}},
+    {"action":"waitFor","selector":{"label":"Powered by Nostr"},"timeoutMs":15000},
+    {"action":"screenshot","name":"onboarding-carousel"},
+    {"action":"tap","selector":{"label":"Powered by Nostr"}},
+    {"action":"waitFor","selector":{"label":"Private by Design"},"timeoutMs":15000},
+    {"action":"screenshot","name":"onboarding-carousel"},
+    {"action":"tap","selector":{"label":"Private by Design"}},
+    {"action":"waitFor","selector":{"label":"Stay private, stay sovereign"},"timeoutMs":15000},
+    {"action":"screenshot","name":"onboarding-carousel"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"label":"Welcome to Sovran"},"timeoutMs":60000},
+    {"action":"screenshot","name":"welcome","stable":true,"tolerance":0.01},
+    {"action":"assert","that":"ax","selector":{"label":"Get Started"},"state":{"enabled":true}},
+    {"action":"tap","selector":{"label":"Get Started"}}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"No History"},"timeoutMs":60000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [],
+  "endState": "wallet"
+}

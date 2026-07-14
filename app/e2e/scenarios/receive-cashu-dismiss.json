@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "id": "receive.cashu.dismiss",
+  "name": "Receive cashu token (paste) [dismiss]",
+  "description": "Create a controlled 50 sat bearer token, preview it through Receive Paste, cancel without redeeming, prove wallet balance/history are unchanged, then return the unspent token to the counterparty through host recovery",
+  "lane": "funded",
+  "tags": ["flow:receive","instrument:cashu-token","io:paste","outcome:dismissed"],
+  "requires": ["fresh-install","cocod.send.cashu","unit.sat"],
+  "funds": {"assets":[{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxPrincipal":50}]},
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"counterparty","operation":"cashu.create","mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"amount":50,"captureAs":"incomingToken","setClipboard":true,"timeoutMs":60000},
+    {"action":"tap","selector":{"id":"wallet-receive"}},
+    {"action":"waitFor","selector":{"id":"receive-method-paste"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"receive-method-paste"}},
+    {"action":"waitFor","selector":{"idPrefix":"transaction-probe-","captureSuffixAs":"previewTx"},"timeoutMs":30000},
+    {"action":"assert","that":"visible","selector":{"id":"receive-token-redeem"}},
+    {"action":"assert","that":"tx","txRef":"${previewTx}","direction":"in","amount":50,"unit":"sat","mintHost":"mint.sovran.money","status":"prepared"},
+    {"action":"screenshot","name":"receive-token","stable":true,"tolerance":0.001},
+    {"action":"tap","selector":{"id":"receive-token-cancel"}},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"id":"wallet-receive"},"timeoutMs":45000},
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0},
+    {"action":"assert","that":"notVisible","selector":{"id":"transaction-${previewTx}"}},
+    {"action":"screenshot","name":"wallet","stable":true,"tolerance":0.001}
+  ],
+  "finally": [
+    {"use":"flow.sweep-mint","with":{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":45000}
+  ],
+  "endState": "wallet"
+}

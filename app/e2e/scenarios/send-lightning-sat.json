@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "id": "send.lightning.sat",
+  "name": "Send bolt11 (paste)",
+  "description": "Fund 100 via Lightning, melt 40 to a cocod invoice; assert the fee-enveloped delta and end on wallet",
+  "lane": "funded",
+  "tags": ["flow:send","instrument:bolt11","io:paste","outcome:settled"],
+  "requires": ["fresh-install","cocod.send.bolt11","cocod.receive.bolt11","unit.sat"],
+  "funds": {"assets":[{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxPrincipal":100}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"flow.fund-lightning-100"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"counterparty","operation":"bolt11.create","mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"amount":40,"captureAs":"invoice","setClipboard":true,"timeoutMs":60000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-send"}}],"until":{"label":"Paste"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"send"},
+    {"action":"tap","selector":{"label":"Paste"}},
+    {"action":"waitFor","selector":{"id":"melt-pay"},"timeoutMs":60000},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"tap","selector":{"id":"melt-pay"}},
+    {"action":"waitFor","selector":{"id":"melt-close"},"timeoutMs":120000},
+    {"action":"assert","that":"visible","selector":{"id":"melt-close"}},
+    {"action":"waitFor","selector":{"idPrefix":"transaction-probe-","captureSuffixAs":"meltTx"},"timeoutMs":30000},
+    {"action":"assert","that":"tx","txRef":"${meltTx}","direction":"out","amount":40,"unit":"sat","mintHost":"mint.sovran.money","status":"PAID"},
+    {"action":"counterparty","operation":"bolt11.settled","mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"amount":40,"invoice":"${invoice}","timeoutMs":60000},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":60000},
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":-40,"feeEnvelopeSats":5},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.sweep-mint","with":{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0}},
+    {"use":"flow.return-to-wallet"},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":45000}
+  ],
+  "endState": "wallet"
+}

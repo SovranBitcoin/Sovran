@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "name": "default",
+  "scenarios": [
+    {"id":"onboarding.fresh","file":"scenarios/onboarding-fresh.json","order":10,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"}
+  ]
+}

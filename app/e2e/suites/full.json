@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "full",
+  "defaultEndState": "wallet",
+  "scenarios": [
+    {"id":"onboarding.fresh","file":"scenarios/onboarding-fresh.json","order":10,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"recovery.reinstall","file":"scenarios/recovery-reinstall.json","order":20,"newInstance":false,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"receive.lightning.sat","file":"scenarios/receive-lightning-sat.json","order":40,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","unit.sat","cocod.receive.cashu"],"endState":"wallet"},
+    {"id":"receive.lightning.change-mint.amount","file":"scenarios/receive-lightning-change-mint-amount.json","order":50,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","unit.sat","cocod.receive.cashu"],"endState":"wallet"},
+    {"id":"receive.cashu.paste","file":"scenarios/receive-cashu-paste.json","order":60,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.cashu","unit.sat","cocod.receive.cashu"],"endState":"wallet"},
+    {"id":"receive.cashu.dismiss","file":"scenarios/receive-cashu-dismiss.json","order":70,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.cashu","unit.sat","cocod.receive.cashu"],"endState":"wallet"},
+    {"id":"receive.lightning.qr","file":"scenarios/receive-lightning-qr.json","order":90,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","unit.sat","cocod.receive.cashu"],"endState":"wallet"},
+    {"id":"send.cashu.sat","file":"scenarios/send-cashu-sat.json","order":100,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","cocod.receive.cashu","unit.sat"],"endState":"wallet"},
+    {"id":"send.cashu.pending-reclaim","file":"scenarios/send-cashu-pending-reclaim.json","order":120,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","unit.sat","cocod.receive.cashu"],"endState":"wallet"},
+    {"id":"send.lightning.sat","file":"scenarios/send-lightning-sat.json","order":140,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","cocod.receive.bolt11","unit.sat","cocod.receive.cashu"],"endState":"wallet"},
+    {"id":"send.lightning.change-mint.preview","file":"scenarios/send-lightning-change-mint-preview.json","order":150,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","cocod.receive.bolt11","unit.sat","cocod.receive.cashu"],"endState":"wallet"},
+    {"id":"send.lightning.dismiss","file":"scenarios/send-lightning-dismiss.json","order":160,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","cocod.receive.bolt11","unit.sat","cocod.receive.cashu"],"endState":"wallet"}
+  ]
+}

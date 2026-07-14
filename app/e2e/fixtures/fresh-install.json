@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "id": "flow.fresh-install",
+  "params": [],
+  "requires": ["fresh-install"],
+  "steps": [
+    {"action":"launch","reset":"erase"},
+    {"action":"waitFor","selector":{"label":"I have read and agree to the Terms and Conditions"},"timeoutMs":240000},
+    {"action":"tap","selector":{"label":"I have read and agree to the Terms and Conditions"}},
+    {"action":"waitFor","selector":{"label":"Next"},"state":"enabled"},
+    {"action":"tap","selector":{"label":"Next"}}
+  ]
+}

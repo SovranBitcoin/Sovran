@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "flow.sweep-mint",
+  "params": ["mintUrl","unit","accountIndex"],
+  "requires": ["cocod.receive.cashu","unit.sat"],
+  "steps": [
+    {"action":"counterparty","operation":"recovery.sweep","mintUrl":"${mintUrl}","unit":"${unit}","accountIndex":"${accountIndex}","timeoutMs":120000}
+  ]
+}

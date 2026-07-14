@@ -10,3 +10,9 @@ expo-env.d.ts
 uniwind-types.d.ts
 vendor/**
 eslint-suppressions.json
+
+# Compact device-test JSON is enforced by `bun run e2e:validate`, NOT prettier.
+# Only these exact test-JSON paths are exempted (TS/MD/other JSON stay formatted).
+e2e/suites/*.json
+e2e/scenarios/*.json
+e2e/fixtures/*.json

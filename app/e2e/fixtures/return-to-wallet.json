@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "id": "flow.return-to-wallet",
+  "params": [],
+  "requires": [],
+  "steps": [
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ]
+}

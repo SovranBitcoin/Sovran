@@ -58,6 +58,9 @@ module.exports = {
   },
   testPathIgnorePatterns: [
     '/node_modules/',
+    // The JSON-native harness uses Bun's test runner and Bun-only APIs. Keep
+    // it out of the app's React Native/Jest lane; `bun run e2e:test` owns it.
+    '<rootDir>/e2e/',
     '/coco/',
     '/eNuts/',
     '/coco-cashu-plugin-p2pk-import/',
