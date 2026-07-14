@@ -56,6 +56,7 @@ import { useOwnEventsSync } from '@/shared/lib/nostr/ownsync/useOwnEventsSync';
 import { useOwnSocialGraphSeed } from '@/shared/lib/nostr/ownsync/useOwnSocialGraphSeed';
 import PopupHost from '@/shared/blocks/popup/PopupHost';
 import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
+import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { AndroidImageOverlayHost } from '@/features/feed/components/nostr/image-overlay/AndroidImageOverlayHost';
 import { OfflineShell, OfflineStatusProvider } from '@/shared/providers/OfflineProvider';
 import {
@@ -841,6 +842,7 @@ export default function RootLayout() {
                 key={`account-${activeAccountIndex}`}
                 accountIndex={activeAccountIndex}>
                 <RootLayoutContent />
+                <E2EToastProbe />
                 {/* Same-window host for the Android feed media lightbox; must
                     sit BEFORE PopupHost so popups triggered from inside the
                     lightbox stack above it. No-op on iOS / when empty. */}

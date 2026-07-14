@@ -7,6 +7,7 @@ import { isCustomSheetPayload, usePopupStore } from '@/shared/stores/runtime/pop
 import type { SheetCloseEvent } from '@/shared/stores/runtime/popupStore';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
 import { CompactToast } from '../CompactToast';
+import { E2EStaticToastRenderMarker } from '../E2EToastProbe';
 import type { LiveSheetConfig } from '../liveSheetTypes';
 
 /** Best-effort first stack frame outside the popup module — gives "where did this come from" without a full trace. */
@@ -63,6 +64,8 @@ export type ToastConfig = {
   onHide?: () => void;
   debugLabel?: string;
   debugFields?: Record<string, unknown>;
+  /** Closed static-popup key; never a toast message or payment value. */
+  e2eProbeKey?: string;
 };
 
 type CustomToastConfig = {
@@ -111,13 +114,20 @@ export function showToast(config: ToastConfig) {
   let managerToastId: string | undefined;
   managerToastId = toastManagerRef.show({
     component: (props: Record<string, unknown>) =>
-      React.createElement(CompactToast, {
-        ...props,
-        variant: config.variant,
-        label: config.label,
-        description: config.description,
-        icon: config.icon,
-      }),
+      React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(E2EStaticToastRenderMarker, {
+          probeKey: config.e2eProbeKey,
+        }),
+        React.createElement(CompactToast, {
+          ...props,
+          variant: config.variant,
+          label: config.label,
+          description: config.description,
+          icon: config.icon,
+        })
+      ),
     duration: config.duration,
     onShow: () => {
       popupLog.info('popup.toast.shown', {

@@ -437,7 +437,7 @@ export type ParamPopupKey = keyof typeof PARAM_POPUPS;
 export type PopupParams<K extends ParamPopupKey> = Parameters<(typeof PARAM_POPUPS)[K]>[0];
 
 export function staticPopup(key: StaticPopupKey, overrides?: PopupOverrides): void {
-  popup({ ...STATIC_POPUPS[key], ...overrides });
+  popup({ ...STATIC_POPUPS[key], ...overrides, e2eProbeKey: key });
 }
 
 export function paramPopup<K extends ParamPopupKey>(

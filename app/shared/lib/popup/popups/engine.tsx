@@ -38,10 +38,21 @@ interface PopupConfig {
   onClose?: (event: SheetCloseEvent) => void;
   type?: PopupSeverity;
   live?: LiveSheetConfig;
+  /** Closed static-popup key used only by the DEV rendered-toast probe. */
+  e2eProbeKey?: string;
 }
 
 export const popup = (config: PopupConfig) => {
-  const { message, text, icon, buttons, type, variant: explicitVariant, ...options } = config;
+  const {
+    message,
+    text,
+    icon,
+    buttons,
+    type,
+    variant: explicitVariant,
+    e2eProbeKey,
+    ...options
+  } = config;
 
   const resolvedButtons = buttons ?? [];
   const severity: PopupSeverity = type ?? 'info';
@@ -86,6 +97,7 @@ export const popup = (config: PopupConfig) => {
     duration: options.duration,
     onShow: options.onOpen,
     onHide: options.onClose ? () => options.onClose!({ reason: 'dismiss' }) : undefined,
+    e2eProbeKey,
   };
   showToast(toastConfig);
 };

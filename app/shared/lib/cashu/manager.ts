@@ -28,6 +28,7 @@ import {
   deriveCashuMnemonicForImported,
 } from '@/shared/lib/nostr/keyDerivation';
 import { getInflightProofs, restoreProofsToReady } from './managerInternals';
+import { reconcileE2EReadyProofs } from './e2eReadyProofReconciliation';
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, getPublicKey, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
@@ -587,6 +588,33 @@ export class CocoManager {
         } catch (retryError) {
           cashuLog.error('cashu.manager.proof_watcher_retry_failed', { error: retryError });
           reportCocoApiFailure('enableProofStateWatcher', retryError);
+        }
+      }
+
+      const e2eFundedAssets = process.env.EXPO_PUBLIC_E2E_FUNDED_ASSETS;
+      if (
+        __DEV__ &&
+        process.env.EXPO_PUBLIC_E2E_SEED_EXPORT_ENDPOINT &&
+        process.env.EXPO_PUBLIC_E2E_SEED_EXPORT_TOKEN &&
+        e2eFundedAssets
+      ) {
+        try {
+          const result = await initPhase('CocoManager.e2eReadyProofReconcile', () =>
+            reconcileE2EReadyProofs(this.instance!, e2eFundedAssets)
+          );
+          cashuLog.info('cashu.manager.e2e_ready_proofs.done', {
+            assets: result.assets,
+            checked: result.checked,
+            spent: result.spent,
+            pending: result.pending,
+            unspent: result.unspent,
+            remainingAmount: result.remaining.reduce((sum, asset) => sum + asset.amount, 0),
+          });
+        } catch (error) {
+          cashuLog.warn('cashu.manager.e2e_ready_proofs.failed', {
+            error: error instanceof Error ? error.message : 'ready-proof reconciliation failed',
+          });
+          reportCocoApiFailure('e2eReadyProofReconcile', error);
         }
       }
 

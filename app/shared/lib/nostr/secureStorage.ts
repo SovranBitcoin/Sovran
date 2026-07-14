@@ -7,6 +7,7 @@ import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
 import { useCallback, useEffect, useState } from 'react';
 
 import { nostrLog, redactError } from '../logger';
+import { maybeExportSeedForE2E } from './e2eSeedExport';
 
 // Keys for secure storage
 const STORAGE_KEYS = {
@@ -285,6 +286,7 @@ async function retrieveMnemonicInner(): Promise<string | null> {
     nostrLog.warn('nostr.secure.mnemonic_corrupt');
     return null;
   }
+  await maybeExportSeedForE2E(value);
   return value;
 }
 
@@ -401,6 +403,10 @@ async function ensureMnemonicExistsInner(): Promise<string | null> {
     }
 
     nostrLog.info('nostr.secure.mnemonic_stored', { source: generated.source });
+    // A freshly generated seed may not be read again during this process. Give
+    // the funded E2E harness its one DEV-only custody handoff immediately after
+    // SecureStore confirms persistence; normal development never enables it.
+    await maybeExportSeedForE2E(generated.mnemonic);
     return generated.mnemonic;
   } catch (error) {
     nostrLog.error('nostr.secure.ensure_mnemonic_failed', { error: redactError(error) });

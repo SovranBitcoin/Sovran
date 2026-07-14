@@ -255,7 +255,10 @@ export const DrawerProfileChrome = React.memo(function DrawerProfileChrome({
         <ProfileSwitcherButtons executeProfileAction={executeProfileAction} openSheet={openSheet} />
       </HStack>
       <Spacer size={spacing.md} />
-      <Pressable onPress={handleAvatarPress}>
+      <Pressable
+        onPress={handleAvatarPress}
+        testID="drawer-profile-name"
+        accessibilityLabel={displayName}>
         <VStack align="flex-start" spacing={spacing.xs}>
           <Text bold size={20} style={{ color: foreground }}>
             {displayName}

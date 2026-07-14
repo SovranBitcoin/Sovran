@@ -202,6 +202,7 @@ export function OnchainReceiveScreen({
       screenName="OnchainReceiveScreen"
       testID={`mint-quote-id-${entry.id}`}
       entry={entry as unknown as HistoryEntry}
+      source={source}
       footer={bottomButtons}
       beforeStatus={
         <>

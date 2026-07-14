@@ -79,7 +79,12 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
   if (supportsLiquidGlass()) {
     return (
       <Animated.View style={[animatedStyle, style]}>
-        <HeaderGlassCircle onPress={onPress}>{avatar}</HeaderGlassCircle>
+        <HeaderGlassCircle
+          onPress={onPress}
+          testID="header-profile-avatar"
+          accessibilityLabel="Open drawer">
+          {avatar}
+        </HeaderGlassCircle>
       </Animated.View>
     );
   }
@@ -90,6 +95,7 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
         onPress={onPress}
         hitSlop={HEADER_BUTTON_HIT_SLOP}
         style={androidStyle}
+        testID="header-profile-avatar"
         accessibilityRole="button"
         accessibilityLabel="Open drawer">
         {avatar}

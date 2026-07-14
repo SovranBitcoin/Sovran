@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import opacity from 'hex-color-opacity';
@@ -67,12 +67,25 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
     if (result instanceof Promise) await result;
   });
 
+  // Synthesized taps (VoiceOver activation, HID automation like serve-sim)
+  // reach the JS touch responder but the RNGH Tap recognizer never fires for
+  // them next to the interactive glass. Fall back to firing the press from
+  // the plain responder when RNGH stays silent for a beat after touch-up;
+  // real finger taps recognize instantly and suppress the fallback. A >10pt
+  // drag cancels it, matching Tap's own maxDistance.
+  const rnghFired = useRef(false);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const moved = useRef(false);
+
   const tap = useMemo(
     () =>
       Gesture.Tap()
         .runOnJS(true)
         .onEnd((_event, success) => {
-          if (success) void guardedPress();
+          if (success) {
+            rnghFired.current = true;
+            void guardedPress();
+          }
         }),
     [guardedPress]
   );
@@ -84,6 +97,27 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
         accessible
         accessibilityRole="button"
         accessibilityLabel={label}
+        onTouchStart={(e) => {
+          rnghFired.current = false;
+          moved.current = false;
+          touchStart.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+        }}
+        onTouchMove={(e) => {
+          const start = touchStart.current;
+          if (!start) return;
+          if (
+            Math.abs(e.nativeEvent.pageX - start.x) > 10 ||
+            Math.abs(e.nativeEvent.pageY - start.y) > 10
+          ) {
+            moved.current = true;
+          }
+        }}
+        onTouchEnd={() => {
+          if (moved.current) return;
+          setTimeout(() => {
+            if (!rnghFired.current) void guardedPress();
+          }, 180);
+        }}
         glassEffectStyle="regular"
         isInteractive
         tintColor={tintColor}

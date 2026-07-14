@@ -19,6 +19,7 @@ export default function MintSelector(props: MintSelectorProps): React.ReactEleme
   return (
     <Log name="MintSelector">
       <BalancePill
+        testID={props.testID}
         title={shared.mintName}
         balance={shared.balance}
         unit={shared.unit}

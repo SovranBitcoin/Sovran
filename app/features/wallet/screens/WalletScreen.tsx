@@ -32,6 +32,7 @@ import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
+import { E2EReadyProofProbe } from '@/features/wallet/components/E2EReadyProofProbe';
 
 // The wallet-screen transaction list shows EVERY account's entries;
 // Transactions treats unit 'all' as unfiltered.
@@ -183,6 +184,7 @@ export function WalletScreen() {
         refreshControl={pullToAi.refreshControl}
         contentContainerStyle={styles.scrollContent}>
         <Log name="WalletScreen" style={styles.screen}>
+          <E2EReadyProofProbe />
           <ScrollableGradientOverlay contentHeight={contentHeight} />
 
           <View style={styles.topArea}>
@@ -205,8 +207,9 @@ export function WalletScreen() {
               pointerEvents={isSwapping ? 'none' : 'auto'}
               style={[styles.primaryActions, { opacity: isSwapping ? 0.4 : 1 }]}>
               <View style={styles.capsuleRow}>
-                <View testID="wallet-receive" style={styles.capsuleSlot}>
+                <View style={styles.capsuleSlot}>
                   <CapsuleButton
+                    testID="wallet-receive"
                     label="Receive"
                     icon="lucide:arrow-down-left"
                     systemIcon={RECEIVE_SYSTEM_ICON}
@@ -214,8 +217,9 @@ export function WalletScreen() {
                     onPress={handleReceive}
                   />
                 </View>
-                <View testID="wallet-send" style={styles.capsuleSlot}>
+                <View style={styles.capsuleSlot}>
                   <CapsuleButton
+                    testID="wallet-send"
                     label="Send"
                     icon="lucide:arrow-up-right"
                     systemIcon={SEND_SYSTEM_ICON}

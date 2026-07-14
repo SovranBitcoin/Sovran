@@ -260,6 +260,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
       testID={`onchain-send-id-${entry.id}`}
       entry={entry as unknown as HistoryEntry}
       mintInfo={mintInfo}
+      source={source}
       footer={bottomButtons}
       timeline={
         <>

@@ -10,6 +10,7 @@
  */
 
 import React from 'react';
+import { StyleSheet } from 'react-native';
 
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { isPaymentRequestPreview } from 'wallet';
@@ -25,6 +26,7 @@ import {
   useBip321Info,
   Bip321MethodIcons,
 } from '@/features/transactions';
+import { TransactionProbe } from '@/features/transactions/components/detail/TransactionProbe';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
@@ -32,6 +34,7 @@ import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/Scree
 import { Screen } from '@/shared/ui/composed/Screen';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { View } from '@/shared/ui/primitives/View/View';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
 interface PaymentRequestScreenProps {
@@ -115,6 +118,17 @@ export function PaymentRequestScreen({
 
   return (
     <Screen name="PaymentRequestScreen" contentPadding={0} footer={bottomButtons}>
+      <View
+        testID="payment-request-ready"
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel="Payment request ready"
+        importantForAccessibility="yes"
+        collapsable={false}
+        pointerEvents="none"
+        style={styles.routeReadyProbe}
+      />
+      <TransactionProbe entry={entry} source={source} transactionId={entry.id} />
       <VStack gap={12}>
         <HistoryEntryHeader
           pendingData={{ amount: entry.amount, unit: entry.unit, type: 'send' }}
@@ -167,3 +181,13 @@ export function PaymentRequestScreen({
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  routeReadyProbe: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: 1,
+    height: 1,
+  },
+});

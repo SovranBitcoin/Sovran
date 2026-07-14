@@ -126,10 +126,10 @@ interface SettingsRecoveryScreenProps {
    */
   gateMode?: boolean;
   /**
-   * Fires when recovery transitions to `complete`. In `gateMode`, AppGate
+   * Fires when the user confirms the completed recovery. In `gateMode`, AppGate
    * uses this to mark `restoreStatus = 'complete'` so the gate falls through
-   * and the rest of the app mounts. In normal usage this is undefined and
-   * the screen falls back to `router.back()` via its own Close button.
+   * and the rest of the app mounts. In normal usage this is undefined and the
+   * screen falls back to `router.back()` via its own Close button.
    */
   onComplete?: () => void;
 }
@@ -194,14 +194,6 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     });
     return unsubscribe;
   }, [recoveryState, navigation, gateMode]);
-
-  // In gateMode, surface the `complete` state to AppGate so it can mark
-  // restoreStatus + seedCreatedAt and let the rest of the app mount.
-  useEffect(() => {
-    if (gateMode && recoveryState === 'complete' && onComplete) {
-      onComplete();
-    }
-  }, [gateMode, recoveryState, onComplete]);
 
   const handleStartRecovery = useCallback(async () => {
     // Build the full list of mint URLs to restore

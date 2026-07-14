@@ -168,6 +168,10 @@ export function startSendEcashFlow(
             ...(opts.recipientProfile
               ? { recipientProfile: opts.recipientProfile }
               : {}),
+            ...(context.p2pkLockPubkey
+              ? { p2pkLockPubkey: context.p2pkLockPubkey }
+              : {}),
+            ...(opts.entrySource ? { entrySource: opts.entrySource } : {}),
           },
         },
       };

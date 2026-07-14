@@ -31,6 +31,11 @@ import { OnboardingSlide } from './types';
 const TOP_CAROUSEL_OFFSET = 230;
 /** Minimum swipe distance (px) to trigger expand/collapse transition */
 const SWIPE_UP_THRESHOLD = 20;
+/** The e2e harness cannot screenshot inside the 3s auto-advance window (its
+ * per-step evidence capture alone costs ~1s), so its owned Metro slows the
+ * slides via env; taps still advance them. Unset outside e2e dev sessions. */
+const E2E_SLIDE_MS = __DEV__ ? Number(process.env.EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS) : NaN;
+const SLIDE_DURATION_MS = Number.isFinite(E2E_SLIDE_MS) && E2E_SLIDE_MS > 0 ? E2E_SLIDE_MS : 3000;
 
 type OnboardingScreenProps = {
   onComplete: () => void;
@@ -56,7 +61,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const slides: OnboardingSlide[] = [
     {
       bgColor: orange300,
-      duration: 3000,
+      duration: SLIDE_DURATION_MS,
       title: 'Bitcoin that feels like cash',
       description:
         'Send and receive instantly with near-zero fees. Ecash bearer tokens live on your device \u2014 like digital cash.',
@@ -64,7 +69,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     },
     {
       bgColor: purple300,
-      duration: 3000,
+      duration: SLIDE_DURATION_MS,
       title: 'Powered by Nostr',
       description:
         'SOVRAN runs on Nostr, a decentralized network that can\u2019t be shut down or censored.',
@@ -72,7 +77,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     },
     {
       bgColor: blue300,
-      duration: 3000,
+      duration: SLIDE_DURATION_MS,
       title: 'Private by Design',
       description:
         'Blind signatures mean mints can\u2019t link your transactions. Choose mints you trust \u2014 spread your balance across many.',
@@ -80,7 +85,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     },
     {
       bgColor: shade300,
-      duration: 3000,
+      duration: SLIDE_DURATION_MS,
       title: 'Stay private, stay sovereign',
       description:
         'You\u2019re all set. Start sending and receiving bitcoin instantly. Welcome to freedom.',

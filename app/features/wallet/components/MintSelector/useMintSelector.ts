@@ -17,6 +17,8 @@ import { walletLog } from '@/shared/lib/logger';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 
 export interface MintSelectorProps {
+  /** Stable identifier forwarded to the interactive platform pill. */
+  testID?: string;
   /** Mint URL to display. When omitted, reads preferredMintUrl from store. */
   selectedMintUrl?: string;
   /** Called when user taps to open the full mint list. Omit to render a non-interactive pill. */

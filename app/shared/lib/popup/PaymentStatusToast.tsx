@@ -20,6 +20,7 @@ import {
 import { useToastSurface } from './useToastSurface';
 import { fmt, isAmountSegment, type PopupTextSegment } from './format';
 import { StatusToast, type StatusToastStatus } from './StatusToast';
+import { E2EPaymentToastRenderMarker } from './E2EToastProbe';
 
 type PaymentStatusToastVariant = 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
 
@@ -319,7 +320,9 @@ export function PaymentStatusToast({
   // Action shown only on confirmed (not on failed) — failure leaves the
   // toast empty on the right so the error message has full breathing room.
   const action =
-    isConfirmed && !isFailed ? { label: 'View', onPress: onPressViewTransaction } : undefined;
+    isConfirmed && !isFailed
+      ? { label: 'View', onPress: onPressViewTransaction, testID: 'payment-status-view' }
+      : undefined;
 
   // Nut Drop special case: while the radar screen is up, an incoming ecash
   // receive is titled "Received payment" (the lightning ceremony is already
@@ -329,6 +332,9 @@ export function PaymentStatusToast({
   const onNutDropRadar = variant === 'receive-ecash' && radarVisible;
   const title =
     effectiveActive?.titleOverride ?? (onNutDropRadar ? 'Received payment' : config.message);
+  const selectorVariant =
+    variant === 'receive' || variant === 'receive-ecash' ? 'receive' : variant;
+  const selectorStage = status === 'pending' ? 'processing' : status;
   const statusToastDebugFields = React.useMemo(
     () => ({
       toastId: toastId ?? null,
@@ -341,13 +347,21 @@ export function PaymentStatusToast({
   );
 
   return (
-    <StatusToast
-      status={status}
-      title={title}
-      subtitle={subtitleNode}
-      action={action}
-      debugFields={statusToastDebugFields}
-      toastProps={{ ...toastProps, hide }}
-    />
+    <>
+      <E2EPaymentToastRenderMarker
+        variant={variant}
+        stage={selectorStage}
+        {...(action ? { onView: action.onPress } : {})}
+      />
+      <StatusToast
+        status={status}
+        title={title}
+        subtitle={subtitleNode}
+        action={action}
+        statusTestID={`payment-status-${selectorVariant}-${selectorStage}`}
+        debugFields={statusToastDebugFields}
+        toastProps={{ ...toastProps, hide, testID: 'payment-status-toast' }}
+      />
+    </>
   );
 }

@@ -14,6 +14,7 @@ import { useBalancePillDimensions } from './useBalancePillDimensions';
 const HORIZONTAL_PADDING = 12;
 
 export default function BalancePillFlat({
+  testID,
   onPress,
   width,
   height,
@@ -46,6 +47,7 @@ export default function BalancePillFlat({
         },
       ]}>
       <PressableFeedback
+        testID={testID}
         animation={false}
         onPress={onPress}
         style={[

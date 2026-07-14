@@ -24,6 +24,7 @@ import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
+import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 
 import { RecipientHeader } from '../components/RecipientHeader';
 
@@ -245,7 +246,11 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
           avatarUrl={headerAvatarUrl}
         />
       ) : (
-        <MintSelector selectedMintUrl={mintUrl} onRequestMintList={handleRequestMintList} />
+        <MintSelector
+          testID="amount-mint-selector"
+          selectedMintUrl={mintUrl}
+          onRequestMintList={handleRequestMintList}
+        />
       ),
     [
       handleRequestMintList,
@@ -302,6 +307,7 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     <Log name="AmountFlowScreen">
       {headerMode === 'native' ? <Stack.Screen options={stackOptions} /> : null}
       <View style={amountBodyStyle}>
+        <E2EActionMenuProbe />
         <AmountSelector
           entry={entry}
           actions={actions}

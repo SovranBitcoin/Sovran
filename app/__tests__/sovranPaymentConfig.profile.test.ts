@@ -12,11 +12,18 @@ import { sendMemoPopup } from '@/shared/lib/popup';
 import { getEncodedToken } from '@cashu/cashu-ts';
 import { sendBLEPrivateMessageWhole } from '@/features/bitchat/lib/blePrivateDelivery';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { paymentLog } from '@/shared/lib/logger';
 
 const mockNavigate = jest.fn();
 const mockNearPayComplete = jest.fn();
 const mockNearPaySetAmountEntry = jest.fn();
 let mockNearPayActive: unknown = null;
+
+function paymentLogCalls(): unknown[][] {
+  return [paymentLog.debug, paymentLog.info, paymentLog.warn, paymentLog.error].flatMap(
+    (method) => (method as jest.Mock).mock.calls
+  );
+}
 
 jest.mock('wallet', () => ({
   withTimeout: jest.fn((promise: Promise<unknown>) => promise),
@@ -137,6 +144,10 @@ describe('createSovranHandlers profile routing', () => {
     (getEncodedToken as jest.Mock).mockReset();
     (sendBLEPrivateMessageWhole as jest.Mock).mockReset();
     (sendMemoPopup as jest.Mock).mockReset();
+    (paymentLog.debug as jest.Mock).mockClear();
+    (paymentLog.info as jest.Mock).mockClear();
+    (paymentLog.warn as jest.Mock).mockClear();
+    (paymentLog.error as jest.Mock).mockClear();
   });
 
   it('opens scanned npubs in the modal profile flow', () => {
@@ -219,6 +230,75 @@ describe('createSovranHandlers profile routing', () => {
         amountEntry: expect.any(String),
       },
     });
+  });
+
+  it('serializes the Create Ecash entry source into the amount route', async () => {
+    // @ts-expect-error enterAmount only reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({ machine, getManager: () => null });
+
+    await handlers.enterAmount?.({
+      unit: 'sat',
+      preselectedMintUrl: 'https://mint.example',
+      constraints: { destination: 'sendEcash', entrySource: 'createEcash' },
+    });
+
+    const navigation = mockNavigate.mock.calls.find(
+      ([value]) => (value as { pathname?: string }).pathname === '/(send-flow)/amount'
+    )?.[0] as { params: { amountEntry: string } };
+    expect(JSON.parse(navigation.params.amountEntry)).toMatchObject({
+      destination: 'sendEcash',
+      selectedMintUrl: 'https://mint.example',
+      unit: 'sat',
+      entrySource: 'createEcash',
+    });
+  });
+
+  it('carries a P2PK lock marker into the amount route without logging the key', async () => {
+    // @ts-expect-error enterAmount only reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({ machine, getManager: () => null });
+    const p2pkLockPubkey = `02${'34'.repeat(32)}`;
+
+    await handlers.enterAmount?.({
+      unit: 'sat',
+      preselectedMintUrl: 'https://mint.example',
+      constraints: { destination: 'sendEcash', p2pkLockPubkey },
+    });
+
+    const navigation = mockNavigate.mock.calls.find(
+      ([value]) => (value as { pathname?: string }).pathname === '/(send-flow)/amount'
+    )?.[0] as { params: { amountEntry: string } };
+    expect(JSON.parse(navigation.params.amountEntry)).toMatchObject({ p2pkLockPubkey });
+    expect(JSON.stringify(paymentLogCalls())).not.toContain(p2pkLockPubkey);
+  });
+
+  it('carries a P2PK lock marker into the send-token route without logging it', async () => {
+    // @ts-expect-error sendComplete only reads getContext.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({ machine, getManager: () => null });
+    const p2pkLockPubkey = `02${'12'.repeat(32)}`;
+    await handlers.sendComplete?.({
+      historyEntry: JSON.stringify({
+        id: 'send-p2pk-e2e',
+        type: 'send',
+        mintUrl: 'https://mint.example',
+        token: { proofs: [] },
+      }),
+      p2pkLockPubkey,
+    });
+
+    const navigation = mockNavigate.mock.calls.find(
+      ([value]) => (value as { pathname?: string }).pathname === '/(send-flow)/sendToken'
+    )?.[0] as { params: { sendHistoryEntry: string } };
+    expect(JSON.parse(navigation.params.sendHistoryEntry)).toMatchObject({
+      metadata: { p2pkLockPubkey },
+    });
+    expect(paymentLog.info).toHaveBeenCalledWith(
+      'payment.step.send_complete',
+      expect.objectContaining({ p2pkLocked: true })
+    );
+    expect(JSON.stringify(paymentLogCalls())).not.toContain(p2pkLockPubkey);
   });
 
   it('opens the ecash memo sheet without submitting the memo on display', () => {

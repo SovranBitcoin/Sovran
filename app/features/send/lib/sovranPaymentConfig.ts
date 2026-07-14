@@ -1528,12 +1528,13 @@ export function createSovranHandlers({
         return;
       }
 
-      // Inject recipientPubkey into the executed history entry's metadata
-      // so SendTokenScreen can render the recipient identity. Operations
-      // build the entry; we attach identity at the screen-handler seam.
-      const enrichedHistoryEntry = recipientPubkey
-        ? injectRecipientPubkey(historyEntry, recipientPubkey)
-        : historyEntry;
+      // Attach recipient identity and P2PK-lock presence to the executed
+      // history entry so SendTokenScreen can render both indicators.
+      // Operations build the entry; this seam adds transient screen metadata.
+      const enrichedHistoryEntry =
+        recipientPubkey || p2pkLockPubkey
+          ? injectSendMetadata(historyEntry, { recipientPubkey, p2pkLockPubkey })
+          : historyEntry;
 
       // Persist the recipient's nostr identity as a counterparty annotation so
       // the transactions row + detail show their avatar (the transient
@@ -1825,6 +1826,7 @@ export function createSovranHandlers({
         // after navigation.
         ...(constraints.recipientPubkey ? { recipientPubkey: constraints.recipientPubkey } : {}),
         ...(constraints.recipientProfile ? { recipientProfile: constraints.recipientProfile } : {}),
+        ...(constraints.p2pkLockPubkey ? { p2pkLockPubkey: constraints.p2pkLockPubkey } : {}),
         // Entry-method marker (Create Ecash / scan / paste / contact) — the
         // amount screen keys its action chrome off this, e.g. a single
         // "Create ecash" button instead of Next + Paste + Scan.
@@ -1918,17 +1920,24 @@ export function createSovranHandlers({
 type Ctx<E> = ScreenActionContext<E> & { manager: Manager };
 
 /**
- * Re-serialize a JSON-encoded coco history entry with `recipientPubkey`
- * added to its metadata. Returns the input unchanged if it can't be parsed
- * — operations build the entry, this only attaches identity at the seam.
+ * Re-serialize a JSON-encoded coco history entry with optional send-screen
+ * metadata. Returns the input unchanged if it can't be parsed — operations
+ * build the entry; this seam only attaches transient presentation context.
  */
-function injectRecipientPubkey(historyEntry: string, recipientPubkey: string): string {
+function injectSendMetadata(
+  historyEntry: string,
+  values: { recipientPubkey?: string; p2pkLockPubkey?: string }
+): string {
   try {
     const parsed = JSON.parse(historyEntry) as { metadata?: Record<string, unknown> };
-    parsed.metadata = { ...(parsed.metadata ?? {}), recipientPubkey };
+    parsed.metadata = {
+      ...(parsed.metadata ?? {}),
+      ...(values.recipientPubkey ? { recipientPubkey: values.recipientPubkey } : {}),
+      ...(values.p2pkLockPubkey ? { p2pkLockPubkey: values.p2pkLockPubkey } : {}),
+    };
     return JSON.stringify(parsed);
   } catch {
-    paymentLog.warn('payment.recipient_pubkey.inject_failed');
+    paymentLog.warn('payment.send_metadata.inject_failed');
     return historyEntry;
   }
 }

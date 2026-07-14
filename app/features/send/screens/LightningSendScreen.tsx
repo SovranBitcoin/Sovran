@@ -42,6 +42,8 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { RecipientHeader } from '../components/RecipientHeader';
+import { MeltDestinationFingerprintProbe } from '../components/MeltDestinationFingerprintProbe';
+import { MeltSelectedMintProbe } from '../components/MeltSelectedMintProbe';
 
 const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
 
@@ -175,12 +177,16 @@ export function LightningSendScreen({
               icon: actions.cancel.loading ? 'ri:loader-line' : 'ri:close-circle-line',
               variant: 'secondary',
               onPress: async () => {
-                await actions.cancel.execute();
+                // A synthetic preview has no operation or quote to roll back;
+                // Cancel simply leaves it. Prepared quotes still release their
+                // reserved proofs before navigation.
+                if (!isPreview) await actions.cancel.execute();
                 onCancel();
               },
               // Hidden while the pay is in flight — a disabled X mid-payment
-              // reads as a broken button. Stays visible during its own cancel.
-              condition: actions.cancel.available && !actions.pay.loading,
+              // reads as a broken button. Synthetic previews remain directly
+              // dismissible even though the rollback action is unavailable.
+              condition: (isPreview || actions.cancel.available) && !actions.pay.loading,
               disabled: anyLoading,
             },
           ]}
@@ -194,6 +200,7 @@ export function LightningSendScreen({
       screenName="LightningSendScreen"
       testID={`melt-quote-id-${entry.id}`}
       entry={entry}
+      source={source}
       footer={bottomButtons}
       headerOverride={
         recipientPubkey && headerDisplayName ? (
@@ -215,10 +222,19 @@ export function LightningSendScreen({
           />
         ) : null
       }
-      beforeStatus={isPaid ? <TransactionLocationSection transactionId={entry.id} /> : null}
+      beforeStatus={
+        <>
+          <MeltSelectedMintProbe mintUrl={entry.mintUrl} transactionId={entry.id} />
+          {entry.metadata?.meltTarget ? (
+            <MeltDestinationFingerprintProbe destination={entry.metadata.meltTarget} />
+          ) : null}
+          {isPaid ? <TransactionLocationSection transactionId={entry.id} /> : null}
+        </>
+      }
       statusRow={
         isReadyToPay && !isHistoryView ? (
           <MintSelector
+            testID="melt-mint-selector"
             width={quoteCardWidth}
             unit={entry.unit}
             selectedMintUrl={mintUrl}

@@ -1,5 +1,4 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Text } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import ViewShot from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
@@ -130,40 +129,48 @@ export function PaymentInfo({
       renderContent={() => (
         <Log name="PaymentInfo">
           <View>
-            {/* Hidden Text node carrying the full payment value, so log-doctor's
-            `capture-id-label` step can read the token/address straight from
-            the AX tree without bouncing through the iOS pasteboard. Text
-            elements are always included in the iOS AX tree (unlike Views
-            with opacity:0, which iOS strips), and the visible content is
-            what populates the WDA `name`/`label` fields — that's why the
-            value is the Text child rather than `accessibilityLabel`. */}
-            <Text
+            {/* Explicit 1×1 accessibility probe carrying the payment value.
+            A hidden Text child keeps its label on iOS but can lose its
+            accessibilityIdentifier, making exact simulator capture unsafe.
+            This mirrors TransactionProbe's proven stable View contract. */}
+            <View
               testID={`payment-info-${kebabCase(copyTarget)}-data`}
-              numberOfLines={1}
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel={selectedValue}
+              importantForAccessibility="yes"
+              collapsable={false}
+              pointerEvents="none"
               style={{
                 position: 'absolute',
+                left: 0,
+                top: 0,
                 width: 1,
                 height: 1,
-                fontSize: 1,
-                color: 'transparent',
-                overflow: 'hidden',
-              }}>
-              {selectedValue}
-            </Text>
+              }}
+            />
             {/* QR code — tap to copy */}
-            <Pressable onPress={handleCopyPress}>
-              <ViewShot captureMode="mount" onCapture={setUri}>
-                <AnimatedQRCode
-                  padding={32}
-                  unit={unit}
-                  address={selectedValue}
-                  animate={animated}
-                  variant={variant}
-                  intervalMs={SPEED_PRESETS[speedIndex].intervalMs}
-                  fragmentSize={DENSITY_PRESETS[densityIndex].fragmentSize}
-                />
-              </ViewShot>
-            </Pressable>
+            <View
+              testID="payment-info-sensitive-visual"
+              accessible
+              accessibilityRole="image"
+              accessibilityLabel="Sensitive payment visual"
+              importantForAccessibility="yes"
+              collapsable={false}>
+              <Pressable onPress={handleCopyPress}>
+                <ViewShot captureMode="mount" onCapture={setUri}>
+                  <AnimatedQRCode
+                    padding={32}
+                    unit={unit}
+                    address={selectedValue}
+                    animate={animated}
+                    variant={variant}
+                    intervalMs={SPEED_PRESETS[speedIndex].intervalMs}
+                    fragmentSize={DENSITY_PRESETS[densityIndex].fragmentSize}
+                  />
+                </ViewShot>
+              </Pressable>
+            </View>
 
             {/* Speed + Density controls — outside the copy pressable */}
             {willAnimate && (

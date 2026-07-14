@@ -240,6 +240,7 @@ function handleAmountEntered(
           meltTarget: currentCtx.meltTarget,
           recipientPubkey: currentCtx.recipientPubkey,
           recipientProfile: currentCtx.recipientProfile,
+          p2pkLockPubkey: currentCtx.p2pkLockPubkey,
         },
       },
     };

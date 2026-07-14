@@ -32,11 +32,12 @@ type ReinstallState = 'checking' | 'none' | 'detected';
  * Backward-compatible: existing users upgrading will have hasSeenOnboarding=true
  * from their persisted settingsStore, so they'll never trigger this path.
  */
-function useReinstallDetection(hasSeenOnboarding: boolean): ReinstallState {
+export function useReinstallDetection(hasSeenOnboarding: boolean): ReinstallState {
   const [state, setState] = useState<ReinstallState>('checking');
   const [settingsHydrated, setSettingsHydrated] = useState(() =>
     useSettingsStore.persist.hasHydrated()
   );
+  const lifecycleHydrated = useWalletLifecycleHydrated();
 
   useEffect(() => {
     if (settingsHydrated) return;
@@ -52,8 +53,9 @@ function useReinstallDetection(hasSeenOnboarding: boolean): ReinstallState {
     // for the overwhelmingly common existing-user boot it is true and the
     // probe is skipped entirely; the keychain is only touched when a hydrated
     // store still says onboarding was never seen (fresh install or true
-    // reinstall with wiped AsyncStorage).
-    if (!settingsHydrated) return;
+    // reinstall with wiped AsyncStorage). Also wait for walletLifecycleStore
+    // hydration — seedCreatedAt below is meaningless before it.
+    if (!settingsHydrated || !lifecycleHydrated) return;
     if (hasSeenOnboarding) {
       setState('none');
       return;
@@ -65,8 +67,24 @@ function useReinstallDetection(hasSeenOnboarding: boolean): ReinstallState {
         const mnemonic = await retrieveMnemonic();
         if (cancelled) return;
         if (mnemonic != null) {
-          log.info('gate.reinstall.detected', { seedExists: true });
-          setState('detected');
+          // A seed in the enclave is only a reinstall signal if THIS install
+          // didn't create it. Boot auto-generates a seed (ensureMnemonicExists)
+          // in parallel with the Terms gate, so on a genuinely fresh install
+          // the probe usually finds that just-created seed — without this
+          // check every fresh install raced into 'detected' and skipped the
+          // onboarding carousel. ensureMnemonicExists marks seedCreatedAt
+          // BEFORE storing the mnemonic, so mnemonic-present ⇒ marker already
+          // set for install-generated seeds; pre-existing seeds (reinstall,
+          // iCloud restore, debug mnemonic) have no marker. Read at decision
+          // time: the marker may be written after this effect was scheduled.
+          const seedCreatedAt = useWalletLifecycleStore.getState().seedCreatedAt;
+          if (seedCreatedAt != null) {
+            log.debug('gate.reinstall.skip', { reason: 'seed_created_by_this_install' });
+            setState('none');
+          } else {
+            log.info('gate.reinstall.detected', { seedExists: true });
+            setState('detected');
+          }
         } else {
           setState('none');
         }
@@ -77,7 +95,7 @@ function useReinstallDetection(hasSeenOnboarding: boolean): ReinstallState {
     return () => {
       cancelled = true;
     };
-  }, [hasSeenOnboarding, settingsHydrated]);
+  }, [hasSeenOnboarding, settingsHydrated, lifecycleHydrated]);
 
   return state;
 }

@@ -19,12 +19,15 @@
  *   - malformed lock keys abort the flow instead of being dropped
  */
 
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import { createTestMachine } from '../_harness';
 import { WALLETS, MINT1 } from '../_harness/fixtures';
+import { setLogger } from '../../src/logger';
 
 /** 33-byte compressed pubkey: "02" + 32-byte x-only hex (Cashu↔Nostr convention). */
 const LOCK_PUBKEY = `02${'ab'.repeat(32)}`;
+
+afterEach(() => setLogger(null));
 
 describe('ecash send — P2PK locked', () => {
   it('passes the lock target to executeSend and surfaces it in sendComplete', async () => {
@@ -32,6 +35,10 @@ describe('ecash send — P2PK locked', () => {
     await tm.machine.startSendEcash({ p2pkLockPubkey: LOCK_PUBKEY });
     tm.assertStep('enterAmount');
     tm.assertContext({ destination: 'sendEcash', p2pkLockPubkey: LOCK_PUBKEY });
+    expect(tm.handlerCalls.at(-1)).toMatchObject({
+      step: 'enterAmount',
+      data: { constraints: { p2pkLockPubkey: LOCK_PUBKEY } },
+    });
 
     await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
@@ -48,8 +55,25 @@ describe('ecash send — P2PK locked', () => {
 
   it('normalizes the lock key to lowercase', async () => {
     const tm = createTestMachine();
-    await tm.machine.startSendEcash({ p2pkLockPubkey: LOCK_PUBKEY.toUpperCase() });
+    await tm.machine.startSendEcash({
+      p2pkLockPubkey: LOCK_PUBKEY.toUpperCase(),
+    });
     tm.assertContext({ p2pkLockPubkey: LOCK_PUBKEY });
+  });
+
+  it('logs lock presence without logging the raw lock target', async () => {
+    const logs: Array<{ event: string; fields?: Record<string, unknown> }> = [];
+    const record = (event: string, fields?: Record<string, unknown>) => {
+      logs.push({ event, fields });
+    };
+    setLogger({ debug: record, info: record, warn: record, error: record });
+
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash({ p2pkLockPubkey: LOCK_PUBKEY });
+    await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
+
+    expect(logs.some(({ fields }) => fields?.p2pkLocked === true)).toBe(true);
+    expect(JSON.stringify(logs)).not.toContain(LOCK_PUBKEY);
   });
 
   it('skips the local-token-first shortcut even with exact local proofs', async () => {
@@ -97,7 +121,10 @@ describe('ecash send — P2PK locked', () => {
   it('does not route offline non-exact proofs to chooseProofs when locked', async () => {
     // Unlocked offline behavior for WALLETS.noExactProofs is the proof picker.
     // A locked send can never use local proofs, so it must error instead.
-    const tm = createTestMachine({ wallet: WALLETS.noExactProofs, offline: true });
+    const tm = createTestMachine({
+      wallet: WALLETS.noExactProofs,
+      offline: true,
+    });
     await tm.machine.startSendEcash({ p2pkLockPubkey: LOCK_PUBKEY });
     await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
 
@@ -124,6 +151,10 @@ describe('ecash send — P2PK locked', () => {
     await tm.machine.requestMintSelector({ scope: 'selected' });
     await tm.machine.changeMint(MINT1);
     tm.assertContext({ p2pkLockPubkey: LOCK_PUBKEY });
+    expect(tm.handlerCalls.at(-1)).toMatchObject({
+      step: 'enterAmount',
+      data: { constraints: { p2pkLockPubkey: LOCK_PUBKEY } },
+    });
 
     await tm.machine.enterAmount({ value: 100, unit: 'sat' }, MINT1);
     tm.assertStep('sendComplete');

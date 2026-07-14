@@ -883,6 +883,7 @@ export function resolveFromContext(
           recipientPubkey: ctx.recipientPubkey,
           recipientProfile: ctx.recipientProfile,
           entrySource: ctx.entrySource,
+          p2pkLockPubkey: ctx.p2pkLockPubkey,
         },
       },
     });

@@ -156,6 +156,8 @@ interface AmountEntryViewProps {
    * feature imports.
    */
   unitIndicator?: React.ReactNode;
+  /** Optional flow-context badge rendered with the amount (e.g. P2PK lock). */
+  contextIndicator?: React.ReactNode;
 
   /** Quick-send suggestions rendered above the keyboard (send flow only). */
   suggestions?: QuickSendSuggestion[];
@@ -213,6 +215,7 @@ export function AmountEntryView({
   secondaryDisplay = null,
   onToggleMode,
   unitIndicator = null,
+  contextIndicator = null,
   suggestions = [],
   onSuggestionTap,
   extraButtons,
@@ -242,6 +245,8 @@ export function AmountEntryView({
   // display-currency mode (symbol = fiatSymbol) and a fiat account's native
   // unit mode (symbol = unitSymbol). Everything else is the sat formatter.
   const displaySymbol = inputMode === 'fiat' ? fiatSymbol : unitSymbol || null;
+  const accessibilityAmountValue = rawInput.length > 0 ? rawInput : String(numericValue);
+  const accessibilityAmountUnit = displaySymbol ?? unit;
   // The amount is neutral foreground on BOTH send and receive — the colour
   // encodes only validity, never transaction direction. This keeps the two
   // screens identical.
@@ -436,27 +441,37 @@ export function AmountEntryView({
       <View style={{ flex: 1, paddingTop: topPadding, paddingHorizontal: 16 }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <VStack align="center" spacing={centerSpacing}>
-            {displaySymbol ? (
-              <FiatAmountDisplay
-                rawInput={rawInput}
-                symbol={displaySymbol}
-                size={amountTextSize}
-                lineHeight={amountLineHeight}
-                activeColor={amountColor}
-                placeholderColor={placeholderColor}
-              />
-            ) : (
-              <AmountFormatter
-                amount={numericValue}
-                unit={unit}
-                size={amountTextSize}
-                lineHeight={amountLineHeight}
-                weight="heavy"
-                animated
-                color={amountColor}
-                centered
-              />
-            )}
+            <View
+              testID="amount-value"
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel={`Amount ${accessibilityAmountValue} ${accessibilityAmountUnit}`}
+              accessibilityValue={{ text: accessibilityAmountValue }}
+              collapsable={false}
+              style={styles.amountValue}>
+              {displaySymbol ? (
+                <FiatAmountDisplay
+                  rawInput={rawInput}
+                  symbol={displaySymbol}
+                  size={amountTextSize}
+                  lineHeight={amountLineHeight}
+                  activeColor={amountColor}
+                  placeholderColor={placeholderColor}
+                />
+              ) : (
+                <AmountFormatter
+                  amount={numericValue}
+                  unit={unit}
+                  size={amountTextSize}
+                  lineHeight={amountLineHeight}
+                  weight="heavy"
+                  animated
+                  color={amountColor}
+                  centered
+                />
+              )}
+            </View>
+            {contextIndicator}
             {secondaryDisplay ? (
               <CurrencySwapperPill inputMode={inputMode} onPress={handleToggleMode} />
             ) : (
@@ -618,6 +633,9 @@ export function AmountEntryView({
 }
 
 const styles = StyleSheet.create({
+  amountValue: {
+    alignItems: 'center',
+  },
   bottomButtons: {
     position: 'relative',
   },

@@ -148,6 +148,7 @@ export const icons: string[] = [
   'mdi:instagram',
   'mdi:close-circle',
   'mdi:close',
+  'mdi:lock-outline',
   'mdi:lock-open-variant-outline',
   'mdi:lan-disconnect',
   'mdi:store',

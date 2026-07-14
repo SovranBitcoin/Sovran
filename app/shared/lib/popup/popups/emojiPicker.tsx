@@ -40,6 +40,7 @@ import { List } from '@/shared/ui/composed/List';
 import { showActionSheet } from './bridge';
 import { copyPopup } from './copy';
 import { CATEGORIES, searchEmojis, type EmojiCategory, type EmojiEntry } from './emojiData';
+import { emojiCodepointKey, emojiPickerOptionTestID } from './emojiPickerIds';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../sheets/types';
 
@@ -71,7 +72,7 @@ const EmojiCell = React.memo(function EmojiCell({
   const handlePress = useCallback(() => onSelect(entry.emoji), [entry.emoji, onSelect]);
   return (
     <Pressable
-      testID={`emoji-${entry.keywords[0]}`}
+      testID={emojiPickerOptionTestID(entry.emoji)}
       onPress={handlePress}
       style={({ pressed }) => [styles.emojiCell, pressed && styles.emojiCellPressed]}>
       <Text style={styles.emojiText}>{entry.emoji}</Text>
@@ -125,12 +126,6 @@ function chunkEmojis(emojis: EmojiEntry[]): EmojiEntry[][] {
 const emojiKeyExtractor = (item: EmojiEntry): string => item.emoji;
 const noopRenderItem = (): null => null;
 
-function emojiCodepointKey(emoji: string): string {
-  return Array.from(emoji)
-    .map((char) => char.codePointAt(0)?.toString(16) ?? 'unknown')
-    .join('-');
-}
-
 const searchRowKeyExtractor = (row: EmojiEntry[], index: number): string => {
   const rowKey = row
     .map((entry) => `${emojiCodepointKey(entry.emoji)}:${entry.keywords[0] ?? 'emoji'}`)
@@ -171,6 +166,7 @@ function EmojiSearchField({
     <View style={{ marginTop: 8, paddingHorizontal: 12 }}>
       <View style={{ position: 'relative', justifyContent: 'center' }}>
         <BottomSheetTextInput
+          testID="emoji-picker-search"
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder ?? 'Search...'}
@@ -189,6 +185,7 @@ function EmojiSearchField({
         />
         {value.length > 0 ? (
           <Pressable
+            testID="emoji-picker-search-clear"
             onPress={onClear}
             hitSlop={8}
             style={{ position: 'absolute', right: 10, padding: 4 }}>
@@ -353,7 +350,9 @@ export function EmojiPickerContent({
     if (!isSearching) return null;
     if (searchResults.length === 0) {
       return (
-        <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+        <View
+          testID="emoji-picker-no-results"
+          style={{ alignItems: 'center', paddingVertical: 32 }}>
           <Text style={{ color: opacity(foreground, 0.4), fontSize: 14 }}>No emoji found</Text>
         </View>
       );

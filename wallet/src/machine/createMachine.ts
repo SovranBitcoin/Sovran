@@ -340,6 +340,7 @@ export function createPaymentMachine(
     // identity (idle, confirmSend, mintQuoteCreated, etc.) are no-ops.
     const pk = flowCtx.recipientPubkey;
     const profile = flowCtx.recipientProfile;
+    const p2pkLockPubkey = flowCtx.p2pkLockPubkey;
     const withRecipientIdentity = <T extends Record<string, unknown>>(
       data: T,
     ) => ({
@@ -357,6 +358,7 @@ export function createPaymentMachine(
             ...d.constraints,
             ...(pk ? { recipientPubkey: pk } : {}),
             ...(profile ? { recipientProfile: profile } : {}),
+            ...(p2pkLockPubkey ? { p2pkLockPubkey } : {}),
           },
         };
         stepData = nextData;

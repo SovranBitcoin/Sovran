@@ -23,6 +23,7 @@ import { BottomSheet, Menu } from 'heroui-native';
 import Icon from 'assets/icons';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { log } from '@/shared/lib/logger';
+import { E2EActionMenuRenderMarker } from '../E2EActionMenuProbe';
 
 import { showActionSheet } from './bridge';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
@@ -54,6 +55,7 @@ export function ActionMenuSheetContent({ payload, close }: ActionMenuSheetConten
 
   return (
     <View>
+      <E2EActionMenuRenderMarker presentationKey={payload} />
       {title ? (
         <BottomSheet.Title className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
           {title}

@@ -63,6 +63,24 @@ describe('manual entry — startSendEcash', () => {
     tm.assertContext({ mintUrl: MINT1 });
   });
 
+  it('preserves the Create Ecash entry source when a funded mint is auto-selected', async () => {
+    const tm = createTestMachine();
+
+    await tm.machine.startSendEcash({ entrySource: 'createEcash' });
+
+    tm.assertStep('enterAmount');
+    tm.assertContext({ mintUrl: MINT1, entrySource: 'createEcash' });
+    expect(tm.handlerCalls[tm.handlerCalls.length - 1]).toMatchObject({
+      step: 'enterAmount',
+      data: {
+        constraints: {
+          destination: 'sendEcash',
+          entrySource: 'createEcash',
+        },
+      },
+    });
+  });
+
   it('multi mint no preferred: selectMint', async () => {
     // Remove preference → machine doesn't know which mint to use → ask user
     const tm = createTestMachine({

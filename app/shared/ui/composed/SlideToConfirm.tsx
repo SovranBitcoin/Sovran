@@ -76,7 +76,11 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
   return (
     <View
       className="h-12 justify-center rounded-full p-1"
-      style={{ backgroundColor: trackColor, width: sliderWidth }}>
+      style={{ backgroundColor: trackColor, width: sliderWidth }}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      testID="slide-to-confirm">
       <Animated.View
         className="absolute inset-x-0 items-center justify-center"
         style={textAnimatedStyle}>

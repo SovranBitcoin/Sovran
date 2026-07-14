@@ -69,6 +69,7 @@ import { getCachedMintInfo } from '@/shared/stores/global/mintMetadataStore';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
+import { isPaymentRequestFailureMockEnabled } from '@/features/send/lib/paymentRequestFailureMock';
 
 const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' };
 
@@ -313,7 +314,12 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         // Trust-review screen still pulls per-mint detail (swap-by-swap timing)
         // from the local audit / KYM caches populated by `useAuditedMint`.
         enrichMintReviewInfo: getSovranMintEnrichment,
-        shouldMockFailPaymentRequest: () => useSettingsStore.getState().mockFailPaymentRequest,
+        shouldMockFailPaymentRequest: () =>
+          isPaymentRequestFailureMockEnabled({
+            settingsEnabled: useSettingsStore.getState().mockFailPaymentRequest,
+            fundedE2EEnvironmentValue: process.env.EXPO_PUBLIC_E2E_MOCK_FAIL_PAYMENT_REQUEST,
+            nodeEnv: process.env.NODE_ENV,
+          }),
         shouldMockFailMelt: () => useSettingsStore.getState().mockFailMelt,
         shouldMockFailSend: () => useSettingsStore.getState().mockFailSend,
         logger: paymentLog,

@@ -129,6 +129,7 @@ export function LightningReceiveScreen({
       screenName="LightningReceiveScreen"
       testID={`mint-quote-id-${entry.id}`}
       entry={entry}
+      source={source}
       footer={bottomButtons}
       beforeStatus={
         <>

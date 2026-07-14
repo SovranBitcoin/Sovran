@@ -46,6 +46,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { NostrKeysContextBridge, useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { alpha } from '@/shared/styles/tokens';
 import { ActionMenuSheetContent } from '@/shared/lib/popup/popups/actionMenuSheet';
+import { markE2EActionMenuPresented } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
@@ -862,6 +863,15 @@ function SheetPopup() {
   // alongside heroui's path is safe.
   const handleNativeSheetClose = () => handleOpenChange(false);
 
+  const handleNativeSheetChange = useCallback(
+    (index: number) => {
+      if (index >= 0 && isOpen && activeCustomPage?.sheetId === 'action-menu') {
+        markE2EActionMenuPresented(openSeq);
+      }
+    },
+    [activeCustomPage?.sheetId, isOpen, openSeq]
+  );
+
   const renderCustomFooter = useCallback(
     (props: { animatedFooterPosition: any }) => {
       if (!isCustom) return null;
@@ -927,6 +937,7 @@ function SheetPopup() {
           />
           <BottomSheet.Content
             accessible={false}
+            onChange={handleNativeSheetChange}
             onClose={handleNativeSheetClose}
             detached={!isCustom}
             bottomInset={isCustom ? undefined : insets.bottom}

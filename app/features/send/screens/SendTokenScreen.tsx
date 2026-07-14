@@ -39,7 +39,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { fetchMintInfo } from '@/shared/lib/apiClient';
-import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
+import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import {
   useSendReachability,
@@ -52,6 +52,7 @@ import {
   formatMemoForDisplay,
 } from '@/shared/lib/nostr/memoMentions';
 import { resolveIdentityName } from '@/shared/lib/identity';
+import { hasP2PKLock, P2PKLockIndicator } from '../components/P2PKLockIndicator';
 
 interface SendTokenScreenProps {
   sendHistoryEntry?: SendHistoryEntry | string;
@@ -182,16 +183,17 @@ export function SendTokenScreen({
   });
   const isComplete = isSendTokenComplete(entry);
   const isCancelled = isSendTokenCancelled(entry);
+  const p2pkLocked = hasP2PKLock(entry);
   const tokenMemo =
     typeof entry.token?.memo === 'string' && entry.token.memo.trim().length > 0
       ? entry.token.memo.trim()
       : null;
 
-  // Copy opens the app-wide `actionMenuPopup()` bottom sheet (rendered once by
-  // <ActionMenuHost /> at the app root) listing the copy variants — no inline
-  // heroui sheet, which mis-positions / paints at rest on Android.
+  // Copy lives inside a native route modal, so its variants use the
+  // FullWindowOverlay-backed action-menu sheet. The root ActionMenuHost disables
+  // FWO and would paint this chooser underneath the transaction flow on iOS.
   const openCopyMenu = () => {
-    actionMenuPopup({
+    actionMenuSheet({
       title: 'Copy token',
       buttons: copyVariants.map((v) => ({
         text: v.label,
@@ -268,9 +270,11 @@ export function SendTokenScreen({
       testID={`send-token-id-${entry.id}`}
       entry={entry}
       mintInfo={mintInfo}
+      source={source}
       footer={bottomButtons}
       beforeStatus={
         <>
+          {p2pkLocked ? <P2PKLockIndicator /> : null}
           {reachabilityWarning && (
             <View style={styles.reachabilityWarning}>
               <Alert status="warning" className="bg-surface-secondary">

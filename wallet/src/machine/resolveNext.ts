@@ -653,6 +653,7 @@ export function resolveNext(
             // never shows the recipient header on first paint.
             recipientPubkey: ctx.recipientPubkey,
             recipientProfile: ctx.recipientProfile,
+            p2pkLockPubkey: ctx.p2pkLockPubkey,
           },
         },
         contextPatch: { destination },

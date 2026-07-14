@@ -29,6 +29,7 @@ const HORIZONTAL_PADDING = spacing.md;
  * approach `FiatCurrencyPillLiquid` already ships with.
  */
 export default function BalancePillLiquid({
+  testID,
   onPress,
   width,
   height,
@@ -71,7 +72,7 @@ export default function BalancePillLiquid({
       <Host
         style={{ zIndex: zIndex.sticky, height: h, width: dimensions.buttonWidth }}
         matchContents>
-        <SwiftUIButton modifiers={buttonModifiers} onPress={onPress}>
+        <SwiftUIButton testID={testID} modifiers={buttonModifiers} onPress={onPress}>
           {/*
            * RN wrapper owns the layout: a fixed-size box matching the
            * SwiftUI frame, with paddingHorizontal mirroring the flat

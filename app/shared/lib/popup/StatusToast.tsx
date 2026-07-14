@@ -30,7 +30,12 @@ const ICON_SIZE = 32;
 const TITLE_FONT_SIZE = 15;
 const SUB_FONT_SIZE = 13;
 const TERMINAL_TINT_DURATION_MS = 800;
-const AUTO_DISMISS_MS = 3000;
+/** The e2e harness cannot screenshot inside the 3s auto-dismiss window (the
+ * confirmed AX probe outlives the visible toast by 15s, and per-step evidence
+ * capture alone costs ~1s), so its owned Metro slows terminal toasts via env.
+ * Unset outside e2e dev sessions. */
+const E2E_DISMISS_MS = __DEV__ ? Number(process.env.EXPO_PUBLIC_E2E_TOAST_DISMISS_MS) : NaN;
+const AUTO_DISMISS_MS = Number.isFinite(E2E_DISMISS_MS) && E2E_DISMISS_MS > 0 ? E2E_DISMISS_MS : 3000;
 
 export type StatusToastStatus = 'pending' | 'delivered' | 'confirmed' | 'failed' | 'warning';
 
@@ -44,7 +49,9 @@ type StatusToastProps = {
    */
   subtitle?: React.ReactNode;
   /** Right-aligned action pill. Hidden when omitted. */
-  action?: { label: string; onPress: () => void };
+  action?: { label: string; onPress: () => void; testID?: string };
+  /** Stable marker for the caller's current lifecycle state. */
+  statusTestID?: string;
   /**
    * Optional segmented ring. When set, the indicator fills `completedSegments`
    * of `segmentCount` arcs instead of an indeterminate spinner — used by the
@@ -84,6 +91,7 @@ export function StatusToast({
   title,
   subtitle,
   action,
+  statusTestID,
   segmentedProgress,
   ringColor,
   ringSuccessColor,
@@ -161,6 +169,7 @@ export function StatusToast({
       />
       <View style={{ flex: 1, gap: 2 }}>
         <RNText
+          testID={statusTestID}
           style={{ fontSize: TITLE_FONT_SIZE, fontWeight: '600', color: surfaceFg }}
           numberOfLines={1}>
           {title}
@@ -174,7 +183,10 @@ export function StatusToast({
         )}
       </View>
       {action ? (
-        <Toast.Action style={{ backgroundColor: surfaceFg }} onPress={action.onPress}>
+        <Toast.Action
+          testID={action.testID}
+          style={{ backgroundColor: surfaceFg }}
+          onPress={action.onPress}>
           <Button.Label style={{ color: surfaceBg }}>{action.label}</Button.Label>
         </Toast.Action>
       ) : null}

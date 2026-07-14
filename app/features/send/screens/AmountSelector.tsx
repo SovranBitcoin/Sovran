@@ -27,6 +27,7 @@ import {
 } from '@/shared/ui/composed/AmountEntryView';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
+import { hasP2PKLock, P2PKLockIndicator } from '@/features/send/components/P2PKLockIndicator';
 
 import type { ButtonHandlerProps } from '@/shared/ui/composed/ButtonHandler';
 
@@ -289,6 +290,7 @@ export function AmountSelector({
   // The amount still reads as a problem (red) when the entry exceeds balance.
   const exceedsBalance = actions.next.exceedsBalance === true;
   const transactionTypeForView: AmountEntryTransactionType = transactionType;
+  const p2pkLocked = hasP2PKLock(entry);
 
   // When the recipient header is in play, surface the mint as a 50/50
   // bottom-bar pill — same component the header uses, so balance, icon,
@@ -328,6 +330,7 @@ export function AmountSelector({
     return (
       <View style={mintBottomPillWrapperStyle}>
         <MintSelector
+          testID="amount-mint-selector"
           selectedMintUrl={mintUrl}
           onRequestMintList={onRequestMintList}
           width={mintBottomPillWidth}
@@ -365,6 +368,7 @@ export function AmountSelector({
         secondaryDisplay={secondaryDisplay}
         onToggleMode={handleToggle}
         unitIndicator={unitIndicator}
+        contextIndicator={p2pkLocked ? <P2PKLockIndicator /> : null}
         warningText={clampNoticeText ?? minNoticeText}
         suggestions={suggestions}
         onSuggestionTap={handleSuggestionTap}

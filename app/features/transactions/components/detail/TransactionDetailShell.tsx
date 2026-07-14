@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 
 import { getCounterparty } from 'wallet';
 
@@ -8,7 +9,10 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HistoryEntryHeader } from '@/features/transactions/components/detail/HistoryEntryHeader';
 import { HistoryEntryRefresh } from '@/features/transactions/components/detail/HistoryEntryRefresh';
 import { HistoryEntryTimeline } from '@/features/transactions/components/detail/timeline';
+import { TransactionProbe } from '@/features/transactions/components/detail/TransactionProbe';
 import { CounterpartyTransactions } from '@/features/transactions/components/CounterpartyTransactions';
+import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
+import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 
 type DetailEntry = React.ComponentProps<typeof HistoryEntryTimeline>['historyEntry'];
 type MintInfo = React.ComponentProps<typeof HistoryEntryRefresh>['mintInfo'];
@@ -26,6 +30,8 @@ interface TransactionDetailShellProps {
   entry?: DetailEntry;
   /** Mint info for the refresh row. */
   mintInfo?: MintInfo;
+  /** Safe presentation source used by the structured device-test probe. */
+  source?: string | null;
   /** Whether the header shows the recipient avatar (sends with a recipient). */
   showRecipientAvatar?: boolean;
   /** Footer (bottom buttons). */
@@ -76,6 +82,7 @@ export function TransactionDetailShell({
   testID,
   entry,
   mintInfo,
+  source,
   showRecipientAvatar = false,
   footer,
   headerOverride,
@@ -90,10 +97,25 @@ export function TransactionDetailShell({
   return (
     <Screen name={screenName} contentPadding={0} footer={footer}>
       {headerOverride}
-      <View testID={testID}>
+      <E2EToastProbe />
+      <E2EActionMenuProbe />
+      <View
+        testID={testID}
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel="Transaction detail ready"
+        importantForAccessibility="yes"
+        collapsable={false}
+        pointerEvents="none"
+        style={styles.routeReadyProbe}
+      />
+      <View>
         <VStack gap={12}>
           {entry ? (
-            <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={showRecipientAvatar} />
+            <>
+              <TransactionProbe entry={entry} source={source} transactionId={entry.id} />
+              <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={showRecipientAvatar} />
+            </>
           ) : null}
           {beforeStatus}
           {entry
@@ -109,3 +131,13 @@ export function TransactionDetailShell({
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  routeReadyProbe: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: 1,
+    height: 1,
+  },
+});

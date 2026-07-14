@@ -105,9 +105,11 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
             text: 'Cancel',
             variant: 'secondary',
             onPress: async () => actions.back.execute(),
-            // Fallback exit only: while the token is redeemable, Redeem is the
-            // sole button (back nav still exits); Close takes over once settled.
-            condition: !canClose && !actions.redeem.available,
+            // Keep dismissal explicit while the token is still unredeemed.
+            // Relying on an implicit header/back gesture makes it too easy for
+            // device tests (and users) to confuse preview with acceptance.
+            condition: !canClose,
+            disabled: actions.redeem.loading,
           },
           {
             testID: 'receive-token-redeem',
@@ -130,6 +132,7 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
       testID={`receive-token-id-${entry.id}`}
       entry={entry}
       mintInfo={mintInfo}
+      source={source}
       footer={bottomButtons}
       beforeStatus={isRedeemed ? <TransactionLocationSection transactionId={entry.id} /> : null}>
       <DetailsSection

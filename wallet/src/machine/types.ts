@@ -155,6 +155,8 @@ export interface StepDataMap {
       meltTarget?: string;
       recipientPubkey?: string;
       recipientProfile?: RecipientProfile;
+      /** Presence-only UI evidence and route survival for locked ecash sends. */
+      p2pkLockPubkey?: string;
       methodContext?: AmountEntryConstraints["methodContext"];
       /** See `SendEntrySource` — how the flow was entered. */
       entrySource?: SendEntrySource;

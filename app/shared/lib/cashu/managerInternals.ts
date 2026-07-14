@@ -39,6 +39,11 @@ interface ManagerInternals {
   proofService: {
     getReadyProofs(mintUrl: string): Promise<CoreProof[]>;
     saveProofs(mintUrl: string, proofs: CoreProof[]): Promise<void>;
+    setProofState(
+      mintUrl: string,
+      secrets: string[],
+      state: 'inflight' | 'ready' | 'spent'
+    ): Promise<void>;
     restoreProofsToReady(mintUrl: string, secrets: string[]): Promise<void>;
   };
   walletService: {
@@ -130,6 +135,34 @@ export async function getReadyProofs(manager: Manager, mintUrl: string): Promise
   } catch (error) {
     cashuLog.warn('cashu.manager_internals.ready_proofs.failed', {
       ...mintUrlLogFields(mintUrl),
+      error: errorMessage(error),
+    });
+    throw error;
+  }
+}
+
+/** Mark only mint-proven spent proofs through ProofService so Coco emits its
+ * normal `proofs:state-changed` event and every balance consumer refreshes. */
+export async function markProofsSpent(
+  manager: Manager,
+  mintUrl: string,
+  secrets: string[]
+): Promise<void> {
+  if (secrets.length === 0) return;
+  cashuLog.info('cashu.manager_internals.mark_spent.start', {
+    ...mintUrlLogFields(mintUrl),
+    count: secrets.length,
+  });
+  try {
+    await internals(manager).proofService.setProofState(mintUrl, secrets, 'spent');
+    cashuLog.info('cashu.manager_internals.mark_spent.done', {
+      ...mintUrlLogFields(mintUrl),
+      count: secrets.length,
+    });
+  } catch (error) {
+    cashuLog.warn('cashu.manager_internals.mark_spent.failed', {
+      ...mintUrlLogFields(mintUrl),
+      count: secrets.length,
       error: errorMessage(error),
     });
     throw error;
