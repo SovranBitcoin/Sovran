@@ -7,12 +7,12 @@
  * operations.test.ts — defaultOperations with real Manager
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Tests built-in operations through createColada against a real mint.
- * Operations that require wallet funding (send, melt, receive) are gated
- * behind fundWallet and skipped when the test mint can't auto-confirm quotes.
+ * Tests built-in operations through createColada against a deliberately
+ * configured live mint. Funding failures fail the suite; no assertion is
+ * conditionally skipped.
  *
- * To run funded tests, set TEST_MINT_URL to a fakewallet mint:
- *   TEST_MINT_URL=http://localhost:3338 bun test __tests__/integration/
+ * To run this live lane against a local fakewallet mint:
+ *   TEST_MINT_URL=http://127.0.0.1:3338 bun run test:live
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -169,18 +169,16 @@ describe('Operations — real Manager', () => {
 
   // ── Funded operations (require fakewallet mint) ─────────────────
 
-  describe('funded operations (require fakewallet mint via TEST_MINT_URL)', () => {
-    let funded = false;
-
+  // Live lane only (this file is excluded from the offline gate). Funding
+  // failure throws in beforeAll → the block fails loudly; no
+  // `if (!funded) return` silent-green escape hatch, and every assertion runs.
+  describe('funded operations (live lane; requires a fakewallet mint via TEST_MINT_URL)', () => {
     beforeAll(async () => {
-      funded = await fundWallet(manager, TEST_MINT, 500);
-      if (funded) {
-        await instance.tracker.refresh();
-      }
+      await fundWallet(manager, TEST_MINT, 500);
+      await instance.tracker.refresh();
     });
 
     it('executeSend creates a send history entry', async () => {
-      if (!funded) return;
       const result = await instance.operations.executeSend!(TEST_MINT, 10);
       expect(result.historyEntry).toBeDefined();
       const entry = JSON.parse(result.historyEntry);
@@ -189,19 +187,16 @@ describe('Operations — real Manager', () => {
     });
 
     it('wallet context updates after send', async () => {
-      if (!funded) return;
       await instance.tracker.refresh();
       const ctx = instance.getWalletContext();
       expect(ctx.mintBalances[TEST_MINT]).toBeLessThan(500);
     });
 
     it('executeReceive accepts a token and creates history', async () => {
-      if (!funded) return;
       const sendResult = await instance.operations.executeSend!(TEST_MINT, 5);
       const sendEntry = JSON.parse(sendResult.historyEntry);
       const token = sendEntry.token || sendEntry.metadata?.token;
-
-      if (!token) return;
+      expect(token).toBeTruthy();
 
       const result = await instance.operations.executeReceive!(token, TEST_MINT, 5);
       expect(result.historyEntry).toBeDefined();

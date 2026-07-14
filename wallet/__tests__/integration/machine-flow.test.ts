@@ -8,15 +8,14 @@
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Tests the full machine lifecycle: instance creation → machine wiring →
- * notification delivery, using a real Manager.
+ * notification delivery, using a real Manager and a deliberately configured
+ * live mint. Run with:
+ *   TEST_MINT_URL=http://127.0.0.1:3338 bun run test:live
  */
 
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import type { Manager } from '@cashu/coco-core';
-import {
-  createColada,
-  createMachineFromInstance,
-} from '../../src/core/createColada';
+import { createColada, createMachineFromInstance } from '../../src/core/createColada';
 import type { ColadaInstance } from '../../src/core/createColada';
 import type { NotificationHandlerMap } from '../../src/machine/types';
 import { createTestManager, addTrustedMint, TEST_MINT } from './helpers/setup';

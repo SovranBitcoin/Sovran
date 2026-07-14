@@ -7,8 +7,9 @@
  * wallet-context.test.ts — WalletContextTracker with real Manager
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Tests that walletContextTracker stays in sync with real Manager state
- * using a live Manager against a public test mint.
+ * Tests that walletContextTracker stays in sync with real Manager state using
+ * a deliberately configured live mint. Run with:
+ *   TEST_MINT_URL=http://127.0.0.1:3338 bun run test:live
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
