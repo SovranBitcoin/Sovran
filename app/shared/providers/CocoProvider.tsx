@@ -11,6 +11,7 @@ import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/l
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { ensureTrustedDefaultMint } from '@/shared/lib/cashu/defaultMintInitialization';
 
 initLog('Module', 'CocoProvider loaded');
 
@@ -66,14 +67,16 @@ async function initializeDefaultMints(manager: Manager): Promise<void> {
     for (const mintUrl of defaultMints) {
       try {
         log.debug('coco.mint_trust_check.start', { ...mintUrlLogFields(mintUrl) });
-        const isKnown = await manager.mint.isTrustedMint(mintUrl);
-        if (isKnown) {
+        const result = await ensureTrustedDefaultMint(manager.mint, mintUrl);
+        if (result.status === 'already-trusted') {
           log.debug('coco.mint_exists', { ...mintUrlLogFields(mintUrl) });
           continue;
         }
 
-        await manager.mint.addMint(mintUrl, { trusted: true });
-        log.info('coco.mint_added', { ...mintUrlLogFields(mintUrl) });
+        log.info('coco.mint_added', {
+          ...mintUrlLogFields(mintUrl),
+          attempts: result.attempts,
+        });
       } catch (error) {
         log.warn('coco.mint_add_failed', { ...mintUrlLogFields(mintUrl), error });
       }
