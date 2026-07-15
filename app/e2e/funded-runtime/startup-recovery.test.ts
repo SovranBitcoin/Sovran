@@ -319,6 +319,126 @@ describe('funded startup recovery', () => {
     expect(existsSync(join(fixture.fundedCustodyDir, 'recovery.json'))).toBe(false);
   });
 
+  it('writes valueless test-mint principal off automatically instead of quarantining', async () => {
+    // Mirrors the real stranded session: a 10-sat testnut leg funded via
+    // cashu.create, the token spent by the app, nothing swept back. testnut
+    // sats are valueless, so recovery must close the leg with an automatic
+    // write-off instead of retaining custody.
+    const testnutAsset: DeclaredRecoveryAsset = {
+      mintUrl: 'https://testnut.cashu.space',
+      unit: 'sat',
+      accountIndex: 0,
+      maxPrincipal: 10,
+    };
+    const artifactsRoot = mkdtempSync(join(tmpdir(), 'sovran-funded-startup-'));
+    const runDir = join(artifactsRoot, 'run-valueless', 'session-0');
+    const fundedCustodyDir = join(runDir, 'funded-custody');
+    const liabilityDir = join(runDir, 'funded-liability');
+    mkdirSync(fundedCustodyDir, { recursive: true, mode: 0o700 });
+    writeFileSync(join(fundedCustodyDir, 'recovery.json'), '{}', { mode: 0o600 });
+    const custody = storeRecovery(liabilityDir, 'mnemonic', MNEMONIC);
+    const ledger = new RunLedger(liabilityDir, 'run-valueless', () => 1);
+    ledger.registerFunding({
+      legId: 'asset-01',
+      custody,
+      counterparty: 'cocod-test-wallet',
+      asset: {
+        mintUrl: testnutAsset.mintUrl,
+        unit: testnutAsset.unit,
+        accountIndex: testnutAsset.accountIndex,
+      },
+      expectedAmount: testnutAsset.maxPrincipal,
+    });
+    ledger.markFunded('asset-01', { amount: 10, fees: 0 });
+    const accountingDir = join(runDir, 'funded-runtime');
+    mkdirSync(accountingDir, { recursive: true, mode: 0o700 });
+    writeFileSync(
+      join(accountingDir, 'cocod-accounting.json'),
+      JSON.stringify({
+        version: 1,
+        runId: 'run-valueless',
+        assets: [{ asset: testnutAsset, baseline: 9994, current: 9984 }],
+        observations: [
+          {
+            sequence: 1,
+            operation: 'cashu.create',
+            asset: testnutAsset,
+            before: 9994,
+            after: 9984,
+            delta: -10,
+          },
+        ],
+        pendingInvoices: [],
+        final: false,
+      }),
+      { mode: 0o600 }
+    );
+    const custodyPath = join(fundedCustodyDir, 'recovery.json');
+    const valuelessReport: FundedRecoveryReport = {
+      assets: [
+        {
+          asset: testnutAsset,
+          restoredAmount: 0,
+          tokenAmount: 0,
+          counterpartyDelta: 0,
+          sendFee: 0,
+          receiveFee: 0,
+          residualAmount: 0,
+        },
+      ],
+      counterpartyTokens: [
+        {
+          asset: testnutAsset,
+          tokenAmount: 10,
+          counterpartyDelta: 0,
+          fee: 0,
+          disposition: 'spent-by-app',
+        },
+      ],
+    };
+    const recovery: FundedRecoveryPort = {
+      custodyPath,
+      assets: [testnutAsset],
+      inspectCashuToken: async () => ({
+        totalAmount: 10,
+        unspentAmount: 0,
+        pendingAmount: 0,
+        spentAmount: 10,
+      }),
+      reconcile: async () => valuelessReport,
+      disposePrivateMaterial: () => unlinkSync(custodyPath),
+    };
+
+    const result = await recoverStaleFundedSessions({
+      artifactsRoot,
+      cocod: fakeCocod(),
+      openRecovery: () => recovery,
+    });
+
+    expect(result.recovered).toHaveLength(1);
+    const reconciledLedger = new RunLedger(liabilityDir, 'run-valueless');
+    expect(reconciledLedger.status().get('asset-01')).toBe('reconciled');
+    expect(reconciledLedger.read()).toContainEqual(
+      expect.objectContaining({
+        kind: 'written-off',
+        legId: 'asset-01',
+        amount: 10,
+        reason: 'valueless-test-mint',
+      })
+    );
+    expect(reconciledLedger.read().at(-1)).toEqual(
+      expect.objectContaining({
+        kind: 'reconciled',
+        fundedAmount: 10,
+        recoveredAmount: 0,
+        outflowAmount: 0,
+        writtenOffAmount: 10,
+        fees: 0,
+      })
+    );
+    expect(existsSync(custodyPath)).toBe(false);
+  });
+
   it('still fails closed when a write-off does not close the funded principal', async () => {
     const fixture = sessionFixture('partial-write-off');
     fixture.ledger.markFunded('asset-01', { amount: 100, fees: 0 });

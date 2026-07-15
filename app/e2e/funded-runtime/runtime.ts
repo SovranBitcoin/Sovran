@@ -15,10 +15,11 @@ import {
 } from '../funded';
 import type { FundedRecovery } from '../funded/funded-recovery';
 import { assetIdentity } from '../funded/custody';
+import { isValuelessTestMint, VALUELESS_WRITE_OFF_REASON } from '../funded/test-mints';
 import { FundingCoordinator, type FundingEffects, type FundingLeg } from '../ledger/coordinator';
 import { deleteRecovery, hasCustody, storeRecovery, type CustodyHandle } from '../ledger/custody';
 import { durableReplaceFile, ensurePrivateDirectory } from '../ledger/durable';
-import { RunLedger, type AssetLocation } from '../ledger/ledger';
+import { RunLedger, type AssetLocation, type LedgerEntry } from '../ledger/ledger';
 
 type LiveLeg =
   | FundingLeg<'intent'>
@@ -770,6 +771,35 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
       const expectedPrincipal = leg ? asset.maxPrincipal : 0;
       const restored = report.assets.find((entry) => assetIdentity(entry.asset) === id);
       if (!restored) throw new Error('funded recovery omitted a declared asset reconciliation');
+      // Valueless test mints are exempt from exact conservation: nothing was
+      // scanned or swept, so the unexplained remainder is written off as
+      // accepted test-fund loss instead of failing (or quarantining) the run.
+      if (isValuelessTestMint(asset.mintUrl)) {
+        if (leg) {
+          const legEntries = this.#ledger.read().filter((entry) => entry.legId === leg.legId);
+          const outflowAmount = legEntries
+            .filter(
+              (entry): entry is Extract<LedgerEntry, { kind: 'outflow' }> =>
+                entry.kind === 'outflow'
+            )
+            .reduce((sum, entry) => sum + entry.amount + entry.fees, 0);
+          const writtenOff = legEntries
+            .filter(
+              (entry): entry is Extract<LedgerEntry, { kind: 'written-off' }> =>
+                entry.kind === 'written-off'
+            )
+            .reduce((sum, entry) => sum + entry.amount, 0);
+          const remainder = expectedPrincipal - outflowAmount - writtenOff;
+          if (remainder > 0) {
+            this.#ledger.writeOff(leg.legId, {
+              amount: remainder,
+              reason: VALUELESS_WRITE_OFF_REASON,
+            });
+          }
+        }
+        sweepResults.set(id, { ok: true, recoveredAmount: 0, residualAmount: 0, fees: 0 });
+        continue;
+      }
       const returnedTokens = report.counterpartyTokens.filter(
         (entry) => assetIdentity(entry.asset) === id && entry.disposition === 'returned'
       );

@@ -21,6 +21,7 @@ import {
   type InspectedCashuToken,
 } from '../funded';
 import type { FundedRecovery } from '../funded/funded-recovery';
+import { isValuelessTestMint, VALUELESS_WRITE_OFF_REASON } from '../funded/test-mints';
 import { deleteRecovery, hasCustody, type CustodyHandle } from '../ledger/custody';
 import {
   effectLeasePath,
@@ -771,6 +772,12 @@ function acceptedEmptyAssets(
   const unsafe: DeclaredRecoveryAsset[] = [];
   for (const item of reportByAsset.values()) {
     if (item.restored.restoredAmount !== 0) continue;
+    // Valueless test-mint principal is never recovered by design — emptiness
+    // is always accepted and reconcileLedger writes the remainder off.
+    if (isValuelessTestMint(item.asset.mintUrl)) {
+      accepted.push(item.asset);
+      continue;
+    }
     // FundedRecovery terminalizes an empty asset itself when it returned a
     // persisted counterparty token. That token is independent proof of the
     // principal's disposition, so no caller exception is needed.
@@ -921,7 +928,37 @@ function reconcileLedger(
       ledger.markFunded(intent.legId, { amount: intent.expectedAmount, fees: 0 });
     }
 
-    const accounting = accountingForLeg(intent, currentEntries, assetReport);
+    // Valueless test-mint legs are exempt from recovery: write the
+    // unexplained remainder off as accepted test-fund loss so the leg
+    // closes without quarantining the harness.
+    if (isValuelessTestMint(intent.asset.mintUrl)) {
+      const explainedEntries = ledger.read().filter((entry) => entry.legId === intent.legId);
+      const outflowTotal = explainedEntries
+        .filter(
+          (entry): entry is Extract<LedgerEntry, { kind: 'outflow' }> => entry.kind === 'outflow'
+        )
+        .reduce((sum, entry) => sum + entry.amount + entry.fees, 0);
+      const writtenOffTotal = explainedEntries
+        .filter(
+          (entry): entry is Extract<LedgerEntry, { kind: 'written-off' }> =>
+            entry.kind === 'written-off'
+        )
+        .reduce((sum, entry) => sum + entry.amount, 0);
+      const returnedPrincipal = assetReport.tokens
+        .filter(({ disposition }) => disposition === 'returned')
+        .reduce((sum, token) => sum + token.tokenAmount, 0);
+      const remainder =
+        intent.expectedAmount -
+        assetReport.restored.restoredAmount -
+        returnedPrincipal -
+        outflowTotal -
+        writtenOffTotal;
+      if (remainder > 0) {
+        ledger.writeOff(intent.legId, { amount: remainder, reason: VALUELESS_WRITE_OFF_REASON });
+      }
+    }
+
+    const accounting = accountingForLeg(intent, ledger.read(), assetReport);
     if (currentStatus === 'reconciled') {
       validateExistingSweep(intent, currentEntries, accounting);
       continue;

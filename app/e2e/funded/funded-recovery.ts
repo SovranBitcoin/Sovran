@@ -16,6 +16,7 @@ import {
 } from './custody';
 import { deriveSovranAccount0CashuSeed } from './derivation';
 import { controlledP2PKPublicKey } from './p2pk';
+import { isValuelessTestMint } from './test-mints';
 import type {
   AssetReconciliation,
   CounterpartyTokenReconciliation,
@@ -278,6 +279,9 @@ export class FundedRecovery {
 
         for (const token of this.#custody.snapshot().counterpartyTokens) {
           if (token.phase === 'reconciled' || token.phase === 'spent') continue;
+          // Valueless test-mint tokens need no inspection or return — the
+          // asset's principal is written off by the caller either way.
+          if (isValuelessTestMint(token.asset.mintUrl)) continue;
           try {
             await this.#reconcileCounterpartyToken(token, cashu, dependencies.cocod, seed);
           } catch (error) {
@@ -302,6 +306,12 @@ export class FundedRecovery {
         for (const asset of beforeScan.assets) {
           const id = assetIdentity(asset);
           if (reconciledAssets.has(id) || openRedemptionAssets.has(id) || blockedAssets.has(id)) {
+            continue;
+          }
+          // Valueless test mints are outside the custody guarantee: never
+          // scan or sweep them — callers write the principal off instead.
+          if (isValuelessTestMint(asset.mintUrl)) {
+            this.#custody.markAssetReconciled(emptyReconciliation(asset));
             continue;
           }
           try {

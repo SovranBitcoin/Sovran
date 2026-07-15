@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadE2E } from './loader';
+import { isValuelessTestMint } from '../funded/test-mints';
 import { effectiveRequirements, expandScenario, unsafeCocodEffects } from './plan';
 import { formatDoc } from '../schema';
 
@@ -41,7 +42,6 @@ describe('loadE2E over the real tree', () => {
   it('keeps every funded happy path independently sweepable with matching suite requirements', () => {
     const ids = [
       'receive.cashu.paste',
-      'receive.cashu.unknown-mint',
       'receive.lightning.sat',
       'receive.lightning.change-mint.confirm',
       'send.cashu.sat',
@@ -57,6 +57,14 @@ describe('loadE2E over the real tree', () => {
         effectiveRequirements(scenario, loaded.fixtures).sort().join(',')
       );
     }
+  });
+
+  it('exempts the valueless testnut scenario from the sweep ceremony', () => {
+    const scenario = loaded.scenarios.get('receive.cashu.unknown-mint')!;
+    expect(scenario.funds?.assets.every((asset) => isValuelessTestMint(asset.mintUrl))).toBe(true);
+    expect(scenario.finally.some((item) => 'use' in item && item.use === 'flow.sweep-mint')).toBe(
+      false
+    );
   });
 
   it('retries the 100-sat Lightning funding handoff through the rendered method sheet', () => {
@@ -433,7 +441,7 @@ describe('loadE2E over the real tree', () => {
     const users = [...loaded.scenarios.values()].filter((scenario) =>
       scenario.finally.some((item) => 'use' in item && item.use === 'flow.sweep-mint')
     );
-    expect(users).toHaveLength(12);
+    expect(users).toHaveLength(11);
     const full = loaded.suites.find((suite) => suite.name === 'full')!;
     for (const scenario of users) {
       const invocations = scenario.finally.filter(

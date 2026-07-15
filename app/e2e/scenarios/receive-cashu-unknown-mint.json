@@ -2,7 +2,7 @@
   "version": 1,
   "id": "receive.cashu.unknown-mint",
   "name": "Receive cashu token from an unknown mint (paste)",
-  "description": "cocod mints a 10 sat testnut token the wallet has never seen; redeeming routes through the mint-trust review screen, tapping Add mint trusts testnut and returns to the token preview where redeem is tapped again; assert +10 at testnut and end on wallet after sweeping",
+  "description": "cocod mints a 10 sat testnut token the wallet has never seen; redeeming routes through the mint-trust review screen, tapping Add mint trusts testnut and returns to the token preview where redeem is tapped again; testnut charges a 1 sat redeem fee so the wallet lands on 9, and the valueless test-mint principal is auto-written-off instead of swept",
   "lane": "funded",
   "tags": ["flow:receive","instrument:cashu-token","io:paste","outcome:settled","check:mint-add"],
   "requires": ["fresh-install","cocod.send.cashu","unit.sat"],
@@ -35,14 +35,12 @@
     {"action":"goHome"}
   ],
   "verify": [
-    {"action":"waitFor","selector":{"label":"₿ 10"},"timeoutMs":60000},
-    {"action":"assert","that":"balanceDelta","unit":"sat","delta":10},
+    {"action":"waitFor","selector":{"label":"₿ 9"},"timeoutMs":60000},
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":10,"feeEnvelopeSats":1},
     {"action":"screenshot","name":"wallet"}
   ],
   "finally": [
-    {"use":"flow.sweep-mint","with":{"mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0}},
-    {"use":"flow.return-to-wallet"},
-    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":45000}
+    {"use":"flow.return-to-wallet"}
   ],
   "endState": "wallet"
 }
