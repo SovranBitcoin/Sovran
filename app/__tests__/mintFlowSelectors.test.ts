@@ -27,6 +27,12 @@ describe('mint flow e2e selectors', () => {
     expect(read(file)).toContain('testID="mint-select-add"');
   });
 
+  it('pins wallet-mint-selector on the wallet home header pill', () => {
+    expect(read('app/(drawer)/(tabs)/index/_layout.tsx')).toContain(
+      'testID="wallet-mint-selector"'
+    );
+  });
+
   it('pins the add-mint screen selectors', () => {
     const source = read('features/mint/screens/MintAddScreen.tsx');
     // Both platform inputs: GlassSearchBar (iOS header) and the Android

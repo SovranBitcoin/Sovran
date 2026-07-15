@@ -33,7 +33,9 @@ export default function HomeLayout() {
       title="Wallet"
       placeholder="Search people..."
       transparent
-      renderIdleTitle={() => <MintSelector onRequestMintList={handleRequestMintList} />}
+      renderIdleTitle={() => (
+        <MintSelector testID="wallet-mint-selector" onRequestMintList={handleRequestMintList} />
+      )}
     />
   );
 }
