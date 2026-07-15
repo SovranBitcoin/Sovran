@@ -21,6 +21,8 @@ export interface CliOptions {
   approveDestructiveReset: boolean;
   acceptTestFundLoss: boolean;
   requireCleanGit: boolean;
+  /** Simulator screen recording is on by default; --no-record opts out. */
+  noRecord: boolean;
   runId?: string;
   leg?: string;
   amount?: number;
@@ -53,6 +55,7 @@ const BOOLEAN_FLAGS = new Set([
   'i-approve-destructive-reset',
   'i-accept-test-fund-loss',
   'require-clean-git',
+  'no-record',
 ]);
 const ALLOWED_BY_COMMAND: Record<CliCommand, Set<string>> = {
   validate: new Set(),
@@ -72,6 +75,7 @@ const ALLOWED_BY_COMMAND: Record<CliCommand, Set<string>> = {
     'i-approve-destructive-reset',
     'i-accept-test-fund-loss',
     'require-clean-git',
+    'no-record',
   ]),
 };
 
@@ -140,6 +144,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
     approveDestructiveReset: booleans.has('i-approve-destructive-reset'),
     acceptTestFundLoss: booleans.has('i-accept-test-fund-loss'),
     requireCleanGit: booleans.has('require-clean-git'),
+    noRecord: booleans.has('no-record'),
     runId: values.get('run-id'),
     leg: values.get('leg'),
     amount,

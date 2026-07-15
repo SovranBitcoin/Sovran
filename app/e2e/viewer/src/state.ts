@@ -37,6 +37,8 @@ export interface AppState {
   frameIndex: number;
   playing: boolean;
   showAllPhases: boolean;
+  /** Play the scenario's test+verify screen recording instead of the frame reel. */
+  videoMode: boolean;
   diff: {
     runA?: string;
     runB?: string;
@@ -67,6 +69,7 @@ export const state: AppState = {
   frameIndex: 0,
   playing: false,
   showAllPhases: false,
+  videoMode: false,
   diff: { view: 'side-by-side', overlayOpacity: 0.5, overlayHeatmap: false },
   pages: { allRuns: false },
 };

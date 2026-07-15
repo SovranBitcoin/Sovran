@@ -839,3 +839,84 @@ describe('runScenario', () => {
     );
   });
 });
+
+describe('runScenario video recording', () => {
+  const recordedScenario = () =>
+    sc([{ action: 'tap', selector: { id: 'mid' } }], {
+      setup: [{ action: 'launch', reset: 'none' }],
+      verify: [{ action: 'waitFor', selector: { id: 'end' }, timeoutMs: 10 }],
+      finally: [{ action: 'tap', selector: { id: 'cleanup' } }],
+    });
+  const recorderHarness = (over: Partial<{ startPath: string | null; stopOk: boolean }> = {}) => {
+    const h = harness({
+      currentState: 'wallet',
+      present: { 'id:end': { id: 'end', label: 'end' } },
+    });
+    const startedWith: string[] = [];
+    h.deps.video = {
+      start: async (scenarioId: string) => {
+        h.driver.calls.push('video:start');
+        startedWith.push(scenarioId);
+        return over.startPath === undefined ? `/abs/run/${scenarioId}/video.mp4` : over.startPath;
+      },
+      stop: async () => {
+        h.driver.calls.push('video:stop');
+        return over.stopOk ?? true;
+      },
+      dispose: async () => {},
+    };
+    return { ...h, startedWith };
+  };
+  const videoArtifacts = (events: RunnerEvent[]) =>
+    events.filter((e) => e.type === 'artifact' && e.kind === 'video');
+
+  it('brackets exactly the behavior window: after setup, before cleanup', async () => {
+    const { deps, driver, events, startedWith } = recorderHarness();
+    expect(await runScenario(recordedScenario(), new Map(), deps)).toBe('passed');
+    expect(startedWith).toEqual(['t.x']);
+    const calls = driver.calls;
+    expect(calls.indexOf('video:start')).toBeGreaterThan(calls.indexOf('launch:none'));
+    expect(calls.indexOf('video:start')).toBeLessThan(calls.indexOf('tap:id:mid'));
+    expect(calls.indexOf('video:stop')).toBeGreaterThan(calls.indexOf('waitFor:id:end'));
+    expect(calls.indexOf('video:stop')).toBeLessThan(calls.indexOf('tap:id:cleanup'));
+    expect(videoArtifacts(events)).toEqual([
+      expect.objectContaining({ stepId: 'VIDEO', path: '/abs/run/t.x/video.mp4' }),
+    ]);
+  });
+
+  it('still stops and emits the video when a behavior step fails', async () => {
+    const { deps, driver, events } = recorderHarness();
+    const scenario = sc([{ action: 'waitFor', selector: { id: 'gone' }, timeoutMs: 10 }], {
+      setup: [{ action: 'launch', reset: 'none' }],
+      finally: [{ action: 'tap', selector: { id: 'cleanup' } }],
+    });
+    expect(await runScenario(scenario, new Map(), deps)).toBe('failed');
+    expect(driver.calls.indexOf('video:stop')).toBeGreaterThan(driver.calls.indexOf('video:start'));
+    expect(driver.calls.indexOf('video:stop')).toBeLessThan(driver.calls.indexOf('tap:id:cleanup'));
+    expect(videoArtifacts(events)).toHaveLength(1);
+  });
+
+  it('never records when setup already failed', async () => {
+    const { deps, driver } = recorderHarness();
+    const scenario = sc([{ action: 'tap', selector: { id: 'mid' } }], {
+      setup: [{ action: 'waitFor', selector: { id: 'missing' }, timeoutMs: 10 }],
+    });
+    expect(await runScenario(scenario, new Map(), deps)).toBe('failed');
+    expect(driver.calls).not.toContain('video:start');
+    expect(driver.calls).not.toContain('video:stop');
+  });
+
+  it('a recorder that cannot start degrades to no video without failing the run', async () => {
+    const { deps, driver, events } = recorderHarness({ startPath: null });
+    expect(await runScenario(recordedScenario(), new Map(), deps)).toBe('passed');
+    expect(driver.calls).toContain('video:start');
+    expect(driver.calls).not.toContain('video:stop');
+    expect(videoArtifacts(events)).toHaveLength(0);
+  });
+
+  it('an unfinalized recording is dropped, not reported as an artifact', async () => {
+    const { deps, events } = recorderHarness({ stopOk: false });
+    expect(await runScenario(recordedScenario(), new Map(), deps)).toBe('passed');
+    expect(videoArtifacts(events)).toHaveLength(0);
+  });
+});

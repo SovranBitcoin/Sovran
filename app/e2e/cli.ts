@@ -27,6 +27,7 @@ import {
   withEphemeralSimulatorSession,
 } from './drivers/simulator-session';
 import { SimulatorDriver } from './drivers/simulator';
+import { createSimVideoRecorder } from './drivers/video';
 import { generateControlledP2PKKeypair } from './funded';
 import { withBoundedCashuRequests } from './funded-runtime/cashu-request-boundary';
 import {
@@ -401,6 +402,7 @@ artifacts.write(
     suite: suite.name,
     driver: options.driver,
     proof,
+    recording: options.driver === 'sim' && !options.noRecord,
     startedAt: new Date().toISOString(),
     scenarios: scenarios.map((scenario) => scenario.id),
     ...(git ? { git } : {}),
@@ -592,6 +594,13 @@ try {
               pendingMnemonic = undefined;
             }
           }
+          const video = options.noRecord
+            ? undefined
+            : createSimVideoRecorder({
+                udid: session.udid,
+                runDir,
+                onWarning: (message) => bus.emit({ type: 'lifecycle', message }),
+              });
           simulator.start();
           try {
             await runGroup({
@@ -601,9 +610,11 @@ try {
               artifacts,
               capabilities: caps,
               signal,
+              ...(video ? { video } : {}),
               ...(runtime ? { counterparty: runtime, reconcile: () => runtime!.reconcile() } : {}),
             });
           } finally {
+            await video?.dispose();
             await simulator.dispose();
           }
         }

@@ -6,6 +6,8 @@ const CONTENT_TYPES: Record<string, string> = {
   '.png': 'image/png',
   '.json': 'application/json',
   '.jsonl': 'application/x-ndjson',
+  '.mp4': 'video/mp4',
+  '.mov': 'video/quicktime',
 };
 
 function contentTypeFor(path: string): string {

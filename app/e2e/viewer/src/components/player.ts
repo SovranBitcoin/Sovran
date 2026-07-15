@@ -83,7 +83,7 @@ export function renderPlayer(root: HTMLElement): void {
   }
 
   const frames = visibleFrames(timeline);
-  const sig = `${runId}|${timeline.scenarioId}|${state.showAllPhases}|${frames.length}`;
+  const sig = `${runId}|${timeline.scenarioId}|${state.showAllPhases}|${frames.length}|${state.videoMode}|${timeline.videoFile ?? ''}`;
   if (root.dataset.playerSig !== sig) {
     buildShell(root, timeline, runId, frames);
     root.dataset.playerSig = sig;
@@ -138,6 +138,13 @@ function buildShell(
         .join('')
     : '';
 
+  const videoActive = state.videoMode && !!timeline.videoFile;
+  const stageContent = videoActive
+    ? `<video id="stage-video" controls playsinline src="${api.runFileUrl(runId, timeline.videoFile!)}"></video>`
+    : frames.length
+      ? `<img id="stage-img" alt="frame" />`
+      : '<span class="empty">no screenshots in this phase filter</span>';
+
   root.innerHTML = `<div class="player">
     <div class="titles">
       <h1>${escapeHtml(timeline.name)}${outcome}</h1>
@@ -145,22 +152,27 @@ function buildShell(
       ${facetChips ? `<div class="facet-chips">${facetChips}</div>` : ''}
     </div>
     <div class="stage-row">
-      <div class="stage">${
-        frames.length
-          ? `<img id="stage-img" alt="frame" />`
-          : '<span class="empty">no screenshots in this phase filter</span>'
-      }</div>
+      <div class="stage">${stageContent}</div>
       <div class="side">
+        ${
+          timeline.videoFile
+            ? `<label class="check"><input type="checkbox" data-action="video" ${state.videoMode ? 'checked' : ''}/> ▶ video recording</label>`
+            : ''
+        }
         <label class="check"><input type="checkbox" data-action="phases" ${state.showAllPhases ? 'checked' : ''}/> show setup / cleanup</label>
         <div class="step-list">${stepItems}</div>
       </div>
     </div>
-    <div class="caption" data-role="caption"></div>
+    ${
+      videoActive
+        ? ''
+        : `<div class="caption" data-role="caption"></div>
     <div class="controls">
       <button data-action="play" aria-label="play slideshow">▶</button>
       <input type="range" data-action="scrub" aria-label="frame" min="0" max="${Math.max(0, frames.length - 1)}" value="0" ${frames.length < 2 ? 'disabled' : ''}/>
       <span class="counter" data-role="counter"></span>
-    </div>
+    </div>`
+    }
     ${named ? `<div class="named-strip">${named}</div>` : ''}
   </div>`;
 
@@ -181,6 +193,12 @@ function buildShell(
     update((current) => {
       current.showAllPhases = !current.showAllPhases;
       current.frameIndex = 0;
+      current.playing = false;
+    })
+  );
+  root.querySelector<HTMLInputElement>('[data-action=video]')?.addEventListener('change', () =>
+    update((current) => {
+      current.videoMode = !current.videoMode;
       current.playing = false;
     })
   );

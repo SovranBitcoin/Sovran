@@ -113,6 +113,11 @@ export function parseEvents(eventsText: string, runDirName: string): ParsedEvent
       case 'artifact': {
         if (!current) break;
         const kind = String(event.kind);
+        if (kind === 'video') {
+          const videoRel = relativeToRunDir(String(event.path), runDirName);
+          if (videoRel) current.videoFile = videoRel;
+          break;
+        }
         if (kind !== 'screenshot' && kind !== 'ax') break;
         const rel = relativeToRunDir(String(event.path), runDirName);
         if (!rel) break;
@@ -219,6 +224,10 @@ export function timelinesFromDirScan(runDir: string, scenarioIds: string[]): Sce
       continue;
     }
     for (const entry of entries.sort()) {
+      if (entry === 'video.mp4') {
+        timeline.videoFile = `${scenarioId}/${entry}`;
+        continue;
+      }
       const match = FRAME_NAME_RE.exec(entry);
       if (!match) continue;
       const phase = phaseOf(match[2]);

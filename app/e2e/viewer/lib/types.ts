@@ -75,6 +75,8 @@ export interface ScenarioTimeline {
   deferred?: boolean;
   frames: Frame[];
   named: NamedFrame[];
+  /** Test+verify screen recording, relative to the run dir (e.g. "mint.add.url/video.mp4"). */
+  videoFile?: string;
   finalState?: { expected: string; actual: string; ok: boolean };
 }
 

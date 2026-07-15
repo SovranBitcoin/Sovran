@@ -78,6 +78,13 @@ describe('parseCliArgs', () => {
     expect(() => parseCliArgs(['run', '--i-approve-funded-run'])).toThrow(/unknown flag/);
   });
 
+  it('records by default and honors --no-record only on run', () => {
+    expect(parseCliArgs(['run']).noRecord).toBe(false);
+    expect(parseCliArgs(['run', '--no-record']).noRecord).toBe(true);
+    expect(() => parseCliArgs(['list', '--no-record'])).toThrow(/not valid/);
+    expect(() => parseCliArgs(['dry-run', '--no-record'])).toThrow(/not valid/);
+  });
+
   it('accepts the read-only funds-status command without selection flags', () => {
     expect(parseCliArgs(['funds-status']).command).toBe('funds-status');
     expect(() => parseCliArgs(['funds-status', '--suite', 'full'])).toThrow(/not valid/);

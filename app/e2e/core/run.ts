@@ -22,6 +22,7 @@ import type {
   StateObservation,
 } from '../drivers/driver';
 import { decode as decodeEmoji } from '../../shared/lib/third-party/emoji';
+import type { VideoRecorder } from '../drivers/video';
 
 export interface RunDeps {
   driver: Driver;
@@ -30,6 +31,9 @@ export interface RunDeps {
   artifacts: ArtifactSink;
   capabilities: Set<string>;
   counterparty?: CounterpartyExecutor;
+  /** Optional per-scenario screen recording over the test+verify window only —
+   *  setup and cleanup stay out of frame. Best-effort evidence, never a gate. */
+  video?: VideoRecorder;
   now?: () => number;
   scenarioIndex?: number;
   totalScenarios?: number;
@@ -249,6 +253,7 @@ export async function runScenario(
     return ok;
   };
 
+  let videoPath: string | null = null;
   try {
     if (!(await executeSteps(preconditions, true))) failed = true;
     if (!failed) {
@@ -266,10 +271,24 @@ export async function runScenario(
         }
       }
     }
+    // Recording brackets exactly the behavior window: the first and last video
+    // frames match the scenario's first and last authored screenshots.
+    if (!failed && deps.video) videoPath = await deps.video.start(plan.id);
     if (!failed && !(await executeSteps(behavior, true))) failed = true;
   } catch {
     failed = true;
   } finally {
+    if (videoPath && deps.video) {
+      if (await deps.video.stop()) {
+        deps.bus.emit({
+          type: 'artifact',
+          artifactSeq: nextArtifactSeq(),
+          stepId: 'VIDEO',
+          kind: 'video',
+          path: videoPath,
+        });
+      }
+    }
     if (cleanup.length) {
       deps.bus.emit({ type: 'cleanup.begin' });
       const cStart = now();
