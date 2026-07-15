@@ -181,6 +181,72 @@ describe('funded recovery reconciliation', () => {
     expect(existsSync(recovery.custodyPath)).toBe(false);
   });
 
+  it('reconciles a valueless test-mint asset without scanning and terminalizes its token even when the mint fails', async () => {
+    const testnut = {
+      mintUrl: 'https://testnut.cashu.space',
+      unit: 'sat',
+      accountIndex: 0,
+      maxPrincipal: 10,
+    } as const;
+    const runDir = mkdtempSync(join(tmpdir(), 'sovran-funded-recovery-'));
+    const recovery = establishFundedRecovery({
+      runDir,
+      appMnemonic: APP_MNEMONIC,
+      assets: [testnut],
+    });
+    const cashu: CashuRecoveryBackend = {
+      restore: async () => {
+        throw new Error('valueless assets must never be scanned');
+      },
+      prepareSendAll: async () => {
+        throw new Error('valueless assets must never be swept');
+      },
+      inspectToken: async () => {
+        throw new Error('testnut is unreachable');
+      },
+    };
+    const testnutBalances = (amount: number): CocodBalanceSnapshot => ({
+      [testnut.mintUrl]: { sat: amount },
+    });
+    const snapshots = [testnutBalances(9994), testnutBalances(9984)];
+    const cocod: CocodCounterparty = {
+      status: async () => 'UNLOCKED',
+      balanceSnapshot: async () => snapshots.shift() ?? testnutBalances(9984),
+      exactBalance: (snapshot, requestedAsset) =>
+        snapshot[requestedAsset.mintUrl]?.[requestedAsset.unit] ?? 0,
+      createCashu: async (_asset, amount) => ({ token: `cashuB${'t'.repeat(30)}`, amount }),
+      receiveCashu: async () => {
+        throw new Error('valueless tokens must not be returned when the mint fails');
+      },
+      createBolt11: async () => {
+        throw new Error('not used');
+      },
+      payBolt11: async () => {
+        throw new Error('not used');
+      },
+      npcAddress: async () => {
+        throw new Error('not used');
+      },
+    };
+
+    await recovery.createCounterpartyCashu({ asset: testnut, amount: 10, cocod });
+    const report = await recovery.reconcile({ cashu, cocod });
+
+    expect(report.assets).toEqual([
+      expect.objectContaining({ asset: testnut, restoredAmount: 0, residualAmount: 0 }),
+    ]);
+    expect(report.counterpartyTokens).toEqual([
+      expect.objectContaining({
+        asset: testnut,
+        tokenAmount: 10,
+        counterpartyDelta: 0,
+        disposition: 'spent-by-app',
+      }),
+    ]);
+    recovery.disposePrivateMaterial();
+    expect(existsSync(recovery.custodyPath)).toBe(false);
+  });
+
   it('persists the send-all token before cocod redemption, re-probes zero, and reconciles exact amounts', async () => {
     const runDir = mkdtempSync(join(tmpdir(), 'sovran-funded-recovery-'));
     const recovery = establishFundedRecovery({

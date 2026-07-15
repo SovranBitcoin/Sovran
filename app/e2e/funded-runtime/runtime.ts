@@ -771,10 +771,23 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
       const expectedPrincipal = leg ? asset.maxPrincipal : 0;
       const restored = report.assets.find((entry) => assetIdentity(entry.asset) === id);
       if (!restored) throw new Error('funded recovery omitted a declared asset reconciliation');
-      // Valueless test mints are exempt from exact conservation: nothing was
-      // scanned or swept, so the unexplained remainder is written off as
-      // accepted test-fund loss instead of failing (or quarantining) the run.
+      // Valueless test mints are exempt from exact conservation: the app's
+      // proofs are never scanned or swept, so whatever the recovery report
+      // cannot explain (typically the token the app redeemed) is written off
+      // as accepted test-fund loss instead of failing (or quarantining) the
+      // run. Returned tokens still count as recovered value with their real
+      // fees so the ledger's own conservation stays exact.
       if (isValuelessTestMint(asset.mintUrl)) {
+        const returned = report.counterpartyTokens.filter(
+          (entry) => assetIdentity(entry.asset) === id && entry.disposition === 'returned'
+        );
+        const recoveredAmount =
+          restored.counterpartyDelta +
+          returned.reduce((sum, entry) => sum + entry.counterpartyDelta, 0);
+        const sweepFees =
+          restored.sendFee +
+          restored.receiveFee +
+          returned.reduce((sum, entry) => sum + (entry.tokenAmount - entry.counterpartyDelta), 0);
         if (leg) {
           const legEntries = this.#ledger.read().filter((entry) => entry.legId === leg.legId);
           const outflowAmount = legEntries
@@ -789,7 +802,12 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
                 entry.kind === 'written-off'
             )
             .reduce((sum, entry) => sum + entry.amount, 0);
-          const remainder = expectedPrincipal - outflowAmount - writtenOff;
+          const explainedPrincipal =
+            restored.restoredAmount +
+            returned.reduce((sum, entry) => sum + entry.tokenAmount, 0) +
+            outflowAmount +
+            writtenOff;
+          const remainder = expectedPrincipal - explainedPrincipal;
           if (remainder > 0) {
             this.#ledger.writeOff(leg.legId, {
               amount: remainder,
@@ -797,7 +815,7 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
             });
           }
         }
-        sweepResults.set(id, { ok: true, recoveredAmount: 0, residualAmount: 0, fees: 0 });
+        sweepResults.set(id, { ok: true, recoveredAmount, residualAmount: 0, fees: sweepFees });
         continue;
       }
       const returnedTokens = report.counterpartyTokens.filter(

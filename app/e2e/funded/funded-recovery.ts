@@ -279,12 +279,23 @@ export class FundedRecovery {
 
         for (const token of this.#custody.snapshot().counterpartyTokens) {
           if (token.phase === 'reconciled' || token.phase === 'spent') continue;
-          // Valueless test-mint tokens need no inspection or return — the
-          // asset's principal is written off by the caller either way.
-          if (isValuelessTestMint(token.asset.mintUrl)) continue;
           try {
             await this.#reconcileCounterpartyToken(token, cashu, dependencies.cocod, seed);
           } catch (error) {
+            // A valueless test-mint token must never block reconciliation:
+            // terminalize it as spent-by-app (delta 0) — the caller writes the
+            // asset's principal off, so no value goes unaccounted.
+            if (isValuelessTestMint(token.asset.mintUrl)) {
+              this.#custody.update((record) => {
+                const entry = record.counterpartyTokens.find(({ id }) => id === token.id);
+                if (!entry) throw new Error('durable counterparty token record disappeared');
+                entry.phase = 'spent';
+                entry.disposition = 'spent-by-app';
+                delete entry.counterpartyDelta;
+                delete entry.returnFee;
+              });
+              continue;
+            }
             blockedAssets.add(assetIdentity(token.asset));
             errors.push(new Error(`counterparty ${token.asset.unit}: ${errorMessage(error)}`));
           }
