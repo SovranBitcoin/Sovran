@@ -13,7 +13,7 @@ export const DIFF_CACHE = join(VIEWER_CACHE, 'diff');
 const RUN_ID_RE = /^run-[A-Za-z0-9][A-Za-z0-9._-]*$/;
 /** Artifact bytes the viewer may serve. Bare `.log` (metro.log, bridge logs)
  * and anything under custody/ stay server-private. */
-const SERVABLE_EXTENSIONS = ['.png', '.ax.json', '.json', '.jsonl'];
+const SERVABLE_EXTENSIONS = ['.png', '.ax.json', '.json', '.jsonl', '.mp4'];
 
 export function isValidRunDirName(name: string): boolean {
   return RUN_ID_RE.test(name);

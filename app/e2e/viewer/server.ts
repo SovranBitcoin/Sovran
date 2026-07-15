@@ -46,7 +46,12 @@ const server = Bun.serve({
     '/api/runs/:runId/file/*': async (req) => {
       const detail = await getRunDetail(req.params.runId);
       const relPath = decodeURIComponent(new URL(req.url).pathname.split('/file/')[1] ?? '');
-      return serveRunFile(req.params.runId, relPath, detail?.status === 'complete');
+      return serveRunFile(
+        req.params.runId,
+        relPath,
+        detail?.status === 'complete',
+        req.headers.get('range')
+      );
     },
 
     '/api/scenarios': async () => json(await buildCatalog()),
