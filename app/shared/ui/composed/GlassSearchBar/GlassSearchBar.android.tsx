@@ -95,6 +95,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
           }}
           keyboardType={keyboardType}
           autoCorrect={false}
+          autoCapitalize="none"
           autoFocus={autoFocus}
         />
       </View>

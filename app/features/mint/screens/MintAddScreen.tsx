@@ -363,7 +363,7 @@ export function MintAddScreen() {
   // Feed search query into URL validation when it looks like a URL
   useEffect(() => {
     const q = searchQuery.trim();
-    if (q.includes('.') || q.startsWith('http')) {
+    if (q.includes('.') || q.toLowerCase().startsWith('http')) {
       cashuLog.debug('mint.add.url_validation.trigger', { query: q });
       setValidationUrl(q);
     } else {

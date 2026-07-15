@@ -74,6 +74,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
       onChangeText={handleTextChange}
       keyboardType={keyboardType}
       autoCorrect={false}
+      autoCapitalize="none"
       autoFocus={autoFocus}
       accessibilityLabel={placeholder}
       accessibilityRole="search"

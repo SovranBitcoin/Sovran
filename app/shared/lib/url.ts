@@ -84,7 +84,9 @@ export function openExternalUrl(raw: string): ResultAsync<void, OpenUrlError> {
  * for UI-layer cache keys where protocol is irrelevant.
  */
 export function normalizeMintUrlKey(url: string): string {
-  const withoutProtocol = url.replace(/^https?:\/\//, '');
+  // Scheme matching is case-insensitive: iOS sentence-capitalization turns a
+  // hand-typed URL into "Https://…", which must key identically.
+  const withoutProtocol = url.replace(/^https?:\/\//i, '');
   const slashIndex = withoutProtocol.indexOf('/');
   if (slashIndex === -1) {
     const result = withoutProtocol
@@ -94,7 +96,7 @@ export function normalizeMintUrlKey(url: string): string {
     cashuLog.debug('url.mint.normalize_key', {
       inputLength: url.length,
       resultLength: result.length,
-      hadProtocol: /^https?:\/\//.test(url),
+      hadProtocol: /^https?:\/\//i.test(url),
       hadPath: false,
     });
     return result;
@@ -108,7 +110,7 @@ export function normalizeMintUrlKey(url: string): string {
   cashuLog.debug('url.mint.normalize_key', {
     inputLength: url.length,
     resultLength: result.length,
-    hadProtocol: /^https?:\/\//.test(url),
+    hadProtocol: /^https?:\/\//i.test(url),
     hadPath: true,
     domainLength: domain.length,
     pathLength: path.length,
@@ -133,14 +135,15 @@ export function extractDomain(url: string): string {
   }
 
   try {
-    // Remove both http and https protocols
-    const withoutProtocol = url.replace(/^https?:\/\//, '');
+    // Remove both http and https protocols (case-insensitively — iOS
+    // sentence-capitalization produces "Https://…")
+    const withoutProtocol = url.replace(/^https?:\/\//i, '');
     // Split by '/' and take the first part (domain)
     const result = withoutProtocol.split('/')[0] || url;
     cashuLog.debug('url.domain.extract', {
       inputLength: url.length,
       resultLength: result.length,
-      hadProtocol: /^https?:\/\//.test(url),
+      hadProtocol: /^https?:\/\//i.test(url),
     });
     return result;
   } catch {
@@ -170,7 +173,9 @@ export function extractDomain(url: string): string {
  */
 export function normalizeUrlForApi(rawUrl: string): string {
   const trimmed = rawUrl.trim();
-  const withoutProtocol = trimmed.replace(/^https?:\/\//, '');
+  // Case-insensitive: "Https://mint" (iOS sentence-capitalization) must not
+  // survive as a phantom "https:" domain segment.
+  const withoutProtocol = trimmed.replace(/^https?:\/\//i, '');
   const slashIndex = withoutProtocol.indexOf('/');
   if (slashIndex === -1) {
     const domain = withoutProtocol.toLowerCase().replace(/^www\./, '');
