@@ -165,7 +165,7 @@ and the JSON plan or blocker. A cited pure test proves only its own layer.
 | `tx.source.cashu-paste`                | JF    | product-run                                  | Prepared source-less preview; distinct finalized Paste tx; persisted Clipboard detail; sweep    |
 | `isolation.payment-roots`              | JS    | draft; deferred:redesign/root-gap            | Seed dirty context, invoke each actual root, and prove it clean immediately                     |
 | `receive.lightning.change-mint.confirm` | JF   | authored; pending product run                | Quote-screen mint switch mints a fresh Minibits quote with the amount intact; +150; sweep       |
-| `receive.cashu.unknown-mint`           | JF    | authored; pending product run                | Untrusted testnut token routes through mint-trust review; Add mint auto-retries redeem; +10     |
+| `receive.cashu.unknown-mint`           | JF    | authored; pending product run                | Untrusted testnut token routes through mint-trust review; Add mint, then redeem again; +10      |
 | `mint.add.url`                         | JS    | authored; pending product run                | Manual URL add of testnut via selector → Add Mints; persists and is selectable on reopen        |
 
 ## `STATE_MACHINE.md` section 5 — shipped flow matrix
