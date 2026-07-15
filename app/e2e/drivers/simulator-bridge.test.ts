@@ -33,6 +33,7 @@ describe('capture-free simulator bridge', () => {
     const native: SimulatorBridgeNative = {
       SimHID: class {
         touch() {}
+        key() {}
       },
       axDescribe: async () => {
         descriptions++;
@@ -76,6 +77,7 @@ describe('capture-free simulator bridge', () => {
     const native: SimulatorBridgeNative = {
       SimHID: class {
         touch() {}
+        key() {}
       },
       axDescribe: async () => {
         inFlight++;
@@ -109,10 +111,14 @@ describe('capture-free simulator bridge', () => {
 
   it('drives HID from AX dimensions without starting native video', async () => {
     const touches: unknown[][] = [];
+    const keys: unknown[][] = [];
     const native: SimulatorBridgeNative = {
       SimHID: class {
         touch(...args: unknown[]) {
           touches.push(args);
+        }
+        key(...args: unknown[]) {
+          keys.push(args);
         }
       },
       axDescribe: async () => RAW_AX,
@@ -129,9 +135,15 @@ describe('capture-free simulator bridge', () => {
       packet[0] = 3;
       packet.set(body, 1);
       socket.send(packet);
+      const keyBody = new TextEncoder().encode(JSON.stringify({ type: 'down', usage: 0x0b }));
+      const keyPacket = new Uint8Array(keyBody.length + 1);
+      keyPacket[0] = 4;
+      keyPacket.set(keyBody, 1);
+      socket.send(keyPacket);
       await Bun.sleep(20);
       socket.close();
       expect(touches).toEqual([['begin', 0.25, 0.75, 400, 800, 0]]);
+      expect(keys).toEqual([['down', 0x0b]]);
     } finally {
       bridge.stop();
     }

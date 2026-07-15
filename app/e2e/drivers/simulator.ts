@@ -28,7 +28,8 @@ import {
   type AxElement,
   type AxSnapshot,
 } from './ax';
-import { run, pressAt, gesture, handleDevClientChrome, sleep } from './simctl';
+import { run, pressAt, gesture, handleDevClientChrome, sleep, typeKeystrokes } from './simctl';
+import { hidKeystrokesFor, LEFT_SHIFT_USAGE } from './hid-keys';
 import { SimulatorInfrastructureError } from './simulator-session';
 
 export interface SimConfig {
@@ -728,8 +729,16 @@ export class SimulatorDriver implements Driver {
       signal: this.#cfg.signal,
     });
   }
-  async input(_sel: Selector, _value: string): Promise<void> {
-    throw new Error('text input is not supported by the simulator driver — use keypad taps');
+  async input(sel: Selector, value: string): Promise<void> {
+    // Map the whole string BEFORE focusing so an unmappable character fails
+    // without leaving a half-typed field behind.
+    const strokes = hidKeystrokesFor(value);
+    await this.tap(sel); // focus the field
+    await sleep(800); // keyboard attach / autofocus settle
+    await typeKeystrokes(this.#cfg.touchEndpoint, strokes, LEFT_SHIFT_USAGE, {
+      signal: this.#cfg.signal,
+    });
+    await sleep(400); // let debounced onChangeText handlers observe the text
   }
   async clipboardSet(value: string): Promise<void> {
     const proc = Bun.spawn(['xcrun', 'simctl', 'pbcopy', this.#cfg.udid], { stdin: 'pipe' });

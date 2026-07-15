@@ -94,8 +94,11 @@ interface PressAtDependencies {
 }
 
 const TOUCH_PACKET = 3;
+const KEY_PACKET = 4;
 const TOUCH_DOWN_MS = 120;
 const TOUCH_FLUSH_MS = 50;
+const KEY_DOWN_MS = 15;
+const KEY_GAP_MS = 30;
 
 function touchPacket(type: 'begin' | 'move' | 'end', x: number, y: number): Uint8Array {
   const body = new TextEncoder().encode(JSON.stringify({ type, x, y }));
@@ -103,6 +106,53 @@ function touchPacket(type: 'begin' | 'move' | 'end', x: number, y: number): Uint
   packet[0] = TOUCH_PACKET;
   packet.set(body, 1);
   return packet;
+}
+
+function keyPacket(type: 'down' | 'up', usage: number): Uint8Array {
+  const body = new TextEncoder().encode(JSON.stringify({ type, usage }));
+  const packet = new Uint8Array(body.length + 1);
+  packet[0] = KEY_PACKET;
+  packet.set(body, 1);
+  return packet;
+}
+
+/**
+ * Type a sequence of HID keystrokes over ONE bridge socket (per-key sockets
+ * would add ~100 handshakes to a URL). Each stroke is a full press with the
+ * shift modifier held around it when needed.
+ */
+export async function typeKeystrokes(
+  touchEndpoint: string,
+  strokes: readonly { usage: number; shift: boolean }[],
+  shiftUsage: number,
+  dependencies: PressAtDependencies = {}
+): Promise<void> {
+  const createSocket =
+    dependencies.createSocket ??
+    ((endpoint: string) => new WebSocket(endpoint) as unknown as TouchSocket);
+  const wait = dependencies.wait ?? sleep;
+  const socket = createSocket(touchEndpoint);
+  try {
+    await waitForTouchSocket(socket, dependencies.signal);
+    for (const stroke of strokes) {
+      if (stroke.shift) {
+        socket.send(keyPacket('down', shiftUsage));
+        await waitWithAbort(wait, KEY_DOWN_MS, dependencies.signal);
+      }
+      socket.send(keyPacket('down', stroke.usage));
+      await waitWithAbort(wait, KEY_DOWN_MS, dependencies.signal);
+      socket.send(keyPacket('up', stroke.usage));
+      await waitWithAbort(wait, KEY_DOWN_MS, dependencies.signal);
+      if (stroke.shift) {
+        socket.send(keyPacket('up', shiftUsage));
+        await waitWithAbort(wait, KEY_DOWN_MS, dependencies.signal);
+      }
+      await waitWithAbort(wait, KEY_GAP_MS, dependencies.signal);
+    }
+    await waitWithAbort(wait, TOUCH_FLUSH_MS, dependencies.signal);
+  } finally {
+    socket.close();
+  }
 }
 
 export async function gesture(

@@ -8,6 +8,8 @@ import { createRequire } from 'node:module';
 
 interface NativeHid {
   touch(type: string, x: number, y: number, width: number, height: number, edge: number): void;
+  /** USB HID keyboard event (usage page 0x07) — hardware-keyboard typing. */
+  key(type: string, usage: number): void;
 }
 
 export interface SimulatorBridgeNative {
@@ -186,6 +188,14 @@ export function startSimulatorBridge(options: {
             typeof message === 'string'
               ? new TextEncoder().encode(message)
               : new Uint8Array(message);
+          if (bytes[0] === 4) {
+            const payload = JSON.parse(new TextDecoder().decode(bytes.slice(1))) as {
+              type: string;
+              usage: number;
+            };
+            hid.key(payload.type, payload.usage);
+            return;
+          }
           if (bytes[0] !== 3) return;
           const payload = JSON.parse(new TextDecoder().decode(bytes.slice(1))) as {
             type: string;
