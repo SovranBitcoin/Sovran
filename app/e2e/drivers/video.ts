@@ -6,7 +6,7 @@
  * framebuffer. The recorder is evidence, not a gate: every failure path warns
  * and degrades to "no video" instead of failing the scenario.
  */
-import { chmodSync, existsSync, mkdirSync, statSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 export interface VideoRecorder {
@@ -34,8 +34,9 @@ export interface SimVideoRecorderOptions {
   hasOutput?: (path: string) => boolean;
   sleep?: (ms: number) => Promise<void>;
   onWarning?: (message: string) => void;
-  /** Budget for the recorder to create its output file before the first test step. */
-  startTimeoutMs?: number;
+  /** Grace period in which an immediately-doomed recorder (bad udid, missing
+   *  xcrun) is expected to exit before we trust it and start the test steps. */
+  startGraceMs?: number;
   /** Budget for SIGINT finalization before falling back to SIGKILL. */
   stopTimeoutMs?: number;
 }
@@ -66,10 +67,18 @@ export function createSimVideoRecorder(options: SimVideoRecorderOptions): VideoR
     hasOutput = defaultHasOutput,
     sleep = defaultSleep,
     onWarning = (message) => process.stderr.write(`[e2e] ${message}\n`),
-    startTimeoutMs = 3000,
+    startGraceMs = 500,
     stopTimeoutMs = 10_000,
   } = options;
   let active: ActiveRecording | undefined;
+
+  const discardOutput = (outPath: string) => {
+    try {
+      rmSync(outPath, { force: true });
+    } catch {
+      // a leftover 0-byte file is cosmetic; never fail the run over it
+    }
+  };
 
   const awaitExit = async (child: RecorderProcess, budgetMs: number): Promise<boolean> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -104,10 +113,12 @@ export function createSimVideoRecorder(options: SimVideoRecorderOptions): VideoR
     const exited = await awaitExit(child, stopTimeoutMs);
     if (!exited) {
       await forceKill(child);
+      discardOutput(outPath);
       onWarning(`video recorder did not finalize within ${stopTimeoutMs}ms — recording dropped`);
       return false;
     }
     if (!hasOutput(outPath)) {
+      discardOutput(outPath);
       onWarning('video recorder exited without producing a recording');
       return false;
     }
@@ -146,24 +157,23 @@ export function createSimVideoRecorder(options: SimVideoRecorderOptions): VideoR
         );
         return null;
       }
-      // Only report started once frames are actually being written, so the
-      // scenario's first test frame is guaranteed to be inside the video.
+      // recordVideo writes no bytes until the display updates, so a static
+      // pre-launch screen keeps the file at 0 bytes indefinitely — output size
+      // proves nothing at start. A doomed recorder (bad udid, missing tooling)
+      // exits within moments instead, so liveness through a short grace period
+      // is the start gate; whether frames actually landed is judged at stop().
       let exitedEarly = false;
       void child.exited.then(() => {
         exitedEarly = true;
       });
-      const deadline = Date.now() + startTimeoutMs;
-      while (!hasOutput(outPath)) {
-        if (exitedEarly || Date.now() >= deadline) {
-          // forceKill resolves `exited`, so pick the reason before killing.
-          const message = exitedEarly
-            ? 'video recorder exited before producing output — recording disabled for this scenario'
-            : `video recorder produced no output within ${startTimeoutMs}ms — recording disabled for this scenario`;
-          await forceKill(child);
-          onWarning(message);
+      const deadline = Date.now() + startGraceMs;
+      while (Date.now() < deadline) {
+        if (exitedEarly) {
+          discardOutput(outPath);
+          onWarning('video recorder exited immediately — recording disabled for this scenario');
           return null;
         }
-        await sleep(100);
+        await sleep(50);
       }
       active = { child, outPath };
       return outPath;

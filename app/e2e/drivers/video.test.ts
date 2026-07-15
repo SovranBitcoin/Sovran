@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -24,7 +24,7 @@ class FakeProc implements RecorderProcess {
 function recorder(overrides: {
   proc?: FakeProc | (() => FakeProc);
   hasOutput?: (path: string) => boolean;
-  startTimeoutMs?: number;
+  startGraceMs?: number;
   stopTimeoutMs?: number;
 }) {
   const runDir = mkdtempSync(join(tmpdir(), 'e2e-video-'));
@@ -44,7 +44,7 @@ function recorder(overrides: {
     hasOutput: overrides.hasOutput ?? (() => true),
     sleep: async () => {},
     onWarning: (message) => warnings.push(message),
-    startTimeoutMs: overrides.startTimeoutMs ?? 3000,
+    startGraceMs: overrides.startGraceMs ?? 0,
     stopTimeoutMs: overrides.stopTimeoutMs ?? 10_000,
   });
   return { rec, runDir, spawned, warnings };
@@ -68,20 +68,19 @@ describe('createSimVideoRecorder', () => {
     ]);
   });
 
-  it('returns null (never throws) when the recorder exits before producing output', async () => {
+  it('returns null (never throws) when the recorder dies inside the grace period', async () => {
     const proc = new FakeProc();
-    const { rec, spawned, warnings } = recorder({ proc, hasOutput: () => false });
+    const { rec, warnings } = recorder({ proc, hasOutput: () => false, startGraceMs: 30 });
     proc.exitNow(1);
     expect(await rec.start('t.x')).toBeNull();
-    expect(spawned[0].proc.signals).toContain('SIGKILL');
     expect(warnings.join(' ')).toContain('recording disabled');
   });
 
-  it('returns null when no output appears within the start budget', async () => {
-    const { rec, spawned, warnings } = recorder({ hasOutput: () => false, startTimeoutMs: 0 });
-    expect(await rec.start('t.x')).toBeNull();
-    expect(spawned[0].proc.signals).toContain('SIGKILL');
-    expect(warnings.join(' ')).toContain('no output');
+  it('starts despite an output file that stays empty — a static screen writes no frames', async () => {
+    // recordVideo produces 0 bytes until the display updates; start must not
+    // gate on output size (that gate killed real recordings on live sims).
+    const { rec, runDir } = recorder({ hasOutput: () => false, startGraceMs: 0 });
+    expect(await rec.start('t.x')).toBe(join(runDir, 't.x', 'video.mp4'));
   });
 
   it('stops with SIGINT only and reports success when the file finalized', async () => {
@@ -92,22 +91,24 @@ describe('createSimVideoRecorder', () => {
     expect(proc.signals).toEqual(['SIGINT']);
   });
 
-  it('falls back to SIGKILL and reports failure when SIGINT never finalizes', async () => {
+  it('falls back to SIGKILL, discards the corpse, and reports failure on a hung SIGINT', async () => {
     const proc = new FakeProc(false);
-    const { rec, warnings } = recorder({ proc, stopTimeoutMs: 0 });
-    await rec.start('t.x');
+    const { rec, runDir, warnings } = recorder({ proc, stopTimeoutMs: 0 });
+    const path = await rec.start('t.x');
+    writeFileSync(path!, 'partial'); // the unfinalized container simctl leaves behind
     expect(await rec.stop()).toBe(false);
     expect(proc.signals).toEqual(['SIGINT', 'SIGKILL']);
     expect(warnings.join(' ')).toContain('did not finalize');
+    expect(existsSync(join(runDir, 't.x', 'video.mp4'))).toBe(false);
   });
 
-  it('reports failure when the recorder exits without leaving a file behind', async () => {
+  it('reports failure and discards the file when stop finds no recorded frames', async () => {
     const proc = new FakeProc();
-    let started = false;
-    const { rec } = recorder({ proc, hasOutput: () => !started });
-    await rec.start('t.x');
-    started = true; // file vanished (or was never flushed) by stop time
+    const { rec, runDir } = recorder({ proc, hasOutput: () => false });
+    const path = await rec.start('t.x');
+    writeFileSync(path!, ''); // 0-byte file: recorder never saw a display update
     expect(await rec.stop()).toBe(false);
+    expect(existsSync(join(runDir, 't.x', 'video.mp4'))).toBe(false);
   });
 
   it('stop and dispose are safe no-ops without an active recording', async () => {
