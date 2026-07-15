@@ -764,6 +764,7 @@ export function MintInfoScreen() {
             entry?.fromAccepter
               ? [
                   {
+                    testID: 'mint-info-close',
                     text: 'Reject',
                     variant: 'secondary',
                     onPress: async () => {
@@ -771,6 +772,7 @@ export function MintInfoScreen() {
                     },
                   },
                   {
+                    testID: 'mint-info-trust',
                     text: actions.trust.loading ? 'Accepting...' : 'Accept',
                     variant: 'primary',
                     disabled: !actions.trust.available || actions.trust.loading,
@@ -780,6 +782,7 @@ export function MintInfoScreen() {
               : mintUrl && (entry?.fromScan || !entry?.isTrusted)
                 ? [
                     {
+                      testID: 'mint-info-close',
                       text: 'Close',
                       variant: 'secondary',
                       onPress: async () => {
@@ -787,6 +790,7 @@ export function MintInfoScreen() {
                       },
                     },
                     {
+                      testID: 'mint-info-trust',
                       text: actions.trust.loading ? 'Adding...' : 'Add mint',
                       variant: 'primary',
                       disabled: !actions.trust.available || actions.trust.loading,
@@ -795,6 +799,7 @@ export function MintInfoScreen() {
                   ]
                 : [
                     {
+                      testID: 'mint-info-close',
                       text: 'Close',
                       variant: 'secondary',
                       onPress: async () => {

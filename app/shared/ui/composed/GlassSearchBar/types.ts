@@ -1,6 +1,7 @@
 import type { KeyboardTypeOptions } from 'react-native';
 
 export interface GlassSearchBarProps {
+  testID?: string;
   width?: number;
   /**
    * Field height (default 44). The wallet/search headers pass

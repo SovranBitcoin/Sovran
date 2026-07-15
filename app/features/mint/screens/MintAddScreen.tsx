@@ -196,6 +196,7 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
         marginRight: 8,
       }}>
       <TextInput
+        testID="mint-add-search-input"
         value={searchQuery}
         onChangeText={onSearchChange}
         onFocus={onFocus}
@@ -663,6 +664,7 @@ export function MintAddScreen() {
       isSearching ? (
         Platform.OS === 'ios' ? (
           <GlassSearchBar
+            testID="mint-add-search-input"
             width={searchBarWidth}
             onChangeText={onSearchChange}
             clearKey={clearKey}
@@ -702,12 +704,14 @@ export function MintAddScreen() {
     () =>
       isSearching ? (
         <ScreenHeaderAction
+          testID="mint-add-search-close"
           icon="material-symbols:close-rounded"
           size={20}
           onPress={onCloseSearch}
         />
       ) : (
         <ScreenHeaderAction
+          testID="mint-add-search-toggle"
           icon="material-symbols:search-rounded"
           size={20}
           onPress={onOpenSearch}
@@ -751,12 +755,14 @@ export function MintAddScreen() {
         <ButtonHandler
           buttons={[
             {
+              testID: 'mint-add-confirm',
               text: isAdding ? 'Adding...' : `Add (${selectedMints.size})`,
               variant: 'primary',
               onPress: handleSave,
               disabled: selectedMints.size === 0 || isAdding,
             },
             {
+              testID: 'mint-add-cancel',
               text: 'Cancel',
               variant: 'secondary',
               onPress: async () => router.back(),

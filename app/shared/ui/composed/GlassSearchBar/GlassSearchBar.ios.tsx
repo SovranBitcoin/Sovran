@@ -11,6 +11,7 @@ import opacity from 'hex-color-opacity';
 import type { GlassSearchBarProps } from './types';
 
 export const GlassSearchBar = memo(function GlassSearchBar({
+  testID,
   width,
   height = 44,
   clearKey,
@@ -65,6 +66,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
   const liquid = supportsLiquidGlass();
   const input = (
     <TextInput
+      testID={testID}
       key={clearKey}
       defaultValue={seedText}
       placeholder={placeholder}

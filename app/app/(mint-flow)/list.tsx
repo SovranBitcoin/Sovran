@@ -117,7 +117,11 @@ function MintListRoute() {
           headerRight: () =>
             showAddMintsButton ? (
               <Link href="/add" asChild>
-                <ScreenHeaderAction icon="fluent:add-24-filled" onPress={() => {}} />
+                <ScreenHeaderAction
+                  testID="mint-select-add"
+                  icon="fluent:add-24-filled"
+                  onPress={() => {}}
+                />
               </Link>
             ) : null,
         })}

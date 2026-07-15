@@ -147,6 +147,7 @@ export function LightningReceiveScreen({
         <>
           {!isPaid && !isHistoryView ? (
             <MintSelector
+              testID="quote-mint-selector"
               width={quoteCardWidth}
               unit={entry.unit}
               selectedMintUrl={mintUrl}

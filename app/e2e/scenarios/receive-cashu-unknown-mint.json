@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "id": "receive.cashu.unknown-mint",
+  "name": "Receive cashu token from an unknown mint (paste)",
+  "description": "cocod mints a 10 sat testnut token the wallet has never seen; redeeming routes through the mint-trust review screen, tapping Add mint trusts testnut and the redeem auto-retries; assert +10 at testnut and end on wallet after sweeping",
+  "lane": "funded",
+  "tags": ["flow:receive","instrument:cashu-token","io:paste","outcome:settled","check:mint-add"],
+  "requires": ["fresh-install","cocod.send.cashu","unit.sat"],
+  "funds": {"assets":[{"mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"maxPrincipal":10}]},
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"counterparty","operation":"cashu.create","mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"amount":10,"captureAs":"incomingToken","setClipboard":true,"timeoutMs":60000},
+    {"action":"tap","selector":{"id":"wallet-receive"}},
+    {"action":"waitFor","selector":{"id":"receive-method-paste"},"timeoutMs":30000},
+    {"action":"screenshot","name":"receive"},
+    {"action":"tap","selector":{"id":"receive-method-paste"}},
+    {"action":"waitFor","selector":{"id":"receive-token-redeem"},"timeoutMs":60000},
+    {"action":"screenshot","name":"receive-token"},
+    {"action":"tap","selector":{"id":"receive-token-redeem"}},
+    {"action":"waitFor","selector":{"id":"mint-info-trust"},"timeoutMs":60000},
+    {"action":"screenshot","name":"mint-info"},
+    {"action":"tap","selector":{"id":"mint-info-trust"}},
+    {"action":"waitFor","selector":{"id":"payment-status-receive-confirmed"},"timeoutMs":120000},
+    {"action":"screenshot","name":"receive-token"},
+    {"action":"waitFor","selector":{"id":"receive-token-close"},"timeoutMs":120000},
+    {"action":"waitFor","selector":{"idPrefix":"transaction-probe-","captureSuffixAs":"receiveTx"},"timeoutMs":30000},
+    {"action":"assert","that":"tx","txRef":"${receiveTx}","direction":"in","amount":10,"unit":"sat","mintHost":"testnut.cashu.space","status":"finalized","source":"paste"},
+    {"action":"tap","selector":{"id":"receive-token-close"}},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"₿ 10"},"timeoutMs":60000},
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":10},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.sweep-mint","with":{"mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0}},
+    {"use":"flow.return-to-wallet"},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":45000}
+  ],
+  "endState": "wallet"
+}

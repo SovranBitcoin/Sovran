@@ -21,7 +21,7 @@ describe('loadE2E over the real tree', () => {
   });
 
   it('requires every canonical scenario to author a non-empty verify section', () => {
-    expect(loaded.scenarios.size).toBe(12);
+    expect(loaded.scenarios.size).toBe(15);
     for (const scenario of loaded.scenarios.values()) {
       expect(scenario.verify.length).toBeGreaterThan(0);
     }
@@ -41,7 +41,9 @@ describe('loadE2E over the real tree', () => {
   it('keeps every funded happy path independently sweepable with matching suite requirements', () => {
     const ids = [
       'receive.cashu.paste',
+      'receive.cashu.unknown-mint',
       'receive.lightning.sat',
+      'receive.lightning.change-mint.confirm',
       'send.cashu.sat',
       'send.lightning.sat',
     ];
@@ -431,7 +433,7 @@ describe('loadE2E over the real tree', () => {
     const users = [...loaded.scenarios.values()].filter((scenario) =>
       scenario.finally.some((item) => 'use' in item && item.use === 'flow.sweep-mint')
     );
-    expect(users).toHaveLength(10);
+    expect(users).toHaveLength(12);
     const full = loaded.suites.find((suite) => suite.name === 'full')!;
     for (const scenario of users) {
       const invocations = scenario.finally.filter(
@@ -455,9 +457,9 @@ describe('loadE2E over the real tree', () => {
     }
   });
 
-  it('gives all 10 funded plans exact bounded assets and no raw cocod argv', () => {
+  it('gives all 12 funded plans exact bounded assets and no raw cocod argv', () => {
     const funded = [...loaded.scenarios.values()].filter((scenario) => scenario.lane === 'funded');
-    expect(funded).toHaveLength(10);
+    expect(funded).toHaveLength(12);
     for (const scenario of funded) {
       expect(scenario.funds?.assets.length).toBeGreaterThan(0);
       expect(

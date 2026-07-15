@@ -9,6 +9,7 @@ import { radius } from '@/shared/styles/tokens';
 import type { GlassSearchBarProps } from './types';
 
 export const GlassSearchBar = memo(function GlassSearchBar({
+  testID,
   clearKey,
   onChangeText,
   placeholder,
@@ -77,6 +78,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
           paddingHorizontal: 12,
         }}>
         <TextInput
+          testID={testID}
           key={clearKey}
           ref={inputRef}
           defaultValue={seedText}

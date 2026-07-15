@@ -31,6 +31,8 @@ export const CANONICAL_PAGES = [
   'lightning-send', // bolt11 melt preview/confirmation
   // shared + recovery
   'mint-select', // mint selector list (receive and send flows)
+  'mint-add', // add-mints screen (search or enter URL, MintAddScreen)
+  'mint-info', // mint info / trust decision screen (MintInfoScreen)
   'restore-gate', // recovery gate with slide-to-confirm
   'recovery-complete', // recovery success state with Continue
 ] as const;

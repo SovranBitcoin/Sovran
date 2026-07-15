@@ -106,6 +106,7 @@ function ReceiveMintSelectRoute() {
           headerRight: () =>
             !isNpcScope && actions.addMint.available ? (
               <ScreenHeaderAction
+                testID="mint-select-add"
                 icon="fluent:add-24-filled"
                 onPress={() => actions.addMint.execute()}
               />
