@@ -102,6 +102,7 @@ function MintSelectRoute() {
             actions.addMint.available ? (
               <ScreenHeaderAction
                 testID="mint-select-add"
+                accessibilityLabel="Add mint"
                 icon="fluent:add-24-filled"
                 onPress={() => actions.addMint.execute()}
               />

@@ -705,6 +705,7 @@ export function MintAddScreen() {
       isSearching ? (
         <ScreenHeaderAction
           testID="mint-add-search-close"
+          accessibilityLabel="Close search"
           icon="material-symbols:close-rounded"
           size={20}
           onPress={onCloseSearch}
@@ -712,6 +713,7 @@ export function MintAddScreen() {
       ) : (
         <ScreenHeaderAction
           testID="mint-add-search-toggle"
+          accessibilityLabel="Search mints"
           icon="material-symbols:search-rounded"
           size={20}
           onPress={onOpenSearch}

@@ -119,6 +119,7 @@ function MintListRoute() {
               <Link href="/add" asChild>
                 <ScreenHeaderAction
                   testID="mint-select-add"
+                  accessibilityLabel="Add mint"
                   icon="fluent:add-24-filled"
                   onPress={() => {}}
                 />

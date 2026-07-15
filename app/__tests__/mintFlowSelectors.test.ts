@@ -24,7 +24,18 @@ describe('mint flow e2e selectors', () => {
     'app/(send-flow)/mintSelect.tsx',
     'app/(mint-flow)/list.tsx',
   ])('pins mint-select-add on the %s header add action', (file) => {
-    expect(read(file)).toContain('testID="mint-select-add"');
+    const source = read(file);
+    expect(source).toContain('testID="mint-select-add"');
+    // HeaderGlassCircle sets accessible={!!accessibilityLabel} — a header
+    // action with only a testID is AX-invisible on liquid-glass devices, so
+    // the label is load-bearing for the e2e selector, not just for VoiceOver.
+    expect(source).toContain('accessibilityLabel="Add mint"');
+  });
+
+  it('keeps the mint-add search header actions accessible on liquid glass', () => {
+    const source = read('features/mint/screens/MintAddScreen.tsx');
+    expect(source).toContain('accessibilityLabel="Search mints"');
+    expect(source).toContain('accessibilityLabel="Close search"');
   });
 
   it('pins wallet-mint-selector on the wallet home header pill', () => {
