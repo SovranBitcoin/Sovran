@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "id": "settings.keyring.generate",
+  "name": "P2PK keyring: fresh baseline + generate a key",
+  "description": "Settings → Security → P2PK Keys for a fresh user shows the auto-provisioned baseline of exactly two keys (the identity nsec auto-imported plus the active generated receive key) with the Regenerate-on-Receive preference on; the Generate header action mints a third keypair and the secure-store keyring re-renders as YOUR KEYS (3). Local crypto only; no funds, no network",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:p2pk-keys"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"Swap routing"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"Swap routing"},"timeoutMs":30000},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"label":"P2PK Keys"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tap","selector":{"label":"P2PK Keys"}},
+    {"action":"waitFor","selector":{"label":"YOUR KEYS (1)"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tap","selector":{"label":"Generate P2PK key"}},
+    {"action":"waitFor","selector":{"label":"YOUR KEYS (2)"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tap","selector":{"label":"Go back"}},
+    {"action":"waitFor","selector":{"label":"P2PK Keys"},"timeoutMs":30000},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

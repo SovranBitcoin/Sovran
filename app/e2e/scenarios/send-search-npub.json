@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "id": "send.search.npub",
+  "name": "Search npub, send via npub.cash fallback",
+  "description": "Fund 50 at Sovran, search cocod's npub from the wallet header search, open the profile from the results, and send 40 with Send Money — the profile has no lud16, so the send falls back to <npub>@npubx.cash and the Select-option menu shows 'to npub.cash'. The melt is proven PAID app-side and ledgered via npc.outflow (cocod exposes no npc claim surface; receipt at its own npubx.cash address is trusted)",
+  "lane": "funded",
+  "tags": ["flow:send","instrument:npc","amount:fixed","outcome:settled","check:search"],
+  "requires": ["fresh-install","cocod.send.bolt11","cocod.npc.address","cocod.receive.cashu","unit.sat"],
+  "funds": {"assets":[{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxPrincipal":50}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"flow.fund-lightning-50","with":{"mintUrl":"https://mint.sovran.money","mintHost":"mint.sovran.money"}}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"counterparty","operation":"npc.address","captureAs":"addr","timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-search-toggle"}}],"until":{"id":"wallet-search-input"},"attempts":4,"settleMs":6000},
+    {"action":"input","selector":{"id":"wallet-search-input"},"value":"npub1ajx0lhr3kdsx8ckfwxsxrgpuazrfx2ahmwrc906lvwzrfr5l0kesg8tx5h"},
+    {"action":"waitFor","selector":{"id":"contact-row:nostr:ec8cffdc71b36063e2c971a061a03ce886932bb7db8782bf5f6384348e9f7db3"},"timeoutMs":60000},
+    {"action":"screenshot","name":"search"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"contact-row:nostr:ec8cffdc71b36063e2c971a061a03ce886932bb7db8782bf5f6384348e9f7db3"}},{"delayMs":4000},{"swipe":{"dir":"up"}},{"swipe":{"dir":"down"}}],"until":{"id":"profile-send-money"},"attempts":3,"settleMs":8000},
+    {"action":"waitFor","selector":{"id":"profile-send-money"},"timeoutMs":90000},
+    {"action":"screenshot","name":"profile"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"profile-send-money"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":8000},
+    {"action":"waitFor","selector":{"id":"amount-selected-mint:mint.sovran.money"},"timeoutMs":15000},
+    {"action":"screenshot","name":"send-amount"},
+    {"action":"tap","selector":{"label":"4"}},
+    {"action":"tap","selector":{"label":"0"}},
+    {"action":"assert","that":"ax","selector":{"id":"amount-value"},"value":"40"},
+    {"action":"waitFor","selector":{"id":"amount-next"},"state":"enabled","timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"amount-next"}}],"until":{"id":"e2e-action-menu-open"},"attempts":6,"settleMs":8000},
+    {"action":"tapAt","x":0.5,"y":0.895},
+    {"action":"waitFor","selector":{"id":"melt-pay"},"timeoutMs":60000},
+    {"action":"waitFor","selector":{"idPrefix":"melt-selected-mint:mint.sovran.money:"},"timeoutMs":15000},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"tap","selector":{"id":"melt-pay"}},
+    {"action":"waitFor","selector":{"id":"melt-close"},"timeoutMs":120000},
+    {"action":"waitFor","selector":{"idPrefix":"transaction-probe-","captureSuffixAs":"meltTx"},"timeoutMs":30000},
+    {"action":"assert","that":"tx","txRef":"${meltTx}","direction":"out","amount":40,"unit":"sat","mintHost":"mint.sovran.money","status":"PAID"},
+    {"action":"counterparty","operation":"npc.outflow","mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"amount":40,"address":"${addr}","maxFeeSats":3,"timeoutMs":30000},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":60000},
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":-40,"feeEnvelopeSats":5},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.sweep-mint","with":{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0}},
+    {"use":"flow.return-to-wallet"},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":45000}
+  ],
+  "endState": "wallet"
+}

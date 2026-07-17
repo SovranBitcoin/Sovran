@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "id": "send.zero-balance",
+  "name": "Send at zero balance shows insufficient-balance toast",
+  "description": "Fresh wallet with zero balance everywhere: the Send method chooser opens unguarded, but tapping Create ecash stops at the insufficient-balance toast (machine NO_BALANCE) without ever reaching the amount screen; document both states and return home",
+  "lane": "simulator",
+  "tags": ["flow:send","check:zero-balance"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Send"}}],"until":{"id":"send-method-createEcash"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"send"},
+    {"action":"tap","selector":{"id":"send-method-createEcash"}},
+    {"action":"waitFor","selector":{"id":"e2e-toast-balance-too-low"},"timeoutMs":10000},
+    {"action":"assert","that":"notVisible","selector":{"id":"amount-next"}},
+    {"action":"screenshot","name":"send"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":60000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "endState": "wallet"
+}

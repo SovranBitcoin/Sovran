@@ -16,12 +16,29 @@
  * - check      — the non-payment behavior the scenario exists to prove
  */
 export const FACETS = {
-  flow: ['onboarding', 'recovery', 'receive', 'send', 'history', 'isolation', 'mint'],
+  flow: ['onboarding', 'recovery', 'receive', 'send', 'history', 'isolation', 'mint', 'wallet'],
   instrument: ['bolt11', 'cashu-token', 'payment-request', 'npc'],
   amount: ['fixed', 'any'],
   io: ['paste', 'copy', 'scan', 'display'],
   outcome: ['settled', 'dismissed', 'rolled-back', 'reclaimed'],
-  check: ['mint-change', 'mint-add', 'toast', 'tx-source', 'share-actions', 'context-isolation'],
+  check: [
+    'mint-change',
+    'mint-add',
+    'toast',
+    'tx-source',
+    'share-actions',
+    'context-isolation',
+    'rebalance',
+    'zero-balance',
+    'mint-preselect',
+    'fiat-unit',
+    'search',
+    'offline',
+    'dm',
+    'navigation',
+    'p2pk-keys',
+    'filters',
+  ],
 } as const;
 
 export type FacetName = keyof typeof FACETS;

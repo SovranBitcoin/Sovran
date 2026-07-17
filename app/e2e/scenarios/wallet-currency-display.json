@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "id": "wallet.currency.display",
+  "name": "Display currency GBP and EUR",
+  "description": "Fund 200 at Sovran so the fiat conversion pill shows a real value, switch the display currency to GBP then EUR via the pill's native menu, and capture the wallet with each symbol; no exact-conversion assert (the BTC price is live) — the screenshots are the evidence. Native-menu rows are tapped by label (USD/EUR/GBP), a first-run hypothesis for UIMenu AX visibility",
+  "lane": "funded",
+  "tags": ["flow:wallet","check:fiat-unit"],
+  "requires": ["fresh-install","cocod.send.bolt11","cocod.receive.cashu","unit.sat"],
+  "funds": {"assets":[{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxPrincipal":200}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"flow.fund-lightning-200"}
+  ],
+  "steps": [
+    {"action":"waitFor","selector":{"id":"wallet-fiat-pill"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-fiat-pill"}}],"until":{"label":"GBP"},"attempts":6,"settleMs":6000},
+    {"action":"tap","selector":{"label":"GBP"}},
+    {"action":"delay","ms":2000,"reason":"native menu dismissal and fiat pill re-render expose no AX signal"},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-fiat-pill"}}],"until":{"label":"EUR"},"attempts":6,"settleMs":6000},
+    {"action":"tap","selector":{"label":"EUR"}},
+    {"action":"delay","ms":2000,"reason":"native menu dismissal and fiat pill re-render expose no AX signal"},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-fiat-pill"}}],"until":{"label":"USD"},"attempts":6,"settleMs":6000},
+    {"action":"tap","selector":{"label":"USD"}},
+    {"action":"delay","ms":2000,"reason":"native menu dismissal and fiat pill re-render expose no AX signal"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"₿ 200"},"timeoutMs":60000},
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.sweep-mint","with":{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0}},
+    {"use":"flow.return-to-wallet"},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":45000}
+  ],
+  "endState": "wallet"
+}

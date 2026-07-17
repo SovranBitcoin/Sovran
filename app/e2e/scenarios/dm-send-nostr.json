@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "id": "dm.send.nostr",
+  "name": "Send a Nostr DM from the profile",
+  "description": "Search cocod's npub from the wallet header, open the profile, pick Nostr DM (NIP-17) from the Send Message menu, type an [E2E]-prefixed message into the composer, and prove the outgoing bubble renders with that exact text — the app-side evidence that the DM was composed and dispatched. The [E2E] prefix keeps harness messages filterable in real clients. Menu row y=0.755 is the measured NIP-17 row of the Send via sheet (FullWindowOverlay, rows AX-invisible)",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:dm","check:search"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-search-toggle"}}],"until":{"id":"wallet-search-input"},"attempts":4,"settleMs":6000},
+    {"action":"input","selector":{"id":"wallet-search-input"},"value":"npub1ajx0lhr3kdsx8ckfwxsxrgpuazrfx2ahmwrc906lvwzrfr5l0kesg8tx5h"},
+    {"action":"waitFor","selector":{"id":"contact-row:nostr:ec8cffdc71b36063e2c971a061a03ce886932bb7db8782bf5f6384348e9f7db3"},"timeoutMs":60000},
+    {"action":"screenshot","name":"search"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"contact-row:nostr:ec8cffdc71b36063e2c971a061a03ce886932bb7db8782bf5f6384348e9f7db3"}},{"delayMs":4000},{"swipe":{"dir":"up"}},{"swipe":{"dir":"down"}}],"until":{"id":"send-message-menu"},"attempts":3,"settleMs":8000},
+    {"action":"waitFor","selector":{"id":"send-message-menu"},"timeoutMs":90000},
+    {"action":"screenshot","name":"profile"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"send-message-menu"}}],"until":{"id":"e2e-action-menu-open"},"attempts":6,"settleMs":8000},
+    {"action":"tapAt","x":0.5,"y":0.755},
+    {"action":"waitFor","selector":{"id":"dm-chat-probe"},"timeoutMs":60000},
+    {"action":"screenshot","name":"dm-chat"},
+    {"action":"input","selector":{"label":"Message composer"},"value":"[E2E] harness check-in"},
+    {"action":"waitFor","selector":{"label":"Send message"},"timeoutMs":15000},
+    {"action":"tap","selector":{"label":"Send message"}},
+    {"action":"waitFor","selector":{"label":"[E2E] harness check-in"},"timeoutMs":45000},
+    {"action":"screenshot","name":"dm-chat"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

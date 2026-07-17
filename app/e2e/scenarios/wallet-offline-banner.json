@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "id": "wallet.offline.banner",
+  "name": "Mock Offline shows the offline shell",
+  "description": "From a fresh wallet, open the drawer, enter Settings, triple-tap the version row to unlock developer mode, and flip Mock Offline on — the blue YOU ARE OFFLINE shell banner must appear and persist on the wallet home while send/receive controls stay mounted; flipping the toggle back off is proven by its AX state probe. Uses settingsStore.mockOffline (the app's own offline lever — simctl has no airplane mode), so this exercises the OfflineProvider shell exactly as a real connectivity drop would",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:offline"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"drawer"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"ACCOUNT"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"settings-version-row"},"timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}}],"until":{"label":"Developer mode enabled"},"attempts":2,"settleMs":1500},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"settings-mock-offline-toggle"},"value":"0","timeoutMs":20000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-mock-offline-toggle"}}],"until":{"id":"settings-mock-offline-toggle"},"untilValue":"1","attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":15000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000},
+    {"action":"waitFor","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":15000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"ACCOUNT"},"timeoutMs":30000},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"settings-mock-offline-toggle"},"timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-mock-offline-toggle"}}],"until":{"id":"settings-mock-offline-toggle"},"untilValue":"0","attempts":4,"settleMs":6000},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"assert","that":"visible","selector":{"id":"wallet-receive"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

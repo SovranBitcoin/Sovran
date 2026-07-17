@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "id": "wallet.unit.switch-usd",
+  "name": "Unit switch to USD follows the usd mint",
+  "description": "From a fresh wallet, open the unit switcher pill's native menu, pick the USD account, and prove the preferred mint re-snaps to mint.cubabitcoin.org (the only default mint with usd keysets) via the wallet-selected-mint probe; switch back to Bitcoin and prove the sat page returns (wallet-fiat-pill only renders on the sat page). selectUnit deliberately keeps the current mint when it supports the new unit, and cubabitcoin also has sat keysets, so the probe stays on cubabitcoin after the switch back — asserted to pin that retention behavior",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:mint-preselect"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"waitFor","selector":{"id":"wallet-selected-mint:mint.sovran.money"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-unit-switcher"}}],"until":{"label":"USD account"},"attempts":6,"settleMs":6000},
+    {"action":"tap","selector":{"label":"USD account"}},
+    {"action":"waitFor","selector":{"id":"wallet-selected-mint:mint.cubabitcoin.org"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-unit-switcher"}}],"until":{"label":"Bitcoin account"},"attempts":6,"settleMs":6000},
+    {"action":"tap","selector":{"label":"Bitcoin account"}},
+    {"action":"waitFor","selector":{"id":"wallet-fiat-pill"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"wallet-selected-mint:mint.cubabitcoin.org"},"timeoutMs":15000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-unit-switcher"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

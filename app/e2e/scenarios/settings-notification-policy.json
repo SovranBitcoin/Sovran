@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "id": "settings.notification-policy",
+  "name": "Notification policy persists",
+  "description": "From Settings → Notifications, prove the persisted policy enum round-trips: Relaxed is selected by default (AX state 1), picking Strict flips the selection states, and on return the Settings row description reads 'Notifications, Strict' — the store persisted and the summary re-rendered. Guards the persisted-enum settings pattern",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"Notifications, Relaxed"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"Notifications, Relaxed"},"timeoutMs":30000},
+    {"action":"tap","selector":{"label":"Notifications, Relaxed"}},
+    {"action":"waitFor","selector":{"id":"notification-policy-relaxed"},"value":"1","timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"notification-policy-strict"},"value":"0","timeoutMs":15000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"notification-policy-strict"}}],"until":{"id":"notification-policy-strict"},"untilValue":"1","attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"notification-policy-relaxed"},"value":"0","timeoutMs":15000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"label":"Notifications, Strict"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"Notifications, Strict"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

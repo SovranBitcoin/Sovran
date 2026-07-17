@@ -7,7 +7,7 @@
   "tags": ["flow:recovery"],
   "requires": ["fresh-install"],
   "setup": [
-    {"action":"tap","selector":{"id":"header-profile-avatar"}},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"id":"drawer-profile-name"},"timeoutMs":30000},
     {"action":"capture","as":"profileNameBefore","fromSelector":{"id":"drawer-profile-name"},"attribute":"label"},
     {"action":"screenshot","name":"drawer","stable":true,"tolerance":0.001}
@@ -26,7 +26,7 @@
     {"action":"screenshot","name":"recovery-complete","stable":true,"tolerance":0.001},
     {"action":"tap","selector":{"label":"Continue"}},
     {"action":"waitFor","selector":{"id":"header-profile-avatar"},"timeoutMs":180000},
-    {"action":"tap","selector":{"id":"header-profile-avatar"}},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-profile-name"},"attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"id":"drawer-profile-name"},"timeoutMs":30000},
     {"action":"assert","that":"ax","selector":{"id":"drawer-profile-name"},"label":"${profileNameBefore}"},
     {"action":"screenshot","name":"drawer","stable":true,"tolerance":0.001},

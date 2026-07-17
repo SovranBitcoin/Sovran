@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "id": "mint.split.zero-balance",
+  "name": "Balance split opens on an empty wallet",
+  "description": "Fresh wallet with zero balance everywhere: tapping the Split action still opens the mint distribution screen with all default mints and an enabled Next (distribution is percentage-based, not balance-gated); document the empty state and return home",
+  "lane": "simulator",
+  "tags": ["flow:mint","check:zero-balance"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-split"}}],"until":{"id":"mint-distribution-next"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"mint-distribution-toggle:https://mint.sovran.money"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"mint-distribution-toggle:https://mint.minibits.cash/Bitcoin"},"timeoutMs":15000},
+    {"action":"waitFor","selector":{"id":"mint-distribution-toggle:https://mint.chorus.community"},"timeoutMs":15000},
+    {"action":"waitFor","selector":{"id":"mint-distribution-toggle:https://mint.cubabitcoin.org"},"timeoutMs":15000},
+    {"action":"waitFor","selector":{"id":"mint-distribution-next"},"state":"enabled","timeoutMs":15000},
+    {"action":"screenshot","name":"balance-split","stable":true,"tolerance":0.001},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":60000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "endState": "wallet"
+}

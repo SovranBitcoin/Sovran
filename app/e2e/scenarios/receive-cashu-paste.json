@@ -13,10 +13,11 @@
   "steps": [
     {"action":"screenshot","name":"wallet"},
     {"action":"counterparty","operation":"cashu.create","mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"amount":50,"captureAs":"incomingToken","setClipboard":true,"timeoutMs":60000},
-    {"action":"tap","selector":{"id":"wallet-receive"}},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-receive"}}],"until":{"id":"receive-method-paste"},"attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"id":"receive-method-paste"},"timeoutMs":30000},
     {"action":"screenshot","name":"receive"},
-    {"action":"tap","selector":{"id":"receive-method-paste"}},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"receive-method-paste"}}],"until":{"label":"Allow Paste"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"label":"Allow Paste"}},
     {"action":"waitFor","selector":{"id":"receive-token-redeem"},"timeoutMs":60000},
     {"action":"screenshot","name":"receive-token"},
     {"action":"tap","selector":{"id":"receive-token-redeem"}},

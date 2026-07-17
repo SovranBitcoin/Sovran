@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "id": "theme.wallpaper.apply",
+  "name": "Wallpaper album applies from the gallery",
+  "description": "From the wallet Theme action, open the wallpaper gallery, pick the first album card — the built-in Colors album (gradient, no image) — apply, and prove the commit: the wallet-wallpaper probe flips off none to a real slug AND the image-render probe reads wallet-wallpaper-image:none, confirming the color album correctly resolves to a gradient rather than a broken image. Gallery content requires the live wallpaper catalog",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"waitFor","selector":{"id":"wallet-wallpaper:none"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-theme"}}],"until":{"id":"theme-preview-theme-button"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"theme-preview"},
+    {"action":"tap","selector":{"id":"theme-preview-theme-button"}},
+    {"action":"waitFor","selector":{"idPrefix":"album-card-"},"timeoutMs":60000},
+    {"action":"screenshot","name":"gallery"},
+    {"action":"tap","selector":{"idPrefix":"album-card-"}},
+    {"action":"waitFor","selector":{"id":"theme-apply"},"timeoutMs":30000},
+    {"action":"screenshot","name":"theme-preview"},
+    {"action":"tap","selector":{"id":"theme-apply"}},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000},
+    {"action":"waitFor","selector":{"idPrefix":"wallet-wallpaper:"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"wallet-wallpaper-image:none"},"timeoutMs":30000},
+    {"action":"assert","that":"notVisible","selector":{"id":"wallet-wallpaper:none"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"assert","that":"notVisible","selector":{"id":"wallet-wallpaper:none"}},
+    {"action":"assert","that":"visible","selector":{"id":"wallet-wallpaper-image:none"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

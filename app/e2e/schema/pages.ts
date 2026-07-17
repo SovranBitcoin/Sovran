@@ -21,6 +21,7 @@ export const CANONICAL_PAGES = [
   'drawer', // profile drawer (drawer-profile-name)
   // receive flow
   'receive', // receive method hub sheet (receive-method-*)
+  'receive-qr', // standing receive rails QR display (ReceiveScreen: Unified/Lightning/Onchain/Cashu)
   'receive-amount', // amount entry in the receive flow
   'lightning-receive', // lightning invoice / mint-quote QR screen (incl. tx re-entry)
   'receive-token', // ecash token preview/redeem screen
@@ -33,6 +34,22 @@ export const CANONICAL_PAGES = [
   'mint-select', // mint selector list (receive and send flows)
   'mint-add', // add-mints screen (search or enter URL, MintAddScreen)
   'mint-info', // mint info / trust decision screen (MintInfoScreen)
+  'mint-reviews', // mint KYM reviews list (MintReviewsScreen)
+  'profile', // nostr user profile (UserProfileScreen)
+  'dm-chat', // 1:1 DM conversation (UserMessagesScreen, dm-chat-probe)
+  'search', // header search overlay with results (SearchOverlay)
+  'settings', // settings root screen ((settings-flow), SettingsScreen)
+  'feed', // home feed tab (FeedScreen: For You / Following)
+  'contacts', // contacts tab (ContactsScreen)
+  'notifications', // notifications tab (NotificationsScreen)
+  'ai', // AI chat tab (AiChatScreen)
+  'signer-hub', // Remote Login / NIP-46 signer hub
+  'theme-preview', // per-unit wallpaper preview cards ((theme-flow)/preview)
+  'gallery', // wallpaper album gallery ((theme-flow)/gallery)
+  'transactions', // full transactions list ((transactions-flow)/transactions)
+  'balance-split', // per-mint distribution sliders (MintDistributionScreen)
+  'rebalance-plan', // rebalance transfer plan + run progress (MintRebalancePlanScreen)
+  'swap', // swap-group detail screen (SwapTransactionScreen)
   'restore-gate', // recovery gate with slide-to-confirm
   'recovery-complete', // recovery success state with Continue
 ] as const;

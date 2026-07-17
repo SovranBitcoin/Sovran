@@ -22,7 +22,7 @@ describe('loadE2E over the real tree', () => {
   });
 
   it('requires every canonical scenario to author a non-empty verify section', () => {
-    expect(loaded.scenarios.size).toBe(15);
+    expect(loaded.scenarios.size).toBe(54);
     for (const scenario of loaded.scenarios.values()) {
       expect(scenario.verify.length).toBeGreaterThan(0);
     }
@@ -44,8 +44,13 @@ describe('loadE2E over the real tree', () => {
       'receive.cashu.paste',
       'receive.lightning.sat',
       'receive.lightning.change-mint.confirm',
+      'receive.npc.default-mint',
+      'receive.npc.change-mint',
       'send.cashu.sat',
+      'send.cashu.preselect-funded-mint',
       'send.lightning.sat',
+      'send.lightning.preselect-funded-mint',
+      'send.search.npub',
     ];
     const full = loaded.suites.find((suite) => suite.name === 'full')!;
     for (const id of ids) {
@@ -111,7 +116,22 @@ describe('loadE2E over the real tree', () => {
     expect(JSON.stringify(scenario.steps)).toContain('receive-method-paste');
     expect(JSON.stringify(scenario.steps)).toContain('receive-token-redeem');
     expect(JSON.stringify(scenario.steps)).toContain('receive-token-close');
-    expect(JSON.stringify(scenario.steps)).not.toContain('tapUntil');
+    // The paste-method tap is dead-tap-hardened AND routed through the iOS
+    // paste-consent alert (fresh installs ALWAYS prompt on the first host-set
+    // clipboard read — observed live 2026-07-17 on iOS 26.2): retry the
+    // chooser tap until the alert appears, grant, then wait for the redeem
+    // sheet. The redeem ACTION itself stays a single plain tap.
+    expect(scenario.steps).toContainEqual({
+      action: 'tapUntil',
+      sequence: [{ tap: { id: 'receive-method-paste' } }],
+      until: { label: 'Allow Paste' },
+      attempts: 4,
+      settleMs: 6_000,
+    });
+    expect(scenario.steps).toContainEqual({
+      action: 'tap',
+      selector: { label: 'Allow Paste' },
+    });
     expect(scenario.steps).toContainEqual({
       action: 'waitFor',
       selector: { idPrefix: 'transaction-probe-', captureSuffixAs: 'receiveTx' },
@@ -346,6 +366,67 @@ describe('loadE2E over the real tree', () => {
     expect(JSON.stringify(scenario.steps)).not.toContain('amount-next-menu-lightning');
   });
 
+  it('promotes the balance-split consolidation with a declared transfer and dual sweeps', () => {
+    const scenario = loaded.scenarios.get('mint.split.consolidate')!;
+    expect(scenario.deferredReason).toBeUndefined();
+    // The reconciliation contract: the rebalance's Minibits→Sovran move is
+    // DECLARED so the funded runtime can explain the cross-mint value shift
+    // within an explicit fee budget instead of quarantining.
+    expect(scenario.funds?.transfers).toEqual([
+      {
+        fromMintUrl: 'https://mint.minibits.cash/Bitcoin',
+        toMintUrl: 'https://mint.sovran.money',
+        unit: 'sat',
+        accountIndex: 0,
+        maxFeeSats: 10,
+      },
+    ]);
+    // 100% to Sovran is reached by switching Minibits OFF. A BLIND tapUntil
+    // re-tap would toggle the mint back on, so the retry is value-gated:
+    // untilValue '0' re-taps only while the toggle still reads ON — a
+    // swallowed tap retries, a landed tap can never be undone.
+    expect(scenario.steps).toContainEqual({
+      action: 'tapUntil',
+      sequence: [{ tap: { id: 'mint-distribution-toggle:https://mint.minibits.cash/Bitcoin' } }],
+      until: { id: 'mint-distribution-toggle:https://mint.minibits.cash/Bitcoin' },
+      untilValue: '0',
+      attempts: 4,
+      settleMs: 6_000,
+    });
+    expect(scenario.steps).toContainEqual({
+      action: 'tap',
+      selector: { id: 'rebalance-start' },
+    });
+    // Waiting on 'rebalance-done' (not 'rebalance-done-noop') proves the plan
+    // computed a real transfer and finished it.
+    expect(scenario.steps).toContainEqual({
+      action: 'waitFor',
+      selector: { id: 'rebalance-done' },
+      timeoutMs: 180_000,
+    });
+    // The rebalance fee is unknowable up front — the verify must stay
+    // fee-tolerant instead of pinning an exact ₿ balance label.
+    expect(scenario.verify).toContainEqual({
+      action: 'assert',
+      that: 'balanceDelta',
+      unit: 'sat',
+      delta: -5,
+      feeEnvelopeSats: 5,
+    });
+    // One sweep invocation is enough: the funded host reconciles EVERY declared
+    // asset in a single pass (runtime #reconcileHost), so Minibits' fee-headroom
+    // residual (~3 sats stay behind — the rebalancer never fully drains its
+    // source) is still recovered without naming it here.
+    const sweeps = scenario.finally.filter(
+      (item): item is Extract<(typeof scenario.finally)[number], { use: string }> =>
+        'use' in item && item.use === 'flow.sweep-mint'
+    );
+    expect(sweeps.map((item) => item.with?.mintUrl)).toEqual(['https://mint.sovran.money']);
+    const authored = JSON.stringify(scenario);
+    expect(authored).not.toContain('"mask"');
+    expect(authored).not.toContain('rebalance-done-noop');
+  });
+
   it('promotes the QR Lightning receive through the AX-visible toast lifecycle', () => {
     const scenario = loaded.scenarios.get('receive.lightning.qr')!;
     expect(scenario.deferredReason).toBeUndefined();
@@ -441,7 +522,7 @@ describe('loadE2E over the real tree', () => {
     const users = [...loaded.scenarios.values()].filter((scenario) =>
       scenario.finally.some((item) => 'use' in item && item.use === 'flow.sweep-mint')
     );
-    expect(users).toHaveLength(11);
+    expect(users).toHaveLength(29);
     const full = loaded.suites.find((suite) => suite.name === 'full')!;
     for (const scenario of users) {
       const invocations = scenario.finally.filter(
@@ -465,9 +546,9 @@ describe('loadE2E over the real tree', () => {
     }
   });
 
-  it('gives all 12 funded plans exact bounded assets and no raw cocod argv', () => {
+  it('gives all 31 funded plans exact bounded assets and no raw cocod argv', () => {
     const funded = [...loaded.scenarios.values()].filter((scenario) => scenario.lane === 'funded');
-    expect(funded).toHaveLength(12);
+    expect(funded).toHaveLength(31);
     for (const scenario of funded) {
       expect(scenario.funds?.assets.length).toBeGreaterThan(0);
       expect(
@@ -478,7 +559,11 @@ describe('loadE2E over the real tree', () => {
   });
 
   it('records Lightning settlement only after product PAID proof', () => {
-    for (const id of ['send.lightning.sat', 'send.lightning.change-mint.preview']) {
+    for (const id of [
+      'send.lightning.sat',
+      'send.lightning.change-mint.preview',
+      'send.lightning.preselect-funded-mint',
+    ]) {
       const steps = loaded.scenarios.get(id)!.steps;
       const paidProof = steps.findIndex(
         (step) => step.action === 'assert' && step.that === 'tx' && step.status === 'PAID'
@@ -506,7 +591,16 @@ describe('loadE2E over the real tree', () => {
       attempts: 4,
       settleMs: 6_000,
     });
-    expect(scenario.steps).toContainEqual({ action: 'tap', selector: { label: 'Paste' } });
+    // Paste is consent-hardened: fresh installs raise the iOS paste alert on
+    // the first clipboard read (see receive.cashu.paste pin).
+    expect(scenario.steps).toContainEqual({
+      action: 'tapUntil',
+      sequence: [{ tap: { label: 'Paste' } }],
+      until: { label: 'Allow Paste' },
+      attempts: 4,
+      settleMs: 6_000,
+    });
+    expect(scenario.steps).toContainEqual({ action: 'tap', selector: { label: 'Allow Paste' } });
 
     const previewCapture = scenario.steps.findIndex(
       (step) =>
@@ -577,7 +671,16 @@ describe('loadE2E over the real tree', () => {
       attempts: 4,
       settleMs: 6_000,
     });
-    expect(scenario.steps).toContainEqual({ action: 'tap', selector: { label: 'Paste' } });
+    // Paste is consent-hardened: fresh installs raise the iOS paste alert on
+    // the first clipboard read (see receive.cashu.paste pin).
+    expect(scenario.steps).toContainEqual({
+      action: 'tapUntil',
+      sequence: [{ tap: { label: 'Paste' } }],
+      until: { label: 'Allow Paste' },
+      attempts: 4,
+      settleMs: 6_000,
+    });
+    expect(scenario.steps).toContainEqual({ action: 'tap', selector: { label: 'Allow Paste' } });
 
     const pay = scenario.steps.findIndex(
       (step) => step.action === 'tap' && 'id' in step.selector && step.selector.id === 'melt-pay'
@@ -731,9 +834,14 @@ describe('loadE2E over the real tree', () => {
     const profileCaptureIndex = scenario.setup.findIndex(
       (step) => 'action' in step && step.action === 'capture' && step.as === 'profileNameBefore'
     );
+    // Drawer open is dead-tap-hardened (avatar tap swallowed on a live run,
+    // 2026-07-17) — the proven tapUntil leg other drawer scenarios use.
     expect(scenario.setup.slice(0, profileCaptureIndex)).toContainEqual({
-      action: 'tap',
-      selector: { id: 'header-profile-avatar' },
+      action: 'tapUntil',
+      sequence: [{ tap: { id: 'header-profile-avatar' } }],
+      until: { id: 'drawer-menu-settings' },
+      attempts: 4,
+      settleMs: 6_000,
     });
     expect(scenario.setup).toContainEqual({
       action: 'capture',

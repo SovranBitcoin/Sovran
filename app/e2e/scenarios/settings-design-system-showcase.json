@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "id": "settings.design-system.showcase",
+  "name": "Design System showcase: timeline states + wallet controls",
+  "description": "Unlock dev mode (triple-tap version), open Developer → Design system: the Timeline family mounts its interactive state player (Cashu/Lightning/Onchain/Request rails, scenario pills, Pause/Step/Reset) — paused for a stable frame; then the Wallet-controls family renders the segmented send/receive/offline control and the circular action buttons in isolation. Pure presentation coverage, no funds",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"ACCOUNT"},"timeoutMs":30000},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"settings-version-row"},"timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}}],"until":{"label":"Developer mode enabled"},"attempts":2,"settleMs":1500},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"label":"Design system, Preview shared UI components"},"timeoutMs":20000},
+    {"action":"tap","selector":{"label":"Design system, Preview shared UI components"}},
+    {"action":"waitFor","selector":{"id":"design-system-family-timeline"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tap","selector":{"id":"design-system-family-timeline"}},
+    {"action":"waitFor","selector":{"label":"Pause"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"label":"Onchain"},"timeoutMs":15000},
+    {"action":"waitFor","selector":{"label":"Request"},"timeoutMs":15000},
+    {"action":"tap","selector":{"label":"Pause"}},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"flow-header-back"}}],"until":{"id":"design-system-family-wallet-controls"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"design-system-family-wallet-controls"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"design-system-family-wallet-controls"}},
+    {"action":"waitFor","selector":{"label":"AMOUNT · BTC AND SAT DISPLAY MODES"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"label":"Copy mintUrl"},"timeoutMs":15000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

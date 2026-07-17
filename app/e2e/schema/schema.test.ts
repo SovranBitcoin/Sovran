@@ -551,6 +551,54 @@ describe('secret scanning', () => {
       scanSecrets({ description: 'Pay a Lightning invoice and confirm the toast' }).length
     ).toBe(0);
   });
+  it('exempts the pinned public test-counterparty identity, but no other npub/pubkey', () => {
+    const cocodNpub = 'npub1ajx0lhr3kdsx8ckfwxsxrgpuazrfx2ahmwrc906lvwzrfr5l0kesg8tx5h';
+    const cocodHex = 'ec8cffdc71b36063e2c971a061a03ce886932bb7db8782bf5f6384348e9f7db3';
+    expect(scanSecrets({ value: cocodNpub }).length).toBe(0);
+    expect(scanSecrets({ id: `contact-row:nostr:${cocodHex}` }).length).toBe(0);
+    expect(scanSecrets({ value: `npub1${'q'.repeat(58)}` }).length).toBeGreaterThan(0);
+  });
+});
+
+describe('npc.outflow placement', () => {
+  const npcOutflow = {
+    action: 'counterparty',
+    operation: 'npc.outflow',
+    mintUrl: 'https://mint.sovran.money',
+    unit: 'sat',
+    accountIndex: 0,
+    amount: 40,
+    address: '${addr}',
+  };
+  const paidAssert = {
+    action: 'assert',
+    that: 'tx',
+    txRef: '${tx}',
+    status: 'PAID',
+  };
+  const funded = (steps: unknown[]) =>
+    scenario({
+      lane: 'funded',
+      requires: ['fresh-install', 'unit.sat'],
+      funds: {
+        assets: [
+          { mintUrl: 'https://mint.sovran.money', unit: 'sat', accountIndex: 0, maxPrincipal: 50 },
+        ],
+      },
+      steps,
+    });
+
+  it('rejects npc.outflow with no prior PAID tx assert', () => {
+    const r = validateScenario(funded([npcOutflow]));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.issues[0]?.message).toContain('npc.outflow must follow');
+    }
+  });
+  it('accepts npc.outflow after a PAID tx assert', () => {
+    const r = validateScenario(funded([paidAssert, npcOutflow]));
+    expect(r.ok).toBe(true);
+  });
 });
 
 describe('suite manifest', () => {

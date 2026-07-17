@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "id": "flow.fund-lightning-50",
+  "params": ["mintUrl","mintHost"],
+  "requires": ["cocod.send.bolt11","unit.sat"],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Receive"}}],"until":{"id":"receive-method-fixedAmount"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"receive-method-fixedAmount"},"state":"enabled","timeoutMs":60000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"receive-method-fixedAmount"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"5"}}],"until":{"id":"amount-value"},"untilValue":"5","attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-value"},"untilValue":"50","attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"amount-mint-selector"}}],"until":{"id":"contact-row:mint:${mintUrl}"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:${mintUrl}"},"timeoutMs":60000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"contact-row:mint:${mintUrl}"}}],"until":{"id":"amount-selected-mint:${mintHost}"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"state":"enabled","timeoutMs":30000},
+    {"action":"assert","that":"ax","selector":{"id":"amount-value"},"value":"50"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"amount-next"}},{"delayMs":2600},{"tapAt":{"x":0.5,"y":0.905}}],"until":{"label":"Copy"},"attempts":6,"settleMs":8000},
+    {"action":"waitFor","selector":{"idPrefix":"transaction-probe-","captureSuffixAs":"fundingQuoteTx"},"timeoutMs":30000},
+    {"action":"assert","that":"tx","txRef":"${fundingQuoteTx}","direction":"in","amount":50,"unit":"sat","mintHost":"${mintHost}","status":"UNPAID"},
+    {"action":"waitFor","selector":{"id":"payment-info-lightning-invoice-data"},"timeoutMs":30000},
+    {"action":"capture","as":"fundingInvoice","fromSelector":{"id":"payment-info-lightning-invoice-data"},"attribute":"label"},
+    {"action":"counterparty","operation":"bolt11.pay","mintUrl":"${mintUrl}","unit":"sat","accountIndex":0,"amount":50,"invoice":"${fundingInvoice}","timeoutMs":120000},
+    {"action":"waitFor","selector":{"label":"Close"},"timeoutMs":180000},
+    {"action":"tap","selector":{"label":"Close"}},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ]
+}

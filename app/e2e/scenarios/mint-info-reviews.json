@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "id": "mint.info.reviews",
+  "name": "Mint page reviews",
+  "description": "From the Cuba Bitcoin mint page (opened via the mint selector's 3-dots inspect button — an AX-collapsed suffix, so the tap is by coordinate), prove the reviews header action renders from the cached review aggregate and opens the Reviews screen; ends on wallet. Cuba is the pinned mint because it reliably has a populated review corpus; Minibits' review fetch returns empty intermittently",
+  "lane": "simulator",
+  "tags": ["flow:mint"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://mint.cubabitcoin.org"},"timeoutMs":45000},
+    {"action":"screenshot","name":"mint-select"},
+    {"action":"tapUntil","sequence":[{"tapAt":{"x":0.884,"y":0.605}}],"until":{"id":"mint-info-close"},"attempts":4,"settleMs":8000},
+    {"action":"screenshot","name":"mint-info"},
+    {"action":"waitFor","selector":{"id":"mint-info-reviews"},"timeoutMs":60000},
+    {"action":"tap","selector":{"id":"mint-info-reviews"}},
+    {"action":"waitFor","selector":{"label":"Reviews"},"timeoutMs":45000},
+    {"action":"screenshot","name":"mint-reviews"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

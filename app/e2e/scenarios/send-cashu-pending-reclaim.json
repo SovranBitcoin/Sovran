@@ -14,7 +14,7 @@
   "steps": [
     {"action":"screenshot","name":"wallet"},
     {"action":"tapUntil","sequence":[{"tap":{"label":"Send"}}],"until":{"id":"send-method-createEcash"},"attempts":4,"settleMs":6000},
-    {"action":"tap","selector":{"id":"send-method-createEcash"}},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"send-method-createEcash"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"id":"amount-next"},"timeoutMs":30000},
     {"action":"waitFor","selector":{"label":"Create ecash"},"timeoutMs":30000},
     {"action":"tap","selector":{"label":"4"}},

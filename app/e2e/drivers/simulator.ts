@@ -611,7 +611,8 @@ export class SimulatorDriver implements Driver {
   async waitFor(
     sel: Selector,
     state: 'visible' | 'enabled' | undefined,
-    timeoutMs: number
+    timeoutMs: number,
+    value?: string
   ): Promise<AxNode> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -630,11 +631,18 @@ export class SimulatorDriver implements Driver {
           continue;
         }
         const el = findSimulatorElement(snap, sel);
-        if (el && (state !== 'enabled' || el.enabled !== false)) return toAxNode(el);
+        if (el && (state !== 'enabled' || el.enabled !== false)) {
+          const node = toAxNode(el);
+          if (value === undefined || node.value === value) return node;
+        }
       }
       await sleep(this.#cfg.pollMs ?? 250);
     }
-    throw new Error(`timed out after ${timeoutMs}ms waiting for ${JSON.stringify(sel)}`);
+    throw new Error(
+      `timed out after ${timeoutMs}ms waiting for ${JSON.stringify(sel)}${
+        value === undefined ? '' : ` with value "${value}"`
+      }`
+    );
   }
 
   async find(sel: Selector): Promise<AxNode | null> {
@@ -739,6 +747,19 @@ export class SimulatorDriver implements Driver {
       signal: this.#cfg.signal,
     });
     await sleep(400); // let debounced onChangeText handlers observe the text
+  }
+  async typeText(value: string, focus?: { x: number; y: number }): Promise<void> {
+    // Same contract as input(), but for fields no selector can reach
+    // (FullWindowOverlay sheet inputs): map first, then coordinate-focus.
+    const strokes = hidKeystrokesFor(value);
+    if (focus) {
+      await pressAt(this.#cfg.touchEndpoint, focus.x, focus.y, { signal: this.#cfg.signal });
+      await sleep(800); // keyboard attach / focus settle
+    }
+    await typeKeystrokes(this.#cfg.touchEndpoint, strokes, LEFT_SHIFT_USAGE, {
+      signal: this.#cfg.signal,
+    });
+    await sleep(400);
   }
   async clipboardSet(value: string): Promise<void> {
     const proc = Bun.spawn(['xcrun', 'simctl', 'pbcopy', this.#cfg.udid], { stdin: 'pipe' });

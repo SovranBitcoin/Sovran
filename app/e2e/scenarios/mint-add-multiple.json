@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "id": "mint.add.multiple",
+  "name": "Add three mints from discovery",
+  "description": "Open Add Mints from the mint selector, check three discovery-catalog mints (21mint.me, mint.macadamia.cash, mint.lnserver.com — the top non-default rows of nagg's discovery list, pinned from a live query and re-verified on the first sim run), confirm the batch add, and prove all three appear in the selector; ends on wallet",
+  "lane": "simulator",
+  "tags": ["flow:mint","check:mint-add"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-select-add"}}],"until":{"id":"mint-add-search-toggle"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://21mint.me"},"timeoutMs":60000},
+    {"action":"screenshot","name":"mint-add"},
+    {"action":"tap","selector":{"id":"contact-row:mint:https://21mint.me"}},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://mint.macadamia.cash"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"contact-row:mint:https://mint.macadamia.cash"}},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://mint.lnserver.com"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"contact-row:mint:https://mint.lnserver.com"}},
+    {"action":"screenshot","name":"mint-add"},
+    {"action":"waitFor","selector":{"id":"mint-add-confirm"},"state":"enabled","timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-add-confirm"}}],"until":{"id":"mint-select-add"},"attempts":8,"settleMs":15000},
+    {"action":"tap","selector":{"label":"Cancel"}},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://21mint.me"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://mint.macadamia.cash"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://mint.lnserver.com"},"timeoutMs":30000},
+    {"action":"screenshot","name":"mint-select"},
+    {"action":"tap","selector":{"label":"Cancel"}},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-mint-selector"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

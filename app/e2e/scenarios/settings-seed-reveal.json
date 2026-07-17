@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "id": "settings.seed.reveal",
+  "name": "Seed phrase reveal round-trip",
+  "description": "From Settings → Account profile, prove the NIP06 recovery-phrase reveal works: the field starts obscured (reveal probe value 0), tapping Show flips the probe to 1 and swaps the button to Hide, and tapping again re-obscures it. This is the single most safety-critical read path — a regression hiding or garbling the seed means users cannot back up funds. No screenshots are taken while revealed, and AX artifacts pass the mnemonic redactor",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:context-isolation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"ACCOUNT"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"settings-profile-row"}},
+    {"action":"waitFor","selector":{"id":"profile-reveal-mnemonic"},"value":"0","timeoutMs":30000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"profile-reveal-mnemonic"}}],"until":{"id":"profile-reveal-mnemonic"},"untilValue":"1","attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"Hide"},"timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"profile-reveal-mnemonic"}}],"until":{"id":"profile-reveal-mnemonic"},"untilValue":"0","attempts":4,"settleMs":6000},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

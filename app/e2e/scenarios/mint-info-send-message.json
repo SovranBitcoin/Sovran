@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "id": "mint.info.send-message",
+  "name": "Mint page to Nostr DM",
+  "description": "From the Minibits mint page, open the mint's Nostr contact profile, use the Send Message action menu to pick the Nostr DM option, and prove the 1:1 DM conversation screen opens (dm-chat-probe); ends on wallet. The action-menu row is an AX-invisible FullWindowOverlay item, so its tapAt y is a first-run measurement",
+  "lane": "simulator",
+  "tags": ["flow:mint"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://mint.minibits.cash/Bitcoin"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tapAt":{"x":0.884,"y":0.383}}],"until":{"id":"mint-info-close"},"attempts":4,"settleMs":8000},
+    {"action":"screenshot","name":"mint-info"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"mint-info-contact-nostr"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-info-contact-nostr"}},{"delayMs":4000},{"swipe":{"dir":"up"}},{"swipe":{"dir":"down"}}],"until":{"id":"send-message-menu"},"attempts":3,"settleMs":8000},
+    {"action":"waitFor","selector":{"id":"send-message-menu"},"timeoutMs":90000},
+    {"action":"screenshot","name":"profile"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"send-message-menu"}}],"until":{"id":"e2e-action-menu-open"},"attempts":6,"settleMs":8000},
+    {"action":"tapAt","x":0.5,"y":0.755},
+    {"action":"waitFor","selector":{"id":"dm-chat-probe"},"timeoutMs":60000},
+    {"action":"screenshot","name":"dm-chat"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

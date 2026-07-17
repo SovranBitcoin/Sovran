@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "id": "send.mock-fail.lightning",
+  "name": "Lightning melt failure rolls back without debiting",
+  "description": "Fund 50, enable Mock Fail Melt (dev mode), paste a cocod 10-sat bolt11 and tap Pay: executeMelt throws after prepare and the cancel-after-failure rescue runs — the melt screen transitions to the SEND • CANCELLED timeline with 'Funds returned to your balance', and the wallet stays at 50 (delta 0) because failed melts debit nothing. The invoice is never paid; sweep restores zero",
+  "lane": "funded",
+  "tags": ["flow:send","instrument:bolt11","io:paste","amount:fixed","outcome:rolled-back"],
+  "requires": ["fresh-install","cocod.send.bolt11","unit.sat","cocod.receive.cashu"],
+  "funds": {"assets":[{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxPrincipal":50}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"flow.fund-lightning-50","with":{"mintUrl":"https://mint.sovran.money","mintHost":"mint.sovran.money"}}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"ACCOUNT"},"timeoutMs":30000},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"settings-version-row"},"timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}}],"until":{"label":"Developer mode enabled"},"attempts":2,"settleMs":1500},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"settings-mock-fail-melt-toggle"},"value":"0","timeoutMs":20000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-mock-fail-melt-toggle"}}],"until":{"id":"settings-mock-fail-melt-toggle"},"untilValue":"1","attempts":4,"settleMs":6000},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"counterparty","operation":"bolt11.create","mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"amount":10,"captureAs":"invoice","setClipboard":true,"timeoutMs":60000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-send"}}],"until":{"label":"Paste"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"send"},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Paste"}}],"until":{"label":"Allow Paste"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"label":"Allow Paste"}},
+    {"action":"waitFor","selector":{"id":"melt-pay"},"timeoutMs":60000},
+    {"action":"waitFor","selector":{"idPrefix":"transaction-probe-","captureSuffixAs":"previewTx"},"timeoutMs":60000},
+    {"action":"assert","that":"tx","txRef":"${previewTx}","direction":"out","amount":10,"unit":"sat","mintHost":"mint.sovran.money","status":"UNPAID"},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"tap","selector":{"id":"melt-pay"}},
+    {"action":"waitFor","selector":{"label":"Funds returned to your balance"},"timeoutMs":60000},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 50"},"timeoutMs":60000}
+  ],
+  "verify": [
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.sweep-mint","with":{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0}},
+    {"use":"flow.return-to-wallet"},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":45000}
+  ],
+  "endState": "wallet"
+}

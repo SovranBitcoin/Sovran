@@ -12,9 +12,9 @@
   ],
   "steps": [
     {"action":"screenshot","name":"wallet"},
-    {"action":"tap","selector":{"id":"wallet-receive"}},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-receive"}}],"until":{"id":"receive-method-fixedAmount"},"attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"id":"receive-method-fixedAmount"},"timeoutMs":30000},
-    {"action":"tap","selector":{"id":"receive-method-fixedAmount"}},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"receive-method-fixedAmount"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"id":"amount-next"},"timeoutMs":30000},
     {"action":"tap","selector":{"label":"3"}},
     {"action":"tap","selector":{"label":"3"}},

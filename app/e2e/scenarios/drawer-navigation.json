@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "id": "drawer.navigation",
+  "name": "Drawer routes reach every surface",
+  "description": "Open the drawer and visit each menu destination in turn — Feed (For You pills), Contacts, Notifications, AI (composer input), Remote Login (signer hub rows) — proving every drawer route lands on its screen for a fresh user, then return to the wallet. Landing markers for Contacts/Notifications are nav-title ids, a first-run hypothesis; the rest are proven ids/labels",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-feed"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"drawer"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-feed"}}],"until":{"label":"For You"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"For You"},"timeoutMs":45000},
+    {"action":"screenshot","name":"feed"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-contacts"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-contacts"}}],"until":{"id":"Contacts"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"Contacts"},"timeoutMs":45000},
+    {"action":"screenshot","name":"contacts"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-notifications"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-notifications"}}],"until":{"id":"Notifications"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"Notifications"},"timeoutMs":45000},
+    {"action":"screenshot","name":"notifications"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-ai"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-ai"}}],"until":{"id":"ai-model-chip"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"ai-model-chip"},"timeoutMs":45000},
+    {"action":"screenshot","name":"ai"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-remote-login"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-remote-login"}}],"until":{"id":"signer-hub-paste-row"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"signer-hub-paste-row"},"timeoutMs":45000},
+    {"action":"screenshot","name":"signer-hub"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

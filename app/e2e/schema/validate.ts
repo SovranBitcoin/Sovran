@@ -31,11 +31,24 @@ const SECRET_PATTERNS: [string, RegExp][] = [
   ['64-hex-private-key', /\b[0-9a-f]{64}\b/i],
 ];
 
+// The test counterparty's PUBLIC Nostr identity (cocod's npub and its hex
+// pubkey). Search-driven scenarios must reference it literally — typing the
+// npub into the search field and waiting on the pubkey-keyed result row — so
+// these exact values are exempt from the secret sniff. Anything else that
+// pattern-matches an identity stays banned.
+const PUBLIC_TEST_IDENTIFIERS = new Set([
+  'npub1ajx0lhr3kdsx8ckfwxsxrgpuazrfx2ahmwrc906lvwzrfr5l0kesg8tx5h',
+  'ec8cffdc71b36063e2c971a061a03ce886932bb7db8782bf5f6384348e9f7db3',
+  // Synthetic NIP-46 client pubkey for the signer pairing scenario — not a key.
+  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+]);
+
 export function scanSecrets(node: unknown, path = ''): Issue[] {
   const out: Issue[] = [];
   if (typeof node === 'string') {
     for (const [kind, re] of SECRET_PATTERNS) {
-      if (re.test(node))
+      const match = re.exec(node);
+      if (match && !PUBLIC_TEST_IDENTIFIERS.has(match[0].toLowerCase()))
         out.push({
           path: path || '(root)',
           message: `looks like a ${kind} secret in a non-secret field`,
@@ -89,6 +102,9 @@ function counterpartyContractIssues(
   if (!node || typeof node !== 'object') return [];
   const step = node as Record<string, unknown>;
   if (step.action !== 'counterparty') return [];
+  // npc.address is read-only and mint-independent — the only counterparty op
+  // with no exact-asset contract to validate.
+  if (step.operation === 'npc.address') return [];
   const recoverySweep = step.operation === 'recovery.sweep';
   if (
     typeof step.mintUrl !== 'string' ||
@@ -139,13 +155,42 @@ function directFundedScenarioIssues(scenario: Scenario): Issue[] {
     ['verify', scenario.verify],
     ['finally', scenario.finally],
   ] as const;
-  return phases.flatMap(([phase, items]) =>
+  const issues = phases.flatMap(([phase, items]) =>
     items.flatMap((item, index): Issue[] => {
       const path = `${phase}.${index}`;
       if (isRawCocodStep(item)) return [{ path, message: RAW_COCOD_FUNDED_MESSAGE }];
       return counterpartyContractIssues(item, path, assets);
     })
   );
+  return [...issues, ...npcOutflowPlacementIssues(scenario, phases)];
+}
+
+/** `npc.outflow` records an outflow on app-side evidence alone (cocod cannot
+ * observe npubx.cash credits), so it may only follow a PAID tx assert in the
+ * scenario's own ordered phases — never pre-record a send that hasn't proven. */
+function npcOutflowPlacementIssues(
+  _scenario: Scenario,
+  phases: readonly (readonly [string, readonly unknown[]])[]
+): Issue[] {
+  const issues: Issue[] = [];
+  let paidAssertSeen = false;
+  for (const [phase, items] of phases) {
+    items.forEach((item, index) => {
+      if (!item || typeof item !== 'object') return;
+      const step = item as Record<string, unknown>;
+      if (step.action === 'assert' && step.that === 'tx' && step.status === 'PAID') {
+        paidAssertSeen = true;
+      }
+      if (step.action === 'counterparty' && step.operation === 'npc.outflow' && !paidAssertSeen) {
+        issues.push({
+          path: `${phase}.${index}`,
+          message:
+            'npc.outflow must follow an assert tx with status "PAID" — it records the outflow on app-side evidence',
+        });
+      }
+    });
+  }
+  return issues;
 }
 
 export const validateScenario = (data: unknown): Result<Scenario> => {

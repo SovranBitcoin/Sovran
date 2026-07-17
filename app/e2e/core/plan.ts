@@ -87,6 +87,8 @@ export function labelForStep(step: Step): string {
       return `drag ${selectorLabel(step.selector)} ${step.from.x},${step.from.y}→${step.to.x},${step.to.y}`;
     case 'input':
       return `input ${selectorLabel(step.selector)} = ${redactString(step.value)}`;
+    case 'typeText':
+      return `typeText${step.focus ? ` @${step.focus.x},${step.focus.y}` : ''} = ${redactString(step.value)}`;
     case 'goHome':
       return 'goHome';
     case 'launch':
@@ -102,7 +104,9 @@ export function labelForStep(step: Step): string {
     case 'setPaymentRequestClipboard':
       return 'setPaymentRequestClipboard ← public NUT-18 request';
     case 'counterparty':
-      return `counterparty ${step.operation}${'amount' in step ? ` ${step.amount}` : ''} ${step.unit} @ ${redactString(step.mintUrl)}${'captureAs' in step ? ` → ${step.captureAs}` : ''}`;
+      return 'mintUrl' in step
+        ? `counterparty ${step.operation}${'amount' in step ? ` ${step.amount}` : ''} ${step.unit} @ ${redactString(step.mintUrl)}${'captureAs' in step ? ` → ${step.captureAs}` : ''}`
+        : `counterparty ${step.operation}${'captureAs' in step ? ` → ${step.captureAs}` : ''}`;
     case 'capture':
       return `capture ${step.as} ← ${step.fromClipboard ? 'clipboard' : `${selectorLabel(step.fromSelector!)}.${step.attribute}`}`;
     case 'screenshot':

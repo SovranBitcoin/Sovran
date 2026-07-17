@@ -29,9 +29,23 @@ export const fundedAssetSchema = z.strictObject({
 });
 export type FundedAsset = z.infer<typeof fundedAssetSchema>;
 
+/** A declared app-internal move of value between two funded assets (e.g. the
+ * balance-split rebalance melting from one mint to fund another). Reconciliation
+ * uses it to explain why the destination restores more than its own principal
+ * and the source less, within an explicit fee budget. */
+export const fundedTransferSchema = z.strictObject({
+  fromMintUrl: z.string().url(),
+  toMintUrl: z.string().url(),
+  unit: unitSchema,
+  accountIndex: z.literal(0),
+  maxFeeSats: z.number().int().positive().max(50),
+});
+export type FundedTransfer = z.infer<typeof fundedTransferSchema>;
+
 export const fundsSchema = z
   .strictObject({
     assets: z.array(fundedAssetSchema).min(1),
+    transfers: z.array(fundedTransferSchema).min(1).optional(),
   })
   .superRefine((funds, ctx) => {
     const seen = new Set<string>();
@@ -45,6 +59,36 @@ export const fundsSchema = z
         });
       }
       seen.add(key);
+    });
+    funds.transfers?.forEach((transfer, index) => {
+      const hasEndpoint = (mintUrl: string) =>
+        funds.assets.some(
+          (asset) =>
+            asset.mintUrl === mintUrl &&
+            asset.unit === transfer.unit &&
+            asset.accountIndex === transfer.accountIndex
+        );
+      if (!hasEndpoint(transfer.fromMintUrl)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['transfers', index, 'fromMintUrl'],
+          message: 'transfer source must reference a declared funded asset',
+        });
+      }
+      if (!hasEndpoint(transfer.toMintUrl)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['transfers', index, 'toMintUrl'],
+          message: 'transfer destination must reference a declared funded asset',
+        });
+      }
+      if (transfer.fromMintUrl === transfer.toMintUrl) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['transfers', index],
+          message: 'transfer source and destination must differ',
+        });
+      }
     });
   });
 export type Funds = z.infer<typeof fundsSchema>;
