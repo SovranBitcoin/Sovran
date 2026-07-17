@@ -48,6 +48,13 @@ export const PENDING_PAYMENT_REQUEST_MAX_AGE_MS = 24 * 60 * 60 * 1000;
  * awaiting payment — the requests coco never projects into history. Limited
  * to requests created within {@link PENDING_PAYMENT_REQUEST_MAX_AGE_MS}
  * (coco stamps `createdAt` in epoch ms at create time).
+ *
+ * Only user-initiated single-use requests (Fixed Amount → "as Ecash") get a
+ * pending row. Standing reusable requests (`singleUse: false`) are the
+ * QR-display rails' get-or-create plumbing — they carry the 1-sat floor
+ * amount coco's create() forces on them and would surface as a phantom
+ * "1 sat receive" every time the QR display opens. A standing request that
+ * actually gets paid still surfaces as a real receive via the claim path.
  */
 export async function listPendingPaymentRequestEntries(
   manager: Manager,
@@ -56,7 +63,7 @@ export async function listPendingPaymentRequestEntries(
   const ops: PaymentRequestReceiveOperation[] =
     await manager.paymentRequests.incoming.list({ state: "active" });
   const cutoff = now - PENDING_PAYMENT_REQUEST_MAX_AGE_MS;
-  const fresh = ops.filter((op) => op.createdAt >= cutoff);
+  const fresh = ops.filter((op) => op.singleUse && op.createdAt >= cutoff);
   logger.debug("history.aggregate.pendingPaymentRequests", {
     count: ops.length,
     shown: fresh.length,

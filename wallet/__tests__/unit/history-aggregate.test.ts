@@ -147,6 +147,21 @@ describe('listPendingPaymentRequestEntries — 24h display cutoff', () => {
     const stale = requestOp('stale', NOW - 2 * PENDING_PAYMENT_REQUEST_MAX_AGE_MS);
     expect(await listPendingPaymentRequestEntries(managerWith([stale]), NOW)).toEqual([]);
   });
+
+  it('hides standing reusable requests — only single-use rows are pending', async () => {
+    // The QR display's standing creq is a reusable (singleUse: false) request
+    // carrying the 1-sat floor amount coco forces on it. It must never surface
+    // as a phantom pending receive; only the user-initiated Fixed Amount →
+    // "as Ecash" request (singleUse: true) earns a row.
+    const standing = { ...requestOp('standing', NOW - 1_000), singleUse: false, amount: 1 };
+    const userRequest = requestOp('user', NOW - 1_000);
+
+    const entries = await listPendingPaymentRequestEntries(
+      managerWith([standing, userRequest]),
+      NOW,
+    );
+    expect(entries.map((e) => e.id)).toEqual(['pr-user']);
+  });
 });
 
 describe('inFlightReceiveToHistoryEntry — payment-request source', () => {
