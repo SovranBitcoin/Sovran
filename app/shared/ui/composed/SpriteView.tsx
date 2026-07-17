@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, useWindowDimensions } from 'react-native';
 import { retainWallpaperMotion, wallpaperMotion } from '@/shared/lib/theme/wallpaperMotion';
 import { noteWallpaperRendered } from '@/shared/lib/theme/themeTransition';
+import { markWallpaperLoaded, markWallpaperFailed } from '@/shared/lib/theme/wallpaperRenderState';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Image } from '@/shared/ui/primitives/Image';
 import { backgroundImageThemes } from 'config/backgroundImageThemes';
@@ -181,6 +182,7 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
             // is rendered — the programmatic overlay holds until the layer
             // underneath reports its theme, then blends away seamlessly.
             noteWallpaperRendered(activeTheme);
+            markWallpaperLoaded(activeTheme);
             log.info('bg.sprite.image_loaded', {
               theme: activeTheme,
               decodeMs: loadStartRef.current ? Date.now() - loadStartRef.current : null,
@@ -189,6 +191,7 @@ const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
             });
           }}
           onError={(event) => {
+            markWallpaperFailed(activeTheme);
             log.warn('bg.sprite.image_load_failed', {
               theme: activeTheme,
               error: describeImageLoadError(event),

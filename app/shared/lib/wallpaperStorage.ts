@@ -10,6 +10,17 @@ import { log } from '@/shared/lib/logger';
 
 const WALLPAPER_DIR = `${FileSystem.documentDirectory}wallpapers/`;
 
+// A real wallpaper JPEG/PNG is hundreds of KB; anything smaller is an empty or
+// truncated download (e.g. an unwritten file or a redirect stub) that would
+// fail to decode and render the background black. Reject it so the theme falls
+// back to its gradient instead.
+const MIN_WALLPAPER_BYTES = 1024;
+
+// Hard ceiling so a stalled native download handle can't hang the whole
+// theme-commit chain. A 1080x1920 wallpaper is ~1MB and fetches in a couple of
+// seconds; 60s is generous headroom.
+const DOWNLOAD_TIMEOUT_MS = 60_000;
+
 /**
  * Ensure the wallpapers directory exists.
  */
@@ -40,37 +51,70 @@ export async function downloadWallpaper(
   log.info('wallpaper.download.start', { themeName, url, localUri });
 
   try {
-    let resolveOnProgress: (() => void) | null = null;
-    const progressDone = new Promise<void>((r) => {
-      resolveOnProgress = r;
-    });
-
     const downloadResumable = FileSystem.createDownloadResumable(
       url,
       localUri,
       {},
       (downloadProgress) => {
-        const progress =
-          downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
+        const total = downloadProgress.totalBytesExpectedToWrite;
+        // total is 0/-1 before the (possibly redirected) response's
+        // Content-Length is known — guard the divide so we never report a
+        // bogus 100% mid-flight.
+        const progress = total > 0 ? downloadProgress.totalBytesWritten / total : 0;
         onProgress?.(progress);
-        if (progress >= 1) resolveOnProgress?.();
       }
     );
 
-    const downloadPromise = downloadResumable.downloadAsync();
+    // Await the ACTUAL download completion — never a progress-callback race.
+    // The old race resolved on the first progress tick that read >=100% (which
+    // a redirect's zero-length Content-Length made fire early), returning a
+    // file:// URI while the bytes were still being written. The background
+    // then registered that theme and `<Image>` decoded a truncated/empty file
+    // ("Downloaded image decode failed") and rendered black.
+    const result = await withTimeout(
+      downloadResumable.downloadAsync(),
+      DOWNLOAD_TIMEOUT_MS,
+      themeName
+    );
 
-    // Resolve as soon as either the promise completes or progress reaches 100%.
-    // expo-file-system can stall between the last progress callback and promise
-    // resolution while it closes the file handle.
-    await Promise.race([downloadPromise, progressDone]);
+    const status = result?.status ?? 0;
+    if (status < 200 || status >= 300) {
+      throw new Error(`HTTP ${status || 'no-response'}`);
+    }
 
-    log.info('wallpaper.download.complete', { themeName, uri: localUri });
+    // Only report success once the file is actually a plausible image on disk.
+    // An empty/truncated download registered as a wallpaper is worse than no
+    // wallpaper: it decode-fails silently and paints the screen black.
+    const info = await FileSystem.getInfoAsync(localUri);
+    const bytes = info.exists ? (info.size ?? 0) : 0;
+    if (bytes < MIN_WALLPAPER_BYTES) {
+      throw new Error(`empty download (${info.exists ? `${bytes} bytes` : 'missing'})`);
+    }
+
+    log.info('wallpaper.download.complete', { themeName, uri: localUri, status, bytes });
     return localUri;
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : String(error ?? 'Unknown download error');
     log.error('wallpaper.download.error', { themeName, url, localUri, error: message });
+    // Remove any partial/empty file so a broken download can't shadow a later
+    // retry (isWallpaperDownloaded checks existence, not validity).
+    await FileSystem.deleteAsync(localUri, { idempotent: true }).catch(() => {});
     throw new Error(`Download failed for "${themeName}": ${message}`);
+  }
+}
+
+/** Reject a download that never resolves so a stalled native handle can't wedge
+ *  the theme-commit chain. */
+async function withTimeout<T>(promise: Promise<T>, ms: number, themeName: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
