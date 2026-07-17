@@ -46,7 +46,9 @@ export function renderPagesView(root: HTMLElement): void {
       `<section class="page-group${expanded ? '' : ' collapsed'}">` +
         `<h2 class="clickable" data-page="${escapeHtml(group.page)}">${escapeHtml(group.page)}` +
         `<span class="count">${group.captures.length}</span></h2>` +
-        (expanded ? `<div class="page-grid">${group.captures.map(captureFigure).join('')}</div>` : '') +
+        (expanded
+          ? `<div class="page-grid">${group.captures.map(captureFigure).join('')}</div>`
+          : '') +
         `</section>`
     );
   }

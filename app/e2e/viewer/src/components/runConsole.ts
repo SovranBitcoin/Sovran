@@ -1,5 +1,6 @@
 import { api } from '../api';
 import { state, update } from '../state';
+import { renderConsoleLine } from './consoleFormat';
 
 export function renderConsole(root: HTMLElement): void {
   const job = state.job;
@@ -16,16 +17,21 @@ export function renderConsole(root: HTMLElement): void {
     job.status === 'running' && job.kind === 'run'
       ? `<button data-action="kill" class="danger">${job.killArmed ? 'really kill?' : 'kill job'}</button>`
       : '';
+  // Copy reads the full buffer, not the 400-line render window below.
+  const copyRow =
+    job.status === 'exited' && job.exitCode !== 0
+      ? `<div class="console-line copy-row"><button data-action="copy-output">copy full output</button></div>`
+      : '';
   root.innerHTML = `<div class="console-head">
       <span>${heading}</span>
       <span class="spacer" style="flex:1"></span>
       ${killButton}
       <button data-action="dismiss">dismiss</button>
     </div>
-    <pre>${job.lines
+    <div class="console-lines">${job.lines
       .slice(-400)
-      .map((line) => line.replace(/&/g, '&amp;').replace(/</g, '&lt;'))
-      .join('\n')}</pre>`;
+      .map(renderConsoleLine)
+      .join('')}${copyRow}</div>`;
   root.querySelector('[data-action=dismiss]')?.addEventListener('click', () =>
     update((current) => {
       current.job = undefined;
@@ -46,8 +52,7 @@ export function renderConsole(root: HTMLElement): void {
       .killJob()
       .catch((error: Error) =>
         update((current) => {
-          if (current.job?.id === job.id)
-            current.job.lines.push(`✗ kill failed: ${error.message}`);
+          if (current.job?.id === job.id) current.job.lines.push(`✗ kill failed: ${error.message}`);
         })
       )
       .finally(() =>
@@ -56,6 +61,22 @@ export function renderConsole(root: HTMLElement): void {
         })
       );
   });
-  const pre = root.querySelector('pre');
-  if (pre) pre.scrollTop = pre.scrollHeight;
+  // Feedback mutates the button directly — an update() here would re-render
+  // the whole app just to flip a label, and lose the flash on the next line.
+  const copyButton = root.querySelector<HTMLButtonElement>('[data-action=copy-output]');
+  copyButton?.addEventListener('click', () => {
+    const lines = state.job?.id === job.id ? state.job.lines : job.lines;
+    const flash = (label: string) => {
+      copyButton.textContent = label;
+      setTimeout(() => {
+        copyButton.textContent = 'copy full output';
+      }, 1500);
+    };
+    navigator.clipboard.writeText(lines.join('\n')).then(
+      () => flash('copied ✓'),
+      () => flash('copy failed')
+    );
+  });
+  const lines = root.querySelector('.console-lines');
+  if (lines) lines.scrollTop = lines.scrollHeight;
 }

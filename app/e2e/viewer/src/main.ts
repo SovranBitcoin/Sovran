@@ -1,8 +1,14 @@
 import { refreshAll, selectScenario } from './actions';
-import { renderDiffView } from './components/diffView';
+import { diffTransportStep, renderDiffView } from './components/diffView';
 import { renderModal } from './components/modal';
 import { renderPagesView } from './components/pagesView';
-import { currentTimeline, renderPlayer, visibleFrames } from './components/player';
+import {
+  currentTimeline,
+  renderPlayer,
+  transportStep,
+  transportTogglePlay,
+  visibleFrames,
+} from './components/player';
 import { renderConsole } from './components/runConsole';
 import { renderRunList } from './components/runList';
 import { renderTopbar } from './components/topbar';
@@ -17,6 +23,14 @@ const modalEl = document.getElementById('modal-root')!;
 function render(): void {
   renderRunList(runsEl);
   renderTopbar(topbarEl);
+  // Mode switches must drop the views' shell signatures: #content still holds
+  // the previous mode's DOM, and a matching stale sig would skip the rebuild —
+  // leaving e.g. the browse player on screen with the Diff tab active.
+  if (contentEl.dataset.mode !== state.mode) {
+    delete contentEl.dataset.playerSig;
+    delete contentEl.dataset.diffSig;
+    contentEl.dataset.mode = state.mode;
+  }
   if (state.mode === 'browse') renderPlayer(contentEl);
   else if (state.mode === 'pages') renderPagesView(contentEl);
   else renderDiffView(contentEl);
@@ -31,6 +45,8 @@ setInterval(() => {
   if (!state.playing) return;
   const timeline = currentTimeline();
   if (!timeline) return;
+  // video mode never sets playing, but belt-and-braces: the <video> owns time
+  if (state.videoMode && timeline.videoFile) return;
   const frames = visibleFrames(timeline);
   update((current) => {
     if (current.frameIndex < frames.length - 1) current.frameIndex++;
@@ -39,28 +55,20 @@ setInterval(() => {
 }, 600);
 
 document.addEventListener('keydown', (event) => {
-  if (state.modal || state.mode !== 'browse') return;
+  if (state.modal) return;
   const target = event.target as HTMLElement;
   if (target.tagName === 'INPUT' || target.tagName === 'SELECT') return;
-  const timeline = currentTimeline();
-  if (!timeline) return;
-  const frames = visibleFrames(timeline);
-  if (event.key === 'ArrowRight') {
-    update((current) => {
-      current.playing = false;
-      current.frameIndex = Math.min(frames.length - 1, current.frameIndex + 1);
-    });
-  } else if (event.key === 'ArrowLeft') {
-    update((current) => {
-      current.playing = false;
-      current.frameIndex = Math.max(0, current.frameIndex - 1);
-    });
-  } else if (event.key === ' ') {
+  if (state.mode === 'diff') {
+    if (event.key === 'ArrowRight') diffTransportStep(1);
+    else if (event.key === 'ArrowLeft') diffTransportStep(-1);
+    return;
+  }
+  if (state.mode !== 'browse' || !currentTimeline()) return;
+  if (event.key === 'ArrowRight') transportStep(1);
+  else if (event.key === 'ArrowLeft') transportStep(-1);
+  else if (event.key === ' ') {
     event.preventDefault();
-    update((current) => {
-      if (!current.playing && current.frameIndex >= frames.length - 1) current.frameIndex = 0;
-      current.playing = !current.playing;
-    });
+    transportTogglePlay();
   }
 });
 

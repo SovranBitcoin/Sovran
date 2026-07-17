@@ -40,6 +40,26 @@ async function readManifest(runDir: string): Promise<Record<string, unknown> | u
   }
 }
 
+/** Simulator device type from the first session-N.json (sim runs only). */
+async function readDeviceType(runDir: string): Promise<string | undefined> {
+  let sessionFile: string | undefined;
+  try {
+    sessionFile = readdirSync(runDir)
+      .filter((name) => /^session-\d+\.json$/.test(name))
+      .sort()[0];
+  } catch {
+    return undefined;
+  }
+  if (!sessionFile) return undefined;
+  try {
+    const session = JSON.parse(await Bun.file(join(runDir, sessionFile)).text());
+    const deviceType = session?.simulator?.deviceType;
+    return typeof deviceType === 'string' ? deviceType : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Every funded leg that was opened (intent/funded) must close with a
  * reconciled entry. Unparseable ledgers fail closed. */
 export function ledgerSafeToDelete(ledgerText: string): boolean {
@@ -120,6 +140,8 @@ export async function getRunDetail(runDirName: string): Promise<RunDetail | unde
     fundsSafeToDelete: await fundsSafeToDelete(runDir),
     scenarios,
   };
+  const deviceType = await readDeviceType(runDir);
+  if (deviceType) detail.deviceType = deviceType;
   if (!parsed.runEnd) {
     detail.status =
       liveRunIds.has(runDirName) || Date.now() - stat.mtimeMs < IN_PROGRESS_WINDOW_MS

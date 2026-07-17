@@ -1,5 +1,5 @@
 import { selectScenario } from '../actions';
-import { state } from '../state';
+import { persistCollapsedFlows, state, update } from '../state';
 import { FACETS } from '../../../schema/facets';
 import type { CatalogRunRef, ScenarioCatalogEntry } from '../../lib/types';
 
@@ -14,10 +14,14 @@ function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** Flow-then-scenario left panel: scenarios grouped under their `flow:` facet
- * in the canonical FACETS order, runs (newest first) nested beneath each. The
- * selected scenario stays expanded; clicking a collapsed scenario opens its
- * newest run. */
+function latestRun(entry: ScenarioCatalogEntry): CatalogRunRef | undefined {
+  return entry.runs.find((run) => run.proof === 'product-run');
+}
+
+/** Collapsible flow-facet tree: caret group headers (sticky while their group
+ * scrolls) → scenario rows → run versions under the selected scenario.
+ * Collapse state lives in state.collapsedFlows and survives reloads; a
+ * collapsed group keeps failures visible via a red count on its header. */
 export function renderRunList(root: HTMLElement): void {
   const parts: string[] = ['<div class="panel-title">Scenarios</div>'];
   const byFlow = (flow: string | undefined) =>
@@ -28,8 +32,19 @@ export function renderRunList(root: HTMLElement): void {
   ];
   for (const [flow, entries] of grouped) {
     if (entries.length === 0) continue;
-    parts.push(`<div class="flow-group">${escapeHtml(flow)}</div>`);
-    parts.push(...entries.map(renderScenarioRows));
+    const collapsed = state.collapsedFlows.includes(flow);
+    const failing = entries.filter((entry) => latestRun(entry)?.ok === false).length;
+    parts.push(
+      `<button class="tree-group" data-flow="${escapeHtml(flow)}" aria-expanded="${!collapsed}">` +
+        `<span class="caret${collapsed ? '' : ' open'}">▸</span>` +
+        `<span class="flow-name">${escapeHtml(flow)}</span>` +
+        (failing ? `<span class="fail-count">${failing} ✗</span>` : '') +
+        `<span class="badge">${entries.length}</span>` +
+        `</button>`
+    );
+    if (!collapsed) {
+      parts.push('<div class="tree-children">', ...entries.map(renderScenarioRows), '</div>');
+    }
   }
   if (state.catalog.length === 0) {
     parts.push('<div class="scenario-row">no scenarios found</div>');
@@ -69,6 +84,17 @@ export function renderRunList(root: HTMLElement): void {
 }
 
 function bindRows(root: HTMLElement): void {
+  for (const header of root.querySelectorAll<HTMLElement>('.tree-group[data-flow]')) {
+    header.addEventListener('click', () => {
+      const flow = header.dataset.flow!;
+      update((current) => {
+        current.collapsedFlows = current.collapsedFlows.includes(flow)
+          ? current.collapsedFlows.filter((candidate) => candidate !== flow)
+          : [...current.collapsedFlows, flow];
+      });
+      persistCollapsedFlows();
+    });
+  }
   for (const row of root.querySelectorAll<HTMLElement>('.run-row[data-scenario]')) {
     row.addEventListener('click', () => {
       const entry = state.catalog.find((candidate) => candidate.id === row.dataset.scenario);

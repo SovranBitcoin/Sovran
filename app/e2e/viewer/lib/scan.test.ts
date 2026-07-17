@@ -43,6 +43,16 @@ describe('getRunDetail (real artifact)', () => {
   });
 });
 
+const SIM_RUN = 'run-2026-07-15T11-27-18-759Z-f2705a12';
+const SIM_RUN_PRESENT = existsSync(join(ARTIFACTS, SIM_RUN, 'session-1.json'));
+
+describe('getRunDetail deviceType', () => {
+  test.skipIf(!SIM_RUN_PRESENT)('sim runs carry the simulator device type', async () => {
+    const detail = await getRunDetail(SIM_RUN);
+    expect(detail?.deviceType).toBe('iPhone 17 Pro');
+  });
+});
+
 describe('ledgerSafeToDelete', () => {
   const leg = (kind: string, legId = 'asset-01') =>
     JSON.stringify({ v: 1, runId: 'r', legId, kind });

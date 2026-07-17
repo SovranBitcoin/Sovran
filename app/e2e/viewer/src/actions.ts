@@ -1,6 +1,6 @@
 import { api } from './api';
 import { state, update, type JobView } from './state';
-import type { TriggerRequest } from '../lib/types';
+import type { DiffResult, TriggerRequest } from '../lib/types';
 
 export async function refreshAll(): Promise<void> {
   const [runs, catalog] = await Promise.all([api.runs(), api.scenarios()]);
@@ -12,16 +12,20 @@ export async function refreshAll(): Promise<void> {
 }
 
 /** Select a scenario, optionally in a specific run. `runId` is undefined for
- * scenarios with no runs yet — selection still enables "Rerun scenario". */
+ * scenarios with no runs yet — selection still enables "Rerun scenario".
+ * Diff mode is sticky: picking a run/scenario in the left panel re-targets the
+ * diff (B = that run, A = derived) instead of bouncing back to browse. */
 export async function selectScenario(runId: string | undefined, scenarioId: string): Promise<void> {
+  const stayInDiff = state.mode === 'diff';
   update((current) => {
-    current.mode = 'browse';
+    current.mode = stayInDiff ? 'diff' : 'browse';
     current.selectedRunId = runId;
     current.selectedScenarioId = scenarioId;
     current.playing = false;
     current.frameIndex = 0;
     current.runDetail = undefined;
   });
+  if (stayInDiff && runId) retargetDiff(runId, scenarioId);
   if (!runId) return;
   try {
     const detail = await api.run(runId);
@@ -170,6 +174,9 @@ export function requestClear(): void {
               current2.diff.result = undefined;
               current2.diff.runA = undefined;
               current2.diff.runB = undefined;
+              current2.diff.forRun = undefined;
+              current2.diff.selectedScenarioId = undefined;
+              current2.diff.pairIndex = 0;
             })
           )
           .then(refreshAll)
@@ -184,13 +191,108 @@ export function requestClear(): void {
   });
 }
 
-export async function computeDiff(): Promise<void> {
+/** Runs eligible for diffing: finished product runs with screenshots. */
+function diffableRuns(): string[] {
+  return state.runs
+    .filter((run) => run.proof === 'product-run' && run.status === 'complete')
+    .map((run) => `run-${run.runId}`);
+}
+
+function scenariosOf(runId: string): string[] {
+  return state.runs.find((run) => `run-${run.runId}` === runId)?.scenarioIds ?? [];
+}
+
+/** The "previous run" for B: the nearest older eligible run containing
+ * `preferScenarioId` when given, else one sharing any scenario with B
+ * (single-scenario runs rarely overlap with their literal neighbour — an
+ * all-added/removed diff says nothing), else plain adjacency.
+ * state.runs is newest-first. */
+function deriveDiffPair(runB: string, preferScenarioId?: string): string | undefined {
+  const eligible = diffableRuns();
+  const bIndex = eligible.indexOf(runB);
+  if (bIndex < 0) return undefined;
+  const older = eligible.slice(bIndex + 1);
+  const bScenarios = new Set(scenariosOf(runB));
+  return (
+    (preferScenarioId
+      ? older.find((id) => scenariosOf(id).includes(preferScenarioId))
+      : undefined) ??
+    older.find((id) => scenariosOf(id).some((scenario) => bScenarios.has(scenario))) ??
+    older[0]
+  );
+}
+
+/** Point the diff at a new B run (left-panel click while in diff mode). An
+ * ineligible run clears to the picker empty state rather than silently keeping
+ * a diff of something else. */
+function retargetDiff(runId: string, scenarioId?: string): void {
+  if (state.diff.runB === runId && state.diff.result) {
+    // same pair — just focus the clicked scenario when the result covers it
+    update((current) => {
+      current.diff.forRun = runId;
+      if (
+        scenarioId &&
+        current.diff.result?.scenarios.some((entry) => entry.scenarioId === scenarioId)
+      ) {
+        current.diff.selectedScenarioId = scenarioId;
+        current.diff.pairIndex = 0;
+      }
+    });
+    return;
+  }
+  const eligible = diffableRuns().includes(runId);
+  const runA = eligible ? deriveDiffPair(runId, scenarioId) : undefined;
+  update((current) => {
+    current.diff.runB = eligible ? runId : undefined;
+    current.diff.runA = runA;
+    current.diff.forRun = runId;
+    current.diff.result = undefined;
+    current.diff.selectedScenarioId = undefined;
+    current.diff.pairIndex = 0;
+  });
+  if (eligible && runA) void computeDiff(scenarioId);
+}
+
+/** Switch to the diff tab, defaulting to the selected run vs the previous one:
+ * B = the browse selection when eligible (else the newest eligible run),
+ * A = deriveDiffPair(B). Re-derives when the selection moved to a different
+ * run since the diff was last targeted; manual picker choices (forRun cleared)
+ * survive tab round-trips as long as the selection stays put. */
+export function enterDiffMode(): void {
+  update((current) => {
+    current.mode = 'diff';
+    current.playing = false;
+  });
+  if (state.diff.computing) return;
+  const selected = state.selectedRunId;
+  if (selected && diffableRuns().includes(selected) && selected !== state.diff.forRun) {
+    retargetDiff(selected, state.selectedScenarioId);
+    return;
+  }
+  if (state.diff.result || state.diff.runA || state.diff.runB) return;
+  const runB = diffableRuns()[0];
+  const runA = runB ? deriveDiffPair(runB) : undefined;
+  if (!runA || !runB) return;
+  update((current) => {
+    current.diff.runA = runA;
+    current.diff.runB = runB;
+  });
+  void computeDiff();
+}
+
+/** Compute (or load) the current A/B pair's diff. `preferScenarioId` opens the
+ * result on that scenario when it's covered, else the biggest relevant change. */
+export async function computeDiff(preferScenarioId?: string): Promise<void> {
   const { runA, runB } = state.diff;
   if (!runA || !runB) return;
+  const openOn = (result: DiffResult | undefined): string | undefined =>
+    preferScenarioId && result?.scenarios.some((entry) => entry.scenarioId === preferScenarioId)
+      ? preferScenarioId
+      : result?.scenarios[0]?.scenarioId;
   update((current) => {
     current.diff.result = undefined;
     current.diff.selectedScenarioId = undefined;
-    current.diff.selectedPairKey = undefined;
+    current.diff.pairIndex = 0;
     current.diff.computing = 'starting';
   });
   try {
@@ -205,6 +307,8 @@ export async function computeDiff(): Promise<void> {
             update((current) => {
               current.diff.result = result;
               current.diff.computing = undefined;
+              current.diff.selectedScenarioId = openOn(result);
+              current.diff.pairIndex = 0;
             });
           }
         });
@@ -215,6 +319,8 @@ export async function computeDiff(): Promise<void> {
     update((current) => {
       current.diff.result = result;
       current.diff.computing = undefined;
+      current.diff.selectedScenarioId = openOn(result);
+      current.diff.pairIndex = 0;
     });
   } catch (error) {
     update((current) => {

@@ -19,6 +19,9 @@ import type {
 const PIXELMATCH_OPTIONS = { threshold: 0.1, includeAA: false } as const;
 /** Phases whose diffs rank scenarios by default (setup/cleanup noise excluded). */
 const RELEVANT: ReadonlySet<string> = new Set(['T', 'V', 'FINAL', 'named']);
+/** Bump when the result.json shape changes; stale caches recompute on load.
+ * v2: pairs carry order/kind/label for the player-style diff reel. */
+export const DIFF_RESULT_VERSION = 2;
 
 export function diffKey(runA: string, runB: string): string {
   return `${runA}__${runB}`;
@@ -28,32 +31,63 @@ export function diffCacheDir(key: string): string {
   return join(DIFF_CACHE, key);
 }
 
+/** The cached result for a key, or undefined when absent, corrupt, or written
+ * by an older format version. Every cache read must go through this — a stale
+ * result returned raw would silently miss the newer fields. */
+export async function loadCachedDiff(key: string): Promise<DiffResult | undefined> {
+  const file = Bun.file(join(diffCacheDir(key), 'result.json'));
+  if (!(await file.exists())) return undefined;
+  try {
+    const cached = JSON.parse(await file.text());
+    return cached.version === DIFF_RESULT_VERSION ? cached : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 interface PairSource {
   key: string;
   scenarioId: string;
   phase: DiffPairResult['phase'];
   stepId?: string;
   name?: string;
+  order?: number;
+  kind?: string;
+  label?: string;
   a?: string; // file relative to run A dir
   b?: string;
 }
 
 /** Pair keys deliberately exclude the volatile NNN capture counter so runs
- * with drifted step counts still match on stepId/name. */
-function collectSources(a: RunDetail, b: RunDetail): PairSource[] {
+ * with drifted step counts still match on stepId/name. Run A is added first,
+ * so order/kind/label reflect run A's frame when the pair exists on both sides.
+ * Exported for tests. */
+export function collectSources(a: RunDetail, b: RunDetail): PairSource[] {
   const sources = new Map<string, PairSource>();
   const add = (side: 'a' | 'b', scenarioId: string, frames: Frame[], named: NamedFrame[]): void => {
     for (const frame of frames) {
       const key = `${scenarioId}/${frame.stepId}/${frame.kind}`;
-      const fallback: PairSource = { key, scenarioId, phase: frame.phase, stepId: frame.stepId };
-      const source = sources.get(key) ?? fallback;
+      const source = sources.get(key) ?? {
+        key,
+        scenarioId,
+        phase: frame.phase,
+        stepId: frame.stepId,
+        order: frame.artifactSeq,
+        kind: frame.kind,
+        label: frame.label,
+      };
       source[side] = frame.file;
       sources.set(key, source);
     }
     for (const capture of named) {
       const key = `${scenarioId}/named/${capture.name}#${capture.occurrence}`;
-      const fallback: PairSource = { key, scenarioId, phase: 'named', name: capture.name };
-      const source = sources.get(key) ?? fallback;
+      const source = sources.get(key) ?? {
+        key,
+        scenarioId,
+        phase: 'named' as const,
+        name: capture.name,
+        order: capture.artifactSeq,
+      };
       source[side] = capture.file;
       sources.set(key, source);
     }
@@ -89,14 +123,10 @@ export async function computeDiff(
 ): Promise<DiffResult | { error: string }> {
   const key = diffKey(runA, runB);
   const cacheDir = diffCacheDir(key);
-  const cachedFile = Bun.file(join(cacheDir, 'result.json'));
-  if (await cachedFile.exists()) {
-    try {
-      return JSON.parse(await cachedFile.text());
-    } catch {
-      // recompute on corrupt cache
-    }
-  }
+  // stale/corrupt caches fall through and recompute (heatmap files are
+  // key-addressed and simply get rewritten)
+  const cached = await loadCachedDiff(key);
+  if (cached) return cached;
 
   const [a, b] = await Promise.all([getRunDetail(runA), getRunDetail(runB)]);
   if (!a || !b) return { error: 'unknown run' };
@@ -117,6 +147,9 @@ export async function computeDiff(
       phase: source.phase,
       stepId: source.stepId,
       name: source.name,
+      order: source.order,
+      kind: source.kind,
+      label: source.label,
       status: 'error',
       aFile: source.a,
       bFile: source.b,
@@ -183,6 +216,7 @@ export async function computeDiff(
   }
 
   const result: DiffResult = {
+    version: DIFF_RESULT_VERSION,
     runA,
     runB,
     computedAt: new Date().toISOString(),

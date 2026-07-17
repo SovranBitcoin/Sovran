@@ -5,7 +5,7 @@
 import index from './index.html';
 import { buildCatalog } from './lib/catalog';
 import { clearRuns } from './lib/clear';
-import { computeDiff, diffCacheDir, diffKey } from './lib/diff';
+import { computeDiff, diffCacheDir, diffKey, loadCachedDiff } from './lib/diff';
 import { serveCacheFile, serveRunFile } from './lib/files';
 import {
   activeJob,
@@ -65,8 +65,7 @@ const server = Bun.serve({
         if (!body.runA || !body.runB || body.runA === body.runB)
           return json({ error: 'pick two different runs' }, 400);
         const key = diffKey(body.runA, body.runB);
-        if (await Bun.file(`${diffCacheDir(key)}/result.json`).exists())
-          return json({ key, cached: true });
+        if (await loadCachedDiff(key)) return json({ key, cached: true });
         const job = startDiffJob(async (onProgress) => {
           const result = await computeDiff(body.runA!, body.runB!, onProgress);
           if ('error' in result) throw new Error(result.error);
@@ -77,8 +76,8 @@ const server = Bun.serve({
     },
 
     '/api/diff/:key': async (req) => {
-      const file = Bun.file(`${diffCacheDir(req.params.key)}/result.json`);
-      if (await file.exists()) return json(JSON.parse(await file.text()));
+      const cached = await loadCachedDiff(req.params.key);
+      if (cached) return json(cached);
       const job = activeJob();
       if (job?.kind === 'diff') return json({ status: 'computing', progress: job.progress }, 202);
       return json({ error: 'diff not computed' }, 404);
