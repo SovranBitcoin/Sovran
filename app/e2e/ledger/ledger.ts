@@ -97,11 +97,26 @@ export const ledgerEntrySchema = z.discriminatedUnion('kind', [
   }),
   z.strictObject({
     ...entryBase,
+    kind: z.literal('transfer-out'),
+    amount: positiveAmount,
+    fees: nonNegativeAmount,
+    toLegId: z.string().min(1),
+  }),
+  z.strictObject({
+    ...entryBase,
+    kind: z.literal('transfer-in'),
+    amount: positiveAmount,
+    fromLegId: z.string().min(1),
+  }),
+  z.strictObject({
+    ...entryBase,
     kind: z.literal('reconciled'),
     fundedAmount: positiveAmount,
     recoveredAmount: nonNegativeAmount,
     outflowAmount: nonNegativeAmount,
     writtenOffAmount: nonNegativeAmount.optional(),
+    transferOutAmount: nonNegativeAmount.optional(),
+    transferInAmount: nonNegativeAmount.optional(),
     fees: nonNegativeAmount,
   }),
   z.strictObject({
@@ -178,6 +193,8 @@ function reconciliationSummary(
   recoveredAmount: number;
   outflowAmount: number;
   writtenOffAmount: number;
+  transferOutAmount: number;
+  transferInAmount: number;
   fees: number;
 } {
   const legEntries = entries.filter((entry) => entry.legId === legId);
@@ -202,19 +219,37 @@ function reconciliationSummary(
   const writeOffs = legEntries.filter(
     (entry): entry is Extract<LedgerEntry, { kind: 'written-off' }> => entry.kind === 'written-off'
   );
+  const transferOuts = legEntries.filter(
+    (entry): entry is Extract<LedgerEntry, { kind: 'transfer-out' }> =>
+      entry.kind === 'transfer-out'
+  );
+  const transferIns = legEntries.filter(
+    (entry): entry is Extract<LedgerEntry, { kind: 'transfer-in' }> => entry.kind === 'transfer-in'
+  );
   const recoveredAmount = sweeps.reduce((sum, sweep) => sum + sweep.recoveredAmount, 0);
   const outflowAmount = outflows.reduce((sum, outflow) => sum + outflow.amount, 0);
   const writtenOffAmount = writeOffs.reduce((sum, entry) => sum + entry.amount, 0);
+  const transferOutAmount = transferOuts.reduce((sum, entry) => sum + entry.amount, 0);
+  const transferInAmount = transferIns.reduce((sum, entry) => sum + entry.amount, 0);
   const fees =
     outflows.reduce((sum, outflow) => sum + outflow.fees, 0) +
+    transferOuts.reduce((sum, entry) => sum + entry.fees, 0) +
     sweeps.reduce((sum, sweep) => sum + sweep.fees, 0);
-  const accounted = recoveredAmount + outflowAmount + writtenOffAmount + fees;
-  if (accounted !== funded.amount) {
+  const accounted = recoveredAmount + outflowAmount + writtenOffAmount + transferOutAmount + fees;
+  if (accounted !== funded.amount + transferInAmount) {
     throw new Error(
-      `cannot reconcile ${legId}: conservation mismatch (funded ${funded.amount}, accounted ${accounted})`
+      `cannot reconcile ${legId}: conservation mismatch (funded ${funded.amount} + transfer-in ${transferInAmount}, accounted ${accounted})`
     );
   }
-  return { fundedAmount: funded.amount, recoveredAmount, outflowAmount, writtenOffAmount, fees };
+  return {
+    fundedAmount: funded.amount,
+    recoveredAmount,
+    outflowAmount,
+    writtenOffAmount,
+    transferOutAmount,
+    transferInAmount,
+    fees,
+  };
 }
 
 function validateLedgerSequence(entries: LedgerEntry[]): void {
@@ -227,6 +262,11 @@ function validateLedgerSequence(entries: LedgerEntry[]): void {
       terminal: boolean;
     }
   >();
+  // Unmatched transfer-out entries awaiting their paired transfer-in. Keyed by
+  // from/to/amount; the out entry is always appended first.
+  const openTransfers = new Map<string, number>();
+  const transferKey = (fromLegId: string, toLegId: string, amount: number): string =>
+    `${fromLegId}\u0000${toLegId}\u0000${amount}`;
   for (const [index, entry] of entries.entries()) {
     const current = state.get(entry.legId) ?? {
       funded: false,
@@ -265,6 +305,28 @@ function validateLedgerSequence(entries: LedgerEntry[]): void {
       if (entry.kind === 'sweep' && entry.ok && entry.residualAmount === 0) {
         current.terminalSweep = true;
       }
+    } else if (entry.kind === 'transfer-out') {
+      if (!current.funded) fail(`transfer-out entry before funded for leg "${entry.legId}"`);
+      if (current.terminalSweep) {
+        fail(`transfer-out entry after successful sweep for leg "${entry.legId}"`);
+      }
+      if (entry.toLegId === entry.legId) fail(`transfer-out targets its own leg "${entry.legId}"`);
+      if (!state.get(entry.toLegId)?.funded) {
+        fail(`transfer-out targets unfunded leg "${entry.toLegId}"`);
+      }
+      const key = transferKey(entry.legId, entry.toLegId, entry.amount);
+      openTransfers.set(key, (openTransfers.get(key) ?? 0) + 1);
+    } else if (entry.kind === 'transfer-in') {
+      if (!current.funded) fail(`transfer-in entry before funded for leg "${entry.legId}"`);
+      if (current.terminalSweep) {
+        fail(`transfer-in entry after successful sweep for leg "${entry.legId}"`);
+      }
+      const key = transferKey(entry.fromLegId, entry.legId, entry.amount);
+      const open = openTransfers.get(key) ?? 0;
+      if (open <= 0) {
+        fail(`transfer-in has no matching prior transfer-out for leg "${entry.legId}"`);
+      }
+      openTransfers.set(key, open - 1);
     } else if (entry.kind === 'reconciled') {
       if (!current.funded) fail(`reconciled entry before funded for leg "${entry.legId}"`);
       const summary = (() => {
@@ -281,6 +343,12 @@ function validateLedgerSequence(entries: LedgerEntry[]): void {
       }
       if ((entry.writtenOffAmount ?? 0) !== summary.writtenOffAmount) {
         fail(`reconciled summary mismatch at writtenOffAmount for leg "${entry.legId}"`);
+      }
+      if ((entry.transferOutAmount ?? 0) !== summary.transferOutAmount) {
+        fail(`reconciled summary mismatch at transferOutAmount for leg "${entry.legId}"`);
+      }
+      if ((entry.transferInAmount ?? 0) !== summary.transferInAmount) {
+        fail(`reconciled summary mismatch at transferInAmount for leg "${entry.legId}"`);
       }
       current.terminal = true;
     }
@@ -442,6 +510,36 @@ export class RunLedger {
     this.#append({ kind: 'outflow', legId, ...outflow });
   }
 
+  /**
+   * A declared app-internal move of value between two funded legs (e.g. an
+   * inter-mint rebalance). Both entries are appended together, transfer-out
+   * first, so the sequence validator can require every transfer-in to match a
+   * prior transfer-out. `amount` is the value that arrived at the destination;
+   * `fees` is what the source additionally lost moving it.
+   */
+  recordTransfer(input: {
+    fromLegId: string;
+    toLegId: string;
+    amount: number;
+    fees: number;
+  }): void {
+    this.#fundedFor(input.fromLegId);
+    this.#fundedFor(input.toLegId);
+    this.#append({
+      kind: 'transfer-out',
+      legId: input.fromLegId,
+      amount: input.amount,
+      fees: input.fees,
+      toLegId: input.toLegId,
+    });
+    this.#append({
+      kind: 'transfer-in',
+      legId: input.toLegId,
+      amount: input.amount,
+      fromLegId: input.fromLegId,
+    });
+  }
+
   recordSweep(
     legId: string,
     sweep: {
@@ -477,7 +575,9 @@ export class RunLedger {
     const funded = this.#fundedFor(legId);
     const entries = this.#entriesFor(legId);
     const outflowAmount = entries
-      .filter((entry): entry is Extract<LedgerEntry, { kind: 'outflow' }> => entry.kind === 'outflow')
+      .filter(
+        (entry): entry is Extract<LedgerEntry, { kind: 'outflow' }> => entry.kind === 'outflow'
+      )
       .reduce((sum, entry) => sum + entry.amount + entry.fees, 0);
     const writtenOffAmount = entries
       .filter(
@@ -485,7 +585,16 @@ export class RunLedger {
           entry.kind === 'written-off'
       )
       .reduce((sum, entry) => sum + entry.amount, 0);
-    if (outflowAmount + writtenOffAmount + writeOff.amount > funded.amount) {
+    const transferNet = entries.reduce(
+      (sum, entry) =>
+        entry.kind === 'transfer-out'
+          ? sum + entry.amount + entry.fees
+          : entry.kind === 'transfer-in'
+            ? sum - entry.amount
+            : sum,
+      0
+    );
+    if (outflowAmount + writtenOffAmount + transferNet + writeOff.amount > funded.amount) {
       throw new Error(
         `write-off exceeds funded principal for leg "${legId}": funded ${funded.amount}, already accounted ${outflowAmount + writtenOffAmount}, requested ${writeOff.amount}`
       );
@@ -499,6 +608,8 @@ export class RunLedger {
     recoveredAmount: number;
     outflowAmount: number;
     writtenOffAmount: number;
+    transferOutAmount: number;
+    transferInAmount: number;
     fees: number;
   } {
     const entries = this.#entriesFor(legId);
@@ -517,6 +628,8 @@ export class RunLedger {
       recoveredAmount: result.recoveredAmount,
       outflowAmount: result.outflowAmount,
       ...(result.writtenOffAmount > 0 ? { writtenOffAmount: result.writtenOffAmount } : {}),
+      ...(result.transferOutAmount > 0 ? { transferOutAmount: result.transferOutAmount } : {}),
+      ...(result.transferInAmount > 0 ? { transferInAmount: result.transferInAmount } : {}),
       fees: result.fees,
     });
     return result;

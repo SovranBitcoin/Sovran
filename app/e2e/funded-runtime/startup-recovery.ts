@@ -521,6 +521,12 @@ function assertLedgerOutflowEvidence(
       (entry): entry is Extract<LedgerEntry, { kind: 'outflow' }> =>
         entry.kind === 'outflow' && entry.legId === intent.legId
     )
+    // npc.outflow legs are trusted deliveries: the value leaves over lightning
+    // to the recipient's npubx.cash and neither cocod nor runtime accounting
+    // can observe it, so there is no independent evidence to match. They are
+    // ledgered on the scenario's PAID-tx assert (validator-enforced) and
+    // identified here by their counterparty namespace.
+    .filter((entry) => !entry.counterparty.startsWith('npc:'))
     .map(({ amount }) => amount)
     .sort((left, right) => left - right);
   const cashu = evidence.cashuOutflows
@@ -809,7 +815,13 @@ function acceptedEmptyAssets(
           entry.kind === 'written-off'
       )
       .reduce((sum, entry) => sum + entry.amount, 0);
-    const explained = observedOutflow + writtenOff;
+    const transferredOut = legEntries
+      .filter(
+        (entry): entry is Extract<LedgerEntry, { kind: 'transfer-out' }> =>
+          entry.kind === 'transfer-out'
+      )
+      .reduce((sum, entry) => sum + entry.amount + entry.fees, 0);
+    const explained = observedOutflow + writtenOff + transferredOut;
     const retainedEffectLease = evidence.effectLeases.includes(
       effectLeasePath(session.liabilityDir, intent.runId, intent.legId)
     );
@@ -843,6 +855,16 @@ function accountingForLeg(
         entry.kind === 'written-off' && entry.legId === intent.legId
     )
     .reduce((sum, entry) => sum + entry.amount, 0);
+  const transferOuts = entries.filter(
+    (entry): entry is Extract<LedgerEntry, { kind: 'transfer-out' }> =>
+      entry.kind === 'transfer-out' && entry.legId === intent.legId
+  );
+  const transferIns = entries.filter(
+    (entry): entry is Extract<LedgerEntry, { kind: 'transfer-in' }> =>
+      entry.kind === 'transfer-in' && entry.legId === intent.legId
+  );
+  const transferOutTotal = transferOuts.reduce((sum, entry) => sum + entry.amount + entry.fees, 0);
+  const transferInTotal = transferIns.reduce((sum, entry) => sum + entry.amount, 0);
   const returnedTokens = report.tokens.filter(({ disposition }) => disposition === 'returned');
   const returnedPrincipal = returnedTokens.reduce((sum, entry) => sum + entry.tokenAmount, 0);
   const returnedDelta = returnedTokens.reduce((sum, entry) => sum + entry.counterpartyDelta, 0);
@@ -852,8 +874,9 @@ function accountingForLeg(
     returnedPrincipal +
     outflowAmount +
     outflowFees +
-    writtenOffAmount;
-  if (knownPrincipal !== intent.expectedAmount) {
+    writtenOffAmount +
+    transferOutTotal;
+  if (knownPrincipal !== intent.expectedAmount + transferInTotal) {
     throw new Error('startup recovery has unexplained funded liability principal');
   }
   const sweepFees =

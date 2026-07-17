@@ -20,6 +20,7 @@ import { isValuelessTestMint } from './test-mints';
 import type {
   AssetReconciliation,
   CounterpartyTokenReconciliation,
+  DeclaredAssetTransfer,
   DeclaredRecoveryAsset,
   FundedRecoveryReport,
   RestorePolicy,
@@ -332,7 +333,7 @@ export class FundedRecovery {
               this.#custody.counterSource(asset),
               beforeScan.restore
             );
-            this.#assertRecovery(asset, recovery);
+            this.#assertRecovery(beforeScan, asset, recovery);
             for (const fingerprint of recovery.proofFingerprints) {
               if (fingerprints.has(fingerprint)) {
                 throw new Error('duplicate proof secret found across declared assets');
@@ -563,7 +564,7 @@ export class FundedRecovery {
       this.#custody.counterSource(redemption.asset),
       restore
     );
-    this.#assertRecovery(redemption.asset, reprobe);
+    this.#assertRecovery(this.#custody.snapshot(), redemption.asset, reprobe);
     if (reprobe.totalAmount !== 0 || reprobe.proofFingerprints.length !== 0) {
       throw new Error('post-redemption Cashu re-probe found a non-zero residual');
     }
@@ -716,14 +717,39 @@ export class FundedRecovery {
     });
   }
 
-  #assertRecovery(asset: DeclaredRecoveryAsset, recovery: RecoveredCashuAsset): void {
+  #assertRecovery(
+    record: CustodyRecord,
+    asset: DeclaredRecoveryAsset,
+    recovery: RecoveredCashuAsset
+  ): void {
     if (assetIdentity(recovery.asset) !== assetIdentity(asset)) {
       throw new Error('Cashu backend returned recovery for the wrong asset');
     }
     assertSafeAmount(recovery.totalAmount, 'restored amount');
-    if (recovery.totalAmount > asset.maxPrincipal) {
+    if (recovery.totalAmount > this.#maxRestorable(record, asset)) {
       throw new Error('restored value exceeds the declared asset principal');
     }
+  }
+
+  /** A declared transfer destination may restore up to its own principal plus
+   * every incoming transfer source's full principal; everything else stays
+   * capped at the asset's own declared principal. */
+  #maxRestorable(record: CustodyRecord, asset: DeclaredRecoveryAsset): number {
+    const incoming = (record.transfers ?? []).filter(
+      (transfer) =>
+        transfer.toMintUrl === asset.mintUrl &&
+        transfer.unit === asset.unit &&
+        transfer.accountIndex === asset.accountIndex
+    );
+    return incoming.reduce((max, transfer) => {
+      const source = record.assets.find(
+        (candidate) =>
+          candidate.mintUrl === transfer.fromMintUrl &&
+          candidate.unit === transfer.unit &&
+          candidate.accountIndex === transfer.accountIndex
+      );
+      return max + (source?.maxPrincipal ?? 0);
+    }, asset.maxPrincipal);
   }
 
   #declaredAsset(record: CustodyRecord, requested: DeclaredRecoveryAsset): DeclaredRecoveryAsset {
@@ -750,6 +776,7 @@ export function establishFundedRecovery(options: {
   runDir: string;
   appMnemonic: string;
   assets: readonly DeclaredRecoveryAsset[];
+  transfers?: readonly DeclaredAssetTransfer[];
   restore?: RestorePolicy;
   p2pkPrivateKey?: string;
 }): FundedRecovery {

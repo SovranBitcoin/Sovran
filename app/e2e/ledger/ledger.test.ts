@@ -190,6 +190,8 @@ describe('RunLedger fund lifecycle', () => {
       recoveredAmount: 59,
       outflowAmount: 40,
       writtenOffAmount: 0,
+      transferOutAmount: 0,
+      transferInAmount: 0,
       fees: 1,
     });
     expect(ledger.status().get('leg-a')).toBe('reconciled');
@@ -225,12 +227,119 @@ describe('RunLedger fund lifecycle', () => {
       recoveredAmount: 0,
       outflowAmount: 40,
       writtenOffAmount: 60,
+      transferOutAmount: 0,
+      transferInAmount: 0,
       fees: 0,
     });
     expect(ledger.status().get('leg-a')).toBe('reconciled');
     expect(ledger.read().at(-1)).toEqual(
       expect.objectContaining({ kind: 'reconciled', writtenOffAmount: 60 })
     );
+  });
+
+  it('records a declared transfer as paired entries and reconciles both legs exactly', () => {
+    const minibits: AssetLocation = {
+      mintUrl: 'https://mint.minibits.cash/Bitcoin',
+      unit: 'sat',
+      accountIndex: 0,
+    };
+    const { custody, ledger } = setup();
+    intent(ledger, custody, 'leg-src');
+    intent(ledger, custody, 'leg-dst', minibits);
+    ledger.markFunded('leg-src', { amount: 100, fees: 0 });
+    ledger.markFunded('leg-dst', { amount: 100, fees: 0 });
+
+    ledger.recordTransfer({ fromLegId: 'leg-src', toLegId: 'leg-dst', amount: 45, fees: 2 });
+
+    ledger.recordSweep('leg-src', {
+      asset: SAT_ACCOUNT_0,
+      ok: true,
+      recoveredAmount: 53,
+      residualAmount: 0,
+    });
+    ledger.recordSweep('leg-dst', {
+      asset: minibits,
+      ok: true,
+      recoveredAmount: 145,
+      residualAmount: 0,
+    });
+    expect(ledger.reconcile('leg-src')).toEqual({
+      ok: true,
+      fundedAmount: 100,
+      recoveredAmount: 53,
+      outflowAmount: 0,
+      writtenOffAmount: 0,
+      transferOutAmount: 45,
+      transferInAmount: 0,
+      fees: 2,
+    });
+    expect(ledger.reconcile('leg-dst')).toEqual({
+      ok: true,
+      fundedAmount: 100,
+      recoveredAmount: 145,
+      outflowAmount: 0,
+      writtenOffAmount: 0,
+      transferOutAmount: 0,
+      transferInAmount: 45,
+      fees: 0,
+    });
+    expect(ledger.status().get('leg-src')).toBe('reconciled');
+    expect(ledger.status().get('leg-dst')).toBe('reconciled');
+    expect(ledger.read().filter((entry) => entry.kind === 'reconciled')).toEqual([
+      expect.objectContaining({ legId: 'leg-src', transferOutAmount: 45, fees: 2 }),
+      expect.objectContaining({ legId: 'leg-dst', transferInAmount: 45 }),
+    ]);
+  });
+
+  it('refuses transfers on unfunded legs and a transfer-in with no matching prior transfer-out', () => {
+    const minibits: AssetLocation = {
+      mintUrl: 'https://mint.minibits.cash/Bitcoin',
+      unit: 'sat',
+      accountIndex: 0,
+    };
+    const { custody, ledger } = setup();
+    intent(ledger, custody, 'leg-src');
+    intent(ledger, custody, 'leg-dst', minibits);
+    ledger.markFunded('leg-src', { amount: 100, fees: 0 });
+    expect(() =>
+      ledger.recordTransfer({ fromLegId: 'leg-src', toLegId: 'leg-dst', amount: 45, fees: 2 })
+    ).toThrow(/funded entry missing/);
+
+    ledger.markFunded('leg-dst', { amount: 100, fees: 0 });
+    appendFileSync(
+      ledger.path,
+      `${JSON.stringify({
+        v: 1,
+        runId: 'run-1',
+        legId: 'leg-dst',
+        ts: 999,
+        kind: 'transfer-in',
+        amount: 45,
+        fromLegId: 'leg-src',
+      })}\n`
+    );
+    expect(() => ledger.read()).toThrow(/no matching prior transfer-out/);
+  });
+
+  it('refuses to reconcile a transfer leg whose sweep ignores the moved value', () => {
+    const minibits: AssetLocation = {
+      mintUrl: 'https://mint.minibits.cash/Bitcoin',
+      unit: 'sat',
+      accountIndex: 0,
+    };
+    const { custody, ledger } = setup();
+    intent(ledger, custody, 'leg-src');
+    intent(ledger, custody, 'leg-dst', minibits);
+    ledger.markFunded('leg-src', { amount: 100, fees: 0 });
+    ledger.markFunded('leg-dst', { amount: 100, fees: 0 });
+    ledger.recordTransfer({ fromLegId: 'leg-src', toLegId: 'leg-dst', amount: 45, fees: 2 });
+    ledger.recordSweep('leg-dst', {
+      asset: minibits,
+      ok: true,
+      recoveredAmount: 100,
+      residualAmount: 0,
+    });
+    expect(() => ledger.reconcile('leg-dst')).toThrow(/conservation mismatch/);
   });
 
   it('refuses to reconcile when a write-off does not close conservation', () => {

@@ -6,6 +6,17 @@ export interface DeclaredRecoveryAsset extends Omit<AssetLocation, 'accountIndex
   maxPrincipal: number;
 }
 
+/** A scenario-declared app-internal move of value between two declared assets
+ * (e.g. an inter-mint rebalance). The destination may then legitimately restore
+ * more than its own principal and the source less, within `maxFeeSats`. */
+export interface DeclaredAssetTransfer {
+  fromMintUrl: string;
+  toMintUrl: string;
+  unit: string;
+  accountIndex: 0;
+  maxFeeSats: number;
+}
+
 export interface RestorePolicy {
   gapLimit: number;
   batchSize: number;

@@ -84,7 +84,11 @@ function crashWindowFor(entries: ReturnType<typeof parseLedgerText>, legId: stri
       ? 'sweep-durable-reconcile-pending'
       : 'sweep-durable-liability-remains';
   }
-  if (latest?.kind === 'outflow') {
+  if (
+    latest?.kind === 'outflow' ||
+    latest?.kind === 'transfer-out' ||
+    latest?.kind === 'transfer-in'
+  ) {
     return 'outflow-durable-sweep-pending';
   }
   if (latest?.kind === 'funded') {

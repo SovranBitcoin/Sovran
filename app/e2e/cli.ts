@@ -28,6 +28,7 @@ import {
 } from './drivers/simulator-session';
 import { SimulatorDriver } from './drivers/simulator';
 import { createSimVideoRecorder } from './drivers/video';
+import { createSimulatorAppDataCapturer } from './drivers/app-data';
 import { generateControlledP2PKKeypair } from './funded';
 import { withBoundedCashuRequests } from './funded-runtime/cashu-request-boundary';
 import {
@@ -132,9 +133,7 @@ function fundsWriteOff(options: {
   for (const session of sessions) {
     const liabilityDir = join(runDir, session, 'funded-liability');
     const entries = parseLedgerText(readFileSync(join(liabilityDir, 'ledger.jsonl'), 'utf8'));
-    const intent = entries.find(
-      (entry) => entry.kind === 'intent' && entry.legId === options.leg
-    );
+    const intent = entries.find((entry) => entry.kind === 'intent' && entry.legId === options.leg);
     if (!intent) continue;
     const ledger = new RunLedger(liabilityDir, entries[0]!.runId);
     const status = ledger.status().get(options.leg);
@@ -149,11 +148,13 @@ function fundsWriteOff(options: {
     if (!funded) fail(`leg "${options.leg}" was never funded — nothing to write off`);
     const accounted = legEntries.reduce(
       (sum, entry) =>
-        entry.kind === 'outflow'
+        entry.kind === 'outflow' || entry.kind === 'transfer-out'
           ? sum + entry.amount + entry.fees
           : entry.kind === 'written-off'
             ? sum + entry.amount
-            : sum,
+            : entry.kind === 'transfer-in'
+              ? sum - entry.amount
+              : sum,
       0
     );
     const residual = funded.amount - accounted;
@@ -578,6 +579,7 @@ try {
               runDir: sessionDir,
               runId: sessionId,
               assets: scenario.funds.assets,
+              ...(scenario.funds.transfers ? { transfers: scenario.funds.transfers } : {}),
               cocod: liveCocod.cocod,
               ...(controlledP2PK ? { p2pkPrivateKey: controlledP2PK.privateKey } : {}),
               resolveLightningAddress: ({ address, amountSats, timeoutMs }) =>
@@ -601,6 +603,11 @@ try {
                 runDir,
                 onWarning: (message) => bus.emit({ type: 'lifecycle', message }),
               });
+          const appData = createSimulatorAppDataCapturer({
+            udid: session.udid,
+            signal,
+            onWarning: (message) => bus.emit({ type: 'lifecycle', message }),
+          });
           simulator.start();
           try {
             await runGroup({
@@ -610,6 +617,7 @@ try {
               artifacts,
               capabilities: caps,
               signal,
+              appData,
               ...(video ? { video } : {}),
               ...(runtime ? { counterparty: runtime, reconcile: () => runtime!.reconcile() } : {}),
             });

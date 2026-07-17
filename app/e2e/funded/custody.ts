@@ -15,6 +15,7 @@ import { deriveSovranAccount0CashuSeed } from './derivation';
 import { controlledP2PKPublicKey } from './p2pk';
 import {
   DEFAULT_RESTORE_POLICY,
+  type DeclaredAssetTransfer,
   type DeclaredRecoveryAsset,
   type RestorePolicy,
   type AssetReconciliation,
@@ -25,6 +26,14 @@ const assetSchema = z.strictObject({
   unit: z.string().min(1).max(16),
   accountIndex: z.literal(0),
   maxPrincipal: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+});
+
+const transferSchema = z.strictObject({
+  fromMintUrl: z.string().url(),
+  toMintUrl: z.string().url(),
+  unit: z.string().min(1).max(16),
+  accountIndex: z.literal(0),
+  maxFeeSats: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
 });
 
 const restorePolicySchema = z.strictObject({
@@ -91,6 +100,7 @@ const custodyRecordSchema = z.strictObject({
     .regex(/^[0-9a-f]{64}$/)
     .optional(),
   assets: z.array(assetSchema).min(1),
+  transfers: z.array(transferSchema).optional(),
   restore: restorePolicySchema,
   counters: z.array(counterSchema),
   redemptions: z.array(redemptionSchema),
@@ -122,6 +132,31 @@ function assertAssets(input: readonly DeclaredRecoveryAsset[]): DeclaredRecovery
   return parsed;
 }
 
+function assertTransfers(
+  transfers: readonly DeclaredAssetTransfer[],
+  assets: readonly DeclaredRecoveryAsset[]
+): DeclaredAssetTransfer[] {
+  const result = z.array(transferSchema).safeParse(transfers);
+  if (!result.success) throw new Error('invalid funded transfer declaration');
+  for (const transfer of result.data) {
+    const declared = (mintUrl: string) =>
+      assets.some(
+        (asset) =>
+          asset.mintUrl === mintUrl &&
+          asset.unit === transfer.unit &&
+          asset.accountIndex === transfer.accountIndex
+      );
+    if (
+      transfer.fromMintUrl === transfer.toMintUrl ||
+      !declared(transfer.fromMintUrl) ||
+      !declared(transfer.toMintUrl)
+    ) {
+      throw new Error('funded transfer must connect two distinct declared assets');
+    }
+  }
+  return result.data;
+}
+
 function assertPrivateRegularFile(path: string): void {
   const stat = lstatSync(path);
   if (!stat.isFile() || stat.isSymbolicLink()) {
@@ -147,6 +182,7 @@ function readRecord(path: string): CustodyRecord {
   deriveSovranAccount0CashuSeed(parsed.data.appMnemonic);
   if (parsed.data.p2pkPrivateKey) controlledP2PKPublicKey(parsed.data.p2pkPrivateKey);
   assertAssets(parsed.data.assets);
+  if (parsed.data.transfers) assertTransfers(parsed.data.transfers, parsed.data.assets);
   return parsed.data;
 }
 
@@ -163,6 +199,7 @@ export class RecoveryCustody {
     runDir: string;
     appMnemonic: string;
     assets: readonly DeclaredRecoveryAsset[];
+    transfers?: readonly DeclaredAssetTransfer[];
     restore?: RestorePolicy;
     p2pkPrivateKey?: string;
   }): RecoveryCustody {
@@ -171,6 +208,9 @@ export class RecoveryCustody {
     deriveSovranAccount0CashuSeed(options.appMnemonic);
     if (options.p2pkPrivateKey) controlledP2PKPublicKey(options.p2pkPrivateKey);
     const assets = assertAssets(options.assets);
+    const transfers = options.transfers?.length
+      ? assertTransfers(options.transfers, assets)
+      : undefined;
     const restore = restorePolicySchema.parse(options.restore ?? DEFAULT_RESTORE_POLICY);
     const dir = join(options.runDir, 'funded-custody');
     const locksDir = join(dir, 'locks');
@@ -185,6 +225,7 @@ export class RecoveryCustody {
         appMnemonic: options.appMnemonic.trim().toLowerCase().split(/\s+/).join(' '),
         ...(options.p2pkPrivateKey ? { p2pkPrivateKey: options.p2pkPrivateKey } : {}),
         assets,
+        ...(transfers ? { transfers } : {}),
         restore,
         counters: [],
         redemptions: [],

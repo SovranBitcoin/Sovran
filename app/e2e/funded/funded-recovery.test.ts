@@ -67,6 +67,48 @@ describe('funded recovery custody', () => {
     ).toThrow(/duplicate asset/);
   });
 
+  it('persists declared transfers in custody and rejects transfers between undeclared assets', () => {
+    const minibits = {
+      mintUrl: 'https://mint.minibits.cash/Bitcoin',
+      unit: 'sat',
+      accountIndex: 0,
+      maxPrincipal: 50,
+    } as const;
+    const transfer = {
+      fromMintUrl: minibits.mintUrl,
+      toMintUrl: asset.mintUrl,
+      unit: 'sat',
+      accountIndex: 0,
+      maxFeeSats: 10,
+    } as const;
+    const runDir = mkdtempSync(join(tmpdir(), 'sovran-funded-recovery-'));
+    const established = establishFundedRecovery({
+      runDir,
+      appMnemonic: APP_MNEMONIC,
+      assets: [asset, minibits],
+      transfers: [transfer],
+    });
+    expect(JSON.parse(readFileSync(established.custodyPath, 'utf8')).transfers).toEqual([transfer]);
+    expect(openFundedRecovery({ runDir }).assets).toEqual([asset, minibits]);
+
+    expect(() =>
+      establishFundedRecovery({
+        runDir: mkdtempSync(join(tmpdir(), 'sovran-funded-recovery-')),
+        appMnemonic: APP_MNEMONIC,
+        assets: [asset],
+        transfers: [transfer],
+      })
+    ).toThrow(/distinct declared assets/);
+    expect(() =>
+      establishFundedRecovery({
+        runDir: mkdtempSync(join(tmpdir(), 'sovran-funded-recovery-')),
+        appMnemonic: APP_MNEMONIC,
+        assets: [asset, minibits],
+        transfers: [{ ...transfer, fromMintUrl: asset.mintUrl }],
+      })
+    ).toThrow(/distinct declared assets/);
+  });
+
   it('keeps an optional controlled P2PK private key in custody and exposes only its 02-prefixed public key', () => {
     const runDir = mkdtempSync(join(tmpdir(), 'sovran-funded-recovery-'));
     const keypair = generateControlledP2PKKeypair();
@@ -179,6 +221,77 @@ describe('funded recovery reconciliation', () => {
     await recovery.reconcile({ cashu, cocod, acceptEmptyAssets: [asset] });
     recovery.disposePrivateMaterial();
     expect(existsSync(recovery.custodyPath)).toBe(false);
+  });
+
+  it('caps restored value at the asset principal unless a declared transfer raises the allowance', async () => {
+    const minibits = {
+      mintUrl: 'https://mint.minibits.cash/Bitcoin',
+      unit: 'sat',
+      accountIndex: 0,
+      maxPrincipal: 50,
+    } as const;
+    const destination = { ...asset, maxPrincipal: 50 } as const;
+    const cashu: CashuRecoveryBackend = {
+      restore: async (requestedAsset) => ({
+        asset: requestedAsset,
+        totalAmount: requestedAsset.mintUrl === destination.mintUrl ? 95 : 0,
+        proofFingerprints: requestedAsset.mintUrl === destination.mintUrl ? ['proof-dst'] : [],
+      }),
+      prepareSendAll: async () => {
+        throw new Error('destination-cap-accepted');
+      },
+      inspectToken: async () => {
+        throw new Error('not used');
+      },
+    };
+    const cocod: CocodCounterparty = {
+      status: async () => 'UNLOCKED',
+      balanceSnapshot: async () => balances(0),
+      exactBalance: () => 0,
+      createCashu: async () => {
+        throw new Error('not used');
+      },
+      receiveCashu: async () => {
+        throw new Error('not used');
+      },
+      createBolt11: async () => {
+        throw new Error('not used');
+      },
+      payBolt11: async () => {
+        throw new Error('not used');
+      },
+      npcAddress: async () => {
+        throw new Error('not used');
+      },
+    };
+
+    const undeclared = establishFundedRecovery({
+      runDir: mkdtempSync(join(tmpdir(), 'sovran-funded-recovery-')),
+      appMnemonic: APP_MNEMONIC,
+      assets: [destination, minibits],
+    });
+    await expect(undeclared.reconcile({ cashu, cocod })).rejects.toThrow(
+      /restored value exceeds the declared asset principal/
+    );
+
+    const declared = establishFundedRecovery({
+      runDir: mkdtempSync(join(tmpdir(), 'sovran-funded-recovery-')),
+      appMnemonic: APP_MNEMONIC,
+      assets: [destination, minibits],
+      transfers: [
+        {
+          fromMintUrl: minibits.mintUrl,
+          toMintUrl: destination.mintUrl,
+          unit: 'sat',
+          accountIndex: 0,
+          maxFeeSats: 10,
+        },
+      ],
+    });
+    const failure = await declared.reconcile({ cashu, cocod }).catch((error: Error) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toContain('destination-cap-accepted');
+    expect((failure as Error).message).not.toContain('restored value exceeds');
   });
 
   it('reconciles a valueless test-mint asset without scanning and terminalizes its token even when the mint fails', async () => {

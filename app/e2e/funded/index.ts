@@ -16,7 +16,7 @@ export type {
   CocodCounterparty,
   CocodStatus,
 } from './cocod';
-export type { DeclaredRecoveryAsset, RestorePolicy } from './types';
+export type { DeclaredAssetTransfer, DeclaredRecoveryAsset, RestorePolicy } from './types';
 export type {
   AssetReconciliation,
   CounterpartyTokenReconciliation,

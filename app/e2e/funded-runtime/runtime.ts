@@ -9,10 +9,16 @@ import type { CounterpartyStep } from '../schema';
 import {
   establishFundedRecovery,
   type CocodCounterparty,
+  type DeclaredAssetTransfer,
   type DeclaredRecoveryAsset,
   type FundedRecoveryReport,
   type InspectedCashuToken,
 } from '../funded';
+import {
+  buildPaymentRequestPayload,
+  decodeNostrPaymentRequest,
+  deliverPaymentRequestPayload,
+} from './payment-request-payer';
 import type { FundedRecovery } from '../funded/funded-recovery';
 import { assetIdentity } from '../funded/custody';
 import { isValuelessTestMint, VALUELESS_WRITE_OFF_REASON } from '../funded/test-mints';
@@ -95,6 +101,7 @@ export interface FundedScenarioRuntimeOptions {
   runDir: string;
   runId: string;
   assets: readonly DeclaredRecoveryAsset[];
+  transfers?: readonly DeclaredAssetTransfer[];
   cocod: CocodCounterparty;
   p2pkPrivateKey?: string;
   resolveLightningAddress: (input: {
@@ -103,6 +110,8 @@ export interface FundedScenarioRuntimeOptions {
     timeoutMs: number;
   }) => Promise<string>;
   decodeBolt11Amount?: (invoice: string) => number | null;
+  /** NIP-17 gift-wrap delivery for paymentRequest.pay; injectable for tests. */
+  deliverPaymentRequest?: typeof deliverPaymentRequestPayload;
   refreshApp?: () => Promise<void>;
   now?: () => number;
   sleep?: (milliseconds: number) => Promise<void>;
@@ -110,6 +119,7 @@ export interface FundedScenarioRuntimeOptions {
     runDir: string;
     appMnemonic: string;
     assets: readonly DeclaredRecoveryAsset[];
+    transfers?: readonly DeclaredAssetTransfer[];
     p2pkPrivateKey?: string;
   }) => RecoveryPort;
 }
@@ -134,7 +144,7 @@ function rawSecret(value: unknown, kind: Secret['kind']): string {
 }
 
 function exactAssetFromStep(
-  step: CounterpartyStep,
+  step: Exclude<CounterpartyStep, { operation: 'npc.address' }>,
   declared: readonly DeclaredRecoveryAsset[]
 ): DeclaredRecoveryAsset {
   if (
@@ -272,6 +282,9 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
   readonly #p2pkPrivateKey?: string;
   readonly #resolveLightningAddress: FundedScenarioRuntimeOptions['resolveLightningAddress'];
   readonly #decodeBolt11Amount: NonNullable<FundedScenarioRuntimeOptions['decodeBolt11Amount']>;
+  readonly #deliverPaymentRequest: NonNullable<
+    FundedScenarioRuntimeOptions['deliverPaymentRequest']
+  >;
   readonly #refreshApp?: () => Promise<void>;
   readonly #now: () => number;
   readonly #sleep: (milliseconds: number) => Promise<void>;
@@ -280,6 +293,10 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
   readonly #accounting: CocodAccounting;
   readonly #legs = new Map<string, LiveLeg>();
   readonly #outflowTotals = new Map<string, number>();
+  /** Per-asset budget for sender-side melt fees on trusted-delivery outflows
+   * (npc.outflow maxFeeSats); consumed by the recovery conservation check. */
+  readonly #outflowFeeBudgets = new Map<string, number>();
+  readonly #transfers: DeclaredAssetTransfer[];
   #coordinator: FundingCoordinator;
   #recovery?: RecoveryPort;
   #mnemonic?: Secret;
@@ -310,6 +327,28 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
       seen.add(id);
       return { ...asset };
     });
+    this.#transfers = (options.transfers ?? []).map((transfer) => {
+      const declared = (mintUrl: string) =>
+        this.#assets.some(
+          (asset) =>
+            asset.mintUrl === mintUrl &&
+            asset.unit === transfer.unit &&
+            asset.accountIndex === transfer.accountIndex
+        );
+      if (
+        transfer.fromMintUrl === transfer.toMintUrl ||
+        !declared(transfer.fromMintUrl) ||
+        !declared(transfer.toMintUrl) ||
+        !Number.isSafeInteger(transfer.maxFeeSats) ||
+        transfer.maxFeeSats <= 0
+      ) {
+        throw new Error('funded runtime received an invalid declared transfer');
+      }
+      if (isValuelessTestMint(transfer.fromMintUrl) || isValuelessTestMint(transfer.toMintUrl)) {
+        throw new Error('valueless test mints cannot be declared transfer endpoints');
+      }
+      return { ...transfer };
+    });
     this.#runDir = options.runDir;
     this.#runId = options.runId;
     this.#cocod = options.cocod;
@@ -317,6 +356,7 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
     this.#resolveLightningAddress = options.resolveLightningAddress;
     this.#decodeBolt11Amount =
       options.decodeBolt11Amount ?? ((invoice) => decodeBolt11Invoice(invoice)?.amountSat ?? null);
+    this.#deliverPaymentRequest = options.deliverPaymentRequest ?? deliverPaymentRequestPayload;
     this.#refreshApp = options.refreshApp;
     this.#now = options.now ?? (() => Date.now());
     this.#sleep =
@@ -371,6 +411,7 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
       runDir: this.#runDir,
       appMnemonic: normalized,
       assets: this.#assets,
+      ...(this.#transfers.length > 0 ? { transfers: this.#transfers } : {}),
       ...(this.#p2pkPrivateKey ? { p2pkPrivateKey: this.#p2pkPrivateKey } : {}),
     });
     this.#mnemonic = secret('mnemonic', normalized);
@@ -378,6 +419,13 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
   }
 
   async execute(step: CounterpartyStep): Promise<{ output?: Secret }> {
+    // npc.address is read-only and mint-independent — the only counterparty
+    // op without exact-asset fields, so it resolves before asset validation.
+    // No accounting: fetching cocod's receiving address moves no value.
+    if (step.operation === 'npc.address') {
+      const address = await this.#cocod.npcAddress();
+      return { output: secret('lightning-address', address) };
+    }
     const asset = exactAssetFromStep(step, this.#assets);
     const amount = 'amount' in step ? exactAmount(step.amount, step.operation) : undefined;
     const timeoutMs = step.timeoutMs ?? 60_000;
@@ -501,6 +549,81 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
         await this.#fund(asset, amount!, () => this.#payBolt11(asset, invoice, amount!));
         return {};
       }
+      case 'npc.outflow': {
+        const address = rawSecret(step.address, 'lightning-address');
+        // Trusted delivery: cocod exposes no npc claim/balance surface, so
+        // the credit side of an app→npubx.cash send is unobservable. The
+        // scenario asserts the app's PAID melt tx BEFORE authoring this step
+        // (schema contract); this records the outflow leg on that app-side
+        // evidence. cocod's own balance must not move — assert it.
+        const before = await this.#exactBalance(asset);
+        this.#accounting.assertCurrent(asset, before);
+        await this.#outflow(
+          asset,
+          amount!,
+          async () => {
+            const after = await this.#exactBalance(asset);
+            if (after !== before) {
+              throw new Error('npc outflow unexpectedly moved cocod-side value');
+            }
+            return {
+              amount: amount!,
+              fees: 0,
+              txId: `npc-${fingerprint(address).slice(0, 16)}`,
+            };
+          },
+          `npc:${address}`
+        );
+        if (step.maxFeeSats) {
+          const id = assetIdentity(asset);
+          this.#outflowFeeBudgets.set(id, (this.#outflowFeeBudgets.get(id) ?? 0) + step.maxFeeSats);
+        }
+        return {};
+      }
+      case 'paymentRequest.pay': {
+        // Same value direction as cashu.create (cocod → app), but delivery is
+        // the harness gift-wrapping the NUT-18 payload to the request's Nostr
+        // inbox instead of the clipboard. The captured creq is public routing
+        // metadata (never a typed secret), validated here after interpolation.
+        const target = decodeNostrPaymentRequest(step.request);
+        if (target.mints.length > 0 && !target.mints.includes(asset.mintUrl)) {
+          throw new Error('payment request does not advertise the declared mint');
+        }
+        if (target.unit && target.unit !== asset.unit) {
+          throw new Error('payment request unit differs from the declared asset unit');
+        }
+        const recovery = this.#requireRecovery();
+        await this.#fund(asset, amount!, async () => {
+          const before = await this.#exactBalance(asset);
+          this.#accounting.assertCurrent(asset, before);
+          const created = await recovery.createCounterpartyCashu({
+            asset,
+            amount: amount!,
+            cocod: this.#cocod,
+          });
+          const after = await this.#exactBalance(asset);
+          if (before - after < amount!) {
+            throw new Error('cocod Cashu creation did not debit the declared principal');
+          }
+          const payloadJson = buildPaymentRequestPayload({
+            requestId: target.requestId,
+            token: created.token,
+            mintUrl: asset.mintUrl,
+            unit: asset.unit,
+            amount: amount!,
+            memo: '[E2E] payment request',
+          });
+          await this.#deliverPaymentRequest({
+            payloadJson,
+            receiverPubkey: target.receiverPubkey,
+            relays: target.relays,
+            timeoutMs,
+          });
+          this.#accounting.record('paymentRequest.pay', asset, before, after);
+          return { amount: amount!, fees: 0 };
+        });
+        return {};
+      }
       case 'recovery.sweep':
         await this.#reconcileHost();
         await this.#refreshAfterSweep();
@@ -621,7 +744,8 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
   async #outflow(
     asset: DeclaredRecoveryAsset,
     amount: number,
-    effect: () => Promise<{ amount: number; fees: number }>
+    effect: () => Promise<{ amount: number; fees: number }>,
+    counterparty = 'cocod-test-wallet'
   ): Promise<void> {
     const current = this.#legs.get(assetIdentity(asset));
     if (!current || current.state !== 'funded') {
@@ -630,7 +754,7 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
     await this.#stage('outflow', asset, effect, async () => {
       const funded = await this.#coordinator.outflow(current, {
         amount,
-        counterparty: 'cocod-test-wallet',
+        counterparty,
       });
       this.#legs.set(assetIdentity(asset), funded);
     });
@@ -749,9 +873,24 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
       this.#accounting.assertCurrent(asset, balance);
       before.set(assetIdentity(asset), balance);
     }
+    // A declared transfer may fully drain its source asset, so an empty scan
+    // there is an expected terminal state, not a retryable anomaly.
+    const transferSourceIds = new Set(
+      this.#transfers.map((transfer) =>
+        locationIdentity({
+          mintUrl: transfer.fromMintUrl,
+          unit: transfer.unit,
+          accountIndex: transfer.accountIndex,
+        })
+      )
+    );
     const acceptEmptyAssets = this.#assets.filter((asset) => {
       const leg = this.#legs.get(assetIdentity(asset));
-      return !leg || (this.#outflowTotals.get(assetIdentity(asset)) ?? 0) === asset.maxPrincipal;
+      return (
+        !leg ||
+        (this.#outflowTotals.get(assetIdentity(asset)) ?? 0) === asset.maxPrincipal ||
+        transferSourceIds.has(assetIdentity(asset))
+      );
     });
     const report = await recovery.reconcile({
       cocod: this.#cocod,
@@ -761,6 +900,7 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
       const after = await this.#exactBalance(asset);
       this.#accounting.record('recovery.sweep', asset, before.get(assetIdentity(asset))!, after);
     }
+    const adjustedExpected = this.#deriveTransferAdjustments(report);
     const sweepResults = new Map<
       string,
       { ok: true; recoveredAmount: number; residualAmount: 0; fees: number }
@@ -768,7 +908,7 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
     for (const asset of this.#assets) {
       const id = assetIdentity(asset);
       const leg = this.#legs.get(id);
-      const expectedPrincipal = leg ? asset.maxPrincipal : 0;
+      const expectedPrincipal = adjustedExpected.get(id)!;
       const restored = report.assets.find((entry) => assetIdentity(entry.asset) === id);
       if (!restored) throw new Error('funded recovery omitted a declared asset reconciliation');
       // Valueless test mints are exempt from exact conservation: the app's
@@ -833,7 +973,13 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
         restored.restoredAmount +
         returnedTokens.reduce((sum, entry) => sum + entry.tokenAmount, 0) +
         outflowAmount;
-      if (accountedPrincipal !== expectedPrincipal) {
+      // A trusted-delivery outflow (npc.outflow) melts over lightning, and the
+      // sender-side melt fee is observable to neither cocod nor the sweep. The
+      // step's declared maxFeeSats bounds how much of the principal may be
+      // attributed to that fee; anything beyond the budget stays unexplained.
+      const outflowFeeShortfall = expectedPrincipal - accountedPrincipal;
+      const outflowFeeBudget = this.#outflowFeeBudgets.get(id) ?? 0;
+      if (outflowFeeShortfall < 0 || outflowFeeShortfall > outflowFeeBudget) {
         throw new Error('funded recovery left declared principal unexplained');
       }
       const observedRecoveryFees =
@@ -843,7 +989,7 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
           (sum, entry) => sum + (entry.tokenAmount - entry.counterpartyDelta),
           0
         );
-      if (fees !== observedRecoveryFees) {
+      if (fees !== observedRecoveryFees + outflowFeeShortfall) {
         throw new Error('funded recovery fee total was not independently observed');
       }
       sweepResults.set(id, {
@@ -855,6 +1001,69 @@ export class FundedScenarioRuntime implements CounterpartyExecutor {
     }
     this.#report = report;
     this.#sweepResults = sweepResults;
+  }
+
+  /** Explain declared app-internal transfers: derive each transfer's actual
+   * amount and fee from the recovery report, record the paired ledger entries,
+   * and return per-asset expected principals adjusted so the existing exact
+   * per-asset conservation checks close. Without declared transfers the map
+   * simply mirrors each leg's declared principal. */
+  #deriveTransferAdjustments(report: FundedRecoveryReport): Map<string, number> {
+    const adjusted = new Map<string, number>();
+    for (const asset of this.#assets) {
+      const id = assetIdentity(asset);
+      adjusted.set(id, this.#legs.get(id) ? asset.maxPrincipal : 0);
+    }
+    if (this.#transfers.length === 0) return adjusted;
+    const accountedFor = (id: string): number => {
+      const restored = report.assets.find((entry) => assetIdentity(entry.asset) === id);
+      if (!restored) throw new Error('funded recovery omitted a declared asset reconciliation');
+      const returnedTokens = report.counterpartyTokens.filter(
+        (entry) => assetIdentity(entry.asset) === id && entry.disposition === 'returned'
+      );
+      return (
+        restored.restoredAmount +
+        returnedTokens.reduce((sum, entry) => sum + entry.tokenAmount, 0) +
+        (this.#outflowTotals.get(id) ?? 0)
+      );
+    };
+    for (const transfer of this.#transfers) {
+      const fromId = locationIdentity({
+        mintUrl: transfer.fromMintUrl,
+        unit: transfer.unit,
+        accountIndex: transfer.accountIndex,
+      });
+      const toId = locationIdentity({
+        mintUrl: transfer.toMintUrl,
+        unit: transfer.unit,
+        accountIndex: transfer.accountIndex,
+      });
+      const arrived = accountedFor(toId) - adjusted.get(toId)!;
+      const departed = adjusted.get(fromId)! - accountedFor(fromId);
+      // A declared transfer that never executed leaves both sides exact.
+      if (arrived === 0 && departed === 0) continue;
+      if (arrived <= 0 || departed < arrived) {
+        throw new Error('funded recovery cannot conserve declared principal');
+      }
+      const transferFee = departed - arrived;
+      if (transferFee > transfer.maxFeeSats) {
+        throw new Error('declared transfer exceeded its fee budget');
+      }
+      const fromLeg = this.#legs.get(fromId);
+      const toLeg = this.#legs.get(toId);
+      if (!fromLeg || !toLeg) {
+        throw new Error('declared transfer moved value without both funded legs');
+      }
+      this.#ledger.recordTransfer({
+        fromLegId: fromLeg.legId,
+        toLegId: toLeg.legId,
+        amount: arrived,
+        fees: transferFee,
+      });
+      adjusted.set(toId, adjusted.get(toId)! + arrived);
+      adjusted.set(fromId, adjusted.get(fromId)! - departed);
+    }
+    return adjusted;
   }
 
   async #reconcileHost(): Promise<void> {
