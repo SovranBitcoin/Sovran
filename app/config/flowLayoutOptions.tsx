@@ -51,6 +51,11 @@ const FlowHeaderButton = memo(function FlowHeaderButton({
       icon={
         isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
       }
+      // ScreenHeaderAction is AX-visible only with an accessibilityLabel; the
+      // labels deliberately avoid "Close"/"Back", which in-flow content buttons
+      // already use as visible text.
+      accessibilityLabel={isFirstScreen ? 'Close screen' : 'Go back'}
+      testID={isFirstScreen ? 'flow-header-close' : 'flow-header-back'}
       onPress={() => router.back()}
     />
   );

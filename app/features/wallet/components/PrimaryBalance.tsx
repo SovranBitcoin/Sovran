@@ -340,7 +340,14 @@ export function PrimaryBalance({
         <View
           style={isSatUnit ? undefined : styles.hiddenSlot}
           pointerEvents={isSatUnit ? 'auto' : 'none'}>
-          <FiatCurrencyPill displayText={isSatUnit ? displayText : '≈ 0.00'} textSize={12} />
+          {/* testID only on the live (sat-page) pill — the hidden layout slots
+              on fiat pages would otherwise duplicate the id in the AX tree. */}
+          <FiatCurrencyPill
+            displayText={isSatUnit ? displayText : '≈ 0.00'}
+            textSize={12}
+            testID={isSatUnit ? 'wallet-fiat-pill' : undefined}
+            accessibilityLabel={isSatUnit ? 'Change display currency' : undefined}
+          />
         </View>
         <EcashStatusPill
           label="PENDING"

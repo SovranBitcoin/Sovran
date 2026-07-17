@@ -21,9 +21,18 @@ interface HistoryEntryRefreshProps {
   mintInfo?: GetInfoResponse | null;
   historyEntry: Partial<HistoryEntry> & { type: HistoryEntry['type']; state?: string };
   onPress?: () => void;
+  /** Pass BOTH testID and accessibilityLabel or the row is AX-invisible on iOS. */
+  testID?: string;
+  accessibilityLabel?: string;
 }
 
-export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: HistoryEntryRefreshProps) {
+export function HistoryEntryRefresh({
+  mintInfo,
+  historyEntry,
+  onPress,
+  testID,
+  accessibilityLabel,
+}: HistoryEntryRefreshProps) {
   const foreground = useThemeColor('foreground');
   const paymentCopy = usePaymentCopyResolver();
   const loading = !mintInfo;
@@ -84,6 +93,8 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
           {onPress ? (
             <PressableFeedback
               animation={false}
+              testID={testID}
+              accessibilityLabel={accessibilityLabel}
               onPress={() => {
                 paymentLog.info('tx.history_refresh.press', {
                   type: historyEntry.type,

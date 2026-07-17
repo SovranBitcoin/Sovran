@@ -43,6 +43,7 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
     <Log name="SwapTransactionRow">
       <Pressable
         className="flex-row items-center justify-between bg-transparent px-4 py-5"
+        testID={`swap-row-${group.id}`}
         onPress={handlePress}>
         <HStack spacing={12} flex={1}>
           <View className="relative h-7 w-7 items-center justify-center bg-transparent">

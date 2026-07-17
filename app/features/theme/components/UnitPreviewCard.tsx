@@ -203,7 +203,15 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
   if (!onPress) return card;
 
   return (
-    <PressableFeedback onPress={onPress} animation={false}>
+    // The pressable carries the AX identity: the inner card View's testID is
+    // not an accessibility element, so device tests could never address a
+    // gallery album card without this.
+    <PressableFeedback
+      onPress={onPress}
+      animation={false}
+      testID={testID}
+      accessible={!!testID}
+      accessibilityLabel={label ?? themeName}>
       <PressableFeedback.Scale>{card}</PressableFeedback.Scale>
     </PressableFeedback>
   );

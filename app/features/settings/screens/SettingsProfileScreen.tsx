@@ -100,6 +100,8 @@ export const SettingsProfileScreen = () => {
                     variant="secondary"
                     size="sm"
                     className="flex-1"
+                    testID={`profile-reveal-${fieldKey}`}
+                    accessibilityValue={{ text: isVisible ? '1' : '0' }}
                     onPress={() => toggleFieldVisibility(fieldKey)}>
                     <Icon
                       name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}

@@ -36,6 +36,7 @@ type HeaderIconButtonProps = {
   size: number;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
+  testID?: string;
 };
 
 /** Minimum 44pt touch target; hitSlop extends so taps near the edge still register. */
@@ -48,6 +49,7 @@ export function HeaderIconButton({
   size,
   style,
   accessibilityLabel,
+  testID,
 }: HeaderIconButtonProps) {
   const [flatSurface, muted] = useThemeColor(['surface-secondary', 'muted'] as const);
 
@@ -66,7 +68,13 @@ export function HeaderIconButton({
     );
 
   if (supportsLiquidGlass()) {
-    return <HeaderGlassCircle onPress={onPress}>{glyph}</HeaderGlassCircle>;
+    // Forward the AX identity: HeaderGlassCircle is accessible only WITH a
+    // label, so dropping it here left the button invisible to device tests.
+    return (
+      <HeaderGlassCircle onPress={onPress} testID={testID} accessibilityLabel={accessibilityLabel}>
+        {glyph}
+      </HeaderGlassCircle>
+    );
   }
 
   return (
@@ -74,6 +82,7 @@ export function HeaderIconButton({
       onPress={onPress}
       hitSlop={HEADER_BUTTON_HIT_SLOP}
       activeOpacity={0.7}
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       style={[

@@ -21,8 +21,16 @@ const CURRENCY_OPTIONS: {
 ];
 
 export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React.ReactElement {
-  const { text, iosHeight, handleSelectCurrency, onPress, enableCurrencyMenu, textSize } =
-    useFiatCurrencyPill(props);
+  const {
+    text,
+    iosHeight,
+    handleSelectCurrency,
+    onPress,
+    enableCurrencyMenu,
+    textSize,
+    testID,
+    accessibilityLabel,
+  } = useFiatCurrencyPill(props);
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
   const [textColor, surfaceSecondary, muted] = useThemeColor([
     'foreground',
@@ -53,6 +61,8 @@ export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React
 
   const renderPill = (primaryHandler?: () => void, longPressHandler?: () => void) => (
     <Pressable
+      testID={testID}
+      accessibilityLabel={accessibilityLabel}
       disabled={!primaryHandler && !longPressHandler}
       onPress={primaryHandler}
       onLongPress={longPressHandler}>

@@ -58,6 +58,7 @@ import {
   CONTACT_SEARCH_MIN_LENGTH,
 } from '@/features/contacts/hooks/useOverlaidContactSearch';
 import { useQuickPayPeople, type QuickPayPerson } from '@/features/send/hooks/useQuickPayPeople';
+import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 import { normalizeRecentPersonPubkey } from '@/shared/stores/profile/recentPeopleStore';
@@ -475,6 +476,9 @@ export function SendScreen({ unit }: { unit: string }) {
       contentContainerStyle={[styles.content, { paddingTop: headerHeight + 8 }]}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag">
+      {/* This screen is a sheet: iOS modal AX hides the root-layout probe, so
+          toast evidence (e.g. balance-too-low) must be mirrored in-sheet. */}
+      <E2EToastProbe />
       {/* Destination input + Paste/Cancel */}
       <View style={[styles.inputWrap, { backgroundColor: surfaceSecondary }]}>
         <Icon name="mdi:magnify" size={20} color={opacity(foreground, 0.5)} />

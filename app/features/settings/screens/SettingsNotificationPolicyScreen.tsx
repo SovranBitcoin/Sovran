@@ -53,6 +53,7 @@ export function SettingsNotificationPolicyScreen() {
                   description={POLICY_DESCRIPTIONS[option]}
                   selected={policy === option}
                   onPress={() => handlePolicyChange(option)}
+                  testID={`notification-policy-${option.toLowerCase()}`}
                 />
               </React.Fragment>
             ))}
@@ -68,14 +69,22 @@ function SelectableSettingsRow({
   description,
   selected,
   onPress,
+  testID,
 }: {
   title: string;
   description: string;
   selected: boolean;
   onPress: () => void;
+  testID?: string;
 }) {
   return (
-    <PressableFeedback animation={false} onPress={onPress}>
+    <PressableFeedback
+      animation={false}
+      onPress={onPress}
+      testID={testID}
+      accessible={!!testID}
+      accessibilityLabel={title}
+      accessibilityValue={testID ? { text: selected ? '1' : '0' } : undefined}>
       <PressableFeedback.Scale>
         <ListGroup.Item disabled>
           <ListGroup.ItemContent>

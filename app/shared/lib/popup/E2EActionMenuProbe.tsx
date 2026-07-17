@@ -72,10 +72,19 @@ export function E2EActionMenuProbe(): React.ReactElement | null {
   const renderedOpenSeq = useE2EActionMenuRenderStore((state) => state.renderedOpenSeq);
   const presentedOpenSeq = useE2EActionMenuRenderStore((state) => state.presentedOpenSeq);
   const openSeq = usePopupStore((state) => state.openSeq);
-  const actionMenuOpen = usePopupStore(
-    (state) =>
-      state.isOpen && isCustomSheetPayload(state.current) && state.current.sheetId === 'action-menu'
+  const openSheetId = usePopupStore((state) =>
+    state.isOpen &&
+    isCustomSheetPayload(state.current) &&
+    // Any FullWindowOverlay sheet whose rows need coordinate selection: the
+    // classic action menu, the offline proof-selector ("Choose amount"), and
+    // the NIP-46 signer connect approval.
+    (state.current.sheetId === 'action-menu' ||
+      state.current.sheetId === 'proof-selector' ||
+      state.current.sheetId === 'signer-connect')
+      ? state.current.sheetId
+      : null
   );
+  const actionMenuOpen = openSheetId != null;
   if (
     !__DEV__ ||
     !actionMenuOpen ||
@@ -91,6 +100,7 @@ export function E2EActionMenuProbe(): React.ReactElement | null {
       accessible
       accessibilityRole="text"
       accessibilityLabel="Action menu open"
+      accessibilityValue={{ text: openSheetId ?? '' }}
       importantForAccessibility="yes"
       collapsable={false}
       pointerEvents="none"

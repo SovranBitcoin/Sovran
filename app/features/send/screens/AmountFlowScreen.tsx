@@ -26,6 +26,8 @@ import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
 import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 
+import { AmountSelectedMintProbe } from '../components/AmountSelectedMintProbe';
+
 import { RecipientHeader } from '../components/RecipientHeader';
 
 import { AmountSelector } from './AmountSelector';
@@ -308,6 +310,7 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
       {headerMode === 'native' ? <Stack.Screen options={stackOptions} /> : null}
       <View style={amountBodyStyle}>
         <E2EActionMenuProbe />
+        {mintUrl ? <AmountSelectedMintProbe mintUrl={mintUrl} /> : null}
         <AmountSelector
           entry={entry}
           actions={actions}

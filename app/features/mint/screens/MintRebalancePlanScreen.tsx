@@ -226,6 +226,9 @@ export function MintRebalancePlanScreen() {
               {
                 text: 'Done',
                 variant: 'primary' as const,
+                // Deliberately distinct from the post-run 'rebalance-done' so
+                // e2e can never mistake an empty plan for a finished run.
+                testID: 'rebalance-done-noop',
                 onPress: async () => handleDone(),
               },
             ]}
@@ -242,6 +245,7 @@ export function MintRebalancePlanScreen() {
               {
                 text: 'Done',
                 variant: 'primary' as const,
+                testID: 'rebalance-done',
                 onPress: async () => handleDone(),
               },
               ...(stepCounts.hasFailedStep
@@ -249,6 +253,7 @@ export function MintRebalancePlanScreen() {
                     {
                       text: 'Retry failed',
                       variant: 'secondary' as const,
+                      testID: 'rebalance-retry-failed',
                       onPress: async () => {
                         paymentLog.info('mint.rebalance_plan.retry_failed_press', {
                           failedCount: stepCounts.failed,
@@ -272,6 +277,7 @@ export function MintRebalancePlanScreen() {
               {
                 text: 'Cancel',
                 variant: 'secondary' as const,
+                testID: 'rebalance-cancel',
                 onPress: async () => {
                   paymentLog.info('mint.rebalance_plan.cancel_press', {
                     runStatus,
@@ -283,6 +289,7 @@ export function MintRebalancePlanScreen() {
               {
                 text: 'Start rebalancing',
                 variant: 'primary' as const,
+                testID: 'rebalance-start',
                 onPress: async () => {
                   paymentLog.info('mint.rebalance_plan.start_press', {
                     planStepCount: plan.steps.length,
@@ -305,6 +312,7 @@ export function MintRebalancePlanScreen() {
             {
               text: runStatus === 'cancelled' ? 'Done' : 'Stop',
               variant: 'secondary' as const,
+              testID: 'rebalance-stop',
               onPress: async () => {
                 paymentLog.info('mint.rebalance_plan.stop_or_done_press', {
                   runStatus,

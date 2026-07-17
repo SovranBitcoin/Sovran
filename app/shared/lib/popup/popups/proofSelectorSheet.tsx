@@ -19,6 +19,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { cashuLog } from '@/shared/lib/logger';
 
 import { showActionSheet } from './bridge';
+import { E2EActionMenuRenderMarker } from '../E2EActionMenuProbe';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../sheets/types';
 
@@ -164,6 +165,7 @@ export function ProofSelectorContent({ payload, close }: ProofSelectorContentPro
 
   return (
     <View>
+      <E2EActionMenuRenderMarker presentationKey={payload} />
       <BottomSheet.Title className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
         Choose amount
       </BottomSheet.Title>

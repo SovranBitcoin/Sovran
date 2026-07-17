@@ -91,12 +91,15 @@ function getMintDisabledReasonLabel(reason: MintListItem['reason']): string | nu
 // `tabler:dots` + `ellipsis` mirrors CircleActionRow's "More" button). The
 // liquid variant renders scroll-safe GlassView glass on supported devices and
 // the shared flat chip elsewhere.
-function MintInspectButton({ onPress }: { onPress: () => void }) {
+function MintInspectButton({ mintUrl, onPress }: { mintUrl: string; onPress: () => void }) {
   return (
     <CircleActionButton
       icon="tabler:dots"
       systemIcon="ellipsis"
       onPress={onPress}
+      // Per-row id: every mint row renders this button, so the shared AX label
+      // alone is ambiguous for device tests.
+      testID={`mint-inspect:${mintUrl}`}
       accessibilityLabel="Open mint page"
     />
   );
@@ -256,7 +259,7 @@ export const MintListScreen = memo(function MintListScreen({
     ({ item }: { item: MintListItem }) => {
       const inspectable = showDetailsButton && !!onInspectMint;
       const trailing = inspectable ? (
-        <MintInspectButton onPress={() => onInspectMint!(item.mintUrl)} />
+        <MintInspectButton mintUrl={item.mintUrl} onPress={() => onInspectMint!(item.mintUrl)} />
       ) : null;
       return (
         <ContactRow

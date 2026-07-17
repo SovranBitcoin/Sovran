@@ -33,6 +33,7 @@ export default function HomeLayout() {
       title="Wallet"
       placeholder="Search people..."
       transparent
+      searchTestIDPrefix="wallet"
       renderIdleTitle={() => (
         <MintSelector testID="wallet-mint-selector" onRequestMintList={handleRequestMintList} />
       )}

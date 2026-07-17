@@ -61,9 +61,10 @@ interface ChipProps {
   icon?: string;
   isSelected: boolean;
   onPress: () => void;
+  testID?: string;
 }
 
-const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress }) => {
+const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress, testID }) => {
   const [foreground, accent, accentSoft] = useThemeColor([
     'foreground',
     'accent',
@@ -73,6 +74,8 @@ const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress }) => {
   return (
     <Pressable
       onPress={onPress}
+      testID={testID}
+      accessibilityValue={testID ? { text: isSelected ? '1' : '0' } : undefined}
       style={[
         styles.chip,
         {
@@ -139,7 +142,8 @@ const MintSelectorChip: React.FC<{
   iconUrl?: string;
   isSelected: boolean;
   onPress: () => void;
-}> = ({ showIcon = true, name, iconUrl, isSelected, onPress }) => {
+  testID?: string;
+}> = ({ showIcon = true, name, iconUrl, isSelected, onPress, testID }) => {
   const [foreground, accent, accentSoft] = useThemeColor([
     'foreground',
     'accent',
@@ -149,6 +153,11 @@ const MintSelectorChip: React.FC<{
   return (
     <Pressable
       onPress={onPress}
+      testID={testID}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={name}
+      accessibilityValue={testID ? { text: isSelected ? '1' : '0' } : undefined}
       style={[
         styles.mintChip,
         {
@@ -297,6 +306,7 @@ export function FiltersScreen() {
           <Pressable
             onPress={handleReset}
             disabled={!hasActiveFilters}
+            testID="filter-reset"
             style={[styles.resetButton, { opacity: hasActiveFilters ? 1 : 0 }]}>
             <Text
               size={14}
@@ -307,6 +317,7 @@ export function FiltersScreen() {
           <ButtonHandler
             buttons={[
               {
+                testID: 'filter-apply',
                 text: `Apply Filters (${resultCount})`,
                 variant: 'primary',
                 onPress: async () => handleApply(),
@@ -325,6 +336,7 @@ export function FiltersScreen() {
               iconUrl={mint.icon_url}
               isSelected={mintUrl === mint.mintUrl}
               onPress={() => setMintUrl(mint.mintUrl)}
+              testID={`filter-mint-${mint.mintUrl}`}
             />
           ))}
         </Section>
@@ -373,18 +385,21 @@ export function FiltersScreen() {
             icon="fluent:arrow-swap-16-filled"
             isSelected={direction === 'all'}
             onPress={() => setDirection('all')}
+            testID="filter-direction-all"
           />
           <Chip
             label="In"
             icon="fluent:arrow-download-16-filled"
             isSelected={direction === 'incoming'}
             onPress={() => setDirection('incoming')}
+            testID="filter-direction-in"
           />
           <Chip
             label="Out"
             icon="fluent:arrow-upload-16-filled"
             isSelected={direction === 'outgoing'}
             onPress={() => setDirection('outgoing')}
+            testID="filter-direction-out"
           />
         </Section>
 

@@ -34,6 +34,7 @@ import {
 } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
 import { clearAllSignerData } from '@/features/nostrSigner/lib/clearSignerData';
+import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import {
   openPairingFromUri,
   PAIRING_ERROR_BUNKER,
@@ -214,6 +215,10 @@ export function SignerHubScreen(): React.ReactElement {
 
   return (
     <Screen name="SignerHubScreen">
+      {/* The paste-link popup is a FullWindowOverlay action sheet whose input
+          and buttons never reach iOS AX — this marker is the waitable evidence
+          e2e uses before typing/tapping by coordinate. */}
+      <E2EActionMenuProbe />
       {pendingCount > 0 ? (
         <Section title="Pending">
           <ListGroup variant="secondary">

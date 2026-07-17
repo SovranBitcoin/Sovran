@@ -39,6 +39,7 @@ import {
 } from '@/features/receive/lib/standingQuoteIdentityStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { copyPopup } from '@/shared/lib/popup';
+import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { Section } from '@/shared/ui/composed/Section';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
@@ -128,6 +129,8 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
           type: 'receive',
           mintUrl: selectedMintUrl || undefined,
         }}
+        testID="receive-npc-mint-row"
+        accessibilityLabel="Change receive mint"
         onPress={
           isNpcMintUpdating || !actions.changeNpcMint.available
             ? undefined
@@ -367,6 +370,10 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
           />
         </BottomButtons>
       }>
+      {/* This screen is a sheet: iOS modal AX hides the root-layout probe, so
+          toast evidence (mint-updated, payment-status) must be mirrored
+          in-sheet for the npc receive scenarios. */}
+      <E2EToastProbe />
       {/* Contacts-style header: full-bleed top-level tabs, then (Lightning
           only) the pill sub-tab row — hairline separators on each band. */}
       {tabs.length > 1 && (

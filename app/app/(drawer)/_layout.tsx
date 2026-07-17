@@ -149,6 +149,9 @@ const MenuButton = React.memo(function MenuButton({
     <GesturePressable
       disabled={isActive}
       onPress={() => onNavigate(route)}
+      testID={`drawer-menu-${label.toLowerCase().replace(/\s+/g, '-')}`}
+      accessible
+      accessibilityLabel={label}
       style={({ pressed }) => [styles.menuButton, pressed && { opacity: alpha.strong }]}>
       <HStack align="center" spacing={spacing.md}>
         <Icon

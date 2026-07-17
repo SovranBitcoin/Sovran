@@ -300,6 +300,7 @@ export function OfflineShell({ children }: { children: React.ReactNode }) {
       <View style={[styles.topSection, topSectionStyle]}>
         {isOffline ? (
           <View
+            testID="offline-banner"
             style={[
               styles.banner,
               { paddingTop: insets.top, backgroundColor: offlineAccentColor },

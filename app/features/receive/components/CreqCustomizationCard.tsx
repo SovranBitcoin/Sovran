@@ -97,6 +97,17 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
     });
   }, []);
 
+  const p2pkDisabled = !p2pkKey || !mintSelection.hasP2pkCapableMint;
+  const p2pkEffectiveOn = p2pkLockOn && !p2pkDisabled;
+  const handleP2pkToggle = useCallback(() => {
+    paymentLog.info('receive.creq.p2pk_lock_toggled', { enabled: !p2pkLockOn });
+    onP2pkLockChange(!p2pkLockOn);
+  }, [p2pkLockOn, onP2pkLockChange]);
+  const p2pkStateValue = React.useMemo(
+    () => ({ text: p2pkEffectiveOn ? '1' : '0' }),
+    [p2pkEffectiveOn]
+  );
+
   const card = (
     <GradientCard>
       <ListGroup variant="transparent">
@@ -117,31 +128,40 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
           <PressableFeedback.Ripple />
         </PressableFeedback>
         <Separator className="mx-4" />
-        <ListGroup.Item>
-          <ListGroup.ItemPrefix>
-            <Icon name="solar:key-bold" size={20} color={muted} />
-          </ListGroup.ItemPrefix>
-          <ListGroup.ItemContent>
-            <ListGroup.ItemTitle>P2PK lock</ListGroup.ItemTitle>
-            <ListGroup.ItemDescription>
-              {!p2pkKey
-                ? 'No P2PK key — generate one in Settings'
-                : !mintSelection.hasP2pkCapableMint
-                  ? 'None of your mints support P2PK locks'
-                  : 'Payers lock ecash to your key'}
-            </ListGroup.ItemDescription>
-          </ListGroup.ItemContent>
-          <ListGroup.ItemSuffix>
-            <HeroSwitch
-              isSelected={p2pkLockOn && !!p2pkKey && mintSelection.hasP2pkCapableMint}
-              isDisabled={!p2pkKey || !mintSelection.hasP2pkCapableMint}
-              onSelectedChange={(value) => {
-                paymentLog.info('receive.creq.p2pk_lock_toggled', { enabled: value });
-                onP2pkLockChange(value);
-              }}
-            />
-          </ListGroup.ItemSuffix>
-        </ListGroup.Item>
+        {/* The whole row is the toggle target: a HeroSwitch inside a
+            ListGroup.ItemSuffix collapses into the grouped AX element and its
+            own testID/handler are unreachable on device, so the row pressable
+            owns both the id and the toggle; the switch is purely visual. */}
+        <PressableFeedback
+          animation={false}
+          testID="receive-creq-p2pk-toggle"
+          accessibilityLabel="Toggle P2PK lock"
+          isDisabled={p2pkDisabled}
+          onPress={handleP2pkToggle}>
+          <PressableFeedback.Scale>
+            <ListGroup.Item disabled>
+              <ListGroup.ItemPrefix>
+                <Icon name="solar:key-bold" size={20} color={muted} />
+              </ListGroup.ItemPrefix>
+              <ListGroup.ItemContent>
+                <ListGroup.ItemTitle>P2PK lock</ListGroup.ItemTitle>
+                <ListGroup.ItemDescription>
+                  {!p2pkKey
+                    ? 'No P2PK key — generate one in Settings'
+                    : !mintSelection.hasP2pkCapableMint
+                      ? 'None of your mints support P2PK locks'
+                      : 'Payers lock ecash to your key'}
+                </ListGroup.ItemDescription>
+              </ListGroup.ItemContent>
+              <ListGroup.ItemSuffix>
+                <View pointerEvents="none">
+                  <HeroSwitch isSelected={p2pkEffectiveOn} isDisabled={p2pkDisabled} />
+                </View>
+              </ListGroup.ItemSuffix>
+            </ListGroup.Item>
+          </PressableFeedback.Scale>
+          <PressableFeedback.Ripple />
+        </PressableFeedback>
         <Separator className="mx-4" />
         <PressableFeedback animation={false} onPress={handleAdvancedToggle}>
           <PressableFeedback.Scale>
@@ -205,6 +225,30 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
   return (
     <View className="mx-4">
       {sectionTitle ? <Section title={sectionTitle}>{card}</Section> : card}
+      {/* AX-only lock-state evidence: the visual switch is grouped away inside
+          the ListGroup row, so device tests wait on this value ('1'/'0')
+          instead (AmountSelectedMintProbe precedent). */}
+      <View
+        testID="receive-creq-p2pk-state"
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel="P2PK lock state"
+        accessibilityValue={p2pkStateValue}
+        importantForAccessibility="yes"
+        collapsable={false}
+        pointerEvents="none"
+        style={probeStyles.probe}
+      />
     </View>
   );
 });
+
+const probeStyles = {
+  probe: {
+    position: 'absolute' as const,
+    left: 0,
+    top: 0,
+    width: 1,
+    height: 1,
+  },
+};

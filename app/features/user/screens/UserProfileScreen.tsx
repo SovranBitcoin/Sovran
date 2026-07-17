@@ -46,6 +46,8 @@ import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { SkeletonLoadingShimmer } from '@/shared/ui/composed/SkeletonExitShimmer';
 import { LightningAddress } from '@sovranbitcoin/schemas';
+import { getNpcAddress } from '@/shared/lib/cashu/npc';
+import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
@@ -894,15 +896,20 @@ export function UserProfileScreen() {
   const machine = usePaymentFlowMachine({ walletContext });
   const rawLud16 = cachedProfile?.lud16;
   const lud16 = rawLud16 && LightningAddress.safeParse(rawLud16).success ? rawLud16 : undefined;
+  // No (valid) lud16 in the profile → fall back to the recipient's npub.cash
+  // address: every Nostr pubkey is payable at <npub>@npubx.cash, so money can
+  // always be sent. The send flow's Select-option menu labels the Lightning
+  // variant "to npub.cash" for npc targets, so the destination stays explicit.
+  const npcFallback = npub ? getNpcAddress(undefined, npub) : undefined;
+  const meltTarget = lud16 ?? npcFallback;
   const handleSendMoney = useCallback(() => {
-    if (!lud16) {
+    if (!meltTarget) {
       paymentLog.warn('user.profile.send_money.unavailable', {
         recipientPubkeyLength: pubkey.length,
         hasRawLightningAddress: !!rawLud16,
         rawLightningAddressLength: rawLud16?.length ?? 0,
       });
-      // Button always renders (no pop-in after the profile metadata
-      // resolves) — a missing/invalid Lightning address answers on press.
+      // Only reachable when the pubkey couldn't even encode to an npub.
       paramPopup('action-unavailable', {
         title: "Can't send money",
         message: `${displayName} hasn't set up a Lightning address.`,
@@ -912,7 +919,8 @@ export function UserProfileScreen() {
     clearPaymentContext('user.profile.send_money');
     paymentLog.info('user.profile.send_money.start', {
       recipientPubkeyLength: pubkey.length,
-      meltTargetLength: lud16.length,
+      meltTargetLength: meltTarget.length,
+      usedNpcFallback: !lud16,
       hasDisplayName: displayName.length > 0,
       hasAvatarUrl: !!cachedProfile?.picture,
       hasNip05: !!cachedProfile?.nip05,
@@ -921,7 +929,7 @@ export function UserProfileScreen() {
       try {
         await machine.startSendEcash({
           reset: true,
-          meltTarget: lud16,
+          meltTarget,
           recipientPubkey: pubkey,
           recipientProfile: {
             displayName,
@@ -931,17 +939,26 @@ export function UserProfileScreen() {
         });
         paymentLog.info('user.profile.send_money.started', {
           recipientPubkeyLength: pubkey.length,
-          meltTargetLength: lud16.length,
+          meltTargetLength: meltTarget.length,
         });
       } catch (error) {
         paymentLog.warn('user.profile.send_money.failed_to_start', {
           recipientPubkeyLength: pubkey.length,
-          meltTargetLength: lud16.length,
+          meltTargetLength: meltTarget.length,
           error: error instanceof Error ? error : new Error(String(error)),
         });
       }
     })();
-  }, [lud16, machine, pubkey, displayName, cachedProfile?.picture, cachedProfile?.nip05, rawLud16]);
+  }, [
+    meltTarget,
+    lud16,
+    machine,
+    pubkey,
+    displayName,
+    cachedProfile?.picture,
+    cachedProfile?.nip05,
+    rawLud16,
+  ]);
 
   const followerCount = profileData?.followers;
   const reputationScore = typeof profileData?.score === 'number' ? profileData.score : undefined;
@@ -1206,6 +1223,10 @@ export function UserProfileScreen() {
 
   return (
     <Log name="UserProfileScreen" style={{ flex: 1, backgroundColor: background }}>
+      {/* The Send-Message/Send-Money menus present in a FullWindowOverlay whose
+          rows never reach iOS AX — this dev-only marker is the waitable
+          evidence e2e uses before a coordinate row selection. */}
+      <E2EActionMenuProbe />
       <Stack.Screen
         options={withGlassHeaderItems({
           title: isMetadataLoading ? 'Profile' : displayName,

@@ -32,8 +32,17 @@ import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/s
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 
 export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.ReactElement {
-  const { text, iosHeight, iosWidth, handleSelectCurrency, onPress, enableCurrencyMenu, textSize } =
-    useFiatCurrencyPill(props);
+  const {
+    text,
+    iosHeight,
+    iosWidth,
+    handleSelectCurrency,
+    onPress,
+    enableCurrencyMenu,
+    textSize,
+    testID,
+    accessibilityLabel,
+  } = useFiatCurrencyPill(props);
   const colorScheme = useColorScheme();
   const textColor = useThemeColor('foreground');
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
@@ -43,6 +52,9 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
     return (
       <LiquidGlassMenu
         style={{ width: iosWidth, height: iosHeight }}
+        testID={testID}
+        accessible={!!accessibilityLabel}
+        accessibilityLabel={accessibilityLabel}
         label={text}
         labelColor={textColor}
         labelSize={textSize}
@@ -83,6 +95,9 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
   const pill = (
     <GlassView
       glassEffectStyle="regular"
+      testID={testID}
+      accessible={!!accessibilityLabel}
+      accessibilityLabel={accessibilityLabel}
       // NOT `isInteractive`: on iOS 26 the interactive glass layer contends for
       // touches with the wrapping Pressable/MenuView, making taps flaky. Keep
       // the glass decorative; the pressable/menu owns the tap.

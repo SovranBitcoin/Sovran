@@ -13,8 +13,16 @@ const CURRENCY_SHEET_OPTIONS = ['USD', 'EUR', 'GBP', 'Cancel'];
 const CANCEL_BUTTON_INDEX = 3;
 
 export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactElement {
-  const { text, iosHeight, handleSelectCurrency, onPress, enableCurrencyMenu, textSize } =
-    useFiatCurrencyPill(props);
+  const {
+    text,
+    iosHeight,
+    handleSelectCurrency,
+    onPress,
+    enableCurrencyMenu,
+    textSize,
+    testID,
+    accessibilityLabel,
+  } = useFiatCurrencyPill(props);
   const colorScheme = useColorScheme();
   const [textColor, surfaceSecondary, muted] = useThemeColor([
     'foreground',
@@ -53,6 +61,8 @@ export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactE
 
   return (
     <Pressable
+      testID={testID}
+      accessibilityLabel={accessibilityLabel}
       disabled={!primaryHandler && !longPressHandler}
       onPress={primaryHandler}
       onLongPress={longPressHandler}>

@@ -42,6 +42,7 @@ import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import { log, useLifecycleLogger, Log } from '@/shared/lib/logger';
 import { openExternalUrl } from '@/shared/lib/url';
 import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
+import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
 import {
   formatMintInfoNostrFallback,
   getMintInfoNostrContactPubkey,
@@ -499,6 +500,13 @@ export function MintInfoScreen() {
 
   const mintUrl = (entry?.mintUrl as string) ?? '';
   const displayName = (entry?.displayName as string) ?? mintUrl;
+  // The inspect paths seed mintInfoEntry with only { mintUrl } (see
+  // (mint-flow)/list.tsx), so KYM review data never arrives via the entry on
+  // that route. Fall back to the same review cache the mint list rows read,
+  // otherwise the reviews header action and rating chart silently vanish.
+  const cachedMeta = useCachedMintMetadata(mintUrl || null);
+  const kymScore =
+    typeof entry?.kymScore === 'number' ? entry.kymScore : (cachedMeta?.averageScore ?? undefined);
   const contact = entry?.contact as
     | { method: string; info: import('wallet').FormattedString }[]
     | undefined;
@@ -553,7 +561,7 @@ export function MintInfoScreen() {
         options={withGlassHeaderItems({
           title: entry?.fromAccepter ? 'Verify Mint' : displayName || 'Mint Details',
           headerRight:
-            entry?.fromAccepter || !(typeof entry?.kymScore === 'number' && entry.kymScore >= 0)
+            entry?.fromAccepter || !(typeof kymScore === 'number' && kymScore >= 0)
               ? undefined
               : () => (
                   <Link
@@ -565,6 +573,7 @@ export function MintInfoScreen() {
                     <ScreenHeaderAction
                       icon="ic:round-star"
                       color={starColor}
+                      testID="mint-info-reviews"
                       accessibilityLabel="View mint reviews"
                     />
                   </Link>
@@ -604,10 +613,10 @@ export function MintInfoScreen() {
 
           <Spacer size={16} />
 
-          {typeof entry?.kymScore === 'number' && entry.kymScore >= 0 && (
+          {typeof kymScore === 'number' && kymScore >= 0 && (
             // Keyed by mintUrl so a screen reused for a different mint remounts
             // the chart (fresh roll-in) instead of rolling the prior mint's score.
-            <RatingBarChart key={mintUrl} score={entry.kymScore} />
+            <RatingBarChart key={mintUrl} score={kymScore} />
           )}
 
           {(entry?.auditState != null || typeof entry?.auditScore === 'number') && (
@@ -690,6 +699,10 @@ export function MintInfoScreen() {
                   <PressableFeedback
                     key={`${c.method}:${c.info}:${c.originalIndex}`}
                     animation={false}
+                    // Stable id for device tests: the row's visible label is a
+                    // resolved display name (data-bearing, flaky to select on).
+                    testID={c.isNostr ? 'mint-info-contact-nostr' : undefined}
+                    accessibilityLabel={c.isNostr ? 'Open Nostr contact profile' : undefined}
                     onPress={() => handleContactPress(c.method, c.info, rowNostrPubkey)}>
                     <PressableFeedback.Scale>
                       <ListGroup.Item disabled>

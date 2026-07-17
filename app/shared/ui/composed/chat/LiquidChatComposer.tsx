@@ -18,6 +18,7 @@ import {
 } from '@expo/ui/swift-ui';
 import {
   Animation,
+  accessibilityLabel as swiftAccessibilityLabel,
   animation,
   autocorrectionDisabled as swiftAutocorrectionDisabled,
   buttonStyle,
@@ -352,6 +353,9 @@ export function LiquidChatComposer({
                       swiftAutocorrectionDisabled(false),
                       textInputAutocapitalization('sentences'),
                       disabledModifier(!!disabled),
+                      // SwiftUI-hosted field: no RN testID reaches AX, so the
+                      // label is the only stable handle (VoiceOver + e2e).
+                      swiftAccessibilityLabel('Message composer'),
                     ]}
                   />
 
@@ -394,6 +398,7 @@ export function LiquidChatComposer({
                     glassEffectId('send', namespaceId),
                     disabledModifier(!canSend),
                     animation(SEND_SPRING, trimmedHasText),
+                    swiftAccessibilityLabel('Send message'),
                   ]}
                   onPress={canSend ? handleSendPress : () => {}}>
                   <SwiftUIHStack
@@ -474,6 +479,12 @@ export function LiquidChatComposer({
         </Pressable>
 
         <View
+          // The multiline TextInput inside surfaces neither its testID nor an
+          // accessibilityLabel on iOS, so the field CONTAINER carries the AX
+          // identity; a center tap on it focuses the input for typing.
+          testID={testID ? `${testID}-field` : undefined}
+          accessible={!!testID}
+          accessibilityLabel={testID ? 'Message composer' : undefined}
           style={{
             flex: 1,
             height: fallbackRowHeight,
@@ -508,6 +519,9 @@ export function LiquidChatComposer({
               returnKeyType="send"
               onSubmitEditing={handleSendPress}
               onContentSizeChange={handleContentSizeChange}
+              // iOS drops accessibilityIdentifier on this multiline input, so
+              // the label is the only reliable AX handle (and VoiceOver's).
+              accessibilityLabel="Message composer"
               style={{
                 flex: 1,
                 color: foreground,

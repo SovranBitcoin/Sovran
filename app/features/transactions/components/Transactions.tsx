@@ -775,7 +775,9 @@ export const Transactions = React.memo(
                           },
                         }}
                         asChild>
-                        <Pressable>
+                        <Pressable
+                          testID="transactions-view-all"
+                          accessibilityLabel="View all transactions">
                           <View style={[styles.viewAllButton, { borderColor }]}>
                             <BlurCardFrame accentColor={muted}>
                               <View style={styles.viewAllContent}>

@@ -101,6 +101,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/receive/components/ReceiveRailPlaceholder.tsx",
     "features/receive/components/ReceiveReusableQuoteTab.tsx",
     "features/receive/components/ReceiveUnifiedTab.tsx",
+    "features/send/components/AmountSelectedMintProbe.tsx",
     "features/send/components/DetectedActionRow.tsx",
     "features/send/components/MeltDestinationFingerprintProbe.tsx",
     "features/send/components/MeltSelectedMintProbe.tsx",
@@ -139,6 +140,8 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.fallback.tsx",
     "features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.liquid.tsx",
     "features/wallet/components/UnitSwitcherPill/useUnitSwitcherPill.tsx",
+    "features/wallet/components/WalletSelectedMintProbe.tsx",
+    "features/wallet/components/WalletWallpaperProbe.tsx",
     "features/whitenoise/components/RequestActions.tsx",
     "features/whitenoise/components/WhitenoiseSetupBanner.tsx",
     "shared/blocks/AppGate.tsx",
@@ -226,6 +229,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/WhiteFaceBeamAvatar.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 220,
+  "total": 223,
 }
 `;

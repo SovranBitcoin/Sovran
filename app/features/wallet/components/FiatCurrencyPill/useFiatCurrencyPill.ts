@@ -15,6 +15,10 @@ export interface FiatCurrencyPillProps {
   textSize?: number;
   /** Enable the iOS ContextMenu for fiat currency selection (wallet UX). */
   enableCurrencyMenu?: boolean;
+  /** Stable id for the tappable pill (e2e). */
+  testID?: string;
+  /** AX label for the tappable pill — required for the id to reach the AX tree on iOS. */
+  accessibilityLabel?: string;
 }
 
 interface FiatCurrencyPillShared {
@@ -26,6 +30,8 @@ interface FiatCurrencyPillShared {
   onPress?: () => void;
   enableCurrencyMenu: boolean;
   textSize: number;
+  testID?: string;
+  accessibilityLabel?: string;
 }
 
 export function useFiatCurrencyPill({
@@ -35,6 +41,8 @@ export function useFiatCurrencyPill({
   showToggleGlyph = false,
   textSize = 14,
   enableCurrencyMenu = true,
+  testID,
+  accessibilityLabel,
 }: FiatCurrencyPillProps): FiatCurrencyPillShared {
   const [success] = useThemeColor(['success'] as const);
   const setDisplayCurrency = useSettingsStore((state) => state.setDisplayCurrency);
@@ -63,5 +71,7 @@ export function useFiatCurrencyPill({
     onPress,
     enableCurrencyMenu,
     textSize,
+    testID,
+    accessibilityLabel,
   };
 }

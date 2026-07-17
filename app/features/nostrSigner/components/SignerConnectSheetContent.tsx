@@ -26,6 +26,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { E2EActionMenuRenderMarker } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import {
@@ -446,9 +447,19 @@ interface SignerConnectContentProps extends CustomSheetSharedProps {
 export function SignerConnectSheetContent(props: SignerConnectContentProps): React.ReactElement {
   const parsedResult = useMemo(() => parseNostrconnectUri(props.payload.uri), [props.payload.uri]);
   if (parsedResult.isErr()) {
-    return <InvalidLinkBody close={props.close} />;
+    return (
+      <>
+        <E2EActionMenuRenderMarker presentationKey={props.payload} />
+        <InvalidLinkBody close={props.close} />
+      </>
+    );
   }
-  return <ConnectReview {...props} parsed={parsedResult.value} />;
+  return (
+    <>
+      <E2EActionMenuRenderMarker presentationKey={props.payload} />
+      <ConnectReview {...props} parsed={parsedResult.value} />
+    </>
+  );
 }
 
 function InvalidLinkBody({ close }: { close: () => void }): React.ReactElement {

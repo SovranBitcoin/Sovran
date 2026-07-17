@@ -35,7 +35,7 @@ export const useSearchContext = () => {
 
 // --- Header components (read state from context, identity-stable) ---
 
-function SearchBarTitle({ placeholder }: { placeholder: string }) {
+function SearchBarTitle({ placeholder, testID }: { placeholder: string; testID?: string }) {
   const { clearKey, seedText, onSearchChange } = useSearchContext();
   const { width } = useWindowDimensions();
   const searchBarWidth = getHeaderTitleWidthFromWidth(width);
@@ -43,6 +43,7 @@ function SearchBarTitle({ placeholder }: { placeholder: string }) {
   return (
     <RNView style={liquidTitleBiasStyle}>
       <GlassSearchBar
+        testID={testID}
         width={searchBarWidth}
         // Match the mint selector pill exactly — the search bar swaps into
         // the same title slot, and a shorter field reads as a jarring jump.
@@ -70,7 +71,7 @@ const liquidTitleBiasStyle = supportsLiquidGlass()
   ? { transform: [{ translateX: LIQUID_TITLE_BIAS_PX }] }
   : null;
 
-function SearchHeaderRight() {
+function SearchHeaderRight({ testID }: { testID?: string }) {
   const { isSearching, onOpenSearch, onCloseSearch } = useSearchContext();
   const iconColor = useThemeColor('foreground');
 
@@ -83,6 +84,7 @@ function SearchHeaderRight() {
       size={20}
       color={iconColor}
       onPress={isSearching ? onCloseSearch : onOpenSearch}
+      testID={testID}
       accessibilityLabel={isSearching ? 'Close search' : 'Open search'}
     />
   );
@@ -105,6 +107,11 @@ type SearchLayoutProps = {
    * behavior used by Feed/Contacts.
    */
   transparent?: boolean;
+  /**
+   * Per-tab e2e id prefix: `<prefix>-search-toggle` on the header button and
+   * `<prefix>-search-input` on the search bar (the Wallet passes "wallet").
+   */
+  searchTestIDPrefix?: string;
 };
 
 export function SearchLayout({
@@ -112,6 +119,7 @@ export function SearchLayout({
   placeholder,
   renderIdleTitle,
   transparent = false,
+  searchTestIDPrefix,
 }: SearchLayoutProps) {
   const [iconColor, surface] = useThemeColor(['foreground', 'surface'] as const);
   const navigation = useNavigation();
@@ -126,10 +134,22 @@ export function SearchLayout({
   // When not searching, let React Navigation render the native title
   // so it picks up the correct tintColor / Liquid Glass styling.
   const searchBarTitle = useCallback(
-    () => <SearchBarTitle placeholder={placeholder} />,
-    [placeholder]
+    () => (
+      <SearchBarTitle
+        placeholder={placeholder}
+        testID={searchTestIDPrefix ? `${searchTestIDPrefix}-search-input` : undefined}
+      />
+    ),
+    [placeholder, searchTestIDPrefix]
   );
-  const headerRight = useCallback(() => <SearchHeaderRight />, []);
+  const headerRight = useCallback(
+    () => (
+      <SearchHeaderRight
+        testID={searchTestIDPrefix ? `${searchTestIDPrefix}-search-toggle` : undefined}
+      />
+    ),
+    [searchTestIDPrefix]
+  );
   const headerLeft = useCallback(() => <HeaderProfileButton onPress={openDrawer} />, [openDrawer]);
 
   const screenOptions = useMemo(

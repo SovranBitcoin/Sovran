@@ -50,6 +50,8 @@ function FilterButton() {
       size={22}
       color={hasActiveFilters ? opacity(foreground, 0.4) : foreground}
       onPress={openFilterSheet}
+      testID="transactions-filter-open"
+      accessibilityLabel="Open transaction filters"
       accessory={
         hasActiveFilters ? (
           <View

@@ -307,7 +307,16 @@ export function MintDistributionScreen() {
   const bottomButtons = useMemo(
     () => (
       <BottomButtons>
-        <ButtonHandler buttons={[{ text: 'Next', variant: 'primary', onPress: handleRebalance }]} />
+        <ButtonHandler
+          buttons={[
+            {
+              text: 'Next',
+              variant: 'primary',
+              testID: 'mint-distribution-next',
+              onPress: handleRebalance,
+            },
+          ]}
+        />
       </BottomButtons>
     ),
     [handleRebalance]
@@ -357,6 +366,8 @@ export function MintDistributionScreen() {
                     <HeroSwitch
                       isSelected={splitEvenly}
                       onSelectedChange={handleSplitEvenlyToggle}
+                      aria-label="Split evenly"
+                      testID="mint-distribution-split-evenly"
                     />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>

@@ -60,6 +60,8 @@ export function UnitSwitcherPillLiquid(props: UnitSwitcherPillProps): React.Reac
         pointerEvents={canSwitch ? 'auto' : 'none'}>
         <LiquidGlassMenu
           testID="wallet-unit-switcher"
+          accessible
+          accessibilityLabel="Switch wallet account"
           style={{ width, height: PILL_HEIGHT }}
           label={label}
           labelColor={textColor}
@@ -104,6 +106,8 @@ export function UnitSwitcherPillLiquid(props: UnitSwitcherPillProps): React.Reac
   return (
     <View
       testID="wallet-unit-switcher"
+      accessible
+      accessibilityLabel="Switch wallet account"
       style={canSwitch ? undefined : styles.disabledSlot}
       pointerEvents={canSwitch ? 'auto' : 'none'}>
       <MenuView

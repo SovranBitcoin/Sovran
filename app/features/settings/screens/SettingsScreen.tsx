@@ -38,6 +38,9 @@ const ProfileButton = () => {
     <ListGroup variant="secondary">
       <PressableFeedback
         animation={false}
+        testID="settings-profile-row"
+        accessible
+        accessibilityLabel="Profile and keys"
         onPress={() => router.navigate('/(settings-flow)/profile')}>
         <PressableFeedback.Scale>
           <ListGroup.Item disabled>
@@ -66,7 +69,9 @@ const ProfileButton = () => {
   );
 };
 
-const TRIPLE_TAP_WINDOW_MS = 1500;
+// e2e simulator taps arrive ~2s apart (one HID session per tap), which can
+// never satisfy a human triple-tap window — the owned e2e Metro widens it.
+const TRIPLE_TAP_WINDOW_MS = Number(process.env.EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS ?? '') || 1500;
 
 const SIGNER_ROW_DESCRIPTION = 'Sign in to Nostr apps with this device';
 
@@ -327,7 +332,13 @@ export const SettingsScreen = () => {
                   <PressableFeedback.Ripple />
                 </PressableFeedback>
                 <Separator className="mx-4" />
-                <PressableFeedback animation={false} onPress={() => setMockOffline(!mockOffline)}>
+                <PressableFeedback
+                  animation={false}
+                  onPress={() => setMockOffline(!mockOffline)}
+                  testID="settings-mock-offline-toggle"
+                  accessible
+                  accessibilityLabel="Mock Offline"
+                  accessibilityValue={{ text: mockOffline ? '1' : '0' }}>
                   <PressableFeedback.Scale>
                     <ListGroup.Item disabled>
                       <ListGroup.ItemContent>
@@ -341,7 +352,13 @@ export const SettingsScreen = () => {
                   <PressableFeedback.Ripple />
                 </PressableFeedback>
                 <Separator className="mx-4" />
-                <PressableFeedback animation={false} onPress={() => setMockFailSend(!mockFailSend)}>
+                <PressableFeedback
+                  animation={false}
+                  onPress={() => setMockFailSend(!mockFailSend)}
+                  testID="settings-mock-fail-send-toggle"
+                  accessible
+                  accessibilityLabel="Mock Fail Send"
+                  accessibilityValue={{ text: mockFailSend ? '1' : '0' }}>
                   <PressableFeedback.Scale>
                     <ListGroup.Item disabled>
                       <ListGroup.ItemContent>
@@ -355,7 +372,13 @@ export const SettingsScreen = () => {
                   <PressableFeedback.Ripple />
                 </PressableFeedback>
                 <Separator className="mx-4" />
-                <PressableFeedback animation={false} onPress={() => setMockFailMelt(!mockFailMelt)}>
+                <PressableFeedback
+                  animation={false}
+                  onPress={() => setMockFailMelt(!mockFailMelt)}
+                  testID="settings-mock-fail-melt-toggle"
+                  accessible
+                  accessibilityLabel="Mock Fail Melt"
+                  accessibilityValue={{ text: mockFailMelt ? '1' : '0' }}>
                   <PressableFeedback.Scale>
                     <ListGroup.Item disabled>
                       <ListGroup.ItemContent>
@@ -434,7 +457,11 @@ export const SettingsScreen = () => {
             </ListGroup>
           </Section>
 
-          <Pressable onPress={handleVersionPress}>
+          <Pressable
+            onPress={handleVersionPress}
+            testID="settings-version-row"
+            accessible
+            accessibilityLabel="App version">
             <VStack spacing={4}>
               <Text className="text-foreground/50 text-center" bold size={13}>
                 {name}

@@ -15,6 +15,7 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useFocusEffect } from 'expo-router';
 import { staticPopup } from '@/shared/lib/popup';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { nip19 } from 'nostr-tools';
 import { buildGiftWrappedDMPair } from '@/shared/lib/nostr/nip17';
 import { buildNip04DM } from '@/shared/lib/nostr/nip04';
 import type { DmProtocol } from '@/features/payments/data/dmDecryptPipeline';
@@ -40,6 +41,8 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { chatLog, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 import { Screen } from '@/shared/ui/composed/Screen';
+import { View } from '@/shared/ui/primitives/View/View';
+import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
@@ -166,6 +169,17 @@ export function UserMessagesScreen({
   // LNURL resolution.
   const rawLud16 = counterpartyMetadata?.lud16;
   const lud16 = rawLud16 && LightningAddress.safeParse(rawLud16).success ? rawLud16 : undefined;
+  // No (valid) lud16 → fall back to the counterparty's npub.cash address so
+  // Send money always works (UserProfileScreen precedent; the send flow's
+  // Select-option menu labels the variant "to npub.cash" for npc targets).
+  const sendMoneyTarget = useMemo(() => {
+    if (lud16) return lud16;
+    try {
+      return getNpcAddress(undefined, nip19.npubEncode(pubkey));
+    } catch {
+      return undefined;
+    }
+  }, [lud16, pubkey]);
   const bubbleMessages = useMemo<ChatBubbleMessage[]>(
     () =>
       messages.map((m) => ({
@@ -367,25 +381,42 @@ export function UserMessagesScreen({
     [ndk, nostrKeys?.privateKey, nostrKeys?.pubkey, pubkey, isMockThread, protocol]
   );
 
+  const dmProbeValue = useMemo(() => ({ text: pubkey ?? 'unknown' }), [pubkey]);
+
   const handleSendMoney = useCallback(() => {
     log.debug('user.messages.send_money', {
       lud16,
+      usedNpcFallback: !lud16,
       userName: counterpartyMetadata?.name,
     });
-    if (!lud16 || !counterpartyMetadata) return;
+    if (!sendMoneyTarget || !counterpartyMetadata) return;
 
     // Enter through colada's normal Send entrypoint so no-balance and
     // multi-mint selection behavior stays identical to the wallet Send button.
     clearPaymentContext('user.messages.send_money');
     void (machine as SendMoneyPaymentMachine).startSendEcash({
       reset: true,
-      meltTarget: lud16,
+      meltTarget: sendMoneyTarget,
       recipientPubkey: pubkey,
     });
-  }, [counterpartyMetadata, lud16, machine, pubkey]);
+  }, [counterpartyMetadata, lud16, sendMoneyTarget, machine, pubkey]);
 
   return (
     <Screen name="UserMessagesScreen" scroll="none">
+      {/* AX-only screen marker: the DM chrome (native header + chat list) has
+          no stable device-test id, and which conversation is open matters —
+          the value carries the counterparty pubkey (public, not a secret). */}
+      <View
+        testID="dm-chat-probe"
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel="DM conversation"
+        accessibilityValue={dmProbeValue}
+        importantForAccessibility="yes"
+        collapsable={false}
+        pointerEvents="none"
+        style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1 }}
+      />
       <DmChatHeader pubkey={pubkey} onBack={handleBack} />
       <ChatScreen
         surface={SURFACE}
@@ -395,8 +426,9 @@ export function UserMessagesScreen({
         onStartReached={hasMore ? loadMore : undefined}
         onStartReachedThreshold={0.3}
         composerPlaceholder="Write here"
+        composerTestID="dm-composer"
         composerActions={
-          lud16 ? (
+          sendMoneyTarget ? (
             <Button
               text="Send money"
               variant="primary"

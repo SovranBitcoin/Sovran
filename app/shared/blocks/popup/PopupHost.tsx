@@ -865,7 +865,13 @@ function SheetPopup() {
 
   const handleNativeSheetChange = useCallback(
     (index: number) => {
-      if (index >= 0 && isOpen && activeCustomPage?.sheetId === 'action-menu') {
+      if (
+        index >= 0 &&
+        isOpen &&
+        (activeCustomPage?.sheetId === 'action-menu' ||
+          activeCustomPage?.sheetId === 'proof-selector' ||
+          activeCustomPage?.sheetId === 'signer-connect')
+      ) {
         markE2EActionMenuPresented(openSeq);
       }
     },
