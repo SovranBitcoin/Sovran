@@ -84,8 +84,25 @@ const LIGHTNING_ADDRESS_NO_BALANCE: FlowScenario = {
   },
 };
 
+const LIGHTNING_ADDRESS_FUNDED_FALLBACK: FlowScenario = {
+  name: 'lightning address: empty preferred mint → enterAmount preselects the funded mint',
+  // The preferred mint holds no balance, so the amount screen must open on a
+  // mint that can actually fund the melt — the highest-balance funded mint —
+  // instead of the empty preference (preselectMintForSend fallback).
+  wallet: { ...WALLETS.multiMintUnbalanced, preferredMintUrl: MINT3 },
+  steps: [{ type: 'execute', input: INPUTS.lightningAddress }],
+  expect: {
+    step: 'enterAmount',
+    data: { preselectedMintUrl: MINT1 },
+  },
+};
+
 describe('lightning melt — lightning address scenarios', () => {
-  it.each([LIGHTNING_ADDRESS_HAPPY, LIGHTNING_ADDRESS_NO_BALANCE])('$name', async (scenario) => {
+  it.each([
+    LIGHTNING_ADDRESS_HAPPY,
+    LIGHTNING_ADDRESS_NO_BALANCE,
+    LIGHTNING_ADDRESS_FUNDED_FALLBACK,
+  ])('$name', async (scenario) => {
     await runScenario(scenario);
   });
 });

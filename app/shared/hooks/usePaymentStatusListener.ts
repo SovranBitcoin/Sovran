@@ -387,10 +387,9 @@ export function usePaymentStatusListener(): void {
     });
 
     const offRedeemed = manager.on('mint-op:finalized', ({ mintUrl, operationId, operation }) => {
-      // FinalizedMintOperation always carries quoteId; init shouldn't reach finalize,
-      // but narrow defensively to satisfy the union and keep operationId as a fallback
-      // for any future variant that lacks a quoteId.
-      const quoteId = operation.state === 'init' ? operationId : operation.quoteId;
+      // rc.2 narrows the finalized payload to FinalizedMintOperation, which
+      // always carries quoteId — no init-state defense needed anymore.
+      const quoteId = operation.quoteId;
       paymentLog.info('hook.payment_status.mint_quote_redeemed', { operationId, quoteId });
       const store = usePaymentStatusStore.getState();
       const hadMatchingActive = store.active?.id === quoteId;
@@ -402,7 +401,7 @@ export function usePaymentStatusListener(): void {
       // and never match the recorded standing id, so they don't rotate
       // anything. The old quote stays pending in coco, so late payments to
       // the retired address still auto-mint.
-      if (operation.state !== 'init' && operation.method === 'onchain') {
+      if (operation.method === 'onchain') {
         const rotationInput = {
           mintUrl,
           method: 'onchain' as const,
@@ -435,7 +434,7 @@ export function usePaymentStatusListener(): void {
       // Standing-quote deposits (bolt12 offer / onchain address) auto-mint
       // with no prior toast — surface a confirmed receive so the deposit
       // isn't silent. bolt11 mints already ran the PAID-processing toast.
-      if (!hadMatchingActive && operation.state !== 'init' && operation.method !== 'bolt11') {
+      if (!hadMatchingActive && operation.method !== 'bolt11') {
         if (isSwapStatusActive()) return;
         const amount = amountToNumber(operation.amount);
         const unit = operation.unit;

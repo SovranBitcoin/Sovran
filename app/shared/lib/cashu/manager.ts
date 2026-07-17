@@ -14,7 +14,7 @@ import {
   storeCashuSeed,
   hashMnemonic,
 } from '@/shared/lib/nostr/secureStorage';
-import { NPCPlugin, type Signer as NpcSigner } from 'coco-cashu-plugin-npc';
+import { NPCPlugin, type NPCAccountApi, type Signer as NpcSigner } from 'coco-cashu-plugin-npc';
 import { createPaymentRequestNostrTransportPlugin } from '@/shared/lib/cashu/paymentRequestNostrTransport';
 import {
   NPC_BASE_URL,
@@ -98,6 +98,7 @@ export class CocoManager {
   private static cashuMnemonic: string | null = null;
   private static signerKey: Uint8Array | null = null;
   private static npcPlugin: NPCPlugin | null = null;
+  private static npcAccount: NPCAccountApi | null = null;
   private static npcPluginRegistered = false;
   /** Stored reference to seed getter for pre-warming during background init */
   private static seedGetter: (() => Promise<Uint8Array>) | null = null;
@@ -111,6 +112,7 @@ export class CocoManager {
     this.signerKey = null;
     this.cashuMnemonic = null;
     this.npcPlugin = null;
+    this.npcAccount = null;
     this.npcPluginRegistered = false;
     this.seedGetter = null;
     this.isImportedProfile = false;
@@ -648,27 +650,27 @@ export class CocoManager {
     cashuLog.info('cashu.manager.npc_sync_and_processor.start');
 
     try {
-      let npcPlugin: NPCPlugin | null = null;
+      let npcAccount: NPCAccountApi | null = null;
       try {
         initLog('CocoManager', 'initializing plugins...');
-        npcPlugin = await this.getOrCreateNpcPlugin();
-        if (npcPlugin && !this.npcPluginRegistered) {
-          // The Plugin type comes from @cashu/coco-core; NPCPlugin implements
-          // the same shape via coco-cashu-plugin-npc's bundled (older) coco
-          // types, so we bridge with a single nominal cast at the seam — far
-          // narrower than a per-callsite `any`.
-          manager.use(npcPlugin as unknown as Plugin);
+        const npcPlugin = this.getOrCreateNpcPlugin();
+        if (!this.npcPluginRegistered) {
+          manager.use(npcPlugin);
           this.npcPluginRegistered = true;
           cashuLog.info('cashu.manager.npc_plugin_registered');
         } else {
           cashuLog.debug('cashu.manager.npc_plugin_registration_skipped', {
-            hasPlugin: !!npcPlugin,
+            hasPlugin: true,
             alreadyRegistered: this.npcPluginRegistered,
           });
         }
         await manager.initPlugins();
+        npcAccount = await this.getOrCreateNpcAccount();
         initLog('CocoManager', 'plugins initialized');
-        cashuLog.info('cashu.manager.plugins_initialized', { hasNpcPlugin: !!npcPlugin });
+        cashuLog.info('cashu.manager.plugins_initialized', {
+          hasNpcPlugin: true,
+          hasNpcAccount: !!npcAccount,
+        });
       } catch (error) {
         cashuLog.warn('cashu.manager.plugins_init_failed', { error });
       }
@@ -767,12 +769,12 @@ export class CocoManager {
         reportCocoApiFailure('requeuePaidMintQuotes', error);
       }
 
-      if (npcPlugin) {
+      if (npcAccount) {
         const timeoutMs = 15_000;
         initLog('CocoManager', 'NPC sync starting...');
         cashuLog.info('cashu.manager.npc_sync.start', { timeoutMs });
         let syncTimeout: ReturnType<typeof setTimeout> | null = null;
-        const syncPromise = npcPlugin.sync().then(
+        const syncPromise = npcAccount.sync().then(
           () => {
             initLog('CocoManager', 'NPC sync done');
             cashuLog.info('cashu.manager.npc_sync.done');
@@ -940,8 +942,27 @@ export class CocoManager {
     }
   }
 
-  private static async getOrCreateNpcPlugin(): Promise<NPCPlugin | null> {
+  private static getOrCreateNpcPlugin(): NPCPlugin {
     if (this.npcPlugin) return this.npcPlugin;
+
+    // v3 plugin: host-level registration only — signers, sync timers, and
+    // websocket subscriptions belong to per-profile account runtimes added
+    // via getOrCreateNpcAccount() after initPlugins().
+    this.npcPlugin = new NPCPlugin({
+      defaultBaseUrl: NPC_BASE_URL,
+      syncIntervalMs: NPC_SYNC_INTERVAL_MS,
+      useWebsocket: true,
+      // Without a logger the plugin's interval syncs, websocket lifecycle, and
+      // claim failures are invisible — a stranded npc receive left no trace.
+      logger: new CocoCoreLogger('npc'),
+    });
+    initLog('CocoManager', 'NPC plugin created');
+    return this.npcPlugin;
+  }
+
+  private static async getOrCreateNpcAccount(): Promise<NPCAccountApi | null> {
+    if (this.npcAccount) return this.npcAccount;
+    if (!this.npcPlugin) return null;
 
     const nsecSigner = await initPhase('CocoManager.getSigner', () =>
       this.getCurrentProfileSigner()
@@ -967,13 +988,16 @@ export class CocoManager {
       return null;
     }
 
-    this.npcPlugin = new NPCPlugin(NPC_BASE_URL, signerFunction, {
-      syncIntervalMs: NPC_SYNC_INTERVAL_MS,
-      useWebsocket: true,
+    this.npcAccount = await this.npcPlugin.addAccount({
+      id: activePubkey,
+      signer: signerFunction,
+      baseUrl: NPC_BASE_URL,
       sinceStore: new AsyncStorageSinceStore(getNpcSinceStoreKey(activePubkey)),
+      // autoStart arms the interval timer + websocket for this account.
+      autoStart: true,
     });
-    initLog('CocoManager', 'NPC plugin created');
-    return this.npcPlugin;
+    initLog('CocoManager', 'NPC account added');
+    return this.npcAccount;
   }
 
   /**
