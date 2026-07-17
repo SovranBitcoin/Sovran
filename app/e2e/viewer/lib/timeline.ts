@@ -46,6 +46,10 @@ export function parseEvents(eventsText: string, runDirName: string): ParsedEvent
   // (stepId, artifactSeq) for step frames and by named basename for named ones.
   const framesByKey = new Map<string, Frame>();
   const namedByBase = new Map<string, NamedFrame>();
+  // store/db sidecar events can carry a PREVIOUS frame's path (unchanged-state
+  // dedup), so they pair strictly by (stepId, artifactSeq) — named frames need
+  // their own seq-keyed index since namedByBase keys by png basename.
+  const namedByKey = new Map<string, NamedFrame>();
 
   for (const line of eventsText.split('\n')) {
     if (!line.trim()) continue;
@@ -69,6 +73,7 @@ export function parseEvents(eventsText: string, runDirName: string): ParsedEvent
         namedCounts.clear();
         framesByKey.clear();
         namedByBase.clear();
+        namedByKey.clear();
         break;
       }
       case 'scenario.end': {
@@ -115,7 +120,21 @@ export function parseEvents(eventsText: string, runDirName: string): ParsedEvent
         const kind = String(event.kind);
         if (kind === 'video') {
           const videoRel = relativeToRunDir(String(event.path), runDirName);
-          if (videoRel) current.videoFile = videoRel;
+          if (videoRel) {
+            current.videoFile = videoRel;
+            if (typeof event.t === 'number') current.videoEndT = event.t;
+          }
+          break;
+        }
+        if (kind === 'store' || kind === 'db') {
+          const rel = relativeToRunDir(String(event.path), runDirName);
+          if (!rel) break;
+          const key = `${event.stepId}:${event.artifactSeq}`;
+          const target = framesByKey.get(key) ?? namedByKey.get(key);
+          if (target) {
+            if (kind === 'store') target.storeFile = rel;
+            else target.dbFile = rel;
+          }
           break;
         }
         if (kind !== 'screenshot' && kind !== 'ax') break;
@@ -141,8 +160,10 @@ export function parseEvents(eventsText: string, runDirName: string): ParsedEvent
             stepId: openStepId,
             artifactSeq: Number(event.artifactSeq ?? (match ? match[2] : 0)),
             phase: openStepId ? phaseOf(openStepId) : undefined,
+            t: typeof event.t === 'number' ? event.t : undefined,
           };
           namedByBase.set(nameBase, named);
+          namedByKey.set(`${event.stepId}:${event.artifactSeq}`, named);
           current.named.push(named);
           break;
         }

@@ -1,21 +1,23 @@
-/* shadcn dark (zinc) token set; keep names aligned with shadcn/ui so values
- * can be cross-checked against upstream. */
+/* Sovran app "dark" theme (themes.ts `dark` ramp + themeEngine semantics).
+ * shadcn-style token names are kept so component rules stay unchanged; each
+ * value cites its app-ramp shade. The app renders borders transparent and
+ * separates by surface depth instead — --border maps to --separator (700). */
 :root {
-  --background: hsl(240 10% 3.9%);
-  --foreground: hsl(0 0% 98%);
-  --card: hsl(240 10% 5.9%);
-  --muted: hsl(240 3.7% 15.9%);
-  --muted-foreground: hsl(240 5% 64.9%);
-  --border: hsl(240 3.7% 15.9%);
-  --input: hsl(240 3.7% 15.9%);
-  --primary: hsl(0 0% 98%);
-  --primary-foreground: hsl(240 5.9% 10%);
-  --accent: hsl(240 3.7% 15.9%);
-  --ring: hsl(240 4.9% 83.9%);
-  --destructive: hsl(0 72% 61%);
-  --success: hsl(142 52% 55%);
-  --warning: hsl(38 65% 60%);
-  --link: hsl(213 94% 68%);
+  --background: #080808; /* dark-950  --background */
+  --foreground: #ffffff; /* dark-0    --foreground */
+  --card: #121212; /* dark-900  --surface */
+  --muted: #1c1c1c; /* dark-700  --default/--surface-tertiary */
+  --muted-foreground: #a8a8a8; /* dark-200 */
+  --border: #1c1c1c; /* dark-700  --separator */
+  --input: #1c1c1c; /* dark-700 */
+  --primary: #ffffff; /* dark-0    --accent */
+  --primary-foreground: #080808; /* dark-950  --accent-foreground */
+  --accent: #1c1c1c; /* dark-700  hover / current-row surface */
+  --ring: #c7c7c7; /* dark-100 */
+  --destructive: #ef4444; /* --danger (red-300) */
+  --success: #34c759; /* --success (green-300) */
+  --warning: #e0b229; /* --warning (yellow-300) */
+  --link: #95c5ea; /* blue-200 — dark-surface text tier */
   --radius: 0.5rem;
   --mono:
     ui-monospace, 'Geist Mono', 'SF Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
@@ -84,8 +86,8 @@ button.primary {
 }
 
 button.primary:hover:not(:disabled) {
-  background: hsl(0 0% 88%);
-  border-color: hsl(0 0% 88%);
+  background: #e8eaed;
+  border-color: #e8eaed;
 }
 
 button.danger {
@@ -95,7 +97,7 @@ button.danger {
 }
 
 button.danger:hover:not(:disabled) {
-  background: hsl(0 72% 61% / 0.12);
+  background: rgb(239 68 68 / 0.12);
 }
 
 select,
@@ -112,7 +114,7 @@ input[type='text'] {
 
 select:hover,
 input[type='text']:hover {
-  border-color: hsl(240 5% 26%);
+  border-color: #2c2c2c;
 }
 
 button:focus-visible,
@@ -148,15 +150,78 @@ input:focus-visible,
   text-transform: uppercase;
 }
 
-/* flow-facet section headers in the scenario panel */
-.flow-group {
-  padding: 10px 8px 3px;
+/* collapsible flow-facet tree: sticky caret headers, guide-lined children */
+.tree-group {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  height: auto;
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--background);
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  opacity: 0.8;
+}
+
+.tree-group:hover:not(:disabled) {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.tree-group .caret {
+  width: 11px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+  transition: transform 120ms ease;
+}
+
+.tree-group .caret.open {
+  transform: rotate(90deg);
+}
+
+.tree-group .flow-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* failures stay visible while a group is collapsed */
+.tree-group .fail-count {
+  color: var(--destructive);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.tree-group .badge {
+  color: var(--muted-foreground);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  opacity: 0.7;
+}
+
+.tree-children {
+  margin-left: 12px;
+  padding-left: 6px;
+  border-left: 1px solid var(--border);
 }
 
 /* facet chips under the player title */
@@ -296,23 +361,132 @@ input:focus-visible,
   min-width: 0;
 }
 
+/* two decks: brand + actions row on top, underline mode tabs riding the
+ * header's bottom border below — no dead center column, nothing wraps */
 #topbar {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  flex-direction: column;
+  padding: 0 16px;
   border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
 }
 
-#topbar .spacer {
-  flex: 1;
+#topbar .topbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 46px;
+  padding-top: 2px;
 }
 
-#topbar .status-pill {
+#topbar button {
+  white-space: nowrap;
+}
+
+#topbar .brand {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+#topbar .brand-mark {
+  color: var(--foreground);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+#topbar .brand-name {
+  color: var(--muted-foreground);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+#topbar .brand-context {
+  overflow: hidden;
+  margin-left: 6px;
   color: var(--muted-foreground);
   font-family: var(--mono);
   font-size: 11px;
+  text-overflow: ellipsis;
+  opacity: 0.75;
+}
+
+/* underline tabs: the active indicator sits ON the header's bottom border */
+.mode-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: -1px;
+}
+
+.mode-tabs .tab {
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+}
+
+.mode-tabs .tab:hover:not(.active) {
+  background: transparent;
+  color: var(--foreground);
+}
+
+.mode-tabs .tab.active {
+  border-bottom-color: var(--foreground);
+  background: transparent;
+  color: var(--foreground);
+}
+
+#topbar .topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+#topbar .status-pill {
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* suite triggers share one bordered container; inner dividers, no double rims */
+.btn-group {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  overflow: hidden;
+}
+
+.btn-group .btn-group-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px 0 10px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  user-select: none;
+}
+
+.btn-group button {
+  border: none;
+  border-radius: 0;
+}
+
+.btn-group button + button,
+.btn-group .btn-group-label + button {
+  border-left: 1px solid var(--border);
 }
 
 #content {
@@ -341,7 +515,6 @@ input:focus-visible,
 
 .player .titles p {
   margin: 3px 0 0;
-  max-width: 72ch;
   color: var(--muted-foreground);
   text-wrap: pretty;
 }
@@ -353,6 +526,15 @@ input:focus-visible,
   min-height: 0;
 }
 
+.player .stage-col {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .player .stage {
   flex: 1;
   min-width: 0;
@@ -360,7 +542,17 @@ input:focus-visible,
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--card);
+  /* breathing room above the device frame; the taller bottom edge is a
+   * guaranteed gutter the caption renders into, so media (max-height resolves
+   * against the padded content box) can never collide with it */
+  padding: 18px 0 46px;
+  /* canvas deliberately sits ABOVE the app ramp's surfaces (dark-600 base,
+   * dark-400 dots) — the near-black captures need contrast against their
+   * backdrop, and the Railway-style dot grid marks it as a workbench, not
+   * an app surface */
+  background:
+    radial-gradient(circle, #525252 1px, transparent 1.5px) 0 0 / 22px 22px,
+    #202020;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   position: relative;
@@ -378,26 +570,82 @@ input:focus-visible,
 }
 
 .player .side {
-  width: 240px;
+  width: 300px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  overflow-y: auto;
   min-height: 0;
 }
 
+/* ---- centered screenshots/video switch ---- */
+
+.view-toggle-row {
+  display: flex;
+  justify-content: center;
+}
+
+.view-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--muted);
+  border-radius: var(--radius);
+}
+
+.view-toggle .seg {
+  height: 30px;
+  padding: 0 22px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 3px);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.view-toggle .seg:hover:not(:disabled):not(.active) {
+  background: transparent;
+  color: var(--foreground);
+}
+
+.view-toggle .seg.active {
+  background: var(--background);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+
+/* in the side column the switch fills the 300px width */
+.side .view-toggle {
+  display: flex;
+  width: 100%;
+}
+
+.side .view-toggle .seg {
+  flex: 1;
+  padding: 0;
+}
+
+/* lives inside the stage's guaranteed bottom gutter */
 .player .caption {
-  min-height: 1.2em;
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  left: 16px;
+  overflow: hidden;
   color: var(--muted-foreground);
   font-family: var(--mono);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .player .caption.fail {
   color: var(--destructive);
 }
 
+/* ---- shared transport (screenshots reel + video) ---- */
+
+/* full-width bar: play · track (fills) · counter · durations */
 .player .controls {
   display: flex;
   align-items: center;
@@ -407,64 +655,327 @@ input:focus-visible,
 .player .controls button {
   width: 34px;
   padding: 0;
-}
-
-.player .controls input[type='range'] {
-  flex: 1;
-  accent-color: var(--primary);
+  flex-shrink: 0;
 }
 
 .player .controls .counter {
-  min-width: 72px;
   text-align: right;
   color: var(--muted-foreground);
   font-family: var(--mono);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* the track is the ruler — it owns all width the counters don't need */
+.scrubber {
+  flex: 1;
+  min-width: 0;
+}
+
+/* step markers on the video timeline — their own lane above the track so
+ * they stay clickable without stealing the range input's pointer events */
+.scrub-ticks {
+  position: relative;
+  height: 8px;
+  margin-bottom: 3px;
+}
+
+.scrub-tick {
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: var(--muted-foreground);
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.scrub-tick:hover {
+  opacity: 1;
+}
+
+.scrub-tick.named {
+  background: var(--link);
+  opacity: 0.85;
+}
+
+.scrub-tick.fail {
+  background: var(--destructive);
+  opacity: 0.9;
+}
+
+.scrub-tick.current {
+  background: var(--primary);
+  opacity: 1;
+}
+
+/* the visual track; the real <input type=range> sits invisible on top and
+ * owns all hit-testing, focus, and drag semantics */
+.scrub-track {
+  position: relative;
+  height: 16px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  overflow: hidden;
+}
+
+.scrub-cells {
+  position: absolute;
+  inset: 3px;
+  display: flex;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.scrub-cell {
+  flex: 1;
+  border-radius: 2px;
+  background: #2c2c2c;
+}
+
+.scrub-cell.named {
+  background: rgb(149 197 234 / 0.45);
+}
+
+.scrub-cell.fail {
+  background: rgb(239 68 68 / 0.55);
+}
+
+.scrub-cell.current {
+  background: var(--primary);
+}
+
+.scrub-cell.fail.current {
+  background: var(--destructive);
+}
+
+.scrub-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--primary);
+  pointer-events: none;
+}
+
+.scrub-track input[type='range'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.scrub-track input[type='range']:disabled {
+  cursor: default;
+}
+
+.scrub-track input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.scrub-track input[type='range']::-moz-range-thumb {
+  border: none;
+  background: transparent;
+}
+
+.scrub-track:has(input:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/* ---- steps pane (diff-viewer treatment) ---- */
+
+/* small key/value table above Steps: run-level facts for the open scenario */
+.scenario-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 14px;
+  padding: 9px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.scenario-meta .k {
+  color: var(--muted-foreground);
+}
+
+.scenario-meta .v {
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.steps-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.steps-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.steps-head .steps-title {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.steps-head .steps-count {
+  margin-right: auto;
+  color: var(--muted-foreground);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.steps-head label.check {
+  font-size: 11px;
 }
 
 .step-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0;
 }
 
 .step-item {
-  padding: 3px 8px;
-  border-radius: calc(var(--radius) - 4px);
+  display: grid;
+  grid-template-columns: 30px 16px 1fr;
+  gap: 0 6px;
+  align-items: baseline;
+  padding: 3px 8px 3px 0;
+  border-left: 2px solid transparent;
   color: var(--muted-foreground);
   font-family: var(--mono);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease;
+  transition: background-color 120ms ease;
 }
 
 .step-item:hover {
-  color: var(--foreground);
+  background: rgb(44 44 44 / 0.5);
 }
 
 .step-item.current {
   background: var(--accent);
-  color: var(--foreground);
+  border-left-color: var(--ring);
 }
 
+/* the diff "deleted line": tinted row + hard left accent */
 .step-item.fail {
+  background: rgb(239 68 68 / 0.08);
+  border-left-color: rgb(239 68 68 / 0.55);
+}
+
+.step-item.fail.current {
+  background: rgb(239 68 68 / 0.16);
+  border-left-color: var(--destructive);
+}
+
+.step-gutter {
+  padding-right: 6px;
+  border-right: 1px solid var(--border);
+  color: var(--muted-foreground);
+  text-align: right;
+  user-select: none;
+  opacity: 0.55;
+}
+
+.step-status {
+  text-align: center;
+}
+
+.step-status.ok {
+  color: var(--success);
+  opacity: 0.8;
+}
+
+.step-status.fail {
   color: var(--destructive);
 }
 
-.step-item.named {
+.step-status.named {
+  color: var(--link);
+}
+
+.step-status.warn {
+  color: var(--warning);
+}
+
+.step-status.none {
+  opacity: 0.5;
+}
+
+.step-code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-code .tok-id {
+  margin-right: 6px;
+  color: var(--link);
+  opacity: 0.85;
+}
+
+.step-code .tok-kind {
+  margin-right: 6px;
+  color: #d3b979; /* yellow ~200 tier for dark surfaces */
+}
+
+.step-code .tok-label {
   color: var(--foreground);
+}
+
+.step-code .tok-name {
+  color: var(--link);
   font-weight: 600;
+}
+
+.step-code .tok-error {
+  display: block;
+  padding: 1px 0 2px;
+  color: var(--destructive);
+  font-size: 10.5px;
+  white-space: normal;
+  word-break: break-word;
+  opacity: 0.9;
 }
 
 .named-strip {
   display: flex;
+  flex-shrink: 0;
   gap: 10px;
   overflow-x: auto;
   padding-bottom: 4px;
@@ -477,7 +988,7 @@ input:focus-visible,
 }
 
 .named-strip img {
-  height: 92px;
+  height: 72px;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) - 2px);
 }
@@ -569,14 +1080,7 @@ label.check input[type='checkbox'] {
   accent-color: var(--primary);
 }
 
-/* ---- diff ---- */
-
-.diff {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  height: 100%;
-}
+/* ---- diff (player layout + diff-specific pieces) ---- */
 
 .diff .pickers {
   display: flex;
@@ -584,38 +1088,6 @@ label.check input[type='checkbox'] {
   align-items: center;
   flex-wrap: wrap;
   color: var(--muted-foreground);
-}
-
-.diff table {
-  border-collapse: collapse;
-  font-family: var(--mono);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.diff th,
-.diff td {
-  padding: 6px 16px 6px 0;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-}
-
-.diff th {
-  color: var(--muted-foreground);
-  font-weight: 400;
-  font-size: 11px;
-}
-
-.diff tr.clickable {
-  cursor: pointer;
-}
-
-.diff tr.clickable:hover td {
-  background: hsl(240 3.7% 15.9% / 0.4);
-}
-
-.diff tr.selected td:first-child {
-  color: var(--link);
 }
 
 .pct-hot {
@@ -630,66 +1102,107 @@ label.check input[type='checkbox'] {
   color: var(--muted-foreground);
 }
 
-.pair-viewer {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
-  min-height: 0;
+/* two device frames sharing the stage; each half centers its screenshot */
+.diff .stage.split {
+  gap: 18px;
 }
 
-.pair-images {
+.diff .stage-half {
   display: flex;
-  gap: 12px;
-  flex: 1;
-  min-height: 300px;
-}
-
-.pair-images figure {
-  margin: 0;
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 10px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.pair-images img {
-  max-width: 100%;
-  min-height: 0;
-  flex: 1;
-  object-fit: contain;
-}
-
-.pair-images figcaption {
-  color: var(--muted-foreground);
-  font-family: var(--mono);
-  font-size: 11px;
-}
-
-.overlay-stage {
-  position: relative;
-  flex: 1;
-  min-height: 300px;
-  display: flex;
   justify-content: center;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  min-width: 0;
+  height: 100%;
 }
 
-.overlay-stage img {
-  position: absolute;
-  inset: 0;
-  margin: auto;
+.diff .stage-half img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+.diff .stage-missing {
+  padding: 24px 28px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--muted-foreground);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* pct-tinted scrub cells (diff mode's step markers) */
+.scrub-cell.warm {
+  background: rgb(224 178 41 / 0.5);
+}
+
+.scrub-cell.hot {
+  background: rgb(239 68 68 / 0.55);
+}
+
+.scrub-cell.edge {
+  background: rgb(149 197 234 / 0.45);
+}
+
+.scrub-cell.warm.current,
+.scrub-cell.hot.current,
+.scrub-cell.edge.current {
+  background: var(--primary);
+}
+
+/* ranked scenario list — the diff's triage panel, styled like step rows */
+.diff-scenarios {
+  flex-shrink: 0;
+  max-height: 30%;
+  overflow-y: auto;
+  padding: 4px 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.diff-scn {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0 10px;
+  align-items: baseline;
+  padding: 3px 10px;
+  border-left: 2px solid transparent;
+  color: var(--muted-foreground);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.diff-scn:hover {
+  background: rgb(44 44 44 / 0.5);
+}
+
+.diff-scn.current {
+  background: var(--accent);
+  border-left-color: var(--ring);
+  color: var(--foreground);
+}
+
+.diff-scn-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-scn-counts {
+  opacity: 0.7;
+}
+
+/* diff step rows carry a trailing pct column */
+.step-item.diff-row {
+  grid-template-columns: 30px 16px 1fr auto;
+}
+
+.step-item .step-pct {
+  padding-right: 2px;
+  font-size: 10.5px;
 }
 
 /* ---- console drawer ---- */
@@ -712,16 +1225,79 @@ label.check input[type='checkbox'] {
   font-size: 11px;
 }
 
-#console pre {
-  margin: 0;
-  padding: 0 16px 12px;
+#console .console-lines {
+  padding: 2px 0 10px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  color: var(--muted-foreground);
   font-family: var(--mono);
   font-size: 11px;
+}
+
+/* one CLI output line, styled like a .step-item row (same token vocabulary) */
+.console-line {
+  padding: 1px 16px 1px 14px;
+  border-left: 2px solid transparent;
+  color: var(--muted-foreground);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* the diff "deleted line": tinted row + hard left accent, as in the steps pane */
+.console-line.fail {
+  background: rgb(239 68 68 / 0.08);
+  border-left-color: rgb(239 68 68 / 0.55);
+}
+
+.console-line.section {
+  color: var(--foreground);
+}
+
+.console-line.sep {
+  opacity: 0.45;
+}
+
+.console-line.meta {
+  opacity: 0.7;
+}
+
+.console-line .glyph.ok {
+  color: var(--success);
+  opacity: 0.8;
+}
+
+.console-line .glyph.fail {
+  color: var(--destructive);
+}
+
+.console-line .glyph.warn {
+  color: var(--warning);
+}
+
+.console-line .glyph.run {
+  color: var(--link);
+}
+
+.console-line .glyph.dim {
+  opacity: 0.6;
+}
+
+.console-line .tok-id {
+  color: var(--link);
+  opacity: 0.85;
+}
+
+.console-line .tok-kind {
+  color: #d3b979; /* yellow ~200 tier, matches .step-code .tok-kind */
+}
+
+.console-line .tok-dur {
+  opacity: 0.55;
+}
+
+.console-line.copy-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 16px 4px;
 }
 
 /* ---- modal ---- */
@@ -791,4 +1367,275 @@ label.check input[type='checkbox'] {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
   }
+}
+
+/* ---- per-frame app-state pane (zustand + coco db, steps-pane treatment) ---- */
+
+.state-pane {
+  display: flex;
+  flex-direction: column;
+  width: 380px;
+  min-height: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.state-pane .view-toggle {
+  margin-left: auto;
+  padding: 2px;
+}
+
+.state-pane .view-toggle .seg {
+  height: 22px;
+  padding: 0 10px;
+  font-size: 10.5px;
+}
+
+.state-pane .scenario-meta.state-meta {
+  margin: 8px 8px 0;
+  border-radius: calc(var(--radius) - 3px);
+}
+
+.state-pane .scenario-meta.state-meta:empty {
+  display: none;
+}
+
+.state-meta .v.state-unchanged {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.state-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 0 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.state-list .empty {
+  display: block;
+  padding: 14px 12px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+/* top-level section: one store / one db table */
+.state-section > summary,
+.state-section.leaf {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 10px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  list-style: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: background-color 120ms ease;
+}
+
+.state-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.state-section > summary::before {
+  content: '▸';
+  color: var(--muted-foreground);
+  opacity: 0.55;
+  font-size: 9px;
+}
+
+.state-section[open] > summary::before {
+  content: '▾';
+}
+
+.state-section > summary:hover {
+  background: rgb(44 44 44 / 0.5);
+}
+
+.state-section[open] > summary {
+  border-left-color: var(--ring);
+}
+
+.state-section .tok-name {
+  color: var(--link);
+  font-weight: 600;
+}
+
+.jt-badge {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+/* nested tree */
+.jt-children {
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+  margin-left: 13px;
+}
+
+.jt-node > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 1px 8px 1px 0;
+  cursor: pointer;
+  list-style: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.jt-node > summary::-webkit-details-marker {
+  display: none;
+}
+
+.jt-node > summary::before {
+  content: '▸';
+  color: var(--muted-foreground);
+  opacity: 0.55;
+  font-size: 9px;
+}
+
+.jt-node[open] > summary::before {
+  content: '▾';
+}
+
+.jt-node > summary:hover {
+  background: rgb(44 44 44 / 0.5);
+}
+
+.jt-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 1px 8px 1px 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.jt-key {
+  flex-shrink: 0;
+  color: var(--link);
+  opacity: 0.85;
+}
+
+.jt-key::after {
+  content: ':';
+  color: var(--muted-foreground);
+}
+
+.jt-str {
+  color: #d3b979; /* same yellow tier as .tok-kind */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jt-num {
+  color: var(--success);
+}
+
+.jt-bool {
+  color: var(--warning);
+}
+
+.jt-null {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+/* Steps-head toggle button for the pane */
+.steps-head .state-toggle {
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.steps-head .state-toggle:hover {
+  color: var(--foreground);
+}
+
+.steps-head .state-toggle.active {
+  background: var(--accent);
+  border-color: var(--ring);
+  color: var(--foreground);
+}
+
+/* narrow viewports: the pane drops under the stage instead of crushing it */
+@media (max-width: 1100px) {
+  .player .stage-row {
+    flex-wrap: wrap;
+  }
+
+  .state-pane {
+    width: 100%;
+    max-height: 40vh;
+  }
+}
+
+/* change highlighting vs the previous frame */
+.state-filter {
+  display: flex;
+  padding: 6px 10px 0;
+}
+
+.state-filter label.check {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.state-meta .v.state-changed {
+  color: var(--warning);
+}
+
+.state-section.changed > summary,
+.state-section.leaf.changed {
+  border-left-color: var(--warning);
+}
+
+.state-section.changed > summary::after {
+  content: '●';
+  margin-left: auto;
+  color: var(--warning);
+  font-size: 7px;
+  opacity: 0.8;
+}
+
+.jt-children .jt-row.changed,
+.jt-children .jt-node.changed > summary {
+  border-left: 2px solid var(--warning);
+  margin-left: -2px;
+}
+
+.state-list .state-jump {
+  display: block;
+  margin: 4px 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  background: transparent;
+  color: var(--link);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.state-list .state-jump:hover {
+  background: var(--accent);
 }

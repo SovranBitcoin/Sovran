@@ -35,6 +35,9 @@ export interface RunSummary {
     funds: string;
   };
   fundsSafeToDelete: boolean;
+  /** Simulator device type from session-N.json (e.g. "iPhone 17 Pro"); absent
+   * for fake-driver runs. Lets the player round frames to the hardware radius. */
+  deviceType?: string;
 }
 
 export type PhaseTag = 'P' | 'T' | 'V' | 'C' | 'FINAL';
@@ -51,6 +54,11 @@ export interface Frame {
   /** Relative to the run dir, e.g. "toast.receive-lightning/001-P01-launch.png". */
   file: string;
   axFile?: string;
+  /** Zustand state-mirror snapshot for this frame. Dedup means consecutive
+   * frames with unchanged state share one rel path. */
+  storeFile?: string;
+  /** Coco SQLite dump for this frame; shares rel paths across frames like storeFile. */
+  dbFile?: string;
 }
 
 export interface NamedFrame {
@@ -59,10 +67,14 @@ export interface NamedFrame {
   occurrence: number;
   file: string;
   axFile?: string;
+  storeFile?: string;
+  dbFile?: string;
   stepId?: string;
   /** Global artifact sequence — lets the player interleave named captures into the reel. */
   artifactSeq?: number;
   phase?: PhaseTag;
+  /** Wall-clock ms of the capture event — maps the frame onto the video timeline. */
+  t?: number;
 }
 
 export interface ScenarioTimeline {
@@ -77,6 +89,10 @@ export interface ScenarioTimeline {
   named: NamedFrame[];
   /** Test+verify screen recording, relative to the run dir (e.g. "mint.add.url/video.mp4"). */
   videoFile?: string;
+  /** Wall-clock ms of the video artifact event, stamped at recorder stop — approximates
+   * the recording's end (SIGINT finalization can add a second or two of drift), letting
+   * the player anchor frame timestamps onto the video timeline. */
+  videoEndT?: number;
   finalState?: { expected: string; actual: string; ok: boolean };
 }
 
@@ -122,6 +138,10 @@ export interface DiffPairResult {
   phase: PhaseTag | 'named';
   stepId?: string;
   name?: string;
+  /** artifactSeq of the source frame (run A's, else run B's) — the reel order. */
+  order?: number;
+  kind?: string;
+  label?: string;
   status: DiffPairStatus;
   diffPct?: number;
   aFile?: string;
@@ -143,6 +163,8 @@ export interface DiffScenarioSummary {
 }
 
 export interface DiffResult {
+  /** Cache format version — stale cached results are recomputed on load. */
+  version: number;
   runA: string;
   runB: string;
   computedAt: string;

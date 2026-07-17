@@ -35,20 +35,27 @@ export interface AppState {
   selectedScenarioId?: string;
   runDetail?: RunDetail;
   frameIndex: number;
+  /** Slideshow auto-advance — screenshots mode only. In video mode the
+   * <video> element owns play state and this stays false. */
   playing: boolean;
   showAllPhases: boolean;
   /** Play the scenario's test+verify screen recording instead of the frame reel. */
   videoMode: boolean;
+  /** Show the per-frame app-state panel (zustand snapshot + coco db dump). */
+  stateOpen: boolean;
   diff: {
     runA?: string;
     runB?: string;
+    /** The left-panel run the pair was derived FOR (undefined after manual
+     * picker use) — re-entering the tab only re-targets when the selection
+     * moved away from this. */
+    forRun?: string;
     result?: DiffResult;
     computing?: { done: number; total: number } | 'starting';
     selectedScenarioId?: string;
-    selectedPairKey?: string;
-    view: 'side-by-side' | 'overlay';
-    overlayOpacity: number;
-    overlayHeatmap: boolean;
+    /** Index into the selected scenario's phase-filtered, reel-ordered pairs. */
+    pairIndex: number;
+    view: 'side-by-side' | 'heatmap';
   };
   pages: {
     index?: PagesIndex;
@@ -60,6 +67,27 @@ export interface AppState {
   job?: JobView;
   modal?: ModalView;
   error?: string;
+  /** Collapsed flow-facet groups in the scenario tree; survives reloads. */
+  collapsedFlows: string[];
+}
+
+const COLLAPSED_KEY = 'e2e-viewer-collapsed-flows';
+
+function loadCollapsedFlows(): string[] {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(COLLAPSED_KEY) ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter((flow) => typeof flow === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function persistCollapsedFlows(): void {
+  try {
+    sessionStorage.setItem(COLLAPSED_KEY, JSON.stringify(state.collapsedFlows));
+  } catch {
+    // storage full/blocked — collapse state just won't survive the reload
+  }
 }
 
 export const state: AppState = {
@@ -70,8 +98,10 @@ export const state: AppState = {
   playing: false,
   showAllPhases: false,
   videoMode: false,
-  diff: { view: 'side-by-side', overlayOpacity: 0.5, overlayHeatmap: false },
+  stateOpen: false,
+  diff: { view: 'side-by-side', pairIndex: 0 },
   pages: { allRuns: false },
+  collapsedFlows: loadCollapsedFlows(),
 };
 
 type Listener = () => void;
