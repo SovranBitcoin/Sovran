@@ -57,6 +57,7 @@ import { useOwnSocialGraphSeed } from '@/shared/lib/nostr/ownsync/useOwnSocialGr
 import PopupHost from '@/shared/blocks/popup/PopupHost';
 import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
+import { E2EStateMirror } from '@/shared/lib/e2e/E2EStateMirror';
 import { AndroidImageOverlayHost } from '@/features/feed/components/nostr/image-overlay/AndroidImageOverlayHost';
 import { OfflineShell, OfflineStatusProvider } from '@/shared/providers/OfflineProvider';
 import {
@@ -832,6 +833,10 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* Above every gate: e2e store snapshots must cover onboarding frames,
+          which render before AccountScopedProviders mounts. Stores are module
+          singletons, so nothing here depends on providers. */}
+      <E2EStateMirror />
       <OuterProviders>
         <TransitionControlRegistrar />
         <TransitionGuardCleanup />

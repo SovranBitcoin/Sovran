@@ -202,6 +202,8 @@ describe('owned host configuration', () => {
       EXPO_PUBLIC_E2E_FUNDED_ASSETS: 'must-not-survive',
       EXPO_PUBLIC_E2E_MOCK_FAIL_PAYMENT_REQUEST: '1',
       EXPO_PUBLIC_E2E_TOAST_DISMISS_MS: '3000',
+      EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS: '9999',
+      EXPO_PUBLIC_E2E_STATE_MIRROR: '0',
       RCT_METRO_PORT: '8082',
     });
     expect(environment).toEqual({
@@ -209,6 +211,8 @@ describe('owned host configuration', () => {
       NODE_OPTIONS: '--dns-result-order=ipv4first',
       EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS: '20000',
       EXPO_PUBLIC_E2E_TOAST_DISMISS_MS: '8000',
+      EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS: '20000',
+      EXPO_PUBLIC_E2E_STATE_MIRROR: '1',
     });
   });
 

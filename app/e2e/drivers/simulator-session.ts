@@ -195,6 +195,8 @@ export function buildMetroEnvironment(
   delete environment[E2E_READY_PROOF_RECONCILIATION_ENV];
   delete environment.EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS;
   delete environment.EXPO_PUBLIC_E2E_TOAST_DISMISS_MS;
+  delete environment.EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS;
+  delete environment.EXPO_PUBLIC_E2E_STATE_MIRROR;
   delete environment.RCT_METRO_PORT;
   // The onboarding carousel's 3s auto-advance outpaces the harness's per-step
   // evidence capture (~1s each), so slide screenshots can never anchor to the
@@ -206,6 +208,13 @@ export function buildMetroEnvironment(
   // to 8s: capture needs ~4-6s, and a longer linger poisons later stable
   // screenshots (a toast is ~7% of the frame vs 0.1% tolerances).
   environment.EXPO_PUBLIC_E2E_TOAST_DISMISS_MS = '8000';
+  // The settings dev-mode gesture is a 1.5s triple-tap; harness taps open one
+  // HID session each (~2s apart), so the window must be widened to be
+  // reachable at all from the simulator driver.
+  environment.EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS = '20000';
+  // Every owned e2e Metro turns on the in-app zustand state mirror so each
+  // evidence frame gets a .store.json sidecar (see shared/lib/e2e/stateMirror).
+  environment.EXPO_PUBLIC_E2E_STATE_MIRROR = '1';
   const nodeOptions = (environment.NODE_OPTIONS ?? '')
     .replace(/(?:^|\s)--dns-result-order(?:=|\s+)\S+/g, ' ')
     .trim();

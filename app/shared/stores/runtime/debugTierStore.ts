@@ -18,7 +18,9 @@ type DebugTierStore = {
   recordTiers: (eventIds: readonly string[], tier: NostrTier) => void;
 };
 
-const useDebugTierStore = create<DebugTierStore>((set, get) => ({
+// Exported only for the dev-gated e2e state mirror; app code goes through the
+// function API below.
+export const useDebugTierStore = create<DebugTierStore>((set, get) => ({
   tiers: new Map(),
   recordTiers: (eventIds, tier) => {
     if (!__DEV__ || eventIds.length === 0) return;
