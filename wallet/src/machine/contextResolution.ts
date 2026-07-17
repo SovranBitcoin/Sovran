@@ -9,6 +9,7 @@ import { logger, mintUrlFields } from "../logger";
 import {
   getValidMintCandidates,
   pickPreferredCandidate,
+  preselectMintForSend,
   selectMint,
 } from "../mint-selection";
 import type {
@@ -831,7 +832,7 @@ export function resolveFromContext(
         context: { ...ctx, destination },
         data: {
           unit,
-          preselectedMintUrl: mintUrl ?? walletCtx.preferredMintUrl,
+          preselectedMintUrl: preselectMintForSend(mintUrl, walletCtx),
           constraints: {
             destination,
             meltTarget: ctx.meltTarget,
@@ -874,7 +875,7 @@ export function resolveFromContext(
       context: { ...ctx, destination },
       data: {
         unit,
-        preselectedMintUrl: mintUrl ?? walletCtx.preferredMintUrl,
+        preselectedMintUrl: preselectMintForSend(mintUrl, walletCtx),
         constraints: {
           destination,
           paymentRequest: ctx.paymentRequest,

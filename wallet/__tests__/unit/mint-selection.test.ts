@@ -47,10 +47,17 @@ import { describe, it, expect } from 'vitest';
 import {
   getValidMintCandidates,
   pickPreferredCandidate,
+  preselectMintForSend,
   selectMint,
   selectMintForMelt,
 } from '../../src/mint-selection';
-import { WALLETS, MINT1, MINT2, UNTRUSTED_MINT } from '../_harness/fixtures';
+import {
+  WALLETS,
+  MINT1,
+  MINT2,
+  MINT3,
+  UNTRUSTED_MINT,
+} from '../_harness/fixtures';
 
 // ---------------------------------------------------------------------------
 // getValidMintCandidates
@@ -322,5 +329,53 @@ describe('pickPreferredCandidate', () => {
 
   it('returns undefined for an empty candidate list', () => {
     expect(pickPreferredCandidate([], MINT1)).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// preselectMintForSend
+// ---------------------------------------------------------------------------
+
+/**
+ * preselectMintForSend decides which mint the send amount screen opens on,
+ * BEFORE an amount exists. The explicit/preferred mint wins while it holds
+ * balance; an empty candidate falls back to the balance-aware pick
+ * (preferred-if-funded, else highest balance). When nothing is funded the
+ * raw candidate comes back unchanged so the NO_VALID_MINT error at amount
+ * commit is preserved.
+ */
+describe('preselectMintForSend', () => {
+  it('returns the preferred mint when it is funded and no explicit mint is set', () => {
+    // WALLETS.default: preferred MINT1 has 1000 — no fallback needed.
+    expect(preselectMintForSend(undefined, WALLETS.default)).toBe(MINT1);
+  });
+
+  it('returns the explicit mint when it is funded', () => {
+    // Explicit MINT2 (500) beats preferred MINT1 — context wins while funded.
+    expect(preselectMintForSend(MINT2, WALLETS.default)).toBe(MINT2);
+  });
+
+  it('falls back to the highest-balance funded mint when the preferred mint is empty', () => {
+    // Preferred MINT3 has 0; MINT1 (5000) is the highest-balance funded mint.
+    const wallet = { ...WALLETS.multiMintUnbalanced, preferredMintUrl: MINT3 };
+    expect(preselectMintForSend(undefined, wallet)).toBe(MINT1);
+  });
+
+  it('falls back to the funded preferred mint when the explicit mint is empty', () => {
+    // Explicit MINT3 has 0; preferred MINT2 (100) is funded, so the
+    // preferred-first rule beats MINT1's higher balance.
+    expect(preselectMintForSend(MINT3, WALLETS.multiMintUnbalanced)).toBe(
+      MINT2,
+    );
+  });
+
+  it('returns the raw candidate unchanged when no mint is funded', () => {
+    // WALLETS.noBalance: preferred MINT1 has 0 and nothing else exists —
+    // the NO_VALID_MINT path at amount commit must still see MINT1.
+    expect(preselectMintForSend(undefined, WALLETS.noBalance)).toBe(MINT1);
+  });
+
+  it('returns undefined for a wallet with no mints and no preference', () => {
+    expect(preselectMintForSend(undefined, WALLETS.noMints)).toBeUndefined();
   });
 });

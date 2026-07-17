@@ -7,7 +7,11 @@ import {
   getMintMethodCapability,
   hasMintSupportingMethod,
 } from "../mint-capabilities";
-import { pickPreferredCandidate, selectMint } from "../mint-selection";
+import {
+  pickPreferredCandidate,
+  preselectMintForSend,
+  selectMint,
+} from "../mint-selection";
 import type {
   MintCandidate,
   MintMethodRequirement,
@@ -615,13 +619,22 @@ export function resolveNext(
 
   // 1. Need amount?
   if (needsAmount(ctx)) {
+    // Send destinations preselect balance-aware (funded fallback when the
+    // preferred mint is empty); receive destinations keep the raw preference.
+    const isSendDestination =
+      destination === "meltQuote" ||
+      destination === "sendEcash" ||
+      destination === "paymentRequest";
+    const preselectedMintUrl = isSendDestination
+      ? preselectMintForSend(ctx.mintUrl, walletCtx)
+      : (ctx.mintUrl ?? walletCtx.preferredMintUrl);
+
     logger.info("resolveNext.enterAmount.amountNeeded", {
       intentType: intent.type,
       destination,
       unit,
-      hasPreselectedMint: !!(ctx.mintUrl ?? walletCtx.preferredMintUrl),
-      preselectedMintUrlLength:
-        (ctx.mintUrl ?? walletCtx.preferredMintUrl)?.length ?? 0,
+      hasPreselectedMint: !!preselectedMintUrl,
+      preselectedMintUrlLength: preselectedMintUrl?.length ?? 0,
       supportedMintCount: supportedMintUrls?.length ?? 0,
       hasPaymentRequest: !!ctx.paymentRequest,
       paymentRequestLength: ctx.paymentRequest?.length ?? 0,
@@ -631,7 +644,6 @@ export function resolveNext(
       hasRecipientProfile: !!ctx.recipientProfile,
     });
 
-    const preselectedMintUrl = ctx.mintUrl ?? walletCtx.preferredMintUrl;
     return logStepResult(
       "resolveNext.enterAmount",
       {

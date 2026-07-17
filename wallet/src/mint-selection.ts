@@ -202,6 +202,36 @@ export function pickPreferredCandidate(
 }
 
 /**
+ * Resolve the mint to preselect when entering a send amount screen.
+ *
+ * The explicit mint (from context) or the user's preferred mint wins when it
+ * holds a balance. When it is empty, fall back to the balance-aware pick so
+ * the amount screen opens on a mint that can actually fund the send:
+ * preferred-if-funded, otherwise the highest-balance funded mint. When no
+ * mint holds any balance, return the original candidate unchanged so the
+ * NO_VALID_MINT error at amount commit keeps its current shape.
+ */
+export function preselectMintForSend(
+  explicitMintUrl: string | undefined,
+  ctx: WalletContext,
+): string | undefined {
+  const candidate = explicitMintUrl ?? ctx.preferredMintUrl;
+  if (candidate && (ctx.mintBalances[candidate] ?? 0) > 0) return candidate;
+  const funded = pickPreferredCandidate(
+    getValidMintCandidates(ctx),
+    ctx.preferredMintUrl,
+  );
+  if (funded && funded.mintUrl !== candidate) {
+    logger.info("mintSelection.preselect.fundedFallback", {
+      ...mintUrlFields(funded.mintUrl),
+      balance: funded.balance,
+      hadCandidate: !!candidate,
+    });
+  }
+  return funded?.mintUrl ?? candidate;
+}
+
+/**
  * Select the best mint for a Lightning melt operation.
  * Lightning melts can use any trusted mint with balance.
  * Prefers the wallet's preferred mint if it has sufficient balance.
