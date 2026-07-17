@@ -753,6 +753,38 @@ describe("amountEntryAvailability — next gate (sat-rounded fiat input)", () =>
     });
     expect(actions.next.available).toBe(false);
   });
+
+  it('labels the Lightning variant "to npub.cash" for npc melt targets', () => {
+    // The npub.cash fallback (recipient without a lud16) must say where the
+    // money actually goes; a real lud16 keeps the generic label.
+    const entryFor = (meltTarget: string) => ({
+      destination: "meltQuote",
+      meltTarget,
+      effectiveAmount: { value: 100, unit: "sat" },
+      unit: "sat",
+      methodContext: {
+        trustedMintUrls: [MINT1],
+        mintBalances: { [MINT1]: 1000 },
+        mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+          {
+            mintUrl: MINT1,
+            mintInfo: {
+              nuts: { "5": { methods: [{ method: "bolt11", unit: "sat" }] } },
+            },
+          },
+        ]),
+      },
+    });
+
+    const labelFor = (meltTarget: string) =>
+      getAvailableActions("amountEntry", entryFor(meltTarget)).next.variants?.find(
+        (variant) => variant.id === "lightning",
+      )?.label;
+
+    expect(labelFor("npub1example@npubx.cash")).toBe("to npub.cash");
+    expect(labelFor("npub1example@npub.cash")).toBe("to npub.cash");
+    expect(labelFor("alice@example.com")).toBe("as Lightning");
+  });
 });
 
 // ---------------------------------------------------------------------------

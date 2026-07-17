@@ -478,6 +478,13 @@ function amountEntryAvailability(
     return `${trimmed.slice(0, 9)}…${trimmed.slice(-9)}`;
   };
 
+  // An npub.cash melt target is the "recipient has no Lightning address"
+  // fallback — every Nostr pubkey is payable at <npub>@npubx.cash, but the
+  // menu must say where the money actually goes instead of a generic
+  // "as Lightning" (npub.cash is the marketing name; npubx.cash the host).
+  const meltTargetIsNpc = /@npubx?\.cash$/i.test(meltTarget.trim());
+  const lightningLabel = meltTargetIsNpc ? "to npub.cash" : "as Lightning";
+
   let lightningAvailable = false;
   let lightningDescription: string | undefined;
   let lightningReason: string | undefined;
@@ -580,7 +587,7 @@ function amountEntryAvailability(
     },
     {
       id: "lightning",
-      label: "as Lightning",
+      label: lightningLabel,
       icon: "mingcute:lightning-fill",
       available: lightningAvailable,
       ...(lightningDescription ? { description: lightningDescription } : {}),
