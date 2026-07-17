@@ -6,7 +6,7 @@
  */
 import { chmodSync, closeSync, mkdirSync, openSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
-import type { CommandRunner, CommandResult, ArtifactSink } from './driver';
+import type { CommandRunner, CommandResult, ArtifactSink, ArtifactKind } from './driver';
 import type { Sink } from '../reporting/reporters';
 import { ALLOWED_COMMANDS } from '../schema/capabilities';
 import { redactString } from '../core/redact';
@@ -43,7 +43,7 @@ export class FileArtifactSink implements ArtifactSink {
     mkdirSync(this.base, { recursive: true, mode: 0o700 });
     chmodSync(this.base, 0o700);
   }
-  write(rel: string, _kind: 'screenshot' | 'ax' | 'log', data: Uint8Array | string): string {
+  write(rel: string, _kind: ArtifactKind, data: Uint8Array | string): string {
     const path = resolve(this.base, rel);
     const fromBase = relative(this.base, path);
     if (!fromBase || fromBase.startsWith('..') || isAbsolute(fromBase))

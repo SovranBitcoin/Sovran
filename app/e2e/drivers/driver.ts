@@ -41,7 +41,8 @@ export interface Driver {
   waitFor(
     sel: Selector,
     state: 'visible' | 'enabled' | undefined,
-    timeoutMs: number
+    timeoutMs: number,
+    value?: string
   ): Promise<AxNode>;
   find(sel: Selector): Promise<AxNode | null>;
   tap(sel: Selector): Promise<void>;
@@ -54,6 +55,10 @@ export interface Driver {
     durationMs?: number
   ): Promise<void>;
   input(sel: Selector, value: string): Promise<void>;
+  /** Type into the currently-focused field via HID, optionally coordinate-
+   * tapping first to focus a field no selector can reach (FullWindowOverlay
+   * sheet inputs are AX-invisible). */
+  typeText(value: string, focus?: { x: number; y: number }): Promise<void>;
   clipboardSet(value: string): Promise<void>;
   clipboardGet(): Promise<string>;
   screenshot(options?: ScreenshotOptions): Promise<Uint8Array>;
@@ -71,9 +76,24 @@ export interface CommandRunner {
   run(command: string[], timeoutMs: number): Promise<CommandResult>;
 }
 
+export type ArtifactKind = 'screenshot' | 'ax' | 'log' | 'store' | 'db';
+
 export interface ArtifactSink {
   /** Persist an artifact and return its (redacted-safe) path. */
-  write(rel: string, kind: 'screenshot' | 'ax' | 'log', data: Uint8Array | string): string;
+  write(rel: string, kind: ArtifactKind, data: Uint8Array | string): string;
+}
+
+/** JSON strings ready to write as sidecars; null = not captured this frame. */
+export interface AppDataResult {
+  store: string | null;
+  db: string | null;
+}
+
+/** Best-effort app-state capture (zustand mirror file + coco SQLite dump).
+ * `capture()` must NEVER reject — every failure degrades to null members so
+ * evidence capture can never fail a step. */
+export interface AppDataCapturer {
+  capture(): Promise<AppDataResult>;
 }
 
 export const selectorKey = (s: Selector): string =>
@@ -143,7 +163,12 @@ export class FakeDriver implements Driver {
   async home() {
     this.calls.push('home');
   }
-  async waitFor(sel: Selector, state: 'visible' | 'enabled' | undefined, _t: number) {
+  async waitFor(
+    sel: Selector,
+    state: 'visible' | 'enabled' | undefined,
+    _t: number,
+    value?: string
+  ) {
     this.calls.push(`waitFor:${selectorKey(sel)}`);
     if ((this.#cfg.failWaitFor ?? []).includes(selectorKey(sel)))
       throw new Error(`timed out waiting for ${selectorKey(sel)}`);
@@ -151,6 +176,8 @@ export class FakeDriver implements Driver {
     if (!node) throw new Error(`waitFor: ${selectorKey(sel)} not present`);
     if (state === 'enabled' && node.state?.enabled === false)
       throw new Error(`waitFor: ${selectorKey(sel)} not enabled`);
+    if (value !== undefined && node.value !== value)
+      throw new Error(`waitFor: ${selectorKey(sel)} value "${node.value}" ≠ "${value}"`);
     return node;
   }
   async find(sel: Selector) {
@@ -177,6 +204,9 @@ export class FakeDriver implements Driver {
   }
   async input(sel: Selector, value: string) {
     this.calls.push(`input:${selectorKey(sel)}=${value}`);
+  }
+  async typeText(value: string, focus?: { x: number; y: number }) {
+    this.calls.push(`typeText:${focus ? `${focus.x},${focus.y}` : 'focused'}=${value}`);
   }
   async clipboardSet(value: string) {
     this.clipboard = value;
@@ -227,7 +257,7 @@ export class FakeCommandRunner implements CommandRunner {
 
 export class MemoryArtifactSink implements ArtifactSink {
   written: { rel: string; kind: string; bytes: number }[] = [];
-  write(rel: string, kind: 'screenshot' | 'ax' | 'log', data: Uint8Array | string): string {
+  write(rel: string, kind: ArtifactKind, data: Uint8Array | string): string {
     this.written.push({ rel, kind, bytes: typeof data === 'string' ? data.length : data.length });
     return `artifacts/${rel}`;
   }

@@ -14,6 +14,7 @@ import { interpolateDeep, type Vars } from './interpolate';
 import { isSecret, redactDeep, redactString, secret, type Secret, type SecretKind } from './redact';
 import type { EventBus, FundsState } from './events';
 import type {
+  AppDataCapturer,
   Driver,
   CommandRunner,
   ArtifactSink,
@@ -48,6 +49,9 @@ export interface RunDeps {
   signal?: AbortSignal;
   /** Optional post-cleanup reconciliation (funded lanes). */
   reconcile?: () => Promise<FundsState>;
+  /** Optional per-frame app-state capture (zustand mirror + coco db dump).
+   *  Best-effort evidence — absent on the fake/offline lane, never a gate. */
+  appData?: AppDataCapturer;
 }
 
 export interface CounterpartyExecutor {
@@ -156,6 +160,10 @@ export async function runScenario(
   let artifactSeq = 0;
   const nextArtifactSeq = deps.nextArtifactSeq ?? (() => ++artifactSeq);
 
+  // Per-scenario memory of the last written app-data sidecars: an unchanged
+  // snapshot re-emits the previous artifact path instead of a duplicate file.
+  const lastAppData: LastAppData = {};
+
   const captureFor =
     (ps: PlannedStep, enabled = true): Capture =>
     async (subLabel, options, named) => {
@@ -164,7 +172,7 @@ export async function runScenario(
       const base = named
         ? `${plan.id}/named/${named}-${pad(seq)}`
         : `${plan.id}/${pad(seq)}-${ps.id}-${subLabel}`;
-      await captureEvidence(deps, base, ps.id, seq, options);
+      await captureEvidence(deps, base, ps.id, seq, options, lastAppData);
     };
 
   const executeSteps = async (
@@ -369,7 +377,8 @@ export async function runScenario(
           {
             timeoutMs: deps.finalStateTimeoutMs ?? 3000,
             pollMs: deps.finalStatePollMs ?? 100,
-          }
+          },
+          lastAppData
         );
         finalObservation = postScreenshotObservation;
         actualState = postScreenshotObservation.state;
@@ -503,12 +512,52 @@ async function settleAfterLaunch(
   }
 }
 
+type LastAppData = Partial<Record<'store' | 'db', { json: string; path: string }>>;
+
+/**
+ * Best-effort app-data sidecars (zustand mirror + coco db dump) beside a
+ * frame's screenshot/AX pair. Unlike screenshot/AX evidence this can NEVER
+ * fail the owning step — any problem degrades to a lifecycle warning and a
+ * missing sidecar. Payloads are written raw (no redaction) by policy: run
+ * dirs are local-only and hold test-wallet material.
+ */
+async function captureAppDataEvidence(
+  deps: RunDeps,
+  base: string,
+  stepId: string,
+  artifactSeq: number,
+  last: LastAppData
+): Promise<void> {
+  if (!deps.appData) return;
+  try {
+    const result = await deps.appData.capture();
+    for (const kind of ['store', 'db'] as const) {
+      const json = result[kind];
+      if (!json) continue;
+      const prev = last[kind];
+      if (prev && prev.json === json) {
+        deps.bus.emit({ type: 'artifact', artifactSeq, stepId, kind, path: prev.path });
+        continue;
+      }
+      const path = deps.artifacts.write(`${base}.${kind}.json`, kind, json);
+      last[kind] = { json, path };
+      deps.bus.emit({ type: 'artifact', artifactSeq, stepId, kind, path });
+    }
+  } catch (error) {
+    deps.bus.emit({
+      type: 'lifecycle',
+      message: `app-data capture failed: ${redactString((error as Error).message)}`,
+    });
+  }
+}
+
 async function captureEvidence(
   deps: RunDeps,
   base: string,
   stepId: string,
   artifactSeq: number,
-  options?: Parameters<Driver['screenshot']>[0]
+  options?: Parameters<Driver['screenshot']>[0],
+  lastAppData?: LastAppData
 ): Promise<void> {
   const screenshot = await deps.driver.screenshot(options);
   const axSnapshot = JSON.stringify(redactDeep(await deps.driver.axSnapshot()));
@@ -516,6 +565,7 @@ async function captureEvidence(
   const axPath = deps.artifacts.write(`${base}.ax.json`, 'ax', axSnapshot);
   deps.bus.emit({ type: 'artifact', artifactSeq, stepId, kind: 'screenshot', path: shotPath });
   deps.bus.emit({ type: 'artifact', artifactSeq, stepId, kind: 'ax', path: axPath });
+  if (lastAppData) await captureAppDataEvidence(deps, base, stepId, artifactSeq, lastAppData);
 }
 
 async function captureFinalEvidence(
@@ -524,7 +574,8 @@ async function captureFinalEvidence(
   artifactSeq: number,
   beforeScreenshot: StateObservation | undefined,
   expectedState: ObservedState,
-  opts: { timeoutMs: number; pollMs: number }
+  opts: { timeoutMs: number; pollMs: number },
+  lastAppData?: LastAppData
 ): Promise<StateObservation> {
   const screenshot = await deps.driver.screenshot({ stable: true });
   const deadline = Date.now() + opts.timeoutMs;
@@ -556,6 +607,7 @@ async function captureFinalEvidence(
     path: shotPath,
   });
   deps.bus.emit({ type: 'artifact', artifactSeq, stepId: 'FINAL', kind: 'ax', path: axPath });
+  if (lastAppData) await captureAppDataEvidence(deps, base, 'FINAL', artifactSeq, lastAppData);
   return observation;
 }
 
