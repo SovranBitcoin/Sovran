@@ -18,8 +18,12 @@
 //                               to the SAME `op:` key)
 //   3. `id:<entry.id>`       — fallback
 //
-// Plus a `raw:<normalisedRaw>` key for scan-time writes that happen before any
-// id exists; the writer later bridges it to the entry key with `linkAnnotation`.
+// Plus a `raw:<sha256(normalisedRaw)>` key for scan-time writes that happen
+// before any id exists; the writer later bridges it to the entry key with
+// `linkAnnotation`.
+
+import { sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
 /** Minimal shape needed to key any history entry or synthetic preview entry. */
 export interface AnnotationEntryLike {
@@ -62,9 +66,16 @@ export function normaliseAnnotationRaw(raw: string): string {
     .replace(/^(nostr|cashu|bitcoin|lightning):/, "");
 }
 
-/** Key for a scan-time write that precedes any transaction id. */
+/** Key for a scan-time write that precedes any transaction id.
+ *
+ * The normalised raw material is HASHED, never embedded: a pasted cashu token
+ * runs >1kB, and an unbounded key both leaks bearer material into persistence
+ * and violates the app store's persisted key-length cap — which used to make
+ * schema rehydration reject the key and (via whole-blob discard) silently wipe
+ * every transaction annotation on the next launch. Same input still maps to
+ * the same key, which is all the scan→transaction bridge needs. */
 export function rawAnnotationKey(raw: string): string {
-  return `raw:${normaliseAnnotationRaw(raw)}`;
+  return `raw:${bytesToHex(sha256(utf8ToBytes(normaliseAnnotationRaw(raw))))}`;
 }
 
 /**

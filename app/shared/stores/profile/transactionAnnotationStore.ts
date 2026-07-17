@@ -31,16 +31,35 @@ interface TransactionAnnotationState {
   annotations: Record<string, AnnotationRecord>;
 }
 
+const AnnotationRecordSchema = z.record(z.string().max(64), z.string().max(16_384));
+
 const PersistedTransactionAnnotationStore = z.object({
-  annotations: z
-    .record(z.string().max(256), z.record(z.string().max(64), z.string().max(16_384)))
-    .default({}),
+  // Entry-tolerant: an invalid key or record drops THAT entry, never the blob.
+  // Historical `raw:<full-token>` keys (>1kB, pre-hashing) used to fail the
+  // 256-char key cap and — via createMergeWithSchema's whole-blob discard —
+  // silently wiped every annotation on the next launch. The preprocess
+  // salvages all valid entries from such blobs and ages the poison out.
+  annotations: z.preprocess(
+    (value) => {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+      const sanitized: Record<string, unknown> = {};
+      for (const [key, record] of Object.entries(value as Record<string, unknown>)) {
+        if (key.length > 256) continue;
+        if (!AnnotationRecordSchema.safeParse(record).success) continue;
+        sanitized[key] = record;
+      }
+      return sanitized;
+    },
+    z.record(z.string().max(256), AnnotationRecordSchema).default({})
+  ),
   // (legacy `_migratedLegacy` flag removed — the cross-store import is now
   // tracked by dataMigrationStore's level. Old blobs carrying the field still
   // validate via the loose record and it simply ages out.)
 });
 
-const useTransactionAnnotationStore = create<TransactionAnnotationState>()(
+// Exported only for the dev-gated e2e state mirror; app code goes through the
+// adapter/function API below.
+export const useTransactionAnnotationStore = create<TransactionAnnotationState>()(
   subscribeWithSelector(
     persist(
       (): TransactionAnnotationState => ({

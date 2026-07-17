@@ -224,13 +224,45 @@ describe("annotationKey / candidateKeys", () => {
     expect(annotationKey(inflight)).toBe(annotationKey(finalised));
     expect(candidateKeys(finalised)).toContain("op:OP");
   });
+
+  it("keys the REAL coco-v2 receive shapes: in-flight receive-<opId> and finalised receive:<opId>", () => {
+    // The live shapes: an in-flight synthetic entry `receive-<opId>` and the
+    // coco operation-projected row `receive:<opId>` (colon), both carrying
+    // `operationId`. Both must anchor on the same op key, and the finalised
+    // row must also expose its own id key — the pair the raw→id bridge and
+    // the list merge depend on.
+    const opId = "1udIEOJSWCTuVPB083ecbA";
+    const inflight: AnnotationEntryLike = {
+      id: `receive-${opId}`,
+      type: "receive",
+      operationId: opId,
+    };
+    const finalised: AnnotationEntryLike = {
+      id: `receive:${opId}`,
+      type: "receive",
+      operationId: opId,
+    };
+    expect(annotationKey(inflight)).toBe(`op:${opId}`);
+    expect(annotationKey(finalised)).toBe(`op:${opId}`);
+    expect(candidateKeys(finalised)).toEqual([`op:${opId}`, `id:receive:${opId}`]);
+  });
 });
 
 describe("normaliseAnnotationRaw / rawAnnotationKey", () => {
   it("strips a leading scheme, trims, and lower-cases", () => {
     expect(normaliseAnnotationRaw("  Bitcoin:BC1XYZ ")).toBe("bc1xyz");
     expect(normaliseAnnotationRaw("lightning:LNBC1")).toBe("lnbc1");
-    expect(rawAnnotationKey(" nostr:NPUB1 ")).toBe("raw:npub1");
+  });
+
+  it("hashes the normalised raw into a bounded key — a >1kB token must never become a persisted key", () => {
+    const hugeToken = `cashu:${"cashuBo2F0".repeat(200)}`;
+    const key = rawAnnotationKey(hugeToken);
+    expect(key.startsWith("raw:")).toBe(true);
+    expect(key.length).toBeLessThanOrEqual(256);
+    // Deterministic across normalisation variants (scheme/case/whitespace)…
+    expect(rawAnnotationKey(`  CASHU:${"cashuBo2F0".repeat(200).toUpperCase()} `)).toBe(key);
+    // …and distinct for distinct raw material.
+    expect(rawAnnotationKey("cashu:other-token")).not.toBe(key);
   });
 });
 
