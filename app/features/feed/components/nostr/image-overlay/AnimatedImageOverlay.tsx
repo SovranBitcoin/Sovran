@@ -1459,6 +1459,13 @@ export function AnimatedImageOverlay() {
   if (Platform.OS === 'android') return null;
   const content = <AnimatedImageOverlayContent ctx={ctx} safeBottom={safeBottom} />;
   if (Platform.OS === 'ios') {
+    // Mount the extra window ONLY while media is active — activeUrl covers the
+    // open AND dismiss morphs (it clears CLEAR_URL_DELAY_MS after close). An
+    // always-mounted FullWindowOverlay is an empty second UIWindow above the
+    // app: iOS then exposes no accessibility tree for the main window, so the
+    // ENTIRE app goes dark for VoiceOver/AX readers whenever any feed is
+    // mounted (tab screens stay mounted after first visit).
+    if (ctx.activeUrl == null) return null;
     return (
       <Log name="AnimatedImageOverlay">
         <FullWindowOverlay>{content}</FullWindowOverlay>
