@@ -494,11 +494,7 @@ async function execStep(
  * the catch). Timing out is NOT a failure — the next step's waitFor owns real
  * readiness; this only keeps the launch frame honest.
  */
-async function settleAfterLaunch(
-  driver: Driver,
-  timeoutMs: number,
-  pollMs: number
-): Promise<void> {
+async function settleAfterLaunch(driver: Driver, timeoutMs: number, pollMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     try {
@@ -635,7 +631,12 @@ async function dispatch(
     case 'waitFor':
       if (step.optional && !(await d.find(step.selector))) return 'skipped';
       {
-        const node = await d.waitFor(step.selector, step.state, step.timeoutMs ?? 30000);
+        const node = await d.waitFor(
+          step.selector,
+          step.state,
+          step.timeoutMs ?? 30000,
+          step.value
+        );
         if ('idPrefix' in step.selector && step.selector.captureSuffixAs) {
           const id = node.id;
           if (!id?.startsWith(step.selector.idPrefix))
@@ -668,6 +669,12 @@ async function dispatch(
         isSecret(step.value as unknown) ? (step.value as unknown as Secret).reveal() : step.value
       );
       return 'ok';
+    case 'typeText':
+      await d.typeText(
+        isSecret(step.value as unknown) ? (step.value as unknown as Secret).reveal() : step.value,
+        step.focus
+      );
+      return 'ok';
     case 'delay':
       await new Promise((r) => setTimeout(r, step.ms));
       return 'ok';
@@ -681,8 +688,19 @@ async function dispatch(
         });
         let sub = 0;
         for (const item of step.sequence) {
-          if ('tap' in item) await d.tap(item.tap);
-          else if ('tapAt' in item) await d.tapAt(item.tapAt.x, item.tapAt.y);
+          if ('tap' in item) {
+            // A retry can race the FIRST tap's own effect: if it landed and the
+            // screen already transitioned (close buttons, one-shot rows), the
+            // selector is gone and a blind re-tap would throw into the wrong
+            // screen. Attempt 0 still requires presence so authoring errors
+            // fail loudly; the until-check remains the only success gate.
+            if (attempt > 0 && !(await d.find(item.tap))) {
+              await evidence(`tapUntil-a${attempt}-s${sub++}`);
+              continue;
+            }
+            await d.tap(item.tap);
+          } else if ('tapAt' in item) await d.tapAt(item.tapAt.x, item.tapAt.y);
+          else if ('swipe' in item) await d.swipe(item.swipe.dir);
           else await new Promise((r) => setTimeout(r, item.delayMs));
           // Evidence after each sub-action so nested menu/sheet taps are captured.
           await evidence(`tapUntil-a${attempt}-s${sub++}`);
@@ -691,7 +709,10 @@ async function dispatch(
         // a slow-rendering screen (a mint quote invoice) is awaited, not re-tapped.
         const settleDeadline = Date.now() + (step.settleMs ?? 2000);
         while (Date.now() < settleDeadline) {
-          if (await d.find(step.until)) return 'ok';
+          const target = await d.find(step.until);
+          if (target && (step.untilValue === undefined || target.value === step.untilValue)) {
+            return 'ok';
+          }
           await new Promise((r) => setTimeout(r, 300));
         }
       }

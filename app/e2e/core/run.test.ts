@@ -92,9 +92,7 @@ describe('runScenario', () => {
       txs: { 'q-1': { direction: 'in', amount: 125, status: 'ISSUED' } },
     });
     const result = await runScenario(
-      sc([
-        { action: 'assert', that: 'tx', txRef: 'q-1', status: 'finalized' },
-      ]),
+      sc([{ action: 'assert', that: 'tx', txRef: 'q-1', status: 'finalized' }]),
       new Map(),
       deps
     );
@@ -231,6 +229,42 @@ describe('runScenario', () => {
     expect(status).toBe('passed');
     expect(calls).toHaveLength(2);
     expect(driver.clipboard).toBe(token);
+  });
+
+  it('captures the asset-free npc.address output and mirrors it to the clipboard', async () => {
+    const address = 'cocod@npubx.cash';
+    const { deps, driver } = harness({ currentState: 'wallet' });
+    deps.counterparty = {
+      execute: async (step) => {
+        if (step.operation !== 'npc.address') throw new Error('unexpected operation');
+        return { output: secret('lightning-address', address) };
+      },
+    };
+    const asset = {
+      mintUrl: 'https://mint.sovran.money',
+      unit: 'sat',
+      accountIndex: 0,
+    } as const;
+    const status = await runScenario(
+      sc(
+        [
+          {
+            action: 'counterparty',
+            operation: 'npc.address',
+            captureAs: 'addr',
+            setClipboard: true,
+          },
+        ],
+        {
+          lane: 'funded',
+          funds: { assets: [{ ...asset, maxPrincipal: 40 }] },
+        }
+      ),
+      new Map(),
+      deps
+    );
+    expect(status).toBe('passed');
+    expect(driver.clipboard).toBe(address);
   });
 
   it('proves an emoji clipboard payload decodes to the captured token without logging either value', async () => {
@@ -918,5 +952,227 @@ describe('runScenario video recording', () => {
     const { deps, events } = recorderHarness({ stopOk: false });
     expect(await runScenario(recordedScenario(), new Map(), deps)).toBe('passed');
     expect(videoArtifacts(events)).toHaveLength(0);
+  });
+});
+
+describe('app-data evidence', () => {
+  const appDataScenario = () =>
+    sc([{ action: 'tap', selector: { id: 'mid' } }], {
+      setup: [{ action: 'launch', reset: 'none' }],
+    });
+
+  const appDataHarness = (results: { store: string | null; db: string | null }[]) => {
+    const base = harness({ permissive: true, currentState: 'wallet' });
+    let call = 0;
+    const captures: number[] = [];
+    base.deps.appData = {
+      capture: async () => {
+        captures.push(++call);
+        return results[Math.min(call - 1, results.length - 1)];
+      },
+    };
+    return { ...base, captures };
+  };
+
+  const appDataArtifacts = (events: RunnerEvent[], kind: 'store' | 'db') =>
+    events.filter((e) => e.type === 'artifact' && e.kind === kind) as Extract<
+      RunnerEvent,
+      { type: 'artifact' }
+    >[];
+
+  it('writes store/db sidecars beside every frame including FINAL', async () => {
+    const { deps, events, artifacts } = appDataHarness([
+      { store: '{"stores":{"a":1}}', db: '{"dbs":{}}' },
+    ]);
+    expect(await runScenario(appDataScenario(), new Map(), deps)).toBe('passed');
+    const store = appDataArtifacts(events, 'store');
+    const db = appDataArtifacts(events, 'db');
+    // launch frame + tap frame + FINAL frame
+    expect(store).toHaveLength(3);
+    expect(db).toHaveLength(3);
+    expect(store.map((e) => e.stepId)).toContain('FINAL');
+    // identical payloads dedup to one written file per kind
+    expect(artifacts.written.filter((w) => w.kind === 'store')).toHaveLength(1);
+    expect(artifacts.written.filter((w) => w.kind === 'db')).toHaveLength(1);
+    const uniquePaths = new Set(store.map((e) => e.path));
+    expect(uniquePaths.size).toBe(1);
+  });
+
+  it('writes a new sidecar when the payload changes', async () => {
+    const { deps, events, artifacts } = appDataHarness([
+      { store: '{"stores":{"a":1}}', db: '{"dbs":{"n":1}}' },
+      { store: '{"stores":{"a":2}}', db: '{"dbs":{"n":1}}' },
+    ]);
+    expect(await runScenario(appDataScenario(), new Map(), deps)).toBe('passed');
+    expect(artifacts.written.filter((w) => w.kind === 'store')).toHaveLength(2);
+    expect(artifacts.written.filter((w) => w.kind === 'db')).toHaveLength(1);
+    expect(new Set(appDataArtifacts(events, 'store').map((e) => e.path)).size).toBe(2);
+  });
+
+  it('null capture results yield no sidecars and never fail the step', async () => {
+    const { deps, events } = appDataHarness([{ store: null, db: null }]);
+    expect(await runScenario(appDataScenario(), new Map(), deps)).toBe('passed');
+    expect(appDataArtifacts(events, 'store')).toHaveLength(0);
+    expect(appDataArtifacts(events, 'db')).toHaveLength(0);
+  });
+
+  it('a throwing capturer degrades to a lifecycle warning, step still passes', async () => {
+    const base = harness({ permissive: true, currentState: 'wallet' });
+    base.deps.appData = {
+      capture: async () => {
+        throw new Error('capturer exploded');
+      },
+    };
+    expect(await runScenario(appDataScenario(), new Map(), base.deps)).toBe('passed');
+    const warnings = base.events.filter(
+      (e) => e.type === 'lifecycle' && e.message.includes('app-data capture failed')
+    );
+    expect(warnings.length).toBeGreaterThan(0);
+  });
+
+  it('absent capturer is a strict no-op', async () => {
+    const { deps, events, artifacts } = harness({ permissive: true, currentState: 'wallet' });
+    expect(await runScenario(appDataScenario(), new Map(), deps)).toBe('passed');
+    expect(appDataArtifacts(events, 'store')).toHaveLength(0);
+    expect(artifacts.written.every((w) => w.kind !== 'store' && w.kind !== 'db')).toBe(true);
+  });
+
+  it('named screenshot frames get sidecars under named/', async () => {
+    // Distinct payload per frame so the named frame writes its own sidecar
+    // instead of dedup-pointing at the launch frame's file.
+    const { deps, events } = appDataHarness([
+      { store: '{"stores":{"n":1}}', db: null },
+      { store: '{"stores":{"n":2}}', db: null },
+      { store: '{"stores":{"n":3}}', db: null },
+    ]);
+    const scenario = sc([{ action: 'screenshot', name: 'wallet-home' }], {
+      setup: [{ action: 'launch', reset: 'none' }],
+    });
+    expect(await runScenario(scenario, new Map(), deps)).toBe('passed');
+    const named = appDataArtifacts(events, 'store').filter((e) => e.path.includes('/named/'));
+    expect(named).toHaveLength(1);
+    expect(named[0].path).toMatch(/named\/wallet-home-\d+\.store\.json$/);
+  });
+});
+
+describe('tapUntil untilValue', () => {
+  const toggleScenario = () =>
+    sc([
+      {
+        action: 'tapUntil',
+        sequence: [{ tap: { id: 'toggle' } }],
+        until: { id: 'toggle' },
+        untilValue: '1',
+        attempts: 3,
+        settleMs: 400,
+      },
+    ]);
+
+  it('passes once the target value appears, without extra taps', async () => {
+    const cfg: FakeConfig = {
+      currentState: 'wallet',
+      present: { 'id:toggle': { id: 'toggle', value: '0' } },
+    };
+    const { deps, driver } = harness(cfg);
+    // first tap lands: flip the value shortly after
+    setTimeout(() => {
+      cfg.present!['id:toggle'] = { id: 'toggle', value: '1' };
+    }, 150);
+    expect(await runScenario(toggleScenario(), new Map(), deps)).toBe('passed');
+    expect(driver.calls.filter((c) => c === 'tap:id:toggle')).toHaveLength(1);
+  });
+
+  it('re-taps while the value stays wrong and fails after attempts', async () => {
+    const cfg: FakeConfig = {
+      currentState: 'wallet',
+      present: { 'id:toggle': { id: 'toggle', value: '0' } },
+    };
+    const { deps, driver } = harness(cfg);
+    expect(await runScenario(toggleScenario(), new Map(), deps)).toBe('failed');
+    expect(driver.calls.filter((c) => c === 'tap:id:toggle')).toHaveLength(3);
+  });
+
+  it('presence alone still satisfies an until without untilValue', async () => {
+    const { deps } = harness({
+      currentState: 'wallet',
+      present: { 'id:toggle': { id: 'toggle', value: '0' } },
+    });
+    const scenario = sc([
+      {
+        action: 'tapUntil',
+        sequence: [{ tap: { id: 'toggle' } }],
+        until: { id: 'toggle' },
+        attempts: 2,
+        settleMs: 200,
+      },
+    ]);
+    expect(await runScenario(scenario, new Map(), deps)).toBe('passed');
+  });
+});
+
+describe('tapUntil retry with a vanished selector', () => {
+  it('skips the absent re-tap and passes once until appears', async () => {
+    const cfg: FakeConfig = {
+      currentState: 'wallet',
+      present: { 'id:close': { id: 'close' } },
+    };
+    const { deps, driver } = harness(cfg);
+    // First tap lands: the close control vanishes, the destination renders late.
+    setTimeout(() => {
+      delete cfg.present!['id:close'];
+    }, 100);
+    setTimeout(() => {
+      cfg.present!['id:dest'] = { id: 'dest' };
+    }, 900);
+    const scenario = sc([
+      {
+        action: 'tapUntil',
+        sequence: [{ tap: { id: 'close' } }],
+        until: { id: 'dest' },
+        attempts: 4,
+        settleMs: 500,
+      },
+    ]);
+    expect(await runScenario(scenario, new Map(), deps)).toBe('passed');
+    expect(driver.calls.filter((c) => c === 'tap:id:close')).toHaveLength(1);
+  });
+
+  it('still fails loudly when the FIRST attempt has no selector', async () => {
+    const { deps } = harness({ currentState: 'wallet', present: {} });
+    const scenario = sc([
+      {
+        action: 'tapUntil',
+        sequence: [{ tap: { id: 'missing' } }],
+        until: { id: 'dest' },
+        attempts: 3,
+        settleMs: 100,
+      },
+    ]);
+    expect(await runScenario(scenario, new Map(), deps)).toBe('failed');
+  });
+});
+
+describe('tapUntil swipe item', () => {
+  it('runs swipes inside the retry sequence', async () => {
+    const cfg: FakeConfig = {
+      currentState: 'wallet',
+      present: { 'id:card': { id: 'card' } },
+    };
+    const { deps, driver } = harness(cfg);
+    setTimeout(() => {
+      cfg.present!['id:dest'] = { id: 'dest' };
+    }, 100);
+    const scenario = sc([
+      {
+        action: 'tapUntil',
+        sequence: [{ tap: { id: 'card' } }, { swipe: { dir: 'up' } }, { swipe: { dir: 'down' } }],
+        until: { id: 'dest' },
+        attempts: 3,
+        settleMs: 500,
+      },
+    ]);
+    expect(await runScenario(scenario, new Map(), deps)).toBe('passed');
+    expect(driver.calls).toContain('swipe:up');
+    expect(driver.calls).toContain('swipe:down');
   });
 });

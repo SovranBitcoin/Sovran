@@ -97,8 +97,14 @@ const TOUCH_PACKET = 3;
 const KEY_PACKET = 4;
 const TOUCH_DOWN_MS = 120;
 const TOUCH_FLUSH_MS = 50;
-const KEY_DOWN_MS = 15;
-const KEY_GAP_MS = 30;
+const KEY_DOWN_MS = 25;
+// Inter-character gap. Long strings typed into fields that run heavy work on
+// every keystroke (e.g. live URI parsing in the signer paste sheet) drop
+// characters when keys arrive faster than the field drains them; 55ms mostly
+// cleared the overrun, but a ~130-char nostrconnect URI still lost a plain
+// mid-run keystroke on a live run (2026-07-17) — 85ms buys headroom for the
+// heaviest fields at ~4s extra on the longest strings we type.
+const KEY_GAP_MS = 85;
 
 function touchPacket(type: 'begin' | 'move' | 'end', x: number, y: number): Uint8Array {
   const body = new TextEncoder().encode(JSON.stringify({ type, x, y }));
@@ -134,20 +140,32 @@ export async function typeKeystrokes(
   const socket = createSocket(touchEndpoint);
   try {
     await waitForTouchSocket(socket, dependencies.signal);
+    // Hold shift across a run of consecutive shifted keys instead of toggling
+    // it per character. Per-char toggling thrashed the modifier and
+    // intermittently dropped the key ADJACENT to a shift transition on long
+    // mixed-case strings (e.g. a nostrconnect:// URI losing a char next to the
+    // shifted ':'). Shift now goes down once when the run starts and up once
+    // when it ends.
+    let shiftHeld = false;
     for (const stroke of strokes) {
-      if (stroke.shift) {
+      if (stroke.shift && !shiftHeld) {
         socket.send(keyPacket('down', shiftUsage));
         await waitWithAbort(wait, KEY_DOWN_MS, dependencies.signal);
+        shiftHeld = true;
+      } else if (!stroke.shift && shiftHeld) {
+        socket.send(keyPacket('up', shiftUsage));
+        await waitWithAbort(wait, KEY_DOWN_MS, dependencies.signal);
+        shiftHeld = false;
       }
       socket.send(keyPacket('down', stroke.usage));
       await waitWithAbort(wait, KEY_DOWN_MS, dependencies.signal);
       socket.send(keyPacket('up', stroke.usage));
       await waitWithAbort(wait, KEY_DOWN_MS, dependencies.signal);
-      if (stroke.shift) {
-        socket.send(keyPacket('up', shiftUsage));
-        await waitWithAbort(wait, KEY_DOWN_MS, dependencies.signal);
-      }
       await waitWithAbort(wait, KEY_GAP_MS, dependencies.signal);
+    }
+    if (shiftHeld) {
+      socket.send(keyPacket('up', shiftUsage));
+      await waitWithAbort(wait, KEY_DOWN_MS, dependencies.signal);
     }
     await waitWithAbort(wait, TOUCH_FLUSH_MS, dependencies.signal);
   } finally {

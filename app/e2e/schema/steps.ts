@@ -30,6 +30,10 @@ const waitFor = z.strictObject({
   action: z.literal('waitFor'),
   selector: selectorSchema,
   state: z.enum(['visible', 'enabled']).optional(),
+  /** Also require the element's AX value to match exactly — the waitable form
+   * of `assert ax` value for state that flips after a tap (e.g. a switch's
+   * "1"/"0"), where a one-shot assert would race the re-render. */
+  value: z.string().optional(),
   timeoutMs: timeoutMs.optional(),
   optional: optionalMarker.optional(),
 });
@@ -55,6 +59,14 @@ const input = z.strictObject({
   selector: nonCapturingSelectorSchema,
   value: z.string(),
 });
+const typeText = z.strictObject({
+  action: z.literal('typeText'),
+  /** Coordinate tapped first so a field no selector can reach (e.g. inside a
+   * FullWindowOverlay sheet, whose content is AX-invisible) owns focus; omit
+   * when the field is already focused. */
+  focus: z.strictObject({ x: coord, y: coord }).optional(),
+  value: z.string().min(1),
+});
 const goHome = z.strictObject({ action: z.literal('goHome') });
 const launch = z.strictObject({
   action: z.literal('launch'),
@@ -69,11 +81,19 @@ const tapUntilItem = z.union([
   z.strictObject({ tap: nonCapturingSelectorSchema }),
   z.strictObject({ tapAt: z.strictObject({ x: coord, y: coord }) }),
   z.strictObject({ delayMs }),
+  // Some pushed cards expose no AX until scroll-nudged; a swipe inside the
+  // retry lets the until-target become observable on the SAME attempt as the
+  // tap that navigated to it.
+  z.strictObject({ swipe: z.strictObject({ dir: z.enum(['left', 'right', 'up', 'down']) }) }),
 ]);
 const tapUntil = z.strictObject({
   action: z.literal('tapUntil'),
   sequence: z.array(tapUntilItem).min(1),
   until: nonCapturingSelectorSchema,
+  /** Also require the target's accessibilityValue to equal this — retries a
+   * swallowed tap on an already-VISIBLE toggle (filter chips) whose selected
+   * state is the only observable change. */
+  untilValue: z.string().optional(),
   attempts: z.number().int().min(1).max(8),
   settleMs: timeoutMs.optional(),
 });
@@ -181,10 +201,50 @@ export const counterpartyStepSchema = z.discriminatedUnion('operation', [
     address: z.string().min(1),
     timeoutMs: timeoutMs.optional(),
   }),
+  // Pays a NUT-18 payment request the app displays: cocod mints the exact
+  // principal as a Cashu token and the harness delivers it over the request's
+  // Nostr transport (NIP-17 gift wrap to the nprofile target's relays). The
+  // request value is normally a captured `${var}`, so full creq validation
+  // happens in the runtime after interpolation — authoring only pins a string.
+  z.strictObject({
+    action: z.literal('counterparty'),
+    operation: z.literal('paymentRequest.pay'),
+    ...exactAsset,
+    amount: positiveAmount,
+    request: z.string().min(1),
+    timeoutMs: timeoutMs.optional(),
+  }),
   z.strictObject({
     action: z.literal('counterparty'),
     operation: z.literal('recovery.sweep'),
     ...exactAsset,
+    timeoutMs: timeoutMs.optional(),
+  }),
+  // Read-only and mint-independent: cocod's own npc lightning address. No
+  // exact-asset fields because fetching an address moves no value.
+  z.strictObject({
+    action: z.literal('counterparty'),
+    operation: z.literal('npc.address'),
+    captureAs: captureName,
+    setClipboard: z.boolean().optional(),
+    timeoutMs: timeoutMs.optional(),
+  }),
+  // Trusted-delivery acknowledgment for an app→npubx.cash send. cocod 0.0.16
+  // exposes no `npc claim`/npc-balance surface, so the credit side is
+  // unobservable — this op records the outflow on app-side evidence instead
+  // of a cocod call. Author it ONLY after the scenario's PAID tx assert
+  // (bolt11.settled placement rule): it must never pre-record an outflow.
+  z.strictObject({
+    action: z.literal('counterparty'),
+    operation: z.literal('npc.outflow'),
+    ...exactAsset,
+    amount: positiveAmount,
+    address: z.string().min(1),
+    /** Sender-side melt-fee budget for the trusted delivery: the cross-mint
+     * lightning melt costs the sender a fee that neither cocod nor the sweep
+     * can observe. Reconciliation may attribute at most this many sats of the
+     * leg's principal to that fee; beyond it the leg quarantines. */
+    maxFeeSats: z.number().int().min(0).max(10).optional(),
     timeoutMs: timeoutMs.optional(),
   }),
 ]);
@@ -284,6 +344,7 @@ export const stepSchema = z.union([
   swipe,
   drag,
   input,
+  typeText,
   goHome,
   launch,
   tapUntil,
