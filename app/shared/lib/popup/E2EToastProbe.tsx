@@ -53,6 +53,12 @@ const useE2EToastProbeStore = create<E2EToastProbeState>((set, get) => ({
 
 let clearTimer: ReturnType<typeof setTimeout> | undefined;
 const CONFIRMED_ACTION_RETAIN_MS = 15_000;
+/** Static probes must outlive their toast: the harness's per-step evidence
+ * capture (screenshot + AX + state sidecars) can spend several seconds between
+ * the action that fired the toast and the waitFor that observes the probe. A
+ * 5s window lost that race twice on live runs (2026-07-17); the probe is an
+ * invisible 1×1 dev-only node, so retention costs nothing. */
+const STATIC_TOAST_RETAIN_MS = 20_000;
 const HIDDEN_PROBE_STYLE = {
   position: 'absolute',
   left: 0,
@@ -74,7 +80,7 @@ function showE2EStaticToastProbe(key: string, durationMs = 5_000): void {
       useE2EToastProbeStore.getState().clear(sequence);
       clearTimer = undefined;
     },
-    Math.max(1_000, durationMs)
+    Math.max(STATIC_TOAST_RETAIN_MS, durationMs)
   );
 }
 
