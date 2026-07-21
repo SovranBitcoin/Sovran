@@ -46,6 +46,7 @@ import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
+import { useDmEchoStore } from '@/shared/stores/runtime/dmEchoStore';
 
 const SURFACE = 'nostr-dm' as const;
 
@@ -116,10 +117,19 @@ export function UserMessagesScreen({
   // server copy nagg later returns.
   const [localMessages, setLocalMessages] = useState<DmMessage[]>([]);
 
-  // Reset local state when the conversation changes.
+  // Reset local state when the conversation changes, seeding any echoes sent
+  // OUTSIDE this screen (the Send flow's contact ecash delivery publishes
+  // before the thread mounts). Seeds carry the self-wrap id, so the standard
+  // dedup below reconciles them against nagg's server copy. The active sender
+  // pubkey is part of the lookup so an in-process profile change cannot expose
+  // another profile's plaintext DM (which may be bearer ecash).
   useEffect(() => {
-    setLocalMessages([]);
-  }, [pubkey]);
+    const seeded = nostrKeys?.pubkey
+      ? useDmEchoStore.getState().getForThread(protocol, nostrKeys.pubkey, pubkey)
+      : [];
+    chatLog.info('dm.echo.seed', { count: seeded.length });
+    setLocalMessages(seeded);
+  }, [nostrKeys?.pubkey, protocol, pubkey]);
 
   // Seed the mock thread (after the reset effect on the same [pubkey] change).
   useEffect(() => {

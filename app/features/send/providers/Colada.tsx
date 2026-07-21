@@ -19,6 +19,7 @@ import { URDecoder } from '@gandlaf21/bc-ur';
 import { useManager } from '@cashu/coco-react';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
+import { getPublicKey } from 'nostr-tools';
 
 import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'wallet';
 import {
@@ -69,6 +70,7 @@ import { getCachedMintInfo } from '@/shared/stores/global/mintMetadataStore';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
+import { useDmEchoStore } from '@/shared/stores/runtime/dmEchoStore';
 import { isPaymentRequestFailureMockEnabled } from '@/features/send/lib/paymentRequestFailureMock';
 
 const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' };
@@ -314,6 +316,9 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         // Trust-review screen still pulls per-mint detail (swap-by-swap timing)
         // from the local audit / KYM caches populated by `useAuditedMint`.
         enrichMintReviewInfo: getSovranMintEnrichment,
+        // Transport-level fault testing lives in shared/lib/e2e/mintFaults
+        // (mock.mint-faults e2e capability); these remain the operation-level
+        // dev toggles for manual Settings-driven testing.
         shouldMockFailPaymentRequest: () =>
           isPaymentRequestFailureMockEnabled({
             settingsEnabled: useSettingsStore.getState().mockFailPaymentRequest,
@@ -491,11 +496,26 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       const ndkInstance = ndkRef.current;
       if (!pk) throw new Error('Nostr keys not available');
       if (!ndkInstance) throw new Error('NDK not available');
-      await publishGiftWrappedDM({
+      const { selfWrapId } = await publishGiftWrappedDM({
         ndk: ndkInstance,
         senderPrivateKey: pk,
         recipientPublicKey: recipientPubkey,
         content: token,
+      });
+      // Seed the thread's optimistic echo lane: this publish happens before the
+      // chat screen mounts, so without it the sender's sent-token bubble only
+      // appears after nagg round-trips the self-copy. Derive the sender pubkey
+      // from the private key we already hold — the provider's cached pubkey ref
+      // can be stale here and a null ref silently skipped the seed (diagnosed
+      // via the dmEchoStore state-mirror: byPeer stayed empty through delivery).
+      const ownPubkey = getPublicKey(pk);
+      paymentLog.info('contact_send.echo.seeded', { selfWrapId });
+      useDmEchoStore.getState().append('nip17', ownPubkey, recipientPubkey, {
+        id: selfWrapId,
+        content: token,
+        isOwn: true,
+        created_at: Math.floor(Date.now() / 1000),
+        pubkey: ownPubkey,
       });
     },
     [privateKeyRef, ndkRef]

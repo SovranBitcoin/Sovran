@@ -44,7 +44,7 @@ export async function publishGiftWrappedDM(params: {
   recipientPublicKey: string;
   content: string;
   extraTags?: string[][];
-}): Promise<void> {
+}): Promise<{ selfWrapId: string }> {
   const { ndk, senderPrivateKey, recipientPublicKey, content, extraTags } = params;
   const { recipientWrap, senderWrap } = buildGiftWrappedDMPair({
     content,
@@ -63,4 +63,8 @@ export async function publishGiftWrappedDM(params: {
         error: err instanceof Error ? err.message : String(err),
       });
     });
+
+  // The self-wrap id is the dedup key the sender's thread uses to reconcile an
+  // optimistic local echo with the server copy nagg eventually returns.
+  return { selfWrapId: senderWrap.id };
 }
