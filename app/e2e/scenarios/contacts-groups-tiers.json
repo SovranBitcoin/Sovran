@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "id": "contacts.groups.tiers",
+  "name": "Groups tab lists nearby groups once location is known",
+  "description": "With the phone's location set to London, the Groups tab moves past its loading message and lists both the Bluetooth nearby group and the local-area groups for that location.",
+  "details": "A fresh user (location permission auto-granted at install; a deterministic London fix seeded via the new `location` step — ephemeral sims never acquire one on their own) opens Contacts → Groups: the tab must settle past 'Getting your location...' into the tier list — the Bluetooth mesh tier (contact-row:geohash:mesh, deterministic) plus the geohash location tiers (contact-row:geohash:gcpvj0d — the precision-7 geohash of the seeded fix, deterministic given the coordinates) — proving the location-dependent Groups surface resolves; the simulated fix is cleared in finally. Without a fix this surface hangs indefinitely (useLocationTiers has no timeout and even the fix-independent mesh tier waits — recorded product finding)",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"location","mode":"set","latitude":51.5074,"longitude":-0.1278},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-contacts"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-contacts"}}],"until":{"id":"Contacts"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Groups"}}],"until":{"id":"contact-row:geohash:mesh"},"attempts":4,"settleMs":8000},
+    {"action":"waitFor","selector":{"id":"contact-row:geohash:gcpvj0d"},"timeoutMs":60000},
+    {"action":"screenshot","name":"contacts"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"location","mode":"clear"}
+  ],
+  "endState": "wallet"
+}

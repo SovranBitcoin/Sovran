@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "id": "profile.own.view",
+  "name": "View your own profile (no Follow or send-money buttons)",
+  "description": "Opens the app's side menu and taps into your own profile page. Because it is your own profile, the Follow and send-money buttons are correctly absent, and the page loads its stats without crashing even for a brand-new user.",
+  "details": "Opening the drawer and tapping the profile name navigates to the viewer's OWN social profile — proven by the new user-profile:own probe — where the Follow and Send-Money affordances are correctly ABSENT (they only show on other people's profiles); the profile renders its stats without crash for a brand-new user with no follows. Back to the wallet",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-profile-name"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"drawer"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-profile-name"}}],"until":{"id":"user-profile:own"},"attempts":4,"settleMs":8000},
+    {"action":"assert","that":"visible","selector":{"id":"user-profile:own"}},
+    {"action":"assert","that":"notVisible","selector":{"id":"profile-follow-button"}},
+    {"action":"assert","that":"notVisible","selector":{"id":"profile-send-money"}},
+    {"action":"screenshot","name":"profile"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

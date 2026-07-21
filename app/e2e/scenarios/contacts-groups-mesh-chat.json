@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "id": "contacts.groups.mesh-chat",
+  "name": "Open the nearby Bluetooth group chat",
+  "description": "From the Groups tab, tapping the Bluetooth nearby group opens its chat screen with the message box ready. No message is sent, because messages in that group are public broadcasts.",
+  "details": "With a seeded location fix (Groups legs proven by contacts.groups.tiers), tapping the Bluetooth mesh tier row pushes the geohash channel chat: the new geohash-chat:mesh probe pins that the MESH channel specifically opened (not a location tier), with its composer surface rendered — navigation and render assert only, deliberately NO message send (mesh messages are public broadcasts); back out to the wallet",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"location","mode":"set","latitude":51.5074,"longitude":-0.1278},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-contacts"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-contacts"}}],"until":{"id":"Contacts"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Groups"}}],"until":{"id":"contact-row:geohash:mesh"},"attempts":4,"settleMs":8000},
+    {"action":"screenshot","name":"contacts"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"contact-row:geohash:mesh"}}],"until":{"id":"geohash-chat:mesh"},"attempts":4,"settleMs":8000},
+    {"action":"screenshot","name":"dm-chat"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"location","mode":"clear"}
+  ],
+  "endState": "wallet"
+}

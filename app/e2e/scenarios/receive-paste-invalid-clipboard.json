@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "id": "receive.paste.invalid-clipboard",
+  "name": "Paste with an empty or nonsense clipboard fails politely",
+  "description": "Tapping Paste on the receive screen with nothing on the clipboard, and again with random text, each shows a friendly error message instead of crashing or going anywhere. Nothing is redeemed and the balance stays at zero.",
+  "details": "Fresh wallet, Receive hub Paste with a deliberately EMPTY clipboard must fail soft with the no-address toast (no navigation, no crash); after relaunch, Paste with plain garbage text must fail soft with the unsupported-input toast. Both legs stay on the hub, nothing is redeemed, and the wallet stays at zero. Clipboard payloads are non-payment literals only.",
+  "lane": "simulator",
+  "tags": ["flow:receive","io:paste","check:invalid-input","check:toast"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"setLiteralClipboard","text":""},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Receive"}}],"until":{"id":"receive-method-paste"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"receive"},
+    {"action":"tap","selector":{"id":"receive-method-paste"}},
+    {"action":"waitFor","selector":{"id":"e2e-toast-no-clipboard-address"},"timeoutMs":10000},
+    {"action":"screenshot","name":"receive"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"setLiteralClipboard","text":"just some plain text 42"},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Receive"}}],"until":{"id":"receive-method-paste"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"id":"receive-method-paste"}},
+    {"action":"waitFor","selector":{"id":"e2e-toast-unsupported-input"},"timeoutMs":10000},
+    {"action":"screenshot","name":"receive"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":60000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"setLiteralClipboard","text":""},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

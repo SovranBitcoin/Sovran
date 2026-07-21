@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "lane": "funded",
+  "requires": ["fresh-install","cocod.send.cashu","unit.sat","mock.mint-faults"],
+  "funds": {"assets":[{"mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"maxPrincipal":20}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"flow.fund-testnut-20"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet",
+  "id": "fault.ecash-send.swap-timeout",
+  "name": "Send hangs (mint never answers) — no money left in limbo",
+  "description": "During a 10-sat send, the mint never answers at all. Because the payment might still have gone through, the wallet does not guess: once the mint responds again it reconciles, the balance comes back exactly right, and no money is ever left in limbo.",
+  "details": "Fund 20 testnut sats (net 19), hang POST /v1/swap forever, attempt a 10-sat Create Ecash: the request stays in-flight (the mint could have signed the outputs), so the wallet must not blindly restore. Clearing the rule aborts the hung fake; state reconciles against the real mint and the balance is exactly 19 again — never a half-state where proofs are both spendable and inside an issued token",
+  "tags": ["flow:send","instrument:cashu-token","amount:fixed","outcome:rolled-back","check:mint-fault"],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"mintFaults","rules":[{"id":"swap-timeout","mint":"https://testnut.cashu.space","path":"/v1/swap","method":"POST","ws":"pass","response":{"mode":"timeout"}}]},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Send"}}],"until":{"id":"send-method-createEcash"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"send-method-createEcash"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"1"}}],"until":{"id":"amount-state:1"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:10"},"attempts":4,"settleMs":3000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"state":"enabled","timeoutMs":15000},
+    {"action":"screenshot","name":"send-amount"},
+    {"action":"tap","selector":{"id":"amount-next"}},
+    {"action":"assert","that":"mintFaultIntercepted","ruleId":"swap-timeout","minCount":1,"timeoutMs":60000},
+    {"action":"screenshot","name":"send-amount"},
+    {"action":"mintFaults","rules":[]},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 19"},"timeoutMs":120000}
+  ],
+  "verify": [
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0},
+    {"action":"screenshot","name":"wallet"}
+  ]
+}

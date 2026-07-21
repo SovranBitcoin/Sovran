@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "id": "send.cashu.dm-contact",
+  "name": "Send ecash to a contact in a direct message",
+  "description": "Sends 20 sats of ecash to a contact through a private direct message and checks the sent money shows up in the chat. Because the contact never claims it, the tester takes the money back and the full balance is restored.",
+  "details": "Fund 50 at Sovran, enter the destination-first Send flow, type cocod's npub into the smart destination input and pick the contact: with no lud16 the send becomes a 20-sat bearer ecash token delivered over a NIP-17 DM (self-copy included), the app auto-lands in the chat thread where the sender's own CashuTokenBubble renders inline; cocod never redeems, so the send stays pending and is reclaimed from the wallet transaction detail (rolledBack, funds restored), then swept",
+  "lane": "funded",
+  "tags": ["flow:send","instrument:cashu-token","amount:fixed","outcome:reclaimed","check:dm","check:search"],
+  "requires": ["fresh-install","cocod.send.bolt11","unit.sat"],
+  "funds": {"assets":[{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxPrincipal":50}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"flow.fund-lightning-50","with":{"mintUrl":"https://mint.sovran.money","mintHost":"mint.sovran.money"}}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Send"}}],"until":{"id":"send-destination-input"},"attempts":4,"settleMs":6000},
+    {"action":"input","selector":{"id":"send-destination-input"},"value":"npub1ajx0lhr3kdsx8ckfwxsxrgpuazrfx2ahmwrc906lvwzrfr5l0kesg8tx5h"},
+    {"action":"waitFor","selector":{"id":"send-contact:ec8cffdc71b36063e2c971a061a03ce886932bb7db8782bf5f6384348e9f7db3"},"timeoutMs":60000},
+    {"action":"screenshot","name":"send"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"send-contact:ec8cffdc71b36063e2c971a061a03ce886932bb7db8782bf5f6384348e9f7db3"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":8000},
+    {"action":"waitFor","selector":{"id":"amount-selected-mint:mint.sovran.money"},"timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"2"}}],"until":{"id":"amount-state:2"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:20"},"attempts":4,"settleMs":3000},
+    {"action":"assert","that":"visible","selector":{"id":"amount-state:20"}},
+    {"action":"waitFor","selector":{"id":"amount-next"},"state":"enabled","timeoutMs":30000},
+    {"action":"screenshot","name":"send-amount"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"amount-next"}}],"until":{"id":"e2e-action-menu-open"},"attempts":6,"settleMs":8000},
+    {"action":"screenshot","name":"send-amount"},
+    {"action":"tap","selector":{"id":"amount-next-menu-ecash"}},
+    {"action":"waitFor","selector":{"id":"dm-chat-probe"},"timeoutMs":120000},
+    {"action":"waitFor","selector":{"id":"cashu-bubble-own"},"timeoutMs":120000},
+    {"action":"screenshot","name":"dm-chat"},
+    {"action":"delay","ms":130000,"reason":"regression window: the sent-DM thread previously decayed to a blank screen within about two minutes"},
+    {"action":"assert","that":"visible","selector":{"id":"dm-chat-probe"}},
+    {"action":"assert","that":"visible","selector":{"id":"cashu-bubble-own"}},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 30"},"timeoutMs":60000},
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":-20},
+    {"action":"waitFor","selector":{"idPrefix":"transaction-send-","captureSuffixAs":"sendTx"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"transaction-send-${sendTx}"}}],"until":{"id":"send-token-id-${sendTx}"},"attempts":4,"settleMs":8000},
+    {"action":"assert","that":"tx","txRef":"${sendTx}","direction":"out","amount":20,"unit":"sat","mintHost":"mint.sovran.money","status":"pending"},
+    {"action":"screenshot","name":"send-token","stable":true,"tolerance":0.001},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"more-button"}}],"until":{"id":"e2e-action-menu-open"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"send-token-cancel-transaction"}}],"until":{"id":"e2e-toast-transaction-cancelled"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"e2e-toast-transaction-cancelled"},"timeoutMs":60000},
+    {"action":"assert","that":"tx","txRef":"${sendTx}","direction":"out","amount":20,"unit":"sat","mintHost":"mint.sovran.money","status":"rolledBack"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 50"},"timeoutMs":60000},
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.sweep-mint","with":{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0}},
+    {"use":"flow.return-to-wallet"},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":45000}
+  ],
+  "endState": "wallet"
+}

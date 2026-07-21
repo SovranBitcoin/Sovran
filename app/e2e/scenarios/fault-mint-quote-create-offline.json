@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "id": "fault.mint-quote.create-offline",
+  "name": "Mint is offline when asking for a top-up invoice",
+  "description": "The wallet asks its mint for a Lightning invoice to receive 100 sats, but the mint can't be reached at all. A clear 'could not connect' message appears, no invoice is ever shown, and the balance stays at zero.",
+  "details": "Fresh wallet arms a mint-fault rule that kills POST /v1/mint/quote/bolt11 before it leaves the device, then drives Receive → Fixed Amount → 100 → Next: the quote request must fail as MINT_QUOTE_FAILED with the 'Could not connect to mint' popup, no invoice is ever displayed, the intercepted-request ledger proves the request never reached the network, and the wallet stays at zero",
+  "lane": "simulator",
+  "tags": ["flow:receive","instrument:bolt11","amount:fixed","check:mint-fault","check:toast"],
+  "requires": ["fresh-install","mock.mint-faults","unit.sat"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"mintFaults","rules":[{"id":"quote-offline","mint":"*","path":"/v1/mint/quote/bolt11","method":"POST","ws":"pass","response":{"mode":"offline"}}]},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Receive"}}],"until":{"label":"Fixed Amount"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Fixed Amount"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":8000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"1"}}],"until":{"id":"amount-state:1"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:10"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:100"},"attempts":4,"settleMs":3000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"state":"enabled","timeoutMs":30000},
+    {"action":"screenshot","name":"receive-amount"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"amount-next"}}],"until":{"id":"e2e-action-menu-open"},"attempts":6,"settleMs":8000},
+    {"action":"tapAt","x":0.5,"y":0.905},
+    {"action":"waitFor","selector":{"id":"e2e-toast-mint-unreachable"},"timeoutMs":60000},
+    {"action":"screenshot","name":"receive-amount"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"mintFaultIntercepted","ruleId":"quote-offline","minCount":1},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "name": "Following feed shows friendly guidance when you follow no one",
+  "id": "feed.following.empty",
+  "description": "A brand-new user opens the social feed's Following tab without following anyone yet. Instead of a blank list or an endless spinner, a card explains they're not following anyone and points them in the right direction.",
+  "details": "A brand-new user (zero follows) opens the Feed, taps the Following tab — which opens the Popular/Recent mode menu (heroui actionMenuPopup, now mirrored by the feed's e2e-heroui-menu-open probe) — and picks Popular: the Following feed must settle into its dedicated 'You're not following anyone yet' guidance card (EmptyFeed no-follows mode) instead of a blank list or spinner; drawer.navigation only proved the For You tab lands",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:empty-state","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-feed"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-feed"}}],"until":{"label":"For You"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"For You"},"timeoutMs":45000},
+    {"action":"screenshot","name":"feed"},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Following"}}],"until":{"id":"e2e-heroui-menu-open"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"feed"},
+    {"action":"tapAt","x":0.5,"y":0.85},
+    {"action":"waitFor","selector":{"label":"You're not following anyone yet"},"timeoutMs":45000},
+    {"action":"screenshot","name":"feed"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

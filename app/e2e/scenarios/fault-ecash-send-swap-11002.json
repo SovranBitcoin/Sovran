@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "lane": "funded",
+  "requires": ["fresh-install","cocod.send.cashu","unit.sat","mock.mint-faults"],
+  "funds": {"assets":[{"mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"maxPrincipal":20}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"flow.fund-testnut-20"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet",
+  "id": "fault.ecash-send.swap-11002",
+  "name": "Send fails (mint says the money is tied up in another payment)",
+  "description": "During a 10-sat send, the mint claims the wallet's money is tied up in another payment still in progress. The send fails cleanly: no retrying, nothing is deducted, and the full balance stays spendable.",
+  "details": "Fund 20 testnut sats (net 19), make POST /v1/swap answer 400 {11002 proofs are pending}, attempt a 10-sat Create Ecash: terminal protocol error — no retry loop, nothing debited, proofs stay spendable (balance 19, delta 0). Documents the current failure surface for the proofs-pending claim",
+  "tags": ["flow:send","instrument:cashu-token","amount:fixed","outcome:rolled-back","check:mint-fault","check:fault-tbd"],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"mintFaults","rules":[{"id":"swap-11002","mint":"https://testnut.cashu.space","path":"/v1/swap","method":"POST","ws":"pass","response":{"mode":"error","code":11002,"detail":"proofs are pending"}}]},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Send"}}],"until":{"id":"send-method-createEcash"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"send-method-createEcash"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"1"}}],"until":{"id":"amount-state:1"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:10"},"attempts":4,"settleMs":3000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"state":"enabled","timeoutMs":15000},
+    {"action":"screenshot","name":"send-amount"},
+    {"action":"tap","selector":{"id":"amount-next"}},
+    {"action":"waitFor","selector":{"id":"e2e-action-menu-open"},"timeoutMs":30000},
+    {"action":"screenshot","name":"send-amount"},
+    {"action":"assert","that":"mintFaultIntercepted","ruleId":"swap-11002","minCount":1,"timeoutMs":60000},
+    {"action":"delay","ms":3000,"reason":"settle window proves no retry hammering after a terminal protocol error"},
+    {"action":"tapAt","x":0.5,"y":0.2},
+    {"action":"assert","that":"notVisible","selector":{"id":"e2e-action-menu-open"},"timeoutMs":15000},
+    {"action":"mintFaults","rules":[]},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 19"},"timeoutMs":120000}
+  ],
+  "verify": [
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0},
+    {"action":"screenshot","name":"wallet"}
+  ]
+}

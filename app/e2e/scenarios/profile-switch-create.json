@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "id": "profile.switch.create",
+  "name": "Create a second profile, then switch back to the first",
+  "description": "Creates a brand-new second profile from the profile switcher and confirms it starts with its own empty wallet and a different identity name. Switching back then brings the first profile back exactly as it was, proving the two identities stay fully separate.",
+  "details": "From the drawer, open the profile switcher and Generate new account: the app restart-switches into a fresh derived profile with its own empty wallet and a different pubkey-derived identity name (profile 1's name is absent from the new drawer), then the inactive-profile avatar switches back to profile 1 whose captured name returns exactly — restart-based profile switching keeps identities isolated and round-trips cleanly",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:context-isolation","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-feed"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"drawer-profile-name"},"timeoutMs":30000},
+    {"action":"capture","as":"profileOneName","fromSelector":{"id":"drawer-profile-name"},"attribute":"label"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-profile-switcher-open"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"drawer"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-profile-switcher-open"}}],"until":{"id":"profile-create"},"attempts":6,"settleMs":8000},
+    {"action":"screenshot","name":"drawer"},
+    {"action":"tap","selector":{"id":"profile-create"}},
+    {"action":"waitFor","selector":{"label":"No History"},"timeoutMs":120000},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-feed"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"drawer-profile-name"},"timeoutMs":30000},
+    {"action":"assert","that":"notVisible","selector":{"label":"${profileOneName}"}},
+    {"action":"screenshot","name":"drawer"},
+    {"action":"waitFor","selector":{"id":"drawer-profile-switch-0"},"timeoutMs":30000},
+    {"action":"tap","selector":{"id":"drawer-profile-switch-0"}},
+    {"action":"waitFor","selector":{"label":"No History"},"timeoutMs":120000},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-feed"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"${profileOneName}"},"timeoutMs":30000},
+    {"action":"screenshot","name":"drawer"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

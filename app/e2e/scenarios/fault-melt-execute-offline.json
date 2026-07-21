@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "id": "fault.melt.execute-offline",
+  "name": "Mint goes unreachable mid Lightning payment — verified refund",
+  "description": "While paying a 10-sat Lightning invoice, the mint becomes unreachable at the crucial moment, so the wallet cannot tell whether the payment went through. It holds the money aside, confirms with the mint that the invoice was never paid, and only then returns the money.",
+  "details": "Fund 20 testnut sats (net 19 after the 1-sat redeem fee), paste a cocod 10-sat bolt11 and get a real melt quote from testnut, then arm a rule that kills only POST /v1/melt/bolt11 before Pay: the execute attempt fails as a NetworkError while the mint may or may not have paid — proofs sit reserved on the executing op, and coco's executing-recovery checks the melt quote at the LIVE mint (the status GET is not faulted), verifies UNPAID, and only then rolls back: the melt screen lands on the SEND CANCELLED timeline (Funds returned to your balance — proven leg from send.mock-fail.lightning; no popup fires on this path) and the balance returns to 18 (delta -1: the execute-phase swap against the live mint costs 1 sat that rollback cannot undo). A verified-UNPAID restore, never a blind one",
+  "lane": "funded",
+  "tags": ["flow:send","instrument:bolt11","io:paste","amount:fixed","outcome:rolled-back","check:mint-fault"],
+  "requires": ["fresh-install","cocod.send.cashu","cocod.receive.bolt11","unit.sat","mock.mint-faults"],
+  "funds": {"assets":[{"mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"maxPrincipal":20}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"flow.fund-testnut-20"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"counterparty","operation":"bolt11.create","mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"amount":10,"captureAs":"invoice","setClipboard":true,"timeoutMs":60000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-send"}}],"until":{"label":"Paste"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Paste"}}],"until":{"label":"Allow Paste"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"label":"Allow Paste"}},
+    {"action":"waitFor","selector":{"id":"melt-pay"},"timeoutMs":60000},
+    {"action":"waitFor","selector":{"idPrefix":"transaction-probe-","captureSuffixAs":"meltTx"},"timeoutMs":60000},
+    {"action":"assert","that":"tx","txRef":"${meltTx}","direction":"out","amount":10,"unit":"sat","mintHost":"testnut.cashu.space","status":"UNPAID"},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"mintFaults","rules":[{"id":"melt-exec-offline","mint":"https://testnut.cashu.space","path":"/v1/melt/bolt11","method":"POST","ws":"pass","response":{"mode":"offline"}}]},
+    {"action":"tap","selector":{"id":"melt-pay"}},
+    {"action":"waitFor","selector":{"label":"Funds returned to your balance"},"timeoutMs":60000},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"assert","that":"mintFaultIntercepted","ruleId":"melt-exec-offline","minCount":1},
+    {"action":"mintFaults","rules":[]},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 18"},"timeoutMs":180000}
+  ],
+  "verify": [
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0,"feeEnvelopeSats":1},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

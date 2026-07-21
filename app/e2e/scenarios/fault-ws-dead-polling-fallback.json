@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "id": "fault.ws.dead-polling-fallback",
+  "name": "Live updates are down — the payment still arrives",
+  "description": "The wallet receives 100 sats via a Lightning invoice while the mint's live-update channel is broken for the whole flow. The wallet falls back to repeatedly asking the mint directly, and the money still arrives correctly.",
+  "details": "Identical to the funded 100-sat Lightning receive, but the mint's NUT-17 WebSocket is forced dead for the whole flow (a rule scoped to /v1/ws that no HTTP request ever matches — pure socket control): coco's HybridTransport must fall back to fast polling over plain HTTP and the quote still settles (+100). Proves success under transport degradation, not an error surface; normal sweep restores zero",
+  "lane": "funded",
+  "tags": ["flow:receive","instrument:bolt11","amount:fixed","io:copy","outcome:settled","check:mint-fault"],
+  "requires": ["fresh-install","cocod.send.bolt11","unit.sat","mock.mint-faults"],
+  "funds": {"assets":[{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxPrincipal":100}]},
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"mintFaults","rules":[{"id":"ws-down","mint":"https://mint.sovran.money","path":"/v1/ws","ws":"down","response":{"mode":"offline"}}]},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Receive"}}],"until":{"label":"Fixed Amount"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Fixed Amount"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":8000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"1"}}],"until":{"id":"amount-state:1"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:10"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:100"},"attempts":4,"settleMs":3000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"state":"enabled","timeoutMs":30000},
+    {"action":"screenshot","name":"receive-amount"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"amount-next"}}],"until":{"id":"e2e-action-menu-open"},"attempts":4,"settleMs":8000},
+    {"action":"tapAt","x":0.5,"y":0.905},
+    {"action":"waitFor","selector":{"label":"Copy"},"timeoutMs":30000},
+    {"action":"screenshot","name":"lightning-receive"},
+    {"action":"tap","selector":{"label":"Copy"}},
+    {"action":"capture","as":"invoice","fromClipboard":true},
+    {"action":"counterparty","operation":"bolt11.pay","mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"amount":100,"invoice":"${invoice}","timeoutMs":120000},
+    {"action":"waitFor","selector":{"label":"Close"},"timeoutMs":180000},
+    {"action":"assert","that":"visible","selector":{"label":"Close"}},
+    {"action":"tap","selector":{"label":"Close"}},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"₿ 100"},"timeoutMs":60000},
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":100},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.sweep-mint","with":{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0}},
+    {"use":"flow.return-to-wallet"},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":45000}
+  ],
+  "endState": "wallet"
+}

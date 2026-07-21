@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "id": "profile.other.view",
+  "name": "View another person's profile (Follow button shown)",
+  "description": "Searches for another user from the wallet and opens their profile page. The page shows a Follow button (which only appears on other people's profiles) and loads without crashing.",
+  "details": "Searching a counterparty npub from the wallet header and opening the result routes to ANOTHER user's social profile — proven by the new user-profile:other probe (distinct from user-profile:own) — where the Follow affordance IS present (it only shows on other people's profiles); the profile renders without crash. Back to the wallet. Complement to profile.own.view; reuses the proven search→profile legs from send.search.npub",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation","check:search"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-search-toggle"}}],"until":{"id":"wallet-search-input"},"attempts":4,"settleMs":6000},
+    {"action":"input","selector":{"id":"wallet-search-input"},"value":"npub1ajx0lhr3kdsx8ckfwxsxrgpuazrfx2ahmwrc906lvwzrfr5l0kesg8tx5h"},
+    {"action":"waitFor","selector":{"id":"contact-row:nostr:ec8cffdc71b36063e2c971a061a03ce886932bb7db8782bf5f6384348e9f7db3"},"timeoutMs":60000},
+    {"action":"screenshot","name":"search"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"contact-row:nostr:ec8cffdc71b36063e2c971a061a03ce886932bb7db8782bf5f6384348e9f7db3"}}],"until":{"id":"user-profile:other"},"attempts":4,"settleMs":8000},
+    {"action":"assert","that":"visible","selector":{"id":"user-profile:other"}},
+    {"action":"assert","that":"notVisible","selector":{"id":"user-profile:own"}},
+    {"action":"assert","that":"visible","selector":{"id":"profile-follow-button"}},
+    {"action":"screenshot","name":"profile"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

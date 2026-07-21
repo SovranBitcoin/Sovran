@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "id": "fault.melt.execute-timeout",
+  "name": "Mint never answers mid Lightning payment — money held, then returned",
+  "description": "While paying a 10-sat Lightning invoice, the mint never answers at all. The wallet keeps the money safely set aside until it can confirm the invoice was never paid, then returns it exactly once — nothing lost and no double refund.",
+  "details": "Fund 20 testnut sats (net 19), get a real 10-sat melt quote, then arm a rule that hangs POST /v1/melt/bolt11 forever: Pay leaves the melt in-flight with proofs reserved. Clearing the rule aborts the hung fake (AbortError → network-failure class); the quote watcher then polls the real mint, sees UNPAID, restores the proofs, and the balance returns to 18 (delta -1: the execute-phase swap against the live mint costs 1 sat that rollback cannot undo). Proves an ambiguous hang never debits and never double-restores",
+  "lane": "funded",
+  "tags": ["flow:send","instrument:bolt11","io:paste","amount:fixed","outcome:rolled-back","check:mint-fault"],
+  "requires": ["fresh-install","cocod.send.cashu","cocod.receive.bolt11","unit.sat","mock.mint-faults"],
+  "funds": {"assets":[{"mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"maxPrincipal":20}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"flow.fund-testnut-20"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"counterparty","operation":"bolt11.create","mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"amount":10,"captureAs":"invoice","setClipboard":true,"timeoutMs":60000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-send"}}],"until":{"label":"Paste"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Paste"}}],"until":{"label":"Allow Paste"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"label":"Allow Paste"}},
+    {"action":"waitFor","selector":{"id":"melt-pay"},"timeoutMs":60000},
+    {"action":"waitFor","selector":{"idPrefix":"transaction-probe-","captureSuffixAs":"meltTx"},"timeoutMs":60000},
+    {"action":"assert","that":"tx","txRef":"${meltTx}","direction":"out","amount":10,"unit":"sat","mintHost":"testnut.cashu.space","status":"UNPAID"},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"mintFaults","rules":[{"id":"melt-exec-timeout","mint":"https://testnut.cashu.space","path":"/v1/melt/bolt11","method":"POST","ws":"pass","response":{"mode":"timeout"}}]},
+    {"action":"tap","selector":{"id":"melt-pay"}},
+    {"action":"assert","that":"mintFaultIntercepted","ruleId":"melt-exec-timeout","minCount":1,"timeoutMs":60000},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"mintFaults","rules":[]},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 18"},"timeoutMs":180000}
+  ],
+  "verify": [
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0,"feeEnvelopeSats":1},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

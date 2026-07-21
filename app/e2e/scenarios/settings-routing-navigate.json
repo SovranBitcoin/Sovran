@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "id": "settings.routing.navigate",
+  "name": "Open the swap-routing settings screen",
+  "description": "Opens the swap-routing preferences screen from Settings and checks its options appear with sensible defaults for a new user, then returns to the wallet — proving the screen opens without crashing.",
+  "details": "From Settings, the Swap routing row opens the routing-preferences screen and its rows render for a fresh user with defaults — Min transfer amount (Rebalancing), Max intermediaries (Middleman Routing) — proving this previously-untested settings route lands without crash; back to wallet. (Section titles are CSS-uppercased so anchor on the mixed-case content rows, not the section headers)",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"Swap routing"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"Swap routing"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Swap routing"}}],"until":{"label":"Max intermediaries"},"attempts":4,"settleMs":6000},
+    {"action":"assert","that":"visible","selector":{"label":"Min transfer amount"}},
+    {"action":"screenshot","name":"settings"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "id": "fault.melt.pending-hold",
+  "name": "Lightning payment stuck in progress — money stays reserved",
+  "description": "The mint reports a Lightning payment as still in progress while the wallet also cannot check on its status. The wallet keeps the money reserved the whole time instead of guessing, and refunds it exactly once when the mint finally confirms the invoice was never paid.",
+  "details": "Fund 20 testnut sats (net 19), real 10-sat melt quote, then POST /v1/melt/bolt11 answers 400 {20005 Quote pending} while GET quote polls are simultaneously killed: the payment is in-flight as far as the wallet can know, so proofs must stay reserved for the whole hold — no blind restore, no double-restore. Clearing both rules lets the real poll return UNPAID and the balance restores to 18 (1-sat pre-melt swap fee is real and unrecoverable) exactly once (delta 0)",
+  "lane": "funded",
+  "tags": ["flow:send","instrument:bolt11","io:paste","amount:fixed","outcome:rolled-back","check:mint-fault"],
+  "requires": ["fresh-install","cocod.send.cashu","cocod.receive.bolt11","unit.sat","mock.mint-faults"],
+  "funds": {"assets":[{"mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"maxPrincipal":20}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"flow.fund-testnut-20"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"counterparty","operation":"bolt11.create","mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"amount":10,"captureAs":"invoice","setClipboard":true,"timeoutMs":60000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-send"}}],"until":{"label":"Paste"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Paste"}}],"until":{"label":"Allow Paste"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"label":"Allow Paste"}},
+    {"action":"waitFor","selector":{"id":"melt-pay"},"timeoutMs":60000},
+    {"action":"waitFor","selector":{"idPrefix":"transaction-probe-","captureSuffixAs":"meltTx"},"timeoutMs":60000},
+    {"action":"assert","that":"tx","txRef":"${meltTx}","direction":"out","amount":10,"unit":"sat","mintHost":"testnut.cashu.space","status":"UNPAID"},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"mintFaults","rules":[{"id":"melt-exec-20005","mint":"https://testnut.cashu.space","path":"/v1/melt/bolt11","method":"POST","ws":"pass","response":{"mode":"error","code":20005,"detail":"Quote pending"}},{"id":"melt-poll-offline","mint":"https://testnut.cashu.space","path":"/v1/melt/quote/bolt11","method":"GET","ws":"pass","response":{"mode":"offline"}}]},
+    {"action":"tap","selector":{"id":"melt-pay"}},
+    {"action":"assert","that":"mintFaultIntercepted","ruleId":"melt-exec-20005","minCount":1,"timeoutMs":60000},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"delay","ms":8000,"reason":"hold window: prove no premature proof restore while pending+polls dead"},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"mintFaults","rules":[]},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 18"},"timeoutMs":180000}
+  ],
+  "verify": [
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0,"feeEnvelopeSats":1},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

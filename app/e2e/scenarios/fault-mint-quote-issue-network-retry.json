@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "id": "fault.mint-quote.issue-network-retry",
+  "name": "Top-up survives two network drops and credits exactly once",
+  "description": "Our test partner wallet pays the wallet's 100-sat Lightning invoice, but the first two attempts to collect the money hit network failures. The wallet quietly retries, succeeds on the third attempt, and the balance goes up by exactly 100 sats — never twice.",
+  "details": "Real 100-sat Lightning receive at mint.sovran.money, but the first TWO POST /v1/mint/bolt11 issuance attempts are killed pre-network (maxMatches 2, then passthrough): cocod pays the invoice, coco's operation processor retries the NetworkError with backoff, the third attempt reaches the real mint, and the wallet credits exactly once (+100, no duplicate proofs). The ledger must show exactly 2 intercepted attempts; normal sweep restores zero",
+  "lane": "funded",
+  "tags": ["flow:receive","instrument:bolt11","amount:fixed","io:copy","outcome:settled","check:mint-fault"],
+  "requires": ["fresh-install","cocod.send.bolt11","unit.sat","cocod.receive.cashu","mock.mint-faults"],
+  "funds": {"assets":[{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxPrincipal":100}]},
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"mintFaults","rules":[{"id":"issue-offline-twice","mint":"https://mint.sovran.money","path":"/v1/mint/bolt11","method":"POST","maxMatches":2,"ws":"pass","response":{"mode":"offline"}}]},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Receive"}}],"until":{"label":"Fixed Amount"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Fixed Amount"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":8000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"1"}}],"until":{"id":"amount-state:1"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:10"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:100"},"attempts":4,"settleMs":3000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"state":"enabled","timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"amount-next"}}],"until":{"id":"e2e-action-menu-open"},"attempts":4,"settleMs":8000},
+    {"action":"tapAt","x":0.5,"y":0.905},
+    {"action":"waitFor","selector":{"label":"Copy"},"timeoutMs":30000},
+    {"action":"screenshot","name":"lightning-receive"},
+    {"action":"tap","selector":{"label":"Copy"}},
+    {"action":"capture","as":"invoice","fromClipboard":true},
+    {"action":"counterparty","operation":"bolt11.pay","mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"amount":100,"invoice":"${invoice}","timeoutMs":120000},
+    {"action":"waitFor","selector":{"label":"Close"},"timeoutMs":180000},
+    {"action":"screenshot","name":"lightning-receive"},
+    {"action":"tap","selector":{"label":"Close"}},
+    {"action":"goHome"}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"₿ 100"},"timeoutMs":60000},
+    {"action":"assert","that":"mintFaultIntercepted","ruleId":"issue-offline-twice","minCount":2},
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":100},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.sweep-mint","with":{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0}},
+    {"use":"flow.return-to-wallet"},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":45000}
+  ],
+  "endState": "wallet"
+}

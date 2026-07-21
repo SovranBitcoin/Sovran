@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "id": "onboarding.relaunch-interrupt",
+  "name": "Quit the app mid-setup — it resumes and can still finish",
+  "description": "A new user gets partway through the welcome slides, then force-quits the app. On reopening, setup picks up right where it left off — no crash, blank screen, or re-asking for terms — and can still be completed through to the wallet.",
+  "details": "A fresh user accepts terms and reaches the intro carousel, then force-quits (cold relaunch, reset:none) before completing onboarding: the app comes back RESUMED at the carousel — not a blank screen, crash, stuck splash, or a re-shown terms gate — and the interrupted user can still complete onboarding through to the wallet. Interruption + recovery axis on the onboarding flow (onboarding.fresh only proved the uninterrupted journey)",
+  "lane": "simulator",
+  "tags": ["flow:onboarding","check:interruption"],
+  "requires": ["fresh-install"],
+  "setup": [],
+  "steps": [
+    {"action":"launch","reset":"erase"},
+    {"action":"tapAt","x":0.68,"y":0.54},
+    {"action":"waitFor","selector":{"id":"terms-acceptance"},"timeoutMs":240000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"terms-acceptance"}}],"until":{"id":"terms-acceptance"},"untilValue":"1","attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"Next"},"state":"enabled","timeoutMs":30000},
+    {"action":"tap","selector":{"label":"Next"}},
+    {"action":"waitFor","selector":{"label":"Bitcoin that feels like cash"},"timeoutMs":60000},
+    {"action":"screenshot","name":"onboarding-carousel"},
+    {"action":"launch","reset":"none"},
+    {"action":"waitFor","selector":{"label":"Bitcoin that feels like cash"},"timeoutMs":60000},
+    {"action":"assert","that":"notVisible","selector":{"label":"I have read and agree to the Terms and Conditions"}},
+    {"action":"screenshot","name":"onboarding-carousel"},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Bitcoin that feels like cash"}}],"until":{"label":"Powered by Nostr"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Powered by Nostr"}}],"until":{"label":"Private by Design"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Private by Design"}}],"until":{"label":"Stay private, stay sovereign"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"label":"Welcome to Sovran"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Get Started"}}],"until":{"label":"No History"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

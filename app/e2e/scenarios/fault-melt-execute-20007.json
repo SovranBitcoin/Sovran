@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "id": "fault.melt.execute-20007",
+  "name": "Lightning payment fails (mint says the offer expired)",
+  "description": "The wallet tries to pay a 10-sat Lightning invoice, but the mint says the payment offer has expired. Nothing gets stuck: the money returns to the wallet and the balance is unchanged.",
+  "details": "Fund 20 testnut sats (net 19), real 10-sat melt quote, then POST /v1/melt/bolt11 answers 400 {20007 Expired quote}: a definitive protocol failure — nothing may stay stuck, the proofs must come back, and the balance returns to exactly 19 (delta 0) with a single intercepted execute. Documents the melt-path 20007 surface",
+  "lane": "funded",
+  "tags": ["flow:send","instrument:bolt11","io:paste","amount:fixed","outcome:rolled-back","check:mint-fault","check:fault-tbd"],
+  "requires": ["fresh-install","cocod.send.cashu","cocod.receive.bolt11","unit.sat","mock.mint-faults"],
+  "funds": {"assets":[{"mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"maxPrincipal":20}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"flow.fund-testnut-20"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"counterparty","operation":"bolt11.create","mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"amount":10,"captureAs":"invoice","setClipboard":true,"timeoutMs":60000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-send"}}],"until":{"label":"Paste"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Paste"}}],"until":{"label":"Allow Paste"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"label":"Allow Paste"}},
+    {"action":"waitFor","selector":{"id":"melt-pay"},"timeoutMs":60000},
+    {"action":"waitFor","selector":{"idPrefix":"transaction-probe-","captureSuffixAs":"meltTx"},"timeoutMs":60000},
+    {"action":"assert","that":"tx","txRef":"${meltTx}","direction":"out","amount":10,"unit":"sat","mintHost":"testnut.cashu.space","status":"UNPAID"},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"mintFaults","rules":[{"id":"melt-exec-20007","mint":"https://testnut.cashu.space","path":"/v1/melt/bolt11","method":"POST","ws":"pass","response":{"mode":"error","code":20007,"detail":"Expired quote"}}]},
+    {"action":"tap","selector":{"id":"melt-pay"}},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"assert","that":"mintFaultIntercepted","ruleId":"melt-exec-20007","minCount":1},
+    {"action":"mintFaults","rules":[]},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 18"},"timeoutMs":180000}
+  ],
+  "verify": [
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0,"feeEnvelopeSats":1},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

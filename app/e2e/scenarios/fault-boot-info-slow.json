@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "lane": "simulator",
+  "requires": ["fresh-install","mock.mint-faults","unit.sat"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet",
+  "id": "fault.boot.info-slow",
+  "name": "App startup never waits on a slow mint",
+  "description": "Every mint is made to take 15 seconds to answer basic status requests, then the app is restarted. The app must be usable well before those slow requests finish, proving startup never waits on a mint.",
+  "details": "Arm a rule that hangs every /v1/info for 15 seconds (then aborts) and cold-relaunch with reset:none: the wallet must be interactive well before the hang resolves — waitFor wallet-send with a 12-second budget proves boot does not block on mint metadata",
+  "tags": ["flow:wallet","check:mint-fault","check:navigation"],
+  "steps": [
+    {"action":"mintFaults","rules":[{"id":"info-slow","mint":"*","path":"/v1/info","ws":"pass","response":{"mode":"timeout","afterMs":15000}}]},
+    {"action":"launch","reset":"none"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":12000},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":15000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"mintFaults","rules":[]}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-receive"}},
+    {"action":"screenshot","name":"wallet"}
+  ]
+}

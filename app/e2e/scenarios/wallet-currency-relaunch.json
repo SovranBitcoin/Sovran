@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "id": "wallet.currency.relaunch",
+  "name": "Chosen display currency survives restarting the app",
+  "description": "Switches the wallet's display currency to British pounds, then fully closes and reopens the app. The wallet still shows pounds after the restart, and is then switched back to dollars.",
+  "details": "Switch the display currency to GBP via the fiat pill menu and cold-relaunch with reset:none: the persisted selection must rehydrate, proven by wallet-fiat-currency:<code>, then restore USD. Native iOS rows and Android's app menu share the stable spoken names USD/EUR/GBP; no funds are needed because the pill renders at ₿0",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:fiat-unit","check:persistence"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"waitFor","selector":{"id":"wallet-fiat-currency:usd"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-fiat-pill"}}],"until":{"label":"GBP"},"attempts":6,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"GBP"}}],"until":{"id":"wallet-fiat-currency:gbp"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"launch","reset":"none"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":15000},
+    {"action":"waitFor","selector":{"id":"wallet-fiat-currency:gbp"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-fiat-pill"}}],"until":{"label":"USD"},"attempts":6,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"USD"}}],"until":{"id":"wallet-fiat-currency:usd"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

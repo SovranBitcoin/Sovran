@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "id": "send.nutdrop.scanning",
+  "name": "Open Nut Drop (nearby sharing) with nobody nearby",
+  "description": "Opens the Nut Drop nearby-sharing screen on a device with no one else around. Instead of crashing, going blank, or spinning forever, it shows a clear 'scanning nearby' message, and the tester can back out to the wallet.",
+  "details": "From the Send hub, tapping Nut Drop opens the NearPay radar; on a device with no nearby BitChat/BLE peers (the ephemeral simulator) it must degrade to the dedicated 'Scanning nearby' empty state — not a crash, blank screen, or stuck spinner — proving the BLE-dependent surface renders safely when the subsystem finds nothing. Back out to the wallet. Subsystem-unavailable axis on the Nut Drop surface (untested until now)",
+  "lane": "simulator",
+  "tags": ["flow:send","check:empty-state"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Send"}}],"until":{"id":"send-method-nutDrop"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"send"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"send-method-nutDrop"}}],"until":{"label":"Scanning nearby"},"attempts":4,"settleMs":8000},
+    {"action":"assert","that":"visible","selector":{"label":"Scanning nearby"}},
+    {"action":"screenshot","name":"send"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

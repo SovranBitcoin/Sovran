@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "lane": "simulator",
+  "requires": ["fresh-install","mock.mint-faults","unit.sat"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet",
+  "id": "fault.mint-switch.all-offline",
+  "name": "Switching your preferred mint works while every mint is offline",
+  "description": "With every mint unreachable, the user picks a different preferred mint from the wallet. The switch completes instantly and the app stays responsive — choosing a mint is a local setting and shouldn't need the network at all.",
+  "details": "Add testnut normally, return to the default mint, then kill EVERY mint (wildcard offline + WebSocket down) and switch the preferred mint to testnut from the wallet selector: the switch is a local store write and must complete instantly — selector closes, wallet stays interactive, no spinner hang — while background keyset refreshes fail quietly. The user's seed case for offline mint management",
+  "tags": ["flow:mint","check:mint-fault","check:mint-change","check:offline"],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-select-add"}}],"until":{"id":"mint-add-search-toggle"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-add-search-toggle"}}],"until":{"id":"mint-add-search-input"},"attempts":4,"settleMs":6000},
+    {"action":"input","selector":{"id":"mint-add-search-input"},"value":"https://testnut.cashu.space"},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://testnut.cashu.space"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"contact-row:mint:https://testnut.cashu.space"}}],"until":{"label":"Add (1)"},"attempts":4,"settleMs":4000},
+    {"action":"waitFor","selector":{"id":"mint-add-confirm"},"state":"enabled","timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-add-confirm"}}],"until":{"id":"e2e-toast-mints-added"},"attempts":4,"settleMs":30000},
+    {"action":"assert","that":"notVisible","selector":{"id":"mint-add-confirm"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"mint-select-add"},"timeoutMs":30000},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://testnut.cashu.space"},"timeoutMs":30000},
+    {"action":"tap","selector":{"label":"Cancel"}},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"mintFaults","rules":[{"id":"all-mints-down","mint":"*","path":"/","ws":"down","response":{"mode":"offline"}}]},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://testnut.cashu.space"},"timeoutMs":30000},
+    {"action":"screenshot","name":"mint-select"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"contact-row:mint:https://testnut.cashu.space"}}],"until":{"id":"wallet-selected-mint:testnut.cashu.space"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"assert","that":"mintFaultIntercepted","ruleId":"all-mints-down","minCount":1},
+    {"action":"mintFaults","rules":[]}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-mint-selector"}},
+    {"action":"assert","that":"visible","selector":{"id":"wallet-receive"}},
+    {"action":"screenshot","name":"wallet"}
+  ]
+}

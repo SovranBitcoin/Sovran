@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "id": "settings.notification-policy.relaunch",
+  "name": "Notification setting survives an app restart",
+  "description": "Switches the notification setting to Strict, then fully closes and reopens the app. The setting still reads Strict everywhere afterward — it does not silently reset to the default.",
+  "details": "Flip the persisted notification-policy enum to Strict (proven legs), then cold-relaunch with reset:none: the Settings row must still read 'Notifications, Strict' and the policy screen must rehydrate with Strict selected (AX state 1) and Relaxed off — the persisted enum survives the restart instead of silently resetting (whole-blob-discard regression guard on settingsStore, the store whose wipe cost terms/onboarding once)",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation","check:persistence"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"Notifications, Relaxed"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"label":"Notifications, Relaxed"}},
+    {"action":"waitFor","selector":{"id":"notification-policy-relaxed"},"value":"1","timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"notification-policy-strict"}}],"until":{"id":"notification-policy-strict"},"untilValue":"1","attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"notification-policy-relaxed"},"value":"0","timeoutMs":15000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000},
+    {"action":"launch","reset":"none"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":15000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"Notifications, Strict"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"label":"Notifications, Strict"},"timeoutMs":30000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"tap","selector":{"label":"Notifications, Strict"}},
+    {"action":"waitFor","selector":{"id":"notification-policy-strict"},"value":"1","timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"notification-policy-relaxed"},"value":"0","timeoutMs":15000},
+    {"action":"screenshot","name":"settings"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

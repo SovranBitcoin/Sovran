@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "id": "wallet.offline.fiat",
+  "name": "Dollar display keeps working with no internet connection",
+  "description": "The wallet shows a dollar value for the balance using the latest exchange rate. With no internet connection, that dollar display stays on screen using the last known rate instead of disappearing or showing an error.",
+  "details": "Fresh wallet, confirm the wallet-fiat-pill ('approximately $X') renders online, then go into REAL airplane mode: the pill keeps showing the last cached price (PricelistProvider reads the persisted pricelist store; the exchange-rate fetch to the price feed dies with the radios but the display falls back to cache). Asserts the fiat display survives an offline drop AND documents the product gap that there is NO staleness indicator — the pill shows a potentially stale rate with no visual marker (PricelistProvider.isStale is computed but never consumed by PrimaryBalance). Fund-free: balance is 0, so the pill reads approximately $0.00 both before and after, and the assertion is purely that the fiat rendering persists offline",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:offline","check:fiat-unit"],
+  "requires": ["fresh-install","device.network"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"waitFor","selector":{"id":"wallet-fiat-pill"},"timeoutMs":45000},
+    {"action":"assert","that":"visible","selector":{"id":"wallet-fiat-pill"}},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"network","mode":"airplane"},
+    {"action":"waitFor","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":20000},
+    {"action":"assert","that":"visible","selector":{"id":"wallet-fiat-pill"}},
+    {"action":"assert","that":"visible","selector":{"label":"YOU ARE OFFLINE"}},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"network","mode":"online"},
+    {"action":"assert","that":"notVisible","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":20000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-fiat-pill"}},
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"network","mode":"online"},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

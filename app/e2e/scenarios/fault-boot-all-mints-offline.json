@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "id": "fault.boot.all-mints-offline",
+  "name": "App starts up fine even when every mint is unreachable",
+  "description": "With an unpaid 100-sat top-up invoice left over and every mint made completely unreachable, the app is restarted from scratch. It must still start quickly, keep all saved data, and stay usable while it quietly retries in the background.",
+  "details": "Fresh wallet leaves a 100-sat mint quote pending (invoice created, never paid, dismissed), then arms a wildcard rule that kills every mint endpoint and WebSocket and cold-relaunches with reset:none so the faults are live from the very first boot frame: the wallet must become interactive within budget with stores rehydrated (no wiped persistence) while quote/proof watchers retry quietly against the dead mints — the regression guard for the default-mints boot hang caused by a blocked quote watcher. The ledger must show at least one intercepted boot-time request",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:mint-fault","check:offline","check:navigation"],
+  "requires": ["fresh-install","mock.mint-faults","unit.sat"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Receive"}}],"until":{"label":"Fixed Amount"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Fixed Amount"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":8000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"1"}}],"until":{"id":"amount-state:1"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:10"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:100"},"attempts":4,"settleMs":3000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"state":"enabled","timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"amount-next"}}],"until":{"id":"e2e-action-menu-open"},"attempts":4,"settleMs":8000},
+    {"action":"tapAt","x":0.5,"y":0.905},
+    {"action":"waitFor","selector":{"id":"payment-info-lightning-invoice-data"},"timeoutMs":60000},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"mintFaults","rules":[{"id":"all-mints-down","mint":"*","path":"/","ws":"down","response":{"mode":"offline"}}]},
+    {"action":"launch","reset":"none"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":15000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"assert","that":"mintFaultIntercepted","ruleId":"all-mints-down","minCount":1,"timeoutMs":60000},
+    {"action":"mintFaults","rules":[]},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-receive"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

@@ -1,46 +1,34 @@
 {
   "version": 1,
   "id": "wallet.offline.banner",
-  "name": "Mock Offline shows the offline shell",
-  "description": "From a fresh wallet, open the drawer, enter Settings, triple-tap the version row to unlock developer mode, and flip Mock Offline on — the blue YOU ARE OFFLINE shell banner must appear and persist on the wallet home while send/receive controls stay mounted; flipping the toggle back off is proven by its AX state probe. Uses settingsStore.mockOffline (the app's own offline lever — simctl has no airplane mode), so this exercises the OfflineProvider shell exactly as a real connectivity drop would",
+  "name": "Offline banner appears with no internet connection",
+  "description": "With no internet connection, a clear 'You are offline' banner appears and stays visible while moving between the wallet, menu, and settings screens. When the connection comes back, the banner disappears.",
+  "details": "From a fresh wallet on the Android emulator, enable REAL airplane mode (adb cmd connectivity — the radios genuinely drop, unlike the retired settingsStore.mockOffline lever) and prove the OfflineProvider's blue YOU ARE OFFLINE shell banner appears after its ~5-6.5s hysteresis, persists across the wallet home, drawer, and settings, and clears near-instantly when the network returns. Send/receive controls stay mounted throughout; the banner wait doubles as the synchronization barrier every offline scenario needs before exercising a flow (until it commits, the app still takes online code paths)",
   "lane": "simulator",
   "tags": ["flow:wallet","check:offline"],
-  "requires": ["fresh-install"],
+  "requires": ["fresh-install","device.network"],
   "setup": [
     {"use":"flow.onboard"}
   ],
   "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"network","mode":"airplane"},
+    {"action":"waitFor","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":20000},
+    {"action":"assert","that":"visible","selector":{"label":"YOU ARE OFFLINE"}},
+    {"action":"screenshot","name":"wallet"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
+    {"action":"assert","that":"visible","selector":{"label":"YOU ARE OFFLINE"}},
     {"action":"screenshot","name":"drawer"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"label":"ACCOUNT"},"timeoutMs":30000},
-    {"action":"screenshot","name":"settings"},
-    {"action":"swipe","dir":"up"},
-    {"action":"swipe","dir":"up"},
-    {"action":"swipe","dir":"up"},
-    {"action":"waitFor","selector":{"id":"settings-version-row"},"timeoutMs":15000},
-    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}},{"tap":{"id":"settings-version-row"}}],"until":{"label":"Developer mode enabled"},"attempts":2,"settleMs":1500},
-    {"action":"swipe","dir":"up"},
-    {"action":"swipe","dir":"up"},
-    {"action":"swipe","dir":"up"},
-    {"action":"waitFor","selector":{"id":"settings-mock-offline-toggle"},"value":"0","timeoutMs":20000},
-    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-mock-offline-toggle"}}],"until":{"id":"settings-mock-offline-toggle"},"untilValue":"1","attempts":4,"settleMs":6000},
-    {"action":"waitFor","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":15000},
+    {"action":"assert","that":"visible","selector":{"label":"YOU ARE OFFLINE"}},
     {"action":"screenshot","name":"settings"},
     {"action":"goHome"},
     {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000},
-    {"action":"waitFor","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":15000},
+    {"action":"assert","that":"visible","selector":{"label":"YOU ARE OFFLINE"}},
     {"action":"screenshot","name":"wallet"},
-    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
-    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"ACCOUNT"},"attempts":4,"settleMs":6000},
-    {"action":"waitFor","selector":{"label":"ACCOUNT"},"timeoutMs":30000},
-    {"action":"swipe","dir":"up"},
-    {"action":"swipe","dir":"up"},
-    {"action":"swipe","dir":"up"},
-    {"action":"waitFor","selector":{"id":"settings-mock-offline-toggle"},"timeoutMs":15000},
-    {"action":"tapUntil","sequence":[{"tap":{"id":"settings-mock-offline-toggle"}}],"until":{"id":"settings-mock-offline-toggle"},"untilValue":"0","attempts":4,"settleMs":6000},
-    {"action":"goHome"},
-    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+    {"action":"network","mode":"online"},
+    {"action":"assert","that":"notVisible","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":20000}
   ],
   "verify": [
     {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
@@ -48,6 +36,7 @@
     {"action":"screenshot","name":"wallet"}
   ],
   "finally": [
+    {"action":"network","mode":"online"},
     {"use":"flow.return-to-wallet"}
   ],
   "endState": "wallet"

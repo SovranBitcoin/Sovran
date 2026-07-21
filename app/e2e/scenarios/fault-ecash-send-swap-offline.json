@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "lane": "funded",
+  "requires": ["fresh-install","cocod.send.cashu","unit.sat","mock.mint-faults"],
+  "funds": {"assets":[{"mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"maxPrincipal":20}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"flow.fund-testnut-20"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet",
+  "id": "fault.ecash-send.swap-offline",
+  "name": "Send while the mint is unreachable — nothing deducted",
+  "description": "The user tries to send 10 sats while the mint is completely unreachable. The app falls back to its offline sending screen, the attempt is abandoned, and not a single sat is deducted from the balance.",
+  "details": "Fund 20 testnut sats (net 19), then kill the ENTIRE testnut mint (all endpoints + WebSocket) and attempt a 10-sat Create Ecash: the send flow must degrade to the offline proof-selector sheet (the same surface the Mock Fail Send toggle proves, now reached through a real transport-level outage) and dismissing it debits nothing. After the rule clears the balance is still exactly 19",
+  "tags": ["flow:send","instrument:cashu-token","amount:fixed","outcome:dismissed","check:mint-fault","check:offline"],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"mintFaults","rules":[{"id":"mint-all-offline","mint":"https://testnut.cashu.space","path":"/","ws":"down","response":{"mode":"offline"}}]},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Send"}}],"until":{"id":"send-method-createEcash"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"send-method-createEcash"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"1"}}],"until":{"id":"amount-state:1"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:10"},"attempts":4,"settleMs":3000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"state":"enabled","timeoutMs":15000},
+    {"action":"screenshot","name":"send-amount"},
+    {"action":"tap","selector":{"id":"amount-next"}},
+    {"action":"waitFor","selector":{"id":"e2e-action-menu-open"},"timeoutMs":30000},
+    {"action":"screenshot","name":"send-amount"},
+    {"action":"assert","that":"mintFaultIntercepted","ruleId":"mint-all-offline","minCount":1},
+    {"action":"tapAt","x":0.5,"y":0.2},
+    {"action":"assert","that":"notVisible","selector":{"id":"e2e-action-menu-open"},"timeoutMs":15000},
+    {"action":"mintFaults","rules":[]},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 19"},"timeoutMs":120000}
+  ],
+  "verify": [
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0},
+    {"action":"screenshot","name":"wallet"}
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "id": "mint.offline.add",
+  "name": "Adding a mint with no internet connection fails cleanly",
+  "description": "With no internet connection, the user tries to add a new mint by typing its web address. The attempt fails without crashing, and once back online the mint list confirms no half-added mint was saved.",
+  "details": "Fresh wallet goes into REAL airplane mode (banner barrier passed), then attempts to add testnut by URL: discovery must fail without crashing and WITHOUT persisting a half-configured mint — the same unreachable class fault.mint-add.unreachable proves per-mint, here caused by the whole device being offline. Back online, the mint selector must still list no testnut row. Add-mint leg copied verbatim from fault.mint-add.unreachable",
+  "lane": "simulator",
+  "tags": ["flow:mint","check:offline","check:mint-add"],
+  "requires": ["fresh-install","device.network","unit.sat"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"network","mode":"airplane"},
+    {"action":"waitFor","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":20000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-select-add"}}],"until":{"id":"mint-add-search-toggle"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-add-search-toggle"}}],"until":{"id":"mint-add-search-input"},"attempts":4,"settleMs":6000},
+    {"action":"input","selector":{"id":"mint-add-search-input"},"value":"https://testnut.cashu.space"},
+    {"action":"delay","ms":8000,"reason":"discovery window: the offline mint must not become addable"},
+    {"action":"assert","that":"visible","selector":{"label":"YOU ARE OFFLINE"}},
+    {"action":"screenshot","name":"mint-add"},
+    {"action":"tap","selector":{"label":"Cancel"},"optional":{"reason":"dismissal chrome varies when discovery fails"}},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"network","mode":"online"},
+    {"action":"assert","that":"notVisible","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":20000}
+  ],
+  "verify": [
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
+    {"action":"assert","that":"notVisible","selector":{"id":"contact-row:mint:https://testnut.cashu.space"}},
+    {"action":"screenshot","name":"mint-select"},
+    {"action":"tap","selector":{"label":"Cancel"}},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "finally": [
+    {"action":"network","mode":"online"},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

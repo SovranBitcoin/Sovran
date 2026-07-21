@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "id": "send.offline.lightning",
+  "name": "Pay a Lightning invoice with no internet connection (cannot proceed)",
+  "description": "With no internet connection, a pasted Lightning invoice reaches the ready-to-pay screen but tapping Pay does nothing — the app currently gives no error message, a known gap. Walking away from the payment leaves the balance untouched once the connection comes back.",
+  "details": "Funded testnut wallet (valueless), pasted a cocod bolt11 while in REAL airplane mode: the Lightning send composes to the READY-TO-SEND preview (out/5/UNPAID) but CANNOT be paid — offline the melt has no mint to quote against. PRODUCT FINDING (pinned live 2026-07-20): tapping Pay offline is a SILENT NO-OP — no 'Could not connect to mint' toast, no in-sheet error, no state change; the send just stays on Ready-to-send / UNPAID with the Pay button still live, so the user gets zero feedback that an offline Lightning send can't proceed (same post-hoc-classification gap as the ecash/receive sides — nothing gates the flow up front on connectivity). Abandoning it (goHome) leaves the balance untouched; back online the balance is intact (₿19, delta 0). testnut is valueless (auto write-off, no sweep). Uses the e2e clipboard bridge for both the funding token and the bolt11. Allow-Paste taps optional (Android has no blocking paste dialog).",
+  "lane": "funded",
+  "tags": ["flow:send","instrument:bolt11","io:paste","outcome:dismissed","check:offline"],
+  "requires": ["fresh-install","cocod.send.cashu","cocod.receive.bolt11","unit.sat","device.network"],
+  "funds": {"assets":[{"mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"maxPrincipal":20}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"action":"counterparty","operation":"cashu.create","mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"amount":20,"captureAs":"fundingToken","setClipboard":true,"timeoutMs":60000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-receive"}}],"until":{"id":"receive-method-paste"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"receive-method-paste"}}],"until":{"id":"receive-token-redeem"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"label":"Allow Paste"},"optional":{"reason":"android has no blocking paste dialog"}},
+    {"action":"waitFor","selector":{"id":"receive-token-redeem"},"timeoutMs":60000},
+    {"action":"tap","selector":{"id":"receive-token-redeem"}},
+    {"action":"waitFor","selector":{"id":"mint-info-trust"},"timeoutMs":60000},
+    {"action":"tap","selector":{"id":"mint-info-trust"}},
+    {"action":"waitFor","selector":{"id":"receive-token-redeem"},"timeoutMs":60000},
+    {"action":"tap","selector":{"id":"receive-token-redeem"}},
+    {"action":"waitFor","selector":{"id":"receive-token-close"},"timeoutMs":120000},
+    {"action":"tap","selector":{"id":"receive-token-close"}},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 19"},"timeoutMs":60000}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"counterparty","operation":"bolt11.create","mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"amount":5,"captureAs":"sendInvoice","setClipboard":true,"timeoutMs":60000},
+    {"action":"network","mode":"airplane"},
+    {"action":"waitFor","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":20000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-send"}}],"until":{"label":"Paste"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"send"},
+    {"action":"tap","selector":{"label":"Allow Paste"},"optional":{"reason":"android has no blocking paste dialog"}},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Paste"}}],"until":{"id":"melt-pay"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"waitFor","selector":{"idPrefix":"transaction-probe-","captureSuffixAs":"meltTx"},"timeoutMs":20000},
+    {"action":"assert","that":"tx","txRef":"${meltTx}","direction":"out","amount":5,"unit":"sat","mintHost":"testnut.cashu.space","status":"UNPAID"},
+    {"action":"tap","selector":{"id":"melt-pay"}},
+    {"action":"waitFor","selector":{"id":"melt-pay"},"timeoutMs":15000},
+    {"action":"assert","that":"tx","txRef":"${meltTx}","direction":"out","amount":5,"unit":"sat","mintHost":"testnut.cashu.space","status":"UNPAID"},
+    {"action":"assert","that":"visible","selector":{"label":"YOU ARE OFFLINE"}},
+    {"action":"screenshot","name":"lightning-send"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000},
+    {"action":"network","mode":"online"},
+    {"action":"assert","that":"notVisible","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":20000},
+    {"action":"waitFor","selector":{"label":"₿ 19"},"timeoutMs":60000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"network","mode":"online"},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

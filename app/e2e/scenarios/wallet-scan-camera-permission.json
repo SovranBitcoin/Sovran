@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "id": "wallet.scan.camera-permission",
+  "name": "Scan button handles blocked camera access, then recovers",
+  "description": "With camera access turned off, tapping the wallet's Scan QR button shows a notice explaining camera access is blocked instead of opening a broken camera screen. Once access is granted again, the same button opens the camera normally.",
+  "details": "Fresh wallet with the camera TCC record revoked host-side: tapping the wallet-home Scan QR button must NOT navigate to the camera screen — it surfaces the camera-permission blocked toast (with its Open-settings action) over the wallet. After the permission is granted back and the app relaunches, the same button opens the camera screen (Scanning state), proving recovery once the capability is restored. No funds move.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","io:scan","check:permission","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"permission","service":"camera","mode":"revoke"},
+    {"action":"launch","reset":"none"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Scan QR code"}}],"until":{"id":"e2e-toast-camera-permission"},"attempts":4,"settleMs":5000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"assert","that":"notVisible","selector":{"label":"Camera permission required"}},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":15000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"permission","service":"camera","mode":"grant"},
+    {"action":"launch","reset":"none"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Scan QR code"}}],"until":{"label":"Scanning..."},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"camera"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":60000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"permission","service":"camera","mode":"reset"},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

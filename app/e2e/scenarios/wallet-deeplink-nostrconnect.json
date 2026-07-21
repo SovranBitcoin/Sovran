@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "id": "wallet.deeplink.nostrconnect",
+  "name": "Open a remote login link from outside the app (not approved)",
+  "description": "Tapping a remote-login connection link from outside the app brings the wallet to a review screen asking whether to approve the new connection. The test dismisses it without approving, so nothing gets connected and the wallet is untouched.",
+  "details": "OS-level deep-link entry (simctl openurl) on a warm fresh wallet: a synthetic nostrconnect:// pairing URI must route through +native-intent's rewrite to /(signer-flow)/connect and open the signer-connect review sheet (action-menu probe value signer-connect) — the first proof that a system URL reaches a flow at all. The review is dismissed without approving, so no pairing is granted; back home the wallet is untouched. Same e2e-secret URI convention as signer.hub.paste; no payment payloads can be authored through the scheme-allowlisted openUrl step.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","io:deeplink","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"openUrl","url":"nostrconnect://ec8cffdc71b36063e2c971a061a03ce886932bb7db8782bf5f6384348e9f7db3?relay=wss%3A%2F%2Frelay.damus.io&secret=e2e-test-secret&name=E2E-Harness"},
+    {"action":"waitFor","selector":{"id":"e2e-action-menu-open:signer-connect"},"timeoutMs":30000},
+    {"action":"screenshot","name":"signer-hub"},
+    {"action":"tapAt","x":0.5,"y":0.15},
+    {"action":"assert","that":"notVisible","selector":{"id":"e2e-action-menu-open"},"timeoutMs":15000},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":60000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "id": "transactions.filter.empty-result",
+  "name": "Filter transactions with no matches (helpful empty message)",
+  "description": "With only one received payment in history, filtering for sent payments leaves an empty list that shows a clear 'No transactions found' message instead of a blank screen. Switching the filter back brings the payment row back.",
+  "details": "Fund 100 at Sovran so history holds exactly one incoming tx, then prove the filtered-empty state: Direction=Out yields zero rows and renders the 'No transactions found' guidance card (not a spinner, not a blank list, no crash), and switching Direction=In recovers the funding row. The empty card was never previously proven on device",
+  "lane": "funded",
+  "tags": ["flow:history","instrument:bolt11","amount:fixed","check:filters","check:empty-state"],
+  "requires": ["fresh-install"],
+  "funds": {"assets":[{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0,"maxPrincipal":100}]},
+  "setup": [
+    {"use":"flow.onboard"},
+    {"use":"flow.fund-lightning-100"},
+    {"action":"waitFor","selector":{"label":"₿ 100"},"timeoutMs":60000}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"transactions-view-all"}}],"until":{"id":"transactions-filter-open"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"idPrefix":"transaction-mint-","captureSuffixAs":"fundingTx"},"timeoutMs":30000},
+    {"action":"screenshot","name":"transactions"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"transactions-filter-open"}}],"until":{"id":"filter-direction-out"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"filter-direction-out"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"filter-direction-out"}}],"until":{"id":"filter-direction-out"},"untilValue":"1","attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"id":"filter-apply"}},
+    {"action":"waitFor","selector":{"id":"transactions-filter-open"},"timeoutMs":30000},
+    {"action":"assert","that":"notVisible","selector":{"id":"transaction-mint-${fundingTx}"}},
+    {"action":"waitFor","selector":{"label":"No transactions found"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"label":"Try adjusting your filters or check back later"},"timeoutMs":10000},
+    {"action":"screenshot","name":"transactions"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"transactions-filter-open"}}],"until":{"id":"filter-direction-in"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"filter-direction-in"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"filter-direction-in"}}],"until":{"id":"filter-direction-in"},"untilValue":"1","attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"id":"filter-apply"}},
+    {"action":"waitFor","selector":{"id":"transaction-mint-${fundingTx}"},"timeoutMs":30000},
+    {"action":"assert","that":"notVisible","selector":{"label":"No transactions found"}},
+    {"action":"screenshot","name":"transactions"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.sweep-mint","with":{"mintUrl":"https://mint.sovran.money","unit":"sat","accountIndex":0}},
+    {"use":"flow.return-to-wallet"},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":45000}
+  ],
+  "endState": "wallet"
+}

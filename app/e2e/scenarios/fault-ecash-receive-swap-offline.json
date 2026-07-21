@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "lane": "funded",
+  "requires": ["fresh-install","cocod.send.cashu","unit.sat","mock.mint-faults"],
+  "funds": {"assets":[{"mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"maxPrincipal":10}]},
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet",
+  "id": "fault.ecash-receive.swap-offline",
+  "name": "Receive while the mint is unreachable (credits after recovery)",
+  "description": "The wallet tries to redeem a 10-sat ecash token while the mint is unreachable. Instead of losing the token, it records the receive as pending, and once the mint comes back the money is credited automatically.",
+  "details": "Fund 20 testnut sats (net 19), then arm an offline rule on testnut /v1/swap and paste a fresh cocod 10-sat token: redeeming is a recoverable network failure, so the wallet must record a pending receive (pendingReason network) instead of losing the token. Clearing the rule lets the receive recover and credit automatically: +10 minus the 1-sat testnut redeem fee lands the wallet on 28 (delta +10 with a 1-sat fee envelope). Fresh-wallet variant: testnut is an unknown mint, so the first redeem opens the trust review (proven legs from receive.cashu.unknown-mint); trust is granted against the live /v1/info (un-faulted) and the SECOND redeem hits the faulted swap",
+  "tags": ["flow:receive","instrument:cashu-token","io:paste","outcome:settled","check:mint-fault"],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"counterparty","operation":"cashu.create","mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"amount":10,"captureAs":"incomingToken","setClipboard":true,"timeoutMs":60000},
+    {"action":"mintFaults","rules":[{"id":"swap-offline","mint":"https://testnut.cashu.space","path":"/v1/swap","method":"POST","ws":"pass","response":{"mode":"offline"}}]},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-receive"}}],"until":{"id":"receive-method-paste"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"receive-method-paste"}}],"until":{"label":"Allow Paste"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"label":"Allow Paste"}},
+    {"action":"waitFor","selector":{"id":"receive-token-redeem"},"timeoutMs":60000},
+    {"action":"screenshot","name":"receive-token"},
+    {"action":"tap","selector":{"id":"receive-token-redeem"}},
+    {"action":"waitFor","selector":{"id":"mint-info-trust"},"timeoutMs":60000},
+    {"action":"screenshot","name":"mint-info"},
+    {"action":"tap","selector":{"id":"mint-info-trust"}},
+    {"action":"waitFor","selector":{"id":"receive-token-redeem"},"timeoutMs":60000},
+    {"action":"tap","selector":{"id":"receive-token-redeem"}},
+    {"action":"assert","that":"mintFaultIntercepted","ruleId":"swap-offline","minCount":1,"timeoutMs":60000},
+    {"action":"screenshot","name":"receive-token"},
+    {"action":"mintFaults","rules":[]},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 9"},"timeoutMs":180000}
+  ],
+  "verify": [
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":10,"feeEnvelopeSats":1},
+    {"action":"screenshot","name":"wallet"}
+  ]
+}

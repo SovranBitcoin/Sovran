@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "id": "mint.add.relaunch",
+  "name": "An added mint is still there after restarting the app",
+  "description": "Adds a mint by typing its web address, then fully closes and reopens the app. The mint is still in the list after the restart — losing it silently would strand any money the user later keeps there.",
+  "details": "Add testnut by typed URL from the wallet-header mint selector (proven legs), close the selector, then cold-relaunch with reset:none: the added mint must still be listed in the reopened selector — mint membership spans the coco DB and mint metadata store, and a mint silently dropped at restart would orphan any balance the user later holds there (mint.add.url only proves same-session reopen)",
+  "lane": "simulator",
+  "tags": ["flow:mint","check:mint-add","check:persistence"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-select-add"}}],"until":{"id":"mint-add-search-toggle"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-add-search-toggle"}}],"until":{"id":"mint-add-search-input"},"attempts":4,"settleMs":6000},
+    {"action":"input","selector":{"id":"mint-add-search-input"},"value":"https://testnut.cashu.space"},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://testnut.cashu.space"},"timeoutMs":45000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"contact-row:mint:https://testnut.cashu.space"}}],"until":{"label":"Add (1)"},"attempts":4,"settleMs":4000},
+    {"action":"screenshot","name":"mint-add"},
+    {"action":"waitFor","selector":{"id":"mint-add-confirm"},"state":"enabled","timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"mint-add-confirm"}}],"until":{"id":"e2e-toast-mints-added"},"attempts":4,"settleMs":30000},
+    {"action":"assert","that":"notVisible","selector":{"id":"mint-add-confirm"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"mint-select-add"},"timeoutMs":30000},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://testnut.cashu.space"},"timeoutMs":30000},
+    {"action":"screenshot","name":"mint-select"},
+    {"action":"tap","selector":{"label":"Cancel"}},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"launch","reset":"none"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-mint-selector"}}],"until":{"id":"mint-select-add"},"attempts":4,"settleMs":6000},
+    {"action":"swipe","dir":"up"},
+    {"action":"waitFor","selector":{"id":"contact-row:mint:https://testnut.cashu.space"},"timeoutMs":30000},
+    {"action":"screenshot","name":"mint-select"},
+    {"action":"tap","selector":{"label":"Cancel"}},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

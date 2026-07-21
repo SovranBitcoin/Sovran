@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "lane": "funded",
+  "requires": ["fresh-install","cocod.send.cashu","unit.sat","mock.mint-faults"],
+  "funds": {"assets":[{"mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"maxPrincipal":10}]},
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "finally": [
+    {"action":"mintFaults","rules":[]},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet",
+  "id": "fault.ecash-receive.swap-11001",
+  "name": "Receive fails (mint claims the ecash was already spent)",
+  "description": "The wallet tries to redeem a 10-sat ecash token, but the mint wrongly replies that the money was already spent. The wallet treats this as final: nothing is credited, no stuck pending entry is left behind, and the balance is unchanged.",
+  "details": "Fund 20 testnut sats (net 19), then paste a fresh cocod 10-sat token while POST /v1/swap answers 400 {11001 proofs already spent}: unlike a network failure this is TERMINAL — no pending receive is recorded, nothing is credited, and after the rule clears the balance is still exactly 19 (delta 0 from a fresh ₿0 wallet (the incoming token is the sole declared funding effect)). The unredeemed token stays with cocod (valueless testnut, auto-written-off). Documents the terminal-redeem failure surface. Fresh-wallet variant: testnut is an unknown mint, so the first redeem opens the trust review (proven legs from receive.cashu.unknown-mint); trust is granted against the live /v1/info (un-faulted) and the SECOND redeem hits the faulted swap",
+  "tags": ["flow:receive","instrument:cashu-token","io:paste","outcome:rolled-back","check:mint-fault","check:fault-tbd"],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"counterparty","operation":"cashu.create","mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"amount":10,"captureAs":"incomingToken","setClipboard":true,"timeoutMs":60000},
+    {"action":"mintFaults","rules":[{"id":"swap-11001-receive","mint":"https://testnut.cashu.space","path":"/v1/swap","method":"POST","ws":"pass","response":{"mode":"error","code":11001,"detail":"proofs already spent"}}]},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-receive"}}],"until":{"id":"receive-method-paste"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"receive-method-paste"}}],"until":{"label":"Allow Paste"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"label":"Allow Paste"}},
+    {"action":"waitFor","selector":{"id":"receive-token-redeem"},"timeoutMs":60000},
+    {"action":"screenshot","name":"receive-token"},
+    {"action":"tap","selector":{"id":"receive-token-redeem"}},
+    {"action":"waitFor","selector":{"id":"mint-info-trust"},"timeoutMs":60000},
+    {"action":"screenshot","name":"mint-info"},
+    {"action":"tap","selector":{"id":"mint-info-trust"}},
+    {"action":"waitFor","selector":{"id":"receive-token-redeem"},"timeoutMs":60000},
+    {"action":"tap","selector":{"id":"receive-token-redeem"}},
+    {"action":"assert","that":"mintFaultIntercepted","ruleId":"swap-11001-receive","minCount":1,"timeoutMs":60000},
+    {"action":"screenshot","name":"receive-token"},
+    {"action":"mintFaults","rules":[]},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":60000}
+  ],
+  "verify": [
+    {"action":"assert","that":"balanceDelta","unit":"sat","delta":0},
+    {"action":"screenshot","name":"wallet"}
+  ]
+}

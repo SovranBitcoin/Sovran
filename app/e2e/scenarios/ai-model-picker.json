@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "id": "ai.model.picker",
+  "name": "Open the AI model picker",
+  "description": "In the AI assistant, tapping the model name opens a sheet listing the available AI models. The test closes the sheet without picking one and confirms the wallet is unchanged.",
+  "details": "From the drawer's AI tab, tapping the model chip opens the model-picker sheet — a FullWindowOverlay snapPoints BottomSheet whose rows were previously invisible to e2e; now the sheet publishes the e2e-action-menu-open:model-picker state probe, proving the model-selection affordance is reachable and renders. Dismissed without changing the model, ending on the wallet at ₿0",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-ai"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-ai"}},{"delayMs":1200},{"tap":{"id":"tab-ai"}}],"until":{"id":"ai-model-chip"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"ai-model-chip"},"timeoutMs":45000},
+    {"action":"screenshot","name":"ai"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"ai-model-chip"}}],"until":{"id":"e2e-action-menu-open"},"attempts":4,"settleMs":6000},
+    {"action":"assert","that":"visible","selector":{"id":"e2e-action-menu-open:model-picker"}},
+    {"action":"screenshot","name":"ai"},
+    {"action":"tapAt","x":0.5,"y":0.12},
+    {"action":"waitFor","selector":{"id":"ai-model-chip"},"timeoutMs":30000},
+    {"action":"assert","that":"notVisible","selector":{"id":"e2e-action-menu-open"}},
+    {"action":"screenshot","name":"ai"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

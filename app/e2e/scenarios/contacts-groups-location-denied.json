@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "id": "contacts.groups.location-denied",
+  "name": "Groups with location denied waits forever (known gap)",
+  "description": "When the user has refused location access, the Groups tab gets stuck saying it is finding their location forever instead of explaining that permission was denied. This test documents that known gap so a future fix can be verified.",
+  "details": "With location permission revoked (TCC + relaunch, the proven permission legs), the Contacts Groups tab renders 'Getting your location...' FOREVER and no tier rows: useLocationTiers sets a permission error but ContactsScreen drops it (only `tiers` is destructured), so denied users see an eternal waiting message instead of permission guidance — this scenario asserts CURRENT behavior (fault-tbd); a product fix should surface the denial and flip these asserts deliberately. No permission-reset in finally: the TCC reset relaunch surfaces a native camera prompt that blocks the AX tree, and the ephemeral simulator is destroyed right after so there is nothing to restore",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:permission","check:fault-tbd"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"permission","service":"location","mode":"revoke"},
+    {"action":"launch","reset":"none"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":15000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-contacts"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-contacts"}}],"until":{"id":"Contacts"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Groups"}}],"until":{"label":"Getting your location..."},"attempts":4,"settleMs":8000},
+    {"action":"assert","that":"notVisible","selector":{"id":"contact-row:geohash:mesh"}},
+    {"action":"screenshot","name":"contacts"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [],
+  "endState": "wallet"
+}

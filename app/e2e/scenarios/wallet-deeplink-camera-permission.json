@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "id": "wallet.deeplink.camera-permission",
+  "name": "Open the camera from a link while camera access is blocked",
+  "description": "With camera access turned off, a link that opens the app's camera screen lands on a clear 'Camera permission required' message instead of a broken camera view. Asking to grant access shows a notice pointing to Settings, and nothing crashes or dead-ends.",
+  "details": "Camera TCC revoked, then an OS-level sovran://camera deep link on the warm app: expo-router must land on the camera route, which shows its in-screen 'Camera permission required' empty state instead of a broken viewfinder. Grant access on the blocked record surfaces the camera-permission blocked toast (with its Open-settings action) rather than a system prompt, and the route stays on the same empty state — no crash, no dead-end. Exit home, wallet untouched. Complements wallet.scan.camera-permission (which proves the wallet-side gate never navigates) by proving the camera route's own denied-state UX when entered directly. This scenario originally EXPOSED two defects: the Grant access label rendered white-on-white, and the old action-menu feedback presented invisibly behind the pushed camera route.",
+  "lane": "simulator",
+  "tags": ["flow:wallet","io:deeplink","check:permission","check:navigation"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"permission","service":"camera","mode":"revoke"},
+    {"action":"launch","reset":"none"},
+    {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000},
+    {"action":"openUrl","url":"sovran://camera"},
+    {"action":"waitFor","selector":{"label":"Camera permission required"},"timeoutMs":15000},
+    {"action":"screenshot","name":"camera"},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Grant camera permission"}}],"until":{"id":"e2e-toast-camera-permission"},"attempts":4,"settleMs":5000},
+    {"action":"screenshot","name":"camera"},
+    {"action":"waitFor","selector":{"label":"Camera permission required"},"timeoutMs":15000},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":60000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"permission","service":"camera","mode":"reset"},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

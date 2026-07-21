@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "id": "wallet.unit.relaunch",
+  "name": "Dollar account selection survives restarting the app",
+  "description": "Switches the wallet to its dollar account, then fully closes and reopens the app. The wallet comes back on the dollar account instead of resetting to Bitcoin, and is then switched back to the Bitcoin account.",
+  "details": "Switch to the USD account via the unit-switcher pill (preferred mint re-snaps to cubabitcoin, the only default usd mint) and cold-relaunch with reset:none: the persisted activeUnit must rehydrate — the wallet boots back onto the USD account page (cubabitcoin selected-mint probe, no sat-page fiat pill) instead of resetting to Bitcoin; then switch back and end on the sat page",
+  "lane": "simulator",
+  "tags": ["flow:wallet","check:fiat-unit","check:persistence"],
+  "requires": ["fresh-install"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"waitFor","selector":{"id":"wallet-selected-mint:mint.sovran.money"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-unit-switcher"}}],"until":{"label":"USD account"},"attempts":6,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"USD account"}}],"until":{"id":"wallet-selected-mint:mint.cubabitcoin.org"},"attempts":4,"settleMs":6000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"launch","reset":"none"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"waitFor","selector":{"id":"wallet-selected-mint:mint.cubabitcoin.org"},"timeoutMs":30000},
+    {"action":"assert","that":"notVisible","selector":{"id":"wallet-fiat-pill"}},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-unit-switcher"}}],"until":{"label":"Bitcoin account"},"attempts":6,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Bitcoin account"}}],"until":{"id":"wallet-fiat-pill"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"wallet-fiat-pill"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "verify": [
+    {"action":"assert","that":"visible","selector":{"id":"wallet-send"}},
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}

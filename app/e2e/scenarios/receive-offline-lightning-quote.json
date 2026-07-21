@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "id": "receive.offline.lightning-quote",
+  "name": "Lightning receive fails cleanly with no internet connection",
+  "description": "With no internet connection, trying to receive 100 sats via a Lightning invoice fails with a clear 'could not connect' message instead of hanging or crashing. No invoice ever appears, and the balance is still zero after the connection comes back.",
+  "details": "Fresh wallet goes into REAL airplane mode (banner barrier passed), then drives Receive → Fixed Amount → 100 → Next: with the whole device offline the mint quote request must fail into the 'Could not connect to mint' popup, no invoice is ever displayed, and after restoring the network the wallet still shows zero. Documents the product gap that nothing gates the flow up front — the user reaches quote creation before learning they are offline (post-hoc error classification only). Toast anchor copied from fault.mint-quote.create-offline; the device-offline failure classing is a first-run hypothesis to pin",
+  "lane": "simulator",
+  "tags": ["flow:receive","instrument:bolt11","amount:fixed","check:offline","check:toast"],
+  "requires": ["fresh-install","device.network","unit.sat"],
+  "setup": [
+    {"use":"flow.onboard"}
+  ],
+  "steps": [
+    {"action":"screenshot","name":"wallet"},
+    {"action":"network","mode":"airplane"},
+    {"action":"waitFor","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":20000},
+    {"action":"screenshot","name":"wallet"},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Receive"}}],"until":{"label":"Fixed Amount"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Fixed Amount"}}],"until":{"id":"amount-next"},"attempts":4,"settleMs":8000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"1"}}],"until":{"id":"amount-state:1"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:10"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"0"}}],"until":{"id":"amount-state:100"},"attempts":4,"settleMs":3000},
+    {"action":"waitFor","selector":{"id":"amount-next"},"state":"enabled","timeoutMs":30000},
+    {"action":"screenshot","name":"receive-amount"},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"amount-next"}}],"until":{"id":"e2e-action-menu-open"},"attempts":6,"settleMs":8000},
+    {"action":"tapAt","x":0.5,"y":0.905},
+    {"action":"waitFor","selector":{"id":"e2e-toast-mint-unreachable"},"timeoutMs":60000},
+    {"action":"assert","that":"visible","selector":{"label":"YOU ARE OFFLINE"}},
+    {"action":"screenshot","name":"receive-amount"},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":45000},
+    {"action":"network","mode":"online"},
+    {"action":"assert","that":"notVisible","selector":{"label":"YOU ARE OFFLINE"},"timeoutMs":20000}
+  ],
+  "verify": [
+    {"action":"waitFor","selector":{"label":"₿ 0"},"timeoutMs":30000},
+    {"action":"screenshot","name":"wallet"}
+  ],
+  "finally": [
+    {"action":"network","mode":"online"},
+    {"use":"flow.return-to-wallet"}
+  ],
+  "endState": "wallet"
+}
