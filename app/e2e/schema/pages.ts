@@ -37,6 +37,7 @@ export const CANONICAL_PAGES = [
   'mint-reviews', // mint KYM reviews list (MintReviewsScreen)
   'profile', // nostr user profile (UserProfileScreen)
   'dm-chat', // 1:1 DM conversation (UserMessagesScreen, dm-chat-probe)
+  'camera', // QR scan camera screen (CameraScreen, incl. its permission-required state)
   'search', // header search overlay with results (SearchOverlay)
   'settings', // settings root screen ((settings-flow), SettingsScreen)
   'feed', // home feed tab (FeedScreen: For You / Following)
@@ -52,6 +53,7 @@ export const CANONICAL_PAGES = [
   'swap', // swap-group detail screen (SwapTransactionScreen)
   'restore-gate', // recovery gate with slide-to-confirm
   'recovery-complete', // recovery success state with Continue
+  'map', // bitcoin merchant map (MapScreen, screen-map)
 ] as const;
 
 export const CANONICAL_PAGE_SET: ReadonlySet<string> = new Set(CANONICAL_PAGES);

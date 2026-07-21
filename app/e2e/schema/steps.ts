@@ -3,6 +3,7 @@ import { decodePaymentRequest } from '@cashu/cashu-ts';
 import { nonCapturingSelectorSchema, selectorSchema } from './selectors';
 import { allowedCommandSchema, unitSchema } from './capabilities';
 import { isCanonicalPage } from './pages';
+import { mintFaultRuleSchema } from '../../shared/lib/e2e/mintFaults/rules';
 
 // Bounds — reject nonsense timeouts/coords at parse time.
 const timeoutMs = z.number().int().positive().max(600_000);
@@ -108,10 +109,77 @@ const exec = z.strictObject({
   captureAs: z.string().min(1).optional(),
   timeoutMs: timeoutMs.optional(),
 });
+/** Deterministic simulator TCC control (`simctl privacy`). Host-side and
+ * simulator-lane only — the fake driver just records the call. iOS may kill a
+ * foreground app whose TCC record changes and permission hooks cache state at
+ * mount, so always follow this step with `launch reset:none` before driving
+ * the affected flow. `reset` returns the service to not-determined; scenarios
+ * that mutate a permission must restore it in `finally`. */
+const permission = z.strictObject({
+  action: z.literal('permission'),
+  service: z.enum(['camera', 'photos', 'location']),
+  mode: z.enum(['grant', 'revoke', 'reset']),
+});
+/** Deterministic simulated device position (`simctl location set`). Ephemeral
+ * simulators never acquire a real GPS fix, so location-dependent surfaces
+ * (geohash tiers) hang without one. `clear` removes the simulated fix;
+ * scenarios that set a location clear it in `finally`. Simulator lane only —
+ * the android driver throws (no equivalent without emulator console access). */
+const location = z
+  .strictObject({
+    action: z.literal('location'),
+    mode: z.enum(['set', 'clear']),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.mode === 'set' && (value.latitude === undefined || value.longitude === undefined)) {
+      ctx.addIssue({ code: 'custom', message: 'location set requires latitude and longitude' });
+    }
+  });
 const setClipboard = z.strictObject({
   action: z.literal('setClipboard'),
   from: command,
   timeoutMs: timeoutMs.optional(),
+});
+/** OS-level deep-link entry (`simctl openurl`). Scheme-allowlisted to the
+ * app's non-payment schemes so authored URLs can never carry a token,
+ * invoice, or request payload; synthetic NIP-46 pairing URIs follow the
+ * same e2e-secret convention as `signer.hub.paste`. */
+const openUrl = z.strictObject({
+  action: z.literal('openUrl'),
+  url: z
+    .string()
+    .max(512)
+    .regex(/^(nostrconnect|sovran):\/\//i, 'must use an allowlisted non-payment app scheme')
+    .superRefine((value, ctx) => {
+      if (/(cashu|creq|lnbc|lntb|lnurl|bitcoin:)/i.test(value.replace(/^nostrconnect:\/\//i, '')))
+        ctx.addIssue({ code: 'custom', message: 'must not embed a payment payload' });
+    }),
+});
+/** Literal clipboard seeding for NEGATIVE-input coverage only (empty or
+ * garbage paste). Deliberately hostile to payloads: short, and must not
+ * resemble a token, invoice, request, URI, key, or seed phrase — real
+ * payment payloads still flow only through the typed counterparty/creq
+ * seams. Empty string clears the clipboard. */
+const setLiteralClipboard = z.strictObject({
+  action: z.literal('setLiteralClipboard'),
+  text: z
+    .string()
+    .max(64)
+    .superRefine((value, ctx) => {
+      if (
+        /(cashu|creq|lnbc|lntb|lnurl|lightning:|bitcoin:|npub1|nsec1|nprofile1|nevent1)/i.test(
+          value
+        )
+      )
+        ctx.addIssue({
+          code: 'custom',
+          message: 'must not resemble a payment or identity payload',
+        });
+      if (value.trim().split(/\s+/).length >= 12)
+        ctx.addIssue({ code: 'custom', message: 'must not resemble a seed phrase' });
+    }),
 });
 const publicPaymentRequest = z
   .string()
@@ -137,6 +205,47 @@ const publicPaymentRequest = z
 const setPaymentRequestClipboard = z.strictObject({
   action: z.literal('setPaymentRequestClipboard'),
   request: publicPaymentRequest,
+});
+
+/** Replace the in-app mint-fault rule set wholesale (`[]` clears all faults).
+ * Requires the `mock.mint-faults` capability. The harness writes the rules
+ * file into the app container and awaits the app's revision ack, so the step
+ * completing means the faults are live. Funded scenarios activate faults
+ * only AFTER setup (funding traffic must be real) and must clear them in
+ * `finally` before the sweep. Rules survive `launch reset:none` relaunches
+ * (the file lives in the container) — the boot-fault pattern — but are wiped
+ * by erase/reinstall. */
+const mintFaults = z.strictObject({
+  action: z.literal('mintFaults'),
+  rules: z
+    .array(mintFaultRuleSchema)
+    .max(32)
+    .superRefine((rules, ctx) => {
+      const seen = new Set<string>();
+      rules.forEach((rule, index) => {
+        if (seen.has(rule.id)) {
+          ctx.addIssue({ code: 'custom', path: [index, 'id'], message: 'duplicate rule id' });
+        }
+        seen.add(rule.id);
+      });
+    }),
+  timeoutMs: timeoutMs.optional(),
+});
+
+/** Real device-level network control (airplane mode). Android driver only
+ * (`adb shell cmd connectivity airplane-mode`); requires the `device.network`
+ * capability, so the scenario defers on sim/fake. `airplane` kills the
+ * emulator's radios for real — the Metro/adb loopback link survives, but every
+ * mint, relay, and the OfflineProvider reachability probe genuinely dies.
+ * The provider's hysteresis commits the banner only ~5–6.5s later, and until
+ * it commits the app still takes ONLINE code paths — so an `airplane` step
+ * must be followed by a `waitFor` on the YOU ARE OFFLINE banner before any
+ * flow step (the go-offline leg is a synchronization barrier, not décor).
+ * Scenarios that go airplane must restore `online` in `finally` before any
+ * sweep; the android session teardown force-restores online as a backstop. */
+const network = z.strictObject({
+  action: z.literal('network'),
+  mode: z.enum(['airplane', 'online']),
 });
 
 /** Value-moving counterparty operations stay semantic and exact-asset. The
@@ -333,6 +442,16 @@ const assertEmojiClipboardDecodesTo = z.strictObject({
   that: z.literal('emojiClipboardDecodesTo'),
   variable: captureName,
 });
+/** Proves a fault actually fired: polls the app's intercepted-request ledger
+ * until the rule has been APPLIED at least minCount times. Mandatory in every
+ * fault scenario — a green run whose rule never matched is a false pass. */
+const assertMintFaultIntercepted = z.strictObject({
+  action: z.literal('assert'),
+  that: z.literal('mintFaultIntercepted'),
+  ruleId: z.string().regex(/^[a-z0-9][a-z0-9._-]*$/),
+  minCount: z.number().int().positive().default(1),
+  timeoutMs: timeoutMs.optional(),
+});
 
 // z.union (not discriminatedUnion): the four `assert` members share the
 // `action` discriminator, which z.discriminatedUnion forbids. Each member is a
@@ -350,8 +469,14 @@ export const stepSchema = z.union([
   tapUntil,
   delay,
   exec,
+  permission,
+  location,
+  openUrl,
   setClipboard,
+  setLiteralClipboard,
   setPaymentRequestClipboard,
+  mintFaults,
+  network,
   counterpartyStepSchema,
   capture,
   screenshot,
@@ -360,6 +485,7 @@ export const stepSchema = z.union([
   assertBalanceDelta,
   assertTx,
   assertEmojiClipboardDecodesTo,
+  assertMintFaultIntercepted,
 ]);
 export type Step = z.infer<typeof stepSchema>;
 export type CounterpartyStep = z.infer<typeof counterpartyStepSchema>;

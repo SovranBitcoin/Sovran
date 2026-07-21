@@ -5,10 +5,12 @@ import {
   validateSuite,
   validateFixtureGraph,
   scanSecrets,
+  scenarioPlatforms,
   checkCompact,
   formatDoc,
   parseFacets,
   CANONICAL_PAGES,
+  REINSTALL_KEYCHAIN_RETENTION_CAPABILITY,
   type Fixture,
 } from './index';
 
@@ -60,6 +62,17 @@ describe('scenario schema — accepts a valid scenario', () => {
         },
       ]);
     }
+  });
+
+  it('accepts an optional technical details field and rejects an empty one', () => {
+    const withDetails = validateScenario(
+      scenario({ details: 'Funds 100 via cocod; asserts the net balance delta.' })
+    );
+    expect(withDetails.ok).toBe(true);
+    if (withDetails.ok) {
+      expect(withDetails.value.details).toBe('Funds 100 via cocod; asserts the net balance delta.');
+    }
+    expect(validateScenario(scenario({ details: '' })).ok).toBe(false);
   });
 });
 
@@ -468,6 +481,58 @@ describe('scenario schema — strict rejections', () => {
       ).ok
     ).toBe(false);
   });
+  it('bounds zero-based visible prefix match indexes', () => {
+    expect(
+      validateScenario(
+        scenario({
+          steps: [
+            {
+              action: 'waitFor',
+              selector: {
+                idPrefix: 'contact-row:mint:',
+                matchIndex: 2,
+                captureSuffixAs: 'mintThreeUrl',
+              },
+            },
+          ],
+        })
+      ).ok
+    ).toBe(true);
+    expect(
+      validateScenario(
+        scenario({
+          steps: [
+            { action: 'waitFor', selector: { idPrefix: 'contact-row:mint:', matchIndex: -1 } },
+          ],
+        })
+      ).ok
+    ).toBe(false);
+    expect(
+      validateScenario(
+        scenario({
+          steps: [
+            { action: 'waitFor', selector: { idPrefix: 'contact-row:mint:', matchIndex: 1.5 } },
+          ],
+        })
+      ).ok
+    ).toBe(false);
+    expect(
+      validateScenario(
+        scenario({
+          steps: [
+            { action: 'waitFor', selector: { idPrefix: 'contact-row:mint:', matchIndex: 101 } },
+          ],
+        })
+      ).ok
+    ).toBe(false);
+    expect(
+      validateScenario(
+        scenario({
+          steps: [{ action: 'tap', selector: { idPrefix: 'contact-row:mint:', matchIndex: 0 } }],
+        })
+      ).ok
+    ).toBe(true);
+  });
   it('rejects inert scenario controls instead of promising unsupported behavior', () => {
     expect(validateScenario(scenario({ knownGap: 'a' })).ok).toBe(false);
     expect(validateScenario(scenario({ timeoutMs: 1_000 })).ok).toBe(false);
@@ -700,5 +765,179 @@ describe('compact format', () => {
   });
   it('rejects invalid JSON', () => {
     expect(checkCompact('{ not json, }').ok).toBe(false);
+  });
+});
+
+describe('scenario schema — mint faults', () => {
+  const FAULT_RULE = {
+    id: 'swap-offline',
+    mint: 'https://testnut.cashu.space',
+    path: '/v1/swap',
+    response: { mode: 'offline' },
+  };
+  const faultStep = (rules: unknown[]) => ({ action: 'mintFaults', rules });
+  const faultAssert = { action: 'assert', that: 'mintFaultIntercepted', ruleId: 'swap-offline' };
+
+  it('requires the mock.mint-faults capability for fault steps and asserts', () => {
+    const missing = validateScenario(
+      scenario({
+        lane: 'simulator',
+        funds: undefined,
+        requires: ['unit.sat'],
+        steps: [faultStep([FAULT_RULE])],
+      })
+    );
+    expect(missing.ok).toBe(false);
+    const missingAssert = validateScenario(
+      scenario({
+        lane: 'simulator',
+        funds: undefined,
+        requires: ['unit.sat'],
+        verify: [faultAssert],
+      })
+    );
+    expect(missingAssert.ok).toBe(false);
+    const declared = validateScenario(
+      scenario({
+        lane: 'simulator',
+        funds: undefined,
+        requires: ['unit.sat', 'mock.mint-faults'],
+        steps: [faultStep([FAULT_RULE])],
+        verify: [faultAssert],
+      })
+    );
+    expect(declared.ok).toBe(true);
+    if (declared.ok) {
+      const step = declared.value.steps[0] as { rules: { ws: string; method: string }[] };
+      expect(step.rules[0]!.ws).toBe('down');
+      expect(step.rules[0]!.method).toBe('ANY');
+    }
+  });
+
+  it('bans arming faults during funded setup and requires a finally clear', () => {
+    const funded = (over: Record<string, unknown>) =>
+      scenario({ requires: ['cocod.receive.bolt11', 'unit.sat', 'mock.mint-faults'], ...over });
+    expect(validateScenario(funded({ setup: [faultStep([FAULT_RULE])] })).ok).toBe(false);
+    // Clearing (empty rules) during setup is fine.
+    expect(validateScenario(funded({ setup: [faultStep([])] })).ok).toBe(true);
+    // Arming in steps without a finally clear leaks faults into the sweep.
+    expect(validateScenario(funded({ steps: [faultStep([FAULT_RULE])] })).ok).toBe(false);
+    expect(
+      validateScenario(funded({ steps: [faultStep([FAULT_RULE])], finally: [faultStep([])] })).ok
+    ).toBe(true);
+  });
+
+  it('rejects malformed fault rules at parse time', () => {
+    const bad = (rules: unknown[]) =>
+      validateScenario(
+        scenario({
+          lane: 'simulator',
+          funds: undefined,
+          requires: ['unit.sat', 'mock.mint-faults'],
+          steps: [faultStep(rules)],
+        })
+      );
+    expect(bad([{ ...FAULT_RULE, mint: 'http://insecure.example' }]).ok).toBe(false);
+    expect(bad([{ ...FAULT_RULE, response: { mode: 'error' } }]).ok).toBe(false);
+    expect(bad([{ ...FAULT_RULE, path: 'v1/swap' }]).ok).toBe(false);
+    expect(bad([FAULT_RULE, FAULT_RULE]).ok).toBe(false);
+  });
+});
+
+describe('scenario schema — network (real airplane mode)', () => {
+  const airplane = { action: 'network', mode: 'airplane' };
+  const online = { action: 'network', mode: 'online' };
+  const sim = (over: Record<string, unknown>) =>
+    scenario({
+      lane: 'simulator',
+      funds: undefined,
+      requires: ['fresh-install', 'device.network'],
+      ...over,
+    });
+
+  it('requires the device.network capability for network steps', () => {
+    const missing = validateScenario(
+      sim({ requires: ['fresh-install'], steps: [airplane], finally: [online] })
+    );
+    expect(missing.ok).toBe(false);
+    const declared = validateScenario(sim({ steps: [airplane], finally: [online] }));
+    expect(declared.ok).toBe(true);
+  });
+
+  it('rejects an unknown network mode and extra keys', () => {
+    expect(validateScenario(sim({ steps: [{ action: 'network', mode: 'wifi' }] })).ok).toBe(false);
+    expect(
+      validateScenario(sim({ steps: [{ ...airplane, delayMs: 5 }], finally: [online] })).ok
+    ).toBe(false);
+  });
+
+  it('forbids network steps during setup — fund online, then fly', () => {
+    expect(
+      validateScenario(sim({ setup: [airplane], steps: [online], finally: [online] })).ok
+    ).toBe(false);
+    expect(
+      validateScenario(sim({ setup: [online], steps: [airplane], finally: [online] })).ok
+    ).toBe(false);
+  });
+
+  it('requires an authored finally restore when a scenario goes airplane', () => {
+    expect(validateScenario(sim({ steps: [airplane], finally: [] })).ok).toBe(false);
+    expect(validateScenario(sim({ steps: [airplane], finally: [online] })).ok).toBe(true);
+    // verify-phase airplane needs the restore too
+    expect(
+      validateScenario(sim({ verify: [airplane, ...(scenario().verify as unknown[])] })).ok
+    ).toBe(false);
+  });
+
+  it('requires the online restore to precede any sweep in finally', () => {
+    const funded = (finallyItems: unknown[]) =>
+      scenario({
+        requires: ['cocod.receive.bolt11', 'unit.sat', 'device.network'],
+        steps: [airplane],
+        finally: finallyItems,
+      });
+    expect(
+      validateScenario(
+        funded([{ use: 'flow.sweep-mint', with: { mintHost: 'mint.sovran.money' } }, online])
+      ).ok
+    ).toBe(false);
+    expect(
+      validateScenario(
+        funded([online, { use: 'flow.sweep-mint', with: { mintHost: 'mint.sovran.money' } }])
+      ).ok
+    ).toBe(true);
+  });
+});
+
+describe('scenarioPlatforms — capability-derived platform support', () => {
+  it('derives both platforms for driver-neutral requires', () => {
+    expect(scenarioPlatforms([])).toEqual(['ios', 'android']);
+    expect(scenarioPlatforms(['fresh-install', 'unit.sat'])).toEqual(['ios', 'android']);
+  });
+
+  it('treats cross-driver tooling capabilities as available everywhere', () => {
+    expect(scenarioPlatforms(['fresh-install', 'cocod.send.bolt11', 'unit.sat'])).toEqual([
+      'ios',
+      'android',
+    ]);
+  });
+
+  it('pins mock levers to ios-sim and real airplane mode to android', () => {
+    expect(scenarioPlatforms(['fresh-install', 'mock.mint-faults'])).toEqual(['ios']);
+    expect(scenarioPlatforms(['fresh-install', 'mock.payment-request-delivery-failure'])).toEqual([
+      'ios',
+    ]);
+    expect(scenarioPlatforms(['fresh-install', 'device.network'])).toEqual(['android']);
+  });
+
+  it('pins true reinstall recovery to iOS Keychain retention', () => {
+    expect(scenarioPlatforms(['fresh-install', REINSTALL_KEYCHAIN_RETENTION_CAPABILITY])).toEqual([
+      'ios',
+    ]);
+  });
+
+  it('yields no platform for physical/unsupported tokens', () => {
+    expect(scenarioPlatforms(['fresh-install', 'ble.transport'])).toEqual([]);
+    expect(scenarioPlatforms(['fresh-install', 'unit.usd'])).toEqual([]);
   });
 });

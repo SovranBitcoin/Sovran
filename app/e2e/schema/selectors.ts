@@ -4,9 +4,9 @@ import { z } from 'zod';
  * A selector picks one element from the accessibility tree. Structured (not a
  * mini-language) so it validates strictly:
  *  - {id}                       exact accessibility id / testID
- *  - {idPrefix, captureSuffixAs?} prefix match (dynamic ids like
- *                               `send-token-id-<uuid>`), optionally capturing the
- *                               matched suffix into a variable
+ *  - {idPrefix, matchIndex?, captureSuffixAs?} prefix match (dynamic ids like
+ *                               `send-token-id-<uuid>`), optionally selecting the
+ *                               zero-based visible match and capturing its suffix
  *  - {label}                    exact visible label / accessibility label
  *
  * Exactly one of the three forms via a discriminated shape enforced by refine.
@@ -14,9 +14,13 @@ import { z } from 'zod';
 const idSelector = z.strictObject({ id: z.string().min(1) });
 const prefixSelector = z.strictObject({
   idPrefix: z.string().min(1),
+  matchIndex: z.number().int().min(0).max(100).optional(),
   captureSuffixAs: z.string().min(1).optional(),
 });
-const nonCapturingPrefixSelector = z.strictObject({ idPrefix: z.string().min(1) });
+const nonCapturingPrefixSelector = z.strictObject({
+  idPrefix: z.string().min(1),
+  matchIndex: z.number().int().min(0).max(100).optional(),
+});
 const labelSelector = z.strictObject({ label: z.string().min(1) });
 
 export const selectorSchema = z.union([idSelector, prefixSelector, labelSelector]);

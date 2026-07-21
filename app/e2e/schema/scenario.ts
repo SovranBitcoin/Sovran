@@ -1,11 +1,13 @@
 import { z } from 'zod';
-import { stepSchema } from './steps';
+import { stepSchema, type Step } from './steps';
 import {
   capabilitySchema,
   laneSchema,
   endStateSchema,
   unitSchema,
   PAYMENT_REQUEST_DELIVERY_FAILURE_CAPABILITY,
+  MINT_FAULTS_CAPABILITY,
+  DEVICE_NETWORK_CAPABILITY,
 } from './capabilities';
 import { SCHEMA_VERSION } from './version';
 import { facetIssues } from './facets';
@@ -98,7 +100,12 @@ export const scenarioSchema = z
     version: z.literal(SCHEMA_VERSION),
     id: dottedId,
     name: z.string().min(1),
+    /** Plain-language summary of what the test proves — written for a reader
+     * with no knowledge of the harness or protocol jargon. */
     description: z.string().min(1),
+    /** Technical companion to `description`: amounts, fault codes, env vars,
+     * timing quirks — everything an author debugging a failure needs. */
+    details: z.string().min(1).optional(),
     lane: laneSchema,
     tags: z.array(z.string().min(1)).default([]),
     requires: z.array(capabilitySchema).default([]),
@@ -115,6 +122,104 @@ export const scenarioSchema = z
   .superRefine((scenario, ctx) => {
     for (const message of facetIssues(scenario.tags)) {
       ctx.addIssue({ code: 'custom', path: ['tags'], message });
+    }
+    const stepsOf = (items: readonly unknown[]): Step[] =>
+      items.filter((item): item is Step => !!item && typeof item === 'object' && 'action' in item);
+    const phases = {
+      setup: stepsOf(scenario.setup),
+      steps: stepsOf(scenario.steps),
+      verify: stepsOf(scenario.verify),
+      finally: stepsOf(scenario.finally),
+    };
+    const isMintFaultsStep = (step: Step): step is Extract<Step, { action: 'mintFaults' }> =>
+      step.action === 'mintFaults';
+    const usesMintFaults = Object.values(phases).some(
+      (steps) =>
+        steps.some(isMintFaultsStep) ||
+        steps.some((step) => step.action === 'assert' && step.that === 'mintFaultIntercepted')
+    );
+    if (usesMintFaults && !scenario.requires.includes(MINT_FAULTS_CAPABILITY)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['requires'],
+        message: `mintFaults steps/asserts require the ${MINT_FAULTS_CAPABILITY} capability`,
+      });
+    }
+    if (scenario.lane === 'funded') {
+      // Funding traffic must be real: faults activate only after setup, and a
+      // finally clear must precede the sweep so recovery traffic is real too.
+      if (phases.setup.some((step) => isMintFaultsStep(step) && step.rules.length > 0)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['setup'],
+          message: 'funded scenarios must not arm mint-fault rules during setup',
+        });
+      }
+      const armsFaults = [...phases.steps, ...phases.verify].some(
+        (step) => isMintFaultsStep(step) && step.rules.length > 0
+      );
+      const finallyClears = phases.finally.some(
+        (step) => isMintFaultsStep(step) && step.rules.length === 0
+      );
+      if (armsFaults && !finallyClears) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['finally'],
+          message: 'funded fault scenarios must clear mint-fault rules in finally (rules: [])',
+        });
+      }
+    }
+    const isNetworkStep = (step: Step): step is Extract<Step, { action: 'network' }> =>
+      step.action === 'network';
+    const usesNetwork = Object.values(phases).some((steps) => steps.some(isNetworkStep));
+    if (usesNetwork && !scenario.requires.includes(DEVICE_NETWORK_CAPABILITY)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['requires'],
+        message: `network steps require the ${DEVICE_NETWORK_CAPABILITY} capability`,
+      });
+    }
+    // Fund online, then fly: funding/onboard traffic must be real, so airplane
+    // mode can never be armed during setup.
+    if (phases.setup.some(isNetworkStep)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['setup'],
+        message: 'network steps are forbidden in setup — fund online, then go airplane in steps',
+      });
+    }
+    const goesAirplane = [...phases.steps, ...phases.verify].some(
+      (step) => isNetworkStep(step) && step.mode === 'airplane'
+    );
+    if (goesAirplane) {
+      // The restore must be authored (the driver backstop is a safety net, not
+      // the contract) and must precede any sweep so recovery traffic is real.
+      const finallyItems = scenario.finally;
+      const restoreIndex = finallyItems.findIndex((item) =>
+        !!item && typeof item === 'object' && 'action' in item
+          ? isNetworkStep(item as Step) &&
+            (item as Extract<Step, { action: 'network' }>).mode === 'online'
+          : false
+      );
+      if (restoreIndex === -1) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['finally'],
+          message: 'airplane scenarios must restore network mode:"online" in finally',
+        });
+      } else {
+        const sweepIndex = finallyItems.findIndex(
+          (item) =>
+            !!item && typeof item === 'object' && 'use' in item && /sweep/.test(String(item.use))
+        );
+        if (sweepIndex !== -1 && sweepIndex < restoreIndex) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['finally', sweepIndex],
+            message: 'network mode:"online" must precede the sweep in finally',
+          });
+        }
+      }
     }
     if (
       scenario.lane !== 'funded' &&

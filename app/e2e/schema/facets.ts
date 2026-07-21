@@ -19,7 +19,7 @@ export const FACETS = {
   flow: ['onboarding', 'recovery', 'receive', 'send', 'history', 'isolation', 'mint', 'wallet'],
   instrument: ['bolt11', 'cashu-token', 'payment-request', 'npc'],
   amount: ['fixed', 'any'],
-  io: ['paste', 'copy', 'scan', 'display'],
+  io: ['paste', 'copy', 'scan', 'display', 'deeplink'],
   outcome: ['settled', 'dismissed', 'rolled-back', 'reclaimed'],
   check: [
     'mint-change',
@@ -38,6 +38,30 @@ export const FACETS = {
     'navigation',
     'p2pk-keys',
     'filters',
+    // Mint-fault injection (mock.mint-faults): the scenario proves behavior
+    // under a faked mint response/outage.
+    'mint-fault',
+    // A device permission (TCC) is denied/revoked via the `permission` step and
+    // the scenario proves the gated flow degrades and recovers.
+    'permission',
+    // Deliberately empty/garbage user input (e.g. clipboard paste) fails soft
+    // with clear feedback instead of crashing or dead-ending.
+    'invalid-input',
+    // A zero-result surface renders its dedicated empty/guidance state (not a
+    // spinner, blank list, or crash) and recovers when results return.
+    'empty-state',
+    // The flow is interrupted mid-payment (dismissal + app relaunch) and the
+    // scenario proves the pending state survives and resumes/settles.
+    'interruption',
+    // A persisted selection survives an app relaunch and rehydrates correctly
+    // (regression guard for the whole-blob-discard failure class).
+    'persistence',
+    // The expected outcome was undocumented before authoring — the scenario
+    // asserts CURRENT behavior; a product fix should flip it deliberately.
+    'fault-tbd',
+    // Only the mint RESPONSE is faked (e.g. a lying 11001) — this is not real
+    // double-spend coverage.
+    'fault-fake-double-spend',
   ],
 } as const;
 

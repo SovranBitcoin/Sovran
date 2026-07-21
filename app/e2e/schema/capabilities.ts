@@ -3,6 +3,27 @@ import { z } from 'zod';
 export const PAYMENT_REQUEST_DELIVERY_FAILURE_CAPABILITY =
   'mock.payment-request-delivery-failure' as const;
 
+/** Arms the in-app mint-fault interceptor (shared/lib/e2e/mintFaults): the
+ * session Metro sets EXPO_PUBLIC_E2E_MINT_FAULTS, and the `mintFaults` step +
+ * `mintFaultIntercepted` assert become available. Zero rules are armed at
+ * launch — every rule flows through the dynamic step, so shared simulator
+ * sessions and funded setup traffic stay passthrough until a scenario says
+ * otherwise. */
+export const MINT_FAULTS_CAPABILITY = 'mock.mint-faults' as const;
+
+/** Real device-level network control (airplane mode). Satisfied ONLY by the
+ * android driver, where `adb shell cmd connectivity airplane-mode` flips the
+ * emulator's radios for real — the OfflineProvider sees genuine
+ * `networkOffline`, not the settings mockOffline lever. Scenarios requiring
+ * this token defer (◌) under the iOS sim/fake drivers. */
+export const DEVICE_NETWORK_CAPABILITY = 'device.network' as const;
+
+/** True uninstall/reinstall can retain the app's protected root secret only
+ * on iOS, where Expo SecureStore uses Keychain. Android SecureStore's
+ * Keystore entry is deleted with the package, so Android must never claim
+ * this capability or fake it with replace-install/keep-data semantics. */
+export const REINSTALL_KEYCHAIN_RETENTION_CAPABILITY = 'reinstall.keychain-retention' as const;
+
 /**
  * The closed set of capability tokens a scenario may `require`. Capability-aware,
  * not capability-guessing: an unknown token is rejected at validation time, and
@@ -17,8 +38,11 @@ export const PAYMENT_REQUEST_DELIVERY_FAILURE_CAPABILITY =
 export const CAPABILITIES = [
   // simulator / lifecycle
   'fresh-install',
+  REINSTALL_KEYCHAIN_RETENTION_CAPABILITY,
   'mock.offline',
+  DEVICE_NETWORK_CAPABILITY,
   PAYMENT_REQUEST_DELIVERY_FAILURE_CAPABILITY,
+  MINT_FAULTS_CAPABILITY,
   // units
   'unit.sat',
   'unit.usd',
@@ -46,6 +70,53 @@ export const CAPABILITIES = [
 
 export type Capability = (typeof CAPABILITIES)[number];
 export const capabilitySchema = z.enum(CAPABILITIES);
+
+/** Capabilities each product driver satisfies on its own (before cocod
+ * feature-detection widens the set at run time). The sim lane owns the
+ * mock/fault levers; the android lane owns real airplane mode. cli.ts seeds
+ * its run capabilities from these, and the viewer derives per-scenario
+ * platform support from them — keep both consumers in mind when editing. */
+export const DRIVER_CAPS: Record<'sim' | 'android', ReadonlySet<string>> = {
+  sim: new Set([
+    'fresh-install',
+    REINSTALL_KEYCHAIN_RETENTION_CAPABILITY,
+    'mock.offline',
+    PAYMENT_REQUEST_DELIVERY_FAILURE_CAPABILITY,
+    MINT_FAULTS_CAPABILITY,
+    'unit.sat',
+  ]),
+  android: new Set(['fresh-install', 'mock.offline', DEVICE_NETWORK_CAPABILITY, 'unit.sat']),
+};
+
+export const PLATFORMS = ['ios', 'android'] as const;
+export type Platform = (typeof PLATFORMS)[number];
+
+/** Driver-independent capabilities supplied by external tooling rather than
+ * the device: the cocod counterparty (feature-detected at run time) and
+ * controlled network fixtures. Available to every platform. */
+function isCrossDriverCapability(capability: string): boolean {
+  return (
+    capability.startsWith('cocod.') || capability === 'relay.controlled' || capability === 'blossom'
+  );
+}
+
+/** Which platforms a scenario is specified to work on, derived from its
+ * `requires` exactly the way the runner defers: a platform is supported iff
+ * every required capability is satisfiable there (by the driver itself or by
+ * cross-driver tooling). Physical-transport and deliberately-unsupported
+ * tokens (ble/nfc, unit.usd) yield an empty list — the scenario currently
+ * runs nowhere. */
+export function scenarioPlatforms(requires: readonly string[]): Platform[] {
+  const driverFor: Record<Platform, ReadonlySet<string>> = {
+    ios: DRIVER_CAPS.sim,
+    android: DRIVER_CAPS.android,
+  };
+  return PLATFORMS.filter((platform) =>
+    requires.every(
+      (capability) => driverFor[platform].has(capability) || isCrossDriverCapability(capability)
+    )
+  );
+}
 
 /** argv[0] allowlist for `exec`/`setClipboard` — no arbitrary shell. */
 export const ALLOWED_COMMANDS = ['cocod'] as const;
