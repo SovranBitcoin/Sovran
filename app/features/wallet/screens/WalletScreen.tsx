@@ -32,6 +32,8 @@ import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
+import { E2EHerouiMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
+import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { E2EReadyProofProbe } from '@/features/wallet/components/E2EReadyProofProbe';
 import { WalletSelectedMintProbe } from '@/features/wallet/components/WalletSelectedMintProbe';
 import { WalletWallpaperProbe } from '@/features/wallet/components/WalletWallpaperProbe';
@@ -187,6 +189,8 @@ export function WalletScreen() {
         contentContainerStyle={styles.scrollContent}>
         <Log name="WalletScreen" style={styles.screen}>
           <E2EReadyProofProbe />
+          <E2EHerouiMenuProbe />
+          <E2EToastProbe />
           <WalletSelectedMintProbe />
           <WalletWallpaperProbe />
           <ScrollableGradientOverlay contentHeight={contentHeight} />

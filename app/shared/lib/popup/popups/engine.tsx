@@ -79,6 +79,7 @@ export const popup = (config: PopupConfig) => {
       buttonLayout: options.buttonLayout,
       onClose: options.onClose,
       live: options.live,
+      e2eProbeKey,
     };
     if (options.live) {
       Object.assign(sheetConfig, options.live.get());

@@ -29,6 +29,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
+import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import Icon from 'assets/icons';
 
 type HubActionName = 'qrDisplay' | 'scanQr' | 'fixedAmount' | 'paste';
@@ -140,6 +141,9 @@ export function ReceiveHubScreen({ receiveHubEntry, unit }: ReceiveHubScreenProp
     <ScrollView
       style={[styles.screen, { backgroundColor: overlay }]}
       contentContainerStyle={[styles.content, { paddingTop: headerHeight + 8 }]}>
+      {/* This screen is a sheet: iOS modal AX hides the root-layout probe, so
+          toast evidence (e.g. no-clipboard-address) must be mirrored in-sheet. */}
+      <E2EToastProbe />
       {rows}
     </ScrollView>
   );

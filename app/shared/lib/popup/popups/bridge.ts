@@ -89,6 +89,8 @@ export type SheetConfig = {
   buttonLayout?: 'row' | 'stack';
   onClose?: (event: SheetCloseEvent) => void;
   live?: LiveSheetConfig;
+  /** DEV-only e2e probe key mirrored into AX by the sheet body. */
+  e2eProbeKey?: string;
 };
 
 export function showToast(config: ToastConfig) {

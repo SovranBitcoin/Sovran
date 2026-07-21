@@ -28,6 +28,7 @@ import {
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { hasP2PKLock, P2PKLockIndicator } from '@/features/send/components/P2PKLockIndicator';
+import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 
 import type { ButtonHandlerProps } from '@/shared/ui/composed/ButtonHandler';
 
@@ -349,6 +350,11 @@ export function AmountSelector({
 
   return (
     <Log name="AmountSelector" style={styles.amountSelectorRoot}>
+      {/* The amount screen lives inside flow sheets whose iOS modal AX hides
+          the root-layout probe, so toast evidence (mint-unreachable /
+          general-error on quote failures) must be mirrored in-surface for the
+          mint-fault scenarios — same rule as ReceiveScreen. */}
+      <E2EToastProbe />
       <AmountEntryView
         rawInput={rawInput}
         numericValue={numericValue}

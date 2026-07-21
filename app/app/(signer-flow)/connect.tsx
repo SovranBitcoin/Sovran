@@ -23,6 +23,7 @@ import {
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { popup } from '@/shared/lib/popup';
+import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { View } from '@/shared/ui/primitives/View/View';
 
@@ -60,6 +61,9 @@ export default function SignerConnectRoute() {
 
   return (
     <Screen name="SignerConnectRoute" scroll="none">
+      {/* The 'signer-connect' sheet is FWO/AX-invisible; simulator plans
+          observe it via this root-tree marker (same seam as SignerHubScreen). */}
+      <E2EActionMenuProbe />
       <View style={BACKDROP_STYLE} />
     </Screen>
   );

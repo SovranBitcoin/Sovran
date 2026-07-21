@@ -33,6 +33,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 
 const CURRENCY_TABS_HEIGHT = MINT_CURRENCY_TABS_HEIGHT;
 
@@ -359,6 +360,8 @@ export const MintListScreen = memo(function MintListScreen({
       onHeaderHeightChange={setTotalHeaderHeight}
       footer={bottomButtons}
       bgColor={surface}>
+      {/* iOS modal AX hides the root probe; mirror toast evidence in-sheet. */}
+      <E2EToastProbe />
       <SkeletonContentCrossfade
         loading={showSkeleton}
         style={{ flex: 1 }}

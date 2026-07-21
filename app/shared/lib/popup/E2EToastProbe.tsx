@@ -66,9 +66,24 @@ const HIDDEN_PROBE_STYLE = {
   width: 1,
   height: 1,
 } as const;
+/** Unlike the passive 1×1 markers, the View proxy must actually RECEIVE a
+ * synthetic tap: a 1×1 target loses to WDA coordinate rounding and the tap
+ * falls through to whatever sits underneath (observed on the QR display —
+ * every attempt hit the address row's Copy instead). 24×24 on the left edge
+ * keeps it invisible and clear of real controls while giving the driver a
+ * target it cannot miss. */
 const HIDDEN_ACTION_STYLE = {
-  ...HIDDEN_PROBE_STYLE,
+  position: 'absolute',
+  left: 0,
   top: '50%',
+  width: 24,
+  height: 24,
+  // The probe mounts as the FIRST child of its screen, so any later sibling
+  // that overlaps its frame wins RN hit-testing (observed: the QR display's
+  // address row swallowed every View tap). zIndex lifts the proxy above its
+  // siblings in both paint and hit-test order; elevation is the Android twin.
+  zIndex: 9999,
+  elevation: 9999,
 } as const;
 
 function showE2EStaticToastProbe(key: string, durationMs = 5_000): void {

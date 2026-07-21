@@ -10,6 +10,7 @@ import {
 } from '@/features/feed/components/HomeFeed';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import { ComposeFab } from '@/features/composer/ui/ComposeFab';
+import { E2EHerouiMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
 import { Log, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { actionMenuPopup } from '@/shared/lib/popup';
@@ -164,6 +165,10 @@ export function FeedScreen() {
       </ScreenContainer>
       <ComposeFab />
       <SearchOverlay recentContext="feed" />
+      {/* The Following tab opens a heroui actionMenuPopup (Popular/Recent),
+          whose rows are AX-invisible under FullWindowOverlay — mirror its open
+          state so e2e can wait before a coordinate tap (same as WalletScreen). */}
+      <E2EHerouiMenuProbe />
     </Log>
   );
 }

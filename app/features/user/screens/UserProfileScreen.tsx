@@ -1227,6 +1227,19 @@ export function UserProfileScreen() {
           rows never reach iOS AX — this dev-only marker is the waitable
           evidence e2e uses before a coordinate row selection. */}
       <E2EActionMenuProbe />
+      {/* e2e marker: the profile screen has no other stable AX root (stats
+          labels collide with the drawer, header actions are AX-collapsed); the
+          suffix distinguishes the viewer's OWN profile from someone else's. */}
+      <View
+        testID={isOwnProfile ? 'user-profile:own' : 'user-profile:other'}
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel="Profile screen probe"
+        importantForAccessibility="yes"
+        collapsable={false}
+        pointerEvents="none"
+        style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1 }}
+      />
       <Stack.Screen
         options={withGlassHeaderItems({
           title: isMetadataLoading ? 'Profile' : displayName,

@@ -18,6 +18,7 @@ import {
   type RoutstrMessage,
 } from '@/shared/stores/profile/routstrStore';
 import { LiquidChatComposer } from '@/shared/ui/composed/chat/LiquidChatComposer';
+import { E2EActionMenuProbe, E2EHerouiMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import {
   useChatKeyboardAnimationLogger,
   useChatSurfacePerfLogger,
@@ -493,6 +494,13 @@ export function AiChatScreen() {
           />
         </RNView>
       </Reanimated.View>
+      {/* The header-right clock opens the Conversations menu (heroui
+          actionMenuPopup, FWO — rows AX-invisible); mirror its open state so
+          e2e can wait on it, same as WalletScreen / FeedScreen. */}
+      <E2EHerouiMenuProbe />
+      {/* The model chip opens the model-picker FWO custom-sheet (the OTHER
+          probe lane, e2e-action-menu-open) — mount its probe here too. */}
+      <E2EActionMenuProbe />
     </RNView>
   );
 }

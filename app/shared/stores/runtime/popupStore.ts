@@ -34,6 +34,9 @@ export type StandardSheetPayload = {
   live?: LiveSheetConfig;
   /** Set by live.get() for styling (e.g. animate to green when confirmed). */
   status?: LiveSheetStatus;
+  /** DEV-only e2e probe key (popup key only, never message/params) mirrored
+   * into AX by the sheet body — same seam as toast popups. */
+  e2eProbeKey?: string;
 };
 
 /** Custom action sheet: sheetId + typed payload */

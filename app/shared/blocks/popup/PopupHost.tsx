@@ -47,6 +47,7 @@ import { NostrKeysContextBridge, useNostrKeysContext } from '@/shared/providers/
 import { alpha } from '@/shared/styles/tokens';
 import { ActionMenuSheetContent } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { markE2EActionMenuPresented } from '@/shared/lib/popup/E2EActionMenuProbe';
+import { E2EStaticToastRenderMarker } from '@/shared/lib/popup/E2EToastProbe';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
@@ -479,6 +480,10 @@ function SheetContent({
 
   return (
     <View className="items-center gap-2 px-1 pb-1">
+      {/* Same DEV-only probe seam as buttonless toast popups: mirror the
+          popup KEY into the toast-probe store so simulator plans can observe
+          buttoned (sheet-variant) popups too. */}
+      <E2EStaticToastRenderMarker probeKey={standardPayload?.e2eProbeKey} />
       <View key={`sheet-icon-${openCycle}`}>{resolvePopupIcon(standardPayload?.icon, 88)}</View>
       {hasLiveStatus ? (
         <Animated.Text
@@ -870,7 +875,8 @@ function SheetPopup() {
         isOpen &&
         (activeCustomPage?.sheetId === 'action-menu' ||
           activeCustomPage?.sheetId === 'proof-selector' ||
-          activeCustomPage?.sheetId === 'signer-connect')
+          activeCustomPage?.sheetId === 'signer-connect' ||
+          activeCustomPage?.sheetId === 'model-picker')
       ) {
         markE2EActionMenuPresented(openSeq);
       }

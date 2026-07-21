@@ -33,6 +33,7 @@ import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import type { AiProviderId, LineupEntry } from '@/shared/lib/routstr/lineup';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -52,6 +53,7 @@ import {
 } from '@/features/ai/lib/format';
 
 import { showActionSheet } from './bridge';
+import { E2EActionMenuRenderMarker } from '../E2EActionMenuProbe';
 import { paramPopup } from './';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../sheets/types';
@@ -186,6 +188,11 @@ interface ModelPickerContentProps extends CustomSheetSharedProps {
 export function ModelPickerContent({ close }: ModelPickerContentProps) {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
 
+  // Keyed on the live openSeq: the snapPoints sheet mounts its content while
+  // openSeq is still settling, so a static render-marker key captures a stale
+  // openSeq and the probe's renderedOpenSeq never matches. Re-firing on the
+  // live value fixes the gate (contentHeight sheets don't hit this race).
+  const popupOpenSeq = usePopupStore((s) => s.openSeq);
   const selectedTier = useRoutstrStore((s) => s.selectedTier);
   const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
   const setSelectedSlot = useRoutstrStore((s) => s.setSelectedSlot);
@@ -235,6 +242,7 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
 
   return (
     <View style={{ flex: 1 }}>
+      <E2EActionMenuRenderMarker presentationKey={popupOpenSeq} />
       {/* Title — same typographic position as `<Menu.Label>` in
           ActionMenuHost so the surface reads as a menu sibling. */}
       <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>

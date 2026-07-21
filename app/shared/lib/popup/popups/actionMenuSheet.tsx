@@ -23,7 +23,7 @@ import { BottomSheet, Menu } from 'heroui-native';
 import Icon from 'assets/icons';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { log } from '@/shared/lib/logger';
-import { E2EActionMenuRenderMarker } from '../E2EActionMenuProbe';
+import { E2EActionMenuRenderMarker, E2EActionMenuTargetMarker } from '../E2EActionMenuProbe';
 
 import { showActionSheet } from './bridge';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
@@ -75,6 +75,8 @@ export function ActionMenuSheetContent({ payload, close }: ActionMenuSheetConten
             <Menu.Item
               key={button.testID ?? `${button.text}-${index}`}
               testID={button.testID}
+              accessibilityLabel={button.accessibilityLabel}
+              accessibilityHint={button.accessibilityHint}
               isDisabled={disabled}
               variant={isDanger ? 'danger' : 'default'}
               onPress={() => {
@@ -95,6 +97,7 @@ export function ActionMenuSheetContent({ payload, close }: ActionMenuSheetConten
                   }
                 })();
               }}>
+              <E2EActionMenuTargetMarker actionId={button.testID} disabled={disabled} />
               <HStack align="center" gap={10} style={{ flex: 1 }}>
                 {button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)}
                 <View style={{ flex: 1 }}>
