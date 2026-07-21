@@ -166,9 +166,9 @@ export function SignerHubScreen(): React.ReactElement {
         onPress: (values, { setError, close }) => {
           const raw = (values.uri ?? '').trim();
           // The URI embeds the pairing secret — never log it. Shared Layer-4
-          // dispatch: validate → hot flag → engine pairing → close the menu
-          // (beforeOpen) → connect sheet.
-          const opened = openPairingFromUri(raw, { beforeOpen: close });
+          // dispatch: validate → hot flag → engine pairing → queue the connect
+          // sheet behind the paste menu's completed native dismissal.
+          const opened = openPairingFromUri(raw, { scheduleOpen: close });
           if (opened.isErr()) {
             setError(
               opened.error.type === 'bunker-unsupported'

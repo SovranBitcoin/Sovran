@@ -45,11 +45,11 @@ type OpenPairingFromUriError = { type: 'invalid-uri' } | { type: 'bunker-unsuppo
 
 interface OpenPairingFromUriOptions {
   /**
-   * Runs after validation succeeds, immediately before the connect sheet
-   * opens — e.g. the hub's paste menu closes itself here so the dismissal
-   * cannot land on top of the freshly opened sheet.
+   * Owns when the connect sheet is presented after validation succeeds. The
+   * paste menu uses this to serialize presentation behind its native close;
+   * camera and deep-link callers omit it and present immediately.
    */
-  beforeOpen?: () => void;
+  scheduleOpen?: (open: () => void) => void;
 }
 
 /**
@@ -88,7 +88,11 @@ export function openPairingFromUri(
   if (started.isErr() && started.error.type !== 'not-started') {
     nostrLog.warn('nostr.signer.pairing_entry_start_failed', { error: started.error.type });
   }
-  options.beforeOpen?.();
-  showActionSheet('signer-connect', { uri: trimmed });
+  const open = () => showActionSheet('signer-connect', { uri: trimmed });
+  if (options.scheduleOpen) {
+    options.scheduleOpen(open);
+  } else {
+    open();
+  }
   return ok(undefined);
 }

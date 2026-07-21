@@ -107,13 +107,21 @@ describe('openPairingFromUri', () => {
     expect(showActionSheetMock).toHaveBeenCalledWith('signer-connect', { uri: VALID_URI });
   });
 
-  it('runs beforeOpen after validation but before the sheet opens', () => {
-    const order: string[] = [];
-    showActionSheetMock.mockImplementation(() => order.push('sheet'));
+  it('defers connect-sheet presentation through the caller-owned scheduler', () => {
+    let present: (() => void) | undefined;
 
-    openPairingFromUri(VALID_URI, { beforeOpen: () => order.push('beforeOpen') });
+    const outcome = openPairingFromUri(VALID_URI, {
+      scheduleOpen: (open) => {
+        present = open;
+      },
+    });
 
-    expect(order).toEqual(['beforeOpen', 'sheet']);
+    expect(outcome.isOk()).toBe(true);
+    expect(showActionSheetMock).not.toHaveBeenCalled();
+
+    present?.();
+
+    expect(showActionSheetMock).toHaveBeenCalledWith('signer-connect', { uri: VALID_URI });
   });
 
   it('malformed input → invalid-uri with zero side effects', () => {
