@@ -24,6 +24,8 @@ export default function AiLayout() {
           headerLeft: () => <HeaderProfileButton onPress={openDrawer} />,
           headerRightIcon: 'clock.arrow.circlepath',
           onHeaderRightPress: openAiSessionsMenu,
+          headerRightAccessibilityLabel: 'Conversation history',
+          headerRightTestID: 'ai-history-button',
           options: {
             headerTitle: () => <AiHeaderTitle />,
             headerTitleAlign: 'center',

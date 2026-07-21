@@ -117,6 +117,10 @@ type ExpoRouterHeaderScreenProps = {
   onHeaderRightPress?: () => void;
   headerRightIconSize?: number;
   headerRightStyle?: StyleProp<ViewStyle>;
+  /** AX identity for the right icon button — required for the button to reach
+   * the iOS accessibility tree (glass header buttons are otherwise id-less). */
+  headerRightAccessibilityLabel?: string;
+  headerRightTestID?: string;
 };
 
 type ExpoRouterHeaderOptionsInput = Omit<ExpoRouterHeaderScreenProps, 'name'>;
@@ -138,6 +142,8 @@ export function buildExpoRouterHeaderOptions({
   onHeaderRightPress,
   headerRightIconSize = 24,
   headerRightStyle,
+  headerRightAccessibilityLabel,
+  headerRightTestID,
 }: ExpoRouterHeaderOptionsInput): NativeStackNavigationOptions {
   const nextOptions: NativeStackNavigationOptions = {
     ...(options || {}),
@@ -185,6 +191,8 @@ export function buildExpoRouterHeaderOptions({
         onPress={onHeaderRightPress}
         size={headerRightIconSize}
         style={headerRightStyle}
+        accessibilityLabel={headerRightAccessibilityLabel}
+        testID={headerRightTestID}
       />
     );
   }

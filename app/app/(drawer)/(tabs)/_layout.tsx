@@ -16,6 +16,7 @@ type TabName = 'feed' | 'index' | 'contacts' | 'notifications' | 'ai';
 type TabDef = {
   name: TabName;
   title: string;
+  testID?: string;
   /** SF Symbol pair for iOS 26+ liquid-glass NativeTabs. */
   sf: { default: SFSymbol; selected: SFSymbol };
   /** Monicon (Iconify) pair for the cross-platform JS tab bar. */
@@ -38,6 +39,7 @@ const TAB_DEFS: readonly TabDef[] = [
   {
     name: 'index',
     title: 'Wallet',
+    testID: 'tab-wallet',
     sf: { default: 'wallet.bifold', selected: 'wallet.bifold' },
     monicon: { default: 'fluent:wallet-20-regular', selected: 'fluent:wallet-20-filled' },
   },
@@ -50,10 +52,24 @@ const TAB_DEFS: readonly TabDef[] = [
   {
     name: 'ai',
     title: 'AI',
+    testID: 'tab-ai',
     sf: { default: 'brain', selected: 'brain' },
     monicon: { default: 'mdi:robot-outline', selected: 'mdi:robot' },
   },
 ];
+
+const NATIVE_TAB_PROPS = Object.fromEntries(
+  TAB_DEFS.map((tab) => [
+    tab.name,
+    {
+      tabBarItemTestID: tab.testID,
+      tabBarItemAccessibilityLabel: tab.title,
+    },
+  ])
+) as Record<
+  TabName,
+  { tabBarItemTestID: string | undefined; tabBarItemAccessibilityLabel: string }
+>;
 
 export default function TabLayout() {
   // iOS 26+ uses native liquid-glass tabs.
@@ -79,7 +95,10 @@ export default function TabLayout() {
             })}
             disableTransparentOnScrollEdge>
             {TAB_DEFS.map((tab) => (
-              <Expo55NativeTabs.Trigger key={tab.name} name={tab.name}>
+              <Expo55NativeTabs.Trigger
+                key={tab.name}
+                name={tab.name}
+                unstable_nativeProps={NATIVE_TAB_PROPS[tab.name]}>
                 <Expo55NativeTabs.Trigger.Label hidden />
                 <Expo55NativeTabs.Trigger.Icon sf={tab.sf} />
               </Expo55NativeTabs.Trigger>
@@ -105,6 +124,7 @@ export default function TabLayout() {
               options={{
                 title: tab.title,
                 tabBarAccessibilityLabel: tab.title,
+                tabBarButtonTestID: tab.testID,
                 tabBarShowLabel: false,
                 tabBarIcon: ({ focused, color }) => (
                   <Icon
