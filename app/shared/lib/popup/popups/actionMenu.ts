@@ -102,6 +102,10 @@ export interface ActionMenuItem {
    * the profile switcher menu. */
   iconNode?: React.ReactNode;
   testID?: string;
+  /** Optional stable spoken name when the visual title differs by platform
+   * (for example Android's "British Pound" vs iOS's native "GBP"). */
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
   variant?: 'primary' | 'secondary' | 'dangerous';
   /** Disables tap and (when `reason` is set) renders the reason as the description. */
   disabled?: boolean;
@@ -148,7 +152,11 @@ export interface ActionMenuInput {
 
 interface ActionMenuPrimaryActionContext {
   setError: (message: string | null) => void;
-  close: () => void;
+  /**
+   * Dismiss the menu. When a successor is provided, the host invokes it only
+   * after the native bottom sheet reports that its close has completed.
+   */
+  close: (afterClose?: () => void) => void;
 }
 
 export interface ActionMenuPrimaryAction {

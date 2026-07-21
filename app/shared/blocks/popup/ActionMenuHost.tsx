@@ -36,6 +36,7 @@ import {
   type ActionMenuSection,
 } from '@/shared/lib/popup/popups/actionMenu';
 import Icon from 'assets/icons';
+import { markE2EHerouiMenu } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 
 const hostLog = log.child({ module: 'actionMenuHost' });
@@ -207,6 +208,10 @@ export function ActionMenuHost() {
   // distinguish user-pick (skip onDismiss) from overlay-tap / swipe-close (fire it).
   const selectedRef = useRef(false);
   const activeDismissRef = useRef<(() => void) | null>(null);
+  // A successor presentation must wait for gorhom's native sheet to finish
+  // closing. Presenting it synchronously after dismissing this menu leaves the
+  // new popup state open while its FullWindowOverlay never becomes visible.
+  const afterCloseRef = useRef<(() => void) | null>(null);
   // Set when an item with `keepOpen` is tapped — tells handleOpenChange to
   // ignore heroui's "close after item press" call so the chained payload
   // (set synchronously by onPress) stays visible instead of being dismissed.
@@ -236,6 +241,9 @@ export function ActionMenuHost() {
       hasSearchable: !!payload?.searchable,
       snapPoint: payload?.snapPoint,
     });
+    // The heroui/gorhom sheet is AX-invisible to serve-sim; mirror the open
+    // payload into the root-tree e2e probe (title only, non-secret).
+    markE2EHerouiMenu(payload ? (payload.title ?? '') : null);
     if (payload) {
       selectedRef.current = false;
       activeDismissRef.current = payload.onDismiss ?? null;
@@ -309,8 +317,9 @@ export function ActionMenuHost() {
       try {
         await action.onPress(inputValues, {
           setError,
-          close: () => {
+          close: (afterClose) => {
             selectedRef.current = true;
+            afterCloseRef.current = afterClose ?? null;
             dismissActionMenuPopup();
           },
         });
@@ -387,6 +396,8 @@ export function ActionMenuHost() {
     const item = (
       <Menu.Item
         testID={button.testID}
+        accessibilityLabel={button.accessibilityLabel}
+        accessibilityHint={button.accessibilityHint}
         isDisabled={isDisabled}
         variant={isDanger ? 'danger' : 'default'}
         onPress={() => handleItemPress(button)}>
@@ -561,6 +572,12 @@ export function ActionMenuHost() {
   // frame, so the sheet opens to full height.
   const [mounted, setMounted] = useState(false);
   const [renderedOpen, setRenderedOpen] = useState(false);
+  const handleNativeClose = useCallback(() => {
+    setMounted(false);
+    const afterClose = afterCloseRef.current;
+    afterCloseRef.current = null;
+    afterClose?.();
+  }, []);
   useEffect(() => {
     if (isOpen) {
       setMounted(true);
@@ -570,8 +587,6 @@ export function ActionMenuHost() {
       return scheduleAfterLayout(() => setRenderedOpen(true));
     }
     setRenderedOpen(false);
-    const unmountTimer = setTimeout(() => setMounted(false), 400);
-    return () => clearTimeout(unmountTimer);
   }, [isOpen]);
 
   if (!mounted) return null;
@@ -600,6 +615,7 @@ export function ActionMenuHost() {
         <MenuScrim />
         <Menu.Content
           presentation="bottom-sheet"
+          onClose={handleNativeClose}
           // `interactive` lifts the sheet by the keyboard height — works with
           // dynamic sizing because position becomes (highestDetent − keyboardHeight),
           // which is strictly higher than the natural content-fit position.
