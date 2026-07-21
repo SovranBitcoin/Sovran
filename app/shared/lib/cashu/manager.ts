@@ -29,6 +29,7 @@ import {
 } from '@/shared/lib/nostr/keyDerivation';
 import { getInflightProofs, restoreProofsToReady } from './managerInternals';
 import { reconcileE2EReadyProofs } from './e2eReadyProofReconciliation';
+import { maybeCreateMintFaultWebSocketFactory } from '@/shared/lib/e2e/mintFaults/webSocketFactory';
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, getPublicKey, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
@@ -524,7 +525,9 @@ export class CocoManager {
           repositories,
           seedGetter,
           new CocoCoreLogger('manager'),
-          undefined,
+          // undefined outside e2e mint-fault sessions → coco's own global-
+          // WebSocket fallback, i.e. today's behavior exactly.
+          maybeCreateMintFaultWebSocketFactory(),
           plugins
         );
         await initPhase('CocoManager.initCorePlugins', () => this.instance!.initPlugins());
