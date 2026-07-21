@@ -274,19 +274,18 @@ function dbSections(doc: DbDoc): string {
 
 // ── panel shell + patch ──────────────────────────────────────────────────────
 
-export function renderStatePaneShell(): string {
-  return `<div class="state-pane" data-role="state-pane">
-    <div class="steps-head">
-      <span class="steps-title">State</span>
+/** The State tab's body — slots into the player's side panel under the
+ * Steps/State tabs; the panel frame and tab bar belong to player.ts. */
+export function renderStateBody(): string {
+  return `<div class="state-body" data-role="state-pane">
+    <div class="state-head">
       <div class="view-toggle" role="tablist" aria-label="state kind">
         <button role="tab" class="seg" data-state-tab="store">Stores</button>
         <button role="tab" class="seg" data-state-tab="db">Coco DB</button>
       </div>
-    </div>
-    <div class="scenario-meta state-meta" data-role="state-meta"></div>
-    <div class="state-filter">
       <label class="check"><input type="checkbox" data-action="changed-only" ${changedOnly ? 'checked' : ''}/> changed only</label>
     </div>
+    <div class="scenario-meta state-meta" data-role="state-meta"></div>
     <div class="state-list" data-role="state-list"></div>
   </div>`;
 }

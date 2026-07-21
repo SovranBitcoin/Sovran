@@ -7,16 +7,9 @@ import { buildCatalog } from './lib/catalog';
 import { clearRuns } from './lib/clear';
 import { computeDiff, diffCacheDir, diffKey, loadCachedDiff } from './lib/diff';
 import { serveCacheFile, serveRunFile } from './lib/files';
-import {
-  activeJob,
-  buildRunArgv,
-  getJob,
-  jobStream,
-  killActiveJob,
-  startDiffJob,
-  startRunJob,
-} from './lib/jobs';
+import { activeJob, getJob, jobStream, killActiveJob, startDiffJob, startRunJob } from './lib/jobs';
 import { buildPagesIndex } from './lib/pages';
+import { buildRunPlan } from './lib/run-plan';
 import { getRunDetail, listRuns, toSummary } from './lib/scan';
 import type { TriggerRequest } from './lib/types';
 
@@ -94,15 +87,11 @@ const server = Bun.serve({
         if (!request || !['scenario', 'suite', 'commit-run'].includes(request.kind))
           return json({ error: 'bad trigger request' }, 400);
         const catalog = await buildCatalog();
-        const known = new Set(catalog.map((entry) => entry.id));
-        const funded = new Set(
-          catalog.filter((entry) => entry.lane === 'funded').map((entry) => entry.id)
-        );
-        const built = buildRunArgv(request, funded, known);
+        const built = buildRunPlan(request, catalog);
         if ('error' in built) return json(built, 400);
-        const job = startRunJob(built.argv);
+        const job = startRunJob(built.argvs);
         if ('error' in job) return json(job, 409);
-        return json({ jobId: job.id, argv: built.argv });
+        return json({ jobId: job.id, argvs: built.argvs });
       },
     },
 

@@ -87,5 +87,6 @@ describe('buildCatalog', () => {
     expect(qr!.facets.io).toBe('display');
     expect(qr!.facets.checks).toContain('toast');
     expect(qr!.suites).toContain('full');
+    expect(catalog.find((entry) => entry.id === 'recovery.reinstall')?.platforms).toEqual(['ios']);
   });
 });

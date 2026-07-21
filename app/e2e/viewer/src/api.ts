@@ -45,7 +45,7 @@ export const api = {
   },
   diffImageUrl: (key: string, relPath: string) => `/api/diff/${key}/image/${relPath}`,
   trigger: (request: TriggerRequest) =>
-    post<{ jobId: string; argv: string[] }>('/api/trigger', request),
+    post<{ jobId: string; argvs: string[][] }>('/api/trigger', request),
   activeJob: () => get<JobStatus | null>('/api/jobs/active'),
   killJob: () => post<{ ok: true; id: string }>('/api/jobs/kill', {}),
   clear: () => post<ClearResult>('/api/clear', { confirm: 'DELETE' }),

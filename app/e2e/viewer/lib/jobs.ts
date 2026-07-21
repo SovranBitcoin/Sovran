@@ -2,10 +2,11 @@ import type { Subprocess } from 'bun';
 
 import { APP_ROOT } from './paths';
 import { evictRun, listRunDirNames, liveRunIds } from './scan';
-import type { JobStatus, TriggerRequest } from './types';
+import type { JobStatus } from './types';
 
-/** One job at a time: the simulator (and the funded-run lock) are global
- * resources, and diffs share the same slot to keep memory bounded. */
+/** One job at a time: device sessions (and the funded-run lock) are global
+ * resources. A matrix run owns that slot while it launches its platform
+ * commands sequentially; diffs share the same slot to keep memory bounded. */
 
 export interface JobEvent {
   event: 'line' | 'run-discovered' | 'progress' | 'exit';
@@ -18,11 +19,14 @@ interface Job {
   status: 'running' | 'exited';
   exitCode?: number;
   runId?: string;
+  runIds: string[];
   argv?: string[];
+  argvs?: string[][];
   progress?: { done: number; total: number };
   lines: string[];
   listeners: Set<(event: JobEvent) => void>;
   child?: Subprocess;
+  cancelRequested?: boolean;
 }
 
 let active: Job | undefined;
@@ -45,7 +49,9 @@ function toStatus(job: Job): JobStatus {
     status: job.status,
     exitCode: job.exitCode,
     runId: job.runId,
+    runIds: [...job.runIds],
     argv: job.argv,
+    argvs: job.argvs,
     progress: job.progress,
   };
 }
@@ -56,11 +62,12 @@ function emit(job: Job, event: JobEvent): void {
 }
 
 function finish(job: Job, exitCode: number): void {
+  if (job.status === 'exited') return;
   job.status = 'exited';
   job.exitCode = exitCode;
-  if (job.runId) {
-    liveRunIds.delete(job.runId);
-    evictRun(job.runId); // pick up run.end on next read
+  for (const runId of job.runIds) {
+    liveRunIds.delete(runId);
+    evictRun(runId); // pick up run.end on next read
   }
   if (active === job) active = undefined;
   emit(job, { event: 'exit', data: { code: exitCode } });
@@ -71,6 +78,7 @@ function newJob(kind: Job['kind']): Job {
     id: `job-${++counter}`,
     kind,
     status: 'running',
+    runIds: [],
     lines: [],
     listeners: new Set(),
   };
@@ -79,78 +87,85 @@ function newJob(kind: Job['kind']): Job {
   return job;
 }
 
-export function buildRunArgv(
-  request: TriggerRequest,
-  fundedScenarioIds: ReadonlySet<string>,
-  knownScenarioIds: ReadonlySet<string>
-): { argv: string[] } | { error: string } {
-  const argv = ['bun', 'e2e/cli.ts', 'run', '--driver', 'sim', '--i-approve-destructive-reset'];
-  let fundedSelected = false;
-  if (request.kind === 'scenario') {
-    if (!knownScenarioIds.has(request.scenarioId)) return { error: 'unknown scenario' };
-    // The full suite is validated to reference every scenario, so it can host
-    // any single-scenario selection.
-    argv.push('--suite', 'full', '--scenario', request.scenarioId);
-    fundedSelected = fundedScenarioIds.has(request.scenarioId);
-  } else {
-    const suite = request.kind === 'suite' ? request.suite : (request.suite ?? 'default');
-    if (suite !== 'default' && suite !== 'full') return { error: 'unknown suite' };
-    argv.push('--suite', suite);
-    fundedSelected = suite === 'full' && fundedScenarioIds.size > 0;
+function discoverRuns(job: Job, preexisting: ReadonlySet<string>): string[] {
+  const fresh = listRunDirNames()
+    .filter((name) => !preexisting.has(name) && !job.runIds.includes(name))
+    .reverse();
+  for (const runId of fresh) {
+    job.runIds.push(runId);
+    job.runId = runId;
+    liveRunIds.add(runId);
+    emit(job, { event: 'run-discovered', data: { runId } });
   }
-  if (request.kind === 'commit-run') argv.push('--require-clean-git');
-  if (request.acceptFundLoss === true && fundedSelected) argv.push('--i-accept-test-fund-loss');
-  return { argv };
+  return fresh;
 }
 
-export function startRunJob(argv: string[]): JobStatus | { error: string } {
-  if (active) return { error: `job ${active.id} is still running` };
-  const job = newJob('run');
-  job.argv = argv;
-  // The CLI never prints its run dir; discover it as the run-* dir that
-  // appears after spawn.
+async function pump(job: Job, stream: ReadableStream<Uint8Array> | undefined | number) {
+  if (!stream || typeof stream === 'number') return;
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffered = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffered += decoder.decode(value, { stream: true });
+    const lines = buffered.split('\n');
+    buffered = lines.pop() ?? '';
+    for (const line of lines) emit(job, { event: 'line', data: line });
+  }
+  if (buffered) emit(job, { event: 'line', data: buffered });
+}
+
+async function runCommand(job: Job, argv: string[]): Promise<number> {
   const preexisting = new Set(listRunDirNames());
+  const firstRunIndex = job.runIds.length;
   const child = Bun.spawn(argv, {
     cwd: APP_ROOT,
     stdout: 'pipe',
     stderr: 'pipe',
     env: { ...process.env, FORCE_COLOR: '0' },
-    onExit: (_proc, exitCode) => {
-      clearInterval(discovery);
-      finish(job, exitCode ?? -1);
-    },
   });
   job.child = child;
-  const discovery = setInterval(() => {
-    if (job.runId) {
-      clearInterval(discovery);
-      return;
-    }
-    const fresh = listRunDirNames().find((name) => !preexisting.has(name));
-    if (fresh) {
-      job.runId = fresh;
-      liveRunIds.add(fresh);
-      emit(job, { event: 'run-discovered', data: { runId: fresh } });
-      clearInterval(discovery);
-    }
-  }, 1_000);
-  const pump = async (stream: ReadableStream<Uint8Array> | undefined | number) => {
-    if (!stream || typeof stream === 'number') return;
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
-    let buffered = '';
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffered += decoder.decode(value, { stream: true });
-      const lines = buffered.split('\n');
-      buffered = lines.pop() ?? '';
-      for (const line of lines) emit(job, { event: 'line', data: line });
-    }
-    if (buffered) emit(job, { event: 'line', data: buffered });
-  };
-  void pump(child.stdout);
-  void pump(child.stderr);
+  job.argv = argv;
+  const discovery = setInterval(() => discoverRuns(job, preexisting), 1_000);
+  const stdout = pump(job, child.stdout);
+  const stderr = pump(job, child.stderr);
+  const exitCode = await child.exited;
+  clearInterval(discovery);
+  discoverRuns(job, preexisting);
+  const commandRunIds = job.runIds.slice(firstRunIndex);
+  await Promise.allSettled([stdout, stderr]);
+  job.child = undefined;
+  for (const runId of commandRunIds) {
+    liveRunIds.delete(runId);
+    evictRun(runId);
+  }
+  return exitCode ?? -1;
+}
+
+async function runCommands(job: Job, argvs: string[][]): Promise<void> {
+  let exitCode = 0;
+  for (const argv of argvs) {
+    if (job.cancelRequested) break;
+    const commandExit = await runCommand(job, argv);
+    if (commandExit !== 0 && exitCode === 0) exitCode = commandExit;
+  }
+  finish(job, exitCode);
+}
+
+/** Start one viewer job containing one or more sequential product commands.
+ * A one-dimensional argv is accepted for existing callers and focused tests. */
+export function startRunJob(argvOrArgvs: string[] | string[][]): JobStatus | { error: string } {
+  if (active) return { error: `job ${active.id} is still running` };
+  const argvs =
+    typeof argvOrArgvs[0] === 'string' ? [argvOrArgvs as string[]] : (argvOrArgvs as string[][]);
+  if (argvs.length === 0 || argvs.some((argv) => argv.length === 0)) {
+    return { error: 'run job requires at least one command' };
+  }
+  const job = newJob('run');
+  job.argv = argvs[0];
+  job.argvs = argvs.map((argv) => [...argv]);
+  void runCommands(job, job.argvs).catch(() => finish(job, 1));
   return toStatus(job);
 }
 
@@ -161,10 +176,12 @@ export function startRunJob(argv: string[]): JobStatus | { error: string } {
  * in-process and cannot be killed. */
 export function killActiveJob(): { ok: true; id: string } | { error: string } {
   if (!active) return { error: 'no job is running' };
-  if (active.kind !== 'run' || !active.child) {
+  if (active.kind !== 'run') {
     return { error: `${active.kind} job cannot be killed` };
   }
   const { child, id } = { child: active.child, id: active.id };
+  active.cancelRequested = true;
+  if (!child) return { ok: true, id };
   try {
     child.kill('SIGTERM');
   } catch {
@@ -208,7 +225,7 @@ export function jobStream(id: string): Response | undefined {
         );
       };
       for (const line of job.lines) send({ event: 'line', data: line });
-      if (job.runId) send({ event: 'run-discovered', data: { runId: job.runId } });
+      for (const runId of job.runIds) send({ event: 'run-discovered', data: { runId } });
       if (job.status === 'exited') {
         send({ event: 'exit', data: { code: job.exitCode } });
         controller.close();

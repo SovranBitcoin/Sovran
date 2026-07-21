@@ -14,7 +14,9 @@ export function renderModal(root: HTMLElement): void {
   if (modal.kind === 'trigger') {
     root.innerHTML = `<div class="backdrop"><div class="modal">
       <h2>${escapeHtml(modal.title)}</h2>
-      <div class="argv">${escapeHtml(modal.argv.join(' '))}</div>
+      <div class="argv">${modal.argvs
+        .map((argv) => `<div>${escapeHtml(argv.join(' '))}</div>`)
+        .join('')}</div>
       ${
         modal.funded
           ? `<label class="check"><input type="checkbox" data-action="fund-ack"/> this selection spends real (test) sats — I accept test fund loss</label>`

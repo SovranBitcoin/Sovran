@@ -1,5 +1,6 @@
 import { api } from './api';
 import { state, update, type JobView } from './state';
+import { buildRunPlan } from '../lib/run-plan';
 import type { DiffResult, TriggerRequest } from '../lib/types';
 
 export async function refreshAll(): Promise<void> {
@@ -68,7 +69,7 @@ export async function loadPages(allRuns = state.pages.allRuns): Promise<void> {
 }
 
 function attachJob(jobId: string, kind: JobView['kind']): void {
-  const job: JobView = { id: jobId, kind, lines: [], status: 'running' };
+  const job: JobView = { id: jobId, kind, runIds: [], lines: [], status: 'running' };
   update((current) => {
     current.job = job;
     current.modal = undefined;
@@ -84,7 +85,10 @@ function attachJob(jobId: string, kind: JobView['kind']): void {
       }),
     runDiscovered: (runId) =>
       update((current) => {
-        if (current.job?.id === jobId) current.job.runId = runId;
+        if (current.job?.id === jobId) {
+          current.job.runId = runId;
+          if (!current.job.runIds.includes(runId)) current.job.runIds.push(runId);
+        }
       }),
     progress: (progress) =>
       update((current) => {
@@ -113,32 +117,20 @@ function attachJob(jobId: string, kind: JobView['kind']): void {
 
 /** Open the confirm modal for a run trigger; sends on confirmation. */
 export function requestTrigger(request: TriggerRequest, title: string): void {
-  const fundedIds = new Set(
-    state.catalog.filter((entry) => entry.lane === 'funded').map((entry) => entry.id)
-  );
-  let funded = false;
-  const argv = ['bun', 'e2e/cli.ts', 'run', '--driver', 'sim', '--i-approve-destructive-reset'];
-  if (request.kind === 'scenario') {
-    argv.push('--suite', 'full', '--scenario', request.scenarioId);
-    funded = fundedIds.has(request.scenarioId);
-  } else {
-    const suite = request.kind === 'suite' ? request.suite : (request.suite ?? 'default');
-    argv.push('--suite', suite);
-    funded =
-      suite === 'full'
-        ? fundedIds.size > 0
-        : state.catalog.some(
-            (entry) => entry.lane === 'funded' && entry.suites.includes('default')
-          );
+  const plan = buildRunPlan(request, state.catalog);
+  if ('error' in plan) {
+    update((current) => {
+      current.error = plan.error;
+    });
+    return;
   }
-  if (request.kind === 'commit-run') argv.push('--require-clean-git');
 
   update((current) => {
     current.modal = {
       kind: 'trigger',
       title,
-      argv,
-      funded,
+      argvs: plan.argvs,
+      funded: plan.funded,
       send: (acceptFundLoss) => {
         void api
           .trigger({ ...request, acceptFundLoss })

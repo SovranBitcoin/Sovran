@@ -1,67 +1,16 @@
 import { describe, expect, test } from 'bun:test';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { activeJob, buildRunArgv, killActiveJob, startRunJob } from './jobs';
-
-const KNOWN = new Set(['onboarding.fresh', 'send.lightning.sat']);
-const FUNDED = new Set(['send.lightning.sat']);
-
-describe('buildRunArgv', () => {
-  test('scenario trigger hosts in the full suite', () => {
-    const built = buildRunArgv({ kind: 'scenario', scenarioId: 'onboarding.fresh' }, FUNDED, KNOWN);
-    expect(built).toEqual({
-      argv: [
-        'bun',
-        'e2e/cli.ts',
-        'run',
-        '--driver',
-        'sim',
-        '--i-approve-destructive-reset',
-        '--suite',
-        'full',
-        '--scenario',
-        'onboarding.fresh',
-      ],
-    });
-  });
-
-  test('unknown scenario is rejected', () => {
-    expect(buildRunArgv({ kind: 'scenario', scenarioId: 'nope' }, FUNDED, KNOWN)).toEqual({
-      error: 'unknown scenario',
-    });
-  });
-
-  test('fund-loss flag only with explicit acceptance on funded selections', () => {
-    const unfunded = buildRunArgv(
-      { kind: 'scenario', scenarioId: 'onboarding.fresh', acceptFundLoss: true },
-      FUNDED,
-      KNOWN
-    );
-    expect('argv' in unfunded && unfunded.argv).not.toContain('--i-accept-test-fund-loss');
-    const funded = buildRunArgv(
-      { kind: 'scenario', scenarioId: 'send.lightning.sat', acceptFundLoss: true },
-      FUNDED,
-      KNOWN
-    );
-    expect('argv' in funded && funded.argv).toContain('--i-accept-test-fund-loss');
-    const fundedNoAck = buildRunArgv(
-      { kind: 'scenario', scenarioId: 'send.lightning.sat' },
-      FUNDED,
-      KNOWN
-    );
-    expect('argv' in fundedNoAck && fundedNoAck.argv).not.toContain('--i-accept-test-fund-loss');
-  });
-
-  test('commit run adds --require-clean-git', () => {
-    const built = buildRunArgv({ kind: 'commit-run', suite: 'full' }, FUNDED, KNOWN);
-    expect('argv' in built && built.argv).toContain('--require-clean-git');
-  });
-});
+import { activeJob, getJob, killActiveJob, startRunJob } from './jobs';
 
 describe('killActiveJob', () => {
   test('refuses with no active job, kills a running job so the lock releases', async () => {
     expect(killActiveJob()).toEqual({ error: 'no job is running' });
 
-    const job = startRunJob(['bun', '-e', 'await new Promise(() => {})']);
+    const hang = ['bun', '-e', 'await new Promise(() => {})'];
+    const job = startRunJob([hang, hang]);
     expect('id' in job).toBe(true);
     if (!('id' in job)) return;
     expect(killActiveJob()).toEqual({ ok: true, id: job.id });
@@ -101,4 +50,48 @@ describe('startRunJob (fake driver, real spawn)', () => {
     }
     expect(activeJob()).toBeUndefined();
   }, 30_000);
+
+  test('runs a command matrix sequentially and preserves every command', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'e2e-viewer-jobs-'));
+    const marker = join(dir, 'order.txt');
+    const argvs = [
+      ['bun', '-e', `await Bun.sleep(100); await Bun.write(${JSON.stringify(marker)}, "ios")`],
+      [
+        'bun',
+        '-e',
+        `const p=${JSON.stringify(marker)}; const first=await Bun.file(p).text(); await Bun.write(p, first+",android")`,
+      ],
+    ];
+    try {
+      const job = startRunJob(argvs);
+      expect('id' in job).toBe(true);
+      if (!('id' in job)) return;
+      expect(job.argvs).toEqual(argvs);
+
+      const deadline = Date.now() + 10_000;
+      while (Date.now() < deadline && activeJob()) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(getJob(job.id)).toMatchObject({ status: 'exited', exitCode: 0, argvs });
+      expect(readFileSync(marker, 'utf8')).toBe('ios,android');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 15_000);
+
+  test('continues the matrix after a failed command and keeps the first failure', async () => {
+    const job = startRunJob([
+      ['bun', '-e', 'process.exit(7)'],
+      ['bun', '-e', 'process.exit(0)'],
+    ]);
+    expect('id' in job).toBe(true);
+    if (!('id' in job)) return;
+
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline && activeJob()) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    expect(getJob(job.id)).toMatchObject({ status: 'exited', exitCode: 7 });
+    expect(getJob(job.id)?.argv).toEqual(['bun', '-e', 'process.exit(0)']);
+  }, 15_000);
 });

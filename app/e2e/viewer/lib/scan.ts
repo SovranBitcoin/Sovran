@@ -40,7 +40,9 @@ async function readManifest(runDir: string): Promise<Record<string, unknown> | u
   }
 }
 
-/** Simulator device type from the first session-N.json (sim runs only). */
+/** Device label from the first session-N.json: the simulator deviceType
+ * ("iPhone 17 Pro") on sim runs, the emulator AVD name on android runs;
+ * absent for fake runs. */
 async function readDeviceType(runDir: string): Promise<string | undefined> {
   let sessionFile: string | undefined;
   try {
@@ -53,7 +55,7 @@ async function readDeviceType(runDir: string): Promise<string | undefined> {
   if (!sessionFile) return undefined;
   try {
     const session = JSON.parse(await Bun.file(join(runDir, sessionFile)).text());
-    const deviceType = session?.simulator?.deviceType;
+    const deviceType = session?.simulator?.deviceType ?? session?.android?.avd;
     return typeof deviceType === 'string' ? deviceType : undefined;
   } catch {
     return undefined;
@@ -128,7 +130,7 @@ export async function getRunDetail(runDirName: string): Promise<RunDetail | unde
   const detail: RunDetail = {
     runId: runDirName.replace(/^run-/, ''),
     suite: String(manifest.suite ?? ''),
-    driver: manifest.driver === 'sim' ? 'sim' : 'fake',
+    driver: manifest.driver === 'sim' ? 'sim' : manifest.driver === 'android' ? 'android' : 'fake',
     proof: manifest.proof === 'product-run' ? 'product-run' : 'orchestration-smoke',
     startedAt: String(manifest.startedAt ?? ''),
     scenarioIds,

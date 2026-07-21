@@ -1,7 +1,9 @@
 import { api } from '../api';
+import { facetTagLabel, platformLabels } from '../facetLabels';
 import { state, update } from '../state';
+import type { AppState } from '../state';
 import { attachDeviceCorners } from './deviceCorners';
-import { bindStatePane, patchStatePane, renderStatePaneShell } from './statePanel';
+import { bindStatePane, patchStatePane, renderStateBody } from './statePanel';
 import type { Frame, ScenarioTimeline } from '../../lib/types';
 
 /** A reel entry: an automatic evidence frame, or a named (canonical-page)
@@ -199,6 +201,11 @@ export function renderPlayer(root: HTMLElement): void {
         <div class="titles">
           <h1>${escapeHtml(entry.name)}</h1>
           <p>${escapeHtml(entry.description)}</p>
+          ${
+            entry.details
+              ? `<details class="tech-details"><summary>Technical details</summary><p>${escapeHtml(entry.details)}</p></details>`
+              : ''
+          }
         </div>
         <div class="stage"><span class="empty">no runs yet — use “Run scenario” above</span></div>
       </div>`;
@@ -211,7 +218,7 @@ export function renderPlayer(root: HTMLElement): void {
   }
 
   const frames = visibleFrames(timeline);
-  const sig = `${runId}|${timeline.scenarioId}|${state.showAllPhases}|${frames.length}|${state.videoMode}|${timeline.videoFile ?? ''}|${state.stateOpen}`;
+  const sig = `${runId}|${timeline.scenarioId}|${state.showAllPhases}|${frames.length}|${state.videoMode}|${timeline.videoFile ?? ''}|${state.sideTab}`;
   if (root.dataset.playerSig !== sig) {
     buildShell(root, timeline, runId, frames);
     root.dataset.playerSig = sig;
@@ -262,9 +269,13 @@ function buildShell(
         .filter((chip): chip is string => !!chip)
         .map(
           (chip) =>
-            `<span class="chip${chip.includes(':') ? '' : ' extra'}">${escapeHtml(chip)}</span>`
+            `<span class="chip${chip.includes(':') ? '' : ' extra'}" title="${escapeHtml(chip)}">${escapeHtml(facetTagLabel(chip))}</span>`
         )
         .join('')
+    : '';
+
+  const detailsBlock = entry?.details
+    ? `<details class="tech-details"><summary>Technical details</summary><p>${escapeHtml(entry.details)}</p></details>`
     : '';
 
   const videoOn = videoIsActive(timeline);
@@ -272,9 +283,9 @@ function buildShell(
   // omit the toggle entirely there instead of showing a permanently dead one.
   const showToggle = !!timeline.videoFile || timeline.lane === 'simulator';
   const viewToggle = showToggle
-    ? `<div class="view-toggle-row"><div class="view-toggle" role="tablist" aria-label="stage view">` +
-      `<button role="tab" aria-selected="${!videoOn}" class="seg${videoOn ? '' : ' active'}" data-action="view-shots">Screenshots</button>` +
-      `<button role="tab" aria-selected="${videoOn}" class="seg${videoOn ? ' active' : ''}" data-action="view-video" ${
+    ? `<div class="view-toggle-row"><div class="stage-tabs" role="tablist" aria-label="stage view">` +
+      `<button role="tab" aria-selected="${!videoOn}" class="stage-tab${videoOn ? '' : ' active'}" data-action="view-shots">Screenshots</button>` +
+      `<button role="tab" aria-selected="${videoOn}" class="stage-tab${videoOn ? ' active' : ''}" data-action="view-video" ${
         timeline.videoFile ? '' : 'disabled title="no recording for this run"'
       }>Video</button>` +
       `</div></div>`
@@ -312,13 +323,27 @@ function buildShell(
     timeline.lane
       ? `<span class="k">lane</span><span class="v">${escapeHtml(timeline.lane)}</span>`
       : '',
+    entry?.platforms.length
+      ? `<span class="k">works on</span><span class="v">${escapeHtml(platformLabels(entry.platforms).join(' + '))}</span>`
+      : '',
   ]
     .filter(Boolean)
     .join('');
 
+  const stepsActive = state.sideTab === 'steps';
   root.innerHTML = `<div class="player">
+    <div class="player-head">
+      <div class="titles">
+        <h1>${escapeHtml(timeline.name)}${outcome}</h1>
+        <p>${escapeHtml(entry?.description ?? '')}</p>
+        ${facetChips ? `<div class="facet-chips">${facetChips}</div>` : ''}
+        ${detailsBlock}
+      </div>
+      ${metaRows ? `<div class="scenario-meta meta-strip">${metaRows}</div>` : ''}
+    </div>
     <div class="stage-row">
       <div class="stage-col">
+        ${viewToggle}
         <div class="stage">${stageContent}<div class="caption" data-role="caption"></div></div>
         <div class="controls">
           <button data-action="play" aria-label="${videoOn ? 'play video' : 'play slideshow'}">▶</button>
@@ -333,27 +358,21 @@ function buildShell(
           <span class="counter" data-role="counter">${videoOn ? '–:–– / –:––' : ''}</span>
         </div>
       </div>
-      <div class="side">
-        <div class="titles">
-          <h1>${escapeHtml(timeline.name)}${outcome}</h1>
-          <p>${escapeHtml(entry?.description ?? '')}</p>
-          ${facetChips ? `<div class="facet-chips">${facetChips}</div>` : ''}
+      <div class="side-pane">
+        <div class="steps-head side-tabs" role="tablist" aria-label="side panel">
+          <button role="tab" aria-selected="${stepsActive}" class="side-tab${stepsActive ? ' active' : ''}" data-side-tab="steps">Steps</button>
+          <button role="tab" aria-selected="${!stepsActive}" class="side-tab${stepsActive ? '' : ' active'}" data-side-tab="state" title="per-frame zustand + coco db snapshots">State</button>
+          ${
+            stepsActive
+              ? `<span class="steps-count">${frames.length}</span>
+            <label class="check"><input type="checkbox" data-action="phases" ${state.showAllPhases ? 'checked' : ''}/> setup / cleanup</label>`
+              : ''
+          }
         </div>
-        ${viewToggle}
-        ${metaRows ? `<div class="scenario-meta">${metaRows}</div>` : ''}
-        <div class="steps-pane">
-          <div class="steps-head">
-            <span class="steps-title">Steps</span>
-            <span class="steps-count">${frames.length}</span>
-            <label class="check"><input type="checkbox" data-action="phases" ${state.showAllPhases ? 'checked' : ''}/> setup / cleanup</label>
-            <button class="state-toggle${state.stateOpen ? ' active' : ''}" data-action="state" aria-pressed="${state.stateOpen}" title="per-frame zustand + coco db snapshots">State</button>
-          </div>
-          <div class="step-list">${stepItems}</div>
-        </div>
-        ${named ? `<div class="named-strip">${named}</div>` : ''}
+        ${stepsActive ? `<div class="step-list">${stepItems}</div>` : renderStateBody()}
       </div>
-      ${state.stateOpen ? renderStatePaneShell() : ''}
     </div>
+    ${named ? `<div class="named-strip">${named}</div>` : ''}
   </div>`;
 
   root.querySelector('[data-action=play]')?.addEventListener('click', () => transportTogglePlay());
@@ -414,12 +433,16 @@ function buildShell(
       current.playing = false;
     })
   );
-  root.querySelector<HTMLButtonElement>('[data-action=state]')?.addEventListener('click', () =>
-    update((current) => {
-      current.stateOpen = !current.stateOpen;
-    })
-  );
-  if (state.stateOpen) bindStatePane(root);
+  for (const button of root.querySelectorAll<HTMLButtonElement>('[data-side-tab]')) {
+    button.addEventListener('click', () => {
+      const next = button.dataset.sideTab as AppState['sideTab'];
+      if (next === state.sideTab) return;
+      update((current) => {
+        current.sideTab = next;
+      });
+    });
+  }
+  if (state.sideTab === 'state') bindStatePane(root);
   for (const item of root.querySelectorAll<HTMLElement>('.step-item')) {
     item.addEventListener('click', () => {
       const index = Number(item.dataset.index);
@@ -623,5 +646,5 @@ function patchDynamic(
     if (neighbour) new Image().src = api.runFileUrl(runId, neighbour.file);
   }
 
-  if (state.stateOpen) patchStatePane(root, runId, frames, index);
+  if (state.sideTab === 'state') patchStatePane(root, runId, frames, index);
 }

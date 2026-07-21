@@ -1,4 +1,5 @@
 import { selectScenario } from '../actions';
+import { facetTagLabel, flowGroupLabel, PLATFORM_LABELS } from '../facetLabels';
 import { persistCollapsedFlows, state, update } from '../state';
 import { FACETS } from '../../../schema/facets';
 import type { CatalogRunRef, ScenarioCatalogEntry } from '../../lib/types';
@@ -16,6 +17,23 @@ function escapeHtml(value: string): string {
 
 function latestRun(entry: ScenarioCatalogEntry): CatalogRunRef | undefined {
   return entry.runs.find((run) => run.proof === 'product-run');
+}
+
+/** "iPhone" / "Android" chips: a scenario shows every platform it is specified
+ * to work on; a run row shows the one platform that run actually used. */
+function platformChips(platforms: readonly ('ios' | 'android')[]): string {
+  return platforms
+    .map(
+      (platform) =>
+        `<span class="platform-chip platform-${platform}">${PLATFORM_LABELS[platform]}</span>`
+    )
+    .join('');
+}
+
+function runPlatformChip(run: CatalogRunRef): string {
+  if (run.driver === 'sim') return platformChips(['ios']);
+  if (run.driver === 'android') return platformChips(['android']);
+  return '';
 }
 
 /** Collapsible flow-facet tree: caret group headers (sticky while their group
@@ -37,7 +55,7 @@ export function renderRunList(root: HTMLElement): void {
     parts.push(
       `<button class="tree-group" data-flow="${escapeHtml(flow)}" aria-expanded="${!collapsed}">` +
         `<span class="caret${collapsed ? '' : ' open'}">▸</span>` +
-        `<span class="flow-name">${escapeHtml(flow)}</span>` +
+        `<span class="flow-name">${escapeHtml(flowGroupLabel(flow))}</span>` +
         (failing ? `<span class="fail-count">${failing} ✗</span>` : '') +
         `<span class="badge">${entries.length}</span>` +
         `</button>`
@@ -61,9 +79,13 @@ export function renderRunList(root: HTMLElement): void {
     const runs = entry.runs.filter((run) => run.proof === 'product-run');
     const selected = state.selectedScenarioId === entry.id && state.mode === 'browse';
     const latest = runs[0];
+    const tooltip = [entry.description, entry.tags.map(facetTagLabel).join(' · ')]
+      .filter(Boolean)
+      .join('\n');
     rows.push(
-      `<div class="run-row${selected ? ' selected' : ''}${runs.length === 0 ? ' smoke' : ''}" data-scenario="${escapeHtml(entry.id)}" title="${escapeHtml(entry.tags.join(' '))}">` +
+      `<div class="run-row${selected ? ' selected' : ''}${runs.length === 0 ? ' smoke' : ''}" data-scenario="${escapeHtml(entry.id)}" title="${escapeHtml(tooltip)}">` +
         `${latest ? okGlyph(latest.ok, latest.status) : ''}<span class="title">${escapeHtml(entry.name)}</span>` +
+        platformChips(entry.platforms) +
         `<span class="badge">${runs.length || ''}</span>` +
         `</div>`
     );
@@ -73,7 +95,7 @@ export function renderRunList(root: HTMLElement): void {
         const runSelected = state.selectedRunId === run.runId;
         rows.push(
           `<div class="scenario-row${runSelected ? ' selected' : ''}" data-run="${run.runId}" data-scenario="${escapeHtml(entry.id)}">` +
-            `${okGlyph(run.ok, run.status)}<span class="${run.commitRun ? 'commit' : ''}">${escapeHtml(run.label)}</span></div>`
+            `${okGlyph(run.ok, run.status)}<span class="${run.commitRun ? 'commit' : ''}">${escapeHtml(run.label)}</span>${runPlatformChip(run)}</div>`
         );
       }
       if (runs.length === 0) rows.push('<div class="scenario-row">no runs yet</div>');

@@ -10,6 +10,7 @@ export interface JobView {
   id: string;
   kind: 'run' | 'diff';
   runId?: string;
+  runIds: string[];
   lines: string[];
   status: 'running' | 'exited';
   exitCode?: number;
@@ -21,7 +22,7 @@ export type ModalView =
   | {
       kind: 'trigger';
       title: string;
-      argv: string[];
+      argvs: string[][];
       funded: boolean;
       send: (acceptFundLoss: boolean) => void;
     }
@@ -41,8 +42,9 @@ export interface AppState {
   showAllPhases: boolean;
   /** Play the scenario's test+verify screen recording instead of the frame reel. */
   videoMode: boolean;
-  /** Show the per-frame app-state panel (zustand snapshot + coco db dump). */
-  stateOpen: boolean;
+  /** Active tab of the side panel: the step list, or the per-frame app-state
+   * view (zustand snapshot + coco db dump). */
+  sideTab: 'steps' | 'state';
   diff: {
     runA?: string;
     runB?: string;
@@ -98,7 +100,7 @@ export const state: AppState = {
   playing: false,
   showAllPhases: false,
   videoMode: false,
-  stateOpen: false,
+  sideTab: 'steps',
   diff: { view: 'side-by-side', pairIndex: 0 },
   pages: { allRuns: false },
   collapsedFlows: loadCollapsedFlows(),

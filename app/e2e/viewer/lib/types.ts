@@ -2,6 +2,7 @@
  * The frontend must import from here with `import type` only so Bun's
  * bundler never pulls server code into the browser. */
 
+import type { Platform } from '../../schema/capabilities';
 import type { ScenarioFacets } from '../../schema/facets';
 
 export interface GitInfo {
@@ -16,7 +17,7 @@ export type RunStatus = 'complete' | 'in-progress' | 'aborted';
 export interface RunSummary {
   runId: string;
   suite: string;
-  driver: 'fake' | 'sim';
+  driver: 'fake' | 'sim' | 'android';
   proof: 'product-run' | 'orchestration-smoke';
   startedAt: string;
   scenarioIds: string[];
@@ -107,6 +108,8 @@ export interface CatalogRunRef {
   startedAt: string;
   status: RunStatus;
   proof: RunSummary['proof'];
+  /** Which product driver executed the run — badges run rows iPhone/Android. */
+  driver: RunSummary['driver'];
   ok?: boolean;
 }
 
@@ -114,13 +117,18 @@ export interface ScenarioCatalogEntry {
   id: string;
   name: string;
   description: string;
+  /** Technical deep-dive companion to the plain `description`. */
+  details?: string;
   lane: string;
   tags: string[];
+  /** Platforms the scenario is specified to work on, derived from `requires`
+   * against the per-driver capability sets (schema/capabilities.ts). */
+  platforms: Platform[];
   /** Structured view of the namespaced facet tags (flow/instrument/io/…). */
   facets: ScenarioFacets;
   deferredReason?: string;
   suites: string[];
-  /** Runs containing this scenario, newest first. */
+  /** Actual non-deferred attempts of this scenario, newest first. */
   runs: CatalogRunRef[];
 }
 
@@ -207,8 +215,14 @@ export interface JobStatus {
   kind: 'run' | 'diff';
   status: 'running' | 'exited';
   exitCode?: number;
+  /** Most recently discovered run, retained for backwards-compatible focus. */
   runId?: string;
+  /** Every platform run produced by this sequential matrix job. */
+  runIds?: string[];
+  /** Command currently running (or the final command after exit). */
   argv?: string[];
+  /** Complete sequential command matrix. */
+  argvs?: string[][];
   progress?: { done: number; total: number };
 }
 
