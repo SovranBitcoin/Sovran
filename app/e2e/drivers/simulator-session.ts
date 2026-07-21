@@ -15,6 +15,10 @@ import {
   serializeE2EReadyProofAssets,
   type E2EReadyProofAsset,
 } from '../../shared/lib/cashu/e2eProofReconciliationConfig';
+import {
+  E2E_MINT_FAULTS_ENV,
+  serializeMintFaultRuleSet,
+} from '../../shared/lib/e2e/mintFaults/rules';
 
 import {
   APP_DIR,
@@ -182,9 +186,14 @@ export function buildMetroEnvironment(
     controlledP2PKPubkey?: string;
     fundedAssets?: readonly E2EReadyProofAsset[];
     mockFailPaymentRequest?: boolean;
+    /** Arms the in-app mint-fault interceptor with ZERO rules — every rule
+     * flows through the dynamic `mintFaults` step, so shared sessions and
+     * funded setup traffic stay passthrough until a scenario says otherwise. */
+    armMintFaults?: boolean;
   } = {}
 ): Record<string, string | undefined> {
   const environment = { ...source };
+  delete environment[E2E_MINT_FAULTS_ENV];
   delete environment.DEBUG_MNEMONIC;
   delete environment.EXPO_PUBLIC_DEBUG_MNEMONIC;
   delete environment.EXPO_PUBLIC_E2E_SEED_EXPORT;
@@ -198,20 +207,24 @@ export function buildMetroEnvironment(
   delete environment.EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS;
   delete environment.EXPO_PUBLIC_E2E_STATE_MIRROR;
   delete environment.RCT_METRO_PORT;
-  // The onboarding carousel's 3s auto-advance outpaces the harness's per-step
-  // evidence capture (~1s each), so slide screenshots can never anchor to the
-  // right slide. Every owned e2e Metro slows the slides; taps still advance.
-  environment.EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS = '20000';
+  // Park each onboarding slide for three minutes. Evidence capture becomes
+  // much slower under concurrent iOS + Android sweeps; the old 20s window let
+  // the carousel auto-advance past a tapUntil destination before or between
+  // retries.
+  // Harness taps still advance immediately, so the longer timer adds no normal
+  // scenario latency while keeping fixture navigation deterministic.
+  environment.EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS = '180000';
   // Terminal payment toasts auto-dismiss after 3s while their AX probe is
   // retained 15s past dismissal, so a waitFor-then-screenshot always samples
   // after the visible toast is gone. Slow the dismiss the same way — but only
   // to 8s: capture needs ~4-6s, and a longer linger poisons later stable
   // screenshots (a toast is ~7% of the frame vs 0.1% tolerances).
   environment.EXPO_PUBLIC_E2E_TOAST_DISMISS_MS = '8000';
-  // The settings dev-mode gesture is a 1.5s triple-tap; harness taps open one
-  // HID session each (~2s apart), so the window must be widened to be
-  // reachable at all from the simulator driver.
-  environment.EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS = '20000';
+  // The settings dev-mode gesture is a 1.5s triple-tap. Every harness tap is
+  // followed by screenshot + AX + store/db evidence, which can exceed 20s on
+  // a busy simulator. Keep the window aligned with the owned onboarding hold;
+  // this Metro-only override never changes production gesture timing.
+  environment.EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS = '180000';
   // Every owned e2e Metro turns on the in-app zustand state mirror so each
   // evidence frame gets a .store.json sidecar (see shared/lib/e2e/stateMirror).
   environment.EXPO_PUBLIC_E2E_STATE_MIRROR = '1';
@@ -259,6 +272,13 @@ export function buildMetroEnvironment(
       throw new Error('payment-request delivery failure mock requires a funded Metro session');
     }
     environment.EXPO_PUBLIC_E2E_MOCK_FAIL_PAYMENT_REQUEST = '1';
+  }
+  if (options.armMintFaults) {
+    environment[E2E_MINT_FAULTS_ENV] = serializeMintFaultRuleSet({
+      version: 1,
+      revision: 0,
+      rules: [],
+    });
   }
   return environment;
 }
@@ -438,11 +458,16 @@ async function metroRunning(url: string): Promise<boolean> {
   }
 }
 
-interface MetroSession {
+export interface MetroSession {
   readonly url: string;
   readonly port: number;
   readonly pid: number;
   readonly logPath: string;
+  /** Host loopback port of the private seed-export server, when a funded
+   * (onSeedExport) session started one. The android session `adb reverse`s
+   * this so the emulator app can POST its seed to the same 127.0.0.1 endpoint
+   * the iOS simulator reaches directly. */
+  readonly seedExportPort?: number;
   stop(): Promise<void>;
 }
 
@@ -497,15 +522,25 @@ async function pumpSimulatorBridgeOutput(
   if (output) appendFileSync(logPath, `${sanitizeMetroLogLine(output)}\n`, { mode: 0o600 });
 }
 
-interface MetroStartOptions {
+export interface MetroStartOptions {
   onSeedExport?: (mnemonic: string) => void;
   controlledP2PKPubkey?: string;
   fundedAssets?: readonly E2EReadyProofAsset[];
   mockFailPaymentRequest?: boolean;
+  armMintFaults?: boolean;
   onLifecycle?: (message: string) => void;
+  /** Platform-session env overrides applied AFTER buildMetroEnvironment —
+   * the android session retunes iOS-calibrated timing constants (its
+   * uiautomator-dump polls are seconds, not milliseconds). Only
+   * EXPO_PUBLIC_E2E_* keys belong here. */
+  extraEnv?: Record<string, string>;
 }
 
-async function startOwnedMetro(
+/** Exported for the android session, which reuses the owned-Metro lifecycle
+ * verbatim (EXPO_PUBLIC_* env is bundle-time, not platform-time) and differs
+ * only in how the dev client reaches it (adb reverse instead of shared
+ * loopback). */
+export async function startOwnedMetro(
   runDir: string,
   signal?: AbortSignal,
   options: MetroStartOptions = {}
@@ -531,12 +566,16 @@ async function startOwnedMetro(
         stdout: 'pipe',
         stderr: 'pipe',
         stdin: 'ignore',
-        env: buildMetroEnvironment(process.env, {
-          seedExport,
-          controlledP2PKPubkey: options.controlledP2PKPubkey,
-          fundedAssets: options.fundedAssets,
-          mockFailPaymentRequest: options.mockFailPaymentRequest,
-        }),
+        env: {
+          ...buildMetroEnvironment(process.env, {
+            seedExport,
+            controlledP2PKPubkey: options.controlledP2PKPubkey,
+            fundedAssets: options.fundedAssets,
+            mockFailPaymentRequest: options.mockFailPaymentRequest,
+            armMintFaults: options.armMintFaults,
+          }),
+          ...options.extraEnv,
+        },
       });
     } catch (error) {
       await seedExport?.stop();
@@ -573,7 +612,17 @@ async function startOwnedMetro(
       if (outputFailure) throw outputFailure;
       if (exitCode !== undefined)
         throw new Error(`owned Metro exited with code ${exitCode} before becoming ready`);
-      if (await metroRunning(url)) return { url, port, pid: child.pid, logPath, stop };
+      if (await metroRunning(url)) {
+        const seedExportPort = seedExport ? Number(new URL(seedExport.endpoint).port) : undefined;
+        return {
+          url,
+          port,
+          pid: child.pid,
+          logPath,
+          ...(seedExportPort ? { seedExportPort } : {}),
+          stop,
+        };
+      }
       await sleep(500);
     }
     throw new Error(`owned Metro did not come up on ${port} (see ${logPath})`);
@@ -883,6 +932,7 @@ export async function withEphemeralSimulatorSession<T>(
     controlledP2PKPubkey?: string;
     fundedAssets?: readonly E2EReadyProofAsset[];
     mockFailPaymentRequest?: boolean;
+    armMintFaults?: boolean;
     onLifecycle?: (message: string) => void;
   },
   callback: (session: EphemeralSimulatorSession, signal: AbortSignal) => Promise<T>,
@@ -922,6 +972,7 @@ export async function withEphemeralSimulatorSession<T>(
       controlledP2PKPubkey: options.controlledP2PKPubkey,
       fundedAssets: options.fundedAssets,
       mockFailPaymentRequest: options.mockFailPaymentRequest,
+      armMintFaults: options.armMintFaults,
       onLifecycle,
     });
     cleanups.push({ priority: 20, run: () => metro.stop() });

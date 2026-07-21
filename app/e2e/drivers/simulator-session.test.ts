@@ -209,9 +209,9 @@ describe('owned host configuration', () => {
     expect(environment).toEqual({
       KEEP_ME: 'yes',
       NODE_OPTIONS: '--dns-result-order=ipv4first',
-      EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS: '20000',
+      EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS: '180000',
       EXPO_PUBLIC_E2E_TOAST_DISMISS_MS: '8000',
-      EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS: '20000',
+      EXPO_PUBLIC_E2E_TRIPLE_TAP_WINDOW_MS: '180000',
       EXPO_PUBLIC_E2E_STATE_MIRROR: '1',
     });
   });
@@ -266,6 +266,13 @@ describe('owned host configuration', () => {
         { fundedAssets: [{ mintUrl: 'https://mint.sovran.money', unit: 'sat' }] }
       )
     ).toThrow(/funded Metro session/);
+  });
+
+  it('arms mint faults with an EMPTY rule set and never inherits one', () => {
+    const inherited = buildMetroEnvironment({ EXPO_PUBLIC_E2E_MINT_FAULTS: 'must-not-survive' });
+    expect(inherited.EXPO_PUBLIC_E2E_MINT_FAULTS).toBeUndefined();
+    const armed = buildMetroEnvironment({}, { armMintFaults: true });
+    expect(armed.EXPO_PUBLIC_E2E_MINT_FAULTS).toBe('{"version":1,"revision":0,"rules":[]}');
   });
 
   it('injects the payment-request failure mock only beside private seed custody', () => {

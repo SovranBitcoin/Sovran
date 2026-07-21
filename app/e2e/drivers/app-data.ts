@@ -17,6 +17,7 @@ import type { AppDataCapturer, AppDataResult } from './driver';
 
 const COCO_DB_RE = /^coco(-\d+)?\.db$/;
 const STATE_MIRROR_REL = join('Documents', 'e2e', 'state.json');
+const MINT_FAULT_LEDGER_REL = join('Documents', 'e2e', 'mint-faults.ledger.json');
 const SQLITE_DIR_REL = join('Documents', 'SQLite');
 const PARSE_RETRY_MS = 150;
 
@@ -182,6 +183,18 @@ export function createSimulatorAppDataCapturer(options: AppDataCapturerOptions):
     return dbCached;
   };
 
+  // Mint-fault ledger sidecar: best-effort and quiet — the file only exists in
+  // mock.mint-faults sessions, so absence is the normal case, never a warning.
+  const captureFaults = (container: string): string | null => {
+    try {
+      const raw = fs.readTextFile(join(container, MINT_FAULT_LEDGER_REL));
+      JSON.parse(raw);
+      return raw;
+    } catch {
+      return null;
+    }
+  };
+
   return {
     async capture(): Promise<AppDataResult> {
       try {
@@ -194,7 +207,7 @@ export function createSimulatorAppDataCapturer(options: AppDataCapturerOptions):
           captureStore(container).catch(() => null),
           captureDb(container).catch(() => null),
         ]);
-        return { store, db };
+        return { store, db, faults: captureFaults(container) };
       } catch {
         return { store: null, db: null };
       }

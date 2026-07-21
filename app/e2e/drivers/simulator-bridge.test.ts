@@ -43,6 +43,7 @@ describe('capture-free simulator bridge', () => {
     const bridge = startSimulatorBridge({ udid: UDID, port: 0, native, pollMs: 2 });
     const abort = new AbortController();
     try {
+      // eslint-disable-next-line no-restricted-globals -- test-only owned loopback SSE stream
       const response = await fetch(bridge.axEndpoint, { signal: abort.signal });
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
@@ -90,19 +91,110 @@ describe('capture-free simulator bridge', () => {
     const bridge = startSimulatorBridge({ udid: UDID, port: 0, native, pollMs: 1000 });
     const abort = new AbortController();
     try {
+      // eslint-disable-next-line no-restricted-globals -- test-only owned loopback SSE stream
       const sse = await fetch(bridge.axEndpoint, { signal: abort.signal });
       const reader = sse.body!.getReader();
       const firstSse = reader.read();
       const origin = new URL(bridge.axEndpoint).origin;
-      const [first, second] = await Promise.all([
-        fetch(`${origin}/helper/${UDID}/ax`),
-        fetch(`${origin}/helper/${UDID}/ax`),
-      ]);
+      // eslint-disable-next-line no-restricted-globals -- test-only owned loopback AX helper
+      const firstHelper = fetch(`${origin}/helper/${UDID}/ax`);
+      // eslint-disable-next-line no-restricted-globals -- test-only owned loopback AX helper
+      const secondHelper = fetch(`${origin}/helper/${UDID}/ax`);
+      const [first, second] = await Promise.all([firstHelper, secondHelper]);
       expect(first.ok).toBe(true);
       expect(second.ok).toBe(true);
       await firstSse;
       expect(maxInFlight).toBe(1);
       await reader.cancel();
+    } finally {
+      abort.abort();
+      bridge.stop();
+    }
+  });
+
+  it('redacts secret-profile fields in both raw helper and SSE serialization', async () => {
+    const rawPrivateLabel = 'raw-private-label';
+    const rawPrivateValue = 'raw-private-value';
+    const roots = JSON.parse(RAW_AX) as { children: unknown[] }[];
+    roots[0]!.children.push({
+      AXUniqueId: 'profile-secret-value-mnemonic',
+      AXLabel: rawPrivateLabel,
+      AXValue: rawPrivateValue,
+      enabled: false,
+      frame: { x: -500, y: -500, width: 10, height: 10 },
+      role_description: 'text',
+      type: 'TextField',
+      children: [],
+    });
+    roots[0]!.children.push({
+      AXUniqueId: 'profile-reveal-mnemonic',
+      AXLabel: 'Show',
+      AXValue: '0',
+      enabled: true,
+      frame: { x: 20, y: 120, width: 100, height: 40 },
+      role_description: 'switch',
+      type: 'Switch',
+      children: [],
+    });
+    const native: SimulatorBridgeNative = {
+      SimHID: class {
+        touch() {}
+        key() {}
+      },
+      axDescribe: async () => JSON.stringify(roots),
+    };
+    const bridge = startSimulatorBridge({ udid: UDID, port: 0, native, pollMs: 2 });
+    const abort = new AbortController();
+    try {
+      const origin = new URL(bridge.axEndpoint).origin;
+      // eslint-disable-next-line no-restricted-globals -- test-only owned loopback AX helper
+      const helperText = await (await fetch(`${origin}/helper/${UDID}/ax`)).text();
+      expect(helperText).not.toContain(rawPrivateLabel);
+      expect(helperText).not.toContain(rawPrivateValue);
+      const helperRoots = JSON.parse(helperText) as {
+        children: Record<string, unknown>[];
+      }[];
+      expect(
+        helperRoots[0]?.children.find((node) => node.AXUniqueId === 'profile-secret-value-mnemonic')
+      ).toMatchObject({
+        AXUniqueId: 'profile-secret-value-mnemonic',
+        AXLabel: '‹profile-secret:redacted›',
+        AXValue: '‹profile-secret:redacted›',
+        enabled: false,
+      });
+      expect(
+        helperRoots[0]?.children.find((node) => node.AXUniqueId === 'profile-reveal-mnemonic')
+      ).toMatchObject({ AXLabel: 'Show', AXValue: '0', enabled: true });
+      // eslint-disable-next-line no-restricted-globals -- test-only owned loopback SSE stream
+      const sse = await fetch(bridge.axEndpoint, { signal: abort.signal });
+      const reader = sse.body!.getReader();
+      const decoder = new TextDecoder();
+      let dataLine = '';
+      const deadline = Date.now() + 250;
+      while (!dataLine && Date.now() < deadline) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        dataLine =
+          decoder
+            .decode(chunk.value)
+            .split('\n')
+            .find((line) => line.startsWith('data: ')) ?? '';
+      }
+      await reader.cancel();
+
+      expect(dataLine).not.toContain(rawPrivateLabel);
+      expect(dataLine).not.toContain(rawPrivateValue);
+      const snapshot = JSON.parse(dataLine.slice('data: '.length)) as {
+        elements: Record<string, unknown>[];
+      };
+      expect(
+        snapshot.elements.find((node) => node.id === 'profile-secret-value-mnemonic')
+      ).toMatchObject({
+        id: 'profile-secret-value-mnemonic',
+        label: '‹profile-secret:redacted›',
+        value: '‹profile-secret:redacted›',
+        enabled: false,
+      });
     } finally {
       abort.abort();
       bridge.stop();

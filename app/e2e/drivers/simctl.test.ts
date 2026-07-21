@@ -3,7 +3,14 @@ import { mkdtempSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { gesture, preparePrivateLog, pressAt, resolveServeSimBin, run } from './simctl';
+import {
+  gesture,
+  handleDevClientChrome,
+  preparePrivateLog,
+  pressAt,
+  resolveServeSimBin,
+  run,
+} from './simctl';
 
 describe('optional serve-sim resolution', () => {
   it('imports offline and resolves native tooling only when explicitly requested', () => {
@@ -28,6 +35,43 @@ describe('preparePrivateLog', () => {
 describe('host command failures', () => {
   it('propagates nonzero exits through the simulator command boundary', async () => {
     await expect(run(['/usr/bin/false'])).rejects.toThrow(/command failed/);
+  });
+});
+
+describe('dev-client system chrome', () => {
+  it('returns from Apple Intelligence settings before trying to dismiss its banner', async () => {
+    const actions: string[] = [];
+    const handled = await handleDevClientChrome(
+      'owned-udid',
+      'ws://127.0.0.1:1/ws',
+      {
+        screen: { width: 400, height: 800 },
+        elements: [
+          {
+            id: 'breadcrumb',
+            label: 'Return to Sovran',
+            role: 'button',
+            enabled: true,
+            frame: { x: 0, y: 0, width: 120, height: 60 },
+          },
+          {
+            id: 'heading',
+            label: 'Apple Intelligence & Siri',
+            role: 'heading',
+            enabled: true,
+            frame: { x: 20, y: 120, width: 360, height: 80 },
+          },
+        ],
+      },
+      undefined,
+      {
+        press: async () => void actions.push('press'),
+        gesture: async () => void actions.push('gesture'),
+      }
+    );
+
+    expect(handled).toBe(true);
+    expect(actions).toEqual(['press']);
   });
 });
 

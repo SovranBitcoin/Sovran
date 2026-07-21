@@ -21,6 +21,7 @@ import type { Driver, AxNode, ScreenshotOptions, StateObservation } from './driv
 import type { Selector } from '../schema/selectors';
 import {
   classifyObservedState,
+  elementTapCenter,
   parseSseData,
   findElement,
   toAxNode,
@@ -28,9 +29,18 @@ import {
   type AxElement,
   type AxSnapshot,
 } from './ax';
-import { run, pressAt, gesture, handleDevClientChrome, sleep, typeKeystrokes } from './simctl';
-import { hidKeystrokesFor, LEFT_SHIFT_USAGE } from './hid-keys';
+import {
+  BUNDLE_ID,
+  run,
+  pressAt,
+  gesture,
+  handleDevClientChrome,
+  sleep,
+  typeKeystrokes,
+} from './simctl';
+import { BACKSPACE_USAGE, hidKeystrokesFor, LEFT_SHIFT_USAGE } from './hid-keys';
 import { SimulatorInfrastructureError } from './simulator-session';
+import { isProfileSecretAxId } from './ax-redaction';
 
 export interface SimConfig {
   udid: string;
@@ -43,10 +53,12 @@ export interface SimConfig {
 export interface SimulatorDriverDeps {
   axWatcher?: AxWatcher;
   install?: (reset: 'erase' | 'reinstall' | 'none') => Promise<void>;
+  press?: (x: number, y: number) => Promise<void>;
   captureAxSnapshot?: () => Promise<AxSnapshot>;
   captureRawScreenshot?: (path: string) => Promise<void>;
   screenshotSettleMs?: number;
   screenshotTempRoot?: string;
+  refreshClearMs?: number;
   reportInfrastructureFailure?: (error: SimulatorInfrastructureError) => void;
 }
 
@@ -57,6 +69,8 @@ export interface SimulatorDriverDeps {
 // screenshot settles briefly (SHOT_SETTLE_MS) for the banner tail + content-shift.
 const REFRESH_CLEAR_MS = 1800;
 const SHOT_SETTLE_MS = 450;
+const WALLET_TAB_SELECTOR = { id: 'tab-wallet' } as const;
+const WALLET_READY_SELECTOR = { id: 'wallet-send' } as const;
 
 export interface PrivateScreenshotTarget {
   directory: string;
@@ -351,10 +365,64 @@ export function automaticSensitiveMaskFrames(snapshot: AxSnapshot): MaskFrame[] 
   );
 }
 
-/** Return unmodified QA evidence by default. Once a checkpoint supplies at
- * least one explicit mask id, apply both its authored masks and the existing
- * sensitive-region masks. This preserves opt-in masking without obscuring the
- * checked-in scenario screenshots. */
+/** Secret-bearing profile fields are never allowed into screenshot artifacts,
+ * even when a scenario did not author an explicit mask. Their stable IDs keep
+ * this protection independent of whether native AX exposes or redacts the
+ * field's current value. */
+function alwaysMaskedProfileFrames(snapshot: AxSnapshot): MaskFrame[] {
+  return snapshot.elements
+    .filter((element) => isProfileSecretAxId(element.id))
+    .map((element) => element.frame);
+}
+
+function projectMaskFrame(
+  frame: MaskFrame,
+  screen: AxSnapshot['screen'],
+  bitmap: { width: number; height: number }
+): { left: number; top: number; width: number; height: number } | null {
+  if (
+    ![screen.width, screen.height, frame.x, frame.y, frame.width, frame.height].every(
+      Number.isFinite
+    ) ||
+    screen.width <= 0 ||
+    screen.height <= 0 ||
+    frame.width <= 0 ||
+    frame.height <= 0
+  ) {
+    return null;
+  }
+  const frameRight = frame.x + frame.width;
+  const frameBottom = frame.y + frame.height;
+  if (!Number.isFinite(frameRight) || !Number.isFinite(frameBottom)) return null;
+
+  const clippedLeft = Math.max(0, frame.x);
+  const clippedTop = Math.max(0, frame.y);
+  const clippedRight = Math.min(screen.width, frameRight);
+  const clippedBottom = Math.min(screen.height, frameBottom);
+  if (clippedRight <= clippedLeft || clippedBottom <= clippedTop) return null;
+
+  const left = Math.max(
+    0,
+    Math.min(bitmap.width - 1, Math.floor((clippedLeft / screen.width) * bitmap.width))
+  );
+  const top = Math.max(
+    0,
+    Math.min(bitmap.height - 1, Math.floor((clippedTop / screen.height) * bitmap.height))
+  );
+  const right = Math.max(
+    left + 1,
+    Math.min(bitmap.width, Math.ceil((clippedRight / screen.width) * bitmap.width))
+  );
+  const bottom = Math.max(
+    top + 1,
+    Math.min(bitmap.height, Math.ceil((clippedBottom / screen.height) * bitmap.height))
+  );
+  return { left, top, width: right - left, height: bottom - top };
+}
+
+/** Preserve ordinary QA evidence by default, but always mask stable profile
+ * secret fields. Once a checkpoint supplies an explicit mask id, also apply
+ * the broader sensitive-region masks. */
 export async function maskScreenshotBytes(
   bytes: Uint8Array,
   snapshot: AxSnapshot | null,
@@ -362,11 +430,17 @@ export async function maskScreenshotBytes(
   snapshotAfterCapture: AxSnapshot | null = snapshot
 ): Promise<Uint8Array> {
   if (!bytes.length) throw new Error('simctl produced an empty screenshot');
-  if (!explicitMaskIds.length) return bytes;
-  if (!snapshot) throw new Error('cannot capture screenshot without an accessibility snapshot');
+  if (!snapshot) {
+    if (explicitMaskIds.length)
+      throw new Error('cannot capture screenshot without an accessibility snapshot');
+    return bytes;
+  }
   if (!snapshotAfterCapture) {
     throw new Error('cannot capture screenshot without a post-capture accessibility snapshot');
   }
+  const alwaysBefore = alwaysMaskedProfileFrames(snapshot);
+  const alwaysAfter = alwaysMaskedProfileFrames(snapshotAfterCapture);
+  if (!explicitMaskIds.length && !alwaysBefore.length && !alwaysAfter.length) return bytes;
   const explicitBefore: MaskFrame[] = [];
   const explicitAfter: MaskFrame[] = [];
   let explicitMaskChanged = false;
@@ -378,8 +452,12 @@ export async function maskScreenshotBytes(
     if (before) explicitBefore.push(before);
     if (after) explicitAfter.push(after);
   }
-  const automaticBefore = automaticSensitiveMaskFrames(snapshot);
-  const automaticAfter = automaticSensitiveMaskFrames(snapshotAfterCapture);
+  const automaticBefore = explicitMaskIds.length
+    ? automaticSensitiveMaskFrames(snapshot)
+    : alwaysBefore;
+  const automaticAfter = explicitMaskIds.length
+    ? automaticSensitiveMaskFrames(snapshotAfterCapture)
+    : alwaysAfter;
   const screenChanged =
     Math.abs(snapshot.screen.width - snapshotAfterCapture.screen.width) >= 0.5 ||
     Math.abs(snapshot.screen.height - snapshotAfterCapture.screen.height) >= 0.5;
@@ -394,40 +472,68 @@ export async function maskScreenshotBytes(
   // identities and unrelated labels can change between equivalent snapshots;
   // they do not affect which pixels can contain secrets and must not erase
   // otherwise useful evidence.
-  const maskFrames = sensitiveGeometryChanged
-    ? [{ x: 0, y: 0, width: snapshot.screen.width, height: snapshot.screen.height }]
-    : [...automaticBefore, ...explicitBefore];
+  // A fail-closed whole-frame mask must come from the decoded bitmap itself.
+  // AX screen geometry can be zero or transient during native navigation; it
+  // is evidence about layout, not an authority for the bitmap's dimensions.
+  if (sensitiveGeometryChanged) return maskWholeScreenshotBytes(bytes);
+  const maskFrames = [...automaticBefore, ...explicitBefore];
   if (!maskFrames.length) return bytes;
   const image = sharp(Buffer.from(bytes));
   const metadata = await image.metadata();
   if (!metadata.width || !metadata.height) {
     throw new Error('cannot read screenshot dimensions for masking');
   }
-  const overlays = maskFrames.map((frame) => {
-    const left = Math.max(0, Math.floor((frame.x / snapshot.screen.width) * metadata.width!));
-    const top = Math.max(0, Math.floor((frame.y / snapshot.screen.height) * metadata.height!));
-    const width = Math.min(
-      metadata.width! - left,
-      Math.max(1, Math.ceil((frame.width / snapshot.screen.width) * metadata.width!))
-    );
-    const height = Math.min(
-      metadata.height! - top,
-      Math.max(1, Math.ceil((frame.height / snapshot.screen.height) * metadata.height!))
-    );
-    return {
+  const overlays = [];
+  for (const frame of maskFrames) {
+    const projected = projectMaskFrame(frame, snapshot.screen, {
+      width: metadata.width,
+      height: metadata.height,
+    });
+    if (!projected) return maskWholeScreenshotBytes(bytes);
+    overlays.push({
       input: {
         create: {
-          width,
-          height,
+          width: projected.width,
+          height: projected.height,
           channels: 4 as const,
           background: { r: 0, g: 0, b: 0, alpha: 1 },
         },
       },
-      left,
-      top,
-    };
-  });
+      left: projected.left,
+      top: projected.top,
+    });
+  }
   return new Uint8Array(await image.composite(overlays).png().toBuffer());
+}
+
+/** When Android cannot produce trustworthy AX geometry, retain only a black
+ * evidence frame. Unknown pixels are never safer than missing visual detail. */
+export async function maskWholeScreenshotBytes(bytes: Uint8Array): Promise<Uint8Array> {
+  if (!bytes.length) throw new Error('device produced an empty screenshot');
+  const image = sharp(Buffer.from(bytes));
+  const metadata = await image.metadata();
+  if (!metadata.width || !metadata.height) {
+    throw new Error('cannot read screenshot dimensions for masking');
+  }
+  return new Uint8Array(
+    await image
+      .composite([
+        {
+          input: {
+            create: {
+              width: metadata.width,
+              height: metadata.height,
+              channels: 4,
+              background: { r: 0, g: 0, b: 0, alpha: 1 },
+            },
+          },
+          left: 0,
+          top: 0,
+        },
+      ])
+      .png()
+      .toBuffer()
+  );
 }
 
 export class AxWatcher {
@@ -506,10 +612,12 @@ export class SimulatorDriver implements Driver {
   #cfg: SimConfig;
   #ax: AxWatcher;
   #install: (reset: 'erase' | 'reinstall' | 'none') => Promise<void>;
+  #press: (x: number, y: number) => Promise<void>;
   #captureAxSnapshot: () => Promise<AxSnapshot>;
   #captureRawScreenshot: (path: string) => Promise<void>;
   #screenshotSettleMs: number;
   #screenshotTempRoot: string | undefined;
+  #refreshClearMs: number;
   #reportInfrastructureFailure: ((error: SimulatorInfrastructureError) => void) | undefined;
   constructor(cfg: SimConfig, deps: SimulatorDriverDeps = {}) {
     this.#cfg = cfg;
@@ -517,6 +625,8 @@ export class SimulatorDriver implements Driver {
     this.#install =
       deps.install ??
       (() => Promise.reject(new Error('SimulatorDriver requires a session-bound install')));
+    this.#press =
+      deps.press ?? ((x, y) => pressAt(cfg.touchEndpoint, x, y, { signal: this.#cfg.signal }));
     this.#captureAxSnapshot = deps.captureAxSnapshot ?? (() => captureSimulatorAxSnapshot(cfg));
     this.#captureRawScreenshot =
       deps.captureRawScreenshot ??
@@ -525,6 +635,7 @@ export class SimulatorDriver implements Driver {
       });
     this.#screenshotSettleMs = deps.screenshotSettleMs ?? SHOT_SETTLE_MS;
     this.#screenshotTempRoot = deps.screenshotTempRoot;
+    this.#refreshClearMs = deps.refreshClearMs ?? REFRESH_CLEAR_MS;
     this.#reportInfrastructureFailure = deps.reportInfrastructureFailure;
   }
   start(): void {
@@ -542,10 +653,7 @@ export class SimulatorDriver implements Driver {
     if (!snap) return null;
     const el = findSimulatorElement(snap, sel);
     if (!el) return null;
-    return {
-      x: (el.frame.x + el.frame.width / 2) / snap.screen.width,
-      y: (el.frame.y + el.frame.height / 2) / snap.screen.height,
-    };
+    return elementTapCenter(el, snap.screen);
   }
   #throwIfAborted(): void {
     if (this.#cfg.signal?.aborted) throw this.#cfg.signal.reason;
@@ -581,26 +689,65 @@ export class SimulatorDriver implements Driver {
     await this.#waitForSnapshotAfter(generation);
   }
 
+  /** Native tabs keep inactive screens in the AX tree, so labels such as
+   * Split/No History cannot prove the Wallet tab is active. Press its stable
+   * tab identity, reject the pre-press tree, then prove live wallet chrome. */
+  async #selectWalletTab(): Promise<void> {
+    await this.waitFor(WALLET_TAB_SELECTOR, 'enabled', 45_000);
+    const center = await this.#waitCenter(WALLET_TAB_SELECTOR);
+    if (!center) throw new Error('Wallet tab disappeared before it could be selected');
+    const generation = this.#ax.invalidate();
+    await this.#press(center.x, center.y);
+    await this.#waitForSnapshotAfter(generation);
+    await this.waitFor(WALLET_READY_SELECTOR, undefined, 45_000);
+  }
+
   async launch(reset: 'erase' | 'reinstall' | 'none'): Promise<void> {
     await this.#navigate(reset);
   }
+  /** OS-level deep link into the running app. */
+  async openUrl(url: string): Promise<void> {
+    this.#throwIfAborted();
+    await run(['xcrun', 'simctl', 'openurl', this.#cfg.udid, url], {
+      signal: this.#cfg.signal,
+    });
+  }
+  /** simctl TCC control. iOS may SIGKILL a running app whose record changes,
+   * and permission hooks cache state at mount — scenarios follow this with
+   * `launch reset:none` before exercising the gated flow. */
+  async setPermission(
+    service: 'camera' | 'photos' | 'location',
+    mode: 'grant' | 'revoke' | 'reset'
+  ): Promise<void> {
+    this.#throwIfAborted();
+    await run(['xcrun', 'simctl', 'privacy', this.#cfg.udid, mode, service, BUNDLE_ID], {
+      signal: this.#cfg.signal,
+    });
+  }
+  async setLocation(mode: 'set' | 'clear', latitude?: number, longitude?: number): Promise<void> {
+    this.#throwIfAborted();
+    const args =
+      mode === 'set'
+        ? ['xcrun', 'simctl', 'location', this.#cfg.udid, 'set', `${latitude},${longitude}`]
+        : ['xcrun', 'simctl', 'location', this.#cfg.udid, 'clear'];
+    await run(args, { signal: this.#cfg.signal });
+  }
   async home(): Promise<void> {
     await this.#navigate('none');
-    await this.waitFor({ label: 'Split' }, undefined, 45000).catch(() =>
-      this.waitFor({ label: 'No History' }, undefined, 20000)
-    );
-    await sleep(REFRESH_CLEAR_MS); // let the post-reload "Refreshing…" overlay clear before any capture
+    await this.#selectWalletTab();
+    await sleep(this.#refreshClearMs); // let the post-reload "Refreshing…" overlay clear before any capture
   }
 
   async homeAfterFundedSweep(expectedAssets: readonly E2EReadyProofAsset[]): Promise<void> {
     await this.#navigate('none');
+    await this.#selectWalletTab();
     const deadline = Date.now() + 60_000;
     while (Date.now() < deadline) {
       this.#throwIfAborted();
       const node = await this.find({ id: E2E_READY_PROOF_STATUS_ID });
       if (node?.value && fundedSweepProbeComplete(node.value, expectedAssets)) {
-        await this.waitFor({ label: 'Split' }, undefined, 45_000);
-        await sleep(REFRESH_CLEAR_MS);
+        await this.waitFor(WALLET_READY_SELECTOR, undefined, 45_000);
+        await sleep(this.#refreshClearMs);
         return;
       }
       await sleep(this.#cfg.pollMs ?? 250);
@@ -655,10 +802,10 @@ export class SimulatorDriver implements Driver {
   async tap(sel: Selector): Promise<void> {
     const c = await this.#waitCenter(sel);
     if (!c) throw new Error(`tap: selector not on screen ${JSON.stringify(sel)}`);
-    await pressAt(this.#cfg.touchEndpoint, c.x, c.y, { signal: this.#cfg.signal });
+    await this.#press(c.x, c.y);
   }
   async tapAt(x: number, y: number): Promise<void> {
-    await pressAt(this.#cfg.touchEndpoint, x, y, { signal: this.#cfg.signal });
+    await this.#press(x, y);
   }
   async swipe(dir: 'left' | 'right' | 'up' | 'down'): Promise<void> {
     const [a, b] =
@@ -741,8 +888,37 @@ export class SimulatorDriver implements Driver {
     // Map the whole string BEFORE focusing so an unmappable character fails
     // without leaving a half-typed field behind.
     const strokes = hidKeystrokesFor(value);
-    await this.tap(sel); // focus the field
-    await sleep(800); // keyboard attach / autofocus settle
+    // Focus must be PROVEN before any letter is typed: a tap on a TextInput
+    // can be silently swallowed (observed on SendScreen's ScrollView), and
+    // unfocused HID letters hit expo-dev-menu's global key commands — a stray
+    // 'r' reloads the dev-client app mid-scenario. Digits carry no dev-menu
+    // binding, so type a benign '1' probe and require the field's AX value to
+    // echo it before committing the real text.
+    const probe = hidKeystrokesFor('1');
+    let focused = false;
+    for (let attempt = 0; attempt < 4 && !focused; attempt++) {
+      await this.tap(sel); // focus the field
+      await sleep(800); // keyboard attach / autofocus settle
+      await typeKeystrokes(this.#cfg.touchEndpoint, probe, LEFT_SHIFT_USAGE, {
+        signal: this.#cfg.signal,
+      });
+      try {
+        await this.waitFor(sel, undefined, 2_000, '1');
+        focused = true;
+      } catch {
+        // The probe never echoed into the field's AX value — the focus tap
+        // missed. The digit was a global no-op, so re-tapping is safe.
+      }
+    }
+    if (!focused) {
+      throw new Error(`input: field never took keyboard focus ${JSON.stringify(sel)}`);
+    }
+    await typeKeystrokes(
+      this.#cfg.touchEndpoint,
+      [{ usage: BACKSPACE_USAGE, shift: false }],
+      LEFT_SHIFT_USAGE,
+      { signal: this.#cfg.signal }
+    );
     await typeKeystrokes(this.#cfg.touchEndpoint, strokes, LEFT_SHIFT_USAGE, {
       signal: this.#cfg.signal,
     });
@@ -784,6 +960,9 @@ export class SimulatorDriver implements Driver {
       const after = await this.#captureAxSnapshot();
       this.#ax.update(after);
       const bytes = new Uint8Array(await Bun.file(target.path).arrayBuffer());
+      // The remaining mask/compression work is memory-only. Remove raw pixels
+      // immediately instead of retaining them until that work completes.
+      target.cleanup();
       return await maskScreenshotBytes(bytes, before, mask, after);
     } catch (error) {
       const infrastructureError =
@@ -851,7 +1030,7 @@ export class SimulatorDriver implements Driver {
   }
 }
 
-async function changedPixelFraction(a: Uint8Array, b: Uint8Array): Promise<number> {
+export async function changedPixelFraction(a: Uint8Array, b: Uint8Array): Promise<number> {
   const [left, right] = await Promise.all([
     sharp(Buffer.from(a)).ensureAlpha().raw().toBuffer({ resolveWithObject: true }),
     sharp(Buffer.from(b)).ensureAlpha().raw().toBuffer({ resolveWithObject: true }),

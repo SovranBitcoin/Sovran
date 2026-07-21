@@ -8,6 +8,8 @@
  */
 import type { Selector } from '../schema/selectors';
 import type { AxNode, ObservedState } from './driver';
+import { parseE2EActionMenuTarget } from '../../shared/lib/e2e/actionMenuTarget';
+import { redactProfileSecretAxFields, redactProfileSecretAxNodes } from './ax-redaction';
 
 export interface AxElement {
   id?: string;
@@ -22,7 +24,41 @@ export interface AxSnapshot {
   elements: AxElement[];
 }
 
+/** Resolve a physical tap centre. Ordinary elements use their AX frame. An
+ * iOS FullWindowOverlay action mirror carries the real row's measured centre
+ * in its non-secret AX value because that native overlay is absent from the
+ * main window's AX tree. */
+export function elementTapCenter(
+  element: AxElement,
+  screen: AxSnapshot['screen']
+): { x: number; y: number } | null {
+  const mirroredTarget = parseE2EActionMenuTarget(element.value);
+  const x = mirroredTarget?.x ?? element.frame.x + element.frame.width / 2;
+  const y = mirroredTarget?.y ?? element.frame.y + element.frame.height / 2;
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    x < 0 ||
+    y < 0 ||
+    x > screen.width ||
+    y > screen.height
+  ) {
+    return null;
+  }
+  return { x: x / screen.width, y: y / screen.height };
+}
+
 export const normalizeWs = (s: string | undefined): string => (s ?? '').replace(/\s+/g, ' ').trim();
+
+const IOS_CHECKED_CONTROL_VALUE = /^(?:radio button|checkbox|switch), (?:checked, 1|unchecked, 0)$/;
+
+/** serve-sim receives VoiceOver's spoken composite for React Native checked
+ * controls instead of the authored accessibilityValue. Recover the terminal
+ * semantic bit only for the exact, internally-consistent control forms. */
+const normalizeCheckedControlValue = (value: string | undefined): string | undefined => {
+  if (!value || !IOS_CHECKED_CONTROL_VALUE.test(value)) return value;
+  return value.endsWith(', 1') ? '1' : '0';
+};
 
 const onScreen = (el: AxElement, screen: AxSnapshot['screen']): boolean => {
   const cx = el.frame.x + el.frame.width / 2;
@@ -95,29 +131,57 @@ export function selectorMatches(el: AxElement, sel: Selector): boolean {
 }
 
 /** Find the best on-screen element for a selector: exact id/label wins over a
- *  prefix hit; only on-screen-center elements qualify. */
+ *  prefix hit; only on-screen-center elements qualify. An indexed prefix is
+ *  ordered top-to-bottom, then left-to-right, after duplicate ids are folded
+ *  (crossfade lists can briefly expose the same row twice). */
 export function findElement(snap: AxSnapshot, sel: Selector): AxElement | null {
   const visible = snap.elements.filter((e) => onScreen(e, snap.screen));
   const matches = visible.filter((e) => selectorMatches(e, sel));
   if (matches.length === 0) return null;
   if ('idPrefix' in sel) {
-    if (sel.captureSuffixAs && matches.length > 1)
-      throw new Error(`ambiguous id prefix capture "${sel.idPrefix}" (${matches.length} matches)`);
-    if (sel.captureSuffixAs && matches[0].id === sel.idPrefix)
+    const distinctIdCount = new Set(matches.map((match) => match.id)).size;
+    if (sel.captureSuffixAs && sel.matchIndex === undefined && distinctIdCount > 1)
+      throw new Error(`ambiguous id prefix capture "${sel.idPrefix}" (${distinctIdCount} matches)`);
+    if (sel.matchIndex === undefined) {
+      const match = matches[0];
+      if (sel.captureSuffixAs && match.id === sel.idPrefix)
+        throw new Error(`empty id suffix for prefix capture "${sel.idPrefix}"`);
+      return match;
+    }
+    const seenIds = new Set<string | undefined>();
+    const orderedMatches = [...matches]
+      .sort((a, b) => {
+        const vertical = a.frame.y - b.frame.y;
+        if (vertical !== 0) return vertical;
+        const horizontal = a.frame.x - b.frame.x;
+        if (horizontal !== 0) return horizontal;
+        return (a.id ?? '').localeCompare(b.id ?? '');
+      })
+      .filter((match) => {
+        if (seenIds.has(match.id)) return false;
+        seenIds.add(match.id);
+        return true;
+      });
+    const match = orderedMatches[sel.matchIndex];
+    if (!match) return null;
+    if (sel.captureSuffixAs && match.id === sel.idPrefix)
       throw new Error(`empty id suffix for prefix capture "${sel.idPrefix}"`);
-    return matches[0];
+    return match;
   }
   // exact: prefer an element whose id/label equals exactly (already guaranteed)
   return matches[0];
 }
 
-export const toAxNode = (el: AxElement): AxNode => ({
-  id: el.id,
-  label: el.label,
-  value: el.value,
-  role: el.role,
-  state: { enabled: el.enabled ?? true },
-});
+export const toAxNode = (el: AxElement): AxNode => {
+  const safe = redactProfileSecretAxFields(el);
+  return {
+    id: safe.id,
+    label: safe.label ?? undefined,
+    value: normalizeCheckedControlValue(safe.value ?? undefined),
+    role: safe.role,
+    state: { enabled: safe.enabled ?? true },
+  };
+};
 
 /** Parse a `data: {...}` SSE line into a snapshot (null for keep-alive lines). */
 export function parseSseData(line: string): AxSnapshot | null {
@@ -126,7 +190,10 @@ export function parseSseData(line: string): AxSnapshot | null {
   if (!body) return null;
   try {
     const obj = JSON.parse(body);
-    if (obj && obj.screen && Array.isArray(obj.elements)) return obj as AxSnapshot;
+    if (obj && obj.screen && Array.isArray(obj.elements)) {
+      const snapshot = obj as AxSnapshot;
+      return { ...snapshot, elements: redactProfileSecretAxNodes(snapshot.elements) };
+    }
   } catch {
     /* partial/keep-alive */
   }

@@ -360,19 +360,27 @@ export async function findInstallableApp(
   );
 }
 
+interface DevClientChromeDependencies {
+  press?: typeof pressAt;
+  gesture?: typeof gesture;
+}
+
 /** Dismiss dev-client / springboard chrome; returns true if it pressed something. */
 export async function handleDevClientChrome(
   _udid: string,
   touchEndpoint: string,
   snap: AxSnapshot,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  dependencies: DevClientChromeDependencies = {}
 ): Promise<boolean> {
+  const press = dependencies.press ?? pressAt;
+  const touchGesture = dependencies.gesture ?? gesture;
   const has = (p: string) => snap.elements.some((e) => e.label?.startsWith(p));
   const includes = (n: string) => snap.elements.some((e) => e.label?.includes(n));
   const pressExact = async (label: string) => {
     const el = snap.elements.find((e) => e.label === label && e.role === 'button');
     if (!el) return false;
-    await pressAt(
+    await press(
       touchEndpoint,
       (el.frame.x + el.frame.width / 2) / snap.screen.width,
       (el.frame.y + el.frame.height / 2) / snap.screen.height,
@@ -380,10 +388,14 @@ export async function handleDevClientChrome(
     );
     return true;
   };
+  // A failed Apple Intelligence banner dismissal can foreground Settings. Its
+  // page still contains the broad Apple Intelligence text below, so return to
+  // the owned app before considering another dismissal gesture.
+  if (await pressExact('Return to Sovran')) return true;
   if (includes('Apple Intelligence') || includes('Time to experience')) {
-    await gesture(touchEndpoint, 'begin', 0.5, 0.11, { signal });
-    await gesture(touchEndpoint, 'move', 0.5, 0.04, { signal });
-    await gesture(touchEndpoint, 'end', 0.5, 0.02, { signal });
+    await touchGesture(touchEndpoint, 'begin', 0.5, 0.11, { signal });
+    await touchGesture(touchEndpoint, 'move', 0.5, 0.04, { signal });
+    await touchGesture(touchEndpoint, 'end', 0.5, 0.02, { signal });
     return true;
   }
   if (has('Open in')) return pressExact('Open');
@@ -392,7 +404,7 @@ export async function handleDevClientChrome(
   if (includes('would like to paste')) return pressExact('Allow Paste');
   if (has('This is the developer menu')) return pressExact('Continue');
   if (has('Fast refresh') || has('Toggle element inspector')) {
-    await pressAt(touchEndpoint, 0.5, 0.15, { signal });
+    await press(touchEndpoint, 0.5, 0.15, { signal });
     return true;
   }
   return false;

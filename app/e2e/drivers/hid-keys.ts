@@ -11,6 +11,8 @@ export interface HidKeystroke {
 }
 
 export const LEFT_SHIFT_USAGE = 0xe1;
+/** HID usage for Backspace — used to clear the focus-probe digit. */
+export const BACKSPACE_USAGE = 0x2a;
 
 const DIGIT_USAGES: Record<string, number> = {
   '1': 0x1e,

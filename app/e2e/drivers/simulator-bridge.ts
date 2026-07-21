@@ -5,6 +5,7 @@
  * unnecessary and (in serve-sim 0.1.44) a native crash surface.
  */
 import { createRequire } from 'node:module';
+import { isProfileSecretAxId, PROFILE_SECRET_AX_REDACTED } from './ax-redaction';
 
 interface NativeHid {
   touch(type: string, x: number, y: number, width: number, height: number, edge: number): void;
@@ -40,7 +41,14 @@ function parseRawAx(raw: string): RawAxNode[] {
   if (!Array.isArray(value) || !value.length || !value[0]?.frame) {
     throw new Error('native simulator bridge returned an invalid accessibility tree');
   }
-  return value as RawAxNode[];
+  const redact = (node: RawAxNode): RawAxNode => ({
+    ...node,
+    ...(isProfileSecretAxId(node.AXUniqueId)
+      ? { AXLabel: PROFILE_SECRET_AX_REDACTED, AXValue: PROFILE_SECRET_AX_REDACTED }
+      : {}),
+    ...(node.children ? { children: node.children.map(redact) } : {}),
+  });
+  return (value as RawAxNode[]).map(redact);
 }
 
 function normalizeAx(roots: RawAxNode[]) {
@@ -95,11 +103,10 @@ export function startSimulatorBridge(options: {
     const result = axTail
       .catch(() => {})
       .then(async () => {
-        const raw = await native.axDescribe(udid);
-        const roots = parseRawAx(raw);
+        const roots = parseRawAx(await native.axDescribe(udid));
         width = roots[0]!.frame.width;
         height = roots[0]!.frame.height;
-        return { raw, roots };
+        return { raw: JSON.stringify(roots), roots };
       });
     axTail = result.then(
       () => {},
@@ -215,7 +222,7 @@ export function startSimulatorBridge(options: {
   });
   const boundPort = server.port;
   if (!boundPort) {
-    server.stop(true);
+    void server.stop(true);
     throw new Error('simulator bridge failed to bind its owned loopback port');
   }
 
@@ -229,7 +236,7 @@ export function startSimulatorBridge(options: {
       if (pollTimer) clearTimeout(pollTimer);
       for (const client of clients) client.close();
       clients.clear();
-      server.stop(true);
+      void server.stop(true);
     },
   };
 }

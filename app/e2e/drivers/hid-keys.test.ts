@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { hidKeystrokeFor, hidKeystrokesFor, LEFT_SHIFT_USAGE } from './hid-keys';
+import { BACKSPACE_USAGE, hidKeystrokeFor, hidKeystrokesFor, LEFT_SHIFT_USAGE } from './hid-keys';
 import { typeKeystrokes } from './simctl';
 
 describe('HID key mapping', () => {
@@ -23,6 +23,13 @@ describe('HID key mapping', () => {
     expect(hidKeystrokeFor('_')).toEqual({ usage: 0x2d, shift: true });
     expect(hidKeystrokeFor('?')).toEqual({ usage: 0x38, shift: true });
     expect(hidKeystrokeFor(' ')).toEqual({ usage: 0x2c, shift: false });
+  });
+
+  it('pins the backspace usage the input focus-probe relies on', () => {
+    // The digit probe ('1', no dev-menu binding) is erased with exactly one
+    // backspace before the real value is typed.
+    expect(BACKSPACE_USAGE).toBe(0x2a);
+    expect(hidKeystrokeFor('1')).toEqual({ usage: 0x1e, shift: false });
   });
 
   it('refuses characters outside the US layout instead of typing garbage', () => {

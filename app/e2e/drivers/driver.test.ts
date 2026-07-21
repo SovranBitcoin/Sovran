@@ -20,6 +20,23 @@ describe('FakeDriver strict defaults', () => {
     });
   });
 
+  it('makes permissive launch evidence immediately AX-ready', async () => {
+    const driver = new FakeDriver({ permissive: true });
+    await expect(driver.axSnapshot()).resolves.not.toHaveLength(0);
+  });
+
+  it('provides a neutral permissive balance baseline for orchestration smoke', async () => {
+    const driver = new FakeDriver({ permissive: true });
+    await expect(driver.balance('sat')).resolves.toBe(0);
+  });
+
+  it('does not claim product value checks in permissive waitFor calls', async () => {
+    const driver = new FakeDriver({ permissive: true });
+    await expect(driver.waitFor({ id: 'state' }, 'visible', 1, 'target')).resolves.toMatchObject({
+      id: 'state',
+    });
+  });
+
   it('rejects disabled controls when enabled state is required', async () => {
     const driver = new FakeDriver({
       present: { 'label:Next': { label: 'Next', state: { enabled: false } } },
@@ -63,5 +80,13 @@ describe('FakeDriver strict defaults', () => {
     await expect(
       ambiguous.waitFor({ idPrefix: 'send-token-id-', captureSuffixAs: 'sendTx' }, 'visible', 1)
     ).rejects.toThrow(/ambiguous.*send-token-id-/i);
+
+    await expect(
+      ambiguous.waitFor(
+        { idPrefix: 'send-token-id-', matchIndex: 1, captureSuffixAs: 'sendTx' },
+        'visible',
+        1
+      )
+    ).resolves.toMatchObject({ id: 'send-token-id-def' });
   });
 });

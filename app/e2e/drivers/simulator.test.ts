@@ -73,6 +73,87 @@ describe('AxWatcher navigation freshness', () => {
     await launching;
     expect(watcher.latest).toBe(afterInstall);
   });
+
+  const fundedAsset = {
+    mintUrl: 'https://mint.sovran.money',
+    unit: 'sat',
+  } as const;
+  const completeSweep = JSON.stringify({
+    version: 1,
+    phase: 'complete',
+    assets: 1,
+    checked: 1,
+    spent: 1,
+    remaining: [{ ...fundedAsset, amount: 0 }],
+  });
+  const feedWithInactiveWalletAx: AxSnapshot = {
+    screen: { width: 400, height: 800 },
+    elements: [
+      {
+        id: 'tab-wallet',
+        label: 'Wallet',
+        frame: { x: 160, y: 740, width: 80, height: 50 },
+      },
+      {
+        label: 'Split',
+        frame: { x: 80, y: 400, width: 80, height: 40 },
+      },
+      {
+        id: 'e2e-ready-proof-reconciliation',
+        value: completeSweep,
+        frame: { x: 0, y: 0, width: 1, height: 1 },
+      },
+    ],
+  };
+  const activeWallet: AxSnapshot = {
+    screen: feedWithInactiveWalletAx.screen,
+    elements: [
+      ...feedWithInactiveWalletAx.elements,
+      {
+        id: 'wallet-send',
+        label: 'Send',
+        frame: { x: 220, y: 580, width: 120, height: 60 },
+      },
+    ],
+  };
+
+  function walletTabDriver() {
+    const watcher = new AxWatcher('unused');
+    const presses: { x: number; y: number }[] = [];
+    const driver = new SimulatorDriver(
+      { udid: 'offline-test', axEndpoint: 'unused', touchEndpoint: 'unused', pollMs: 1 },
+      {
+        axWatcher: watcher,
+        install: async () => {
+          setTimeout(() => watcher.update(feedWithInactiveWalletAx), 0);
+        },
+        press: async (x, y) => {
+          presses.push({ x, y });
+          watcher.update(activeWallet);
+        },
+        refreshClearMs: 0,
+      }
+    );
+    return { driver, presses };
+  }
+
+  it('actively selects the Wallet tab instead of accepting hidden inactive Wallet AX', async () => {
+    const { driver, presses } = walletTabDriver();
+
+    await driver.home();
+
+    expect(presses).toHaveLength(1);
+    await expect(driver.find({ id: 'wallet-send' })).resolves.toMatchObject({ id: 'wallet-send' });
+  });
+
+  it('selects the Wallet tab before accepting funded reconciliation probes', async () => {
+    const { driver, presses } = walletTabDriver();
+
+    await driver.homeAfterFundedSweep([fundedAsset]);
+
+    expect(presses).toHaveLength(1);
+    await expect(driver.find({ id: 'wallet-send' })).resolves.toMatchObject({ id: 'wallet-send' });
+  });
 });
 
 describe('SimulatorDriver fail-closed host boundaries', () => {
@@ -336,6 +417,122 @@ describe('SimulatorDriver fail-closed host boundaries', () => {
     ).rejects.toThrow(/without an accessibility snapshot/);
   });
 
+  it('always masks secret profile values while preserving ordinary profile pixels', async () => {
+    const input = await sharp({
+      create: {
+        width: 10,
+        height: 10,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const snap: AxSnapshot = {
+      screen: { width: 10, height: 10 },
+      elements: [
+        {
+          id: 'profile-secret-value-mnemonic',
+          frame: { x: 2, y: 2, width: 4, height: 4 },
+        },
+        {
+          id: 'profile-reveal-mnemonic',
+          label: 'Hide',
+          frame: { x: 7, y: 7, width: 2, height: 2 },
+        },
+      ],
+    };
+
+    const output = await maskScreenshotBytes(new Uint8Array(input), snap);
+    const { data, info } = await sharp(output)
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const pixel = (x: number, y: number): number => data[(y * info.width + x) * info.channels];
+
+    expect(pixel(3, 3)).toBe(0);
+    expect(pixel(8, 8)).toBe(255);
+  });
+
+  it('uses decoded bitmap dimensions when invalid AX geometry requires a full-frame mask', async () => {
+    const input = await sharp({
+      create: {
+        width: 10,
+        height: 10,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const before: AxSnapshot = { screen: { width: 0, height: 0 }, elements: [] };
+    const after: AxSnapshot = {
+      screen: { width: 0, height: 0 },
+      elements: [
+        {
+          id: 'profile-secret-value-mnemonic',
+          frame: { x: 0, y: 0, width: 0, height: 0 },
+        },
+      ],
+    };
+
+    const output = await maskScreenshotBytes(new Uint8Array(input), before, [], after);
+    const { data } = await sharp(output).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+
+    expect(data.every((channel) => channel === 0)).toBe(true);
+  });
+
+  it('fails closed for invalid or non-overlapping regional AX mask geometry', async () => {
+    const input = await sharp({
+      create: {
+        width: 10,
+        height: 10,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const cases: AxSnapshot[] = [
+      {
+        screen: { width: 0, height: 0 },
+        elements: [
+          {
+            id: 'profile-secret-value-mnemonic',
+            frame: { x: 0, y: 0, width: 4, height: 4 },
+          },
+        ],
+      },
+      {
+        screen: { width: 10, height: 10 },
+        elements: [
+          {
+            id: 'profile-secret-value-mnemonic',
+            frame: { x: 2, y: 2, width: 0, height: 4 },
+          },
+        ],
+      },
+      {
+        screen: { width: 10, height: 10 },
+        elements: [
+          {
+            id: 'profile-secret-value-mnemonic',
+            frame: { x: 10, y: 2, width: 4, height: 4 },
+          },
+        ],
+      },
+    ];
+
+    for (const snap of cases) {
+      const output = await maskScreenshotBytes(new Uint8Array(input), snap);
+      const { data } = await sharp(output)
+        .removeAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      expect(data.every((channel) => channel === 0)).toBe(true);
+    }
+  });
+
   it('fails closed when the accessibility tree changes across a bitmap capture', async () => {
     const input = await sharp({
       create: {
@@ -448,6 +645,32 @@ describe('SimulatorDriver fail-closed host boundaries', () => {
 
       expect(data.every((channel) => channel === 255)).toBe(true);
       expect(snapshots).toHaveLength(0);
+      expect(readdirSync(root)).toHaveLength(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('removes private raw pixels when post-capture AX fails', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'sovran-shot-driver-failure-test-'));
+    let captures = 0;
+    try {
+      const driver = new SimulatorDriver(
+        { udid: 'offline-test', axEndpoint: 'unused', touchEndpoint: 'unused' },
+        {
+          captureAxSnapshot: async () => {
+            if (captures++ === 0) return snapshot('wallet');
+            throw new Error('post-capture AX unavailable');
+          },
+          captureRawScreenshot: async (path) => {
+            writeFileSync(path, 'raw-private-pixels');
+          },
+          screenshotSettleMs: 0,
+          screenshotTempRoot: root,
+        }
+      );
+
+      await expect(driver.screenshot()).rejects.toThrow(/evidence transport unavailable/);
       expect(readdirSync(root)).toHaveLength(0);
     } finally {
       rmSync(root, { recursive: true, force: true });

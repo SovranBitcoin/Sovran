@@ -5,7 +5,8 @@
  * + serve-sim /ax + gesture) plugs into the same interface only through an
  * owned ephemeral session. `clipboardSet`
  * takes an already safe/opaque value; AX/text is redacted, while bitmaps are
- * owner-private and masked only when a checkpoint explicitly requests it.
+ * owner-private; stable secret-profile regions are always masked, while other
+ * sensitive regions are masked when a checkpoint explicitly requests it.
  */
 import type { Selector } from '../schema/selectors';
 
@@ -36,8 +37,21 @@ export interface StateObservation {
 }
 
 export interface Driver {
+  /** False only for the permissive fake lane: it exercises assertion
+   * orchestration without claiming product semantics. */
+  readonly semanticAssertions?: boolean;
   launch(reset: 'erase' | 'reinstall' | 'none'): Promise<void>;
   home(): Promise<void>;
+  /** Set a TCC privacy record for the app (simctl privacy on the simulator).
+   * Takes effect for permission hooks only after the next launch. */
+  setPermission(
+    service: 'camera' | 'photos' | 'location',
+    mode: 'grant' | 'revoke' | 'reset'
+  ): Promise<void>;
+  /** Simulate a device GPS fix (`simctl location`); `clear` removes it. */
+  setLocation(mode: 'set' | 'clear', latitude?: number, longitude?: number): Promise<void>;
+  /** Deliver an OS-level deep link to the running app (simctl openurl). */
+  openUrl(url: string): Promise<void>;
   waitFor(
     sel: Selector,
     state: 'visible' | 'enabled' | undefined,
@@ -76,7 +90,7 @@ export interface CommandRunner {
   run(command: string[], timeoutMs: number): Promise<CommandResult>;
 }
 
-export type ArtifactKind = 'screenshot' | 'ax' | 'log' | 'store' | 'db';
+export type ArtifactKind = 'screenshot' | 'ax' | 'log' | 'store' | 'db' | 'faults';
 
 export interface ArtifactSink {
   /** Persist an artifact and return its (redacted-safe) path. */
@@ -87,6 +101,8 @@ export interface ArtifactSink {
 export interface AppDataResult {
   store: string | null;
   db: string | null;
+  /** Mint-fault intercepted-request ledger (mock.mint-faults sessions only). */
+  faults?: string | null;
 }
 
 /** Best-effort app-state capture (zustand mirror file + coco SQLite dump).
@@ -96,10 +112,32 @@ export interface AppDataCapturer {
   capture(): Promise<AppDataResult>;
 }
 
+/** Real device-level network control (the `network` step). Provided only by
+ * sessions that can genuinely sever the device's network (android emulator
+ * airplane mode); scenarios gate on the `device.network` capability. `set`
+ * resolving means the device-side state change is confirmed, not just
+ * requested — the orchestrator's finally backstop relies on that. */
+export interface NetworkChannel {
+  set(mode: 'airplane' | 'online'): Promise<void>;
+}
+
 export const selectorKey = (s: Selector): string =>
-  'id' in s ? `id:${s.id}` : 'idPrefix' in s ? `idPrefix:${s.idPrefix}` : `label:${s.label}`;
+  'id' in s
+    ? `id:${s.id}`
+    : 'idPrefix' in s
+      ? `idPrefix:${s.idPrefix}${s.matchIndex === undefined ? '' : `[${s.matchIndex}]`}`
+      : `label:${s.label}`;
 
 // ── Fakes for offline orchestrator tests ────────────────────────────────────
+
+export class FakeNetworkChannel implements NetworkChannel {
+  mode: 'airplane' | 'online' = 'online';
+  readonly calls: ('airplane' | 'online')[] = [];
+  async set(mode: 'airplane' | 'online'): Promise<void> {
+    this.mode = mode;
+    this.calls.push(mode);
+  }
+}
 
 export interface FakeConfig {
   present?: Record<string, AxNode>; // selectorKey -> node currently on screen
@@ -121,16 +159,22 @@ export class FakeDriver implements Driver {
   calls: string[] = [];
   screenshotOptions: ScreenshotOptions[] = [];
   clipboard = '';
+  readonly semanticAssertions: boolean;
   #cfg: FakeConfig;
   #observedStateIndex = 0;
   #observedRevision = 0;
   constructor(cfg: FakeConfig = {}) {
     this.#cfg = cfg;
+    this.semanticAssertions = !cfg.permissive;
   }
   #match(sel: Selector): AxNode | null {
     if (this.#cfg.permissive) {
       const id =
-        'id' in sel ? sel.id : 'idPrefix' in sel ? `${sel.idPrefix}fake-suffix` : undefined;
+        'id' in sel
+          ? sel.id
+          : 'idPrefix' in sel
+            ? `${sel.idPrefix}fake-suffix${sel.matchIndex === undefined ? '' : `-${sel.matchIndex}`}`
+            : undefined;
       return {
         id,
         label: 'label' in sel ? sel.label : id,
@@ -146,13 +190,20 @@ export class FakeDriver implements Driver {
         const id = candidate.id ?? (candidateKey.startsWith('id:') ? candidateKey.slice(3) : '');
         return id.startsWith(sel.idPrefix) ? [{ ...candidate, id }] : [];
       });
-      if (sel.captureSuffixAs && matches.length > 1)
+      const seenIds = new Set<string | undefined>();
+      const distinctMatches = matches.filter((match) => {
+        if (seenIds.has(match.id)) return false;
+        seenIds.add(match.id);
+        return true;
+      });
+      if (sel.captureSuffixAs && sel.matchIndex === undefined && distinctMatches.length > 1)
         throw new Error(
-          `ambiguous id prefix capture "${sel.idPrefix}" (${matches.length} matches)`
+          `ambiguous id prefix capture "${sel.idPrefix}" (${distinctMatches.length} matches)`
         );
-      if (sel.captureSuffixAs && matches[0]?.id === sel.idPrefix)
+      const match = sel.matchIndex === undefined ? matches[0] : distinctMatches[sel.matchIndex];
+      if (sel.captureSuffixAs && match?.id === sel.idPrefix)
         throw new Error(`empty id suffix for prefix capture "${sel.idPrefix}"`);
-      if (matches[0]) return matches[0];
+      if (match) return match;
     }
     if (present[key]) return present[key];
     return null;
@@ -162,6 +213,18 @@ export class FakeDriver implements Driver {
   }
   async home() {
     this.calls.push('home');
+  }
+  async setPermission(
+    service: 'camera' | 'photos' | 'location',
+    mode: 'grant' | 'revoke' | 'reset'
+  ) {
+    this.calls.push(`permission:${mode}:${service}`);
+  }
+  async setLocation(mode: 'set' | 'clear', latitude?: number, longitude?: number) {
+    this.calls.push(`location:${mode}:${latitude ?? ''}:${longitude ?? ''}`);
+  }
+  async openUrl(url: string) {
+    this.calls.push(`openUrl:${url}`);
   }
   async waitFor(
     sel: Selector,
@@ -176,7 +239,7 @@ export class FakeDriver implements Driver {
     if (!node) throw new Error(`waitFor: ${selectorKey(sel)} not present`);
     if (state === 'enabled' && node.state?.enabled === false)
       throw new Error(`waitFor: ${selectorKey(sel)} not enabled`);
-    if (value !== undefined && node.value !== value)
+    if (this.semanticAssertions && value !== undefined && node.value !== value)
       throw new Error(`waitFor: ${selectorKey(sel)} value "${node.value}" ≠ "${value}"`);
     return node;
   }
@@ -221,6 +284,7 @@ export class FakeDriver implements Driver {
     return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
   }
   async axSnapshot() {
+    if (this.#cfg.permissive) return [{ id: 'fake-root', label: 'fake-root', role: 'button' }];
     return Object.values(this.#cfg.present ?? {});
   }
   async observeState(): Promise<StateObservation> {
@@ -237,6 +301,7 @@ export class FakeDriver implements Driver {
     return { state, revision, ax: Object.values(this.#cfg.present ?? {}) };
   }
   async balance(unit: string) {
+    if (this.#cfg.permissive) return 0;
     if (!this.#cfg.balances || !(unit in this.#cfg.balances))
       throw new Error(`unsupported or unconfigured balance unit: ${unit}`);
     return this.#cfg.balances[unit];

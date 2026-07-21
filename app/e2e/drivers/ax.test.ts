@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 import {
   classifyObservedState,
+  elementTapCenter,
   normalizeWs,
   selectorMatches,
   findElement,
   parseSseData,
   parseBalanceSat,
+  toAxNode,
   type AxSnapshot,
   type AxElement,
 } from './ax';
@@ -48,6 +50,100 @@ describe('findElement', () => {
       })
     ).toThrow(/ambiguous.*send-token-id-/i);
   });
+  it('selects indexed visible prefix matches in visual order and folds duplicate ids', () => {
+    const top = el({
+      id: 'contact-row:mint:https://top.example',
+      frame: { x: 20, y: 100, width: 300, height: 60 },
+    });
+    const bottom = el({
+      id: 'contact-row:mint:https://bottom.example',
+      frame: { x: 20, y: 300, width: 300, height: 60 },
+    });
+    const duplicateTop = el({
+      id: top.id,
+      frame: { x: 20, y: 101, width: 300, height: 60 },
+    });
+    const snapshot = snap([bottom, duplicateTop, top]);
+
+    expect(
+      findElement(snapshot, {
+        idPrefix: 'contact-row:mint:',
+        matchIndex: 0,
+        captureSuffixAs: 'mintOneUrl',
+      })?.id
+    ).toBe(top.id);
+    expect(
+      findElement(snapshot, {
+        idPrefix: 'contact-row:mint:',
+        matchIndex: 1,
+        captureSuffixAs: 'mintTwoUrl',
+      })?.id
+    ).toBe(bottom.id);
+    expect(findElement(snapshot, { idPrefix: 'contact-row:mint:', matchIndex: 2 })).toBeNull();
+  });
+});
+
+describe('toAxNode checked-control values', () => {
+  it.each([
+    ['radio button, checked, 1', '1'],
+    ['radio button, unchecked, 0', '0'],
+    ['checkbox, checked, 1', '1'],
+    ['checkbox, unchecked, 0', '0'],
+    ['switch, checked, 1', '1'],
+    ['switch, unchecked, 0', '0'],
+  ])('normalizes the iOS composite %s to %s', (value, expected) => {
+    expect(toAxNode(el({ value })).value).toBe(expected);
+  });
+
+  it.each([
+    'button, checked, 1',
+    'radio button, checked, 0',
+    'checkbox, unchecked, 1',
+    'switch, mixed, 1',
+    'radio button, checked, 1, extra',
+    '1',
+  ])('preserves the nonmatching value %s', (value) => {
+    expect(toAxNode(el({ value })).value).toBe(value);
+  });
+
+  it('redacts every secret-profile label and value while preserving stable selector state', () => {
+    const node = toAxNode(
+      el({
+        id: 'profile-secret-value-mnemonic',
+        label: 'raw-private-label',
+        value: 'raw-private-value',
+        role: 'text',
+        enabled: false,
+        frame: { x: -500, y: -500, width: 10, height: 10 },
+      })
+    );
+
+    expect(node).toEqual({
+      id: 'profile-secret-value-mnemonic',
+      label: '‹profile-secret:redacted›',
+      value: '‹profile-secret:redacted›',
+      role: 'text',
+      state: { enabled: false },
+    });
+  });
+});
+
+describe('elementTapCenter', () => {
+  it('uses the ordinary accessibility frame for normal controls', () => {
+    expect(elementTapCenter(el({}), snap([]).screen)).toEqual({ x: 0.3125, y: 0.2625 });
+  });
+
+  it('uses an app-measured FullWindowOverlay row target when present', () => {
+    expect(
+      elementTapCenter(el({ value: 'e2e-action-menu-target:200.000:720.000' }), snap([]).screen)
+    ).toEqual({ x: 0.5, y: 0.9 });
+  });
+
+  it('rejects an app-measured target outside the current screen', () => {
+    expect(
+      elementTapCenter(el({ value: 'e2e-action-menu-target:200.000:900.000' }), snap([]).screen)
+    ).toBeNull();
+  });
 });
 
 describe('parseSseData', () => {
@@ -55,6 +151,28 @@ describe('parseSseData', () => {
     expect(parseSseData('data: {"screen":{"width":1,"height":1},"elements":[]}')).not.toBeNull();
     expect(parseSseData(':keep-alive')).toBeNull();
     expect(parseSseData('data: ')).toBeNull();
+  });
+
+  it('redacts a retained secret-profile node before it can leave the SSE parser', () => {
+    const parsed = parseSseData(
+      `data: ${JSON.stringify({
+        screen: { width: 400, height: 800 },
+        elements: [
+          {
+            id: 'profile-secret-value-cashuMnemonic',
+            label: 'raw-private-label',
+            value: 'raw-private-value',
+            frame: { x: -500, y: -500, width: 10, height: 10 },
+          },
+        ],
+      })}`
+    );
+
+    expect(parsed?.elements[0]).toMatchObject({
+      id: 'profile-secret-value-cashuMnemonic',
+      label: '‹profile-secret:redacted›',
+      value: '‹profile-secret:redacted›',
+    });
   });
 });
 
