@@ -13,6 +13,9 @@ describe('wallet surface e2e selectors', () => {
   it('pins wallet-fiat-pill on the sat-page fiat conversion pill', () => {
     const source = read('features/wallet/components/PrimaryBalance.tsx');
     expect(source).toContain("testID={isSatUnit ? 'wallet-fiat-pill' : undefined}");
+    // The 1×1 sibling probe mirrors the persisted selection into AX — the
+    // native menu pill itself exposes no machine-readable currency code.
+    expect(source).toContain('testID={`wallet-fiat-currency:${displayCurrency}`}');
     expect(source).toContain(
       "accessibilityLabel={isSatUnit ? 'Change display currency' : undefined}"
     );
@@ -53,6 +56,12 @@ describe('wallet surface e2e selectors', () => {
     expect(source).toContain("testID={c.isNostr ? 'mint-info-contact-nostr' : undefined}");
   });
 
+  it('pins the own/other profile screen probe', () => {
+    expect(read('features/user/screens/UserProfileScreen.tsx')).toContain(
+      "testID={isOwnProfile ? 'user-profile:own' : 'user-profile:other'}"
+    );
+  });
+
   it('pins profile-send-money on the user profile screen', () => {
     expect(read('features/user/screens/UserProfileScreen.tsx')).toContain(
       'testID="profile-send-money"'
@@ -65,6 +74,7 @@ describe('wallet surface e2e selectors', () => {
     // the row pressable owns the id and the toggle; the probe carries state.
     expect(source).toContain('testID="receive-creq-p2pk-toggle"');
     expect(source).toContain('testID="receive-creq-p2pk-state"');
+    expect(source).toContain('testID={`receive-creq-p2pk-state:${p2pkStateValue.text}`}');
   });
 
   it('pins the wallet header search toggle and input', () => {
@@ -85,6 +95,16 @@ describe('wallet surface e2e selectors', () => {
     expect(source).toContain('testID="dm-chat-probe"');
   });
 
+  it('pins the inline cashu-token bubble AX identity in chat threads', () => {
+    // The interactive outer Pressable carries the id (inner Texts AX-flatten
+    // into it); own vs incoming direction is the e2e-relevant distinction.
+    const source = read('shared/ui/composed/chat/CashuTokenBubble.tsx');
+    expect(source).toContain("testID={isOwn ? 'cashu-bubble-own' : 'cashu-bubble-incoming'}");
+    expect(source).toContain(
+      "accessibilityLabel={isOwn ? 'Sent ecash token' : 'Received ecash token'}"
+    );
+  });
+
   it('pins the unit switcher pill AX identity', () => {
     const source = read('features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.liquid.tsx');
     // LiquidGlassMenu is AX-invisible without accessible+label — both render
@@ -99,6 +119,56 @@ describe('wallet surface e2e selectors', () => {
     expect(settings).toContain('testID="settings-version-row"');
     expect(settings).toContain('testID="settings-mock-offline-toggle"');
     expect(settings).toContain('testID="settings-mock-fail-melt-toggle"');
+    expect(settings.match(/accessibilityRole="switch"/g)?.length).toBeGreaterThanOrEqual(3);
+    for (const state of ['mockOffline', 'mockFailSend', 'mockFailMelt']) {
+      expect(settings).toContain(`accessibilityState={{ checked: ${state} }}`);
+    }
+  });
+
+  it('exposes transaction filter selection as semantic checked state', () => {
+    const filters = read('features/transactions/screens/FiltersScreen.tsx');
+    expect(filters.match(/accessibilityRole="radio"/g)?.length).toBe(2);
+    expect(filters.match(/accessibilityState={{ checked: isSelected }}/g)?.length).toBe(2);
+  });
+
+  it('exposes mint distribution toggles as native checked controls', () => {
+    const distribution = read('features/mint/components/distribution/MintDistributionCards.tsx');
+    expect(distribution).toContain('isSelected={enabled}');
+    expect(distribution).toContain('testID={`mint-distribution-toggle:${mintUrl}`}');
+  });
+
+  it('exposes notification policy selection as semantic radio state', () => {
+    const policy = read('features/settings/screens/SettingsNotificationPolicyScreen.tsx');
+    expect(policy).toContain('accessibilityRole="radio"');
+    expect(policy).toContain('accessibilityState={{ checked: selected }}');
+    expect(policy).toContain('testID={`notification-policy-${option.toLowerCase()}`}');
+  });
+
+  it('drives the Design System through actionable outer-row selectors', () => {
+    const settings = read('features/settings/screens/SettingsScreen.tsx');
+    expect(settings).toContain('testID="settings-design-system-row"');
+    expect(settings).toContain('accessible={testID ? true : undefined}');
+    expect(settings).toContain("accessibilityRole={testID ? 'button' : undefined}");
+
+    const catalog = read('features/settings/screens/SettingsDesignSystemScreen.tsx');
+    expect(catalog).toContain('testID={`design-system-family-${id}`}');
+    expect(catalog).toContain('accessibilityLabel={`${title}, ${description}`}');
+    expect(catalog).toContain('accessibilityRole="button"');
+
+    const scenario = JSON.parse(read('e2e/scenarios/settings-design-system-showcase.json')) as {
+      steps: unknown[];
+    };
+    expect(scenario.steps).toContainEqual({
+      action: 'tapUntil',
+      sequence: [{ tap: { id: 'settings-design-system-row' } }],
+      until: { id: 'design-system-family-timeline' },
+      attempts: 4,
+      settleMs: 6000,
+    });
+    expect(scenario.steps).not.toContainEqual({
+      action: 'tap',
+      selector: { label: 'Design system, Preview shared UI components' },
+    });
   });
 
   it('pins the DM composer testID plumbing', () => {
@@ -110,6 +180,60 @@ describe('wallet surface e2e selectors', () => {
   it('pins the seed reveal toggles on SettingsProfileScreen', () => {
     const source = read('features/settings/screens/SettingsProfileScreen.tsx');
     expect(source).toContain('testID={`profile-reveal-${fieldKey}`}');
+    expect(source).toContain('testID={fieldKey ? `profile-secret-value-${fieldKey}` : undefined}');
+    expect(source).toContain('accessibilityRole="switch"');
+    expect(source).toContain('accessibilityState={{ checked: isVisible }}');
+  });
+
+  it('mounts the heroui menu probe on the feed for the Following mode menu', () => {
+    expect(read('features/feed/screens/FeedScreen.tsx')).toContain('<E2EHerouiMenuProbe />');
+  });
+
+  it('makes the AI model picker FWO sheet observable to e2e', () => {
+    expect(read('shared/lib/popup/E2EActionMenuProbe.tsx')).toContain(
+      "state.current.sheetId === 'model-picker'"
+    );
+    // Keyed on the live openSeq (not a static string) so the render marker
+    // re-fires when the snapPoints sheet settles — see the sidecar diagnosis.
+    expect(read('shared/lib/popup/popups/modelPicker.tsx')).toContain(
+      '<E2EActionMenuRenderMarker presentationKey={popupOpenSeq} />'
+    );
+    expect(read('shared/blocks/popup/PopupHost.tsx')).toContain(
+      "activeCustomPage?.sheetId === 'model-picker'"
+    );
+    // The probe COMPONENT (not just the gate) must be mounted on the AI screen.
+    expect(read('features/ai/screens/AiChatScreen.tsx')).toContain('<E2EActionMenuProbe />');
+  });
+
+  it('gives the AI history header button an AX identity and mounts its menu probe', () => {
+    expect(read('app/(drawer)/(tabs)/ai/_layout.tsx')).toContain(
+      "headerRightTestID: 'ai-history-button'"
+    );
+    // The generic header helper must forward the label/testID to the button.
+    expect(read('navigation/nativeTabs.tsx')).toContain(
+      'accessibilityLabel={headerRightAccessibilityLabel}'
+    );
+    expect(read('features/ai/screens/AiChatScreen.tsx')).toContain('<E2EHerouiMenuProbe />');
+  });
+
+  it('pins the geohash channel probe on GeohashChatScreen', () => {
+    // The channel screen has no other stable AX identity; the suffix pins
+    // WHICH geohash channel opened (mesh vs a location tier).
+    expect(read('features/bitchat/screens/GeohashChatScreen.tsx')).toContain(
+      "testID={`geohash-chat:${geohash ?? 'unknown'}`}"
+    );
+  });
+
+  it('pins the fresh-user empty-state ids on the social surfaces', () => {
+    // Empty states are e2e evidence (a blank list and a dedicated guidance
+    // card are indistinguishable without an id); the suffix carries the
+    // variant so a wrong branch (e.g. notifications 'no-profile') fails loud.
+    expect(read('features/contacts/screens/ContactsScreen.tsx')).toContain(
+      'testID={`contacts-empty:${activeFilter.toLowerCase()}`}'
+    );
+    expect(read('features/feed/screens/NotificationsScreen.tsx')).toContain(
+      "testID={`notifications-empty:${errorMessage ? 'error' : viewerReady ? 'none' : 'no-profile'}`}"
+    );
   });
 
   it('pins the drawer menu row ids', () => {

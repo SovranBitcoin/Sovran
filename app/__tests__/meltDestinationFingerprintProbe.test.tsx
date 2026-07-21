@@ -22,9 +22,12 @@ describe('MeltDestinationFingerprintProbe', () => {
       renderer = TestRenderer.create(<MeltDestinationFingerprintProbe destination={destination} />);
     });
 
-    const probe = renderer!.root.findByProps({ testID: 'melt-destination-fingerprint' });
+    const fingerprint = paymentDestinationFingerprint(destination);
+    const probe = renderer!.root.findByProps({
+      testID: `melt-destination-fingerprint:${fingerprint}`,
+    });
     expect(probe.props.accessibilityValue).toEqual({
-      text: paymentDestinationFingerprint(destination),
+      text: fingerprint,
     });
     expect(JSON.stringify(probe.props)).not.toContain(destination);
   });

@@ -54,4 +54,16 @@ describe('resolveStickyMintSelectorItems', () => {
       })
     ).toBe(current);
   });
+
+  it('treats an empty current live list as authoritative', () => {
+    const previous = [mintItem('https://old.example', 'Old Mint')];
+
+    expect(
+      resolveStickyMintSelectorItems({
+        liveItems: [],
+        entryItems: previous,
+        previousLiveItems: previous,
+      })
+    ).toEqual([]);
+  });
 });

@@ -62,6 +62,8 @@ describe('PaymentInfo device data probe', () => {
     });
     expect(probe.props.accessible).toBe(true);
     expect(probe.props.accessibilityLabel).toBe('lnbc100n-test-value');
+    expect(probe.props.importantForAccessibility).toBe('yes');
+    expect(probe.props.collapsable).toBe(false);
     expect(probe.props.pointerEvents).toBe('none');
 
     const sensitiveVisual = renderer!.root.findByProps({
@@ -71,5 +73,16 @@ describe('PaymentInfo device data probe', () => {
     expect(sensitiveVisual.props.accessibilityRole).toBe('image');
     expect(sensitiveVisual.props.accessibilityLabel).not.toContain('lnbc100n-test-value');
     expect(sensitiveVisual.props.collapsable).toBe(false);
+  });
+
+  it('mounts the Lightning invoice probe on the fixed-amount destination screen', () => {
+    const { readFileSync } = jest.requireActual<typeof import('node:fs')>('node:fs');
+    const { resolve } = jest.requireActual<typeof import('node:path')>('node:path');
+    const source = readFileSync(
+      resolve(__dirname, '..', 'features/receive/screens/LightningReceiveScreen.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('copyTarget="lightningInvoice"');
   });
 });

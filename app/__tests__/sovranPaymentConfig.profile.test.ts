@@ -13,8 +13,10 @@ import { getEncodedToken } from '@cashu/cashu-ts';
 import { sendBLEPrivateMessageWhole } from '@/features/bitchat/lib/blePrivateDelivery';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { paymentLog } from '@/shared/lib/logger';
+import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 
 const mockNavigate = jest.fn();
+const mockDismissAll = jest.fn();
 const mockNearPayComplete = jest.fn();
 const mockNearPaySetAmountEntry = jest.fn();
 let mockNearPayActive: unknown = null;
@@ -41,6 +43,7 @@ jest.mock('expo-router', () => ({
     navigate: (...args: unknown[]) => mockNavigate(...args),
     replace: jest.fn(),
     dismiss: jest.fn(),
+    dismissAll: (...args: unknown[]) => mockDismissAll(...args),
   },
   useSegments: jest.fn(() => []),
 }));
@@ -61,6 +64,7 @@ jest.mock('@/features/bitchat/lib/profileScope', () => ({
 }));
 jest.mock('@/shared/lib/logger', () => ({
   paymentLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  storeLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 jest.mock('@/shared/lib/id', () => ({ mintLocalId: jest.fn((prefix: string) => `${prefix}-id`) }));
 jest.mock('@/shared/lib/cashu/utils', () => ({ buildReceiveHistoryEntry: jest.fn() }));
@@ -138,6 +142,7 @@ jest.mock('@/shared/stores/profile/transactionDistributionStore', () => ({
 describe('createSovranHandlers profile routing', () => {
   beforeEach(() => {
     mockNavigate.mockReset();
+    mockDismissAll.mockReset();
     mockNearPayComplete.mockReset();
     mockNearPaySetAmountEntry.mockReset();
     mockNearPayActive = null;
@@ -148,6 +153,7 @@ describe('createSovranHandlers profile routing', () => {
     (paymentLog.info as jest.Mock).mockClear();
     (paymentLog.warn as jest.Mock).mockClear();
     (paymentLog.error as jest.Mock).mockClear();
+    useContactSendStore.setState({ active: null });
   });
 
   it('opens scanned npubs in the modal profile flow', () => {
@@ -299,6 +305,99 @@ describe('createSovranHandlers profile routing', () => {
       expect.objectContaining({ p2pkLocked: true })
     );
     expect(JSON.stringify(paymentLogCalls())).not.toContain(p2pkLockPubkey);
+  });
+
+  it('waits for contact DM delivery before opening the thread and clears the target', async () => {
+    const recipientPubkey = 'ab'.repeat(32);
+    const bearerToken = 'cashuA-private-contact-token';
+    useContactSendStore.getState().start({ pubkey: recipientPubkey, displayName: 'Alice' });
+
+    let markDeliveryStarted!: () => void;
+    let releaseDelivery!: () => void;
+    const deliveryStarted = new Promise<void>((resolve) => {
+      markDeliveryStarted = resolve;
+    });
+    const deliveryPending = new Promise<void>((resolve) => {
+      releaseDelivery = resolve;
+    });
+    const deliverContactEcashDm = jest.fn(() => {
+      markDeliveryStarted();
+      return deliveryPending;
+    });
+    // @ts-expect-error sendComplete only reads getContext.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({
+      machine,
+      getManager: () => null,
+      deliverContactEcashDm,
+    });
+
+    const sendComplete = handlers.sendComplete?.({
+      historyEntry: JSON.stringify({
+        id: 'send-contact-success',
+        type: 'send',
+        mintUrl: 'https://mint.example',
+        tokenString: bearerToken,
+      }),
+      createdOffline: false,
+      mintWasOffline: false,
+    });
+    await deliveryStarted;
+
+    expect(deliverContactEcashDm).toHaveBeenCalledWith({ recipientPubkey, token: bearerToken });
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(useContactSendStore.getState().active).not.toBeNull();
+
+    releaseDelivery();
+    await sendComplete;
+
+    expect(mockDismissAll).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/userMessages',
+      params: { pubkey: recipientPubkey },
+    });
+    expect(useContactSendStore.getState().active).toBeNull();
+    expect(mockDismissAll.mock.invocationCallOrder[0]).toBeLessThan(
+      mockNavigate.mock.invocationCallOrder[0]
+    );
+    expect(JSON.stringify(paymentLogCalls())).not.toContain(bearerToken);
+  });
+
+  it('keeps the contact target and opens bearer hand-off when DM delivery fails', async () => {
+    const recipientPubkey = 'cd'.repeat(32);
+    const bearerToken = 'cashuA-recoverable-contact-token';
+    useContactSendStore.getState().start({ pubkey: recipientPubkey, displayName: 'Carol' });
+    const deliverContactEcashDm = jest.fn(async () => {
+      throw new Error('relay unavailable');
+    });
+    // @ts-expect-error sendComplete only reads getContext.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({
+      machine,
+      getManager: () => null,
+      deliverContactEcashDm,
+    });
+
+    await handlers.sendComplete?.({
+      historyEntry: JSON.stringify({
+        id: 'send-contact-fallback',
+        type: 'send',
+        mintUrl: 'https://mint.example',
+        tokenString: bearerToken,
+      }),
+      createdOffline: false,
+      mintWasOffline: false,
+    });
+
+    expect(useContactSendStore.getState().active).toMatchObject({ pubkey: recipientPubkey });
+    expect(mockDismissAll).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(send-flow)/sendToken',
+      params: expect.objectContaining({
+        sendHistoryEntry: expect.stringContaining('send-contact-fallback'),
+      }),
+    });
+    expect(JSON.stringify(paymentLogCalls())).not.toContain(bearerToken);
   });
 
   it('opens the ecash memo sheet without submitting the memo on display', () => {

@@ -196,15 +196,23 @@ describe('Android UI regressions', () => {
     expect(mockActionMenuPopup).toHaveBeenCalledTimes(1);
     const payload = mockActionMenuPopup.mock.calls[0][0] as {
       title: string;
-      buttons: { testID?: string; suffix?: unknown; onPress: () => void }[];
+      buttons: {
+        testID?: string;
+        accessibilityLabel?: string;
+        accessibilityHint?: string;
+        suffix?: unknown;
+        onPress: () => void;
+      }[];
     };
     expect(payload.title).toBe('Display currency');
     expect(payload.buttons).toHaveLength(3);
     // displayCurrency mock is 'usd' → the USD row carries the selected-check suffix.
     const usd = payload.buttons.find((b) => b.testID === 'fiat-currency-menu-usd');
     expect(usd?.suffix).toBeTruthy();
+    expect(usd).toMatchObject({ accessibilityLabel: 'USD', accessibilityHint: 'US Dollar' });
 
     const eur = payload.buttons.find((b) => b.testID === 'fiat-currency-menu-eur');
+    expect(eur).toMatchObject({ accessibilityLabel: 'EUR', accessibilityHint: 'Euro' });
     act(() => {
       eur?.onPress();
     });

@@ -30,11 +30,14 @@ const STORE_DIRS: Record<string, string> = {
   feed: 'features/feed/stores',
 };
 
-/** Files with no module-level store hook (helpers / per-call factories). */
+/** Files intentionally absent from the mirror. Every exclusion needs a durable
+ * reason: either there is no enumerable store instance, or the state contains
+ * plaintext secrets that must never enter debug artifacts. */
 const EXCLUDED: ReadonlySet<string> = new Set([
   'global/migrateSettings',
   'profile/restoreActiveSessionView',
   'runtime/clearPaymentContext',
+  'runtime/dmEchoStore', // DM bodies may be live bearer ecash tokens
   'runtime/legProgress', // factory: instances are created per call, not enumerable
 ]);
 
@@ -68,8 +71,12 @@ describe('E2E_STORE_MANIFEST completeness', () => {
     expect(stale).toEqual([]);
   });
 
-  it('excluded files stay excluded for a live reason (helper or factory, no hook)', () => {
+  it('keeps every reviewed helper, factory, or sensitive store exclusion out', () => {
     const keys = manifestKeys();
     for (const key of EXCLUDED) expect(keys.has(key)).toBe(false);
+  });
+
+  it('never mirrors plaintext DM echoes that may contain bearer ecash tokens', () => {
+    expect(manifestKeys()).not.toContain('runtime/dmEchoStore');
   });
 });
