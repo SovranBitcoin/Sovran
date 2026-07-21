@@ -175,7 +175,13 @@ export function TermsAndConditionsScreen({
 
         <VStack spacing={16}>
           {showCheckbox && (
-            <ControlField isSelected={isChecked} onSelectedChange={setIsChecked}>
+            <ControlField
+              testID="terms-acceptance"
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: isChecked }}
+              accessibilityValue={{ text: isChecked ? '1' : '0' }}
+              isSelected={isChecked}
+              onSelectedChange={setIsChecked}>
               <View className="flex-1">
                 <Label>{checkboxText}</Label>
               </View>

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Log } from '@/shared/lib/logger';
 
 import Animated, {
@@ -14,6 +15,19 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
+
+// Android e2e only: the per-slide progress bar runs a continuous withTiming for
+// the whole slide duration, so the window NEVER idles and Android's
+// `uiautomator dump` intermittently fails ("could not get idle state") — the
+// harness can't read the tree mid-carousel. iOS is unaffected (its serve-sim AX
+// stream is push-based, no idle requirement) so it keeps the real animation.
+// Under Android e2e the harness taps to advance, so the auto-advance animation
+// is unnecessary: hold progress static (no withTiming) so the window can idle.
+const E2E_MANUAL_SLIDES =
+  Platform.OS === 'android' &&
+  typeof __DEV__ === 'boolean' &&
+  __DEV__ &&
+  Number.isFinite(Number(process.env.EXPO_PUBLIC_E2E_ONBOARDING_SLIDE_MS));
 
 type OnboardingPaginationItemProps = {
   index: number;
@@ -95,6 +109,11 @@ const OnboardingPaginationItem: React.FC<OnboardingPaginationItemProps> = ({
   });
 
   useEffect(() => {
+    if (E2E_MANUAL_SLIDES) {
+      // Static, no continuous animation → the window can idle for uiautomator.
+      slideProgress.set(0);
+      return;
+    }
     if (currentSlideIndex === index) {
       slideProgress.set(0);
       slideProgress.set(withTiming(1, { duration: slideDuration }));
@@ -107,6 +126,7 @@ const OnboardingPaginationItem: React.FC<OnboardingPaginationItemProps> = ({
   useAnimatedReaction(
     () => ({ isDraggingVal: isDragging.get() }),
     ({ isDraggingVal }) => {
+      if (E2E_MANUAL_SLIDES) return;
       if (!isDraggingVal && currentSlideIndex === index && slideProgress.get() > 0) {
         slideProgress.set(0);
         slideProgress.set(withTiming(1, { duration: slideDuration }));
