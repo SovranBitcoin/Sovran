@@ -471,6 +471,24 @@ export function AmountEntryView({
                 />
               )}
             </View>
+            {/* Android merges accessibilityLabel + accessibilityValue into one
+                content-desc, so the visible amount node cannot provide an
+                exact cross-platform value signal. Encode the semantic state
+                in a harness-only sibling testID instead; keypad retries can
+                observe a landed digit without duplicating spoken production
+                content or risking a blind duplicate tap. */}
+            {__DEV__ && process.env.EXPO_PUBLIC_E2E_STATE_MIRROR === '1' ? (
+              <View
+                testID={`amount-state:${accessibilityAmountValue}`}
+                accessible
+                accessibilityRole="text"
+                accessibilityLabel={`Amount state ${accessibilityAmountValue}`}
+                importantForAccessibility="yes"
+                collapsable={false}
+                pointerEvents="none"
+                style={styles.amountStateProbe}
+              />
+            ) : null}
             {contextIndicator}
             {secondaryDisplay ? (
               <CurrencySwapperPill inputMode={inputMode} onPress={handleToggleMode} />
@@ -635,6 +653,13 @@ export function AmountEntryView({
 const styles = StyleSheet.create({
   amountValue: {
     alignItems: 'center',
+  },
+  amountStateProbe: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: 1,
+    height: 1,
   },
   bottomButtons: {
     position: 'relative',

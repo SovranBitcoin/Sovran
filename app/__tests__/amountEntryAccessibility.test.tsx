@@ -60,24 +60,58 @@ jest.mock('@/shared/ui/primitives/Pressable', () => ({ Pressable: () => null }))
 jest.mock('assets/icons', () => ({ __esModule: true, default: () => null }));
 
 describe('AmountEntryView accessibility', () => {
-  it('exposes the undecorated input as amount-value', async () => {
+  const originalE2EStateMirror = process.env.EXPO_PUBLIC_E2E_STATE_MIRROR;
+
+  afterEach(() => {
+    if (originalE2EStateMirror === undefined) {
+      delete process.env.EXPO_PUBLIC_E2E_STATE_MIRROR;
+    } else {
+      process.env.EXPO_PUBLIC_E2E_STATE_MIRROR = originalE2EStateMirror;
+    }
+  });
+
+  const amountElement = (rawInput = '40', numericValue = 40) => (
+    <AmountEntryView
+      rawInput={rawInput}
+      numericValue={numericValue}
+      unit="sat"
+      keyboardUnit="sat"
+      inputMode="unit"
+      onKeyPress={jest.fn()}
+      onNext={jest.fn()}
+    />
+  );
+
+  const renderAmount = async (rawInput = '40', numericValue = 40) => {
     let renderer: TestRenderer.ReactTestRenderer;
     await act(async () => {
-      renderer = TestRenderer.create(
-        <AmountEntryView
-          rawInput="40"
-          numericValue={40}
-          unit="sat"
-          keyboardUnit="sat"
-          inputMode="unit"
-          onKeyPress={jest.fn()}
-          onNext={jest.fn()}
-        />
-      );
+      renderer = TestRenderer.create(amountElement(rawInput, numericValue));
     });
+    return renderer!;
+  };
 
-    const amount = renderer!.root.findByProps({ testID: 'amount-value' });
+  it('keeps the ordinary accessible amount and omits duplicate spoken content', async () => {
+    delete process.env.EXPO_PUBLIC_E2E_STATE_MIRROR;
+    const renderer = await renderAmount();
+
+    const amount = renderer.root.findByProps({ testID: 'amount-value' });
     expect(amount.props.accessible).toBe(true);
     expect(amount.props.accessibilityValue).toEqual({ text: '40' });
+    expect(renderer.root.findAllByProps({ testID: 'amount-state:40' })).toHaveLength(0);
+  });
+
+  it('exposes the semantic amount state only for an owned e2e Metro', async () => {
+    process.env.EXPO_PUBLIC_E2E_STATE_MIRROR = '1';
+    const renderer = await renderAmount('', 0);
+    expect(renderer.root.findByProps({ testID: 'amount-state:0' })).toBeDefined();
+
+    await act(async () => {
+      renderer.update(amountElement('40', 40));
+    });
+    expect(renderer.root.findAllByProps({ testID: 'amount-state:0' })).toHaveLength(0);
+    const state = renderer.root.findByProps({ testID: 'amount-state:40' });
+    expect(state.props.accessible).toBe(true);
+    expect(state.props.accessibilityLabel).toBe('Amount state 40');
+    expect(state.props.accessibilityValue).toBeUndefined();
   });
 });
