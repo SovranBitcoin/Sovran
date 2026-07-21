@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "id": "flow.fund-testnut-20",
+  "requires": ["cocod.send.cashu","unit.sat"],
+  "steps": [
+    {"action":"counterparty","operation":"cashu.create","mintUrl":"https://testnut.cashu.space","unit":"sat","accountIndex":0,"amount":20,"captureAs":"fundingToken","setClipboard":true,"timeoutMs":60000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-receive"}}],"until":{"id":"receive-method-paste"},"attempts":4,"settleMs":6000},
+    {"action":"waitFor","selector":{"id":"receive-method-paste"},"timeoutMs":30000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"receive-method-paste"}}],"until":{"label":"Allow Paste"},"attempts":4,"settleMs":6000},
+    {"action":"tap","selector":{"label":"Allow Paste"}},
+    {"action":"waitFor","selector":{"id":"receive-token-redeem"},"timeoutMs":60000},
+    {"action":"tap","selector":{"id":"receive-token-redeem"}},
+    {"action":"waitFor","selector":{"id":"mint-info-trust"},"timeoutMs":60000},
+    {"action":"tap","selector":{"id":"mint-info-trust"}},
+    {"action":"waitFor","selector":{"id":"receive-token-redeem"},"timeoutMs":60000},
+    {"action":"tap","selector":{"id":"receive-token-redeem"}},
+    {"action":"waitFor","selector":{"id":"receive-token-close"},"timeoutMs":120000},
+    {"action":"tap","selector":{"id":"receive-token-close"}},
+    {"action":"goHome"},
+    {"action":"waitFor","selector":{"label":"₿ 19"},"timeoutMs":60000}
+  ]
+}

@@ -6,15 +6,10 @@
   "steps": [
     {"use":"flow.fresh-install"},
     {"action":"waitFor","selector":{"label":"Bitcoin that feels like cash"},"timeoutMs":60000},
-    {"action":"tap","selector":{"label":"Bitcoin that feels like cash"}},
-    {"action":"waitFor","selector":{"label":"Powered by Nostr"},"timeoutMs":15000},
-    {"action":"tap","selector":{"label":"Powered by Nostr"}},
-    {"action":"waitFor","selector":{"label":"Private by Design"},"timeoutMs":15000},
-    {"action":"tap","selector":{"label":"Private by Design"}},
-    {"action":"waitFor","selector":{"label":"Stay private, stay sovereign"},"timeoutMs":15000},
-    {"action":"swipe","dir":"up"},
-    {"action":"waitFor","selector":{"label":"Welcome to Sovran"},"timeoutMs":60000},
-    {"action":"tap","selector":{"label":"Get Started"}},
-    {"action":"waitFor","selector":{"label":"No History"},"timeoutMs":60000}
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Bitcoin that feels like cash"}}],"until":{"label":"Powered by Nostr"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Powered by Nostr"}}],"until":{"label":"Private by Design"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Private by Design"}}],"until":{"label":"Stay private, stay sovereign"},"attempts":4,"settleMs":6000},
+    {"action":"tapUntil","sequence":[{"swipe":{"dir":"up"}}],"until":{"label":"Welcome to Sovran"},"attempts":4,"settleMs":3000},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"Get Started"}}],"until":{"label":"No History"},"attempts":4,"settleMs":8000}
   ]
 }

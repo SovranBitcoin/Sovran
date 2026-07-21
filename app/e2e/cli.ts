@@ -8,8 +8,9 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { EventBus, type FundsState, type RunProof } from './core/events';
-import { captureGitInfo } from './core/git';
+import { captureGitInfo, captureSourceFingerprint, compareSourceFingerprints } from './core/git';
 import { loadE2E } from './core/loader';
+import type { RunManifest } from './core/manifest';
 import { expandScenario, formatDryRunPlan } from './core/plan';
 import {
   assertDriverLaneCompatibility,
@@ -19,14 +20,26 @@ import {
   selectSuiteScenarios,
 } from './core/selection';
 import { runScenario, type RunDeps } from './core/run';
-import { PAYMENT_REQUEST_DELIVERY_FAILURE_CAPABILITY } from './schema';
-import { FakeCommandRunner, FakeDriver } from './drivers/driver';
+import {
+  assessSessionGroupCompletion,
+  shouldRunSessionGroupMember,
+} from './core/session-group-policy';
+import {
+  DRIVER_CAPS,
+  MINT_FAULTS_CAPABILITY,
+  PAYMENT_REQUEST_DELIVERY_FAILURE_CAPABILITY,
+} from './schema';
+import { FakeCommandRunner, FakeDriver, FakeNetworkChannel } from './drivers/driver';
+import { createSimulatorMintFaultChannel, FakeMintFaultChannel } from './drivers/mint-faults';
 import { FileArtifactSink, RealCommandRunner, SecureAppendSink } from './drivers/real';
 import {
   SimulatorRunInterrupted,
   withEphemeralSimulatorSession,
 } from './drivers/simulator-session';
 import { SimulatorDriver } from './drivers/simulator';
+import { AndroidDriver } from './drivers/android/android-driver';
+import { AndroidClipboardChannel } from './drivers/android/clipboard';
+import { withAndroidEmulatorSession } from './drivers/android/android-session';
 import { createSimVideoRecorder } from './drivers/video';
 import { createSimulatorAppDataCapturer } from './drivers/app-data';
 import { generateControlledP2PKKeypair } from './funded';
@@ -61,12 +74,8 @@ const E2E = dirname(new URL(import.meta.url).pathname);
 const ARTIFACTS = join(E2E, 'artifacts');
 const STDOUT = { write: (value: string) => process.stdout.write(value) };
 
-const SIMULATOR_LANE_CAPS = new Set([
-  'fresh-install',
-  'mock.offline',
-  PAYMENT_REQUEST_DELIVERY_FAILURE_CAPABILITY,
-  'unit.sat',
-]);
+// Per-driver capability seeds live in schema/capabilities.ts (DRIVER_CAPS) so
+// the viewer can derive per-scenario platform support from the same sets.
 const LEGACY_RECOVERY_DEADLINE_MS = 45_000;
 const LEGACY_RECOVERY_REQUEST_TIMEOUT_MS = 5_000;
 
@@ -193,6 +202,11 @@ if (options.command === 'funds-write-off') {
   });
 }
 
+const sourceFingerprintBeforeLoad =
+  options.command === 'run' ? captureSourceFingerprint(E2E) : undefined;
+if (options.command === 'run' && !sourceFingerprintBeforeLoad) {
+  fail('source fingerprint unavailable — every tracked/untracked nonignored file must be readable');
+}
 const loaded = loadE2E(E2E);
 if (options.command === 'validate') {
   for (const { file, issue } of loaded.issues)
@@ -214,7 +228,9 @@ try {
   fail((error as Error).message);
 }
 const { suite, scenarios, sessionGroups } = selection;
-const caps = new Set(options.caps ?? SIMULATOR_LANE_CAPS);
+const caps = new Set(
+  options.caps ?? (options.driver === 'android' ? DRIVER_CAPS.android : DRIVER_CAPS.sim)
+);
 const selectedFunded = scenarios.some((scenario) => scenario.lane === 'funded');
 
 if (options.command === 'list') {
@@ -239,13 +255,24 @@ if (options.command === 'dry-run') {
 if (options.command !== 'run') fail(`unsupported command "${options.command}"`);
 
 const git = captureGitInfo(E2E);
+const sourceComparison = compareSourceFingerprints(
+  sourceFingerprintBeforeLoad,
+  captureSourceFingerprint(E2E)
+);
+if (sourceComparison.status === 'unavailable') {
+  fail('source fingerprint unavailable — every tracked/untracked nonignored file must be readable');
+}
+if (sourceComparison.status === 'changed') {
+  fail('source changed while E2E JSON was loaded and selected — rerun from a stable source tree');
+}
+const sourceFingerprint = sourceComparison.fingerprint;
 if (options.requireCleanGit) {
   if (!git) fail('--require-clean-git: git state unavailable (not a repo, or git missing)');
   if (git.dirty) fail('--require-clean-git: working tree is dirty — commit or stash first');
 }
 
-if (options.driver === 'sim') {
-  // Simulator destruction and fund-loss acceptance are independent approvals.
+if (options.driver === 'sim' || options.driver === 'android') {
+  // Device destruction and fund-loss acceptance are independent approvals.
   // Both gates run before artifacts, Metro, cocod effects, or device creation.
   try {
     assertFundedSelectionAuthorized(scenarios, options.acceptTestFundLoss);
@@ -254,7 +281,11 @@ if (options.driver === 'sim') {
     fail((error as Error).message);
   }
   if (!options.approveDestructiveReset) {
-    fail('ephemeral simulator creation/deletion requires --i-approve-destructive-reset');
+    fail(
+      options.driver === 'android'
+        ? 'android emulator app erase/reinstall requires --i-approve-destructive-reset'
+        : 'ephemeral simulator creation/deletion requires --i-approve-destructive-reset'
+    );
   }
 }
 
@@ -262,7 +293,7 @@ const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().
 let liveCocod: LiveCocodBoundary | undefined;
 let fundedRunLock: FundedRunLock | undefined;
 if (
-  options.driver === 'sim' &&
+  (options.driver === 'sim' || options.driver === 'android') &&
   selectedFunded &&
   scenarios.some((scenario) => scenario.lane === 'funded' && !scenario.deferredReason)
 ) {
@@ -390,7 +421,7 @@ const hasRunnableProductScenario = scenarios.some(
     expandScenario(scenario, loaded.fixtures, { capabilities: caps }).availability === 'ready'
 );
 const proof: RunProof =
-  options.driver === 'sim' && hasRunnableProductScenario ? 'product-run' : 'orchestration-smoke';
+  options.driver !== 'fake' && hasRunnableProductScenario ? 'product-run' : 'orchestration-smoke';
 const runDir = join(ARTIFACTS, `run-${runId}`);
 const artifacts = new FileArtifactSink(runDir);
 const transcript = new SecureAppendSink(join(runDir, 'events.jsonl'));
@@ -403,6 +434,7 @@ artifacts.write(
     suite: suite.name,
     driver: options.driver,
     proof,
+    sourceFingerprint,
     recording: options.driver === 'sim' && !options.noRecord,
     startedAt: new Date().toISOString(),
     scenarios: scenarios.map((scenario) => scenario.id),
@@ -422,7 +454,7 @@ artifacts.write(
           },
         }
       : {}),
-  })
+  } satisfies RunManifest)
 );
 
 const bus = new EventBus();
@@ -460,24 +492,31 @@ try {
     totalScenarios: scenarios.length,
   });
   bus.emit({ type: 'suite.begin', suite: suite.name });
-  let stopAfterFailure = false;
   const recordStatus = (status: Awaited<ReturnType<typeof runScenario>>) => {
     if (status === 'passed') passed++;
     else if (status === 'failed') failed++;
     else deferred++;
   };
   for (const [groupIndex, group] of sessionGroups.entries()) {
-    if (stopAfterFailure) break;
     const groupPlans = group.map(({ scenario }) =>
       expandScenario(scenario, loaded.fixtures, { capabilities: caps })
     );
     const statuses: Awaited<ReturnType<typeof runScenario>>[] = [];
+    let fundedSession = false;
+    let fundsReconciled: boolean | undefined;
     const runGroup = async (
       deps: Omit<RunDeps, 'scenarioIndex' | 'totalScenarios' | 'nextArtifactSeq'>
     ) => {
       for (const [memberIndex, { ref, scenario }] of group.entries()) {
         const predecessor = statuses.at(-1);
-        if (memberIndex > 0 && !ref.newInstance && predecessor !== 'passed') break;
+        if (
+          !shouldRunSessionGroupMember({
+            memberIndex,
+            newInstance: ref.newInstance,
+            predecessor,
+          })
+        )
+          break;
         const status = await runScenario(scenario, loaded.fixtures, {
           ...deps,
           scenarioIndex: scenarioIndexes.get(scenario.id)!,
@@ -496,7 +535,110 @@ try {
         bus,
         artifacts,
         capabilities: caps,
+        mintFaults: new FakeMintFaultChannel(),
+        network: new FakeNetworkChannel(),
       });
+    } else if (options.driver === 'android') {
+      const sessionIndex = groupIndex + 1;
+      const sessionId = `${runId}-${String(sessionIndex).padStart(2, '0')}`;
+      const sessionDir = join(runDir, `session-${sessionIndex}`);
+      const groupScenarios = group.map(({ scenario }) => scenario);
+      const scenario = groupScenarios[0]!;
+      const funded = scenario.lane === 'funded';
+      fundedSession = funded;
+      if (funded && groupScenarios.length !== 1) {
+        throw new Error('funded scenarios must own a fresh android session');
+      }
+      let runtime: ReturnType<typeof createFundedScenarioRuntime> | undefined;
+      let pendingMnemonic: string | undefined;
+      await withAndroidEmulatorSession(
+        {
+          runId: sessionId,
+          runDir: sessionDir,
+          onLifecycle: (message) => bus.emit({ type: 'lifecycle', message }),
+          ...(funded
+            ? {
+                fundedAssets: scenario.funds!.assets.map(({ mintUrl, unit }) => ({
+                  mintUrl,
+                  unit,
+                })),
+                onSeedExport: (mnemonic: string) => {
+                  if (runtime) runtime.captureMnemonic(mnemonic);
+                  else pendingMnemonic = mnemonic;
+                },
+              }
+            : {}),
+        },
+        async (session, signal) => {
+          artifacts.write(
+            `session-${sessionIndex}.json`,
+            'log',
+            JSON.stringify({
+              version: 1,
+              runId: sessionId,
+              ephemeral: true,
+              seedExport: funded,
+              scenarios: groupScenarios.map(({ id }) => id),
+              android: {
+                serial: session.serial,
+                avd: session.avd,
+                avdRoot: session.avdRoot,
+              },
+              metro: { url: session.metroUrl, port: session.metroPort, pid: session.metroPid },
+            })
+          );
+          const android = new AndroidDriver(
+            session.adb,
+            { signal },
+            {
+              install: session.install,
+              reportInfrastructureFailure: session.reportInfrastructureFailure,
+              clipboard: new AndroidClipboardChannel(session.adb),
+            }
+          );
+          if (funded) {
+            if (!liveCocod || !scenario.funds) {
+              throw new Error('funded android session lacks its approved runtime boundary');
+            }
+            runtime = createFundedScenarioRuntime({
+              runDir: sessionDir,
+              runId: sessionId,
+              assets: scenario.funds.assets,
+              ...(scenario.funds.transfers ? { transfers: scenario.funds.transfers } : {}),
+              cocod: liveCocod.cocod,
+              resolveLightningAddress: ({ address, amountSats, timeoutMs }) =>
+                resolveLightningAddressInvoice(address, amountSats, undefined, timeoutMs),
+              refreshApp: async () => {
+                if (signal.aborted) return;
+                await android.homeAfterFundedSweep(
+                  scenario.funds!.assets.map(({ mintUrl, unit }) => ({ mintUrl, unit }))
+                );
+              },
+            });
+            if (pendingMnemonic) {
+              runtime.captureMnemonic(pendingMnemonic);
+              pendingMnemonic = undefined;
+            }
+          }
+          await runGroup({
+            driver: android,
+            runner: new RealCommandRunner(),
+            bus,
+            artifacts,
+            capabilities: caps,
+            signal,
+            network: session.network,
+            // Each android observeState() is a ~1-3s uiautomator dump (vs iOS's
+            // push-based AX stream), so the default 3s final-state window can't
+            // fit the 2 consecutive fresh-revision observations stabilization
+            // needs. Widen it.
+            finalStateTimeoutMs: 30_000,
+            finalStatePollMs: 500,
+            ...(runtime ? { counterparty: runtime, reconcile: () => runtime!.reconcile() } : {}),
+          });
+        }
+      );
+      if (funded) fundsReconciled = runtime?.fundsReconciled;
     } else {
       const sessionIndex = groupIndex + 1;
       const sessionId = `${runId}-${String(sessionIndex).padStart(2, '0')}`;
@@ -504,6 +646,7 @@ try {
       const groupScenarios = group.map(({ scenario }) => scenario);
       const scenario = groupScenarios[0]!;
       const funded = scenario.lane === 'funded';
+      fundedSession = funded;
       if (funded && groupScenarios.length !== 1) {
         throw new Error('funded scenarios must own a fresh simulator session');
       }
@@ -512,6 +655,11 @@ try {
       const mockFailPaymentRequest =
         funded &&
         groupPlans[0]?.requires.includes(PAYMENT_REQUEST_DELIVERY_FAILURE_CAPABILITY) === true;
+      // Any group member arming faults arms the whole session (shared Metro);
+      // zero rules at launch keeps other members' traffic passthrough.
+      const armMintFaults = groupPlans.some(
+        (plan) => plan.availability === 'ready' && plan.requires.includes(MINT_FAULTS_CAPABILITY)
+      );
       let runtime: ReturnType<typeof createFundedScenarioRuntime> | undefined;
       let pendingMnemonic: string | undefined;
       await withEphemeralSimulatorSession(
@@ -519,6 +667,7 @@ try {
           runId: sessionId,
           runDir: sessionDir,
           onLifecycle: (message) => bus.emit({ type: 'lifecycle', message }),
+          ...(armMintFaults ? { armMintFaults: true } : {}),
           ...(funded
             ? {
                 ...(controlledP2PK ? { controlledP2PKPubkey: controlledP2PK.publicKey } : {}),
@@ -540,6 +689,7 @@ try {
             'log',
             JSON.stringify({
               version: 1,
+              runId: sessionId,
               ephemeral: true,
               seedExport: funded,
               scenarios: groupScenarios.map(({ id }) => id),
@@ -608,6 +758,9 @@ try {
             signal,
             onWarning: (message) => bus.emit({ type: 'lifecycle', message }),
           });
+          const mintFaults = armMintFaults
+            ? createSimulatorMintFaultChannel({ udid: session.udid, signal })
+            : undefined;
           simulator.start();
           try {
             await runGroup({
@@ -618,6 +771,7 @@ try {
               capabilities: caps,
               signal,
               appData,
+              ...(mintFaults ? { mintFaults } : {}),
               ...(video ? { video } : {}),
               ...(runtime ? { counterparty: runtime, reconcile: () => runtime!.reconcile() } : {}),
             });
@@ -627,11 +781,23 @@ try {
           }
         }
       );
-      if (funded && !runtime?.fundsReconciled) fundedFundsSafe = false;
+      if (funded) fundsReconciled = runtime?.fundsReconciled;
     }
 
     statuses.forEach(recordStatus);
-    if (statuses.includes('failed') || statuses.length < group.length) stopAfterFailure = true;
+    // Returned scenario outcomes are contained to this session group. A thrown
+    // setup/session error never reaches this policy, and unsafe funded custody
+    // explicitly stops before another independent group can start.
+    const completion = assessSessionGroupCompletion({
+      statuses,
+      expectedScenarios: group.length,
+      fundedSession,
+      fundsReconciled,
+    });
+    if (!completion.shouldContinue) {
+      fundedFundsSafe = false;
+      break;
+    }
   }
   const durationMs = Date.now() - started;
   bus.emit({ type: 'suite.end', suite: suite.name, durationMs });
@@ -652,7 +818,7 @@ try {
   });
   if (options.driver === 'fake')
     console.log('\n[e2e] fake driver: orchestration smoke only, never product proof');
-  process.exitCode = failed ? 1 : 0;
+  process.exitCode = failed || !fundedFundsSafe ? 1 : 0;
 } catch (error) {
   const code = interruptionCode(error) ?? 1;
   console.error(`✗ ${error instanceof Error ? error.message : String(error)}`);
