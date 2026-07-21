@@ -17,7 +17,7 @@ export interface CliOptions {
   shuffle: boolean;
   seed: number;
   caps?: string[];
-  driver: 'fake' | 'sim';
+  driver: 'fake' | 'sim' | 'android';
   approveDestructiveReset: boolean;
   acceptTestFundLoss: boolean;
   requireCleanGit: boolean;
@@ -110,8 +110,8 @@ export function parseCliArgs(argv: string[]): CliOptions {
   if (!Number.isSafeInteger(seed))
     throw new Error(`--seed must be a safe integer, got "${seedRaw}"`);
   const driver = values.get('driver') ?? 'fake';
-  if (driver !== 'fake' && driver !== 'sim')
-    throw new Error(`unknown driver "${driver}" (use fake | sim)`);
+  if (driver !== 'fake' && driver !== 'sim' && driver !== 'android')
+    throw new Error(`unknown driver "${driver}" (use fake | sim | android)`);
   const capsRaw = values.get('caps');
   const caps = capsRaw?.split(',').filter(Boolean);
   if (capsRaw !== undefined && (!caps?.length || caps.join(',') !== capsRaw))
@@ -320,21 +320,20 @@ export function formatScenarioListLine(scenario: Scenario, fixtures: Map<string,
   return `  ${scenario.id.padEnd(42)} ${scenario.lane.padEnd(10)} [${scenario.tags.join(',')}] → ${scenario.endState}  requires: ${requires.join(', ') || '—'}`;
 }
 
-/** The ephemeral simulator driver owns both ordinary simulator scenarios and
- * funded scenarios. Funded value effects still require their independent CLI
- * authorization and recovery lifecycle; live and physical transports never
- * fall through to simctl. */
+/** The ephemeral simulator and android emulator drivers both own ordinary
+ * simulator scenarios and funded scenarios. Funded value effects still require
+ * their independent CLI authorization and recovery lifecycle; live and
+ * physical transports never fall through to a device driver. */
 export function assertDriverLaneCompatibility(
-  driver: 'fake' | 'sim',
+  driver: 'fake' | 'sim' | 'android',
   scenarios: readonly { id: string; lane: string }[]
 ): void {
-  if (driver !== 'sim') return;
-  const incompatible = scenarios.filter(
-    (scenario) => !['simulator', 'funded'].includes(scenario.lane)
-  );
+  if (driver === 'fake') return;
+  const allowedLanes = ['simulator', 'funded'];
+  const incompatible = scenarios.filter((scenario) => !allowedLanes.includes(scenario.lane));
   if (incompatible.length === 0) return;
   throw new Error(
-    `driver "sim" can execute only simulator and funded lanes; blocked: ${incompatible.map((scenario) => `${scenario.id} (${scenario.lane})`).join(', ')}`
+    `driver "${driver}" can execute only ${allowedLanes.join(' and ')} lanes; blocked: ${incompatible.map((scenario) => `${scenario.id} (${scenario.lane})`).join(', ')}`
   );
 }
 

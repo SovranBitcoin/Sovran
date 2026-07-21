@@ -69,7 +69,8 @@ export function formatDryRunPlan(plan: PlannedScenario): string {
 
 function selectorLabel(s: Selector): string {
   if ('id' in s) return `#${s.id}`;
-  if ('idPrefix' in s) return `#${s.idPrefix}*${s.captureSuffixAs ? `→${s.captureSuffixAs}` : ''}`;
+  if ('idPrefix' in s)
+    return `#${s.idPrefix}*${s.matchIndex === undefined ? '' : `[${s.matchIndex}]`}${s.captureSuffixAs ? `→${s.captureSuffixAs}` : ''}`;
   return `"${s.label}"`;
 }
 
@@ -99,10 +100,26 @@ export function labelForStep(step: Step): string {
       return `delay ${step.ms}ms (${step.reason})`;
     case 'exec':
       return `exec ${redactString(step.command.join(' '))}${step.captureAs ? ` → ${step.captureAs}` : ''}`;
+    case 'permission':
+      return `permission ${step.mode} ${step.service}`;
+    case 'location':
+      return `location ${step.mode}${step.mode === 'set' ? ` ${step.latitude},${step.longitude}` : ''}`;
+    case 'openUrl':
+      return `openUrl ${redactString(step.url)}`;
     case 'setClipboard':
       return `setClipboard ← ${redactString(step.from.join(' '))}`;
+    case 'setLiteralClipboard':
+      return step.text
+        ? `setLiteralClipboard "${step.text}" (non-payload literal)`
+        : 'setLiteralClipboard ← empty (clear)';
     case 'setPaymentRequestClipboard':
       return 'setPaymentRequestClipboard ← public NUT-18 request';
+    case 'mintFaults':
+      return step.rules.length
+        ? `mintFaults ${step.rules.map((rule) => `${rule.id}:${rule.response.mode}`).join(', ')}`
+        : 'mintFaults clear';
+    case 'network':
+      return step.mode === 'airplane' ? 'network airplane (real offline)' : 'network online';
     case 'counterparty':
       return 'mintUrl' in step
         ? `counterparty ${step.operation}${'amount' in step ? ` ${step.amount}` : ''} ${step.unit} @ ${redactString(step.mintUrl)}${'captureAs' in step ? ` → ${step.captureAs}` : ''}`
@@ -120,7 +137,9 @@ export function labelForStep(step: Step): string {
             ? `assert ax ${selectorLabel(step.selector)}`
             : step.that === 'emojiClipboardDecodesTo'
               ? `assert emoji clipboard decodes to $${step.variable}`
-              : `assert ${step.that} ${selectorLabel(step.selector)}`;
+              : step.that === 'mintFaultIntercepted'
+                ? `assert mintFaultIntercepted ${step.ruleId} ≥${step.minCount}`
+                : `assert ${step.that} ${selectorLabel(step.selector)}`;
   }
 }
 

@@ -19,11 +19,15 @@ import type {
   CommandRunner,
   ArtifactSink,
   AxNode,
+  NetworkChannel,
   ObservedState,
   StateObservation,
 } from '../drivers/driver';
 import { decode as decodeEmoji } from '../../shared/lib/third-party/emoji';
 import type { VideoRecorder } from '../drivers/video';
+import type { MintFaultChannel } from '../drivers/mint-faults';
+import { MINT_FAULTS_CAPABILITY, DEVICE_NETWORK_CAPABILITY } from '../schema/capabilities';
+import { redactProfileSecretAxNodes } from '../drivers/ax-redaction';
 
 export interface RunDeps {
   driver: Driver;
@@ -52,6 +56,12 @@ export interface RunDeps {
   /** Optional per-frame app-state capture (zustand mirror + coco db dump).
    *  Best-effort evidence — absent on the fake/offline lane, never a gate. */
   appData?: AppDataCapturer;
+  /** Mint-fault rule channel (mock.mint-faults scenarios): serves the
+   *  `mintFaults` step and the `mintFaultIntercepted` assert. */
+  mintFaults?: MintFaultChannel;
+  /** Real device network control (device.network scenarios): serves the
+   *  `network` step. Android sessions only. */
+  network?: NetworkChannel;
 }
 
 export interface CounterpartyExecutor {
@@ -319,6 +329,44 @@ export async function runScenario(
       if (!cleanupOk) failed = true; // failed cleanup fails the run
     }
 
+    // Defensive rule clear: simulator sessions are shared across scenarios,
+    // so leaked fault rules would silently poison the next scenario. The
+    // scenario's own finally should have cleared already; this is the backstop.
+    if (
+      deps.mintFaults &&
+      plan.requires.includes(MINT_FAULTS_CAPABILITY) &&
+      !deps.signal?.aborted
+    ) {
+      try {
+        await deps.mintFaults.set([]);
+      } catch (error) {
+        deps.bus.emit({
+          type: 'lifecycle',
+          message: `mint-fault clear failed: ${redactString((error as Error).message)}`,
+        });
+        failed = true; // faults leaking into the next scenario must not be silent
+      }
+    }
+
+    // Defensive network restore: a leaked airplane mode would sever EVERY real
+    // dependency of the next scenario (and the sweep/reconcile below). The
+    // scenario's own finally should have restored already; this is the backstop.
+    if (
+      deps.network &&
+      plan.requires.includes(DEVICE_NETWORK_CAPABILITY) &&
+      !deps.signal?.aborted
+    ) {
+      try {
+        await deps.network.set('online');
+      } catch (error) {
+        deps.bus.emit({
+          type: 'lifecycle',
+          message: `network restore failed: ${redactString((error as Error).message)}`,
+        });
+        failed = true; // airplane mode leaking into the next scenario must not be silent
+      }
+    }
+
     if (deps.reconcile) {
       deps.bus.emit({ type: 'reconciliation.begin' });
       let state: FundsState = 'n/a';
@@ -508,7 +556,7 @@ async function settleAfterLaunch(driver: Driver, timeoutMs: number, pollMs: numb
   }
 }
 
-type LastAppData = Partial<Record<'store' | 'db', { json: string; path: string }>>;
+type LastAppData = Partial<Record<'store' | 'db' | 'faults', { json: string; path: string }>>;
 
 /**
  * Best-effort app-data sidecars (zustand mirror + coco db dump) beside a
@@ -527,7 +575,7 @@ async function captureAppDataEvidence(
   if (!deps.appData) return;
   try {
     const result = await deps.appData.capture();
-    for (const kind of ['store', 'db'] as const) {
+    for (const kind of ['store', 'db', 'faults'] as const) {
       const json = result[kind];
       if (!json) continue;
       const prev = last[kind];
@@ -556,7 +604,9 @@ async function captureEvidence(
   lastAppData?: LastAppData
 ): Promise<void> {
   const screenshot = await deps.driver.screenshot(options);
-  const axSnapshot = JSON.stringify(redactDeep(await deps.driver.axSnapshot()));
+  const axSnapshot = JSON.stringify(
+    redactDeep(redactProfileSecretAxNodes(await deps.driver.axSnapshot()))
+  );
   const shotPath = deps.artifacts.write(`${base}.png`, 'screenshot', screenshot);
   const axPath = deps.artifacts.write(`${base}.ax.json`, 'ax', axSnapshot);
   deps.bus.emit({ type: 'artifact', artifactSeq, stepId, kind: 'screenshot', path: shotPath });
@@ -591,7 +641,10 @@ async function captureFinalEvidence(
   }
 
   const axSnapshot = JSON.stringify(
-    redactDeep({ revision: observation.revision, nodes: observation.ax })
+    redactDeep({
+      revision: observation.revision,
+      nodes: redactProfileSecretAxNodes(observation.ax),
+    })
   );
   const shotPath = deps.artifacts.write(`${base}.png`, 'screenshot', screenshot);
   const axPath = deps.artifacts.write(`${base}.ax.json`, 'ax', axSnapshot);
@@ -679,6 +732,15 @@ async function dispatch(
       await new Promise((r) => setTimeout(r, step.ms));
       return 'ok';
     case 'tapUntil': {
+      const targetReached = async (): Promise<boolean> => {
+        const target = await d.find(step.until);
+        return Boolean(
+          target &&
+          (d.semanticAssertions === false ||
+            step.untilValue === undefined ||
+            target.value === step.untilValue)
+        );
+      };
       for (let attempt = 0; attempt < step.attempts; attempt++) {
         deps.bus.emit({
           type: 'retry',
@@ -696,6 +758,7 @@ async function dispatch(
             // fail loudly; the until-check remains the only success gate.
             if (attempt > 0 && !(await d.find(item.tap))) {
               await evidence(`tapUntil-a${attempt}-s${sub++}`);
+              if (await targetReached()) return 'ok';
               continue;
             }
             await d.tap(item.tap);
@@ -704,20 +767,29 @@ async function dispatch(
           else await new Promise((r) => setTimeout(r, item.delayMs));
           // Evidence after each sub-action so nested menu/sheet taps are captured.
           await evidence(`tapUntil-a${attempt}-s${sub++}`);
+          // A sub-action may have already reached the destination. Stop before
+          // later recovery gestures can interact with the new screen.
+          if (await targetReached()) return 'ok';
         }
         // Poll for the target within settleMs before re-running the sequence, so
         // a slow-rendering screen (a mint quote invoice) is awaited, not re-tapped.
         const settleDeadline = Date.now() + (step.settleMs ?? 2000);
         while (Date.now() < settleDeadline) {
-          const target = await d.find(step.until);
-          if (target && (step.untilValue === undefined || target.value === step.untilValue)) {
-            return 'ok';
-          }
+          if (await targetReached()) return 'ok';
           await new Promise((r) => setTimeout(r, 300));
         }
       }
       throw new Error(`tapUntil: target never appeared after ${step.attempts} attempts`);
     }
+    case 'permission':
+      await d.setPermission(step.service, step.mode);
+      return 'ok';
+    case 'location':
+      await d.setLocation(step.mode, step.latitude, step.longitude);
+      return 'ok';
+    case 'openUrl':
+      await d.openUrl(step.url);
+      return 'ok';
     case 'exec': {
       const res = await deps.runner.run(step.command, step.timeoutMs ?? 60000);
       if (res.code !== 0) throw new Error(`command failed (${res.code}): ${step.command[0]} …`);
@@ -730,8 +802,19 @@ async function dispatch(
       await d.clipboardSet(res.stdout.trim());
       return 'ok';
     }
+    case 'setLiteralClipboard':
+      await d.clipboardSet(step.text);
+      return 'ok';
     case 'setPaymentRequestClipboard':
       await d.clipboardSet(step.request);
+      return 'ok';
+    case 'mintFaults':
+      if (!deps.mintFaults) throw new Error('mint-fault channel is not configured');
+      await deps.mintFaults.set(step.rules, step.timeoutMs);
+      return 'ok';
+    case 'network':
+      if (!deps.network) throw new Error('network channel is not configured');
+      await deps.network.set(step.mode);
       return 'ok';
     case 'counterparty': {
       if (!deps.counterparty) throw new Error('typed counterparty runtime is not configured');
@@ -774,16 +857,41 @@ async function dispatch(
       );
       return 'ok';
     case 'assert':
+      if (step.that === 'mintFaultIntercepted') {
+        if (!deps.mintFaults) throw new Error('mint-fault channel is not configured');
+        // Counted from ledger ENTRIES, which survive rule-set swaps (counts
+        // reset per revision, and a finally clear must not erase the proof).
+        const deadline = Date.now() + (step.timeoutMs ?? 10_000);
+        for (;;) {
+          const ledger = await deps.mintFaults.ledger();
+          const applied =
+            ledger?.entries.filter(
+              (entry) => entry.ruleId === step.ruleId && entry.outcome === 'applied'
+            ).length ?? 0;
+          if (applied >= (step.minCount ?? 1)) return 'ok';
+          if (Date.now() >= deadline) {
+            throw new Error(
+              `mintFaultIntercepted: rule "${step.ruleId}" applied ${applied} time(s), ` +
+                `expected at least ${step.minCount ?? 1} — the fault never actually fired`
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+      }
       return assertStep(step, d, startBalances, vars);
   }
 }
 
 async function assertStep(
-  step: Extract<Step, { action: 'assert' }>,
+  step: Exclude<Extract<Step, { action: 'assert' }>, { that: 'mintFaultIntercepted' }>,
   d: Driver,
   startBalances: Record<string, number>,
   vars: Vars
 ): Promise<'ok'> {
+  // The permissive fake lane proves that every authored assertion reaches the
+  // orchestration seam; it is deliberately not product evidence and cannot
+  // truthfully evaluate device state, balances, or transactions.
+  if (d.semanticAssertions === false) return 'ok';
   switch (step.that) {
     case 'visible':
     case 'notVisible': {

@@ -4,9 +4,11 @@ import { observeStableState, runScenario, type RunDeps } from './run';
 import {
   FakeDriver,
   FakeCommandRunner,
+  FakeNetworkChannel,
   MemoryArtifactSink,
   type FakeConfig,
 } from '../drivers/driver';
+import { FakeMintFaultChannel } from '../drivers/mint-faults';
 import type { Fixture, Scenario } from '../schema';
 import type { CounterpartyStep } from '../schema/steps';
 import { Secret, secret } from './redact';
@@ -178,6 +180,41 @@ describe('runScenario', () => {
     expect(artifacts.written.filter((w) => w.kind === 'ax').length).toBe(5);
     expect(artifacts.written.some((w) => w.rel.includes('FINAL-final-state'))).toBe(true);
     expect(events.at(-1)?.type).toBe('scenario.end');
+  });
+
+  it('redacts retained secret-profile fields in post-home and final AX artifacts', async () => {
+    const rawPrivateLabel = 'raw-private-label';
+    const rawPrivateValue = 'raw-private-value';
+    const secretNode = {
+      id: 'profile-secret-value-mnemonic',
+      label: rawPrivateLabel,
+      value: rawPrivateValue,
+      role: 'text',
+      state: { enabled: false },
+    };
+    const { deps } = harness({
+      currentState: 'wallet',
+      present: { 'id:profile-secret-value-mnemonic': secretNode },
+    });
+    const axPayloads: string[] = [];
+    deps.artifacts = {
+      write(rel, kind, data) {
+        if (kind === 'ax' && typeof data === 'string') axPayloads.push(data);
+        return `artifacts/${rel}`;
+      },
+    };
+
+    const status = await runScenario(sc([{ action: 'goHome' }]), new Map(), deps);
+
+    expect(status).toBe('passed');
+    expect(axPayloads).toHaveLength(2);
+    for (const payload of axPayloads) {
+      expect(payload).not.toContain(rawPrivateLabel);
+      expect(payload).not.toContain(rawPrivateValue);
+      expect(payload).toContain('profile-secret-value-mnemonic');
+      expect(payload).toContain('‹profile-secret:redacted›');
+      expect(payload).toContain('"enabled":false');
+    }
   });
 
   it('keeps typed counterparty outputs secret while handing raw bytes only to the device boundary', async () => {
@@ -549,6 +586,34 @@ describe('runScenario', () => {
     ).toBe('failed');
   });
 
+  it('treats semantic assertions as orchestration-only in permissive smoke mode', async () => {
+    const { deps } = harness({ permissive: true, currentState: 'wallet' });
+    expect(
+      await runScenario(
+        sc([
+          {
+            action: 'tapUntil',
+            sequence: [{ tap: { label: 'Toggle' } }],
+            until: { label: 'Toggle' },
+            untilValue: '1',
+            attempts: 1,
+            settleMs: 1,
+          },
+          {
+            action: 'assert',
+            that: 'ax',
+            selector: { label: 'Next' },
+            state: { enabled: false },
+          },
+          { action: 'assert', that: 'notVisible', selector: { label: 'Hidden' } },
+          { action: 'assert', that: 'balanceDelta', unit: 'sat', delta: 10 },
+        ]),
+        new Map(),
+        deps
+      )
+    ).toBe('passed');
+  });
+
   it('skips (not fails) an explicitly optional control that is absent', async () => {
     const { events, deps } = harness({});
     const status = await runScenario(
@@ -669,6 +734,39 @@ describe('runScenario', () => {
       )
     ).toBe('passed');
     expect(runner.calls).toContainEqual(['cocod', 'history', 'tx-123']);
+  });
+
+  it('captures an explicitly indexed dynamic id suffix for later interpolation', async () => {
+    const { deps } = harness({
+      present: {
+        'id:contact-row:mint:https://first.example': {
+          id: 'contact-row:mint:https://first.example',
+        },
+        'id:contact-row:mint:https://second.example': {
+          id: 'contact-row:mint:https://second.example',
+        },
+      },
+    });
+    const runner = new FakeCommandRunner();
+    deps.runner = runner;
+    expect(
+      await runScenario(
+        sc([
+          {
+            action: 'waitFor',
+            selector: {
+              idPrefix: 'contact-row:mint:',
+              matchIndex: 1,
+              captureSuffixAs: 'mintUrl',
+            },
+          },
+          { action: 'exec', command: ['cocod', 'history', '${mintUrl}'] },
+        ]),
+        new Map(),
+        deps
+      )
+    ).toBe('passed');
+    expect(runner.calls).toContainEqual(['cocod', 'history', 'https://second.example']);
   });
 
   it('fails an empty dynamic-id suffix instead of capturing an unusable value', async () => {
@@ -1153,6 +1251,33 @@ describe('tapUntil retry with a vanished selector', () => {
 });
 
 describe('tapUntil swipe item', () => {
+  it('stops the sequence when the target appears after the first sub-action', async () => {
+    const cfg: FakeConfig = {
+      currentState: 'wallet',
+      present: { 'id:card': { id: 'card' } },
+    };
+    const { deps, driver } = harness(cfg);
+    const tap = driver.tap.bind(driver);
+    driver.tap = async (selector) => {
+      await tap(selector);
+      cfg.present!['id:dest'] = { id: 'dest' };
+    };
+    const scenario = sc([
+      {
+        action: 'tapUntil',
+        sequence: [{ tap: { id: 'card' } }, { swipe: { dir: 'up' } }, { swipe: { dir: 'down' } }],
+        until: { id: 'dest' },
+        attempts: 3,
+        settleMs: 500,
+      },
+    ]);
+
+    expect(await runScenario(scenario, new Map(), deps)).toBe('passed');
+    expect(driver.calls).toContain('tap:id:card');
+    expect(driver.calls).not.toContain('swipe:up');
+    expect(driver.calls).not.toContain('swipe:down');
+  });
+
   it('runs swipes inside the retry sequence', async () => {
     const cfg: FakeConfig = {
       currentState: 'wallet',
@@ -1174,5 +1299,183 @@ describe('tapUntil swipe item', () => {
     expect(await runScenario(scenario, new Map(), deps)).toBe('passed');
     expect(driver.calls).toContain('swipe:up');
     expect(driver.calls).toContain('swipe:down');
+  });
+});
+
+describe('mintFaults step and mintFaultIntercepted assert', () => {
+  const FAULT_RULE = {
+    id: 'quote-offline',
+    mint: 'https://testnut.cashu.space',
+    path: '/v1/mint/quote/bolt11',
+    method: 'POST',
+    afterMatches: 0,
+    ws: 'down',
+    response: { mode: 'offline' },
+  } as const;
+  const faultScenario = (steps: unknown[], verify: unknown[] = []) =>
+    sc(steps, { requires: ['mock.mint-faults'], verify });
+
+  it('sets rules through the channel, asserts application, and defensively clears', async () => {
+    const { deps } = harness({ currentState: 'wallet' }, ['mock.mint-faults']);
+    const channel = new FakeMintFaultChannel();
+    deps.mintFaults = channel;
+    const result = await runScenario(
+      faultScenario(
+        [{ action: 'mintFaults', rules: [FAULT_RULE] }],
+        [{ action: 'assert', that: 'mintFaultIntercepted', ruleId: 'quote-offline', minCount: 1 }]
+      ),
+      new Map(),
+      deps
+    );
+    expect(result).toBe('passed');
+    // The authored set plus the orchestrator's defensive clear for the next
+    // scenario sharing this simulator session.
+    expect(channel.sets).toEqual([[FAULT_RULE], []]);
+  });
+
+  it('fails the scenario when no channel is configured', async () => {
+    const { deps } = harness({ currentState: 'wallet' }, ['mock.mint-faults']);
+    const result = await runScenario(
+      faultScenario([{ action: 'mintFaults', rules: [] }]),
+      new Map(),
+      deps
+    );
+    expect(result).toBe('failed');
+  });
+
+  it('fails the assert when the rule never applied within its timeout', async () => {
+    const { deps } = harness({ currentState: 'wallet' }, ['mock.mint-faults']);
+    const channel = new FakeMintFaultChannel();
+    channel.setLedger({ v: 1, activeRevision: 1, counts: {}, entries: [] });
+    deps.mintFaults = channel;
+    const result = await runScenario(
+      faultScenario(
+        [{ action: 'mintFaults', rules: [FAULT_RULE] }],
+        [
+          {
+            action: 'assert',
+            that: 'mintFaultIntercepted',
+            ruleId: 'quote-offline',
+            minCount: 1,
+            timeoutMs: 200,
+          },
+        ]
+      ),
+      new Map(),
+      deps
+    );
+    expect(result).toBe('failed');
+  });
+
+  it('fails the run when the defensive clear cannot reach the app', async () => {
+    const { deps } = harness({ currentState: 'wallet' }, ['mock.mint-faults']);
+    const channel = new FakeMintFaultChannel();
+    let sets = 0;
+    const realSet = channel.set.bind(channel);
+    channel.set = async (rules) => {
+      sets += 1;
+      if (sets > 1) throw new Error('app is gone');
+      return realSet(rules);
+    };
+    deps.mintFaults = channel;
+    const result = await runScenario(
+      faultScenario([{ action: 'mintFaults', rules: [FAULT_RULE] }]),
+      new Map(),
+      deps
+    );
+    expect(result).toBe('failed');
+  });
+
+  it('writes the faults ledger sidecar when app data reports one', async () => {
+    const { deps, artifacts } = harness({ currentState: 'wallet' });
+    deps.appData = {
+      capture: async () => ({
+        store: null,
+        db: null,
+        faults: JSON.stringify({ v: 1, activeRevision: 1, counts: {}, entries: [] }),
+      }),
+    };
+    expect(await runScenario(sc([{ action: 'goHome' }]), new Map(), deps)).toBe('passed');
+    expect(
+      artifacts.written.some(
+        (entry) => entry.rel.endsWith('.faults.json') && entry.kind === 'faults'
+      )
+    ).toBe(true);
+  });
+});
+
+describe('network step (device.network real airplane mode)', () => {
+  it('restores online defensively and reports channel calls in order', async () => {
+    const { deps } = harness({ currentState: 'wallet' }, ['device.network']);
+    const channel = new FakeNetworkChannel();
+    deps.network = channel;
+    const result = await runScenario(
+      sc(
+        [
+          { action: 'network', mode: 'airplane' },
+          { action: 'network', mode: 'online' },
+        ],
+        { requires: ['device.network'], finally: [{ action: 'network', mode: 'online' }] }
+      ),
+      new Map(),
+      deps
+    );
+    expect(result).toBe('passed');
+    // authored airplane → authored online → authored finally → defensive backstop
+    expect(channel.calls).toEqual(['airplane', 'online', 'online', 'online']);
+    expect(channel.mode).toBe('online');
+  });
+
+  it('fails the network step when no channel is configured', async () => {
+    const { deps } = harness({ currentState: 'wallet' }, ['device.network']);
+    const result = await runScenario(
+      sc([{ action: 'network', mode: 'airplane' }], { requires: ['device.network'] }),
+      new Map(),
+      deps
+    );
+    expect(result).toBe('failed');
+  });
+
+  it('force-restores online even when the scenario fails mid-airplane', async () => {
+    const { deps } = harness({ currentState: 'wallet', failWaitFor: ['id:never-appears'] }, [
+      'device.network',
+    ]);
+    const channel = new FakeNetworkChannel();
+    deps.network = channel;
+    const result = await runScenario(
+      sc(
+        [
+          { action: 'network', mode: 'airplane' },
+          { action: 'waitFor', selector: { id: 'never-appears' }, timeoutMs: 100 },
+        ],
+        { requires: ['device.network'], finally: [{ action: 'network', mode: 'online' }] }
+      ),
+      new Map(),
+      deps
+    );
+    expect(result).toBe('failed');
+    expect(channel.mode).toBe('online');
+  });
+
+  it('fails the run when the defensive online restore cannot reach the device', async () => {
+    const { deps } = harness({ currentState: 'wallet' }, ['device.network']);
+    const channel = new FakeNetworkChannel();
+    let calls = 0;
+    const realSet = channel.set.bind(channel);
+    channel.set = async (mode) => {
+      calls += 1;
+      if (calls > 1) throw new Error('adb is gone');
+      return realSet(mode);
+    };
+    deps.network = channel;
+    const result = await runScenario(
+      sc([{ action: 'network', mode: 'airplane' }], {
+        requires: ['device.network'],
+        finally: [{ action: 'network', mode: 'online' }],
+      }),
+      new Map(),
+      deps
+    );
+    expect(result).toBe('failed');
   });
 });

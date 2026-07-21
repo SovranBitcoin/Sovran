@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { interpolate, interpolateDeep } from './interpolate';
-import { expandScenario, formatDryRunPlan, unsafeCocodEffects } from './plan';
+import { expandScenario, formatDryRunPlan, labelForStep, unsafeCocodEffects } from './plan';
 import type { Scenario, Fixture } from '../schema';
 
 const CASHU = 'cashu' + 'B' + 'o' + 'a'.repeat(30);
@@ -54,6 +54,21 @@ describe('interpolate', () => {
   it('preserves the type of an exact fixture parameter reference', () => {
     expect(interpolateDeep<unknown>('${amount}', { amount: 40 })).toBe(40);
     expect(interpolateDeep('amount-${amount}', { amount: 40 })).toBe('amount-40');
+  });
+});
+
+describe('labelForStep', () => {
+  it('shows indexed prefix-capture semantics in plans', () => {
+    expect(
+      labelForStep({
+        action: 'waitFor',
+        selector: {
+          idPrefix: 'contact-row:mint:',
+          matchIndex: 2,
+          captureSuffixAs: 'mintThreeUrl',
+        },
+      })
+    ).toBe('waitFor #contact-row:mint:*[2]→mintThreeUrl');
   });
 });
 

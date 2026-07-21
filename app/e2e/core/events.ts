@@ -82,7 +82,7 @@ export type RunnerEvent = Base &
         type: 'artifact';
         artifactSeq: number;
         stepId: string;
-        kind: 'screenshot' | 'ax' | 'log' | 'video' | 'store' | 'db';
+        kind: 'screenshot' | 'ax' | 'log' | 'video' | 'store' | 'db' | 'faults';
         path: string;
       }
     | { type: 'funding'; leg: string; unit: string; amountSat: number; mintHost: string }

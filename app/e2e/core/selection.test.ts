@@ -112,12 +112,12 @@ describe('parseCliArgs', () => {
       acceptTestFundLoss: true,
     });
     expect(() => parseCliArgs(full.slice(0, -1))).toThrow(/i-accept-test-fund-loss/);
-    expect(() => parseCliArgs(full.filter((arg, i) => !(arg === '--leg' || full[i - 1] === '--leg')))).toThrow(
-      /requires --leg/
-    );
     expect(() =>
-      parseCliArgs(full.map((arg) => (arg === '33' ? '0' : arg)))
-    ).toThrow(/positive integer/);
+      parseCliArgs(full.filter((arg, i) => !(arg === '--leg' || full[i - 1] === '--leg')))
+    ).toThrow(/requires --leg/);
+    expect(() => parseCliArgs(full.map((arg) => (arg === '33' ? '0' : arg)))).toThrow(
+      /positive integer/
+    );
     expect(() => parseCliArgs(['funds-write-off', '--suite', 'full'])).toThrow(/not valid/);
   });
 });
@@ -259,6 +259,18 @@ describe('suite registry', () => {
     expect(() => assertDriverLaneCompatibility('sim', [{ id: 'live', lane: 'live' }])).toThrow(
       /only simulator.*funded.*live/i
     );
+  });
+
+  it('lets the android emulator driver accept simulator and funded lanes only', () => {
+    expect(() =>
+      assertDriverLaneCompatibility('android', [{ id: 'safe', lane: 'simulator' }])
+    ).not.toThrow();
+    expect(() =>
+      assertDriverLaneCompatibility('android', [{ id: 'funded', lane: 'funded' }])
+    ).not.toThrow();
+    expect(() =>
+      assertDriverLaneCompatibility('android', [{ id: 'nfc.receive', lane: 'physical' }])
+    ).toThrow(/android.*physical/i);
   });
 
   it('requires explicit fund-loss acceptance only when a funded scenario is selected', () => {
