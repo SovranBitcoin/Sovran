@@ -31,6 +31,7 @@ import Animated, {
 import Svg, { Circle, Defs, Mask, Path, Rect } from 'react-native-svg';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
 import {
   useVisualLayoutLogger,
   visualLayoutScopePart,
@@ -425,7 +426,9 @@ function ConfirmationSegment({
   }, [completed, progress, pulse]);
 
   useEffect(() => {
-    if (active && !completed) {
+    // Under Android e2e the perpetual breathe keeps the window from idling, so
+    // uiautomator can't dump a screen with an in-progress segment. Leave it flat.
+    if (active && !completed && !IS_ANDROID_E2E) {
       wasBreathingRef.current = true;
       debugEventRef.current?.('dot.segment_breathe', {
         segmentIndex: debugMetaRef.current.index,
@@ -806,7 +809,11 @@ export function LoadingIndicator({
         easing: E_DEF,
       })
     );
-    const nextSpeed = isSegmentedMode ? 0 : SPEED[effectivePhase];
+    // Under Android e2e the perpetual loading spin never lets the window reach
+    // idle, so uiautomator can't dump any screen showing an in-progress
+    // indicator (e.g. a pending send's timeline dot). Freeze the arc — the
+    // phase/result semantics stay intact for assertions; only the rotation stops.
+    const nextSpeed = isSegmentedMode || IS_ANDROID_E2E ? 0 : SPEED[effectivePhase];
 
     // Segmented rings are anchored: segment 0 starts at 12 o'clock and fills
     // clockwise (the segment dash geometry pairs with rotate(-90)). A leftover

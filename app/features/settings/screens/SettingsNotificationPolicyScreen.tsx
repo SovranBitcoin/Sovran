@@ -83,7 +83,9 @@ function SelectableSettingsRow({
       onPress={onPress}
       testID={testID}
       accessible={!!testID}
+      accessibilityRole="radio"
       accessibilityLabel={title}
+      accessibilityState={{ checked: selected }}
       accessibilityValue={testID ? { text: selected ? '1' : '0' } : undefined}>
       <PressableFeedback.Scale>
         <ListGroup.Item disabled>

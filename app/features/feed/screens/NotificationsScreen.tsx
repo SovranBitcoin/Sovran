@@ -1311,7 +1311,13 @@ function EmptyNotifications({
   const subtitle = errorMessage ? errorMessage : viewerReady ? '' : 'Nostr profile required';
 
   return (
-    <VStack align="center" gap={12} style={styles.emptyState}>
+    <VStack
+      align="center"
+      gap={12}
+      style={styles.emptyState}
+      testID={`notifications-empty:${errorMessage ? 'error' : viewerReady ? 'none' : 'no-profile'}`}
+      accessible
+      accessibilityLabel={title}>
       <Icon name={icon} size={34} color={opacity(foreground, 0.45)} />
       <Text size={18} bold style={{ color: foreground, textAlign: 'center' }}>
         {title}

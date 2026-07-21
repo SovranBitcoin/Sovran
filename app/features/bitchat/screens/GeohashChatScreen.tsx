@@ -284,6 +284,18 @@ export function GeohashChatScreen({
 
   return (
     <Screen name="GeohashChatScreen" scroll="none">
+      {/* e2e marker: the channel surface has no other stable AX identity —
+          the suffix pins WHICH geohash channel opened (mesh vs location). */}
+      <View
+        testID={`geohash-chat:${geohash ?? 'unknown'}`}
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel="Geohash channel probe"
+        importantForAccessibility="yes"
+        collapsable={false}
+        pointerEvents="none"
+        style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1 }}
+      />
       {header}
       {bleDmBanner}
       <ChatScreen

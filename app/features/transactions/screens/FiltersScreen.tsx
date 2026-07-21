@@ -75,6 +75,10 @@ const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress, testID })
     <Pressable
       onPress={onPress}
       testID={testID}
+      accessible
+      accessibilityRole="radio"
+      accessibilityLabel={label}
+      accessibilityState={{ checked: isSelected }}
       accessibilityValue={testID ? { text: isSelected ? '1' : '0' } : undefined}
       style={[
         styles.chip,
@@ -155,8 +159,9 @@ const MintSelectorChip: React.FC<{
       onPress={onPress}
       testID={testID}
       accessible
-      accessibilityRole="button"
+      accessibilityRole="radio"
       accessibilityLabel={name}
+      accessibilityState={{ checked: isSelected }}
       accessibilityValue={testID ? { text: isSelected ? '1' : '0' } : undefined}
       style={[
         styles.mintChip,

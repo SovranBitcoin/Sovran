@@ -405,7 +405,11 @@ export const ContactsScreen = () => {
       );
     }
     return (
-      <View style={styles.emptyContainer}>
+      <View
+        style={styles.emptyContainer}
+        testID={`contacts-empty:${activeFilter.toLowerCase()}`}
+        accessible
+        accessibilityLabel="No contacts to show">
         <Icon name="mdi:account-group" size={30} color={muted} />
         <Text style={[styles.emptyText, { color: muted }]}>
           {activeFilter === 'Mints'

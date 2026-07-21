@@ -239,6 +239,16 @@ export const CreqCustomizationCard = memo(function CreqCustomizationCard({
         pointerEvents="none"
         style={probeStyles.probe}
       />
+      <View
+        testID={`receive-creq-p2pk-state:${p2pkStateValue.text}`}
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel="P2PK lock state probe"
+        importantForAccessibility="yes"
+        collapsable={false}
+        pointerEvents="none"
+        style={probeStyles.probe}
+      />
     </View>
   );
 });

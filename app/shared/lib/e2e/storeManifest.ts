@@ -6,10 +6,10 @@
  *
  * Inclusion rule (enforced by app/__tests__/e2eStoreManifest.test.ts): every
  * file under the store directories whose module-level export is a zustand
- * `create(...)` hook must appear here. Excluded by rule: pure helpers with no
- * store (clearPaymentContext, migrateSettings, restoreActiveSessionView) and
- * per-call store factories (legProgress) whose instances cannot be enumerated
- * statically.
+ * `create(...)` hook must appear here unless it is an explicit sensitive-state
+ * exclusion. Pure helpers with no store and per-call factories are excluded as
+ * well. `dmEchoStore` is deliberately absent: its plaintext DM body may be a
+ * live bearer ecash token and must never enter debug artifacts.
  */
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { useMempoolAddressCache } from '@/shared/stores/global/mempoolAddressCache';

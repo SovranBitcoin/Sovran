@@ -13,7 +13,7 @@ export function MeltDestinationFingerprintProbe({ destination }: { destination: 
   const accessibilityValue = React.useMemo(() => ({ text: fingerprint }), [fingerprint]);
   return (
     <View
-      testID="melt-destination-fingerprint"
+      testID={`melt-destination-fingerprint:${fingerprint}`}
       accessible
       accessibilityRole="text"
       accessibilityLabel="Payment destination fingerprint"

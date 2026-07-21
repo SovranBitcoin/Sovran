@@ -50,6 +50,10 @@ export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React
         text: option.label,
         iconNode: <Icon name={option.icon} size={20} />,
         testID: `fiat-currency-menu-${option.currency}`,
+        // Match the native iOS UIMenu's stable row names while retaining the
+        // friendlier long visual title and hint for Android screen readers.
+        accessibilityLabel: option.currency.toUpperCase(),
+        accessibilityHint: option.label,
         suffix:
           option.currency === displayCurrency ? (
             <Icon name="mdi:check" size={20} color={success} />

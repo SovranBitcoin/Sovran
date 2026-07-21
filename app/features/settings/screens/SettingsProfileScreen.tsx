@@ -86,6 +86,7 @@ export const SettingsProfileScreen = () => {
           <TextField>
             <Label>{label}</Label>
             <Input
+              testID={fieldKey ? `profile-secret-value-${fieldKey}` : undefined}
               value={resolvedValue}
               editable={false}
               secureTextEntry={shouldObscure}
@@ -101,6 +102,8 @@ export const SettingsProfileScreen = () => {
                     size="sm"
                     className="flex-1"
                     testID={`profile-reveal-${fieldKey}`}
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: isVisible }}
                     accessibilityValue={{ text: isVisible ? '1' : '0' }}
                     onPress={() => toggleFieldVisibility(fieldKey)}>
                     <Icon

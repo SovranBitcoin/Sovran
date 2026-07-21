@@ -172,7 +172,11 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
         alignSelf: isOwn ? 'flex-end' : 'flex-start',
         maxWidth: '85%',
       }}>
-      <Pressable onPress={handlePress}>
+      <Pressable
+        onPress={handlePress}
+        testID={isOwn ? 'cashu-bubble-own' : 'cashu-bubble-incoming'}
+        accessibilityRole="button"
+        accessibilityLabel={isOwn ? 'Sent ecash token' : 'Received ecash token'}>
         <VStack
           spacing={spacing.sm}
           style={{

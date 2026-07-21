@@ -214,6 +214,11 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
     latitude: mockMode ? MOCK_LAT : DEFAULT_LAT,
     longitude: mockMode ? MOCK_LON : DEFAULT_LON,
   });
+  // Denial is otherwise silent (the card just keeps the London default), so
+  // the outcome of the permission request must be AX-observable for e2e.
+  const [permStatus, setPermStatus] = useState<'undetermined' | 'granted' | 'denied'>(
+    'undetermined'
+  );
 
   useEffect(() => {
     if (mockMode) {
@@ -231,6 +236,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
         // undetermined, so this card never had a fix and stayed on the London
         // default.
         const { status } = await Location.requestForegroundPermissionsAsync();
+        if (!cancelled) setPermStatus(status === 'granted' ? 'granted' : 'denied');
         if (status !== 'granted') return;
 
         // Last-known gives an instant first paint, but returns null when the OS
@@ -294,7 +300,10 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
   return (
     <Log name="BitcoinNearYou">
       <Link href="/(map-flow)" asChild>
-        <Pressable activeOpacity={0.85}>
+        {/* The permission outcome rides the card's aggregated AX element (iOS
+            flattens every descendant into this Pressable), so denial — which
+            is otherwise silent — stays e2e-observable. */}
+        <Pressable activeOpacity={0.85} testID={`wallet-location:${permStatus}`}>
           <SquircleView
             style={{
               overflow: 'hidden',

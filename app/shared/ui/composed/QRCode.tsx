@@ -18,6 +18,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
+import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
 
 export { SPEED_PRESETS, DENSITY_PRESETS, DEFAULT_SPEED_INDEX, DEFAULT_DENSITY_INDEX };
 
@@ -29,6 +30,14 @@ const MAX_QR_DATA_LENGTH = 2000;
 // minibits: fragment=150, interval=250ms
 // cashu.me: fragment=150 (default), interval=150/250/500ms (adjustable)
 const ANIMATE_THRESHOLD = 500; // chars — animate tokens above this length (multi-proof tokens)
+
+// A fountain-QR that cycles fragments every frame never lets the Android window
+// reach idle, so `uiautomator dump` can never snapshot the Send-ecash screen
+// (Copy button, offline banner, tx probe all go unreadable). Under Android e2e
+// render a single static frame instead — the length-preference animation only;
+// genuinely over-capacity data (> MAX_QR_DATA_LENGTH) still animates because it
+// must, and e2e tokens are always well under that.
+const E2E_STATIC_QR = IS_ANDROID_E2E;
 
 // Speed presets — cycle through with tap (cashu.me: 150/250/500)
 const SPEED_PRESETS = [
@@ -102,7 +111,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   // Short data (addresses, invoices) is always static — faster to scan.
   const needsAnimation =
     (address != null && address.length > MAX_QR_DATA_LENGTH) ||
-    (animateProp && address != null && address.length >= ANIMATE_THRESHOLD);
+    (!E2E_STATIC_QR && animateProp && address != null && address.length >= ANIMATE_THRESHOLD);
 
   const encodeStartRef = useRef(0);
 

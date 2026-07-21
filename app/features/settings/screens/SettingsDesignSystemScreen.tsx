@@ -18,6 +18,9 @@ const DesignSystemLinkItem: React.FC<DesignSystemFamily> = ({ id, href, title, d
   return (
     <PressableFeedback
       testID={`design-system-family-${id}`}
+      accessible
+      accessibilityLabel={`${title}, ${description}`}
+      accessibilityRole="button"
       animation={false}
       onPress={handlePress}>
       <PressableFeedback.Scale>

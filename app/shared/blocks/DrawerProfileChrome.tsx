@@ -155,6 +155,9 @@ function ProfileSwitcherButtons({
         .map((profile: ProfileEntry) => (
           <Pressable
             key={profile.accountIndex}
+            testID={`drawer-profile-switch-${profile.accountIndex}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Switch account ${profile.accountIndex + 1}`}
             onPress={() => {
               void executeProfileAction({
                 type: 'switch',
@@ -176,6 +179,9 @@ function ProfileSwitcherButtons({
         ))}
       <Pressable
         onPress={openSheet}
+        testID="drawer-profile-switcher-open"
+        accessibilityRole="button"
+        accessibilityLabel="Switch profile"
         style={[dotsButtonStyle, { borderColor: defaultColor, backgroundColor: defaultColor }]}>
         <Icon name="tabler:dots" size={iconSize.xl} color={foreground} />
       </Pressable>

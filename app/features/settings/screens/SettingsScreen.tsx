@@ -86,10 +86,17 @@ const SettingsListLinkItem: React.FC<{
   title: string;
   description?: string;
   isDanger?: boolean;
-}> = ({ href, title, description, isDanger }) => {
+  testID?: string;
+}> = ({ href, title, description, isDanger, testID }) => {
   const danger = useThemeColor('danger');
   return (
-    <PressableFeedback animation={false} onPress={() => router.navigate(href)}>
+    <PressableFeedback
+      animation={false}
+      testID={testID}
+      accessible={testID ? true : undefined}
+      accessibilityLabel={testID ? `${title}${description ? `, ${description}` : ''}` : undefined}
+      accessibilityRole={testID ? 'button' : undefined}
+      onPress={() => router.navigate(href)}>
       <PressableFeedback.Scale>
         <ListGroup.Item disabled>
           <ListGroup.ItemContent>
@@ -316,6 +323,7 @@ export const SettingsScreen = () => {
                   href="/(settings-flow)/design-system"
                   title="Design system"
                   description="Preview shared UI components"
+                  testID="settings-design-system-row"
                 />
                 <Separator className="mx-4" />
                 <PressableFeedback animation={false} onPress={() => setMockMode(!mockMode)}>
@@ -337,7 +345,9 @@ export const SettingsScreen = () => {
                   onPress={() => setMockOffline(!mockOffline)}
                   testID="settings-mock-offline-toggle"
                   accessible
+                  accessibilityRole="switch"
                   accessibilityLabel="Mock Offline"
+                  accessibilityState={{ checked: mockOffline }}
                   accessibilityValue={{ text: mockOffline ? '1' : '0' }}>
                   <PressableFeedback.Scale>
                     <ListGroup.Item disabled>
@@ -357,7 +367,9 @@ export const SettingsScreen = () => {
                   onPress={() => setMockFailSend(!mockFailSend)}
                   testID="settings-mock-fail-send-toggle"
                   accessible
+                  accessibilityRole="switch"
                   accessibilityLabel="Mock Fail Send"
+                  accessibilityState={{ checked: mockFailSend }}
                   accessibilityValue={{ text: mockFailSend ? '1' : '0' }}>
                   <PressableFeedback.Scale>
                     <ListGroup.Item disabled>
@@ -377,7 +389,9 @@ export const SettingsScreen = () => {
                   onPress={() => setMockFailMelt(!mockFailMelt)}
                   testID="settings-mock-fail-melt-toggle"
                   accessible
+                  accessibilityRole="switch"
                   accessibilityLabel="Mock Fail Melt"
+                  accessibilityState={{ checked: mockFailMelt }}
                   accessibilityValue={{ text: mockFailMelt ? '1' : '0' }}>
                   <PressableFeedback.Scale>
                     <ListGroup.Item disabled>

@@ -348,6 +348,22 @@ export function PrimaryBalance({
             testID={isSatUnit ? 'wallet-fiat-pill' : undefined}
             accessibilityLabel={isSatUnit ? 'Change display currency' : undefined}
           />
+          {/* e2e probe: the pill renders through a native menu whose AX value
+              forwarding is platform-dependent, so the persisted selection is
+              mirrored here (wallet-wallpaper:<slug> pattern) — screenshots
+              alone cannot prove which currency survived a relaunch. */}
+          {isSatUnit ? (
+            <View
+              testID={`wallet-fiat-currency:${displayCurrency}`}
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel="Display currency probe"
+              importantForAccessibility="yes"
+              collapsable={false}
+              pointerEvents="none"
+              style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1 }}
+            />
+          ) : null}
         </View>
         <EcashStatusPill
           label="PENDING"

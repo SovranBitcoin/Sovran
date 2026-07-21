@@ -6,7 +6,17 @@ import {
   visualLayoutScopePart,
   type VisualLayoutConfig,
 } from '@/shared/lib/contentShiftLog';
+import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
 import { cn } from '@/shared/lib/utils';
+
+// NativeWind's `animate-pulse` is a Reanimated opacity loop that never stops
+// while the skeleton is mounted. On an offline screen a skeleton can be mounted
+// indefinitely (e.g. mint info that will never load), and that perpetual
+// animation stops the Android window from ever reaching idle — so
+// `uiautomator dump` returns an empty tree and every AX assert on the screen is
+// blind. Under Android e2e render a static placeholder instead; production/iOS
+// keep the pulse.
+const E2E_STATIC_SKELETON = IS_ANDROID_E2E;
 
 type SkeletonVisualProps = {
   visualScope?: string;
@@ -77,7 +87,7 @@ const Skeleton = React.forwardRef<View, SkeletonProps>(function Skeleton(
       {...props}
       ref={setRef}
       collapsable={false}
-      className={cn('bg-skeleton animate-pulse rounded-md', className)}
+      className={cn('bg-skeleton rounded-md', !E2E_STATIC_SKELETON && 'animate-pulse', className)}
       onLayout={handleLayout}
     />
   );
