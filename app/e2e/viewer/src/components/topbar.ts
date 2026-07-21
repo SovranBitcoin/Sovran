@@ -5,6 +5,35 @@ function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** Live progress: `running <scenario> · done/total · m:ss`. Shown for any
+ * in-progress run — viewer-triggered or terminal-started; a run job that has
+ * not yet produced a run dir falls back to the plain busy pill. The 2s live
+ * poll re-renders the topbar, so the elapsed clock ticks without a timer. */
+function progressPill(busy: boolean): string {
+  const live = state.runs.find((run) => run.status === 'in-progress');
+  if (!live) return busy ? `<span class="status-pill">job running…</span>` : '';
+  const statuses = live.scenarioStatus ? Object.values(live.scenarioStatus) : [];
+  const done = statuses.filter(
+    (status) =>
+      status === 'passed' || status === 'failed' || status === 'deferred' || status === 'skipped'
+  ).length;
+  const total = live.scenarioIds.length;
+  const active = live.activeScenarioId;
+  const name = active
+    ? (state.catalog.find((entry) => entry.id === active)?.name ?? active)
+    : undefined;
+  const elapsedSec = Math.max(0, Math.floor((Date.now() - Date.parse(live.startedAt)) / 1000));
+  const clock = Number.isFinite(elapsedSec)
+    ? `${Math.floor(elapsedSec / 60)}:${String(elapsedSec % 60).padStart(2, '0')}`
+    : '';
+  const parts = [
+    name ? `running ${name}` : 'running…',
+    total > 0 && statuses.length > 0 ? `${done}/${total}` : '',
+    clock,
+  ].filter(Boolean);
+  return `<span class="status-pill progress-pill" title="run-${escapeHtml(live.runId)}"><span class="glyph-running">●</span> ${escapeHtml(parts.join(' · '))}</span>`;
+}
+
 /** Two-deck header: brand + action cluster share the top row (actions get the
  * full width, so the cluster never wraps), underline-style mode tabs sit on
  * the header's bottom border like a GitHub repo nav. */
@@ -37,7 +66,7 @@ export function renderTopbar(root: HTMLElement): void {
     `</div>` +
     `<div class="topbar-actions">` +
     (state.error ? `<span class="status-pill glyph-fail">${escapeHtml(state.error)}</span>` : '') +
-    (busy ? `<span class="status-pill">job running…</span>` : '') +
+    progressPill(busy) +
     (state.mode === 'browse' && versions.length > 0
       ? `<select data-action="version" aria-label="run version" title="run version">${versionOptions}</select>`
       : '') +

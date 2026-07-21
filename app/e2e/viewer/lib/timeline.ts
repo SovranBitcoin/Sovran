@@ -1,7 +1,15 @@
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { Frame, NamedFrame, PhaseTag, RunSummary, ScenarioTimeline } from './types';
+import type {
+  Frame,
+  NamedFrame,
+  PhaseTag,
+  RunStatus,
+  RunSummary,
+  ScenarioRunStatus,
+  ScenarioTimeline,
+} from './types';
 
 const STEP_ID_RE = /^(P|T|V|C)\d+$/;
 /** NNN-<STEPID>-<kind>.png */
@@ -223,6 +231,40 @@ export function parseEvents(eventsText: string, runDirName: string): ParsedEvent
     timeline.frames.sort((a, b) => a.artifactSeq - b.artifactSeq);
   }
   return { scenarios: [...timelines.values()], runEnd };
+}
+
+/** Map each manifest scenario to its live status. Runs execute sequentially,
+ * so at most one timeline is begun-but-unended; that one is the active
+ * scenario while the run is in-progress (and a mid-scenario abort once it
+ * isn't). Scenarios with no timeline yet are pending on a live run and
+ * skipped (fail-fast / never reached) on a finished one. */
+export function deriveScenarioStatuses(
+  scenarioIds: string[],
+  timelines: ScenarioTimeline[],
+  runStatus: RunStatus
+): { scenarioStatus: Record<string, ScenarioRunStatus>; activeScenarioId?: string } {
+  const byId = new Map(timelines.map((timeline) => [timeline.scenarioId, timeline]));
+  const live = runStatus === 'in-progress';
+  const scenarioStatus: Record<string, ScenarioRunStatus> = {};
+  let activeScenarioId: string | undefined;
+  for (const scenarioId of scenarioIds) {
+    const timeline = byId.get(scenarioId);
+    if (!timeline) {
+      scenarioStatus[scenarioId] = live ? 'pending' : 'skipped';
+      continue;
+    }
+    if (timeline.deferred) {
+      scenarioStatus[scenarioId] = 'deferred';
+      continue;
+    }
+    if (timeline.ok !== undefined) {
+      scenarioStatus[scenarioId] = timeline.ok ? 'passed' : 'failed';
+      continue;
+    }
+    scenarioStatus[scenarioId] = live ? 'running' : 'failed';
+    if (live) activeScenarioId = scenarioId;
+  }
+  return { scenarioStatus, activeScenarioId };
 }
 
 /** Crash-early fallback when events.jsonl is missing or unreadable: rebuild a

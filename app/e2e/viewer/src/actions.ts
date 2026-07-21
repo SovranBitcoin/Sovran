@@ -1,7 +1,8 @@
 import { api } from './api';
 import { state, update, type JobView } from './state';
+import { visibleFrames } from './components/player';
 import { buildRunPlan } from '../lib/run-plan';
-import type { DiffResult, TriggerRequest } from '../lib/types';
+import type { DiffResult, RunDetail, RunSummary, TriggerRequest } from '../lib/types';
 
 export async function refreshAll(): Promise<void> {
   const [runs, catalog] = await Promise.all([api.runs(), api.scenarios()]);
@@ -10,13 +11,20 @@ export async function refreshAll(): Promise<void> {
     current.catalog = catalog;
     current.error = undefined;
   });
+  if (shouldPoll()) startLivePoll();
 }
 
 /** Select a scenario, optionally in a specific run. `runId` is undefined for
  * scenarios with no runs yet — selection still enables "Rerun scenario".
  * Diff mode is sticky: picking a run/scenario in the left panel re-targets the
- * diff (B = that run, A = derived) instead of bouncing back to browse. */
-export async function selectScenario(runId: string | undefined, scenarioId: string): Promise<void> {
+ * diff (B = that run, A = derived) instead of bouncing back to browse.
+ * A `'user'` selection pins the view: follow-the-runner stops until the next
+ * run job starts. */
+export async function selectScenario(
+  runId: string | undefined,
+  scenarioId: string,
+  source: 'user' | 'auto' = 'user'
+): Promise<void> {
   const stayInDiff = state.mode === 'diff';
   update((current) => {
     current.mode = stayInDiff ? 'diff' : 'browse';
@@ -25,6 +33,7 @@ export async function selectScenario(runId: string | undefined, scenarioId: stri
     current.playing = false;
     current.frameIndex = 0;
     current.runDetail = undefined;
+    if (source === 'user') current.followLive = false;
   });
   if (stayInDiff && runId) retargetDiff(runId, scenarioId);
   if (!runId) return;
@@ -43,6 +52,99 @@ export async function selectScenario(runId: string | undefined, scenarioId: stri
 /** Hop the currently selected scenario to another run (version dropdown). */
 export function selectVersion(runId: string): void {
   if (state.selectedScenarioId) void selectScenario(runId, state.selectedScenarioId);
+}
+
+// ── live polling ─────────────────────────────────────────────────────────────
+// While a run executes (viewer job OR terminal-started, detected via the
+// server's in-progress status) the client re-fetches runs + catalog + the
+// selected run's detail every 2s. The server memoizes aggressively, so a tick
+// is ~3 stats plus at most one incremental events.jsonl reparse.
+
+const LIVE_POLL_MS = 2_000;
+let livePollTimer: ReturnType<typeof setInterval> | undefined;
+let livePollBusy = false;
+
+function shouldPoll(): boolean {
+  return (
+    (state.job?.status === 'running' && state.job.kind === 'run') ||
+    state.runs.some((run) => run.status === 'in-progress')
+  );
+}
+
+export function startLivePoll(): void {
+  if (livePollTimer) return;
+  livePollTimer = setInterval(() => void livePollTick(), LIVE_POLL_MS);
+}
+
+function stopLivePoll(): void {
+  if (livePollTimer) clearInterval(livePollTimer);
+  livePollTimer = undefined;
+}
+
+async function livePollTick(): Promise<void> {
+  if (livePollBusy) return; // skip a tick rather than stack slow fetches
+  livePollBusy = true;
+  try {
+    await refreshAll();
+    const runId = state.selectedRunId;
+    const selected = runId
+      ? state.runs.find((candidate) => `run-${candidate.runId}` === runId)
+      : undefined;
+    if (runId && selected?.status === 'in-progress') {
+      try {
+        applyLiveDetail(await api.run(runId));
+      } catch {
+        // transient mid-write read — the next tick retries
+      }
+    }
+    followActiveScenario();
+    if (!shouldPoll()) stopLivePoll();
+  } finally {
+    livePollBusy = false;
+  }
+}
+
+/** Swap in a fresher detail of the already-open run without resetting the
+ * player: the scrub position survives, and when the user is parked on the tail
+ * of the actively running scenario the view sticks to newly landed frames. */
+function applyLiveDetail(detail: RunDetail): void {
+  update((current) => {
+    if (current.selectedRunId !== `run-${detail.runId}`) return;
+    const scenarioId = current.selectedScenarioId;
+    const prevTimeline = current.runDetail?.scenarios.find(
+      (scenario) => scenario.scenarioId === scenarioId
+    );
+    const nextTimeline = detail.scenarios.find((scenario) => scenario.scenarioId === scenarioId);
+    const atTail = !prevTimeline || current.frameIndex >= visibleFrames(prevTimeline).length - 1;
+    current.runDetail = detail;
+    if (
+      nextTimeline &&
+      atTail &&
+      !current.playing &&
+      !current.videoMode &&
+      scenarioId === detail.activeScenarioId
+    ) {
+      current.frameIndex = Math.max(visibleFrames(nextTimeline).length - 1, 0);
+    }
+  });
+}
+
+/** Follow mode: hop the selection to whatever scenario the live run is
+ * executing. The job's newest run wins; otherwise any in-progress run (the
+ * terminal case). */
+function followActiveScenario(): void {
+  if (!state.followLive) return;
+  const jobRunId = state.job?.runId;
+  const live: RunSummary | undefined =
+    state.runs.find((run) => `run-${run.runId}` === jobRunId && run.status === 'in-progress') ??
+    state.runs.find((run) => run.status === 'in-progress');
+  if (!live) return;
+  const runId = `run-${live.runId}`;
+  const target =
+    live.activeScenarioId ?? (state.selectedRunId === runId ? undefined : live.scenarioIds[0]);
+  if (!target) return;
+  if (state.selectedRunId === runId && state.selectedScenarioId === target) return;
+  void selectScenario(runId, target, 'auto');
 }
 
 /** Load (or reload) the Pages gallery index. */
@@ -73,7 +175,9 @@ function attachJob(jobId: string, kind: JobView['kind']): void {
   update((current) => {
     current.job = job;
     current.modal = undefined;
+    if (kind === 'run') current.followLive = true;
   });
+  if (kind === 'run') startLivePoll();
   api.stream(jobId, {
     open: () =>
       update((current) => {
@@ -83,13 +187,17 @@ function attachJob(jobId: string, kind: JobView['kind']): void {
       update((current) => {
         if (current.job?.id === jobId) current.job.lines.push(line);
       }),
-    runDiscovered: (runId) =>
+    runDiscovered: (runId) => {
       update((current) => {
         if (current.job?.id === jobId) {
           current.job.runId = runId;
           if (!current.job.runIds.includes(runId)) current.job.runIds.push(runId);
         }
-      }),
+      });
+      // Pull the new run into the list immediately instead of waiting for job
+      // exit; follow mode then hops onto it on the next poll tick.
+      void refreshAll().then(followActiveScenario);
+    },
     progress: (progress) =>
       update((current) => {
         if (current.diff.computing) current.diff.computing = progress;
@@ -100,6 +208,7 @@ function attachJob(jobId: string, kind: JobView['kind']): void {
           current.job.status = 'exited';
           current.job.exitCode = code;
         }
+        current.followLive = false;
       });
       void refreshAll().then(() => {
         const runId = state.job?.runId;
@@ -108,7 +217,7 @@ function attachJob(jobId: string, kind: JobView['kind']): void {
           const run = state.runs.find((candidate) => `run-${candidate.runId}` === runId);
           const scenario =
             scenarioId && run?.scenarioIds.includes(scenarioId) ? scenarioId : run?.scenarioIds[0];
-          if (scenario) void selectScenario(runId, scenario);
+          if (scenario) void selectScenario(runId, scenario, 'auto');
         }
       });
     },

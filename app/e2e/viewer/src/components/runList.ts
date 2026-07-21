@@ -4,12 +4,39 @@ import { persistCollapsedFlows, state, update } from '../state';
 import { FACETS } from '../../../schema/facets';
 import type { CatalogRunRef, ScenarioCatalogEntry } from '../../lib/types';
 
-function okGlyph(ok: boolean | undefined, status: CatalogRunRef['status']): string {
+/** Prefer the per-scenario status (live runs distinguish the one running
+ * scenario from its pending siblings); fall back to run-level status for runs
+ * recorded before scenarioStatus existed. */
+function okGlyph(
+  ok: boolean | undefined,
+  status: CatalogRunRef['status'],
+  scenarioStatus?: CatalogRunRef['scenarioStatus']
+): string {
+  switch (scenarioStatus) {
+    case 'running':
+      return '<span class="glyph-running">●</span>';
+    case 'pending':
+      return '<span class="glyph-pending">○</span>';
+    case 'skipped':
+      return '<span class="glyph-fail">◌</span>';
+    case 'deferred':
+      return '<span class="glyph-pending">–</span>';
+    case 'passed':
+      return '<span class="glyph-pass">✓</span>';
+    case 'failed':
+      return '<span class="glyph-fail">✗</span>';
+    default:
+      break;
+  }
   if (status === 'in-progress') return '<span class="glyph-live">●</span>';
   if (status === 'aborted') return '<span class="glyph-fail">◌</span>';
   if (ok === undefined) return '';
   return ok ? '<span class="glyph-pass">✓</span>' : '<span class="glyph-fail">✗</span>';
 }
+
+/** The running row auto-scrolls into view once per scenario change, so the 2s
+ * live poll never fights the user's own scrolling. */
+let lastScrolledScenarioId: string | undefined;
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -73,6 +100,12 @@ export function renderRunList(root: HTMLElement): void {
   }
   root.innerHTML = parts.join('');
   bindRows(root);
+  const runningRow = root.querySelector('.glyph-running')?.closest<HTMLElement>('[data-scenario]');
+  const runningScenarioId = runningRow?.dataset.scenario;
+  if (runningRow && runningScenarioId !== lastScrolledScenarioId) {
+    runningRow.scrollIntoView({ block: 'nearest' });
+    lastScrolledScenarioId = runningScenarioId;
+  }
 
   function renderScenarioRows(entry: ScenarioCatalogEntry): string {
     const rows: string[] = [];
@@ -84,7 +117,7 @@ export function renderRunList(root: HTMLElement): void {
       .join('\n');
     rows.push(
       `<div class="run-row${selected ? ' selected' : ''}${runs.length === 0 ? ' smoke' : ''}" data-scenario="${escapeHtml(entry.id)}" title="${escapeHtml(tooltip)}">` +
-        `${latest ? okGlyph(latest.ok, latest.status) : ''}<span class="title">${escapeHtml(entry.name)}</span>` +
+        `${latest ? okGlyph(latest.ok, latest.status, latest.scenarioStatus) : ''}<span class="title">${escapeHtml(entry.name)}</span>` +
         platformChips(entry.platforms) +
         `<span class="badge">${runs.length || ''}</span>` +
         `</div>`
@@ -95,7 +128,7 @@ export function renderRunList(root: HTMLElement): void {
         const runSelected = state.selectedRunId === run.runId;
         rows.push(
           `<div class="scenario-row${runSelected ? ' selected' : ''}" data-run="${run.runId}" data-scenario="${escapeHtml(entry.id)}">` +
-            `${okGlyph(run.ok, run.status)}<span class="${run.commitRun ? 'commit' : ''}">${escapeHtml(run.label)}</span>${runPlatformChip(run)}</div>`
+            `${okGlyph(run.ok, run.status, run.scenarioStatus)}<span class="${run.commitRun ? 'commit' : ''}">${escapeHtml(run.label)}</span>${runPlatformChip(run)}</div>`
         );
       }
       if (runs.length === 0) rows.push('<div class="scenario-row">no runs yet</div>');

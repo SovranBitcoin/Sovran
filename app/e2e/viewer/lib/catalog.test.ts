@@ -42,6 +42,36 @@ describe('catalogRunRef', () => {
     expect(catalogRunRef(run, 'deferred')).toBeUndefined();
     expect(catalogRunRef(run, 'fail-fast-skipped')).toBeUndefined();
   });
+
+  test('carries the per-scenario status on attempted refs', () => {
+    const withStatus: RunDetail = {
+      ...run,
+      scenarioStatus: { attempted: 'passed', deferred: 'deferred', 'fail-fast-skipped': 'skipped' },
+    };
+    expect(catalogRunRef(withStatus, 'attempted')?.scenarioStatus).toBe('passed');
+    // finished runs keep the attempted-only invariant even with statuses present
+    expect(catalogRunRef(withStatus, 'fail-fast-skipped')).toBeUndefined();
+  });
+
+  test('a live run surfaces pending and running members without a timeline', () => {
+    const live: RunDetail = {
+      ...run,
+      status: 'in-progress',
+      scenarioIds: ['attempted', 'active', 'queued'],
+      scenarios: [timeline('attempted', { ok: true })],
+      scenarioStatus: { attempted: 'passed', active: 'running', queued: 'pending' },
+      activeScenarioId: 'active',
+    };
+    expect(catalogRunRef(live, 'active')?.scenarioStatus).toBe('running');
+    expect(catalogRunRef(live, 'queued')?.scenarioStatus).toBe('pending');
+    // deferred members stay excluded even mid-run
+    const liveDeferred: RunDetail = {
+      ...live,
+      scenarios: [...live.scenarios, timeline('held', { deferred: true })],
+      scenarioStatus: { ...live.scenarioStatus, held: 'deferred' },
+    };
+    expect(catalogRunRef(liveDeferred, 'held')).toBeUndefined();
+  });
 });
 
 describe('catalogScenarioPlatforms', () => {

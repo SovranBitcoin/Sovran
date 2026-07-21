@@ -1,4 +1,4 @@
-import { LANES, PLATFORMS, type Platform } from '../../schema/capabilities';
+import { LANES, PLATFORMS, PLATFORM_DRIVERS, type Platform } from '../../schema/capabilities';
 import type { ScenarioCatalogEntry, TriggerRequest } from './types';
 
 export interface RunPlan {
@@ -6,11 +6,6 @@ export interface RunPlan {
   funded: boolean;
   platforms: Platform[];
 }
-
-const DRIVER_BY_PLATFORM: Record<Platform, 'sim' | 'android'> = {
-  ios: 'sim',
-  android: 'android',
-};
 
 /** Expand one viewer trigger into one product run per supported platform.
  * Platform support comes from the same capability-derived catalog chips the
@@ -53,7 +48,7 @@ export function buildRunPlan(
         'e2e/cli.ts',
         'run',
         '--driver',
-        DRIVER_BY_PLATFORM[platform],
+        PLATFORM_DRIVERS[platform],
         '--i-approve-destructive-reset',
         ...selectionArgs,
         ...(lane ? ['--lane', lane] : []),

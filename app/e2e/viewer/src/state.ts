@@ -69,6 +69,9 @@ export interface AppState {
   job?: JobView;
   modal?: ModalView;
   error?: string;
+  /** Follow the live run: auto-open each scenario as it begins. Set when a run
+   * job starts (or a live run is adopted at boot); cleared by any user click. */
+  followLive?: boolean;
   /** Collapsed flow-facet groups in the scenario tree; survives reloads. */
   collapsedFlows: string[];
 }

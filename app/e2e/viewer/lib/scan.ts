@@ -2,7 +2,7 @@ import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { ARTIFACTS, isValidRunDirName } from './paths';
-import { parseEvents, runLabel, timelinesFromDirScan } from './timeline';
+import { deriveScenarioStatuses, parseEvents, runLabel, timelinesFromDirScan } from './timeline';
 import type { RunDetail, RunSummary } from './types';
 
 /** A run with no run.end whose events file went quiet for this long is
@@ -150,6 +150,13 @@ export async function getRunDetail(runDirName: string): Promise<RunDetail | unde
         ? 'in-progress'
         : 'aborted';
   }
+  // Only event-derived timelines carry begin/end truth; the dir-scan fallback
+  // fabricates a bare timeline per manifest id and would misread as "running".
+  if (parsed.scenarios.length > 0) {
+    const derived = deriveScenarioStatuses(scenarioIds, scenarios, detail.status);
+    detail.scenarioStatus = derived.scenarioStatus;
+    detail.activeScenarioId = derived.activeScenarioId;
+  }
 
   cache.set(runDirName, {
     mtimeMs: stat.mtimeMs,
@@ -170,6 +177,13 @@ function refreshVolatileStatus(detail: RunDetail): RunDetail {
     liveRunIds.has(runDirName) || Date.now() - stat.mtimeMs < IN_PROGRESS_WINDOW_MS
       ? 'in-progress'
       : 'aborted';
+  // The in-progress→aborted flip retires pending→skipped and running→failed
+  // without a reparse.
+  if (detail.scenarioStatus) {
+    const derived = deriveScenarioStatuses(detail.scenarioIds, detail.scenarios, detail.status);
+    detail.scenarioStatus = derived.scenarioStatus;
+    detail.activeScenarioId = derived.activeScenarioId;
+  }
   return detail;
 }
 

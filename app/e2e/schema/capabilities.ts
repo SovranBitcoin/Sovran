@@ -91,6 +91,14 @@ export const DRIVER_CAPS: Record<'sim' | 'android', ReadonlySet<string>> = {
 export const PLATFORMS = ['ios', 'android'] as const;
 export type Platform = (typeof PLATFORMS)[number];
 
+/** The product driver that executes each platform. Shared by the viewer's
+ * run-plan expansion and the suite orchestrator so a platform never maps to
+ * two different drivers. */
+export const PLATFORM_DRIVERS: Record<Platform, 'sim' | 'android'> = {
+  ios: 'sim',
+  android: 'android',
+};
+
 /** Driver-independent capabilities supplied by external tooling rather than
  * the device: the cocod counterparty (feature-detected at run time) and
  * controlled network fixtures. Available to every platform. */

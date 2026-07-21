@@ -1,4 +1,4 @@
-import { refreshAll, selectScenario } from './actions';
+import { refreshAll, selectScenario, startLivePoll } from './actions';
 import { diffTransportStep, renderDiffView } from './components/diffView';
 import { renderModal } from './components/modal';
 import { renderPagesView } from './components/pagesView';
@@ -73,6 +73,20 @@ document.addEventListener('keydown', (event) => {
 });
 
 void refreshAll().then(() => {
+  // Opening the viewer mid-run (e.g. a terminal-started suite) lands on the
+  // live run's active scenario and follows it; otherwise the newest product run.
+  const live = state.runs.find(
+    (run) => run.proof === 'product-run' && run.status === 'in-progress'
+  );
+  if (live) {
+    update((current) => {
+      current.followLive = true;
+    });
+    startLivePoll();
+    const scenario = live.activeScenarioId ?? live.scenarioIds[0];
+    if (scenario) void selectScenario(`run-${live.runId}`, scenario, 'auto');
+    return;
+  }
   const first = state.runs.find((run) => run.proof === 'product-run' && run.scenarioIds.length > 0);
-  if (first) void selectScenario(`run-${first.runId}`, first.scenarioIds[0]);
+  if (first) void selectScenario(`run-${first.runId}`, first.scenarioIds[0], 'auto');
 });

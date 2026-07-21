@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { parseEvents, timelinesFromDirScan } from './timeline';
+import { deriveScenarioStatuses, parseEvents, timelinesFromDirScan } from './timeline';
+import type { ScenarioTimeline } from './types';
 
 const RUN_DIR = 'run-2026-07-15T00-00-00-000Z-video123';
 const lines = (events: Record<string, unknown>[]) =>
@@ -87,6 +88,82 @@ describe('timelinesFromDirScan video fallback', () => {
     const [timeline] = timelinesFromDirScan(runDir, ['mint.add.url']);
     expect(timeline.videoFile).toBe('mint.add.url/video.mp4');
     expect(timeline.frames).toHaveLength(1);
+  });
+});
+
+describe('deriveScenarioStatuses', () => {
+  const timeline = (
+    scenarioId: string,
+    over: Partial<ScenarioTimeline> = {}
+  ): ScenarioTimeline => ({
+    scenarioId,
+    name: scenarioId,
+    lane: 'simulator',
+    frames: [],
+    named: [],
+    ...over,
+  });
+
+  test('in-progress run: ended → passed/failed, begun-unended → running, unbegun → pending', () => {
+    const { scenarioStatus, activeScenarioId } = deriveScenarioStatuses(
+      ['a', 'b', 'c', 'd', 'e'],
+      [
+        timeline('a', { ok: true }),
+        timeline('b', { ok: false }),
+        timeline('c', { deferred: true }),
+        timeline('d'),
+      ],
+      'in-progress'
+    );
+    expect(scenarioStatus).toEqual({
+      a: 'passed',
+      b: 'failed',
+      c: 'deferred',
+      d: 'running',
+      e: 'pending',
+    });
+    expect(activeScenarioId).toBe('d');
+  });
+
+  test('aborted run: begun-unended → failed, unbegun → skipped, no active scenario', () => {
+    const { scenarioStatus, activeScenarioId } = deriveScenarioStatuses(
+      ['a', 'b', 'c'],
+      [timeline('a', { ok: true }), timeline('b')],
+      'aborted'
+    );
+    expect(scenarioStatus).toEqual({ a: 'passed', b: 'failed', c: 'skipped' });
+    expect(activeScenarioId).toBeUndefined();
+  });
+
+  test('complete run: every unbegun manifest scenario is skipped', () => {
+    const { scenarioStatus, activeScenarioId } = deriveScenarioStatuses(
+      ['a', 'b'],
+      [timeline('a', { ok: true })],
+      'complete'
+    );
+    expect(scenarioStatus).toEqual({ a: 'passed', b: 'skipped' });
+    expect(activeScenarioId).toBeUndefined();
+  });
+
+  test('a truncated tail (scenario.begin only) still yields the running scenario', () => {
+    const text = lines([
+      { type: 'scenario.begin', id: 't.first', name: 'first', lane: 'simulator' },
+      { type: 'scenario.end', id: 't.first', ok: true, durationMs: 5 },
+      { type: 'scenario.begin', id: 't.second', name: 'second', lane: 'simulator' },
+      { type: 'step.begin', index: 0, stepId: 'T01', kind: 'tap', label: 'tap' },
+    ]);
+    const { scenarios } = parseEvents(text, RUN_DIR);
+    const { scenarioStatus, activeScenarioId } = deriveScenarioStatuses(
+      ['t.first', 't.second', 't.third'],
+      scenarios,
+      'in-progress'
+    );
+    expect(scenarioStatus).toEqual({
+      't.first': 'passed',
+      't.second': 'running',
+      't.third': 'pending',
+    });
+    expect(activeScenarioId).toBe('t.second');
   });
 });
 

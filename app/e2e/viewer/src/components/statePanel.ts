@@ -38,7 +38,10 @@ function escapeHtml(value: string): string {
 }
 
 function fetchDoc(runId: string, rel: string): Promise<unknown> {
-  let cached = docCache.get(rel);
+  // Keyed by run + rel: sidecar rel paths repeat across runs of the same
+  // scenario, and a rel-only key would serve run A's state while viewing run B.
+  const key = `${runId}/${rel}`;
+  let cached = docCache.get(key);
   if (!cached) {
     // eslint-disable-next-line no-restricted-globals -- standalone browser dev tool (see api.ts)
     cached = fetch(api.runFileUrl(runId, rel)).then((response) => {
@@ -46,8 +49,8 @@ function fetchDoc(runId: string, rel: string): Promise<unknown> {
       return response.json();
     });
     // A failed fetch must not poison the cache for later revisits.
-    cached.catch(() => docCache.delete(rel));
-    docCache.set(rel, cached);
+    cached.catch(() => docCache.delete(key));
+    docCache.set(key, cached);
   }
   return cached;
 }

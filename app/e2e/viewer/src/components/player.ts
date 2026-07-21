@@ -218,7 +218,10 @@ export function renderPlayer(root: HTMLElement): void {
   }
 
   const frames = visibleFrames(timeline);
-  const sig = `${runId}|${timeline.scenarioId}|${state.showAllPhases}|${frames.length}|${state.videoMode}|${timeline.videoFile ?? ''}|${state.sideTab}`;
+  // ok + run status + named count keep a live scenario's shell honest: the
+  // outcome badge flips when scenario.end lands, and named captures without an
+  // artifactSeq (invisible to frames.length) still rebuild the named strip.
+  const sig = `${runId}|${timeline.scenarioId}|${state.showAllPhases}|${frames.length}|${timeline.named.length}|${timeline.ok ?? ''}|${state.runDetail?.status ?? ''}|${state.videoMode}|${timeline.videoFile ?? ''}|${state.sideTab}`;
   if (root.dataset.playerSig !== sig) {
     buildShell(root, timeline, runId, frames);
     root.dataset.playerSig = sig;
@@ -240,9 +243,13 @@ function buildShell(
   cornerObserver = undefined;
 
   const entry = state.catalog.find((candidate) => candidate.id === timeline.scenarioId);
+  const liveScenario =
+    timeline.ok === undefined && !timeline.deferred && state.runDetail?.status === 'in-progress';
   const outcome =
     timeline.ok === undefined
-      ? ''
+      ? liveScenario
+        ? ' <span class="glyph-running">● running</span>'
+        : ''
       : timeline.ok
         ? ' <span class="glyph-pass">✓ passed</span>'
         : ' <span class="glyph-fail">✗ failed</span>';
@@ -295,7 +302,9 @@ function buildShell(
     ? `<video id="stage-video" playsinline src="${api.runFileUrl(runId, timeline.videoFile!)}"></video>`
     : frames.length
       ? `<img id="stage-img" alt="frame" />`
-      : '<span class="empty">no screenshots in this phase filter</span>';
+      : liveScenario
+        ? '<span class="empty">waiting for first frame…</span>'
+        : '<span class="empty">no screenshots in this phase filter</span>';
 
   const cells = videoOn
     ? ''

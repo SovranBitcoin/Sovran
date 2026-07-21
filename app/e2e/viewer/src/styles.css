@@ -341,6 +341,32 @@ input:focus-visible,
   color: var(--warning);
 }
 
+/* The one scenario currently executing — pulses to read as "live". */
+.glyph-running {
+  color: var(--warning);
+  animation: glyph-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes glyph-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* Queued in the live run but not yet begun (also the deferred dash). */
+.glyph-pending {
+  color: var(--muted-foreground);
+  opacity: 0.7;
+}
+
+.progress-pill .glyph-running {
+  margin-right: 2px;
+}
+
 .commit {
   color: var(--link);
   font-family: var(--mono);

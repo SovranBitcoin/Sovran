@@ -14,6 +14,17 @@ export interface GitInfo {
 
 export type RunStatus = 'complete' | 'in-progress' | 'aborted';
 
+/** Per-scenario status within one run, derived from the event timelines:
+ * pending/running only exist while the run is in-progress; a begun-but-unended
+ * timeline in a finished run collapses to failed, an unbegun one to skipped. */
+export type ScenarioRunStatus =
+  | 'pending'
+  | 'running'
+  | 'passed'
+  | 'failed'
+  | 'deferred'
+  | 'skipped';
+
 export interface RunSummary {
   runId: string;
   suite: string;
@@ -39,6 +50,11 @@ export interface RunSummary {
   /** Simulator device type from session-N.json (e.g. "iPhone 17 Pro"); absent
    * for fake-driver runs. Lets the player round frames to the hardware radius. */
   deviceType?: string;
+  /** Status per manifest scenarioId; absent when the run has no parsable event
+   * stream (dir-scan fallback) so consumers fall back to run-level status. */
+  scenarioStatus?: Record<string, ScenarioRunStatus>;
+  /** The scenario currently executing — only set while status is in-progress. */
+  activeScenarioId?: string;
 }
 
 export type PhaseTag = 'P' | 'T' | 'V' | 'C' | 'FINAL';
@@ -111,6 +127,9 @@ export interface CatalogRunRef {
   /** Which product driver executed the run — badges run rows iPhone/Android. */
   driver: RunSummary['driver'];
   ok?: boolean;
+  /** This scenario's own status in the run — distinguishes the one running
+   * scenario from its still-pending siblings while the run is live. */
+  scenarioStatus?: ScenarioRunStatus;
 }
 
 export interface ScenarioCatalogEntry {

@@ -64,6 +64,7 @@
     "shots:commit": "bun e2e/cli.ts run --driver sim --require-clean-git --i-approve-destructive-reset",
     "shots:android": "bun e2e/cli.ts run --driver android --suite android-offline --i-approve-destructive-reset",
     "e2e:viewer": "bun --hot e2e/viewer/server.ts",
+    "e2e:orchestrate": "bun e2e/orchestrate.ts",
     "e2e:validate": "bun e2e/validate.ts",
     "e2e:validate:fix": "bun e2e/validate.ts --fix",
     "e2e:list": "bun e2e/cli.ts list",
