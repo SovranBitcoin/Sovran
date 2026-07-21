@@ -20,7 +20,7 @@ export function resolveStickyMintSelectorItems({
   const previousLiveCount = Array.isArray(previousLiveItems) ? previousLiveItems.length : 0;
   const entryCount = Array.isArray(entryItems) ? entryItems.length : 0;
 
-  if (hasItems(liveItems)) {
+  if (Array.isArray(liveItems)) {
     cashuLog.debug('mint.selector.sticky_items.result', {
       source: 'live',
       liveCount,
@@ -63,7 +63,7 @@ export function useStickyMintSelectorItems(
   const previousLiveItemsRef = useRef<MintListItem[] | null>(null);
 
   useEffect(() => {
-    if (hasItems(liveItems)) {
+    if (Array.isArray(liveItems)) {
       previousLiveItemsRef.current = liveItems;
       cashuLog.debug('mint.selector.sticky_items.cache_live', {
         liveCount: liveItems.length,

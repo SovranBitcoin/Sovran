@@ -13,14 +13,24 @@
  * `useScreenActions`.
  */
 
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 
-import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'wallet/react';
+import {
+  useColadaTrustedMintUrls,
+  useExecutionState,
+  useScreenActions,
+  usePaymentFlowMachine,
+} from 'wallet/react';
 import type { MintListItem, StepDataMap } from 'wallet';
 
-import { MintListScreen, useMintRowsWithCache, useStickyMintSelectorItems } from '@/features/mint';
+import {
+  MintListScreen,
+  useMintRowsWithCache,
+  useRefreshMintSelectorOnFocus,
+  useStickyMintSelectorItems,
+} from '@/features/mint';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
@@ -36,12 +46,29 @@ function ReceiveMintSelectRoute() {
   const params = useRouteParams(ParamsSchema, { where: 'receive-flow.mintSelect' });
 
   const walletContext = useWalletContext();
+  const trackedTrustedMintUrls = useColadaTrustedMintUrls();
   const machine = usePaymentFlowMachine({ walletContext });
   const execution = useExecutionState(machine);
 
   const { entry, actions } = useScreenActions('mintSelector', params?.mintSelectorEntry);
   const liveSelectMint =
     execution.step === 'selectMint' ? (execution.details as StepDataMap['selectMint']) : null;
+  const candidateMintUrls = liveSelectMint?.candidates.map((candidate) => candidate.mintUrl) ?? [];
+  const refreshMintSelector = useCallback(
+    () =>
+      machine.requestMintSelector(
+        liveSelectMint?.scope ? { scope: liveSelectMint.scope } : undefined
+      ),
+    [liveSelectMint?.scope, machine]
+  );
+
+  useRefreshMintSelectorOnFocus({
+    enabled: actions.addMint.available && liveSelectMint !== null,
+    flow: 'receive',
+    trustedMintUrls: trackedTrustedMintUrls ?? walletContext.trustedMintUrls,
+    candidateMintUrls,
+    refresh: refreshMintSelector,
+  });
 
   const liveItems = Array.isArray(liveSelectMint?.mintListItems)
     ? liveSelectMint.mintListItems

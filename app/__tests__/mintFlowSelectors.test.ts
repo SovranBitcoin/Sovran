@@ -32,10 +32,32 @@ describe('mint flow e2e selectors', () => {
     expect(source).toContain('accessibilityLabel="Add mint"');
   });
 
+  it.each(['app/(receive-flow)/mintSelect.tsx', 'app/(send-flow)/mintSelect.tsx'])(
+    'refreshes stale machine candidates when %s regains focus',
+    (file) => {
+      const source = read(file);
+      expect(source).toContain('useRefreshMintSelectorOnFocus({');
+      expect(source).toContain('const trackedTrustedMintUrls = useColadaTrustedMintUrls();');
+      expect(source).toContain(
+        'trustedMintUrls: trackedTrustedMintUrls ?? walletContext.trustedMintUrls'
+      );
+      expect(source).toContain('refresh: refreshMintSelector');
+      expect(source).toContain(
+        'liveSelectMint?.scope ? { scope: liveSelectMint.scope } : undefined'
+      );
+    }
+  );
+
   it('keeps the mint-add search header actions accessible on liquid glass', () => {
     const source = read('features/mint/screens/MintAddScreen.tsx');
     expect(source).toContain('accessibilityLabel="Search mints"');
     expect(source).toContain('accessibilityLabel="Close search"');
+  });
+
+  it('mirrors toast evidence inside the mint-list modal', () => {
+    const source = read('features/mint/screens/MintListScreen.tsx');
+    expect(source).toContain("import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';");
+    expect(source).toContain('<E2EToastProbe />');
   });
 
   it('pins wallet-mint-selector on the wallet home header pill', () => {

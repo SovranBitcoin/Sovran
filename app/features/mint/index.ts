@@ -28,4 +28,8 @@ export { useDebouncedMintValidation } from './hooks/useDebouncedMintValidation';
 export { useNostrDiscoveredMints } from './hooks/useNostrDiscoveredMints';
 export { useSovranDiscoveredMints } from './hooks/useSovranDiscoveredMints';
 export { useStickyMintSelectorItems } from './hooks/useStickyMintSelectorItems';
+export {
+  mintSelectorCandidateSetIsStale,
+  useRefreshMintSelectorOnFocus,
+} from './hooks/useRefreshMintSelectorOnFocus';
 export { useMintRowsWithCache, type MintRow } from './hooks/useMintRowsWithCache';
