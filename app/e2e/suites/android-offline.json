@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "android-offline",
+  "scenarios": [
+    {"id":"wallet.offline.banner","file":"scenarios/wallet-offline-banner.json","order":10,"newInstance":true,"lane":"simulator","requires":["fresh-install","device.network"],"endState":"wallet"},
+    {"id":"receive.offline.lightning-quote","file":"scenarios/receive-offline-lightning-quote.json","order":20,"newInstance":true,"lane":"simulator","requires":["fresh-install","device.network","unit.sat"],"endState":"wallet"},
+    {"id":"mint.offline.add","file":"scenarios/mint-offline-add.json","order":30,"newInstance":true,"lane":"simulator","requires":["fresh-install","device.network","unit.sat"],"endState":"wallet"},
+    {"id":"wallet.offline.nostr","file":"scenarios/wallet-offline-nostr.json","order":40,"newInstance":true,"lane":"simulator","requires":["fresh-install","device.network"],"endState":"wallet"},
+    {"id":"onboarding.offline","file":"scenarios/onboarding-offline.json","order":50,"newInstance":true,"lane":"simulator","requires":["fresh-install","device.network"],"endState":"wallet"},
+    {"id":"receive.offline.ecash-pending","file":"scenarios/receive-offline-ecash-pending.json","order":60,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.cashu","unit.sat","device.network"],"endState":"wallet"},
+    {"id":"send.offline.ecash","file":"scenarios/send-offline-ecash.json","order":70,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.cashu","unit.sat","device.network"],"endState":"wallet"},
+    {"id":"wallet.offline.fiat","file":"scenarios/wallet-offline-fiat.json","order":45,"newInstance":true,"lane":"simulator","requires":["fresh-install","device.network"],"endState":"wallet"},
+    {"id":"send.offline.lightning","file":"scenarios/send-offline-lightning.json","order":80,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.cashu","cocod.receive.bolt11","unit.sat","device.network"],"endState":"wallet"}
+  ]
+}
