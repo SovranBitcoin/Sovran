@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Linking } from 'react-native';
 import { popup } from './engine';
 import type { PopupOverrides } from './types';
 import type { PopupIcon } from '../icons';
@@ -380,11 +381,22 @@ const PARAM_POPUPS = {
         type: 'success',
       };
     }
+    // A denied/blocked TCC record can only be fixed in the iOS Settings app,
+    // so the button deep-links there (`app-settings:` is the app's own iOS
+    // Settings page — a constant scheme outside openExternalUrl's allowlist).
+    const openSettings = {
+      text: 'Open settings',
+      onPress: () => {
+        // eslint-disable-next-line no-restricted-syntax
+        void Linking.openURL('app-settings:');
+      },
+    };
     if (status === 'denied') {
       return {
         message: 'Camera permission denied',
         text: 'Camera access is denied. Please enable it in your device settings.',
         icon: CAMERA_ICON,
+        buttons: [openSettings],
         type: 'error',
       };
     }
@@ -392,7 +404,7 @@ const PARAM_POPUPS = {
       message: 'Camera permission blocked',
       text: 'Camera access is blocked. Please enable it in your device settings.',
       icon: CAMERA_ICON,
-      buttons: [{ text: 'Open settings', page: 'settings' }],
+      buttons: [openSettings],
       type: 'error',
     };
   },
@@ -446,5 +458,8 @@ export function paramPopup<K extends ParamPopupKey>(
   overrides?: PopupOverrides
 ): void {
   const build = PARAM_POPUPS[key] as (p: PopupParams<K>) => PopupSpec;
-  popup({ ...build(params), ...overrides });
+  // Same DEV-only probe seam as staticPopup: the key alone is mirrored into
+  // AX (never the built message/params), so simulator plans can observe
+  // param popups too.
+  popup({ ...build(params), ...overrides, e2eProbeKey: key });
 }

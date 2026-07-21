@@ -6,7 +6,9 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import type { CameraScreenShared } from './types';
+import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { Log } from '@/shared/lib/logger';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface CameraLayoutProps extends CameraScreenShared {
   children: React.ReactNode;
@@ -23,12 +25,16 @@ export function CameraLayout({
   handleCameraReady,
   children,
 }: CameraLayoutProps): React.ReactElement {
+  const background = useThemeColor('background');
   const { width } = useWindowDimensions();
   const scanBoxSize = width * 0.8;
 
   if (!hasPermission) {
     return (
       <View className="relative flex-1 items-center justify-center bg-black px-8">
+        {/* Grant access on a blocked permission fires the camera-permission
+            HeroUI toast (FWO/AX-invisible) — mirror it for simulator plans. */}
+        <E2EToastProbe />
         <Text className="text-foreground mb-2 text-center" size={20} weight="semibold">
           Camera permission required
         </Text>
@@ -40,7 +46,10 @@ export function CameraLayout({
           className="bg-foreground rounded-full px-6 py-3"
           accessibilityRole="button"
           accessibilityLabel="Grant camera permission">
-          <Text className="text-background" size={16} weight="semibold">
+          {/* The Text primitive's inline base style (color: foreground) beats
+              any className color, so `text-background` rendered white-on-white
+              here — pass the color prop, which the primitive applies last. */}
+          <Text color={background} size={16} weight="semibold">
             Grant access
           </Text>
         </Pressable>

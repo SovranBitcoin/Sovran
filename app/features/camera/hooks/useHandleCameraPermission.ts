@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 
 import { useCameraPermissions } from 'expo-camera';
-import { Linking } from 'react-native';
 
-import { actionMenuPopup, paramPopup } from '@/shared/lib/popup';
+import { paramPopup } from '@/shared/lib/popup';
 import { log } from '@/shared/lib/logger';
 
 export function useHandleCameraPermission() {
@@ -35,24 +34,14 @@ export function useHandleCameraPermission() {
     }
 
     log.warn('camera.permission.denied', { canAskAgain: permission.canAskAgain });
-    // For both denied and blocked, surface the Open Settings action.
-    actionMenuPopup({
-      title: permission.canAskAgain ? 'Camera Permission Denied' : 'Camera Permission Blocked',
-      buttons: [
-        {
-          text: 'Open settings',
-          icon: 'material-symbols:settings-rounded',
-          variant: 'primary',
-          onPress: async () => {
-            // `app-settings:` is the iOS deep link to the app's own Settings
-            // page — not in the http/https/mailto/tel allowlist enforced by
-            // openExternalUrl, but safe here because the scheme is a constant.
-            // eslint-disable-next-line no-restricted-syntax
-            await Linking.openURL('app-settings:');
-          },
-        },
-      ],
-    });
+    // Denied/blocked feedback goes through the HeroUI toast popup (with its
+    // Open-settings action), NOT actionMenuPopup: the heroui action menu
+    // renders in the app window (its Menu.Portal must disable
+    // FullWindowOverlay — see ActionMenuHost), so above a pushed native
+    // screen like /camera it presents invisibly BEHIND the route and the
+    // user gets a silent dead-end. The toast lives in a FullWindowOverlay
+    // and is visible from every route.
+    paramPopup('camera-permission', permission.canAskAgain ? 'denied' : 'blocked');
     return false;
   };
 
