@@ -118,6 +118,10 @@ export interface ColadaConfig {
   /** Fetch aggregated Nostr reviews for a mint. */
   fetchMintReviews?: MintReviewsFetcher;
 
+  // Operation-level failure toggles. For transport-level faults (specific mint
+  // error bodies, offline, timeouts per endpoint) prefer the app's e2e
+  // mint-fault interceptor (sovran-app/app/shared/lib/e2e/mintFaults) — it
+  // fakes the wire itself and needs no per-flow flag.
   /** Dev: when true, executePaymentRequest simulates a delivery failure to test rollback. */
   shouldMockFailPaymentRequest?: () => boolean;
   /** Dev: when true, executeMelt fails after prepare so the cancel-rescue path runs. */

@@ -17,6 +17,7 @@ import React, {
   useLayoutEffect,
   useMemo,
   useRef,
+  useSyncExternalStore,
 } from "react";
 
 import { useLatestRef } from "./useLatestRef";
@@ -187,6 +188,10 @@ export interface ColadaProviderProps {
 
 interface ColadaContextValue {
   machine: PaymentMachine;
+  walletContextSource: Pick<
+    ColadaInstance,
+    "getWalletContext" | "subscribeWalletContext"
+  > | null;
   walletContextRef: React.MutableRefObject<WalletContext | null>;
   unitRef: React.MutableRefObject<string | undefined>;
   optionDismissRef: React.MutableRefObject<(() => void) | undefined>;
@@ -677,6 +682,7 @@ export function ColadaProvider({
   const value = useMemo<ColadaContextValue>(
     () => ({
       machine: machineRef.current!,
+      walletContextSource: instance ?? null,
       walletContextRef,
       unitRef,
       optionDismissRef,
@@ -699,6 +705,7 @@ export function ColadaProvider({
     }),
     [
       walletContextRef,
+      instance,
       screenActionHandlers,
       screenActionsBridge,
       paymentCopyOverridesRef,
@@ -728,6 +735,43 @@ export function useColadaContext(): ColadaContextValue {
 
 export function useColadaSubscriptions(): ColadaSubscriptionBus {
   return useColadaContext().subscriptionBusRef.current;
+}
+
+type ColadaWalletContextSource = Pick<
+  ColadaInstance,
+  "getWalletContext" | "subscribeWalletContext"
+>;
+
+/** Stable external-store adapter kept separate so subscription behavior is testable without React. */
+export function createColadaTrustedMintUrlsStore(
+  source: ColadaWalletContextSource | null,
+) {
+  return {
+    subscribe: source
+      ? source.subscribeWalletContext
+      : (_listener: () => void) => () => undefined,
+    getSnapshot: source
+      ? () => source.getWalletContext().trustedMintUrls
+      : () => null,
+  };
+}
+
+/**
+ * Trusted-mint URLs from the same tracker snapshot the shared payment machine
+ * reads. Returns null when ColadaProvider is running without a createColada
+ * instance, allowing callers to fall back to their explicitly-bound context.
+ */
+export function useColadaTrustedMintUrls(): readonly string[] | null {
+  const source = useColadaContext().walletContextSource;
+  const store = useMemo(
+    () => createColadaTrustedMintUrlsStore(source),
+    [source],
+  );
+  return useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot,
+  );
 }
 
 /**

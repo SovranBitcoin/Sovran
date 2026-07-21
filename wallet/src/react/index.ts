@@ -9,6 +9,7 @@ export {
   useColadaContext,
   useColadaManager,
   useColadaSubscriptions,
+  useColadaTrustedMintUrls,
   usePaymentCopy,
   usePaymentFlowMachine,
   useSetTransactionAnnotation,
