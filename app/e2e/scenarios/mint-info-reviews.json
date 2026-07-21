@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "mint.info.reviews",
-  "name": "Mint page reviews",
-  "description": "From the Cuba Bitcoin mint page (opened via the mint selector's 3-dots inspect button — an AX-collapsed suffix, so the tap is by coordinate), prove the reviews header action renders from the cached review aggregate and opens the Reviews screen; ends on wallet. Cuba is the pinned mint because it reliably has a populated review corpus; Minibits' review fetch returns empty intermittently",
+  "name": "Open a mint's user reviews",
+  "description": "Opens the details page for one of the wallet's mints and taps through to its user reviews. The reviews screen opens and shows the community's ratings for that mint.",
+  "details": "From the Cuba Bitcoin mint page (opened via the mint selector's 3-dots inspect button — an AX-collapsed suffix, so the tap is by coordinate), prove the reviews header action renders from the cached review aggregate and opens the Reviews screen; ends on wallet. Cuba is the pinned mint because it reliably has a populated review corpus; Minibits' review fetch returns empty intermittently",
   "lane": "simulator",
   "tags": ["flow:mint"],
   "requires": ["fresh-install"],

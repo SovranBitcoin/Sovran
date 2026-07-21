@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "receive.cashu.paste",
-  "name": "Receive cashu token (paste)",
-  "description": "cocod mints a 50 sat sovran token; app pastes and redeems; assert +50 and end on wallet",
+  "name": "Receive ecash (pasted)",
+  "description": "Our test partner wallet creates an ecash token worth 50 sats, the wallet pastes it in and redeems it, and the balance goes up by exactly 50 sats.",
+  "details": "cocod mints a 50 sat sovran token; app pastes and redeems; assert +50 and end on wallet",
   "lane": "funded",
   "tags": ["flow:receive","instrument:cashu-token","io:paste","outcome:settled"],
   "requires": ["fresh-install","cocod.send.cashu","unit.sat"],

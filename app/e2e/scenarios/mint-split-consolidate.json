@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "mint.split.consolidate",
-  "name": "Balance split (consolidate to Sovran)",
-  "description": "Fund Sovran and Minibits with 50 sat each over Lightning, open Balance split, switch every other default mint off (Minibits, Chorus, Cuba) so Sovran holds 100%, run the rebalance (one Minibits-to-Sovran Lightning transfer), land on wallet with the consolidated balance, open the swap detail from the home history row and close it back to home, then sweep; one sweep invocation reconciles every declared asset host-side, including the fee-headroom residual the rebalancer leaves at Minibits",
+  "name": "Move all money onto one mint with Balance split",
+  "description": "With 50 sats held at each of two mints, the Balance split screen is used to direct everything to a single mint. The wallet moves the money over, lands back home showing the combined balance, and the transfer appears in the history.",
+  "details": "Fund Sovran and Minibits with 50 sat each over Lightning, open Balance split, switch every other default mint off (Minibits, Chorus, Cuba) so Sovran holds 100%, run the rebalance (one Minibits-to-Sovran Lightning transfer), land on wallet with the consolidated balance, open the swap detail from the home history row and close it back to home, then sweep; one sweep invocation reconciles every declared asset host-side, including the fee-headroom residual the rebalancer leaves at Minibits",
   "lane": "funded",
   "tags": ["flow:mint","check:rebalance"],
   "requires": ["fresh-install","cocod.send.bolt11","unit.sat"],

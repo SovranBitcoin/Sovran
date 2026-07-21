@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "send.lightning.dismiss",
-  "name": "Send bolt11 (paste) [dismiss]",
-  "description": "Fund 100 sat, open a controlled unpaid 40 sat invoice, cancel the synthetic preview without paying, prove no balance moved and no melt row entered wallet history, then sweep the untouched funds",
+  "name": "Pay a Lightning invoice (backed out before paying)",
+  "description": "Opens a 40-sat Lightning invoice ready to pay, then cancels instead of paying. No money moves and nothing shows up in the wallet's payment history.",
+  "details": "Fund 100 sat, open a controlled unpaid 40 sat invoice, cancel the synthetic preview without paying, prove no balance moved and no melt row entered wallet history, then sweep the untouched funds",
   "lane": "funded",
   "tags": ["flow:send","instrument:bolt11","io:paste","outcome:dismissed"],
   "requires": ["fresh-install","cocod.send.bolt11","cocod.receive.bolt11","unit.sat"],

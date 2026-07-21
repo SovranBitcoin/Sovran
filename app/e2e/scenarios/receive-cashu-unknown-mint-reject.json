@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "receive.cashu.unknown-mint.reject",
-  "name": "Receive cashu token from an unknown mint (paste) [reject]",
-  "description": "cocod mints a 10 sat testnut token the wallet has never seen; redeeming routes through the mint-trust review screen where the secondary button REJECTS the mint, returning to the token preview untrusted; the preview is cancelled, then the mint selector proves testnut was never added and the balance never moved — the trust gate actually gates. Valueless testnut principal is auto-written-off (token stays unredeemed), no sweep",
+  "name": "Receive ecash from an unknown mint (pasted) — reject the mint",
+  "description": "Pasting a 10-sat ecash token from a mint the wallet has never seen brings up a screen asking whether to trust that mint. Choosing to reject it cancels everything: the mint is never added and the balance never changes.",
+  "details": "cocod mints a 10 sat testnut token the wallet has never seen; redeeming routes through the mint-trust review screen where the secondary button REJECTS the mint, returning to the token preview untrusted; the preview is cancelled, then the mint selector proves testnut was never added and the balance never moved — the trust gate actually gates. Valueless testnut principal is auto-written-off (token stays unredeemed), no sweep",
   "lane": "funded",
   "tags": ["flow:receive","instrument:cashu-token","io:paste","outcome:dismissed","check:mint-add"],
   "requires": ["fresh-install","cocod.send.cashu","unit.sat"],

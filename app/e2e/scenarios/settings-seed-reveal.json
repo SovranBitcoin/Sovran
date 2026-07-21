@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "settings.seed.reveal",
-  "name": "Seed phrase reveal round-trip",
-  "description": "From Settings → Account profile, prove the NIP06 recovery-phrase reveal works: the field starts obscured (reveal probe value 0), tapping Show flips the probe to 1 and swaps the button to Hide, and tapping again re-obscures it. This is the single most safety-critical read path — a regression hiding or garbling the seed means users cannot back up funds. No screenshots are taken while revealed, and AX artifacts pass the mnemonic redactor",
+  "name": "Show and hide the recovery phrase",
+  "description": "In account settings, the recovery phrase starts hidden; tapping Show reveals it and tapping Hide covers it again. This phrase is how users get their money back if they lose the phone, so the test proves it can always be read when needed — and the test itself never records it.",
+  "details": "From Settings → Account profile, prove the NIP06 recovery-phrase reveal works: the field starts obscured (reveal probe value 0), tapping Show flips the probe to 1 and swaps the button to Hide, and tapping again re-obscures it. This is the single most safety-critical read path — a regression hiding or garbling the seed means users cannot back up funds. Every automatic screenshot masks the stable secret-value region while revealed, and AX artifacts pass the mnemonic redactor",
   "lane": "simulator",
   "tags": ["flow:wallet","check:context-isolation"],
   "requires": ["fresh-install"],

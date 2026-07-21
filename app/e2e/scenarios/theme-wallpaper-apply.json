@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "theme.wallpaper.apply",
-  "name": "Wallpaper album applies from the gallery",
-  "description": "From the wallet Theme action, open the wallpaper gallery, pick the first album card — the built-in Colors album (gradient, no image) — apply, and prove the commit: the wallet-wallpaper probe flips off none to a real slug AND the image-render probe reads wallet-wallpaper-image:none, confirming the color album correctly resolves to a gradient rather than a broken image. Gallery content requires the live wallpaper catalog",
+  "name": "Apply a wallpaper (first album in the gallery)",
+  "description": "Opens the wallpaper gallery from the wallet's Theme option, picks the first album (a built-in color gradient), and applies it. The wallet comes back with the new look, correctly showing a gradient rather than a broken image.",
+  "details": "From the wallet Theme action, open the wallpaper gallery, pick the first album card — the built-in Colors album (gradient, no image) — apply, and prove the commit: the wallet-wallpaper probe flips off none to a real slug AND the image-render probe reads wallet-wallpaper-image:none, confirming the color album correctly resolves to a gradient rather than a broken image. Gallery content requires the live wallpaper catalog",
   "lane": "simulator",
   "tags": ["flow:wallet","check:navigation"],
   "requires": ["fresh-install"],

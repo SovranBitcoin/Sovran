@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "mint.info.send-message",
-  "name": "Mint page to Nostr DM",
-  "description": "From the Minibits mint page, open the mint's Nostr contact profile, use the Send Message action menu to pick the Nostr DM option, and prove the 1:1 DM conversation screen opens (dm-chat-probe); ends on wallet. The action-menu row is an AX-invisible FullWindowOverlay item, so its tapAt y is a first-run measurement",
+  "name": "Message a mint's operator from its details page",
+  "description": "From a mint's details page, opens the operator's contact profile and chooses to send them a direct message. The one-on-one chat screen opens, ready to type.",
+  "details": "From the Minibits mint page, open the mint's Nostr contact profile, use the Send Message action menu to pick the Nostr DM option, and prove the 1:1 DM conversation screen opens (dm-chat-probe); ends on wallet. The action-menu row exposes a semantic E2E target so the transition can retry until chat is visible",
   "lane": "simulator",
   "tags": ["flow:mint"],
   "requires": ["fresh-install"],
@@ -20,9 +21,8 @@
     {"action":"tapUntil","sequence":[{"tap":{"id":"mint-info-contact-nostr"}},{"delayMs":4000},{"swipe":{"dir":"up"}},{"swipe":{"dir":"down"}}],"until":{"id":"send-message-menu"},"attempts":3,"settleMs":8000},
     {"action":"waitFor","selector":{"id":"send-message-menu"},"timeoutMs":90000},
     {"action":"screenshot","name":"profile"},
-    {"action":"tapUntil","sequence":[{"tap":{"id":"send-message-menu"}}],"until":{"id":"e2e-action-menu-open"},"attempts":6,"settleMs":8000},
-    {"action":"tapAt","x":0.5,"y":0.755},
-    {"action":"waitFor","selector":{"id":"dm-chat-probe"},"timeoutMs":60000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"send-message-menu"}}],"until":{"id":"send-message-menu-nostr"},"attempts":6,"settleMs":8000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"send-message-menu-nostr"}}],"until":{"id":"dm-chat-probe"},"attempts":4,"settleMs":15000},
     {"action":"screenshot","name":"dm-chat"},
     {"action":"goHome"},
     {"action":"waitFor","selector":{"label":"Split"},"timeoutMs":45000}

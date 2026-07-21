@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "send.lightning.preselect-funded-mint",
-  "name": "Pasted bolt11 preselects the funded mint",
-  "description": "Fund 50 at Minibits while the preferred Sovran mint stays empty: pasting a 30 sat cocod invoice must open the melt preview on the funded Minibits mint (melt-selected-mint probe), pay it there, and end on wallet with the fee-enveloped -30",
+  "name": "Pay a Lightning invoice (the mint holding the money is pre-chosen)",
+  "description": "With money at only one of two mints, pasting a 30-sat Lightning invoice automatically picks the mint that actually has funds, and the invoice is paid from there.",
+  "details": "Fund 50 at Minibits while the preferred Sovran mint stays empty: pasting a 30 sat cocod invoice must open the melt preview on the funded Minibits mint (melt-selected-mint probe), pay it there, and end on wallet with the fee-enveloped -30",
   "lane": "funded",
   "tags": ["flow:send","instrument:bolt11","io:paste","outcome:settled","check:mint-preselect"],
   "requires": ["fresh-install","cocod.send.bolt11","cocod.receive.bolt11","cocod.receive.cashu","unit.sat"],

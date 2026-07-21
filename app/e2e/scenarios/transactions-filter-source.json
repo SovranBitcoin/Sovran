@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "transactions.filter.source",
-  "name": "Transaction Source filter isolates paste-annotated history",
-  "description": "Fund 50 at Minibits over Lightning (a mint tx with no scan source) and paste-redeem a 30-sat Sovran token (finalized receive with source=paste, proven by the tx probe), then prove the annotation-driven Source filter: Paste leaves exactly the paste receive row, QR hides it (no tx carries a QR source). Both mints sweep to zero",
+  "name": "Filter transactions by how they arrived (paste vs QR scan)",
+  "description": "After receiving one payment by pasting an ecash token, the source filter is checked: filtering to 'Paste' shows that payment, and filtering to 'QR' hides it, since nothing arrived by QR scan.",
+  "details": "Fund 50 at Minibits over Lightning (a mint tx with no scan source) and paste-redeem a 30-sat Sovran token (finalized receive with source=paste, proven by the tx probe), then prove the annotation-driven Source filter: Paste leaves exactly the paste receive row, QR hides it (no tx carries a QR source). Both mints sweep to zero",
   "lane": "funded",
   "tags": ["flow:history","instrument:cashu-token","io:paste","amount:fixed","check:filters","check:tx-source"],
   "requires": ["fresh-install","cocod.send.bolt11","cocod.send.cashu","unit.sat","cocod.receive.cashu"],

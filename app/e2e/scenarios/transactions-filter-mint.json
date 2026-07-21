@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "transactions.filter.mint",
-  "name": "Transaction Mint filter narrows history to one mint",
-  "description": "Fund 50 at Sovran and 50 at Minibits (two confirmed in-txs at different mints), then prove the Mint filter: selecting Minibits leaves exactly one mint row (captured unambiguously), and switching to Sovran hides that row while still showing a mint row. Mint chips carry new filter-mint-<url> testIDs with AX selection state; both mints sweep to zero",
+  "name": "Filter transactions by mint",
+  "description": "With 50 sats received at each of two different mints, the mint filter is checked both ways: choosing one mint shows only its transaction, and switching to the other mint hides it.",
+  "details": "Fund 50 at Sovran and 50 at Minibits (two confirmed in-txs at different mints), then prove the Mint filter: selecting Minibits leaves exactly one mint row (captured unambiguously), and switching to Sovran hides that row while still showing a mint row. Mint chips carry new filter-mint-<url> testIDs with AX selection state; both mints sweep to zero",
   "lane": "funded",
   "tags": ["flow:history","instrument:bolt11","amount:fixed","check:filters","check:mint-change"],
   "requires": ["fresh-install","cocod.send.bolt11","unit.sat","cocod.receive.cashu"],

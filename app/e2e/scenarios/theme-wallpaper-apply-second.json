@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "theme.wallpaper.apply-second",
-  "name": "Second wallpaper album applies from the gallery",
-  "description": "From the wallet Theme action, open the wallpaper gallery and pick the SECOND album card — Artemis II Collection, distinct from the first (Colors) that theme.wallpaper.apply picks — apply the draft, and prove the exact commit via the wallet-wallpaper probe reading wallet-wallpaper:artemis-ii-collection; ends on wallet. Album slugs are curated (BASICS then SPACE), so the second card is stable; needs the live wallpaper catalog",
+  "name": "Apply a wallpaper (second album in the gallery)",
+  "description": "Opens the wallpaper gallery from the wallet's Theme option, picks the second album in the list, and applies it. The wallet comes back showing exactly that wallpaper.",
+  "details": "From the wallet Theme action, open the wallpaper gallery and pick the SECOND album card — Artemis II Collection, distinct from the first (Colors) that theme.wallpaper.apply picks — apply the draft, and prove the exact commit via the wallet-wallpaper probe reading wallet-wallpaper:artemis-ii-collection; ends on wallet. Album slugs are curated (BASICS then SPACE), so the second card is stable; needs the live wallpaper catalog",
   "lane": "simulator",
   "tags": ["flow:wallet","check:navigation"],
   "requires": ["fresh-install"],

@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "receive.cashu.unknown-mint",
-  "name": "Receive cashu token from an unknown mint (paste)",
-  "description": "cocod mints a 10 sat testnut token the wallet has never seen; redeeming routes through the mint-trust review screen, tapping Add mint trusts testnut and returns to the token preview where redeem is tapped again; testnut charges a 1 sat redeem fee so the wallet lands on 9, and the valueless test-mint principal is auto-written-off instead of swept",
+  "name": "Receive ecash from an unknown mint (pasted) — accept the mint",
+  "description": "Pasting a 10-sat ecash token from a mint the wallet has never seen brings up a screen asking whether to trust that mint. Accepting adds the mint and the redeem completes, landing at 9 sats after the mint's 1-sat fee.",
+  "details": "cocod mints a 10 sat testnut token the wallet has never seen; redeeming routes through the mint-trust review screen, tapping Add mint trusts testnut and returns to the token preview where redeem is tapped again; testnut charges a 1 sat redeem fee so the wallet lands on 9, and the valueless test-mint principal is auto-written-off instead of swept",
   "lane": "funded",
   "tags": ["flow:receive","instrument:cashu-token","io:paste","outcome:settled","check:mint-add"],
   "requires": ["fresh-install","cocod.send.cashu","unit.sat"],

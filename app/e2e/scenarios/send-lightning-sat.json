@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "send.lightning.sat",
-  "name": "Send bolt11 (paste)",
-  "description": "Fund 100 via Lightning, melt 40 to a cocod invoice; assert the fee-enveloped delta and end on wallet",
+  "name": "Pay a Lightning invoice (pasted)",
+  "description": "Pastes a 40-sat Lightning invoice from our test partner wallet and pays it, then checks the balance dropped by the amount plus a small fee.",
+  "details": "Fund 100 via Lightning, melt 40 to a cocod invoice; assert the fee-enveloped delta and end on wallet",
   "lane": "funded",
   "tags": ["flow:send","instrument:bolt11","io:paste","outcome:settled"],
   "requires": ["fresh-install","cocod.send.bolt11","cocod.receive.bolt11","unit.sat"],

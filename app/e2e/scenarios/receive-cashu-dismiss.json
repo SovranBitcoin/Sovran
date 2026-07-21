@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "receive.cashu.dismiss",
-  "name": "Receive cashu token (paste) [dismiss]",
-  "description": "Create a controlled 50 sat bearer token, preview it through Receive Paste, cancel without redeeming, prove wallet balance/history are unchanged, then return the unspent token to the counterparty through host recovery",
+  "name": "Receive ecash (pasted) — cancel before redeeming",
+  "description": "An ecash token worth 50 sats is pasted into the wallet, but the preview is cancelled instead of redeemed. The balance and history stay unchanged, and the unused money goes back to the sender.",
+  "details": "Create a controlled 50 sat bearer token, preview it through Receive Paste, cancel without redeeming, prove wallet balance/history are unchanged, then return the unspent token to the counterparty through host recovery",
   "lane": "funded",
   "tags": ["flow:receive","instrument:cashu-token","io:paste","outcome:dismissed"],
   "requires": ["fresh-install","cocod.send.cashu","unit.sat"],

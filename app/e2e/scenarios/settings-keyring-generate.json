@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "settings.keyring.generate",
-  "name": "P2PK keyring: fresh baseline + generate a key",
-  "description": "Settings → Security → P2PK Keys for a fresh user shows the auto-provisioned baseline of exactly two keys (the identity nsec auto-imported plus the active generated receive key) with the Regenerate-on-Receive preference on; the Generate header action mints a third keypair and the secure-store keyring re-renders as YOUR KEYS (3). Local crypto only; no funds, no network",
+  "name": "Security keys: new wallet starts with two, generate a third",
+  "description": "A brand-new wallet automatically starts with exactly two security keys used for payments locked to a key; tapping Generate adds a third and the list updates to show all three. Everything happens on the phone — no money or network involved.",
+  "details": "Settings → Security → P2PK Keys for a fresh user shows the auto-provisioned baseline of exactly two keys (the identity nsec auto-imported plus the active generated receive key) with the Regenerate-on-Receive preference on; the Generate header action mints a third keypair and the secure-store keyring re-renders as YOUR KEYS (3). Local crypto only; no funds, no network",
   "lane": "simulator",
   "tags": ["flow:wallet","check:p2pk-keys"],
   "requires": ["fresh-install"],

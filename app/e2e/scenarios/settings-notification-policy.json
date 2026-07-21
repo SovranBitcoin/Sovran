@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "settings.notification-policy",
-  "name": "Notification policy persists",
-  "description": "From Settings → Notifications, prove the persisted policy enum round-trips: Relaxed is selected by default (AX state 1), picking Strict flips the selection states, and on return the Settings row description reads 'Notifications, Strict' — the store persisted and the summary re-rendered. Guards the persisted-enum settings pattern",
+  "name": "Notification setting saves when changed",
+  "description": "Opens the notification settings, confirms Relaxed is the default, switches to Strict, and checks the settings list now shows Strict — proving the choice was saved and displayed correctly.",
+  "details": "From Settings → Notifications, prove the persisted policy enum round-trips: Relaxed is selected by default (AX state 1), picking Strict flips the selection states, and on return the Settings row description reads 'Notifications, Strict' — the store persisted and the summary re-rendered. Guards the persisted-enum settings pattern",
   "lane": "simulator",
   "tags": ["flow:wallet","check:navigation"],
   "requires": ["fresh-install"],

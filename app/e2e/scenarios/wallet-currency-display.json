@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "wallet.currency.display",
-  "name": "Display currency GBP and EUR",
-  "description": "Fund 200 at Sovran so the fiat conversion pill shows a real value, switch the display currency to GBP then EUR via the pill's native menu, and capture the wallet with each symbol; no exact-conversion assert (the BTC price is live) — the screenshots are the evidence. Native-menu rows are tapped by label (USD/EUR/GBP), a first-run hypothesis for UIMenu AX visibility",
+  "name": "Show the balance in pounds and euros",
+  "description": "With 200 sats in the wallet, the displayed currency is switched to British pounds and then euros, checking that a converted value appears with the right currency symbol each time before switching back to dollars.",
+  "details": "Fund 200 at Sovran so the fiat conversion pill shows a real value, switch the display currency to GBP then EUR via the pill's native menu, and capture the wallet with each symbol; no exact-conversion assert because the BTC price is live. Native iOS rows and Android's app menu share the stable spoken names USD/EUR/GBP, while wallet-fiat-currency:<code> proves every selection before capture",
   "lane": "funded",
   "tags": ["flow:wallet","check:fiat-unit"],
   "requires": ["fresh-install","cocod.send.bolt11","cocod.receive.cashu","unit.sat"],
@@ -15,16 +16,13 @@
     {"action":"waitFor","selector":{"id":"wallet-fiat-pill"},"timeoutMs":30000},
     {"action":"screenshot","name":"wallet"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-fiat-pill"}}],"until":{"label":"GBP"},"attempts":6,"settleMs":6000},
-    {"action":"tap","selector":{"label":"GBP"}},
-    {"action":"delay","ms":2000,"reason":"native menu dismissal and fiat pill re-render expose no AX signal"},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"GBP"}}],"until":{"id":"wallet-fiat-currency:gbp"},"attempts":4,"settleMs":6000},
     {"action":"screenshot","name":"wallet"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-fiat-pill"}}],"until":{"label":"EUR"},"attempts":6,"settleMs":6000},
-    {"action":"tap","selector":{"label":"EUR"}},
-    {"action":"delay","ms":2000,"reason":"native menu dismissal and fiat pill re-render expose no AX signal"},
+    {"action":"tapUntil","sequence":[{"tap":{"label":"EUR"}}],"until":{"id":"wallet-fiat-currency:eur"},"attempts":4,"settleMs":6000},
     {"action":"screenshot","name":"wallet"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-fiat-pill"}}],"until":{"label":"USD"},"attempts":6,"settleMs":6000},
-    {"action":"tap","selector":{"label":"USD"}},
-    {"action":"delay","ms":2000,"reason":"native menu dismissal and fiat pill re-render expose no AX signal"}
+    {"action":"tapUntil","sequence":[{"tap":{"label":"USD"}}],"until":{"id":"wallet-fiat-currency:usd"},"attempts":4,"settleMs":6000}
   ],
   "verify": [
     {"action":"waitFor","selector":{"label":"₿ 200"},"timeoutMs":60000},

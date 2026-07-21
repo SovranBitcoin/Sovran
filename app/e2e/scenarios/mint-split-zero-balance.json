@@ -1,8 +1,9 @@
 {
   "version": 1,
   "id": "mint.split.zero-balance",
-  "name": "Balance split opens on an empty wallet",
-  "description": "Fresh wallet with zero balance everywhere: tapping the Split action still opens the mint distribution screen with all default mints and an enabled Next (distribution is percentage-based, not balance-gated); document the empty state and return home",
+  "name": "Balance split opens even with an empty wallet",
+  "description": "On a wallet holding no money at all, the Balance split screen still opens with every default mint listed and the flow ready to continue — splitting is about percentages, so an empty wallet doesn't block it.",
+  "details": "Fresh wallet with zero balance everywhere: tapping the Split action still opens the mint distribution screen with all default mints and an enabled Next (distribution is percentage-based, not balance-gated); document the empty state and return home",
   "lane": "simulator",
   "tags": ["flow:mint","check:zero-balance"],
   "requires": ["fresh-install"],

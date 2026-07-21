@@ -1,11 +1,12 @@
 {
   "version": 1,
   "id": "recovery.reinstall",
-  "name": "Recover wallet (reinstall)",
-  "description": "Capture the preceding onboarding scenario's drawer profile name, reinstall while preserving the keychain, pass Terms and RestoreGate, recover known mints, and prove the inherited profile name is unchanged",
+  "name": "Recover the iOS wallet after deleting and reinstalling the app",
+  "description": "On iOS, the app is deleted and reinstalled while Keychain keeps its securely saved secrets. After accepting the terms and going through recovery, the wallet comes back with the same profile name and its known mints.",
+  "details": "Capture the preceding onboarding scenario's drawer profile name, perform a true iOS uninstall/reinstall, pass Terms and RestoreGate using the Keychain-retained mnemonic, recover known mints, and prove the inherited profile name is unchanged. Android is excluded because uninstall removes Expo SecureStore's Android Keystore key.",
   "lane": "simulator",
   "tags": ["flow:recovery"],
-  "requires": ["fresh-install"],
+  "requires": ["fresh-install","reinstall.keychain-retention"],
   "setup": [
     {"action":"tapUntil","sequence":[{"tap":{"id":"header-profile-avatar"}}],"until":{"id":"drawer-menu-settings"},"attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"id":"drawer-profile-name"},"timeoutMs":30000},
@@ -14,8 +15,8 @@
   ],
   "steps": [
     {"action":"launch","reset":"reinstall"},
-    {"action":"waitFor","selector":{"label":"I have read and agree to the Terms and Conditions"},"timeoutMs":240000},
-    {"action":"tap","selector":{"label":"I have read and agree to the Terms and Conditions"}},
+    {"action":"waitFor","selector":{"id":"terms-acceptance"},"timeoutMs":240000},
+    {"action":"tapUntil","sequence":[{"tap":{"id":"terms-acceptance"}}],"until":{"id":"terms-acceptance"},"untilValue":"1","attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"label":"Next"},"state":"enabled","timeoutMs":30000},
     {"action":"tap","selector":{"label":"Next"}},
     {"action":"waitFor","selector":{"label":"Recover Wallet"},"timeoutMs":180000},
@@ -30,7 +31,8 @@
     {"action":"waitFor","selector":{"id":"drawer-profile-name"},"timeoutMs":30000},
     {"action":"assert","that":"ax","selector":{"id":"drawer-profile-name"},"label":"${profileNameBefore}"},
     {"action":"screenshot","name":"drawer","stable":true,"tolerance":0.001},
-    {"action":"tapAt","x":0.95,"y":0.5}
+    {"action":"goHome"},
+    {"action":"assert","that":"notVisible","selector":{"label":"Close drawer"},"timeoutMs":30000}
   ],
   "verify": [
     {"action":"waitFor","selector":{"id":"wallet-send"},"timeoutMs":60000},
