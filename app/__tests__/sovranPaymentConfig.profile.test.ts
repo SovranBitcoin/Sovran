@@ -52,6 +52,11 @@ jest.mock('expo-camera', () => ({ scanFromURLAsync: jest.fn() }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('react-native', () => ({ Share: { share: jest.fn() } }));
+jest.mock('@/shared/lib/interactions', () => ({
+  // The DM-thread navigate is deferred behind the interaction settle; run it
+  // synchronously here — the pinned contract is dismissAll-before-navigate.
+  runAfterInteractions: (callback: () => void) => callback(),
+}));
 jest.mock('@cashu/cashu-ts', () => ({ getDecodedToken: jest.fn(), getEncodedToken: jest.fn() }));
 jest.mock('@/features/bitchat/lib/blePrivateDelivery', () => ({
   sendBLEPrivateMessageWhole: jest.fn(),

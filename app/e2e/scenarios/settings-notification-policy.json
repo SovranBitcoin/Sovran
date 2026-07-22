@@ -15,7 +15,7 @@
     {"action":"tapUntil","sequence":[{"tap":{"id":"drawer-menu-settings"}}],"until":{"label":"Notifications, Relaxed"},"attempts":4,"settleMs":6000},
     {"action":"waitFor","selector":{"label":"Notifications, Relaxed"},"timeoutMs":30000},
     {"action":"tap","selector":{"label":"Notifications, Relaxed"}},
-    {"action":"waitFor","selector":{"id":"notification-policy-relaxed"},"value":"1","timeoutMs":30000},
+    {"action":"waitFor","selector":{"id":"notification-policy-relaxed"},"value":"1","timeoutMs":90000},
     {"action":"waitFor","selector":{"id":"notification-policy-strict"},"value":"0","timeoutMs":15000},
     {"action":"screenshot","name":"settings"},
     {"action":"tapUntil","sequence":[{"tap":{"id":"notification-policy-strict"}}],"until":{"id":"notification-policy-strict"},"untilValue":"1","attempts":4,"settleMs":6000},

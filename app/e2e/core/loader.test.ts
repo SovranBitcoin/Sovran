@@ -730,10 +730,12 @@ describe('loadE2E over the real tree', () => {
     }
   });
 
-  it('resets location permission before the final wallet relaunch', () => {
+  it('returns to the wallet before resetting location permission in cleanup', () => {
+    // Reset needs no UI; reset-then-relaunch would guarantee a location prompt
+    // mid-cleanup (the relaunch re-requests), so the return-home flow runs first.
     expect(loaded.scenarios.get('wallet.location.permission')!.finally).toEqual([
-      { action: 'permission', service: 'location', mode: 'reset' },
       { use: 'flow.return-to-wallet' },
+      { action: 'permission', service: 'location', mode: 'reset' },
     ]);
   });
 
@@ -766,21 +768,22 @@ describe('loadE2E over the real tree', () => {
     expect(JSON.stringify(scenario.steps)).toContain('receive-method-paste');
     expect(JSON.stringify(scenario.steps)).toContain('receive-token-redeem');
     expect(JSON.stringify(scenario.steps)).toContain('receive-token-close');
-    // The paste-method tap is dead-tap-hardened AND routed through the iOS
-    // paste-consent alert (fresh installs ALWAYS prompt on the first host-set
-    // clipboard read — observed live 2026-07-17 on iOS 26.2): retry the
-    // chooser tap until the alert appears, grant, then wait for the redeem
-    // sheet. The redeem ACTION itself stays a single plain tap.
+    // The paste-method tap is dead-tap-hardened and retried until the
+    // post-paste redeem sheet appears — NOT until the iOS paste-consent alert,
+    // which Android never shows (clipboard reads are unblocked there, so an
+    // 'Allow Paste' until-target can never appear). iOS is covered by the
+    // driver's auto-press plus the optional grant tap below.
     expect(scenario.steps).toContainEqual({
       action: 'tapUntil',
       sequence: [{ tap: { id: 'receive-method-paste' } }],
-      until: { label: 'Allow Paste' },
+      until: { id: 'receive-token-redeem' },
       attempts: 4,
       settleMs: 6_000,
     });
     expect(scenario.steps).toContainEqual({
       action: 'tap',
       selector: { label: 'Allow Paste' },
+      optional: { reason: 'android has no blocking paste dialog' },
     });
     expect(scenario.steps).toContainEqual({
       action: 'waitFor',
@@ -1222,13 +1225,17 @@ describe('loadE2E over the real tree', () => {
     expect(authored).not.toContain('"label":"Received"');
     expect(authored).not.toContain('lightning-toast-processing');
     expect(authored).not.toContain('lightning-toast-confirmed');
-    for (const id of [
-      'payment-status-receive-processing',
-      'payment-status-receive-confirmed',
-      'payment-status-view',
-    ]) {
+    for (const id of ['payment-status-receive-confirmed', 'payment-status-view']) {
       expect(authored).toContain(id);
     }
+    // The ~3s processing stage can expire during the preceding evidence
+    // capture — the first toast wait matches EITHER stage via idPrefix instead
+    // of pinning the exact processing id.
+    expect(scenario.steps).toContainEqual({
+      action: 'waitFor',
+      selector: { idPrefix: 'payment-status-receive-' },
+      timeoutMs: 60_000,
+    });
     // The QR path reads the invoice from the displayed screen — never the
     // clipboard — and stays in-app: no Copy, no relaunch/no-replay coda.
     expect(scenario.steps).toContainEqual({
@@ -1258,17 +1265,15 @@ describe('loadE2E over the real tree', () => {
         'id' in step.selector &&
         step.selector.id === 'payment-status-receive-confirmed'
     );
+    // A toast is NEVER a tapUntil target: the first press consumes the probe
+    // (clearPayment), and the standalone-ready id only mounts on the standalone
+    // /lightningReceive route — unreachable from the in-flow toast press. A
+    // single plain tap plus the transaction-probe wait below is the contract.
     expect(scenario.steps[confirmedAt + 1]).toEqual({
-      action: 'tapUntil',
-      sequence: [{ tap: { id: 'payment-status-view' } }],
-      until: { id: 'lightning-receive-standalone-ready' },
-      attempts: 4,
-      settleMs: 6_000,
-    });
-    expect(scenario.steps).not.toContainEqual({
       action: 'tap',
       selector: { id: 'payment-status-view' },
     });
+    expect(authored).not.toContain('lightning-receive-standalone-ready');
     expect(scenario.steps[confirmedAt + 2]).toEqual({
       action: 'waitFor',
       selector: { id: 'transaction-probe-${quoteTx}' },
@@ -1519,16 +1524,22 @@ describe('loadE2E over the real tree', () => {
       attempts: 4,
       settleMs: 6_000,
     });
-    // Paste is consent-hardened: fresh installs raise the iOS paste alert on
-    // the first clipboard read (see receive.cashu.paste pin).
+    // The Paste tap retries until the post-paste melt preview mounts — never
+    // until the iOS-only 'Allow Paste' alert, which Android has no equivalent
+    // of (see receive.cashu.paste pin). The grant tap is optional for the same
+    // reason.
     expect(scenario.steps).toContainEqual({
       action: 'tapUntil',
       sequence: [{ tap: { label: 'Paste' } }],
-      until: { label: 'Allow Paste' },
+      until: { id: 'melt-pay' },
       attempts: 4,
       settleMs: 6_000,
     });
-    expect(scenario.steps).toContainEqual({ action: 'tap', selector: { label: 'Allow Paste' } });
+    expect(scenario.steps).toContainEqual({
+      action: 'tap',
+      selector: { label: 'Allow Paste' },
+      optional: { reason: 'android has no blocking paste dialog' },
+    });
 
     const previewCapture = scenario.steps.findIndex(
       (step) =>
@@ -1551,8 +1562,19 @@ describe('loadE2E over the real tree', () => {
     expect(unpaidProof).toBeGreaterThan(previewCapture);
     expect(dismiss).toBeGreaterThan(unpaidProof);
 
+    // melt-pay may appear as the post-paste join TARGET, but the dismissal
+    // contract is that it is never tapped — the flow cancels, never pays.
+    expect(
+      scenario.steps.some(
+        (step) =>
+          (step.action === 'tap' && 'id' in step.selector && step.selector.id === 'melt-pay') ||
+          (step.action === 'tapUntil' &&
+            step.sequence.some(
+              (item) => 'tap' in item && 'id' in item.tap && item.tap.id === 'melt-pay'
+            ))
+      )
+    ).toBe(false);
     const authored = JSON.stringify(scenario);
-    expect(authored).not.toContain('melt-pay');
     expect(authored).not.toContain('bolt11.settled');
     expect(authored).not.toContain('send-paste');
     expect(authored).not.toContain('"mask"');
@@ -1599,16 +1621,22 @@ describe('loadE2E over the real tree', () => {
       attempts: 4,
       settleMs: 6_000,
     });
-    // Paste is consent-hardened: fresh installs raise the iOS paste alert on
-    // the first clipboard read (see receive.cashu.paste pin).
+    // The Paste tap retries until the post-paste melt preview mounts — never
+    // until the iOS-only 'Allow Paste' alert, which Android has no equivalent
+    // of (see receive.cashu.paste pin). The grant tap is optional for the same
+    // reason.
     expect(scenario.steps).toContainEqual({
       action: 'tapUntil',
       sequence: [{ tap: { label: 'Paste' } }],
-      until: { label: 'Allow Paste' },
+      until: { id: 'melt-pay' },
       attempts: 4,
       settleMs: 6_000,
     });
-    expect(scenario.steps).toContainEqual({ action: 'tap', selector: { label: 'Allow Paste' } });
+    expect(scenario.steps).toContainEqual({
+      action: 'tap',
+      selector: { label: 'Allow Paste' },
+      optional: { reason: 'android has no blocking paste dialog' },
+    });
 
     const pay = scenario.steps.findIndex(
       (step) => step.action === 'tap' && 'id' in step.selector && step.selector.id === 'melt-pay'

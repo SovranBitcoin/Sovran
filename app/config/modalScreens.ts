@@ -41,9 +41,6 @@ const ANDROID_SHEET_OPTIONS = {
   headerShown: false,
 } satisfies Partial<NativeStackNavigationOptions>;
 
-/** Card: default stack presentation. */
-const card = (name: string): ModalConfig => ({ name });
-
 /**
  * Modal flow hosting a nested stack. iOS: fullscreen pageSheet-style modal
  * (unchanged). Android: native bottom sheet — requires the flow's _layout to
@@ -171,7 +168,10 @@ const flowGroups = [
 ].map((name) => modalFlow(name));
 
 const standaloneScreens: ModalConfig[] = [
-  card('userMessages'),
+  // DM thread: headerShown must be statically true — DmChatHeader only swaps
+  // header CONTENT. A false→true flip while the send-flow modal is dismissing
+  // makes react-native-screens remount the screen in a loop (blank DM thread).
+  { name: 'userMessages', options: { headerShown: true } },
   slideFromBottom('composer'),
   slideFromRight('(settings-flow)'),
   slideFromRight('(signer-flow)'),

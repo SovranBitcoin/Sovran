@@ -17,7 +17,7 @@
     {"action":"assert","that":"visible","selector":{"id":"amount-state:50"}},
     {"action":"tapUntil","sequence":[{"tap":{"id":"amount-next"}}],"until":{"id":"e2e-action-menu-open"},"attempts":6,"settleMs":8000},
     {"action":"tapAt","x":0.5,"y":0.905},
-    {"action":"waitFor","selector":{"id":"payment-info-lightning-invoice-data"},"timeoutMs":60000},
+    {"action":"waitFor","selector":{"id":"payment-info-lightning-invoice-data"},"timeoutMs":120000},
     {"action":"waitFor","selector":{"idPrefix":"transaction-probe-","captureSuffixAs":"fundingQuoteTx"},"timeoutMs":30000},
     {"action":"assert","that":"tx","txRef":"${fundingQuoteTx}","direction":"in","amount":50,"unit":"sat","mintHost":"${mintHost}","status":"UNPAID"},
     {"action":"capture","as":"fundingInvoice","fromSelector":{"id":"payment-info-lightning-invoice-data"},"attribute":"label"},

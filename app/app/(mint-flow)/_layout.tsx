@@ -24,7 +24,10 @@ const INFO_OPTIONS = { title: 'Mint details' };
 const REVIEWS_OPTIONS = { title: 'Reviews' };
 const DISTRIBUTION_OPTIONS = { title: 'Balance split' };
 const REBALANCE_PLAN_OPTIONS = { title: 'Rebalance plan' };
-const USER_MESSAGES_OPTIONS = { headerShown: false };
+// Statically shown: DmChatHeader swaps header content only. A false→true
+// visibility flip on mount remounts the screen in a loop inside modals
+// (blank DM thread) — keep in sync with config/modalScreens.ts.
+const USER_MESSAGES_OPTIONS = { headerShown: true };
 
 export default function MintFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);

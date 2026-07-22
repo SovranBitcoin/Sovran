@@ -211,9 +211,14 @@ export class FundingCoordinator {
           asset: leg.asset,
           expectedAmount: leg.expectedAmount,
         });
-      } catch {
+      } catch (cause) {
         this.#quarantine(leg.legId, 'funding-effect-uncertain');
-        throw new Error(`funding effect outcome is uncertain for leg "${leg.legId}"`);
+        // Surface the underlying effect error — losing it costs the entire
+        // diagnosis of an uncertain outcome (e.g. which relay refused a wrap).
+        const detail = cause instanceof Error ? cause.message : String(cause);
+        throw new Error(`funding effect outcome is uncertain for leg "${leg.legId}": ${detail}`, {
+          cause,
+        });
       }
 
       try {
@@ -253,9 +258,14 @@ export class FundingCoordinator {
           amount: input.amount,
           counterparty: input.counterparty,
         });
-      } catch {
+      } catch (cause) {
         this.#quarantine(leg.legId, 'outflow-effect-uncertain');
-        throw new Error(`outflow effect outcome is uncertain for leg "${leg.legId}"`);
+        // Surface the underlying effect error — losing it costs the entire
+        // diagnosis of an uncertain outcome (e.g. which relay refused a wrap).
+        const detail = cause instanceof Error ? cause.message : String(cause);
+        throw new Error(`outflow effect outcome is uncertain for leg "${leg.legId}": ${detail}`, {
+          cause,
+        });
       }
 
       try {
@@ -296,9 +306,14 @@ export class FundingCoordinator {
           custody: leg.custody,
           asset: leg.asset,
         });
-      } catch {
+      } catch (cause) {
         this.#quarantine(leg.legId, 'sweep-effect-uncertain');
-        throw new Error(`sweep effect outcome is uncertain for leg "${leg.legId}"`);
+        // Surface the underlying effect error — losing it costs the entire
+        // diagnosis of an uncertain outcome (e.g. which relay refused a wrap).
+        const detail = cause instanceof Error ? cause.message : String(cause);
+        throw new Error(`sweep effect outcome is uncertain for leg "${leg.legId}": ${detail}`, {
+          cause,
+        });
       }
 
       try {

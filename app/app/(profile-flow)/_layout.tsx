@@ -14,7 +14,10 @@ import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
 import { FLOW_SHEET_HEADER_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
 
 const PROFILE_OPTIONS = { title: 'Profile' };
-const USER_MESSAGES_OPTIONS = { headerShown: false };
+// Statically shown: DmChatHeader swaps header content only. A false→true
+// visibility flip on mount remounts the screen in a loop inside modals
+// (blank DM thread) — keep in sync with config/modalScreens.ts.
+const USER_MESSAGES_OPTIONS = { headerShown: true };
 const SHARE_OPTIONS = { title: 'Share profile' };
 const THREAD_OPTIONS = { title: 'Thread' };
 const WHITENOISE_SETUP_OPTIONS = { title: 'White Noise' };

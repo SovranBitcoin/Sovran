@@ -12,6 +12,7 @@ import { MintQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 
 import type { HistoryEntry } from '@cashu/coco-core';
 
+import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
 import { Text } from '@/shared/ui/primitives/Text';
 import {
   meltQuoteExpired,
@@ -72,6 +73,10 @@ export function ExpiryCountdown({
   const mintState = historyEntry.type === 'mint' ? historyEntry.state : null;
 
   useEffect(() => {
+    // The 1s tick keeps uiautomator from ever reaching idle, blinding every AX
+    // dump on unpaid-quote screens — same class as the QRCode/LoadingIndicator/
+    // Skeleton gates. The badge still renders its initial value once.
+    if (IS_ANDROID_E2E) return;
     const shouldUpdate =
       (historyEntry.type === 'melt' && meltExpiry) ||
       (historyEntry.type === 'mint' && !isOnchainMint && mintState === MintQuoteState.UNPAID);

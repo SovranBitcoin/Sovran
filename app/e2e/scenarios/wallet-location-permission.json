@@ -38,8 +38,8 @@
     {"action":"screenshot","name":"wallet"}
   ],
   "finally": [
-    {"action":"permission","service":"location","mode":"reset"},
-    {"use":"flow.return-to-wallet"}
+    {"use":"flow.return-to-wallet"},
+    {"action":"permission","service":"location","mode":"reset"}
   ],
   "endState": "wallet"
 }

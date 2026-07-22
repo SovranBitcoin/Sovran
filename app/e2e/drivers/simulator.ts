@@ -764,8 +764,9 @@ export class SimulatorDriver implements Driver {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       this.#throwIfAborted();
-      const snap = this.#ax.latest;
-      if (snap) {
+      const current = this.#ax.current();
+      if (current) {
+        const { snapshot: snap, generation } = current;
         if (
           await handleDevClientChrome(
             this.#cfg.udid,
@@ -774,7 +775,16 @@ export class SimulatorDriver implements Driver {
             this.#cfg.signal
           )
         ) {
-          await sleep(this.#cfg.pollMs ?? 250);
+          // The press mutated the screen, so the cached snapshot is stale.
+          // Wait for a FRESH snapshot before considering another press — a
+          // stale-coordinate re-press ghost-taps whatever now sits under the
+          // dismissed alert's button (observed: Scan-QR under "Allow While
+          // Using App" on iOS 26.2).
+          const pressDeadline = Math.min(deadline, Date.now() + 10_000);
+          while (Date.now() < pressDeadline && !this.#ax.snapshotAfter(generation)) {
+            this.#throwIfAborted();
+            await sleep(this.#cfg.pollMs ?? 250);
+          }
           continue;
         }
         const el = findSimulatorElement(snap, sel);

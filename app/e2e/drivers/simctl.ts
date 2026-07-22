@@ -399,8 +399,15 @@ export async function handleDevClientChrome(
     return true;
   }
   if (has('Open in')) return pressExact('Open');
-  if (has('Allow “Sovran”') || has('“Sovran” Would Like'))
-    return (await pressExact('Allow While Using App')) || pressExact('Allow');
+  // Case-insensitive: iOS 26.2 sentence-cases permission alerts
+  // ("“Sovran” would like to access the Camera") where earlier runtimes used
+  // title case — a case-sensitive miss leaves the alert occluding the app.
+  const hasFold = (p: string) =>
+    snap.elements.some((e) => e.label?.toLowerCase().startsWith(p.toLowerCase()));
+  if (hasFold('Allow “Sovran”') || hasFold('“Sovran” Would Like'))
+    return (
+      (await pressExact('Allow While Using App')) || (await pressExact('Allow')) || pressExact('OK')
+    );
   if (includes('would like to paste')) return pressExact('Allow Paste');
   if (has('This is the developer menu')) return pressExact('Continue');
   if (has('Fast refresh') || has('Toggle element inspector')) {

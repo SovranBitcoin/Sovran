@@ -20,7 +20,10 @@ import {
 } from '../../config/flowLayoutOptions';
 
 const PROFILE_OPTIONS = { title: 'Profile' };
-const USER_MESSAGES_OPTIONS = { headerShown: false };
+// Statically shown: DmChatHeader swaps header content only. A false→true
+// visibility flip on mount remounts the screen in a loop inside modals
+// (blank DM thread) — keep in sync with config/modalScreens.ts.
+const USER_MESSAGES_OPTIONS = { headerShown: true };
 const SHARE_OPTIONS = { title: 'Share profile' };
 const GEOHASH_CHAT_OPTIONS = { headerShown: false };
 const BITCHAT_NETWORK_OPTIONS = { headerShown: false };

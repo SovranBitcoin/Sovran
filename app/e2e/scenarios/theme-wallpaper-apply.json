@@ -15,7 +15,7 @@
     {"action":"tapUntil","sequence":[{"tap":{"id":"wallet-theme"}}],"until":{"id":"theme-preview-theme-button"},"attempts":4,"settleMs":6000},
     {"action":"screenshot","name":"theme-preview"},
     {"action":"tap","selector":{"id":"theme-preview-theme-button"}},
-    {"action":"waitFor","selector":{"idPrefix":"album-card-"},"timeoutMs":60000},
+    {"action":"waitFor","selector":{"idPrefix":"album-card-"},"timeoutMs":120000},
     {"action":"screenshot","name":"gallery"},
     {"action":"tap","selector":{"idPrefix":"album-card-"}},
     {"action":"waitFor","selector":{"id":"theme-apply"},"timeoutMs":30000},

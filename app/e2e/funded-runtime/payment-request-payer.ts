@@ -162,19 +162,36 @@ export async function deliverPaymentRequestPayload(params: {
   timeoutMs: number;
 }): Promise<{ wrapEventId: string; acceptedBy: string }> {
   const senderPrivateKey = generateSecretKey();
-  const wrap = wrapEvent(senderPrivateKey, { publicKey: params.receiverPubkey }, params.payloadJson);
-  const frame = JSON.stringify(['EVENT', wrap]);
-  const attempts = params.relays.map((relay) =>
-    publishToRelay(relay, frame, wrap.id, params.timeoutMs)
+  const wrap = wrapEvent(
+    senderPrivateKey,
+    { publicKey: params.receiverPubkey },
+    params.payloadJson
   );
-  try {
-    const acceptedBy = await Promise.any(attempts);
-    return { wrapEventId: wrap.id, acceptedBy };
-  } catch (error) {
-    const reasons =
-      error instanceof AggregateError
-        ? error.errors.map((entry) => (entry instanceof Error ? entry.message : String(entry)))
-        : [error instanceof Error ? error.message : String(error)];
-    throw new Error(`payment request delivery failed on every relay: ${reasons.join('; ')}`);
+  const frame = JSON.stringify(['EVENT', wrap]);
+  // Re-publishing the same wrap event id is idempotent, and the token is
+  // durably recorded as prepared before delivery — so a short retry rides out
+  // transient all-relay publish failures without weakening the liability
+  // contract (one such failure quarantined a whole funded chunk).
+  const maxAttempts = 3;
+  let lastReasons: string[] = [];
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const attempts = params.relays.map((relay) =>
+      publishToRelay(relay, frame, wrap.id, params.timeoutMs)
+    );
+    try {
+      const acceptedBy = await Promise.any(attempts);
+      return { wrapEventId: wrap.id, acceptedBy };
+    } catch (error) {
+      lastReasons =
+        error instanceof AggregateError
+          ? error.errors.map((entry) => (entry instanceof Error ? entry.message : String(entry)))
+          : [error instanceof Error ? error.message : String(error)];
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+      }
+    }
   }
+  throw new Error(
+    `payment request delivery failed on every relay (${maxAttempts} rounds): ${lastReasons.join('; ')}`
+  );
 }

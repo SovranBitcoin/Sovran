@@ -17,6 +17,7 @@ import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { paymentLog } from '@/shared/lib/logger';
+import { runAfterInteractions } from '@/shared/lib/interactions';
 import { mintLocalId } from '@/shared/lib/id';
 
 import { getEncodedToken, getTokenMetadata } from '@cashu/cashu-ts';
@@ -1591,7 +1592,12 @@ export function createSovranHandlers({
         );
         if (delivered) {
           router.dismissAll();
-          router.navigate({ pathname: '/userMessages', params: { pubkey: recipientPubkey } });
+          // Let the modal dismissal settle before pushing the DM thread —
+          // navigating mid-dismissal triggers react-native-screens' modal
+          // header-visibility remount loop (blank DM thread).
+          runAfterInteractions(() => {
+            router.navigate({ pathname: '/userMessages', params: { pubkey: recipientPubkey } });
+          });
           return;
         }
         // Delivery failed — fall through to the bearer hand-off screen so the

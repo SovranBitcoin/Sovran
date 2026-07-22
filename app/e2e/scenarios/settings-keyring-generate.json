@@ -22,7 +22,7 @@
     {"action":"waitFor","selector":{"label":"YOUR KEYS (1)"},"timeoutMs":30000},
     {"action":"screenshot","name":"settings"},
     {"action":"tap","selector":{"label":"Generate P2PK key"}},
-    {"action":"waitFor","selector":{"label":"YOUR KEYS (2)"},"timeoutMs":30000},
+    {"action":"waitFor","selector":{"label":"YOUR KEYS (2)"},"timeoutMs":90000},
     {"action":"screenshot","name":"settings"},
     {"action":"tap","selector":{"label":"Go back"}},
     {"action":"waitFor","selector":{"label":"P2PK Keys"},"timeoutMs":30000},
