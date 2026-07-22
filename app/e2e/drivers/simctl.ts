@@ -399,6 +399,12 @@ export async function handleDevClientChrome(
     return true;
   }
   if (has('Open in')) return pressExact('Open');
+  // Paste consent MUST precede the generic permission branch: its title
+  // ("“Sovran” would like to paste from …") case-folds onto the same
+  // '“Sovran” Would Like' prefix, but its only affirmative button is
+  // "Allow Paste" — the generic branch would try Allow/OK, press nothing,
+  // and leave the alert pinned over the app.
+  if (includes('would like to paste')) return pressExact('Allow Paste');
   // Case-insensitive: iOS 26.2 sentence-cases permission alerts
   // ("“Sovran” would like to access the Camera") where earlier runtimes used
   // title case — a case-sensitive miss leaves the alert occluding the app.
@@ -408,7 +414,6 @@ export async function handleDevClientChrome(
     return (
       (await pressExact('Allow While Using App')) || (await pressExact('Allow')) || pressExact('OK')
     );
-  if (includes('would like to paste')) return pressExact('Allow Paste');
   if (has('This is the developer menu')) return pressExact('Continue');
   if (has('Fast refresh') || has('Toggle element inspector')) {
     await press(touchEndpoint, 0.5, 0.15, { signal });

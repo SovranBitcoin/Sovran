@@ -73,6 +73,45 @@ describe('dev-client system chrome', () => {
     expect(handled).toBe(true);
     expect(actions).toEqual(['press']);
   });
+
+  it('presses Allow Paste on the paste-consent alert, not the generic permission branch', async () => {
+    const pressed: { x: number; y: number }[] = [];
+    const element = (id: string, label: string, role: string, y: number) => ({
+      id,
+      label,
+      role,
+      enabled: true,
+      frame: { x: 40, y, width: 320, height: 48 },
+    });
+    const handled = await handleDevClientChrome(
+      'owned-udid',
+      'ws://127.0.0.1:1/ws',
+      {
+        screen: { width: 400, height: 800 },
+        elements: [
+          element(
+            '0.0',
+            '\u201cSovran\u201d would like to paste from \u201cCoreSimulatorBridge\u201d',
+            'text',
+            300
+          ),
+          element('0.1', 'Do you want to allow this?', 'text', 348),
+          element('0.2', 'Don\u2019t Allow Paste', 'button', 400),
+          element('0.3', 'Allow Paste', 'button', 452),
+        ],
+      },
+      undefined,
+      {
+        press: async (_endpoint, x, y) => void pressed.push({ x, y }),
+        gesture: async () => undefined,
+      }
+    );
+
+    expect(handled).toBe(true);
+    // Exactly one press, centered on the Allow Paste button (y 452..500).
+    expect(pressed.length).toBe(1);
+    expect(pressed[0]!.y).toBeCloseTo((452 + 24) / 800, 2);
+  });
 });
 
 describe('owned simulator bridge touch connection', () => {
