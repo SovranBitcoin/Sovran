@@ -803,8 +803,27 @@ export class SimulatorDriver implements Driver {
   }
 
   async find(sel: Selector): Promise<AxNode | null> {
-    const snap = this.#ax.latest;
-    if (!snap) return null;
+    const current = this.#ax.current();
+    if (!current) return null;
+    let snap = current.snapshot;
+    // Dismiss interposed system chrome exactly like waitFor does: tapUntil's
+    // until-check and optional taps both probe via find, and a paste-consent
+    // alert occluding the app otherwise pins every probe to the alert tree
+    // (observed: receive.cashu.paste retrying under "would like to paste"
+    // for all 4 attempts). After a press, wait briefly for a fresh snapshot
+    // so the probe reads the post-dismissal screen, never stale coordinates.
+    if (
+      await handleDevClientChrome(this.#cfg.udid, this.#cfg.touchEndpoint, snap, this.#cfg.signal)
+    ) {
+      const deadline = Date.now() + 10_000;
+      while (Date.now() < deadline && !this.#ax.snapshotAfter(current.generation)) {
+        this.#throwIfAborted();
+        await sleep(this.#cfg.pollMs ?? 250);
+      }
+      const fresh = this.#ax.latest;
+      if (!fresh) return null;
+      snap = fresh;
+    }
     const el = findSimulatorElement(snap, sel);
     return el ? toAxNode(el) : null;
   }
