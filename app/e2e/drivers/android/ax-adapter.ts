@@ -75,7 +75,7 @@ export function parseUiautomatorXml(
       value = text;
     } else if (attrs.checkable === 'true') {
       value = attrs.checked === 'true' ? '1' : '0';
-    } else if (id?.startsWith('transaction-probe-')) {
+    } else if (id?.startsWith('transaction-probe-') || id === 'e2e-ready-proof-reconciliation') {
       // The transaction probe carries its JSON payload percent-encoded in
       // content-desc (a raw JSON label's commas/quotes/braces make Android drop
       // the content-desc entirely). Decode it back to the JSON the shared probe
