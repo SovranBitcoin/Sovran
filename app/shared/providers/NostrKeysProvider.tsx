@@ -96,7 +96,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
   useInitMount('NostrKeysProvider');
   const stage = useInitializationStage('nostr', {
     message: 'Initializing keys...',
-    dependsOn: ['migrations'],
+    dependsOn: ['global-migrations'],
   });
   const {
     value: mnemonic,

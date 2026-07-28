@@ -28,7 +28,6 @@ describe('bitchat profile scope', () => {
     useProfileStore.setState({
       activeAccountIndex: 0,
       profiles: [],
-      cocoMigrationComplete: {},
     });
   });
 

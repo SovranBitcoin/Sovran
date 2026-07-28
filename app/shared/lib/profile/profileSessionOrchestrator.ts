@@ -22,7 +22,10 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { restartApp } from '@/shared/lib/profile/appRestart';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import {
+  PROFILE_STORE_PERSIST_VERSION,
+  useProfileStore,
+} from '@/shared/stores/global/profileStore';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 
 // ── AsyncStorage-based transition guard ──────────────────────────
@@ -85,12 +88,12 @@ export function registerKeyDerivation(fn: KeyDerivationFn): void {
 }
 
 async function flushProfileStoreToDisk(): Promise<void> {
-  const { activeAccountIndex, profiles, cocoMigrationComplete } = useProfileStore.getState();
+  const { activeAccountIndex, profiles } = useProfileStore.getState();
   await AsyncStorage.setItem(
     'profile-store',
     JSON.stringify({
-      state: { activeAccountIndex, profiles, cocoMigrationComplete },
-      version: 0,
+      state: { activeAccountIndex, profiles },
+      version: PROFILE_STORE_PERSIST_VERSION,
     })
   );
 }
@@ -236,7 +239,7 @@ export async function switchToImportedProfile(opts: {
 /**
  * Nuclear wipe — delete ALL app data and restart fresh.
  * Clears: all Zustand stores, all AsyncStorage, all SecureStore keys,
- * all SQLite databases, all Redux state. Nothing survives.
+ * all SQLite databases. Nothing survives.
  */
 export async function deleteAllProfiles(opts?: {
   resetStages?: TransitionControls['resetStages'];
@@ -293,19 +296,10 @@ export async function deleteAllProfiles(opts?: {
       log.warn('profile.orchestrator.async_storage_clear_failed', { error: redactError(e) });
     }
 
-    // 4. Purge Redux persisted state
-    try {
-      const { persistor } = await import('@/redux/store/store.deprecated');
-      await persistor.purge();
-    } catch (e) {
-      log.warn('profile.orchestrator.redux_purge_failed', { error: redactError(e) });
-    }
-
-    // 5. Clear all Zustand in-memory state so nothing bleeds before restart
+    // 4. Clear all Zustand in-memory state so nothing bleeds before restart
     useProfileStore.setState({
       activeAccountIndex: 0,
       profiles: [],
-      cocoMigrationComplete: {},
     });
     // btcMapStore holds an in-flight 2–3s places fetch that would otherwise
     // resolve between AsyncStorage.clear() above and restartApp() below,

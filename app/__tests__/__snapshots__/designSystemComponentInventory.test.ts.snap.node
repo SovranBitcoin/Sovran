@@ -149,8 +149,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/blocks/GlobalMigrationGate.tsx",
     "shared/blocks/HeaderProfileButton.tsx",
     "shared/blocks/InitializationGate.tsx",
-    "shared/blocks/LegacyMigrationGate.tsx",
-    "shared/blocks/MigrationGate.tsx",
     "shared/blocks/NotFoundScreen.tsx",
     "shared/blocks/PaymentInfo.tsx",
     "shared/blocks/PullToAiRefreshControl.tsx",
@@ -229,6 +227,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/WhiteFaceBeamAvatar.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 223,
+  "total": 221,
 }
 `;

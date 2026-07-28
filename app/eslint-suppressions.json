@@ -175,26 +175,6 @@
       "count": 1
     }
   },
-  "redux/cashu/types.deprecated.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    }
-  },
-  "redux/nostr/reducer.deprecated.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 7
-    }
-  },
-  "redux/store/reducer.deprecated.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "redux/store/store.deprecated.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 29
-    }
-  },
   "shared/blocks/popup/ActionMenuHost.tsx": {
     "@typescript-eslint/consistent-type-assertions": {
       "count": 1
@@ -269,11 +249,6 @@
       "count": 4
     }
   },
-  "shared/lib/typedUpdate.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 7
-    }
-  },
   "shared/lib/utils.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 4
@@ -288,11 +263,6 @@
     }
   },
   "shared/providers/hero-transition/measure.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "shared/stores/global/migrateSettings.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
     }

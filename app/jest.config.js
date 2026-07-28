@@ -52,7 +52,6 @@ module.exports = {
     '^@/sheets/(.*)$': '<rootDir>/shared/lib/popup/sheets/$1',
     '^@/navigation/(.*)$': '<rootDir>/navigation/$1',
     '^@/config/(.*)$': '<rootDir>/config/$1',
-    '^@/redux/(.*)$': '<rootDir>/redux/$1',
     '^@/themes$': '<rootDir>/themes',
     '^@/(.*)$': '<rootDir>/$1',
   },

@@ -27,7 +27,6 @@ export default function GlobalMigrationGate({ children }: GlobalMigrationGatePro
       tag="GlobalMigrationGate"
       stageId="global-migrations"
       message="Running global migrations..."
-      dependsOn={['legacy-redux-bootstrap']}
       logEvent="gate.global_migration"
       run={runGlobalMigrations}
       onSuccess={signalMigrationsComplete}>

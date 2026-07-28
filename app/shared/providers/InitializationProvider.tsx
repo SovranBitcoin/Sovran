@@ -33,10 +33,8 @@ initLog('Module', 'InitializationProvider loaded');
  *
  *  | Stage ID               | Blocking | Depends On             | Provider              |
  *  |------------------------|----------|------------------------|-----------------------|
- *  | legacy-redux-bootstrap | yes      | —                      | LegacyMigrationGate   |
- *  | global-migrations      | yes      | legacy-redux-bootstrap | GlobalMigrationGate   |
- *  | migrations             | yes      | global-migrations      | MigrationGate         |
- *  | nostr                  | yes      | migrations             | NostrKeysProvider     |
+ *  | global-migrations      | yes      | —                      | GlobalMigrationGate   |
+ *  | nostr                  | yes      | global-migrations      | NostrKeysProvider     |
  *  | coco                   | yes      | nostr                  | CocoProvider          |
  *  | nostr-ndk              | no       | coco                   | NostrNDKProvider      |
  *  | coco-background        | no       | coco                   | CocoProvider          |

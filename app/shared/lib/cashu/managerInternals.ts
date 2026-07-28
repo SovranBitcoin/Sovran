@@ -38,7 +38,6 @@ interface ManagerInternals {
   };
   proofService: {
     getReadyProofs(mintUrl: string): Promise<CoreProof[]>;
-    saveProofs(mintUrl: string, proofs: CoreProof[]): Promise<void>;
     setProofState(
       mintUrl: string,
       secrets: string[],
@@ -48,17 +47,6 @@ interface ManagerInternals {
   };
   walletService: {
     getWallet(mintUrl: string, unit: string): Promise<Wallet>;
-  };
-  counterService: {
-    getCounter(
-      mintUrl: string,
-      keysetId: string
-    ): Promise<{ mintUrl: string; keysetId: string; counter: number }>;
-    overwriteCounter(
-      mintUrl: string,
-      keysetId: string,
-      counter: number
-    ): Promise<{ mintUrl: string; keysetId: string; counter: number }>;
   };
   mintOperationRepository: {
     delete(id: string): Promise<void>;
@@ -235,82 +223,6 @@ export async function restoreProofsToReady(
     cashuLog.warn('cashu.manager_internals.restore_proofs.failed', {
       ...mintUrlLogFields(mintUrl),
       count: secrets.length,
-      error: errorMessage(error),
-    });
-    throw error;
-  }
-}
-
-/**
- * Persist proofs in the given mint+state, via the private ProofService.
- * Used by the legacy Redux→Coco migration to seed the proof table.
- */
-export async function saveProofs(
-  manager: Manager,
-  mintUrl: string,
-  proofs: CoreProof[]
-): Promise<void> {
-  cashuLog.info('cashu.manager_internals.save_proofs.start', {
-    ...mintUrlLogFields(mintUrl),
-    count: proofs.length,
-  });
-  try {
-    await internals(manager).proofService.saveProofs(mintUrl, proofs);
-    cashuLog.info('cashu.manager_internals.save_proofs.done', {
-      ...mintUrlLogFields(mintUrl),
-      count: proofs.length,
-    });
-  } catch (error) {
-    cashuLog.warn('cashu.manager_internals.save_proofs.failed', {
-      ...mintUrlLogFields(mintUrl),
-      count: proofs.length,
-      error: errorMessage(error),
-    });
-    throw error;
-  }
-}
-
-/**
- * Raise a deterministic counter for a (mint, keyset) pair, via the private
- * CounterService. Used by the legacy Redux→Coco migration to recover counters
- * the user already burnt before installing the Coco-backed build. This is
- * MAX-on-conflict: a stale migration snapshot may skip nothing or move the
- * high-water mark forward, but can never lower it and reuse derivation indices.
- */
-export async function overwriteCounter(
-  manager: Manager,
-  mintUrl: string,
-  keysetId: string,
-  counter: number
-): Promise<{ mintUrl: string; keysetId: string; counter: number }> {
-  if (!Number.isSafeInteger(counter) || counter < 0) {
-    throw new RangeError('counter must be a non-negative safe integer');
-  }
-  cashuLog.info('cashu.manager_internals.counter_overwrite.start', {
-    ...mintUrlLogFields(mintUrl),
-    keysetId,
-    counter,
-  });
-  try {
-    const counterService = internals(manager).counterService;
-    const current = await counterService.getCounter(mintUrl, keysetId);
-    if (counter > current.counter) {
-      await counterService.overwriteCounter(mintUrl, keysetId, counter);
-    }
-    // Read back through the service because the Sovran repository wrapper is
-    // also MAX-on-conflict and may have rejected a racing stale write.
-    const result = await counterService.getCounter(mintUrl, keysetId);
-    cashuLog.info('cashu.manager_internals.counter_overwrite.done', {
-      ...mintUrlLogFields(mintUrl),
-      keysetId,
-      counter: result.counter,
-    });
-    return result;
-  } catch (error) {
-    cashuLog.warn('cashu.manager_internals.counter_overwrite.failed', {
-      ...mintUrlLogFields(mintUrl),
-      keysetId,
-      counter,
       error: errorMessage(error),
     });
     throw error;

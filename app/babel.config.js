@@ -13,7 +13,6 @@ module.exports = function (api) {
         '@/sheets': './shared/lib/popup/sheets',
         '@/navigation': './navigation',
         '@/config': './config',
-        '@/redux': './redux',
         '@/themes': './themes',
         '@': './',
         assets: './assets',

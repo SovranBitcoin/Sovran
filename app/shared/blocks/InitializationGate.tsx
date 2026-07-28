@@ -12,7 +12,7 @@ interface InitializationGateProps {
   message: string;
   /** Stage IDs this stage waits on. Used as a splash hint, not as a render gate. */
   dependsOn?: string[];
-  /** Logger event prefix, e.g. `gate.legacy_migration` — emits `.start`/`.complete`/`.failed`. */
+  /** Logger event prefix, e.g. `gate.global_migration` — emits `.start`/`.complete`/`.failed`. */
   logEvent: string;
   /** Async work that resolves the gate. Called exactly once on mount. */
   run: () => Promise<void>;
@@ -29,8 +29,8 @@ interface InitializationGateProps {
 
 /**
  * Generic blocking gate for app-startup work. Replaces the three near-identical
- * gate components flagged in audit-46 F-005 (LegacyMigrationGate /
- * GlobalMigrationGate / MigrationGate). The single primitive owns the
+ * gate components flagged in audit-46 F-005
+ * (GlobalMigrationGate). The single primitive owns the
  * hasStarted ref, the stage wiring, the success/error fork, and the children
  * Log wrapper — callers supply only the async `run` and the per-gate metadata.
  *

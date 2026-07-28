@@ -84,7 +84,6 @@ class NsecSigner implements Signer {
 
 /**
  * Coco Manager singleton for managing Cashu operations
- * This replaces the complex Redux-based cashuClient.ts approach
  */
 export class CocoManager {
   private static instance: Manager | null = null;

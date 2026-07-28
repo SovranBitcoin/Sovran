@@ -40,7 +40,7 @@ export interface CachedDerivedKeys {
 // iOS keychain options. `requireAuthentication: false` writes items under the
 // `app:no-auth` keychain service alias (expo-secure-store v55) so reads are
 // silent. We do NOT want a biometric gate on boot — multiple providers
-// (AppGate, NostrKeysProvider, MigrationGate, CocoManager) hit SecureStore in
+// (AppGate, NostrKeysProvider, CocoManager) hit SecureStore in
 // parallel and each prompt is per-call, so flipping this to `true` would show
 // a cascade of FaceID sheets every cold start.
 const IOS_SECURE_OPTIONS = {
@@ -572,37 +572,15 @@ export async function retrieveCashuSeed(
   });
 }
 
-// ── Migrations Complete Flag (per-account) ──────────────────────
+// ── Migrations Complete Flag (per-account) — tombstone ──────────
+// Nothing reads or writes these any more; the migration gate that set them is
+// gone. The key helper survives for one reason: every install that shipped
+// before the removal still has `migrations_complete_*` records sitting in its
+// keychain, and 'Delete All' must keep deleting them. Drop this and those
+// records are orphaned forever.
 
 function migrationsCompleteKey(accountIndex: number): string {
   return `${STORAGE_KEYS.MIGRATIONS_COMPLETE_PREFIX}${accountIndex}`;
-}
-
-/**
- * Check whether Redux migrations have already completed for the given account.
- * Falls back to the legacy global key for accounts that migrated before the
- * per-account key was introduced.
- */
-export async function isMigrationsComplete(accountIndex: number = 0): Promise<boolean> {
-  // Check per-account key first
-  const perAccount = await secureGet(migrationsCompleteKey(accountIndex), 'check_migration_flag');
-  if (perAccount === 'true') return true;
-
-  // Backward compat: check legacy global key (only trust it for account 0)
-  if (accountIndex === 0) {
-    const legacy = await secureGet(STORAGE_KEYS.MIGRATIONS_COMPLETE_LEGACY, 'check_migration_flag');
-    if (legacy === 'true') {
-      // Promote to per-account key so we don't check legacy again
-      await secureSet(migrationsCompleteKey(0), 'true', 'set_migration_flag');
-      return true;
-    }
-  }
-
-  return false;
-}
-
-export function setMigrationsComplete(accountIndex: number = 0): Promise<boolean> {
-  return secureSet(migrationsCompleteKey(accountIndex), 'true', 'set_migration_flag');
 }
 
 // ── Imported Nsec Storage ───────────────────────────────────────

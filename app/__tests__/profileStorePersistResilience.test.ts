@@ -47,11 +47,9 @@ describe('profileStore persistence', () => {
           cachedDisplayName: 'Future profile',
         },
       ],
-      cocoMigrationComplete: { 0: true, 1: true },
     }) as {
       activeAccountIndex: number;
       profiles: { source?: string; cachedBalanceSats?: number; cachedDisplayName?: string }[];
-      cocoMigrationComplete: Record<string, boolean>;
     };
 
     expect(parsed.activeAccountIndex).toBe(1);
@@ -66,6 +64,5 @@ describe('profileStore persistence', () => {
       cachedBalanceSats: 34,
       cachedDisplayName: 'Future profile',
     });
-    expect(parsed.cocoMigrationComplete).toEqual({ 0: true, 1: true });
   });
 });

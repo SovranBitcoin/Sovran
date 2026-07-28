@@ -17,8 +17,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import AppGate from '@/shared/blocks/AppGate';
 import GlobalMigrationGate from '@/shared/blocks/GlobalMigrationGate';
-import LegacyMigrationGate from '@/shared/blocks/LegacyMigrationGate';
-import MigrationGate from '@/shared/blocks/MigrationGate';
 import {
   InitializationProvider,
   useInitializationState,
@@ -35,9 +33,6 @@ import { CapabilityProvider, useCapabilities } from '@/shared/ui/capability';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
-import { Provider } from 'react-redux';
-import { PersistGate } from 'redux-persist/integration/react';
-import { persistor, store } from '@/redux/store/store.deprecated';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { androidHeaderScrimOptions, getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
@@ -85,23 +80,6 @@ void SplashScreen.preventAutoHideAsync();
 
 initLog('_layout', 'module loaded — SplashScreen.preventAutoHideAsync called');
 
-// Log when redux-persist finishes rehydration. PersistGate doesn't expose
-// a callback through its composed form, so we subscribe directly. Handle
-// the race where persistor is already bootstrapped by the time we subscribe.
-{
-  const start = Date.now();
-  if (persistor.getState().bootstrapped) {
-    initLog('Persistor', 'already bootstrapped at module load');
-  } else {
-    const unsubscribe = persistor.subscribe(() => {
-      if (persistor.getState().bootstrapped) {
-        initLog('Persistor', `bootstrapped durationMs=${Date.now() - start}`);
-        unsubscribe();
-      }
-    });
-  }
-}
-
 LogBox.ignoreAllLogs();
 
 const IOS_SPLASH_IMAGE_WIDTH = 390;
@@ -114,7 +92,7 @@ const PROFILE_SWITCH_SPLASH_BOX_SIZE =
 
 // Outer providers — stable across profile switches, never remount.
 // InitializationProvider is first so the splash screen renders immediately
-// while PersistGate waits for Redux rehydration (avoids blank screen gap).
+// while the blocking init stages run (avoids a blank screen gap).
 // OfflineStatusProvider lives here (not inside RootLayoutContent) so the
 // downstream SovranColadaProvider — which consumes useOfflineStatus() to
 // drive the machine's offline send branch — actually sees real network state
@@ -123,8 +101,6 @@ const PROFILE_SWITCH_SPLASH_BOX_SIZE =
 const OuterProviders = compose([
   KeyboardProvider,
   InitializationProvider,
-  [PersistGate, { loading: null, persistor }],
-  [Provider, { store }],
   ThemeProvider,
   CapabilityProvider,
   HeroUINativeProvider,
@@ -151,7 +127,6 @@ function AccountScopedProviders({
   const InnerProviders = useMemo(
     () =>
       compose([
-        MigrationGate,
         [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
         [NostrNDKProvider, { accountIndex }],
         // NIP-46 signer service — stays cold (no sockets) until the user has
@@ -841,22 +816,20 @@ export default function RootLayout() {
         <TransitionControlRegistrar />
         <TransitionGuardCleanup />
         <NativeSplashLayoutGate>
-          <LegacyMigrationGate>
-            <GlobalMigrationGate>
-              <AccountScopedProviders
-                key={`account-${activeAccountIndex}`}
-                accountIndex={activeAccountIndex}>
-                <RootLayoutContent />
-                <E2EToastProbe />
-                {/* Same-window host for the Android feed media lightbox; must
+          <GlobalMigrationGate>
+            <AccountScopedProviders
+              key={`account-${activeAccountIndex}`}
+              accountIndex={activeAccountIndex}>
+              <RootLayoutContent />
+              <E2EToastProbe />
+              {/* Same-window host for the Android feed media lightbox; must
                     sit BEFORE PopupHost so popups triggered from inside the
                     lightbox stack above it. No-op on iOS / when empty. */}
-                <AndroidImageOverlayHost />
-                <PopupHost />
-                <ActionMenuHost />
-              </AccountScopedProviders>
-            </GlobalMigrationGate>
-          </LegacyMigrationGate>
+              <AndroidImageOverlayHost />
+              <PopupHost />
+              <ActionMenuHost />
+            </AccountScopedProviders>
+          </GlobalMigrationGate>
         </NativeSplashLayoutGate>
       </OuterProviders>
     </GestureHandlerRootView>

@@ -870,17 +870,6 @@ exports[`persisted schema drift profile-store schema matches the golden snapshot
         "minimum": -9007199254740991,
         "type": "integer",
       },
-      "cocoMigrationComplete": {
-        "additionalProperties": {
-          "type": "boolean",
-        },
-        "default": {},
-        "propertyNames": {
-          "maxLength": 32,
-          "type": "string",
-        },
-        "type": "object",
-      },
       "profiles": {
         "default": [],
         "items": {
@@ -941,11 +930,10 @@ exports[`persisted schema drift profile-store schema matches the golden snapshot
     "required": [
       "activeAccountIndex",
       "profiles",
-      "cocoMigrationComplete",
     ],
     "type": "object",
   },
-  "version": 1,
+  "version": 2,
 }
 `;
 

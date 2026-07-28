@@ -55,7 +55,7 @@ bun run docs:preview   # preview the build
 - **Bun** as package manager and CI runtime
 - **TypeScript** with `noImplicitOverride`, type-aware ESLint, `eslint-plugin-react-compiler`, `eslint-plugin-react-perf`
 - **Reanimated v4** (legacy `Animated` banned by lint), **Gesture Handler**, **Nitro Modules**, **Worklets**
-- **Redux + redux-persist** alongside **Zustand**
+- **Zustand** with Zod-validated persistence
 - **Zod v4**; `@sovranbitcoin/schemas` for shared payloads
 - **`neverthrow`** for `Result` / `ResultAsync` return types
 - **`react-native-quick-crypto`** + `@noble/hashes` + `@scure/bip32` + `@scure/bip39`

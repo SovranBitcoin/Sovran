@@ -19,7 +19,6 @@
       "@/sheets/*": ["./shared/lib/popup/sheets/*"],
       "@/navigation/*": ["./navigation/*"],
       "@/config/*": ["./config/*"],
-      "@/redux/*": ["./redux/*"],
       "@/themes": ["./themes"],
       "~/*": ["src/*"],
       // Pin every `zod`/`neverthrow` import (including those inside the wallet/

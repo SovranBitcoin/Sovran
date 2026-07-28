@@ -34,7 +34,6 @@ const STORE_DIRS: Record<string, string> = {
  * reason: either there is no enumerable store instance, or the state contains
  * plaintext secrets that must never enter debug artifacts. */
 const EXCLUDED: ReadonlySet<string> = new Set([
-  'global/migrateSettings',
   'profile/restoreActiveSessionView',
   'runtime/clearPaymentContext',
   'runtime/dmEchoStore', // DM bodies may be live bearer ecash tokens

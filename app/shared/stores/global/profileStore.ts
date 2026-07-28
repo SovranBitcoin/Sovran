@@ -49,8 +49,6 @@ interface ProfileState {
   activeAccountIndex: number;
   /** All known profiles */
   profiles: ProfileEntry[];
-  /** Per-account flag: true once the Redux-to-Coco migration has run (or been confirmed unnecessary). */
-  cocoMigrationComplete: Record<number, boolean>;
 }
 
 interface ProfileActions {
@@ -69,10 +67,6 @@ interface ProfileActions {
   getNextAccountIndex: () => number;
   /** Update the cached balance for a profile (called by ProfileBalanceSync) */
   updateProfileBalance: (accountIndex: number, balanceSats: number) => void;
-  /** Check whether the Redux-to-Coco migration has already been handled for an account. */
-  isCocoMigrationComplete: (accountIndex: number) => boolean;
-  /** Mark the Redux-to-Coco migration as done for an account. */
-  markCocoMigrationComplete: (accountIndex: number) => void;
   /** Update cached Nostr kind-0 metadata for a profile */
   updateProfileMetadata: (accountIndex: number, displayName?: string, picture?: string) => void;
   /** Check if a pubkey is already used by any profile */
@@ -101,15 +95,40 @@ const PersistedProfileEntry = z.looseObject({
 const PersistedProfileStore = z.object({
   activeAccountIndex: z.number().int().default(0),
   profiles: z.array(PersistedProfileEntry).max(64).default([]),
-  cocoMigrationComplete: z.record(z.string().max(32), z.boolean()).default({}),
 });
+
+/**
+ * Persisted schema version. Exported so `flushProfileStoreToDisk` — which
+ * hand-writes the blob during a profile switch — stamps the same version the
+ * store declares, instead of forcing a needless migrate on every restart.
+ */
+export const PROFILE_STORE_PERSIST_VERSION = 2;
+
+type V2Persisted = {
+  activeAccountIndex: number;
+  profiles: ProfileEntry[];
+};
+
+/**
+ * v1 → v2: drop `cocoMigrationComplete`, the per-account Redux→Coco flag that
+ * left the app with the migration it gated. Every existing install still has
+ * the key in its blob; strip it here so the v2 schema sees the current shape.
+ *
+ * Append-only chain — zustand only calls migrate on a version mismatch.
+ */
+function migrateProfileStore(state: unknown, version: number): V2Persisted {
+  if (version < 2 && state && typeof state === 'object') {
+    const { cocoMigrationComplete: _dropped, ...rest } = state as Record<string, unknown>;
+    return rest as V2Persisted;
+  }
+  return state as V2Persisted;
+}
 
 export const useProfileStore = create<ProfileStore>()(
   persist(
     (set, get) => ({
       activeAccountIndex: 0,
       profiles: [],
-      cocoMigrationComplete: {},
 
       addProfile: (
         accountIndex: number,
@@ -189,20 +208,6 @@ export const useProfileStore = create<ProfileStore>()(
         }));
       },
 
-      isCocoMigrationComplete: (accountIndex: number) => {
-        return !!get().cocoMigrationComplete[accountIndex];
-      },
-
-      markCocoMigrationComplete: (accountIndex: number) => {
-        storeLog.info('store.profile.mark_coco_migration_complete', { accountIndex });
-        set((state) => ({
-          cocoMigrationComplete: {
-            ...state.cocoMigrationComplete,
-            [accountIndex]: true,
-          },
-        }));
-      },
-
       updateProfileMetadata: (accountIndex: number, displayName?: string, picture?: string) => {
         storeLog.debug('store.profile.update_metadata', { accountIndex, displayName });
         set((state) => ({
@@ -227,10 +232,11 @@ export const useProfileStore = create<ProfileStore>()(
       name: 'profile-store',
       storage: AsyncStorage,
       schema: PersistedProfileStore,
+      version: PROFILE_STORE_PERSIST_VERSION,
+      migrate: migrateProfileStore,
       partialize: (state) => ({
         activeAccountIndex: state.activeAccountIndex,
         profiles: state.profiles,
-        cocoMigrationComplete: state.cocoMigrationComplete,
       }),
     })
   )

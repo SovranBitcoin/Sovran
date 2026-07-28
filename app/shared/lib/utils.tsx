@@ -177,8 +177,7 @@ export function cn(...inputs: ClassValue[]) {
  * // Mixed approach (tuples + direct)
  * const AppProviders = compose([
  *   [NostrProvider, { relayUrls: RELAY_URLS }],
- *   [PersistGate, { loading: null, persistor }],
- *   [Provider, { store }],
+ *   [WhitenoiseProvider, { accountIndex }],
  *   ThemeProvider,  // Direct component (no props needed)
  *   ActionSheetProvider, // Automatically wrapped in Fragment for single-child requirement
  * ]);

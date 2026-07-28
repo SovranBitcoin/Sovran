@@ -8,10 +8,8 @@ import type {
   Repositories,
   RepositoryTransactionScope,
 } from '@cashu/coco-core/adapter';
-import type { Manager } from '@cashu/coco-core';
 
 import { createSovranCocoRepositories } from '@/shared/lib/cashu/cocoRepositories';
-import { overwriteCounter } from '@/shared/lib/cashu/managerInternals';
 
 const MINT_URL = 'https://mint.example';
 
@@ -135,45 +133,4 @@ describe('Sovran Coco counter repository boundary', () => {
       { counter: 50 }
     );
   });
-});
-
-describe('legacy counter migration boundary', () => {
-  it('reads back the current high-water mark and ignores a stale migration value', async () => {
-    let current = 42;
-    const counterService = {
-      getCounter: jest.fn(async () => ({
-        counter: current,
-        keysetId: 'keyset-a',
-        mintUrl: MINT_URL,
-      })),
-      overwriteCounter: jest.fn(async (_mintUrl: string, _keysetId: string, counter: number) => {
-        current = counter;
-        return { counter, keysetId: 'keyset-a', mintUrl: MINT_URL };
-      }),
-    };
-    const manager = Object.assign(Object.create(null), { counterService }) as Manager;
-
-    await expect(overwriteCounter(manager, MINT_URL, 'keyset-a', 7)).resolves.toMatchObject({
-      counter: 42,
-    });
-    expect(counterService.overwriteCounter).not.toHaveBeenCalled();
-
-    await expect(overwriteCounter(manager, MINT_URL, 'keyset-a', 75)).resolves.toMatchObject({
-      counter: 75,
-    });
-    expect(counterService.overwriteCounter).toHaveBeenCalledWith(MINT_URL, 'keyset-a', 75);
-  });
-
-  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
-    'rejects an invalid migration counter: %s',
-    async (counter) => {
-      const manager = Object.assign(Object.create(null), {
-        counterService: { getCounter: jest.fn(), overwriteCounter: jest.fn() },
-      }) as Manager;
-
-      await expect(overwriteCounter(manager, MINT_URL, 'keyset-a', counter)).rejects.toThrow(
-        'counter must be a non-negative safe integer'
-      );
-    }
-  );
 });
