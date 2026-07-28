@@ -470,6 +470,7 @@ function BannerWithAvatarComponent({
   displayName,
   nip05,
   isLoading,
+  isResolving,
   showFollowButton,
   isFollowing,
   isFollowLoading,
@@ -486,6 +487,10 @@ function BannerWithAvatarComponent({
   displayName: string;
   nip05?: string;
   isLoading: boolean;
+  /** Kind-0 fetch still needed/in flight (see useNostrProfileMetadata). While
+   *  true, avatar/banner without an image stay on the loading placeholder
+   *  instead of revealing the generative fallback a fetch may replace. */
+  isResolving: boolean;
   showFollowButton: boolean;
   isFollowing: boolean;
   isFollowLoading: boolean;
@@ -519,15 +524,19 @@ function BannerWithAvatarComponent({
   const bannerError = bannerStatus === 'failed';
   const hasBannerImage = Boolean(bannerUrl && !bannerError);
   // Mirror Avatar's state model for the banner:
-  //   - 'loading'  → metadata still resolving, OR we have a bannerUrl that hasn't finished loading
   //   - 'image'    → bannerUrl resolved and loaded
-  //   - 'fallback' → metadata resolved with no banner, OR banner load failed
-  const bannerState: 'loading' | 'image' | 'fallback' = isLoading
-    ? 'loading'
-    : hasBannerImage
-      ? bannerStatus === 'loaded'
-        ? 'image'
-        : 'loading'
+  //   - 'loading'  → bannerUrl still loading, OR the kind-0 that decides
+  //                  whether a banner exists is still resolving
+  //   - 'fallback' → metadata settled with no banner, OR banner load failed
+  // `isResolving` (not just isLoading) gates the fallback so a seeded
+  // name-only record revalidating in the background never flashes the seeded
+  // gradient before the real banner arrives — always placeholder → final.
+  const bannerState: 'loading' | 'image' | 'fallback' = hasBannerImage
+    ? bannerStatus === 'loaded'
+      ? 'image'
+      : 'loading'
+    : isLoading || isResolving
+      ? 'loading'
       : 'fallback';
   const pfpColors = useDominantColor(pictureUrl, fallbackIndex);
   const bannerColors = useDominantColor(
@@ -580,7 +589,7 @@ function BannerWithAvatarComponent({
   const avatarContent = (
     <View style={[styles.avatarBorder, { borderColor: background, backgroundColor: background }]}>
       <Avatar
-        state={isLoading ? 'loading' : pictureUrl ? 'image' : 'fallback'}
+        state={pictureUrl ? 'image' : isLoading || isResolving ? 'loading' : 'fallback'}
         picture={pictureUrl}
         seed={pubkey}
         size={AVATAR_SIZE}
@@ -864,7 +873,11 @@ export function UserProfileScreen() {
   // /(user-flow)/userMessages route avoids a duplicate kind-0
   // fetch). First open per session pays one round-trip; the cache
   // entry is shared across surfaces and persists across launches.
-  const { metadata: cachedProfile, isLoading: isMetadataLoading } = useNostrProfileMetadata(pubkey);
+  const {
+    metadata: cachedProfile,
+    isLoading: isMetadataLoading,
+    isResolving: isMetadataResolving,
+  } = useNostrProfileMetadata(pubkey);
 
   const contactsTags = useNostrSocialStore((state) => state.contactsTags);
   const contactsContent = useNostrSocialStore((state) => state.contactsContent);
@@ -1297,6 +1310,7 @@ export function UserProfileScreen() {
                 displayName={displayName}
                 nip05={cachedProfile?.nip05}
                 isLoading={isMetadataLoading}
+                isResolving={isMetadataResolving}
                 // Wait until our own keys are known before deciding whether to
                 // show the follow button. Otherwise on own-profile open we would
                 // briefly render the skeleton (isOwnProfile=false until keys load),

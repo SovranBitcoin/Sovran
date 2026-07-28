@@ -12,6 +12,16 @@ const STALE_TTL_MS = 24 * 60 * 60 * 1000;
 interface UseNostrProfileMetadataResult {
   metadata: NostrProfileMetadata | undefined;
   isLoading: boolean;
+  /** True while a real kind-0 fetch is still needed or in flight — including
+   *  the first render (before the fetch effect has run), retry backoff
+   *  windows, and revalidation of a stale/seeded record. Surfaces that render
+   *  a generative fallback (e.g. the clay avatar) should hold their loading
+   *  placeholder while this is true, so users see placeholder → final and
+   *  never a fallback that an in-flight fetch is about to replace. `isLoading`
+   *  alone misses the seeded-record case: a feed-seeded name-only record is
+   *  "stale, not missing", so `isLoading` stays false while the fetch that
+   *  will deliver the picture is still running. */
+  isResolving: boolean;
 }
 
 const MAX_FETCH_ATTEMPTS = 3;
@@ -30,6 +40,7 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
   // short backoff a bounded number of times; a genuine not-found still settles
   // after the cap without looping.
   const attempts = useRef<Map<string, number>>(new Map());
+  const inFlight = useRef(0);
   const [retryNonce, setRetryNonce] = useState(0);
   const attemptCount = pubkey ? (attempts.current.get(pubkey) ?? 0) : MAX_FETCH_ATTEMPTS;
   const needsFetch = !!pubkey && (isMissing || isStale) && attemptCount < MAX_FETCH_ATTEMPTS;
@@ -39,6 +50,13 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
     attempts.current.set(pubkey, (attempts.current.get(pubkey) ?? 0) + 1);
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    // Ref-counted rather than gated on `cancelled`: bumping the attempt counter
+    // to the cap flips `needsFetch` during this effect's own lifetime, which
+    // runs this cleanup (cancelled=true) while the fetch is still in flight — a
+    // cancel-guarded `setIsFetching(false)` then never fires and isFetching
+    // sticks true forever for a profile-less pubkey. The counter also keeps an
+    // overlapping newer fetch from being clobbered back to false.
+    inFlight.current += 1;
     setIsFetching(true);
     // refresh:true so a stale/boot-seeded record is revalidated, not served back.
     void fetchProfilesViaFacade([pubkey], { refresh: true })
@@ -57,7 +75,8 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
         }, RETRY_BACKOFF_MS);
       })
       .finally(() => {
-        if (!cancelled) setIsFetching(false);
+        inFlight.current -= 1;
+        if (inFlight.current === 0) setIsFetching(false);
       });
     return () => {
       cancelled = true;
@@ -68,7 +87,11 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
   }, [pubkey, needsFetch, retryNonce]);
 
   const isLoading = isMissing && isFetching;
-  return { metadata, isLoading };
+  // `needsFetch` covers the pre-effect first render and retry backoffs;
+  // `isFetching` covers the in-flight window (needsFetch can flip false the
+  // moment attempts are bumped). Settles false once resolved or attempts cap.
+  const isResolving = isFetching || needsFetch;
+  return { metadata, isLoading, isResolving };
 }
 
 /**
