@@ -121,7 +121,6 @@ export function SignerAppPersonScreen(): React.ReactElement {
             state={person.picture ? 'image' : 'fallback'}
             picture={person.picture}
             seed={peer}
-            fallbackVariant="beam"
             size={64}
             alt={name}
           />

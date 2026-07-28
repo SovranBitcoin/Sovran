@@ -44,15 +44,6 @@ jest.mock('@/shared/lib/imageCache', () => ({
   prefetchImage: jest.fn(),
 }));
 
-jest.mock('@mealection/react-native-boring-avatars', () => ({
-  __esModule: true,
-  default: (props: Record<string, unknown>) => {
-    const ReactActual = jest.requireActual<typeof import('react')>('react');
-    const { View } = jest.requireActual<typeof import('react-native')>('react-native');
-    return ReactActual.createElement(View, { testID: 'boring-avatar', ...props });
-  },
-}));
-
 jest.mock('expo-image', () => ({
   Image: (props: Record<string, unknown>) => {
     const ReactActual = jest.requireActual<typeof import('react')>('react');
@@ -280,7 +271,10 @@ jest.mock('react-native-svg', () => {
     Circle: createSvgHost('Circle'),
     Defs: createSvgHost('Defs'),
     Mask: createSvgHost('Mask'),
+    Ellipse: createSvgHost('Ellipse'),
+    G: createSvgHost('G'),
     LinearGradient: createSvgHost('LinearGradient'),
+    RadialGradient: createSvgHost('RadialGradient'),
     Path: createSvgHost('Path'),
     Rect: createSvgHost('Rect'),
     Svg: createSvgHost('Svg'),

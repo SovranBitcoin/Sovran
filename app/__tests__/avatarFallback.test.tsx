@@ -5,49 +5,17 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
-import {
-  AVATAR_FALLBACK_COLOR_TOKENS,
-  AVATAR_FALLBACK_VARIANT_LABELS,
-  AVATAR_FALLBACK_VARIANTS,
-  getAvatarFallbackColorsForVariant,
-  sanitizeAvatarFallbackSeed,
-} from '@/shared/lib/avatarFallback';
+import { sanitizeAvatarFallbackSeed } from '@/shared/lib/avatarFallback';
+import { generateClayAvatarTheme, generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
-jest.mock('@monicon/native', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
-
-  return {
-    Monicon: ({ name, ...props }: { name: string }) =>
-      ReactActual.createElement(View, { testID: `icon-${name}`, ...props }),
-  };
-});
-
-jest.mock('@mealection/react-native-boring-avatars', () => ({
-  __esModule: true,
-  default: (props: Record<string, unknown>) => {
-    const ReactActual = jest.requireActual<typeof import('react')>('react');
-    const { View } = jest.requireActual<typeof import('react-native')>('react-native');
-    return ReactActual.createElement(View, { testID: 'boring-avatar', ...props });
-  },
-}));
 
 jest.mock('expo-image', () => ({
   Image: (props: Record<string, unknown>) => {
     const ReactActual = jest.requireActual<typeof import('react')>('react');
     const { View } = jest.requireActual<typeof import('react-native')>('react-native');
     return ReactActual.createElement(View, { testID: 'expo-image', ...props });
-  },
-}));
-
-jest.mock('expo-linear-gradient', () => ({
-  LinearGradient: (props: Record<string, unknown>) => {
-    const ReactActual = jest.requireActual<typeof import('react')>('react');
-    const { View } = jest.requireActual<typeof import('react-native')>('react-native');
-    return ReactActual.createElement(View, { ...props });
   },
 }));
 
@@ -63,10 +31,15 @@ jest.mock('react-native-svg', () => {
     __esModule: true,
     default: createSvgHost('Svg'),
     Svg: createSvgHost('Svg'),
+    Circle: createSvgHost('Circle'),
+    Defs: createSvgHost('Defs'),
+    Ellipse: createSvgHost('Ellipse'),
     G: createSvgHost('G'),
-    Mask: createSvgHost('Mask'),
+    LinearGradient: createSvgHost('LinearGradient'),
     Path: createSvgHost('Path'),
+    RadialGradient: createSvgHost('RadialGradient'),
     Rect: createSvgHost('Rect'),
+    Stop: createSvgHost('Stop'),
   };
 });
 
@@ -75,19 +48,15 @@ jest.mock('@/shared/lib/imageCache', () => ({
 }));
 
 jest.mock('@/shared/lib/logger', () => ({
-  log: {
-    warn: jest.fn(),
-  },
+  log: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  storeLog: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  applyFileLogging: jest.fn(),
+  redactError: (error: unknown) => error,
 }));
 
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | readonly string[]) =>
     Array.isArray(tokens) ? tokens.map((token) => `theme-${token}`) : 'theme-single',
-}));
-
-jest.mock('@/shared/stores/global/settingsStore', () => ({
-  useSettingsStore: (selector: (state: Record<string, string>) => unknown) =>
-    selector({ avatarFallbackVariant: 'pixel' }),
 }));
 
 jest.mock('hex-color-opacity', () => jest.fn(() => 'rgba(0,0,0,0.07)'));
@@ -130,33 +99,10 @@ describe('avatar fallback rendering', () => {
     expect(sanitizeAvatarFallbackSeed('')).toBe('avatar');
   });
 
-  it('exposes beam, pixels, glass, and flat as fallback options', () => {
-    expect(AVATAR_FALLBACK_VARIANTS).toEqual(['beam', 'pixel', 'glass', 'flat']);
-    expect(AVATAR_FALLBACK_VARIANT_LABELS).toEqual({
-      beam: 'Beam',
-      pixel: 'Pixels',
-      glass: 'Glass',
-      flat: 'Flat',
-    });
-  });
-
-  it('uses stronger multicolor design-system tokens for every fallback variation', () => {
-    expect(AVATAR_FALLBACK_COLOR_TOKENS).toHaveLength(12);
-    expect(
-      AVATAR_FALLBACK_COLOR_TOKENS.every((token) =>
-        /^(blue|green|purple|yellow|orange|red)-(300|400)$/.test(token)
-      )
-    ).toBe(true);
-    expect(AVATAR_FALLBACK_COLOR_TOKENS.some((token) => token.startsWith('blue-'))).toBe(true);
-    expect(AVATAR_FALLBACK_COLOR_TOKENS.some((token) => token.startsWith('green-'))).toBe(true);
-    expect(AVATAR_FALLBACK_COLOR_TOKENS.some((token) => token.startsWith('purple-'))).toBe(true);
-  });
-
-  it('passes the sanitized seed and stored pixel variant to Boring Avatars', () => {
+  it('renders the clay silhouette with the sanitized seed', () => {
     let renderer: TestRenderer.ReactTestRenderer;
     const rawSeed = 'npub 123/#?';
     const sanitizedSeed = sanitizeAvatarFallbackSeed(rawSeed);
-    const themeColors = AVATAR_FALLBACK_COLOR_TOKENS.map((token) => `theme-${token}`);
 
     act(() => {
       renderer = TestRenderer.create(
@@ -164,161 +110,85 @@ describe('avatar fallback rendering', () => {
       );
     });
 
-    const boringAvatar = renderer!.root.findByProps({ testID: 'boring-avatar' });
+    const svg = renderer!.root.findByProps({ testID: 'clay-silhouette-avatar' });
+    expect(svg.props.width).toBe(40);
+    expect(svg.props.height).toBe(40);
+    expect(svg.props.viewBox).toBe('0 0 24 24');
 
-    expect(boringAvatar.props.name).toBe(sanitizedSeed);
-    expect(boringAvatar.props.variant).toBe('pixel');
-    expect(boringAvatar.props.size).toBe(40);
-    expect(boringAvatar.props.colors).toEqual(
-      getAvatarFallbackColorsForVariant({
-        variant: 'pixel',
-        colors: themeColors,
-        seed: sanitizedSeed,
-      })
-    );
+    // The gradient ids embed the sanitized seed, proving raw seeds never leak
+    // into SVG ids.
+    const background = renderer!.root.findByProps({ testID: 'clay-avatar-background' });
+    expect(background.props.fill).toBe(`url(#clay-${sanitizedSeed}-bg)`);
 
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('limits the pixel variation to a deterministic smaller palette', () => {
+  it('renders deterministic clay layers from the seeded theme', () => {
     let renderer: TestRenderer.ReactTestRenderer;
-    const rawSeed = 'npub pixel palette/#?';
-    const sanitizedSeed = sanitizeAvatarFallbackSeed(rawSeed);
-    const themeColors = AVATAR_FALLBACK_COLOR_TOKENS.map((token) => `theme-${token}`);
+    const seed = 'npub-test-seed';
+    const theme = generateClayAvatarTheme(seed);
 
     act(() => {
       renderer = TestRenderer.create(
-        <Avatar
-          state="fallback"
-          seed={rawSeed}
-          alt="Pixel avatar seed"
-          size={40}
-          fallbackVariant="pixel"
-        />
+        <Avatar state="fallback" seed={seed} alt="Clay avatar" size={48} />
       );
     });
 
-    const boringAvatar = renderer!.root.findByProps({ testID: 'boring-avatar' });
+    const stops = renderer!.root.findAllByType('Stop' as never);
+    const stopColors = stops.map((stop) => stop.props.stopColor);
+    expect(stopColors).toEqual([
+      theme.bgStart,
+      theme.bgEnd,
+      theme.bodyTop,
+      theme.bodyBottom,
+      theme.highlight,
+      theme.highlight,
+      theme.highlight,
+      theme.contactShadow,
+      theme.contactShadow,
+    ]);
 
-    expect(boringAvatar.props.name).toBe(sanitizedSeed);
-    expect(boringAvatar.props.variant).toBe('pixel');
-    expect(boringAvatar.props.colors).toHaveLength(3);
-    expect(boringAvatar.props.colors).toEqual(
-      getAvatarFallbackColorsForVariant({
-        variant: 'pixel',
-        colors: themeColors,
-        seed: sanitizedSeed,
-      })
-    );
-    expect(boringAvatar.props.colors.every((color: string) => themeColors.includes(color))).toBe(
-      true
-    );
+    // All four layers present: background, body, specular, contact shadow.
+    expect(renderer!.root.findByProps({ testID: 'clay-avatar-background' })).toBeTruthy();
+    expect(renderer!.root.findByProps({ testID: 'clay-avatar-body' })).toBeTruthy();
+    expect(renderer!.root.findByProps({ testID: 'clay-avatar-specular' })).toBeTruthy();
+    expect(renderer!.root.findByProps({ testID: 'clay-avatar-ground' })).toBeTruthy();
 
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('renders the beam variation as a white face with black face details', () => {
-    let renderer: TestRenderer.ReactTestRenderer;
+  it('shares its hues with the profile banner seeded gradient', () => {
+    const seed = 'npub-test-seed';
+    const clay = generateClayAvatarTheme(seed);
+    const banner = generateSeededGradient(seed);
 
-    act(() => {
-      renderer = TestRenderer.create(
-        <Avatar
-          state="fallback"
-          seed="npub 123/#?"
-          alt="White face avatar seed"
-          size={40}
-          fallbackVariant="beam"
-        />
-      );
-    });
-
-    expect(renderer!.root.findAllByProps({ testID: 'boring-avatar' })).toHaveLength(0);
-
-    const background = renderer!.root.findByProps({ testID: 'white-face-beam-background' });
-    const head = renderer!.root.findByProps({ testID: 'white-face-beam-head' });
-    const mouth = renderer!.root.findByProps({ testID: 'white-face-beam-mouth' });
-    const leftEye = renderer!.root.findByProps({ testID: 'white-face-beam-left-eye' });
-    const rightEye = renderer!.root.findByProps({ testID: 'white-face-beam-right-eye' });
-
-    expect(background.props.fill).toMatch(
-      /^theme-(blue|green|purple|yellow|orange|red)-(300|400)$/
-    );
-    expect(head.props.fill).toBe('white');
-    expect([mouth.props.fill, mouth.props.stroke]).toContain('black');
-    expect(leftEye.props.fill).toBe('black');
-    expect(rightEye.props.fill).toBe('black');
-
-    act(() => {
-      renderer.unmount();
-    });
+    // The clay background starts on exactly the banner's mid color, so a
+    // pubkey's fallback avatar and banner visibly harmonize.
+    expect(clay.bgStart).toBe(banner.primaryColors[1]);
   });
 
-  it('renders the glass variation with the old seeded gradient fallback', () => {
-    let renderer: TestRenderer.ReactTestRenderer;
+  it('renders the identical composition at every size', () => {
+    const seed = 'size-invariant-seed';
+    const collectStops = (size: number) => {
+      let renderer: TestRenderer.ReactTestRenderer;
+      act(() => {
+        renderer = TestRenderer.create(
+          <Avatar state="fallback" seed={seed} alt="Sized avatar" size={size} />
+        );
+      });
+      const stops = renderer!.root
+        .findAllByType('Stop' as never)
+        .map((stop) => [stop.props.stopColor, stop.props.stopOpacity]);
+      act(() => {
+        renderer.unmount();
+      });
+      return stops;
+    };
 
-    act(() => {
-      renderer = TestRenderer.create(
-        <Avatar
-          state="fallback"
-          seed="npub glass/#?"
-          alt="Glass avatar seed"
-          size={40}
-          fallbackVariant="glass"
-        />
-      );
-    });
-
-    expect(renderer!.root.findAllByProps({ testID: 'boring-avatar' })).toHaveLength(0);
-    expect(renderer!.root.findAllByProps({ testID: 'white-face-beam-head' })).toHaveLength(0);
-
-    const primaryGradient = renderer!.root.findByProps({
-      testID: 'avatar-glass-gradient-primary',
-    });
-    const overlayGradient = renderer!.root.findByProps({
-      testID: 'avatar-glass-gradient-overlay',
-    });
-
-    expect(primaryGradient.props.colors).toHaveLength(3);
-    expect(overlayGradient.props.colors).toHaveLength(3);
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('renders the flat variation as a person glyph in the background color', () => {
-    let renderer: TestRenderer.ReactTestRenderer;
-
-    act(() => {
-      renderer = TestRenderer.create(
-        <Avatar
-          state="fallback"
-          seed="npub flat/#?"
-          alt="Flat avatar seed"
-          size={40}
-          fallbackVariant="flat"
-        />
-      );
-    });
-
-    // No generative content — flat is a single static glyph like the mint icon.
-    expect(renderer!.root.findAllByProps({ testID: 'boring-avatar' })).toHaveLength(0);
-    expect(renderer!.root.findAllByProps({ testID: 'white-face-beam-head' })).toHaveLength(0);
-    expect(renderer!.root.findAllByProps({ testID: 'avatar-glass-gradient-primary' })).toHaveLength(
-      0
-    );
-
-    const personIcon = renderer!.root.findByProps({ testID: 'icon-mingcute:user-3-fill' });
-    expect(personIcon.props.color).toBe('theme-background');
-    // 72% of the avatar size, matching the mint fallback ratio.
-    expect(personIcon.props.size).toBe(29);
-
-    act(() => {
-      renderer.unmount();
-    });
+    expect(collectStops(24)).toEqual(collectStops(80));
   });
 });

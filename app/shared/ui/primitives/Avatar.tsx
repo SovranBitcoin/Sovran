@@ -1,23 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import BoringAvatar from '@mealection/react-native-boring-avatars';
 import { Image as ExpoImage } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import {
-  AVATAR_FALLBACK_COLOR_TOKENS,
-  FLAT_AVATAR_FALLBACK_ICON,
-  FLAT_AVATAR_FALLBACK_VARIANT,
-  GLASS_AVATAR_FALLBACK_VARIANT,
-  WHITE_FACE_AVATAR_FALLBACK_VARIANT,
-  getAvatarFallbackColorsForVariant,
-  sanitizeAvatarFallbackSeed,
-  type AvatarFallbackVariant,
-} from '@/shared/lib/avatarFallback';
-import { generateSeededGradient } from '@/shared/lib/avatarGradient';
+import { sanitizeAvatarFallbackSeed } from '@/shared/lib/avatarFallback';
 import { prefetchImage } from '@/shared/lib/imageCache';
 import { log } from '@/shared/lib/logger';
 import {
@@ -26,10 +14,9 @@ import {
   type VisualLayoutConfig,
 } from '@/shared/lib/contentShiftLog';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Badge } from './Badge';
 import { zIndex } from '@/shared/styles/tokens';
-import { WhiteFaceBeamAvatar } from './WhiteFaceBeamAvatar';
+import { ClaySilhouetteAvatar } from './ClaySilhouetteAvatar';
 
 export type AvatarState = 'loading' | 'fallback' | 'image';
 
@@ -41,8 +28,6 @@ interface AvatarProps {
   name?: string;
   status?: string;
   seed?: string;
-  /** Preview override. Normal app avatars read the persisted Settings value. */
-  fallbackVariant?: AvatarFallbackVariant;
   visualScope?: string;
   visualKey?: string;
   visualSurface?: string;
@@ -54,103 +39,20 @@ interface AvatarProps {
 
 type ImageStatus = 'loading' | 'loaded' | 'failed';
 
-function GradientFallbackContent({
-  fallbackSeed,
-  borderRadius,
-}: {
-  fallbackSeed: string;
-  borderRadius: number;
-}) {
-  const gradientTheme = useMemo(() => generateSeededGradient(fallbackSeed), [fallbackSeed]);
-
-  return (
-    <View
-      pointerEvents="none"
-      style={[StyleSheet.absoluteFill, { borderRadius, overflow: 'hidden' }]}>
-      <LinearGradient
-        colors={gradientTheme.primaryColors}
-        start={gradientTheme.primaryStart}
-        end={gradientTheme.primaryEnd}
-        style={StyleSheet.absoluteFill}
-        testID="avatar-glass-gradient-primary"
-      />
-      <LinearGradient
-        colors={gradientTheme.overlayColors}
-        start={gradientTheme.overlayStart}
-        end={gradientTheme.overlayEnd}
-        style={StyleSheet.absoluteFill}
-        testID="avatar-glass-gradient-overlay"
-      />
-    </View>
-  );
-}
-
-function FlatFallbackContent({ borderRadius, size }: { borderRadius: number; size: number }) {
-  // Mirror `MintIcon`'s missing-icon fallback: a single glyph in the background
-  // color, centered on the muted surface color.
-  const [muted, background] = useThemeColor(['muted', 'background'] as const);
-  const iconSize = Math.round(size * 0.72);
-
-  return (
-    <View
-      pointerEvents="none"
-      style={[
-        StyleSheet.absoluteFill,
-        {
-          borderRadius,
-          overflow: 'hidden',
-          backgroundColor: muted,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-      ]}>
-      <Icon name={FLAT_AVATAR_FALLBACK_ICON} size={iconSize} color={background} />
-    </View>
-  );
-}
-
 function AvatarFallbackContent({
   fallbackSeed,
   borderRadius,
   size,
-  variant,
 }: {
   fallbackSeed: string;
   borderRadius: number;
   size: number;
-  variant?: AvatarFallbackVariant;
 }) {
-  const storedVariant = useSettingsStore((state) => state.avatarFallbackVariant);
-  const fallbackVariant = variant ?? storedVariant;
-  const fallbackColors = useThemeColor(AVATAR_FALLBACK_COLOR_TOKENS);
-  const variantColors = getAvatarFallbackColorsForVariant({
-    variant: fallbackVariant,
-    colors: fallbackColors,
-    seed: fallbackSeed,
-  });
-
-  if (fallbackVariant === FLAT_AVATAR_FALLBACK_VARIANT) {
-    return <FlatFallbackContent borderRadius={borderRadius} size={size} />;
-  }
-
-  if (fallbackVariant === GLASS_AVATAR_FALLBACK_VARIANT) {
-    return <GradientFallbackContent fallbackSeed={fallbackSeed} borderRadius={borderRadius} />;
-  }
-
   return (
     <View
       pointerEvents="none"
       style={[StyleSheet.absoluteFill, { borderRadius, overflow: 'hidden' }]}>
-      {fallbackVariant === WHITE_FACE_AVATAR_FALLBACK_VARIANT ? (
-        <WhiteFaceBeamAvatar name={fallbackSeed} size={size} colors={variantColors} />
-      ) : (
-        <BoringAvatar
-          name={fallbackSeed}
-          size={size}
-          variant={fallbackVariant}
-          colors={variantColors}
-        />
-      )}
+      <ClaySilhouetteAvatar seed={fallbackSeed} size={size} />
     </View>
   );
 }
@@ -186,7 +88,6 @@ export const Avatar = ({
   name,
   status,
   seed,
-  fallbackVariant,
   visualScope = 'loading.avatar',
   visualKey,
   visualSurface = 'shared',
@@ -332,7 +233,6 @@ export const Avatar = ({
             fallbackSeed={fallbackSeed}
             borderRadius={borderRadius}
             size={size}
-            variant={fallbackVariant}
           />
         </View>
         {StatusBadgeWrapper}
@@ -352,7 +252,6 @@ export const Avatar = ({
             fallbackSeed={fallbackSeed}
             borderRadius={borderRadius}
             size={size}
-            variant={fallbackVariant}
           />
         </View>
         {StatusBadgeWrapper}
@@ -369,7 +268,6 @@ export const Avatar = ({
             fallbackSeed={fallbackSeed}
             borderRadius={borderRadius}
             size={size}
-            variant={fallbackVariant}
           />
         </View>
         {StatusBadgeWrapper}

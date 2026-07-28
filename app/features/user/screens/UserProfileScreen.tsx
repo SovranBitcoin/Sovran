@@ -585,7 +585,6 @@ function BannerWithAvatarComponent({
         seed={pubkey}
         size={AVATAR_SIZE}
         name={displayName}
-        fallbackVariant={isOwnProfile ? 'beam' : undefined}
       />
     </View>
   );

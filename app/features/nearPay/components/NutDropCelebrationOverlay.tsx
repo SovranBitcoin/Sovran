@@ -289,7 +289,6 @@ export function NutDropCelebrationOverlay({
             name={peer.name || 'Nearby peer'}
             seed={peer.peerID}
             alt={`${peer.name || 'Nearby peer'} avatar`}
-            fallbackVariant="beam"
           />
           <LightningStrike
             status={PHASE_STRIKE_STATUS[phase]}

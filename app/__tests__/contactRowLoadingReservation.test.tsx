@@ -32,7 +32,6 @@ jest.mock('@/shared/lib/date', () => ({
 jest.mock('@/shared/stores/global/settingsStore', () => {
   const state = {
     language: 'en',
-    avatarFallbackVariant: 'beam',
     getDisplayBtc: () => 'sats',
   };
   const useSettingsStore = Object.assign(

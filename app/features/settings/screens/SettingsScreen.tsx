@@ -21,7 +21,6 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
-import { AVATAR_FALLBACK_VARIANT_LABELS } from '@/shared/lib/avatarFallback';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
 import { notificationPolicyLabel } from '@/features/feed/lib/notificationCopy';
 import { useNip46RequestsStore } from '@/features/nostrSigner';
@@ -51,7 +50,6 @@ const ProfileButton = () => {
                 picture={picture}
                 name={displayName}
                 size={40}
-                fallbackVariant="beam"
               />
             </ListGroup.ItemPrefix>
             <ListGroup.ItemContent>
@@ -172,7 +170,6 @@ export const SettingsScreen = () => {
   const setWhitenoiseEnabled = useSettingsStore((state) => state.setWhitenoiseEnabled);
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
-  const avatarFallbackVariant = useSettingsStore((state) => state.avatarFallbackVariant);
   const notificationPolicy = useNotificationPolicyStore((state) => state.policy);
   const signerPendingCount = useNip46RequestsStore((state) => state.pending.length);
 
@@ -218,12 +215,6 @@ export const SettingsScreen = () => {
         <Section title="Preferences">
           <ListGroup variant="secondary">
             <SettingsListLinkItem href="/(settings-flow)/routing" title="Swap routing" />
-            <Separator className="mx-4" />
-            <SettingsListLinkItem
-              href="/(settings-flow)/avatar"
-              title="Avatar fallback"
-              description={AVATAR_FALLBACK_VARIANT_LABELS[avatarFallbackVariant]}
-            />
             <Separator className="mx-4" />
             <SettingsListLinkItem
               href="/(settings-flow)/notification-policy"

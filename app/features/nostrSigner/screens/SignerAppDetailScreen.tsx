@@ -179,7 +179,6 @@ function PeerAccessIdentity({ pubkey, sublabel }: { pubkey: string; sublabel: st
         state={person.picture ? 'image' : 'fallback'}
         picture={person.picture}
         seed={pubkey}
-        fallbackVariant="beam"
         size={32}
         alt={name}
       />
@@ -227,7 +226,6 @@ function AppHeaderIdentity({
         state={image ? 'image' : 'fallback'}
         picture={image}
         seed={seed}
-        fallbackVariant="beam"
         size={28}
         alt={name}
       />
@@ -726,7 +724,6 @@ export function SignerAppDetailScreen(): React.ReactElement {
               state={app.image ? 'image' : 'fallback'}
               picture={app.image}
               seed={app.clientPubkey}
-              fallbackVariant="beam"
               size={IDENTITY_AVATAR_SIZE}
               alt={appName}
             />

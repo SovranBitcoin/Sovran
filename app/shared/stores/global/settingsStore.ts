@@ -4,11 +4,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { storeLog, applyFileLogging } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
-import {
-  AVATAR_FALLBACK_VARIANTS,
-  DEFAULT_AVATAR_FALLBACK_VARIANT,
-  type AvatarFallbackVariant,
-} from '@/shared/lib/avatarFallback';
 
 interface TermsAccepted {
   termsAccepted: boolean;
@@ -83,7 +78,6 @@ interface SettingsState {
   naggTierEnabled: boolean;
   primalTierEnabled: boolean;
   relayTierEnabled: boolean;
-  avatarFallbackVariant: AvatarFallbackVariant;
   /** Minimum transfer amount in sats to include in a rebalance plan. */
   minTransferThreshold: number;
   middlemanRouting: MiddlemanRoutingSettings;
@@ -165,10 +159,6 @@ const PersistedSettings = z.object({
   naggTierEnabled: z.boolean().default(true).catch(true),
   primalTierEnabled: z.boolean().default(true).catch(true),
   relayTierEnabled: z.boolean().default(true).catch(true),
-  avatarFallbackVariant: z
-    .enum(AVATAR_FALLBACK_VARIANTS)
-    .default(DEFAULT_AVATAR_FALLBACK_VARIANT)
-    .catch(DEFAULT_AVATAR_FALLBACK_VARIANT),
   minTransferThreshold: z.number().int().nonnegative().default(5).catch(5),
   middlemanRouting: PersistedMiddlemanRouting.default(DEFAULT_MIDDLEMAN_ROUTING_PERSISTED).catch(
     DEFAULT_MIDDLEMAN_ROUTING_PERSISTED
@@ -197,7 +187,6 @@ const DEFAULT_SETTINGS: SettingsState = {
   naggTierEnabled: true,
   primalTierEnabled: true,
   relayTierEnabled: true,
-  avatarFallbackVariant: DEFAULT_AVATAR_FALLBACK_VARIANT,
   minTransferThreshold: 5,
   middlemanRouting: DEFAULT_MIDDLEMAN_ROUTING,
 };
@@ -261,10 +250,6 @@ interface SettingsActions {
   setNaggTierEnabled: (enabled: boolean) => void;
   setPrimalTierEnabled: (enabled: boolean) => void;
   setRelayTierEnabled: (enabled: boolean) => void;
-
-  // Avatar fallback variation
-  setAvatarFallbackVariant: (variant: AvatarFallbackVariant) => void;
-  getAvatarFallbackVariant: () => AvatarFallbackVariant;
 
   // Rebalancing
   setMinTransferThreshold: (sats: number) => void;
@@ -410,13 +395,6 @@ export const useSettingsStore = create<SettingsStore>()(
           set({ relayTierEnabled: enabled });
         },
 
-        // Avatar fallback
-        setAvatarFallbackVariant: (variant: AvatarFallbackVariant) => {
-          storeLog.info('store.settings.set_avatar_fallback_variant', { variant });
-          set({ avatarFallbackVariant: variant });
-        },
-        getAvatarFallbackVariant: () => get().avatarFallbackVariant,
-
         // Rebalancing
         setMinTransferThreshold: (sats: number) => {
           storeLog.info('store.settings.set_min_transfer_threshold', { sats });
@@ -444,7 +422,7 @@ export const useSettingsStore = create<SettingsStore>()(
         // launch, regardless of how it was turned on; afterHydrate then purges
         // any fixture metadata that already leaked into the cache.
         version: 4,
-        migrate: (state, version) => {
+        migrate: (state) => {
           const persisted = (state ?? {}) as z.infer<typeof PersistedSettings>;
           return {
             ...persisted,
@@ -464,15 +442,14 @@ export const useSettingsStore = create<SettingsStore>()(
             mockFailMelt: false,
             mockFailPaymentRequest: false,
             mockNoGlass: false,
-            // v2 -> v3: the avatar fallback default moved from the cute `beam`
-            // face to the neutral `flat` person glyph (so dense surfaces stay
-            // quiet). Installs still carrying the old default ride the new one;
-            // explicit `pixel`/`glass`/`flat` choices are preserved. Gated to
-            // pre-v3 blobs so a deliberate post-v3 `beam` pick survives v4+.
-            avatarFallbackVariant:
-              version < 3 && persisted.avatarFallbackVariant === 'beam'
-                ? 'flat'
-                : persisted.avatarFallbackVariant,
+            // `avatarFallbackVariant` (the removed avatar-style picker enum) is
+            // deliberately absent here: old blobs of any version still carry
+            // the key, the plain `z.object` in `merge` strips unknown keys, and
+            // the first persist write drops it from disk (partialize no longer
+            // emits it) — same pattern as the removed `balanceSplitVariant`;
+            // see settingsStorePersistResilience.test.ts. Do NOT re-add a field
+            // or bump `version` for it: a bump would re-run the un-guarded dev
+            // reset above on v4 blobs.
           };
         },
         partialize: (state) => ({
@@ -493,7 +470,6 @@ export const useSettingsStore = create<SettingsStore>()(
           regenerateP2PKOnReceive: state.regenerateP2PKOnReceive,
           sendLocationEnabled: state.sendLocationEnabled,
           fileLoggingEnabled: state.fileLoggingEnabled,
-          avatarFallbackVariant: state.avatarFallbackVariant,
           minTransferThreshold: state.minTransferThreshold,
           middlemanRouting: state.middlemanRouting,
           naggTierEnabled: state.naggTierEnabled,

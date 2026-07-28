@@ -253,7 +253,6 @@ export function SignerHubScreen(): React.ReactElement {
                       state={connection.image ? 'image' : 'fallback'}
                       picture={connection.image}
                       seed={connection.clientPubkey}
-                      fallbackVariant="beam"
                       size={44}
                       alt={appDisplayName(connection)}
                     />

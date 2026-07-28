@@ -95,7 +95,6 @@
     "@gandlaf21/bolt11-decode": "^3.1.1",
     "@gorhom/bottom-sheet": "5.2.14",
     "@internet-privacy/marmot-ts": "file:./vendor/marmot-ts",
-    "@mealection/react-native-boring-avatars": "1.1.2",
     "@monicon/metro": "^2.0.8",
     "@monicon/native": "^1.2.2",
     "@noble/hashes": "^2.0.1",

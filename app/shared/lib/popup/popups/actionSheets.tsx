@@ -49,7 +49,6 @@ export function profileSwitcherPopup(payload: ProfileSwitcherPopupPayload): void
           picture={profile.cachedPicture}
           name={displayName}
           size={36}
-          fallbackVariant="beam"
         />
       ),
       suffix: (

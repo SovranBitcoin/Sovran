@@ -79,16 +79,41 @@ describe('settingsStore persist resilience', () => {
     expect(store.getState().displayCurrency).toBe('eur');
   });
 
-  it('keeps terms acceptance when an unknown avatarFallbackVariant is persisted', async () => {
-    preload({
-      termsAccepted: { termsAccepted: true, date: '2025-01-01T00:00:00.000Z' },
-      avatarFallbackVariant: 'some-removed-variant',
-    });
+  it('keeps terms acceptance when a removed avatarFallbackVariant is still in the blob (v4, no migrate)', async () => {
+    // `avatarFallbackVariant` was the persisted avatar-style picker enum,
+    // removed when the single clay fallback shipped. A device that persisted it
+    // must still parse cleanly (unknown keys strip) without wiping the blob.
+    preload(
+      {
+        termsAccepted: { termsAccepted: true, date: '2025-01-01T00:00:00.000Z' },
+        hasSeenOnboarding: true,
+        avatarFallbackVariant: 'pixel',
+        displayCurrency: 'eur',
+      },
+      4
+    );
 
     const store = await loadStore();
 
     expect(store.getState().isTermsAccepted()).toBe(true);
-    expect(store.getState().avatarFallbackVariant).toBe('flat');
+    expect(store.getState().hasSeenOnboarding).toBe(true);
+    expect(store.getState().displayCurrency).toBe('eur');
+    expect('avatarFallbackVariant' in store.getState()).toBe(false);
+  });
+
+  it('keeps terms acceptance when an old v2 blob still carries avatarFallbackVariant (migrate path)', async () => {
+    preload(
+      {
+        termsAccepted: { termsAccepted: true, date: '2025-01-01T00:00:00.000Z' },
+        avatarFallbackVariant: 'beam',
+      },
+      2
+    );
+
+    const store = await loadStore();
+
+    expect(store.getState().isTermsAccepted()).toBe(true);
+    expect('avatarFallbackVariant' in store.getState()).toBe(false);
   });
 
   it('v3 -> v4 resets every developer setting without touching user settings', async () => {
@@ -97,7 +122,6 @@ describe('settingsStore persist resilience', () => {
         termsAccepted: { termsAccepted: true, date: '2025-01-01T00:00:00.000Z' },
         hasSeenOnboarding: true,
         displayCurrency: 'eur',
-        avatarFallbackVariant: 'beam',
         experimental: true,
         mockMode: true,
         mockOffline: true,
@@ -131,26 +155,9 @@ describe('settingsStore persist resilience', () => {
     expect(state.primalTierEnabled).toBe(true);
     expect(state.relayTierEnabled).toBe(true);
 
-    // User settings survive, including a deliberate post-v3 `beam` pick
-    // (the v2->v3 beam->flat remap must not re-run on v3 blobs).
+    // User settings survive.
     expect(state.isTermsAccepted()).toBe(true);
     expect(state.hasSeenOnboarding).toBe(true);
     expect(state.displayCurrency).toBe('eur');
-    expect(state.avatarFallbackVariant).toBe('beam');
-  });
-
-  it('v2 -> v4 still remaps the old beam default to flat', async () => {
-    preload(
-      {
-        termsAccepted: { termsAccepted: true, date: '2025-01-01T00:00:00.000Z' },
-        avatarFallbackVariant: 'beam',
-      },
-      2
-    );
-
-    const store = await loadStore();
-
-    expect(store.getState().isTermsAccepted()).toBe(true);
-    expect(store.getState().avatarFallbackVariant).toBe('flat');
   });
 });

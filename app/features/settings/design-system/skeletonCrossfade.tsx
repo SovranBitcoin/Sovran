@@ -39,7 +39,6 @@ export function DesignSystemProfileRow({
         size={44}
         picture={pictureUrl}
         name="Sovran"
-        fallbackVariant="flat"
         visualDisabled
       />
       <VStack spacing={4} className="flex-1">

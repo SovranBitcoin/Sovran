@@ -173,7 +173,6 @@ function ProfileSwitcherButtons({
                 overrideName: profile.cachedDisplayName,
               })}
               size={30}
-              fallbackVariant="beam"
             />
           </Pressable>
         ))}
@@ -255,7 +254,6 @@ export const DrawerProfileChrome = React.memo(function DrawerProfileChrome({
             picture={picture}
             name={displayName}
             size={56}
-            fallbackVariant="beam"
           />
         </Pressable>
         <ProfileSwitcherButtons executeProfileAction={executeProfileAction} openSheet={openSheet} />

@@ -766,7 +766,6 @@ function ConnectReview({
           state={parsed.image !== undefined ? 'image' : 'fallback'}
           picture={parsed.image}
           seed={parsed.clientPubkey}
-          fallbackVariant="beam"
           size={44}
           alt={appName}
         />
@@ -791,7 +790,6 @@ function ConnectReview({
             state={activeProfile?.cachedPicture ? 'image' : 'fallback'}
             picture={activeProfile?.cachedPicture}
             seed={activeProfile?.pubkey ?? keys?.pubkey ?? 'sovran-profile'}
-            fallbackVariant="beam"
             size={40}
             alt={profileDisplayName}
           />
@@ -1121,7 +1119,6 @@ export function SignerProfilePickerContent({
                   state={profile.cachedPicture ? 'image' : 'fallback'}
                   picture={profile.cachedPicture}
                   seed={profile.pubkey}
-                  fallbackVariant="beam"
                   size={40}
                   alt={displayName}
                 />

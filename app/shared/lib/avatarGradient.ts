@@ -36,7 +36,52 @@ function hsl(h: number, s: number, l: number, a = 1): string {
   return `hsla(${hue}, ${sat}%, ${light}%, ${a})`;
 }
 
-export function generateSeededGradient(seedInput: string): SeededGradientTheme {
+const AXES: readonly (readonly [GradientPoint, GradientPoint])[] = [
+  [
+    { x: 0, y: 0 },
+    { x: 1, y: 1 },
+  ],
+  [
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+  ],
+  [
+    { x: 0.15, y: 0 },
+    { x: 0.85, y: 1 },
+  ],
+  [
+    { x: 0, y: 0.25 },
+    { x: 1, y: 0.75 },
+  ],
+  [
+    { x: 0.25, y: 0 },
+    { x: 0.75, y: 1 },
+  ],
+  [
+    { x: 0, y: 0.1 },
+    { x: 1, y: 0.9 },
+  ],
+];
+
+type SeededPalette = {
+  baseHue: number;
+  hueA: number;
+  hueB: number;
+  saturationBase: number;
+  lightBase: number;
+  satC1: number;
+  satC3: number;
+  glossAlpha: number;
+  shadowAlpha: number;
+  primaryAxis: readonly [GradientPoint, GradientPoint];
+  overlayAxis: readonly [GradientPoint, GradientPoint];
+};
+
+// Single source of the seeded palette. The PRNG draw ORDER below is a durable
+// contract: it defines the hues every already-shipped profile banner shows for
+// a given pubkey. Do not add, remove, reorder, or make conditional any
+// `random()` call — `avatarGradient.test.ts` pins the outputs.
+function deriveSeededPalette(seedInput: string): SeededPalette {
   const random = createSeededRandom(seedInput);
 
   const baseHue = random() * 360;
@@ -54,49 +99,76 @@ export function generateSeededGradient(seedInput: string): SeededGradientTheme {
   const saturationBase = 58 + random() * 16;
   const lightBase = 44 + random() * 9;
 
-  const c1 = hsl(baseHue, saturationBase - 6 + random() * 6, lightBase + 9);
-  const c2 = hsl(hueA, saturationBase, lightBase + 2);
-  const c3 = hsl(hueB, saturationBase - 8 + random() * 6, lightBase - 9);
+  const satC1 = saturationBase - 6 + random() * 6;
+  const satC3 = saturationBase - 8 + random() * 6;
 
-  const gloss = `rgba(255,255,255,${(0.14 + random() * 0.12).toFixed(3)})`;
-  const shadow = `rgba(0,0,0,${(0.16 + random() * 0.12).toFixed(3)})`;
+  const glossAlpha = 0.14 + random() * 0.12;
+  const shadowAlpha = 0.16 + random() * 0.12;
 
-  const axes: readonly (readonly [GradientPoint, GradientPoint])[] = [
-    [
-      { x: 0, y: 0 },
-      { x: 1, y: 1 },
-    ],
-    [
-      { x: 1, y: 0 },
-      { x: 0, y: 1 },
-    ],
-    [
-      { x: 0.15, y: 0 },
-      { x: 0.85, y: 1 },
-    ],
-    [
-      { x: 0, y: 0.25 },
-      { x: 1, y: 0.75 },
-    ],
-    [
-      { x: 0.25, y: 0 },
-      { x: 0.75, y: 1 },
-    ],
-    [
-      { x: 0, y: 0.1 },
-      { x: 1, y: 0.9 },
-    ],
-  ];
-
-  const primaryAxis = axes[Math.floor(random() * axes.length)];
-  const overlayAxis = axes[Math.floor(random() * axes.length)];
+  const primaryAxis = AXES[Math.floor(random() * AXES.length)];
+  const overlayAxis = AXES[Math.floor(random() * AXES.length)];
 
   return {
-    primaryColors: [c1, c2, c3],
-    overlayColors: [gloss, 'rgba(255,255,255,0)', shadow],
-    primaryStart: primaryAxis[0],
-    primaryEnd: primaryAxis[1],
-    overlayStart: overlayAxis[0],
-    overlayEnd: overlayAxis[1],
+    baseHue,
+    hueA,
+    hueB,
+    saturationBase,
+    lightBase,
+    satC1,
+    satC3,
+    glossAlpha,
+    shadowAlpha,
+    primaryAxis,
+    overlayAxis,
+  };
+}
+
+export function generateSeededGradient(seedInput: string): SeededGradientTheme {
+  const p = deriveSeededPalette(seedInput);
+
+  return {
+    primaryColors: [
+      hsl(p.baseHue, p.satC1, p.lightBase + 9),
+      hsl(p.hueA, p.saturationBase, p.lightBase + 2),
+      hsl(p.hueB, p.satC3, p.lightBase - 9),
+    ],
+    overlayColors: [
+      `rgba(255,255,255,${p.glossAlpha.toFixed(3)})`,
+      'rgba(255,255,255,0)',
+      `rgba(0,0,0,${p.shadowAlpha.toFixed(3)})`,
+    ],
+    primaryStart: p.primaryAxis[0],
+    primaryEnd: p.primaryAxis[1],
+    overlayStart: p.overlayAxis[0],
+    overlayEnd: p.overlayAxis[1],
+  };
+}
+
+type ClayAvatarTheme = {
+  bgStart: string;
+  bgEnd: string;
+  bodyTop: string;
+  bodyBottom: string;
+  highlight: string;
+  contactShadow: string;
+};
+
+// Palette for the clay silhouette avatar fallback. Derived from the SAME
+// seeded palette as the banner so a pubkey's fallback avatar and banner
+// visibly share hues: `bgStart` is exactly the banner's mid color (c2) and
+// `bgEnd` deepens the banner's c3. The silhouette sits in the same hue family,
+// lighter and slightly desaturated (matte clay); saturation only ever
+// decreases from banner values so the result can't go neon.
+export function generateClayAvatarTheme(seedInput: string): ClayAvatarTheme {
+  const p = deriveSeededPalette(seedInput);
+  const bodySat = p.saturationBase - 10;
+
+  return {
+    bgStart: hsl(p.hueA, p.saturationBase, p.lightBase + 2),
+    bgEnd: hsl(p.hueB, p.satC3, p.lightBase - 13),
+    bodyTop: hsl(p.baseHue, bodySat, Math.min(p.lightBase + 24, 80)),
+    bodyBottom: hsl(p.hueA, bodySat + 4, p.lightBase + 8),
+    highlight: hsl(p.baseHue, 30, 96),
+    contactShadow: hsl(p.hueB, p.saturationBase, Math.max(p.lightBase - 30, 8)),
   };
 }

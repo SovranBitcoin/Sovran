@@ -17,6 +17,5 @@ export { SettingsDesignSystemTimelineScreen } from './screens/SettingsDesignSyst
 export { SettingsDesignSystemEmptyStatesScreen } from './screens/SettingsDesignSystemEmptyStatesScreen';
 export { SettingsDesignSystemSkeletonCrossfadeScreen } from './screens/SettingsDesignSystemSkeletonCrossfadeScreen';
 export { SettingsDesignSystemFadeStressScreen } from './screens/SettingsDesignSystemFadeStressScreen';
-export { SettingsAvatarScreen } from './screens/SettingsAvatarScreen';
 export { SettingsNotificationPolicyScreen } from './screens/SettingsNotificationPolicyScreen';
 export { DeleteScreen } from './screens/DeleteScreen';

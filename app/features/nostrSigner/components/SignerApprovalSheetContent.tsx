@@ -491,7 +491,6 @@ export function SignerApprovalSheetContent({
             state={connection?.image ? 'image' : 'fallback'}
             picture={connection?.image}
             seed={head.clientPubkey}
-            fallbackVariant="beam"
             size={44}
             alt={appName}
           />

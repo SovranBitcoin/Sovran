@@ -665,7 +665,6 @@ const PeerNode = React.memo(function PeerNode({
             name={target.peer.name}
             seed={target.peer.identitySeed}
             alt={`${target.peer.name} avatar`}
-            fallbackVariant="beam"
           />
           {strike ? (
             <LightningStrike
@@ -817,7 +816,6 @@ const NearPayAmountHeader = React.memo(function NearPayAmountHeader({
           name={recipient.name}
           seed={recipient.identitySeed}
           alt={`${recipient.name} avatar`}
-          fallbackVariant="beam"
         />
       </View>
       <Text size={15} weight="bold" numberOfLines={1} style={titleStyle}>
@@ -2251,7 +2249,6 @@ export function NearPayScreen() {
                       name={sharedAvatarPeer.name}
                       seed={sharedAvatarPeer.identitySeed}
                       alt={`${sharedAvatarPeer.name} avatar`}
-                      fallbackVariant="beam"
                     />
                   </View>
                 </Animated.View>

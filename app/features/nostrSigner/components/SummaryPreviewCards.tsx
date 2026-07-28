@@ -101,7 +101,6 @@ function PeerIdentityRow({
         state={picture ? 'image' : 'fallback'}
         picture={picture}
         seed={pubkey}
-        fallbackVariant="beam"
         size={size}
         alt={name}
       />
@@ -282,7 +281,6 @@ export function DecryptPeerCard({
           state={person.picture ? 'image' : 'fallback'}
           picture={person.picture}
           seed={peerPubkey}
-          fallbackVariant="beam"
           size={36}
           alt={name}
         />

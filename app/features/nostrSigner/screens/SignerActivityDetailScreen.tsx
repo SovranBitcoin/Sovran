@@ -171,7 +171,6 @@ export function SignerActivityDetailScreen(): React.ReactElement {
             state={connection?.image ? 'image' : 'fallback'}
             picture={connection?.image}
             seed={entry.clientPubkey}
-            fallbackVariant="beam"
             size={44}
             alt={appName}
           />

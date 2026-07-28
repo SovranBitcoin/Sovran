@@ -171,7 +171,6 @@ export const SettingsProfileScreen = () => {
               picture={profilePicture}
               name={username}
               size={72}
-              fallbackVariant="beam"
             />
             <Card.Title className="mt-3">{username}</Card.Title>
             <Card.Description className="mt-1">
