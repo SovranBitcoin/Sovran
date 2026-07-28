@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import Svg, {
   Circle,
   Defs,
-  Ellipse,
   G,
   LinearGradient,
   Path,
@@ -81,10 +80,6 @@ export function ClaySilhouetteAvatar({ seed, size }: ClaySilhouetteAvatarProps) 
           <Stop offset="0.55" stopColor={theme.highlight} stopOpacity="0.14" />
           <Stop offset="1" stopColor={theme.highlight} stopOpacity="0" />
         </RadialGradient>
-        <RadialGradient id={`${uid}-ground`} gradientUnits="userSpaceOnUse" cx="12" cy="24.4" r="9">
-          <Stop offset="0" stopColor={theme.contactShadow} stopOpacity="0.3" />
-          <Stop offset="1" stopColor={theme.contactShadow} stopOpacity="0" />
-        </RadialGradient>
       </Defs>
       {/* seeded background, diagonal mid→deep (light source upper-left) */}
       <Rect
@@ -96,20 +91,12 @@ export function ClaySilhouetteAvatar({ seed, size }: ClaySilhouetteAvatarProps) 
         fill={`url(#${uid}-bg)`}
       />
       <G transform={`translate(0, ${SILHOUETTE_OFFSET_Y})`}>
-        {/* clay body, vertical light-top→mid-bottom */}
+        {/* clay body: ONE path, ONE continuous vertical gradient. No overlays
+            on the torso — a layered shadow reads as a seam splitting it. */}
         <Path testID="clay-avatar-body" d={SILHOUETTE_PATH} fill={`url(#${uid}-body)`} />
         {/* specular hint on the head, congruent with the head subpath */}
         <Circle testID="clay-avatar-specular" cx="12" cy="7" r="5" fill={`url(#${uid}-spec)`} />
       </G>
-      {/* soft contact shadow where the cropped torso meets the bottom edge */}
-      <Ellipse
-        testID="clay-avatar-ground"
-        cx="12"
-        cy="24.4"
-        rx="10"
-        ry="3.2"
-        fill={`url(#${uid}-ground)`}
-      />
     </Svg>
   );
 }

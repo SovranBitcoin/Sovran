@@ -146,15 +146,15 @@ describe('avatar fallback rendering', () => {
       theme.highlight,
       theme.highlight,
       theme.highlight,
-      theme.contactShadow,
-      theme.contactShadow,
     ]);
 
-    // All four layers present: background, body, specular, contact shadow.
+    // All three layers present: background, body, specular. The body is ONE
+    // path with one continuous gradient — no torso overlays (a layered
+    // contact shadow read as a seam splitting the torso).
     expect(renderer!.root.findByProps({ testID: 'clay-avatar-background' })).toBeTruthy();
     expect(renderer!.root.findByProps({ testID: 'clay-avatar-body' })).toBeTruthy();
     expect(renderer!.root.findByProps({ testID: 'clay-avatar-specular' })).toBeTruthy();
-    expect(renderer!.root.findByProps({ testID: 'clay-avatar-ground' })).toBeTruthy();
+    expect(renderer!.root.findAllByProps({ testID: 'clay-avatar-ground' })).toHaveLength(0);
 
     act(() => {
       renderer.unmount();

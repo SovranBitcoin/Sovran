@@ -150,7 +150,6 @@ type ClayAvatarTheme = {
   bodyTop: string;
   bodyBottom: string;
   highlight: string;
-  contactShadow: string;
 };
 
 // Palette for the clay silhouette avatar fallback. Derived from the SAME
@@ -169,6 +168,5 @@ export function generateClayAvatarTheme(seedInput: string): ClayAvatarTheme {
     bodyTop: hsl(p.baseHue, bodySat, Math.min(p.lightBase + 24, 80)),
     bodyBottom: hsl(p.hueA, bodySat + 4, p.lightBase + 8),
     highlight: hsl(p.baseHue, 30, 96),
-    contactShadow: hsl(p.hueB, p.saturationBase, Math.max(p.lightBase - 30, 8)),
   };
 }

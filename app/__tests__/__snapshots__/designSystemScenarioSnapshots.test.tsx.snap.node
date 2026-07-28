@@ -18666,36 +18666,6 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/ava
                           },
                           "type": "RadialGradient",
                         },
-                        {
-                          "children": [
-                            {
-                              "children": null,
-                              "props": {
-                                "offset": "0",
-                                "stopColor": "hsla(274, 67%, 19%, 1)",
-                                "stopOpacity": "0.3",
-                              },
-                              "type": "Stop",
-                            },
-                            {
-                              "children": null,
-                              "props": {
-                                "offset": "1",
-                                "stopColor": "hsla(274, 67%, 19%, 1)",
-                                "stopOpacity": "0",
-                              },
-                              "type": "Stop",
-                            },
-                          ],
-                          "props": {
-                            "cx": "12",
-                            "cy": "24.4",
-                            "gradientUnits": "userSpaceOnUse",
-                            "id": "clay-Sovran-ground",
-                            "r": "9",
-                          },
-                          "type": "RadialGradient",
-                        },
                       ],
                       "props": {},
                       "type": "Defs",
@@ -18739,18 +18709,6 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/ava
                         "transform": "translate(0, 4)",
                       },
                       "type": "G",
-                    },
-                    {
-                      "children": null,
-                      "props": {
-                        "cx": "12",
-                        "cy": "24.4",
-                        "fill": "url(#clay-Sovran-ground)",
-                        "rx": "10",
-                        "ry": "3.2",
-                        "testID": "clay-avatar-ground",
-                      },
-                      "type": "Ellipse",
                     },
                   ],
                   "props": {
@@ -19216,36 +19174,6 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/pro
                               },
                               "type": "RadialGradient",
                             },
-                            {
-                              "children": [
-                                {
-                                  "children": null,
-                                  "props": {
-                                    "offset": "0",
-                                    "stopColor": "hsla(274, 67%, 19%, 1)",
-                                    "stopOpacity": "0.3",
-                                  },
-                                  "type": "Stop",
-                                },
-                                {
-                                  "children": null,
-                                  "props": {
-                                    "offset": "1",
-                                    "stopColor": "hsla(274, 67%, 19%, 1)",
-                                    "stopOpacity": "0",
-                                  },
-                                  "type": "Stop",
-                                },
-                              ],
-                              "props": {
-                                "cx": "12",
-                                "cy": "24.4",
-                                "gradientUnits": "userSpaceOnUse",
-                                "id": "clay-Sovran-ground",
-                                "r": "9",
-                              },
-                              "type": "RadialGradient",
-                            },
                           ],
                           "props": {},
                           "type": "Defs",
@@ -19289,18 +19217,6 @@ exports[`Design System exact structural snapshots renders skeleton-crossfade/pro
                             "transform": "translate(0, 4)",
                           },
                           "type": "G",
-                        },
-                        {
-                          "children": null,
-                          "props": {
-                            "cx": "12",
-                            "cy": "24.4",
-                            "fill": "url(#clay-Sovran-ground)",
-                            "rx": "10",
-                            "ry": "3.2",
-                            "testID": "clay-avatar-ground",
-                          },
-                          "type": "Ellipse",
                         },
                       ],
                       "props": {
