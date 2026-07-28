@@ -2,7 +2,8 @@
  * [DEBUG-inv] Dev-only reveal probe for the shared-value fade-in idiom
  * (`opacity: useSharedValue(0)` driven to 1 by `withTiming` in an effect) —
  * the pattern behind the intermittent "element present but invisible" reports
- * (profile pfp, top-followers grid, feed cards, wallet QR button).
+ * (profile pfp, top-followers grid, feed cards; the wallet QR button has since
+ * moved to a declarative CSS-transition reveal and no longer needs probing).
  *
  * After `deadlineMs` it reads the shared value back:
  *   - value still < target  → `visual.fadeprobe.stuck`  (WARN) — the animation

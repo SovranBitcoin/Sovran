@@ -138,3 +138,44 @@ function subscribeHandoff(cb: () => void): () => void {
 export function useBootSplashHandoff(): boolean {
   return useSyncExternalStore(subscribeHandoff, getBootSplashHandoff, getBootSplashHandoff);
 }
+
+// Whether the wallet tab is the focused tab. Tri-state: `null` = unknown (the
+// wallet screen isn't mounted — cold boot before first mount, onboarding, or
+// mid-profile-switch remount), `true`/`false` = the mounted wallet screen's
+// focus. Published by useWalletTabFocusPublisher; the boot splash gate
+// subscribes so it can fast-forward the morph overlay when the user switches
+// tabs mid-boot instead of ghosting the QR look-alike over feed/notifications.
+let walletTabFocused: boolean | null = null;
+const focusListeners = new Set<() => void>();
+
+export function setWalletTabFocused(focused: boolean | null): void {
+  if (walletTabFocused === focused) return;
+  walletTabFocused = focused;
+  focusListeners.forEach((cb) => cb());
+}
+
+export function getWalletTabFocused(): boolean | null {
+  return walletTabFocused;
+}
+
+export function subscribeWalletTabFocused(cb: () => void): () => void {
+  focusListeners.add(cb);
+  return () => {
+    focusListeners.delete(cb);
+  };
+}
+
+// Fast-forward policy for the boot morph overlay, pure so it can be unit
+// tested. Keep the overlay unless the wallet tab is definitively blurred
+// (`focused !== false` covers onboarding / pre-mount / profile switch, where
+// there is no wallet tab to be blurred from). The anchor guard disambiguates
+// a real tab switch from a profile-switch remount: on remount the
+// WalletScreen's blur cleanup fires, but QRButton's child cleanup nulls the
+// anchor FIRST (React runs child cleanups before parents), so a null anchor
+// marks that blur as an unmount echo — the replayed morph must survive it.
+export function shouldFastForwardBootOverlay(
+  focused: boolean | null,
+  anchor: QRButtonAnchor | null
+): boolean {
+  return focused === false && anchor !== null;
+}

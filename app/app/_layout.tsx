@@ -62,10 +62,13 @@ import {
 } from '@/shared/lib/profile/profileSessionOrchestrator';
 import {
   getQRButtonAnchor,
+  getWalletTabFocused,
   requestQRButtonRemeasure,
   setBootMorphCompleted,
   setBootSplashHandoff,
+  shouldFastForwardBootOverlay,
   subscribeQRButtonAnchor,
+  subscribeWalletTabFocused,
   type QRButtonAnchor,
 } from '@/shared/lib/qrButtonAnchor';
 
@@ -405,6 +408,11 @@ const MORPH_FALLBACK_TIMEOUT = 8000;
 // layout shifts (iOS `contentInsetAdjustmentBehavior`, safe-area updates,
 // wallpaper image load) instead of locking to an early/wrong position.
 const LAYOUT_SETTLE_DELAY = 500;
+// Hard wall-clock cap on the overlay's life, measured from `await_anchor`
+// entry (native splash hidden). Anchor republishes restart the morph
+// tween/timer by design; the cap guarantees restarts can only ever SHORTEN
+// the remaining overlay life, never extend it indefinitely.
+const OVERLAY_LIFETIME_CAP_MS = 10_000;
 // Poll cadence for `measureInWindow` during the settle window. Cheap call —
 // the store dedupes redundant anchor publishes via field-level equality.
 const LAYOUT_POLL_INTERVAL = 100;
@@ -443,6 +451,9 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
 
   const [phase, setPhase] = useState<SplashPhase>('await_init');
   const [anchor, setAnchor] = useState<QRButtonAnchor | null>(getQRButtonAnchor());
+  // Absolute deadline for the overlay's current cycle; armed on await_anchor
+  // entry, consulted by the (restartable) morphing timer.
+  const overlayDeadlineRef = useRef<number | null>(null);
   const [hasRootLaidOut, setHasRootLaidOut] = useState(false);
   // Window-relative offset of the splash overlay's parent View. The QRButton
   // publishes its anchor in window coords (pageX/pageY); to position the
@@ -491,6 +502,7 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
     if (!hasRootLaidOut) return;
     initLog('SplashMorph', 'root laid out — hiding native splash');
     void SplashScreen.hideAsync();
+    overlayDeadlineRef.current = Date.now() + OVERLAY_LIFETIME_CAP_MS;
     setPhase('await_anchor');
   }, [phase, hasRootLaidOut]);
 
@@ -589,9 +601,18 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (phase !== 'morphing') return;
     setBootSplashHandoff(true);
+    // Clamp the (restartable) completion timer to the overlay's absolute
+    // deadline so anchor-republish restarts can't extend its life forever.
+    const remaining = overlayDeadlineRef.current
+      ? Math.max(0, overlayDeadlineRef.current - Date.now())
+      : MORPH_DURATION_MS + 30;
+    const holdMs = Math.min(MORPH_DURATION_MS + 30, remaining);
+    if (holdMs < MORPH_DURATION_MS + 30) {
+      initLog('SplashMorph', `lifetime cap — clamping morph hold to ${holdMs}ms`);
+    }
     initLog(
       'SplashMorph',
-      `morph timer armed — ${MORPH_DURATION_MS + 30}ms (restarts with the tween on anchor change)`
+      `morph timer armed — ${holdMs}ms (restarts with the tween on anchor change)`
     );
     const id = setTimeout(() => {
       const node = splashOverlayRef.current as unknown as {
@@ -605,9 +626,37 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
       });
       setBootMorphCompleted(true);
       setPhase('done');
-    }, MORPH_DURATION_MS + 30);
+    }, holdMs);
     return () => clearTimeout(id);
   }, [phase, anchor, parentOffset]);
+
+  // Fast-forward: the overlay is anchored to the WALLET tab's QR button and
+  // renders above the whole navigator; the moment the wallet tab stops being
+  // what the user looks at, finish the handoff invisibly instead of ghosting
+  // the QR look-alike over feed/notifications. The policy fn's anchor guard
+  // keeps profile-switch remounts (blur echo with a nulled anchor) from
+  // cutting the replayed morph.
+  useEffect(() => {
+    // Only these two phases can meaningfully fast-forward: await_init must
+    // still run its hideAsync handoff, and fading/done are already exiting.
+    if (phase !== 'await_anchor' && phase !== 'morphing') return;
+    const check = () => {
+      if (!shouldFastForwardBootOverlay(getWalletTabFocused(), getQRButtonAnchor())) return;
+      initLog('SplashMorph', `wallet tab not focused (phase=${phase}) — fast-forwarding overlay`);
+      if (phase === 'morphing') {
+        // Mid-morph ghost on the wrong tab: cut immediately.
+        setBootSplashHandoff(true);
+        setBootMorphCompleted(true);
+        setPhase('unmounted');
+      } else {
+        // Full-screen splash (await_anchor): reuse the fading path — it sets
+        // handoff + morphCompleted on its own timer.
+        setPhase('fading');
+      }
+    };
+    check();
+    return subscribeWalletTabFocused(check);
+  }, [phase, anchor]);
 
   // Phase 3b — fading: same duration mirror, but the fade's target values
   // never depend on the anchor, so an anchor republish must NOT restart it.

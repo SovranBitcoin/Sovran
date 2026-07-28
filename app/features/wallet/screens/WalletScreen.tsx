@@ -27,6 +27,7 @@ import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useAmbientNfcArm } from '@/features/wallet/hooks/useAmbientNfcArm';
+import { useWalletTabFocusPublisher } from '@/features/wallet/hooks/useWalletTabFocusPublisher';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { useHeaderHeight } from 'expo-router/react-navigation';
@@ -151,6 +152,11 @@ export function WalletScreen() {
   // the Send modal) but the ambient listener stays armed here so tapping a
   // terminal still works from the home screen.
   useAmbientNfcArm(machine);
+
+  // Feeds the boot splash gate: lets it fast-forward the splash→QR morph
+  // overlay if this tab blurs mid-boot (the overlay renders above the tab
+  // navigator and would otherwise ghost over feed/notifications).
+  useWalletTabFocusPublisher();
 
   // Secondary wallet actions in priority order. CircleActionRow decides what
   // to render: today's two actions are two circle buttons; a fourth would
