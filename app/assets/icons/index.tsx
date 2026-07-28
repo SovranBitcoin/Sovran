@@ -130,6 +130,15 @@ export const icons: string[] = [
   'mdi:bell-off-outline',
   'mdi:bell-outline',
 
+  // Mint-update glyphs (Notifications → Mints, and the Mint updates screen).
+  // Passed dynamically per change kind, so the scanner can't follow them.
+  'mdi:package-up', // software release
+  'mdi:star-four-points', // new capability
+  'mdi:bullhorn', // mint notice (NUT-06 motd)
+  'mdi:speedometer', // send/receive limits
+  'mdi:pause-circle', // a direction paused
+  'mdi:card-account-details-outline', // profile / identity fields
+
   // Explore page icons
   'mdi:chevron-left',
   'mdi:chevron-right',

@@ -78,6 +78,8 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/map/components/StatsCard.tsx",
     "features/mint/components/MintCurrencyTabs.tsx",
     "features/mint/components/distribution/MintDistributionCards.tsx",
+    "features/mint/components/mintChanges/MintChangeRow.tsx",
+    "features/mint/components/mintChanges/MintChangesList.tsx",
     "features/mint/components/rebalance/RebalanceChainCard.tsx",
     "features/mint/components/rebalance/RebalanceStepRow.tsx",
     "features/nearPay/components/LightningStrike.tsx",
@@ -227,6 +229,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/WhiteFaceBeamAvatar.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 221,
+  "total": 223,
 }
 `;

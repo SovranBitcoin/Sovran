@@ -41,6 +41,7 @@ import { seedThread } from '@/features/feed/lib/threadSeedCache';
 import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
 import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
+import { MintChangesList } from '@/features/mint/components/mintChanges/MintChangesList';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import {
   remeasureVisualLayoutScope,
@@ -66,15 +67,23 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
-// `APP` is a client-only tab (app announcements like the welcome card); it never
-// hits the server. ALL/MENTIONS are the server-backed tabs.
-type NotificationTab = FeedNotificationTab | 'APP';
+// `APP` (app announcements like the welcome card) and `MINTS` (what this
+// wallet's mints changed about their NUT-06 info, served by nagg's mint
+// changelog) are client-sourced tabs; neither hits the feed client.
+// ALL/MENTIONS are the server-backed tabs.
+type NotificationTab = FeedNotificationTab | 'APP' | 'MINTS';
 
 const NOTIFICATION_TABS: { id: NotificationTab; label: string }[] = [
   { id: 'ALL', label: 'All' },
   { id: 'MENTIONS', label: 'Mentions' },
+  { id: 'MINTS', label: 'Mints' },
   { id: 'APP', label: 'App' },
 ];
+
+/** Tabs that never call the feed client — they render from local sources. */
+function isClientTab(tab: NotificationTab): tab is 'APP' | 'MINTS' {
+  return tab === 'APP' || tab === 'MINTS';
+}
 
 const NOTIFICATIONS_PAGE_SIZE = 50;
 const MAX_GROUP_AVATARS = 3;
@@ -163,8 +172,8 @@ export function NotificationsScreen() {
       until?: number;
       refresh?: boolean;
     }) => {
-      // The App tab is client-only (synthetic announcements) — never fetch.
-      if (!viewerPubkey || activeTab === 'APP') return null;
+      // Client-only tabs (synthetic announcements, mint changelog) never fetch.
+      if (!viewerPubkey || isClientTab(activeTab)) return null;
       const client = getFeedClient();
       try {
         return await client.getNotifications({
@@ -201,9 +210,9 @@ export function NotificationsScreen() {
   const loadFirstPage = useCallback(
     (signal: AbortSignal, mode: LoadMode) => {
       const sequence = ++loadSequenceRef.current;
-      // No viewer, or the client-only App tab → nothing to fetch; the synthetic
-      // items (welcome card) render without a server round-trip.
-      if (!viewerPubkey || activeTab === 'APP') {
+      // No viewer, or a client-only tab → nothing to fetch; the synthetic items
+      // (welcome card) and the mint changelog render without a server round-trip.
+      if (!viewerPubkey || isClientTab(activeTab)) {
         applyFirstPage(null);
         setErrorMessage(null);
         setIsInitialLoading(false);
@@ -621,97 +630,107 @@ export function NotificationsScreen() {
             </View>
           </View>
         </VisualLayoutProbe>
-        <FlatList
-          data={notificationItems}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: tabBarPadding },
-            notificationItems.length === 0 && styles.emptyListContent,
-          ]}
-          contentInsetAdjustmentBehavior="never"
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              tintColor={foreground}
-            />
-          }
-          ItemSeparatorComponent={() => (
-            <View style={[styles.separator, { backgroundColor: separator }]} />
-          )}
-          ListEmptyComponent={
-            isInitialLoading ? (
+        {activeTab === 'MINTS' ? (
+          // Mint changes have their own source, refresh and row shapes — the
+          // notifications list below stays untouched.
+          <MintChangesList />
+        ) : (
+          <FlatList
+            data={notificationItems}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: tabBarPadding },
+              notificationItems.length === 0 && styles.emptyListContent,
+            ]}
+            contentInsetAdjustmentBehavior="never"
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                tintColor={foreground}
+              />
+            }
+            ItemSeparatorComponent={() => (
+              <View style={[styles.separator, { backgroundColor: separator }]} />
+            )}
+            ListEmptyComponent={
+              isInitialLoading ? (
+                <VisualLayoutProbe
+                  scope={notificationsVisualScope}
+                  surface="notifications"
+                  component="NotificationsInitialSpinner"
+                  itemKey="empty:initial-spinner"
+                  itemType="spinner"
+                  extra={{ tab: activeTab, phase: visualPhase }}>
+                  <Spinner size={22} color={opacity(foreground, 0.65)} style={styles.loader} />
+                </VisualLayoutProbe>
+              ) : (
+                <VisualLayoutProbe
+                  scope={notificationsVisualScope}
+                  surface="notifications"
+                  component="NotificationsEmptyState"
+                  itemKey={errorMessage ? 'empty:error' : 'empty:no-results'}
+                  itemType={errorMessage ? 'error' : 'empty'}
+                  extra={{ tab: activeTab, viewerReady: !!viewerPubkey }}>
+                  <EmptyNotifications
+                    viewerReady={!!viewerPubkey}
+                    errorMessage={errorMessage}
+                    foreground={foreground}
+                    muted={muted}
+                  />
+                </VisualLayoutProbe>
+              )
+            }
+            ListFooterComponent={
+              // Only when there's content — never stacked on the empty-state spinner.
+              isLoadingMore && notificationItems.length > 0 ? (
+                <VisualLayoutProbe
+                  scope={notificationsVisualScope}
+                  surface="notifications"
+                  component="NotificationsPaginationSpinner"
+                  itemKey="footer:pagination-spinner"
+                  itemType="spinner"
+                  extra={{ tab: activeTab, items: notificationItems.length }}>
+                  <Spinner
+                    size={18}
+                    color={opacity(foreground, 0.65)}
+                    style={styles.footerSpinner}
+                  />
+                </VisualLayoutProbe>
+              ) : null
+            }
+            onLayout={handleListLayout}
+            onContentSizeChange={handleContentSizeChange}
+            onEndReached={loadMoreNotifications}
+            onEndReachedThreshold={0.4}
+            onScroll={handleListScroll}
+            scrollEventThrottle={250}
+            viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
+            onViewableItemsChanged={handleListViewableItemsChanged}
+            renderItem={({ item, index }) => (
               <VisualLayoutProbe
                 scope={notificationsVisualScope}
                 surface="notifications"
-                component="NotificationsInitialSpinner"
-                itemKey="empty:initial-spinner"
-                itemType="spinner"
+                component="NotificationListRow"
+                itemKey={`notification:${item.id}`}
+                itemType={item.type}
+                index={index}
                 extra={{ tab: activeTab, phase: visualPhase }}>
-                <Spinner size={22} color={opacity(foreground, 0.65)} style={styles.loader} />
-              </VisualLayoutProbe>
-            ) : (
-              <VisualLayoutProbe
-                scope={notificationsVisualScope}
-                surface="notifications"
-                component="NotificationsEmptyState"
-                itemKey={errorMessage ? 'empty:error' : 'empty:no-results'}
-                itemType={errorMessage ? 'error' : 'empty'}
-                extra={{ tab: activeTab, viewerReady: !!viewerPubkey }}>
-                <EmptyNotifications
-                  viewerReady={!!viewerPubkey}
-                  errorMessage={errorMessage}
+                <NotificationListRow
+                  item={item}
+                  result={resultForRows}
                   foreground={foreground}
+                  surface={surface}
                   muted={muted}
+                  pressedBackground={opacity(surfaceTertiary, 0.45)}
+                  onPressNotification={openNotification}
+                  onPressFollowGroup={openFollowGroup}
                 />
               </VisualLayoutProbe>
-            )
-          }
-          ListFooterComponent={
-            // Only when there's content — never stacked on the empty-state spinner.
-            isLoadingMore && notificationItems.length > 0 ? (
-              <VisualLayoutProbe
-                scope={notificationsVisualScope}
-                surface="notifications"
-                component="NotificationsPaginationSpinner"
-                itemKey="footer:pagination-spinner"
-                itemType="spinner"
-                extra={{ tab: activeTab, items: notificationItems.length }}>
-                <Spinner size={18} color={opacity(foreground, 0.65)} style={styles.footerSpinner} />
-              </VisualLayoutProbe>
-            ) : null
-          }
-          onLayout={handleListLayout}
-          onContentSizeChange={handleContentSizeChange}
-          onEndReached={loadMoreNotifications}
-          onEndReachedThreshold={0.4}
-          onScroll={handleListScroll}
-          scrollEventThrottle={250}
-          viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
-          onViewableItemsChanged={handleListViewableItemsChanged}
-          renderItem={({ item, index }) => (
-            <VisualLayoutProbe
-              scope={notificationsVisualScope}
-              surface="notifications"
-              component="NotificationListRow"
-              itemKey={`notification:${item.id}`}
-              itemType={item.type}
-              index={index}
-              extra={{ tab: activeTab, phase: visualPhase }}>
-              <NotificationListRow
-                item={item}
-                result={resultForRows}
-                foreground={foreground}
-                surface={surface}
-                muted={muted}
-                pressedBackground={opacity(surfaceTertiary, 0.45)}
-                onPressNotification={openNotification}
-                onPressFollowGroup={openFollowGroup}
-              />
-            </VisualLayoutProbe>
-          )}
-        />
+            )}
+          />
+        )}
       </Log>
     </Screen>
   );

@@ -1,0 +1,954 @@
+{
+  "trackedMints": 102,
+  "reachableMints": 56,
+  "totalChanges": 21,
+  "changes": [
+    {
+      "mintUrl": "https://mint.hanbitkorea.org",
+      "name": "Hanbit mint",
+      "at": 1785163721,
+      "previousLastSeenAt": 1785074273,
+      "hash": "40d41d60122fa69945075d790ebb756b3a8454d52b265bd3b9dc82b6e7a216bb",
+      "summary": [
+        "URLs - added: https://mint.bitcoinhanbit.org"
+      ],
+      "patch": [
+        {
+          "value": "https://mint.bitcoinhanbit.org",
+          "op": "add",
+          "path": "/urls/-"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.macadamia.cash",
+      "name": "macadamia Mint",
+      "at": 1785163579,
+      "previousLastSeenAt": 1785074134,
+      "hash": "2b95e47a3be748bd22fc72e6ba8bd6f50df511816a9ff99d9e35c79f48df6dce",
+      "summary": [
+        "NUT-4 methods 0 method_name added: bolt11",
+        "NUT-5 methods 0 method_name added: bolt11",
+        "version: Nutshell/0.20.1 → Nutshell/0.20.3"
+      ],
+      "patch": [
+        {
+          "value": "bolt11",
+          "op": "add",
+          "path": "/nuts/4/methods/0/method_name"
+        },
+        {
+          "value": "bolt11",
+          "op": "add",
+          "path": "/nuts/5/methods/0/method_name"
+        },
+        {
+          "value": "Nutshell/0.20.1",
+          "op": "test",
+          "path": "/version"
+        },
+        {
+          "value": "Nutshell/0.20.3",
+          "op": "replace",
+          "path": "/version"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.sovran.money",
+      "name": "Sovran",
+      "at": 1785074264,
+      "previousLastSeenAt": 1784762841,
+      "hash": "86f33c7b2a27b472a18b3a8656dc3271daae673b169555442d26216fe5dcc3f8",
+      "summary": [
+        "NUT-29 enabled",
+        "NUT-4 methods 0 method_name added: bolt11",
+        "NUT-5 methods 0 method_name added: bolt11",
+        "version: Nutshell/0.20.0 → Nutshell/0.20.3"
+      ],
+      "patch": [
+        {
+          "value": {
+            "max_batch_size": 1000,
+            "methods": [
+              "bolt11"
+            ],
+            "supported": true
+          },
+          "op": "add",
+          "path": "/nuts/29"
+        },
+        {
+          "value": "bolt11",
+          "op": "add",
+          "path": "/nuts/4/methods/0/method_name"
+        },
+        {
+          "value": "bolt11",
+          "op": "add",
+          "path": "/nuts/5/methods/0/method_name"
+        },
+        {
+          "value": "Nutshell/0.20.0",
+          "op": "test",
+          "path": "/version"
+        },
+        {
+          "value": "Nutshell/0.20.3",
+          "op": "replace",
+          "path": "/version"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://rugs01.cashu.exchange",
+      "name": "Rugs Monthly 01",
+      "at": 1785074255,
+      "previousLastSeenAt": 1784762832,
+      "hash": "9ba82184fb91fe7ac5949bb7aecc1cb6018fc22b133e85f2b0e568e24f9df395",
+      "summary": [
+        "NUT-19 enabled"
+      ],
+      "patch": [
+        {
+          "value": {
+            "cached_endpoints": [
+              {
+                "method": "POST",
+                "path": "/v1/mint/bolt11"
+              },
+              {
+                "method": "POST",
+                "path": "/v1/mint"
+              },
+              {
+                "method": "POST",
+                "path": "/v1/swap"
+              },
+              {
+                "method": "POST",
+                "path": "/v1/melt/bolt11"
+              },
+              {
+                "method": "POST",
+                "path": "/v1/melt"
+              }
+            ],
+            "ttl": 300
+          },
+          "op": "add",
+          "path": "/nuts/19"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://rugs.cashu.exchange",
+      "name": "Rugs Monthly",
+      "at": 1785074253,
+      "previousLastSeenAt": 1784762831,
+      "hash": "22fae94c66aa1024c62037b00c6ec69b36f2a69c09744d0fabc3ac4daf834a25",
+      "summary": [
+        "NUT-19 enabled"
+      ],
+      "patch": [
+        {
+          "value": {
+            "cached_endpoints": [
+              {
+                "method": "POST",
+                "path": "/v1/mint/bolt11"
+              },
+              {
+                "method": "POST",
+                "path": "/v1/mint"
+              },
+              {
+                "method": "POST",
+                "path": "/v1/swap"
+              },
+              {
+                "method": "POST",
+                "path": "/v1/melt/bolt11"
+              },
+              {
+                "method": "POST",
+                "path": "/v1/melt"
+              }
+            ],
+            "ttl": 300
+          },
+          "op": "add",
+          "path": "/nuts/19"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.wolfcoil.com",
+      "name": "peeenuts",
+      "at": 1784762845,
+      "previousLastSeenAt": 1784676226,
+      "hash": "6644dbc1c418aa1d9ce481ed777eb6ddce4c382a9d73897f6f840a9c7e9685d8",
+      "summary": [
+        "NUT-15 methods 1 removed",
+        "NUT-17 supported 1 removed",
+        "NUT-4 methods 1 removed",
+        "NUT-5 methods 1 removed"
+      ],
+      "patch": [
+        {
+          "value": {
+            "method": "bolt11",
+            "unit": "msat"
+          },
+          "op": "test",
+          "path": "/nuts/15/methods/1"
+        },
+        {
+          "op": "remove",
+          "path": "/nuts/15/methods/1"
+        },
+        {
+          "value": {
+            "commands": [
+              "bolt11_melt_quote",
+              "proof_state",
+              "bolt11_mint_quote"
+            ],
+            "method": "bolt11",
+            "unit": "msat"
+          },
+          "op": "test",
+          "path": "/nuts/17/supported/1"
+        },
+        {
+          "op": "remove",
+          "path": "/nuts/17/supported/1"
+        },
+        {
+          "value": {
+            "max_amount": 2100,
+            "method": "bolt11",
+            "method_name": "bolt11",
+            "min_amount": 0,
+            "options": {
+              "description": true
+            },
+            "unit": "msat"
+          },
+          "op": "test",
+          "path": "/nuts/4/methods/1"
+        },
+        {
+          "op": "remove",
+          "path": "/nuts/4/methods/1"
+        },
+        {
+          "value": {
+            "max_amount": 2100,
+            "method": "bolt11",
+            "method_name": "bolt11",
+            "min_amount": 0,
+            "unit": "msat"
+          },
+          "op": "test",
+          "path": "/nuts/5/methods/1"
+        },
+        {
+          "op": "remove",
+          "path": "/nuts/5/methods/1"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://8333.space:3338",
+      "name": "Cashu test mint",
+      "at": 1784762706,
+      "previousLastSeenAt": 1784676085,
+      "hash": "8f942ca2f29ea87e229e961e687d82307ab0d1126251f9183588245da078c6fd",
+      "summary": [
+        "version: Nutshell/0.20.2 → Nutshell/0.20.3"
+      ],
+      "patch": [
+        {
+          "value": "Nutshell/0.20.2",
+          "op": "test",
+          "path": "/version"
+        },
+        {
+          "value": "Nutshell/0.20.3",
+          "op": "replace",
+          "path": "/version"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.wolfcoil.com",
+      "name": "peeenuts",
+      "at": 1784676226,
+      "previousLastSeenAt": 1784589607,
+      "hash": "0bc8e442880bd94f8955ab87cd7f2bf0dee17bfaadd55bd7dbefbb843a992b19",
+      "summary": [
+        "NUT-4 methods 0 max_amount added: 2100",
+        "NUT-4 methods 0 min_amount added: 0",
+        "NUT-4 methods 1 max_amount added: 2100",
+        "NUT-4 methods 1 min_amount added: 0",
+        "NUT-5 methods 0 max_amount added: 2100",
+        "NUT-5 methods 0 min_amount added: 0",
+        "NUT-5 methods 1 max_amount added: 2100",
+        "NUT-5 methods 1 min_amount added: 0"
+      ],
+      "patch": [
+        {
+          "value": 2100,
+          "op": "add",
+          "path": "/nuts/4/methods/0/max_amount"
+        },
+        {
+          "value": 0,
+          "op": "add",
+          "path": "/nuts/4/methods/0/min_amount"
+        },
+        {
+          "value": 2100,
+          "op": "add",
+          "path": "/nuts/4/methods/1/max_amount"
+        },
+        {
+          "value": 0,
+          "op": "add",
+          "path": "/nuts/4/methods/1/min_amount"
+        },
+        {
+          "value": 2100,
+          "op": "add",
+          "path": "/nuts/5/methods/0/max_amount"
+        },
+        {
+          "value": 0,
+          "op": "add",
+          "path": "/nuts/5/methods/0/min_amount"
+        },
+        {
+          "value": 2100,
+          "op": "add",
+          "path": "/nuts/5/methods/1/max_amount"
+        },
+        {
+          "value": 0,
+          "op": "add",
+          "path": "/nuts/5/methods/1/min_amount"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.westernbtc.com",
+      "name": "WesternBTC Cashu mint",
+      "at": 1784676160,
+      "previousLastSeenAt": 1784589540,
+      "hash": "0c57c1ead461a14ca9abc67caca1fa33bb71dd5298260c6ad85a506ac5487e2e",
+      "summary": [
+        "NUT-17 supported - added: {\"commands\":[\"onchain_mint_quote\",\"onchain_melt_quote\",\"pro…",
+        "NUT-19 cached_endpoints - added: {\"method\":\"POST\",\"path\":\"/v1/mint/onchain\"}",
+        "NUT-19 cached_endpoints - added: {\"method\":\"POST\",\"path\":\"/v1/melt/onchain\"}",
+        "NUT-29 methods - added: onchain",
+        "NUT-4 methods - added: {\"max_amount\":1000000,\"method\":\"onchain\",\"method_name\":\"Onc…",
+        "NUT-5 methods - added: {\"max_amount\":1000000,\"method\":\"onchain\",\"method_name\":\"Onc…"
+      ],
+      "patch": [
+        {
+          "value": {
+            "commands": [
+              "onchain_mint_quote",
+              "onchain_melt_quote",
+              "proof_state"
+            ],
+            "method": "onchain",
+            "unit": "sat"
+          },
+          "op": "add",
+          "path": "/nuts/17/supported/-"
+        },
+        {
+          "value": {
+            "method": "POST",
+            "path": "/v1/mint/onchain"
+          },
+          "op": "add",
+          "path": "/nuts/19/cached_endpoints/-"
+        },
+        {
+          "value": {
+            "method": "POST",
+            "path": "/v1/melt/onchain"
+          },
+          "op": "add",
+          "path": "/nuts/19/cached_endpoints/-"
+        },
+        {
+          "value": "onchain",
+          "op": "add",
+          "path": "/nuts/29/methods/-"
+        },
+        {
+          "value": {
+            "max_amount": 1000000,
+            "method": "onchain",
+            "method_name": "Onchain",
+            "min_amount": 10000,
+            "options": {
+              "confirmations": 3
+            },
+            "unit": "sat"
+          },
+          "op": "add",
+          "path": "/nuts/4/methods/-"
+        },
+        {
+          "value": {
+            "max_amount": 1000000,
+            "method": "onchain",
+            "method_name": "Onchain",
+            "min_amount": 10000,
+            "unit": "sat"
+          },
+          "op": "add",
+          "path": "/nuts/5/methods/-"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.westernbtc.com",
+      "name": "WesternBTC Cashu mint",
+      "at": 1784589540,
+      "previousLastSeenAt": 1784502913,
+      "hash": "e0e22f35ca30da4ffc39daa4d4c7919c09c58794c22ea0d68400e0a4b8235978",
+      "summary": [
+        "contact 0 info: npub1pc57ls4rad5kvsp733suhzl2d4u9y7h4upt952a2pucnalc59teq33… → 0e29efc2a3eb6966403e8c61cb8bea6d78527af5e0565a2baa0f313eff1…",
+        "NUT-17 supported 0 commands 0: bolt11_melt_quote → bolt11_mint_quote",
+        "NUT-17 supported 0 commands 1: proof_state → bolt11_melt_quote",
+        "NUT-17 supported 0 commands 2: bolt11_mint_quote → proof_state",
+        "NUT-19 enabled",
+        "NUT-29 enabled",
+        "NUT-4 methods 0 description added: true",
+        "NUT-4 methods 0 max_amount added: 500000",
+        "NUT-4 methods 0 method_name added: Bolt11",
+        "NUT-4 methods 0 min_amount added: 1",
+        "NUT-4 methods 0 options removed",
+        "NUT-5 methods 0 amountless added: true",
+        "NUT-5 methods 0 max_amount added: 500000",
+        "NUT-5 methods 0 method_name added: Bolt11",
+        "NUT-5 methods 0 min_amount added: 1",
+        "pubkey: 02c060e3f6b924c5b18ac9d84c2dea25261c3760cb853457a99d0319439… → 03d207829861fcaa86f96258828e8a70e381451941cb4d69d6ef2d93a8d…",
+        "URLs removed",
+        "version: Nutshell/0.20.0 → cdk-mintd/0.17.0"
+      ],
+      "patch": [
+        {
+          "value": "npub1pc57ls4rad5kvsp733suhzl2d4u9y7h4upt952a2pucnalc59teq33dmza",
+          "op": "test",
+          "path": "/contact/0/info"
+        },
+        {
+          "value": "0e29efc2a3eb6966403e8c61cb8bea6d78527af5e0565a2baa0f313eff142af2",
+          "op": "replace",
+          "path": "/contact/0/info"
+        },
+        {
+          "value": "bolt11_melt_quote",
+          "op": "test",
+          "path": "/nuts/17/supported/0/commands/0"
+        },
+        {
+          "value": "bolt11_mint_quote",
+          "op": "replace",
+          "path": "/nuts/17/supported/0/commands/0"
+        },
+        {
+          "value": "proof_state",
+          "op": "test",
+          "path": "/nuts/17/supported/0/commands/1"
+        },
+        {
+          "value": "bolt11_melt_quote",
+          "op": "replace",
+          "path": "/nuts/17/supported/0/commands/1"
+        },
+        {
+          "value": "bolt11_mint_quote",
+          "op": "test",
+          "path": "/nuts/17/supported/0/commands/2"
+        },
+        {
+          "value": "proof_state",
+          "op": "replace",
+          "path": "/nuts/17/supported/0/commands/2"
+        },
+        {
+          "value": {
+            "cached_endpoints": [
+              {
+                "method": "POST",
+                "path": "/v1/swap"
+              },
+              {
+                "method": "POST",
+                "path": "/v1/mint/bolt11"
+              },
+              {
+                "method": "POST",
+                "path": "/v1/melt/bolt11"
+              }
+            ],
+            "ttl": 60
+          },
+          "op": "add",
+          "path": "/nuts/19"
+        },
+        {
+          "value": {
+            "max_batch_size": 100,
+            "methods": [
+              "bolt11"
+            ]
+          },
+          "op": "add",
+          "path": "/nuts/29"
+        },
+        {
+          "value": true,
+          "op": "add",
+          "path": "/nuts/4/methods/0/description"
+        },
+        {
+          "value": 500000,
+          "op": "add",
+          "path": "/nuts/4/methods/0/max_amount"
+        },
+        {
+          "value": "Bolt11",
+          "op": "add",
+          "path": "/nuts/4/methods/0/method_name"
+        },
+        {
+          "value": 1,
+          "op": "add",
+          "path": "/nuts/4/methods/0/min_amount"
+        },
+        {
+          "value": {
+            "description": true
+          },
+          "op": "test",
+          "path": "/nuts/4/methods/0/options"
+        },
+        {
+          "op": "remove",
+          "path": "/nuts/4/methods/0/options"
+        },
+        {
+          "value": true,
+          "op": "add",
+          "path": "/nuts/5/methods/0/amountless"
+        },
+        {
+          "value": 500000,
+          "op": "add",
+          "path": "/nuts/5/methods/0/max_amount"
+        },
+        {
+          "value": "Bolt11",
+          "op": "add",
+          "path": "/nuts/5/methods/0/method_name"
+        },
+        {
+          "value": 1,
+          "op": "add",
+          "path": "/nuts/5/methods/0/min_amount"
+        },
+        {
+          "value": "02c060e3f6b924c5b18ac9d84c2dea25261c3760cb853457a99d031943964c5881",
+          "op": "test",
+          "path": "/pubkey"
+        },
+        {
+          "value": "03d207829861fcaa86f96258828e8a70e381451941cb4d69d6ef2d93a8d59efbbe",
+          "op": "replace",
+          "path": "/pubkey"
+        },
+        {
+          "value": [
+            "https://westernbtc.com/mint",
+            "http://hjar34h5zwgtvxr345q7rncso3dhdaryuxgri3lu7lbhmnzvin72z5ad.onion/mint"
+          ],
+          "op": "test",
+          "path": "/urls"
+        },
+        {
+          "op": "remove",
+          "path": "/urls"
+        },
+        {
+          "value": "Nutshell/0.20.0",
+          "op": "test",
+          "path": "/version"
+        },
+        {
+          "value": "cdk-mintd/0.17.0",
+          "op": "replace",
+          "path": "/version"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.nostrzap.me",
+      "name": "mint.nostrzap.me",
+      "at": 1784427233,
+      "previousLastSeenAt": 1784340604,
+      "hash": "231df763cab147a2be30d6338d908291116113b6d6e15fefb6c645f814483117",
+      "summary": [
+        "NUT-4 methods 0 max_amount: 25000 → 100000",
+        "NUT-5 methods 0 max_amount: 25000 → 100000"
+      ],
+      "patch": [
+        {
+          "value": 25000,
+          "op": "test",
+          "path": "/nuts/4/methods/0/max_amount"
+        },
+        {
+          "value": 100000,
+          "op": "replace",
+          "path": "/nuts/4/methods/0/max_amount"
+        },
+        {
+          "value": 25000,
+          "op": "test",
+          "path": "/nuts/5/methods/0/max_amount"
+        },
+        {
+          "value": 100000,
+          "op": "replace",
+          "path": "/nuts/5/methods/0/max_amount"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.fredix.xyz",
+      "name": "Mint fredix",
+      "at": 1784329699,
+      "previousLastSeenAt": 1784243072,
+      "hash": "cd495ee2eac41cbca78d8f2f2fc248095c581b5906b1f00c1539028acff1383b",
+      "summary": [
+        "version: cdk-mintd/0.17.2 → cdk-mintd/0.17.3"
+      ],
+      "patch": [
+        {
+          "value": "cdk-mintd/0.17.2",
+          "op": "test",
+          "path": "/version"
+        },
+        {
+          "value": "cdk-mintd/0.17.3",
+          "op": "replace",
+          "path": "/version"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.minibits.cash/Bitcoin",
+      "name": "Minibits mint",
+      "at": 1784242956,
+      "previousLastSeenAt": 1784156321,
+      "hash": "72895bd57e4a4428a8d08a74a58573ef3f45fe95c40e1940761d89e87901b77e",
+      "summary": [
+        "NUT-4 methods 0 method_name added: bolt11",
+        "NUT-5 methods 0 method_name added: bolt11",
+        "version: Nutshell/0.20.1 → Nutshell/0.20.2"
+      ],
+      "patch": [
+        {
+          "value": "bolt11",
+          "op": "add",
+          "path": "/nuts/4/methods/0/method_name"
+        },
+        {
+          "value": "bolt11",
+          "op": "add",
+          "path": "/nuts/5/methods/0/method_name"
+        },
+        {
+          "value": "Nutshell/0.20.1",
+          "op": "test",
+          "path": "/version"
+        },
+        {
+          "value": "Nutshell/0.20.2",
+          "op": "replace",
+          "path": "/version"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.nostrzap.me",
+      "name": "mint.nostrzap.me",
+      "at": 1784080714,
+      "previousLastSeenAt": 1783994085,
+      "hash": "c21b54eb2846ec8f8e4021d721661b3fdecbd0c528ab02f8ec88812c7cfc64e5",
+      "summary": [
+        "name: nostrzap.me mint → mint.nostrzap.me"
+      ],
+      "patch": [
+        {
+          "value": "nostrzap.me mint",
+          "op": "test",
+          "path": "/name"
+        },
+        {
+          "value": "mint.nostrzap.me",
+          "op": "replace",
+          "path": "/name"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://m7.mountainlake.io",
+      "name": "Mountainlake M7",
+      "at": 1784069825,
+      "previousLastSeenAt": 1783983193,
+      "hash": "a39d04c6a0fa94487e891f472b643cc84a3139fcb6d5983a15d6947f6c16ccb5",
+      "summary": [
+        "version: cdk-mintd/0.17.2 → cdk-mintd/0.17.3"
+      ],
+      "patch": [
+        {
+          "value": "cdk-mintd/0.17.2",
+          "op": "test",
+          "path": "/version"
+        },
+        {
+          "value": "cdk-mintd/0.17.3",
+          "op": "replace",
+          "path": "/version"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.nostrzap.me",
+      "name": "mint.nostrzap.me",
+      "at": 1783994085,
+      "previousLastSeenAt": 1783907454,
+      "hash": "4293aa598f11c93e639c09bee9274c250892f49d38d5f6f132cd7d144645b434",
+      "summary": [
+        "version: cdk-mintd/0.17.2 → cdk-mintd/0.17.3"
+      ],
+      "patch": [
+        {
+          "value": "cdk-mintd/0.17.2",
+          "op": "test",
+          "path": "/version"
+        },
+        {
+          "value": "cdk-mintd/0.17.3",
+          "op": "replace",
+          "path": "/version"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.wolfcoil.com",
+      "name": "peeenuts",
+      "at": 1783896572,
+      "previousLastSeenAt": 1783809933,
+      "hash": "fd27c4a869dd33cce7873e9c8e58e842cf42895d83d5104dd9bb869c244c86cf",
+      "summary": [
+        "long description removed",
+        "NUT-15 methods - added: {\"method\":\"bolt11\",\"unit\":\"msat\"}",
+        "NUT-17 supported - added: {\"commands\":[\"bolt11_melt_quote\",\"proof_state\",\"bolt11_mint…",
+        "NUT-4 methods 0 max_amount removed",
+        "NUT-4 methods 0 min_amount removed",
+        "NUT-4 methods - added: {\"method\":\"bolt11\",\"method_name\":\"bolt11\",\"options\":{\"descr…",
+        "NUT-5 methods 0 max_amount removed",
+        "NUT-5 methods 0 min_amount removed",
+        "NUT-5 methods - added: {\"method\":\"bolt11\",\"method_name\":\"bolt11\",\"unit\":\"msat\"}"
+      ],
+      "patch": [
+        {
+          "value": "",
+          "op": "test",
+          "path": "/description_long"
+        },
+        {
+          "op": "remove",
+          "path": "/description_long"
+        },
+        {
+          "value": {
+            "method": "bolt11",
+            "unit": "msat"
+          },
+          "op": "add",
+          "path": "/nuts/15/methods/-"
+        },
+        {
+          "value": {
+            "commands": [
+              "bolt11_melt_quote",
+              "proof_state",
+              "bolt11_mint_quote"
+            ],
+            "method": "bolt11",
+            "unit": "msat"
+          },
+          "op": "add",
+          "path": "/nuts/17/supported/-"
+        },
+        {
+          "value": 2100,
+          "op": "test",
+          "path": "/nuts/4/methods/0/max_amount"
+        },
+        {
+          "op": "remove",
+          "path": "/nuts/4/methods/0/max_amount"
+        },
+        {
+          "value": 0,
+          "op": "test",
+          "path": "/nuts/4/methods/0/min_amount"
+        },
+        {
+          "op": "remove",
+          "path": "/nuts/4/methods/0/min_amount"
+        },
+        {
+          "value": {
+            "method": "bolt11",
+            "method_name": "bolt11",
+            "options": {
+              "description": true
+            },
+            "unit": "msat"
+          },
+          "op": "add",
+          "path": "/nuts/4/methods/-"
+        },
+        {
+          "value": 2100,
+          "op": "test",
+          "path": "/nuts/5/methods/0/max_amount"
+        },
+        {
+          "op": "remove",
+          "path": "/nuts/5/methods/0/max_amount"
+        },
+        {
+          "value": 0,
+          "op": "test",
+          "path": "/nuts/5/methods/0/min_amount"
+        },
+        {
+          "op": "remove",
+          "path": "/nuts/5/methods/0/min_amount"
+        },
+        {
+          "value": {
+            "method": "bolt11",
+            "method_name": "bolt11",
+            "unit": "msat"
+          },
+          "op": "add",
+          "path": "/nuts/5/methods/-"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.wolfcoil.com",
+      "name": "peeenuts",
+      "at": 1783809933,
+      "previousLastSeenAt": 1783723307,
+      "hash": "5ca31fd9eaa7768ee84439a29d2cf57b1ba3ed1bea06f8b7d616bd784a24bcf2",
+      "summary": [
+        "long description: お試しでUmbrelにmintサーバを立ててみた → "
+      ],
+      "patch": [
+        {
+          "value": "お試しでUmbrelにmintサーバを立ててみた",
+          "op": "test",
+          "path": "/description_long"
+        },
+        {
+          "value": "",
+          "op": "replace",
+          "path": "/description_long"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.21linz.at",
+      "name": "21linz Cashu Mint",
+      "at": 1783723310,
+      "previousLastSeenAt": 1783636692,
+      "hash": "8896cc662ac9fa098d8bf71bc356588cb6ecfe73f05534352238a46456febac5",
+      "summary": [
+        "description added: Cashu mint hosted on node21",
+        "name added: 21linz Cashu Mint"
+      ],
+      "patch": [
+        {
+          "value": "Cashu mint hosted on node21",
+          "op": "add",
+          "path": "/description"
+        },
+        {
+          "value": "21linz Cashu Mint",
+          "op": "add",
+          "path": "/name"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.fredix.xyz",
+      "name": "Mint fredix",
+      "at": 1783723284,
+      "previousLastSeenAt": 1783636650,
+      "hash": "4d4d71d1b1f4df043ef87086c4afbd557d7016fc60f0a0bb70db0e685f74f5fa",
+      "summary": [
+        "version: cdk-mintd/0.17.1 → cdk-mintd/0.17.2"
+      ],
+      "patch": [
+        {
+          "value": "cdk-mintd/0.17.1",
+          "op": "test",
+          "path": "/version"
+        },
+        {
+          "value": "cdk-mintd/0.17.2",
+          "op": "replace",
+          "path": "/version"
+        }
+      ]
+    },
+    {
+      "mintUrl": "https://mint.nostrzap.me",
+      "name": "mint.nostrzap.me",
+      "at": 1783647555,
+      "previousLastSeenAt": 1783560923,
+      "hash": "91ffea2516b27d08e9caf5ac1e59ae930311871d1aef73c8fb15b37933a65887",
+      "summary": [
+        "contact added: [{\"info\":\"admin@nostrzap.me\",\"method\":\"email\"}]"
+      ],
+      "patch": [
+        {
+          "value": [
+            {
+              "info": "admin@nostrzap.me",
+              "method": "email"
+            }
+          ],
+          "op": "add",
+          "path": "/contact"
+        }
+      ]
+    }
+  ]
+}

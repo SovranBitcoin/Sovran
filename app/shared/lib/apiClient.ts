@@ -104,6 +104,36 @@ const DiscoverMint = z
   })
   .passthrough();
 export type DiscoverMint = z.infer<typeof DiscoverMint>;
+// nagg's mint-info changelog: every tracked mint's NUT-06 revisions, newest
+// first, each carrying the RFC-6902 patch that produced it. Lenient like
+// `DiscoverMint` — the `patch` ops are a wire shape we only ever read, and the
+// decoder (`features/mint/lib/mintChanges/decode`) tolerates unknown ops.
+const MintChangePatchOp = z
+  .object({
+    op: z.string().max(16),
+    path: z.string().max(1024),
+    value: z.unknown().optional(),
+  })
+  .passthrough();
+const MintChange = z
+  .object({
+    mintUrl: z.string().max(2048),
+    name: z.string().max(256).optional(),
+    at: z.number().int().nonnegative(),
+    previousLastSeenAt: z.number().int().nonnegative().optional(),
+    hash: z.string().max(128),
+    summary: z.array(z.string().max(512)).max(200).optional(),
+    patch: z.array(MintChangePatchOp).max(500).optional(),
+  })
+  .passthrough();
+const MintChangesResponse = z.object({
+  trackedMints: z.number().int().nonnegative(),
+  reachableMints: z.number().int().nonnegative(),
+  totalChanges: z.number().int().nonnegative(),
+  changes: z.array(MintChange).max(1000),
+});
+export type MintChangesResponse = z.infer<typeof MintChangesResponse>;
+
 const ReviewerProfileInfo = z
   .object({ name: z.string().optional(), picture: z.string().optional() })
   .passthrough();
@@ -407,6 +437,7 @@ const parseNostrProfileFor =
 const parseLatestVersion = parseWith(LatestVersionResponse, 'app/latest-version');
 const parseAiLineup = parseWith(NaggAiLineupSchema, 'app/ai-lineup');
 const parseDiscoverMints = parseWith(DiscoverMintsResponse, 'nostr/mint/discover');
+const parseMintChanges = parseWith(MintChangesResponse, 'nostr/mint/changes');
 const parseCatalog = parseWith(CatalogResponse, 'wallpapers/catalog');
 
 /**
@@ -452,6 +483,24 @@ export const discoverMints = ({ limit, signal }: { limit?: number; signal?: Abor
     `${SCORE_API_BASE_URL}/nostr/mint/discover${limit ? `?limit=${limit}` : ''}`,
     parseDiscoverMints,
     'nostr/mint/discover',
+    undefined,
+    { signal }
+  );
+
+/**
+ * nagg mint-info changelog: what every tracked mint changed about its own NUT-06
+ * document, newest first. One call covers the whole ecosystem (nagg caps `limit`
+ * at 500 and the entire recorded history is well under that), so callers filter
+ * the response down to the mints they care about rather than asking per mint.
+ */
+export const fetchMintChanges = ({
+  limit = 500,
+  signal,
+}: { limit?: number; signal?: AbortSignal } = {}) =>
+  fetchJson(
+    `${SCORE_API_BASE_URL}/nostr/mint/changes?limit=${limit}`,
+    parseMintChanges,
+    'nostr/mint/changes',
     undefined,
     { signal }
   );

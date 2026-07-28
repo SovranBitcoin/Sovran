@@ -43,6 +43,21 @@ export default function NotificationsLayout() {
         })}
       />
       <Stack.Screen
+        name="mint-changes"
+        options={buildExpoRouterHeaderOptions({
+          iconColor,
+          options: {
+            title: 'Mint updates',
+            headerBackButtonDisplayMode: 'minimal',
+            headerBackButtonMenuEnabled: false,
+            headerBackTitle: '',
+            headerStyle: { backgroundColor: surface },
+            headerTitleStyle: { color: iconColor },
+            headerTintColor: iconColor,
+          },
+        })}
+      />
+      <Stack.Screen
         name="followers"
         options={buildExpoRouterHeaderOptions({
           iconColor,
