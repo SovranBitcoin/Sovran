@@ -195,13 +195,16 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
     async thread(request: ThreadRequest): Promise<TierOutcome<ThreadBundle>> {
       // Full ranked-thread parity with the server: sort/viewer trigger the
       // relevant merge (OP direct replies pinned), offset/replyLimit window
-      // the ordered manifest, candidateLimit bounds the merge pool.
+      // the ordered manifest, candidateLimit bounds the merge pool. The fetch
+      // cap (`limit`) is only sent when the caller asks — the server default
+      // (1000) must apply for replyLimit=0 full-manifest reads, or the stack
+      // would silently truncate at the merge pool size.
       const offset = request.offset ?? 0;
       const replyLimit = request.replyLimit ?? 0;
       const candidateLimit = Math.max(100, offset + replyLimit + RELEVANT_AUTHOR_REPLY_LIMIT + 1);
       const binding = threadAppView({
         id: request.noteId,
-        limit: request.limit ?? candidateLimit,
+        ...(request.limit ? { limit: request.limit } : {}),
         sort: request.sort ?? 'relevant',
         viewer: request.viewerPubkey,
         offset,

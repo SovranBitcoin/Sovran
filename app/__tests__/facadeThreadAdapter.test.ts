@@ -84,18 +84,33 @@ describe('resolvedThreadToResult — tier-aware paging contract', () => {
     } as unknown as facade.FeedItem;
   }
 
-  test('nagg order passes through un-post-sorted; hasMore rides the resolved thread', () => {
+  test('nagg order passes through un-post-sorted into the memory stack', () => {
     // Server ranked B before A on purpose — post-sorting would flip them.
     const thread = buildThread({
       tier: 'nagg',
       replies: [note(B, 200), note(A, 300)],
-      hasMore: true,
+      hasMore: false,
     });
     const result = resolvedThreadToResult(thread, { eventId: ROOT, sort: 'likes', limit: 10 });
     expect(result.replyPageEventIds).toEqual([B, A]);
-    expect(result.hasMoreReplies).toBe(true);
+    expect(result.allSortedReplyIds).toEqual([B, A]);
+    expect(result.hasMoreReplies).toBe(false);
+    expect(result.serverHasMoreReplies).toBe(false);
     expect(result.tier).toBe('nagg');
-    expect(result.allSortedReplyIds).toBeUndefined();
+  });
+
+  test('nagg windows the stack to the display page size; a server continuation keeps hasMore', () => {
+    const thread = buildThread({
+      tier: 'nagg',
+      replies: [note(B, 200), note(A, 300), note(C, 100)],
+      hasMore: true, // fetch cap exceeded server-side
+    });
+    const result = resolvedThreadToResult(thread, { eventId: ROOT, sort: 'relevant', limit: 2 });
+    expect(result.replyPageEventIds).toEqual([B, A]); // first window, server order kept
+    expect(result.allSortedReplyIds).toEqual([B, A, C]); // full stack for memory paging
+    expect(result.loadedReplyCount).toBe(2);
+    expect(result.hasMoreReplies).toBe(true);
+    expect(result.serverHasMoreReplies).toBe(true);
   });
 
   test('single-shot sources window locally and expose the full sorted order', () => {

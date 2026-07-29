@@ -137,11 +137,17 @@ export type ThreadResult = ThreadSeedBuckets & {
   /** The source's full acknowledged reply-id set — the spam-audit diff baseline. */
   knownReplyIds: string[];
   /**
-   * Present only for single-shot sources (Primal/relay): the COMPLETE locally
-   * sorted reply order. replyPageEventIds is a window into this; load-more
-   * widens the window from memory instead of re-fetching.
+   * The COMPLETE ordered reply stack this fetch delivered (nagg: the full
+   * server manifest; Primal/relay: the locally sorted set). replyPageEventIds
+   * is a window into it; load-more widens the window from memory.
    */
   allSortedReplyIds?: string[];
+  /**
+   * nagg only: the server holds MORE ordered replies beyond this stack (fetch
+   * cap exceeded). Once the stack is exhausted, load-more extends it over the
+   * network from the stack's end.
+   */
+  serverHasMoreReplies?: boolean;
 };
 
 export interface FeedClient {

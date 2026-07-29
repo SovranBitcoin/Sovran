@@ -146,9 +146,12 @@ export function useThread(eventId: string): UseThreadResult {
   const knownReplyIdsRef = useRef<Set<string>>(new Set());
   const primaryTierRef = useRef<NostrTier | null>(null);
   const spamAuditStartedRef = useRef(false);
-  /** Full locally-sorted order from a single-shot source — load-more pages this
-   *  from memory instead of the network. Null on the nagg (server-paged) path. */
+  /** The full ordered reply STACK from the source (nagg manifest or local
+   *  sort) — load-more pages this from memory, never the network. */
   const allSortedReplyIdsRef = useRef<string[] | null>(null);
+  /** nagg only: the server holds more ordered replies beyond the stack (fetch
+   *  cap exceeded) — exhausting the stack extends it with one network fetch. */
+  const serverHasMoreRef = useRef(false);
   const isInitialFetchingRef = useRef(false);
   const isLoadingMoreRepliesRef = useRef(false);
   const requestGenerationRef = useRef(0);
@@ -175,7 +178,17 @@ export function useThread(eventId: string): UseThreadResult {
       if (source === 'initial') {
         primaryTierRef.current = result.tier;
         allSortedReplyIdsRef.current = result.allSortedReplyIds ?? null;
+      } else if (result.allSortedReplyIds) {
+        // A network continuation (stack exhausted, server had more): extend
+        // the stack with the tail's unseen ids so fake pagination resumes.
+        const stack = allSortedReplyIdsRef.current ?? [];
+        const seen = new Set(stack);
+        allSortedReplyIdsRef.current = [
+          ...stack,
+          ...result.allSortedReplyIds.filter((id) => !seen.has(id)),
+        ];
       }
+      serverHasMoreRef.current = result.serverHasMoreReplies ?? false;
       for (const id of result.knownReplyIds) knownReplyIdsRef.current.add(id);
       for (const id of replyOrderRef.current) knownReplyIdsRef.current.add(id);
       // A later page can acknowledge a reply the audit had flagged — unflag it.
@@ -349,30 +362,41 @@ export function useThread(eventId: string): UseThreadResult {
       return;
     }
 
-    // Single-shot source (Primal/relay): the full sorted order is already in
-    // memory — widen the window, no network.
+    // Memory first: every source delivers its full ordered stack up front, so
+    // a scroll to the end reveals the next window instantly. The network is
+    // touched only in the rare case where nagg's fetch cap left a server
+    // continuation beyond the stack.
     const allSorted = allSortedReplyIdsRef.current;
     if (allSorted) {
       const shown = replyOrderRef.current.length;
       const next = allSorted.slice(shown, shown + THREAD_REPLY_PAGE_SIZE);
-      replyOrderRef.current = [...replyOrderRef.current, ...next];
-      for (const id of next) knownReplyIdsRef.current.add(id);
-      const exhausted = replyOrderRef.current.length >= allSorted.length;
-      hasMoreRepliesRef.current = !exhausted;
-      setHasMoreReplies(!exhausted);
-      rebuildRepliesFromOrder();
-      feedLog.info('thread.replies.load_more.done', {
-        eventId,
-        replies: next.length,
-        fromMemory: true,
-        hasMoreReplies: !exhausted,
-        replySort,
-      });
-      return;
+      if (next.length > 0) {
+        replyOrderRef.current = [...replyOrderRef.current, ...next];
+        for (const id of next) knownReplyIdsRef.current.add(id);
+        const exhausted =
+          replyOrderRef.current.length >= allSorted.length && !serverHasMoreRef.current;
+        hasMoreRepliesRef.current = !exhausted;
+        setHasMoreReplies(!exhausted);
+        rebuildRepliesFromOrder();
+        feedLog.info('thread.replies.load_more.done', {
+          eventId,
+          replies: next.length,
+          fromMemory: true,
+          hasMoreReplies: !exhausted,
+          replySort,
+        });
+        return;
+      }
+      if (!serverHasMoreRef.current) {
+        hasMoreRepliesRef.current = false;
+        setHasMoreReplies(false);
+        return;
+      }
+      // Stack drained but the server holds more — fall through to extend it.
     }
 
     const generation = requestGenerationRef.current;
-    const offset = replyOffsetRef.current;
+    const offset = allSortedReplyIdsRef.current?.length ?? replyOffsetRef.current;
     const seed = threadSeedRef.current;
     const controller = new AbortController();
     loadMoreAbortControllerRef.current?.abort();

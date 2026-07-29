@@ -32,7 +32,12 @@ export function toFacadeThreadRequest(request: ThreadRequest): facade.ThreadRequ
     sort: toFacadeSort(request.sort),
     ...(request.viewerPubkey ? { viewerPubkey: request.viewerPubkey } : {}),
     offset: request.offset ?? 0,
-    ...(typeof request.limit === 'number' ? { replyLimit: request.limit } : {}),
+    // replyLimit 0 = the FULL ordered manifest from `offset`. nagg ships every
+    // hydrated event regardless of the manifest window, so this costs the same
+    // bytes as a 10-reply page — and the client fake-paginates the stack from
+    // memory, so scrolling (and reaching the spam section) never waits on the
+    // network. request.limit stays the DISPLAY window size only.
+    replyLimit: 0,
     ...(request.signal ? { signal: request.signal } : {}),
     timeoutMs: request.timeoutMs ?? THREAD_TIER_TIMEOUT_MS,
   };
@@ -143,45 +148,38 @@ export function resolvedThreadToResult(
     });
   }
 
-  const offset = request.offset ?? 0;
   const pageSize = request.limit ?? replyEvents.length;
 
+  // Every source is a single fetch feeding a MEMORY STACK the hook
+  // fake-paginates. nagg: the full server manifest (relevant = OP direct
+  // replies pinned) is the authoritative order — post-sorting it would be
+  // exactly the reshuffle the ordering-manifest rules exist to prevent; a
+  // server continuation (thread.hasMore, fetch cap exceeded) is surfaced so
+  // the hook can extend the stack over the network once memory runs out.
+  // Primal/relay: the server can't be trusted to sort/page, so sort locally
+  // (5-way tabs) and pin the OP's direct replies under the relevant sort.
+  let stackOrder: string[];
   if (thread.tier === 'nagg') {
-    // Server-windowed ranked page: the manifest order (relevant = OP direct
-    // replies pinned) is authoritative. Post-sorting it here would be exactly
-    // the reshuffle the ordering-manifest rules exist to prevent.
-    return {
-      allEvents,
-      profiles,
-      metrics,
-      quotedEvents,
-      thread: buildThreadStructure(request.eventId, allEvents),
-      replyPageEventIds: replyEvents.map((event) => event.id),
-      replyPageSize: pageSize,
-      loadedReplyCount: replyEvents.length,
-      hasMoreReplies: thread.hasMore,
-      tier: thread.tier,
-      knownReplyIds: thread.knownReplyIds,
-    };
+    stackOrder = replyEvents.map((event) => event.id);
+  } else {
+    const fullSorted = sortedReplyIds(
+      replyEvents,
+      thread.stats as Record<string, ReplyStat>,
+      request.sort
+    );
+    stackOrder =
+      (request.sort ?? 'relevant') === 'relevant' && root
+        ? facade.partitionOpFirst(fullSorted, root.pubkey, (id) => {
+            const event = allEvents.get(id);
+            return event && facade.isDirectReplyTo(event, request.eventId)
+              ? event.pubkey
+              : undefined;
+          })
+        : fullSorted;
   }
 
-  // Single-shot sources (Primal/relay): the full reply set arrived at once and
-  // the server can't be trusted to sort/page it. Sort locally (5-way tabs), pin
-  // the OP's direct replies under the relevant sort, then present a WINDOW —
-  // load-more widens the window from memory, no network.
-  const fullSorted = sortedReplyIds(
-    replyEvents,
-    thread.stats as Record<string, ReplyStat>,
-    request.sort
-  );
-  const opPinned =
-    (request.sort ?? 'relevant') === 'relevant' && root
-      ? facade.partitionOpFirst(fullSorted, root.pubkey, (id) => {
-          const event = allEvents.get(id);
-          return event && facade.isDirectReplyTo(event, request.eventId) ? event.pubkey : undefined;
-        })
-      : fullSorted;
-  const windowEnd = Math.min(opPinned.length, offset + pageSize);
+  const windowEnd = Math.min(stackOrder.length, pageSize);
+  const serverHasMoreReplies = thread.tier === 'nagg' && thread.hasMore;
 
   return {
     allEvents,
@@ -189,13 +187,14 @@ export function resolvedThreadToResult(
     metrics,
     quotedEvents,
     thread: buildThreadStructure(request.eventId, allEvents),
-    replyPageEventIds: opPinned.slice(0, windowEnd),
+    replyPageEventIds: stackOrder.slice(0, windowEnd),
     replyPageSize: pageSize,
     loadedReplyCount: windowEnd,
-    hasMoreReplies: windowEnd < opPinned.length,
+    hasMoreReplies: windowEnd < stackOrder.length || serverHasMoreReplies,
+    serverHasMoreReplies,
     tier: thread.tier,
     knownReplyIds: thread.knownReplyIds,
-    allSortedReplyIds: opPinned,
+    allSortedReplyIds: stackOrder,
   };
 }
 
