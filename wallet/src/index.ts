@@ -194,6 +194,7 @@ export {
   getPaymentRequest,
   getScanSource,
   getSwap,
+  getZap,
   isP2PKLocked,
   mergeAnnotationRecords,
   mergeAnnotationsIntoEntry,
@@ -212,6 +213,7 @@ export type {
   ScanMethod,
   SwapRole,
   TransactionAnnotation,
+  ZapReceiptKind,
 } from "./annotations";
 
 // Balance breakdown read model (framework-agnostic)

@@ -52,6 +52,15 @@ export const ANNOTATION_KEYS = {
   onchainAddress: "onchainAddress",
   onchainAmountSats: "onchainAmountSats",
   onchainAccelerated: "onchainAccelerated",
+  zapEventId: "zapEventId",
+  zapEventKind: "zapEventKind",
+  zapAuthorPubkey: "zapAuthorPubkey",
+  zapAuthorName: "zapAuthorName",
+  zapAuthorAvatarUrl: "zapAuthorAvatarUrl",
+  zapContentPreview: "zapContentPreview",
+  zapEmoji: "zapEmoji",
+  zapComment: "zapComment",
+  zapReceiptKind: "zapReceiptKind",
 } as const;
 
 /** The flat, persisted/merged form. coco-metadata-compatible. */
@@ -75,6 +84,11 @@ export type PaymentRequestAnnotationTransport =
 /** Who produced a persisted onchain-melt outpoint: the mint's quote row, or
  *  our own mempool.space destination-address match (best-effort). */
 export type OnchainOutpointSource = "mint" | "heuristic";
+/** How a post payment travelled: `nip57` = a signed kind-9734 zap request
+ *  rode the LNURL callback (the recipient's server publishes the 9735
+ *  receipt); `plain` = the target didn't advertise `allowsNostr`, so it was
+ *  paid as a normal lightning send but is still recorded as a post payment. */
+export type ZapReceiptKind = "nip57" | "plain";
 
 /** The rich, decoded form callers read and write. Every field is optional. */
 export interface TransactionAnnotation {
@@ -163,6 +177,30 @@ export interface TransactionAnnotation {
     amountSats?: number;
     /** The tx was boosted via the mempool.space Accelerator. */
     accelerated?: boolean;
+  };
+  /**
+   * Marks a melt as a payment for a nostr post (a "zap"), so the history
+   * detail can render the zapped post and link back to its thread. Only
+   * small reconstructible facts are persisted — the post `eventId` plus a
+   * short display snapshot (author, ~120-char content preview, the preset
+   * emoji and comment). The raw nostr event is deliberately NOT stored.
+   */
+  zap?: {
+    /** Zapped post's nostr event id (hex). */
+    eventId?: string;
+    /** Zapped post's kind (the 9734 `k` tag). */
+    eventKind?: number;
+    /** Post author's nostr pubkey (hex). */
+    authorPubkey?: string;
+    authorName?: string;
+    authorAvatarUrl?: string;
+    /** First ~120 chars of the post content, newlines collapsed. */
+    contentPreview?: string;
+    /** Preset emoji chosen in the zap menu. */
+    emoji?: string;
+    /** Zap comment (9734 content / canned preset message). */
+    comment?: string;
+    receiptKind?: ZapReceiptKind;
   };
 }
 
@@ -317,6 +355,26 @@ export function encodeAnnotation(
     if (patch.onchainMelt.accelerated === true) {
       record[ANNOTATION_KEYS.onchainAccelerated] = "1";
     }
+  }
+
+  if (patch.zap) {
+    setString(record, ANNOTATION_KEYS.zapEventId, patch.zap.eventId);
+    setFiniteNumber(record, ANNOTATION_KEYS.zapEventKind, patch.zap.eventKind);
+    setString(record, ANNOTATION_KEYS.zapAuthorPubkey, patch.zap.authorPubkey);
+    setString(record, ANNOTATION_KEYS.zapAuthorName, patch.zap.authorName);
+    setString(
+      record,
+      ANNOTATION_KEYS.zapAuthorAvatarUrl,
+      patch.zap.authorAvatarUrl,
+    );
+    setString(
+      record,
+      ANNOTATION_KEYS.zapContentPreview,
+      patch.zap.contentPreview,
+    );
+    setString(record, ANNOTATION_KEYS.zapEmoji, patch.zap.emoji);
+    setString(record, ANNOTATION_KEYS.zapComment, patch.zap.comment);
+    setString(record, ANNOTATION_KEYS.zapReceiptKind, patch.zap.receiptKind);
   }
 
   return record;
@@ -519,6 +577,43 @@ export function decodeAnnotation(
       ...(onchainAddress ? { address: onchainAddress } : {}),
       ...(onchainAmountSats != null ? { amountSats: onchainAmountSats } : {}),
       ...(onchainAccelerated ? { accelerated: true } : {}),
+    };
+  }
+
+  const zapEventId = record[ANNOTATION_KEYS.zapEventId];
+  const zapEventKind = parseFiniteNumber(record[ANNOTATION_KEYS.zapEventKind]);
+  const zapAuthorPubkey = record[ANNOTATION_KEYS.zapAuthorPubkey];
+  const zapAuthorName = record[ANNOTATION_KEYS.zapAuthorName];
+  const zapAuthorAvatarUrl = record[ANNOTATION_KEYS.zapAuthorAvatarUrl];
+  const zapContentPreview = record[ANNOTATION_KEYS.zapContentPreview];
+  const zapEmoji = record[ANNOTATION_KEYS.zapEmoji];
+  const zapComment = record[ANNOTATION_KEYS.zapComment];
+  const zapReceiptKindRaw = record[ANNOTATION_KEYS.zapReceiptKind];
+  const zapReceiptKind =
+    zapReceiptKindRaw === "nip57" || zapReceiptKindRaw === "plain"
+      ? (zapReceiptKindRaw as ZapReceiptKind)
+      : undefined;
+  if (
+    zapEventId ||
+    zapEventKind != null ||
+    zapAuthorPubkey ||
+    zapAuthorName ||
+    zapAuthorAvatarUrl ||
+    zapContentPreview ||
+    zapEmoji ||
+    zapComment ||
+    zapReceiptKind
+  ) {
+    annotation.zap = {
+      ...(zapEventId ? { eventId: zapEventId } : {}),
+      ...(zapEventKind != null ? { eventKind: zapEventKind } : {}),
+      ...(zapAuthorPubkey ? { authorPubkey: zapAuthorPubkey } : {}),
+      ...(zapAuthorName ? { authorName: zapAuthorName } : {}),
+      ...(zapAuthorAvatarUrl ? { authorAvatarUrl: zapAuthorAvatarUrl } : {}),
+      ...(zapContentPreview ? { contentPreview: zapContentPreview } : {}),
+      ...(zapEmoji ? { emoji: zapEmoji } : {}),
+      ...(zapComment ? { comment: zapComment } : {}),
+      ...(zapReceiptKind ? { receiptKind: zapReceiptKind } : {}),
     };
   }
 

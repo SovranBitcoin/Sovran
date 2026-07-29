@@ -41,8 +41,33 @@ describe("encodeAnnotation / decodeAnnotation", () => {
       location: { lat: 51.5, lng: -0.12 },
       swap: { groupId: "g1", role: "mint", chainId: "c1", hopIndex: 2 },
       creqCustomization: { p2pkLock: true, excludedMints: ["https://m1", "https://m2"] },
+      zap: {
+        eventId: "e".repeat(64),
+        eventKind: 1,
+        authorPubkey: "f".repeat(64),
+        authorName: "Alice",
+        authorAvatarUrl: "https://x/a.png",
+        contentPreview: "gm nostr",
+        emoji: "👍",
+        comment: "Great post 👍",
+        receiptKind: "nip57",
+      },
     };
     expect(decodeAnnotation(encodeAnnotation(annotation))).toEqual(annotation);
+  });
+
+  it("drops an unknown zap receiptKind but keeps the rest of the zap", () => {
+    const record = encodeAnnotation({
+      zap: { eventId: "abc", eventKind: 1, receiptKind: "plain" },
+    });
+    record.zapReceiptKind = "bogus";
+    expect(decodeAnnotation(record).zap).toEqual({ eventId: "abc", eventKind: 1 });
+  });
+
+  it("round-trips the numeric zap eventKind through the string record", () => {
+    const record = encodeAnnotation({ zap: { eventId: "abc", eventKind: 30023 } });
+    expect(record.zapEventKind).toBe("30023");
+    expect(decodeAnnotation(record).zap?.eventKind).toBe(30023);
   });
 
   it("persists a per-request p2pkLock:false and empty exclusions (overrides global)", () => {

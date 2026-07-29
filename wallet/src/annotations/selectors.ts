@@ -71,6 +71,12 @@ export function getOnchainMelt(
   return getAnnotation(entry).onchainMelt ?? null;
 }
 
+export function getZap(
+  entry: EntryWithMetadata,
+): TransactionAnnotation["zap"] | null {
+  return getAnnotation(entry).zap ?? null;
+}
+
 type EntryWithToken = EntryWithMetadata & { token?: unknown };
 
 /** Best-effort proof extraction from a (send) history entry's token. */

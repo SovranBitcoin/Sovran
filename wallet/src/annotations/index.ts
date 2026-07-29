@@ -13,6 +13,7 @@ export type {
   SwapRole,
   PaymentRequestRole,
   PaymentRequestAnnotationTransport,
+  ZapReceiptKind,
 } from "./model";
 
 export {
@@ -42,5 +43,6 @@ export {
   getCreqCustomization,
   getPaymentRequest,
   getOnchainMelt,
+  getZap,
   isP2PKLocked,
 } from "./selectors";
