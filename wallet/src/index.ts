@@ -498,6 +498,8 @@ export {
   isLightningInvoiceBolt11,
   LnurlError,
   type LnurlErrorCode,
+  type LnurlPayExtrasContext,
+  type LnurlPayExtrasProvider,
 } from "./lnurl";
 
 // Recipient identity resolution (Lightning Address → Nostr hex pubkey)

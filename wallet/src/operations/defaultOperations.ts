@@ -38,7 +38,11 @@ import type {
 } from "../types";
 import { defaultDetectors } from "../detectors";
 import { errField, logger, mintUrlFields } from "../logger";
-import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from "../lnurl";
+import {
+  requestInvoiceFromLnurl,
+  isLightningInvoiceBolt11,
+  type LnurlPayExtrasProvider,
+} from "../lnurl";
 import { parsePaymentInput } from "../parse";
 import { MeltUserCancelledError, UnitRateUnavailableError } from "../errors";
 import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
@@ -553,6 +557,12 @@ export interface DefaultOperationsConfig {
    * sats. Never called for unit 'sat'.
    */
   getSatsPerUnitMinor?: (unit: string) => number | null;
+  /**
+   * Extra LNURL invoice-callback query params (LUD-12 comment / NIP-57 zap
+   * request). The wallet stays nostr-agnostic: the app decides per melt
+   * target whether to attach anything, and the values are opaque strings.
+   */
+  getLnurlPayExtras?: LnurlPayExtrasProvider;
 }
 
 // ---------------------------------------------------------------------------
@@ -1360,9 +1370,12 @@ export function createDefaultOperations(
       const bolt11 =
         targetKind === "bolt11"
           ? meltTarget
-          : await requestInvoiceFromLnurl(meltTarget, toSatDenominated(amount), {
-              timeoutMs: config.lightningTimeoutMs,
-            });
+          : await requestInvoiceFromLnurl(
+              meltTarget,
+              toSatDenominated(amount),
+              { timeoutMs: config.lightningTimeoutMs },
+              config.getLnurlPayExtras,
+            );
       logger.info("operations.executeMelt.invoiceReady", {
         ...mintUrlFields(mintUrl),
         amount,

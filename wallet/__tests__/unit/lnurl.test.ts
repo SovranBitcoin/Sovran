@@ -277,6 +277,87 @@ describe('requestInvoiceFromLnurl — boundary checks', () => {
   });
 });
 
+describe('requestInvoiceFromLnurl — extras provider (NIP-57 / LUD-12)', () => {
+  const ZAP_PAY_PARAMS = {
+    callback: 'https://example.com/lnurl-pay/cb',
+    minSendable: 1000,
+    maxSendable: 1_000_000_000,
+    metadata: '[]',
+    tag: 'payRequest',
+    commentAllowed: 20,
+    allowsNostr: true,
+    nostrPubkey: 'ab'.repeat(32),
+  };
+
+  it('passes the validated pay-params context and appends nostr + comment', async () => {
+    installFetch({ payParams: ZAP_PAY_PARAMS, invoiceResponse: { pr: BOLT11_21_SATS } });
+    const seen: unknown[] = [];
+    const invoice = await requestInvoiceFromLnurl('alice@example.com', 21, {}, async (ctx) => {
+      seen.push(ctx);
+      return { nostr: '{"kind":9734}', comment: 'Great post 👍' };
+    });
+    expect(invoice).toBe(BOLT11_21_SATS);
+    expect(seen).toEqual([
+      {
+        meltTarget: 'alice@example.com',
+        amountMsats: 21000,
+        allowsNostr: true,
+        nostrPubkey: 'ab'.repeat(32),
+        commentAllowed: 20,
+      },
+    ]);
+    const callbackCall = fetchCalls.find((c) => c.url.includes('/lnurl-pay/cb'));
+    const composed = new URL(callbackCall!.url);
+    expect(composed.searchParams.get('amount')).toBe('21000');
+    // searchParams handles URL-encoding of the JSON payload.
+    expect(composed.searchParams.get('nostr')).toBe('{"kind":9734}');
+    // Comment truncated to commentAllowed (20 chars).
+    expect(composed.searchParams.get('comment')).toBe('Great post 👍'.slice(0, 20));
+  });
+
+  it('omits the comment param when the server does not advertise commentAllowed', async () => {
+    const { commentAllowed: _omit, ...noComment } = ZAP_PAY_PARAMS;
+    installFetch({ payParams: noComment, invoiceResponse: { pr: BOLT11_21_SATS } });
+    await requestInvoiceFromLnurl('alice@example.com', 21, {}, async () => ({
+      nostr: '{"kind":9734}',
+      comment: 'hello',
+    }));
+    const composed = new URL(fetchCalls.find((c) => c.url.includes('/lnurl-pay/cb'))!.url);
+    expect(composed.searchParams.get('nostr')).toBe('{"kind":9734}');
+    expect(composed.searchParams.get('comment')).toBeNull();
+  });
+
+  it('leaves the callback untouched when the provider returns null', async () => {
+    installFetch({ payParams: ZAP_PAY_PARAMS, invoiceResponse: { pr: BOLT11_21_SATS } });
+    const invoice = await requestInvoiceFromLnurl('alice@example.com', 21, {}, async () => null);
+    expect(invoice).toBe(BOLT11_21_SATS);
+    const composed = new URL(fetchCalls.find((c) => c.url.includes('/lnurl-pay/cb'))!.url);
+    expect(composed.searchParams.get('nostr')).toBeNull();
+    expect(composed.searchParams.get('comment')).toBeNull();
+  });
+
+  it('still returns the invoice when the provider throws (extras are best-effort)', async () => {
+    installFetch({ payParams: ZAP_PAY_PARAMS, invoiceResponse: { pr: BOLT11_21_SATS } });
+    const invoice = await requestInvoiceFromLnurl('alice@example.com', 21, {}, async () => {
+      throw new Error('9734 build failed');
+    });
+    expect(invoice).toBe(BOLT11_21_SATS);
+    const composed = new URL(fetchCalls.find((c) => c.url.includes('/lnurl-pay/cb'))!.url);
+    expect(composed.searchParams.get('nostr')).toBeNull();
+  });
+
+  it('reports allowsNostr=false for a plain LNURL server', async () => {
+    const { allowsNostr: _a, nostrPubkey: _p, ...plain } = ZAP_PAY_PARAMS;
+    installFetch({ payParams: plain, invoiceResponse: { pr: BOLT11_21_SATS } });
+    const seen: { allowsNostr: boolean; nostrPubkey?: string }[] = [];
+    await requestInvoiceFromLnurl('alice@example.com', 21, {}, async (ctx) => {
+      seen.push({ allowsNostr: ctx.allowsNostr, nostrPubkey: ctx.nostrPubkey });
+      return null;
+    });
+    expect(seen).toEqual([{ allowsNostr: false, nostrPubkey: undefined }]);
+  });
+});
+
 // Suppress the warn we emit on invalid pay params shapes — tests assert
 // the rejection path; the console noise is not the contract.
 beforeEach(() => {

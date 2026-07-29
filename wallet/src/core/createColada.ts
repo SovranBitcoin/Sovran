@@ -74,6 +74,12 @@ export interface ColadaConfig {
    */
   getSatsPerUnitMinor?: DefaultOperationsConfig["getSatsPerUnitMinor"];
 
+  /**
+   * Extra LNURL invoice-callback query params (LUD-12 comment / NIP-57
+   * zap request) — see DefaultOperationsConfig.getLnurlPayExtras.
+   */
+  getLnurlPayExtras?: DefaultOperationsConfig["getLnurlPayExtras"];
+
   unit?: string;
   /**
    * The wallet's ACTIVE unit (multi-unit wallets). The context tracker
@@ -221,6 +227,7 @@ export function createColada(config: ColadaConfig): ColadaInstance {
       config.fetchMintReviews ?? appViewEnrichment?.fetchMintReviews,
     selectOnchainFeeIndex: config.selectOnchainFeeIndex,
     getSatsPerUnitMinor: config.getSatsPerUnitMinor,
+    getLnurlPayExtras: config.getLnurlPayExtras,
     shouldMockFailPaymentRequest: config.shouldMockFailPaymentRequest,
     shouldMockFailMelt: config.shouldMockFailMelt,
     shouldMockFailSend: config.shouldMockFailSend,

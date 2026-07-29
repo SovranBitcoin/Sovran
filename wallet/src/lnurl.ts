@@ -113,6 +113,25 @@ function summarizeCallbackUrl(url: URL): Record<string, unknown> {
   };
 }
 
+/**
+ * App-supplied extra query params for the LNURL invoice callback (LUD-12
+ * comment / NIP-57 zap request). Opaque to the wallet: values are set
+ * verbatim via `URL.searchParams` (which handles encoding). Called AFTER
+ * the msat amount is validated against min/maxSendable, so an attached
+ * zap request can embed the exact amount the callback will carry.
+ */
+export interface LnurlPayExtrasContext {
+  meltTarget: string;
+  amountMsats: number;
+  allowsNostr: boolean;
+  nostrPubkey?: string;
+  commentAllowed?: number;
+}
+
+export type LnurlPayExtrasProvider = (
+  ctx: LnurlPayExtrasContext,
+) => Promise<{ nostr?: string; comment?: string } | null>;
+
 export class LnurlError extends Error {
   readonly code: LnurlErrorCode;
   constructor(code: LnurlErrorCode, message: string) {
@@ -313,6 +332,7 @@ export async function requestInvoiceFromLnurl(
   meltTarget: string,
   amountSats: number,
   controls: RequestControls = {},
+  getExtras?: LnurlPayExtrasProvider,
 ): Promise<string> {
   logger.info('lnurl.invoice.start', {
     ...summarizeTarget(meltTarget),
@@ -351,6 +371,36 @@ export async function requestInvoiceFromLnurl(
 
   const callbackUrl = assertSecureCallback(params.callback);
   callbackUrl.searchParams.set('amount', String(amountMsats));
+  if (getExtras) {
+    try {
+      const extras = await getExtras({
+        meltTarget,
+        amountMsats,
+        allowsNostr: params.allowsNostr === true,
+        nostrPubkey: params.nostrPubkey,
+        commentAllowed: params.commentAllowed,
+      });
+      if (extras?.nostr) {
+        callbackUrl.searchParams.set('nostr', extras.nostr);
+      }
+      if (extras?.comment && params.commentAllowed) {
+        callbackUrl.searchParams.set(
+          'comment',
+          extras.comment.slice(0, params.commentAllowed),
+        );
+      }
+      logger.info('lnurl.invoice.extras', {
+        hasNostr: !!extras?.nostr,
+        nostrLength: extras?.nostr?.length ?? 0,
+        hasComment: !!extras?.comment,
+        allowsNostr: params.allowsNostr === true,
+      });
+    } catch (e) {
+      // Extras are best-effort decoration — a failed zap-request build must
+      // not block the payment. Continue as a plain LNURL pay.
+      logger.warn('lnurl.invoice.extrasFailed', { error: errField(e) });
+    }
+  }
   logger.info('lnurl.invoice.callback', {
     ...summarizeCallbackUrl(callbackUrl),
     amountMsats,
