@@ -45,6 +45,7 @@ import type {
   TransactionSourceFilter,
   TransactionLockFilter,
   TransactionCounterpartyFilter,
+  TransactionZapFilter,
 } from '../components/TransactionsFilterContext';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
@@ -83,6 +84,8 @@ interface TransactionsScreenProps {
   filterLock?: TransactionLockFilter;
   /** External filter: has a nostr counterparty */
   filterCounterparty?: TransactionCounterpartyFilter;
+  /** External filter: paid for a nostr post (zap annotation) */
+  filterZap?: TransactionZapFilter;
   /**
    * External month key (format: "YYYY-MM"). No longer a filter — it names the
    * month the viewport is on / should jump to.
@@ -102,6 +105,7 @@ export function TransactionsScreen({
   filterSource = 'all',
   filterLock = 'all',
   filterCounterparty = 'all',
+  filterZap = 'all',
   filterMonth,
   onMonthChange,
 }: TransactionsScreenProps) {
@@ -352,6 +356,7 @@ export function TransactionsScreen({
         source={filterSource}
         lock={filterLock}
         counterparty={filterCounterparty}
+        zap={filterZap}
         at="all"
         tab={tab}
         onTransactionPress={onTransactionPress}

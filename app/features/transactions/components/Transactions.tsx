@@ -37,6 +37,7 @@ import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import {
   bucketTransaction,
   getCounterparty,
+  getZap,
   getScanSource,
   getSwap,
   isCancellablePendingEcash,
@@ -135,6 +136,8 @@ interface Props {
   source?: 'all' | ScanMethod;
   lock?: 'all' | 'locked' | 'unlocked';
   counterparty?: 'all' | 'with';
+  /** 'zaps' = only melts that paid for a nostr post. */
+  zap?: 'all' | 'zaps';
   at?: 'all' | 'at';
   tab?: 'All' | 'Confirmed' | 'Pending' | 'Expired';
   days?: number;
@@ -196,6 +199,7 @@ export const Transactions = React.memo(
     source = 'all',
     lock = 'all',
     counterparty = 'all',
+    zap = 'all',
     tab = 'All',
     days = 1,
     hideExpired = false,
@@ -242,10 +246,11 @@ export const Transactions = React.memo(
           return false;
         }
 
-        // Annotation-driven filters (source/transport, P2PK lock, counterparty).
+        // Annotation-driven filters (source/transport, P2PK lock, counterparty, zap).
         if (source !== 'all' && getScanSource(historyEntry)?.method !== source) return false;
         if (lock !== 'all' && isP2PKLocked(historyEntry) !== (lock === 'locked')) return false;
         if (counterparty === 'with' && !getCounterparty(historyEntry)?.pubkey) return false;
+        if (zap === 'zaps' && !getZap(historyEntry)?.eventId) return false;
 
         // Filter out expired transactions if hideExpired is true
         if (hideExpired) {

@@ -30,6 +30,7 @@ import {
   getCounterparty,
   getScanSource,
   getSwap,
+  getZap,
   isP2PKLocked,
   isPendingTransaction,
   matchesTransactionFilters,
@@ -42,6 +43,7 @@ type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 type SourceFilter = 'all' | ScanMethod;
 type LockFilter = 'all' | 'locked' | 'unlocked';
 type CounterpartyFilter = 'all' | 'with';
+type ZapFilter = 'all' | 'zaps';
 
 const SUPPORTED_CURRENCIES = ['ALL', 'SAT', 'USD', 'EUR', 'GBP'];
 
@@ -54,6 +56,7 @@ const ParamsSchema = z.object({
   source: z.enum(['all', 'qr', 'nfc', 'ble', 'paste', 'deeplink']).optional(),
   lock: z.enum(['all', 'locked', 'unlocked']).optional(),
   counterparty: z.enum(['all', 'with']).optional(),
+  zap: z.enum(['all', 'zaps']).optional(),
 });
 
 interface ChipProps {
@@ -205,6 +208,7 @@ export function FiltersScreen() {
   const [counterparty, setCounterparty] = useState<CounterpartyFilter>(
     params?.counterparty || 'all'
   );
+  const [zap, setZap] = useState<ZapFilter>(params?.zap || 'all');
 
   const mintOptions = useMemo(
     () => [
@@ -227,6 +231,7 @@ export function FiltersScreen() {
       source,
       lock,
       counterparty,
+      zap,
       hasMintFilter: mintUrl !== 'all',
     });
     router.dismissTo({
@@ -240,9 +245,10 @@ export function FiltersScreen() {
         filterSource: source,
         filterLock: lock,
         filterCounterparty: counterparty,
+        filterZap: zap,
       },
     });
-  }, [currency, paymentType, direction, status, mintUrl, source, lock, counterparty]);
+  }, [currency, paymentType, direction, status, mintUrl, source, lock, counterparty, zap]);
 
   const handleReset = useCallback(() => {
     log.info('tx.filters.reset');
@@ -254,6 +260,7 @@ export function FiltersScreen() {
     setSource('all');
     setLock('all');
     setCounterparty('all');
+    setZap('all');
   }, []);
 
   const hasActiveFilters = useMemo(
@@ -265,8 +272,9 @@ export function FiltersScreen() {
       mintUrl !== 'all' ||
       source !== 'all' ||
       lock !== 'all' ||
-      counterparty !== 'all',
-    [currency, paymentType, direction, status, mintUrl, source, lock, counterparty]
+      counterparty !== 'all' ||
+      zap !== 'all',
+    [currency, paymentType, direction, status, mintUrl, source, lock, counterparty, zap]
   );
 
   const resultCount = useMemo(() => {
@@ -284,6 +292,7 @@ export function FiltersScreen() {
       if (source !== 'all' && getScanSource(historyEntry)?.method !== source) return false;
       if (lock !== 'all' && isP2PKLocked(historyEntry) !== (lock === 'locked')) return false;
       if (counterparty === 'with' && !getCounterparty(historyEntry)?.pubkey) return false;
+      if (zap === 'zaps' && !getZap(historyEntry)?.eventId) return false;
 
       if (status === 'All') return true;
 
@@ -300,7 +309,7 @@ export function FiltersScreen() {
     });
 
     return filteredTransactions.length;
-  }, [currency, direction, history, mintUrl, paymentType, source, lock, counterparty, status]);
+  }, [currency, direction, history, mintUrl, paymentType, source, lock, counterparty, zap, status]);
 
   return (
     <ScreenWrapper
@@ -507,6 +516,21 @@ export function FiltersScreen() {
             icon="ph:user-bold"
             isSelected={counterparty === 'with'}
             onPress={() => setCounterparty('with')}
+          />
+        </Section>
+
+        <Section title="Zaps">
+          <Chip
+            label="All"
+            icon="fluent:apps-16-filled"
+            isSelected={zap === 'all'}
+            onPress={() => setZap('all')}
+          />
+          <Chip
+            label="Zapped posts"
+            icon="mingcute:lightning-fill"
+            isSelected={zap === 'zaps'}
+            onPress={() => setZap('zaps')}
           />
         </Section>
       </View>

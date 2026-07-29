@@ -17,6 +17,8 @@ type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 export type TransactionSourceFilter = 'all' | ScanMethod;
 export type TransactionLockFilter = 'all' | 'locked' | 'unlocked';
 export type TransactionCounterpartyFilter = 'all' | 'with';
+/** 'zaps' = melts carrying a zap annotation (paid for a nostr post). */
+export type TransactionZapFilter = 'all' | 'zaps';
 
 interface TransactionsFilterState {
   currency: string;
@@ -27,6 +29,7 @@ interface TransactionsFilterState {
   source: TransactionSourceFilter;
   lock: TransactionLockFilter;
   counterparty: TransactionCounterpartyFilter;
+  zap: TransactionZapFilter;
   selectedMonth: string | null;
 }
 
@@ -39,6 +42,7 @@ interface TransactionsFilterContextValue extends TransactionsFilterState {
   setSource: (source: TransactionSourceFilter) => void;
   setLock: (lock: TransactionLockFilter) => void;
   setCounterparty: (counterparty: TransactionCounterpartyFilter) => void;
+  setZap: (zap: TransactionZapFilter) => void;
   setSelectedMonth: (month: string | null) => void;
   openFilterSheet: () => void;
   hasActiveFilters: boolean;
@@ -72,6 +76,7 @@ export function TransactionsFilterProvider({
   const [source, setSource] = useState<TransactionSourceFilter>('all');
   const [lock, setLock] = useState<TransactionLockFilter>('all');
   const [counterparty, setCounterparty] = useState<TransactionCounterpartyFilter>('all');
+  const [zap, setZap] = useState<TransactionZapFilter>('all');
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const openFilterSheet = useCallback(() => {
@@ -94,6 +99,7 @@ export function TransactionsFilterProvider({
         source,
         lock,
         counterparty,
+        zap,
       },
     });
   }, [
@@ -105,6 +111,7 @@ export function TransactionsFilterProvider({
     source,
     lock,
     counterparty,
+    zap,
     selectedMonth,
   ]);
 
@@ -116,9 +123,10 @@ export function TransactionsFilterProvider({
       mintUrl !== 'all' ||
       source !== 'all' ||
       lock !== 'all' ||
-      counterparty !== 'all'
+      counterparty !== 'all' ||
+      zap !== 'all'
     );
-  }, [paymentType, direction, status, mintUrl, source, lock, counterparty]);
+  }, [paymentType, direction, status, mintUrl, source, lock, counterparty, zap]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -129,8 +137,9 @@ export function TransactionsFilterProvider({
     if (source !== 'all') count++;
     if (lock !== 'all') count++;
     if (counterparty !== 'all') count++;
+    if (zap !== 'all') count++;
     return count;
-  }, [paymentType, direction, status, mintUrl, source, lock, counterparty]);
+  }, [paymentType, direction, status, mintUrl, source, lock, counterparty, zap]);
 
   const value = useMemo(
     () => ({
@@ -142,6 +151,7 @@ export function TransactionsFilterProvider({
       source,
       lock,
       counterparty,
+      zap,
       selectedMonth,
       setCurrency,
       setPaymentType,
@@ -151,6 +161,7 @@ export function TransactionsFilterProvider({
       setSource,
       setLock,
       setCounterparty,
+      setZap,
       setSelectedMonth,
       openFilterSheet,
       hasActiveFilters,
@@ -165,6 +176,7 @@ export function TransactionsFilterProvider({
       source,
       lock,
       counterparty,
+      zap,
       selectedMonth,
       openFilterSheet,
       hasActiveFilters,

@@ -34,6 +34,7 @@ const ParamsSchema = z.object({
   filterSource: z.enum(['all', 'qr', 'nfc', 'ble', 'paste', 'deeplink']).optional(),
   filterLock: z.enum(['all', 'locked', 'unlocked']).optional(),
   filterCounterparty: z.enum(['all', 'with']).optional(),
+  filterZap: z.enum(['all', 'zaps']).optional(),
 });
 
 function FilterButton() {
@@ -83,6 +84,7 @@ function TransactionsRoute() {
     source,
     lock,
     counterparty,
+    zap,
     selectedMonth,
     setSelectedMonth,
     setCurrency,
@@ -93,6 +95,7 @@ function TransactionsRoute() {
     setSource,
     setLock,
     setCounterparty,
+    setZap,
   } = useTransactionsFilter();
 
   const filterCurrency = params?.filterCurrency;
@@ -103,6 +106,7 @@ function TransactionsRoute() {
   const filterSource = params?.filterSource;
   const filterLock = params?.filterLock;
   const filterCounterparty = params?.filterCounterparty;
+  const filterZap = params?.filterZap;
 
   // Sync filter params from URL to context (when returning from filter flow)
   React.useEffect(() => {
@@ -131,6 +135,7 @@ function TransactionsRoute() {
     if (filterSource) setSource(filterSource);
     if (filterLock) setLock(filterLock);
     if (filterCounterparty) setCounterparty(filterCounterparty);
+    if (filterZap) setZap(filterZap);
   }, [
     filterCurrency,
     filterPaymentType,
@@ -140,6 +145,7 @@ function TransactionsRoute() {
     filterSource,
     filterLock,
     filterCounterparty,
+    filterZap,
     setCurrency,
     setPaymentType,
     setDirection,
@@ -148,6 +154,7 @@ function TransactionsRoute() {
     setSource,
     setLock,
     setCounterparty,
+    setZap,
   ]);
 
   // Handle transaction press — declared before the early-return so the hook
@@ -180,6 +187,7 @@ function TransactionsRoute() {
         filterSource={source}
         filterLock={lock}
         filterCounterparty={counterparty}
+        filterZap={zap}
         filterMonth={selectedMonth}
         onMonthChange={setSelectedMonth}
       />
