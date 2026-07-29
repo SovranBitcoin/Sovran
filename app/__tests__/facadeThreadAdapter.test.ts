@@ -8,9 +8,25 @@ const B = 'b'.repeat(64); // most likes
 const C = 'c'.repeat(64); // most zaps, oldest
 
 function note(id: string, createdAt: number): facade.FeedItem {
+  // Replies must carry a real NIP-10 parent tag now — the adapter's stack
+  // holds only direct replies of the target.
   return {
     type: 'note',
-    event: { id, pubkey: 'p'.repeat(64), kind: 1, content: '', tags: [], created_at: createdAt },
+    event: {
+      id,
+      pubkey: 'p'.repeat(64),
+      kind: 1,
+      content: '',
+      tags: [['e', ROOT, '', 'root']],
+      created_at: createdAt,
+    },
+  } as unknown as facade.FeedItem;
+}
+
+function rootNote(createdAt: number): facade.FeedItem {
+  return {
+    type: 'note',
+    event: { id: ROOT, pubkey: 'p'.repeat(64), kind: 1, content: '', tags: [], created_at: createdAt },
   } as unknown as facade.FeedItem;
 }
 
@@ -24,7 +40,7 @@ const STATS = {
 function buildThread(overrides: Record<string, unknown> = {}): facade.ResolvedThread {
   return {
     tier: 'primal',
-    root: note(ROOT, 1000),
+    root: rootNote(1000),
     parents: [],
     replies: [note(A, 300), note(B, 200), note(C, 100)],
     extras: [],
@@ -155,5 +171,36 @@ describe('resolvedThreadToResult — tier-aware paging contract', () => {
       },
     } as never);
     expect(result.allEvents.get(seedEvent.id)?.content).toBe('seed');
+  });
+});
+
+describe('resolvedThreadToResult — direct-only reply enforcement (every rail)', () => {
+  const NESTED = '6'.repeat(64);
+
+  test('a nested reply in the source set never enters the stack, pages, or known window math', () => {
+    const nested = {
+      type: 'note',
+      event: {
+        id: NESTED,
+        pubkey: 'n'.repeat(64),
+        kind: 1,
+        content: '',
+        // Replies to A (reply marker) — root tag is thread context, not parent.
+        tags: [
+          ['e', ROOT, '', 'root'],
+          ['e', A, '', 'reply'],
+        ],
+        created_at: 400,
+      },
+    } as unknown as facade.FeedItem;
+
+    for (const tier of ['nagg', 'primal'] as const) {
+      const thread = buildThread({ tier, replies: [note(A, 300), nested, note(B, 200)] });
+      const result = resolvedThreadToResult(thread, { eventId: ROOT, sort: 'new', limit: 10 });
+      expect(result.replyPageEventIds).not.toContain(NESTED);
+      expect(result.allSortedReplyIds).not.toContain(NESTED);
+      // Still hydrated for tap-through: opening it shows its true parent.
+      expect(result.allEvents.get(NESTED)?.id).toBe(NESTED);
+    }
   });
 });

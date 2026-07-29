@@ -1,3 +1,5 @@
+import { facade } from 'nostr';
+
 import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
 import type { ThreadResult, ThreadSeedBuckets } from '@/features/feed/data/feedClient';
 import {
@@ -180,6 +182,11 @@ function includeSelectedReplyIdsInThread(
   for (const id of replyIds) {
     const event = allEvents.get(id);
     if (!event || existingIds.has(event.id)) continue;
+    // Feed previews include NESTED replies (the author chain / followed tail).
+    // The thread's flat reply list holds DIRECT replies only — a nested
+    // preview rendered here sits under the wrong parent, so it waits for its
+    // own place in the tree instead of being force-appended.
+    if (!facade.isDirectReplyTo(event, thread.target.id)) continue;
     existingIds.add(event.id);
     selectedReplies.push(event);
   }

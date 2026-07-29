@@ -105,7 +105,7 @@ describe('thread item builders', () => {
     ).toEqual(['first-preview', 'second-preview']);
   });
 
-  it('renders nested preview replies already shown by the feed seed', () => {
+  it('drops nested preview replies from the flat list (they belong to their own subtree)', () => {
     const root = note({ id: 'root', content: 'root post', createdAt: 100, pubkey: 'alice' });
     const authorReply = note({
       id: 'author-reply',
@@ -131,9 +131,11 @@ describe('thread item builders', () => {
       })
     );
 
+    // followed-tail replies to author-reply, not the root — force-rendering it
+    // flat put it under the wrong parent (the reported wrong-tree taps).
     expect(
       built?.items.filter((item) => item.type === 'reply').map((item) => item.event.id)
-    ).toEqual(['author-reply', 'followed-tail']);
+    ).toEqual(['author-reply']);
   });
 
   it('does not duplicate a seeded reply when the GraphQL page returns it again', () => {

@@ -151,19 +151,27 @@ export function resolvedThreadToResult(
   const pageSize = request.limit ?? replyEvents.length;
 
   // Every source is a single fetch feeding a MEMORY STACK the hook
-  // fake-paginates. nagg: the full server manifest (relevant = OP direct
-  // replies pinned) is the authoritative order — post-sorting it would be
-  // exactly the reshuffle the ordering-manifest rules exist to prevent; a
-  // server continuation (thread.hasMore, fetch cap exceeded) is surfaced so
-  // the hook can extend the stack over the network once memory runs out.
+  // fake-paginates. The stack holds ONLY the target's DIRECT replies
+  // (NIP-10/NIP-22 parent == target) on EVERY rail: nagg enforces this
+  // server-side now, but Primal/relay return whole subtrees and an older nagg
+  // appended nested descendants — rendering those flat put replies under the
+  // wrong parent. Nested events stay in allEvents for tap-through.
+  // nagg: the direct-filtered server manifest (relevant = OP direct replies
+  // pinned) is the authoritative order — post-sorting it would be exactly the
+  // reshuffle the ordering-manifest rules exist to prevent; a server
+  // continuation (thread.hasMore, fetch cap exceeded) is surfaced so the hook
+  // can extend the stack over the network once memory runs out.
   // Primal/relay: the server can't be trusted to sort/page, so sort locally
   // (5-way tabs) and pin the OP's direct replies under the relevant sort.
+  const directReplyEvents = replyEvents.filter((event) =>
+    facade.isDirectReplyTo(event, request.eventId)
+  );
   let stackOrder: string[];
   if (thread.tier === 'nagg') {
-    stackOrder = replyEvents.map((event) => event.id);
+    stackOrder = directReplyEvents.map((event) => event.id);
   } else {
     const fullSorted = sortedReplyIds(
-      replyEvents,
+      directReplyEvents,
       thread.stats as Record<string, ReplyStat>,
       request.sort
     );
