@@ -286,6 +286,10 @@ export function demuxPrimalThread(events: ReadonlyArray<RawPrimalEvent>, rootId:
     parents,
     itemsById,
     manifest,
+    // Single-shot full thread: nothing is off-manifest and there is never a
+    // further server page — the caller windows locally if it wants pages.
+    extras: [],
+    hasMore: false,
     stats: batch.stats,
     ...(hasActions ? { actions: batch.actions } : {}),
     profiles: batch.profiles,

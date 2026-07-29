@@ -157,3 +157,141 @@ describe('thread parity — Primal and relay tiers', () => {
     expect(thread.stats).toEqual({}); // no engagement on the floor
   });
 });
+
+// ---------------------------------------------------------------------------
+// Thread contract v2: paging params, hasMore, extras, knownReplyIds, OP pin
+// ---------------------------------------------------------------------------
+
+describe('nagg thread — paging params and truthful hasMore', () => {
+  test('forwards sort/viewer/offset/replyLimit/candidateLimit/rankedLimit to the app-view', async () => {
+    const { client, urlOf } = naggClientReturning({ ...THREAD_ENVELOPE, total: 2 });
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+
+    await layer.getThread({
+      noteId: ROOT,
+      viewerPubkey: PUB,
+      sort: 'relevant',
+      offset: 10,
+      replyLimit: 10,
+    });
+    const url = urlOf();
+    expect(url).toContain('/nostr/thread');
+    expect(url).toContain('sort=relevant');
+    expect(url).toContain(`viewer=${PUB}`);
+    expect(url).toContain('offset=10');
+    expect(url).toContain('replyLimit=10');
+    expect(url).toContain('candidateLimit=100');
+    expect(url).toContain('rankedLimit=50');
+  });
+
+  test('hasMore/nextOffset ride the envelope cursor; absent cursor = exhausted', async () => {
+    const paged = naggClientReturning({ ...THREAD_ENVELOPE, total: 40, cursor: '0|2' });
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client: paged.client })] });
+    const thread = (await layer.getThread({ noteId: ROOT }))._unsafeUnwrap();
+    expect(thread.hasMore).toBe(true);
+    expect(thread.nextOffset).toBe(2);
+
+    const lastPage = naggClientReturning({ ...THREAD_ENVELOPE, total: 2 });
+    const layer2 = createNostrDataLayer({ tiers: [createNaggTier({ client: lastPage.client })] });
+    const done = (await layer2.getThread({ noteId: ROOT }))._unsafeUnwrap();
+    expect(done.hasMore).toBe(false);
+    expect(done.nextOffset).toBeUndefined();
+  });
+
+  test('off-manifest hydration lands in extras (and knownReplyIds), never in replies', async () => {
+    const EXTRA = '7'.repeat(64);
+    const envelope = {
+      ...THREAD_ENVELOPE,
+      events: [...THREAD_ENVELOPE.events, { ...event(EXTRA, 1_700_000_300), tags: [['e', ROOT, '', 'root']] }],
+      total: 3,
+      cursor: '0|2',
+    };
+    const { client } = naggClientReturning(envelope);
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+    const thread = (await layer.getThread({ noteId: ROOT }))._unsafeUnwrap();
+
+    expect(thread.replies.map((r) => (r.type === 'note' ? r.event.id : ''))).toEqual([R1, R2]);
+    expect(thread.extras.map((r) => (r.type === 'note' ? r.event.id : ''))).toEqual([EXTRA]);
+    expect([...thread.knownReplyIds].sort()).toEqual([R1, R2, EXTRA].sort());
+    // Extras are cached for instant tap-through.
+    expect(layer.cache.getNote(EXTRA)?.id).toBe(EXTRA);
+  });
+});
+
+describe('OP-first partition across tiers (relevant sort only)', () => {
+  const OP = '1'.repeat(64);
+  const OTHER = '2'.repeat(64);
+  const OP_DIRECT = '3'.repeat(64);
+  const OP_NESTED = '4'.repeat(64);
+  const OTHER_R = '5'.repeat(64);
+
+  // Relay batch: root by OP; a newer reply by OTHER; an older DIRECT reply by
+  // OP; and a nested OP reply (to OTHER_R, only root-marker context tag).
+  const relayBatch: RawRelayEvent[] = [
+    { id: ROOT, pubkey: OP, kind: 1, content: 'root', tags: [], created_at: 1_700_000_000 },
+    { id: OTHER_R, pubkey: OTHER, kind: 1, content: 'r', tags: [['e', ROOT]], created_at: 1_700_000_300 },
+    { id: OP_DIRECT, pubkey: OP, kind: 1, content: 'op', tags: [['e', ROOT]], created_at: 1_700_000_100 },
+    {
+      id: OP_NESTED,
+      pubkey: OP,
+      kind: 1,
+      content: 'op nested',
+      tags: [
+        ['e', ROOT, '', 'root'],
+        ['e', OTHER_R, '', 'reply'],
+      ],
+      created_at: 1_700_000_400,
+    },
+  ];
+
+  function fakeRelay(events: RawRelayEvent[]): RelayConnection {
+    return { request: (): Promise<Result<RawRelayEvent[], NaggError>> => Promise.resolve(ok(events)) };
+  }
+
+  test('relay-served relevant thread pins the OP direct reply first; nested OP replies stay put', async () => {
+    const layer = createNostrDataLayer({
+      tiers: [pendingFeedTier('nagg'), createRelayTier({ connection: fakeRelay(relayBatch) })],
+    });
+    const thread = (await layer.getThread({ noteId: ROOT }))._unsafeUnwrap();
+    // Recency order would be [OP_NESTED, OTHER_R, OP_DIRECT]; the pin moves
+    // ONLY the direct OP reply to the front, keeping relative order elsewhere.
+    expect(thread.replies.map((r) => (r.type === 'note' ? r.event.id : ''))).toEqual([
+      OP_DIRECT,
+      OP_NESTED,
+      OTHER_R,
+    ]);
+    expect(thread.hasMore).toBe(false); // single-shot full thread — no fake "more"
+  });
+
+  test('an explicit sort stays literal — no OP pin under sort:"new"', async () => {
+    const layer = createNostrDataLayer({
+      tiers: [pendingFeedTier('nagg'), createRelayTier({ connection: fakeRelay(relayBatch) })],
+    });
+    const thread = (await layer.getThread({ noteId: ROOT, sort: 'new' }))._unsafeUnwrap();
+    expect(thread.replies.map((r) => (r.type === 'note' ? r.event.id : ''))).toEqual([
+      OP_NESTED,
+      OTHER_R,
+      OP_DIRECT,
+    ]);
+  });
+
+  test('nagg manifest already leads with the OP block — the partition is a byte-identical no-op', async () => {
+    // Server order: OP direct replies first, then others (what nagg emits for
+    // sort=relevant). Re-partitioning client-side must not move anything.
+    const envelope = {
+      order: [ROOT, OP_DIRECT, OTHER_R],
+      orderBy: 'rank',
+      events: [
+        { id: ROOT, kind: 1, pubkey: OP, content: 'root', tags: [], created_at: 1_700_000_000 },
+        { id: OP_DIRECT, kind: 1, pubkey: OP, content: 'op', tags: [['e', ROOT, '', 'root']], created_at: 1_700_000_100 },
+        { id: OTHER_R, kind: 1, pubkey: OTHER, content: 'r', tags: [['e', ROOT, '', 'root']], created_at: 1_700_000_300 },
+      ],
+      aggregates: {},
+      total: 2,
+    };
+    const { client } = naggClientReturning(envelope);
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+    const thread = (await layer.getThread({ noteId: ROOT, sort: 'relevant' }))._unsafeUnwrap();
+    expect(thread.replies.map((r) => (r.type === 'note' ? r.event.id : ''))).toEqual([OP_DIRECT, OTHER_R]);
+  });
+});

@@ -502,11 +502,32 @@ export function feedPageFromEnvelope(envelope: NaggEnvelope): NaggFeedPage {
 // Thread reconstruction — order[0] is the root, the rest are ranked replies
 // ---------------------------------------------------------------------------
 
+/**
+ * Thread route extension: `total` = ordered replies before offset/replyLimit
+ * slicing (excludes the root). Old servers omit it — `nullish` keeps them
+ * parsing (schema tolerance, not a behavioral fallback path).
+ */
+export const NaggThreadEnvelopeSchema = NaggEnvelopeSchema.extend({
+  total: z.number().int().nonnegative().nullish(),
+});
+export type NaggThreadEnvelope = z.infer<typeof NaggThreadEnvelopeSchema>;
+
 /** The structural thread shape (v1's `ThreadResponse`), fed to `bundleFromThread`. */
 export type NaggThread = {
   root: NaggFeedEvent;
+  /** The ordered reply PAGE — manifest-resolved, server order. */
   events: NaggFeedEvent[];
   ordering?: NaggOrderingManifest;
+  /**
+   * Hydrated non-kind-0 events NOT in `order` (off-page descendants, quoted
+   * hydration). Kept accessible for caching and the thread-audit diff but
+   * NEVER merged into the rendered order (anti-reshuffle).
+   */
+  extraEvents: Record<string, NaggFeedEvent>;
+  /** Server's total ordered replies pre-paging; undefined on old servers. */
+  totalReplies?: number;
+  /** Echo back as `offset` for the next page; undefined when exhausted (or old server). */
+  nextOffset?: number;
   metrics: Record<string, NaggNoteMetrics>;
   profiles: Record<string, NaggProfileInfo>;
   quoted: Record<string, NaggFeedEvent>;
@@ -517,7 +538,7 @@ export type NaggThread = {
  * the server-ranked reply ids. Returns null when the root event is missing from
  * the envelope (nothing to render — let the caller fall through).
  */
-export function threadFromEnvelope(envelope: NaggEnvelope): NaggThread | null {
+export function threadFromEnvelope(envelope: NaggThreadEnvelope): NaggThread | null {
   const byId = envelopeEventsById(envelope);
   const rootId = envelope.order[0];
   const root = rootId ? byId.get(rootId) : undefined;
@@ -530,14 +551,25 @@ export function threadFromEnvelope(envelope: NaggEnvelope): NaggThread | null {
     if (event) events.push(event);
   }
 
-  const metricIds = new Set<string>([root.id, ...replyIds]);
+  const inOrder = new Set(envelope.order);
+  const extraEvents: Record<string, NaggFeedEvent> = {};
+  for (const event of envelope.events) {
+    if (event.kind === 0 || inOrder.has(event.id)) continue;
+    extraEvents[event.id] = event;
+  }
+
+  const cursor = parseEnvelopeCursor(envelope.cursor);
+  const metricIds = new Set<string>([root.id, ...replyIds, ...Object.keys(extraEvents)]);
   return {
     root,
     events,
     ordering: { orderBy: envelope.orderBy, elements: replyIds },
+    extraEvents,
+    ...(typeof envelope.total === 'number' ? { totalReplies: envelope.total } : {}),
+    ...(cursor ? { nextOffset: cursor.offset } : {}),
     metrics: noteMetricsMapFromAggregates(envelope.aggregates, metricIds),
     profiles: profileInfoMapFromEnvelope(envelope),
-    quoted: quotedMap(byId, [root, ...events]),
+    quoted: quotedMap(byId, [root, ...events, ...Object.values(extraEvents)]),
   };
 }
 

@@ -243,3 +243,97 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
     expect(layer.cache.getProfile(PUB)?.name).toBe('alice');
   });
 });
+
+describe('nagg tier cooldown circuit-breaker', () => {
+  const FEED_SPEC = { kind: 'for-you', viewerPubkey: PUB } as const;
+
+  test('consecutive network failures arm the cooldown; subsequent reads short-circuit without fetching', async () => {
+    let fetchCalls = 0;
+    const client = createNaggClient({
+      appView: { baseUrl: 'https://nagg.test' },
+      fetchImpl: (async () => {
+        fetchCalls += 1;
+        throw new Error('fetch failed: network down');
+      }) as unknown as typeof fetch,
+    });
+    const tier = createNaggTier({ client });
+
+    // First failure: below the threshold — the next read still probes nagg.
+    const first = await tier.feedPage!({ spec: FEED_SPEC });
+    expect(first.kind).toBe('failed');
+    expect(fetchCalls).toBe(1);
+
+    // Second consecutive failure opens the breaker …
+    const second = await tier.feedPage!({ spec: FEED_SPEC });
+    expect(second.kind).toBe('failed');
+    expect(fetchCalls).toBe(2);
+
+    // … so the third read fails fast without touching the network.
+    const third = await tier.feedPage!({ spec: FEED_SPEC });
+    expect(third.kind).toBe('failed');
+    expect(fetchCalls).toBe(2);
+  });
+
+  test('a single slow/timed-out read does NOT poison later reads (success resets the count)', async () => {
+    let fetchCalls = 0;
+    const responses: Array<'timeout' | 'ok'> = ['timeout', 'ok', 'timeout', 'ok'];
+    const client = createNaggClient({
+      appView: { baseUrl: 'https://nagg.test' },
+      fetchImpl: (async () => {
+        const behavior = responses[fetchCalls];
+        fetchCalls += 1;
+        if (behavior === 'timeout') {
+          const error = new Error('Timed out');
+          error.name = 'TimeoutError';
+          throw error;
+        }
+        return jsonResponse(FEED_ENVELOPE);
+      }) as unknown as typeof fetch,
+    });
+    const tier = createNaggTier({ client });
+
+    // timeout → probe again → answered (resets) → timeout → probe again.
+    // Every read reaches the network: isolated slow reads never open the breaker.
+    for (let i = 0; i < 4; i++) {
+      await tier.feedPage!({ spec: FEED_SPEC });
+    }
+    expect(fetchCalls).toBe(4);
+  });
+
+  test('an HTTP error (server reachable) does NOT arm the cooldown', async () => {
+    let fetchCalls = 0;
+    const client = createNaggClient({
+      appView: { baseUrl: 'https://nagg.test' },
+      fetchImpl: (async () => {
+        fetchCalls += 1;
+        return jsonResponse({}, { ok: false, status: 500 });
+      }) as unknown as typeof fetch,
+    });
+    const tier = createNaggTier({ client });
+
+    await tier.feedPage!({ spec: FEED_SPEC });
+    await tier.feedPage!({ spec: FEED_SPEC });
+    expect(fetchCalls).toBe(2);
+  });
+
+  test('a caller abort does NOT arm the cooldown', async () => {
+    let fetchCalls = 0;
+    const client = createNaggClient({
+      appView: { baseUrl: 'https://nagg.test' },
+      fetchImpl: (async () => {
+        fetchCalls += 1;
+        const error = new Error('Aborted');
+        error.name = 'AbortError';
+        throw error;
+      }) as unknown as typeof fetch,
+    });
+    const tier = createNaggTier({ client });
+
+    const controller = new AbortController();
+    controller.abort();
+    await tier.feedPage!({ spec: FEED_SPEC, signal: controller.signal });
+    await tier.feedPage!({ spec: FEED_SPEC, signal: controller.signal });
+    // Aborted reads reach the transport but never count toward the breaker.
+    expect(fetchCalls).toBe(2);
+  });
+});

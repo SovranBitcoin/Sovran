@@ -107,6 +107,10 @@ export function demuxRelayThread(
     parents,
     itemsById,
     manifest,
+    // Single-shot full thread: nothing is off-manifest and there is never a
+    // further server page — the caller windows locally if it wants pages.
+    extras: [],
+    hasMore: false,
     stats: {},
     profiles,
     quoted: {},

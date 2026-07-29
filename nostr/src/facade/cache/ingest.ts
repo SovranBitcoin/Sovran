@@ -51,6 +51,9 @@ export function ingestThread(cache: NostrEntityCache, thread: ResolvedThread): v
   const events: NaggFeedEvent[] = [...eventsFromFeedItem(thread.root)];
   for (const item of thread.parents) events.push(...eventsFromFeedItem(item));
   for (const item of thread.replies) events.push(...eventsFromFeedItem(item));
+  // Off-manifest hydration (off-page descendants, quote hydration): cached so
+  // tapping one opens instantly, but never rendered in the reply order.
+  for (const item of thread.extras) events.push(...eventsFromFeedItem(item));
   events.push(...Object.values(thread.quoted));
   cache.ingestNotes(events);
   cache.ingestNoteStats(thread.stats, thread.tier);

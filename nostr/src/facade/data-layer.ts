@@ -2,11 +2,13 @@ import { ok, type Result } from 'neverthrow';
 import type { NostrTier } from '@sovranbitcoin/schemas';
 import {
   resolveAcrossTiers,
+  auditAcrossTiers,
   applyOrderingManifest,
   type TierCandidate,
   type TierResolutionError,
 } from '../tiers';
 import { nostrLog, type NostrLogData } from '../log';
+import type { NaggFeedEvent } from '../map/feed';
 import { feedItemKey, type FeedBundle, type FeedItem, type FeedPageRequest, type ResolvedFeedPage } from './feed';
 import {
   createSurfaceSession,
@@ -14,7 +16,16 @@ import {
   type LiveSubscribe,
   type SurfaceSession,
 } from './session/surface-session';
-import type { ThreadBundle, ThreadRequest, ResolvedThread } from './thread';
+import {
+  partitionOpFirst,
+  isDirectReplyTo,
+  type ThreadBundle,
+  type ThreadRequest,
+  type ThreadSort,
+  type ThreadAuditRequest,
+  type ResolvedThread,
+  type ResolvedThreadAudit,
+} from './thread';
 import type {
   NotificationsBundle,
   NotificationsRequest,
@@ -97,6 +108,15 @@ export interface NostrDataLayer {
    */
   openFeedSession(request: FeedPageRequest): SurfaceSession<FeedItem>;
   getThread(request: ThreadRequest): Promise<Result<ResolvedThread, TierResolutionError>>;
+  /**
+   * Background "Might be spam" second opinion for a thread: consult only the
+   * tiers BELOW the one that served the primary read, diff their direct
+   * replies against the primary's acknowledged set, and return the extras
+   * (OP-authored ones split out for promotion). Memoized per note (~5 min) so
+   * navigation churn doesn't re-run the Primal/relay fan-out. Never throws;
+   * exhaustion is `{ tier: null }`.
+   */
+  auditThreadReplies(request: ThreadAuditRequest): Promise<ResolvedThreadAudit>;
   getNotifications(
     request: NotificationsRequest,
   ): Promise<Result<ResolvedNotifications, TierResolutionError>>;
@@ -143,6 +163,10 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
   // relay-only.
   const liveTier = config.tiers.find((t) => typeof t.feedLiveSubscribe === 'function');
   const dmLiveTier = config.tiers.find((t) => typeof t.dmLiveSubscribe === 'function');
+
+  // Per-note audit memo. Layer-scoped (the app supplies a profile-scoped
+  // layer singleton, so a profile switch drops it with everything else).
+  const auditMemo: ThreadAuditMemo = new Map();
 
   return {
     cache,
@@ -197,19 +221,29 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
     },
 
     async getThread(request) {
+      const sort: ThreadSort = request.sort ?? 'relevant';
       return runRead(
         'thread',
-        { noteId: short(request.noteId), sort: request.sort ?? 'relevant' },
+        { noteId: short(request.noteId), sort, offset: request.offset ?? 0 },
         async () => {
           const candidates = candidatesFor(config.tiers, 'thread', (t) => () => t.thread!(request));
           return (await resolveAcrossTiers<ThreadBundle>(candidates)).map(({ tier, value }) => {
-            const thread = assembleThread(tier, value);
+            const thread = assembleThread(tier, value, sort);
             ingestThread(cache, thread);
             return thread;
           });
         },
-        (t) => ({ replies: t.replies.length, missingIds: t.missingIds.length }),
+        (t) => ({
+          replies: t.replies.length,
+          extras: t.extras.length,
+          hasMore: t.hasMore,
+          missingIds: t.missingIds.length,
+        }),
       );
+    },
+
+    async auditThreadReplies(request) {
+      return auditThread(config.tiers, cache, auditMemo, request);
     },
 
     async getNotifications(request) {
@@ -445,16 +479,154 @@ function assembleFeedPage(tier: NostrTier, bundle: FeedBundle): ResolvedFeedPage
   };
 }
 
-function assembleThread(tier: NostrTier, bundle: ThreadBundle): ResolvedThread {
+const THREAD_AUDIT_TTL_MS = 5 * 60_000;
+const THREAD_AUDIT_MEMO_MAX = 50;
+
+type ThreadAuditMemo = Map<string, { at: number; promise: Promise<ResolvedThreadAudit> }>;
+
+const EMPTY_THREAD_AUDIT: ResolvedThreadAudit = {
+  tier: null,
+  extras: [],
+  opExtras: [],
+  stats: {},
+  profiles: {},
+};
+
+function auditThread(
+  tiers: ReadonlyArray<NostrTierStrategy>,
+  cache: NostrEntityCache,
+  memo: ThreadAuditMemo,
+  request: ThreadAuditRequest,
+): Promise<ResolvedThreadAudit> {
+  const cached = memo.get(request.noteId);
+  const now = Date.now();
+  if (cached && now - cached.at < THREAD_AUDIT_TTL_MS) {
+    nostrLog.debug('nostr.read.threadAudit.memo', { noteId: short(request.noteId) });
+    return cached.promise;
+  }
+  const promise = runThreadAudit(tiers, cache, request);
+  memo.set(request.noteId, { at: now, promise });
+  if (memo.size > THREAD_AUDIT_MEMO_MAX) {
+    const oldest = memo.keys().next().value;
+    if (oldest !== undefined) memo.delete(oldest);
+  }
+  return promise;
+}
+
+async function runThreadAudit(
+  tiers: ReadonlyArray<NostrTierStrategy>,
+  cache: NostrEntityCache,
+  request: ThreadAuditRequest,
+): Promise<ResolvedThreadAudit> {
+  const primaryIndex = tiers.findIndex((t) => t.tier === request.primaryTier);
+  const below =
+    primaryIndex < 0 ? [] : tiers.slice(primaryIndex + 1).filter((t) => typeof t.thread === 'function');
+  if (below.length === 0) {
+    nostrLog.debug('nostr.read.threadAudit.skipped', {
+      reason: 'no_lower_tiers',
+      primary: request.primaryTier,
+    });
+    return EMPTY_THREAD_AUDIT;
+  }
+
+  nostrLog.info('nostr.read.threadAudit.request', {
+    noteId: short(request.noteId),
+    primary: request.primaryTier,
+    tiers: below.map((t) => t.tier),
+    known: request.knownReplyIds.length,
+  });
+
+  // Single shot, no retry: the audit can only ADD to an already-rendered
+  // thread, so failure is silent by design.
+  const auditRequest: ThreadRequest = {
+    noteId: request.noteId,
+    limit: 100,
+    ...(request.signal ? { signal: request.signal } : {}),
+    ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
+  };
+  const answer = await auditAcrossTiers<ThreadBundle>(
+    below.map((t) => ({ tier: t.tier, attempt: () => t.thread!(auditRequest) })),
+  );
+  if (!answer) {
+    nostrLog.info('nostr.read.threadAudit.done', { noteId: short(request.noteId), tier: null, extras: 0 });
+    return EMPTY_THREAD_AUDIT;
+  }
+
+  const { tier, value: bundle } = answer;
+  const known = new Set(request.knownReplyIds);
+  const excluded = new Set<string>([request.noteId]);
+  for (const parent of bundle.parents) {
+    if (parent.type === 'note') excluded.add(parent.event.id);
+  }
+
+  const opExtras: FeedItem[] = [];
+  const extras: FeedItem[] = [];
+  for (const item of bundle.itemsById.values()) {
+    if (item.type !== 'note') continue;
+    const event = item.event;
+    if (known.has(event.id) || excluded.has(event.id)) continue;
+    if (!isDirectReplyTo(event, request.noteId)) continue;
+    (event.pubkey === request.opPubkey ? opExtras : extras).push(item);
+  }
+  // OP promotions read as the author's continuation → chronological; the spam
+  // bucket reads as an appendix → recency-descending, id tiebreak.
+  const createdAtOf = (item: FeedItem) => (item.type === 'note' ? item.event.created_at : 0);
+  const idOf = (item: FeedItem) => (item.type === 'note' ? item.event.id : '');
+  opExtras.sort((a, b) => createdAtOf(a) - createdAtOf(b) || (idOf(a) < idOf(b) ? -1 : 1));
+  extras.sort((a, b) => createdAtOf(b) - createdAtOf(a) || (idOf(a) > idOf(b) ? -1 : 1));
+
+  // Cache the findings (notes + profiles + stats) so tapping one opens instantly.
+  const events: NaggFeedEvent[] = [];
+  for (const item of [...opExtras, ...extras]) {
+    if (item.type === 'note') events.push(item.event);
+  }
+  cache.ingestNotes(events);
+  cache.ingestNoteStats(bundle.stats, tier);
+  cache.ingestProfileInfos(bundle.profiles, tier);
+
+  nostrLog.info('nostr.read.threadAudit.done', {
+    noteId: short(request.noteId),
+    tier,
+    extras: extras.length,
+    opExtras: opExtras.length,
+  });
+  return { tier, extras, opExtras, stats: bundle.stats, profiles: bundle.profiles };
+}
+
+function assembleThread(tier: NostrTier, bundle: ThreadBundle, sort: ThreadSort): ResolvedThread {
   const missingIds: string[] = [];
-  const replies = applyOrderingManifest(bundle.manifest, bundle.itemsById, {
+  const ordered = applyOrderingManifest(bundle.manifest, bundle.itemsById, {
     onMissing: (id) => missingIds.push(id),
   });
+  // The relevant sort pins the OP's DIRECT replies first across EVERY tier.
+  // Stable partition only, and only over direct replies: nagg's server order
+  // already leads with the OP block (no-op there), and the OP's nested replies
+  // to other commenters must stay where the sort put them — on any page.
+  const opPubkey = bundle.root.type === 'note' ? bundle.root.event.pubkey : undefined;
+  const rootId = bundle.root.type === 'note' ? bundle.root.event.id : undefined;
+  const replies =
+    sort === 'relevant' && opPubkey && rootId
+      ? partitionOpFirst(ordered, opPubkey, (item) =>
+          item.type === 'note' && isDirectReplyTo(item.event, rootId)
+            ? item.event.pubkey
+            : undefined,
+        )
+      : ordered;
+  const knownReplyIds = [
+    ...new Set([
+      ...bundle.manifest.elements,
+      ...bundle.extras.map((item) => (item.type === 'note' ? item.event.id : '')).filter(Boolean),
+    ]),
+  ];
   return {
     tier,
     root: bundle.root,
     parents: bundle.parents,
     replies,
+    extras: bundle.extras,
+    hasMore: bundle.hasMore,
+    ...(bundle.nextOffset !== undefined ? { nextOffset: bundle.nextOffset } : {}),
+    knownReplyIds,
     stats: bundle.stats,
     ...(bundle.actions ? { actions: bundle.actions } : {}),
     profiles: bundle.profiles,

@@ -1,6 +1,11 @@
-import type { NaggClient } from '../transport';
+import { errAsync } from 'neverthrow';
+import type { z } from 'zod';
+
+import type { NaggClient, NaggRestRequest } from '../transport';
+import type { NaggError } from '../errors';
 import {
   NaggEnvelopeSchema,
+  NaggThreadEnvelopeSchema,
   NaggNotificationsEnvelopeSchema,
   NaggProfilesEnvelopeSchema,
   feedPageFromEnvelope,
@@ -84,8 +89,77 @@ export type NaggTierConfig = {
   client: NaggClient;
 };
 
+/**
+ * Cooldown circuit-breaker: after CONSECUTIVE network failures (fetch failed
+ * or timed out — NOT a caller abort, NOT an HTTP/schema error, which prove
+ * the server is reachable), every nagg read short-circuits for this long
+ * instead of paying the full request timeout again. Without it, each read
+ * independently burned the whole timeout against a dead nagg before falling
+ * through to Primal/relay — a 30s stall per query while nagg was down.
+ *
+ * The threshold exists because a slow-but-alive nagg is NOT a dead nagg: a
+ * single heavy read (cold ranked feed) exceeding its per-request timeout must
+ * only fail over THAT read, not poison every nagg read for 30s — that traded
+ * the gold tier away for speed on the whole session. A genuinely hung nagg
+ * fails every request, so it still opens the breaker on the second failure;
+ * any success closes it.
+ */
+const NAGG_COOLDOWN_MS = 30_000;
+const NAGG_COOLDOWN_THRESHOLD = 2;
+
+/**
+ * Headroom the thread candidate pool reserves for the relevant merge's
+ * author tier (all OP direct replies) on top of the requested page window.
+ */
+const RELEVANT_AUTHOR_REPLY_LIMIT = 50;
+
+function withCooldown(rawClient: NaggClient): NaggClient {
+  let cooldownUntil = 0;
+  let consecutiveNetworkFailures = 0;
+  return {
+    appViewBaseUrl: rawClient.appViewBaseUrl,
+    rest: <TSchema extends z.ZodType>(request: NaggRestRequest<TSchema>) => {
+      const now = Date.now();
+      if (now < cooldownUntil) {
+        nostrLog.debug('nostr.tier.cooldown', {
+          tier: 'nagg',
+          remainingMs: Math.round(cooldownUntil - now),
+        });
+        return errAsync<z.infer<TSchema>, NaggError>({
+          type: 'network',
+          message: 'nagg is cooling down after repeated network failures',
+          cause: 'cooldown',
+        });
+      }
+      return rawClient.rest(request)
+        .map((value) => {
+          consecutiveNetworkFailures = 0;
+          return value;
+        })
+        .mapErr((error) => {
+          // A caller abort (navigation away) says nothing about nagg's health.
+          if (error.type === 'network' && request.signal?.aborted !== true) {
+            consecutiveNetworkFailures += 1;
+            if (consecutiveNetworkFailures >= NAGG_COOLDOWN_THRESHOLD) {
+              cooldownUntil = Date.now() + NAGG_COOLDOWN_MS;
+              nostrLog.warn('nostr.tier.cooldown_armed', {
+                tier: 'nagg',
+                cooldownMs: NAGG_COOLDOWN_MS,
+                consecutiveFailures: consecutiveNetworkFailures,
+              });
+            }
+          } else if (error.type !== 'network') {
+            // An HTTP/schema answer proves the server is alive.
+            consecutiveNetworkFailures = 0;
+          }
+          return error;
+        });
+    },
+  };
+}
+
 export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
-  const { client } = config;
+  const client = withCooldown(config.client);
 
   return {
     tier: 'nagg',
@@ -119,13 +193,28 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
     },
 
     async thread(request: ThreadRequest): Promise<TierOutcome<ThreadBundle>> {
-      const binding = threadAppView({ id: request.noteId, limit: request.limit });
+      // Full ranked-thread parity with the server: sort/viewer trigger the
+      // relevant merge (OP direct replies pinned), offset/replyLimit window
+      // the ordered manifest, candidateLimit bounds the merge pool.
+      const offset = request.offset ?? 0;
+      const replyLimit = request.replyLimit ?? 0;
+      const candidateLimit = Math.max(100, offset + replyLimit + RELEVANT_AUTHOR_REPLY_LIMIT + 1);
+      const binding = threadAppView({
+        id: request.noteId,
+        limit: request.limit ?? candidateLimit,
+        sort: request.sort ?? 'relevant',
+        viewer: request.viewerPubkey,
+        offset,
+        replyLimit,
+        candidateLimit,
+        rankedLimit: Math.min(candidateLimit, 50),
+      });
       nostrLog.debug('nostr.nagg.thread', { path: binding.path });
-      const result = await client.rest<typeof NaggEnvelopeSchema>({
+      const result = await client.rest<typeof NaggThreadEnvelopeSchema>({
         path: binding.path,
         method: binding.method ?? 'GET',
         searchParams: binding.searchParams,
-        responseSchema: NaggEnvelopeSchema,
+        responseSchema: NaggThreadEnvelopeSchema,
         operationName: binding.operationName,
         refresh: request.refresh,
         signal: request.signal,

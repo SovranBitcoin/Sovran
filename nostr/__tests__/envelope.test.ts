@@ -14,6 +14,7 @@ import {
   orderedFeedItemsFromEnvelope,
   feedPageFromEnvelope,
   threadFromEnvelope,
+  NaggThreadEnvelopeSchema,
   deriveNotificationReason,
   notificationsPageFromEnvelope,
   parseEnvelopeCursor,
@@ -573,5 +574,88 @@ describe('profile route reconstruction', () => {
       aggregates: {},
     });
     expect(orderedEnvelopeEvents(envelope).map((e) => e.id)).toEqual([NOTE_ID]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Thread envelope extension — total / cursor / off-manifest extras
+// ---------------------------------------------------------------------------
+
+describe('threadFromEnvelope — thread envelope extension', () => {
+  const EXTRA_ID = '9'.repeat(64);
+
+  test('keeps off-manifest hydrated events in extraEvents (excluding kind-0 and ordered ids)', () => {
+    const envelope = NaggThreadEnvelopeSchema.parse({
+      order: [ROOT_ID, NOTE_ID],
+      orderBy: 'rank',
+      events: [
+        event(ROOT_ID, { content: 'root' }),
+        event(NOTE_ID, { tags: [['e', ROOT_ID, '', 'root']] }),
+        event(EXTRA_ID, { tags: [['e', NOTE_ID, '', 'reply']] }), // fetched, not ordered
+        kind0(PUBKEY, { name: 'alice' }),
+      ],
+      aggregates: { [EXTRA_ID]: { k7_e: { actors: 4 } } },
+      total: 2,
+    });
+    const thread = threadFromEnvelope(envelope);
+    expect(thread).not.toBeNull();
+    expect(thread!.events.map((e) => e.id)).toEqual([NOTE_ID]);
+    expect(Object.keys(thread!.extraEvents)).toEqual([EXTRA_ID]);
+    // The manifest never absorbs extras (anti-reshuffle).
+    expect(thread!.ordering).toEqual({ orderBy: 'rank', elements: [NOTE_ID] });
+    // Metrics zero-fill covers extras too.
+    expect(thread!.metrics[EXTRA_ID]?.likeCount).toBe(4);
+    expect(thread!.metrics[NOTE_ID]?.likeCount).toBe(0);
+  });
+
+  test('parses total and the thread cursor into totalReplies/nextOffset', () => {
+    const envelope = NaggThreadEnvelopeSchema.parse({
+      order: [ROOT_ID, NOTE_ID],
+      orderBy: 'rank',
+      events: [event(ROOT_ID, {}), event(NOTE_ID, { tags: [['e', ROOT_ID, '', 'root']] })],
+      aggregates: {},
+      total: 42,
+      cursor: '0|10',
+    });
+    const thread = threadFromEnvelope(envelope);
+    expect(thread!.totalReplies).toBe(42);
+    expect(thread!.nextOffset).toBe(10);
+  });
+
+  test('omits nextOffset when the cursor is absent (last page), and totalReplies on old servers', () => {
+    const lastPage = NaggThreadEnvelopeSchema.parse({
+      order: [ROOT_ID],
+      orderBy: 'rank',
+      events: [event(ROOT_ID, {})],
+      aggregates: {},
+      total: 5,
+    });
+    expect(threadFromEnvelope(lastPage)!.nextOffset).toBeUndefined();
+    expect(threadFromEnvelope(lastPage)!.totalReplies).toBe(5);
+
+    // An old server sends no total/cursor: both fields stay undefined and the
+    // envelope still parses (nullish tolerance, not a fallback path).
+    const oldServer = NaggThreadEnvelopeSchema.parse({
+      order: [ROOT_ID],
+      orderBy: 'rank',
+      events: [event(ROOT_ID, {})],
+      aggregates: {},
+    });
+    expect(threadFromEnvelope(oldServer)!.totalReplies).toBeUndefined();
+    expect(threadFromEnvelope(oldServer)!.nextOffset).toBeUndefined();
+    expect(threadFromEnvelope(oldServer)!.extraEvents).toEqual({});
+  });
+
+  test('null order/events still parse on the extended schema (Go nil tolerance)', () => {
+    const parsed = NaggThreadEnvelopeSchema.parse({
+      order: null,
+      orderBy: 'rank',
+      events: null,
+      aggregates: null,
+      total: null,
+    });
+    expect(parsed.order).toEqual([]);
+    expect(parsed.events).toEqual([]);
+    expect(threadFromEnvelope(parsed)).toBeNull();
   });
 });
