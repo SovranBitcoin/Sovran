@@ -451,6 +451,14 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       const metrics = getDisplayMetrics(item.event.id);
       const engagement = getEngagementState(item.event.id);
 
+      // The spam separator draws its own full-width borders, and nothing
+      // follows the section's last card — suppress the adjacent per-card
+      // footer borders so the divider doesn't double up.
+      const nextItem = displayItems[index + 1];
+      const suppressFooterBorder =
+        (item.type === 'reply' && nextItem?.type === 'spam-separator') ||
+        (item.type === 'spam-reply' && index === displayItems.length - 1);
+
       const card = (
         <PostCard
           variant={isTarget ? 'thread-target' : 'thread-reply'}
@@ -459,6 +467,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           quotedEvents={quotedEventsRef.current}
           profiles={profilesRef.current}
           getMetrics={getMetrics}
+          showFooterBorder={!suppressFooterBorder}
           onLinkPress={isTarget ? embedOpen : undefined}
           footerOpacity={isTarget ? targetFooterOpacity : undefined}
           showLineAbove={isParent ? index > 0 : isTarget ? hasParents : false}
@@ -499,6 +508,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     [
       openPostActions,
       openComposer,
+      displayItems,
       embedOpen,
       targetFooterOpacity,
       getDisplayMetrics,
@@ -704,10 +714,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   spamSeparator: {
-    marginTop: 24,
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
+    // Recessed over the wallpaper/surface on both themes (same overlay family
+    // as the reply bar's scrim).
+    backgroundColor: 'rgba(0,0,0,0.15)',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
