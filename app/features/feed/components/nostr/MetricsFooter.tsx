@@ -7,7 +7,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { COMMENT_ACCENT } from '@/shared/lib/brandColors';
+import { COMMENT_ACCENT, ZAP_ACCENT } from '@/shared/lib/brandColors';
 import { openRepostMenu } from '@/features/feed/lib/repostMenu';
 import type { NoteMetrics } from './feedTypes';
 import { formatCount, formatSats } from './feedFormat';
@@ -63,11 +63,14 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   onRepostPress,
   onQuotePress,
   onLikePress,
+  onZapPress,
   reposted = false,
   liked = false,
   replied = false,
+  zapped = false,
   repostPending = false,
   likePending = false,
+  zapPending = false,
   repostPendingDirection: _repostPendingDirection,
   likePendingDirection: _likePendingDirection,
   onActionPressIn,
@@ -81,11 +84,14 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   onRepostPress?: () => void;
   onQuotePress?: () => void;
   onLikePress?: () => void;
+  onZapPress?: () => void;
   reposted?: boolean;
   liked?: boolean;
   replied?: boolean;
+  zapped?: boolean;
   repostPending?: boolean;
   likePending?: boolean;
+  zapPending?: boolean;
   repostPendingDirection?: 'activating' | 'deactivating';
   likePendingDirection?: 'activating' | 'deactivating';
   onActionPressIn?: () => void;
@@ -171,19 +177,37 @@ export const MetricsFooter = React.memo(function MetricsFooter({
             pending={likePending}
           />
         </Pressable>
-        {metrics.satsZapped > 0 ? (
-          <HStack align="center" gap={4}>
-            <Icon name="mingcute:lightning-fill" size={iconSizes.base} color={iconColor} />
-            <AnimatedCountValue
-              value={formatSats(metrics.satsZapped)}
-              size={textSize}
-              color={textColor}
-              overpass
+        <Pressable
+          onPress={onZapPress}
+          disabled={!onZapPress || zapPending}
+          onPressIn={onActionPressIn}
+          onPressOut={onActionPressOut}
+          accessibilityRole="button"
+          accessibilityLabel={`Zap, ${formatSats(metrics.satsZapped)} sats zapped`}
+          testID="post-zap"
+          hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
+          {metrics.satsZapped > 0 ? (
+            <HStack align="center" gap={4}>
+              <Icon
+                name="mingcute:lightning-fill"
+                size={iconSizes.base}
+                color={zapped ? ZAP_ACCENT : iconColor}
+              />
+              <AnimatedCountValue
+                value={formatSats(metrics.satsZapped)}
+                size={textSize}
+                color={zapped ? ZAP_ACCENT : textColor}
+                overpass
+              />
+            </HStack>
+          ) : (
+            <Icon
+              name="mingcute:lightning-fill"
+              size={iconSizes.base}
+              color={zapped ? ZAP_ACCENT : iconColor}
             />
-          </HStack>
-        ) : (
-          <Icon name="mingcute:lightning-fill" size={iconSizes.base} color={iconColor} />
-        )}
+          )}
+        </Pressable>
       </HStack>
     </View>
   );

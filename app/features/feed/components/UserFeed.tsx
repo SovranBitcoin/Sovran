@@ -86,6 +86,7 @@ import {
   type ImageOverlayReplaceLayout,
 } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
+import { useZap } from '@/features/feed/hooks/useZap';
 import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -125,12 +126,15 @@ export const RepostCard = React.memo(function RepostCard({
   liked = false,
   replied = false,
   reposted = false,
+  zapped = false,
   likePending = false,
   repostPending = false,
+  zapPending = false,
   likePendingDirection,
   repostPendingDirection,
   onLikePress,
   onRepostPress,
+  onZapPress,
   onMorePress,
   skipAnimation,
   getThreadContext,
@@ -153,12 +157,15 @@ export const RepostCard = React.memo(function RepostCard({
   liked?: boolean;
   replied?: boolean;
   reposted?: boolean;
+  zapped?: boolean;
   likePending?: boolean;
   repostPending?: boolean;
+  zapPending?: boolean;
   likePendingDirection?: 'activating' | 'deactivating';
   repostPendingDirection?: 'activating' | 'deactivating';
   onLikePress?: () => void;
   onRepostPress?: () => void;
+  onZapPress?: () => void;
   onMorePress?: () => void;
   skipAnimation?: boolean;
   getThreadContext?: () => ThreadSeed | null;
@@ -283,12 +290,15 @@ export const RepostCard = React.memo(function RepostCard({
             liked={liked}
             replied={replied}
             reposted={reposted}
+            zapped={zapped}
             likePending={likePending}
             repostPending={repostPending}
+            zapPending={zapPending}
             likePendingDirection={likePendingDirection}
             repostPendingDirection={repostPendingDirection}
             onLikePress={onLikePress}
             onRepostPress={onRepostPress}
+            onZapPress={onZapPress}
             onMorePress={onMorePress}
             onNestedProfilePressIn={suppressThreadTapStart}
             onNestedProfilePressOut={suppressThreadTapEnd}
@@ -683,12 +693,12 @@ export function UserFeed({
     return Array.from(map.values());
   }, [feedItems]);
 
-  const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost } = useNostrEngagement(
-    actionableEvents,
-    getMetrics
-  );
+  const { getDisplayMetrics, getEngagementState, getZapState, toggleLike, toggleRepost } =
+    useNostrEngagement(actionableEvents, getMetrics);
   const toggleLikeRef = useLatestRef(toggleLike);
   const toggleRepostRef = useLatestRef(toggleRepost);
+  const { openZapMenu } = useZap();
+  const openZapMenuRef = useLatestRef(openZapMenu);
   const openPostActions = usePostActions();
 
   const videoPosts = useMemo((): VideoPostRecord[] => {
@@ -720,9 +730,18 @@ export function UserFeed({
         getEngagementState,
         profilesRef,
         toggleLike,
-        toggleRepost
+        toggleRepost,
+        { getZapState, openZapMenu }
       ),
-    [feedItems, getDisplayMetrics, getEngagementState, toggleLike, toggleRepost]
+    [
+      feedItems,
+      getDisplayMetrics,
+      getEngagementState,
+      getZapState,
+      openZapMenu,
+      toggleLike,
+      toggleRepost,
+    ]
   );
 
   const getVideoFeedLayoutsAndIndex = useCallback((): {
@@ -842,9 +861,12 @@ export function UserFeed({
                 repostPending={rootEngagement.repostPending}
                 likePendingDirection={rootEngagement.likePendingDirection}
                 repostPendingDirection={rootEngagement.repostPendingDirection}
+                zapped={getZapState(rootEvent.id).zapped}
+                zapPending={getZapState(rootEvent.id).zapPending}
                 onLikePress={() => toggleLikeRef.current(rootEvent)}
                 onMorePress={() => openPostActions(rootEvent)}
                 onRepostPress={() => toggleRepostRef.current(rootEvent)}
+                onZapPress={() => openZapMenuRef.current(rootEvent, rootMetrics.satsZapped)}
                 skipAnimation={!isFirstRender.current}
                 showLineBelow
                 getThreadContext={() => getThreadContextRef.current()}
@@ -866,9 +888,12 @@ export function UserFeed({
                 repostPending={engagement.repostPending}
                 likePendingDirection={engagement.likePendingDirection}
                 repostPendingDirection={engagement.repostPendingDirection}
+                zapped={getZapState(item.event.id).zapped}
+                zapPending={getZapState(item.event.id).zapPending}
                 onLikePress={() => toggleLikeRef.current(item.event)}
                 onMorePress={() => openPostActions(item.event)}
                 onRepostPress={() => toggleRepostRef.current(item.event)}
+                onZapPress={() => openZapMenuRef.current(item.event, metrics.satsZapped)}
                 showLineAbove
                 getThreadContext={() => getThreadContextRef.current()}
               />
@@ -893,9 +918,12 @@ export function UserFeed({
             repostPending={engagement.repostPending}
             likePendingDirection={engagement.likePendingDirection}
             repostPendingDirection={engagement.repostPendingDirection}
+            zapped={getZapState(item.event.id).zapped}
+            zapPending={getZapState(item.event.id).zapPending}
             onLikePress={() => toggleLikeRef.current(item.event)}
             onMorePress={() => openPostActions(item.event)}
             onRepostPress={() => toggleRepostRef.current(item.event)}
+            onZapPress={() => openZapMenuRef.current(item.event, metrics.satsZapped)}
             skipAnimation={!isFirstRender.current}
             getThreadContext={() => getThreadContextRef.current()}
           />
@@ -927,9 +955,12 @@ export function UserFeed({
               repostPending={rootEngagement.repostPending}
               likePendingDirection={rootEngagement.likePendingDirection}
               repostPendingDirection={rootEngagement.repostPendingDirection}
+              zapped={getZapState(rootEvent.id).zapped}
+              zapPending={getZapState(rootEvent.id).zapPending}
               onLikePress={() => toggleLikeRef.current(rootEvent)}
               onMorePress={() => openPostActions(rootEvent)}
               onRepostPress={() => toggleRepostRef.current(rootEvent)}
+              onZapPress={() => openZapMenuRef.current(rootEvent, rootMetrics.satsZapped)}
               skipAnimation={!isFirstRender.current}
               showLineBelow
               getThreadContext={() => getThreadContextRef.current()}
@@ -954,9 +985,12 @@ export function UserFeed({
               repostPending={engagement.repostPending}
               likePendingDirection={engagement.likePendingDirection}
               repostPendingDirection={engagement.repostPendingDirection}
+              zapped={getZapState(originalEvent.id).zapped}
+              zapPending={getZapState(originalEvent.id).zapPending}
               onLikePress={() => toggleLikeRef.current(originalEvent)}
               onMorePress={() => openPostActions(originalEvent)}
               onRepostPress={() => toggleRepostRef.current(originalEvent)}
+              onZapPress={() => openZapMenuRef.current(originalEvent, row.metrics.satsZapped)}
               skipAnimation={!isFirstRender.current}
               getThreadContext={() => getThreadContextRef.current()}
               showLineAbove
@@ -985,8 +1019,15 @@ export function UserFeed({
           repostPending={engagement.repostPending}
           likePendingDirection={engagement.likePendingDirection}
           repostPendingDirection={engagement.repostPendingDirection}
+          zapped={originalEvent ? getZapState(originalEvent.id).zapped : false}
+          zapPending={originalEvent ? getZapState(originalEvent.id).zapPending : false}
           onLikePress={originalEvent ? () => toggleLikeRef.current(originalEvent) : undefined}
           onRepostPress={originalEvent ? () => toggleRepostRef.current(originalEvent) : undefined}
+          onZapPress={
+            originalEvent
+              ? () => openZapMenuRef.current(originalEvent, row.metrics.satsZapped)
+              : undefined
+          }
           skipAnimation={!isFirstRender.current}
           getThreadContext={() => getThreadContextRef.current()}
         />
@@ -994,11 +1035,13 @@ export function UserFeed({
     },
     [
       getMetrics,
+      getZapState,
       onOverlayOpenedFromIndex,
       displayName,
       pubkey,
       toggleLikeRef,
       toggleRepostRef,
+      openZapMenuRef,
       getThreadContextRef,
       openPostActions,
     ]

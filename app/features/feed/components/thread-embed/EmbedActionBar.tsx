@@ -36,23 +36,29 @@ export const EmbedActionBar = React.memo(function EmbedActionBar({
   liked,
   replied,
   reposted,
+  zapped,
   likePending,
   repostPending,
+  zapPending,
   onCommentPress,
   onRepostPress,
   onQuotePress,
   onLikePress,
+  onZapPress,
 }: {
   metrics: NoteMetrics;
   liked: boolean;
   replied: boolean;
   reposted: boolean;
+  zapped?: boolean;
   likePending: boolean;
   repostPending: boolean;
+  zapPending?: boolean;
   onCommentPress: () => void;
   onRepostPress: () => void;
   onQuotePress?: () => void;
   onLikePress: () => void;
+  onZapPress?: () => void;
 }) {
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const insets = useSafeAreaInsets();
@@ -125,11 +131,14 @@ export const EmbedActionBar = React.memo(function EmbedActionBar({
           onRepostPress={onRepostPress}
           onQuotePress={onQuotePress}
           onLikePress={onLikePress}
+          onZapPress={onZapPress}
           reposted={reposted}
           liked={liked}
           replied={replied}
+          zapped={zapped}
           repostPending={repostPending}
           likePending={likePending}
+          zapPending={zapPending}
         />
       </Animated.View>
     </GestureDetector>

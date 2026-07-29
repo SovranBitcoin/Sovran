@@ -26,13 +26,16 @@ export interface ImageOverlayPost {
   reposted?: boolean;
   liked?: boolean;
   replied?: boolean;
+  zapped?: boolean;
   repostPending?: boolean;
   likePending?: boolean;
+  zapPending?: boolean;
   repostPendingDirection?: 'activating' | 'deactivating';
   likePendingDirection?: 'activating' | 'deactivating';
   onCommentPress?: () => void;
   onRepostPress?: () => void;
   onLikePress?: () => void;
+  onZapPress?: () => void;
   onActionPressIn?: () => void;
   onActionPressOut?: () => void;
 }

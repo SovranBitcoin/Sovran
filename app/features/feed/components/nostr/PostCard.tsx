@@ -191,12 +191,15 @@ interface PostCardProps {
   onCommentPress?: () => void;
   onRepostPress?: () => void;
   onLikePress?: () => void;
+  onZapPress?: () => void;
   onMorePress?: () => void;
   reposted?: boolean;
   liked?: boolean;
   replied?: boolean;
+  zapped?: boolean;
   repostPending?: boolean;
   likePending?: boolean;
+  zapPending?: boolean;
   repostPendingDirection?: 'activating' | 'deactivating';
   likePendingDirection?: 'activating' | 'deactivating';
   onNestedProfilePressIn?: () => void;
@@ -231,12 +234,15 @@ export const PostCard = React.memo(function PostCard({
   onCommentPress,
   onRepostPress,
   onLikePress,
+  onZapPress,
   onMorePress,
   reposted = false,
   liked = false,
   replied = false,
+  zapped = false,
   repostPending = false,
   likePending = false,
+  zapPending = false,
   repostPendingDirection,
   likePendingDirection,
   onNestedProfilePressIn,
@@ -432,11 +438,14 @@ export const PostCard = React.memo(function PostCard({
               onRepostPress={onRepostPress}
               onQuotePress={handleQuotePress}
               onLikePress={onLikePress}
+              onZapPress={onZapPress}
               reposted={reposted}
               liked={liked}
               replied={replied}
+              zapped={zapped}
               repostPending={repostPending}
               likePending={likePending}
+              zapPending={zapPending}
               repostPendingDirection={repostPendingDirection}
               likePendingDirection={likePendingDirection}
               onActionPressIn={handleNestedPressIn}
@@ -523,13 +532,16 @@ export const PostCard = React.memo(function PostCard({
           reposted={reposted}
           liked={liked}
           replied={replied}
+          zapped={zapped}
           repostPending={repostPending}
           likePending={likePending}
+          zapPending={zapPending}
           repostPendingDirection={repostPendingDirection}
           likePendingDirection={likePendingDirection}
           onCommentPress={onCommentPress ?? navigateToThread}
           onRepostPress={onRepostPress}
           onLikePress={onLikePress}
+          onZapPress={onZapPress}
           onActionPressIn={handleNestedPressIn}
           onActionPressOut={handleNestedPressOut}
         />
@@ -554,11 +566,14 @@ export const PostCard = React.memo(function PostCard({
             onRepostPress={onRepostPress}
             onQuotePress={handleQuotePress}
             onLikePress={onLikePress}
+            onZapPress={onZapPress}
             reposted={reposted}
             liked={liked}
             replied={replied}
+            zapped={zapped}
             repostPending={repostPending}
             likePending={likePending}
+            zapPending={zapPending}
             repostPendingDirection={repostPendingDirection}
             likePendingDirection={likePendingDirection}
             onActionPressIn={handleNestedPressIn}

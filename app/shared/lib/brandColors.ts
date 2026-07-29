@@ -20,6 +20,12 @@ export const CONNECTED_ACCENT = '#34C759';
  *  the theme-derived `link` token which can render greyish). */
 export const COMMENT_ACCENT = '#3B9EFF';
 
+/** Zap accent (#F7B500). Fixed cross-theme amber used to highlight the
+ *  lightning icon when the viewer has zapped a post — sibling to the fixed
+ *  pink "like" and blue "reply" accents. Warmer than BITCOIN_ACCENT so a
+ *  zapped bolt reads as "lit up", not as a bitcoin glyph. */
+export const ZAP_ACCENT = '#F7B500';
+
 /** Bitcoin orange (#F7931A). Used wherever a "bitcoin-accepting" or
  *  "bitcoin-denominated" semantic cue is rendered: BTCMap markers, splitBill
  *  participant pills, mint-info bitcoin glyphs. Matches `orange-300` in

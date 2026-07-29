@@ -25,7 +25,7 @@ import type { ContentSegment } from '../feedTypes';
 import type { ImageOverlayPost } from './types';
 import { BOTTOM_PANEL_PADDING_HORIZONTAL, BOTTOM_PANEL_PADDING_TOP } from './config';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { COMMENT_ACCENT } from '@/shared/lib/brandColors';
+import { COMMENT_ACCENT, ZAP_ACCENT } from '@/shared/lib/brandColors';
 import { openRepostMenu } from '@/features/feed/lib/repostMenu';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { Log } from '@/shared/lib/logger';
@@ -53,6 +53,19 @@ function useOverlayRepostMenu(post: ImageOverlayPost, onRequestClose?: () => voi
     }, OVERLAY_CLOSE_BEFORE_MENU_MS);
   }, [post, onRequestClose, quotePost]);
 }
+/**
+ * Zap handler for the overlay's lightning buttons: dismiss the lightbox, then
+ * let the post's own handler open the shared zap menu. Same choreography as
+ * the repost menu — `actionMenuPopup` is invisible under the lightbox.
+ */
+function useOverlayZapPress(post: ImageOverlayPost, onRequestClose?: () => void) {
+  return useCallback(() => {
+    if (!post.onZapPress) return;
+    onRequestClose?.();
+    setTimeout(() => post.onZapPress?.(), OVERLAY_CLOSE_BEFORE_MENU_MS);
+  }, [post, onRequestClose]);
+}
+
 // Absolute bar text stays white — it floats over the dark, blurred image, not
 // over the sheet's `surface` background.
 const PANEL_TEXT = 'rgba(255,255,255,0.95)';
@@ -254,8 +267,9 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
       onConsumedExpand?.();
     }
   }, [initialContentExpanded, onConsumedExpand]);
-  const { event, metrics, profile, reposted, liked, replied, onLikePress } = post;
+  const { event, metrics, profile, reposted, liked, replied, zapped, onLikePress } = post;
   const handleRepostPress = useOverlayRepostMenu(post, onRequestClose);
+  const handleZapPress = useOverlayZapPress(post, onRequestClose);
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
@@ -397,16 +411,20 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
               {formatCount(metrics.likeCount)}
             </Text>
           </Pressable>
-          <View style={styles.metricBtn}>
+          <Pressable
+            onPress={handleZapPress}
+            disabled={!post.onZapPress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.metricBtn}>
             <Icon
               name="mingcute:lightning-fill"
               size={POST_ACTION_ICON_SIZES.regular.base}
-              color={muted}
+              color={zapped ? ZAP_ACCENT : muted}
             />
-            <Text overpass size={13} style={{ color: muted }}>
+            <Text overpass size={13} style={{ color: zapped ? ZAP_ACCENT : muted }}>
               {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
             </Text>
-          </View>
+          </Pressable>
         </View>
       </View>
     </Log>
@@ -431,7 +449,8 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
   const repostedColor = useThemeColor('success');
   const repliedColor = COMMENT_ACCENT;
   const handleRepostPress = useOverlayRepostMenu(post, onRequestClose);
-  const { event, metrics, profile, reposted, liked, replied, onLikePress } = post;
+  const handleZapPress = useOverlayZapPress(post, onRequestClose);
+  const { event, metrics, profile, reposted, liked, replied, zapped, onLikePress } = post;
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
@@ -533,16 +552,20 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
               {formatCount(metrics.likeCount)}
             </Text>
           </Pressable>
-          <View style={styles.metricBtn}>
+          <Pressable
+            onPress={handleZapPress}
+            disabled={!post.onZapPress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.metricBtn}>
             <Icon
               name="mingcute:lightning-fill"
               size={POST_ACTION_ICON_SIZES.regular.base}
-              color={PANEL_TEXT_MUTED}
+              color={zapped ? ZAP_ACCENT : PANEL_TEXT_MUTED}
             />
-            <Text overpass size={13} style={{ color: PANEL_TEXT_MUTED }}>
+            <Text overpass size={13} style={{ color: zapped ? ZAP_ACCENT : PANEL_TEXT_MUTED }}>
               {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
             </Text>
-          </View>
+          </Pressable>
         </View>
       </View>
     </Log>

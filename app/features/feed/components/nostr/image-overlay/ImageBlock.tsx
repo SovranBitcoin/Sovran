@@ -47,13 +47,16 @@ interface ImageBlockOverlayPostProps {
   reposted?: boolean;
   liked?: boolean;
   replied?: boolean;
+  zapped?: boolean;
   repostPending?: boolean;
   likePending?: boolean;
+  zapPending?: boolean;
   repostPendingDirection?: 'activating' | 'deactivating';
   likePendingDirection?: 'activating' | 'deactivating';
   onCommentPress?: () => void;
   onRepostPress?: () => void;
   onLikePress?: () => void;
+  onZapPress?: () => void;
   onActionPressIn?: () => void;
   onActionPressOut?: () => void;
 }
@@ -77,13 +80,16 @@ export const ImageBlock = React.memo(function ImageBlock({
   reposted,
   liked,
   replied,
+  zapped,
   repostPending,
   likePending,
+  zapPending,
   repostPendingDirection,
   likePendingDirection,
   onCommentPress,
   onRepostPress,
   onLikePress,
+  onZapPress,
   onActionPressIn,
   onActionPressOut,
 }: {
@@ -301,13 +307,16 @@ export const ImageBlock = React.memo(function ImageBlock({
                 reposted,
                 liked,
                 replied,
+                zapped,
                 repostPending,
                 likePending,
+                zapPending,
                 repostPendingDirection,
                 likePendingDirection,
                 onCommentPress,
                 onRepostPress,
                 onLikePress,
+                onZapPress,
                 onActionPressIn,
                 onActionPressOut,
               }
@@ -353,13 +362,16 @@ export const ImageBlock = React.memo(function ImageBlock({
       reposted,
       liked,
       replied,
+      zapped,
       repostPending,
       likePending,
+      zapPending,
       repostPendingDirection,
       likePendingDirection,
       onCommentPress,
       onRepostPress,
       onLikePress,
+      onZapPress,
       onActionPressIn,
       onActionPressOut,
     ]

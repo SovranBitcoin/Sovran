@@ -38,6 +38,7 @@ import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { ThreadReplyBar } from '@/features/feed/components/ThreadReplyBar';
 import type { ThreadReplySort } from '@/features/feed/data/feedClient';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
+import { useZap } from '@/features/feed/hooks/useZap';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { feedLog, Log } from '@/shared/lib/logger';
 import { actionMenuPopup } from '@/shared/lib/popup';
@@ -375,8 +376,15 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   );
 
   const actionableEvents = useMemo(() => items.map((item) => item.event), [items]);
-  const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
-    useNostrEngagement(actionableEvents, getMetrics);
+  const {
+    getDisplayMetrics,
+    getEngagementState,
+    getZapState,
+    toggleLike,
+    toggleRepost,
+    engagementRevision,
+  } = useNostrEngagement(actionableEvents, getMetrics);
+  const { openZapMenu } = useZap();
 
   const getThreadContext = useCallback(() => {
     const allEvents = new Map<string, FeedEvent>();
@@ -439,8 +447,11 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           repostPending={engagement.repostPending}
           likePendingDirection={engagement.likePendingDirection}
           repostPendingDirection={engagement.repostPendingDirection}
+          zapped={getZapState(item.event.id).zapped}
+          zapPending={getZapState(item.event.id).zapPending}
           onLikePress={() => toggleLike(item.event)}
           onRepostPress={() => toggleRepost(item.event)}
+          onZapPress={() => openZapMenu(item.event, metrics.satsZapped)}
           onCommentPress={() =>
             openComposer(deriveReplyTarget(item.event), {
               parentEvent: item.event,
@@ -469,6 +480,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       targetFooterOpacity,
       getDisplayMetrics,
       getEngagementState,
+      getZapState,
       getMetrics,
       hasParents,
       profilesRef,
@@ -479,6 +491,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       surfaceTertiary,
       toggleLike,
       toggleRepost,
+      openZapMenu,
       getThreadContext,
     ]
   );
@@ -631,12 +644,17 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               liked={getEngagementState(targetEvent.id).liked}
               replied={getEngagementState(targetEvent.id).replied}
               reposted={getEngagementState(targetEvent.id).reposted}
+              zapped={getZapState(targetEvent.id).zapped}
               likePending={getEngagementState(targetEvent.id).likePending}
               repostPending={getEngagementState(targetEvent.id).repostPending}
+              zapPending={getZapState(targetEvent.id).zapPending}
               onCommentPress={onTargetComment}
               onRepostPress={onTargetRepost}
               onQuotePress={onTargetQuote}
               onLikePress={onTargetLike}
+              onZapPress={() =>
+                openZapMenu(targetEvent, getDisplayMetrics(targetEvent.id).satsZapped)
+              }
             />
           ) : null}
           <AnimatedImageOverlay />

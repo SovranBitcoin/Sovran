@@ -64,6 +64,7 @@ import {
   type ImageOverlayReplaceLayout,
 } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
+import { useZap } from '@/features/feed/hooks/useZap';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 
@@ -658,12 +659,12 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     return Array.from(map.values());
   }, [feedItems]);
 
-  const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost } = useNostrEngagement(
-    actionableEvents,
-    getMetrics
-  );
+  const { getDisplayMetrics, getEngagementState, getZapState, toggleLike, toggleRepost } =
+    useNostrEngagement(actionableEvents, getMetrics);
   const toggleLikeRef = useLatestRef(toggleLike);
   const toggleRepostRef = useLatestRef(toggleRepost);
+  const { openZapMenu } = useZap();
+  const openZapMenuRef = useLatestRef(openZapMenu);
 
   const overlaySourceIndexRef = useRef(-1);
   const feedIndicesWithVideo = useMemo(() => computeFeedIndicesWithVideo(feedItems), [feedItems]);
@@ -681,9 +682,18 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         getEngagementState,
         profilesRef,
         toggleLike,
-        toggleRepost
+        toggleRepost,
+        { getZapState, openZapMenu }
       ),
-    [feedItems, getDisplayMetrics, getEngagementState, toggleLike, toggleRepost]
+    [
+      feedItems,
+      getDisplayMetrics,
+      getEngagementState,
+      getZapState,
+      openZapMenu,
+      toggleLike,
+      toggleRepost,
+    ]
   );
 
   const getVideoFeedLayoutsAndIndex = useCallback((): {
@@ -827,9 +837,12 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   repostPending={engagement.repostPending}
                   likePendingDirection={engagement.likePendingDirection}
                   repostPendingDirection={engagement.repostPendingDirection}
+                  zapped={getZapState(item.event.id).zapped}
+                  zapPending={getZapState(item.event.id).zapPending}
                   onLikePress={() => toggleLikeRef.current(item.event)}
                   onMorePress={() => openPostActions(item.event)}
                   onRepostPress={() => toggleRepostRef.current(item.event)}
+                  onZapPress={() => openZapMenuRef.current(item.event, metrics.satsZapped)}
                   skipAnimation={!isFirstRender.current}
                   getThreadContext={() => getThreadContextRef.current(replyPreviewEvents)}
                   showFooterBorder={false}
@@ -861,9 +874,14 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                         repostPending={replyEngagement.repostPending}
                         likePendingDirection={replyEngagement.likePendingDirection}
                         repostPendingDirection={replyEngagement.repostPendingDirection}
+                        zapped={getZapState(replyEvent.id).zapped}
+                        zapPending={getZapState(replyEvent.id).zapPending}
                         onLikePress={() => toggleLikeRef.current(replyEvent)}
                         onMorePress={() => openPostActions(replyEvent)}
                         onRepostPress={() => toggleRepostRef.current(replyEvent)}
+                        onZapPress={() =>
+                          openZapMenuRef.current(replyEvent, replyMetrics.satsZapped)
+                        }
                         getThreadContext={() => getThreadContextRef.current()}
                         showFooterBorder={isLastReply}
                         fullBleedFooterBorder
@@ -899,9 +917,12 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   repostPending={rootEngagement.repostPending}
                   likePendingDirection={rootEngagement.likePendingDirection}
                   repostPendingDirection={rootEngagement.repostPendingDirection}
+                  zapped={getZapState(rootEvent.id).zapped}
+                  zapPending={getZapState(rootEvent.id).zapPending}
                   onLikePress={() => toggleLikeRef.current(rootEvent)}
                   onMorePress={() => openPostActions(rootEvent)}
                   onRepostPress={() => toggleRepostRef.current(rootEvent)}
+                  onZapPress={() => openZapMenuRef.current(rootEvent, rootMetrics.satsZapped)}
                   skipAnimation={!isFirstRender.current}
                   getThreadContext={() => getThreadContextRef.current()}
                   showFooterBorder={false}
@@ -926,9 +947,12 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   repostPending={engagement.repostPending}
                   likePendingDirection={engagement.likePendingDirection}
                   repostPendingDirection={engagement.repostPendingDirection}
+                  zapped={getZapState(item.event.id).zapped}
+                  zapPending={getZapState(item.event.id).zapPending}
                   onLikePress={() => toggleLikeRef.current(item.event)}
                   onMorePress={() => openPostActions(item.event)}
                   onRepostPress={() => toggleRepostRef.current(item.event)}
+                  onZapPress={() => openZapMenuRef.current(item.event, metrics.satsZapped)}
                   getThreadContext={() => getThreadContextRef.current()}
                   fullBleedFooterBorder
                 />
@@ -954,9 +978,12 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             repostPending={engagement.repostPending}
             likePendingDirection={engagement.likePendingDirection}
             repostPendingDirection={engagement.repostPendingDirection}
+            zapped={getZapState(item.event.id).zapped}
+            zapPending={getZapState(item.event.id).zapPending}
             onLikePress={() => toggleLikeRef.current(item.event)}
             onMorePress={() => openPostActions(item.event)}
             onRepostPress={() => toggleRepostRef.current(item.event)}
+            onZapPress={() => openZapMenuRef.current(item.event, metrics.satsZapped)}
             skipAnimation={!isFirstRender.current}
             getThreadContext={() => getThreadContextRef.current()}
             fullBleedFooterBorder
@@ -992,9 +1019,12 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 repostPending={rootEngagement.repostPending}
                 likePendingDirection={rootEngagement.likePendingDirection}
                 repostPendingDirection={rootEngagement.repostPendingDirection}
+                zapped={getZapState(rootEvent.id).zapped}
+                zapPending={getZapState(rootEvent.id).zapPending}
                 onLikePress={() => toggleLikeRef.current(rootEvent)}
                 onMorePress={() => openPostActions(rootEvent)}
                 onRepostPress={() => toggleRepostRef.current(rootEvent)}
+                onZapPress={() => openZapMenuRef.current(rootEvent, rootMetrics.satsZapped)}
                 skipAnimation={!isFirstRender.current}
                 getThreadContext={() => getThreadContextRef.current()}
                 showFooterBorder={false}
@@ -1022,9 +1052,16 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 repostPending={repostEngagement.repostPending}
                 likePendingDirection={repostEngagement.likePendingDirection}
                 repostPendingDirection={repostEngagement.repostPendingDirection}
+                zapped={originalEvent ? getZapState(originalEvent.id).zapped : false}
+                zapPending={originalEvent ? getZapState(originalEvent.id).zapPending : false}
                 onLikePress={() => toggleLikeRef.current(originalEvent)}
                 onMorePress={() => openPostActions(originalEvent)}
                 onRepostPress={() => toggleRepostRef.current(originalEvent)}
+                onZapPress={
+                  originalEvent
+                    ? () => openZapMenuRef.current(originalEvent, row.metrics.satsZapped)
+                    : undefined
+                }
                 skipAnimation={!isFirstRender.current}
                 getThreadContext={() => getThreadContextRef.current()}
                 fullBleedFooterBorder
@@ -1054,8 +1091,15 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           repostPending={repostEngagement.repostPending}
           likePendingDirection={repostEngagement.likePendingDirection}
           repostPendingDirection={repostEngagement.repostPendingDirection}
+          zapped={originalEvent ? getZapState(originalEvent.id).zapped : false}
+          zapPending={originalEvent ? getZapState(originalEvent.id).zapPending : false}
           onLikePress={originalEvent ? () => toggleLikeRef.current(originalEvent) : undefined}
           onRepostPress={originalEvent ? () => toggleRepostRef.current(originalEvent) : undefined}
+          onZapPress={
+            originalEvent
+              ? () => openZapMenuRef.current(originalEvent, row.metrics.satsZapped)
+              : undefined
+          }
           skipAnimation={!isFirstRender.current}
           getThreadContext={() => getThreadContextRef.current()}
           fullBleedFooterBorder
@@ -1066,9 +1110,11 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       getMetrics,
       getDisplayMetrics,
       getEngagementState,
+      getZapState,
       onOverlayOpenedFromIndex,
       toggleLikeRef,
       toggleRepostRef,
+      openZapMenuRef,
       getThreadContextRef,
       openPostActions,
     ]

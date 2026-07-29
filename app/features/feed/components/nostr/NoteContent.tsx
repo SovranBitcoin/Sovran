@@ -433,13 +433,16 @@ export const NoteContent = React.memo(function NoteContent({
   reposted,
   liked,
   replied,
+  zapped,
   repostPending,
   likePending,
+  zapPending,
   repostPendingDirection,
   likePendingDirection,
   onCommentPress,
   onRepostPress,
   onLikePress,
+  onZapPress,
   onActionPressIn,
   onActionPressOut,
   feedIndex,
@@ -470,13 +473,16 @@ export const NoteContent = React.memo(function NoteContent({
   reposted?: boolean;
   liked?: boolean;
   replied?: boolean;
+  zapped?: boolean;
   repostPending?: boolean;
   likePending?: boolean;
+  zapPending?: boolean;
   repostPendingDirection?: 'activating' | 'deactivating';
   likePendingDirection?: 'activating' | 'deactivating';
   onCommentPress?: () => void;
   onRepostPress?: () => void;
   onLikePress?: () => void;
+  onZapPress?: () => void;
   onActionPressIn?: () => void;
   onActionPressOut?: () => void;
 }) {
@@ -570,13 +576,16 @@ export const NoteContent = React.memo(function NoteContent({
             reposted,
             liked,
             replied,
+            zapped,
             repostPending,
             likePending,
+            zapPending,
             repostPendingDirection,
             likePendingDirection,
             onCommentPress,
             onRepostPress,
             onLikePress,
+            onZapPress,
             onActionPressIn,
             onActionPressOut,
           }
@@ -595,13 +604,16 @@ export const NoteContent = React.memo(function NoteContent({
     reposted,
     liked,
     replied,
+    zapped,
     repostPending,
     likePending,
+    zapPending,
     repostPendingDirection,
     likePendingDirection,
     onCommentPress,
     onRepostPress,
     onLikePress,
+    onZapPress,
     onActionPressIn,
     onActionPressOut,
   ]);
@@ -819,13 +831,16 @@ export const NoteContent = React.memo(function NoteContent({
                     reposted={reposted}
                     liked={liked}
                     replied={replied}
+                    zapped={zapped}
                     repostPending={repostPending}
                     likePending={likePending}
+                    zapPending={zapPending}
                     repostPendingDirection={repostPendingDirection}
                     likePendingDirection={likePendingDirection}
                     onCommentPress={onCommentPress}
                     onRepostPress={onRepostPress}
                     onLikePress={onLikePress}
+                    onZapPress={onZapPress}
                     onActionPressIn={onActionPressIn}
                     onActionPressOut={onActionPressOut}
                   />

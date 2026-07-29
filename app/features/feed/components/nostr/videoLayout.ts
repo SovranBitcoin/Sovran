@@ -74,7 +74,11 @@ export function buildVideoOverlayLayout(
   },
   profilesRef: React.RefObject<Map<string, ProfileInfo>>,
   toggleLike: (event: FeedEvent) => void,
-  toggleRepost: (event: FeedEvent) => void
+  toggleRepost: (event: FeedEvent) => void,
+  zap?: {
+    getZapState: (id: string) => { zapped: boolean; zapPending: boolean };
+    openZapMenu: (event: FeedEvent, baseSats: number) => void;
+  }
 ): {
   url: string;
   urls: string[];
@@ -132,8 +136,10 @@ export function buildVideoOverlayLayout(
       profile: profile ?? undefined,
       reposted: engagement.reposted,
       liked: engagement.liked,
+      zapped: zap?.getZapState(event.id).zapped ?? false,
       repostPending: engagement.repostPending,
       likePending: engagement.likePending,
+      zapPending: zap?.getZapState(event.id).zapPending ?? false,
       repostPendingDirection: engagement.repostPendingDirection,
       likePendingDirection: engagement.likePendingDirection,
       onCommentPress: () =>
@@ -143,6 +149,7 @@ export function buildVideoOverlayLayout(
         }),
       onRepostPress: () => toggleRepost(event),
       onLikePress: () => toggleLike(event),
+      onZapPress: zap ? () => zap.openZapMenu(event, metrics.satsZapped) : undefined,
     },
   };
 }
