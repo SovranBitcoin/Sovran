@@ -44,6 +44,9 @@ const MELT_QUOTE_OPTIONS = {
 const SEND_TOKEN_OPTIONS = { title: 'Send ecash' };
 const RECEIVE_TOKEN_OPTIONS = { title: 'Receive ecash' };
 const SWAP_OPTIONS = { title: 'Swap' };
+// Zapped-post drill-in from the melt detail card — same re-export pattern as
+// (profile-flow)/thread, so the post opens IN FRONT of this modal stack.
+const THREAD_OPTIONS = { title: 'Thread' };
 
 function TransactionsFlowContent() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
@@ -76,6 +79,7 @@ function TransactionsFlowContent() {
         <Stack.Screen name="sendToken" options={SEND_TOKEN_OPTIONS} />
         <Stack.Screen name="receiveToken" options={RECEIVE_TOKEN_OPTIONS} />
         <Stack.Screen name="swap" options={SWAP_OPTIONS} />
+        <Stack.Screen name="thread" options={THREAD_OPTIONS} />
       </Stack>
     </AndroidSheetRoot>
   );

@@ -41,6 +41,9 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
+import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
+import { consumePendingZap, peekPendingZap } from '@/shared/stores/runtime/pendingZapStore';
+import { ZappedPostSection } from '@/features/transactions/components/detail/ZappedPostSection';
 import { RecipientHeader } from '../components/RecipientHeader';
 import { MeltDestinationFingerprintProbe } from '../components/MeltDestinationFingerprintProbe';
 import { MeltSelectedMintProbe } from '../components/MeltSelectedMintProbe';
@@ -127,6 +130,49 @@ export function LightningSendScreen({
       },
     });
   }, [entry?.quoteId, recipientPubkey, headerDisplayName, headerAvatarUrl, recipientNip05]);
+
+  // Zap (preset or custom): if this melt was launched from a post's zap menu,
+  // the pending-zap registry holds the post context keyed by meltTarget.
+  // Persist it as a zap annotation once the real quoteId exists (same window
+  // as the counterparty annotation above). `entry?.state` is in the deps
+  // because `receiptKind` is stamped by the LNURL extras callback DURING pay
+  // — the post-pay re-run upgrades a 'plain' write to 'nip57' — and because
+  // the paid re-run records the durable zapped highlight + count bump, after
+  // which the pending zap is consumed (making later re-runs no-ops). Accepted
+  // edge: dismissing the screen mid-pay before the paid state renders skips
+  // the durable mark; the annotation is already written and counts self-heal
+  // via nagg's 9735 aggregation.
+  const meltTarget =
+    typeof entry?.metadata?.meltTarget === 'string' ? entry.metadata.meltTarget : undefined;
+  useEffect(() => {
+    const quoteId = entry?.quoteId;
+    if (!quoteId || !meltTarget || !entry) return;
+    const pending = peekPendingZap(meltTarget);
+    if (!pending) return;
+    setTransactionAnnotation(`quote:${quoteId}`, {
+      zap: {
+        eventId: pending.eventId,
+        eventKind: pending.eventKind,
+        authorPubkey: pending.authorPubkey,
+        ...(pending.authorName ? { authorName: pending.authorName } : {}),
+        ...(pending.authorAvatarUrl ? { authorAvatarUrl: pending.authorAvatarUrl } : {}),
+        contentPreview: pending.contentPreview,
+        emoji: pending.emoji,
+        ...(pending.comment ? { comment: pending.comment } : {}),
+        receiptKind: pending.receiptKind ?? 'plain',
+      },
+    });
+    if (isMeltQuotePaid(entry)) {
+      // Sats are only attributable when the melt is sat-denominated; a
+      // fiat-unit custom melt records the highlight alone (sats 0) and the
+      // public count self-heals from the receipt aggregate.
+      const paidSats = entry.unit === 'sat' ? Number(entry.amount) : (pending.presetSats ?? 0);
+      useNostrSocialStore
+        .getState()
+        .recordZapPaid(pending.eventId, Number.isFinite(paidSats) ? paidSats : 0, pending.baseSats);
+      consumePendingZap(meltTarget);
+    }
+  }, [entry, meltTarget]);
 
   if (error) {
     log.warn('send.lightning.error', { error });
@@ -228,6 +274,7 @@ export function LightningSendScreen({
           {entry.metadata?.meltTarget ? (
             <MeltDestinationFingerprintProbe destination={entry.metadata.meltTarget} />
           ) : null}
+          <ZappedPostSection entry={entry} />
           {isPaid ? <TransactionLocationSection transactionId={entry.id} /> : null}
         </>
       }
