@@ -29,6 +29,10 @@ export type EventQueryInput = {
   shuffle?: ShuffleInput;
   pubkeysFrom?: unknown[];
   pubkeyScore?: PubkeyScoreFilterInput;
+  /** When >0, excludes text events (kinds 1/1111) whose content exceeds this
+   *  many UTF-8 code points; non-text kinds pass (NIP-18 repost content is the
+   *  reposted event's JSON). Capability: graphql.events.maxContentLength. */
+  maxContentLength?: number;
 };
 
 export type PubkeyScoreFilterInput = {

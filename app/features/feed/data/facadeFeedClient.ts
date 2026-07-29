@@ -6,7 +6,9 @@ import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import {
   isRootNote,
   mapAppSpecToFeedSpec,
+  MAX_FEED_POST_CHARS,
   resolvedFeedPageToParseResult,
+  skimmableFeedFilters,
 } from './facadeFeedAdapter';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import {
@@ -121,10 +123,14 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
         // Rank-paged specs advance by absolute offset (rank order is not
         // chronological); the nagg tier consumes it, time-paged tiers ignore it.
         ...(request.offset ? { offset: request.offset } : {}),
+        // Skimmable home feed: nagg drops over-long text notes server-side so
+        // the page stays full; skimmableFeedFilters below is the parity net
+        // for Primal/relay pages (and reposts of long originals).
+        maxContentLength: MAX_FEED_POST_CHARS,
       });
 
       return result.match(
-        (page) => resolvedFeedPageToParseResult(page),
+        (page) => resolvedFeedPageToParseResult(page, skimmableFeedFilters),
         (error) => {
           feedLog.warn('feed.facade.exhausted', {
             attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),

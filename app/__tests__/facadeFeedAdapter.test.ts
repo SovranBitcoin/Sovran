@@ -2,7 +2,11 @@
  * Validates the facade ResolvedFeedPage → app FeedParseResult adapter: the shape
  * bridge that lets the tier-selecting facade drive the existing feed UI.
  */
-import { resolvedFeedPageToParseResult } from '@/features/feed/data/facadeFeedAdapter';
+import {
+  MAX_FEED_POST_CHARS,
+  resolvedFeedPageToParseResult,
+  skimmableFeedFilters,
+} from '@/features/feed/data/facadeFeedAdapter';
 
 const NOTE = 'a'.repeat(64);
 const REPOST = 'b'.repeat(64);
@@ -162,5 +166,59 @@ describe('isRootNote', () => {
     expect(isRootNote({ tags: [['e', NOTE, '', 'mention']] })).toBe(true);
     expect(isRootNote({ tags: [['e', NOTE, '', 'reply']] })).toBe(false);
     expect(isRootNote({ tags: [['e', NOTE]] })).toBe(false);
+  });
+});
+
+describe('skimmableFeedFilters — the 280-char home-feed cap', () => {
+  function page(items: unknown[]) {
+    return {
+      tier: 'primal' as const,
+      items,
+      stats: {},
+      profiles: {},
+      quoted: {},
+      cursor: null,
+      missingIds: [],
+    } as never;
+  }
+
+  it('drops over-long text notes but keeps short ones (code points, not UTF-16 units)', () => {
+    const short = event(NOTE, 200);
+    const long = { ...event(REPOST, 150), content: 'x'.repeat(MAX_FEED_POST_CHARS + 1) };
+    // 280 emoji = 560 UTF-16 units but exactly 280 code points — must PASS,
+    // matching ClickHouse lengthUTF8 semantics on the nagg side.
+    const emoji = { ...event(ORIG, 100), content: '😀'.repeat(MAX_FEED_POST_CHARS) };
+    const result = resolvedFeedPageToParseResult(
+      page([
+        { type: 'note', event: short },
+        { type: 'note', event: long },
+        { type: 'note', event: emoji },
+      ]),
+      skimmableFeedFilters
+    );
+    expect(result.orderedFeedItems.map((i) => (i.type === 'note' ? i.event.id : ''))).toEqual([
+      NOTE,
+      ORIG,
+    ]);
+  });
+
+  it('drops reposts of over-long originals; non-text kinds always pass', () => {
+    const longOriginal = { ...event(ORIG, 100), content: 'y'.repeat(1000) };
+    const longVideoNote = { ...event(NOTE, 90), kind: 34235, content: 'z'.repeat(1000) };
+    const result = resolvedFeedPageToParseResult(
+      page([
+        {
+          type: 'repost',
+          repostEvent: event(REPOST, 150),
+          originalEvent: longOriginal,
+          originalEventId: ORIG,
+        },
+        { type: 'note', event: longVideoNote },
+      ]),
+      skimmableFeedFilters
+    );
+    expect(result.orderedFeedItems.map((i) => (i.type === 'note' ? i.event.id : 'repost'))).toEqual(
+      [NOTE]
+    );
   });
 });

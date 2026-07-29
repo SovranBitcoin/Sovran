@@ -473,6 +473,7 @@ function feedBindingForSpec(request: FeedPageRequest) {
   const until = request.cursor?.createdAt;
   const limit = request.limit;
   const offset = request.offset;
+  const maxContentLength = request.maxContentLength;
   const spec = request.spec;
   switch (spec.kind) {
     // The ranked pools are OFFSET-paged: rank order is not chronological, and
@@ -482,14 +483,14 @@ function feedBindingForSpec(request: FeedPageRequest) {
     // out of the ranked bindings.
     case 'for-you':
       return rankedFeedAppView(
-        forYouRankedEventsInput({ viewerPubkey: spec.viewerPubkey, limit, offset }),
+        forYouRankedEventsInput({ viewerPubkey: spec.viewerPubkey, limit, offset, maxContentLength }),
       );
     case 'following-popular':
       return rankedFeedAppView(
-        followingPopularRankedEventsInput({ viewerPubkey: spec.viewerPubkey, limit, offset }),
+        followingPopularRankedEventsInput({ viewerPubkey: spec.viewerPubkey, limit, offset, maxContentLength }),
       );
     case 'following-recent':
-      return followsFeedAppView({ pubkeys: spec.authors, viewer: spec.viewerPubkey, until, limit });
+      return followsFeedAppView({ pubkeys: spec.authors, viewer: spec.viewerPubkey, until, limit, maxContentLength });
     case 'user':
       return userFeedAppView({ pubkey: spec.pubkey, until, limit });
   }

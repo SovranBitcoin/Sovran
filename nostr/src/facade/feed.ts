@@ -51,6 +51,13 @@ export type FeedPageRequest = RequestControls & {
    */
   offset?: number;
   limit?: number;
+  /**
+   * When >0, the nagg tier asks the server to exclude text notes longer than
+   * this many characters (UTF-8 code points) so the page stays full of
+   * skimmable posts. Tiers without server support ignore it — the caller
+   * applies its own post-filter for parity.
+   */
+  maxContentLength?: number;
   refresh?: boolean;
 };
 

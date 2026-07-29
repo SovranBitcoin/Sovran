@@ -39,11 +39,38 @@ export function isRootNote(event: { tags: string[][] }): boolean {
 export interface FeedPageAdapterOptions {
   /** Keep a note item? Profile feeds require author-owned root notes. */
   includeNote?: (event: FeedEvent) => boolean;
-  /** Keep a repost item (judged by the repost event)? */
-  includeRepost?: (event: FeedEvent) => boolean;
+  /** Keep a repost item (judged by the repost event + its original, when hydrated)? */
+  includeRepost?: (event: FeedEvent, originalEvent?: FeedEvent) => boolean;
   /** Seed a known author identity so the header renders on first paint. */
   extraProfile?: { pubkey: string; profile: ProfileInfo };
 }
+
+/**
+ * Skimmable-feed cap: X's standard post length. nagg enforces it server-side
+ * (`maxContentLength`); this client-side twin keeps Primal/relay-served pages
+ * (and old servers) consistent. Counts code points, matching lengthUTF8.
+ */
+export const MAX_FEED_POST_CHARS = 280;
+
+function withinFeedLengthCap(event: FeedEvent | undefined): boolean {
+  if (!event || (event.kind !== 1 && event.kind !== 1111)) return true;
+  const content = event.content ?? '';
+  // Cheap UTF-16 pre-check: code points never exceed UTF-16 length.
+  if (content.length <= MAX_FEED_POST_CHARS) return true;
+  let points = 0;
+  for (const _char of content) {
+    points += 1;
+    if (points > MAX_FEED_POST_CHARS) return false;
+  }
+  return true;
+}
+
+/** Home-feed filter: drop text notes (and reposts of text notes) longer than
+ *  the skimmable cap. Composes in front of any caller-supplied filters. */
+export const skimmableFeedFilters: Pick<FeedPageAdapterOptions, 'includeNote' | 'includeRepost'> = {
+  includeNote: (event) => withinFeedLengthCap(event),
+  includeRepost: (_event, originalEvent) => withinFeedLengthCap(originalEvent),
+};
 
 /** Adapt the facade's ResolvedFeedPage to the app's FeedParseResult. */
 export function resolvedFeedPageToParseResult(
@@ -52,7 +79,7 @@ export function resolvedFeedPageToParseResult(
 ): FeedParseResult {
   const orderedFeedItems = page.items.map(toAppFeedItem).filter((item) => {
     if (item.type === 'note') return options.includeNote?.(item.event) ?? true;
-    return options.includeRepost?.(item.repostEvent) ?? true;
+    return options.includeRepost?.(item.repostEvent, item.originalEvent) ?? true;
   });
 
   // Dev-only: stamp each note with the tier that served this page so PostCard can

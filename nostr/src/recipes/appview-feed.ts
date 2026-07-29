@@ -41,6 +41,7 @@ export type FollowsFeedAppViewOptions = {
   until?: number;
   limit?: number;
   offset?: number;
+  maxContentLength?: number;
 };
 
 /**
@@ -66,6 +67,7 @@ export function followsFeedAppView(options: FollowsFeedAppViewOptions = {}): Nag
       ...(options.until ? { until: options.until } : {}),
       limit: options.limit ?? 30,
       ...(options.offset ? { offset: options.offset } : {}),
+      ...(options.maxContentLength ? { maxContentLength: options.maxContentLength } : {}),
     },
   };
 }

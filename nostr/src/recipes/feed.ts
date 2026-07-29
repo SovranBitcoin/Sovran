@@ -126,6 +126,7 @@ export function forYouRankedEventsInput(options: {
   offset?: number;
   shuffle?: ShuffleInput;
   excludeTags?: Array<{ key: string; values: string[] }>;
+  maxContentLength?: number;
 }): RankedEventsInput {
   return {
     references: {
@@ -137,7 +138,12 @@ export function forYouRankedEventsInput(options: {
       pubkeyScore: VERTEX_SCORED_PUBKEY_FILTER,
     },
     via: { key: 'e' },
-    target: { kinds: [1, 1111], limit: options.limit ?? 30, offset: 0 },
+    target: {
+      kinds: [1, 1111],
+      limit: options.limit ?? 30,
+      offset: 0,
+      ...(options.maxContentLength ? { maxContentLength: options.maxContentLength } : {}),
+    },
     metric: { name: 'actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
     terms: [
       ...engagementRankTerms({ pubkeyScore: VERTEX_SCORED_PUBKEY_FILTER }),
@@ -211,6 +217,7 @@ export function followingPopularRankedEventsInput(options: {
   limit?: number;
   offset?: number;
   shuffle?: ShuffleInput;
+  maxContentLength?: number;
 }): RankedEventsInput {
   return {
     references: {
@@ -224,6 +231,7 @@ export function followingPopularRankedEventsInput(options: {
       kinds: [1, 1111],
       pubkeysFrom: followedPubkeySource(options.viewerPubkey),
       limit: options.limit ?? 30,
+      ...(options.maxContentLength ? { maxContentLength: options.maxContentLength } : {}),
     },
     metric: { name: 'actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
     terms: [...engagementRankTerms(), vertexAuthorScoreTerm(0.25), recencyTerm(0.9)],
