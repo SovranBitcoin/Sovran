@@ -120,7 +120,10 @@ export function resolvedFeedPageToParseResult(
     missingQuotedIds: [...neededQuoteIds].filter((id) => !quotedEventsMap.has(id)),
     missingProfilePubkeys: [...neededPubkeys].filter((pk) => !profilesMap.has(pk)),
     paginationUntil: page.cursor?.createdAt ?? 0,
-    paginationOffset: orderedFeedItems.length,
+    // Pagination advance, not display count: how many ranked slots this page
+    // consumed server-side. Items the app-side include filters drop still
+    // occupied a slot, so the pre-filter count is the one to advance by.
+    paginationOffset: page.items.length,
   };
 }
 

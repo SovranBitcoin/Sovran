@@ -132,6 +132,9 @@ export function createFacadeFeedClient(fallback: FeedClient): FeedClient {
         signal: request.signal,
         timeoutMs: request.timeoutMs ?? FEED_READ_TIMEOUT_MS,
         cursor: request.until ? { createdAt: request.until, id: '' } : null,
+        // Rank-paged specs advance by absolute offset (rank order is not
+        // chronological); the nagg tier consumes it, time-paged tiers ignore it.
+        ...(request.offset ? { offset: request.offset } : {}),
       });
 
       return result.match(

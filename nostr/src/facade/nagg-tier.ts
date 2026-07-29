@@ -380,13 +380,21 @@ export function createNaggTier(config: NaggTierConfig): NostrTierStrategy {
 function feedBindingForSpec(request: FeedPageRequest) {
   const until = request.cursor?.createdAt;
   const limit = request.limit;
+  const offset = request.offset;
   const spec = request.spec;
   switch (spec.kind) {
+    // The ranked pools are OFFSET-paged: rank order is not chronological, and
+    // the for-you feature path ignores a reference `until` entirely — paging it
+    // by time re-serves page one verbatim (and on the live path it warps the
+    // engagement window instead of advancing the page). The time cursor stays
+    // out of the ranked bindings.
     case 'for-you':
-      return rankedFeedAppView(forYouRankedEventsInput({ viewerPubkey: spec.viewerPubkey, until, limit }));
+      return rankedFeedAppView(
+        forYouRankedEventsInput({ viewerPubkey: spec.viewerPubkey, limit, offset }),
+      );
     case 'following-popular':
       return rankedFeedAppView(
-        followingPopularRankedEventsInput({ viewerPubkey: spec.viewerPubkey, until, limit }),
+        followingPopularRankedEventsInput({ viewerPubkey: spec.viewerPubkey, limit, offset }),
       );
     case 'following-recent':
       return followsFeedAppView({ pubkeys: spec.authors, viewer: spec.viewerPubkey, until, limit });

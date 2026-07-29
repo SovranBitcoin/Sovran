@@ -28,6 +28,12 @@ import { router } from 'expo-router';
 import { Button } from 'heroui-native';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import type { FeedParseResult } from '@/features/feed/data/feedClient';
+import {
+  advancedPaginationState,
+  emptyPaginationState,
+  isRankedFeedSpec,
+  seededPaginationState,
+} from '@/features/feed/data/feedPagination';
 import { feedPageCache, feedPageKey } from '@/features/feed/data/feedCache';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
 import { usePostActions } from '@/features/feed/hooks/usePostActions';
@@ -225,11 +231,9 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const isFollowingFeed =
     activeFilter === FEED_FILTER_FOLLOWING_POPULAR || activeFilter === FEED_FILTER_FOLLOWING_RECENT;
   const openPostActions = usePostActions();
-  const hasMoreRef = useRef(
-    seed ? seed.paginationUntil > 0 && seed.orderedFeedItems.length > 0 : true
+  const paginationRef = useRef(
+    seed ? seededPaginationState(seed, isRankedFeedSpec(initialSpec)) : emptyPaginationState()
   );
-  const paginationUntilRef = useRef(seed?.paginationUntil ?? 0);
-  const paginationOffsetRef = useRef(seed?.paginationOffset ?? 0);
   const loadingMoreRef = useRef(false);
   const feedItemIdsRef = useRef(
     new Set<string>(
@@ -294,9 +298,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       // Applies a page-0 result to state + pagination refs. Used both for the
       // instant warm-nav paint and for the fresh fetch.
       const applyPhase1 = (phase1: FeedParseResult) => {
-        paginationUntilRef.current = phase1.paginationUntil;
-        hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
-        paginationOffsetRef.current = phase1.paginationOffset;
+        paginationRef.current = seededPaginationState(phase1, isRankedFeedSpec(spec));
         feedItemIdsRef.current = new Set(
           phase1.orderedFeedItems.map((item) =>
             item.type === 'note' ? item.event.id : item.repostEvent.id
@@ -339,9 +341,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           setQuotedEventsMap(new Map());
           setProfilesMap(new Map());
         }
-        hasMoreRef.current = true;
-        paginationUntilRef.current = 0;
-        paginationOffsetRef.current = 0;
+        paginationRef.current = emptyPaginationState();
         feedItemIdsRef.current.clear();
       } else if (feedPageCache.isFresh(cachedEntry)) {
         // Warm + fresh: the instant paint above is complete and authoritative.
@@ -482,11 +482,12 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   // ── Pagination: load older items ──
 
   const loadMoreItems = useCallback(async (): Promise<FeedItem[]> => {
+    const ranked = isRankedFeedSpec(currentSpec);
     if (
       loadingMoreRef.current ||
-      !hasMoreRef.current ||
+      !paginationRef.current.hasMore ||
       !currentSpec ||
-      paginationUntilRef.current === 0
+      (!ranked && paginationRef.current.until === 0)
     )
       return [];
 
@@ -500,35 +501,16 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         spec: currentSpec,
         userPubkey,
         limit: FEED_PAGE_LIMIT,
-        until: paginationUntilRef.current,
-        offset: paginationOffsetRef.current > 0 ? paginationOffsetRef.current : undefined,
+        until: paginationRef.current.until > 0 ? paginationRef.current.until : undefined,
+        offset: paginationRef.current.offset > 0 ? paginationRef.current.offset : undefined,
         signal: controller.signal,
       });
 
       if (!isActiveLoad(requestId)) return [];
 
-      if (page.orderedFeedItems.length === 0) {
-        hasMoreRef.current = false;
-        return [];
-      }
-
-      if (page.paginationUntil > 0 && page.paginationUntil < paginationUntilRef.current) {
-        paginationUntilRef.current = page.paginationUntil;
-        paginationOffsetRef.current = page.paginationOffset;
-      } else if (page.paginationUntil === paginationUntilRef.current) {
-        paginationOffsetRef.current += page.paginationOffset;
-      } else {
-        let oldest = paginationUntilRef.current;
-        for (const item of page.orderedFeedItems) {
-          if (item.timestamp < oldest) oldest = item.timestamp;
-        }
-        if (oldest >= paginationUntilRef.current) {
-          hasMoreRef.current = false;
-          return [];
-        }
-        paginationUntilRef.current = oldest;
-        paginationOffsetRef.current = page.paginationOffset;
-      }
+      const advanced = advancedPaginationState(paginationRef.current, page, ranked);
+      paginationRef.current = advanced;
+      if (!advanced.hasMore) return [];
 
       const newItems = page.orderedFeedItems.filter((item) => {
         const id = item.type === 'note' ? item.event.id : item.repostEvent.id;
@@ -536,7 +518,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       });
 
       if (newItems.length === 0) {
-        hasMoreRef.current = false;
+        paginationRef.current = { ...paginationRef.current, hasMore: false };
         return [];
       }
 

@@ -52,14 +52,17 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
 
 function naggClientReturning(body: unknown, init?: { ok?: boolean; status?: number }) {
   let lastUrl = '';
+  let lastBody: unknown;
   const client = createNaggClient({
     appView: { baseUrl: 'https://nagg.test' },
-    fetchImpl: (async (url: string) => {
+    fetchImpl: (async (url: string, requestInit?: RequestInit) => {
       lastUrl = String(url);
+      lastBody =
+        typeof requestInit?.body === 'string' ? JSON.parse(requestInit.body) : undefined;
       return jsonResponse(body, init);
     }) as unknown as typeof fetch,
   });
-  return { client, urlOf: () => lastUrl };
+  return { client, urlOf: () => lastUrl, bodyOf: () => lastBody as Record<string, any> };
 }
 
 describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
@@ -120,6 +123,54 @@ describe('NostrDataLayer.getFeedPage — nagg tier end to end', () => {
       'primal:unsupported',
       'relay:unsupported',
     ]);
+  });
+
+  test('ranked specs page by OFFSET — the body carries it and never a time cursor', async () => {
+    // Rank order is not chronological: paging a ranked pool by `until` re-serves
+    // page one on the for-you feature path (which ignores a reference until).
+    // The tier must translate a paged request into a body offset instead.
+    const { client, bodyOf } = naggClientReturning(FEED_ENVELOPE);
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+
+    const result = await layer.getFeedPage({
+      spec: { kind: 'for-you', viewerPubkey: PUB },
+      cursor: { createdAt: 1_700_000_100, id: ID_B },
+      offset: 30,
+      limit: 10,
+    });
+    expect(result.isOk()).toBe(true);
+    const body = bodyOf();
+    expect(body.offset).toBe(30);
+    expect(body.limit).toBe(10);
+    expect(body.references.until).toBeUndefined();
+  });
+
+  test('following-popular pages by offset the same way', async () => {
+    const { client, bodyOf } = naggClientReturning(FEED_ENVELOPE);
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+
+    const result = await layer.getFeedPage({
+      spec: { kind: 'following-popular', viewerPubkey: PUB },
+      cursor: { createdAt: 1_700_000_100, id: ID_B },
+      offset: 30,
+    });
+    expect(result.isOk()).toBe(true);
+    const body = bodyOf();
+    expect(body.offset).toBe(30);
+    expect(body.references.until).toBeUndefined();
+  });
+
+  test('following-recent stays time-paged: until rides the URL, offset does not', async () => {
+    const { client, urlOf } = naggClientReturning(FEED_ENVELOPE);
+    const layer = createNostrDataLayer({ tiers: [createNaggTier({ client })] });
+    const result = await layer.getFeedPage({
+      spec: { kind: 'following-recent', authors: [PUB] },
+      cursor: { createdAt: 1_700_000_100, id: ID_B },
+      offset: 30,
+    });
+    expect(result.isOk()).toBe(true);
+    expect(urlOf()).toContain('until=1700000100');
+    expect(urlOf()).not.toContain('offset=');
   });
 
   test('user feed hits /nostr/feed/user with the author', async () => {

@@ -43,6 +43,13 @@ export type FeedPageRequest = RequestControls & {
   spec: FeedSpec;
   /** Page position from a previous result's `cursor` (null/undefined = newest). */
   cursor?: NostrCursor;
+  /**
+   * Absolute item offset for the RANKED specs (`for-you` / `following-popular`):
+   * how many ranked items previous pages already consumed. Rank order is not
+   * chronological, so a time cursor cannot page a ranked pool — nagg pages it by
+   * offset. Time-paged specs (and tiers without offset support) ignore it.
+   */
+  offset?: number;
   limit?: number;
   refresh?: boolean;
 };
