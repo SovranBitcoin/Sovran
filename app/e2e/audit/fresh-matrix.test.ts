@@ -956,26 +956,26 @@ describe('loadWorkspaceFreshMatrixSource', () => {
 
     expect(result.isOk()).toBe(true);
     const source = result._unsafeUnwrap();
-    expect(source.scenarioCount).toBe(125);
-    expect(source.expectedPairs).toHaveLength(213);
-    expect(source.expectedPairs.filter((pair) => pair.platform === 'ios')).toHaveLength(116);
-    expect(source.expectedPairs.filter((pair) => pair.platform === 'android')).toHaveLength(97);
+    expect(source.scenarioCount).toBe(126);
+    expect(source.expectedPairs).toHaveLength(215);
+    expect(source.expectedPairs.filter((pair) => pair.platform === 'ios')).toHaveLength(117);
+    expect(source.expectedPairs.filter((pair) => pair.platform === 'android')).toHaveLength(98);
     expect(source.sourceFingerprint).toBe(SOURCE_FINGERPRINT);
   });
 
-  test('reports all 213 pairs missing when the cutoff is in the future', async () => {
+  test('reports all 215 pairs missing when the cutoff is in the future', async () => {
     const result = await runWorkspaceFreshMatrixAudit('2099-01-01T00:00:00.000Z', {
       captureSourceFingerprint: () => SOURCE_FINGERPRINT,
     });
 
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap()).toMatchObject({
-      scenarios: 125,
-      expected: 213,
+      scenarios: 126,
+      expected: 215,
       covered: 0,
       complete: false,
     });
-    expect(result._unsafeUnwrap().missing).toHaveLength(213);
+    expect(result._unsafeUnwrap().missing).toHaveLength(215);
   });
 
   test('rejects a source edit during raw evidence validation', async () => {

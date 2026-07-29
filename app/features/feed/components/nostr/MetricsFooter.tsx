@@ -127,6 +127,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           onPressOut={onActionPressOut}
           accessibilityRole="button"
           accessibilityLabel={`${replied ? 'Replied' : 'Reply'}, ${metrics.replyCount} replies`}
+          testID="post-comment"
           hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
           <AnimatedMetric
             iconName="iconamoon:comment-fill"

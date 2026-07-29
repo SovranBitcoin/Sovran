@@ -5,12 +5,12 @@ import { buildChunkPlan, chunkArgv, pairKey } from './matrix';
 describe('buildChunkPlan (real authoring tree)', () => {
   const plan = buildChunkPlan({ platforms: ['ios', 'android'] });
 
-  test('matches the fresh-matrix invariant: 125 scenarios, 213 pairs', () => {
+  test('matches the fresh-matrix invariant: 126 scenarios, 215 pairs', () => {
     expect(plan.isOk()).toBe(true);
     const value = plan._unsafeUnwrap();
-    expect(value.scenarioCount).toBe(125);
-    expect(value.expectedPairKeys.length).toBe(213);
-    expect(new Set(value.expectedPairKeys).size).toBe(213);
+    expect(value.scenarioCount).toBe(126);
+    expect(value.expectedPairKeys.length).toBe(215);
+    expect(new Set(value.expectedPairKeys).size).toBe(215);
   });
 
   test('one chunk per session group per supported platform, iOS first', () => {
@@ -25,7 +25,7 @@ describe('buildChunkPlan (real authoring tree)', () => {
     );
     // Chunks jointly prove exactly the full matrix.
     const proved = new Set(value.chunks.flatMap((chunk) => chunk.expectedPairKeys));
-    expect(proved.size).toBe(213);
+    expect(proved.size).toBe(215);
   });
 
   test('multi-member groups keep the last member as --scenario target', () => {

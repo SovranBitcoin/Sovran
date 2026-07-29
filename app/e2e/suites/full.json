@@ -77,6 +77,7 @@
     {"id":"send.cashu.dm-contact","file":"scenarios/send-cashu-dm-contact.json","order":362,"newInstance":true,"lane":"funded","requires":["fresh-install","cocod.send.bolt11","unit.sat","cocod.receive.cashu"],"endState":"wallet"},
     {"id":"settings.seed.reveal","file":"scenarios/settings-seed-reveal.json","order":370,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"drawer.navigation","file":"scenarios/drawer-navigation.json","order":380,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
+    {"id":"feed.thread.backnav","file":"scenarios/feed-thread-backnav.json","order":381,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"ai.send.no-credits","file":"scenarios/ai-send-no-credits.json","order":382,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"ai.history.empty","file":"scenarios/ai-history-empty.json","order":386,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},
     {"id":"ai.model.picker","file":"scenarios/ai-model-picker.json","order":388,"newInstance":true,"lane":"simulator","requires":["fresh-install"],"endState":"wallet"},

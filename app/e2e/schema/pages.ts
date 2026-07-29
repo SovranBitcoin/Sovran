@@ -41,6 +41,7 @@ export const CANONICAL_PAGES = [
   'search', // header search overlay with results (SearchOverlay)
   'settings', // settings root screen ((settings-flow), SettingsScreen)
   'feed', // home feed tab (FeedScreen: For You / Following)
+  'thread', // post thread reader ((user-flow)/thread, ThreadView)
   'contacts', // contacts tab (ContactsScreen)
   'notifications', // notifications tab (NotificationsScreen)
   'ai', // AI chat tab (AiChatScreen)
