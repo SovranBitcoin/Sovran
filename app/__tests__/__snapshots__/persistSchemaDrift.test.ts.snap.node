@@ -530,6 +530,67 @@ exports[`persisted schema drift nostr-social-store schema matches the golden sna
         },
         "type": "object",
       },
+      "optimisticZapsByEventId": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "deltaSats": {
+              "type": "number",
+            },
+            "expectedSats": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "pending": {
+              "type": "boolean",
+            },
+            "updatedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "deltaSats",
+            "pending",
+            "updatedAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 128,
+          "type": "string",
+        },
+        "type": "object",
+      },
+      "zappedByEventId": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "totalSats": {
+              "type": "number",
+            },
+            "updatedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "totalSats",
+            "updatedAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 128,
+          "type": "string",
+        },
+        "type": "object",
+      },
     },
     "required": [
       "contactsTags",
@@ -542,6 +603,8 @@ exports[`persisted schema drift nostr-social-store schema matches the golden sna
       "optimisticFollowsByPubkey",
       "optimisticLikesByEventId",
       "optimisticRepostsByEventId",
+      "optimisticZapsByEventId",
+      "zappedByEventId",
     ],
     "type": "object",
   },

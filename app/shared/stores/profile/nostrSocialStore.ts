@@ -52,6 +52,36 @@ type EngagementOptimisticState = {
   updatedAt: number;
 };
 
+/**
+ * Optimistic zap overlay for one target event. Unlike likes/reposts a zap is
+ * additive sats, not a boolean toggle: `deltaSats` accumulates across multiple
+ * zaps on the same post, `expectedSats` is the base `satsZapped` at zap time
+ * plus the delta (the entry clears only once the aggregated 9735 counts catch
+ * up — never age-out, which would visibly DECREASE the display).
+ */
+type ZapOptimisticState = {
+  deltaSats: number;
+  pending: boolean;
+  expectedSats?: number;
+  updatedAt: number;
+};
+
+/**
+ * Durable "I zapped this post" record — drives the amber lightning highlight.
+ * Separate from the optimistic count overlay, which is deliberately cleared
+ * once nagg's aggregated `satsZapped` catches up: without this record the
+ * highlight would vanish at that moment (and never appear at all for zaps
+ * whose sat amount couldn't be attributed). `totalSats` accumulates across
+ * repeat zaps on the same post.
+ */
+type ZappedRecord = {
+  totalSats: number;
+  updatedAt: number;
+};
+
+/** Recency cap for the durable zapped map (mirrors the engagement cap idea). */
+const MAX_ZAPPED_ENTRIES = 2000;
+
 interface NostrSocialState {
   contactsTags: string[][];
   contactsContent: string;
@@ -76,6 +106,8 @@ interface NostrSocialState {
   optimisticFollowsByPubkey: Record<string, FollowOptimisticState>;
   optimisticLikesByEventId: Record<string, EngagementOptimisticState>;
   optimisticRepostsByEventId: Record<string, EngagementOptimisticState>;
+  optimisticZapsByEventId: Record<string, ZapOptimisticState>;
+  zappedByEventId: Record<string, ZappedRecord>;
 }
 
 interface NostrSocialActions {
@@ -140,6 +172,16 @@ interface NostrSocialActions {
   ) => void;
   clearLikeOptimistic: (eventId: string) => void;
   clearRepostOptimistic: (eventId: string) => void;
+
+  /**
+   * A zap melt was confirmed paid. Sets the durable zapped record (highlight)
+   * and — when `sats > 0` — an already-settled optimistic count bump that
+   * clears once nagg's aggregated `satsZapped` reaches `expectedSats`.
+   * `sats: 0` (fiat-unit melt whose sat value is unknown app-side) records
+   * the highlight only; the public count self-heals via the 9735 aggregate.
+   */
+  recordZapPaid: (eventId: string, sats: number, baseSats?: number) => void;
+  clearZapOptimistic: (eventId: string) => void;
 }
 
 type NostrSocialStore = NostrSocialState & NostrSocialActions;
@@ -285,6 +327,8 @@ const INITIAL_STATE: NostrSocialState = {
   optimisticFollowsByPubkey: {},
   optimisticLikesByEventId: {},
   optimisticRepostsByEventId: {},
+  optimisticZapsByEventId: {},
+  zappedByEventId: {},
 };
 
 // Bounded schemas - `nostrSocialStore` persists up to three optimistic maps
@@ -314,6 +358,18 @@ const PersistedEngagementOptimistic = z.looseObject({
   updatedAt: z.number().int().nonnegative(),
 });
 
+const PersistedZapOptimistic = z.looseObject({
+  deltaSats: z.number(),
+  pending: z.boolean(),
+  expectedSats: z.number().int().optional(),
+  updatedAt: z.number().int().nonnegative(),
+});
+
+const PersistedZappedRecord = z.looseObject({
+  totalSats: z.number(),
+  updatedAt: z.number().int().nonnegative(),
+});
+
 const PersistedNostrSocialStore = z.object({
   contactsTags: z
     .array(z.array(z.string().max(2048)).max(16))
@@ -334,6 +390,8 @@ const PersistedNostrSocialStore = z.object({
   optimisticRepostsByEventId: z
     .record(z.string().max(128), PersistedEngagementOptimistic)
     .default({}),
+  optimisticZapsByEventId: z.record(z.string().max(128), PersistedZapOptimistic).default({}),
+  zappedByEventId: z.record(z.string().max(128), PersistedZappedRecord).default({}),
 });
 
 export const useNostrSocialStore = create<NostrSocialStore>()(
@@ -583,6 +641,43 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
           optimisticRepostsByEventId: omitKey(state.optimisticRepostsByEventId, eventId),
         }));
       },
+
+      // ---- zaps ----
+
+      recordZapPaid: (eventId, sats, baseSats) => {
+        storeLog.info('social.zap.paid', { eventId: eventId.slice(0, 8), sats });
+        set((state) => {
+          const zappedExisting = state.zappedByEventId[eventId];
+          const zappedByEventId = capByRecency(
+            {
+              ...state.zappedByEventId,
+              [eventId]: {
+                totalSats: (zappedExisting?.totalSats ?? 0) + sats,
+                updatedAt: Date.now(),
+              },
+            },
+            MAX_ZAPPED_ENTRIES
+          );
+          if (sats <= 0) return { zappedByEventId };
+          const optExisting = state.optimisticZapsByEventId[eventId];
+          const deltaSats = (optExisting?.deltaSats ?? 0) + sats;
+          return {
+            zappedByEventId,
+            optimisticZapsByEventId: withOptimisticEntry(state.optimisticZapsByEventId, eventId, {
+              deltaSats,
+              pending: false,
+              expectedSats: (baseSats ?? 0) + deltaSats,
+            }),
+          };
+        });
+      },
+
+      clearZapOptimistic: (eventId) => {
+        storeLog.debug('social.zap.optimistic.clear', { eventId: eventId.slice(0, 8) });
+        set((state) => ({
+          optimisticZapsByEventId: omitKey(state.optimisticZapsByEventId, eventId),
+        }));
+      },
     }),
     persistConfig({
       name: 'nostr-social-store',
@@ -602,6 +697,8 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         optimisticFollowsByPubkey: state.optimisticFollowsByPubkey,
         optimisticLikesByEventId: state.optimisticLikesByEventId,
         optimisticRepostsByEventId: state.optimisticRepostsByEventId,
+        optimisticZapsByEventId: state.optimisticZapsByEventId,
+        zappedByEventId: state.zappedByEventId,
       }),
     })
   )

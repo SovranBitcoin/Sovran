@@ -169,14 +169,21 @@ export function useNostrEngagement(
   // State slices — grouped with useShallow to minimise re-subscriptions. The
   // canonical maps are populated globally by useOwnEventsSync, so this hook only
   // reads them (no per-screen relay subscription) and owns the optimistic toggle.
-  const { engagementByEventId, optimisticLikesByEventId, optimisticRepostsByEventId } =
-    useNostrSocialStore(
-      useShallow((s) => ({
-        engagementByEventId: s.engagementByEventId,
-        optimisticLikesByEventId: s.optimisticLikesByEventId,
-        optimisticRepostsByEventId: s.optimisticRepostsByEventId,
-      }))
-    );
+  const {
+    engagementByEventId,
+    optimisticLikesByEventId,
+    optimisticRepostsByEventId,
+    optimisticZapsByEventId,
+    zappedByEventId,
+  } = useNostrSocialStore(
+    useShallow((s) => ({
+      engagementByEventId: s.engagementByEventId,
+      optimisticLikesByEventId: s.optimisticLikesByEventId,
+      optimisticRepostsByEventId: s.optimisticRepostsByEventId,
+      optimisticZapsByEventId: s.optimisticZapsByEventId,
+      zappedByEventId: s.zappedByEventId,
+    }))
+  );
 
   const lastStaleWarningRef = useRef(0);
 
@@ -208,6 +215,19 @@ export function useNostrEngagement(
         getBaseMetrics(eventId).repostCount,
         () => clearRepostOptimistic(eventId)
       );
+      // Zap overlay: clear only when the aggregated 9735 counts have caught
+      // up to what we expect. Deliberately NO age-out — an aged-out clear
+      // would visibly DECREASE satsZapped when a slow/absent LNURL server
+      // never publishes the receipt; the store's recency cap bounds the map.
+      const optZap = optimisticZapsByEventId[eventId];
+      if (
+        optZap &&
+        !optZap.pending &&
+        optZap.expectedSats != null &&
+        getBaseMetrics(eventId).satsZapped >= optZap.expectedSats
+      ) {
+        useNostrSocialStore.getState().clearZapOptimistic(eventId);
+      }
     }
   }, [
     eventIds,
@@ -215,6 +235,7 @@ export function useNostrEngagement(
     engagementByEventId,
     optimisticLikesByEventId,
     optimisticRepostsByEventId,
+    optimisticZapsByEventId,
   ]);
 
   // ---- DEV stale-optimistic warning ----
@@ -243,7 +264,14 @@ export function useNostrEngagement(
     engagementRevisionRef.current += 1;
     return engagementRevisionRef.current;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventIds, engagementByEventId, optimisticLikesByEventId, optimisticRepostsByEventId]);
+  }, [
+    eventIds,
+    engagementByEventId,
+    optimisticLikesByEventId,
+    optimisticRepostsByEventId,
+    optimisticZapsByEventId,
+    zappedByEventId,
+  ]);
 
   // ---- public getters ----
 
@@ -281,13 +309,32 @@ export function useNostrEngagement(
       const baseMetrics = getBaseMetrics(eventId);
       const likeDelta = optimisticLikesByEventId[eventId]?.delta ?? 0;
       const repostDelta = optimisticRepostsByEventId[eventId]?.delta ?? 0;
+      const zapDeltaSats = optimisticZapsByEventId[eventId]?.deltaSats ?? 0;
       return {
         ...baseMetrics,
         likeCount: Math.max(0, baseMetrics.likeCount + likeDelta),
         repostCount: Math.max(0, baseMetrics.repostCount + repostDelta),
+        satsZapped: Math.max(0, baseMetrics.satsZapped + zapDeltaSats),
       };
     },
-    [getBaseMetrics, optimisticLikesByEventId, optimisticRepostsByEventId]
+    [getBaseMetrics, optimisticLikesByEventId, optimisticRepostsByEventId, optimisticZapsByEventId]
+  );
+
+  /**
+   * Viewer zap state for the lightning button tint. The durable
+   * `zappedByEventId` record is the authority — the optimistic overlay is
+   * cleared once nagg's counts catch up, so tinting off it alone made the
+   * highlight vanish at settle time.
+   */
+  const getZapState = useCallback(
+    (eventId: string): { zapped: boolean; zapPending: boolean } => {
+      const optZap = optimisticZapsByEventId[eventId];
+      return {
+        zapped: !!zappedByEventId[eventId] || (optZap?.deltaSats ?? 0) > 0,
+        zapPending: !!optZap?.pending,
+      };
+    },
+    [optimisticZapsByEventId, zappedByEventId]
   );
 
   // ---- toggle actions (unified via toggleEngagement) ----
@@ -377,6 +424,7 @@ export function useNostrEngagement(
   return {
     getDisplayMetrics,
     getEngagementState,
+    getZapState,
     toggleLike,
     toggleRepost,
     engagementRevision,

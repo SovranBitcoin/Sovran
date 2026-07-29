@@ -38,6 +38,18 @@ describe('fresh payment-root context clearing', () => {
       clear: "clearPaymentContext('feed.lightning_invoice')",
       start: 'machine.execute(meltTarget, { reset: true })',
     },
+    {
+      // Preset zap path: clear before booking the amount into the machine.
+      file: 'app/features/feed/hooks/useZap.ts',
+      clear: "clearPaymentContext('feed.zap_post')",
+      start: 'machine.enterAmount(',
+    },
+    {
+      // Custom zap path: clear before entering the send flow.
+      file: 'app/features/feed/hooks/useZap.ts',
+      clear: "clearPaymentContext('feed.zap_post')",
+      start: 'machine.startSendEcash({',
+    },
   ])('$file clears stale routing state before starting Colada', ({ file, clear, start }) => {
     expectBefore(readSource(file), clear, start);
   });
