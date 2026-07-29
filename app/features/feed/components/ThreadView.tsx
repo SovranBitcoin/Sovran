@@ -435,8 +435,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 
       if (item.type === 'spam-separator') {
         return (
-          <View style={styles.spamSeparator}>
-            <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
+          <View style={[styles.spamSeparator, { borderColor: opacity(foreground, 0.1) }]}>
+            <Text
+              size={12}
+              style={[styles.spamSeparatorLabel, { color: opacity(foreground, 0.4) }]}>
               Might be spam · {item.count}
             </Text>
           </View>
@@ -702,10 +704,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   spamSeparator: {
-    paddingTop: 24,
-    paddingBottom: 12,
+    marginTop: 24,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  spamSeparatorLabel: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   replySortContainer: {
     paddingHorizontal: 16,
