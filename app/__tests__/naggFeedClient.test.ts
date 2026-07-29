@@ -184,34 +184,6 @@ describe('createNaggFeedClient (app-view REST)', () => {
     expect(result.profilesMap.get('carol')).toEqual({ name: 'Carol' });
   });
 
-  it('getThread renders the server reply manifest from /v1/nostr/thread', async () => {
-    const reply1 = note({ id: 'reply1', pubkey: 'bob', tags: [['e', 'root', '', 'reply']] });
-    const reply2 = note({ id: 'reply2', pubkey: 'carol', tags: [['e', 'root', '', 'reply']] });
-    mockFetch.mockResolvedValueOnce(
-      restResponse({
-        // order[0] is the root id; the rest are the server-ranked reply ids.
-        order: ['root', 'reply2', 'reply1'],
-        orderBy: 'rank',
-        events: [note(), reply1, reply2],
-        aggregates: {},
-      })
-    );
-
-    const result = await loadClient().getThread({
-      eventId: 'root',
-      sort: 'relevant',
-      viewerPubkey: 'viewer',
-      limit: 10,
-    });
-
-    const url = lastUrl();
-    expect(url).toContain('/v1/nostr/thread');
-    expect(url).toContain('sort=relevant');
-    expect(url).toContain('viewer=viewer');
-    expect(result.allEvents.has('root')).toBe(true);
-    expect(result.replyPageEventIds).toEqual(['reply2', 'reply1']);
-  });
-
   it('enrich fetches quoted events and profiles from the REST endpoints', async () => {
     mockFetch
       .mockResolvedValueOnce(

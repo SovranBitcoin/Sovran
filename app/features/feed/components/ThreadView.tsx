@@ -119,6 +119,10 @@ function threadKeyExtractor(item: ThreadListItem): string {
       return `t_${item.event.id}`;
     case 'reply':
       return `r_${item.event.id}`;
+    case 'spam-reply':
+      return `sr_${item.event.id}`;
+    case 'spam-separator':
+      return 'spam-separator';
     case 'reply-sort-tabs':
       return item.id;
     case 'target-skeleton':
@@ -128,7 +132,8 @@ function threadKeyExtractor(item: ThreadListItem): string {
 }
 
 function threadItemType(item: ThreadListItem): string {
-  return item.type;
+  // Spam replies render the same PostCard as replies — share the recycling pool.
+  return item.type === 'spam-reply' ? 'reply' : item.type;
 }
 
 function createReplySkeletonItems(count: number): ThreadSkeletonItem[] {
@@ -243,7 +248,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 
   const {
     items,
-    hiddenReplyCount,
     isLoading,
     isFetching,
     isLoadingMoreReplies,
@@ -283,17 +287,18 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       ];
     }
 
-    // Real replies render immediately (they fade in); any remaining unfetched
-    // replies show as fixed-height skeletons appended below, which crossfade to
-    // real cards as they load. No measurement / height-matching.
+    // Real replies render immediately (they fade in); skeletons appear ONLY
+    // while a fetch is actually in flight (isFetching clears in a finally on
+    // every path), so they are guaranteed to resolve — never sized from the
+    // reply-count aggregate, which counts replies no source may ever serve.
+    if (!isFetching) return withReplySortTabs(items);
+
     const targetReplyCount = getTargetReplyCount(items, metricsRef);
     if (targetReplyCount === 0) return withReplySortTabs(items);
 
     const pendingReplyCount =
       targetReplyCount == null
-        ? isFetching
-          ? DEFAULT_REPLY_SKELETON_COUNT
-          : 0
+        ? DEFAULT_REPLY_SKELETON_COUNT
         : Math.max(0, targetReplyCount - getRenderedReplyCount(items));
     const skeletonCount = Math.min(MAX_REPLY_SKELETON_COUNT, pendingReplyCount);
 
@@ -375,7 +380,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     [metricsRef]
   );
 
-  const actionableEvents = useMemo(() => items.map((item) => item.event), [items]);
+  const actionableEvents = useMemo(
+    () => items.flatMap((item) => (item.type === 'spam-separator' ? [] : [item.event])),
+    [items]
+  );
   const {
     getDisplayMetrics,
     getEngagementState,
@@ -388,7 +396,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 
   const getThreadContext = useCallback(() => {
     const allEvents = new Map<string, FeedEvent>();
-    for (const it of items) allEvents.set(it.event.id, it.event);
+    for (const it of items) {
+      if (it.type === 'spam-separator') continue;
+      allEvents.set(it.event.id, it.event);
+    }
     return {
       allEvents,
       profiles: profilesRef.current,
@@ -419,6 +430,16 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
             foreground={foreground}
             surfaceTertiary={surfaceTertiary}
           />
+        );
+      }
+
+      if (item.type === 'spam-separator') {
+        return (
+          <View style={styles.spamSeparator}>
+            <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
+              Might be spam · {item.count}
+            </Text>
+          </View>
         );
       }
 
@@ -468,7 +489,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       // doesn't re-fire on scroll, since recycled cells reuse the instance) — unlike
       // a skeleton EXIT, which lingered in a recycled cell's slot (the "wrong
       // place" glitch), so the reply only ever fades IN.
-      if (item.type === 'reply') {
+      if (item.type === 'reply' || item.type === 'spam-reply') {
         return <Animated.View entering={REPLY_FADE_IN}>{card}</Animated.View>;
       }
       return card;
@@ -611,13 +632,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                   <View style={styles.hiddenReplyFooter}>
                     <Spinner size={18} color={opacity(foreground, 0.45)} />
                   </View>
-                ) : hiddenReplyCount > 0 && !isFetching && !hasMoreReplies ? (
-                  <View style={styles.hiddenReplyFooter}>
-                    <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
-                      {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not
-                      loaded
-                    </Text>
-                  </View>
                 ) : null
               }
               showsVerticalScrollIndicator={false}
@@ -684,6 +698,12 @@ const styles = StyleSheet.create({
   },
   hiddenReplyFooter: {
     paddingVertical: 16,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  spamSeparator: {
+    paddingTop: 24,
+    paddingBottom: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
   },

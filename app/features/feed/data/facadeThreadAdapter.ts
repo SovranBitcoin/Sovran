@@ -5,22 +5,25 @@ import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/fe
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import type { ThreadRequest, ThreadResult } from './feedClient';
 
-// Pure shape bridge: facade ResolvedThread → the app's ThreadResult. Used only
-// on the cache/relay path (nagg toggled off); the nagg-enabled path keeps the
-// GraphQL viewer-ranked thread in naggFeedClient, which the facade's REST nagg
-// tier can't reproduce. Dependency-light (facade + feed types + the pure
-// buildThreadStructure) so it stays unit-testable.
+// Pure shape bridge: facade ResolvedThread → the app's ThreadResult, for every
+// tier. nagg serves a server-windowed ranked page (its manifest order is
+// authoritative — no client post-sort); Primal/relay serve the full thread in
+// one shot, so the reply order is computed locally and paged as a window over
+// memory. Dependency-light (facade + feed types + the pure buildThreadStructure)
+// so it stays unit-testable.
 
 // Per-tier budget for a facade thread fetch. Lower than the facade's 30s default
 // so a Primal→relay fall-through (when Primal lacks the note) can't hold the
 // thread skeleton for a full minute before settling to "no replies".
 const THREAD_TIER_TIMEOUT_MS = 12_000;
 
-/** Map the app's 5-way reply sort to what the facade tiers serve natively.
- *  Primal's thread_view has NO server sort param (the client post-sorts), so we
- *  fetch in relevance/new order and post-sort engagement modes below. */
+/** Map the app's 5-way reply sort onto the facade's server sorts: the
+ *  engagement tabs (likes/zaps/reposts) all collapse to nagg's `ranked`;
+ *  Primal/relay have no server sort and are post-sorted locally below. */
 function toFacadeSort(sort: ThreadRequest['sort']): facade.ThreadSort {
-  return sort === 'new' ? 'new' : 'relevant';
+  if (sort === 'new') return 'new';
+  if (sort === 'likes' || sort === 'zaps' || sort === 'reposts') return 'ranked';
+  return 'relevant';
 }
 
 export function toFacadeThreadRequest(request: ThreadRequest): facade.ThreadRequest {
@@ -28,7 +31,8 @@ export function toFacadeThreadRequest(request: ThreadRequest): facade.ThreadRequ
     noteId: request.eventId,
     sort: toFacadeSort(request.sort),
     ...(request.viewerPubkey ? { viewerPubkey: request.viewerPubkey } : {}),
-    ...(typeof request.limit === 'number' ? { limit: request.limit } : {}),
+    offset: request.offset ?? 0,
+    ...(typeof request.limit === 'number' ? { replyLimit: request.limit } : {}),
     ...(request.signal ? { signal: request.signal } : {}),
     timeoutMs: request.timeoutMs ?? THREAD_TIER_TIMEOUT_MS,
   };
@@ -89,7 +93,14 @@ export function resolvedThreadToResult(
   thread: facade.ResolvedThread,
   request: ThreadRequest
 ): ThreadResult {
-  const allEvents = new Map<string, FeedEvent>();
+  // Seed first, network overlay second — a just-posted own note (not yet on any
+  // tier) keeps rendering, and fresher network entities win on id collision.
+  const allEvents = request.seed ? new Map(request.seed.allEvents) : new Map<string, FeedEvent>();
+  const profiles = request.seed ? new Map(request.seed.profiles) : new Map<string, ProfileInfo>();
+  const metrics = request.seed ? new Map(request.seed.metrics) : new Map<string, NoteMetrics>();
+  const quotedEvents = request.seed
+    ? new Map(request.seed.quotedEvents)
+    : new Map<string, FeedEvent>();
   const replyEvents: FeedEvent[] = [];
 
   const root = feedItemEvent(thread.root);
@@ -106,21 +117,23 @@ export function resolvedThreadToResult(
     allEvents.set(event.id, event);
     replyEvents.push(event);
   }
+  // Off-manifest hydration (off-page descendants, quote context): available for
+  // tap-through and tree context, never in the reply page order.
+  for (const item of thread.extras) {
+    const event = feedItemEvent(item);
+    if (event) allEvents.set(event.id, event);
+  }
 
   // Dev-only: stamp every note in the thread (root + parents + replies) with the
   // tier that served it so PostCard can badge its source. No-op in production.
   if (__DEV__) recordDebugTiers([...allEvents.keys()], thread.tier);
 
-  const quotedEvents = new Map<string, FeedEvent>(
-    Object.entries(thread.quoted) as [string, FeedEvent][]
-  );
-  const profiles = new Map<string, ProfileInfo>(
-    Object.entries(thread.profiles).map(([pk, p]) => [
-      pk,
-      { name: p.name, ...(p.picture ? { picture: p.picture } : {}) },
-    ])
-  );
-  const metrics = new Map<string, NoteMetrics>();
+  for (const [id, quoted] of Object.entries(thread.quoted)) {
+    quotedEvents.set(id, quoted as FeedEvent);
+  }
+  for (const [pk, p] of Object.entries(thread.profiles)) {
+    profiles.set(pk, { name: p.name, ...(p.picture ? { picture: p.picture } : {}) });
+  }
   for (const [id, s] of Object.entries(thread.stats)) {
     metrics.set(id, {
       likeCount: s.likes,
@@ -130,24 +143,59 @@ export function resolvedThreadToResult(
     });
   }
 
-  const replyPageEventIds = sortedReplyIds(
+  const offset = request.offset ?? 0;
+  const pageSize = request.limit ?? replyEvents.length;
+
+  if (thread.tier === 'nagg') {
+    // Server-windowed ranked page: the manifest order (relevant = OP direct
+    // replies pinned) is authoritative. Post-sorting it here would be exactly
+    // the reshuffle the ordering-manifest rules exist to prevent.
+    return {
+      allEvents,
+      profiles,
+      metrics,
+      quotedEvents,
+      thread: buildThreadStructure(request.eventId, allEvents),
+      replyPageEventIds: replyEvents.map((event) => event.id),
+      replyPageSize: pageSize,
+      loadedReplyCount: replyEvents.length,
+      hasMoreReplies: thread.hasMore,
+      tier: thread.tier,
+      knownReplyIds: thread.knownReplyIds,
+    };
+  }
+
+  // Single-shot sources (Primal/relay): the full reply set arrived at once and
+  // the server can't be trusted to sort/page it. Sort locally (5-way tabs), pin
+  // the OP's direct replies under the relevant sort, then present a WINDOW —
+  // load-more widens the window from memory, no network.
+  const fullSorted = sortedReplyIds(
     replyEvents,
     thread.stats as Record<string, ReplyStat>,
     request.sort
   );
+  const opPinned =
+    (request.sort ?? 'relevant') === 'relevant' && root
+      ? facade.partitionOpFirst(fullSorted, root.pubkey, (id) => {
+          const event = allEvents.get(id);
+          return event && facade.isDirectReplyTo(event, request.eventId) ? event.pubkey : undefined;
+        })
+      : fullSorted;
+  const windowEnd = Math.min(opPinned.length, offset + pageSize);
+
   return {
     allEvents,
     profiles,
     metrics,
     quotedEvents,
-    // The tier returned the whole thread already ordered by its manifest, so the
-    // pure tree-builder arranges parents/replies; there's no separate page merge.
     thread: buildThreadStructure(request.eventId, allEvents),
-    replyPageEventIds,
-    replyPageSize: request.limit ?? replyEvents.length,
-    loadedReplyCount: replyEvents.length,
-    // Primal/relay return the full thread in one shot (cursor null) → no paging.
-    hasMoreReplies: thread.cursor !== null,
+    replyPageEventIds: opPinned.slice(0, windowEnd),
+    replyPageSize: pageSize,
+    loadedReplyCount: windowEnd,
+    hasMoreReplies: windowEnd < opPinned.length,
+    tier: thread.tier,
+    knownReplyIds: thread.knownReplyIds,
+    allSortedReplyIds: opPinned,
   };
 }
 
@@ -155,14 +203,19 @@ export function resolvedThreadToResult(
  *  honest (shows "no replies") rather than silently using nagg behind a toggle. */
 export function emptyThreadResult(request: ThreadRequest): ThreadResult {
   return {
-    allEvents: new Map(),
-    profiles: new Map(),
-    metrics: new Map(),
-    quotedEvents: new Map(),
-    thread: buildThreadStructure(request.eventId, new Map()),
+    allEvents: request.seed ? new Map(request.seed.allEvents) : new Map(),
+    profiles: request.seed ? new Map(request.seed.profiles) : new Map(),
+    metrics: request.seed ? new Map(request.seed.metrics) : new Map(),
+    quotedEvents: request.seed ? new Map(request.seed.quotedEvents) : new Map(),
+    thread: buildThreadStructure(
+      request.eventId,
+      request.seed ? request.seed.allEvents : new Map()
+    ),
     replyPageEventIds: [],
     replyPageSize: request.limit ?? 0,
     loadedReplyCount: 0,
     hasMoreReplies: false,
+    tier: null,
+    knownReplyIds: [],
   };
 }

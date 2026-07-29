@@ -21,17 +21,21 @@ const STATS = {
   [C]: { likes: 0, reposts: 0, replies: 0, zaps: 5, satsZapped: 9000 },
 };
 
-function buildThread(): facade.ResolvedThread {
+function buildThread(overrides: Record<string, unknown> = {}): facade.ResolvedThread {
   return {
     tier: 'primal',
     root: note(ROOT, 1000),
     parents: [],
     replies: [note(A, 300), note(B, 200), note(C, 100)],
+    extras: [],
+    hasMore: false,
+    knownReplyIds: [A, B, C],
     stats: STATS,
     profiles: {},
     quoted: {},
     cursor: null,
     missingIds: [],
+    ...overrides,
   } as unknown as facade.ResolvedThread;
 }
 
@@ -60,5 +64,81 @@ describe('resolvedThreadToResult reply post-sorting', () => {
     const result = resolvedThreadToResult(buildThread(), { eventId: ROOT, sort: 'new' });
     expect(result.thread.target?.id).toBe(ROOT);
     expect(result.loadedReplyCount).toBe(3);
+  });
+});
+
+describe('resolvedThreadToResult — tier-aware paging contract', () => {
+  const OP = '9'.repeat(64);
+
+  function taggedNote(id: string, pubkey: string, createdAt: number): facade.FeedItem {
+    return {
+      type: 'note',
+      event: {
+        id,
+        pubkey,
+        kind: 1,
+        content: '',
+        tags: [['e', ROOT, '', 'root']],
+        created_at: createdAt,
+      },
+    } as unknown as facade.FeedItem;
+  }
+
+  test('nagg order passes through un-post-sorted; hasMore rides the resolved thread', () => {
+    // Server ranked B before A on purpose — post-sorting would flip them.
+    const thread = buildThread({
+      tier: 'nagg',
+      replies: [note(B, 200), note(A, 300)],
+      hasMore: true,
+    });
+    const result = resolvedThreadToResult(thread, { eventId: ROOT, sort: 'likes', limit: 10 });
+    expect(result.replyPageEventIds).toEqual([B, A]);
+    expect(result.hasMoreReplies).toBe(true);
+    expect(result.tier).toBe('nagg');
+    expect(result.allSortedReplyIds).toBeUndefined();
+  });
+
+  test('single-shot sources window locally and expose the full sorted order', () => {
+    const result = resolvedThreadToResult(buildThread(), { eventId: ROOT, sort: 'new', limit: 2 });
+    expect(result.replyPageEventIds).toEqual([A, B]); // window of 2 over [A,B,C]
+    expect(result.hasMoreReplies).toBe(true); // C still in memory
+    expect(result.allSortedReplyIds).toEqual([A, B, C]);
+    expect(result.loadedReplyCount).toBe(2);
+  });
+
+  test('relevant pins the OP direct reply first on single-shot sources', () => {
+    const opRoot = {
+      type: 'note',
+      event: { id: ROOT, pubkey: OP, kind: 1, content: '', tags: [], created_at: 1000 },
+    } as unknown as facade.FeedItem;
+    const thread = buildThread({
+      root: opRoot,
+      // OP's direct reply is oldest and least engaged — sort alone buries it.
+      replies: [taggedNote(A, 'a'.repeat(64), 300), taggedNote(B, 'b'.repeat(64), 200), taggedNote(C, OP, 100)],
+    });
+    const result = resolvedThreadToResult(thread, { eventId: ROOT, sort: 'relevant', limit: 10 });
+    expect(result.replyPageEventIds[0]).toBe(C);
+  });
+
+  test('seed events survive the network overlay', () => {
+    const seedEvent = {
+      id: 's'.repeat(64),
+      pubkey: OP,
+      kind: 1,
+      content: 'seed',
+      tags: [],
+      created_at: 1,
+    };
+    const result = resolvedThreadToResult(buildThread(), {
+      eventId: ROOT,
+      sort: 'new',
+      seed: {
+        allEvents: new Map([[seedEvent.id, seedEvent]]),
+        profiles: new Map(),
+        metrics: new Map(),
+        quotedEvents: new Map(),
+      },
+    } as never);
+    expect(result.allEvents.get(seedEvent.id)?.content).toBe('seed');
   });
 });

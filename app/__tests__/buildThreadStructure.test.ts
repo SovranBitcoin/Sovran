@@ -95,3 +95,23 @@ describe('buildThreadStructure (audit 59.json F-001)', () => {
     expect(result.parents.map((p) => p.id)).toEqual(['rootA', 'parentB']);
   });
 });
+
+describe('buildThreadStructure — OP direct replies lead the seed order', () => {
+  const OP = 'f'.repeat(64);
+
+  it('partitions the target author\'s direct replies first, chronological within each group', () => {
+    const root = note('root', OP, []);
+    const early = note('early-other', 'a'.repeat(64), [['e', 'root', '', 'root']], 100);
+    const opLate = note('op-late', OP, [['e', 'root', '', 'root']], 300);
+    const mid = note('mid-other', 'b'.repeat(64), [['e', 'root', '', 'root']], 200);
+    const events = new Map([
+      ['root', root],
+      ['early-other', early],
+      ['op-late', opLate],
+      ['mid-other', mid],
+    ]);
+
+    const structure = buildThreadStructure('root', events);
+    expect(structure.replies.map((e) => e.id)).toEqual(['op-late', 'early-other', 'mid-other']);
+  });
+});

@@ -7,12 +7,12 @@ import {
 export type ThreadItem =
   | { type: 'parent'; event: FeedEvent }
   | { type: 'target'; event: FeedEvent }
-  | { type: 'reply'; event: FeedEvent };
+  | { type: 'reply'; event: FeedEvent }
+  | { type: 'spam-separator'; count: number }
+  | { type: 'spam-reply'; event: FeedEvent };
 
 export type BuiltThreadItems = {
   items: ThreadItem[];
-  hiddenReplyCount: number;
-  expectedReplies: number;
   receivedReplies: number;
 };
 
@@ -35,8 +35,6 @@ export function buildThreadItemsFromResult(
   if (!thread.target) return null;
 
   const target = thread.target;
-  const targetMetrics = result.metrics.get(eventId);
-  const expectedReplies = targetMetrics?.replyCount ?? 0;
   const replyById = new Map(thread.replies.map((event) => [event.id, event]));
   // Replies render in the order the server returned them (the chosen sort). The
   // page-id ordering, when present, preserves pagination order across fetches.
@@ -51,10 +49,48 @@ export function buildThreadItemsFromResult(
 
   return {
     items,
-    hiddenReplyCount: Math.max(0, expectedReplies - replies.length),
-    expectedReplies,
     receivedReplies: thread.replies.length,
   };
+}
+
+export type ThreadIgnoreFilters = {
+  pubkeys: ReadonlySet<string>;
+  eventIds: ReadonlySet<string>;
+};
+
+/**
+ * Pure final composition of the thread list: apply the viewer's ignore filters
+ * to replies (NEVER the target; parents stay for context), then — only once the
+ * primary list is fully loaded — append the "Might be spam" section: a
+ * separator carrying the surviving count, followed by the audit-found replies.
+ */
+export function composeThreadItems(
+  built: readonly ThreadItem[],
+  spamReplies: readonly FeedEvent[],
+  ignore: ThreadIgnoreFilters,
+  options: { includeSpam: boolean }
+): ThreadItem[] {
+  const isIgnored = (event: FeedEvent): boolean =>
+    ignore.pubkeys.has(event.pubkey) || ignore.eventIds.has(event.id);
+
+  const primaryIds = new Set<string>();
+  const items: ThreadItem[] = [];
+  for (const item of built) {
+    if ((item.type === 'reply' || item.type === 'spam-reply') && isIgnored(item.event)) continue;
+    if (item.type === 'reply' || item.type === 'target' || item.type === 'parent') {
+      primaryIds.add(item.event.id);
+    }
+    items.push(item);
+  }
+
+  if (!options.includeSpam) return items;
+  const spam = spamReplies.filter((event) => !primaryIds.has(event.id) && !isIgnored(event));
+  if (spam.length === 0) return items;
+  return [
+    ...items,
+    { type: 'spam-separator', count: spam.length },
+    ...spam.map<ThreadItem>((event) => ({ type: 'spam-reply', event })),
+  ];
 }
 
 export function orderedReplyIdsForThreadResult(
@@ -122,6 +158,8 @@ export function buildThreadItemsFromSeed(
       replyPageSize: replyPageEventIds.length,
       loadedReplyCount: 0,
       hasMoreReplies: false,
+      tier: null,
+      knownReplyIds: [],
     },
     replyPageEventIds
   );

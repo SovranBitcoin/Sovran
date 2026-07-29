@@ -1,4 +1,5 @@
 import type { RequestControls } from 'wallet';
+import type { NostrTier } from '@sovranbitcoin/schemas';
 import type {
   FeedEvent,
   FeedItem,
@@ -131,6 +132,16 @@ export type ThreadResult = ThreadSeedBuckets & {
   replyPageSize: number;
   loadedReplyCount: number;
   hasMoreReplies: boolean;
+  /** Tier that served this page; null when every tier was exhausted. */
+  tier: NostrTier | null;
+  /** The source's full acknowledged reply-id set — the spam-audit diff baseline. */
+  knownReplyIds: string[];
+  /**
+   * Present only for single-shot sources (Primal/relay): the COMPLETE locally
+   * sorted reply order. replyPageEventIds is a window into this; load-more
+   * widens the window from memory instead of re-fetching.
+   */
+  allSortedReplyIds?: string[];
 };
 
 export interface FeedClient {

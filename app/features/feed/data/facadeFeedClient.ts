@@ -3,7 +3,6 @@ import { facade } from 'nostr';
 import type { FeedEvent, FeedItem } from '@/features/feed/components/nostr/feedTypes';
 import { feedLog } from '@/shared/lib/logger';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
-import { getNostrTierConfig } from '@/shared/lib/nostr/nostrTierConfig';
 import {
   isRootNote,
   mapAppSpecToFeedSpec,
@@ -25,7 +24,6 @@ import {
   type FeedNotificationsResult,
   type FeedParseResult,
   type ThreadResult,
-  type ThreadSeedBuckets,
 } from './feedClient';
 
 // ---------------------------------------------------------------------------
@@ -50,18 +48,6 @@ function eventsFromAppFeedItem(item: FeedItem): FeedEvent[] {
     if (item.reposters) for (const reposter of item.reposters) out.push(reposter.event);
   }
   return out;
-}
-
-/** Write a thread result's notes/profiles/metrics into the shared cache. */
-function ingestThreadIntoCache(result: ThreadSeedBuckets): void {
-  // Dev-only: this is the nagg GraphQL thread path, so every note here was served
-  // by nagg — badge it as such on PostCard. No-op in production.
-  if (__DEV__) recordDebugTiers([...result.allEvents.keys()], 'nagg');
-  const cache = buildNostrDataLayer()?.cache;
-  if (!cache) return;
-  cache.ingestNotes([...result.allEvents.values(), ...result.quotedEvents.values()]);
-  cache.ingestProfileInfos(Object.fromEntries(result.profiles), 'nagg');
-  cache.ingestNoteStats(facade.statsFromMetrics(Object.fromEntries(result.metrics)), 'nagg');
 }
 
 /** Write a parsed feed/user-feed page's notes/profiles/metrics into the shared cache. */
@@ -108,7 +94,7 @@ function ingestFeedPageIntoCache(result: FeedParseResult): void {
 // the waterfall still has Primal + relays after it.
 const FEED_READ_TIMEOUT_MS = 15_000;
 
-export function createFacadeFeedClient(fallback: FeedClient): FeedClient {
+export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>): FeedClient {
   return {
     ...fallback,
     async getFeed(request): Promise<FeedParseResult> {
@@ -149,16 +135,11 @@ export function createFacadeFeedClient(fallback: FeedClient): FeedClient {
     },
 
     async getThread(request): Promise<ThreadResult> {
-      // nagg's GraphQL thread is the viewer-ranked gold path (authoredReplyChain
-      // + rankedReferencedBy); its REST app-view — and thus the facade's nagg
-      // tier — can't reproduce that ranking. So keep the GraphQL path whenever
-      // nagg is enabled, and only route threads through the facade (Primal →
-      // relay) when nagg is toggled off, so the cache/relay tiers can serve them.
-      if (getNostrTierConfig().nagg.enabled) {
-        const result = await fallback.getThread(request);
-        ingestThreadIntoCache(result);
-        return result;
-      }
+      // One path for every tier: the facade waterfall (nagg → Primal → relay).
+      // The facade's nagg tier sends the full ranked-thread parameter set, so
+      // the old nagg-only bypass (and its "REST can't reproduce the ranking"
+      // rationale) is gone — a failing nagg now falls through instead of
+      // throwing, and ingestion happens inside the data layer.
 
       // Never throw: useThread's seeded-error path keeps isLoading=true on a
       // throw (so a transient nagg error doesn't clobber a seeded render), which

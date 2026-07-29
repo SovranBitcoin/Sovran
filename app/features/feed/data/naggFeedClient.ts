@@ -5,7 +5,6 @@ import {
   enrichmentFromEnvelope,
   feedPageFromEnvelope,
   notificationsPageFromEnvelope,
-  threadFromEnvelope,
   type NaggAppViewBinding,
   type NaggError,
   type NaggNotificationsPage,
@@ -18,7 +17,6 @@ import {
   notificationsAppView,
   profilesAppView,
   rankedFeedAppView,
-  threadAppView,
   userFeedAppView,
   withRankedTargetExclusions,
   type RankedEventsInput,
@@ -27,7 +25,6 @@ import { type NaggFeedPage } from 'nostr/map';
 import type { z } from 'zod';
 import { backendConfig } from '@/shared/config/backend';
 import { apiLog, feedLog, redactError } from '@/shared/lib/logger';
-import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
 import { mapNaggFeedPage } from './mapNaggFeedPage';
 import type {
   FeedClient,
@@ -38,8 +35,6 @@ import type {
   FeedNotification,
   FeedNotificationsRequest,
   FeedNotificationsResult,
-  ThreadRequest,
-  ThreadResult,
   UserFeedPageRequest,
   PostsByPubkeysRequest,
 } from './feedClient';
@@ -51,8 +46,6 @@ import { parseJson } from '../components/nostr/feedParse';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
 import { useFeedIgnoreStore } from '../stores/ignoreStore';
 
-const RELEVANT_AUTHOR_REPLY_LIMIT = 50;
-
 type FeedQueryOptions = {
   includeNote?: (event: FeedEvent, rootEvent?: FeedEvent) => boolean;
   includeRepost?: (event: FeedEvent, originalEvent?: FeedEvent, rootEvent?: FeedEvent) => boolean;
@@ -63,10 +56,6 @@ function isRootNote(event: { tags: string[][] }): boolean {
   const eTags = (event.tags || []).filter((tag) => tag[0] === 'e');
   if (eTags.length === 0) return true;
   return eTags.every((tag) => tag[3] === 'mention');
-}
-
-function shortId(value: unknown): string | undefined {
-  return typeof value === 'string' && value.length > 0 ? value.slice(0, 10) : undefined;
 }
 
 function endpointLogFields(): Record<string, unknown> {
@@ -106,7 +95,7 @@ type NaggRestOptions<TSchema extends z.ZodType> = {
  * nagg v2 answers every app-view route with the ONE generic envelope
  * (`{ order, orderBy, events, aggregates, cursor? }`), which the caller
  * reconstructs into the canonical shape via `nostr`'s envelope helpers
- * (`feedPageFromEnvelope`, `threadFromEnvelope`, …). Errors are logged and
+ * (`feedPageFromEnvelope`, …). Errors are logged and
  * rethrown.
  */
 async function runNaggRest<TSchema extends z.ZodType>(
@@ -474,7 +463,9 @@ function notificationsResultFromPage(page: NaggNotificationsPage): FeedNotificat
   };
 }
 
-export function createNaggFeedClient(): FeedClient {
+// getThread intentionally absent: threads are served exclusively by the facade
+// waterfall (createFacadeFeedClient), whose nagg tier speaks the same app-view.
+export function createNaggFeedClient(): Omit<FeedClient, 'getThread'> {
   return {
     async getFeed({
       spec,
@@ -726,104 +717,6 @@ export function createNaggFeedClient(): FeedClient {
         paginationUntil: result.paginationUntil,
       });
       return result;
-    },
-
-    async getThread({
-      eventId,
-      limit = 10,
-      offset = 0,
-      sort = 'relevant',
-      viewerPubkey,
-      seed,
-      signal,
-      timeoutMs,
-    }: ThreadRequest): Promise<ThreadResult> {
-      const startedAt = Date.now();
-      // A generous candidate fetch so the server-side relevance merge + ordering
-      // see the full reply set; the page window (offset/limit) is applied to the
-      // returned manifest. The viewer-specific reply order is computed by nagg
-      // (`sort=relevant`), replacing the old client-side GraphQL merge.
-      const candidateLimit = Math.max(100, offset + limit + RELEVANT_AUTHOR_REPLY_LIMIT + 1);
-      // nagg's thread endpoint sorts by relevant | ranked | new; the legacy
-      // engagement sorts (likes/zaps/reposts) all map to the server's `ranked`.
-      const threadSort: 'relevant' | 'ranked' | 'new' =
-        sort === 'relevant' || sort === 'new' ? sort : 'ranked';
-      const envelope = await runNaggRest(
-        threadAppView({
-          id: eventId,
-          limit: candidateLimit,
-          sort: threadSort,
-          viewer: viewerPubkey,
-          offset,
-          replyLimit: limit,
-          candidateLimit,
-          rankedLimit: Math.min(candidateLimit, 50),
-        }),
-        false,
-        { responseSchema: NaggEnvelopeSchema, signal, timeoutMs }
-      );
-      // v2: order[0] is the root id, the rest the ranked reply ids. A missing/
-      // unhydrated root means nagg has nothing to render — surface it as an
-      // error, exactly as the v1 schema parse would have (the caller's
-      // fallback/error handling is unchanged).
-      const page = threadFromEnvelope(envelope);
-      if (!page) {
-        throw new Error(`nagg thread root missing for ${eventId.slice(0, 10)}`);
-      }
-
-      // The canonical thread carries the root + flat descendants + side maps;
-      // FeedEvent/NoteMetrics/ProfileInfo are structurally the canonical shapes,
-      // so hydrate the buckets directly. buildThreadStructure builds the tree;
-      // the server `ordering` manifest is the reply render order.
-      const buckets = {
-        allEvents: seed ? new Map(seed.allEvents) : new Map<string, FeedEvent>(),
-        profiles: seed ? new Map(seed.profiles) : new Map<string, ProfileInfo>(),
-        metrics: seed ? new Map(seed.metrics) : new Map<string, NoteMetrics>(),
-        quotedEvents: seed ? new Map(seed.quotedEvents) : new Map<string, FeedEvent>(),
-      };
-      const root = page.root as FeedEvent;
-      buckets.allEvents.set(root.id, root);
-      for (const event of page.events as FeedEvent[]) buckets.allEvents.set(event.id, event);
-      for (const [id, metrics] of Object.entries(page.metrics)) {
-        buckets.metrics.set(id, metrics as NoteMetrics);
-      }
-      for (const [pubkey, profile] of Object.entries(page.profiles)) {
-        buckets.profiles.set(pubkey, profile as ProfileInfo);
-      }
-      for (const [id, quoted] of Object.entries(page.quoted)) {
-        buckets.quotedEvents.set(id, quoted as FeedEvent);
-      }
-
-      const orderedReplyIds = page.ordering?.elements ?? page.events.map((event) => event.id);
-      const thread = buildThreadStructure(eventId, buckets.allEvents);
-      const targetMetrics = buckets.metrics.get(eventId);
-      // Another page may exist when the candidate fetch saturated.
-      const hasMoreReplies = page.events.length >= candidateLimit;
-
-      feedLog.info('thread.nagg.appview.result', {
-        eventId,
-        sort,
-        limit,
-        offset,
-        candidateLimit,
-        durationMs: Date.now() - startedAt,
-        seedEvents: seed?.allEvents.size ?? 0,
-        allEvents: buckets.allEvents.size,
-        replyCount: orderedReplyIds.length,
-        replyPageEventIds: orderedReplyIds.map(shortId),
-        renderedReplies: thread.replies.length,
-        targetReplyCount: targetMetrics?.replyCount ?? null,
-        hasMoreReplies,
-      });
-
-      return {
-        ...buckets,
-        thread,
-        replyPageEventIds: orderedReplyIds,
-        replyPageSize: limit,
-        loadedReplyCount: orderedReplyIds.length,
-        hasMoreReplies,
-      };
     },
   };
 }

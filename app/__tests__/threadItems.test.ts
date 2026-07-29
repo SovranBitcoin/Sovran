@@ -5,7 +5,9 @@ import type { ThreadResult, ThreadSeedBuckets } from '@/features/feed/data/feedC
 import {
   buildThreadItemsFromResult,
   buildThreadItemsFromSeed,
+  composeThreadItems,
   orderedReplyIdsForThreadResult,
+  type ThreadItem,
 } from '@/features/feed/lib/threadItems';
 
 const EMPTY_METRICS: NoteMetrics = {
@@ -69,12 +71,11 @@ describe('thread item builders', () => {
       })
     );
 
-    expect(built?.items.map((item) => `${item.type}:${item.event.id}`)).toEqual([
-      'target:root',
-      'reply:seeded-reply',
-    ]);
-    expect(built?.hiddenReplyCount).toBe(2);
-    expect(built?.expectedReplies).toBe(3);
+    expect(
+      built?.items.map((item) =>
+        item.type === 'spam-separator' ? item.type : `${item.type}:${item.event.id}`
+      )
+    ).toEqual(['target:root', 'reply:seeded-reply']);
     expect(built?.receivedReplies).toBe(1);
   });
 
@@ -163,6 +164,8 @@ describe('thread item builders', () => {
       replyPageSize: 10,
       loadedReplyCount: 2,
       hasMoreReplies: false,
+      tier: 'nagg',
+      knownReplyIds: [],
     };
 
     const orderedIds = orderedReplyIdsForThreadResult(result, 'more', ['seeded-reply']);
@@ -199,6 +202,8 @@ describe('thread item builders', () => {
       replyPageSize: 10,
       loadedReplyCount: 2,
       hasMoreReplies: false,
+      tier: 'nagg',
+      knownReplyIds: [],
     };
 
     // The seeded reply (already painted) stays first; the ranked delta appends.
@@ -208,5 +213,59 @@ describe('thread item builders', () => {
     // With no seed, the server order is used as-is.
     const cold = orderedReplyIdsForThreadResult(result, 'initial', []);
     expect(cold).toEqual(['ranked-first', 'seeded-reply']);
+  });
+});
+
+describe('composeThreadItems — ignore filters + the "Might be spam" section', () => {
+  const target = note({ id: 'root', pubkey: 'op' });
+  const reply = note({ id: 'reply-1', pubkey: 'friend', tags: [['e', 'root', '', 'root']] });
+  const ignoredReply = note({ id: 'reply-2', pubkey: 'blocked', tags: [['e', 'root', '', 'root']] });
+  const built: ThreadItem[] = [
+    { type: 'target', event: target },
+    { type: 'reply', event: reply },
+    { type: 'reply', event: ignoredReply },
+  ];
+  const spamA = note({ id: 'spam-1', pubkey: 'rando', tags: [['e', 'root', '', 'root']] });
+  const spamIgnored = note({ id: 'spam-2', pubkey: 'blocked', tags: [['e', 'root', '', 'root']] });
+  const noIgnore = { pubkeys: new Set<string>(), eventIds: new Set<string>() };
+
+  it('appends the separator + spam cards only when the primary list is exhausted', () => {
+    const withSpam = composeThreadItems(built, [spamA], noIgnore, { includeSpam: true });
+    expect(withSpam.map((i) => i.type)).toEqual([
+      'target',
+      'reply',
+      'reply',
+      'spam-separator',
+      'spam-reply',
+    ]);
+    expect(withSpam.find((i) => i.type === 'spam-separator')).toMatchObject({ count: 1 });
+
+    const stillPaging = composeThreadItems(built, [spamA], noIgnore, { includeSpam: false });
+    expect(stillPaging.some((i) => i.type === 'spam-separator')).toBe(false);
+  });
+
+  it('ignore filters drop replies AND spam, never the target', () => {
+    const filtered = composeThreadItems(built, [spamA, spamIgnored], {
+      pubkeys: new Set(['blocked']),
+      eventIds: new Set<string>(),
+    }, { includeSpam: true });
+    expect(filtered.map((i) => (i.type === 'spam-separator' ? i.type : `${i.type}:${i.event.id}`))).toEqual([
+      'target:root',
+      'reply:reply-1',
+      'spam-separator',
+      'spam-reply:spam-1',
+    ]);
+    // Ignoring the target's author never removes the target itself.
+    const opIgnored = composeThreadItems(built, [], {
+      pubkeys: new Set(['op']),
+      eventIds: new Set<string>(),
+    }, { includeSpam: true });
+    expect(opIgnored.some((i) => i.type === 'target')).toBe(true);
+  });
+
+  it('spam already acknowledged by the primary list is deduped, and an empty bucket adds no separator', () => {
+    const dupSpam = note({ id: 'reply-1', pubkey: 'friend', tags: [['e', 'root', '', 'root']] });
+    const composed = composeThreadItems(built, [dupSpam], noIgnore, { includeSpam: true });
+    expect(composed.some((i) => i.type === 'spam-separator')).toBe(false);
   });
 });
