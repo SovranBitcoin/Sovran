@@ -2,6 +2,7 @@ import { storeLog } from '@/shared/lib/logger';
 import { useAmountDraftStore } from './amountDraftStore';
 import { useContactSendStore } from './contactSendStore';
 import { useNearPaySessionStore } from './nearPayStore';
+import { clearPendingZaps } from './pendingZapStore';
 import { useRoutstrTopUpStore } from './routstrTopUpStore';
 
 /**
@@ -39,4 +40,7 @@ export function clearPaymentContext(reason: string): void {
   // A fresh flow must never restore an amount stashed during a previous,
   // abandoned mint-selector round trip.
   useAmountDraftStore.getState().clear();
+  // An abandoned zap must never attach its 9734 to a later unrelated payment
+  // that happens to target the same lightning address.
+  clearPendingZaps();
 }

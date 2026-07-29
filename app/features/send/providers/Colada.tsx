@@ -25,6 +25,7 @@ import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'w
 import {
   createColada,
   createMempoolSpaceChainAdapter,
+  decodeUrlOrAddress,
   isFiatUnit,
   unitMinorDecimals,
   withTimeout,
@@ -42,6 +43,9 @@ import { paymentLog } from '@/shared/lib/logger';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
+import { getOwnWriteRelays } from '@/shared/lib/nostr/outbox/relayListStore';
+import { buildSignedZapRequestJson, lnurlBech32 } from '@/shared/lib/nostr/zap/buildZapRequest';
+import { markPendingZapReceipt, peekPendingZap } from '@/shared/stores/runtime/pendingZapStore';
 import { publishGiftWrappedDM } from '@/shared/lib/nostr/publishGiftWrappedDM';
 import { ingestResolvedProfiles } from '@/shared/lib/nostr/useEntityCache';
 import {
@@ -211,6 +215,37 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         getDisplayCurrency,
         getPreferredMintUrl: () => useMintStore.getState().selectedMint,
         getActiveUnit: () => useMintStore.getState().activeUnit,
+        // NIP-57: when the melt target was registered as a zap (pendingZapStore),
+        // attach a signed kind-9734 zap request to the LNURL invoice callback.
+        // The 9734 is never published to relays — the recipient's LNURL server
+        // publishes the 9735 receipt. Targets without allowsNostr still get
+        // paid, just as a plain lightning send (annotated 'plain').
+        getLnurlPayExtras: async ({ meltTarget, amountMsats, allowsNostr, nostrPubkey }) => {
+          const pending = peekPendingZap(meltTarget);
+          if (!pending) return null;
+          const pk = privateKeyRef.current;
+          if (!allowsNostr || !nostrPubkey || !pk) {
+            markPendingZapReceipt(meltTarget, 'plain');
+            paymentLog.info('zap.extras.plain_fallback', {
+              allowsNostr,
+              hasNostrPubkey: !!nostrPubkey,
+              hasPrivateKey: !!pk,
+            });
+            return null;
+          }
+          const nostr = buildSignedZapRequestJson({
+            privateKey: pk,
+            recipientPubkeyHex: pending.authorPubkey,
+            eventId: pending.eventId,
+            eventKind: pending.eventKind,
+            amountMsats,
+            relays: getOwnWriteRelays(),
+            lnurl: lnurlBech32(decodeUrlOrAddress(meltTarget) ?? ''),
+            content: pending.comment,
+          });
+          markPendingZapReceipt(meltTarget, 'nip57');
+          return { nostr };
+        },
         // NUT-30 onchain melt fee picker. Runs BEFORE prepare (no proofs
         // reserved while the sheet is open); dismiss resolves null = cancel.
         // Routed through the FullWindowOverlay-backed action-menu SHEET (not the

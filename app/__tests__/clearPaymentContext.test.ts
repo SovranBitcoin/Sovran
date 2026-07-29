@@ -7,6 +7,7 @@ import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext
 import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
 import { useContactSendStore } from '@/shared/stores/runtime/contactSendStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
+import { peekPendingZap, registerPendingZap } from '@/shared/stores/runtime/pendingZapStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 
 describe('clearPaymentContext', () => {
@@ -39,6 +40,27 @@ describe('clearPaymentContext', () => {
     clearPaymentContext('test');
 
     expect(useContactSendStore.getState().active).toBeNull();
+  });
+
+  it('clears a pending zap left by an abandoned zap flow', () => {
+    // A stale zap context must never attach its 9734 to a later unrelated
+    // payment that happens to target the same lightning address.
+    registerPendingZap({
+      meltTarget: 'alice@example.com',
+      eventId: 'e'.repeat(64),
+      eventKind: 1,
+      authorPubkey: 'f'.repeat(64),
+      contentPreview: 'gm',
+      emoji: '👍',
+      comment: 'Great post 👍',
+      presetSats: 21,
+      createdAt: Date.now(),
+    });
+    expect(peekPendingZap('alice@example.com')).toBeDefined();
+
+    clearPaymentContext('test');
+
+    expect(peekPendingZap('alice@example.com')).toBeUndefined();
   });
 
   it('clears an amount draft left by an abandoned mint-selector round trip', () => {
