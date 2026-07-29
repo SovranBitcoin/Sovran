@@ -106,7 +106,7 @@
     "@scure/base": "^2.0.0",
     "@scure/bip32": "^1.3.3",
     "@scure/bip39": "^1.2.2",
-    "@shopify/flash-list": "2.0.2",
+    "@shopify/flash-list": "2.3.2",
     "@shopify/react-native-skia": "2.6.2",
     "@sovranbitcoin/coco-cashu-plugin-p2pk-import": "^0.2.0",
     "@sovranbitcoin/schemas": "^2.2.0",
