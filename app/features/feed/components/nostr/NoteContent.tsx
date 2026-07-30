@@ -32,6 +32,7 @@ import {
   tryNpubEncode,
 } from './feedParse';
 import { PollCard } from './poll/PollCard';
+import { RelayCard } from './RelayCard';
 import { POLL_KIND } from './poll/pollParse';
 import { formatRelative } from '@/shared/lib/date';
 import { sharedStyles } from './feedStyles';
@@ -532,6 +533,7 @@ export const NoteContent = React.memo(function NoteContent({
         case 'image':
         case 'video':
         case 'lightning':
+        case 'relay':
         case 'nevent':
         case 'note':
           blocks.push(resolved);
@@ -798,6 +800,10 @@ export const NoteContent = React.memo(function NoteContent({
           const imageUrls = blockSegments
             .filter((s): s is typeof s & { kind: 'image' } => s.kind === 'image')
             .map((s) => s.url);
+          // Fan-out cap: only the first 3 relay cards per note fetch NIP-11
+          // (a pasted NIP-65-style relay dump must not fan out N HTTP GETs);
+          // the rest render the static non-fetching row.
+          let relayCount = 0;
           return blockSegments.map((seg, i) => {
             switch (seg.kind) {
               case 'image': {
@@ -886,6 +892,8 @@ export const NoteContent = React.memo(function NoteContent({
               }
               case 'lightning':
                 return <LightningBlock key={`b${i}`} meltTarget={seg.meltTarget} />;
+              case 'relay':
+                return <RelayCard key={`b${i}`} url={seg.url} noFetch={relayCount++ >= 3} />;
               case 'nevent':
               case 'note':
                 return renderQuoteCard(seg.eventId, `b${i}`);

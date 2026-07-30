@@ -63,6 +63,14 @@ export const LIGHTNING_GOLD_GLOW = '#FFE099';
 /** Pale gold rim-light — LIGHTNING_GOLD analog of LIGHTNING_RIM. */
 export const LIGHTNING_GOLD_RIM = '#FFECBF';
 
+/** Buzz relay brand chartreuse (#d7d72e — buzz.xyz `theme-color`). Accent for
+ *  relay cards whose NIP-11 `software` is the Block buzz repo. */
+export const BUZZ_ACCENT = '#D7D72E';
+
+/** Buzz brand ink (#231e1e) — the near-black buzz.xyz pairs with BUZZ_ACCENT;
+ *  the readable-on-accent text color for Buzz brand pills. */
+export const BUZZ_INK = '#231E1E';
+
 /** Theme-invariant dark success tint for animated frosted payment toasts. */
 export const TOAST_SUCCESS_DARK_BG = '#089A2C';
 
