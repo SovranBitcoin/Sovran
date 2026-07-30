@@ -254,6 +254,47 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
       );
     },
 
+    openNotificationsSession(request) {
+      const facadeRequest = toFacadeNotificationsRequest(request);
+      if (!facadeRequest) return null;
+      const layer = buildNostrDataLayer();
+      if (!layer) {
+        feedLog.warn('feed.notifications.facade.no_layer', {
+          tab: request.tab ?? 'ALL',
+          policy: request.policy,
+          replyScope: request.replyScope,
+        });
+        return null;
+      }
+      const session = layer.openNotificationsSession(facadeRequest);
+      const map = (page: facade.ResolvedNotifications): FeedNotificationsResult => {
+        const mapped = resolvedNotificationsToResult(page);
+        return { ...mapped, hasNextPage: session.hasMore() };
+      };
+      return {
+        firstPage: async () => {
+          const page = await session.firstPage();
+          feedLog.info('feed.notifications.fetch.done', {
+            transport: 'session',
+            tier: page.tier,
+            tab: request.tab ?? 'ALL',
+            policy: request.policy,
+            replyScope: request.replyScope,
+            results: page.notifications.length,
+            pending: session.pendingCount(),
+            hasNextPage: session.hasMore(),
+          });
+          return map(page);
+        },
+        loadMore: async () => map(await session.loadMore()),
+        snapshot: () => map(session.snapshot()),
+        hasMore: () => session.hasMore(),
+        pendingCount: () => session.pendingCount(),
+        subscribe: (listener) => session.subscribe(listener),
+        close: () => session.close(),
+      };
+    },
+
     async getNotifications(request): Promise<FeedNotificationsResult> {
       const facadeRequest = toFacadeNotificationsRequest(request);
       if (!facadeRequest) return fallback.getNotifications(request);

@@ -30,6 +30,7 @@ export function toFacadeNotificationsRequest(
     refresh: request.refresh,
     signal: request.signal,
     timeoutMs: request.timeoutMs,
+    ...(request.ownEventIds?.length ? { ownEventIds: request.ownEventIds } : {}),
     cursor: request.until ? { createdAt: request.until, id: '' } : null,
   };
 }

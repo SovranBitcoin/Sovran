@@ -19,6 +19,8 @@ export type NotificationListItem =
       total: number;
       /** Server hit its window cap — render the count as "N+". */
       totalCapped?: boolean;
+      /** Built by the client-grouping fallback (no server group metadata). */
+      clientGrouped?: true;
     }
   | {
       /** Synthetic, client-injected "thanks for downloading" card, pinned to the
@@ -84,9 +86,12 @@ export function buildNotificationListItems(
           ...sample.slice(1).map((actor) => syntheticActorNotification(actor, notification.reason)),
         ];
         const total = notification.total ?? members.length;
+        // Target-keyed, total-free, representative-free id: count bumps and
+        // representative upgrades from the unified session must UPDATE this row
+        // in place, never remount it (a changing id would reset the row).
         out.push({
           type: 'group',
-          id: `${reason}:${notification.event.id}:${total}`,
+          id: `group:${reason}:${batchKeyFor(notification, reason)}`,
           reason,
           notifications: members,
           total,
@@ -117,21 +122,26 @@ export function buildNotificationListItems(
     }
     const group: Extract<NotificationListItem, { type: 'group' }> = {
       type: 'group',
-      id: `client:${key}`,
+      // Same id space as the server-group branch: a client group that a later
+      // (nagg-shaped) emission upgrades to a server group keeps its row.
+      id: `group:${key}`,
       reason,
       notifications: [notification],
       total: 1,
+      clientGrouped: true,
     };
     clientGroups.set(key, group);
     out.push(group);
   }
 
-  // A client group that attracted no other members is really a single.
+  // A client group that attracted no other members is really a single. Keep
+  // the GROUP id: if a later emission adds a second member the row becomes a
+  // group again without remounting (same key, same position).
   return out.map((item) =>
-    item.type === 'group' && item.id.startsWith('client:') && item.notifications.length === 1
+    item.type === 'group' && item.clientGrouped === true && item.notifications.length === 1
       ? {
           type: 'single',
-          id: item.notifications[0]!.event.id,
+          id: item.id,
           notification: item.notifications[0]!,
         }
       : item

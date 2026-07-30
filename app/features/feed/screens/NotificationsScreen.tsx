@@ -14,6 +14,7 @@ import opacity from 'hex-color-opacity';
 
 import Icon from '@/assets/icons';
 import type {
+  AppNotificationsSession,
   FeedNotification,
   FeedNotificationTab,
   FeedNotificationsResult,
@@ -175,6 +176,30 @@ export function NotificationsScreen() {
     size: null,
   });
 
+  // The unified three-source session (nagg + Primal + relays, concurrent).
+  // Owns cross-source dedupe, per-source cursors, and the pooled-new-rows
+  // no-shift contract; the refs here only manage its lifecycle.
+  const sessionRef = useRef<AppNotificationsSession | null>(null);
+  const sessionUnsubRef = useRef<(() => void) | null>(null);
+  const closeSession = useCallback(() => {
+    sessionUnsubRef.current?.();
+    sessionUnsubRef.current = null;
+    sessionRef.current?.close();
+    sessionRef.current = null;
+  }, []);
+
+  // Own recent event ids power the relay floor's #e/#q backstop and flip its
+  // reply/engagement classification fail-open → fail-closed.
+  const ownContentById = useOwnContentStore((s) => s.byId);
+  const ownEventIds = useMemo(
+    () =>
+      Object.values(ownContentById)
+        .sort((a, b) => b.event.created_at - a.event.created_at)
+        .slice(0, 200)
+        .map((entry) => entry.event.id),
+    [ownContentById]
+  );
+
   const fetchNotificationsPage = useCallback(
     async ({
       signal,
@@ -282,16 +307,54 @@ export function NotificationsScreen() {
       }
       setErrorMessage(null);
 
+      // Unified session first: all three sources concurrently, one merged page.
+      // Falls back to the one-shot waterfall when the client/layer can't serve
+      // a session (legacy transport, no facade layer).
+      closeSession();
+      const sessionClient = getFeedClient();
+      const session =
+        sessionClient.openNotificationsSession?.({
+          viewerPubkey,
+          tab: activeTab,
+          policy,
+          replyScope,
+          limit: NOTIFICATIONS_PAGE_SIZE,
+          refresh: mode === 'refresh',
+          ownEventIds,
+          signal,
+        }) ?? null;
+      sessionRef.current = session;
+      sessionClient.dispose?.();
+
       // Only an explicit pull-to-refresh forces nagg to revalidate. An initial
       // focus reads the shared response cache (which auto-revalidates a stale
       // entry in the background), so opening the screen no longer pays the full
       // recompute cost on every mount.
-      void fetchNotificationsPage({ signal, refresh: mode === 'refresh' })
+      const firstLoad = session
+        ? session.firstPage()
+        : fetchNotificationsPage({ signal, refresh: mode === 'refresh' });
+      void firstLoad
         .then((page) => {
           if (signal.aborted || sequence !== loadSequenceRef.current) return;
           applyFirstPage(page, 'network');
           if (page) notificationsPageCache.setEntry(cacheKey, page, { viewerKey: viewerPubkey });
           notificationsPageCache.markTouched(cacheKey);
+          if (!session) return;
+          hasMoreRef.current = session.hasMore();
+          // In-place updates only (count bumps, shape/profile upgrades, pool
+          // count changes): row ids are stable, so the list updates without
+          // remounting or shifting; new rows wait for the next load-more.
+          sessionUnsubRef.current = session.subscribe(() => {
+            if (sequence !== loadSequenceRef.current) return;
+            const snap = session.snapshot();
+            feedLog.debug('feed.notifications.session.update', {
+              tab: activeTab,
+              rows: snap.notifications.length,
+              pending: session.pendingCount(),
+            });
+            hasMoreRef.current = session.hasMore();
+            setResult(snap);
+          });
         })
         .catch((error) => {
           if (signal.aborted || sequence !== loadSequenceRef.current) return;
@@ -314,7 +377,16 @@ export function NotificationsScreen() {
           else setIsRefreshing(false);
         });
     },
-    [applyFirstPage, fetchNotificationsPage, viewerPubkey, activeTab, policy, replyScope]
+    [
+      applyFirstPage,
+      closeSession,
+      fetchNotificationsPage,
+      ownEventIds,
+      viewerPubkey,
+      activeTab,
+      policy,
+      replyScope,
+    ]
   );
 
   useFocusEffect(
@@ -326,8 +398,9 @@ export function NotificationsScreen() {
         refreshControllerRef.current?.abort();
         refreshControllerRef.current = null;
         loadSequenceRef.current += 1;
+        closeSession();
       };
-    }, [loadFirstPage])
+    }, [loadFirstPage, closeSession])
   );
 
   const handleRefresh = useCallback(() => {
@@ -339,6 +412,45 @@ export function NotificationsScreen() {
   }, [isRefreshing, loadFirstPage]);
 
   const loadMoreNotifications = useCallback(async () => {
+    // Session path: the session owns cursors/dedupe and the pooled-row reveal;
+    // this is the sanctioned page boundary where new rows may appear.
+    const session = sessionRef.current;
+    if (session) {
+      if (loadingMoreRef.current || isInitialLoading || isRefreshing || !session.hasMore()) return;
+      const sequence = loadSequenceRef.current;
+      loadingMoreRef.current = true;
+      setIsLoadingMore(true);
+      try {
+        const page = await session.loadMore();
+        if (sequence !== loadSequenceRef.current) return;
+        hasMoreRef.current = session.hasMore();
+        setResult(page);
+        feedLog.info('feed.notifications.ui.load_more', {
+          tab: activeTab,
+          policy,
+          replyScope,
+          transport: 'session',
+          pageResults: page.notifications.length,
+          pending: session.pendingCount(),
+          hasMore: hasMoreRef.current,
+        });
+      } catch (error) {
+        if (sequence !== loadSequenceRef.current) return;
+        const message = error instanceof Error ? error.message : String(error);
+        feedLog.warn('feed.notifications.load_more_failed', {
+          tab: activeTab,
+          policy,
+          replyScope,
+          transport: 'session',
+          message,
+        });
+      } finally {
+        loadingMoreRef.current = false;
+        setIsLoadingMore(false);
+      }
+      return;
+    }
+
     if (
       loadingMoreRef.current ||
       isInitialLoading ||
@@ -517,7 +629,8 @@ export function NotificationsScreen() {
   // `targetEventId`, leaving no preview. Resolve the missing target from local
   // own-content so the post preview renders regardless of serving tier — its
   // author is us, so no profile refetch is needed (see viewerPubkey below).
-  const ownContentById = useOwnContentStore((s) => s.byId);
+  // (ownContentById is subscribed above, next to the session refs, where the
+  // same store also feeds the relay ownEventIds backstop.)
   const notifications = useMemo(() => {
     let changed = false;
     const hydrated = rawNotifications.map((n) => {
@@ -789,6 +902,9 @@ export function NotificationsScreen() {
                 </VisualLayoutProbe>
               ) : null
             }
+            // Load-more reveals pooled rows into their true chronological slots
+            // (possibly above the viewport); keep the visible window anchored.
+            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
             onLayout={handleListLayout}
             onContentSizeChange={handleContentSizeChange}
             onEndReached={loadMoreNotifications}

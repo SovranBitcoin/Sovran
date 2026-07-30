@@ -77,3 +77,23 @@ describe('resolvedNotificationsToResult', () => {
     expect(result.hasNextPage).toBe(false);
   });
 });
+
+describe('ownEventIds pass-through', () => {
+  it('forwards ownEventIds to the facade request', () => {
+    const request = toFacadeNotificationsRequest({
+      viewerPubkey: 'f'.repeat(64),
+      tab: 'ALL',
+      ownEventIds: ['a'.repeat(64)],
+    });
+    expect(request?.ownEventIds).toEqual(['a'.repeat(64)]);
+  });
+
+  it('omits an empty ownEventIds list', () => {
+    const request = toFacadeNotificationsRequest({
+      viewerPubkey: 'f'.repeat(64),
+      tab: 'ALL',
+      ownEventIds: [],
+    });
+    expect(request?.ownEventIds).toBeUndefined();
+  });
+});

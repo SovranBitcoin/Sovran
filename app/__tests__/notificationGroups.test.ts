@@ -86,3 +86,45 @@ describe('buildNotificationListItems', () => {
     ]);
   });
 });
+
+describe('row id stability (unified session no-shift contract)', () => {
+  it('keeps a server group id stable across total changes', () => {
+    const grouped = (total: number): FeedNotification => ({
+      ...notification('rep-1', 'reaction', 'post-1'),
+      type: 'group',
+      total,
+      sampleActors: [{ pubkey: 'rep-1-pubkey', eventId: 'rep-1', createdAt: 1 }],
+    });
+    const [three] = buildNotificationListItems([grouped(3)]);
+    const [five] = buildNotificationListItems([grouped(5)]);
+    expect(three?.id).toBe(five?.id);
+    expect(three?.id).toContain('post-1'); // target-keyed, not representative-keyed
+  });
+
+  it('keeps the id stable when a client single grows into a group', () => {
+    const [single] = buildNotificationListItems([notification('like-1', 'reaction', 'post-9')]);
+    const [group] = buildNotificationListItems([
+      notification('like-1', 'reaction', 'post-9'),
+      notification('like-2', 'reaction', 'post-9'),
+    ]);
+    expect(single?.type).toBe('single');
+    expect(group?.type).toBe('group');
+    expect(single?.id).toBe(group?.id);
+  });
+
+  it('keeps server and client group ids in the same id space for one target', () => {
+    const [client] = buildNotificationListItems([
+      notification('like-1', 'reaction', 'post-2'),
+      notification('like-2', 'reaction', 'post-2'),
+    ]);
+    const [server] = buildNotificationListItems([
+      {
+        ...notification('like-9', 'reaction', 'post-2'),
+        type: 'group',
+        total: 4,
+        sampleActors: [{ pubkey: 'a', eventId: 'like-9', createdAt: 1 }],
+      },
+    ]);
+    expect(client?.id).toBe(server?.id);
+  });
+});

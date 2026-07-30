@@ -73,6 +73,12 @@ export type FeedNotificationsRequest = RequestControls & {
   refresh?: boolean;
   /** Group follow/repost/reaction/zap server-side (default true). Set false for the raw list. */
   grouped?: boolean;
+  /**
+   * The viewer's own recent event ids (from ownContentStore). Powers the relay
+   * floor's `#e`/`#q` backstop and flips its reply/engagement classification
+   * from fail-open to fail-closed. Ignored by the server tiers.
+   */
+  ownEventIds?: string[];
 };
 
 /** One sampled participant of a grouped notification (for the avatar cluster). */
@@ -150,6 +156,22 @@ export type ThreadResult = ThreadSeedBuckets & {
   serverHasMoreReplies?: boolean;
 };
 
+/**
+ * The unified three-source notifications surface: nagg + Primal + relays
+ * fetched concurrently, merged into one shift-free page stream. `subscribe`
+ * fires on IN-PLACE row updates (count bumps, shape upgrades) and pool-count
+ * changes — new rows only ever appear from firstPage/loadMore results.
+ */
+export type AppNotificationsSession = {
+  firstPage(): Promise<FeedNotificationsResult>;
+  loadMore(): Promise<FeedNotificationsResult>;
+  snapshot(): FeedNotificationsResult;
+  hasMore(): boolean;
+  pendingCount(): number;
+  subscribe(listener: () => void): () => void;
+  close(): void;
+};
+
 export interface FeedClient {
   getFeed(request: FeedPageRequest): Promise<FeedParseResult>;
   getUserFeed(request: UserFeedPageRequest): Promise<FeedParseResult>;
@@ -157,6 +179,13 @@ export interface FeedClient {
   getPostsByPubkeys(request: PostsByPubkeysRequest): Promise<FeedParseResult>;
   enrich(request: FeedEnrichmentRequest): Promise<FeedEnrichmentUpdates>;
   getNotifications(request: FeedNotificationsRequest): Promise<FeedNotificationsResult>;
+  /**
+   * Open the concurrent notifications session; null when the tab is
+   * client-only, the facade layer is unavailable, or the client has no
+   * session support (legacy transport) — callers fall back to
+   * getNotifications.
+   */
+  openNotificationsSession?(request: FeedNotificationsRequest): AppNotificationsSession | null;
   getThread(request: ThreadRequest): Promise<ThreadResult>;
   dispose?(): void;
 }
