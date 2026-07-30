@@ -33,6 +33,7 @@ export const PRIMAL_KIND = {
   noteStats: 10_000_100,
   feedRange: 10_000_113,
   noteActions: 10_000_115,
+  notification: 10_000_132,
 } as const;
 
 export type PrimalCacheRequest = {

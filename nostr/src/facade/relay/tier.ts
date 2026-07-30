@@ -3,7 +3,7 @@ import { answered, failed, unsupported, type TierOutcome } from '../../tiers';
 import type { FeedBundle, FeedItem, FeedPageRequest, FeedSpec } from '../feed';
 import type { SortKey } from '../session/page-buffer';
 import type { ThreadBundle, ThreadRequest } from '../thread';
-import type { NotificationsBundle, NotificationsRequest } from '../notifications';
+import type { NotificationItem, NotificationsBundle, NotificationsRequest } from '../notifications';
 import { ownActionKinds, type OwnHistoryBundle, type OwnHistoryRequest } from '../own-state';
 import {
   summarizeReviews,
@@ -35,7 +35,13 @@ import {
 import { toFeedEvent } from '../event';
 import type { NaggFeedEvent } from '../../map/feed';
 import type { NostrTierStrategy } from '../strategy';
-import { demuxRelayFeed, demuxRelayThread, demuxRelayNotifications, demuxRelayOwnHistory } from './demux';
+import {
+  demuxRelayFeed,
+  demuxRelayThread,
+  demuxRelayNotifications,
+  demuxRelayOwnHistory,
+  relayNotificationItem,
+} from './demux';
 import { buildRelayForYouFeed } from './for-you/build';
 import type { NostrFilter, RawRelayEvent, RelayConnection } from './protocol';
 
@@ -178,6 +184,38 @@ export function createRelayTier(config: RelayTierConfig): NostrTierStrategy {
           ),
         (error) => failed(error),
       );
+    },
+
+    notificationsLiveSubscribe(
+      request: NotificationsRequest,
+      since: SortKey | undefined,
+      onItems: (items: readonly NotificationItem[]) => void,
+    ): () => void {
+      if (!config.connection.subscribe) return () => {};
+      const isMentions = request.tab === 'MENTIONS';
+      // Open stream: same kinds/#p (+#e/#q backstop) shape as the one-shot
+      // notifications, minus `limit`. `since` only bounds relay-side backfill
+      // volume — classification stays unbounded so evidence for already-known
+      // rows still merges as count bumps.
+      const bounds = since?.createdAt ? { since: since.createdAt } : {};
+      const filters: NostrFilter[] = [
+        { kinds: isMentions ? [1] : [1, 6, 7, 9735], '#p': [request.viewerPubkey], ...bounds },
+      ];
+      if (request.ownEventIds && request.ownEventIds.length > 0) {
+        filters.push({ kinds: [1], '#e': request.ownEventIds, ...bounds });
+        filters.push({ kinds: [1], '#q': request.ownEventIds, ...bounds });
+      }
+      const own =
+        request.ownEventIds && request.ownEventIds.length > 0
+          ? new Set(request.ownEventIds)
+          : null;
+      return config.connection.subscribe(filters, (raw) => {
+        const item = relayNotificationItem(raw, request.viewerPubkey, own, {
+          tab: request.tab,
+          replyScope: request.replyScope,
+        });
+        if (item) onItems([item]);
+      });
     },
 
     async ownHistory(request: OwnHistoryRequest): Promise<TierOutcome<OwnHistoryBundle>> {

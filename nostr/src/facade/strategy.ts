@@ -3,7 +3,7 @@ import type { TierOutcome } from '../tiers';
 import type { FeedBundle, FeedItem, FeedPageRequest } from './feed';
 import type { SortKey } from './session/page-buffer';
 import type { ThreadBundle, ThreadRequest } from './thread';
-import type { NotificationsBundle, NotificationsRequest } from './notifications';
+import type { NotificationItem, NotificationsBundle, NotificationsRequest } from './notifications';
 import type { OwnHistoryBundle, OwnHistoryRequest } from './own-state';
 import type {
   DiscoverMintsRequest,
@@ -43,6 +43,19 @@ export interface NostrTierStrategy {
   ): () => void;
   thread?(request: ThreadRequest): Promise<TierOutcome<ThreadBundle>>;
   notifications?(request: NotificationsRequest): Promise<TierOutcome<NotificationsBundle>>;
+  /**
+   * Open a LIVE listener for events that notify the viewer — the push
+   * counterpart of the one-shot `notifications`. Only the relay tier streams;
+   * other tiers omit it. No auto-reconnect (same contract as dmLiveSubscribe):
+   * a caller needing at-least-once pairs it with a poll backstop. `since`
+   * bounds relay backfill volume only — classification is unbounded so that
+   * evidence for already-known rows still merges. Returns an unsubscribe.
+   */
+  notificationsLiveSubscribe?(
+    request: NotificationsRequest,
+    since: SortKey | undefined,
+    onItems: (items: readonly NotificationItem[]) => void,
+  ): () => void;
   ownHistory?(request: OwnHistoryRequest): Promise<TierOutcome<OwnHistoryBundle>>;
   getMintReviews?(request: MintReviewsRequest): Promise<TierOutcome<MintReviewsSummary>>;
   discoverMints?(request: DiscoverMintsRequest): Promise<TierOutcome<DiscoveredMint[]>>;

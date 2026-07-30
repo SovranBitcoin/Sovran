@@ -128,6 +128,53 @@ export function demuxRelayThread(
 // otherwise we fall back to a `#p` match (the subscription already filtered #p).
 // ---------------------------------------------------------------------------
 
+/**
+ * Classify one raw relay event into a flat NotificationItem — the shared body
+ * of the one-shot demux and the live subscription. Drops the viewer's own
+ * events (nagg excludes them server-side; a live REQ has no such filter),
+ * applies the tab/replyScope semantics, and leaves `type` UNSET (ungrouped
+ * transport — see demuxRelayNotifications). Returns null for non-notifications.
+ */
+export function relayNotificationItem(
+  raw: RawRelayEvent,
+  viewerPubkey: string,
+  own: Set<string> | null,
+  options?: { tab?: NotificationTab; replyScope?: NotificationReplyScope },
+): NotificationItem | null {
+  const event = toFeedEvent(raw);
+  if (!event) return null;
+  if (event.pubkey === viewerPubkey && event.kind !== 9735) return null;
+  const reason = classifyNotification(event, viewerPubkey, own);
+  if (!reason) return null;
+  // MENTIONS = replies + quotes + @-mentions (kind-1 referencing the viewer);
+  // reactions/reposts/zaps are ALL-tab only.
+  const tab = options?.tab ?? 'ALL';
+  if (tab === 'MENTIONS' && reason !== 'reply' && reason !== 'quote' && reason !== 'mention') {
+    return null;
+  }
+  // DIRECT scope keeps only replies whose immediate (NIP-10) parent is mine.
+  const replyScope = options?.replyScope ?? 'THREAD';
+  if (reason === 'reply' && replyScope === 'DIRECT' && !isDirectReplyToOwn(event, own)) return null;
+  // Carry the referenced (target) event id so client-side grouping/dedup keys
+  // these the SAME way as the nagg tier (reason + target), not by the engagement id.
+  //
+  // Leave `type` UNSET. The relay floor can't aggregate, so these are an
+  // ungrouped transport: the app's buildNotificationListItems client-groups by
+  // reason+target only when `type` is absent — a `type: 'single'` here would
+  // short-circuit each engagement to its own row (grouping by the engagement
+  // event instead of its target), which is exactly the bug we're avoiding.
+  const targetEventId =
+    reason === 'quote'
+      ? (event.tags.find((t) => t[0] === 'q')?.[1] ?? event.tags.find((t) => t[0] === 'e')?.[1])
+      : event.tags.find((t) => t[0] === 'e')?.[1];
+  return {
+    event,
+    reason,
+    actorVertexScore: 0,
+    ...(targetEventId ? { targetEventId } : {}),
+  };
+}
+
 export function demuxRelayNotifications(
   events: ReadonlyArray<RawRelayEvent>,
   viewerPubkey: string,
@@ -135,43 +182,15 @@ export function demuxRelayNotifications(
   options?: { tab?: NotificationTab; replyScope?: NotificationReplyScope },
 ): NotificationsBundle {
   const own = ownEventIds && ownEventIds.length > 0 ? new Set(ownEventIds) : null;
-  const tab = options?.tab ?? 'ALL';
-  const replyScope = options?.replyScope ?? 'THREAD';
   const itemsById = new Map<string, NotificationItem>();
   const ordered: NaggFeedEvent[] = [];
 
   for (const raw of events) {
-    const event = toFeedEvent(raw);
-    if (!event) continue;
-    const reason = classifyNotification(event, viewerPubkey, own);
-    if (!reason) continue;
-    // MENTIONS = replies + quotes + @-mentions (kind-1 referencing the viewer);
-    // reactions/reposts/zaps are ALL-tab only.
-    if (tab === 'MENTIONS' && reason !== 'reply' && reason !== 'quote' && reason !== 'mention') {
-      continue;
-    }
-    // DIRECT scope keeps only replies whose immediate (NIP-10) parent is mine.
-    if (reason === 'reply' && replyScope === 'DIRECT' && !isDirectReplyToOwn(event, own)) continue;
-    if (itemsById.has(event.id)) continue;
-    // Carry the referenced (target) event id so client-side grouping/dedup keys
-    // these the SAME way as the nagg tier (reason + target), not by the engagement id.
-    //
-    // Leave `type` UNSET. The relay floor can't aggregate, so these are an
-    // ungrouped transport: the app's buildNotificationListItems client-groups by
-    // reason+target only when `type` is absent — a `type: 'single'` here would
-    // short-circuit each engagement to its own row (grouping by the engagement
-    // event instead of its target), which is exactly the bug we're avoiding.
-    const targetEventId =
-      reason === 'quote'
-        ? (event.tags.find((t) => t[0] === 'q')?.[1] ?? event.tags.find((t) => t[0] === 'e')?.[1])
-        : event.tags.find((t) => t[0] === 'e')?.[1];
-    itemsById.set(event.id, {
-      event,
-      reason,
-      actorVertexScore: 0,
-      ...(targetEventId ? { targetEventId } : {}),
-    });
-    ordered.push(event);
+    const item = relayNotificationItem(raw, viewerPubkey, own, options);
+    if (!item) continue;
+    if (itemsById.has(item.event.id)) continue;
+    itemsById.set(item.event.id, item);
+    ordered.push(item.event);
   }
 
   const manifest = synthesizeRecencyManifest(ordered.map((e) => ({ id: e.id, created_at: e.created_at })));

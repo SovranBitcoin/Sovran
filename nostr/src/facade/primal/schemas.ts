@@ -63,6 +63,37 @@ export const PrimalProfileContent = z
   .passthrough();
 export type PrimalProfileContent = z.infer<typeof PrimalProfileContent>;
 
+/**
+ * kind 10000132 — Primal notification summary.
+ *
+ * NOTE (capability assumption): the live primal-server exposes a
+ * `get_notifications` cache verb returning these synthetic summaries plus the
+ * referenced kind-1s and kind-0 user infos. This shape is modeled from the
+ * primal-server reference, NOT pinned against the live cache. Validation is
+ * strict enough that shape drift skips a summary rather than fabricating a
+ * row; a batch with zero usable summaries makes the tier answer
+ * `unsupported`, so a concurrent notifications read proceeds on the other
+ * sources.
+ */
+export const PrimalNotificationContent = z
+  .object({
+    pubkey: z.string(), // the notified viewer
+    created_at: z.number(),
+    type: z.number(), // primal-server notification type code
+    follower: z.string().optional(),
+    your_post: z.string().optional(),
+    who_liked_it: z.string().optional(),
+    who_reposted_it: z.string().optional(),
+    who_zapped_it: z.string().optional(),
+    who_replied_to_it: z.string().optional(),
+    reply: z.string().optional(),
+    you_were_mentioned_in: z.string().optional(),
+    your_post_were_mentioned_in: z.string().optional(),
+    satszapped: z.number().optional(),
+  })
+  .passthrough();
+export type PrimalNotificationContent = z.infer<typeof PrimalNotificationContent>;
+
 /** Parse a synthetic event's JSON `content` with a schema; null on any failure. */
 export function parseContent<T>(schema: z.ZodType<T>, content: string | undefined): T | null {
   if (typeof content !== 'string' || content.length === 0) return null;

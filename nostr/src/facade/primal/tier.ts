@@ -21,7 +21,9 @@ import {
   demuxPrimalOwnHistory,
   demuxPrimalProfileStats,
   demuxPrimalSocialGraph,
+  demuxPrimalNotifications,
 } from './demux';
+import type { NotificationsBundle, NotificationsRequest } from '../notifications';
 import type { PrimalCacheRequest, PrimalConnection } from './protocol';
 
 // ---------------------------------------------------------------------------
@@ -70,6 +72,37 @@ export function createPrimalTier(config: PrimalTierConfig): NostrTierStrategy {
           const bundle = demuxPrimalFeed(events);
           // Empty page → fall through (e.g. Primal lacks this viewer's data).
           return bundle.itemsById.size === 0 ? unsupported() : answered(bundle);
+        },
+        (error) => failed(error),
+      );
+    },
+
+    async notifications(request: NotificationsRequest): Promise<TierOutcome<NotificationsBundle>> {
+      // NOTE (capability assumption): `get_notifications` per the primal-server
+      // reference; params modeled as pubkey/user_pubkey/limit/until. Any
+      // network/verb failure → failed(); a batch with no parsable kind-10000132
+      // summaries → unsupported(). Either way a concurrent notifications read
+      // proceeds on the other sources — Primal is additive here, never load-
+      // bearing (see demuxPrimalNotifications).
+      const result = await config.connection.request(
+        {
+          verb: 'get_notifications',
+          params: {
+            pubkey: request.viewerPubkey,
+            user_pubkey: request.viewerPubkey,
+            limit: request.limit ?? 50,
+            ...(request.cursor?.createdAt ? { until: request.cursor.createdAt } : {}),
+          },
+        },
+        { signal: request.signal, timeoutMs: request.timeoutMs },
+      );
+      return result.match<TierOutcome<NotificationsBundle>>(
+        (events) => {
+          const bundle = demuxPrimalNotifications(events, request.viewerPubkey, {
+            tab: request.tab === 'MENTIONS' ? 'MENTIONS' : 'ALL',
+            replyScope: request.replyScope,
+          });
+          return bundle ? answered(bundle) : unsupported();
         },
         (error) => failed(error),
       );

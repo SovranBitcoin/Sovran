@@ -24,8 +24,10 @@ import {
   PrimalFeedRangeContent,
   PrimalProfileContent,
   PrimalUserProfileContent,
+  PrimalNotificationContent,
   parseContent,
 } from './schemas';
+import type { NotificationItem, NotificationsBundle } from '../notifications';
 
 // ---------------------------------------------------------------------------
 // Primal demux
@@ -382,4 +384,122 @@ function deriveCursor(manifest: OrderingManifest, eventsById: Map<string, NaggFe
     if (event) return { createdAt: event.created_at, id };
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Primal notifications (flat, ungrouped)
+//
+// Reconstructed from `get_notifications` kind-10000132 summaries (see the
+// schema's capability NOTE). Engagement summaries (like/repost/zap/follow)
+// carry the actor's PUBKEY but not their engagement event id, so those items
+// get a synthetic, stable evidence event — good enough for merge evidence and
+// avatar clusters, never rendered as content. Replies/mentions reference a
+// real kind-1 that rides in the same batch.
+// ---------------------------------------------------------------------------
+
+// Best-guess primal-server type codes → facade reasons. Unknown codes are
+// skipped (defensive: an unmodeled type must not fabricate a row).
+const PRIMAL_NOTIFICATION_REASON: Record<number, string> = {
+  1: 'follow',
+  3: 'zap',
+  4: 'reaction',
+  5: 'repost',
+  6: 'reply',
+  7: 'mention',
+  8: 'quote',
+};
+const PRIMAL_ACTOR_FIELD: Record<number, keyof PrimalNotificationContent> = {
+  1: 'follower',
+  3: 'who_zapped_it',
+  4: 'who_liked_it',
+  5: 'who_reposted_it',
+  6: 'who_replied_to_it',
+  7: 'pubkey',
+  8: 'pubkey',
+};
+
+export function demuxPrimalNotifications(
+  events: ReadonlyArray<RawPrimalEvent>,
+  viewerPubkey: string,
+  options?: { tab?: 'ALL' | 'MENTIONS'; replyScope?: 'DIRECT' | 'THREAD' },
+): NotificationsBundle | null {
+  const notesById = new Map<string, NaggFeedEvent>();
+  const profiles: Record<string, NaggProfileInfo> = {};
+  const summaries: PrimalNotificationContent[] = [];
+  for (const raw of events) {
+    if (raw.kind === PRIMAL_KIND.note) {
+      const note = toFeedEvent(raw as RawWireEvent);
+      if (note) notesById.set(note.id, note);
+    } else if (raw.kind === PRIMAL_KIND.metadata && typeof raw.pubkey === 'string') {
+      const parsed = parseContent(PrimalProfileContent, raw.content);
+      if (parsed) {
+        profiles[raw.pubkey] = {
+          name: parsed.display_name ?? parsed.displayName ?? parsed.name ?? '',
+          ...(parsed.picture ? { picture: parsed.picture } : {}),
+        };
+      }
+    } else if (raw.kind === PRIMAL_KIND.notification) {
+      const parsed = parseContent(PrimalNotificationContent, raw.content);
+      if (parsed && parsed.pubkey === viewerPubkey) summaries.push(parsed);
+    }
+  }
+  // Zero summaries = the verb is unsupported (or its shape drifted): NOT an
+  // empty page. The tier maps null to `unsupported` so other sources serve.
+  if (summaries.length === 0) return null;
+
+  const itemsById = new Map<string, NotificationItem>();
+  const ordered: NaggFeedEvent[] = [];
+  for (const s of summaries) {
+    const reason = PRIMAL_NOTIFICATION_REASON[s.type];
+    if (!reason) continue;
+    if (options?.tab === 'MENTIONS' && reason !== 'reply' && reason !== 'quote' && reason !== 'mention') {
+      continue;
+    }
+    // Primal cannot evaluate whether a reply's parent is the viewer's, so
+    // DIRECT scope skips its replies entirely — nagg and the relay floor
+    // (with ownEventIds) cover them accurately.
+    if (reason === 'reply' && options?.replyScope === 'DIRECT') continue;
+    const actorField = PRIMAL_ACTOR_FIELD[s.type];
+    const actorPubkey = (actorField ? (s[actorField] as string | undefined) : undefined) ?? s.pubkey;
+    if (!actorPubkey || actorPubkey === viewerPubkey) continue;
+    const targetEventId = s.your_post ?? s.your_post_were_mentioned_in;
+    const realEvent =
+      (s.reply ? notesById.get(s.reply) : undefined) ??
+      (s.you_were_mentioned_in ? notesById.get(s.you_were_mentioned_in) : undefined);
+    const event: NaggFeedEvent = realEvent ?? {
+      id: `primal:${s.type}:${actorPubkey}:${targetEventId ?? 'profile'}`,
+      pubkey: actorPubkey,
+      kind: 1,
+      content: '',
+      tags: [],
+      created_at: s.created_at,
+    };
+    if (itemsById.has(event.id)) continue;
+    // `type` UNSET: ungrouped transport, same convention as the relay floor.
+    itemsById.set(event.id, {
+      event,
+      reason,
+      actorVertexScore: 0,
+      ...(targetEventId ? { targetEventId } : {}),
+      ...(targetEventId && notesById.has(targetEventId)
+        ? { targetEvent: notesById.get(targetEventId) }
+        : {}),
+    });
+    ordered.push(event);
+  }
+
+  const manifest = synthesizeRecencyManifest(
+    ordered.map((e) => ({ id: e.id, created_at: e.created_at })),
+  );
+  const lastId = manifest.elements[manifest.elements.length - 1];
+  const lastEvent = lastId ? itemsById.get(lastId)?.event : undefined;
+  return {
+    itemsById,
+    manifest,
+    grouped: false,
+    stats: {},
+    profiles,
+    quoted: {},
+    cursor: lastEvent ? { createdAt: lastEvent.created_at, id: lastEvent.id } : null,
+  };
 }

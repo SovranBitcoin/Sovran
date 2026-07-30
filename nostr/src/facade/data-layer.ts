@@ -27,10 +27,16 @@ import {
   type ResolvedThreadAudit,
 } from './thread';
 import type {
+  NotificationItem,
   NotificationsBundle,
   NotificationsRequest,
   ResolvedNotifications,
 } from './notifications';
+import {
+  createNotificationsSession,
+  type NotificationsSession,
+} from './session/notifications-session';
+import type { SortKey } from './session/page-buffer';
 import type { OwnHistoryBundle, OwnHistoryRequest, ResolvedOwnHistory } from './own-state';
 import type {
   DiscoverMintsRequest,
@@ -120,6 +126,16 @@ export interface NostrDataLayer {
   getNotifications(
     request: NotificationsRequest,
   ): Promise<Result<ResolvedNotifications, TierResolutionError>>;
+  /**
+   * The CONCURRENT notifications surface: every tier that implements
+   * `notifications` is opened at once and merged into one shift-free page
+   * stream (see createNotificationsSession). nagg may lack history, so
+   * redundancy — not "best tier that works" — is the point here; this is the
+   * one surface that deliberately fans out instead of using the sequential
+   * engine. `getNotifications` above stays the one-shot waterfall (used by the
+   * followers detail screen and any grouped:false consumer).
+   */
+  openNotificationsSession(request: NotificationsRequest): NotificationsSession;
   getOwnHistory(
     request: OwnHistoryRequest,
   ): Promise<Result<ResolvedOwnHistory, TierResolutionError>>;
@@ -244,6 +260,33 @@ export function createNostrDataLayer(config: NostrDataLayerConfig): NostrDataLay
 
     async auditThreadReplies(request) {
       return auditThread(config.tiers, cache, auditMemo, request);
+    },
+
+    openNotificationsSession(request) {
+      const sources = config.tiers
+        .filter((t) => typeof t.notifications === 'function')
+        .map((t) => ({
+          tier: t.tier,
+          fetch: (req: NotificationsRequest) => t.notifications!(req),
+        }));
+      const notifLiveTier = config.tiers.find(
+        (t) => typeof t.notificationsLiveSubscribe === 'function',
+      );
+      return createNotificationsSession({
+        request,
+        sources,
+        cache,
+        ...(notifLiveTier
+          ? {
+              liveSubscribe: (
+                req: NotificationsRequest,
+                since: SortKey | undefined,
+                onItems: (items: readonly NotificationItem[]) => void,
+              ) => notifLiveTier.notificationsLiveSubscribe!(req, since, onItems),
+            }
+          : {}),
+        ...(request.limit ? { pageSize: request.limit } : {}),
+      });
     },
 
     async getNotifications(request) {

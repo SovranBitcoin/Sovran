@@ -20,5 +20,7 @@ export * from './cache/read-thread';
 export * from './cache/pending';
 export * from './session/page-buffer';
 export * from './session/surface-session';
+export * from './session/notifications-merger';
+export * from './session/notifications-session';
 export * as primal from './primal';
 export * as relay from './relay';
