@@ -3,6 +3,8 @@
 exports[`Design System component inventory tracks the complete reusable component surface 1`] = `
 {
   "covered": [
+    "features/feed/components/nostr/PostCard.tsx",
+    "features/feed/components/nostr/RelayCard.tsx",
     "features/transactions/components/detail/timeline/TimelineCard.tsx",
     "features/transactions/components/detail/timeline/TimelineRow.tsx",
     "shared/blocks/status/LoadingIndicator.tsx",
@@ -59,7 +61,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/feed/components/nostr/DeletedTombstone.tsx",
     "features/feed/components/nostr/MetricsFooter.tsx",
     "features/feed/components/nostr/NoteContent.tsx",
-    "features/feed/components/nostr/PostCard.tsx",
     "features/feed/components/nostr/StoriesCarousel.tsx",
     "features/feed/components/nostr/StoriesContainer.tsx",
     "features/feed/components/nostr/StoryProgressBar.tsx",
@@ -128,6 +129,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/transactions/components/detail/TransactionDetailShell.tsx",
     "features/transactions/components/detail/TransactionProbe.tsx",
     "features/transactions/components/detail/TransactionSourceSection.tsx",
+    "features/transactions/components/detail/ZappedPostSection.tsx",
     "features/transactions/components/detail/timeline/ExpiryCountdown.tsx",
     "features/user/components/SendMessageMenu.tsx",
     "features/wallet/components/Account.tsx",
@@ -229,6 +231,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/Pressable.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 223,
+  "total": 225,
 }
 `;
