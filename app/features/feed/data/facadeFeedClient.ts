@@ -259,13 +259,43 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
       if (!facadeRequest) return fallback.getNotifications(request);
 
       const layer = buildNostrDataLayer();
-      if (!layer) return emptyNotificationsResult();
+      if (!layer) {
+        feedLog.warn('feed.notifications.facade.no_layer', {
+          tab: request.tab ?? 'ALL',
+          policy: request.policy,
+          replyScope: request.replyScope,
+        });
+        return emptyNotificationsResult();
+      }
 
       const result = await layer.getNotifications(facadeRequest);
       return result.match(
-        (page) => resolvedNotificationsToResult(page),
+        (page) => {
+          const mapped = resolvedNotificationsToResult(page);
+          // Mirrors the nagg client's fetch.done, plus the tier that actually
+          // answered — the waterfall means the same filters can be served by
+          // different tiers with different result shapes.
+          feedLog.info('feed.notifications.fetch.done', {
+            transport: 'facade',
+            tier: page.tier,
+            tab: request.tab ?? 'ALL',
+            policy: request.policy,
+            replyScope: request.replyScope,
+            until: request.until ?? 0,
+            refresh: !!request.refresh,
+            results: mapped.notifications.length,
+            metrics: mapped.metricsMap.size,
+            profiles: mapped.profilesMap.size,
+            paginationUntil: mapped.paginationUntil,
+            hasNextPage: mapped.hasNextPage,
+          });
+          return mapped;
+        },
         (error) => {
           feedLog.warn('notifications.facade.exhausted', {
+            tab: request.tab ?? 'ALL',
+            policy: request.policy,
+            replyScope: request.replyScope,
             attempts: error.attempts.map((a) => `${a.tier}=${a.outcome}`),
           });
           return emptyNotificationsResult();

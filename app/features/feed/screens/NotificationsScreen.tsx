@@ -103,6 +103,19 @@ function notificationItemType(item: NotificationListItem): string {
   return 'welcome';
 }
 
+/** Per-type row counts (e.g. {reaction: 3, "group:follow": 1}) for render logs. */
+function notificationItemBreakdown(items: readonly NotificationListItem[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const item of items) {
+    const type = notificationItemType(item);
+    counts[type] = (counts[type] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/** Where an applied page-0 came from — the axis visual inconsistency hides on. */
+type AppliedPageSource = 'network' | 'cache' | 'client-tab' | 'error-reset';
+
 function notificationVisualToken(token: ViewToken) {
   return {
     index: typeof token.index === 'number' ? token.index : null,
@@ -193,19 +206,26 @@ export function NotificationsScreen() {
     [activeTab, policy, replyScope, viewerPubkey]
   );
 
-  const applyFirstPage = useCallback((page: FeedNotificationsResult | null) => {
-    paginationUntilRef.current = page?.paginationUntil ?? 0;
-    seenKeysRef.current = new Set((page?.notifications ?? []).map(notificationDedupeKey));
-    // Optimistic: as long as there's a cursor, try to page. load-more stops as
-    // soon as a fetch brings no genuinely-new items.
-    hasMoreRef.current = !!page && page.paginationUntil > 0;
-    feedLog.info('feed.notifications.ui.applied', {
-      notifications: page?.notifications.length ?? 0,
-      hasPage: !!page,
-      paginationUntil: page?.paginationUntil ?? 0,
-    });
-    setResult(page);
-  }, []);
+  const applyFirstPage = useCallback(
+    (page: FeedNotificationsResult | null, source: AppliedPageSource) => {
+      paginationUntilRef.current = page?.paginationUntil ?? 0;
+      seenKeysRef.current = new Set((page?.notifications ?? []).map(notificationDedupeKey));
+      // Optimistic: as long as there's a cursor, try to page. load-more stops as
+      // soon as a fetch brings no genuinely-new items.
+      hasMoreRef.current = !!page && page.paginationUntil > 0;
+      feedLog.info('feed.notifications.ui.applied', {
+        source,
+        tab: activeTab,
+        policy,
+        replyScope,
+        notifications: page?.notifications.length ?? 0,
+        hasPage: !!page,
+        paginationUntil: page?.paginationUntil ?? 0,
+      });
+      setResult(page);
+    },
+    [activeTab, policy, replyScope]
+  );
 
   const loadFirstPage = useCallback(
     (signal: AbortSignal, mode: LoadMode) => {
@@ -213,7 +233,15 @@ export function NotificationsScreen() {
       // No viewer, or a client-only tab → nothing to fetch; the synthetic items
       // (welcome card) and the mint changelog render without a server round-trip.
       if (!viewerPubkey || isClientTab(activeTab)) {
-        applyFirstPage(null);
+        feedLog.info('feed.notifications.ui.load', {
+          mode,
+          tab: activeTab,
+          policy,
+          replyScope,
+          viewerReady: !!viewerPubkey,
+          clientTab: isClientTab(activeTab),
+        });
+        applyFirstPage(null, 'client-tab');
         setErrorMessage(null);
         setIsInitialLoading(false);
         setIsRefreshing(false);
@@ -226,13 +254,23 @@ export function NotificationsScreen() {
       // Warm navigation (key touched earlier this session): paint the cached
       // page instantly and revalidate. Cold start (first focus this session):
       // show loading, never a stale first paint.
+      const coldStart = notificationsPageCache.isColdStart(cacheKey);
+      const cached =
+        mode === 'initial' && !coldStart ? notificationsPageCache.getEntry(cacheKey) : undefined;
+      feedLog.info('feed.notifications.ui.load', {
+        mode,
+        tab: activeTab,
+        policy,
+        replyScope,
+        viewerReady: true,
+        clientTab: false,
+        coldStart,
+        cacheHit: !!cached,
+      });
       let paintedFromCache = false;
       if (mode === 'initial') {
-        const cached = notificationsPageCache.isColdStart(cacheKey)
-          ? undefined
-          : notificationsPageCache.getEntry(cacheKey);
         if (cached) {
-          applyFirstPage(cached.data);
+          applyFirstPage(cached.data, 'cache');
           setIsInitialLoading(false);
           paintedFromCache = true;
         } else {
@@ -251,17 +289,24 @@ export function NotificationsScreen() {
       void fetchNotificationsPage({ signal, refresh: mode === 'refresh' })
         .then((page) => {
           if (signal.aborted || sequence !== loadSequenceRef.current) return;
-          applyFirstPage(page);
+          applyFirstPage(page, 'network');
           if (page) notificationsPageCache.setEntry(cacheKey, page, { viewerKey: viewerPubkey });
           notificationsPageCache.markTouched(cacheKey);
         })
         .catch((error) => {
           if (signal.aborted || sequence !== loadSequenceRef.current) return;
           const message = error instanceof Error ? error.message : String(error);
-          feedLog.warn('feed.notifications.load_failed', { message });
+          feedLog.warn('feed.notifications.load_failed', {
+            mode,
+            tab: activeTab,
+            policy,
+            replyScope,
+            paintedFromCache,
+            message,
+          });
           setErrorMessage(message);
           // Keep the warm-painted page on a transient failure.
-          if (mode === 'initial' && !paintedFromCache) applyFirstPage(null);
+          if (mode === 'initial' && !paintedFromCache) applyFirstPage(null, 'error-reset');
         })
         .finally(() => {
           if (signal.aborted || sequence !== loadSequenceRef.current) return;
@@ -331,19 +376,48 @@ export function NotificationsScreen() {
         newKeys.forEach((key) => seenKeysRef.current.add(key));
         setResult((previous) => mergeNotificationsResult(previous, page));
       }
+      feedLog.info('feed.notifications.ui.load_more', {
+        tab: activeTab,
+        policy,
+        replyScope,
+        cursor,
+        pageResults: page.notifications.length,
+        newItems: newKeys.length,
+        advanced,
+        hasMore: hasMoreRef.current,
+      });
     } catch (error) {
       if (controller.signal.aborted || sequence !== loadSequenceRef.current) return;
       const message = error instanceof Error ? error.message : String(error);
-      feedLog.warn('feed.notifications.load_more_failed', { message });
+      feedLog.warn('feed.notifications.load_more_failed', {
+        tab: activeTab,
+        policy,
+        replyScope,
+        message,
+      });
     } finally {
       loadingMoreRef.current = false;
       setIsLoadingMore(false);
     }
-  }, [fetchNotificationsPage, isInitialLoading, isRefreshing, viewerPubkey]);
+  }, [
+    activeTab,
+    fetchNotificationsPage,
+    isInitialLoading,
+    isRefreshing,
+    policy,
+    replyScope,
+    viewerPubkey,
+  ]);
 
   const selectTab = useCallback(
     (tab: NotificationTab) => {
       if (tab === activeTab) return;
+      feedLog.info('feed.notifications.ui.tab_selected', {
+        from: activeTab,
+        to: tab,
+        policy,
+        replyScope,
+      });
       paginationUntilRef.current = 0;
       hasMoreRef.current = false;
       seenKeysRef.current = new Set();
@@ -353,7 +427,7 @@ export function NotificationsScreen() {
       setIsInitialLoading(true);
       setActiveTab(tab);
     },
-    [activeTab]
+    [activeTab, policy, replyScope]
   );
 
   // Direct/Thread reply-scope picker for the Mentions tab. Mirrors the Following
@@ -587,17 +661,32 @@ export function NotificationsScreen() {
     ]
   );
 
-  // Render boundary for notifications: result rows → rendered list items, and
-  // whether the screen is empty. Cross-check with feed.notifications.fetch.done
-  // (data layer) to localize an empty notifications screen.
+  // Render boundary for notifications: result rows → rendered list items under
+  // the active filter options, plus a per-type breakdown of what's on screen.
+  // Cross-check with feed.notifications.fetch.done (data layer, carries the
+  // serving tier) and feed.notifications.ui.applied (page source) to localize
+  // an inconsistent or empty notifications screen.
   useEffect(() => {
     feedLog.info('feed.notifications.ui.render', {
       tab: activeTab,
+      policy,
+      replyScope,
+      phase: visualPhase,
       notifications: notifications.length,
       items: notificationItems.length,
+      itemTypes: notificationItemBreakdown(notificationItems),
       empty: notificationItems.length === 0,
+      error: !!errorMessage,
     });
-  }, [notifications.length, notificationItems.length, activeTab]);
+  }, [
+    notifications.length,
+    notificationItems,
+    activeTab,
+    policy,
+    replyScope,
+    visualPhase,
+    errorMessage,
+  ]);
 
   return (
     <Screen name="NotificationsScreen" scroll="custom" bgColor={surface}>
