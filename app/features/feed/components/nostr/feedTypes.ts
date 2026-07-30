@@ -28,6 +28,7 @@ export type ContentSegment =
   | { kind: 'text'; text: string }
   | { kind: 'newline' }
   | { kind: 'url'; url: string }
+  | { kind: 'relay'; url: string }
   | { kind: 'image'; url: string }
   | { kind: 'video'; url: string }
   | { kind: 'hashtag'; tag: string }

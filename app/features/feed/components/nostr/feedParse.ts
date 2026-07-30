@@ -25,6 +25,8 @@ export function mediaKindForMime(mime: string | undefined): 'image' | 'video' | 
 const LIGHTNING_INVOICE_REGEX = /\b(lnbc[a-z0-9]{20,700})\b/gi;
 const HASHTAG_REGEX = /#([a-zA-Z][a-zA-Z0-9_]{0,31})/g;
 export const URL_REGEX = /https?:\/\/[^\s<>"')\]]{1,2048}/gi;
+const RELAY_URL_REGEX = /wss?:\/\/[^\s<>"')\]]{1,2048}/gi;
+const RELAY_HOST_CHECK = /^wss?:\/\/[a-z0-9]/i;
 const NOSTR_URI_REGEX = /nostr:(npub1|nprofile1|nevent1|note1|naddr1)[a-z0-9]{1,512}/gi;
 const HEX_EVENT_ID_REGEX = /^[0-9a-f]{64}$/i;
 
@@ -94,6 +96,19 @@ function _parseContentInner(raw: string): ContentSegment[] {
       start: m.index!,
       end: m.index! + m[0].length,
       seg: { kind: 'lightning', meltTarget: m[0] },
+    });
+  }
+
+  for (const m of raw.matchAll(RELAY_URL_REGEX)) {
+    // Unparseable ws(s) input ("wss://.") stays plain text instead of mounting
+    // a card. Validated locally (host must lead with an alphanumeric label)
+    // rather than via `safeNormalizeRelay` — the outbox module drags NDK into
+    // this parse hot path, which many consumers (and their tests) don't carry.
+    if (!RELAY_HOST_CHECK.test(m[0])) continue;
+    spans.push({
+      start: m.index!,
+      end: m.index! + m[0].length,
+      seg: { kind: 'relay', url: m[0] },
     });
   }
 
