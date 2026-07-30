@@ -416,6 +416,15 @@ const OVERLAY_LIFETIME_CAP_MS = 10_000;
 // Poll cadence for `measureInWindow` during the settle window. Cheap call —
 // the store dedupes redundant anchor publishes via field-level equality.
 const LAYOUT_POLL_INTERVAL = 100;
+// UI-thread self-fade of the overlay's content after the tween docks. The JS
+// completion timer that unmounts the overlay routinely fires 0.3–1.3s late on
+// a congested boot thread, so the overlay must make itself invisible on the
+// UI thread (transitionDelay = MORPH_DURATION_MS + DOCK_FADE_DELAY_MS) — the
+// late timer then only performs the invisible unmount. The real QR button is
+// already opaque underneath (it reveals at handoff, covered by the overlay
+// for the whole tween), so the fade crosses identical pixels.
+const DOCK_FADE_DELAY_MS = 100;
+const DOCK_FADE_MS = 150;
 
 // Linear phase machine for the boot splash → QR-button handoff.
 //   await_init    — splash visible; waiting for our root view to lay out
@@ -423,7 +432,6 @@ const LAYOUT_POLL_INTERVAL = 100;
 //                   (or MORPH_FALLBACK_TIMEOUT, whichever comes first)
 //   morphing      — animating the overlay to the QR-button position
 //   fading        — animating the overlay to opacity 0 (no anchor available)
-//   done          — animation complete; brief hold before unmount
 //   unmounted     — overlay fully gone; real QR button takes over
 //
 // Each phase owns exactly one effect that drives its own forward transition,
@@ -440,7 +448,7 @@ const LAYOUT_POLL_INTERVAL = 100;
 // window, so it is always safe to hide the native splash once our own
 // layout is ready — the QR anchor IS the "WalletScreen ready" signal we
 // want to wait on.
-type SplashPhase = 'await_init' | 'await_anchor' | 'morphing' | 'fading' | 'done' | 'unmounted';
+type SplashPhase = 'await_init' | 'await_anchor' | 'morphing' | 'fading' | 'unmounted';
 
 function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
   useInitMount('NativeSplashLayoutGate');
@@ -624,8 +632,13 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
           `final overlay rect (window) — x=${x} y=${y} width=${w} height=${h}`
         );
       });
+      // Unmount directly — no hold. The real QR button revealed at handoff
+      // (underneath the opaque overlay), so it is already fully opaque by the
+      // time the tween docks; and if this timer fired late (congested JS
+      // thread), the overlay's dock fade has already made it invisible on the
+      // UI thread. Either way there is nothing left to show.
       setBootMorphCompleted(true);
-      setPhase('done');
+      setPhase('unmounted');
     }, holdMs);
     return () => clearTimeout(id);
   }, [phase, anchor, parentOffset]);
@@ -660,43 +673,34 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
 
   // Phase 3b — fading: same duration mirror, but the fade's target values
   // never depend on the anchor, so an anchor republish must NOT restart it.
+  // The overlay is at opacity 0 when the timer fires, so unmount directly.
   useEffect(() => {
     if (phase !== 'fading') return;
     setBootSplashHandoff(true);
     const id = setTimeout(() => {
       setBootMorphCompleted(true);
-      setPhase('done');
+      setPhase('unmounted');
     }, MORPH_DURATION_MS + 30);
     return () => clearTimeout(id);
   }, [phase]);
 
-  // Phase 4 — done: hold one short beat so the real QR button has time to
-  // fade in at the same position, then unmount.
-  useEffect(() => {
-    if (phase !== 'done') return;
-    const id = setTimeout(() => setPhase('unmounted'), 200);
-    return () => clearTimeout(id);
-  }, [phase]);
-
   const showSplash = phase !== 'unmounted';
-  const isMorphing = phase === 'morphing' || phase === 'done';
-  const isFading = phase === 'fading' || phase === 'done';
+  const isMorphing = phase === 'morphing';
+  const isFading = phase === 'fading';
 
   // Build the splash container style. Reanimated 4 CSS Transitions tween the
   // listed properties on the UI thread whenever their values change.
-  // The container stays opaque white throughout — only the logo/icon and the
-  // optional gradient layer cross-fade on top.
+  // The container itself is transparent — the opaque white fill lives on the
+  // content layer below so it can self-fade after docking without dragging
+  // the geometry transition's timing along.
   const overlayStyle = useMemo(() => {
     const base = {
       position: 'absolute' as const,
-      backgroundColor: '#FFFFFF',
       // Match the QRButton's `borderCurve: 'continuous'` (squircle) so the
       // morphed corners line up pixel-for-pixel with the real button at
       // handoff. iOS-only — Android falls back to standard arc which the
       // Android QRButton also uses.
       borderCurve: 'continuous' as const,
-      justifyContent: 'center' as const,
-      alignItems: 'center' as const,
       overflow: 'hidden' as const,
       zIndex: 9999,
       transitionProperty: ['top', 'left', 'width', 'height', 'borderRadius', 'opacity'],
@@ -731,6 +735,28 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
       opacity: isFading ? 0 : 1,
     };
   }, [isMorphing, isFading, anchor, parentOffset]);
+
+  // Content layer: owns the opaque white fill, centering, and every visual
+  // child. Once the morph starts, it schedules its own UI-thread fade-out
+  // timed to land just after the geometry tween docks (delay = tween duration
+  // + DOCK_FADE_DELAY_MS). This is the congestion insurance: the JS unmount
+  // timer below can fire arbitrarily late, but the overlay stops being
+  // visible on schedule regardless — and the real QR button underneath is
+  // already opaque (revealed at handoff), so the fade is pixel-invisible.
+  const contentFadeStyle = useMemo(
+    () => ({
+      ...StyleSheet.absoluteFill,
+      backgroundColor: '#FFFFFF',
+      justifyContent: 'center' as const,
+      alignItems: 'center' as const,
+      opacity: isMorphing ? 0 : 1,
+      transitionProperty: ['opacity'],
+      transitionDuration: `${DOCK_FADE_MS}ms`,
+      transitionDelay: `${MORPH_DURATION_MS + DOCK_FADE_DELAY_MS}ms`,
+      transitionTimingFunction: MORPH_TIMING,
+    }),
+    [isMorphing]
+  );
 
   // Logo: fades + scales down during the morph so it doesn't bulge out of the
   // shrinking container. Lives inside the morph container, so it's already
@@ -787,43 +813,47 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
       {children}
       {showSplash ? (
         <Animated.View ref={splashOverlayRef} pointerEvents="none" style={overlayStyle}>
-          {/* QR-button look-alike layered background. Replicates the exact
+          {/* Content layer — solid white fill + all visuals. Self-fades on the
+              UI thread after the tween docks (see contentFadeStyle). */}
+          <Animated.View pointerEvents="none" style={contentFadeStyle}>
+            {/* QR-button look-alike layered background. Replicates the exact
               stack the real QRButton uses (dark base + white-overlay + white
               top-to-bottom gradient + faint white border) so when the splash
               docks at the QR position and unmounts, the pixel handoff to
               the real button is seamless.
               Boot state: opacity 0 (the container's solid white shows through);
               morph state: opacity 1 (matches the QR gradient). */}
-          <Animated.View pointerEvents="none" style={gradientLayerStyle}>
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0f0f12' }]} />
-            <View
-              style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.35)' }]}
-            />
-            <LinearGradient
-              colors={[
-                '#FFFFFF',
-                'rgba(255,255,255,0.8)',
-                'rgba(255,255,255,0.7)',
-                'rgba(255,255,255,0.6)',
-              ]}
-              locations={[0, 0.35, 0.6, 1]}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                { borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
-              ]}
-            />
-          </Animated.View>
-          {/* Splash logo. Fades + scales out during morph. */}
-          <Animated.Image source={REINIT_SPLASH_IMAGE} resizeMode="contain" style={logoStyle} />
-          {/* QR icon. Fades in (delayed) so it's visible by the time the
+            <Animated.View pointerEvents="none" style={gradientLayerStyle}>
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0f0f12' }]} />
+              <View
+                style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.35)' }]}
+              />
+              <LinearGradient
+                colors={[
+                  '#FFFFFF',
+                  'rgba(255,255,255,0.8)',
+                  'rgba(255,255,255,0.7)',
+                  'rgba(255,255,255,0.6)',
+                ]}
+                locations={[0, 0.35, 0.6, 1]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  { borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
+                ]}
+              />
+            </Animated.View>
+            {/* Splash logo. Fades + scales out during morph. */}
+            <Animated.Image source={REINIT_SPLASH_IMAGE} resizeMode="contain" style={logoStyle} />
+            {/* QR icon. Fades in (delayed) so it's visible by the time the
               swap happens to the real button. */}
-          <Animated.View pointerEvents="none" style={qrIconLayerStyle}>
-            <Icon name="stash:qr-code" size={38} color={surfaceTertiary} />
+            <Animated.View pointerEvents="none" style={qrIconLayerStyle}>
+              <Icon name="stash:qr-code" size={38} color={surfaceTertiary} />
+            </Animated.View>
           </Animated.View>
         </Animated.View>
       ) : null}

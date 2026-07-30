@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { act, renderHook } from '@testing-library/react-native';
 
-import { setBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
+import { setBootMorphCompleted, setBootSplashHandoff } from '@/shared/lib/qrButtonAnchor';
 import { useQRButtonReveal } from '@/shared/ui/composed/QRButton/useQRButtonReveal';
 
 const BOOT_MORPH_FAILSAFE_MS = 1500;
@@ -12,11 +12,13 @@ describe('useQRButtonReveal', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     setBootMorphCompleted(false);
+    setBootSplashHandoff(false);
   });
 
   afterEach(() => {
     jest.useRealTimers();
     setBootMorphCompleted(false);
+    setBootSplashHandoff(false);
   });
 
   it('hides the button pre-morph WITH the opacity transition attached', () => {
@@ -25,6 +27,17 @@ describe('useQRButtonReveal', () => {
     // committed React prop animated declaratively, so a dropped UI-thread
     // tick can never strand the button at a stale mid-fade value.
     expect(result.current.opacity).toBe(0);
+    expect(result.current.transitionProperty).toContain('opacity');
+  });
+
+  it('reveals the moment the splash handoff starts (under the opaque overlay)', () => {
+    // The overlay's geometry tween covers the button rect for its whole run,
+    // so revealing at handoff is invisible — and it makes the final swap
+    // independent of the gate's JS completion timer, which fires late on a
+    // congested boot thread.
+    const { result } = renderHook(() => useQRButtonReveal());
+    act(() => setBootSplashHandoff(true));
+    expect(result.current.opacity).toBe(1);
     expect(result.current.transitionProperty).toContain('opacity');
   });
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { initLog } from '@/shared/lib/logger';
-import { useBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
+import { useBootMorphCompleted, useBootSplashHandoff } from '@/shared/lib/qrButtonAnchor';
 
 /**
  * How long to wait for the boot-morph splash→button visual handoff before
@@ -25,23 +25,33 @@ const REVEALED_STYLE = {
  * Owns the QR button's boot-morph reveal — shared by QRButton.ios and
  * QRButton.android so the platform files can't drift.
  *
- * The button fades in when the splash→button morph completes, or after the
- * failsafe timeout (the anchor poll can race or time out). The fade is a
- * declarative Reanimated CSS transition (the idiom the boot-morph overlay in
- * app/_layout.tsx uses): opacity is a committed React prop, so every Fabric
- * commit re-asserts it. A dropped UI-thread tick can at worst skip the
- * animation — it can never strand the button at a stale mid-fade opacity,
- * which is what the previous withTiming + static-settle version did when the
- * settle commit no-op'd against a JS-side style that already claimed
- * opacity 1. A profile switch resets the morph, which hides the button again
- * so the next reveal can fade in.
+ * The button fades in the moment the splash→button handoff starts (the morph
+ * tween's first frame), or after the failsafe timeout (the anchor poll can
+ * race or time out). Revealing at handoff — not at morph COMPLETION — is
+ * deliberate: the overlay's geometry interpolates from a full-screen square
+ * down to the button's own rect, so the opaque overlay covers the button for
+ * the entire tween and the early reveal is invisible. By the time the overlay
+ * docks, the button underneath is already fully opaque, which makes the final
+ * swap seamless no matter how late the gate's JS completion timer fires on a
+ * congested boot thread (it used to lag the UI-thread tween by 0.3–1.3s,
+ * leaving a dead-looking look-alike parked on top of a hidden button).
+ *
+ * The fade is a declarative Reanimated CSS transition (the idiom the
+ * boot-morph overlay in app/_layout.tsx uses): opacity is a committed React
+ * prop, so every Fabric commit re-asserts it. A dropped UI-thread tick can at
+ * worst skip the animation — it can never strand the button at a stale
+ * mid-fade opacity, which is what the previous withTiming + static-settle
+ * version did when the settle commit no-op'd against a JS-side style that
+ * already claimed opacity 1. A profile switch resets both the handoff and the
+ * morph flags, which hides the button again so the next reveal can fade in.
  */
 export function useQRButtonReveal() {
+  const handoff = useBootSplashHandoff();
   const morphCompleted = useBootMorphCompleted();
   const [failsafeRevealed, setFailsafeRevealed] = useState(false);
 
   useEffect(() => {
-    if (morphCompleted) return;
+    if (handoff || morphCompleted) return;
     // Morph pending (boot) or reset (profile switch): hide and arm the
     // failsafe reveal.
     setFailsafeRevealed(false);
@@ -50,9 +60,9 @@ export function useQRButtonReveal() {
       setFailsafeRevealed(true);
     }, BOOT_MORPH_FAILSAFE_MS);
     return () => clearTimeout(timer);
-  }, [morphCompleted]);
+  }, [handoff, morphCompleted]);
 
-  const revealed = morphCompleted || failsafeRevealed;
+  const revealed = handoff || morphCompleted || failsafeRevealed;
 
   return revealed ? REVEALED_STYLE : HIDDEN_STYLE;
 }
