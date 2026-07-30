@@ -24,6 +24,7 @@ import '@/shared/stores/profile/ownedMediaStore';
 import '@/shared/stores/profile/nostrSocialStore';
 import '@/shared/stores/profile/dataMigrationStore';
 import '@/shared/stores/global/mintMetadataStore';
+import '@/shared/stores/global/relayMetadataStore';
 import '@/shared/stores/profile/mintStore';
 // AI chat: apiKey + sessions (now incl. message attachments) + the
 // last-known model lineup — none cheaply refetchable.

@@ -6,7 +6,7 @@
  * falling back to a generous default. Media is enabled now that the Blossom
  * upload pipeline exists. Poll/alt-text/sensitive are all supported.
  */
-import { getMergedContentLimit } from '@/shared/lib/nostr/nip11';
+import { getMergedContentLimit } from '@/shared/stores/global/relayMetadataStore';
 import type { RailCapability } from '@/features/composer/config/types';
 
 const DEFAULT_CHAR_BUDGET = 10_000;

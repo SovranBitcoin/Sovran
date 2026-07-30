@@ -1,87 +1,64 @@
 /**
- * @fileoverview NIP-11 relay information document fetch + cache.
+ * @fileoverview NIP-11 relay information document fetcher.
  *
  * A relay advertises metadata (name, software, supported NIPs, posting limits)
- * at its HTTP origin with `Accept: application/nostr+json`. Used by the relay
- * settings screen (display) and the composer's Nostr capability descriptor
- * (the `limitation.max_content_length` ceiling). Cached per host with a TTL so
- * opening the composer never blocks on a slow relay.
+ * at its HTTP origin with `Accept: application/nostr+json`. This module is the
+ * pure network fetcher + document schema; the single cache (persisted SWR)
+ * lives in `relayMetadataStore` — consumers go through `getCachedRelayInfo` /
+ * `useRelayMetadata` there, never call this directly from UI.
  */
 import { ResultAsync } from 'neverthrow';
+import { z } from 'zod';
 
 import { nostrLog } from '@/shared/lib/logger';
 
-export interface RelayLimitation {
-  max_content_length?: number;
-  max_message_length?: number;
-  max_subscriptions?: number;
-  auth_required?: boolean;
-  payment_required?: boolean;
-}
+// Tolerant per the persisted-schema invariant: the parsed document is stored
+// verbatim in `relayMetadataStore`, so every field is `.optional().catch()` —
+// one malformed field drops that field, never the whole document (and never,
+// on rehydrate, the whole store).
+const RelayLimitationSchema = z.looseObject({
+  max_content_length: z.number().optional().catch(undefined),
+  max_message_length: z.number().optional().catch(undefined),
+  max_subscriptions: z.number().optional().catch(undefined),
+  max_filters: z.number().optional().catch(undefined),
+  max_limit: z.number().optional().catch(undefined),
+  auth_required: z.boolean().optional().catch(undefined),
+  payment_required: z.boolean().optional().catch(undefined),
+  restricted_writes: z.boolean().optional().catch(undefined),
+});
 
-export interface RelayInformation {
-  name?: string;
-  description?: string;
-  software?: string;
-  version?: string;
-  supported_nips?: number[];
-  icon?: string;
-  limitation?: RelayLimitation;
-}
+// `icon` may be an https URL or an inline data: URI (buzz ships a base64 PNG);
+// the 64KB cap keeps a hostile relay from persisting megabytes into
+// AsyncStorage. `pubkey`/`contact` are `.nullable()` because relays send
+// explicit `null` (NIP-11 permits it; buzz does).
+export const RelayInformationSchema = z.looseObject({
+  name: z.string().max(256).optional().catch(undefined),
+  description: z.string().max(4096).optional().catch(undefined),
+  pubkey: z.string().max(128).nullable().optional().catch(undefined),
+  contact: z.string().max(256).nullable().optional().catch(undefined),
+  software: z.string().max(512).optional().catch(undefined),
+  version: z.string().max(64).optional().catch(undefined),
+  icon: z.string().max(65_536).optional().catch(undefined),
+  supported_nips: z.array(z.number().int()).max(256).optional().catch(undefined),
+  supported_extensions: z.array(z.string().max(64)).max(64).optional().catch(undefined),
+  limitation: RelayLimitationSchema.optional().catch(undefined),
+});
+
+export type RelayInformation = z.infer<typeof RelayInformationSchema>;
 
 export type RelayInfoError = { type: 'fetch-failed' } | { type: 'invalid' };
 
-const TTL_MS = 60 * 60 * 1000; // 1h
 const FETCH_TIMEOUT_MS = 6_000;
-const EMPTY_INFO: RelayInformation = {};
-
-interface CacheEntry {
-  info: RelayInformation;
-  at: number;
-}
-const cache = new Map<string, CacheEntry>();
 
 /** `wss://relay.example/` → `https://relay.example/`. */
 function toHttpUrl(relayUrl: string): string {
   return relayUrl.replace(/^ws:\/\//i, 'http://').replace(/^wss:\/\//i, 'https://');
 }
 
-function parseInfo(raw: unknown): RelayInformation | null {
-  if (typeof raw !== 'object' || raw === null) return null;
-  const obj = raw as Record<string, unknown>;
-  const info: RelayInformation = {};
-  if (typeof obj.name === 'string') info.name = obj.name;
-  if (typeof obj.description === 'string') info.description = obj.description;
-  if (typeof obj.software === 'string') info.software = obj.software;
-  if (typeof obj.version === 'string') info.version = obj.version;
-  if (typeof obj.icon === 'string') info.icon = obj.icon;
-  if (Array.isArray(obj.supported_nips)) {
-    info.supported_nips = obj.supported_nips.filter((n): n is number => typeof n === 'number');
-  }
-  if (typeof obj.limitation === 'object' && obj.limitation !== null) {
-    const lim = obj.limitation as Record<string, unknown>;
-    info.limitation = {
-      max_content_length:
-        typeof lim.max_content_length === 'number' ? lim.max_content_length : undefined,
-      max_message_length:
-        typeof lim.max_message_length === 'number' ? lim.max_message_length : undefined,
-      auth_required: typeof lim.auth_required === 'boolean' ? lim.auth_required : undefined,
-      payment_required:
-        typeof lim.payment_required === 'boolean' ? lim.payment_required : undefined,
-    };
-  }
-  return info;
-}
-
-/** Fetches (and caches) a relay's NIP-11 document. */
+/** Fetches a relay's NIP-11 document. Pure fetch — no cache (see fileoverview). */
 export function fetchRelayInformation(
   relayUrl: string
 ): ResultAsync<RelayInformation, RelayInfoError> {
-  const cached = cache.get(relayUrl);
-  if (cached && Date.now() - cached.at < TTL_MS) {
-    return ResultAsync.fromSafePromise(Promise.resolve(cached.info));
-  }
-
   return ResultAsync.fromPromise(
     (async (): Promise<RelayInformation> => {
       const controller = new AbortController();
@@ -96,10 +73,9 @@ export function fetchRelayInformation(
           signal: controller.signal,
         });
         if (!res.ok) throw new Error(`status ${res.status}`);
-        const info = parseInfo(await res.json());
-        if (!info) throw new Error('invalid nip-11 document');
-        cache.set(relayUrl, { info, at: Date.now() });
-        return info;
+        const parsed = RelayInformationSchema.safeParse(await res.json());
+        if (!parsed.success) throw new Error('invalid nip-11 document');
+        return parsed.data;
       } finally {
         clearTimeout(timer);
       }
@@ -109,24 +85,4 @@ export function fetchRelayInformation(
       return { type: 'fetch-failed' };
     }
   );
-}
-
-/**
- * The tightest `max_content_length` across the given relays (the composer must
- * respect the strictest write relay). Returns `undefined` when no relay
- * advertises a limit, so callers apply a sane default.
- */
-export async function getMergedContentLimit(
-  relayUrls: readonly string[]
-): Promise<number | undefined> {
-  const infos = await Promise.all(
-    relayUrls.map((url) => fetchRelayInformation(url).unwrapOr(EMPTY_INFO))
-  );
-  let min: number | undefined;
-  for (const info of infos) {
-    const limit = info.limitation?.max_content_length;
-    if (typeof limit === 'number' && limit > 0)
-      min = min === undefined ? limit : Math.min(min, limit);
-  }
-  return min;
 }

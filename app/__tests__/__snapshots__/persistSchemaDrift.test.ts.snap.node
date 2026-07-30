@@ -1000,6 +1000,142 @@ exports[`persisted schema drift profile-store schema matches the golden snapshot
 }
 `;
 
+exports[`persisted schema drift relay-metadata-store schema matches the golden snapshot for its version: relay-metadata-store 1`] = `
+{
+  "name": "relay-metadata-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "byRelayUrl": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "failedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "fetchedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "info": {
+              "additionalProperties": {},
+              "properties": {
+                "contact": {
+                  "anyOf": [
+                    {
+                      "maxLength": 256,
+                      "type": "string",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                },
+                "description": {
+                  "maxLength": 4096,
+                  "type": "string",
+                },
+                "icon": {
+                  "maxLength": 65536,
+                  "type": "string",
+                },
+                "limitation": {
+                  "additionalProperties": {},
+                  "properties": {
+                    "auth_required": {
+                      "type": "boolean",
+                    },
+                    "max_content_length": {
+                      "type": "number",
+                    },
+                    "max_filters": {
+                      "type": "number",
+                    },
+                    "max_limit": {
+                      "type": "number",
+                    },
+                    "max_message_length": {
+                      "type": "number",
+                    },
+                    "max_subscriptions": {
+                      "type": "number",
+                    },
+                    "payment_required": {
+                      "type": "boolean",
+                    },
+                    "restricted_writes": {
+                      "type": "boolean",
+                    },
+                  },
+                  "type": "object",
+                },
+                "name": {
+                  "maxLength": 256,
+                  "type": "string",
+                },
+                "pubkey": {
+                  "anyOf": [
+                    {
+                      "maxLength": 128,
+                      "type": "string",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                },
+                "software": {
+                  "maxLength": 512,
+                  "type": "string",
+                },
+                "supported_extensions": {
+                  "items": {
+                    "maxLength": 64,
+                    "type": "string",
+                  },
+                  "maxItems": 64,
+                  "type": "array",
+                },
+                "supported_nips": {
+                  "items": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer",
+                  },
+                  "maxItems": 256,
+                  "type": "array",
+                },
+                "version": {
+                  "maxLength": 64,
+                  "type": "string",
+                },
+              },
+              "type": "object",
+            },
+          },
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 2048,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "byRelayUrl",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift routstr-store schema matches the golden snapshot for its version: routstr-store 1`] = `
 {
   "name": "routstr-store",
