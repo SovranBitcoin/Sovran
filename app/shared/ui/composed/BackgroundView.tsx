@@ -143,6 +143,15 @@ function ScrollableGradientOverlayComponent({
 }: ScrollableGradientOverlayProps) {
   useRenderLogger('ScrollableGradientOverlay');
   const screenBackgroundColor = useThemeColor('surface');
+  const { currentTheme } = useTheme();
+  const carouselPages = useSyncExternalStore(subscribeWallpaperLayers, getCarouselPages);
+
+  // The overlay exists solely to wash the wallpaper image out under the
+  // scroll content. Any carousel page with an image counts (not just the
+  // active theme) so the fade doesn't pop in mid-swipe between units.
+  const hasImageWallpaper =
+    isBackgroundImageTheme(currentTheme) ||
+    carouselPages.some((page) => isBackgroundImageTheme(page.theme));
 
   const viewportHeight = useWindowDimensions().height;
 
@@ -172,6 +181,14 @@ function ScrollableGradientOverlayComponent({
       }),
     [screenBackgroundColor]
   );
+
+  // On solid-colour themes the transparent→surface alpha ramp still paints
+  // (dither banding, and a foreign colour band whenever the active theme's
+  // surface differs from the carousel page's) — skip it entirely.
+  if (!hasImageWallpaper) {
+    return null;
+  }
+
   return (
     <Log name="ScrollableGradientOverlay">
       <View
@@ -460,6 +477,14 @@ const WallpaperLayer = memo(function WallpaperLayer({
       ),
     [theme, gradientColor, layerSurface]
   );
+  // Without an image (and with no explicit tint colour) the transparent→
+  // surface ramp composites to a flat surface fill — but `dither` still adds
+  // visible noise to it. Paint the flat fill directly instead.
+  const isFlatFill = !isBackgroundImageTheme(theme) && !gradientColor;
+  const flatFillStyle = useMemo(
+    () => [StyleSheet.absoluteFill, { backgroundColor: layerSurface }],
+    [layerSurface]
+  );
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, layerStyle]}>
       {showImage && (
@@ -470,7 +495,9 @@ const WallpaperLayer = memo(function WallpaperLayer({
           imageTransitionMs={0}
         />
       )}
-      {useMeshGradient ? (
+      {isFlatFill ? (
+        <View style={flatFillStyle} pointerEvents="none" />
+      ) : useMeshGradient ? (
         <MeshGradientView
           columns={3}
           rows={3}
