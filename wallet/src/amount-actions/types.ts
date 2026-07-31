@@ -118,6 +118,14 @@ export interface CreateAmountActionManagerConfig {
    * to track destination changes mid-flow without rebuilding the manager.
    */
   offlineOptimization: boolean | (() => boolean);
+  /**
+   * Whether quick-send suggestions are computed. Defaults to the
+   * `offlineOptimization` gate when omitted. Set independently when the two
+   * scopes differ — suggestions cover every ecash send path (direct send AND
+   * paying a payment request), while offline optimization stays direct-send
+   * only. Pass a getter to track destination changes mid-flow.
+   */
+  suggestionsEnabled?: boolean | (() => boolean);
   /** Active account unit (e.g. 'sat', 'usd'). Pass a getter when the unit can change. */
   unit: string | (() => string);
   /**

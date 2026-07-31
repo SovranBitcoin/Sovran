@@ -137,6 +137,61 @@ describe('createAmountActionManager — unit awareness', () => {
   });
 });
 
+describe('createAmountActionManager — suggestions gate', () => {
+  const PROOFS = [64, 32, 4];
+
+  it('defaults to the offlineOptimization gate when suggestionsEnabled is omitted', () => {
+    const { manager: off } = makeManager({
+      getProofAmounts: () => PROOFS,
+      offlineOptimization: false,
+      quickSendConfig: undefined,
+    });
+    expect(off.inspect().suggestions).toHaveLength(0);
+
+    const { manager: on } = makeManager({
+      getProofAmounts: () => PROOFS,
+      offlineOptimization: true,
+      quickSendConfig: undefined,
+    });
+    expect(on.inspect().suggestions.length).toBeGreaterThan(0);
+  });
+
+  it('suggestionsEnabled shows suggestions without offline optimization (payment-request shape)', () => {
+    const { manager } = makeManager({
+      getProofAmounts: () => PROOFS,
+      offlineOptimization: false,
+      suggestionsEnabled: true,
+      quickSendConfig: undefined,
+    });
+    const state = manager.inspect();
+    expect(state.suggestions.length).toBeGreaterThan(0);
+    expect(state.suggestions.some((s) => s.sendAll)).toBe(true);
+  });
+
+  it('suggestionsEnabled: false suppresses suggestions even with offline optimization on', () => {
+    const { manager } = makeManager({
+      getProofAmounts: () => PROOFS,
+      offlineOptimization: true,
+      suggestionsEnabled: false,
+      quickSendConfig: undefined,
+    });
+    expect(manager.inspect().suggestions).toHaveLength(0);
+  });
+
+  it('a mid-flow gate flip invalidates the compute memo', () => {
+    const gate = { current: false };
+    const { manager } = makeManager({
+      getProofAmounts: () => PROOFS,
+      offlineOptimization: false,
+      suggestionsEnabled: () => gate.current,
+      quickSendConfig: undefined,
+    });
+    expect(manager.inspect().suggestions).toHaveLength(0);
+    gate.current = true;
+    expect(manager.inspect().suggestions.length).toBeGreaterThan(0);
+  });
+});
+
 describe('createAmountActionManager — envelope clamp', () => {
   it('replaces input above the cap with the cap raw string', () => {
     const { manager } = makeManager({

@@ -441,6 +441,15 @@ export function useScreenActions(
       getBtcPrice: () => getBtcPriceRef.current?.() ?? 0,
       offlineOptimization: () =>
         machineRef.current.getContext().destination === 'sendEcash',
+      // Quick-send suggestions belong to every ecash SEND path: direct sends
+      // and paying a NUT-18 payment request. Melt (lightning/onchain) and the
+      // receive destinations never show them. Deliberately wider than
+      // offlineOptimization — a payment request needs a live transport, so the
+      // offline icon / fiat-window optimization must stay direct-send only.
+      suggestionsEnabled: () => {
+        const destination = machineRef.current.getContext().destination;
+        return destination === 'sendEcash' || destination === 'paymentRequest';
+      },
       unit: () => machineRef.current.getContext().unit,
       fiatCurrency: () => getDisplayCurrencyRef.current?.()?.code,
       fiatSymbol: () => getDisplayCurrencyRef.current?.()?.symbol,

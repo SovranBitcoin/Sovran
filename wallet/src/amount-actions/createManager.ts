@@ -87,6 +87,7 @@ export function createAmountActionManager(
     getProofAmounts,
     getBtcPrice,
     offlineOptimization,
+    suggestionsEnabled,
     unit,
     fiatCurrency,
     fiatSymbol,
@@ -95,6 +96,13 @@ export function createAmountActionManager(
   } = config;
 
   const getOfflineOptimization = asGetter(offlineOptimization);
+  // Suggestions historically rode the offline-optimization gate; an explicit
+  // `suggestionsEnabled` decouples them (ecash paths can want suggestions
+  // without the offline icon / fiat-window optimization semantics).
+  const getSuggestionsEnabled =
+    suggestionsEnabled === undefined
+      ? getOfflineOptimization
+      : asGetter(suggestionsEnabled);
   const getUnit = asGetter(unit);
   const getFiatCurrency = asGetter<string | undefined>(fiatCurrency);
   const getFiatSymbol = asGetter<string | undefined>(fiatSymbol);
@@ -171,7 +179,7 @@ export function createAmountActionManager(
   } | null = null;
 
   function getSuggestions(): QuickSendSuggestion[] {
-    if (!getOfflineOptimization() || suggestionsDisabled)
+    if (!getSuggestionsEnabled() || suggestionsDisabled)
       return EMPTY_SUGGESTIONS;
     const unitNow = getUnit();
     const proofs = getProofAmounts();
@@ -278,6 +286,7 @@ export function createAmountActionManager(
     const proofAmounts = mintUrl ? allProofAmounts : [];
     const btcPrice = getBtcPrice();
     const offlineOpt = getOfflineOptimization();
+    const suggestionsOn = getSuggestionsEnabled();
     const unitNow = getUnit();
     const fiatCurrencyNow = getFiatCurrency();
     const fiatSymbolNow = getFiatSymbol();
@@ -295,6 +304,7 @@ export function createAmountActionManager(
       proofSignature(allProofAmounts),
       btcPrice,
       offlineOpt,
+      suggestionsOn,
       fiatCurrencyNow ?? '',
       fiatSymbolNow ?? '',
       clampedToCap,
