@@ -6,6 +6,11 @@ Tooling and prompts for code-quality review.
 codereview/
 ├── audit.md             # read-only review prompt, inline markdown report
 ├── fix.md               # write-capable live-code cleanup prompt
+├── optimize.md          # repeatable perf/UX reviewer; subagent fan-out per lens
+├── optimize/            # optimize.md's lens catalogs + cross-run findings ledger
+│   ├── lenses/          # one heuristic checklist per review dimension (11 files)
+│   ├── reports/         # full per-run reports (findings + evidence + refutations)
+│   └── LEDGER.md        # fingerprinted findings + coverage log (novelty across runs)
 ├── analyze-structure/   # repo-wide structural metrics + lookalikes subcommand
 │   ├── index.mjs              # CLI dispatch + structural reports
 │   ├── lookalikes-mode.mjs    # `lookalikes` subcommand entry
@@ -22,8 +27,8 @@ codereview/
     └── args.mjs         # getNumericArg, getStringArg
 ```
 
-`bun run audit`, `bun run fix`, `bun run analyze-structure`, and
-`npm run log-doctor` invoke these by their canonical paths. There are no
+`bun run audit`, `bun run fix`, `bun run optimize`, `bun run analyze-structure`,
+and `npm run log-doctor` invoke these by their canonical paths. There are no
 `scripts/` shims — paths in audit.md / fix.md / commands below match
 exactly what gets run.
 
