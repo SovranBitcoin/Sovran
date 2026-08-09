@@ -959,3 +959,58 @@ describe('quoteMelt / executeMelt quote-first (BTC-05)', () => {
     expect(mgr.quotes.melt.create).toHaveBeenCalledTimes(2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// executeSend reservation rescue (BTC-07)
+// ---------------------------------------------------------------------------
+
+describe('executeSend — reservation rescue (BTC-07)', () => {
+  it('cancels the prepared operation when execute throws', async () => {
+    const mockManager = createMockManager();
+    mockManager.ops.send.execute = vi.fn().mockRejectedValue(new Error('network drop mid-flight'));
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+    });
+
+    await expect(ops.executeSend!(MINT1, 100)).rejects.toThrow('network drop mid-flight');
+    // The prepared op's reservation must be released, not abandoned.
+    expect(mockManager.ops.send.cancel).toHaveBeenCalledWith('prepared-send-1');
+  });
+
+  it('does not cancel when execute succeeds', async () => {
+    const mockManager = createMockManager();
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+    });
+
+    await ops.executeSend!(MINT1, 100);
+    expect(mockManager.ops.send.cancel).not.toHaveBeenCalled();
+  });
+
+  it('still surfaces the original error when the rescue cancel also fails', async () => {
+    const mockManager = createMockManager();
+    mockManager.ops.send.execute = vi.fn().mockRejectedValue(new Error('network drop mid-flight'));
+    mockManager.ops.send.cancel = vi.fn().mockRejectedValue(new Error('mint unreachable'));
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+    });
+
+    await expect(ops.executeSend!(MINT1, 100)).rejects.toThrow('network drop mid-flight');
+    expect(mockManager.ops.send.cancel).toHaveBeenCalledWith('prepared-send-1');
+  });
+
+  it('executeOfflineSend rescues the reservation when execute throws', async () => {
+    const mockManager = createMockManager();
+    mockManager.ops.send.execute = vi.fn().mockRejectedValue(new Error('local failure'));
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+    });
+
+    await expect(ops.executeOfflineSend!(MINT1, 100)).rejects.toThrow('local failure');
+    expect(mockManager.ops.send.cancel).toHaveBeenCalledWith('prepared-send-1');
+  });
+});

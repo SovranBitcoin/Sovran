@@ -184,15 +184,29 @@ export function createDefaultScreenActionHandlers(
         if (!ops?.rollbackSend) return;
 
         if (getOffline?.() === true) {
-          logger.info("screenAction.sendToken.cancel.blockedOffline", {
+          // A prepared (never-executed) send releases its proof reservation
+          // purely locally in coco (releaseProofs — no mint contact), so
+          // cancelling it is safe while offline. A pending/executing send's
+          // reclaim swaps at the mint and stays offline-blocked. Failing
+          // sends strand in the prepared state precisely when the network
+          // drops — blocking their cancel offline strands the user's balance
+          // behind the exact condition that caused the failure (BTC-07).
+          const entryState = getString(entry, "state");
+          if (entryState !== "prepared") {
+            logger.info("screenAction.sendToken.cancel.blockedOffline", {
+              operationId,
+              state: entryState ?? null,
+            });
+            notify("onSendCancelFailed", {
+              operationId,
+              message: "Cancel transaction is not possible while offline.",
+              offline: true,
+            });
+            return;
+          }
+          logger.info("screenAction.sendToken.cancel.offlinePreparedAllowed", {
             operationId,
           });
-          notify("onSendCancelFailed", {
-            operationId,
-            message: "Cancel transaction is not possible while offline.",
-            offline: true,
-          });
-          return;
         }
 
         logger.info("screenAction.sendToken.cancel.start", { operationId });

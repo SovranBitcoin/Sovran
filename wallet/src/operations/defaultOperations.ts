@@ -188,6 +188,57 @@ function buildMeltEntry(
   return { historyEntry: JSON.stringify(entry) };
 }
 
+/**
+ * Execute a prepared send with the same reservation rescue melts get
+ * (executeMeltWithRescue): prepare() reserved proofs at the mint, so if
+ * execute() throws — network drop mid-flight, app backgrounded, mint 5xx —
+ * the operation is cancelled instead of abandoning the reservation (locked
+ * proofs + a phantom pending history row until the next recovery run).
+ * Safety-critical: keep ONE copy (BTC-07).
+ */
+async function executeSendWithRescue(
+  mgr: Manager,
+  operation: { id: string },
+  input: {
+    logPrefix: "executeSend" | "executeOfflineSend" | "executeNfcSend";
+    /** Passed through to ops.send.execute verbatim (undefined = no options). */
+    executeOptions?: { memo?: string };
+    /** Dev mock-fail gate — inside the try so the rescue path is exercised. */
+    mockFail?: boolean;
+  },
+): Promise<Awaited<ReturnType<Manager["ops"]["send"]["execute"]>>> {
+  const { logPrefix } = input;
+  try {
+    if (input.mockFail) {
+      throw new Error("Mock send failure (dev)");
+    }
+    const result = input.executeOptions
+      ? await mgr.ops.send.execute(operation.id, input.executeOptions)
+      : await mgr.ops.send.execute(operation.id);
+    logger.info(`operations.${logPrefix}.executeComplete`, {
+      operationId: result.operation.id,
+      state: result.operation.state,
+    });
+    return result;
+  } catch (e) {
+    logger.warn(`operations.${logPrefix}.executeFailed`, {
+      operationId: operation.id,
+      error: errField(e),
+    });
+    // Best-effort rescue: a cancel failure (or a sync throw) must never
+    // mask the original execute error.
+    try {
+      await mgr.ops.send.cancel(operation.id);
+    } catch (cancelErr) {
+      logger.warn(`operations.${logPrefix}.cancelAfterFailureFailed`, {
+        operationId: operation.id,
+        error: errField(cancelErr),
+      });
+    }
+    throw e;
+  }
+}
+
 /** Bare onchain address from a melt target (address or bitcoin:/BIP-321 URI). */
 function extractOnchainAddress(meltTarget: string): string | null {
   const parsed = parsePaymentInput(meltTarget, defaultDetectors);
@@ -637,15 +688,6 @@ export function createDefaultOperations(
   return {
     executeSend: async (mintUrl, amount, memo, options) => {
       const mgr = requireManager();
-      // send.execute is atomic — there is no rollback to exercise — so the
-      // mock-fail gate runs before prepare to leave no reservation behind.
-      if (mockFailEnabled("send")) {
-        logger.warn("operations.executeSend.mockFailure", {
-          ...mintUrlFields(mintUrl),
-          amount,
-        });
-        throw new Error("Mock send failure (dev)");
-      }
       const p2pkLockPubkey = options?.p2pkLockPubkey;
       logger.info("operations.executeSend.prepare", {
         ...mintUrlFields(mintUrl),
@@ -670,8 +712,12 @@ export function createDefaultOperations(
       });
       // v2 persists the memo on the executed token (whitespace-only ignored);
       // applyTokenMemo keeps the local copy consistent for synthetic entries.
-      const { operation, token } = await mgr.ops.send.execute(prepared.id, {
-        memo: normalizeMemo(memo),
+      // The rescue cancels the prepared op when execute fails, so the mock
+      // gate moved inside it — the QA toggle exercises the rescue too.
+      const { operation, token } = await executeSendWithRescue(mgr, prepared, {
+        logPrefix: "executeSend",
+        executeOptions: { memo: normalizeMemo(memo) },
+        mockFail: mockFailEnabled("send"),
       });
       const tokenWithMemo = applyTokenMemo(token, memo);
       logger.info("operations.executeSend.complete", {
@@ -734,9 +780,14 @@ export function createDefaultOperations(
         throw new Error("Offline send requires exact proof match");
       }
 
-      const { operation, token } = await mgr.ops.send.execute(prepared.id, {
-        memo: normalizeMemo(memo),
-      });
+      const { operation, token } = await executeSendWithRescue(
+        mgr,
+        prepared,
+        {
+          logPrefix: "executeOfflineSend",
+          executeOptions: { memo: normalizeMemo(memo) },
+        },
+      );
       const tokenWithMemo = applyTokenMemo(token, memo);
       logger.info("operations.executeOfflineSend.complete", {
         operationId: operation.id,
@@ -1143,7 +1194,9 @@ export function createDefaultOperations(
         operationId: prepared.id,
         needsSwap: !!prepared.needsSwap,
       });
-      const { operation, token } = await mgr.ops.send.execute(prepared.id);
+      const { operation, token } = await executeSendWithRescue(mgr, prepared, {
+        logPrefix: "executeNfcSend",
+      });
       logger.info("operations.executeNfcSend.tokenCreated", {
         operationId: operation.id,
         state: operation.state,
