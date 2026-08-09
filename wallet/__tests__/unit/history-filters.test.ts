@@ -68,6 +68,18 @@ describe('history state filters', () => {
     expect(isSettledReceiveHistoryEntry({ type: 'receive', state: 'finalized' } as never)).toBe(
       true,
     );
+    // BTC-11: only redeemed receives count as received money — an
+    // executing (unredeemed) or rolled-back (failed/already-spent) token
+    // never arrived in spendable balance and must not inflate the stats.
+    expect(isSettledReceiveHistoryEntry({ type: 'receive', state: 'executing' } as never)).toBe(
+      false,
+    );
+    expect(isSettledReceiveHistoryEntry({ type: 'receive', state: 'rolled_back' } as never)).toBe(
+      false,
+    );
+    expect(isSettledReceiveHistoryEntry({ type: 'receive', state: 'rolledBack' } as never)).toBe(
+      false,
+    );
     expect(isSettledReceiveHistoryEntry({ type: 'mint', state: 'PAID' } as never)).toBe(true);
     expect(isSettledReceiveHistoryEntry({ type: 'mint', state: 'UNPAID' } as never)).toBe(false);
     // A fully-credited deposit settles to ISSUED (v2 finalized), NOT PAID — it

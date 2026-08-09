@@ -99,7 +99,12 @@ export function isSettledReceiveHistoryEntry(
   historyEntry: HistoryEntry,
 ): boolean {
   return historyEntry.type === "receive"
-    ? true
+    ? // A receive counts as received money only once the token actually
+      // redeemed (finalized). `executing` entries are received-but-
+      // unredeemed (not yet in spendable balance) and `rolled_back` entries
+      // are failed/already-spent token attempts — counting either inflates
+      // "Received this month" with money that never arrived (BTC-11).
+      isReceiveTokenRedeemed(historyEntry)
     : historyEntry.type === "mint"
       ? // A mint quote (Lightning / bolt12 / onchain deposit) counts as received
         // once the mint has observed the payment. This spans BOTH the transient
