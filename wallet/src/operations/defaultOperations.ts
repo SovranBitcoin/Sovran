@@ -1596,6 +1596,23 @@ export function createDefaultOperations(
 
       const nostrTransport = info.transports?.find((t) => t.type === "nostr");
       const httpTransport = info.transports?.find((t) => t.type === "post");
+
+      // The machine enforces request-unit === active unit at scan time
+      // (BTC-04); assert it again at the money seam so a future caller that
+      // bypasses the machine can't stamp the payload with a unit the
+      // prepared proofs aren't denominated in.
+      const requestUnit = (info.unit ?? "sat").trim().toLowerCase();
+      if (requestUnit !== unit.trim().toLowerCase()) {
+        logger.warn("operations.executePaymentRequest.unitMismatch", {
+          ...mintUrlFields(mintUrl),
+          requestUnit,
+          unit,
+        });
+        throw new Error(
+          `Payment request unit (${requestUnit}) does not match the wallet unit (${unit})`,
+        );
+      }
+
       let operationId: string;
 
       if (nostrTransport && !httpTransport) {
@@ -1611,20 +1628,23 @@ export function createDefaultOperations(
           );
         }
 
-        const effectiveAmount = info.amount ?? amount;
-        if (!effectiveAmount) {
+        // Use ONLY the machine-validated amount (seeded from the request
+        // when valid, otherwise typed by the user). Re-reading the raw
+        // request amount here would let an invalid/crafted `info.amount`
+        // silently override the amount the user approved (BTC-04).
+        if (!amount || amount <= 0) {
           logger.warn("operations.executePaymentRequest.nostr.missingAmount");
           throw new Error("Amount is required for Nostr payment requests");
         }
 
         const prepared = await mgr.ops.send.prepare({
           mintUrl,
-          amount: effectiveAmount,
+          amount,
         });
         logger.info("operations.executePaymentRequest.nostr.prepared", {
           operationId: prepared.id,
           ...mintUrlFields(mintUrl),
-          amount: effectiveAmount,
+          amount,
           needsSwap: !!prepared.needsSwap,
         });
         const { operation, token } = await mgr.ops.send.execute(prepared.id);
@@ -1663,7 +1683,7 @@ export function createDefaultOperations(
             return buildRolledBackResult(
               operationId,
               mintUrl,
-              effectiveAmount,
+              amount,
               unit,
               paymentRequest,
               "nostr",

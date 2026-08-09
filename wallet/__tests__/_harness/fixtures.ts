@@ -284,6 +284,20 @@ export const INPUTS = {
    */
   paymentRequestLocked:
     'creqApGFhGDJhdWNzYXRhbYF4GWh0dHBzOi8vbWludDEuZXhhbXBsZS5jb21lbnV0MTCjYWtkUDJQS2FkeEIwMmFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhdIA=',
+
+  /**
+   * Real CBOR payment request: amount 500, unit 'usd', mints=[MINT1],
+   * nostr transport. Used for cross-unit (BTC-04) tests.
+   */
+  paymentRequestUsdNostr:
+    'creqApWF0gaNhdGVub3N0cmFheEVucHJvZmlsZTFxcXN5eDd5NnYwa2xqOXc0azNtNWc3ejhxMnI0dDZ5OHUwaTJvNHA2YThzMGQyZjRnNmg4amtjOWtrYzlhZ/dhaW10ZXN0LXVzZC1jcmVxYWEZAfRhdWN1c2RhbYF4GWh0dHBzOi8vbWludDEuZXhhbXBsZS5jb20=',
+
+  /**
+   * Real CBOR payment request: amount 500, unit 'sat', mints=[MINT1],
+   * nostr transport. Companion to paymentRequestUsdNostr.
+   */
+  paymentRequestSatNostr:
+    'creqApWF0gaNhdGVub3N0cmFheEVucHJvZmlsZTFxcXN5eDd5NnYwa2xqOXc0azNtNWc3ejhxMnI0dDZ5OHUwaTJvNHA2YThzMGQyZjRnNmg4amtjOWtrYzlhZ/dhaW10ZXN0LXNhdC1jcmVxYWEZAfRhdWNzYXRhbYF4GWh0dHBzOi8vbWludDEuZXhhbXBsZS5jb20=',
 } as const;
 
 export type InputFixtureName = keyof typeof INPUTS;

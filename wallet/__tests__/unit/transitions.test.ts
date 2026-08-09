@@ -48,6 +48,7 @@
 import { describe, it, expect } from 'vitest';
 import { transition, type TransitionResult } from '../../src/machine/transitions';
 import { defaultDetectors } from '../../src/detectors';
+import { parsePaymentInput } from '../../src/parse';
 import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
 import { WALLETS, MINT1, MINT2, MINT3, INPUTS } from '../_harness/fixtures';
 import type { FlowContext, FlowEvent, FlowStep } from '../../src/machine/types';
@@ -452,6 +453,63 @@ describe('transition — EXECUTE fixed bolt11 on fiat units', () => {
 
     expect(result.context.unit).toBe('sat');
     expect(result.context.amount).toBe(250_000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EXECUTE / OPTION_CHOSEN — cross-unit NUT-18 payment requests (BTC-04)
+// ---------------------------------------------------------------------------
+
+/**
+ * A NUT-18 request carries its own unit, but the machine's WalletContext is
+ * always the ACTIVE-unit view and execution prepares proofs in that unit
+ * while the payload stamps it. Flipping the flow unit to the request's unit
+ * crossed the two contexts (cross-unit gates; proofs mislabelled in the
+ * payload). Cross-unit requests now hard-stop with an actionable error.
+ */
+describe('transition — cross-unit payment requests', () => {
+  it('rejects a usd-denominated request on a sat-unit wallet with an actionable error', () => {
+    const result = tx('idle', idle, {
+      type: 'EXECUTE',
+      input: INPUTS.paymentRequestUsdNostr,
+    });
+
+    expect(result.step).toBe('error');
+    expect(result.data).toMatchObject({ code: 'UNSUPPORTED_PAYMENT_METHOD' });
+    expect((result.data as { message: string }).message).toContain('usd');
+    // The flow unit must NOT have been flipped to the request's unit.
+    expect(result.context.unit).toBe('sat');
+    expect(result.context.amount).toBeUndefined();
+  });
+
+  it('accepts a same-unit request and seeds its amount', () => {
+    const result = tx('idle', idle, {
+      type: 'EXECUTE',
+      input: INPUTS.paymentRequestSatNostr,
+    });
+
+    expect(result.step).toBe('navigateToPaymentRequest');
+    expect(result.context.unit).toBe('sat');
+    expect(result.context.amount).toBe(500);
+  });
+
+  it('rejects a cross-unit request chosen from a multi-option input', () => {
+    // Standalone parse gives a single-option parsed input; firing
+    // OPTION_CHOSEN with it exercises the handleOptionChosen arm.
+    const parsed = parsePaymentInput(INPUTS.paymentRequestUsdNostr, defaultDetectors);
+    const option = parsed.options.find((o) => o.kind === 'paymentRequest');
+    expect(option).toBeDefined();
+
+    const result = tx(
+      'chooseOption',
+      { unit: 'sat', parsed },
+      { type: 'OPTION_CHOSEN', option: option! },
+      WALLETS.default
+    );
+
+    expect(result.step).toBe('error');
+    expect(result.data).toMatchObject({ code: 'UNSUPPORTED_PAYMENT_METHOD' });
+    expect(result.context.unit).toBe('sat');
   });
 });
 

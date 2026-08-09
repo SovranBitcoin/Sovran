@@ -191,6 +191,53 @@ describe('executePaymentRequest — Nostr transport', () => {
       'sendNostrDM operation is required'
     );
   });
+
+  it('uses the machine-validated amount, never the raw request amount (BTC-04)', async () => {
+    // A crafted/invalid request amount (500.5 — rejected by the machine's
+    // sat validator, so the user typed 500) must NOT win over the
+    // user-approved amount at execution.
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const mockManager = createMockManager();
+
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 500.5,
+      unit: 'sat',
+      transports: [{ type: 'nostr', target: 'nprofile1abc' }],
+    });
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM,
+    });
+
+    await ops.executePaymentRequest!(MINT1, 'creqABC', 500, 'sat');
+
+    expect(mockManager.ops.send.prepare).toHaveBeenCalledWith({ mintUrl: MINT1, amount: 500 });
+  });
+
+  it('throws when the request unit does not match the flow unit (BTC-04)', async () => {
+    const sendNostrDM = vi.fn().mockResolvedValue(undefined);
+    const mockManager = createMockManager();
+
+    mockGetPRInfo.mockReturnValue({
+      mints: [MINT1],
+      amount: 500,
+      unit: 'usd',
+      transports: [{ type: 'nostr', target: 'nprofile1abc' }],
+    });
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      sendNostrDM,
+    });
+
+    await expect(ops.executePaymentRequest!(MINT1, 'creqABC', 500, 'sat')).rejects.toThrow(
+      'does not match the wallet unit'
+    );
+    expect(mockManager.ops.send.prepare).not.toHaveBeenCalled();
+    expect(sendNostrDM).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------

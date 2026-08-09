@@ -103,6 +103,30 @@ function handleExecute(
   // Extract known data from the intent into context
   switch (intent.type) {
     case "sendPaymentRequest": {
+      // The request's unit must equal the flow unit (the wallet's active
+      // unit): the WalletContext (balances, proof amounts, capabilities) is
+      // always the active-unit view, and execution selects proofs in that
+      // unit while the NUT-18 payload stamps it. Flipping ctx.unit to the
+      // request's unit would cross the two contexts — gates compare
+      // cross-unit and the paid proofs mislabel their unit (BTC-04). A
+      // cross-unit request can't be paid from this view at all, so stop
+      // with an actionable error instead of mixing units silently.
+      const requestUnit = (intent.info.unit ?? "sat").trim().toLowerCase();
+      const activeUnit = unit.trim().toLowerCase();
+      if (requestUnit !== activeUnit) {
+        logger.warn("transitions.execute.paymentRequestUnitMismatch", {
+          requestUnit,
+          activeUnit,
+        });
+        return {
+          step: "error",
+          context: ctx,
+          data: {
+            code: "UNSUPPORTED_PAYMENT_METHOD" as const,
+            message: `This payment request is denominated in ${requestUnit}, but your wallet is using ${activeUnit}. Switch your wallet unit to ${requestUnit} to pay it.`,
+          },
+        };
+      }
       ctx.paymentRequest = intent.option.value;
       ctx.supportedMintUrls =
         intent.info.mints.length > 0 ? intent.info.mints : undefined;
@@ -114,7 +138,6 @@ function handleExecute(
           amount: intent.info.amount,
         });
       }
-      if (intent.info.unit) ctx.unit = intent.info.unit;
       // A nostr transport entry is the request's identity disclosure
       // (NUT-18 convention). Seeding recipientPubkey here lets the stage-2
       // profile resolver paint "Pay <name>" on the amount screen for any
@@ -220,7 +243,25 @@ function handleOptionChosen(
 
   // Extract data from the newly resolved intent
   switch (intent.type) {
-    case "sendPaymentRequest":
+    case "sendPaymentRequest": {
+      // Same cross-unit hard-stop as the EXECUTE arm (BTC-04) — a BIP-321
+      // creq option carries its unit just like a standalone scan.
+      const requestUnit = (intent.info.unit ?? "sat").trim().toLowerCase();
+      const activeUnit = (currentCtx.unit ?? "sat").trim().toLowerCase();
+      if (requestUnit !== activeUnit) {
+        logger.warn("transitions.optionChosen.paymentRequestUnitMismatch", {
+          requestUnit,
+          activeUnit,
+        });
+        return {
+          step: "error",
+          context: ctx,
+          data: {
+            code: "UNSUPPORTED_PAYMENT_METHOD" as const,
+            message: `This payment request is denominated in ${requestUnit}, but your wallet is using ${activeUnit}. Switch your wallet unit to ${requestUnit} to pay it.`,
+          },
+        };
+      }
       ctx.paymentRequest = intent.option.value;
       ctx.supportedMintUrls =
         intent.info.mints.length > 0 ? intent.info.mints : undefined;
@@ -233,6 +274,7 @@ function handleOptionChosen(
         });
       }
       break;
+    }
     case "meltLightningInvoice":
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
