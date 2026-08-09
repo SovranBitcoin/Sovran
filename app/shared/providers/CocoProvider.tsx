@@ -203,6 +203,17 @@ export function CocoProvider({ children }: CocoProviderProps) {
     if (bgStarted.current) return;
     bgStarted.current = true;
 
+    // BTC-13: an unmount (profile switch remount) must stop this chain. The
+    // statics it calls (CocoManager.enableSafeWatchers /
+    // enableNpcSyncAndProcessor) act on CocoManager.instance — after a
+    // remount that is the NEW profile's manager, so an orphaned chain would
+    // arm watchers/sync on it out of order. Abort on cleanup and assert the
+    // captured manager is still the live instance before every step.
+    const controller = new AbortController();
+    const chainManager = manager;
+    const isLive = () =>
+      !controller.signal.aborted && CocoManager.peekInstance() === chainManager;
+
     const runBackground = async () => {
       try {
         initLog('Coco-bg', 'Phase 2 starting');
@@ -210,34 +221,42 @@ export function CocoProvider({ children }: CocoProviderProps) {
 
         // Safe to enable observe-only watchers and pre-warm the seed cache
         // immediately — neither uses the deterministic counter.
+        if (!isLive()) return;
         await initPhase('Coco-bg.safeWatchers', () => CocoManager.enableSafeWatchers());
 
+        if (!isLive()) return;
         bgStage.log('Initializing default mints...');
-        await initPhase('Coco-bg.defaultMints', () => initializeDefaultMints(manager));
+        await initPhase('Coco-bg.defaultMints', () => initializeDefaultMints(chainManager));
 
         // Block NPC sync + the mint-operation processor until the wallet
         // has restored its NUT-13 counter (or proven restore isn't needed).
         // RestoreGate routes the user to /restore when this is pending.
+        if (!isLive()) return;
         bgStage.log('Waiting for wallet restore...');
         await initPhase('Coco-bg.restoreReady', () => awaitRestoreReady(useWalletLifecycleStore));
+        if (!isLive()) return;
         bgStage.log('Starting NPC sync...');
         await initPhase('Coco-bg.npcSync', () => CocoManager.enableNpcSyncAndProcessor());
 
         try {
+          if (!isLive()) return;
           bgStage.log('Recovering pending operations...');
           log.info('coco.recovery.send.start');
-          await initPhase('Coco-bg.sendRecovery', () => manager.ops.send.recovery.run());
+          await initPhase('Coco-bg.sendRecovery', () => chainManager.ops.send.recovery.run());
+          if (!isLive()) return;
           log.info('coco.recovery.send.done');
           log.info('coco.recovery.melt.start');
-          await initPhase('Coco-bg.meltRecovery', () => manager.ops.melt.recovery.run());
+          await initPhase('Coco-bg.meltRecovery', () => chainManager.ops.melt.recovery.run());
+          if (!isLive()) return;
           log.info('coco.recovery.melt.done');
           log.info('coco.recovery.receive.start');
-          await initPhase('Coco-bg.receiveRecovery', () => manager.ops.receive.recovery.run());
+          await initPhase('Coco-bg.receiveRecovery', () => chainManager.ops.receive.recovery.run());
+          if (!isLive()) return;
           log.info('coco.recovery.receive.done');
           // Safe no-op sweep while the NUT-18 incoming saga is unused.
           log.info('coco.recovery.payment_request_receive.start');
           await initPhase('Coco-bg.paymentRequestReceiveRecovery', () =>
-            manager.recoverPendingPaymentRequestReceiveAttempts()
+            chainManager.recoverPendingPaymentRequestReceiveAttempts()
           );
           log.info('coco.recovery.payment_request_receive.done');
         } catch (recoveryErr) {
@@ -248,6 +267,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
           reportCocoApiFailure('ops.*.recovery.run', recoveryErr);
         }
 
+        if (!isLive()) return;
         bgStage.complete();
         initLog('Coco-bg', 'Phase 2 complete');
         log.info('coco.phase2.done');
@@ -302,6 +322,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
     }
 
     return () => {
+      controller.abort();
       if (timeoutHandle) clearTimeout(timeoutHandle);
       unsubscribe?.();
       deferHandle?.cancel();

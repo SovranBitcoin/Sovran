@@ -87,12 +87,22 @@ export function registerKeyDerivation(fn: KeyDerivationFn): void {
   registeredKeyDerivation = fn;
 }
 
-async function flushProfileStoreToDisk(): Promise<void> {
-  const { activeAccountIndex, profiles } = useProfileStore.getState();
+/**
+ * Persist the switch target WITHOUT flipping the in-memory store. The
+ * in-memory flip drives RootLayout's keyed remount
+ * (`key={account-${activeAccountIndex}}`), and a remount before the native
+ * restart boots the new profile in-process — SecureStore reads, coco init,
+ * SQLite migrations, PBKDF2 seed warm — only to race the restart: two full
+ * boots per switch plus a native-crash window with expo-sqlite work in
+ * flight (BTC-13). Persist-first lets the restart boot from the target
+ * directly; the in-memory flip is kept only as the failed-restart fallback.
+ */
+async function persistSwitchTargetToDisk(accountIndex: number): Promise<void> {
+  const { profiles } = useProfileStore.getState();
   await AsyncStorage.setItem(
     'profile-store',
     JSON.stringify({
-      state: { activeAccountIndex, profiles },
+      state: { activeAccountIndex: accountIndex, profiles },
       version: PROFILE_STORE_PERSIST_VERSION,
     })
   );
@@ -143,16 +153,26 @@ export async function switchToExistingProfile(opts: {
     resetStages?.({ holdUntilCancel: true });
     usePopupStore.getState().close();
 
-    await CocoManager.cleanup();
-
-    const switched = useProfileStore.getState().switchProfile(opts.accountIndex);
-    if (!switched) {
+    // Validate the target up front — the same existence check
+    // profileStore.switchProfile performs, done before any teardown.
+    const targetExists = useProfileStore
+      .getState()
+      .profiles.some((p) => p.accountIndex === opts.accountIndex);
+    if (!targetExists) {
       throw new Error(`Target profile does not exist: ${opts.accountIndex}`);
     }
 
-    await flushProfileStoreToDisk();
+    await CocoManager.cleanup();
+
+    // Persist the switch target and restart into it WITHOUT the in-memory
+    // store flip — the flip remounts the whole provider tree and would boot
+    // the new profile in-process, racing the native restart (BTC-13).
+    await persistSwitchTargetToDisk(opts.accountIndex);
     const restarted = await teardownAndRestart();
     if (!restarted) {
+      // Restart unavailable: complete the switch in-process — the remount
+      // boots the new profile, the only boot in this configuration.
+      useProfileStore.getState().switchProfile(opts.accountIndex);
       cancelResetStages?.();
       transitionInFlight = false;
       await endTransition();
@@ -206,14 +226,15 @@ export async function createAndSwitchProfile(opts?: {
     profileStore.addProfile(nextIndex, newKeys.pubkey);
 
     await CocoManager.cleanup();
-    const switched = useProfileStore.getState().switchProfile(nextIndex);
-    if (!switched) {
-      throw new Error(`Failed to activate newly-created profile: ${nextIndex}`);
-    }
-
-    await flushProfileStoreToDisk();
+    // Persist-then-restart without the in-memory flip (BTC-13 — see
+    // switchToExistingProfile); the flip is the failed-restart fallback.
+    await persistSwitchTargetToDisk(nextIndex);
     const restarted = await teardownAndRestart();
     if (!restarted) {
+      const switched = useProfileStore.getState().switchProfile(nextIndex);
+      if (!switched) {
+        throw new Error(`Failed to activate newly-created profile: ${nextIndex}`);
+      }
       cancelResetStages?.();
       transitionInFlight = false;
       await endTransition();

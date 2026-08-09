@@ -820,6 +820,17 @@ export class CocoManager {
   }
 
   /**
+   * Non-throwing instance peek. Used by lifecycle code (e.g. CocoProvider's
+   * phase-2 background chain) to assert the manager it captured is still the
+   * live instance before acting on the statics — a chain orphaned by a
+   * profile-switch remount must not arm watchers/sync on the NEW profile's
+   * manager (BTC-13).
+   */
+  static peekInstance(): Manager | null {
+    return this.instance;
+  }
+
+  /**
    * Check if Manager is initialized
    */
   static isInitialized(): boolean {
