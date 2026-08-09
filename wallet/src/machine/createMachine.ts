@@ -712,6 +712,26 @@ export function createPaymentMachine(
         });
       }
       notify();
+    } else if (
+      step === "selectMint" &&
+      (event.type === "CONFIRM_MELT" ||
+        event.type === "CONFIRM_PAYMENT_REQUEST")
+    ) {
+      // The restore guard failed: the selector was dismissed with no mint
+      // ever chosen, so the machine sits on selectMint while the UI shows
+      // the terminal screen. Never drop the confirm tap silently (BTC-09):
+      // surface "choose a mint" and re-dispatch the selector handler so the
+      // flow can complete instead of dead-ending on an inert Pay button.
+      logger.warn("machine.confirm.noMintSelected", { type: event.type });
+      void notifications?.onMissingMintForAmount?.();
+      try {
+        await dispatchHandler(step, stepData);
+      } finally {
+        handlerExecuting = false;
+        sendLocked = false;
+        notify();
+      }
+      return;
     }
 
     if (
