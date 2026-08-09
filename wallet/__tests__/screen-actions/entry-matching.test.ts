@@ -147,6 +147,60 @@ describe('shouldApplyEntryUpdate — melt preview fallback', () => {
   });
 });
 
+describe('shouldApplyEntryUpdate — preview correlation ids (BTC-08)', () => {
+  // Two back-to-back same-mint same-amount operations used to cross-apply:
+  // while preview #2 was open, settle events for #1 merged into it. The
+  // pre-created melt quote (BTC-05) gives melt previews a unique correlation
+  // id — when one exists, mintUrl+amount must NEVER be used as a fallback.
+
+  it('melt preview with meltQuoteId matches only the update carrying that quoteId', () => {
+    const preview = {
+      id: 'melt-preview-1711500000000',
+      type: 'melt',
+      quoteId: '',
+      state: 'UNPAID',
+      mintUrl: MINT1,
+      amount: 200,
+      metadata: { phase: 'preview', meltQuoteId: 'quote-A' },
+    };
+    const ownUpdate = {
+      id: 'op-A',
+      type: 'melt',
+      quoteId: 'quote-A',
+      state: 'PAID',
+      mintUrl: MINT1,
+      amount: 200,
+      metadata: { operationId: 'op-A' },
+    };
+    // Same mint + same amount, different quote — the BTC-08 cross-match.
+    const otherUpdate = { ...ownUpdate, id: 'op-B', quoteId: 'quote-B', metadata: { operationId: 'op-B' } };
+
+    expect(shouldApplyEntryUpdate(preview, ownUpdate)).toBe(true);
+    expect(shouldApplyEntryUpdate(preview, otherUpdate)).toBe(false);
+  });
+
+  it('melt preview without a quote keeps the mintUrl + amount fallback', () => {
+    const preview = {
+      id: 'melt-preview-1711500000000',
+      type: 'melt',
+      quoteId: '',
+      state: 'UNPAID',
+      mintUrl: MINT1,
+      amount: 200,
+      metadata: { phase: 'preview', meltTarget: 'user@wallet.com' },
+    };
+    const update = {
+      id: 'op-A',
+      type: 'melt',
+      quoteId: 'quote-A',
+      state: 'PAID',
+      mintUrl: MINT1,
+      amount: 200,
+    };
+    expect(shouldApplyEntryUpdate(preview, update)).toBe(true);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Send — operationId matching (existing behavior)
 // ---------------------------------------------------------------------------

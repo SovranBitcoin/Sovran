@@ -643,6 +643,10 @@ export function shouldApplyEntryUpdate(
     const isPreview = currentId?.startsWith("pr-preview-") ?? false;
     if (!isPreview) return false;
 
+    // Preview entries (no operationId yet) match by mintUrl + amount. A
+    // creq-based correlation (like the melt preview's meltQuoteId) is NOT
+    // possible here: coco's send rows don't carry the request string, so
+    // strict matching would drop the preview's own post-confirm updates.
     const cm = getStringField(currentEntry, "mintUrl");
     const um = getStringField(updatedEntry, "mintUrl");
     const ca = getNumberField(currentEntry, "amount");
@@ -668,6 +672,18 @@ export function shouldApplyEntryUpdate(
     // Preview entries (no quoteId yet) match by mintUrl + amount
     const isPreview = currentId?.startsWith("melt-preview-") ?? false;
     if (!isPreview) return false;
+
+    // Quote-first previews (BTC-05) carry the pre-created quote's id in
+    // metadata — a unique correlation id. Match updates by it and NEVER
+    // fall back to mintUrl+amount, which cross-matches same-mint
+    // same-amount operations (BTC-08).
+    const previewQuoteId = getStringField(
+      getMetadata(currentEntry),
+      "meltQuoteId",
+    );
+    if (previewQuoteId) {
+      return uq === previewQuoteId;
+    }
 
     const cm = getStringField(currentEntry, "mintUrl");
     const um = getStringField(updatedEntry, "mintUrl");
