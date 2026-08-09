@@ -362,6 +362,16 @@ MUST:
 - `executeSend`/`executeOfflineSend` never return a tokenless entry; the history
   entry is enriched or synthesized to carry the token.
   `defaultOperations.ts:373-379,399-405`.
+- `executeSend`/`executeOfflineSend`/`executeNfcSend` route execute through
+  `executeSendWithRescue`: when `ops.send.execute` throws after prepare, the
+  prepared operation is cancelled (best-effort, original error rethrown) so
+  proofs never stay reserved and no phantom pending row lingers. The dev
+  mock-fail gate sits inside the rescue so QA exercises it.
+  `defaultOperations.ts:191-238`.
+- `PROOFS_CHOSEN` / `SEND_MEMO_SUBMITTED` are handled only from their owning
+  steps (`chooseProofs` / `enterSendMemo`) and are not in `INTENT_EVENTS` — a
+  stray event must not supersede in-flight resolve work.
+  `transitions.ts:570-596`; `createMachine.ts:194-211`.
 
 MUST NOT:
 
@@ -385,7 +395,9 @@ exception: it routes through `chooseProofs` with a round-DOWN-only suggestion
 ```
 EXECUTE (melt* intent) / AMOUNT_ENTERED(destination=meltQuote)
    -> enterAmount? -> selectMint? (balance + method-aware) -> navigateToMeltPreview
-   -> CONFIRM_MELT -- in place --> operations.executeMelt
+        [quote-first: operations.quoteMelt creates the melt quote BEFORE the
+         preview dispatches; its fee_reserve + quoted amount ride the step data]
+   -> CONFIRM_MELT -- in place --> operations.executeMelt(…, { quoteId })
         success: setStep('navigateToMeltPreview', {...data, historyEntry})  (step STAYS)
         failure: routeOperationFailure -> chooseFallbackOption | ALL_OPTIONS_DISABLED | stay
 ```
@@ -393,6 +405,7 @@ EXECUTE (melt* intent) / AMOUNT_ENTERED(destination=meltQuote)
 | Effect / operation | When | Network |
 | --- | --- | --- |
 | `operations.buildMintListItems` | `selectMint` | conditional |
+| `operations.quoteMelt` | pre-dispatch on `navigateToMeltPreview` (bolt11/lnurl/bolt12; never onchain) | always when configured |
 | `operations.executeMelt` | `CONFIRM_MELT` | always (LNURL resolve + mint) |
 | `operations.rollbackMelt` | screen action `meltQuote.cancel` | conditional |
 
@@ -402,6 +415,17 @@ BIP321 multi-option failure routes to `chooseFallbackOption` (failed option
 disabled) or `error` `ALL_OPTIONS_DISABLED`. If `melt.execute` throws after
 prepare, `executeMelt` cancels the melt operation to release reserved proofs,
 then rethrows.
+
+Quote-first (fee transparency): when `operations.quoteMelt` is provided, routing
+to `navigateToMeltPreview` creates the melt quote up front (LNURL fetch included)
+and attaches `{ quoteId, quoteAmount, feeReserve, unit, method }` to the step
+data and `flowCtx.meltQuotePreview`; the confirm screen renders Amount
+(mint-quoted), Fee, and Total before the Pay tap, and `executeMelt` executes
+against THAT quote — the displayed fee is the charged fee. Quote creation is
+best-effort: a failure navigates without a quote and Pay falls back to creating
+one at execution. A mint/amount/unit/target change invalidates the stored quote
+(`meltQuotePreviewMatches`) and re-quotes. Onchain targets keep the at-execution
+NUT-30 fee picker instead.
 
 MUST:
 
@@ -413,7 +437,17 @@ MUST:
   throw `LNURL_TOR_REQUIRED` up front. `lnurl.ts:115-130,172-177`.
 - On `CONFIRM_MELT` success the step stays `navigateToMeltPreview` with
   `historyEntry` merged. `createMachine.ts:634`; `effects.ts:504-510`.
-- `executeMelt` rejects non-sat units. `defaultOperations.ts:118-121,737`.
+- `FlowContext.amount` is ALWAYS denominated in `ctx.unit`. Scanned fixed
+  amounts (BIP-321 `amount=`, fixed bolt11/bolt12) are sat-denominated, so on a
+  fiat-unit account the seeding arms re-denominate ONCE via the live pricelist
+  (`CreateMachineConfig.getSatsPerUnitMinor`); with no rate (or a sub-minor
+  amount) the amount stays unseeded and the flow bounces to `enterAmount`.
+  Booking raw sats into a fiat context double-converts at execution.
+  `transitions.ts:42-80`.
+- bolt11 decode rounds sub-sat (msat) invoice amounts UP to whole sats — the
+  payer-safe direction; a fractional value would fail the integer-only
+  validator and silently degrade the fixed invoice to amountless.
+  `bolt11.ts:58-66`.
 - `resolveFromContext` meltQuote path errors `MISSING_MELT_TARGET` when
   `ctx.meltTarget` is absent. `contextResolution.ts:363-369`.
 
@@ -431,8 +465,9 @@ MUST NOT:
 Stuck-on-selectMint recovery: if the user dismissed the mint selector opened from
 the preview, `CONFIRM_MELT` restores `navigateToMeltPreview` from ctx -- but ONLY
 when both `flowCtx.mintUrl` and `flowCtx.amount` are truthy
-(`createMachine.ts:565-587`). With no mint chosen yet the Pay tap is silently
-dropped.
+(`createMachine.ts:565-587`). When the guard fails (no mint ever chosen) the
+machine fires `onMissingMintForAmount` and re-dispatches the `selectMint`
+handler — the confirm tap is never silently dropped.
 
 ### 5.3 Mint / top-up (Lightning receive)
 
@@ -589,6 +624,15 @@ MUST:
   amount. `defaultOperations.ts:927-936`.
 - `ctx.supportedMintUrls` is set from `info.mints` ONLY when non-empty.
   `transitions.ts:49,129`.
+- The request's `unit` must equal the flow's active unit — the WalletContext
+  is always the active-unit view and execution prepares proofs in that unit
+  while the payload stamps it. A cross-unit request hard-stops with
+  `UNSUPPORTED_PAYMENT_METHOD` (switch units to pay); the flow unit is never
+  flipped to the request's. `transitions.ts:106-127`.
+- Execution consumes ONLY the machine-validated amount (seeded from the
+  request when valid, else typed by the user) — never re-reads the raw
+  `info.amount` — and asserts request-unit === flow-unit at the money seam.
+  `defaultOperations.ts:1640-1670`.
 
 MUST NOT:
 
@@ -1321,10 +1365,11 @@ Shipped NFC behavior is Section 5.6. The following are intended, not shipped:
   the only bound mint-selector action is `receive.changeNpcMint`,
   `defaultHandlers.ts:470-472`). So the "always allow change mint at confirmation"
   philosophy depends on the app surfacing the global call.
-- Current footgun: if the selector is opened from the preview and dismissed with
-  no mint ever chosen (`flowCtx.mintUrl` absent), a subsequent `CONFIRM_MELT` /
-  `CONFIRM_PAYMENT_REQUEST` tap is SILENTLY DROPPED (`createMachine.ts:565-587`,
-  `transitions.ts:455-457`) -- no error, no recovery prompt.
-- Target: surface a recovery hint instead of silently dropping the confirm tap,
-  and (Section 11.13) optionally open the lightning flow after an ecash rollback
-  for a QR payload that carried one.
+- Resolved footgun: if the selector was opened from the preview and dismissed
+  with no mint ever chosen (`flowCtx.mintUrl` absent), a `CONFIRM_MELT` /
+  `CONFIRM_PAYMENT_REQUEST` tap used to be SILENTLY DROPPED. The machine now
+  fires `onMissingMintForAmount` and re-dispatches the `selectMint` handler —
+  the user is told to pick a mint and the selector reopens
+  (`createMachine.ts:703-727`).
+- Target: (Section 11.13) optionally open the lightning flow after an ecash
+  rollback for a QR payload that carried one.
