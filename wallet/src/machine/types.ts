@@ -107,6 +107,30 @@ export interface RecipientProfile {
   nip05: string | null;
 }
 
+/**
+ * A melt quote created BEFORE the user confirms (BTC-05 quote-first). The
+ * machine creates it when routing to the melt preview so the confirm screen
+ * can show the mint's real `fee_reserve` and the amount+fee total; Pay then
+ * executes against THIS quote (via `executeMelt`'s `options.quoteId`), so the
+ * displayed fee is the charged fee. Preparing the operation (which reserves
+ * proofs) still happens only at Pay time — an abandoned preview's quote
+ * simply expires at the mint.
+ */
+export interface MeltQuotePreview {
+  quoteId: string;
+  /** Mint-quoted amount in minor units of `unit` (the debit basis). */
+  quoteAmount: number;
+  /** Mint `fee_reserve` in minor units of `unit`. */
+  feeReserve: number;
+  unit: string;
+  method: MeltQuoteMethod;
+  /** Inputs the quote was created against — validity matching only. */
+  mintUrl: string;
+  meltTarget: string;
+  /** Flow amount (minor units of `unit`) the quote was created for. */
+  flowAmount: number;
+}
+
 export interface AmountEntryDisplayMetadata {
   inputMode: "unit" | "fiat";
   rawInput: string;
@@ -221,6 +245,12 @@ export interface StepDataMap {
     amount: number;
     recipientPubkey?: string;
     recipientProfile?: RecipientProfile;
+    /**
+     * Pre-created melt quote (see `MeltQuotePreview`). Present when
+     * `operations.quoteMelt` is configured and the quote succeeded; absent on
+     * quote failure (Pay falls back to creating a fresh quote at execution).
+     */
+    meltQuote?: MeltQuotePreview;
     /** Populated after a successful melt so the screen can link to the new transaction. */
     historyEntry?: string;
   };
@@ -373,6 +403,14 @@ export interface FlowContext {
    */
   mintUnreachableConfirmed?: boolean;
   supportedMintUrls?: string[];
+  /**
+   * The pre-created melt quote for the current melt preview (BTC-05). Held
+   * on the context (not only step data) so the CONFIRM_MELT restore path —
+   * which rebuilds preview step data from context after a dismissed mint
+   * selector — keeps the quote. Validity is matched on
+   * (mintUrl, meltTarget, flowAmount, unit) before reuse.
+   */
+  meltQuotePreview?: MeltQuotePreview;
   /**
    * When true, use local proof routing for ecash sends instead of relying on
    * an online swap. Exact local composition can still go straight to token
@@ -935,13 +973,32 @@ export interface MachineOperations {
    * Execute a lightning melt. Called when the user confirms a melt from the
    * preview screen via `confirmMelt()`. The machine routes to the result
    * handler on success or BIP321 fallback / error on failure.
+   *
+   * When `options.quoteId` references a quote previously created via
+   * `quoteMelt` (BTC-05 quote-first), the implementation MUST execute
+   * against that quote — it is the one whose fee the user approved.
    */
   executeMelt?: (
     mintUrl: string,
     meltTarget: string,
     amount: number,
     unit: string,
+    options?: { quoteId?: string },
   ) => Promise<{ historyEntry: string }>;
+  /**
+   * Create a melt quote for display BEFORE the user confirms (BTC-05).
+   * Called by the machine when routing to the melt preview (bolt11/lnurl/
+   * bolt12 targets; onchain keeps its at-execution fee picker). The returned
+   * summary feeds the confirm screen's amount/fee/total rows and is passed
+   * back to `executeMelt` via `options.quoteId`. No proofs are reserved by
+   * this call — that happens in `ops.melt.prepare` at Pay time.
+   */
+  quoteMelt?: (
+    mintUrl: string,
+    meltTarget: string,
+    amount: number,
+    unit: string,
+  ) => Promise<MeltQuotePreview>;
   /**
    * Execute a payment request send. Called when the user confirms from the
    * payment request screen via `confirmPaymentRequest()`. The machine routes

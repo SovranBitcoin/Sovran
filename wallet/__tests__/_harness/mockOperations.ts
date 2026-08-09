@@ -244,6 +244,11 @@ export function createMockOperations(
     // rollbackMelt: cancels a melt operation (no-op in tests)
     rollbackMelt: wrap('rollbackMelt', async () => {}),
 
+    // quoteMelt: pre-creates the melt quote for the preview screen (BTC-05).
+    // No default in tests — when absent the machine keeps the legacy
+    // pay-then-quote shape; suites opt in via overrides.
+    quoteMelt: wrap('quoteMelt', undefined),
+
     // resolveRecipientPubkey / resolveRecipientProfile: optional recipient
     // identity enrichers. No defaults in tests; individual suites opt in.
     resolveRecipientPubkey: wrap('resolveRecipientPubkey', undefined),

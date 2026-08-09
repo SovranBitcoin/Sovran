@@ -1652,6 +1652,7 @@ export function createSovranHandlers({
       unit,
       recipientPubkey,
       recipientProfile,
+      meltQuote,
     }) => {
       paymentLog.info('payment.step.navigate_melt_preview', {
         ...mintUrlLogFields(mintUrl),
@@ -1662,6 +1663,7 @@ export function createSovranHandlers({
         recipientProfilePresent: !!recipientProfile,
         recipientProfileDisplayName: recipientProfile?.displayName ?? null,
         recipientProfileAvatarUrlPresent: !!recipientProfile?.avatarUrl,
+        hasPrecreatedQuote: !!meltQuote,
       });
       // `MeltHistoryEntry.metadata` is typed `Record<string, string>` upstream
       // in `@cashu/coco-core`, so the resolved profile is flattened into
@@ -1690,6 +1692,17 @@ export function createSovranHandlers({
           phase: 'preview',
           meltTarget,
           ...(isOnchain ? { method: 'onchain', onchainAddress: meltTarget } : {}),
+          // Quote-first (BTC-05): the melt quote was created before this
+          // screen rendered — surface its mint-quoted amount + fee so the
+          // user approves the real total. Display-only metadata; Pay
+          // executes against meltQuote.quoteId via the machine's step data.
+          ...(meltQuote
+            ? {
+                meltQuoteId: meltQuote.quoteId,
+                quoteAmount: String(meltQuote.quoteAmount),
+                feeReserve: String(meltQuote.feeReserve),
+              }
+            : {}),
           ...(recipientPubkey ? { recipientPubkey } : {}),
           ...(recipientProfile?.displayName
             ? { recipientDisplayName: recipientProfile.displayName }

@@ -8,6 +8,7 @@ import { buildChooseProofsData, buildProofSuggestions } from './amountFallback';
 import type {
   FlowContext,
   MachineOperations,
+  MeltQuotePreview,
   MintQuoteMethod,
   NotificationHandlerMap,
   NfcIOAdapter,
@@ -143,6 +144,20 @@ export type ConfirmMeltEffectSuccess =
     };
 
 export type ConfirmMeltEffectError = {
+  kind: 'failed';
+  cause: unknown;
+};
+
+export type MeltQuotePreviewEffectSuccess =
+  | {
+      kind: 'completed';
+      quote: MeltQuotePreview;
+    }
+  | {
+      kind: 'stale';
+    };
+
+export type MeltQuotePreviewEffectError = {
   kind: 'failed';
   cause: unknown;
 };
@@ -309,6 +324,12 @@ export interface RunConfirmMeltEffectConfig {
   data: StepDataMap['navigateToMeltPreview'];
   operation: NonNullable<MachineOperations['executeMelt']>;
   context: FlowContext;
+  isStale: (op: string) => boolean;
+}
+
+export interface RunMeltQuotePreviewEffectConfig {
+  data: StepDataMap['navigateToMeltPreview'];
+  operation: NonNullable<MachineOperations['quoteMelt']>;
   isStale: (op: string) => boolean;
 }
 
@@ -1287,11 +1308,19 @@ export function runConfirmMeltEffect({
     amount: data.amount,
     unit: data.unit,
     meltTargetLength: data.meltTarget.length,
+    hasPrecreatedQuote: !!data.meltQuote,
     context: summarizeContext(context),
   });
 
   return ResultAsync.fromThrowable(
-    () => operation(data.mintUrl, data.meltTarget, data.amount, data.unit),
+    // No 5th argument when no pre-created quote exists — legacy callers
+    // (and their call-shape assertions) keep the exact 4-argument form.
+    () =>
+      data.meltQuote
+        ? operation(data.mintUrl, data.meltTarget, data.amount, data.unit, {
+            quoteId: data.meltQuote.quoteId,
+          })
+        : operation(data.mintUrl, data.meltTarget, data.amount, data.unit),
     (cause): ConfirmMeltEffectError => {
       logger.warn('effects.confirmMelt.threw', {
         ...mintUrlFields(data.mintUrl),
@@ -1321,6 +1350,68 @@ export function runConfirmMeltEffect({
         ...mintUrlFields(data.mintUrl),
         amount: data.amount,
         unit: data.unit,
+        error: errField(failure.cause),
+      });
+      return errAsync(failure);
+    });
+}
+
+/**
+ * Create the melt quote for the preview screen (BTC-05 quote-first). The
+ * quote's `fee_reserve` and mint-quoted amount are what the confirm screen
+ * displays; `confirmMelt` later executes against the same quote. Best-effort
+ * by contract of the caller: a failure must NOT block navigation — the
+ * preview degrades to today's pay-then-quote shape instead.
+ */
+export function runMeltQuotePreviewEffect({
+  data,
+  operation,
+  isStale,
+}: RunMeltQuotePreviewEffectConfig): ResultAsync<
+  MeltQuotePreviewEffectSuccess,
+  MeltQuotePreviewEffectError
+> {
+  logger.info('effects.meltQuotePreview.start', {
+    ...mintUrlFields(data.mintUrl),
+    amount: data.amount,
+    unit: data.unit,
+    meltTargetLength: data.meltTarget.length,
+  });
+
+  return ResultAsync.fromThrowable(
+    () => operation(data.mintUrl, data.meltTarget, data.amount, data.unit),
+    (cause): MeltQuotePreviewEffectError => {
+      logger.warn('effects.meltQuotePreview.threw', {
+        ...mintUrlFields(data.mintUrl),
+        amount: data.amount,
+        unit: data.unit,
+        error: errField(cause),
+      });
+      return { kind: 'failed', cause };
+    },
+  )()
+    .andThen((quote) => {
+      if (isStale('quoteMelt')) {
+        logger.info('effects.meltQuotePreview.stale', { op: 'quoteMelt' });
+        return okAsync({ kind: 'stale' } as const);
+      }
+      logger.info('effects.meltQuotePreview.completed', {
+        ...mintUrlFields(data.mintUrl),
+        quoteId: quote.quoteId,
+        quoteAmount: quote.quoteAmount,
+        feeReserve: quote.feeReserve,
+        unit: quote.unit,
+        method: quote.method,
+      });
+      return okAsync({ kind: 'completed' as const, quote });
+    })
+    .orElse((failure) => {
+      if (isStale('quoteMelt.catch')) {
+        logger.info('effects.meltQuotePreview.stale', { op: 'quoteMelt.catch' });
+        return okAsync({ kind: 'stale' } as const);
+      }
+      logger.warn('effects.meltQuotePreview.failed', {
+        ...mintUrlFields(data.mintUrl),
         error: errField(failure.cause),
       });
       return errAsync(failure);

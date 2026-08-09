@@ -863,3 +863,99 @@ describe('createPaymentRequestReceive — single-use invariant', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// quoteMelt + executeMelt pre-created quote reuse (BTC-05)
+// ---------------------------------------------------------------------------
+
+describe('quoteMelt / executeMelt quote-first (BTC-05)', () => {
+  // Shape-only bolt11 string — isLightningInvoiceBolt11 prefix-matches lnbc.
+  const BOLT11_TARGET = 'lnbc210n1pdqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
+
+  function createMeltManager() {
+    const quote = {
+      quoteId: 'q-1',
+      method: 'bolt11',
+      amount: 200,
+      fee_reserve: 2,
+      unit: 'sat',
+    };
+    return {
+      quote,
+      quotes: { melt: { create: vi.fn().mockResolvedValue(quote) } },
+      ops: {
+        melt: {
+          prepare: vi.fn().mockResolvedValue({ id: 'melt-op-1', quoteId: 'q-1' }),
+          execute: vi.fn().mockResolvedValue({
+            id: 'melt-op-1',
+            quoteId: 'q-1',
+            createdAt: 1700000000000,
+            mintUrl: MINT1,
+            amount: 200,
+            state: 'executing',
+          }),
+          cancel: vi.fn(),
+        },
+      },
+    };
+  }
+
+  it('quoteMelt creates the quote up front and returns fee + quoted amount', async () => {
+    const mgr = createMeltManager();
+    const ops = createDefaultOperations({ getManager: () => mgr as unknown as Manager });
+
+    const preview = await ops.quoteMelt!(MINT1, BOLT11_TARGET, 200, 'sat');
+
+    expect(mgr.quotes.melt.create).toHaveBeenCalledTimes(1);
+    expect(mgr.quotes.melt.create).toHaveBeenCalledWith({
+      mintUrl: MINT1,
+      method: 'bolt11',
+      methodData: { invoice: BOLT11_TARGET },
+      unit: 'sat',
+    });
+    expect(preview).toMatchObject({
+      quoteId: 'q-1',
+      quoteAmount: 200,
+      feeReserve: 2,
+      unit: 'sat',
+      method: 'bolt11',
+      mintUrl: MINT1,
+      meltTarget: BOLT11_TARGET,
+      flowAmount: 200,
+    });
+  });
+
+  it('executeMelt with the pre-created quoteId executes THAT quote (no second create)', async () => {
+    const mgr = createMeltManager();
+    const ops = createDefaultOperations({ getManager: () => mgr as unknown as Manager });
+
+    const preview = await ops.quoteMelt!(MINT1, BOLT11_TARGET, 200, 'sat');
+    await ops.executeMelt!(MINT1, BOLT11_TARGET, 200, 'sat', { quoteId: preview.quoteId });
+
+    expect(mgr.quotes.melt.create).toHaveBeenCalledTimes(1);
+    expect(mgr.ops.melt.prepare).toHaveBeenCalledWith({ quote: mgr.quote });
+    expect(mgr.ops.melt.execute).toHaveBeenCalledWith('melt-op-1');
+  });
+
+  it('executeMelt without a quoteId creates a fresh quote (legacy path)', async () => {
+    const mgr = createMeltManager();
+    const ops = createDefaultOperations({ getManager: () => mgr as unknown as Manager });
+
+    await ops.executeMelt!(MINT1, BOLT11_TARGET, 200, 'sat');
+
+    expect(mgr.quotes.melt.create).toHaveBeenCalledTimes(1);
+    expect(mgr.ops.melt.prepare).toHaveBeenCalledWith({ quote: mgr.quote });
+  });
+
+  it('a consumed pre-created quote is never executed twice', async () => {
+    const mgr = createMeltManager();
+    const ops = createDefaultOperations({ getManager: () => mgr as unknown as Manager });
+
+    const preview = await ops.quoteMelt!(MINT1, BOLT11_TARGET, 200, 'sat');
+    await ops.executeMelt!(MINT1, BOLT11_TARGET, 200, 'sat', { quoteId: preview.quoteId });
+    // Second call with the same quoteId falls back to a fresh quote.
+    await ops.executeMelt!(MINT1, BOLT11_TARGET, 200, 'sat', { quoteId: preview.quoteId });
+
+    expect(mgr.quotes.melt.create).toHaveBeenCalledTimes(2);
+  });
+});

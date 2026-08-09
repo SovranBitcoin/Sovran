@@ -8,6 +8,7 @@ import {
   runConfirmMeltEffect,
   runConfirmPaymentRequestEffect,
   runConfirmSendEffect,
+  runMeltQuotePreviewEffect,
   runMintListEnrichmentEffect,
   runMintReviewInfoEffect,
   runMintQuoteEffect,
@@ -18,6 +19,8 @@ import {
   runTrustMintEffect,
 } from "./effects";
 import { transition } from "./transitions";
+import { meltMethodForTarget } from "../melt-target";
+import { meltQuotePreviewMatches } from "./meltQuotePreview";
 import type { UnitAmount } from "../amount-actions";
 import type { MintListItem, PaymentOption } from "../types";
 import type {
@@ -689,6 +692,16 @@ export function createPaymentMachine(
           meltTarget: flowCtx.meltTarget,
           amount: flowCtx.amount,
           unit: flowCtx.unit,
+          // Carry the pre-created quote (BTC-05) so Pay still executes
+          // against the quote whose fee the user saw.
+          ...(meltQuotePreviewMatches(flowCtx.meltQuotePreview, {
+            mintUrl: flowCtx.mintUrl,
+            meltTarget: flowCtx.meltTarget,
+            amount: flowCtx.amount,
+            unit: flowCtx.unit,
+          })
+            ? { meltQuote: flowCtx.meltQuotePreview }
+            : {}),
         });
       } else if (flowCtx.paymentRequest) {
         setStep("navigateToPaymentRequest", {
@@ -1381,8 +1394,7 @@ export function createPaymentMachine(
 
       // Trust mint operation: when MINT_TRUSTED transitions to receiveToken,
       // call operations.trustMint first. On failure, redirect to error.
-      if (reviewMintData && operations?.trustMint && step === "receiveToken") {
-        handlerExecuting = true;
+      if (reviewMintData && operations?.trustMint && step === "receiveToken") {        handlerExecuting = true;
         notify();
 
         const effect = await runTrustMintEffect({
@@ -1399,6 +1411,61 @@ export function createPaymentMachine(
         }
         handlerExecuting = false;
         notify();
+      }
+
+      // Quote-first melt preview (BTC-05): create the melt quote BEFORE the
+      // preview screen renders so the confirm sheet can show the mint's real
+      // fee_reserve and the amount+fee total. Pay executes against THIS
+      // quote, so the displayed fee is the charged fee. Best-effort: when
+      // quote creation fails the preview navigates without one and Pay
+      // falls back to creating a quote at execution. Onchain targets keep
+      // their at-execution fee picker (NUT-30 fee options).
+      if (
+        step === "navigateToMeltPreview" &&
+        operations?.quoteMelt &&
+        meltMethodForTarget(
+          (stepData as StepDataMap["navigateToMeltPreview"]).meltTarget,
+        ) !== "onchain"
+      ) {
+        const data = stepData as StepDataMap["navigateToMeltPreview"];
+        const matching = meltQuotePreviewMatches(
+          flowCtx.meltQuotePreview,
+          data,
+        )
+          ? flowCtx.meltQuotePreview
+          : undefined;
+        if (matching) {
+          if (!data.meltQuote) {
+            setStep("navigateToMeltPreview", { ...data, meltQuote: matching });
+          }
+        } else {
+          handlerExecuting = true;
+          notify();
+          const effect = await runMeltQuotePreviewEffect({
+            data,
+            operation: operations.quoteMelt,
+            isStale: (op) => isStaleGeneration(sendGeneration, op),
+          });
+          if (effect.isOk()) {
+            if (effect.value.kind === "stale") return;
+            flowCtx = { ...flowCtx, meltQuotePreview: effect.value.quote };
+            setStep("navigateToMeltPreview", {
+              ...data,
+              meltQuote: effect.value.quote,
+            });
+          } else {
+            // Degrade to pay-then-quote (pre-quote-first shape) — never
+            // block the preview on a quote failure.
+            if (flowCtx.meltQuotePreview) {
+              flowCtx = { ...flowCtx, meltQuotePreview: undefined };
+            }
+            logger.warn("machine.meltQuotePreview.unavailable", {
+              error: errField(effect.error.cause),
+            });
+          }
+          handlerExecuting = false;
+          notify();
+        }
       }
 
       // Dispatch notification for error steps (fire-and-forget).

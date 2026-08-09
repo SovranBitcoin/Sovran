@@ -21,6 +21,7 @@ import {
   type MeltQuoteOnchainFeeOption as OnchainMeltFeeOption,
 } from "@cashu/cashu-ts";
 import type {
+  BoltMeltQuote,
   Manager,
   Mint,
   ReceiveHistoryEntry,
@@ -604,6 +605,34 @@ export function createDefaultOperations(
           : config.shouldMockFailSend;
     return getter?.() === true;
   };
+
+  // LNURL invoice requests and onchain amountSats are sat-denominated.
+  // A fiat-unit melt's `amount` is minor units (cents) and MUST be
+  // converted — booking cents as sats would pay the wrong amount.
+  const toSatDenominated = (unit: string, minor: number): number => {
+    if (unit === "sat") return minor;
+    const rate = config.getSatsPerUnitMinor?.(unit) ?? null;
+    if (rate == null || rate <= 0) {
+      logger.warn("operations.executeMelt.unitRateUnavailable", { unit });
+      throw new UnitRateUnavailableError(unit);
+    }
+    const sats = Math.round(minor * rate);
+    logger.info("lnurl.convert", { unit, minor, rate, sats });
+    return sats;
+  };
+
+  // Pre-created melt quotes (BTC-05 quote-first): the machine creates the
+  // quote before the confirm screen renders so the user sees fee + total;
+  // Pay then executes against THAT quote, so the displayed fee is the
+  // charged fee. Keyed by quoteId; consumed on use. An abandoned preview's
+  // quote is never prepared (no proofs reserved) and expires at the mint.
+  const precreatedMeltQuotes = new Map<
+    string,
+    {
+      quote: BoltMeltQuote<"bolt11"> | BoltMeltQuote<"bolt12">;
+      bolt11?: string;
+    }
+  >();
 
   return {
     executeSend: async (mintUrl, amount, memo, options) => {
@@ -1291,24 +1320,89 @@ export function createDefaultOperations(
       return trusted;
     },
 
-    executeMelt: async (mintUrl, meltTarget, amount, _unit) => {
+    quoteMelt: async (mintUrl, meltTarget, amount, _unit) => {
       const mgr = requireManager();
       const unit = _unit || "sat";
 
-      // LNURL invoice requests and onchain amountSats are sat-denominated.
-      // A fiat-unit melt's `amount` is minor units (cents) and MUST be
-      // converted — booking cents as sats would pay the wrong amount.
-      const toSatDenominated = (minor: number): number => {
-        if (unit === "sat") return minor;
-        const rate = config.getSatsPerUnitMinor?.(unit) ?? null;
-        if (rate == null || rate <= 0) {
-          logger.warn("operations.executeMelt.unitRateUnavailable", { unit });
-          throw new UnitRateUnavailableError(unit);
-        }
-        const sats = Math.round(minor * rate);
-        logger.info("lnurl.convert", { unit, minor, rate, sats });
-        return sats;
+      // Onchain targets keep their at-execution fee picker (NUT-30
+      // fee_options) — quote-first covers bolt11/lnurl/bolt12 only.
+      const onchainAddress = extractOnchainAddress(meltTarget);
+      if (onchainAddress) {
+        logger.warn("operations.quoteMelt.onchainUnsupported", {
+          ...mintUrlFields(mintUrl),
+        });
+        throw new Error("Onchain melts are quoted at execution time");
+      }
+
+      const bolt12Offer = extractBolt12Offer(meltTarget);
+      if (bolt12Offer) {
+        const quote = await mgr.quotes.melt.create({
+          mintUrl,
+          method: "bolt12",
+          methodData: {
+            offer: bolt12Offer,
+            amountSats: toSatDenominated(unit, amount),
+          },
+          unit,
+        });
+        precreatedMeltQuotes.set(quote.quoteId, { quote });
+        logger.info("operations.quoteMelt.bolt12.created", {
+          ...mintUrlFields(mintUrl),
+          quoteId: quote.quoteId,
+          unit,
+        });
+        return {
+          quoteId: quote.quoteId,
+          quoteAmount: amountToNumber(quote.amount),
+          feeReserve: amountToNumber(quote.fee_reserve),
+          unit: quote.unit ?? unit,
+          method: "bolt12" as const,
+          mintUrl,
+          meltTarget,
+          flowAmount: amount,
+        };
+      }
+
+      const targetKind = isLightningInvoiceBolt11(meltTarget)
+        ? "bolt11"
+        : "lnurl";
+      const bolt11 =
+        targetKind === "bolt11"
+          ? meltTarget
+          : await requestInvoiceFromLnurl(
+              meltTarget,
+              toSatDenominated(unit, amount),
+              { timeoutMs: config.lightningTimeoutMs },
+              config.getLnurlPayExtras,
+            );
+      const quote = await mgr.quotes.melt.create({
+        mintUrl,
+        method: "bolt11",
+        methodData: { invoice: bolt11 },
+        unit,
+      });
+      precreatedMeltQuotes.set(quote.quoteId, { quote, bolt11 });
+      logger.info("operations.quoteMelt.bolt11.created", {
+        ...mintUrlFields(mintUrl),
+        quoteId: quote.quoteId,
+        source: targetKind,
+        unit,
+      });
+      return {
+        quoteId: quote.quoteId,
+        quoteAmount: amountToNumber(quote.amount),
+        feeReserve: amountToNumber(quote.fee_reserve),
+        unit: quote.unit ?? unit,
+        method: "bolt11" as const,
+        mintUrl,
+        meltTarget,
+        flowAmount: amount,
       };
+    },
+
+    executeMelt: async (mintUrl, meltTarget, amount, _unit, options) => {
+      const mgr = requireManager();
+      const unit = _unit || "sat";
 
       // Onchain targets (bare address or bitcoin:/BIP-321 URI) take the
       // onchain melt path; everything else is Lightning (bolt11 or lnurl).
@@ -1318,11 +1412,22 @@ export function createDefaultOperations(
           mintUrl,
           address: onchainAddress,
           amount,
-          amountSats: toSatDenominated(amount),
+          amountSats: toSatDenominated(unit, amount),
           unit,
           selectFeeIndex: config.selectOnchainFeeIndex,
           mockFail: mockFailEnabled("melt"),
         });
+      }
+
+      // BTC-05 quote-first: a quote pre-created for the preview is executed
+      // as-is — the user approved its fee. Consumed on use; when absent
+      // (quote creation failed at preview, or a legacy caller) a fresh quote
+      // is created below as before.
+      const precreated = options?.quoteId
+        ? precreatedMeltQuotes.get(options.quoteId)
+        : undefined;
+      if (options?.quoteId) {
+        precreatedMeltQuotes.delete(options.quoteId);
       }
 
       // BOLT-12 offer (`lno1…` or bitcoin:?lno=) — quote-first via coco's
@@ -1336,17 +1441,26 @@ export function createDefaultOperations(
           amount,
           unit,
           offerLength: bolt12Offer.length,
+          precreated: !!precreated,
         });
-        const quote = await mgr.quotes.melt.create({
-          mintUrl,
-          method: "bolt12",
-          methodData: { offer: bolt12Offer, amountSats: toSatDenominated(amount) },
-          unit,
-        });
+        const stashedBolt12 = precreated?.quote;
+        const quote =
+          stashedBolt12 && stashedBolt12.method === "bolt12"
+            ? stashedBolt12
+            : await mgr.quotes.melt.create({
+                mintUrl,
+                method: "bolt12",
+                methodData: {
+                  offer: bolt12Offer,
+                  amountSats: toSatDenominated(unit, amount),
+                },
+                unit,
+              });
         logger.info("operations.executeMelt.bolt12.quoteCreated", {
           ...mintUrlFields(mintUrl),
           quoteId: quote.quoteId,
           unit,
+          precreated: !!precreated,
         });
         const operation = await mgr.ops.melt.prepare({ quote });
         const result = await executeMeltWithRescue(mgr, operation, {
@@ -1365,35 +1479,43 @@ export function createDefaultOperations(
         unit,
         targetKind,
         targetLength: meltTarget.length,
+        precreated: !!precreated,
       });
 
       const bolt11 =
-        targetKind === "bolt11"
+        precreated?.bolt11 ??
+        (targetKind === "bolt11"
           ? meltTarget
           : await requestInvoiceFromLnurl(
               meltTarget,
-              toSatDenominated(amount),
+              toSatDenominated(unit, amount),
               { timeoutMs: config.lightningTimeoutMs },
               config.getLnurlPayExtras,
-            );
+            ));
       logger.info("operations.executeMelt.invoiceReady", {
         ...mintUrlFields(mintUrl),
         amount,
         source: targetKind,
         invoiceLength: bolt11.length,
+        precreated: !!precreated,
       });
 
       // v2 quote-first: canonical melt quote row, then the durable operation.
-      const quote = await mgr.quotes.melt.create({
-        mintUrl,
-        method: "bolt11",
-        methodData: { invoice: bolt11 },
-        unit,
-      });
+      const stashedBolt11 = precreated?.quote;
+      const quote =
+        stashedBolt11 && stashedBolt11.method === "bolt11"
+          ? stashedBolt11
+          : await mgr.quotes.melt.create({
+              mintUrl,
+              method: "bolt11",
+              methodData: { invoice: bolt11 },
+              unit,
+            });
       logger.info("operations.executeMelt.quoteCreated", {
         ...mintUrlFields(mintUrl),
         quoteId: quote.quoteId,
         unit,
+        precreated: !!precreated,
       });
       const operation = await mgr.ops.melt.prepare({ quote });
       logger.info("operations.executeMelt.execute", {

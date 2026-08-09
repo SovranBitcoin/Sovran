@@ -188,11 +188,20 @@ export function LightningSendScreen({
   const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
   const isPaid = isMeltQuotePaid(entry);
   const isReadyToPay = isMeltQuoteReadyToPay(entry);
+  // Quote-first (BTC-05): the preview carries the mint-quoted amount +
+  // fee_reserve created BEFORE the Pay tap. Amount/fee/total render from the
+  // quote so approved == charged; without a quote (creation failed) the
+  // screen degrades to the typed amount only.
+  const metadataRecord = (entry.metadata ?? {}) as Record<string, unknown>;
+  const quoteAmount = Number(metadataRecord.quoteAmount);
+  const feeReserve = Number(metadataRecord.feeReserve);
+  const hasQuoteFee = Number.isFinite(quoteAmount) && Number.isFinite(feeReserve) && isPreview;
   log.debug('send.lightning.render', {
     state: entry.state,
     isPreview,
     amount: entry.amount,
     unit: entry.unit,
+    hasQuoteFee,
   });
 
   const bottomButtons = (
@@ -300,7 +309,21 @@ export function LightningSendScreen({
             value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />,
           },
           { title: 'Date', value: entry.createdAt.datetime },
-          { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+          {
+            title: 'Amount',
+            value: formatAmount({
+              amount: hasQuoteFee ? quoteAmount : entry.amount,
+              unit: entry.unit,
+            }),
+          },
+          hasQuoteFee && {
+            title: 'Fee',
+            value: formatAmount({ amount: feeReserve, unit: entry.unit }),
+          },
+          hasQuoteFee && {
+            title: 'Total',
+            value: formatAmount({ amount: quoteAmount + feeReserve, unit: entry.unit }),
+          },
           { title: 'State', value: entry.state },
           entry.quoteId && {
             title: 'Quote ID',
