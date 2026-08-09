@@ -36,6 +36,7 @@ import { CopyableValue } from '@/shared/ui/composed/CopyableValue';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { formatAmount } from '@/shared/lib/currency';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
@@ -196,6 +197,11 @@ export function LightningSendScreen({
   const quoteAmount = Number(metadataRecord.quoteAmount);
   const feeReserve = Number(metadataRecord.feeReserve);
   const hasQuoteFee = Number.isFinite(quoteAmount) && Number.isFinite(feeReserve) && isPreview;
+  // BTC-06: a fiat-unit melt settles at the MINT's FX rate, not the app's
+  // pricelist — so the mint-quoted debit can differ from the typed amount.
+  // When it does, show both: silently swapping the figure would hide the
+  // spread exactly when it matters.
+  const quoteDiverges = hasQuoteFee && quoteAmount !== amountToNumber(entry.amount);
   log.debug('send.lightning.render', {
     state: entry.state,
     isPreview,
@@ -309,6 +315,10 @@ export function LightningSendScreen({
             value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />,
           },
           { title: 'Date', value: entry.createdAt.datetime },
+          quoteDiverges && {
+            title: 'Requested',
+            value: formatAmount({ amount: entry.amount, unit: entry.unit }),
+          },
           {
             title: 'Amount',
             value: formatAmount({
