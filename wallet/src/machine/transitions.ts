@@ -131,7 +131,12 @@ function handleExecute(
     case "meltLightningInvoice":
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
-        ctx.amount = intent.option.amount;
+        seedScannedSatAmount(
+          ctx,
+          intent.option.amount,
+          "meltLightningInvoice",
+          getSatsPerUnitMinor,
+        );
       } else if (intent.option.amount != null) {
         logger.warn("transitions.execute.invalidAmount", {
           source: "meltLightningInvoice",
@@ -231,7 +236,12 @@ function handleOptionChosen(
     case "meltLightningInvoice":
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
-        ctx.amount = intent.option.amount;
+        seedScannedSatAmount(
+          ctx,
+          intent.option.amount,
+          "meltLightningInvoice",
+          getSatsPerUnitMinor,
+        );
       } else if (intent.option.amount != null) {
         logger.warn("transitions.optionChosen.invalidAmount", {
           source: "meltLightningInvoice",

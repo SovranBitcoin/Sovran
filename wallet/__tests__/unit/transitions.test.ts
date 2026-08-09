@@ -360,6 +360,102 @@ describe('transition — EXECUTE scanned fixed amounts on fiat units', () => {
 });
 
 // ---------------------------------------------------------------------------
+// EXECUTE — fixed bolt11 invoices on fiat-unit accounts (BTC-03)
+// ---------------------------------------------------------------------------
+
+/**
+ * A scanned fixed bolt11 is sat-denominated like any other scanned target.
+ * On a fiat-unit account, seeding the sats raw made the preview render them
+ * as fiat minor units (1,000 sats → "$10.00") and compared them against
+ * fiat-denominated balances/capability bounds. Seeding converts once, so the
+ * confirm screen shows the invoice's fiat equivalent and every gate compares
+ * like units. (The invoice itself pins the wire amount — this was a
+ * display/gating bug, not a wrong-amount send.)
+ */
+describe('transition — EXECUTE fixed bolt11 on fiat units', () => {
+  // 10 sats per usd-cent (≈ $100k/BTC).
+  const tenSatsPerCent = () => 10;
+
+  const usdBolt11Wallet: WalletContext = {
+    trustedMintUrls: [MINT1],
+    mintBalances: { [MINT1]: 100_000 }, // 100,000¢
+    preferredMintUrl: MINT1,
+    proofAmounts: {},
+    mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints(
+      [
+        {
+          mintUrl: MINT1,
+          mintInfo: {
+            nuts: { '5': { methods: [{ method: 'bolt11', unit: 'usd' }] } },
+          },
+        },
+      ],
+      'usd'
+    ),
+  };
+
+  it('re-denominates the invoice amount into the active fiat unit once', () => {
+    // bolt11WithAmount = 250,000 sats → 25,000¢ at 10 sats/¢.
+    const result = tx(
+      'idle',
+      { unit: 'usd' },
+      { type: 'EXECUTE', input: INPUTS.bolt11WithAmount },
+      usdBolt11Wallet,
+      { unit: 'usd', getSatsPerUnitMinor: tenSatsPerCent }
+    );
+
+    expect(result.step).toBe('navigateToMeltPreview');
+    expect(result.context.unit).toBe('usd');
+    expect(result.context.amount).toBe(25_000);
+    expect(result.data).toMatchObject({ amount: 25_000, unit: 'usd' });
+  });
+
+  it('balance gating compares like units (no false insufficient-balance)', () => {
+    // 30,000¢ balance covers a 25,000¢ invoice but NOT 250,000 raw sats —
+    // the pre-fix cross-unit gate would wrongly reject this invoice.
+    const wallet: WalletContext = {
+      ...usdBolt11Wallet,
+      mintBalances: { [MINT1]: 30_000 },
+    };
+    const result = tx(
+      'idle',
+      { unit: 'usd' },
+      { type: 'EXECUTE', input: INPUTS.bolt11WithAmount },
+      wallet,
+      { unit: 'usd', getSatsPerUnitMinor: tenSatsPerCent }
+    );
+
+    expect(result.step).toBe('navigateToMeltPreview');
+  });
+
+  it('bounces to amount entry when no fiat rate is available', () => {
+    const result = tx(
+      'idle',
+      { unit: 'usd' },
+      { type: 'EXECUTE', input: INPUTS.bolt11WithAmount },
+      usdBolt11Wallet,
+      { unit: 'usd' }
+    );
+
+    expect(result.step).toBe('enterAmount');
+    expect(result.context.amount).toBeUndefined();
+  });
+
+  it('keeps sat seeding untouched on a sat-unit account', () => {
+    const result = tx(
+      'idle',
+      idle,
+      { type: 'EXECUTE', input: INPUTS.bolt11WithAmount },
+      WALLETS.default,
+      { getSatsPerUnitMinor: tenSatsPerCent }
+    );
+
+    expect(result.context.unit).toBe('sat');
+    expect(result.context.amount).toBe(250_000);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // EXECUTE — wallet state variations
 // ---------------------------------------------------------------------------
 
