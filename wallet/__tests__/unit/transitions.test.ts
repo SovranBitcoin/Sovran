@@ -526,6 +526,60 @@ describe('transition — cross-unit payment requests', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Event gating (BTC-12)
+// ---------------------------------------------------------------------------
+
+describe('transition — event gating', () => {
+  it('ignores PROOFS_CHOSEN outside the chooseProofs step', () => {
+    // A stray/double-fired proofs callback mid-flow must not supersede the
+    // current step (previously it dereferenced ctx.mintUrl! and forced a
+    // bogus confirmSend/error state).
+    const result = tx(
+      'enterAmount',
+      { ...idle },
+      { type: 'PROOFS_CHOSEN', amount: 100 }
+    );
+    expect(result.step).toBe('enterAmount');
+  });
+
+  it('ignores SEND_MEMO_SUBMITTED outside the enterSendMemo step', () => {
+    const result = tx(
+      'enterAmount',
+      { ...idle, amount: 100, mintUrl: MINT1 },
+      { type: 'SEND_MEMO_SUBMITTED', memo: 'hello' }
+    );
+    expect(result.step).toBe('enterAmount');
+    expect(result.context.memo).toBeUndefined();
+  });
+
+  it('keeps the full constraint set on the AMOUNT_ENTERED unit-mismatch recovery', () => {
+    // A payment-request flow that hits the unit guard (stale draft across a
+    // unit switch) must re-render with the request's mint allow-list and
+    // context intact — not a bare destination.
+    const ctx: FlowContext = {
+      unit: 'usd',
+      destination: 'paymentRequest',
+      paymentRequest: 'creqAtest',
+      supportedMintUrls: [MINT1],
+      entrySource: 'scan',
+    };
+    const result = tx(
+      'enterAmount',
+      ctx,
+      { type: 'AMOUNT_ENTERED', amount: 500, unit: 'sat', mintUrl: MINT1 }
+    );
+
+    expect(result.step).toBe('enterAmount');
+    const data = result.data as { constraints: Record<string, unknown> };
+    expect(data.constraints.destination).toBe('paymentRequest');
+    expect(data.constraints.supportedMintUrls).toEqual([MINT1]);
+    expect(data.constraints.paymentRequest).toBe('creqAtest');
+    expect(data.constraints.entrySource).toBe('scan');
+    expect(data.constraints.methodContext).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // EXECUTE — wallet state variations
 // ---------------------------------------------------------------------------
 

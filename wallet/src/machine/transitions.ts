@@ -1,5 +1,6 @@
 import { resolveIntent } from "../intent";
 import { logger, mintUrlFields } from "../logger";
+import { createAmountEntryMethodContext } from "../mint-capabilities";
 import { parsePaymentInput } from "../parse";
 import { isValidSatAmount } from "../guards";
 import { normalizeNostrPubkey } from "../recipient";
@@ -353,11 +354,24 @@ function handleAmountEntered(
       data: {
         unit: currentCtx.unit,
         constraints: {
+          // Rebuild the FULL constraint set (BTC-12): dropping
+          // supportedMintUrls / paymentRequest / methodContext here lost a
+          // payment-request flow's mint allow-list (and more) on the retry.
           destination: event.destination ?? currentCtx.destination ?? "sendEcash",
+          ...(currentCtx.supportedMintUrls
+            ? { supportedMintUrls: currentCtx.supportedMintUrls }
+            : {}),
+          ...(currentCtx.paymentRequest
+            ? { paymentRequest: currentCtx.paymentRequest }
+            : {}),
           meltTarget: currentCtx.meltTarget,
           recipientPubkey: currentCtx.recipientPubkey,
           recipientProfile: currentCtx.recipientProfile,
           p2pkLockPubkey: currentCtx.p2pkLockPubkey,
+          methodContext: createAmountEntryMethodContext(walletCtx),
+          ...(currentCtx.entrySource
+            ? { entrySource: currentCtx.entrySource }
+            : {}),
         },
       },
     };
@@ -633,8 +647,6 @@ export function transition(
       return stamp({ step: "idle", context: { unit }, data: {} as any });
     case "REQUEST_MINT_SELECTOR":
       return stamp(requestMintSelector(event, currentCtx, walletCtx));
-    case "SEND_MEMO_SUBMITTED":
-      return stamp(handleSendMemoSubmitted(event, currentCtx));
     case "START_SEND_ECASH":
       logger.info("transitions.startSendEcash", {
         unit,
@@ -714,9 +726,26 @@ export function transition(
         handleMintSelected(event, currentCtx, walletCtx, enableEcashSendMemo),
       );
     case "PROOFS_CHOSEN":
+      // Only valid from the machine-rendered proof sheet — accepted from any
+      // other step it dereferences a mint/amount the context may not have and
+      // supersedes in-flight resolve work (BTC-12).
+      if (currentStep !== "chooseProofs") {
+        logger.warn("transitions.proofsChosen.wrongStep", {
+          currentStep,
+          amount: event.amount,
+        });
+        return stamp({ step: currentStep, context: currentCtx, data: {} as any });
+      }
       return stamp(
         handleProofsChosen(event, currentCtx, walletCtx, enableEcashSendMemo),
       );
+    case "SEND_MEMO_SUBMITTED":
+      // Same gating: only the memo prompt's own step may consume it (BTC-12).
+      if (currentStep !== "enterSendMemo") {
+        logger.warn("transitions.sendMemoSubmitted.wrongStep", { currentStep });
+        return stamp({ step: currentStep, context: currentCtx, data: {} as any });
+      }
+      return stamp(handleSendMemoSubmitted(event, currentCtx));
   }
 
   // Unhandled events (e.g. CONFIRM_MELT, CONFIRM_PAYMENT_REQUEST that

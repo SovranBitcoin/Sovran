@@ -196,8 +196,10 @@ const INTENT_EVENTS = new Set<import("./types").FlowEvent["type"]>([
   "OPTION_CHOSEN",
   "AMOUNT_ENTERED",
   "MINT_SELECTED",
-  "PROOFS_CHOSEN",
-  "SEND_MEMO_SUBMITTED",
+  // PROOFS_CHOSEN and SEND_MEMO_SUBMITTED are deliberately absent: they are
+  // responses to machine-rendered steps (chooseProofs / enterSendMemo), not
+  // fresh intent — accepted mid-resolve they superseded in-flight work and
+  // could force a bogus error state (BTC-12).
   "REQUEST_MINT_SELECTOR",
   "START_SEND_ECASH",
   "START_SEND",
@@ -1310,6 +1312,12 @@ export function createPaymentMachine(
           });
           handlerExecuting = true;
           notify();
+          // NOTE: deliberately NOT enrolled in the commit generation — the
+          // back-nav resubmit flow (INTENT_EVENTS supersede) is the designed
+          // behavior for quote creation (see back-nav-reentry tests): the
+          // stale continuation is discarded via isStaleGeneration, and the
+          // superseded quote simply expires at the mint. coco exposes no
+          // mint-quote cancel, so a hard commit would only break re-entry.
           const effect = await runMintQuoteEffect({
             data,
             operations,
@@ -1345,6 +1353,8 @@ export function createPaymentMachine(
           });
           handlerExecuting = true;
           notify();
+          // Deliberately NOT commit-generation enrolled — same rationale as
+          // createMintQuote above (supersede-on-resubmit is designed).
           const effect = await runPaymentRequestReceiveEffect({
             data,
             operations,
