@@ -98,8 +98,8 @@ const STATIC_POPUPS = {
     type: 'error',
   },
   'wallet-still-loading': {
-    message: 'Wallet is still loading',
-    text: 'Please wait for the wallet to finish loading before switching profiles.',
+    message: 'Wallet is still syncing',
+    text: 'The wallet is finishing background work — try again in a few seconds.',
     icon: 'icon:mdi:clock-outline',
     type: 'info',
   },

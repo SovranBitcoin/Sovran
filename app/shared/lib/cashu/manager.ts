@@ -842,12 +842,34 @@ export class CocoManager {
    * Used by profile switching to determine if it's safe to tear down.
    */
   static isReadyForCleanup(): boolean {
-    return (
-      this.instance !== null &&
-      !this.pendingInit &&
-      !this.pendingCleanup &&
-      !this.isBackgroundRunning
-    );
+    return this.getCleanupReadiness().ready;
+  }
+
+  /**
+   * Component breakdown behind isReadyForCleanup — the profile-switch
+   * refusal log needs WHICH condition is blocking, not a bare false (BTC-14).
+   */
+  static getCleanupReadiness(): {
+    hasInstance: boolean;
+    initInFlight: boolean;
+    cleanupInFlight: boolean;
+    backgroundRunning: boolean;
+    ready: boolean;
+  } {
+    const parts = {
+      hasInstance: this.instance !== null,
+      initInFlight: this.pendingInit !== null,
+      cleanupInFlight: this.pendingCleanup !== null,
+      backgroundRunning: this.isBackgroundRunning,
+    };
+    return {
+      ...parts,
+      ready:
+        parts.hasInstance &&
+        !parts.initInFlight &&
+        !parts.cleanupInFlight &&
+        !parts.backgroundRunning,
+    };
   }
 
   /**
@@ -935,6 +957,12 @@ export class CocoManager {
         cashuLog.info('cashu.manager.cleanup_done');
       } catch (error) {
         cashuLog.error('cashu.manager.cleanup_failed', { error });
+        // Null the instance on a partially-failed cleanup too — leaving it
+        // set makes the next initialize() hand out a disposed Manager
+        // (reuse-after-dispose: every guarded coco call then throws
+        // "Cannot … after disposal has started"). The DB is closed and
+        // sensitive state cleared either way; the instance is unusable.
+        this.instance = null;
         if (this.db) {
           try {
             await this.db.closeAsync();

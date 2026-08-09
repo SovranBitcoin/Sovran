@@ -122,6 +122,36 @@ async function teardownAndRestart(): Promise<boolean> {
 // ── Synchronous in-memory guard (supplements the async AsyncStorage guard) ──
 let transitionInFlight = false;
 
+/**
+ * coco's Manager.dispose() → NPC plugin shutdown awaits any in-flight sync
+ * with NO timeout (BTC-14): a stalled sync would pin the profile switch on
+ * the transition splash until the user force-kills (reported as a crash).
+ * Bound the teardown wait — the native restart that follows reclaims
+ * everything native-side anyway.
+ */
+const COCO_CLEANUP_TIMEOUT_MS = 5_000;
+
+async function cleanupCocoWithTimeout(): Promise<void> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  try {
+    await Promise.race([
+      CocoManager.cleanup(),
+      new Promise<void>((resolve) => {
+        timeoutHandle = setTimeout(() => {
+          log.warn('profile.orchestrator.cleanup_timeout', {
+            timeoutMs: COCO_CLEANUP_TIMEOUT_MS,
+          });
+          resolve();
+        }, COCO_CLEANUP_TIMEOUT_MS);
+      }),
+    ]);
+  } catch (error) {
+    log.warn('profile.orchestrator.cleanup_failed', { error: redactError(error) });
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+}
+
 // ── Public API ───────────────────────────────────────────────────
 
 export async function switchToExistingProfile(opts: {
@@ -134,8 +164,10 @@ export async function switchToExistingProfile(opts: {
     return false;
   }
   if (!CocoManager.isReadyForCleanup()) {
+    // Log the full component breakdown so a "switch did nothing" report says
+    // WHICH condition blocked it (BTC-14).
     log.warn('profile.orchestrator.switch_blocked_coco_not_ready', {
-      isInitialized: CocoManager.isInitialized(),
+      ...CocoManager.getCleanupReadiness(),
     });
     return false;
   }
@@ -162,7 +194,7 @@ export async function switchToExistingProfile(opts: {
       throw new Error(`Target profile does not exist: ${opts.accountIndex}`);
     }
 
-    await CocoManager.cleanup();
+    await cleanupCocoWithTimeout();
 
     // Persist the switch target and restart into it WITHOUT the in-memory
     // store flip — the flip remounts the whole provider tree and would boot
@@ -225,7 +257,7 @@ export async function createAndSwitchProfile(opts?: {
 
     profileStore.addProfile(nextIndex, newKeys.pubkey);
 
-    await CocoManager.cleanup();
+    await cleanupCocoWithTimeout();
     // Persist-then-restart without the in-memory flip (BTC-13 — see
     // switchToExistingProfile); the flip is the failed-restart fallback.
     await persistSwitchTargetToDisk(nextIndex);

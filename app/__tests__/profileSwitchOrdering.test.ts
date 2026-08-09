@@ -112,3 +112,39 @@ describe('switchToExistingProfile — persist-before-restart (BTC-13)', () => {
     expect(mockRestart).not.toHaveBeenCalled();
   });
 });
+
+describe('switchToExistingProfile — bounded teardown (BTC-14)', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('a hung coco cleanup does not pin the switch — restart proceeds', async () => {
+    jest.resetModules();
+    jest.clearAllMocks();
+    const { CocoManager } = require('@/shared/lib/cashu/manager') as {
+      CocoManager: Record<string, jest.Mock>;
+    };
+    // The NPC plugin's shutdown awaits in-flight sync forever — simulate.
+    CocoManager.cleanup.mockReturnValue(new Promise(() => {}));
+    CocoManager.isReadyForCleanup.mockReturnValue(true);
+
+    const orchestrator = require('@/shared/lib/profile/profileSessionOrchestrator') as typeof import('@/shared/lib/profile/profileSessionOrchestrator');
+    const { useProfileStore } = require('@/shared/stores/global/profileStore') as typeof import('@/shared/stores/global/profileStore');
+    const { restartApp } = require('@/shared/lib/profile/appRestart') as typeof import('@/shared/lib/profile/appRestart');
+    useProfileStore.setState({
+      activeAccountIndex: 0,
+      profiles: [
+        { accountIndex: 0, pubkey: 'a'.repeat(64), addedAt: 1 },
+        { accountIndex: 1, pubkey: 'b'.repeat(64), addedAt: 2 },
+      ],
+    } as never);
+    jest.mocked(restartApp).mockResolvedValue(true);
+
+    const pending = orchestrator.switchToExistingProfile({ accountIndex: 1 });
+    // Let the pre-cleanup awaits settle, then push past the 5s timeout.
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(6_000);
+
+    await expect(pending).resolves.toBe(true);
+    expect(jest.mocked(restartApp)).toHaveBeenCalled();
+  });
+});
