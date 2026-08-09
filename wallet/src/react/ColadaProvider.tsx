@@ -150,6 +150,14 @@ export interface ColadaProviderProps {
    * mounted. Without this getter (and no explicit binding), 'sat' is used.
    */
   getUnit?: () => string;
+  /**
+   * Sats per one minor unit of a fiat wallet unit (e.g. sats per usd-cent),
+   * from the wallet's live pricelist. Re-denominates scanned fixed sat
+   * amounts into the active unit at seeding time — see
+   * `CreateMachineConfig.getSatsPerUnitMinor`. Flat prop wins over the
+   * instance's config, mirroring the other getter props.
+   */
+  getSatsPerUnitMinor?: (unit: string) => number | null;
   enableEcashSendMemo?: boolean;
   getBtcPrice?: () => number;
   getDisplayCurrency?: () => { code: string; symbol: string } | null;
@@ -309,6 +317,7 @@ export function ColadaProvider({
   screenActionsBridge,
   getOffline: getOfflineProp,
   getUnit: getUnitProp,
+  getSatsPerUnitMinor: getSatsPerUnitMinorProp,
   enableEcashSendMemo: enableEcashSendMemoProp,
   getBtcPrice: getBtcPriceProp,
   getDisplayCurrency: getDisplayCurrencyProp,
@@ -387,7 +396,7 @@ export function ColadaProvider({
     enableEcashSendMemoProp ?? ic?.enableEcashSendMemo ?? false;
   const getBtcPrice = getBtcPriceProp ?? ic?.getBtcPrice;
   const getDisplayCurrency = getDisplayCurrencyProp ?? ic?.getDisplayCurrency;
-  const getSatsPerUnitMinor = ic?.getSatsPerUnitMinor;
+  const getSatsPerUnitMinor = getSatsPerUnitMinorProp ?? ic?.getSatsPerUnitMinor;
   const writeClipboard = clipboardAdapter?.writeText;
   const shareContent = shareAdapter
     ? (content: { message: string; url?: string }) =>

@@ -98,9 +98,10 @@ const PersistedProfileStore = z.object({
 });
 
 /**
- * Persisted schema version. Exported so `flushProfileStoreToDisk` — which
- * hand-writes the blob during a profile switch — stamps the same version the
- * store declares, instead of forcing a needless migrate on every restart.
+ * Persisted schema version. Exported so the profile-session orchestrator —
+ * which hand-writes the blob during a profile switch — stamps the same
+ * version the store declares, instead of forcing a needless migrate on every
+ * restart.
  */
 export const PROFILE_STORE_PERSIST_VERSION = 2;
 

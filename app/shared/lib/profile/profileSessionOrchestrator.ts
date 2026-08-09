@@ -16,6 +16,7 @@
  * the drawer/sheet all the way to the orchestrator.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ResultAsync } from 'neverthrow';
 
 import { log, redactError } from '../logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -97,14 +98,17 @@ export function registerKeyDerivation(fn: KeyDerivationFn): void {
  * flight (BTC-13). Persist-first lets the restart boot from the target
  * directly; the in-memory flip is kept only as the failed-restart fallback.
  */
-async function persistSwitchTargetToDisk(accountIndex: number): Promise<void> {
+function persistSwitchTargetToDisk(accountIndex: number): ResultAsync<void, Error> {
   const { profiles } = useProfileStore.getState();
-  await AsyncStorage.setItem(
-    'profile-store',
-    JSON.stringify({
-      state: { activeAccountIndex: accountIndex, profiles },
-      version: PROFILE_STORE_PERSIST_VERSION,
-    })
+  return ResultAsync.fromPromise(
+    AsyncStorage.setItem(
+      'profile-store',
+      JSON.stringify({
+        state: { activeAccountIndex: accountIndex, profiles },
+        version: PROFILE_STORE_PERSIST_VERSION,
+      })
+    ),
+    (error) => (error instanceof Error ? error : new Error(String(error)))
   );
 }
 
@@ -199,7 +203,10 @@ export async function switchToExistingProfile(opts: {
     // Persist the switch target and restart into it WITHOUT the in-memory
     // store flip — the flip remounts the whole provider tree and would boot
     // the new profile in-process, racing the native restart (BTC-13).
-    await persistSwitchTargetToDisk(opts.accountIndex);
+    const persisted = await persistSwitchTargetToDisk(opts.accountIndex);
+    if (persisted.isErr()) {
+      throw persisted.error;
+    }
     const restarted = await teardownAndRestart();
     if (!restarted) {
       // Restart unavailable: complete the switch in-process — the remount
@@ -260,7 +267,10 @@ export async function createAndSwitchProfile(opts?: {
     await cleanupCocoWithTimeout();
     // Persist-then-restart without the in-memory flip (BTC-13 — see
     // switchToExistingProfile); the flip is the failed-restart fallback.
-    await persistSwitchTargetToDisk(nextIndex);
+    const persisted = await persistSwitchTargetToDisk(nextIndex);
+    if (persisted.isErr()) {
+      throw persisted.error;
+    }
     const restarted = await teardownAndRestart();
     if (!restarted) {
       const switched = useProfileStore.getState().switchProfile(nextIndex);

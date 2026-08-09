@@ -191,12 +191,14 @@ export function LightningSendScreen({
   const isReadyToPay = isMeltQuoteReadyToPay(entry);
   // Quote-first (BTC-05): the preview carries the mint-quoted amount +
   // fee_reserve created BEFORE the Pay tap. Amount/fee/total render from the
-  // quote so approved == charged; without a quote (creation failed) the
-  // screen degrades to the typed amount only.
+  // quote so approved == charged; the metadata survives the preview→paid
+  // merge, so the settled screen keeps showing the fee that was charged.
+  // Without a quote (creation failed) the screen degrades to the typed
+  // amount; history re-opens carry no fee metadata and show neither row.
   const metadataRecord = (entry.metadata ?? {}) as Record<string, unknown>;
   const quoteAmount = Number(metadataRecord.quoteAmount);
   const feeReserve = Number(metadataRecord.feeReserve);
-  const hasQuoteFee = Number.isFinite(quoteAmount) && Number.isFinite(feeReserve) && isPreview;
+  const hasQuoteFee = Number.isFinite(quoteAmount) && Number.isFinite(feeReserve);
   // BTC-06: a fiat-unit melt settles at the MINT's FX rate, not the app's
   // pricelist — so the mint-quoted debit can differ from the typed amount.
   // When it does, show both: silently swapping the figure would hide the
