@@ -301,6 +301,7 @@ export function createMachineFromInstance(
     getContext: instance.tracker.getContext,
     getUnit: () => unit,
     getOffline: getOffline ?? (() => false),
+    getSatsPerUnitMinor: instance.config.getSatsPerUnitMinor,
     getLocale: getLocale ?? (() => "en"),
     unit,
     operations: instance.operations as MachineOperations,

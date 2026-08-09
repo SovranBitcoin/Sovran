@@ -63,9 +63,23 @@ function tx(
   step: FlowStep,
   ctx: FlowContext,
   event: FlowEvent,
-  wallet: WalletContext = WALLETS.default
+  wallet: WalletContext = WALLETS.default,
+  opts?: {
+    unit?: string;
+    getSatsPerUnitMinor?: (unit: string) => number | null;
+  }
 ): TransitionResult {
-  return transition(step, ctx, event, defaultDetectors, wallet, UNIT);
+  return transition(
+    step,
+    ctx,
+    event,
+    defaultDetectors,
+    wallet,
+    opts?.unit ?? UNIT,
+    undefined,
+    false,
+    opts?.getSatsPerUnitMinor
+  );
 }
 
 /** The minimal idle context — just the unit. */
@@ -232,6 +246,116 @@ describe('transition — EXECUTE', () => {
       }
     );
     expect(result.step).toBe('receiveToken');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EXECUTE — scanned fixed amounts on fiat-unit accounts (BTC-02)
+// ---------------------------------------------------------------------------
+
+/**
+ * Scanned fixed amounts (BIP-321 `amount=`, fixed bolt11/bolt12) are ALWAYS
+ * sat-denominated, but `ctx.amount` must be denominated in `ctx.unit`. On a
+ * fiat-unit account the sats are re-denominated to the active unit ONCE at
+ * seeding; booking raw sats into a fiat context double-converts at execution
+ * (a 1000-sat BIP-321 target would melt ~rate× the requested amount).
+ */
+describe('transition — EXECUTE scanned fixed amounts on fiat units', () => {
+  // 10 sats per usd-cent (≈ $100k/BTC).
+  const tenSatsPerCent = () => 10;
+
+  const usdOnchainWallet: WalletContext = {
+    trustedMintUrls: [MINT1],
+    mintBalances: { [MINT1]: 5000 }, // 5000¢
+    preferredMintUrl: MINT1,
+    proofAmounts: {},
+    mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints(
+      [
+        {
+          mintUrl: MINT1,
+          mintInfo: {
+            nuts: { '5': { methods: [{ method: 'onchain', unit: 'usd' }] } },
+          },
+        },
+      ],
+      'usd'
+    ),
+  };
+
+  it('re-denominates a BIP-321 amount into the active fiat unit once', () => {
+    // amount=0.0001 BTC = 10,000 sats → 1000¢ at 10 sats/¢.
+    const result = tx(
+      'idle',
+      { unit: 'usd' },
+      { type: 'EXECUTE', input: INPUTS.bip321OnchainWithAmount },
+      usdOnchainWallet,
+      { unit: 'usd', getSatsPerUnitMinor: tenSatsPerCent }
+    );
+
+    expect(result.step).toBe('navigateToMeltPreview');
+    expect(result.context.unit).toBe('usd');
+    expect(result.context.amount).toBe(1000);
+    expect(result.data).toMatchObject({ amount: 1000, unit: 'usd' });
+  });
+
+  it('keeps sat seeding untouched on a sat-unit account', () => {
+    const satOnchainWallet: WalletContext = {
+      ...WALLETS.default,
+      mintBalances: { [MINT1]: 100_000, [MINT2]: 500 },
+      mintMethodCapabilities: deriveMintMethodCapabilityMapFromTrustedMints([
+        {
+          mintUrl: MINT1,
+          mintInfo: {
+            nuts: { '5': { methods: [{ method: 'onchain', unit: 'sat' }] } },
+          },
+        },
+      ]),
+    };
+
+    const result = tx(
+      'idle',
+      idle,
+      { type: 'EXECUTE', input: INPUTS.bip321OnchainWithAmount },
+      satOnchainWallet,
+      { getSatsPerUnitMinor: tenSatsPerCent }
+    );
+
+    expect(result.step).toBe('navigateToMeltPreview');
+    expect(result.context.amount).toBe(10_000);
+    expect(result.context.unit).toBe('sat');
+  });
+
+  it('bounces to amount entry when no fiat rate is available', () => {
+    // No rate getter → the amount must NOT be seeded as raw sats into the
+    // fiat context. The flow asks the user to type the amount instead.
+    const result = tx(
+      'idle',
+      { unit: 'usd' },
+      { type: 'EXECUTE', input: INPUTS.bip321OnchainWithAmount },
+      usdOnchainWallet,
+      { unit: 'usd' }
+    );
+
+    expect(result.step).toBe('enterAmount');
+    expect(result.context.amount).toBeUndefined();
+  });
+
+  it('bounces to amount entry when the amount is below one minor unit', () => {
+    // 4 sats at 10 sats/¢ rounds to 0¢ — unrepresentable, so bounce.
+    const result = tx(
+      'idle',
+      { unit: 'usd' },
+      {
+        type: 'EXECUTE',
+        input:
+          'bitcoin:bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080?amount=0.00000004',
+      },
+      usdOnchainWallet,
+      { unit: 'usd', getSatsPerUnitMinor: tenSatsPerCent }
+    );
+
+    expect(result.step).toBe('enterAmount');
+    expect(result.context.amount).toBeUndefined();
   });
 });
 

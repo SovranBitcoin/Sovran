@@ -1156,6 +1156,18 @@ export interface CreateMachineConfig {
    */
   getOffline?: () => boolean;
   /**
+   * Sats per one minor unit of a fiat wallet unit (e.g. sats per usd-cent),
+   * from the wallet's live pricelist. Used at scan time to re-denominate a
+   * scanned fixed sat amount (BIP-321 `amount=`, fixed bolt11/bolt12) into the
+   * active unit, so `FlowContext.amount` stays denominated in `ctx.unit` — the
+   * invariant every downstream consumer (preview display, balance/capability
+   * gates, `executeMelt`'s fiat→sat conversion) relies on. When unset or
+   * returning null for the active unit, fiat-unit scans leave the amount
+   * unseeded and the flow bounces to amount entry rather than booking sats
+   * into a fiat context (which double-converts at execution).
+   */
+  getSatsPerUnitMinor?: (unit: string) => number | null;
+  /**
    * When true, ecash sends pause after amount/mint selection and ask the
    * consumer UI for an optional Cashu token memo before token creation.
    * Defaults to false for backwards compatibility.

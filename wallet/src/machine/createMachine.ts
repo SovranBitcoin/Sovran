@@ -219,6 +219,7 @@ export function createPaymentMachine(
     getContext,
     getUnit,
     getOffline,
+    getSatsPerUnitMinor,
     enableEcashSendMemo = false,
     getLocale,
     unit: configUnit = "sat",
@@ -960,6 +961,7 @@ export function createPaymentMachine(
         unit,
         offline,
         enableEcashSendMemo,
+        getSatsPerUnitMinor,
       );
 
       flowCtx = result.context;
@@ -1082,6 +1084,7 @@ export function createPaymentMachine(
                 unitInner,
                 offline,
                 enableEcashSendMemo,
+                getSatsPerUnitMinor,
               );
               flowCtx = r.context;
               flowCtx.source = "nfc";
@@ -1108,6 +1111,7 @@ export function createPaymentMachine(
                 unitInner,
                 offline,
                 enableEcashSendMemo,
+                getSatsPerUnitMinor,
               );
               flowCtx = r.context;
               flowCtx.source = "nfc";

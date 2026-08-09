@@ -34,12 +34,56 @@ function apply(result: StepResult, ctx: FlowContext): TransitionResult {
 // Per-event transition handlers
 // ---------------------------------------------------------------------------
 
+/**
+ * Seed a scanned fixed amount into the flow context. Scanned amounts are
+ * ALWAYS sat-denominated (BIP-321 `amount=`, fixed bolt11/bolt12 decodes),
+ * but `ctx.amount` must stay denominated in `ctx.unit` — every downstream
+ * consumer (preview display, balance/capability gates, `executeMelt`'s
+ * fiat→sat conversion) assumes that invariant. On a fiat-unit account the
+ * sats are therefore re-denominated to the active unit ONCE here. Without a
+ * live rate (or when the amount is below one minor unit) the amount is left
+ * unseeded so the flow bounces to amount entry — never book sats into a
+ * fiat context, which would double-convert at execution (BTC-02).
+ */
+function seedScannedSatAmount(
+  ctx: FlowContext,
+  sats: number,
+  source: string,
+  getSatsPerUnitMinor?: (unit: string) => number | null,
+): void {
+  if (ctx.unit.toLowerCase() === "sat") {
+    ctx.amount = sats;
+    return;
+  }
+  const rate = getSatsPerUnitMinor?.(ctx.unit) ?? null;
+  if (rate == null || rate <= 0) {
+    logger.warn("transitions.seedScannedAmount.noRate", {
+      source,
+      unit: ctx.unit,
+      sats,
+    });
+    return;
+  }
+  const minor = Math.round(sats / rate);
+  if (!Number.isSafeInteger(minor) || minor <= 0) {
+    logger.warn("transitions.seedScannedAmount.belowMinorUnit", {
+      source,
+      unit: ctx.unit,
+      sats,
+      rate,
+    });
+    return;
+  }
+  ctx.amount = minor;
+}
+
 function handleExecute(
   input: string,
   detectors: Detectors,
   walletCtx: WalletContext,
   unit: string,
   offline?: boolean,
+  getSatsPerUnitMinor?: (unit: string) => number | null,
 ): TransitionResult {
   const parsed = parsePaymentInput(input, detectors);
   const intent = resolveIntent(parsed, detectors, walletCtx);
@@ -106,7 +150,12 @@ function handleExecute(
       // Null today (amountless / quote-first → user enters it). A decoded fixed
       // offer seeds it here, exactly like the fixed bolt11 invoice arm above.
       if (isValidSatAmount(intent.option.amount)) {
-        ctx.amount = intent.option.amount;
+        seedScannedSatAmount(
+          ctx,
+          intent.option.amount,
+          "meltBolt12Offer",
+          getSatsPerUnitMinor,
+        );
       }
       break;
     case "meltOnchainAddress":
@@ -114,7 +163,12 @@ function handleExecute(
       ctx.meltQuoteMethod = "onchain";
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
-        ctx.amount = intent.option.amount;
+        seedScannedSatAmount(
+          ctx,
+          intent.option.amount,
+          "meltOnchainAddress",
+          getSatsPerUnitMinor,
+        );
       }
       break;
   }
@@ -127,6 +181,7 @@ function handleOptionChosen(
   currentCtx: FlowContext,
   detectors: Detectors,
   walletCtx: WalletContext,
+  getSatsPerUnitMinor?: (unit: string) => number | null,
 ): TransitionResult {
   const parsed = currentCtx.parsed;
   if (!parsed) {
@@ -193,7 +248,12 @@ function handleOptionChosen(
       ctx.meltQuoteMethod = "bolt12";
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
-        ctx.amount = intent.option.amount;
+        seedScannedSatAmount(
+          ctx,
+          intent.option.amount,
+          "meltBolt12Offer",
+          getSatsPerUnitMinor,
+        );
       }
       break;
     case "meltOnchainAddress":
@@ -201,7 +261,12 @@ function handleOptionChosen(
       ctx.meltQuoteMethod = "onchain";
       ctx.meltTarget = intent.option.value;
       if (isValidSatAmount(intent.option.amount)) {
-        ctx.amount = intent.option.amount;
+        seedScannedSatAmount(
+          ctx,
+          intent.option.amount,
+          "meltOnchainAddress",
+          getSatsPerUnitMinor,
+        );
       }
       break;
   }
@@ -490,6 +555,9 @@ export function transition(
    *  value — even when a handler creates a fresh FlowContext. */
   offline?: boolean,
   enableEcashSendMemo = false,
+  /** See `CreateMachineConfig.getSatsPerUnitMinor` — re-denominates scanned
+   *  fixed sat amounts into the active unit at seeding time. */
+  getSatsPerUnitMinor?: (unit: string) => number | null,
 ): TransitionResult {
   function stamp(result: TransitionResult): TransitionResult {
     if (offline != null) result.context.offline = offline;
@@ -500,7 +568,14 @@ export function transition(
   switch (event.type) {
     case "EXECUTE":
       return stamp(
-        handleExecute(event.input, detectors, walletCtx, unit, offline),
+        handleExecute(
+          event.input,
+          detectors,
+          walletCtx,
+          unit,
+          offline,
+          getSatsPerUnitMinor,
+        ),
       );
     case "RESET":
       return stamp({ step: "idle", context: { unit }, data: {} as any });
@@ -569,7 +644,15 @@ export function transition(
   // State-specific events
   switch (event.type) {
     case "OPTION_CHOSEN":
-      return stamp(handleOptionChosen(event, currentCtx, detectors, walletCtx));
+      return stamp(
+        handleOptionChosen(
+          event,
+          currentCtx,
+          detectors,
+          walletCtx,
+          getSatsPerUnitMinor,
+        ),
+      );
     case "AMOUNT_ENTERED":
       return stamp(
         handleAmountEntered(event, currentCtx, walletCtx, enableEcashSendMemo),

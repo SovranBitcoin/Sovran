@@ -387,6 +387,7 @@ export function ColadaProvider({
     enableEcashSendMemoProp ?? ic?.enableEcashSendMemo ?? false;
   const getBtcPrice = getBtcPriceProp ?? ic?.getBtcPrice;
   const getDisplayCurrency = getDisplayCurrencyProp ?? ic?.getDisplayCurrency;
+  const getSatsPerUnitMinor = ic?.getSatsPerUnitMinor;
   const writeClipboard = clipboardAdapter?.writeText;
   const shareContent = shareAdapter
     ? (content: { message: string; url?: string }) =>
@@ -464,6 +465,7 @@ export function ColadaProvider({
   const getOfflineRef = useLatestRef(getOffline);
   const getBtcPriceRef = useLatestRef(getBtcPrice);
   const getDisplayCurrencyRef = useLatestRef(getDisplayCurrency);
+  const getSatsPerUnitMinorRef = useLatestRef(getSatsPerUnitMinor);
 
   const walletContextRef = useRef<WalletContext | null>(null);
   const getUnitRef = useLatestRef(getUnitProp);
@@ -583,6 +585,8 @@ export function ColadaProvider({
           },
       getUnit: () => unitRef.current ?? getUnitRef.current?.() ?? "sat",
       getOffline: () => getOfflineRef.current?.() ?? false,
+      getSatsPerUnitMinor: (unit) =>
+        getSatsPerUnitMinorRef.current?.(unit) ?? null,
       enableEcashSendMemo,
       getLocale: () => getLocaleRef.current?.() ?? "en",
       operations: operations as MachineOperations | undefined,
