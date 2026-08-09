@@ -11,7 +11,16 @@ import { decode } from "@gandlaf21/bolt11-decode";
 import { logger } from "./logger";
 
 export interface Bolt11Info {
-  /** Amount in sats, or null when the invoice is amountless. */
+  /**
+   * Amount in whole sats, or null when the invoice is amountless. Invoices
+   * with sub-sat (msat) precision are rounded UP to the next whole sat — the
+   * safe direction for the payer: the seeded flow amount is used for display
+   * and balance gating, and rounding down would show/approve less than the
+   * invoice's true cost. (Before this, a fractional-sat value failed the
+   * machine's integer-only validator and the invoice silently degraded to
+   * "amountless" — the user typed an amount that was displayed while the
+   * invoice's own amount was charged. BTC-10.)
+   */
   amountSat: number | null;
   /** Invoice creation time (unix seconds), or null. */
   timestampSec: number | null;
@@ -51,13 +60,14 @@ export function decodeBolt11Invoice(invoice: string): Bolt11Info | null {
     | undefined;
 
   // bolt11-decode surfaces the amount section `value` as msats — as a string in
-  // some builds, a number in others — so coerce before dividing.
+  // some builds, a number in others — so coerce before dividing. Sub-sat
+  // precision rounds UP to the next whole sat (see Bolt11Info.amountSat).
   const msatsRaw = sectionValue(sections, "amount");
   const msats =
     typeof msatsRaw === "string" ? Number(msatsRaw) : (msatsRaw as number);
   const amountSat =
     typeof msats === "number" && Number.isFinite(msats) && msats > 0
-      ? msats / 1000
+      ? Math.ceil(msats / 1000)
       : null;
 
   const timestamp = sectionValue(sections, "timestamp");

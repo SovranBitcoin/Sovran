@@ -249,6 +249,14 @@ export const INPUTS = {
   bolt11WithAmount:
     'lnbc2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpuaztrnwngzn3kdzw5hydlzf03qdgm2hdq27cqv3agm2awhz5se903vruatfhq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rspfj9srp',
 
+  /**
+   * Same test vector as bolt11WithAmount re-encoded with an 11n HRP:
+   * 11 nano-BTC = 1.1 sats = 1100 msat — sub-sat precision. Decoders must
+   * round UP to 2 sats (payer-safe direction, BTC-10).
+   */
+  bolt11MsatPrecision:
+    'lnbc11n1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpuaztrnwngzn3kdzw5hydlzf03qdgm2hdq27cqv3agm2awhz5se903vruatfhq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rspmk49uv',
+
   /** lnurlp:// endpoint — paid via Lightning (no identity to resolve). */
   lnurlpUri: 'lnurlp://pay.example.com/u/x',
 

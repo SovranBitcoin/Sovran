@@ -493,6 +493,18 @@ describe('transition — cross-unit payment requests', () => {
     expect(result.context.amount).toBe(500);
   });
 
+  it('treats an msat-precision bolt11 as a fixed invoice, rounded up (BTC-10)', () => {
+    // 1100 msat → 2 sats: passes the integer validator, so the flow skips
+    // amount entry instead of degrading to "amountless".
+    const result = tx('idle', idle, {
+      type: 'EXECUTE',
+      input: INPUTS.bolt11MsatPrecision,
+    });
+
+    expect(result.context.amount).toBe(2);
+    expect(result.step).not.toBe('enterAmount');
+  });
+
   it('rejects a cross-unit request chosen from a multi-option input', () => {
     // Standalone parse gives a single-option parsed input; firing
     // OPTION_CHOSEN with it exercises the handleOptionChosen arm.
