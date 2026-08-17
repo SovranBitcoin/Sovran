@@ -6,7 +6,7 @@ describe('backend config', () => {
       nostrAppViewBaseUrl: 'https://nagg-production.up.railway.app',
       apiBaseUrl: 'https://api.sovran.money/api',
       scoreApiBaseUrl: 'https://nagg-production.up.railway.app',
-      mintAppViewBaseUrl: 'https://nagg-production.up.railway.app',
+      mintAppViewBaseUrl: 'https://nagg-mint-production.up.railway.app',
       nostrGraphqlEndpoint: 'https://nagg-production.up.railway.app/graphql',
       primalCacheUrl: 'wss://cache2.primal.net/v1',
     });
@@ -24,7 +24,7 @@ describe('backend config', () => {
       nostrAppViewBaseUrl: 'http://localhost:8080',
       apiBaseUrl: 'https://api.example.test/api',
       scoreApiBaseUrl: 'http://localhost:8080',
-      mintAppViewBaseUrl: 'http://localhost:8080',
+      mintAppViewBaseUrl: 'https://nagg-mint-production.up.railway.app',
       nostrGraphqlEndpoint: 'http://localhost:8081/graphql',
       primalCacheUrl: 'wss://cache2.primal.net/v1',
     });
@@ -43,13 +43,17 @@ describe('backend config', () => {
     expect(config.nostrAppViewBaseUrl).toBe('https://nagg.example.test');
   });
 
-  it('falls the mint app-view back to the score API host', () => {
+  // The mint routes are served by their OWN deployment (NAGG_MODULES=mint), so
+  // the default is compiled in rather than inherited from the app-view host —
+  // eas.json env only reaches EAS builds, and a dev server pointing mint calls
+  // at the full app-view host gets nothing but 404s.
+  it('defaults the mint app-view to its own deployment, not the score API host', () => {
     expect(
       parseBackendConfig({
         EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL: 'https://nagg.example.test',
         EXPO_PUBLIC_SCORE_API_BASE_URL: 'https://scores.example.test',
       }).mintAppViewBaseUrl
-    ).toBe('https://scores.example.test');
+    ).toBe('https://nagg-mint-production.up.railway.app');
   });
 
   it('keeps the legacy Nagg base URL env as an app-view fallback', () => {

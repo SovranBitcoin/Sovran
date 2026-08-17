@@ -105,12 +105,13 @@ describe('apiClient backend config routing', () => {
 
     const result = await reviewMint({ mintUrl: 'https://mint.example.test' });
 
-    // Two hosts: /nostr/mint/reviews follows the mint app-view, but the operator
-    // lookup the same client makes is /nostr/profile, which a mint-only nagg
-    // does not mount. With EXPO_PUBLIC_MINT_APPVIEW_BASE_URL unset both resolve
-    // to the same base.
+    // Two hosts on purpose: /nostr/mint/reviews goes to the mint deployment,
+    // but the operator lookup the same client makes is /nostr/profile, which a
+    // mint-only nagg does not mount (it reads pubkey_stats and the follower
+    // graph). The mint host is a compiled-in default, not inherited from the
+    // app-view URL under test.
     expect(mockCreateNostrMintEnrichment).toHaveBeenCalledWith({
-      appViewBaseUrl: 'http://localhost:8080',
+      appViewBaseUrl: 'https://nagg-mint-production.up.railway.app',
       profileBaseUrl: 'http://localhost:8080',
       appViewVersion: 'v1',
       timeoutMs: 10_000,

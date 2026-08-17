@@ -6,6 +6,16 @@ import { z } from 'zod';
 const DEFAULT_NOSTR_APPVIEW_BASE_URL = 'https://nagg-production.up.railway.app';
 const DEFAULT_API_BASE_URL = 'https://api.sovran.money/api';
 /**
+ * The mint observatory: a nagg running `NAGG_MODULES=mint`, serving
+ * `/nostr/mint/*` off a ClickHouse of nine tables.
+ *
+ * Compiled in rather than inherited from `scoreApiBaseUrl`, because eas.json
+ * env only reaches EAS builds — a dev server or an older installed build would
+ * otherwise fall back to the full app-view host and every mint call would fail.
+ * Point EXPO_PUBLIC_MINT_APPVIEW_BASE_URL at your own nagg to override.
+ */
+const DEFAULT_MINT_APPVIEW_BASE_URL = 'https://nagg-mint-production.up.railway.app';
+/**
  * Primal's PUBLIC cache server (Primal operates it; we only connect). Tier 2 of
  * the resilient Nostr data layer — the `nagg → Primal cache → raw relays`
  * fallback. Override via EXPO_PUBLIC_PRIMAL_CACHE_URL for a different instance.
@@ -46,13 +56,12 @@ type BackendConfig = {
   scoreApiBaseUrl: string;
   /**
    * Host for the `nostr/mint/*` app-view routes (discovery, reviews, the NUT-06
-   * changelog). Split out from `scoreApiBaseUrl` because those can be served by
-   * a nagg running `NAGG_MODULES=mint` — the mint observatory alone, on a
+   * changelog). Split out from `scoreApiBaseUrl` because those are served by a
+   * nagg running `NAGG_MODULES=mint` — the mint observatory alone, on a
    * ClickHouse of nine tables instead of the full Nostr archive — while
    * `/app/latest-version`, `/app/ai-lineup` and `/nostr/profile` stay on the
-   * full app-view. Defaults to `scoreApiBaseUrl`, so leaving
-   * EXPO_PUBLIC_MINT_APPVIEW_BASE_URL unset keeps every mint call exactly where
-   * it is today.
+   * full app-view. Defaults to DEFAULT_MINT_APPVIEW_BASE_URL, NOT to
+   * `scoreApiBaseUrl`: see that constant for why.
    */
   mintAppViewBaseUrl: string;
   /**
@@ -100,7 +109,8 @@ export function parseBackendConfig(env: BackendEnvInput = readBackendEnv()): Bac
     nostrAppViewBaseUrl,
     apiBaseUrl: parsed.data.EXPO_PUBLIC_API_BASE_URL,
     scoreApiBaseUrl,
-    mintAppViewBaseUrl: parsed.data.EXPO_PUBLIC_MINT_APPVIEW_BASE_URL ?? scoreApiBaseUrl,
+    mintAppViewBaseUrl:
+      parsed.data.EXPO_PUBLIC_MINT_APPVIEW_BASE_URL ?? DEFAULT_MINT_APPVIEW_BASE_URL,
     nostrGraphqlEndpoint:
       parsed.data.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT ?? `${nostrAppViewBaseUrl}/graphql`,
     primalCacheUrl: parsed.data.EXPO_PUBLIC_PRIMAL_CACHE_URL ?? DEFAULT_PRIMAL_CACHE_URL,
