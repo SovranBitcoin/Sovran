@@ -42,8 +42,7 @@
       "ignoreBinaries": ["claude", "eas", "gh", "tsx"]
     },
     "wallet": {
-      "project": ["src/**/*.{ts,tsx}"],
-      "ignoreDependencies": ["@cashu/coco-core"]
+      "project": ["src/**/*.{ts,tsx}"]
     },
     "nostr": {
       "project": ["src/**/*.{ts,tsx}"]

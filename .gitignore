@@ -4,12 +4,6 @@
 # Hoisted workspace dependencies
 node_modules/
 
-# Local upstream checkouts backing the `file:vendor/*` overrides in
-# package.json (cashu-ts, coco). Source trees + build output, repopulated by
-# hand — never committed. Root-anchored so app/vendor/marmot-ts, which IS
-# tracked, keeps working.
-/vendor/
-
 # Confidential security-review reports (see artifacts/README.md — held for
 # coordinated disclosure).
 /artifacts/
