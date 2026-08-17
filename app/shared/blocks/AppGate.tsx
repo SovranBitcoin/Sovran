@@ -199,12 +199,19 @@ const RestoreGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       setEvaluated(true);
       return;
     }
-    if (restoreStatus === 'pending' || restoreStatus === 'in-progress') {
+    if (restoreStatus === 'pending') {
       // Already decided in a previous boot — the screen will pick it up.
       setEvaluated(true);
       return;
     }
-    // restoreStatus === 'unknown' or 'failed' → resolve now.
+    // restoreStatus === 'unknown' | 'failed' | 'in-progress' → resolve now.
+    //
+    // 'in-progress' is a stranded value: a build briefly wrote it when a
+    // Settings-initiated recovery started and never cleared it, which pinned
+    // the app to this gate on every launch. Nothing writes it now, so treating
+    // it as unresolved heals those installs — the check below sends anyone
+    // whose seed this install created to 'not-needed', and everyone else to
+    // 'pending', which is what should have happened all along.
     let cancelled = false;
     void (async () => {
       try {
@@ -237,11 +244,7 @@ const RestoreGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return null;
   }
 
-  if (
-    restoreStatus === 'pending' ||
-    restoreStatus === 'in-progress' ||
-    restoreStatus === 'failed'
-  ) {
+  if (restoreStatus === 'pending' || restoreStatus === 'failed') {
     log.debug('gate.restore.blocked', { restoreStatus });
     return (
       <SettingsRecoveryScreen

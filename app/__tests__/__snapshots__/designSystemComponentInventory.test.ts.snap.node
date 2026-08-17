@@ -183,6 +183,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/CircleActionButton/CircleActionButton.liquid.tsx",
     "shared/ui/composed/CircleActionRow.tsx",
     "shared/ui/composed/ContactRow.tsx",
+    "shared/ui/composed/ElapsedSeconds.tsx",
     "shared/ui/composed/FlowSheetHeader.tsx",
     "shared/ui/composed/FollowBadge.tsx",
     "shared/ui/composed/FormSheetChrome.tsx",
@@ -231,6 +232,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/Pressable.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 225,
+  "total": 226,
 }
 `;

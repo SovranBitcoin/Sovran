@@ -240,7 +240,6 @@ export const icons: string[] = [
   'mdi:skip-next',
   'mdi:swap-horizontal',
   'mdi:ticket-percent',
-  'mingcute:search-3-fill',
   'mingcute:search-3-line',
   'ri:arrow-left-line',
   'ri:close-circle-line',

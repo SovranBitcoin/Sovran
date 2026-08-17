@@ -6,8 +6,24 @@
  * proofs. The actual interval/gap walk belongs to cashu-ts `Wallet.batchRestore`.
  * These tests exercise both installed public contracts without implementing a
  * second restore walker in Colada.
+ *
+ * cashu-ts 5 walk semantics (changed from 4.x, which stepped one batch at a
+ * time and stopped on the exact gap):
+ *
+ *  - The gap threshold is `ceil(gapLimit / batchSize)`, measured in *batches*.
+ *  - Batches are issued in **waves of 4, concurrently**, and the consecutive-
+ *    empty run is only evaluated at a wave boundary. Total requests are
+ *    therefore always a multiple of 4, and the walk overscans past the gap
+ *    rather than stopping on it. The docs call gapLimit "a floor, not an exact
+ *    ceiling: batches already in flight past it are still processed."
+ *  - `filterSpent` defaults to **true** and triggers a NUT-07 round trip.
+ *    Coco passes `false` and keeps spent-checking ownership, so these tests
+ *    pin that shape.
+ *
+ * The safety-critical invariant is that the walk never stops *before* covering
+ * the gap. Overscanning costs requests; underscanning loses funds.
  */
-import { Amount, Wallet, type Proof } from "@cashu/cashu-ts";
+import { Amount, CheckStateEnum, Wallet, type Proof } from "@cashu/cashu-ts";
 import {
   initializeCoco,
   MemoryRepositories,
@@ -101,7 +117,7 @@ async function createManager(): Promise<{
 }
 
 describe("installed cashu-ts restore interval contract", () => {
-  it("stops after exactly N consecutive empty batches", async () => {
+  it("covers at least the gap limit, scanning in whole waves of 4", async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: 1, max: 8 }),
@@ -109,22 +125,32 @@ describe("installed cashu-ts restore interval contract", () => {
         fc.integer({ min: 0, max: 1_000 }),
         async (emptyBatches, batchSize, startCounter) => {
           const { wallet, restore } = fakeWallet(async () => ({ proofs: [] }));
-          const result = await Wallet.prototype.batchRestore.call(
-            wallet,
-            emptyBatches * batchSize,
+          const result = await Wallet.prototype.batchRestore.call(wallet, {
+            gapLimit: emptyBatches * batchSize,
             batchSize,
-            startCounter,
-            V2_KEYSET_ID,
-          );
+            counter: startCounter,
+            keysetId: V2_KEYSET_ID,
+            // Coco passes filterSpent: false and keeps NUT-07 ownership.
+            filterSpent: false,
+          });
 
           expect(result).toEqual({
             proofs: [],
             lastCounterWithSignature: undefined,
           });
-          expect(restore).toHaveBeenCalledTimes(emptyBatches);
+
+          // gapLimit is emptyBatches * batchSize, so the threshold is exactly
+          // `emptyBatches` batches; the walk rounds that up to whole waves.
+          const expectedCalls = 4 * Math.ceil(emptyBatches / 4);
+          expect(restore).toHaveBeenCalledTimes(expectedCalls);
+
+          // The invariant that actually protects funds: never stop short of
+          // the gap. Overscanning is permitted, underscanning is not.
+          expect(restore.mock.calls.length).toBeGreaterThanOrEqual(emptyBatches);
+
           expect(restore.mock.calls.map(([counter]) => counter)).toEqual(
             Array.from(
-              { length: emptyBatches },
+              { length: expectedCalls },
               (_, index) => startCounter + index * batchSize,
             ),
           );
@@ -151,16 +177,19 @@ describe("installed cashu-ts restore interval contract", () => {
       };
     });
 
-    const result = await Wallet.prototype.batchRestore.call(
-      wallet,
-      300,
-      100,
-      0,
-      V2_KEYSET_ID,
-    );
+    const result = await Wallet.prototype.batchRestore.call(wallet, {
+      gapLimit: 300,
+      batchSize: 100,
+      counter: 0,
+      keysetId: V2_KEYSET_ID,
+      filterSpent: false,
+    });
 
+    // Wave 1 (0,100,200,300): 0 and 100 sign, so the empty run only reaches 2
+    // of the required 3 and the walk continues. Wave 2 (400..700) is fully
+    // empty, pushing the run to 6 and ending the scan at the wave boundary.
     expect(restore.mock.calls.map(([counter]) => counter)).toEqual([
-      0, 100, 200, 300, 400,
+      0, 100, 200, 300, 400, 500, 600, 700,
     ]);
     expect(result.proofs).toHaveLength(200);
     expect(result.proofs[0]?.secret).toBe("restored-0");
@@ -185,16 +214,18 @@ describe("installed cashu-ts restore interval contract", () => {
       return { proofs: [] };
     });
 
-    const result = await Wallet.prototype.batchRestore.call(
-      wallet,
-      300,
-      100,
-      0,
-      V2_KEYSET_ID,
-    );
+    const result = await Wallet.prototype.batchRestore.call(wallet, {
+      gapLimit: 300,
+      batchSize: 100,
+      counter: 0,
+      keysetId: V2_KEYSET_ID,
+      filterSpent: false,
+    });
 
+    // The signature at counter 300 lands in wave 1 and resets the empty run to
+    // 0, so wave 2 (400..700) has to rebuild the full gap from scratch.
     expect(restore.mock.calls.map(([counter]) => counter)).toEqual([
-      0, 100, 200, 300, 400, 500, 600,
+      0, 100, 200, 300, 400, 500, 600, 700,
     ]);
     expect(result.proofs.map(({ secret }) => secret)).toEqual([
       "restored-0",
@@ -204,6 +235,57 @@ describe("installed cashu-ts restore interval contract", () => {
       "restored-301",
     ]);
     expect(result.lastCounterWithSignature).toBe(301);
+  });
+
+  it("filters spent proofs by default, which is why coco opts out", async () => {
+    // cashu-ts 5 added filterSpent, defaulting to true. Coco owns spent-checking
+    // (it saves only ready proofs), so it passes false to avoid a second NUT-07
+    // round trip over every restored proof. Pin both halves of that contract.
+    function walletWithSpentCheck() {
+      const { wallet, restore } = fakeWallet(async (start) =>
+        start === 0
+          ? {
+              proofs: [restoredProof(0), restoredProof(1)],
+              lastCounterWithSignature: 1,
+            }
+          : { proofs: [] },
+      );
+      const checkProofsStates = vi.fn(async (proofs: Proof[]) =>
+        proofs.map((_, index) => ({
+          state: index === 0 ? CheckStateEnum.SPENT : CheckStateEnum.UNSPENT,
+        })),
+      );
+      (wallet as unknown as Record<string, unknown>).checkProofsStates =
+        checkProofsStates;
+      return { wallet, restore, checkProofsStates };
+    }
+
+    const optedOut = walletWithSpentCheck();
+    const kept = await Wallet.prototype.batchRestore.call(optedOut.wallet, {
+      gapLimit: 300,
+      batchSize: 100,
+      counter: 0,
+      keysetId: V2_KEYSET_ID,
+      filterSpent: false,
+    });
+    expect(optedOut.checkProofsStates).not.toHaveBeenCalled();
+    expect(kept.proofs.map(({ secret }) => secret)).toEqual([
+      "restored-0",
+      "restored-1",
+    ]);
+
+    const defaulted = walletWithSpentCheck();
+    const filtered = await Wallet.prototype.batchRestore.call(
+      defaulted.wallet,
+      {
+        gapLimit: 300,
+        batchSize: 100,
+        counter: 0,
+        keysetId: V2_KEYSET_ID,
+      },
+    );
+    expect(defaulted.checkProofsStates).toHaveBeenCalledOnce();
+    expect(filtered.proofs.map(({ secret }) => secret)).toEqual(["restored-1"]);
   });
 });
 
@@ -232,12 +314,13 @@ describe("Sovran -> coco restore persistence boundary", () => {
         unit: "sat",
       });
 
-      expect(batchRestore).toHaveBeenCalledExactlyOnceWith(
-        300,
-        100,
-        0,
-        V2_KEYSET_ID,
-      );
+      expect(batchRestore).toHaveBeenCalledExactlyOnceWith({
+        gapLimit: 300,
+        batchSize: 100,
+        counter: 0,
+        keysetId: V2_KEYSET_ID,
+        filterSpent: false,
+      });
       expect(checkProofsStates).toHaveBeenCalledExactlyOnceWith([
         restoredProof(4, 13),
         restoredProof(305, 21),

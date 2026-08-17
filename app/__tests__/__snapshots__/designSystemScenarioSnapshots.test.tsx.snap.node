@@ -10605,6 +10605,1470 @@ exports[`Design System exact structural snapshots renders segmented-progress/che
 }
 `;
 
+exports[`Design System exact structural snapshots renders segmented-progress/recovery-finalizing: recovery-finalizing 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": null,
+                          "props": {
+                            "fill": "white",
+                            "height": 100,
+                            "width": 100,
+                          },
+                          "type": "Rect",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 0,
+                            },
+                            "d": "M 26 50 L 43 67 L 74 35",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 73,
+                            "strokeLinecap": "round",
+                            "strokeLinejoin": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 47,
+                            },
+                            "d": "M 35 35 L 65 65",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 47,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 47,
+                            },
+                            "d": "M 65 35 L 35 65",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 47,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 121,
+                            },
+                            "d": "M 50 31 A 19 19 0 1 0 69 50 L 69 41 L 76 48 M 69 41 L 62 48",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 121,
+                            "strokeLinecap": "round",
+                            "strokeLinejoin": "round",
+                            "strokeWidth": 6.5,
+                            "transform": "rotate(-135 50 50)",
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 70,
+                            },
+                            "d": "M 24 42 C 38 29 62 29 76 42",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 70,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 70,
+                            },
+                            "d": "M 35 53 C 44 45 56 45 65 53",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 70,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 70,
+                            },
+                            "d": "M 48 64 L 52 64",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 70,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                      ],
+                      "props": {
+                        "id": "iconMask",
+                      },
+                      "type": "Mask",
+                    },
+                  ],
+                  "props": {},
+                  "type": "Defs",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "fill": "rgb(32, 128, 72)",
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "mask": "url(#iconMask)",
+                    "r": 42.25,
+                  },
+                  "type": "Circle",
+                },
+              ],
+              "props": {
+                "height": 48,
+                "viewBox": "0 0 100 100",
+                "width": 48,
+              },
+              "type": "Svg",
+            },
+          ],
+          "props": {
+            "style": [
+              {
+                "bottom": 0,
+                "left": 0,
+                "position": "absolute",
+                "right": 0,
+                "top": 0,
+              },
+              {
+                "opacity": 1,
+                "transform": [
+                  {
+                    "scale": 1,
+                  },
+                ],
+              },
+            ],
+          },
+          "type": "View",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -6.25,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-0",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -54.002208334564855,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-1",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -101.75441666912971,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-2",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -149.50662500369458,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-3",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -197.25883333825942,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-4",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+              ],
+              "props": {
+                "height": 48,
+                "viewBox": "0 0 100 100",
+                "width": 48,
+              },
+              "type": "Svg",
+            },
+          ],
+          "props": {
+            "style": [
+              {
+                "bottom": 0,
+                "left": 0,
+                "position": "absolute",
+                "right": 0,
+                "top": 0,
+              },
+              {
+                "transform": [
+                  {
+                    "rotate": "0deg",
+                  },
+                ],
+              },
+            ],
+          },
+          "type": "View",
+        },
+      ],
+      "props": {
+        "className": "css-view-g5y9jx",
+        "dir": null,
+        "style": {
+          "height": "48px",
+          "width": "48px",
+        },
+      },
+      "type": "div",
+    },
+    {
+      "children": [
+        "Finishing up",
+      ],
+      "props": {
+        "className": "css-text-146c3p1",
+        "dir": "auto",
+        "style": {
+          "color": "rgba(16,16,16,1.00)",
+          "fontFamily": "OxygenBold",
+          "fontSize": "12px",
+        },
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+  },
+  "type": "div",
+}
+`;
+
+exports[`Design System exact structural snapshots renders segmented-progress/recovery-partial: recovery-partial 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": null,
+                          "props": {
+                            "fill": "white",
+                            "height": 100,
+                            "width": 100,
+                          },
+                          "type": "Rect",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 0,
+                            },
+                            "d": "M 26 50 L 43 67 L 74 35",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 73,
+                            "strokeLinecap": "round",
+                            "strokeLinejoin": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 47,
+                            },
+                            "d": "M 35 35 L 65 65",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 47,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 47,
+                            },
+                            "d": "M 65 35 L 35 65",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 47,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 121,
+                            },
+                            "d": "M 50 31 A 19 19 0 1 0 69 50 L 69 41 L 76 48 M 69 41 L 62 48",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 121,
+                            "strokeLinecap": "round",
+                            "strokeLinejoin": "round",
+                            "strokeWidth": 6.5,
+                            "transform": "rotate(-135 50 50)",
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 70,
+                            },
+                            "d": "M 24 42 C 38 29 62 29 76 42",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 70,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 70,
+                            },
+                            "d": "M 35 53 C 44 45 56 45 65 53",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 70,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 70,
+                            },
+                            "d": "M 48 64 L 52 64",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 70,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                      ],
+                      "props": {
+                        "id": "iconMask",
+                      },
+                      "type": "Mask",
+                    },
+                  ],
+                  "props": {},
+                  "type": "Defs",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "fill": "rgb(32, 128, 72)",
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "mask": "url(#iconMask)",
+                    "r": 42.25,
+                  },
+                  "type": "Circle",
+                },
+              ],
+              "props": {
+                "height": 48,
+                "viewBox": "0 0 100 100",
+                "width": 48,
+              },
+              "type": "Svg",
+            },
+          ],
+          "props": {
+            "style": [
+              {
+                "bottom": 0,
+                "left": 0,
+                "position": "absolute",
+                "right": 0,
+                "top": 0,
+              },
+              {
+                "opacity": 1,
+                "transform": [
+                  {
+                    "scale": 1,
+                  },
+                ],
+              },
+            ],
+          },
+          "type": "View",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -6.25,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-0",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -54.002208334564855,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-1",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -101.75441666912971,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-2",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -149.50662500369458,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-3",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -197.25883333825942,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-4",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+              ],
+              "props": {
+                "height": 48,
+                "viewBox": "0 0 100 100",
+                "width": 48,
+              },
+              "type": "Svg",
+            },
+          ],
+          "props": {
+            "style": [
+              {
+                "bottom": 0,
+                "left": 0,
+                "position": "absolute",
+                "right": 0,
+                "top": 0,
+              },
+              {
+                "transform": [
+                  {
+                    "rotate": "0deg",
+                  },
+                ],
+              },
+            ],
+          },
+          "type": "View",
+        },
+      ],
+      "props": {
+        "className": "css-view-g5y9jx",
+        "dir": null,
+        "style": {
+          "height": "48px",
+          "width": "48px",
+        },
+      },
+      "type": "div",
+    },
+    {
+      "children": [
+        "Partial (a mint failed)",
+      ],
+      "props": {
+        "className": "css-text-146c3p1",
+        "dir": "auto",
+        "style": {
+          "color": "rgba(16,16,16,1.00)",
+          "fontFamily": "OxygenBold",
+          "fontSize": "12px",
+        },
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+  },
+  "type": "div",
+}
+`;
+
+exports[`Design System exact structural snapshots renders segmented-progress/recovery-restoring: recovery-restoring 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": null,
+                          "props": {
+                            "fill": "white",
+                            "height": 100,
+                            "width": 100,
+                          },
+                          "type": "Rect",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 73,
+                            },
+                            "d": "M 26 50 L 43 67 L 74 35",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 73,
+                            "strokeLinecap": "round",
+                            "strokeLinejoin": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 47,
+                            },
+                            "d": "M 35 35 L 65 65",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 47,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 47,
+                            },
+                            "d": "M 65 35 L 35 65",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 47,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 121,
+                            },
+                            "d": "M 50 31 A 19 19 0 1 0 69 50 L 69 41 L 76 48 M 69 41 L 62 48",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 121,
+                            "strokeLinecap": "round",
+                            "strokeLinejoin": "round",
+                            "strokeWidth": 6.5,
+                            "transform": "rotate(-135 50 50)",
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 70,
+                            },
+                            "d": "M 24 42 C 38 29 62 29 76 42",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 70,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 70,
+                            },
+                            "d": "M 35 53 C 44 45 56 45 65 53",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 70,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 70,
+                            },
+                            "d": "M 48 64 L 52 64",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 70,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                      ],
+                      "props": {
+                        "id": "iconMask",
+                      },
+                      "type": "Mask",
+                    },
+                  ],
+                  "props": {},
+                  "type": "Defs",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "fill": "rgb(16, 16, 16)",
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "mask": "url(#iconMask)",
+                    "r": 42.25,
+                  },
+                  "type": "Circle",
+                },
+              ],
+              "props": {
+                "height": 48,
+                "viewBox": "0 0 100 100",
+                "width": 48,
+              },
+              "type": "Svg",
+            },
+          ],
+          "props": {
+            "style": [
+              {
+                "bottom": 0,
+                "left": 0,
+                "position": "absolute",
+                "right": 0,
+                "top": 0,
+              },
+              {
+                "opacity": 0,
+                "transform": [
+                  {
+                    "scale": 0.78,
+                  },
+                ],
+              },
+            ],
+          },
+          "type": "View",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -6.25,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-0",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -54.002208334564855,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-1",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 0.77,
+                      "stroke": "rgb(16, 16, 16)",
+                      "strokeWidth": 6.82,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -101.75441666912971,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-2",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 0.45,
+                      "stroke": "rgb(16, 16, 16)",
+                      "strokeWidth": 6.12,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -149.50662500369458,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-3",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 0.45,
+                      "stroke": "rgb(16, 16, 16)",
+                      "strokeWidth": 6.12,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -197.25883333825942,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-4",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+              ],
+              "props": {
+                "height": 48,
+                "viewBox": "0 0 100 100",
+                "width": 48,
+              },
+              "type": "Svg",
+            },
+          ],
+          "props": {
+            "style": [
+              {
+                "bottom": 0,
+                "left": 0,
+                "position": "absolute",
+                "right": 0,
+                "top": 0,
+              },
+              {
+                "transform": [
+                  {
+                    "rotate": "0deg",
+                  },
+                ],
+              },
+            ],
+          },
+          "type": "View",
+        },
+      ],
+      "props": {
+        "className": "css-view-g5y9jx",
+        "dir": null,
+        "style": {
+          "height": "48px",
+          "width": "48px",
+        },
+      },
+      "type": "div",
+    },
+    {
+      "children": [
+        "2 of 5 mints",
+      ],
+      "props": {
+        "className": "css-text-146c3p1",
+        "dir": "auto",
+        "style": {
+          "color": "rgba(16,16,16,1.00)",
+          "fontFamily": "OxygenBold",
+          "fontSize": "12px",
+        },
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+  },
+  "type": "div",
+}
+`;
+
+exports[`Design System exact structural snapshots renders segmented-progress/recovery-straggler: recovery-straggler 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": null,
+                          "props": {
+                            "fill": "white",
+                            "height": 100,
+                            "width": 100,
+                          },
+                          "type": "Rect",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 73,
+                            },
+                            "d": "M 26 50 L 43 67 L 74 35",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 73,
+                            "strokeLinecap": "round",
+                            "strokeLinejoin": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 47,
+                            },
+                            "d": "M 35 35 L 65 65",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 47,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 47,
+                            },
+                            "d": "M 65 35 L 35 65",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 47,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 121,
+                            },
+                            "d": "M 50 31 A 19 19 0 1 0 69 50 L 69 41 L 76 48 M 69 41 L 62 48",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 121,
+                            "strokeLinecap": "round",
+                            "strokeLinejoin": "round",
+                            "strokeWidth": 6.5,
+                            "transform": "rotate(-135 50 50)",
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 70,
+                            },
+                            "d": "M 24 42 C 38 29 62 29 76 42",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 70,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 70,
+                            },
+                            "d": "M 35 53 C 44 45 56 45 65 53",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 70,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                        {
+                          "children": null,
+                          "props": {
+                            "animatedProps": {
+                              "strokeDashoffset": 70,
+                            },
+                            "d": "M 48 64 L 52 64",
+                            "fill": "none",
+                            "stroke": "black",
+                            "strokeDasharray": 70,
+                            "strokeLinecap": "round",
+                            "strokeWidth": 6.5,
+                          },
+                          "type": "Path",
+                        },
+                      ],
+                      "props": {
+                        "id": "iconMask",
+                      },
+                      "type": "Mask",
+                    },
+                  ],
+                  "props": {},
+                  "type": "Defs",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "fill": "rgb(16, 16, 16)",
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "mask": "url(#iconMask)",
+                    "r": 42.25,
+                  },
+                  "type": "Circle",
+                },
+              ],
+              "props": {
+                "height": 48,
+                "viewBox": "0 0 100 100",
+                "width": 48,
+              },
+              "type": "Svg",
+            },
+          ],
+          "props": {
+            "style": [
+              {
+                "bottom": 0,
+                "left": 0,
+                "position": "absolute",
+                "right": 0,
+                "top": 0,
+              },
+              {
+                "opacity": 0,
+                "transform": [
+                  {
+                    "scale": 0.78,
+                  },
+                ],
+              },
+            ],
+          },
+          "type": "View",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -6.25,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-0",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -54.002208334564855,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-1",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -101.75441666912971,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-2",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 1,
+                      "stroke": "rgb(32, 128, 72)",
+                      "strokeWidth": 8.5,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -149.50662500369458,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-3",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+                {
+                  "children": null,
+                  "props": {
+                    "animatedProps": {
+                      "opacity": 0.77,
+                      "stroke": "rgb(16, 16, 16)",
+                      "strokeWidth": 6.82,
+                    },
+                    "cx": 50,
+                    "cy": 50,
+                    "fill": "none",
+                    "r": 38,
+                    "strokeDasharray": [
+                      35.252208334564855,
+                      203.50883333825942,
+                    ],
+                    "strokeDashoffset": -197.25883333825942,
+                    "strokeLinecap": "round",
+                    "testID": "loading-indicator-confirmation-segment-4",
+                    "transform": "rotate(-90 50 50)",
+                  },
+                  "type": "Circle",
+                },
+              ],
+              "props": {
+                "height": 48,
+                "viewBox": "0 0 100 100",
+                "width": 48,
+              },
+              "type": "Svg",
+            },
+          ],
+          "props": {
+            "style": [
+              {
+                "bottom": 0,
+                "left": 0,
+                "position": "absolute",
+                "right": 0,
+                "top": 0,
+              },
+              {
+                "transform": [
+                  {
+                    "rotate": "0deg",
+                  },
+                ],
+              },
+            ],
+          },
+          "type": "View",
+        },
+      ],
+      "props": {
+        "className": "css-view-g5y9jx",
+        "dir": null,
+        "style": {
+          "height": "48px",
+          "width": "48px",
+        },
+      },
+      "type": "div",
+    },
+    {
+      "children": [
+        "4 of 5, one straggler",
+      ],
+      "props": {
+        "className": "css-text-146c3p1",
+        "dir": "auto",
+        "style": {
+          "color": "rgba(16,16,16,1.00)",
+          "fontFamily": "OxygenBold",
+          "fontSize": "12px",
+        },
+      },
+      "type": "div",
+    },
+  ],
+  "props": {
+    "className": "css-view-g5y9jx",
+    "dir": null,
+  },
+  "type": "div",
+}
+`;
+
 exports[`Design System exact structural snapshots renders segmented-progress/segments-complete: segments-complete 1`] = `
 {
   "children": [

@@ -4,6 +4,7 @@ import type { Mint } from '@cashu/coco-core';
 import { useManager } from '@cashu/coco-react';
 import { log } from '@/shared/lib/logger';
 import { getCachedMintInfo } from '@/shared/stores/global/mintMetadataStore';
+import { deferWhileRecovering } from '@/shared/lib/cashu/recoverySuppression';
 
 // Module-level in-flight dedupe. Multiple components that use this hook
 // (ContactsScreen, settings recovery, mint screens) each kick off their
@@ -123,6 +124,10 @@ export function useMintManagement() {
     // disappeared") and known mints keep stale mintInfo if it was
     // refreshed under them.
     const refresh = (reason: string) => {
+      // A recovery run fires these continuously while trusting mints it
+      // discovers; reloading the whole trusted-mint list per event is pure
+      // waste on the thread restore is already saturating.
+      if (deferWhileRecovering('mint-management', () => void loadMints('recovery-flush'))) return;
       log.debug('mint.list.event', { reason });
       void loadMints(reason);
     };

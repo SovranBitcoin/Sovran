@@ -141,8 +141,9 @@ const REAL_WALLET_FACTORY: CashuWalletFactory = async ({ asset, seed, counters }
   await wallet.loadMint();
   return {
     listKeysets: async () => (await mint.getKeySets()).keysets,
+    // cashu-ts 5 replaced batchRestore's positional args with a config object.
     batchRestore: (keysetId, gapLimit, batchSize) =>
-      wallet.batchRestore(gapLimit, batchSize, 0, keysetId),
+      wallet.batchRestore({ keysetId, gapLimit, batchSize, counter: 0 }),
     checkProofStates: (proofs) => wallet.checkProofsStates(proofs),
     decodeToken: (token) => wallet.decodeToken(token),
     maxSpendableAfterFees: (proofs) => wallet.maxSpendableAfterFees(proofs),

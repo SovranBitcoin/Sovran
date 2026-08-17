@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.1",
   "packageManager": "bun@1.3.5",
-  "description": "Sovran monorepo — the app and its self-contained wallet (colada) and nostr (nagg-ts) packages, plus the docs site.",
+  "description": "Sovran monorepo \u2014 the app and its self-contained wallet (colada) and nostr (nagg-ts) packages, plus the docs site.",
   "workspaces": [
     "app",
     "wallet",
@@ -11,13 +11,18 @@
     "docs"
   ],
   "overrides": {
-    "@cashu/cashu-ts": "4.5.1",
+    "@cashu/cashu-ts": "file:vendor/cashu-ts",
+    "@cashu/coco-core": "file:vendor/coco/packages/core",
+    "@cashu/coco-react": "file:vendor/coco/packages/react",
+    "@cashu/coco-expo-sqlite": "file:vendor/coco/packages/expo-sqlite",
+    "@cashu/coco-sql-storage": "file:vendor/coco/packages/sql-storage",
+    "@cashu/coco-adapter-tests": "file:vendor/coco/packages/adapter-tests",
     "zod": "4.4.3",
     "neverthrow": "8.2.0",
     "react-native-quick-base64": "^3.0.0"
   },
   "scripts": {
-    "postinstall": "cd app && node scripts/apply-patches.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js",
+    "postinstall": "cd app && node scripts/dedupe-coco.js && node scripts/apply-patches.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
@@ -44,5 +49,10 @@
   },
   "devDependencies": {
     "vitepress": "^1.6.3"
+  },
+  "dependencies": {
+    "@cashu/coco-core": "file:vendor/coco/packages/core",
+    "@cashu/coco-react": "file:vendor/coco/packages/react",
+    "@cashu/coco-expo-sqlite": "file:vendor/coco/packages/expo-sqlite"
   }
 }

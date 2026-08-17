@@ -255,6 +255,8 @@ describe('buildTimeline (audit 61.json F-006)', () => {
         quote: 'q1',
         request: 'lnbc1...',
         amount: Amount.from(100),
+        // cashu-ts 5 added `method` to MeltQuoteBaseResponse.
+        method: 'bolt11',
         fee_reserve: Amount.from(0),
         state: MeltQuoteState.UNPAID,
         expiry: Math.floor(NOW / 1000) - 60,

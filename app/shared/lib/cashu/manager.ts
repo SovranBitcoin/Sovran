@@ -34,6 +34,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, getPublicKey, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
 import { cashuLog, initLog, initPhase } from '../logger';
+import { resolveOutputDataCreator } from './nativeOutputDataCreator';
 import { logCocoVersions, reportCocoApiFailure, reportCocoIssue } from './cocoFeedback';
 import {
   createP2PKImportPlugin,
@@ -520,6 +521,13 @@ export class CocoManager {
 
         // 4. Create Manager
         initLog('CocoManager', 'creating Manager instance...');
+        // Always a creator, so every blinding call logs which implementation
+        // ran it (cashu.output_data.created: impl/outputs/duration_ms). Native
+        // CDK only behind EXPO_PUBLIC_CASHU_NATIVE_CRYPTO=1 plus a
+        // byte-identical self-test; otherwise instrumented stock cashu-ts,
+        // behaviorally identical to coco's own default.
+        const outputDataCreator = resolveOutputDataCreator();
+
         this.instance = new Manager(
           repositories,
           seedGetter,
@@ -527,7 +535,13 @@ export class CocoManager {
           // undefined outside e2e mint-fault sessions → coco's own global-
           // WebSocket fallback, i.e. today's behavior exactly.
           maybeCreateMintFaultWebSocketFactory(),
-          plugins
+          plugins,
+          // watchers / processors / subscriptions keep their defaults;
+          // outputDataCreator is the 9th positional parameter.
+          undefined,
+          undefined,
+          undefined,
+          outputDataCreator
         );
         await initPhase('CocoManager.initCorePlugins', () => this.instance!.initPlugins());
         initLog('CocoManager', 'Manager created');

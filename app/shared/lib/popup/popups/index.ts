@@ -84,6 +84,13 @@ const STATIC_POPUPS = {
     type: 'error',
   },
 
+  'crypto-benchmark-complete': {
+    message: 'Benchmark complete',
+    text: 'Per-operation results are in the log.',
+    icon: 'icon:mdi:shield-check',
+    type: 'success',
+  },
+
   // general
   'general-error': {
     message: 'Something went wrong',

@@ -21,7 +21,7 @@ function methodsOf(nuts: MintNuts | undefined, nut: string): NutMethod[] {
   return methods.filter((m): m is NutMethod => !!m && typeof m === 'object');
 }
 
-function uniqueLower(values: Array<string | undefined>): string[] {
+function uniqueLower(values: (string | undefined)[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const value of values) {
@@ -55,9 +55,9 @@ export function meltMethodsFromNuts(nuts: MintNuts | undefined): string[] {
 export function mintMethodUnitPairsFromNuts(
   nuts: MintNuts | undefined,
   nut = '4'
-): Array<{ method: string; unit: string }> {
+): { method: string; unit: string }[] {
   const seen = new Set<string>();
-  const out: Array<{ method: string; unit: string }> = [];
+  const out: { method: string; unit: string }[] = [];
   for (const m of methodsOf(nuts, nut)) {
     const method = (m.method ?? '').trim().toLowerCase();
     const unit = (m.unit ?? '').trim().toLowerCase();

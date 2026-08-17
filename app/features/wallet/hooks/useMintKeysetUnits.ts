@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useManager, useMints } from '@cashu/coco-react';
 
 import { getMintKeysetUnits } from '@/shared/lib/cashu/managerInternals';
+import { deferWhileRecovering } from '@/shared/lib/cashu/recoverySuppression';
 import { walletLog } from '@/shared/lib/logger';
 
 /**
@@ -63,8 +64,15 @@ export function useMintKeysetUnits(): Record<string, string[] | undefined> {
 
     void load();
     // Keyset rows change when coco adds/refreshes a mint — re-read then.
-    const offAdded = manager.on('mint:added', () => void load());
-    const offUpdated = manager.on('mint:updated', () => void load());
+    // During recovery these fire per mint while `trustedMints` is still
+    // growing, and each reload re-reads (and JSON-parses) every mint's
+    // keysets, so hold them for one pass at the end instead.
+    const reload = () => {
+      if (deferWhileRecovering('mint-keyset-units', () => void load())) return;
+      void load();
+    };
+    const offAdded = manager.on('mint:added', reload);
+    const offUpdated = manager.on('mint:updated', reload);
     return () => {
       cancelled = true;
       offAdded();

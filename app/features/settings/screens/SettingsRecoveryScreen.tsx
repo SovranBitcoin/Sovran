@@ -17,11 +17,53 @@ import { useNavigation } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Mint } from '@cashu/coco-core';
 import { useBalanceContext } from '@cashu/coco-react';
-import { deleteMintOperation } from '@/shared/lib/cashu/managerInternals';
+import {
+  deleteMintOperation,
+  restoreKeysetForMint,
+  isRestorableKeysetId,
+  isAlreadyRecoveredError,
+  probeMintForHistory,
+} from '@/shared/lib/cashu/managerInternals';
+import { withTimeout } from 'wallet';
+import {
+  beginRecoverySuppression,
+  endRecoverySuppression,
+} from '@/shared/lib/cashu/recoverySuppression';
+import {
+  isNativeCryptoAvailable,
+  setNativeCryptoEnabled,
+} from '@/shared/lib/cashu/nativeOutputDataCreator';
+import { runCryptoMicroBench } from '@/shared/lib/cashu/cryptoMicroBench';
+import {
+  beginRecoveryBenchmark,
+  endRecoveryBenchmark,
+  markMintStart,
+  recordFinalizePhase,
+  recordMintBenchmark,
+  recordProbePhase,
+} from '@/shared/lib/cashu/recoveryBenchmark';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { ElapsedSeconds } from '@/shared/ui/composed/ElapsedSeconds';
+import {
+  computeRecoveryCounts,
+  countKnownFailures,
+  createInitialMintStates,
+  currentMint,
+  currentMintPosition,
+  describeMintProgress,
+  isSuccess,
+  mintStatusToCheckpoint,
+  type MintRecoveryState,
+  type RecoveryPhase,
+} from '@/features/settings/lib/recoveryProgress';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { LoadingIndicator } from '@/shared/blocks/status';
+import { LoadingIndicator, mapCheckpointStatusToIndicator } from '@/shared/blocks/status';
+import {
+  DOT_SIZE,
+  STROKE_PX,
+  rowDelays,
+} from '@/features/transactions/components/detail/timeline/timelineTheme';
 import { staticPopup, paramPopup } from '@/shared/lib/popup';
 import { fetchJson } from '@/shared/lib/apiClient';
 import { MintListResponse, parseWith } from '@sovranbitcoin/schemas';
@@ -103,17 +145,53 @@ async function fetchDiscoveredMintUrls(
   return admitted;
 }
 
-type RecoveryState = 'idle' | 'recovering' | 'complete' | 'error';
+/** Phases where the run is doing work and must not be interrupted. */
+const ACTIVE_PHASES: ReadonlySet<RecoveryPhase> = new Set<RecoveryPhase>([
+  'discovering',
+  'restoring',
+  'finalizing',
+]);
 
-interface RecoveryResult {
-  mint: string;
-  success: boolean;
-  error?: string;
-  durationMs?: number;
-  /** Whether this was a discovered (probed) mint vs a known one */
-  isDiscovered?: boolean;
-  /** Whether funds were actually recovered on this mint */
-  fundsFound?: boolean;
+/** A mint that stops answering must not strand the whole (now serial) run. */
+const MINT_RESTORE_TIMEOUT_MS = 120_000;
+
+/** Probed mints get one cheap batch to prove they hold anything at all. */
+const PROBE_CONCURRENCY = 4;
+
+/**
+ * Module-scoped, deliberately not React state.
+ *
+ * Two full recoveries once ran concurrently on-device (two `recovery.start`,
+ * each taking ~180s instead of ~100s) because the screen remounted — a Metro
+ * reload, or AppGate re-rendering — and remounting resets any state- or
+ * ref-based guard back to "idle". Module scope is the only thing that survives
+ * that, and running two restores against one wallet database races counters.
+ */
+let recoveryInFlight = false;
+
+/** Set when the user cancels; checked between mints and between keysets. */
+let recoveryCancelled = false;
+
+/**
+ * Benchmark preference, module-scoped for the same reason as the guard above:
+ * this screen remounts constantly (AppGate re-render, navigation, a Metro
+ * reload), and as component state the switch silently snapped back to native
+ * between flipping it and swiping — which is why four "A/B" runs all came out
+ * `cdk-native`. Survives a remount; a full JS reload still resets it to the
+ * default, which is the honest default anyway.
+ */
+let preferNativeCrypto = true;
+
+/**
+ * Hand the thread back so timers fire and React can paint.
+ *
+ * A `setTimeout` and not `queueMicrotask`/`await null`: restore's cost lands as
+ * promise continuations, and microtasks drain fully before the timer queue, so
+ * four batches' worth of unblinding chain back-to-back into one 34-second block.
+ * Only a macrotask boundary actually breaks that chain.
+ */
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 // ─── Main screen ────────────────────────────────────────────────────────────
@@ -139,23 +217,44 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   onComplete,
 }) => {
   useLifecycleLogger('SettingsRecoveryScreen');
-  const [foreground, green400, red400, surfaceSecondary] = useThemeColor([
-    'foreground',
-    'green-400',
-    'red-400',
-    'surface-secondary',
-  ] as const);
+  const [foreground, mutedColor, successColor, dangerColor, warningColor, surfaceSecondary] =
+    useThemeColor([
+      'foreground',
+      'muted',
+      'success',
+      'danger',
+      'warning',
+      'surface-secondary',
+    ] as const);
   const navigation = useNavigation();
   const { mints, loadMints } = useMintManagement();
 
-  const [recoveryState, setRecoveryState] = useState<RecoveryState>('idle');
-  const [currentMintIndex, setCurrentMintIndex] = useState(0);
-  const [results, setResults] = useState<RecoveryResult[]>([]);
+  const [phase, setPhase] = useState<RecoveryPhase>('idle');
+  const [results, setResults] = useState<MintRecoveryState[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  /** Sublabel for the `finalizing` phase, so cleanup names the work it is doing. */
+  const [finalizingLabel, setFinalizingLabel] = useState<string | null>(null);
 
   // Deep probe: also check mints from the audit API
   const [deepProbe, setDeepProbe] = useState(false);
   const [discoveredMintUrls, setDiscoveredMintUrls] = useState<string[]>([]);
+  const [isDiscovering, setIsDiscovering] = useState(false);
+
+  // Benchmark switch. Defaults to native and only offered when the self-test
+  // proved the two implementations byte-identical — flipping it is an A/B of
+  // the same wallet, not a behaviour change.
+  const [useNativeCrypto, setUseNativeCryptoState] = useState(preferNativeCrypto);
+  const [isBenchmarking, setIsBenchmarking] = useState(false);
+  const nativeAvailable = isNativeCryptoAvailable();
+
+  const setUseNativeCrypto = useCallback((next: boolean) => {
+    // Write through to module scope so a remount cannot revert the choice, and
+    // log the flip — otherwise a run that silently reverted looks identical to
+    // one the user meant to run natively.
+    preferNativeCrypto = next;
+    setUseNativeCryptoState(next);
+    cashuLog.info('recovery.native_crypto.preference', { useNativeCrypto: next });
+  }, []);
 
   useEffect(() => {
     if (!deepProbe) {
@@ -163,14 +262,22 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       return;
     }
     const controller = new AbortController();
+    // Surfaced so the swipe can be held back: without this the user could
+    // enable "Search all mints", swipe immediately, and get an empty probe
+    // list with no indication anything was still loading.
+    setIsDiscovering(true);
     void fetchDiscoveredMintUrls(
       mints.map((m) => m.mintUrl),
       controller.signal
     ).then((urls) => {
       if (controller.signal.aborted) return;
       setDiscoveredMintUrls(urls);
+      setIsDiscovering(false);
     });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      setIsDiscovering(false);
+    };
   }, [deepProbe, mints]);
 
   // Lock navigation when recovery is in progress.
@@ -179,7 +286,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   // beforeRemove listener has no event to prevent.
   useEffect(() => {
     if (gateMode) return;
-    const isLocked = recoveryState === 'recovering';
+    const isLocked = ACTIVE_PHASES.has(phase);
     navigation.setOptions({
       gestureEnabled: !isLocked,
       headerBackVisible: !isLocked,
@@ -193,81 +300,328 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       if (isLocked) e.preventDefault();
     });
     return unsubscribe;
-  }, [recoveryState, navigation, gateMode]);
+  }, [phase, navigation, gateMode]);
 
   const handleStartRecovery = useCallback(async () => {
+    // Module-scoped, so a remount cannot reset it. Two concurrent recoveries
+    // race the same counters and each takes ~1.8x as long.
+    if (recoveryInFlight) {
+      cashuLog.warn('recovery.start.rejected', { reason: 'already_in_flight' });
+      return;
+    }
+    if (ACTIVE_PHASES.has(phase)) return;
+    recoveryInFlight = true;
+    recoveryCancelled = false;
+    // Read the module variable, NOT the `useNativeCrypto` state: this callback
+    // is memoised without it in the dependency list, so the closed-over value
+    // is whatever it was on first render. That stale `true` is why a run made
+    // right after switching the toggle off still came out `cdk-native`.
+    setNativeCryptoEnabled(preferNativeCrypto);
+    // Hold the app-wide refresh storm until the run is over — see the module
+    // doc for what it costs when left on.
+    beginRecoverySuppression();
+
     // Build the full list of mint URLs to restore
     const knownMintUrls = mints.map((m) => m.mintUrl);
-    const probeMintUrls = deepProbe ? discoveredMintUrls : [];
-    const allMintUrls = [...knownMintUrls, ...probeMintUrls];
+    const probeCandidates = deepProbe ? discoveredMintUrls : [];
 
-    if (allMintUrls.length === 0) {
+    if (knownMintUrls.length === 0 && probeCandidates.length === 0) {
+      recoveryInFlight = false;
       staticPopup('recovery-failed', { text: 'No mints found to recover from. Add a mint first.' });
       return;
     }
 
     const t0 = performance.now();
 
-    setRecoveryState('recovering');
-    setResults([]);
-    setCurrentMintIndex(0);
     setErrorMessage(null);
+    setFinalizingLabel(null);
+    // Deliberately does NOT touch `restoreStatus`. Writing 'in-progress' here
+    // locked users out of the app: AppGate blocks on that value, and a
+    // Settings-initiated run has nothing that clears it afterwards, so every
+    // subsequent launch booted straight into the recovery gate. It also bought
+    // nothing — a kill mid-recovery leaves 'pending', and the gate re-showing
+    // is the correct response to an interrupted recovery either way. Only the
+    // gate owns this flag, via `onComplete`.
 
-    cashuLog.info('recovery.start', {
-      mintCount: allMintUrls.length,
+    let allMintUrls = knownMintUrls;
+    let probeMintUrls: string[] = [];
+
+    beginRecoveryBenchmark({
       knownMints: knownMintUrls.length,
-      discoveredMints: probeMintUrls.length,
-      deepProbe,
+      probeCandidates: probeCandidates.length,
     });
-
-    const recoveryResults: RecoveryResult[] = allMintUrls.map((url, i) => ({
-      mint: url,
-      success: false,
-      isDiscovered: i >= knownMintUrls.length,
-    }));
-    setResults([...recoveryResults]);
 
     try {
       const manager = CocoManager.getInstance();
 
+      // Shallow probe pass. Ask each unknown mint one cheap question — does
+      // this seed have anything here — instead of running a full gap walk over
+      // every keyset of up to 100 mints. Empty probes produce no signatures and
+      // therefore no unblinding, so these are safe to run a few at a time.
+      if (probeCandidates.length > 0) {
+        const probeT0 = performance.now();
+        setPhase('discovering');
+        setResults(createInitialMintStates(knownMintUrls, []));
+        for (let start = 0; start < probeCandidates.length; start += PROBE_CONCURRENCY) {
+          if (recoveryCancelled) break;
+          const slice = probeCandidates.slice(start, start + PROBE_CONCURRENCY);
+          setFinalizingLabel(
+            `Checking ${Math.min(start + slice.length, probeCandidates.length)} of ${probeCandidates.length} mints`
+          );
+          const hits = await Promise.all(
+            slice.map((url) =>
+              probeMintForHistory(manager, url)
+                .then((found) => (found ? url : null))
+                .catch(() => null)
+            )
+          );
+          probeMintUrls.push(...hits.filter((url): url is string => url != null));
+          await yieldToEventLoop();
+        }
+        cashuLog.info('recovery.probe.done', {
+          candidates: probeCandidates.length,
+          hits: probeMintUrls.length,
+        });
+        recordProbePhase({
+          hits: probeMintUrls.length,
+          durationMs: performance.now() - probeT0,
+        });
+        allMintUrls = [...knownMintUrls, ...probeMintUrls];
+      }
+
+      setFinalizingLabel(null);
+      setPhase('restoring');
+
+      cashuLog.info('recovery.start', {
+        mintCount: allMintUrls.length,
+        knownMints: knownMintUrls.length,
+        discoveredMints: probeMintUrls.length,
+        probeCandidates: probeCandidates.length,
+        deepProbe,
+      });
+
+      const recoveryResults = createInitialMintStates(knownMintUrls, probeMintUrls);
+      setResults([...recoveryResults]);
+
+      const patch = (i: number, next: Partial<MintRecoveryState>) => {
+        recoveryResults[i] = { ...recoveryResults[i], ...next };
+        setResults([...recoveryResults]);
+      };
+
+      /**
+       * Per-mint NUT-07 tally, owned by the loop rather than by `restoreOneUrl`.
+       * A mint that hits `MINT_RESTORE_TIMEOUT_MS` is abandoned partway through,
+       * so its counts have to live somewhere the timeout handler can still read
+       * them — otherwise the slowest mints, which are exactly the ones worth
+       * measuring, contribute zeroes to the table.
+       */
+      const proofTally = { ready: 0, spent: 0 };
+
       const restoreOneUrl = async (mintUrl: string, i: number) => {
         const isDiscovered = i >= knownMintUrls.length;
         const mintT0 = performance.now();
+        const cryptoAtMintStart = markMintStart();
         cashuLog.info('recovery.mint.start', {
           ...mintUrlLogFields(mintUrl),
           mintIndex: i,
           totalMints: allMintUrls.length,
           isDiscovered,
         });
+        patch(i, { status: 'restoring', startedAtMs: Date.now() });
+
+        // Drive coco's own restore loop keyset by keyset instead of calling
+        // `wallet.restore(mintUrl)`. That call walks every keyset silently and
+        // throws once at the end, so it can report neither how far along a mint
+        // is nor which keyset failed — and a single mint can hold this screen
+        // for over a minute.
+        let failedKeysets = 0;
+        let alreadyRecoveredKeysets = 0;
+        let skippedKeysets = 0;
+        let mintError: string | undefined;
         try {
-          await manager.wallet.restore(mintUrl);
+          // Same call `wallet.restore` makes first, so this stays idempotent —
+          // and it is the only way to learn the keyset count up front.
+          const { keysets } = await manager.mint.addMint(mintUrl, { trusted: true });
+          patch(i, { keysetsTotal: keysets.length });
+          cashuLog.info('recovery.mint.keysets', {
+            ...mintUrlLogFields(mintUrl),
+            keysetCount: keysets.length,
+          });
+
+          for (const keyset of keysets) {
+            if (recoveryCancelled) break;
+            // Mirrors coco's normalizeUnit(keyset.unit ?? DEFAULT_UNIT).
+            const unit = (keyset.unit ?? 'sat').toLowerCase();
+            if (!isRestorableKeysetId(keyset.id)) {
+              skippedKeysets += 1;
+              cashuLog.info('recovery.keyset.skipped', {
+                ...mintUrlLogFields(mintUrl),
+                keysetId: keyset.id,
+                reason: 'non_nut02_id',
+              });
+            } else {
+              try {
+                // `proofTally` is written through, not returned: this call
+                // throws on the already-recovered path, which is precisely
+                // where the interesting counts are.
+                await restoreKeysetForMint(manager, mintUrl, keyset.id, unit, proofTally);
+              } catch (error) {
+                if (isAlreadyRecoveredError(error)) {
+                  // Every proof was already in the database — a second run
+                  // finding nothing new is success, not failure.
+                  alreadyRecoveredKeysets += 1;
+                  cashuLog.info('recovery.keyset.already_recovered', {
+                    ...mintUrlLogFields(mintUrl),
+                    keysetId: keyset.id,
+                  });
+                } else {
+                  failedKeysets += 1;
+                  cashuLog.warn('recovery.keyset.failed', {
+                    ...mintUrlLogFields(mintUrl),
+                    keysetId: keyset.id,
+                    unit,
+                    error: (error as Error)?.message,
+                  });
+                }
+              }
+            }
+            patch(i, {
+              keysetsDone: recoveryResults[i].keysetsDone + 1,
+              failedKeysets,
+              alreadyRecoveredKeysets,
+              skippedKeysets,
+            });
+            // Between keysets, not inside them: unblinding a batch is one
+            // uninterruptible JS turn, so this is the only place the thread
+            // can be handed back.
+            await yieldToEventLoop();
+          }
         } catch (error) {
+          // addMint failed — the mint is unreachable, so no keyset ran at all.
+          failedKeysets = Math.max(failedKeysets, 1);
+          mintError = (error as Error)?.message;
           cashuLog.warn('recovery.mint.restore_threw', {
             ...mintUrlLogFields(mintUrl),
-            error: (error as Error)?.message,
+            error: mintError,
           });
         }
-        // Check if funds were actually recovered regardless of whether restore threw
+
+        // Scoped to this mint. Unscoped, coco falls through to
+        // `getAllReadyProofs` — a full ready-proof scan across every mint,
+        // once per mint completion.
         const balances = await manager.wallet.balances
-          .byMint()
+          .byMint({ mintUrls: [mintUrl] })
           .catch(() => ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>);
         const mintBalance = amountToNumber(balances[mintUrl]?.total);
         const fundsFound = mintBalance > 0;
         const mintMs = Math.round((performance.now() - mintT0) * 100) / 100;
 
-        recoveryResults[i] = {
-          mint: mintUrl,
-          success: true,
+        const restoredSomething = alreadyRecoveredKeysets === 0 || failedKeysets > 0;
+        const mintStatus =
+          failedKeysets > 0 ? 'failed' : restoredSomething ? 'done' : 'already-recovered';
+        recordMintBenchmark(
+          {
+            mintUrl,
+            isDiscovered,
+            status: mintStatus,
+            keysetsTotal: recoveryResults[i]!.keysetsTotal ?? 0,
+            keysetsAttempted: recoveryResults[i]!.keysetsDone - skippedKeysets,
+            keysetsSkipped: skippedKeysets,
+            keysetsAlreadyRecovered: alreadyRecoveredKeysets,
+            keysetsFailed: failedKeysets,
+            durationMs: performance.now() - mintT0,
+            proofsReady: proofTally.ready,
+            proofsSpent: proofTally.spent,
+          },
+          cryptoAtMintStart
+        );
+        patch(i, {
+          // Report what actually happened. This used to be an unconditional
+          // `success: true`, which made "Recovery Partial" dead code and let
+          // the screen claim it recovered from every mint while restore threw.
+          status: mintStatus,
+          error: failedKeysets > 0 ? (mintError ?? `${failedKeysets} keyset(s) failed`) : undefined,
           durationMs: mintMs,
-          isDiscovered,
           fundsFound,
-        };
-
-        setResults([...recoveryResults]);
+        });
+        cashuLog.info('recovery.mint.done', {
+          ...mintUrlLogFields(mintUrl),
+          durationMs: mintMs,
+          failedKeysets,
+          alreadyRecoveredKeysets,
+          skippedKeysets,
+          fundsFound,
+        });
       };
 
-      setCurrentMintIndex(-1);
-      await Promise.allSettled(allMintUrls.map((url, i) => restoreOneUrl(url, i)));
+      // ONE MINT AT A TIME.
+      //
+      // This used to be `Promise.allSettled(allMintUrls.map(...))`. Every other
+      // Cashu wallet — cashu.me, macadamia, minibits — and CDK's own Rust
+      // restore run mints strictly sequentially, and the measured reason is
+      // stark: with N mints in flight, cashu-ts's 4-way in-keyset batch pool
+      // becomes 4N concurrent responses whose unblinding drains as one
+      // unbroken microtask chain. On-device that produced 34s and 39s JS
+      // blocks, and it punished the innocent — the two mints that restored
+      // NOTHING still took 35s each, with request latency up to 56s, purely
+      // from contention. Network concurrency inside a keyset is kept, because
+      // that part is bounded and not CPU-bound.
+      for (let i = 0; i < allMintUrls.length; i += 1) {
+        if (recoveryCancelled) {
+          patch(i, { status: 'skipped', error: 'Cancelled' });
+          continue;
+        }
+        const timeoutT0 = performance.now();
+        const cryptoBeforeMint = markMintStart();
+        proofTally.ready = 0;
+        proofTally.spent = 0;
+        try {
+          await withTimeout(
+            restoreOneUrl(allMintUrls[i]!, i),
+            MINT_RESTORE_TIMEOUT_MS,
+            'recovery.mint'
+          );
+        } catch (error) {
+          // coco's request provider has no HTTP timeout, so one unresponsive
+          // mint would otherwise stall every mint behind it.
+          patch(i, {
+            status: 'failed',
+            error: (error as Error)?.message ?? 'Timed out',
+            durationMs: null,
+          });
+          // Record it here too: `restoreOneUrl`'s own benchmark call never runs
+          // when the timeout fires, and without this the mint vanishes from the
+          // per-mint table — a run that touched five mints reported four, which
+          // made the two implementations look like different workloads even
+          // though the run-level counters matched exactly.
+          recordMintBenchmark(
+            {
+              mintUrl: allMintUrls[i]!,
+              isDiscovered: i >= knownMintUrls.length,
+              status: 'timed-out',
+              keysetsTotal: recoveryResults[i]?.keysetsTotal ?? 0,
+              keysetsAttempted: recoveryResults[i]?.keysetsDone ?? 0,
+              keysetsSkipped: recoveryResults[i]?.skippedKeysets ?? 0,
+              keysetsAlreadyRecovered: recoveryResults[i]?.alreadyRecoveredKeysets ?? 0,
+              keysetsFailed: recoveryResults[i]?.failedKeysets ?? 0,
+              durationMs: performance.now() - timeoutT0,
+              proofsReady: proofTally.ready,
+              proofsSpent: proofTally.spent,
+            },
+            cryptoBeforeMint
+          );
+          cashuLog.warn('recovery.mint.timed_out', {
+            ...mintUrlLogFields(allMintUrls[i]),
+            timeoutMs: MINT_RESTORE_TIMEOUT_MS,
+          });
+        }
+      }
+
+      // Everything below is real work that used to run under the "Recovering
+      // Wallet" spinner with every mint row already showing its green check —
+      // the "idle spinner near the end". It gets its own phase and copy.
+      const finalizeT0 = performance.now();
+      setPhase('finalizing');
 
       // Untrust discovered mints that returned no funds. `wallet.restore`
       // calls `mintService.addMintByUrl(url, { trusted: true })` for every
@@ -276,6 +630,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       // in the trusted-mints set used by the routing surface.
       const discoveredEmpty = recoveryResults.filter((r) => r.isDiscovered && !r.fundsFound);
       if (discoveredEmpty.length > 0) {
+        setFinalizingLabel(`Tidying up ${discoveredEmpty.length} probed mints`);
         await Promise.allSettled(
           discoveredEmpty.map(async (r) => {
             try {
@@ -304,6 +659,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       try {
         const pendingOps = await manager.ops.mint.listPending();
         if (pendingOps.length > 0) {
+          setFinalizingLabel(`Clearing ${pendingOps.length} stale operations`);
           // Coco doesn't expose a public abandon API for pending operations,
           // so go through the typed seam in shared/lib/cashu/managerInternals.
           for (const op of pendingOps) {
@@ -326,18 +682,20 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         });
       }
 
+      setFinalizingLabel('Refreshing your mints');
       await loadMints();
+      recordFinalizePhase(performance.now() - finalizeT0);
       const totalMs = Math.round((performance.now() - t0) * 100) / 100;
-      const successCount = recoveryResults.filter((r) => r.success).length;
+      const counts = computeRecoveryCounts(recoveryResults);
+      const successCount = counts.succeeded;
       // Only count failures on known mints — discovered mint failures are expected
-      const knownFailureCount = recoveryResults
-        .slice(0, knownMintUrls.length)
-        .filter((r) => !r.success).length;
+      const knownFailureCount = countKnownFailures(recoveryResults);
 
       cashuLog.info('recovery.complete', {
         totalMs,
         successCount,
         knownFailureCount,
+        failedMints: counts.failed,
         totalResults: recoveryResults.length,
       });
 
@@ -352,7 +710,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             durationSec: (totalMs / 1000).toFixed(1),
           });
         }
-        setRecoveryState('complete');
+        setPhase('complete');
       } else {
         if (!gateMode) {
           if (successCount > 0) {
@@ -361,7 +719,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             staticPopup('recovery-failed');
           }
         }
-        setRecoveryState('error');
+        setPhase('error');
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -369,9 +727,49 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       if (!gateMode) {
         staticPopup('recovery-failed', { text: errorMsg });
       }
-      setRecoveryState('error');
+      setPhase('error');
+    } finally {
+      setFinalizingLabel(null);
+      recoveryInFlight = false;
+      // Always emits, including on the error path — a failed run's numbers are
+      // exactly the ones worth reading.
+      endRecoveryBenchmark();
+      // Replays one refresh per subscriber. Must run before `loadMints` below
+      // would otherwise be the only thing that repopulated the screen.
+      endRecoverySuppression();
     }
-  }, [mints, deepProbe, discoveredMintUrls, loadMints, gateMode]);
+  }, [phase, mints, deepProbe, discoveredMintUrls, loadMints, gateMode]);
+
+  /**
+   * Stops after the mint in flight finishes. Nothing is torn down mid-mint:
+   * abandoning a keyset between `batchRestore` and `saveProofs` would leave the
+   * derivation counter ahead of what was persisted, and the next run would
+   * re-derive secrets the mint has already signed.
+   */
+  /**
+   * Times each BDHKE primitive on its own, native vs JS. Separate from the
+   * recovery run because it takes seconds of solid crypto — folding it into
+   * every restore would tax the thing it is meant to measure.
+   */
+  const handleRunMicroBench = useCallback(async () => {
+    if (recoveryInFlight || isBenchmarking) return;
+    setIsBenchmarking(true);
+    try {
+      const rows = await runCryptoMicroBench();
+      const compared = rows.filter((r) => r.cdkUs != null).length;
+      staticPopup('crypto-benchmark-complete', {
+        text: `${rows.length} operations timed, ${compared} with a native counterpart.`,
+      });
+    } finally {
+      setIsBenchmarking(false);
+    }
+  }, [isBenchmarking]);
+
+  const handleCancelRecovery = useCallback(() => {
+    recoveryCancelled = true;
+    setFinalizingLabel('Stopping after this mint');
+    cashuLog.info('recovery.cancel.requested', {});
+  }, []);
 
   const handleClose = useCallback(() => router.back(), []);
 
@@ -431,11 +829,50 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
               Search all mints
             </Text>
             <Text size={12} style={{ color: opacity(foreground, 0.4) }}>
-              Probe mints you may have used before
+              {isDiscovering
+                ? 'Loading mint list…'
+                : deepProbe && discoveredMintUrls.length > 0
+                  ? `${discoveredMintUrls.length} extra mints to check`
+                  : 'Probe mints you may have used before'}
             </Text>
           </VStack>
-          <Switch isSelected={deepProbe} onSelectedChange={setDeepProbe} />
+          {isDiscovering ? (
+            <View style={{ width: 24, alignItems: 'center' }}>
+              <LoadingIndicator size={20} phase="loading" color={foreground} />
+            </View>
+          ) : (
+            <Switch isSelected={deepProbe} onSelectedChange={setDeepProbe} />
+          )}
         </HStack>
+
+        {/* Benchmark A/B. Only offered once the self-test has proven the two
+            implementations byte-identical, so flipping it changes speed and
+            nothing else. */}
+        {nativeAvailable && (
+          <HStack
+            className="w-full items-center justify-between rounded-2xl px-4 py-3"
+            style={{ backgroundColor: surfaceSecondary }}>
+            <VStack spacing={2} style={{ flex: 1 }}>
+              <Text size={14} bold style={{ color: foreground }}>
+                Native crypto
+              </Text>
+              <Text size={12} style={{ color: opacity(foreground, 0.4) }}>
+                {useNativeCrypto ? 'Rust CDK bindings' : 'cashu-ts fallback (slower)'}
+              </Text>
+            </VStack>
+            <Switch isSelected={useNativeCrypto} onSelectedChange={setUseNativeCrypto} />
+          </HStack>
+        )}
+
+        <Button
+          variant="secondary"
+          className="w-full"
+          isDisabled={isBenchmarking}
+          onPress={handleRunMicroBench}>
+          <Button.Label>
+            {isBenchmarking ? 'Benchmarking…' : 'Benchmark crypto operations'}
+          </Button.Label>
+        </Button>
         <SlideToConfirm
           onConfirm={handleStartRecovery}
           iconName="mdi:shield-refresh"
@@ -454,49 +891,11 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     </VStack>
   );
 
-  // ─── Probe progress row (shared) ─────────────────────────────────────────
-
-  const renderProbeRow = () => {
-    if (!deepProbe) return null;
-    const discoveredResults = results.filter((r) => r.isDiscovered);
-    const probed = discoveredResults.filter((r) => r.durationMs != null).length;
-    const total = discoveredResults.length;
-    if (total === 0) return null;
-    const done = probed >= total;
-    const found = discoveredResults.filter((r) => r.fundsFound).length;
-    return (
-      <HStack spacing={12} className="items-center">
-        <View
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 18,
-            backgroundColor: foreground,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-          <Icon name="mingcute:search-3-fill" size={20} color={surfaceSecondary} />
-        </View>
-        <VStack spacing={2} style={{ flex: 1, minWidth: 0 }}>
-          <Text size={14} bold numberOfLines={1} style={{ color: foreground }}>
-            {done ? 'Search complete' : 'Searching mints'}
-          </Text>
-          <Text size={12} style={{ color: opacity(foreground, 0.4) }}>
-            {done
-              ? `Probed ${total} mints${found > 0 ? `, found ${found}` : ''}`
-              : `Probed ${probed} of ${total}`}
-          </Text>
-        </VStack>
-        <View style={{ width: 24, flexShrink: 0, alignItems: 'center' }}>
-          <LoadingIndicator size={24} phase={done ? 'done' : 'loading'} result="success" />
-        </View>
-      </HStack>
-    );
-  };
-
-  // Build lookup and filter: only show known mints + discovered mints that recovered funds
+  // Every row in `results` is a mint we are actually restoring: probed mints
+  // were already filtered down to those the shallow probe found history at, so
+  // there is nothing left to hide and no separate aggregate probe row to show.
   const mintsByUrl = Object.fromEntries(mints.map((m) => [m.mintUrl, m]));
-  const visibleResults = results.filter((r) => !r.isDiscovered || r.fundsFound);
+  const visibleResults = results;
 
   // ─── Recovering + complete states (single tree) ──────────────────────────
   //
@@ -508,8 +907,14 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   // animation (see LoadingIndicator's `startedDone` ref).
 
   const renderActiveOrCompleteState = () => {
-    const isComplete = recoveryState === 'complete';
-    const successMintCount = visibleResults.filter((r) => r.success).length;
+    const isComplete = phase === 'complete';
+    // Every mint in the list is one we are really restoring, so the ring can
+    // count them all — the denominator is fixed before the first mint starts
+    // and never moves, which is what keeps the ring honest.
+    const counts = computeRecoveryCounts(results);
+    const successMintCount = visibleResults.filter((r) => isSuccess(r.status)).length;
+    const active = currentMint(results);
+    const activeMint = active ? mintsByUrl[active.mint] : undefined;
     return (
       <VStack spacing={24} className="flex-1 px-6 pt-12">
         <VStack spacing={24} className="flex-1 items-center justify-center">
@@ -519,16 +924,29 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             <LoadingIndicator
               size={48}
               phase={isComplete ? 'done' : 'loading'}
-              result="success"
+              result={counts.failed > 0 ? 'warning' : 'success'}
+              // One segment per mint: the ring itself now carries how far the
+              // run has actually got, instead of spinning identically from the
+              // first mint to the last.
+              segmentedProgress={{
+                completedSegments: counts.settled,
+                segmentCount: Math.max(1, counts.total),
+              }}
+              segmentedInProgress={phase === 'restoring'}
               color={foreground}
-              successColor={green400}
-              errorColor={red400}
+              successColor={successColor}
+              errorColor={dangerColor}
+              warningColor={warningColor}
             />
           </View>
 
           <VStack spacing={8} className="items-center">
             <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
-              {isComplete ? 'Recovery Complete' : 'Recovering Wallet'}
+              {isComplete
+                ? 'Recovery Complete'
+                : phase === 'finalizing'
+                  ? 'Finishing Up'
+                  : 'Recovering Wallet'}
             </Text>
             <Text
               size={isComplete ? 16 : 14}
@@ -541,45 +959,75 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                 ? `Successfully recovered from ${successMintCount} mint${
                     successMintCount !== 1 ? 's' : ''
                   }.`
-                : 'Restoring ecash from your mints...'}
+                : phase === 'finalizing' || phase === 'discovering'
+                  ? (finalizingLabel ?? 'Putting your wallet back together')
+                  : `Mint ${currentMintPosition(results)} of ${counts.total}`}
             </Text>
+            {/* Proof of life. The JS thread blocks for tens of seconds at a
+                time during restore, so this is deliberately UI-thread driven —
+                it keeps counting when nothing else on screen can move. */}
+            {!isComplete && (
+              <ElapsedSeconds
+                running={ACTIVE_PHASES.has(phase)}
+                size={13}
+                color={opacity(foreground, 0.4)}
+                testID="recovery-elapsed"
+              />
+            )}
+            {/* Naming the mint in flight only became possible once mints run
+                one at a time. */}
+            {active && (
+              <Text size={13} numberOfLines={1} style={{ color: opacity(foreground, 0.6) }}>
+                {getMintDisplayName(activeMint, active.mint)}
+              </Text>
+            )}
           </VStack>
 
           <Card variant="secondary" className="w-full">
             <Card.Body>
               <VStack spacing={12}>
-                {visibleResults.map((r) => (
+                {visibleResults.map((r, i) => (
                   <MintRecoveryRow
                     key={r.mint}
                     mintUrl={r.mint}
                     mint={mintsByUrl[r.mint]}
-                    index={results.indexOf(r)}
-                    // While recovering, currentMintIndex is -1 (allActive
-                    // mode in MintRecoveryRow). On `complete`, push it past
-                    // the last index so every row reports as done — but the
-                    // per-row LoadingIndicator already drives off the
-                    // result.success state, so this is just for the row's
-                    // text dimming.
-                    currentIndex={isComplete ? results.length : currentMintIndex}
-                    result={r}
+                    state={r}
+                    index={i}
                   />
                 ))}
-                {renderProbeRow()}
               </VStack>
             </Card.Body>
           </Card>
         </VStack>
 
-        {isComplete && (
-          <VStack spacing={12} className="w-full pb-6">
+        <VStack spacing={12} className="w-full pb-6">
+          {isComplete ? (
             <Button
               variant="primary"
               className="w-full"
               onPress={gateMode ? onComplete : handleClose}>
               <Button.Label>{gateMode ? 'Continue' : 'Close'}</Button.Label>
             </Button>
-          </VStack>
-        )}
+          ) : (
+            // Cancelling is only coherent because mints run one at a time: it
+            // stops before the next mint rather than tearing down work in
+            // flight. None of cashu.me, macadamia or minibits offers this.
+            //
+            // Never in gateMode: there, cancelling would skip mints, still
+            // reach the 'complete' state (skipped mints are not failures), and
+            // let Continue mark the restore permanently done — stranding funds
+            // on the mints that never ran.
+            !gateMode && (
+              <Button
+                variant="secondary"
+                className="w-full"
+                isDisabled={recoveryCancelled}
+                onPress={handleCancelRecovery}>
+                <Button.Label>{recoveryCancelled ? 'Stopping…' : 'Cancel'}</Button.Label>
+              </Button>
+            )
+          )}
+        </VStack>
       </VStack>
     );
   };
@@ -587,8 +1035,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   // ─── Error state (retry available) ──────────────────────────────────────
 
   const renderErrorState = () => {
-    const visibleSuccessCount = visibleResults.filter((r) => r.success).length;
-    const visibleFailureCount = visibleResults.filter((r) => !r.success).length;
+    const visibleSuccessCount = visibleResults.filter((r) => r.status === 'done').length;
+    const visibleFailureCount = visibleResults.filter((r) => r.status !== 'done').length;
 
     return (
       <VStack spacing={24} className="flex-1 px-6 pt-12">
@@ -601,8 +1049,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
               phase="done"
               result="error"
               color={foreground}
-              successColor={green400}
-              errorColor={red400}
+              successColor={successColor}
+              errorColor={dangerColor}
             />
           </View>
 
@@ -623,27 +1071,34 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             <Card variant="secondary" className="w-full">
               <Card.Body>
                 <VStack spacing={12}>
-                  {visibleResults.map((result, index) => {
+                  {visibleResults.map((result) => {
                     const mint = mintsByUrl[result.mint];
                     const displayName = getMintDisplayName(mint, result.mint);
                     return (
-                      <HStack key={index} spacing={12} className="items-center">
+                      <HStack key={result.mint} spacing={12} className="items-center">
                         <MintIcon iconUrl={mint?.mintInfo?.icon_url} name={displayName} size={36} />
                         <VStack spacing={2} style={{ flex: 1, minWidth: 0 }}>
                           <Text size={14} bold numberOfLines={1} style={{ color: foreground }}>
                             {displayName}
                           </Text>
                           {result.error && (
-                            <Text size={12} numberOfLines={1} style={{ color: red400 }}>
+                            <Text size={12} numberOfLines={1} style={{ color: dangerColor }}>
                               {result.error}
                             </Text>
                           )}
                         </VStack>
-                        <View style={{ width: 24, flexShrink: 0, alignItems: 'center' }}>
+                        <View style={{ width: DOT_SIZE, flexShrink: 0, alignItems: 'center' }}>
                           <LoadingIndicator
-                            size={24}
-                            phase="done"
-                            result={result.success ? 'success' : 'error'}
+                            size={DOT_SIZE}
+                            strokeWidthPx={STROKE_PX}
+                            pendingColor={mutedColor}
+                            successColor={successColor}
+                            errorColor={dangerColor}
+                            revertedColor={warningColor}
+                            warningColor={warningColor}
+                            {...mapCheckpointStatusToIndicator(
+                              mintStatusToCheckpoint(result.status)
+                            )}
                           />
                         </View>
                       </HStack>
@@ -680,11 +1135,16 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ flexGrow: 1 }}
-        scrollEnabled={recoveryState !== 'recovering'}>
-        {recoveryState === 'idle' && renderIdleState()}
-        {(recoveryState === 'recovering' || recoveryState === 'complete') &&
+        // Scrolling stays enabled throughout. Locking it during a run was
+        // conflating "don't navigate away" with "don't move" — navigation is
+        // already blocked by the beforeRemove guard above, and with a mint list
+        // that can be taller than the screen, freezing the scroll just makes a
+        // multi-minute operation feel like a hang.
+        scrollEnabled>
+        {(phase === 'idle' || phase === 'discovering') && renderIdleState()}
+        {(phase === 'restoring' || phase === 'finalizing' || phase === 'complete') &&
           renderActiveOrCompleteState()}
-        {recoveryState === 'error' && renderErrorState()}
+        {phase === 'error' && renderErrorState()}
       </ScrollView>
     </ScreenWrapper>
   );
@@ -705,41 +1165,53 @@ function getMintDisplayName(mint: Mint | undefined, fallbackUrl: string): string
 const MintRecoveryRow: React.FC<{
   mintUrl: string;
   mint?: Mint;
+  state: MintRecoveryState;
   index: number;
-  currentIndex: number;
-  result?: RecoveryResult;
-}> = ({ mintUrl, mint, index, currentIndex, result }) => {
-  const foreground = useThemeColor('foreground');
+}> = ({ mintUrl, mint, state, index }) => {
+  const [foreground, mutedColor, successColor, dangerColor, warningColor] = useThemeColor([
+    'foreground',
+    'muted',
+    'success',
+    'danger',
+    'warning',
+  ] as const);
   const { balances: liveBalances } = useBalanceContext();
   const mintBalance = liveBalances.byMint[mintUrl]?.total || 0;
 
-  const allActive = currentIndex === -1;
-  const hasResult = result?.durationMs != null;
-  const isActive = allActive ? !hasResult : index === currentIndex;
-  const isPending = allActive ? false : index > currentIndex;
-
   const displayName = getMintDisplayName(mint, mintUrl);
+  // Derived at render rather than on a timer: renders arrive in bursts while
+  // the JS thread is blocked, and a timer would be starved anyway.
+  const progressLabel = describeMintProgress(state, Date.now());
 
   return (
     <HStack spacing={12} className="items-center">
       <MintIcon iconUrl={mint?.mintInfo?.icon_url} name={displayName} size={36} />
       <VStack spacing={2} style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          size={14}
-          bold
-          numberOfLines={1}
-          style={{ color: isPending ? opacity(foreground, 0.33) : foreground }}>
+        <Text size={14} bold numberOfLines={1} style={{ color: foreground }}>
           {displayName}
         </Text>
-        <Text size={12} style={{ color: opacity(foreground, 0.4) }}>
-          {mintBalance.toLocaleString()} sats
+        <Text
+          size={12}
+          numberOfLines={1}
+          style={{ color: state.status === 'failed' ? dangerColor : opacity(foreground, 0.4) }}>
+          {progressLabel ?? `${mintBalance.toLocaleString()} sats`}
         </Text>
       </VStack>
-      <View style={{ width: 24, flexShrink: 0, alignItems: 'center' }}>
+      {/* Same dot the payment timeline draws, same size, stroke weight and
+          cascade — minus the connector rail, since these rows are a list of
+          independent mints rather than one payment's ordered steps. A queued
+          mint resolves to phase `idle`: dimmed, dashed, and stationary. */}
+      <View style={{ width: DOT_SIZE, flexShrink: 0, alignItems: 'center' }}>
         <LoadingIndicator
-          size={24}
-          phase={isActive ? 'loading' : 'done'}
-          result={result?.success ? 'success' : 'error'}
+          size={DOT_SIZE}
+          strokeWidthPx={STROKE_PX}
+          transitionDelayMs={rowDelays(index).dotDelayMs}
+          pendingColor={mutedColor}
+          successColor={successColor}
+          errorColor={dangerColor}
+          revertedColor={warningColor}
+          warningColor={warningColor}
+          {...mapCheckpointStatusToIndicator(mintStatusToCheckpoint(state.status))}
         />
       </View>
     </HStack>

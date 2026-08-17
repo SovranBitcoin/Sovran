@@ -9,6 +9,7 @@
 
 import { useEffect } from 'react';
 
+import { getMintQuoteRemoteState } from '@cashu/coco-core';
 import { useManagerContext } from '@cashu/coco-react';
 
 import {
@@ -314,8 +315,13 @@ export function usePaymentStatusListener(): void {
         try {
           const quote = await manager.quotes.mint.get({ mintUrl, quoteId });
           if (disposed) return;
-          state = quote?.state ?? quote?.lastObservedRemoteState;
-          lastObservedRemoteStateAt = quote?.lastObservedRemoteStateAt;
+          // coco's Mint Quote Accounting refactor removed the observation
+          // fields from mint quotes: state is now derived from
+          // amountPaid/amountIssued, and the local (millisecond) `updatedAt` is
+          // the observation timestamp. `remoteUpdatedAt` is NOT a substitute —
+          // it is mint-reported protocol *seconds*.
+          state = quote ? getMintQuoteRemoteState(quote) : undefined;
+          lastObservedRemoteStateAt = quote?.updatedAt;
         } catch (error) {
           paymentLog.debug('hook.payment_status.mint_quote_lookup_failed', {
             quoteId,

@@ -19,7 +19,6 @@
           "react-native-nfc-manager",
           "react-native-restart",
           "bitchat-module",
-          "nutpatch",
           "liquid-glass-menu",
           "liquid-glass-text"
         ]
@@ -85,10 +84,8 @@
   "dependencies": {
     "@babel/runtime": "^7.28.0",
     "@bacons/apple-targets": "^4.0.6",
-    "@cashu/cashu-ts": "4.5.1",
-    "@cashu/coco-core": "2.0.0-rc.2",
-    "@cashu/coco-expo-sqlite": "2.0.0-rc.2",
-    "@cashu/coco-react": "2.0.0-rc.2",
+    "@cashu/cashu-ts": "file:../vendor/cashu-ts",
+    "@cashudevkit/react-native": "github:crodas/cdk-nitro#v0.17.3",
     "@expo/metro-runtime": "~56.0.17",
     "@expo/react-native-action-sheet": "^4.1.0",
     "@expo/ui": "~56.0.18",
@@ -165,7 +162,6 @@
     "nostr-tools": "^2.10.4",
     "npubcash-sdk": "^0.3.2",
     "number-flow-react-native": "^0.2.5",
-    "nutpatch": "^1.0.0",
     "polished": "^4.3.1",
     "process": "^0.11.10",
     "react": "19.2.3",

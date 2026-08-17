@@ -1,5 +1,6 @@
 import type { MutableRefObject } from 'react';
 
+import { getMintQuoteRemoteState } from '@cashu/coco-core';
 import type { HistoryEntry } from '@cashu/coco-core';
 
 import type {
@@ -328,7 +329,7 @@ export function createSovranScreenActionsBridge({
         // decoupled from operations — the payload carries no operationId; bus
         // consumers match by quoteId.
         manager.on('mint-quote:updated', ({ quoteId, quote }) => {
-          const state = quote.state ?? quote.lastObservedRemoteState;
+          const state = getMintQuoteRemoteState(quote);
           paymentLog.info('send.mint_quote_updated', {
             quoteId,
             state: state ?? null,

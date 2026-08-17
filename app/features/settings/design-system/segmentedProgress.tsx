@@ -38,6 +38,44 @@ const SEGMENT_CASES = [
   { id: 'segments-complete', title: 'Segments · 6/6', completedSegments: 6, segmentCount: 6 },
 ] as const;
 
+// The recovery hero, which uses one segment per mint. Pinned here because the
+// straggler case (4 of 5 settled, one mint scanning for another minute) is the
+// state the screen used to render as an indistinguishable spinner.
+const RECOVERY_CASES = [
+  {
+    id: 'recovery-restoring',
+    title: 'Recovery · 2 of 5 mints',
+    completedSegments: 2,
+    segmentCount: 5,
+    inProgress: true,
+    result: 'success',
+  },
+  {
+    id: 'recovery-straggler',
+    title: 'Recovery · 4 of 5, one straggler',
+    completedSegments: 4,
+    segmentCount: 5,
+    inProgress: true,
+    result: 'success',
+  },
+  {
+    id: 'recovery-finalizing',
+    title: 'Recovery · Finishing up',
+    completedSegments: 5,
+    segmentCount: 5,
+    inProgress: false,
+    result: 'success',
+  },
+  {
+    id: 'recovery-partial',
+    title: 'Recovery · Partial (a mint failed)',
+    completedSegments: 5,
+    segmentCount: 5,
+    inProgress: false,
+    result: 'warning',
+  },
+] as const;
+
 const TRANSFER_CASES = [
   { id: 'transfer-pending', title: 'Transfer · Pending', status: 'pending' },
   { id: 'transfer-invoice', title: 'Transfer · Creating invoice', status: 'creatingInvoice' },
@@ -77,6 +115,42 @@ function SegmentedPreview({
   );
 }
 
+function RecoveryHeroPreview({
+  completedSegments,
+  segmentCount,
+  inProgress,
+  result,
+  caption,
+}: {
+  completedSegments: number;
+  segmentCount: number;
+  inProgress: boolean;
+  result: 'success' | 'warning';
+  caption: string;
+}) {
+  const complete = !inProgress && completedSegments >= segmentCount;
+  const segmentedProgress = React.useMemo(
+    () => ({ completedSegments, segmentCount }),
+    [completedSegments, segmentCount]
+  );
+
+  return (
+    <View className="items-center justify-center py-3">
+      <LoadingIndicator
+        size={48}
+        phase={complete && result === 'success' ? 'done' : 'loading'}
+        result={result}
+        segmentedProgress={segmentedProgress}
+        segmentedInProgress={inProgress}
+        visualDisabled
+      />
+      <Text size={12} bold className="text-foreground/60 mt-2">
+        {caption}
+      </Text>
+    </View>
+  );
+}
+
 function CheckpointStatusMatrix() {
   return (
     <VStack gap={8}>
@@ -103,6 +177,20 @@ export const SEGMENTED_PROGRESS_SCENARIOS = [
     covers: [LOADING_INDICATOR_SOURCE],
     render: () => (
       <SegmentedPreview completedSegments={completedSegments} segmentCount={segmentCount} />
+    ),
+  })),
+  ...RECOVERY_CASES.map(({ id, title, completedSegments, segmentCount, inProgress, result }) => ({
+    id,
+    title,
+    covers: [LOADING_INDICATOR_SOURCE],
+    render: () => (
+      <RecoveryHeroPreview
+        completedSegments={completedSegments}
+        segmentCount={segmentCount}
+        inProgress={inProgress}
+        result={result}
+        caption={title.replace('Recovery · ', '')}
+      />
     ),
   })),
   {
