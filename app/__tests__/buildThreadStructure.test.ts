@@ -99,7 +99,7 @@ describe('buildThreadStructure (audit 59.json F-001)', () => {
 describe('buildThreadStructure — OP direct replies lead the seed order', () => {
   const OP = 'f'.repeat(64);
 
-  it('partitions the target author\'s direct replies first, chronological within each group', () => {
+  it("partitions the target author's direct replies first, chronological within each group", () => {
     const root = note('root', OP, []);
     const early = note('early-other', 'a'.repeat(64), [['e', 'root', '', 'root']], 100);
     const opLate = note('op-late', OP, [['e', 'root', '', 'root']], 300);

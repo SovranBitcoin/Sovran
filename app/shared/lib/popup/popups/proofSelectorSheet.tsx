@@ -31,8 +31,7 @@ interface SuggestionRowProps {
 }
 
 type ProofSuggestionDisplay =
-  | { kind: 'sat'; amount: number; unit: string }
-  | { kind: 'fiat'; label: string };
+  { kind: 'sat'; amount: number; unit: string } | { kind: 'fiat'; label: string };
 
 export function getProofSuggestionDisplay(
   amount: number,

@@ -73,12 +73,7 @@ describe('isAlreadyRecoveredError', () => {
 });
 
 describe('restoreKeysetForMint proof-state tally', () => {
-  const STATES = [
-    { state: 'SPENT' },
-    { state: 'UNSPENT' },
-    { state: 'SPENT' },
-    { state: 'SPENT' },
-  ];
+  const STATES = [{ state: 'SPENT' }, { state: 'UNSPENT' }, { state: 'SPENT' }, { state: 'SPENT' }];
 
   /**
    * A wallet whose `checkProofsStates` lives on the prototype, matching cashu-ts

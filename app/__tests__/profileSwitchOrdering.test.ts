@@ -45,17 +45,21 @@ jest.mock('@/shared/stores/runtime/popupStore', () => ({
 function setup() {
   jest.resetModules();
   jest.clearAllMocks();
-  const AsyncStorage = require('@react-native-async-storage/async-storage') as typeof AsyncStorageMock;
-  const orchestrator = require('@/shared/lib/profile/profileSessionOrchestrator') as typeof import('@/shared/lib/profile/profileSessionOrchestrator');
-  const { useProfileStore } = require('@/shared/stores/global/profileStore') as typeof import('@/shared/stores/global/profileStore');
-  const { restartApp } = require('@/shared/lib/profile/appRestart') as typeof import('@/shared/lib/profile/appRestart');
+  const AsyncStorage =
+    require('@react-native-async-storage/async-storage') as typeof AsyncStorageMock;
+  const orchestrator =
+    require('@/shared/lib/profile/profileSessionOrchestrator') as typeof import('@/shared/lib/profile/profileSessionOrchestrator');
+  const { useProfileStore } =
+    require('@/shared/stores/global/profileStore') as typeof import('@/shared/stores/global/profileStore');
+  const { restartApp } =
+    require('@/shared/lib/profile/appRestart') as typeof import('@/shared/lib/profile/appRestart');
   useProfileStore.setState({
     activeAccountIndex: 0,
     profiles: [
       { accountIndex: 0, pubkey: 'a'.repeat(64), addedAt: 1 },
       { accountIndex: 1, pubkey: 'b'.repeat(64), addedAt: 2 },
     ],
-  } as never);
+  });
   (AsyncStorage.setItem as jest.Mock).mockClear();
   return {
     switchToExistingProfile: orchestrator.switchToExistingProfile,
@@ -127,16 +131,19 @@ describe('switchToExistingProfile — bounded teardown (BTC-14)', () => {
     CocoManager.cleanup.mockReturnValue(new Promise(() => {}));
     CocoManager.isReadyForCleanup.mockReturnValue(true);
 
-    const orchestrator = require('@/shared/lib/profile/profileSessionOrchestrator') as typeof import('@/shared/lib/profile/profileSessionOrchestrator');
-    const { useProfileStore } = require('@/shared/stores/global/profileStore') as typeof import('@/shared/stores/global/profileStore');
-    const { restartApp } = require('@/shared/lib/profile/appRestart') as typeof import('@/shared/lib/profile/appRestart');
+    const orchestrator =
+      require('@/shared/lib/profile/profileSessionOrchestrator') as typeof import('@/shared/lib/profile/profileSessionOrchestrator');
+    const { useProfileStore } =
+      require('@/shared/stores/global/profileStore') as typeof import('@/shared/stores/global/profileStore');
+    const { restartApp } =
+      require('@/shared/lib/profile/appRestart') as typeof import('@/shared/lib/profile/appRestart');
     useProfileStore.setState({
       activeAccountIndex: 0,
       profiles: [
         { accountIndex: 0, pubkey: 'a'.repeat(64), addedAt: 1 },
         { accountIndex: 1, pubkey: 'b'.repeat(64), addedAt: 2 },
       ],
-    } as never);
+    });
     jest.mocked(restartApp).mockResolvedValue(true);
 
     const pending = orchestrator.switchToExistingProfile({ accountIndex: 1 });

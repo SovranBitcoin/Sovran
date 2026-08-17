@@ -23,8 +23,7 @@ function encodeRequest(options: {
   mints?: string[];
   unit?: string;
 }): string {
-  const target =
-    options.target ?? nip19.nprofileEncode({ pubkey: RECEIVER_PK, relays: RELAYS });
+  const target = options.target ?? nip19.nprofileEncode({ pubkey: RECEIVER_PK, relays: RELAYS });
   const transport = [
     {
       type: options.transportType ?? PaymentRequestTransportType.NOSTR,
@@ -178,7 +177,7 @@ describe('deliverPaymentRequestPayload', () => {
       expect(rumor.kind).toBe(14);
       expect(rumor.content).toBe(payloadJson);
     } finally {
-      server.stop(true);
+      await server.stop(true);
     }
   });
 

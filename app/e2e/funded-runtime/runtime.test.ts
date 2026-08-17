@@ -4,11 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import {
-  PaymentRequest,
-  PaymentRequestTransportType,
-  getEncodedToken,
-} from '@cashu/cashu-ts';
+import { PaymentRequest, PaymentRequestTransportType, getEncodedToken } from '@cashu/cashu-ts';
 import * as nip19 from 'nostr-tools/nip19';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 

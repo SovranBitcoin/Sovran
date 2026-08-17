@@ -50,8 +50,7 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
   const downloaded = useWallpaperStore((s) => s.downloaded[themeName]);
   const activeDownloadProgress = useWallpaperStore((s) => s.activeDownloads[themeName]);
   const paletteColors = THEMES[themeName as keyof typeof THEMES] as
-    | Record<string, string>
-    | undefined;
+    Record<string, string> | undefined;
   // Selection border tracks the wallet's active theme so the picker
   // reflects the user's choice instead of a hardcoded blue.
   const foreground = useThemeColor('foreground');

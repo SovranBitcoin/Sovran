@@ -749,6 +749,11 @@ async function retireCombinedRecovery(
 async function defaultMintHealthProbe(mintUrl: string): Promise<boolean> {
   try {
     const base = mintUrl.endsWith('/') ? mintUrl : `${mintUrl}/`;
+    // Bare `fetch` on purpose: this is e2e-harness code running under Bun, not
+    // in the app runtime, and the probe only wants reachability — it reads
+    // `response.ok` and never parses a body, so `fetchJson`'s zod envelope and
+    // redaction buy nothing here.
+    // eslint-disable-next-line no-restricted-globals
     const response = await fetch(new URL('v1/info', base), { signal: AbortSignal.timeout(5_000) });
     return response.ok;
   } catch {

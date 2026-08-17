@@ -169,18 +169,9 @@ export interface EvaluateInput {
 }
 
 export type PolicyAllowReason =
-  | 'auto_method'
-  | 'grant_always'
-  | 'session_grant'
-  | 'session_allow'
-  | 'peer_grant_always';
+  'auto_method' | 'grant_always' | 'session_grant' | 'session_allow' | 'peer_grant_always';
 export type PolicyDenyReason =
-  | 'not_connected'
-  | 'blocked'
-  | 'rate_limited'
-  | 'forbidden_kind'
-  | 'grant_deny'
-  | 'malformed';
+  'not_connected' | 'blocked' | 'rate_limited' | 'forbidden_kind' | 'grant_deny' | 'malformed';
 export type PolicyAskReason = 'no_grant' | 'strict_mode' | 'critical_class' | 'self_decrypt';
 
 interface PolicyDecisionBase {

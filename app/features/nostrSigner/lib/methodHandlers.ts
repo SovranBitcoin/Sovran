@@ -38,8 +38,7 @@ import { nostrLog, redactError, type RedactedError } from '@/shared/lib/logger';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 
 type Nip46MethodHandlerError =
-  | { type: 'malformed-params' }
-  | { type: 'execution-failed'; cause: RedactedError };
+  { type: 'malformed-params' } | { type: 'execution-failed'; cause: RedactedError };
 
 const MALFORMED: Nip46MethodHandlerError = { type: 'malformed-params' };
 

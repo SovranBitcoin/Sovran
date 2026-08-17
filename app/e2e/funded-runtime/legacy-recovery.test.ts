@@ -389,7 +389,13 @@ describe('retired harness funded recovery', () => {
     });
     const digest = createHash('sha256').update(FIRST_SEED).digest('hex');
     writePrivate(
-      join(artifactsRoot, 'legacy-recovery-work', `seed-${digest}`, 'funded-custody', 'recovery.json'),
+      join(
+        artifactsRoot,
+        'legacy-recovery-work',
+        `seed-${digest}`,
+        'funded-custody',
+        'recovery.json'
+      ),
       '{"managed":true}'
     );
 

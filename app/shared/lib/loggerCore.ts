@@ -364,8 +364,7 @@ const LONG_STRING_PATTERNS: { name: string; noPreview?: boolean; test: (s: strin
   ];
 
 type StringClass =
-  | { kind: 'secret'; name: string }
-  | { kind: 'long'; name: string; noPreview?: boolean };
+  { kind: 'secret'; name: string } | { kind: 'long'; name: string; noPreview?: boolean };
 
 function classifyString(s: string): StringClass {
   for (const p of SECRET_STRING_PATTERNS) if (p.test(s)) return { kind: 'secret', name: p.name };

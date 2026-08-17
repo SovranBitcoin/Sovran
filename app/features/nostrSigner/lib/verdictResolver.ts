@@ -47,12 +47,7 @@ import { nostrLog, redactError } from '@/shared/lib/logger';
  * (runtime-only, so the persisted critical ceiling is untouched).
  */
 export type Nip46DecisionAction =
-  | 'approve_once'
-  | 'approve_session'
-  | 'always'
-  | 'deny_once'
-  | 'always_deny'
-  | 'block';
+  'approve_once' | 'approve_session' | 'always' | 'deny_once' | 'always_deny' | 'block';
 
 export interface Nip46RequestDecision {
   action: Nip46DecisionAction;

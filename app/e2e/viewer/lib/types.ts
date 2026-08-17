@@ -18,12 +18,7 @@ export type RunStatus = 'complete' | 'in-progress' | 'aborted';
  * pending/running only exist while the run is in-progress; a begun-but-unended
  * timeline in a finished run collapses to failed, an unbegun one to skipped. */
 export type ScenarioRunStatus =
-  | 'pending'
-  | 'running'
-  | 'passed'
-  | 'failed'
-  | 'deferred'
-  | 'skipped';
+  'pending' | 'running' | 'passed' | 'failed' | 'deferred' | 'skipped';
 
 export interface RunSummary {
   runId: string;
@@ -152,12 +147,7 @@ export interface ScenarioCatalogEntry {
 }
 
 export type DiffPairStatus =
-  | 'diff'
-  | 'identical'
-  | 'added'
-  | 'removed'
-  | 'dimension-mismatch'
-  | 'error';
+  'diff' | 'identical' | 'added' | 'removed' | 'dimension-mismatch' | 'error';
 
 export interface DiffPairResult {
   key: string;

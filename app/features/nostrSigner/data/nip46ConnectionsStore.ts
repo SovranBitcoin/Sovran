@@ -210,16 +210,10 @@ interface UpdateMetadataInput {
 export type UpsertAppError = 'invalid_pubkey' | 'invalid_relays' | 'app_limit_reached';
 type SetGrantError = 'unknown_app' | 'invalid_grant_key' | 'critical_always_forbidden';
 type SetPeerDecryptGrantError =
-  | 'unknown_app'
-  | 'self_decrypt_forbidden'
-  | 'invalid_peer'
-  | 'peer_grant_limit';
+  'unknown_app' | 'self_decrypt_forbidden' | 'invalid_peer' | 'peer_grant_limit';
 
 export type AdoptConnectionError =
-  | UpsertAppError
-  | 'unknown_previous'
-  | 'same_pubkey'
-  | 'target_exists';
+  UpsertAppError | 'unknown_previous' | 'same_pubkey' | 'target_exists';
 
 interface Nip46ConnectionsState {
   apps: Record<string, Nip46Connection>;

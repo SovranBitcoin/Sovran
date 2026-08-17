@@ -35,7 +35,8 @@ const TERMINAL_TINT_DURATION_MS = 800;
  * capture alone costs ~1s), so its owned Metro slows terminal toasts via env.
  * Unset outside e2e dev sessions. */
 const E2E_DISMISS_MS = __DEV__ ? Number(process.env.EXPO_PUBLIC_E2E_TOAST_DISMISS_MS) : NaN;
-const AUTO_DISMISS_MS = Number.isFinite(E2E_DISMISS_MS) && E2E_DISMISS_MS > 0 ? E2E_DISMISS_MS : 3000;
+const AUTO_DISMISS_MS =
+  Number.isFinite(E2E_DISMISS_MS) && E2E_DISMISS_MS > 0 ? E2E_DISMISS_MS : 3000;
 
 export type StatusToastStatus = 'pending' | 'delivered' | 'confirmed' | 'failed' | 'warning';
 

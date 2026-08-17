@@ -211,8 +211,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
     // captured manager is still the live instance before every step.
     const controller = new AbortController();
     const chainManager = manager;
-    const isLive = () =>
-      !controller.signal.aborted && CocoManager.peekInstance() === chainManager;
+    const isLive = () => !controller.signal.aborted && CocoManager.peekInstance() === chainManager;
 
     const runBackground = async () => {
       try {

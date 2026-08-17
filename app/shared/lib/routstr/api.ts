@@ -649,8 +649,7 @@ function* parseSSEFromText(text: string): Generator<ChatCompletionChunk> {
  * string-only assumption can't survive anywhere on the path.
  */
 export type RoutstrContentPart =
-  | { type: 'text'; text: string }
-  | { type: 'image_url'; image_url: { url: string } };
+  { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
 
 export type RoutstrMessageContent = string | RoutstrContentPart[];
 

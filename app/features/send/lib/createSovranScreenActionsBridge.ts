@@ -311,10 +311,7 @@ export function createSovranScreenActionsBridge({
 
       const subscribeMeltOperation = (
         eventName:
-          | 'melt-op:prepared'
-          | 'melt-op:pending'
-          | 'melt-op:finalized'
-          | 'melt-op:rolled-back'
+          'melt-op:prepared' | 'melt-op:pending' | 'melt-op:finalized' | 'melt-op:rolled-back'
       ) =>
         manager.on(eventName, ({ operation }) => {
           publishMeltUpdated(bus, operation);

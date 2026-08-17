@@ -2,6 +2,7 @@
  * Validates the facade ResolvedFeedPage → app FeedParseResult adapter: the shape
  * bridge that lets the tier-selecting facade drive the existing feed UI.
  */
+import type { facade } from 'nostr';
 import {
   MAX_FEED_POST_CHARS,
   resolvedFeedPageToParseResult,
@@ -170,16 +171,17 @@ describe('isRootNote', () => {
 });
 
 describe('skimmableFeedFilters — the 280-char home-feed cap', () => {
-  function page(items: unknown[]) {
-    return {
-      tier: 'primal' as const,
-      items,
+  function page(items: unknown[]): facade.ResolvedFeedPage {
+    const built: facade.ResolvedFeedPage = {
+      tier: 'primal',
+      items: items as facade.ResolvedFeedPage['items'],
       stats: {},
       profiles: {},
       quoted: {},
       cursor: null,
       missingIds: [],
-    } as never;
+    };
+    return built;
   }
 
   it('drops over-long text notes but keeps short ones (code points, not UTF-16 units)', () => {

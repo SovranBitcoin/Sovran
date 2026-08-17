@@ -130,8 +130,7 @@ export type ImageOverlayContextValue = {
   setVideoFeedIndex: (index: number, layout: ImageOverlayReplaceLayout) => void;
   /** Called by overlay to get layouts for vertical feed; feed returns { layouts, initialIndex: 0 }. */
   getVideoFeedLayoutsAndIndex:
-    | (() => { layouts: ImageOverlayReplaceLayout[]; initialIndex: number } | null)
-    | null;
+    (() => { layouts: ImageOverlayReplaceLayout[]; initialIndex: number } | null) | null;
   imageState: ReturnType<typeof useSharedValue<'open' | 'close'>>;
   /** True while close animation is running; overlay uses normal rect so wrap shrinks with dismiss. */
   isClosing: ReturnType<typeof useSharedValue<boolean>>;

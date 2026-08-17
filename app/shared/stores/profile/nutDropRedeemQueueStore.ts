@@ -20,12 +20,7 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
  * anyone but this profile's key — still treated as wallet-adjacent data.
  */
 type NutDropRedeemStatus =
-  | 'pending'
-  | 'redeeming'
-  | 'redeemed'
-  | 'spent'
-  | 'untrusted-mint'
-  | 'failed';
+  'pending' | 'redeeming' | 'redeemed' | 'spent' | 'untrusted-mint' | 'failed';
 
 interface NutDropRedeemEntry {
   token: string;

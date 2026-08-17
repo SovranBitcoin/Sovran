@@ -9,9 +9,7 @@
       "at": 1785163721,
       "previousLastSeenAt": 1785074273,
       "hash": "40d41d60122fa69945075d790ebb756b3a8454d52b265bd3b9dc82b6e7a216bb",
-      "summary": [
-        "URLs - added: https://mint.bitcoinhanbit.org"
-      ],
+      "summary": ["URLs - added: https://mint.bitcoinhanbit.org"],
       "patch": [
         {
           "value": "https://mint.bitcoinhanbit.org",
@@ -70,9 +68,7 @@
         {
           "value": {
             "max_batch_size": 1000,
-            "methods": [
-              "bolt11"
-            ],
+            "methods": ["bolt11"],
             "supported": true
           },
           "op": "add",
@@ -106,9 +102,7 @@
       "at": 1785074255,
       "previousLastSeenAt": 1784762832,
       "hash": "9ba82184fb91fe7ac5949bb7aecc1cb6018fc22b133e85f2b0e568e24f9df395",
-      "summary": [
-        "NUT-19 enabled"
-      ],
+      "summary": ["NUT-19 enabled"],
       "patch": [
         {
           "value": {
@@ -147,9 +141,7 @@
       "at": 1785074253,
       "previousLastSeenAt": 1784762831,
       "hash": "22fae94c66aa1024c62037b00c6ec69b36f2a69c09744d0fabc3ac4daf834a25",
-      "summary": [
-        "NUT-19 enabled"
-      ],
+      "summary": ["NUT-19 enabled"],
       "patch": [
         {
           "value": {
@@ -209,11 +201,7 @@
         },
         {
           "value": {
-            "commands": [
-              "bolt11_melt_quote",
-              "proof_state",
-              "bolt11_mint_quote"
-            ],
+            "commands": ["bolt11_melt_quote", "proof_state", "bolt11_mint_quote"],
             "method": "bolt11",
             "unit": "msat"
           },
@@ -265,9 +253,7 @@
       "at": 1784762706,
       "previousLastSeenAt": 1784676085,
       "hash": "8f942ca2f29ea87e229e961e687d82307ab0d1126251f9183588245da078c6fd",
-      "summary": [
-        "version: Nutshell/0.20.2 → Nutshell/0.20.3"
-      ],
+      "summary": ["version: Nutshell/0.20.2 → Nutshell/0.20.3"],
       "patch": [
         {
           "value": "Nutshell/0.20.2",
@@ -357,11 +343,7 @@
       "patch": [
         {
           "value": {
-            "commands": [
-              "onchain_mint_quote",
-              "onchain_melt_quote",
-              "proof_state"
-            ],
+            "commands": ["onchain_mint_quote", "onchain_melt_quote", "proof_state"],
             "method": "onchain",
             "unit": "sat"
           },
@@ -507,9 +489,7 @@
         {
           "value": {
             "max_batch_size": 100,
-            "methods": [
-              "bolt11"
-            ]
+            "methods": ["bolt11"]
           },
           "op": "add",
           "path": "/nuts/29"
@@ -638,9 +618,7 @@
       "at": 1784329699,
       "previousLastSeenAt": 1784243072,
       "hash": "cd495ee2eac41cbca78d8f2f2fc248095c581b5906b1f00c1539028acff1383b",
-      "summary": [
-        "version: cdk-mintd/0.17.2 → cdk-mintd/0.17.3"
-      ],
+      "summary": ["version: cdk-mintd/0.17.2 → cdk-mintd/0.17.3"],
       "patch": [
         {
           "value": "cdk-mintd/0.17.2",
@@ -694,9 +672,7 @@
       "at": 1784080714,
       "previousLastSeenAt": 1783994085,
       "hash": "c21b54eb2846ec8f8e4021d721661b3fdecbd0c528ab02f8ec88812c7cfc64e5",
-      "summary": [
-        "name: nostrzap.me mint → mint.nostrzap.me"
-      ],
+      "summary": ["name: nostrzap.me mint → mint.nostrzap.me"],
       "patch": [
         {
           "value": "nostrzap.me mint",
@@ -716,9 +692,7 @@
       "at": 1784069825,
       "previousLastSeenAt": 1783983193,
       "hash": "a39d04c6a0fa94487e891f472b643cc84a3139fcb6d5983a15d6947f6c16ccb5",
-      "summary": [
-        "version: cdk-mintd/0.17.2 → cdk-mintd/0.17.3"
-      ],
+      "summary": ["version: cdk-mintd/0.17.2 → cdk-mintd/0.17.3"],
       "patch": [
         {
           "value": "cdk-mintd/0.17.2",
@@ -738,9 +712,7 @@
       "at": 1783994085,
       "previousLastSeenAt": 1783907454,
       "hash": "4293aa598f11c93e639c09bee9274c250892f49d38d5f6f132cd7d144645b434",
-      "summary": [
-        "version: cdk-mintd/0.17.2 → cdk-mintd/0.17.3"
-      ],
+      "summary": ["version: cdk-mintd/0.17.2 → cdk-mintd/0.17.3"],
       "patch": [
         {
           "value": "cdk-mintd/0.17.2",
@@ -791,11 +763,7 @@
         },
         {
           "value": {
-            "commands": [
-              "bolt11_melt_quote",
-              "proof_state",
-              "bolt11_mint_quote"
-            ],
+            "commands": ["bolt11_melt_quote", "proof_state", "bolt11_mint_quote"],
             "method": "bolt11",
             "unit": "msat"
           },
@@ -867,9 +835,7 @@
       "at": 1783809933,
       "previousLastSeenAt": 1783723307,
       "hash": "5ca31fd9eaa7768ee84439a29d2cf57b1ba3ed1bea06f8b7d616bd784a24bcf2",
-      "summary": [
-        "long description: お試しでUmbrelにmintサーバを立ててみた → "
-      ],
+      "summary": ["long description: お試しでUmbrelにmintサーバを立ててみた → "],
       "patch": [
         {
           "value": "お試しでUmbrelにmintサーバを立ててみた",
@@ -912,9 +878,7 @@
       "at": 1783723284,
       "previousLastSeenAt": 1783636650,
       "hash": "4d4d71d1b1f4df043ef87086c4afbd557d7016fc60f0a0bb70db0e685f74f5fa",
-      "summary": [
-        "version: cdk-mintd/0.17.1 → cdk-mintd/0.17.2"
-      ],
+      "summary": ["version: cdk-mintd/0.17.1 → cdk-mintd/0.17.2"],
       "patch": [
         {
           "value": "cdk-mintd/0.17.1",
@@ -934,9 +898,7 @@
       "at": 1783647555,
       "previousLastSeenAt": 1783560923,
       "hash": "91ffea2516b27d08e9caf5ac1e59ae930311871d1aef73c8fb15b37933a65887",
-      "summary": [
-        "contact added: [{\"info\":\"admin@nostrzap.me\",\"method\":\"email\"}]"
-      ],
+      "summary": ["contact added: [{\"info\":\"admin@nostrzap.me\",\"method\":\"email\"}]"],
       "patch": [
         {
           "value": [

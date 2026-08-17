@@ -508,8 +508,7 @@ export function MintInfoScreen() {
   const kymScore =
     typeof entry?.kymScore === 'number' ? entry.kymScore : (cachedMeta?.averageScore ?? undefined);
   const contact = entry?.contact as
-    | { method: string; info: import('wallet').FormattedString }[]
-    | undefined;
+    { method: string; info: import('wallet').FormattedString }[] | undefined;
   const contactRows = useMemo(() => getSortedMintInfoContacts(contact), [contact]);
   const nostrContactPubkey = useMemo(
     () => getMintInfoNostrContactPubkey(contactRows),

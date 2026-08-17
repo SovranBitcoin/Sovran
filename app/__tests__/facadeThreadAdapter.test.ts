@@ -1,6 +1,6 @@
 import type { facade } from 'nostr';
 import { resolvedThreadToResult } from '@/features/feed/data/facadeThreadAdapter';
-import type { ThreadReplySort } from '@/features/feed/data/feedClient';
+import type { ThreadReplySort, ThreadRequest } from '@/features/feed/data/feedClient';
 
 const ROOT = 'r'.repeat(64);
 const A = 'a'.repeat(64); // newest, most reposts
@@ -26,7 +26,14 @@ function note(id: string, createdAt: number): facade.FeedItem {
 function rootNote(createdAt: number): facade.FeedItem {
   return {
     type: 'note',
-    event: { id: ROOT, pubkey: 'p'.repeat(64), kind: 1, content: '', tags: [], created_at: createdAt },
+    event: {
+      id: ROOT,
+      pubkey: 'p'.repeat(64),
+      kind: 1,
+      content: '',
+      tags: [],
+      created_at: createdAt,
+    },
   } as unknown as facade.FeedItem;
 }
 
@@ -145,7 +152,11 @@ describe('resolvedThreadToResult — tier-aware paging contract', () => {
     const thread = buildThread({
       root: opRoot,
       // OP's direct reply is oldest and least engaged — sort alone buries it.
-      replies: [taggedNote(A, 'a'.repeat(64), 300), taggedNote(B, 'b'.repeat(64), 200), taggedNote(C, OP, 100)],
+      replies: [
+        taggedNote(A, 'a'.repeat(64), 300),
+        taggedNote(B, 'b'.repeat(64), 200),
+        taggedNote(C, OP, 100),
+      ],
     });
     const result = resolvedThreadToResult(thread, { eventId: ROOT, sort: 'relevant', limit: 10 });
     expect(result.replyPageEventIds[0]).toBe(C);
@@ -160,7 +171,7 @@ describe('resolvedThreadToResult — tier-aware paging contract', () => {
       tags: [],
       created_at: 1,
     };
-    const result = resolvedThreadToResult(buildThread(), {
+    const request: ThreadRequest = {
       eventId: ROOT,
       sort: 'new',
       seed: {
@@ -169,7 +180,8 @@ describe('resolvedThreadToResult — tier-aware paging contract', () => {
         metrics: new Map(),
         quotedEvents: new Map(),
       },
-    } as never);
+    };
+    const result = resolvedThreadToResult(buildThread(), request);
     expect(result.allEvents.get(seedEvent.id)?.content).toBe('seed');
   });
 });

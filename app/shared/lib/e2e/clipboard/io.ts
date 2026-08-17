@@ -143,7 +143,12 @@ export function startE2EClipboardIo(): () => void {
           writeAtomic(
             system,
             STATUS_PARTS,
-            JSON.stringify({ tick: tickCount, lastAckedRevision, lastError, setExists: diagSetExists })
+            JSON.stringify({
+              tick: tickCount,
+              lastAckedRevision,
+              lastError,
+              setExists: diagSetExists,
+            })
           );
         } catch {
           // Best-effort; never let the heartbeat break the loop.
@@ -165,7 +170,9 @@ export function startE2EClipboardIo(): () => void {
     if (!stopped) setTimeout(tick, POLL_MS);
   };
 
-  tick();
+  // Fire-and-forget: `tick` re-schedules itself and swallows its own errors, so
+  // there is no result to await and nothing for a caller to catch.
+  void tick();
 
   return () => {
     stopped = true;

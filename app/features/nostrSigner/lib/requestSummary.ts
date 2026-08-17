@@ -37,15 +37,10 @@ export interface SummaryCopyContext {
 }
 
 export type SummaryRisk =
-  | 'never_sign_anomaly'
-  | 'financial'
-  | 'wallet_credential'
-  | 'full_list_replace';
+  'never_sign_anomaly' | 'financial' | 'wallet_credential' | 'full_list_replace';
 
 export type SummaryReaction =
-  | { kind: 'like' }
-  | { kind: 'dislike' }
-  | { kind: 'emoji'; emoji: string };
+  { kind: 'like' } | { kind: 'dislike' } | { kind: 'emoji'; emoji: string };
 
 export type SummaryDetail =
   | { type: 'post'; text: string }

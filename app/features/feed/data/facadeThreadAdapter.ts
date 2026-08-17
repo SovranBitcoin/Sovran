@@ -90,8 +90,7 @@ function sortedReplyIds(
 
 function feedItemEvent(item: facade.FeedItem): FeedEvent | undefined {
   return (item.type === 'note' ? item.event : (item.originalEvent ?? item.repostEvent)) as
-    | FeedEvent
-    | undefined;
+    FeedEvent | undefined;
 }
 
 export function resolvedThreadToResult(

@@ -195,7 +195,13 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
     // makes per-keyset progress and per-keyset failure reporting possible.
     expect(mockAddMint).toHaveBeenCalledWith(MINT_URL, { trusted: true });
     expect(mockRestoreKeyset).toHaveBeenCalledTimes(2);
-    expect(mockRestoreKeyset).toHaveBeenCalledWith(expect.anything(), MINT_URL, KEYSET_A, 'sat');
+    expect(mockRestoreKeyset).toHaveBeenCalledWith(
+      expect.anything(),
+      MINT_URL,
+      KEYSET_A,
+      'sat',
+      expect.objectContaining({ ready: expect.any(Number), spent: expect.any(Number) })
+    );
     expect(
       renderer!.root
         .findAll((node) => node.type === ('MockText' as unknown))
@@ -287,7 +293,13 @@ describe('SettingsRecoveryScreen gate confirmation', () => {
 
     // Only the valid keyset is attempted, and the mint still succeeds.
     expect(mockRestoreKeyset).toHaveBeenCalledTimes(1);
-    expect(mockRestoreKeyset).toHaveBeenCalledWith(expect.anything(), MINT_URL, KEYSET_A, 'sat');
+    expect(mockRestoreKeyset).toHaveBeenCalledWith(
+      expect.anything(),
+      MINT_URL,
+      KEYSET_A,
+      'sat',
+      expect.objectContaining({ ready: expect.any(Number), spent: expect.any(Number) })
+    );
     const texts = renderer!.root
       .findAll((node) => node.type === ('MockText' as unknown))
       .map((node) => node.props.children);

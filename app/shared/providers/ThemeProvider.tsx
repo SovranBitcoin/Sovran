@@ -89,8 +89,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
     const surfaceOf =
       ((themeVariables[resolvedTheme] ?? getThemeVariables(resolvedTheme))['--surface'] as
-        | string
-        | undefined) ?? null;
+        string | undefined) ?? null;
 
     const unitChanged = lastAppliedUnit.current !== activeUnit;
     lastAppliedUnit.current = activeUnit;

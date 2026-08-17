@@ -59,7 +59,10 @@ module.exports = {
     '/node_modules/',
     // The JSON-native harness uses Bun's test runner and Bun-only APIs. Keep
     // it out of the app's React Native/Jest lane; `bun run e2e:test` owns it.
+    // `shared/lib/e2e/` holds harness support code that lives in the app tree
+    // but is still Bun-only, so it needs naming separately from `<rootDir>/e2e/`.
     '<rootDir>/e2e/',
+    '<rootDir>/shared/lib/e2e/',
     '/coco/',
     '/eNuts/',
     '/coco-cashu-plugin-p2pk-import/',

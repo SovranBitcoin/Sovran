@@ -207,13 +207,11 @@ export function parseNostrconnectUri(raw: string): Result<ParsedNostrConnectUri,
           image: optionalTrimmed(singles.image),
         });
         if (!fields.success) return err<never, Nip46UriError>(invalidField(fields.error));
-        return parsePermsCsv(singles.perms ?? '').map(
-          ({ tokens }): ParsedNostrConnectUri => ({
-            type: 'nostrconnect',
-            ...fields.data,
-            perms: tokens,
-          })
-        );
+        return parsePermsCsv(singles.perms ?? '').map(({ tokens }): ParsedNostrConnectUri => ({
+          type: 'nostrconnect',
+          ...fields.data,
+          perms: tokens,
+        }));
       });
   });
 }
@@ -237,9 +235,8 @@ export function parseBunkerUri(raw: string): Result<ParsedBunkerUri, Nip46UriErr
 
 /** Parse either pairing URI form (scan/paste input), dispatching on scheme. */
 export function parseNip46Uri(raw: string): Result<ParsedNip46Uri, Nip46UriError> {
-  return splitUri(raw).andThen(
-    (parts): Result<ParsedNip46Uri, Nip46UriError> =>
-      parts.scheme === 'nostrconnect' ? parseNostrconnectUri(raw) : parseBunkerUri(raw)
+  return splitUri(raw).andThen((parts): Result<ParsedNip46Uri, Nip46UriError> =>
+    parts.scheme === 'nostrconnect' ? parseNostrconnectUri(raw) : parseBunkerUri(raw)
   );
 }
 

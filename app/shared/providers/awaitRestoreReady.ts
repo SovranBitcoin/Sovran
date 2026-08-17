@@ -1,10 +1,5 @@
 export type RestoreReadyStatus =
-  | 'unknown'
-  | 'not-needed'
-  | 'pending'
-  | 'in-progress'
-  | 'complete'
-  | 'failed';
+  'unknown' | 'not-needed' | 'pending' | 'in-progress' | 'complete' | 'failed';
 
 const isReady = (s: RestoreReadyStatus) => s === 'complete' || s === 'not-needed';
 

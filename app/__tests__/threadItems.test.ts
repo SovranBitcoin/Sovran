@@ -221,7 +221,11 @@ describe('thread item builders', () => {
 describe('composeThreadItems — ignore filters + the "Might be spam" section', () => {
   const target = note({ id: 'root', pubkey: 'op' });
   const reply = note({ id: 'reply-1', pubkey: 'friend', tags: [['e', 'root', '', 'root']] });
-  const ignoredReply = note({ id: 'reply-2', pubkey: 'blocked', tags: [['e', 'root', '', 'root']] });
+  const ignoredReply = note({
+    id: 'reply-2',
+    pubkey: 'blocked',
+    tags: [['e', 'root', '', 'root']],
+  });
   const built: ThreadItem[] = [
     { type: 'target', event: target },
     { type: 'reply', event: reply },
@@ -247,21 +251,28 @@ describe('composeThreadItems — ignore filters + the "Might be spam" section', 
   });
 
   it('ignore filters drop replies AND spam, never the target', () => {
-    const filtered = composeThreadItems(built, [spamA, spamIgnored], {
-      pubkeys: new Set(['blocked']),
-      eventIds: new Set<string>(),
-    }, { includeSpam: true });
-    expect(filtered.map((i) => (i.type === 'spam-separator' ? i.type : `${i.type}:${i.event.id}`))).toEqual([
-      'target:root',
-      'reply:reply-1',
-      'spam-separator',
-      'spam-reply:spam-1',
-    ]);
+    const filtered = composeThreadItems(
+      built,
+      [spamA, spamIgnored],
+      {
+        pubkeys: new Set(['blocked']),
+        eventIds: new Set<string>(),
+      },
+      { includeSpam: true }
+    );
+    expect(
+      filtered.map((i) => (i.type === 'spam-separator' ? i.type : `${i.type}:${i.event.id}`))
+    ).toEqual(['target:root', 'reply:reply-1', 'spam-separator', 'spam-reply:spam-1']);
     // Ignoring the target's author never removes the target itself.
-    const opIgnored = composeThreadItems(built, [], {
-      pubkeys: new Set(['op']),
-      eventIds: new Set<string>(),
-    }, { includeSpam: true });
+    const opIgnored = composeThreadItems(
+      built,
+      [],
+      {
+        pubkeys: new Set(['op']),
+        eventIds: new Set<string>(),
+      },
+      { includeSpam: true }
+    );
     expect(opIgnored.some((i) => i.type === 'target')).toBe(true);
   });
 
