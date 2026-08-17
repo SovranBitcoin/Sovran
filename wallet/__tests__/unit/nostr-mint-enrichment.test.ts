@@ -149,3 +149,54 @@ describe('createNostrMintEnrichment', () => {
     expect(reviews?.recommendations[1]).toMatchObject({ score: 0 }); // -3 → 0
   });
 });
+
+// A nagg running NAGG_MODULES=mint serves /nostr/mint/* off a tiny ClickHouse
+// but does NOT mount /nostr/profile — that route reads pubkey_stats and the
+// follower graph, which belong to the nostr module. Pointing the whole client
+// at a mint-only host therefore 404s every operator lookup.
+describe('split hosts', () => {
+  const MINT_URL_HOST = 'https://nagg-mint.example.com';
+
+  it('sends the profile lookup to profileBaseUrl and reviews to appViewBaseUrl', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: string) => {
+      const url = new URL(input);
+      if (url.pathname.endsWith('/nostr/profile')) {
+        return Promise.resolve(jsonResponse({ pubkey: PUBKEY, name: 'operator' }));
+      }
+      return Promise.resolve(
+        jsonResponse({
+          summary: { mintUrl: 'https://mint.example.com', averageScore: 5, reviewCount: 0 },
+          reviews: [],
+        }),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const enrichment = createNostrMintEnrichment({
+      appViewBaseUrl: MINT_URL_HOST,
+      profileBaseUrl: BASE_URL,
+    });
+    await enrichment.resolveMintContactProfile(PUBKEY, 'https://mint.example.com');
+    await enrichment.fetchMintReviews('https://mint.example.com');
+
+    const profileUrl = new URL(fetchMock.mock.calls[0][0]);
+    expect(profileUrl.origin).toBe(BASE_URL);
+    expect(profileUrl.pathname).toBe('/v1/nostr/profile');
+
+    const reviewsUrl = new URL(fetchMock.mock.calls[1][0]);
+    expect(reviewsUrl.origin).toBe(MINT_URL_HOST);
+    expect(reviewsUrl.pathname).toBe('/v1/nostr/mint/reviews');
+  });
+
+  it('defaults profileBaseUrl to appViewBaseUrl so a single-host setup is unchanged', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ pubkey: PUBKEY, name: 'operator' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const enrichment = createNostrMintEnrichment({ appViewBaseUrl: BASE_URL });
+    await enrichment.resolveMintContactProfile(PUBKEY, 'https://mint.example.com');
+
+    expect(new URL(fetchMock.mock.calls[0][0]).origin).toBe(BASE_URL);
+  });
+});

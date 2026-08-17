@@ -9,8 +9,20 @@ import type {
 } from './types';
 
 export interface NostrMintEnrichmentConfig {
-  /** REST app-view base URL, e.g. `https://nagg.up.railway.app`. */
+  /** REST app-view base URL for the `/nostr/mint/*` routes. */
   appViewBaseUrl: string;
+  /**
+   * Host for `/nostr/profile`, which resolves the mint operator's Nostr
+   * identity. Defaults to `appViewBaseUrl`.
+   *
+   * It is separable because the two routes can live on different deployments.
+   * A nagg running `NAGG_MODULES=mint` serves the mint routes off a tiny
+   * ClickHouse but does NOT mount `/nostr/profile` — that route reads
+   * `pubkey_stats` and the follower graph, which belong to the `nostr` module —
+   * so pointing the whole client at a mint-only host 404s every operator
+   * profile lookup.
+   */
+  profileBaseUrl?: string;
   /** Route version prefix: `''` → `/nostr/*`, `'v1'` → `/v1/nostr/*`. Default `'v1'`. */
   appViewVersion?: '' | 'v1';
   reviewLimit?: number;
@@ -87,10 +99,13 @@ export function createNostrMintEnrichment(
   config: NostrMintEnrichmentConfig,
 ): NostrMintEnrichment {
   const baseUrl = config.appViewBaseUrl.trim();
+  const profileBaseUrl = (config.profileBaseUrl ?? config.appViewBaseUrl).trim();
   const version = config.appViewVersion ?? 'v1';
   const reviewLimit = Math.max(1, Math.min(config.reviewLimit ?? 100, 500));
   logger.info('nostrMint.create', {
     baseUrlLength: baseUrl.length,
+    profileBaseUrlLength: profileBaseUrl.length,
+    splitHosts: profileBaseUrl !== baseUrl,
     version,
     requestedReviewLimit: config.reviewLimit ?? null,
     reviewLimit,
@@ -100,6 +115,15 @@ export function createNostrMintEnrichment(
     appView: { baseUrl, version },
     defaultTimeoutMs: config.timeoutMs,
   });
+  // Same client when the hosts match, so the common case keeps one connection
+  // pool and one set of defaults.
+  const profileClient =
+    profileBaseUrl === baseUrl
+      ? client
+      : createNaggClient({
+          appView: { baseUrl: profileBaseUrl, version },
+          defaultTimeoutMs: config.timeoutMs,
+        });
 
   return {
     resolveMintContactProfile: async (pubkey, _mintUrl, controls = {}) => {
@@ -112,7 +136,7 @@ export function createNostrMintEnrichment(
         ...mintUrlFields(_mintUrl),
         ...summarizeControls(effectiveControls),
       });
-      const result = await client.rest({
+      const result = await profileClient.rest({
         path: '/nostr/profile',
         method: 'GET',
         searchParams: { pubkey },

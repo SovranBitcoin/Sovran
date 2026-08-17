@@ -160,9 +160,12 @@ const MINT_APPVIEW_BASE_URL = backendConfig.mintAppViewBaseUrl;
  * `DEFAULT_TIMEOUT_MS` (15s, tuned for arbitrary LNURL endpoints).
  */
 const DEFAULT_TIMEOUT_MS = 10_000;
-// /nostr/mint/reviews — a mint route, so it follows the mint host.
+// This client speaks to BOTH deployments: /nostr/mint/reviews is a mint route,
+// but the operator identity lookup it also makes is /nostr/profile, which a
+// mint-only nagg does not mount (it reads pubkey_stats and the follower graph).
 const mintReviewsEnrichment = createNostrMintEnrichment({
   appViewBaseUrl: backendConfig.mintAppViewBaseUrl,
+  profileBaseUrl: backendConfig.nostrAppViewBaseUrl,
   appViewVersion: 'v1',
   timeoutMs: DEFAULT_TIMEOUT_MS,
 });
