@@ -27,7 +27,6 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { SelectableCheck } from '@/shared/ui/primitives/SelectableCheck';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { ListRow, type ListRowAvatar, type ListRowIconCircle } from '@/shared/ui/composed/ListRow';
@@ -155,14 +154,7 @@ interface SelfIdentity {
 export type Identity = NostrIdentity | MintIdentity | BleIdentity | GeohashIdentity | SelfIdentity;
 
 type StatKey =
-  | 'balance'
-  | 'units'
-  | 'score'
-  | 'audit'
-  | 'reputation'
-  | 'followers'
-  | 'offline'
-  | 'connection';
+  'balance' | 'units' | 'score' | 'audit' | 'reputation' | 'followers' | 'offline' | 'connection';
 
 // ---------------------------------------------------------------------------
 // Factories — keep call sites from re-typing `kind:` + field plumbing.
@@ -316,9 +308,6 @@ interface ContactRowProps {
    *  inspect button. */
   trailingInteractive?: boolean;
   trailingVariant?: 'chevron' | 'spinner' | 'none';
-  /** When set, a 3-dot button appears in the trailing slot if nothing else
-   *  higher-priority takes it. */
-  onInspectPress?: () => void;
 
   onPress?: () => void;
   loading?: boolean;
@@ -649,7 +638,6 @@ export function ContactRow({
   trailing: trailingOverride,
   trailingInteractive = false,
   trailingVariant,
-  onInspectPress,
   onPress,
   loading,
   animate = false,
@@ -873,26 +861,10 @@ export function ContactRow({
       disabled,
       hasOnPress: !!onPress,
       hasOnToggle: !!onToggle,
-      hasInspectPress: !!onInspectPress,
     });
   };
 
-  const inspectPress =
-    mint && onInspectPress
-      ? () => {
-          logMintInteraction('contact_row.mint.inspect_press');
-          onInspectPress();
-        }
-      : onInspectPress;
-
-  const inspectNode = inspectPress ? (
-    <Pressable
-      onPress={inspectPress}
-      hitSlop={8}
-      style={{ padding: 8, borderRadius: 999, backgroundColor: opacity(foreground, 0.06) }}>
-      <Icon name="bx:dots-vertical-rounded" size={18} color={foreground} />
-    </Pressable>
-  ) : null;
+  const inspectNode = null;
 
   // Trailing badge mirrors the same three-state model the subtitle uses so
   // the row's right edge is honest about DM reachability:
@@ -1019,7 +991,6 @@ export function ContactRow({
       padding,
       hasOnPress: !!onPress,
       hasOnToggle: !!onToggle,
-      hasInspectPress: !!onInspectPress,
       hasTitleOverride: titleOverride !== undefined,
       titleOverrideLength: typeof titleOverride === 'string' ? titleOverride.length : null,
       testIDLength: testID?.length ?? 0,
@@ -1051,7 +1022,6 @@ export function ContactRow({
     mintStats?.worksOffline,
     mintUrlLength,
     nostr,
-    onInspectPress,
     onPress,
     onToggle,
     padding,

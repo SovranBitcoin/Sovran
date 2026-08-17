@@ -46,16 +46,16 @@ export interface FundedRecoveryPort {
   disposePrivateMaterial(): void;
 }
 
-export type FundedRecoveryOpener = (options: { runDir: string }) => FundedRecoveryPort;
+type FundedRecoveryOpener = (options: { runDir: string }) => FundedRecoveryPort;
 
-export interface FundedRecoverySession {
+interface FundedRecoverySession {
   runDir: string;
   recoveryPath: string;
   liabilityDir: string;
   ledgerPath: string;
 }
 
-export interface FundedRecoveryAuditSession extends FundedRecoverySession {
+interface FundedRecoveryAuditSession extends FundedRecoverySession {
   recoveryPresent: boolean;
   ledgerPresent: boolean;
   runId?: string;
@@ -64,7 +64,7 @@ export interface FundedRecoveryAuditSession extends FundedRecoverySession {
   internalLeaseCount: number;
 }
 
-export interface FundedRecoveryAuditBlocker {
+interface FundedRecoveryAuditBlocker {
   runDir: string;
   reason:
     | 'invalid-recovery-custody'
@@ -76,7 +76,7 @@ export interface FundedRecoveryAuditBlocker {
     | 'ambiguous-private-temp';
 }
 
-export type FundedRecoveryAudit =
+type FundedRecoveryAudit =
   | { status: 'clean'; sessions: []; blockers: [] }
   | {
       status: 'recovery-required';
@@ -89,14 +89,14 @@ export type FundedRecoveryAudit =
       blockers: FundedRecoveryAuditBlocker[];
     };
 
-export interface RecoveredFundedSession {
+interface RecoveredFundedSession {
   runDir: string;
   cancelledLegs: number;
   reconciledLegs: number;
   clearedEffectLeases: number;
 }
 
-export interface FundedStartupRecoveryResult {
+interface FundedStartupRecoveryResult {
   status: 'clean';
   recovered: RecoveredFundedSession[];
   audit: FundedRecoveryAudit;

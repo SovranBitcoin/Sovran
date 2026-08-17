@@ -32,7 +32,7 @@ type NfcWriteFailedNotificationData = Parameters<
   NonNullable<NotificationHandlerMap['onNfcWriteFailed']>
 >[0];
 
-export type MachineEffectNotification =
+type MachineEffectNotification =
   | {
       type: 'onPaymentConfirmed';
       data: PaymentConfirmedNotificationData;
@@ -50,7 +50,7 @@ export type MachineEffectNotification =
       data: NfcWriteFailedNotificationData;
     };
 
-export type MachineEffectLink = {
+type MachineEffectLink = {
   type: 'linkTransaction';
   input: string;
   transactionId: string;
@@ -74,7 +74,7 @@ type ConfirmSendContextPatch = Partial<
   Pick<FlowContext, 'mintUnreachableConfirmed'>
 >;
 
-export type MintQuoteEffectSuccess =
+type MintQuoteEffectSuccess =
   | {
       kind: 'completed';
       step: 'mintQuoteCreated';
@@ -83,13 +83,13 @@ export type MintQuoteEffectSuccess =
     }
   | { kind: 'stale' };
 
-export type MintQuoteEffectError = {
+type MintQuoteEffectError = {
   kind: 'failed';
   cause: unknown;
   data: StepDataMap['error'];
 };
 
-export type PaymentRequestReceiveEffectSuccess =
+type PaymentRequestReceiveEffectSuccess =
   | {
       kind: 'completed';
       step: 'paymentRequestReceived';
@@ -97,13 +97,13 @@ export type PaymentRequestReceiveEffectSuccess =
     }
   | { kind: 'stale' };
 
-export type PaymentRequestReceiveEffectError = {
+type PaymentRequestReceiveEffectError = {
   kind: 'failed';
   cause: unknown;
   data: StepDataMap['error'];
 };
 
-export type ConfirmSendEffectSuccess =
+type ConfirmSendEffectSuccess =
   | {
       kind: 'completed';
       path: ConfirmSendEffectPath;
@@ -123,7 +123,7 @@ export type ConfirmSendEffectSuccess =
       context?: ConfirmSendContextPatch;
     };
 
-export type ConfirmSendEffectError = {
+type ConfirmSendEffectError = {
   kind: 'failed';
   cause: unknown;
   data: StepDataMap['error'];
@@ -131,7 +131,7 @@ export type ConfirmSendEffectError = {
   fallbackFailure?: unknown;
 };
 
-export type ConfirmMeltEffectSuccess =
+type ConfirmMeltEffectSuccess =
   | {
       kind: 'completed';
       step: 'navigateToMeltPreview';
@@ -143,12 +143,12 @@ export type ConfirmMeltEffectSuccess =
       kind: 'stale';
     };
 
-export type ConfirmMeltEffectError = {
+type ConfirmMeltEffectError = {
   kind: 'failed';
   cause: unknown;
 };
 
-export type MeltQuotePreviewEffectSuccess =
+type MeltQuotePreviewEffectSuccess =
   | {
       kind: 'completed';
       quote: MeltQuotePreview;
@@ -157,12 +157,12 @@ export type MeltQuotePreviewEffectSuccess =
       kind: 'stale';
     };
 
-export type MeltQuotePreviewEffectError = {
+type MeltQuotePreviewEffectError = {
   kind: 'failed';
   cause: unknown;
 };
 
-export type ConfirmPaymentRequestEffectSuccess =
+type ConfirmPaymentRequestEffectSuccess =
   | {
       kind: 'completed';
       step: 'navigateToPaymentRequest';
@@ -179,12 +179,12 @@ export type ConfirmPaymentRequestEffectSuccess =
       kind: 'stale';
     };
 
-export type ConfirmPaymentRequestEffectError = {
+type ConfirmPaymentRequestEffectError = {
   kind: 'failed';
   cause: unknown;
 };
 
-export type MintReviewInfoEffectSuccess =
+type MintReviewInfoEffectSuccess =
   | {
       kind: 'completed';
       step: 'reviewMint';
@@ -199,13 +199,13 @@ export type MintReviewInfoEffectSuccess =
       kind: 'stale';
     };
 
-export type MintReviewInfoEffectError = {
+type MintReviewInfoEffectError = {
   kind: 'failed';
   cause: unknown;
   data: StepDataMap['error'];
 };
 
-export type TrustMintEffectSuccess =
+type TrustMintEffectSuccess =
   | {
       kind: 'completed';
     }
@@ -213,13 +213,13 @@ export type TrustMintEffectSuccess =
       kind: 'stale';
     };
 
-export type TrustMintEffectError = {
+type TrustMintEffectError = {
   kind: 'failed';
   cause: unknown;
   data: StepDataMap['error'];
 };
 
-export type MintListEnrichmentEffectSuccess =
+type MintListEnrichmentEffectSuccess =
   | {
       kind: 'completed';
       items: MintListItems;
@@ -228,12 +228,12 @@ export type MintListEnrichmentEffectSuccess =
       kind: 'stale';
     };
 
-export type MintListEnrichmentEffectError = {
+type MintListEnrichmentEffectError = {
   kind: 'failed';
   cause: unknown;
 };
 
-export type NfcWriteBackEffectSuccess =
+type NfcWriteBackEffectSuccess =
   | {
       kind: 'completed';
       step: 'sendComplete';
@@ -245,7 +245,7 @@ export type NfcWriteBackEffectSuccess =
       kind: 'stale';
     };
 
-export type NfcWriteBackEffectError = {
+type NfcWriteBackEffectError = {
   kind: 'failed';
   cause: unknown;
   data: StepDataMap['error'];
@@ -253,7 +253,7 @@ export type NfcWriteBackEffectError = {
   notifications: MachineEffectNotification[];
 };
 
-export type RecipientPubkeyEffectSuccess =
+type RecipientPubkeyEffectSuccess =
   | {
       kind: 'resolved';
       target: string;
@@ -268,13 +268,13 @@ export type RecipientPubkeyEffectSuccess =
       target: string;
     };
 
-export type RecipientPubkeyEffectError = {
+type RecipientPubkeyEffectError = {
   kind: 'failed';
   target: string;
   cause: unknown;
 };
 
-export type RecipientProfileEffectSuccess =
+type RecipientProfileEffectSuccess =
   | {
       kind: 'resolved';
       pubkey: string;
@@ -289,13 +289,13 @@ export type RecipientProfileEffectSuccess =
       pubkey: string;
     };
 
-export type RecipientProfileEffectError = {
+type RecipientProfileEffectError = {
   kind: 'failed';
   pubkey: string;
   cause: unknown;
 };
 
-export interface RunMintQuoteEffectConfig {
+interface RunMintQuoteEffectConfig {
   data: StepDataMap['createMintQuote'];
   operations: Pick<MachineOperations, 'executeMintQuote'>;
   context: FlowContext;
@@ -304,13 +304,13 @@ export interface RunMintQuoteEffectConfig {
   isStale: (op: string) => boolean;
 }
 
-export interface RunPaymentRequestReceiveEffectConfig {
+interface RunPaymentRequestReceiveEffectConfig {
   data: StepDataMap['createPaymentRequestReceive'];
   operations: Pick<MachineOperations, 'createPaymentRequestReceive'>;
   isStale: (op: string) => boolean;
 }
 
-export interface RunConfirmSendEffectConfig {
+interface RunConfirmSendEffectConfig {
   data: StepDataMap['confirmSend'];
   operations: Pick<MachineOperations, 'executeSend' | 'executeOfflineSend'>;
   context: FlowContext;
@@ -320,27 +320,27 @@ export interface RunConfirmSendEffectConfig {
   isStale: (op: string) => boolean;
 }
 
-export interface RunConfirmMeltEffectConfig {
+interface RunConfirmMeltEffectConfig {
   data: StepDataMap['navigateToMeltPreview'];
   operation: NonNullable<MachineOperations['executeMelt']>;
   context: FlowContext;
   isStale: (op: string) => boolean;
 }
 
-export interface RunMeltQuotePreviewEffectConfig {
+interface RunMeltQuotePreviewEffectConfig {
   data: StepDataMap['navigateToMeltPreview'];
   operation: NonNullable<MachineOperations['quoteMelt']>;
   isStale: (op: string) => boolean;
 }
 
-export interface RunConfirmPaymentRequestEffectConfig {
+interface RunConfirmPaymentRequestEffectConfig {
   data: StepDataMap['navigateToPaymentRequest'];
   operation: NonNullable<MachineOperations['executePaymentRequest']>;
   context: FlowContext;
   isStale: (op: string) => boolean;
 }
 
-export interface RunMintReviewInfoEffectConfig {
+interface RunMintReviewInfoEffectConfig {
   step: 'reviewMint' | 'openMint';
   data: StepDataMap['reviewMint'] | StepDataMap['openMint'];
   operation: NonNullable<MachineOperations['buildMintReviewInfo']>;
@@ -348,20 +348,20 @@ export interface RunMintReviewInfoEffectConfig {
   isStale: (op: string) => boolean;
 }
 
-export interface RunTrustMintEffectConfig {
+interface RunTrustMintEffectConfig {
   data: StepDataMap['reviewMint'];
   operation: NonNullable<MachineOperations['trustMint']>;
   getLocale: () => string;
   isStale: (op: string) => boolean;
 }
 
-export interface RunMintListEnrichmentEffectConfig {
+interface RunMintListEnrichmentEffectConfig {
   data: StepDataMap['selectMint'];
   operation: MachineOperations['buildMintListItems'];
   isStale: (op: string) => boolean;
 }
 
-export interface RunNfcWriteBackEffectConfig {
+interface RunNfcWriteBackEffectConfig {
   data: StepDataMap['navigateToPaymentRequest'];
   executeNfcSend: NonNullable<MachineOperations['executeNfcSend']>;
   rollbackSend?: MachineOperations['rollbackSend'];
@@ -371,13 +371,13 @@ export interface RunNfcWriteBackEffectConfig {
   isStale: (op: string) => boolean;
 }
 
-export interface RunRecipientPubkeyEffectConfig {
+interface RunRecipientPubkeyEffectConfig {
   target: string;
   operation: NonNullable<MachineOperations['resolveRecipientPubkey']>;
   isStale: (op: string) => boolean;
 }
 
-export interface RunRecipientProfileEffectConfig {
+interface RunRecipientProfileEffectConfig {
   pubkey: string;
   operation: NonNullable<MachineOperations['resolveRecipientProfile']>;
   isStale: (op: string) => boolean;

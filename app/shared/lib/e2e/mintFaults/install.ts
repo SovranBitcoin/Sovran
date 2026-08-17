@@ -13,7 +13,7 @@ import { installMintFaultFetchInterceptor } from './interceptor';
 import { startMintFaultIo } from './io';
 import { parseMintFaultRuleSet } from './rules';
 
-export function installMintFaults(): void {
+function installMintFaults(): void {
   if (!isMintFaultInjectionEnabled()) return;
   const raw = mintFaultLaunchRuleSetRaw();
   if (raw) {

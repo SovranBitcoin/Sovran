@@ -44,5 +44,3 @@ export const suiteSchema = z
     });
   });
 export type Suite = z.infer<typeof suiteSchema>;
-
-export { SCHEMA_VERSION };

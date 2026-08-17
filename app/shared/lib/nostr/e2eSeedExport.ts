@@ -3,7 +3,7 @@ type SeedExportFetch = (
   init: RequestInit
 ) => Promise<Pick<Response, 'ok' | 'status'>>;
 
-export interface E2ESeedExportOptions {
+interface E2ESeedExportOptions {
   enabled?: boolean;
   endpoint?: string;
   token?: string;

@@ -260,7 +260,7 @@ export function isOnchainMeltSettled(state: string | null | undefined): boolean 
 }
 
 /** Default target confirmations for an onchain SEND timeline. */
-export const DEFAULT_ONCHAIN_MELT_CONFIRMATIONS = 6;
+const DEFAULT_ONCHAIN_MELT_CONFIRMATIONS = 6;
 
 function getPositiveInteger(value: unknown): number | null {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;

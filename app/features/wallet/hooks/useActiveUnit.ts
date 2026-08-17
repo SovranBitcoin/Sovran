@@ -8,7 +8,7 @@ import { amountToNumber } from '@/shared/lib/cashu/amount';
 
 import { useMintKeysetUnits } from './useMintKeysetUnits';
 
-export interface ActiveUnitState {
+interface ActiveUnitState {
   /** The unit the wallet view is denominated in right now. */
   unit: ActiveUnit;
   /** Switchable units at least one trusted mint advertises (sat always). */

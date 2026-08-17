@@ -314,7 +314,7 @@ export { createPaymentMachine } from "./machine/createMachine";
 export { resolveNext } from "./machine/resolveNext";
 
 // Pipeline utilities (usable standalone)
-export { parsePaymentInput, isBip321 } from "./parse";
+export { parsePaymentInput, isBip321, looksLikeBitcoinAddress } from "./parse";
 export {
   buildBip321OnchainUri,
   buildUnifiedBip321Uri,

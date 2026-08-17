@@ -17,7 +17,7 @@ import type {
 
 const SATS_PER_BTC = 100_000_000;
 
-export interface ResolveAmountInput {
+interface ResolveAmountInput {
   inputMode: AmountInputMode;
   rawInput: string;
   /** Parsed major-denomination value of rawInput. */

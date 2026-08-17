@@ -46,7 +46,7 @@ export const RelayInformationSchema = z.looseObject({
 
 export type RelayInformation = z.infer<typeof RelayInformationSchema>;
 
-export type RelayInfoError = { type: 'fetch-failed' } | { type: 'invalid' };
+type RelayInfoError = { type: 'fetch-failed' } | { type: 'invalid' };
 
 const FETCH_TIMEOUT_MS = 6_000;
 

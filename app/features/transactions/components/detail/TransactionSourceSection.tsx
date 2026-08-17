@@ -5,15 +5,6 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 import { useColadaTransactionAnnotation } from 'wallet/react';
-import type { ScanMethod } from 'wallet';
-
-const SOURCE_LABELS: Record<ScanMethod, string> = {
-  qr: 'QR Code',
-  nfc: 'NFC',
-  paste: 'Clipboard',
-  deeplink: 'Deep Link',
-  ble: 'Bluetooth',
-};
 
 function isLightningKind(k: string) {
   return k === 'lightningInvoice' || k === 'lightningAddress' || k === 'lnurlp';
@@ -25,16 +16,6 @@ function isEcashKind(k: string) {
 
 function isOnchainKind(k: string) {
   return k === 'onchainAddress';
-}
-
-/**
- * Returns the human-readable source label for a transaction, or null if none is linked.
- * Intended for use as a row in DetailsSection.
- */
-export function useTransactionSource(transactionId: string | undefined): string | null {
-  const annotation = useColadaTransactionAnnotation(transactionId ? { id: transactionId } : null);
-  const method = annotation.scan?.method;
-  return method ? SOURCE_LABELS[method] : null;
 }
 
 /**

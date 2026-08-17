@@ -4,13 +4,8 @@ import { create } from 'zustand';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
 
-export type E2EPaymentToastVariant =
-  | 'receive'
-  | 'send'
-  | 'melt'
-  | 'receive-ecash'
-  | 'payment-request';
-export type E2EPaymentToastStage = 'processing' | 'delivered' | 'warning' | 'confirmed' | 'failed';
+type E2EPaymentToastVariant = 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
+type E2EPaymentToastStage = 'processing' | 'delivered' | 'warning' | 'confirmed' | 'failed';
 
 type PaymentToastProbe = {
   variant: E2EPaymentToastVariant;

@@ -53,7 +53,7 @@ const realFs: AppDataFs = {
   rm: (path) => rmSync(path, { recursive: true, force: true }),
 };
 
-export interface AppDataCapturerOptions {
+interface AppDataCapturerOptions {
   udid: string;
   bundleId?: string;
   onWarning?: (message: string) => void;

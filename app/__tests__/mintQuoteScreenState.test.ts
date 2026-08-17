@@ -3,11 +3,6 @@ import { isMintQuotePaymentObserved } from 'wallet';
 import type { MempoolAddressSummary } from 'wallet';
 
 import {
-  getMintQuoteRouteTitle,
-  getReceiveQuoteScreenTitle,
-  getOnchainStatusProgress,
-} from '@/features/receive/lib/mintQuotePresentation';
-import {
   getMintQuotePaymentValue,
   getOnchainMintQuoteRequiredConfirmations,
   getOnchainRequiredConfirmations,
@@ -46,100 +41,6 @@ describe('mint quote screen presentation', () => {
     explorerUrl: 'https://mempool.space/address/bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
     transactionExplorerUrl: null,
   };
-
-  it('titles onchain mint quotes separately from Lightning quotes', () => {
-    expect(getReceiveQuoteScreenTitle(true)).toBe('Receive Onchain');
-    expect(getReceiveQuoteScreenTitle(false)).toBe('Receive Lightning');
-  });
-
-  it('derives the route title from serialized onchain mint quote entries', () => {
-    const address = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080';
-
-    expect(
-      getMintQuoteRouteTitle(
-        JSON.stringify({
-          type: 'mint',
-          paymentRequest: address,
-          metadata: { method: 'onchain', onchainAddress: address },
-        })
-      )
-    ).toBe('Receive Onchain');
-
-    expect(getMintQuoteRouteTitle(JSON.stringify({ type: 'mint', paymentRequest: 'lnbc1' }))).toBe(
-      'Receive Lightning'
-    );
-  });
-
-  it('derives the route title from BIP321 onchain paymentRequest values', () => {
-    const address = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080';
-
-    expect(
-      getMintQuoteRouteTitle(
-        JSON.stringify({
-          type: 'mint',
-          paymentRequest: `bitcoin:${address}?amount=0.00001234`,
-        })
-      )
-    ).toBe('Receive Onchain');
-  });
-
-  it('does not create onchain progress before payment is seen', () => {
-    expect(getOnchainStatusProgress(null)).toBeNull();
-    expect(getOnchainStatusProgress(emptySummary)).toBeNull();
-  });
-
-  it('derives compact onchain confirmation progress for the timeline', () => {
-    expect(
-      getOnchainStatusProgress({
-        ...emptySummary,
-        unconfirmedTxCount: 1,
-        unconfirmedReceivedSats: 21,
-        unconfirmedNetSats: 21,
-        totalReceivedSats: 21,
-      })
-    ).toMatchObject({
-      hasPayment: true,
-      hasUnconfirmedPayment: true,
-      currentConfirmations: null,
-      requiredConfirmations: 6,
-    });
-
-    expect(
-      getOnchainStatusProgress(
-        {
-          ...emptySummary,
-          confirmedTxCount: 1,
-          confirmedReceivedSats: 34,
-          confirmedBalanceSats: 34,
-          confirmedFundingConfirmations: 1,
-          totalReceivedSats: 34,
-        },
-        6
-      )
-    ).toMatchObject({
-      currentConfirmations: 1,
-      requiredConfirmations: 6,
-      isSatisfied: false,
-    });
-
-    expect(
-      getOnchainStatusProgress(
-        {
-          ...emptySummary,
-          confirmedTxCount: 1,
-          confirmedReceivedSats: 34,
-          confirmedBalanceSats: 34,
-          confirmedFundingConfirmations: 8,
-          totalReceivedSats: 34,
-        },
-        6
-      )
-    ).toMatchObject({
-      currentConfirmations: 6,
-      requiredConfirmations: 6,
-      isSatisfied: true,
-    });
-  });
 
   it('encodes onchain mint quotes as BIP321 with the requested amount', () => {
     const address = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080';

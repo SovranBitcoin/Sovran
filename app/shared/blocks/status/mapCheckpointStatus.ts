@@ -15,7 +15,7 @@ export type CheckpointStatus =
   | 'rolled-back'
   | 'already-spent';
 
-export interface IndicatorTuple {
+interface IndicatorTuple {
   phase: Phase;
   result: Result;
 }

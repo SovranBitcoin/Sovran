@@ -25,10 +25,10 @@ import {
   BOLT_CANVAS_CENTER,
   BOLT_CANVAS_SIZE,
   generateStrikeVariants,
-  type BoltVariant,
 } from '@/features/nearPay/lib/boltGeometry';
 import type { StrikeStatus } from '@/features/nearPay/lib/nutDropStrikeState';
 import opacity from 'hex-color-opacity';
+import { variantToSkPath } from '@/features/nearPay/lib/boltSkiaPath';
 
 import {
   BLUETOOTH_ACCENT,
@@ -121,17 +121,6 @@ interface LightningStrikeProps {
   frameSize?: number;
   /** 'electric-blue' = pending/radar identity; 'storm-gold' = money landed. */
   palette?: LightningPalette;
-}
-
-function variantToSkPath(variant: BoltVariant) {
-  const path = Skia.Path.Make();
-  const [first, ...rest] = variant.main;
-  path.moveTo(first.x, first.y);
-  for (const point of rest) path.lineTo(point.x, point.y);
-  const [forkStart, ...forkRest] = variant.fork;
-  path.moveTo(forkStart.x, forkStart.y);
-  for (const point of forkRest) path.lineTo(point.x, point.y);
-  return path;
 }
 
 function ambientFlicker(peak: number) {

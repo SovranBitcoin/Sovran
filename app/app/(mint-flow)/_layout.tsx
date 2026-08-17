@@ -4,8 +4,7 @@
  * This layout creates a nested stack navigator inside a modal presentation.
  * The parent root Stack presents this group as a modal (slides up from bottom).
  * Screens within this group push horizontally:
- * - list: Entry point, shows owned mints with balances
- * - add: Discover and add new mints (horizontal push)
+ * - add: Entry point, discover and add new mints
  * - info: Mint details and audit info (horizontal push)
  *
  * The first screen shows a close button, subsequent screens show a back button.
@@ -18,7 +17,6 @@ import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
 import { FLOW_SHEET_HEADER_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
 
-const LIST_OPTIONS = { title: 'Select mint' };
 const ADD_OPTIONS = { title: 'Add mints' };
 const INFO_OPTIONS = { title: 'Mint details' };
 const REVIEWS_OPTIONS = { title: 'Reviews' };
@@ -39,7 +37,6 @@ export default function MintFlowLayout() {
   return (
     <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
       <Stack screenOptions={screenOptions}>
-        <Stack.Screen name="list" options={LIST_OPTIONS} />
         <Stack.Screen name="add" options={ADD_OPTIONS} />
         <Stack.Screen name="info" options={INFO_OPTIONS} />
         <Stack.Screen name="reviews" options={REVIEWS_OPTIONS} />

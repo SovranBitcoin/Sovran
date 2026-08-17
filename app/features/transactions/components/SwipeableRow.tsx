@@ -36,19 +36,10 @@ interface SwipeableRowProps {
   /** When false, the gesture is inert — the row stays mounted (so shared
    * values + worklets persist) but no swipe reveals the action track. */
   enabled?: boolean;
-  actionLabel?: string;
-  actionIcon?: string;
   testID?: string;
 }
 
-export function SwipeableRow({
-  children,
-  onCommit,
-  enabled = true,
-  actionLabel = 'Cancel',
-  actionIcon = 'mdi:close-circle',
-  testID,
-}: SwipeableRowProps) {
+export function SwipeableRow({ children, onCommit, enabled = true, testID }: SwipeableRowProps) {
   const [danger, foreground] = useThemeColor(['danger', 'foreground'] as const);
 
   // translateX is always >= 0 here — the row only slides RIGHT.
@@ -115,9 +106,9 @@ export function SwipeableRow({
         style={[styles.track, { backgroundColor: danger }, trackStyle]}
         pointerEvents="none">
         <Animated.View style={[styles.action, labelStyle]}>
-          <Icon name={actionIcon} size={22} color={foreground} />
+          <Icon name="mdi:close-circle" size={22} color={foreground} />
           <Text size={12} heavy style={{ color: foreground, marginTop: 2 }}>
-            {actionLabel}
+            Cancel
           </Text>
         </Animated.View>
       </Animated.View>

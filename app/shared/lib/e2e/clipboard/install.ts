@@ -6,7 +6,7 @@
 import { isE2EClipboardBridgeEnabled } from './enabled';
 import { startE2EClipboardIo } from './io';
 
-export function installE2EClipboardBridge(): void {
+function installE2EClipboardBridge(): void {
   if (!isE2EClipboardBridgeEnabled()) return;
   startE2EClipboardIo();
 }

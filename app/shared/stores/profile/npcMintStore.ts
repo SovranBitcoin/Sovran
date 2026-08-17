@@ -27,14 +27,6 @@ interface NpcMintActions {
   getActiveMintUrl: () => string;
 
   /**
-   * Fetch the current mint URL from the NPC server and cache locally.
-   * Returns the mint URL on success, or the cached/default value on failure.
-   */
-  syncFromServer: (manager: {
-    ext?: { npc?: { getInfo: () => Promise<NpcInfo> } };
-  }) => Promise<string | undefined>;
-
-  /**
    * Update the NPC server with a new mint URL, then cache locally.
    * Returns true on success.
    */
@@ -87,37 +79,6 @@ export const useNpcMintStore = create<NpcMintStore>()(
         isUpdating: false,
 
         getActiveMintUrl: () => get().mintUrl ?? NPC_DEFAULT_MINT_URL,
-
-        syncFromServer: async (manager) => {
-          if (get().isSyncing) return get().mintUrl ?? NPC_DEFAULT_MINT_URL;
-
-          storeLog.info('store.npc_mint.sync.start');
-          const startTime = performance.now();
-          set({ isSyncing: true });
-          try {
-            const npcApi = manager?.ext?.npc;
-            if (!npcApi) return get().mintUrl ?? NPC_DEFAULT_MINT_URL;
-
-            const npcInfo = await npcApi.getInfo();
-            const mintUrl = npcInfo?.mintUrl ?? npcInfo?.mint_url;
-
-            if (mintUrl) {
-              storeLog.info('store.npc_mint.sync.success', {
-                mintUrl,
-                duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
-              });
-              set({ mintUrl });
-              return mintUrl;
-            }
-
-            return get().mintUrl ?? NPC_DEFAULT_MINT_URL;
-          } catch (error) {
-            storeLog.warn('store.npc_mint.sync_failed', { error: redactError(error) });
-            return get().mintUrl ?? NPC_DEFAULT_MINT_URL;
-          } finally {
-            set({ isSyncing: false });
-          }
-        },
 
         updateServerMint: async (newMintUrl, privateKey) => {
           if (get().isUpdating) return false;

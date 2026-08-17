@@ -24,7 +24,7 @@ let installed = false;
  * cleared rule unblocks the app deterministically instead of hanging. */
 const pendingTimeoutRejects = new Set<() => void>();
 
-export function rejectPendingTimeoutFakes(): void {
+function rejectPendingTimeoutFakes(): void {
   for (const reject of [...pendingTimeoutRejects]) reject();
   pendingTimeoutRejects.clear();
 }

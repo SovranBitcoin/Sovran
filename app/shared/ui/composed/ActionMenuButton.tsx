@@ -90,12 +90,6 @@ interface ActionMenuButtonProps {
    */
   variants: ActionMenuVariant[];
   /**
-   * When true (default) the chevron renders even if only one variant is
-   * provided — keeps future methods discoverable. Set false to collapse to a
-   * plain button when a single variant is given.
-   */
-  alwaysShowMenu?: boolean;
-  /**
    * When true, the primary button also opens the menu instead of invoking the
    * default variant. Use when there is no sensible default (every variant is a
    * deliberate user choice).
@@ -152,7 +146,6 @@ export function ActionMenuButton({
   loading,
   disabled,
   variants,
-  alwaysShowMenu = true,
   collapsedPressOpensMenu = false,
   presentation = 'popover',
   menuTitle,
@@ -161,7 +154,7 @@ export function ActionMenuButton({
 }: ActionMenuButtonProps) {
   const defaultVariant = variants[0];
   const hasVariants = variants.length > 0;
-  const showChevron = hasVariants && (variants.length > 1 || alwaysShowMenu);
+  const showChevron = hasVariants;
   // An explicit `bottom-sheet` request routes through the FullWindowOverlay-
   // backed `<BottomSheet>` lane (`actionMenuSheet`) so the menu stacks ABOVE
   // route modals — the menu-lane host (`actionMenuPopup`) disables FWO and

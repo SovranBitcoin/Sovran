@@ -25,7 +25,7 @@ export interface DmEchoMessage {
   pubkey: string;
 }
 
-export type DmEchoProtocol = 'nip04' | 'nip17';
+type DmEchoProtocol = 'nip04' | 'nip17';
 
 interface DmEchoStore {
   byThread: Record<string, DmEchoMessage[]>;

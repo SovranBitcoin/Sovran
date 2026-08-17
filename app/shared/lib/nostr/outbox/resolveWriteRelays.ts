@@ -21,7 +21,7 @@ export interface RecipientRelays {
   readRelays: readonly string[];
 }
 
-export interface ResolveWriteRelaysInput {
+interface ResolveWriteRelaysInput {
   /** The active profile's own write relays (empty → defaults). */
   ownWriteRelays: readonly string[];
   /** Recipients whose read relays the event should also reach. */

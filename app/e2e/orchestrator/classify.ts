@@ -13,7 +13,7 @@ import { parseEvents } from '../viewer/lib/timeline';
 import type { ScenarioTimeline } from '../viewer/lib/types';
 import type { AttemptOutcome, AttemptRecord } from './state';
 
-export interface AttemptClassification {
+interface AttemptClassification {
   outcome: AttemptOutcome;
   failure?: NonNullable<AttemptRecord['failure']>;
   artifacts?: NonNullable<AttemptRecord['artifacts']>;

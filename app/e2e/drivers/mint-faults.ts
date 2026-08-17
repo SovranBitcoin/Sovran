@@ -27,7 +27,7 @@ export interface MintFaultChannel {
   ledger(): Promise<MintFaultLedger | null>;
 }
 
-export interface SimulatorMintFaultChannelOptions {
+interface SimulatorMintFaultChannelOptions {
   udid: string;
   bundleId?: string;
   exec?: (cmd: string[], opts?: RunOptions) => Promise<string>;

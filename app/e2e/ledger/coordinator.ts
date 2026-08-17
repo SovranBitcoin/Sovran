@@ -74,7 +74,7 @@ export interface FundingEffects {
   sweep(request: SweepEffectRequest): Promise<SweepEffectResult>;
 }
 
-export type QuarantineReason =
+type QuarantineReason =
   | 'funding-effect-uncertain'
   | 'funding-result-invalid'
   | 'outflow-effect-uncertain'
@@ -85,7 +85,7 @@ export type QuarantineReason =
   | 'startup-resume-required'
   | 'operator-halt';
 
-export interface PrepareFundingInput {
+interface PrepareFundingInput {
   legId: string;
   custody: CustodyHandle;
   counterparty: string;
@@ -93,7 +93,7 @@ export interface PrepareFundingInput {
   expectedAmount: number;
 }
 
-export interface OutflowInput {
+interface OutflowInput {
   counterparty: string;
   amount: number;
 }

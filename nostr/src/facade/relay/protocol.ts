@@ -1,3 +1,4 @@
+import { parseWireFrame } from '../wire-frame';
 import { ok, err, type Result } from 'neverthrow';
 import { DEFAULT_TIMEOUT_MS, type RequestControls } from '../../timeout';
 import type { NaggError } from '../../errors';
@@ -166,7 +167,7 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
             socket.send(JSON.stringify(['REQ', subId, ...filters]));
           };
           socket.onmessage = (event) => {
-            const message = parseMessage(event.data);
+            const message = parseWireFrame(event.data);
             if (!message || message[1] !== subId) return;
             anyResponded = true;
             if (message[0] === 'EVENT' && message[2] && typeof message[2] === 'object') {
@@ -200,7 +201,7 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
           if (!closed) socket.send(JSON.stringify(['REQ', subId, ...filters]));
         };
         socket.onmessage = (event) => {
-          const message = parseMessage(event.data);
+          const message = parseWireFrame(event.data);
           // Stay open past EOSE — a live listener only cares about EVENTs.
           if (!message || message[1] !== subId || message[0] !== 'EVENT') return;
           const raw = message[2];
@@ -227,17 +228,4 @@ export function createRelayPoolConnection(config: RelayPoolConfig): RelayConnect
       };
     },
   };
-}
-
-function parseMessage(data: unknown): [string, string, unknown?] | null {
-  if (typeof data !== 'string') return null;
-  try {
-    const parsed = JSON.parse(data);
-    if (Array.isArray(parsed) && typeof parsed[0] === 'string' && typeof parsed[1] === 'string') {
-      return parsed as [string, string, unknown?];
-    }
-  } catch {
-    // ignore malformed frames
-  }
-  return null;
 }

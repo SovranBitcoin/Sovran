@@ -13,7 +13,7 @@ import type { HistoryEntry } from "@cashu/coco-core";
 import { decode } from "@gandlaf21/bolt11-decode";
 
 import { defaultDetectors } from "../../detectors";
-import { parsePaymentInput } from "../../parse";
+import { looksLikeBitcoinAddress, parsePaymentInput } from "../../parse";
 import {
   createPaymentCopyGroups,
   createPaymentCopyResolver,
@@ -38,7 +38,7 @@ type AmountValue = AmountLike | null | undefined;
 
 export const DEFAULT_PAYMENT_COPY = createPaymentCopyResolver();
 
-export function amountToNumber(value: AmountValue): number {
+function amountToNumber(value: AmountValue): number {
   if (value == null) return 0;
   if (typeof value === "number") return value;
   if (typeof value === "bigint") return Number(value);
@@ -47,14 +47,6 @@ export function amountToNumber(value: AmountValue): number {
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return value.toNumber();
-}
-
-function looksLikeBitcoinAddress(value: string): boolean {
-  const candidate = value.trim();
-  if (!candidate) return false;
-
-  if (/^(bc|tb|bcrt)1[ac-hj-np-z02-9]{11,87}$/i.test(candidate)) return true;
-  return /^[123mn2][1-9A-HJ-NP-Za-km-z]{25,62}$/.test(candidate);
 }
 
 function getBip321OnchainAddress(value: string): string | null {

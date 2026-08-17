@@ -23,20 +23,13 @@ type FollowRelationship = 'following' | 'follows_you' | 'mutual' | 'none';
 
 interface FollowBadgeProps {
   pubkey: string;
-  /** Server-provided relationship; when omitted/none, falls back to local follow state. */
-  relationship?: FollowRelationship;
 }
 
-export function FollowBadge({ pubkey, relationship }: FollowBadgeProps) {
+export function FollowBadge({ pubkey }: FollowBadgeProps) {
   const isFollowingLocal = useNostrSocialStore(selectIsFollowingPubkey(pubkey));
   const [success, accent] = useThemeColor(['success', 'accent'] as const);
 
-  const resolved: FollowRelationship =
-    relationship && relationship !== 'none'
-      ? relationship
-      : isFollowingLocal
-        ? 'following'
-        : 'none';
+  const resolved: FollowRelationship = isFollowingLocal ? 'following' : 'none';
 
   if (resolved === 'none') return null;
 

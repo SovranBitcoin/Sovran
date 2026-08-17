@@ -21,7 +21,7 @@ export interface ChildHandle {
   terminate(): void;
 }
 
-export interface SpawnChunkOptions {
+interface SpawnChunkOptions {
   cwd: string;
   /** Absolute path; every child line is appended here as well as stdout. */
   logFile: string;

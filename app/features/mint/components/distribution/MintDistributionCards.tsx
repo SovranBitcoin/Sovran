@@ -10,7 +10,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { extractDomain } from '@/shared/lib/url';
 import { bpToPercent } from '@/shared/stores/profile/mintDistributionStore';
 
-export interface MintDistributionCardsProps {
+interface MintDistributionCardsProps {
   /** Active mint URLs for the selected currency, in display order. */
   mintUrls: string[];
   /** Async-resolved mint metadata (name, icon) keyed by mint URL. */

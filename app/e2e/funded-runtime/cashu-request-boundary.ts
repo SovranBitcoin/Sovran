@@ -1,6 +1,6 @@
 import { setGlobalRequestOptions } from '@cashu/cashu-ts';
 
-export interface BoundedCashuRequestOptions {
+interface BoundedCashuRequestOptions {
   /** Total wall-clock budget shared by every Cashu request in the operation. */
   readonly deadlineMs: number;
   /** Per-request guard so one connection cannot consume the whole budget. */

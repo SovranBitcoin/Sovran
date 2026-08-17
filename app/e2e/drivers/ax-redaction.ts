@@ -7,10 +7,10 @@
  * transport or artifact serialization; never depend on content recognition.
  */
 
-export const PROFILE_SECRET_AX_ID_PREFIX = 'profile-secret-value-';
+const PROFILE_SECRET_AX_ID_PREFIX = 'profile-secret-value-';
 export const PROFILE_SECRET_AX_REDACTED = '‹profile-secret:redacted›';
 
-export interface ProfileSecretAxFields {
+interface ProfileSecretAxFields {
   id?: string | null;
   label?: string | null;
   value?: string | null;

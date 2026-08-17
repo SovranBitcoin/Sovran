@@ -195,7 +195,6 @@ interface RoutstrActions {
   clearBalance: () => void;
 
   addMessage: (message: RoutstrMessage) => void;
-  clearConversation: () => void;
   updateMessage: (id: string, content: string) => void;
   /** Toggle a message's transient `pending` flag. Used by `useAiSend` to
    *  flip the user-bubble spinner → check once the streaming round-trip
@@ -219,13 +218,6 @@ interface RoutstrActions {
    *  the current session's `activeChildren` so the choice survives across
    *  app restarts. */
   setActiveBranch: (parentId: string, childId: string) => void;
-
-  setSelectedModel: (modelId: string) => void;
-  clearSelectedModel: () => void;
-
-  setSelectedTier: (tier: RoutstrTierId) => void;
-
-  setSelectedProvider: (provider: RoutstrProviderId) => void;
   /** Atomic write of the (provider, tier) pair — used by the tabbed
    *  picker so flipping a row doesn't briefly leave the store in a
    *  half-updated state between two `set()` calls. */
@@ -238,14 +230,10 @@ interface RoutstrActions {
    *  node override. */
   setServerLineup: (params: { lineup: AiLineup; nodeBaseUrl: string | null }) => void;
   isCacheStale: () => boolean;
-  clearModelsCache: () => void;
 
   createSession: () => string;
   switchSession: (sessionId: string) => void;
   updateCurrentSessionTitle: () => void;
-  deleteSession: (sessionId: string) => void;
-
-  setAnonymousMode: (isAnonymous: boolean) => void;
 }
 
 type RoutstrStore = RoutstrState & RoutstrActions;
@@ -355,11 +343,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
           }
           return { conversationHistory: newHistory };
         });
-      },
-
-      clearConversation: () => {
-        storeLog.info('store.routstr.clear_conversation');
-        set({ conversationHistory: [], activeChildren: {} });
       },
 
       removeMessages: (ids: Set<string>) => {
@@ -475,28 +458,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
         });
       },
 
-      setSelectedModel: (modelId: string) => {
-        storeLog.info('store.routstr.set_model', { modelId });
-        set({ selectedModel: modelId });
-      },
-
-      clearSelectedModel: () => {
-        storeLog.info('store.routstr.clear_model');
-        set({ selectedModel: null });
-      },
-
-      setSelectedTier: (tier: RoutstrTierId) => {
-        const safe = TIER_IDS.includes(tier) ? tier : DEFAULT_TIER;
-        storeLog.info('store.routstr.set_tier', { tier: safe });
-        set({ selectedTier: safe });
-      },
-
-      setSelectedProvider: (provider: RoutstrProviderId) => {
-        const safe = PROVIDER_IDS.includes(provider) ? provider : DEFAULT_PROVIDER;
-        storeLog.info('store.routstr.set_provider', { provider: safe });
-        set({ selectedProvider: safe });
-      },
-
       setSelectedSlot: (slot) => {
         const safeProvider = PROVIDER_IDS.includes(slot.provider)
           ? slot.provider
@@ -570,11 +531,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
         return Date.now() - cache.timestamp > MODELS_CACHE_TTL;
       },
 
-      clearModelsCache: () => {
-        storeLog.debug('store.routstr.clear_models_cache');
-        set({ modelsCache: null });
-      },
-
       createSession: () => {
         const sessionId = mintLocalId('session');
         storeLog.info('store.routstr.create_session', { sessionId });
@@ -629,47 +585,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
             session.id === state.currentSessionId ? { ...session, title } : session
           );
           set({ sessions: updatedSessions });
-        }
-      },
-
-      deleteSession: (sessionId: string) => {
-        storeLog.info('store.routstr.delete_session', { sessionId });
-        const state = get();
-        const updatedSessions = state.sessions.filter((s) => s.id !== sessionId);
-        let newCurrentSessionId = state.currentSessionId;
-        let newConversationHistory = state.conversationHistory;
-        let newActiveChildren = state.activeChildren;
-
-        // If deleting current session, switch to another or create new one
-        if (state.currentSessionId === sessionId) {
-          if (updatedSessions.length > 0) {
-            // Switch to first session (newest)
-            const firstSession = updatedSessions[0];
-            newCurrentSessionId = firstSession.id;
-            newConversationHistory = firstSession.messages;
-            newActiveChildren = firstSession.activeChildren ?? {};
-          } else {
-            // No sessions left, clear current
-            newCurrentSessionId = null;
-            newConversationHistory = [];
-            newActiveChildren = {};
-          }
-        }
-
-        set({
-          sessions: updatedSessions,
-          currentSessionId: newCurrentSessionId,
-          conversationHistory: newConversationHistory,
-          activeChildren: newActiveChildren,
-        });
-      },
-
-      setAnonymousMode: (isAnonymous: boolean) => {
-        storeLog.info('store.routstr.set_anonymous_mode', { isAnonymous });
-        set({ isAnonymousMode: isAnonymous });
-        // Clear conversation history when switching modes
-        if (isAnonymous) {
-          set({ conversationHistory: [], activeChildren: {} });
         }
       },
     }),

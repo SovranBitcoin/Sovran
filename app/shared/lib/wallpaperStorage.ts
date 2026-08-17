@@ -135,18 +135,6 @@ export function getWallpaperUri(themeName: string): string {
 }
 
 /**
- * Delete a downloaded wallpaper image from disk.
- */
-export async function deleteWallpaper(themeName: string): Promise<void> {
-  const uri = getWallpaperUri(themeName);
-  const info = await FileSystem.getInfoAsync(uri);
-  if (info.exists) {
-    await FileSystem.deleteAsync(uri, { idempotent: true });
-    log.info('wallpaper.delete', { themeName });
-  }
-}
-
-/**
  * Clean up orphaned files — files on disk that aren't tracked in the store.
  * Returns list of cleaned-up file names.
  */

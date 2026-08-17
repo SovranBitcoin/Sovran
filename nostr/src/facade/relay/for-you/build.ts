@@ -84,7 +84,7 @@ type ForYouCorpus = {
 /** Per-viewer corpus cache. For-You is the only ranked relay spec. */
 const cacheByViewer = new Map<string, ForYouCorpus>();
 
-export type BuildRelayForYouArgs = {
+type BuildRelayForYouArgs = {
   viewerPubkey?: string;
   connection: RelayConnection;
   request: FeedPageRequest;

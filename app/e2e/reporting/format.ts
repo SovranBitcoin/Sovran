@@ -5,8 +5,8 @@
  */
 import type { RunnerEvent } from '../core/events';
 
-export const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const;
-export const SPINNER_ASCII = ['|', '/', '-', '\\'] as const;
+const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const;
+const SPINNER_ASCII = ['|', '/', '-', '\\'] as const;
 
 const UNICODE = {
   scenario: '▶',
@@ -43,12 +43,11 @@ const ASCII = {
   empty: '.',
 } as const;
 
-export type Glyphs = typeof UNICODE;
+type Glyphs = typeof UNICODE;
 export const glyphs = (unicode: boolean): Glyphs =>
   unicode ? UNICODE : (ASCII as unknown as Glyphs);
 
-export const fmtDuration = (ms: number): string =>
-  ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+const fmtDuration = (ms: number): string => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`);
 const pad = (n: number) => ' '.repeat(Math.max(0, n));
 const phaseLabel = (
   phase: Extract<RunnerEvent, { type: 'phase.begin' }>['phase'],
@@ -131,13 +130,13 @@ export function lineFor(e: RunnerEvent, unicode = true): string | null {
   }
 }
 
-export function progressBar(done: number, total: number, width = 20, unicode = true): string {
+function progressBar(done: number, total: number, width = 20, unicode = true): string {
   const g = glyphs(unicode);
   const filled = total === 0 ? 0 : Math.round((done / total) * width);
   return g.block.repeat(filled) + g.empty.repeat(Math.max(0, width - filled));
 }
 
-export function spinnerFrame(tick: number, unicode = true): string {
+function spinnerFrame(tick: number, unicode = true): string {
   const frames = unicode ? SPINNER : SPINNER_ASCII;
   return frames[tick % frames.length];
 }

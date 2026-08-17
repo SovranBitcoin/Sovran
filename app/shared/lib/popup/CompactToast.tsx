@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Button, Toast } from 'heroui-native';
+import { Toast } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
 import { resolvePopupIcon, type PopupIcon } from './icons';
@@ -14,8 +14,6 @@ type CompactToastProps = {
   label: string;
   description?: string;
   icon?: PopupIcon;
-  actionLabel?: string;
-  onActionPress?: (args: { hide: (ids?: string | string[] | 'all') => void }) => void;
   hide?: (ids?: string | string[] | 'all') => void;
   [key: string]: unknown;
 };
@@ -33,8 +31,6 @@ export function CompactToast({
   label,
   description,
   icon,
-  actionLabel,
-  onActionPress,
   hide,
   ...toastProps
 }: CompactToastProps) {
@@ -44,12 +40,6 @@ export function CompactToast({
   // ghosted (the slab renders no BlurView there).
   const frosted = useToastFrosted();
   const tintColor = frosted ? opacity(bg, TINT_ALPHA) : bg;
-
-  const handleActionPress = () => {
-    if (onActionPress && hide) {
-      onActionPress({ hide });
-    }
-  };
 
   return (
     <ToastSlab
@@ -67,11 +57,6 @@ export function CompactToast({
           </Toast.Description>
         ) : null}
       </View>
-      {actionLabel ? (
-        <Toast.Action style={{ backgroundColor: fg }} onPress={handleActionPress}>
-          <Button.Label style={{ color: bg }}>{actionLabel}</Button.Label>
-        </Toast.Action>
-      ) : null}
     </ToastSlab>
   );
 }

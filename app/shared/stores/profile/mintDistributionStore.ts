@@ -28,7 +28,6 @@ interface MintDistributionState {
 interface MintDistributionActions {
   // Getters
   getDistribution: (unit: string) => Record<string, number>;
-  getMintDistribution: (unit: string, mintUrl: string) => number;
 
   // Core setter with redistribution logic
   setMintDistribution: (
@@ -43,22 +42,7 @@ interface MintDistributionActions {
 
   // Quick actions
   equalizeMints: (unit: string, mintUrls: string[]) => void;
-  maxMint: (unit: string, mintUrl: string, allMintUrls: string[]) => void;
   minMint: (unit: string, mintUrl: string, allMintUrls: string[]) => void;
-  /** Match each mint's share to its current proportion of total holdings.
-   *  Falls back to equal split when total balance is zero. */
-  mirrorBalances: (unit: string, balances: Record<string, number>, mintUrls: string[]) => void;
-  /** Push the largest share to the highest-balance mint and split the rest
-   *  evenly among the others. Falls back to equal split when balances are
-   *  unknown or tied at zero. */
-  concentrateOnPrimary: (
-    unit: string,
-    balances: Record<string, number>,
-    mintUrls: string[]
-  ) => void;
-
-  // Utility
-  clearDistribution: (unit: string) => void;
 }
 
 type MintDistributionStore = MintDistributionState & MintDistributionActions;
@@ -187,13 +171,6 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
         getDistribution: (unit: string) => {
           const normalizedUnit = unit.toLowerCase();
           return get().distributions[normalizedUnit] || {};
-        },
-
-        // Get specific mint's distribution
-        getMintDistribution: (unit: string, mintUrl: string) => {
-          const normalizedUnit = unit.toLowerCase();
-          const distribution = get().distributions[normalizedUnit] || {};
-          return distribution[mintUrl] || 0;
         },
 
         // Set mint distribution with automatic redistribution
@@ -428,27 +405,6 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
           });
         },
 
-        // Set mint to 100%
-        maxMint: (unit: string, mintUrl: string, allMintUrls: string[]) => {
-          storeLog.info('store.mint_dist.max', { unit, mintUrl });
-          const normalizedUnit = unit.toLowerCase();
-
-          set((state) => {
-            const newDistribution: Record<string, number> = {};
-
-            allMintUrls.forEach((url) => {
-              newDistribution[url] = url === mintUrl ? TOTAL_BASIS_POINTS : 0;
-            });
-
-            return {
-              distributions: {
-                ...state.distributions,
-                [normalizedUnit]: newDistribution,
-              },
-            };
-          });
-        },
-
         // Set mint to 0% and redistribute
         minMint: (unit: string, mintUrl: string, allMintUrls: string[]) => {
           storeLog.info('store.mint_dist.min', { unit, mintUrl });
@@ -511,100 +467,6 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
                 [normalizedUnit]: newDistribution,
               },
             };
-          });
-        },
-
-        // Match share to current balance proportions
-        mirrorBalances: (unit: string, balances: Record<string, number>, mintUrls: string[]) => {
-          storeLog.info('store.mint_dist.mirror', { unit, mintCount: mintUrls.length });
-          const normalizedUnit = unit.toLowerCase();
-
-          set((state) => {
-            if (mintUrls.length === 0) return state;
-
-            const values = mintUrls.map((url) => Math.max(0, balances[url] ?? 0));
-            const total = values.reduce((s, v) => s + v, 0);
-
-            // No holdings → fall back to equal split, same as initializeDistribution.
-            const bps =
-              total === 0
-                ? distributeProportionally(
-                    mintUrls.map(() => 1),
-                    TOTAL_BASIS_POINTS
-                  )
-                : distributeProportionally(values, TOTAL_BASIS_POINTS);
-
-            const newDistribution: Record<string, number> = {};
-            mintUrls.forEach((url, i) => {
-              newDistribution[url] = bps[i];
-            });
-
-            return {
-              distributions: {
-                ...state.distributions,
-                [normalizedUnit]: newDistribution,
-              },
-            };
-          });
-        },
-
-        // Push the largest share to the top mint, split the rest evenly
-        concentrateOnPrimary: (
-          unit: string,
-          balances: Record<string, number>,
-          mintUrls: string[]
-        ) => {
-          storeLog.info('store.mint_dist.concentrate', { unit, mintCount: mintUrls.length });
-          const normalizedUnit = unit.toLowerCase();
-
-          set((state) => {
-            if (mintUrls.length === 0) return state;
-            if (mintUrls.length === 1) {
-              return {
-                distributions: {
-                  ...state.distributions,
-                  [normalizedUnit]: { [mintUrls[0]]: TOTAL_BASIS_POINTS },
-                },
-              };
-            }
-
-            // Pick the highest-balance mint as primary; fall back to the
-            // first url if every mint is at zero (we still want a deterministic
-            // pick rather than no-op).
-            const primary = mintUrls.reduce((best, url) =>
-              (balances[url] ?? 0) > (balances[best] ?? 0) ? url : best
-            );
-
-            const PRIMARY_SHARE_BP = 8_000; // 80%
-            const remainder = TOTAL_BASIS_POINTS - PRIMARY_SHARE_BP;
-            const others = mintUrls.filter((url) => url !== primary);
-            const perOther = Math.floor(remainder / others.length);
-            const leftover = remainder - perOther * others.length;
-
-            const newDistribution: Record<string, number> = {
-              [primary]: PRIMARY_SHARE_BP,
-            };
-            others.forEach((url, i) => {
-              newDistribution[url] = perOther + (i < leftover ? 1 : 0);
-            });
-
-            return {
-              distributions: {
-                ...state.distributions,
-                [normalizedUnit]: newDistribution,
-              },
-            };
-          });
-        },
-
-        // Clear distribution for a unit
-        clearDistribution: (unit: string) => {
-          storeLog.info('store.mint_dist.clear', { unit });
-          const normalizedUnit = unit.toLowerCase();
-
-          set((state) => {
-            const { [normalizedUnit]: _, ...rest } = state.distributions;
-            return { distributions: rest };
           });
         },
       }),

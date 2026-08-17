@@ -49,7 +49,7 @@ export interface ChunkPlan {
   chunks: ChunkPlanEntry[];
 }
 
-export interface ChunkPlanOptions {
+interface ChunkPlanOptions {
   /** Execution order, e.g. ['ios', 'android']. */
   platforms: Platform[];
   /** Narrow to chunks containing at least one member of this lane. */
@@ -60,8 +60,8 @@ export interface ChunkPlanOptions {
 
 /** Matches the fresh-matrix invariant guard — bump both together when the
  * full suite grows. */
-export const EXPECTED_SCENARIOS = 126;
-export const EXPECTED_PAIRS = 215;
+const EXPECTED_SCENARIOS = 126;
+const EXPECTED_PAIRS = 215;
 
 export function buildChunkPlan(options: ChunkPlanOptions): Result<ChunkPlan, string> {
   if (options.platforms.length === 0) return err('no platforms selected');

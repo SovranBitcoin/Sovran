@@ -39,16 +39,10 @@ interface TransferEntryRowProps {
   unit: string;
   /** Left-side subtitle (e.g. timestamp or status text) */
   subtitle?: string;
-  /** Color for the left-side subtitle */
-  subtitleColor?: string;
   /** Right-side subtitle (e.g. fiat amount) */
   secondarySubtitle?: string;
-  /** Color for the right-side subtitle */
-  secondarySubtitleColor?: string;
   /** Optional press handler for the row */
   onPress?: () => void;
-  /** Optional trailing status icon (rendered after the amount) */
-  statusIcon?: React.ReactNode;
 }
 
 export const TransferEntryRow = React.memo(
@@ -59,11 +53,8 @@ export const TransferEntryRow = React.memo(
     amount,
     unit,
     subtitle,
-    subtitleColor,
     secondarySubtitle,
-    secondarySubtitleColor,
     onPress,
-    statusIcon,
   }: TransferEntryRowProps) => {
     const [foreground, surfaceSecondary, danger, success] = useThemeColor([
       'foreground',
@@ -104,25 +95,20 @@ export const TransferEntryRow = React.memo(
                 color={amountColor}
                 sign={isSend ? '-' : '+'}
               />
-              {statusIcon ? <View style={styles.statusIconSlot}>{statusIcon}</View> : null}
             </HStack>
           </HStack>
 
           {(subtitle || secondarySubtitle) && (
             <HStack justify="space-between" align="center">
               {subtitle ? (
-                <UntranslatedText size={10} color={subtitleColor ?? defaultSubtitleColor}>
+                <UntranslatedText size={10} color={defaultSubtitleColor}>
                   {subtitle}
                 </UntranslatedText>
               ) : (
                 <View />
               )}
               {secondarySubtitle ? (
-                <UntranslatedText
-                  overpass
-                  bold
-                  size={10}
-                  color={secondarySubtitleColor ?? defaultSubtitleColor}>
+                <UntranslatedText overpass bold size={10} color={defaultSubtitleColor}>
                   {secondarySubtitle}
                 </UntranslatedText>
               ) : null}
@@ -175,8 +161,5 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  statusIconSlot: {
-    marginLeft: 6,
   },
 });

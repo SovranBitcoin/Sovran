@@ -192,10 +192,6 @@ const DEFAULT_SETTINGS: SettingsState = {
 };
 
 interface SettingsActions {
-  // Language management
-  setLanguage: (language: string) => void;
-  getLanguage: () => string;
-
   // Display settings
   setDisplayBtc: (display: number) => void;
   getDisplayBtc: () => number;
@@ -204,47 +200,31 @@ interface SettingsActions {
 
   // Experimental features
   setExperimental: (experimental: boolean) => void;
-  getExperimental: () => boolean;
 
   // Mock mode (demo data)
   setMockMode: (enabled: boolean) => void;
-  getMockMode: () => boolean;
   setMockOffline: (enabled: boolean) => void;
-  getMockOffline: () => boolean;
   setMockFailSend: (enabled: boolean) => void;
-  getMockFailSend: () => boolean;
   setMockFailMelt: (enabled: boolean) => void;
-  getMockFailMelt: () => boolean;
   setMockFailPaymentRequest: (enabled: boolean) => void;
-  getMockFailPaymentRequest: () => boolean;
   setWhitenoiseEnabled: (enabled: boolean) => void;
-  getWhitenoiseEnabled: () => boolean;
   setMockNoGlass: (enabled: boolean) => void;
-  getMockNoGlass: () => boolean;
 
   // Terms acceptance
   acceptTerms: (date: string) => void;
-  getTermsAccepted: () => TermsAccepted | null;
   isTermsAccepted: () => boolean;
 
   // Onboarding
   completeOnboarding: () => void;
 
-  // P2PK quick access
-  setQuickAccessP2PK: (enabled: boolean) => void;
-  getQuickAccessP2PK: () => boolean;
-
   // P2PK key regeneration on receive
   setRegenerateP2PKOnReceive: (enabled: boolean) => void;
-  getRegenerateP2PKOnReceive: () => boolean;
 
   // Send location stamping
   setSendLocationEnabled: (enabled: boolean) => void;
-  getSendLocationEnabled: () => boolean;
 
   // On-device file logging (dev diagnostics)
   setFileLoggingEnabled: (enabled: boolean) => void;
-  getFileLoggingEnabled: () => boolean;
 
   // Nostr data-layer per-tier enablement (dev)
   setNaggTierEnabled: (enabled: boolean) => void;
@@ -253,11 +233,9 @@ interface SettingsActions {
 
   // Rebalancing
   setMinTransferThreshold: (sats: number) => void;
-  getMinTransferThreshold: () => number;
 
   // Middleman routing
   setMiddlemanRouting: (settings: Partial<MiddlemanRoutingSettings>) => void;
-  getMiddlemanRouting: () => MiddlemanRoutingSettings;
 }
 
 type SettingsStore = SettingsState & SettingsActions;
@@ -267,13 +245,6 @@ export const useSettingsStore = create<SettingsStore>()(
     persist(
       (set, get) => ({
         ...DEFAULT_SETTINGS,
-
-        // Language
-        setLanguage: (language: string) => {
-          storeLog.info('store.settings.set_language', { language });
-          set({ language });
-        },
-        getLanguage: () => get().language,
 
         // Display
         setDisplayBtc: (display: number) => {
@@ -292,7 +263,6 @@ export const useSettingsStore = create<SettingsStore>()(
           storeLog.info('store.settings.set_experimental', { experimental });
           set({ experimental });
         },
-        getExperimental: () => get().experimental,
 
         // Mock mode — lazy-import to avoid circular dependency at module load time
         setMockMode: (enabled: boolean) => {
@@ -307,44 +277,36 @@ export const useSettingsStore = create<SettingsStore>()(
           }
           set({ mockMode: enabled });
         },
-        getMockMode: () => get().mockMode,
         setMockOffline: (enabled: boolean) => {
           storeLog.info('store.settings.set_mock_offline', { enabled });
           set({ mockOffline: enabled });
         },
-        getMockOffline: () => get().mockOffline,
         setMockFailSend: (enabled: boolean) => {
           storeLog.info('store.settings.set_mock_fail_send', { enabled });
           set({ mockFailSend: enabled });
         },
-        getMockFailSend: () => get().mockFailSend,
         setMockFailMelt: (enabled: boolean) => {
           storeLog.info('store.settings.set_mock_fail_melt', { enabled });
           set({ mockFailMelt: enabled });
         },
-        getMockFailMelt: () => get().mockFailMelt,
         setMockFailPaymentRequest: (enabled: boolean) => {
           storeLog.info('store.settings.set_mock_fail_payment_request', { enabled });
           set({ mockFailPaymentRequest: enabled });
         },
-        getMockFailPaymentRequest: () => get().mockFailPaymentRequest,
         setWhitenoiseEnabled: (enabled: boolean) => {
           storeLog.info('store.settings.set_whitenoise_enabled', { enabled });
           set({ whitenoiseEnabled: enabled });
         },
-        getWhitenoiseEnabled: () => get().whitenoiseEnabled,
         setMockNoGlass: (enabled: boolean) => {
           storeLog.info('store.settings.set_mock_no_glass', { enabled });
           set({ mockNoGlass: enabled });
         },
-        getMockNoGlass: () => get().mockNoGlass,
 
         // Terms
         acceptTerms: (date: string) => {
           storeLog.info('store.settings.accept_terms', { date });
           set({ termsAccepted: { termsAccepted: true, date } });
         },
-        getTermsAccepted: () => get().termsAccepted,
         isTermsAccepted: () => get().termsAccepted?.termsAccepted === true,
 
         // Onboarding
@@ -352,25 +314,16 @@ export const useSettingsStore = create<SettingsStore>()(
           storeLog.info('store.settings.complete_onboarding');
           set({ hasSeenOnboarding: true });
         },
-
-        // P2PK
-        setQuickAccessP2PK: (enabled: boolean) => {
-          storeLog.info('store.settings.set_quick_access_p2pk', { enabled });
-          set({ quickAccessP2PK: enabled });
-        },
-        getQuickAccessP2PK: () => get().quickAccessP2PK,
         setRegenerateP2PKOnReceive: (enabled: boolean) => {
           storeLog.info('store.settings.set_regenerate_p2pk', { enabled });
           set({ regenerateP2PKOnReceive: enabled });
         },
-        getRegenerateP2PKOnReceive: () => get().regenerateP2PKOnReceive,
 
         // Location stamping
         setSendLocationEnabled: (enabled: boolean) => {
           storeLog.info('store.settings.set_send_location', { enabled });
           set({ sendLocationEnabled: enabled });
         },
-        getSendLocationEnabled: () => get().sendLocationEnabled,
 
         // File logging — drive the logger's file transport alongside the
         // persisted flag so toggling takes effect immediately.
@@ -379,7 +332,6 @@ export const useSettingsStore = create<SettingsStore>()(
           set({ fileLoggingEnabled: enabled });
           applyFileLogging(enabled);
         },
-        getFileLoggingEnabled: () => get().fileLoggingEnabled,
 
         // Nostr data-layer tiers (dev)
         setNaggTierEnabled: (enabled: boolean) => {
@@ -400,7 +352,6 @@ export const useSettingsStore = create<SettingsStore>()(
           storeLog.info('store.settings.set_min_transfer_threshold', { sats });
           set({ minTransferThreshold: sats });
         },
-        getMinTransferThreshold: () => get().minTransferThreshold,
 
         // Middleman routing
         setMiddlemanRouting: (settings) => {
@@ -409,7 +360,6 @@ export const useSettingsStore = create<SettingsStore>()(
             middlemanRouting: { ...state.middlemanRouting, ...settings },
           }));
         },
-        getMiddlemanRouting: () => get().middlemanRouting,
       }),
       persistConfig({
         name: 'settings-store',

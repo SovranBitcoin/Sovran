@@ -23,7 +23,7 @@ import {
   buildProofSuggestions,
   findFullAmountCandidates,
 } from "./amountFallback";
-import { toMintError } from "./resolveNext";
+import { methodRequirementForDestination, toMintError } from "./resolveNext";
 import type {
   Destination,
   FlowContext,
@@ -32,7 +32,7 @@ import type {
   StepDataMap,
 } from "./types";
 
-export interface ContextResolutionResult<S extends FlowStep = FlowStep> {
+interface ContextResolutionResult<S extends FlowStep = FlowStep> {
   step: S;
   context: FlowContext;
   data: StepDataMap[S];
@@ -133,20 +133,6 @@ function logContextResult<S extends FlowStep>(
 
 function needsSpendableBalance(destination: Destination): boolean {
   return destination !== "mintQuote";
-}
-
-function methodRequirementForDestination(
-  destination: Destination,
-  ctx: FlowContext,
-  unit: string,
-): MintMethodRequirement | null {
-  if (destination === "mintQuote") {
-    return { operation: "mint", method: ctx.mintQuoteMethod ?? "bolt11", unit };
-  }
-  if (destination === "meltQuote") {
-    return { operation: "melt", method: ctx.meltQuoteMethod ?? "bolt11", unit };
-  }
-  return null;
 }
 
 function buildMethodCandidates(

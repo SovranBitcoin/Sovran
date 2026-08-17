@@ -109,14 +109,8 @@ type ExpoRouterHeaderScreenProps = {
   iconColor?: string;
   headerLeft?: NonNullable<NativeStackNavigationOptions['headerLeft']>;
   headerRight?: NonNullable<NativeStackNavigationOptions['headerRight']>;
-  headerLeftIcon?: HeaderIconName;
-  onHeaderLeftPress?: () => void;
-  headerLeftIconSize?: number;
-  headerLeftStyle?: StyleProp<ViewStyle>;
   headerRightIcon?: HeaderIconName;
   onHeaderRightPress?: () => void;
-  headerRightIconSize?: number;
-  headerRightStyle?: StyleProp<ViewStyle>;
   /** AX identity for the right icon button — required for the button to reach
    * the iOS accessibility tree (glass header buttons are otherwise id-less). */
   headerRightAccessibilityLabel?: string;
@@ -134,14 +128,8 @@ export function buildExpoRouterHeaderOptions({
   iconColor,
   headerLeft,
   headerRight,
-  headerLeftIcon,
-  onHeaderLeftPress,
-  headerLeftIconSize = 30,
-  headerLeftStyle,
   headerRightIcon,
   onHeaderRightPress,
-  headerRightIconSize = 24,
-  headerRightStyle,
   headerRightAccessibilityLabel,
   headerRightTestID,
 }: ExpoRouterHeaderOptionsInput): NativeStackNavigationOptions {
@@ -169,16 +157,6 @@ export function buildExpoRouterHeaderOptions({
 
   if (providedHeaderLeft) {
     nextOptions.headerLeft = providedHeaderLeft;
-  } else if (headerLeftIcon && onHeaderLeftPress) {
-    nextOptions.headerLeft = () => (
-      <HeaderIconButton
-        icon={headerLeftIcon}
-        color={resolvedIconColor}
-        onPress={onHeaderLeftPress}
-        size={headerLeftIconSize}
-        style={headerLeftStyle}
-      />
-    );
   }
 
   if (providedHeaderRight) {
@@ -189,8 +167,7 @@ export function buildExpoRouterHeaderOptions({
         icon={headerRightIcon}
         color={resolvedIconColor}
         onPress={onHeaderRightPress}
-        size={headerRightIconSize}
-        style={headerRightStyle}
+        size={24}
         accessibilityLabel={headerRightAccessibilityLabel}
         testID={headerRightTestID}
       />

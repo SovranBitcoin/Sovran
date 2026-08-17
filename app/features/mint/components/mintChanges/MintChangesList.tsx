@@ -16,7 +16,11 @@ import { useMintChanges } from '@/features/mint/hooks/useMintChanges';
 import type { MintChangeUpdate } from '@/features/mint/lib/mintChanges/groupEntries';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
-import { useVisualListLogger, VISUAL_LIST_VIEWABILITY_CONFIG } from '@/shared/lib/contentShiftLog';
+import {
+  useVisualListLogger,
+  visualViewabilityRange,
+  VISUAL_LIST_VIEWABILITY_CONFIG,
+} from '@/shared/lib/contentShiftLog';
 import { cashuLog } from '@/shared/lib/logger';
 import { alpha, spacing } from '@/shared/styles/tokens';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
@@ -33,15 +37,6 @@ function mintChangeVisualToken(token: ViewToken) {
     isViewable: token.isViewable,
     item: token.item as MintChangeUpdate,
   };
-}
-
-function visualViewabilityRange(tokens: ViewToken[]) {
-  const indexes = tokens
-    .map((token) => token.index)
-    .filter((index): index is number => typeof index === 'number');
-  const start = indexes.length > 0 ? Math.min(...indexes) : 0;
-  const end = indexes.length > 0 ? Math.max(...indexes) : -1;
-  return { start, end, startBuffered: start, endBuffered: end };
 }
 
 export function MintChangesList() {

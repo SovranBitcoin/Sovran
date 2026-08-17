@@ -60,7 +60,7 @@ export interface LegacyRecoveryFactory {
   open(options: { runDir: string }): LegacyRecoveryPort;
 }
 
-export interface LegacyRecoverySummary {
+interface LegacyRecoverySummary {
   version: 2;
   status: 'reconciled' | 'deferred';
   sourceRecords: {
@@ -76,17 +76,17 @@ export interface LegacyRecoverySummary {
   completedAt: string;
 }
 
-export interface LegacyDeferredAsset extends DeclaredRecoveryAsset {
+interface LegacyDeferredAsset extends DeclaredRecoveryAsset {
   custodyCount: number;
 }
 
-export interface LegacyRecoveryResult {
+interface LegacyRecoveryResult {
   status: 'clean' | 'deferred';
   summaryPath?: string;
   summary?: LegacyRecoverySummary;
 }
 
-export interface LegacyRecoveryAudit {
+interface LegacyRecoveryAudit {
   status: 'clean' | 'deferred' | 'blocked';
   canRunRequiredAssets: boolean;
   deferredAssets: LegacyDeferredAsset[];
@@ -94,7 +94,7 @@ export interface LegacyRecoveryAudit {
   reason?: 'unmanaged-sources' | 'invalid-quarantine';
 }
 
-export interface RecoverLegacyArtifactsOptions {
+interface RecoverLegacyArtifactsOptions {
   artifactsRoot: string;
   cocod: CocodCounterparty;
   assets: readonly DeclaredRecoveryAsset[];
@@ -109,7 +109,7 @@ export interface RecoverLegacyArtifactsOptions {
   probeMintHealth?: (mintUrl: string) => Promise<boolean>;
 }
 
-export interface AuditLegacyArtifactsOptions {
+interface AuditLegacyArtifactsOptions {
   artifactsRoot: string;
   requiredAssets?: readonly Pick<DeclaredRecoveryAsset, 'mintUrl' | 'unit' | 'accountIndex'>[];
 }

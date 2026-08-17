@@ -13,7 +13,7 @@ import { parseJson } from '../components/nostr/feedParse';
 //   key; echoing an offset alongside it skips that many UNSEEN events. Offset
 //   only steps through a pathological page whose items all share the boundary
 //   timestamp (an inclusive-until tier answering).
-export type FeedPaginationState = {
+type FeedPaginationState = {
   until: number;
   offset: number;
   hasMore: boolean;

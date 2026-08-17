@@ -122,7 +122,7 @@ interface Props {
   /**
    * Embedded mode (use with `showMore`): renders the per-person/relationship
    * list inside another screen. Hides the global "View all" link, shows all
-   * date groups (no `days` cap), and skips the swap-store injection so the list
+   * date groups (no one-day cap), and skips the swap-store injection so the list
    * is driven purely by the passed `history`.
    */
   embedded?: boolean;
@@ -140,7 +140,6 @@ interface Props {
   zap?: 'all' | 'zaps';
   at?: 'all' | 'at';
   tab?: 'All' | 'Confirmed' | 'Pending' | 'Expired';
-  days?: number;
   hideExpired?: boolean; // If true, expired transactions will be filtered out
   /** Optional custom press handler for transactions */
   onTransactionPress?: (historyEntry: HistoryEntry) => void;
@@ -201,7 +200,6 @@ export const Transactions = React.memo(
     counterparty = 'all',
     zap = 'all',
     tab = 'All',
-    days = 1,
     hideExpired = false,
     onTransactionPress,
     onScroll,
@@ -356,9 +354,9 @@ export const Transactions = React.memo(
           'desc'
         );
 
-        // Embedded mode shows every date group (no `days` cap).
+        // Embedded mode shows every date group (no one-day cap).
         const datesToShow =
-          showMore && !embedded ? sortedDateEntries.slice(0, days) : sortedDateEntries;
+          showMore && !embedded ? sortedDateEntries.slice(0, 1) : sortedDateEntries;
 
         return datesToShow.map(({ dateString }) => ({
           title: dateString,
@@ -388,7 +386,7 @@ export const Transactions = React.memo(
         });
       }
       return result;
-    }, [pending, confirmed, expired, showMore, days, embedded]);
+    }, [pending, confirmed, expired, showMore, embedded]);
 
     const sectionsToDisplay = useMemo(() => {
       // Initial history fetch: coco's page hasn't landed yet, but the

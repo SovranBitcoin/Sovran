@@ -133,7 +133,7 @@ function firstOrNull(values?: string[]): string | null {
   return values && values.length > 0 ? values[0] : null;
 }
 
-function looksLikeBitcoinAddress(value: string): boolean {
+export function looksLikeBitcoinAddress(value: string): boolean {
   const candidate = value.trim();
   if (!candidate) return false;
 

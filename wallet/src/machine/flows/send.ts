@@ -11,7 +11,7 @@ import type {
 } from '../types';
 import { logger, mintUrlFields } from '../../logger';
 
-export type SendFlowState =
+type SendFlowState =
   | {
       type: 'enter-amount';
       unit: string;
@@ -27,15 +27,15 @@ export type SendFlowState =
     }
   | { type: 'blocked'; unit: string; reason: string };
 
-export type SendFlowAction = 'enterAmount' | 'selectMint' | 'showError';
+type SendFlowAction = 'enterAmount' | 'selectMint' | 'showError';
 
-export interface SendFlowTransitionResult<S extends FlowStep = FlowStep> {
+interface SendFlowTransitionResult<S extends FlowStep = FlowStep> {
   step: S;
   context: FlowContext;
   data: StepDataMap[S];
 }
 
-export interface StartSendEcashOptions {
+interface StartSendEcashOptions {
   offline?: boolean;
   meltTarget?: string;
   recipientPubkey?: string;
@@ -55,7 +55,7 @@ export interface StartSendEcashOptions {
 /** 33-byte compressed secp256k1 pubkey, `02`-prefixed per the Cashu↔Nostr convention. */
 const P2PK_LOCK_PUBKEY_PATTERN = /^02[0-9a-f]{64}$/i;
 
-export interface SendFlowDefinition {
+interface SendFlowDefinition {
   initial: SendFlowState;
   start: (
     walletCtx: WalletContext,

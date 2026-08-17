@@ -54,7 +54,7 @@ export function findInstallableApk(appDir = APP_DIR): string {
 /** Android dev clients register `exp+<slug>://` (spike-verified via dumpsys:
  * sovran, cashu, exp+sovran — NOT the iOS-style bundle-id scheme that
  * buildDevClientUrl emits), so the bundle URL rides the slug scheme here. */
-export function buildAndroidDevClientUrl(metroUrl: string, slug = 'sovran'): string {
+function buildAndroidDevClientUrl(metroUrl: string, slug = 'sovran'): string {
   const url = new URL(`exp+${slug}://expo-development-client/`);
   url.searchParams.set('url', metroUrl);
   return url.toString();
@@ -66,14 +66,14 @@ const DEFAULT_GRANTS = [
   'android.permission.ACCESS_COARSE_LOCATION',
 ];
 
-export interface EmulatorBootOptions {
+interface EmulatorBootOptions {
   runId: string;
   runDir: string;
   signal?: AbortSignal;
   onLifecycle?: (message: string) => void;
 }
 
-export interface BootedEmulator {
+interface BootedEmulator {
   readonly serial: string;
   readonly consolePort: number;
   readonly avd: string;
@@ -95,7 +95,7 @@ function ownedAndroidAvdSuffix(uniqueId: string): string {
   return suffix;
 }
 
-export interface OwnedAndroidAvd {
+interface OwnedAndroidAvd {
   readonly parent: string;
   readonly root: string;
   readonly avdName: string;
@@ -390,7 +390,7 @@ async function allocateConsolePort(adb: string): Promise<number> {
   throw new Error('no free emulator console port in 5554–5680');
 }
 
-export async function bootEmulator(options: EmulatorBootOptions): Promise<BootedEmulator> {
+async function bootEmulator(options: EmulatorBootOptions): Promise<BootedEmulator> {
   const sdkRoot = resolveAndroidSdkRoot();
   const adb = adbBin(sdkRoot);
   const onLifecycle = options.onLifecycle ?? log;
@@ -672,7 +672,7 @@ export function throwIfAndroidInfrastructureUnavailable(signal: AbortSignal): vo
   }
 }
 
-export class AndroidNetworkChannel implements NetworkChannel {
+class AndroidNetworkChannel implements NetworkChannel {
   #adb: Adb;
   constructor(adb: Adb) {
     this.#adb = adb;
@@ -682,7 +682,7 @@ export class AndroidNetworkChannel implements NetworkChannel {
   }
 }
 
-export interface AndroidEmulatorSession {
+interface AndroidEmulatorSession {
   readonly serial: string;
   readonly avd: string;
   readonly avdRoot: string;

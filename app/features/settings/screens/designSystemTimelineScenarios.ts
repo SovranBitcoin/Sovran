@@ -41,7 +41,7 @@ interface TimelineFrame {
 /** Top-level tab on the Design System Timeline screen (payment method). */
 export type TimelineScenarioGroup = 'Cashu' | 'Lightning' | 'Onchain' | 'Request';
 
-export interface TimelineScenario {
+interface TimelineScenario {
   id: string;
   label: string;
   /** Which top-level method tab the scenario lives under. */

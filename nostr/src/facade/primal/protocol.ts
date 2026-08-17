@@ -1,3 +1,4 @@
+import { parseWireFrame } from '../wire-frame';
 import { ok, err, type Result } from 'neverthrow';
 import { DEFAULT_TIMEOUT_MS, type RequestControls } from '../../timeout';
 import type { NaggError } from '../../errors';
@@ -144,7 +145,7 @@ export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): 
         };
 
         socket.onmessage = (event) => {
-          const message = parseMessage(event.data);
+          const message = parseWireFrame(event.data);
           if (!message || message[1] !== subId) return;
           if (message[0] === 'EVENT' && message[2] && typeof message[2] === 'object') {
             events.push(message[2] as RawPrimalEvent);
@@ -169,17 +170,4 @@ export function createPrimalWebSocketConnection(config: PrimalWebSocketConfig): 
       });
     },
   };
-}
-
-function parseMessage(data: unknown): [string, string, unknown?] | null {
-  if (typeof data !== 'string') return null;
-  try {
-    const parsed = JSON.parse(data);
-    if (Array.isArray(parsed) && typeof parsed[0] === 'string' && typeof parsed[1] === 'string') {
-      return parsed as [string, string, unknown?];
-    }
-  } catch {
-    // ignore malformed frames
-  }
-  return null;
 }

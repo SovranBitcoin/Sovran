@@ -8,7 +8,7 @@ import type { JobStatus } from './types';
  * resources. A matrix run owns that slot while it launches its platform
  * commands sequentially; diffs share the same slot to keep memory bounded. */
 
-export interface JobEvent {
+interface JobEvent {
   event: 'line' | 'run-discovered' | 'progress' | 'exit';
   data: unknown;
 }

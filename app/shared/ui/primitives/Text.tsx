@@ -57,16 +57,12 @@ interface StyledTextProps extends CustomTextProps {
   primary?: boolean;
   secondary?: boolean;
   negative?: boolean;
-  colors?: readonly [ColorValue, ColorValue, ...ColorValue[]];
-  custom?: boolean;
 }
 
 export const StyledText = ({
   primary,
   secondary,
   negative,
-  custom,
-  colors = ['#4c669f', '#3b5998', '#192f6a'],
   style,
   children,
   ...props
@@ -88,12 +84,6 @@ export const StyledText = ({
   } else if (negative) {
     return (
       <GradientText gradientColors={[danger, danger]} style={style}>
-        {children}
-      </GradientText>
-    );
-  } else if (custom) {
-    return (
-      <GradientText gradientColors={colors} style={style}>
         {children}
       </GradientText>
     );
@@ -126,8 +116,6 @@ interface CustomTextProps extends TextProps {
   italic?: boolean;
   size?: number;
   style?: object;
-  lightColor?: string;
-  darkColor?: string;
   id?: string;
   children?: React.ReactNode;
   className?: string;

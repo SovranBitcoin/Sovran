@@ -55,7 +55,7 @@ import { useBitchatDmMessagesStore } from '@/features/bitchat/stores/bitchatDmMe
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
 
-export interface MirrorableStore {
+interface MirrorableStore {
   getState(): unknown;
   subscribe(listener: () => void): () => void;
 }

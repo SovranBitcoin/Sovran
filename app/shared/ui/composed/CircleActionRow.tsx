@@ -8,7 +8,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
  * CircleActionRow — a row of CircleActionButtons that self-manages overflow.
  *
  * Give it the full action list in priority order and it decides what to
- * render: while the list fits within `maxVisible` slots every action gets its
+ * render: while the list fits within three slots every action gets its
  * own circle button; past that, the tail collapses into a trailing "More"
  * button that opens the app-wide action-menu sheet (<ActionMenuHost />).
  * "More" occupies the last visible slot, so the overflow menu always holds at
@@ -36,27 +36,21 @@ export interface CircleRowAction {
 interface CircleActionRowProps {
   /** Actions in priority order — the head of the list keeps the direct slots. */
   actions: CircleRowAction[];
-  /** Max visible circle buttons, counting "More" when it appears. */
-  maxVisible?: number;
-  /** Sheet title for the overflow menu. */
-  moreTitle?: string;
   moreTestID?: string;
   style?: StyleProp<ViewStyle>;
 }
 
 export function CircleActionRow({
   actions,
-  maxVisible = 3,
-  moreTitle = 'Select option',
   moreTestID = 'circle-action-more',
   style,
 }: CircleActionRowProps) {
-  const direct = actions.length <= maxVisible ? actions : actions.slice(0, maxVisible - 1);
+  const direct = actions.length <= 3 ? actions : actions.slice(0, 2);
   const overflow = actions.slice(direct.length);
 
   const handleMore = useCallback(() => {
     actionMenuPopup({
-      title: moreTitle,
+      title: 'Select option',
       buttons: overflow.map((action) => ({
         text: action.menuText ?? action.label,
         icon: action.icon,
@@ -66,7 +60,7 @@ export function CircleActionRow({
         onPress: () => action.onPress(),
       })),
     });
-  }, [moreTitle, overflow]);
+  }, [overflow]);
 
   return (
     <HStack justify="space-around" style={style}>

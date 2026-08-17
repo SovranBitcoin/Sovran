@@ -1,6 +1,6 @@
 export { FormattedTimestamp } from './FormattedTimestamp';
 export { FormattedString, type TruncateMode } from './FormattedString';
-export { t, localizeReason, type LocalizedReason } from './locales';
+export { localizeReason, type LocalizedReason } from './locales';
 export {
   isFiatUnit,
   majorToMinor,

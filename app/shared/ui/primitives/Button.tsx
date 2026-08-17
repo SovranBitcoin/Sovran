@@ -1,19 +1,17 @@
 /**
- * @fileoverview Button Component - Advanced button with ripple effects and blur support
+ * @fileoverview Button Component - Advanced button with blur support
  *
  * @module shared/ui/primitives/Button
  *
  * @description
  * **Comprehensive button component with advanced visual effects and multiple modes**
  * - Multiple variants (primary, secondary, dangerous, underline)
- * - Ripple effect animations with customizable configuration
  * - Blur effects for enhanced visual appeal
  * - Icon-only, text-only, and combined modes
  * - Loading states with animated spinners
  * - Theme integration with dynamic colors
  *
  * **Features:**
- * - Ripple effect animations with position tracking
  * - Blur effects with customizable intensity and tint
  * - Button variants with theme-aware colors
  * - Loading states with animated spinners
@@ -25,21 +23,11 @@
  * // Basic text button
  * <Button text="Save" onPress={handleSave} variant="primary" />
  *
- * // Icon-only button with ripple
- * <Button icon={<Icon name="save" />} onPress={handleSave} ripple />
- *
  * // Button with blur effect
  * <Button text="Action" onPress={handleAction} blur />
  *
  * // Loading button
  * <Button text="Processing" onPress={handleProcess} loading />
- *
- * // Custom ripple configuration
- * <Button
- *   text="Custom"
- *   onPress={handleCustom}
- *   ripple={{ color: 'blue', duration: 600 }}
- * />
  *
  * // Button with haptic feedback
  * <Button text="Haptic" onPress={handleHaptic} haptics />
@@ -57,16 +45,8 @@
  * @see {@link ./Text}
  */
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import {
-  StyleProp,
-  ViewStyle,
-  Animated,
-  LayoutChangeEvent,
-  GestureResponderEvent,
-  Platform,
-  StyleSheet,
-} from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { StyleProp, ViewStyle, GestureResponderEvent, Platform, StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -81,140 +61,6 @@ import { Spinner } from '@/shared/ui/primitives/Spinner';
 // enough not to overlap adjacent buttons in the standard footer layout but
 // catches the misses that previously felt like "the button isn't pressing."
 const BUTTON_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
-
-/**
- * Configuration for ripple effect animations
- *
- * @interface RippleConfig
- * @description
- * Controls the visual appearance and behavior of ripple effects
- * when the button is pressed.
- */
-interface RippleConfig {
-  /** Color of the ripple effect (default: 'rgba(255,255,255,0.8)') */
-  color?: string;
-  /** Opacity of the ripple effect (default: 0.3) */
-  opacity?: number;
-  /** Duration of the ripple animation in milliseconds (default: 400) */
-  duration?: number;
-  /** Whether ripple should be centered or follow touch position (default: true) */
-  centered?: boolean;
-}
-
-/**
- * Options for the useRipple hook
- *
- * @interface UseRippleOptions
- * @description
- * Configuration object for enabling and customizing ripple effects.
- */
-interface UseRippleOptions {
-  /** Whether ripple effects are enabled */
-  enabled: boolean;
-  /** Ripple configuration object */
-  config: RippleConfig;
-}
-
-/**
- * Custom hook for managing ripple effect animations
- *
- * @description
- * Provides ripple effect functionality for buttons with customizable animations.
- * Tracks touch position, manages animation values, and provides handlers for
- * layout and press events. Supports both centered and touch-positioned ripples.
- *
- * **Process:** Initialize state → handle layout → handle press → animate ripple
- * **Effects:** Creates animated ripple effects on button press
- *
- * @param {UseRippleOptions} options - Configuration for ripple effects
- * @returns {Object} Ripple effect handlers and state
- * @returns {Function} returns.handleLayout - Layout event handler
- * @returns {Function} returns.handlePressIn - Press event handler
- * @returns {Function} returns.getRippleStyle - Style generator for ripple
- * @returns {boolean} returns.shouldShowRipple - Whether to show ripple
- *
- * @example
- * const { handleLayout, handlePressIn, getRippleStyle, shouldShowRipple } = useRipple({
- *   enabled: true,
- *   config: { color: 'blue', duration: 600, centered: false }
- * });
- */
-const useRipple = ({ enabled, config }: UseRippleOptions) => {
-  const [rippleSize, setRippleSize] = useState(0);
-  const [buttonSize, setButtonSize] = useState({ width: 0, height: 0 });
-  const [ripplePosition, setRipplePosition] = useState({ x: 0, y: 0 });
-  const rippleScale = useRef(new Animated.Value(0)).current;
-  const rippleOpacity = useRef(new Animated.Value(0)).current;
-
-  const {
-    color = 'rgba(255,255,255,0.8)',
-    opacity = 0.3,
-    duration = 400,
-    centered = true,
-  } = config;
-
-  const handleLayout = useCallback(
-    (e: LayoutChangeEvent) => {
-      if (!enabled) return;
-      const { width, height } = e.nativeEvent.layout;
-      setButtonSize({ width, height });
-      setRippleSize(Math.max(width, height) * 2);
-    },
-    [enabled]
-  );
-
-  const handlePressIn = useCallback(
-    (event: GestureResponderEvent) => {
-      if (!enabled) return;
-
-      // Calculate ripple position
-      if (!centered && event.nativeEvent) {
-        const { locationX, locationY } = event.nativeEvent;
-        setRipplePosition({ x: locationX, y: locationY });
-      } else {
-        setRipplePosition({ x: buttonSize.width / 2, y: buttonSize.height / 2 });
-      }
-
-      rippleScale.setValue(0);
-      rippleOpacity.setValue(opacity);
-      Animated.parallel([
-        Animated.timing(rippleScale, {
-          toValue: 1,
-          duration,
-          useNativeDriver: true,
-        }),
-        Animated.timing(rippleOpacity, {
-          toValue: 0,
-          duration,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    },
-    [enabled, centered, buttonSize, rippleScale, rippleOpacity, opacity, duration]
-  );
-
-  const getRippleStyle = useCallback(
-    () => ({
-      position: 'absolute' as const,
-      top: ripplePosition.y - rippleSize / 2,
-      left: ripplePosition.x - rippleSize / 2,
-      width: rippleSize,
-      height: rippleSize,
-      borderRadius: rippleSize / 2,
-      backgroundColor: color,
-      transform: [{ scale: rippleScale }],
-      opacity: rippleOpacity,
-    }),
-    [ripplePosition, rippleSize, color, rippleScale, rippleOpacity]
-  );
-
-  return {
-    handleLayout,
-    handlePressIn,
-    getRippleStyle,
-    shouldShowRipple: enabled,
-  };
-};
 
 /**
  * Button variant types
@@ -322,8 +168,6 @@ interface ButtonProps {
   icon?: React.ReactNode;
   /** Additional style overrides */
   style?: StyleProp<ViewStyle>;
-  /** Ripple effect configuration (boolean or config object) */
-  ripple?: boolean | RippleConfig;
   /** Blur effect configuration (boolean or config object) */
   blur?: boolean | BlurConfig;
   /** Haptic feedback configuration (boolean or config object) */
@@ -336,7 +180,7 @@ interface ButtonProps {
 }
 
 /**
- * Advanced Button component with ripple effects and blur support
+ * Advanced Button component with blur support
  *
  * @component
  * @param {ButtonProps} props - Component props
@@ -350,21 +194,11 @@ interface ButtonProps {
  * // Basic text button
  * <Button text="Save" onPress={handleSave} variant="primary" />
  *
- * // Icon-only button with ripple
- * <Button icon={<Icon name="save" />} onPress={handleSave} ripple />
- *
  * // Button with blur effect
  * <Button text="Action" onPress={handleAction} blur />
  *
  * // Loading button
  * <Button text="Processing" onPress={handleProcess} loading />
- *
- * // Custom ripple configuration
- * <Button
- *   text="Custom"
- *   onPress={handleCustom}
- *   ripple={{ color: 'blue', duration: 600 }}
- * />
  */
 export const Button = ({
   disabled = false,
@@ -376,7 +210,6 @@ export const Button = ({
   icon,
   style,
   testID,
-  ripple = false,
   blur = false,
   haptics = false,
   accessibilityLabel,
@@ -413,18 +246,6 @@ export const Button = ({
     'danger',
   ] as const);
 
-  // Ripple hook
-  const rippleConfig = typeof ripple === 'object' ? ripple : {};
-  const {
-    handleLayout: handleRippleLayout,
-    handlePressIn: handleRipplePressIn,
-    getRippleStyle,
-    shouldShowRipple,
-  } = useRipple({
-    enabled: !!ripple,
-    config: rippleConfig,
-  });
-
   // Blur config
   const blurConfig = typeof blur === 'object' ? blur : {};
   const { intensity = 75, tint = 'dark' } = blurConfig;
@@ -435,17 +256,16 @@ export const Button = ({
    * Gets button styles based on variant and effect configuration
    *
    * @description
-   * Calculates appropriate styling for the button based on variant, ripple mode,
+   * Calculates appropriate styling for the button based on variant,
    * and blur effects. Handles different visual modes and theme integration.
    *
-   * **Process:** Define base styles → check ripple mode → check blur mode → apply variant colors
+   * **Process:** Define base styles → check blur mode → apply variant colors
    * **Effects:** Returns appropriate ViewStyle object for button container
    *
    * @returns {ViewStyle} Style object for button container
    *
    * @example
    * getButtonStyles() // Returns base styles with primary variant colors
-   * // With ripple=true: Returns minimal styles for ripple mode
    * // With blur=true: Returns base styles without border
    */
   const getButtonStyles = () => {
@@ -469,15 +289,6 @@ export const Button = ({
       overflow: 'hidden' as const,
       opacity: disabled || loading ? 0.5 : 1,
     };
-
-    // If ripple is enabled, use minimal styling like original RippleButton
-    if (ripple) {
-      return {
-        overflow: 'hidden' as const,
-        position: 'relative' as const,
-        opacity: disabled || loading ? 0.5 : 1,
-      };
-    }
 
     if (shouldUseBlur) {
       return {
@@ -551,50 +362,7 @@ export const Button = ({
   };
 
   // Re-entrancy guard, haptic timing, and opacity feedback all live in
-  // the shared `Pressable` primitive below — Button used to reimplement
-  // each one. `onPressIn` here is purely the ripple-animation hook;
-  // Pressable runs its own haptic('start') ahead of this callback.
-
-  // Ripple mode: behaves like original RippleButton (minimal styling, direct content)
-  if (ripple) {
-    return (
-      <Pressable
-        testID={testID}
-        disabled={disabled || loading}
-        onPress={onPress}
-        onLayout={handleRippleLayout}
-        onPressIn={handleRipplePressIn}
-        haptics={haptics}
-        hitSlop={BUTTON_HIT_SLOP}
-        {...a11yProps}
-        style={[getButtonStyles(), style]}>
-        {/* Ripple effect overlay */}
-        {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
-        {/* Content rendering - string text or React node */}
-        {typeof layoutText === 'string' ? (
-          <Text
-            size={16}
-            bold
-            style={{
-              color: getTextColor(),
-              opacity: loading ? 0 : 1,
-              ...(variant === 'underline'
-                ? { textDecorationLine: 'underline' as const }
-                : undefined),
-            }}>
-            {layoutText}
-          </Text>
-        ) : (
-          <View style={loading ? styles.hiddenContent : undefined}>{layoutText ?? layoutIcon}</View>
-        )}
-        {loading ? (
-          <View pointerEvents="none" style={styles.loadingOverlay}>
-            <Spinner size={16} />
-          </View>
-        ) : null}
-      </Pressable>
-    );
-  }
+  // the shared `Pressable` primitive below — Button used to reimplement each one.
 
   // Icon-only: a fixed square. Override the outer paddings to 0 because the
   // dimension *is* the visual size — extra padding would push the icon off-
@@ -605,8 +373,6 @@ export const Button = ({
         testID={testID}
         disabled={disabled || loading}
         onPress={onPress}
-        onLayout={handleRippleLayout}
-        onPressIn={handleRipplePressIn}
         haptics={haptics}
         hitSlop={BUTTON_HIT_SLOP}
         {...a11yProps}>
@@ -625,8 +391,6 @@ export const Button = ({
           blur={shouldUseBlur}
           blurIntensity={intensity}
           blurTint={tint}>
-          {/* Ripple effect overlay */}
-          {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
           {/* Loading spinner or icon content */}
           {loading ? <Spinner size={16} /> : layoutIcon}
         </View>
@@ -644,8 +408,6 @@ export const Button = ({
       testID={testID}
       disabled={disabled || loading}
       onPress={onPress}
-      onLayout={handleRippleLayout}
-      onPressIn={handleRipplePressIn}
       haptics={haptics}
       hitSlop={BUTTON_HIT_SLOP}
       {...a11yProps}>
@@ -654,8 +416,6 @@ export const Button = ({
         blur={shouldUseBlur}
         blurIntensity={intensity}
         blurTint={tint}>
-        {/* Ripple effect overlay */}
-        {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
         <HStack
           collapsable={false}
           align="center"

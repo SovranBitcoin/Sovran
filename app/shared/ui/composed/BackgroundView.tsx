@@ -255,11 +255,6 @@ interface AnimatedBackgroundViewProps {
    */
   gradientColor?: string;
   /**
-   * Render the active wallpaper image behind the gradient overlay.
-   * @default true
-   */
-  showBackgroundImage?: boolean;
-  /**
    * Render the theme gradient as a native mesh. Useful for Android
    * surfaces where linear gradients show banding.
    * @default false
@@ -287,7 +282,6 @@ function AnimatedBackgroundViewComponent({
   style,
   gradientTopOpacity = 0,
   gradientColor,
-  showBackgroundImage = true,
   useMeshGradient = false,
 }: AnimatedBackgroundViewProps) {
   useRenderLogger('AnimatedBackgroundView');
@@ -323,9 +317,9 @@ function AnimatedBackgroundViewComponent({
     isBackgroundImageTheme(currentTheme) ||
     carouselPages.some((page) => isBackgroundImageTheme(page.theme));
   React.useEffect(() => {
-    if (!showBackgroundImage || !hasImageWallpaper) return;
+    if (!hasImageWallpaper) return;
     return retainWallpaperMotion();
-  }, [showBackgroundImage, hasImageWallpaper]);
+  }, [hasImageWallpaper]);
 
   const backgroundAnimatedStyle = useAnimatedStyle(() => ({
     // themeLayerOpacity dips to 0 during color-only theme switches so the
@@ -381,7 +375,7 @@ function AnimatedBackgroundViewComponent({
                 fallbackSurface={surface}
                 gradientColor={gradientColor}
                 gradientTopOpacity={gradientTopOpacity}
-                showImage={showBackgroundImage}
+                showImage
                 useMeshGradient={useMeshGradient}
               />
             ))
@@ -391,7 +385,7 @@ function AnimatedBackgroundViewComponent({
               fallbackSurface={surface}
               gradientColor={gradientColor}
               gradientTopOpacity={gradientTopOpacity}
-              showImage={showBackgroundImage}
+              showImage
               useMeshGradient={useMeshGradient}
             />
           )}
@@ -402,7 +396,7 @@ function AnimatedBackgroundViewComponent({
               fallbackSurface={surface}
               gradientColor={gradientColor}
               gradientTopOpacity={gradientTopOpacity}
-              showImage={showBackgroundImage}
+              showImage
               useMeshGradient={useMeshGradient}
             />
           )}

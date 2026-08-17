@@ -20,7 +20,7 @@ function getRootSeed(mnemonic: string): Uint8Array {
   return _cachedRootSeed;
 }
 
-export interface DerivedNostrKeys {
+interface DerivedNostrKeys {
   npub: string;
   nsec: string;
   pubkey: string;

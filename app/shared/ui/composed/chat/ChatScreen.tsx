@@ -43,8 +43,6 @@ interface ChatScreenProps {
   onSend: (text: string) => Promise<unknown> | unknown;
   composerDisabled?: boolean;
   composerPlaceholder?: string;
-  composerOnPlusPress?: () => void;
-  composerOnVoicePress?: () => void;
   /**
    * Optional row of action buttons rendered ABOVE the LiquidChatComposer
    * inside the same sticky container — so it rides up with the keyboard
@@ -135,8 +133,6 @@ export function ChatScreen({
   onSend,
   composerDisabled,
   composerPlaceholder,
-  composerOnPlusPress,
-  composerOnVoicePress,
   composerActions,
   composerTestID,
   banner,
@@ -429,8 +425,6 @@ export function ChatScreen({
                 onSend={handleSubmit}
                 disabled={composerDisabled}
                 placeholder={composerPlaceholder}
-                onPlusPress={composerOnPlusPress}
-                onVoicePress={composerOnVoicePress}
                 bottomPadding={8}
                 testID={composerTestID}
                 surface={surface}

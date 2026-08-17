@@ -61,8 +61,6 @@ interface ProfileActions {
   ) => void;
   /** Set the active account index (caller is responsible for cleanup/resetStages before this) */
   switchProfile: (accountIndex: number) => boolean;
-  /** Remove a profile (cannot remove the last profile or the currently active one) */
-  removeProfile: (accountIndex: number) => boolean;
   /** Get the next available account index (only considers derived profiles) */
   getNextAccountIndex: () => number;
   /** Update the cached balance for a profile (called by ProfileBalanceSync) */
@@ -170,25 +168,6 @@ export const useProfileStore = create<ProfileStore>()(
         }
         storeLog.info('store.profile.switch', { accountIndex });
         set({ activeAccountIndex: accountIndex });
-        return true;
-      },
-
-      removeProfile: (accountIndex: number) => {
-        const { profiles, activeAccountIndex } = get();
-        // Cannot remove the last profile
-        if (profiles.length <= 1) {
-          storeLog.warn('store.profile.cannot_remove_last');
-          return false;
-        }
-        // Cannot remove the currently active profile
-        if (accountIndex === activeAccountIndex) {
-          storeLog.warn('store.profile.cannot_remove_active');
-          return false;
-        }
-        storeLog.info('store.profile.remove', { accountIndex });
-        set((state) => ({
-          profiles: state.profiles.filter((p) => p.accountIndex !== accountIndex),
-        }));
         return true;
       },
 

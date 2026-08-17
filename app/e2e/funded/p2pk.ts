@@ -1,7 +1,7 @@
 import { schnorr } from '@noble/curves/secp256k1.js';
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
-export interface ControlledP2PKKeypair {
+interface ControlledP2PKKeypair {
   privateKey: string;
   /** Cashu app contract: 02 + BIP-340 x-only public key. */
   publicKey: string;

@@ -25,7 +25,7 @@ const VISIBLE_PHASES: ReadonlySet<string> = new Set(['T', 'V', 'FINAL', 'named']
 
 /** The selected scenario's pairs in reel order (run A's artifactSeq; pairs
  * from pre-v2 caches or B-only steps fall back to key order at the end). */
-export function visiblePairs(result: DiffResult, scenarioId: string): DiffPairResult[] {
+function visiblePairs(result: DiffResult, scenarioId: string): DiffPairResult[] {
   return result.pairs
     .filter(
       (pair) =>

@@ -13,9 +13,9 @@ import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 /** Blossom authorization event kind (BUD-01). */
 export const BLOSSOM_AUTH_KIND = 24242;
 
-export type BlossomAction = 'upload' | 'delete' | 'get' | 'list';
+type BlossomAction = 'upload' | 'delete' | 'get' | 'list';
 
-export interface UnsignedBlossomAuth {
+interface UnsignedBlossomAuth {
   kind: number;
   content: string;
   created_at: number;

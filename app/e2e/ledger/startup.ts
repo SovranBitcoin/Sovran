@@ -15,7 +15,7 @@ import {
   type LegStatus,
 } from './ledger';
 
-export interface StartupBlocker {
+interface StartupBlocker {
   ledgerPath: string;
   runId: string;
   legId: string;
@@ -33,7 +33,7 @@ export interface StartupBlocker {
   resume: StartupResumeDecision;
 }
 
-export type CrashWindow =
+type CrashWindow =
   | 'intent-durable-effect-unconfirmed'
   | 'funded-durable-sweep-pending'
   | 'outflow-durable-sweep-pending'
@@ -44,7 +44,7 @@ export type CrashWindow =
   | 'value-effect-outcome-uncertain'
   | 'legacy-seed-material-unaccounted';
 
-export interface StartupResumeDecision {
+interface StartupResumeDecision {
   action:
     | 'quarantine-before-any-effect'
     | 'restore-custody-then-quarantine'
@@ -53,9 +53,8 @@ export interface StartupResumeDecision {
   automaticValueEffectsAllowed: false;
 }
 
-export type StartupAudit =
-  | { status: 'clean'; blockers: [] }
-  | { status: 'blocked'; blockers: StartupBlocker[] };
+type StartupAudit =
+  { status: 'clean'; blockers: [] } | { status: 'blocked'; blockers: StartupBlocker[] };
 
 function matchingFiles(root: string, matches: (name: string) => boolean): string[] {
   if (!existsSync(root)) return [];

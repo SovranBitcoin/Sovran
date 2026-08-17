@@ -3,9 +3,9 @@ import { useSegments } from 'expo-router';
 export const USER_PROFILE_FLOW = '(user-flow)';
 export const MODAL_PROFILE_FLOW = '(profile-flow)';
 
-export type ProfileFlowGroup = typeof USER_PROFILE_FLOW | typeof MODAL_PROFILE_FLOW;
+type ProfileFlowGroup = typeof USER_PROFILE_FLOW | typeof MODAL_PROFILE_FLOW;
 
-export type ProfileRouteName =
+type ProfileRouteName =
   | 'profile'
   | 'share'
   | 'userMessages'
@@ -18,7 +18,7 @@ export type ProfileRouteName =
 type ProfileRouteParamValue = string | number | (string | number)[] | null | undefined;
 type ProfileRouteParams = Record<string, ProfileRouteParamValue>;
 
-export type ProfileHref<Route extends ProfileRouteName = ProfileRouteName> = {
+type ProfileHref<Route extends ProfileRouteName = ProfileRouteName> = {
   pathname: `/${ProfileFlowGroup}/${Route}`;
   params?: ProfileRouteParams;
 };

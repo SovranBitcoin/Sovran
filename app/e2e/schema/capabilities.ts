@@ -67,8 +67,6 @@ export const CAPABILITIES = [
   'ble.transport',
   'nfc.transport',
 ] as const;
-
-export type Capability = (typeof CAPABILITIES)[number];
 export const capabilitySchema = z.enum(CAPABILITIES);
 
 /** Capabilities each product driver satisfies on its own (before cocod
@@ -133,8 +131,8 @@ export const allowedCommandSchema = z.enum(ALLOWED_COMMANDS);
 export const LANES = ['simulator', 'funded', 'live', 'physical'] as const;
 export const laneSchema = z.enum(LANES);
 
-export const UNITS = ['sat', 'usd'] as const;
+const UNITS = ['sat', 'usd'] as const;
 export const unitSchema = z.enum(UNITS);
 
-export const END_STATES = ['wallet', 'onboarding'] as const;
+const END_STATES = ['wallet', 'onboarding'] as const;
 export const endStateSchema = z.enum(END_STATES);

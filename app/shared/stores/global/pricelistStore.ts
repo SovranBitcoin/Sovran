@@ -33,12 +33,9 @@ export interface BitcoinPrices {
 type SupportedCurrency = keyof PricelistData;
 
 interface PricelistActions {
-  setPricelist: (data: PricelistData) => void;
-  setBtcPrice: (price: number) => void;
   setBtcPrices: (prices: BitcoinPrices) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  clearPricelist: () => void;
   getBtcPrice: (currency?: SupportedCurrency) => number | null;
   isStale: (maxAgeMinutes?: number) => boolean;
 }
@@ -65,31 +62,6 @@ export const usePricelistStore = create<PricelistStore>()(
       lastUpdated: null,
       error: null,
 
-      setPricelist: (data: PricelistData) => {
-        storeLog.debug('store.pricelist.set', { usd: data.usd?.btc });
-        set({
-          pricelist: data,
-          lastUpdated: Date.now(),
-          error: null,
-        });
-      },
-
-      /**
-       * Sets only the USD/BTC price, preserving existing EUR/GBP rates.
-       * Spread order: existing first, then usd override.
-       */
-      setBtcPrice: (price: number) => {
-        storeLog.debug('store.pricelist.set_btc_price', { price });
-        set((state) => ({
-          pricelist: {
-            ...state.pricelist,
-            usd: { btc: price },
-          },
-          lastUpdated: Date.now(),
-          error: null,
-        }));
-      },
-
       setBtcPrices: (prices: BitcoinPrices) => {
         storeLog.debug('store.pricelist.set_btc_prices', {
           usd: prices.USD,
@@ -114,15 +86,6 @@ export const usePricelistStore = create<PricelistStore>()(
       setError: (error: string | null) => {
         if (error) storeLog.warn('store.pricelist.error', { error });
         set({ error });
-      },
-
-      clearPricelist: () => {
-        storeLog.info('store.pricelist.clear');
-        set({
-          pricelist: null,
-          lastUpdated: null,
-          error: null,
-        });
       },
 
       getBtcPrice: (currency: SupportedCurrency = 'usd') => {

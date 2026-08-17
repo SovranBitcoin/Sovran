@@ -1,6 +1,6 @@
 import type { RunStatus } from './run';
 
-export interface SessionGroupCompletionInput {
+interface SessionGroupCompletionInput {
   statuses: readonly RunStatus[];
   expectedScenarios: number;
   /** True only when a real funded device session was started. */
@@ -8,7 +8,7 @@ export interface SessionGroupCompletionInput {
   fundsReconciled?: boolean;
 }
 
-export interface SessionGroupCompletion {
+interface SessionGroupCompletion {
   shouldContinue: boolean;
   outcome: 'complete' | 'scenario-failed' | 'dependency-prefix-incomplete' | 'unsafe-funds';
 }

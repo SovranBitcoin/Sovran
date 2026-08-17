@@ -36,7 +36,7 @@ export function percentile(samples: number[], p: number): number {
   );
 }
 
-export interface DurationSummary {
+interface DurationSummary {
   count: number;
   min: number;
   max: number;
@@ -132,7 +132,7 @@ export function errorClusterKey(entry: AnalyzableEntry): string {
   ].join('|');
 }
 
-export interface ErrorCluster<T> {
+interface ErrorCluster<T> {
   key: string;
   count: number;
   exemplar: T;

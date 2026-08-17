@@ -35,16 +35,15 @@ export type FundedAsset = z.infer<typeof fundedAssetSchema>;
  * balance-split rebalance melting from one mint to fund another). Reconciliation
  * uses it to explain why the destination restores more than its own principal
  * and the source less, within an explicit fee budget. */
-export const fundedTransferSchema = z.strictObject({
+const fundedTransferSchema = z.strictObject({
   fromMintUrl: z.string().url(),
   toMintUrl: z.string().url(),
   unit: unitSchema,
   accountIndex: z.literal(0),
   maxFeeSats: z.number().int().positive().max(50),
 });
-export type FundedTransfer = z.infer<typeof fundedTransferSchema>;
 
-export const fundsSchema = z
+const fundsSchema = z
   .strictObject({
     assets: z.array(fundedAssetSchema).min(1),
     transfers: z.array(fundedTransferSchema).min(1).optional(),
@@ -93,7 +92,6 @@ export const fundsSchema = z
       }
     });
   });
-export type Funds = z.infer<typeof fundsSchema>;
 
 export const scenarioSchema = z
   .strictObject({
@@ -262,4 +260,4 @@ export const fixtureSchema = z.strictObject({
 });
 export type Fixture = z.infer<typeof fixtureSchema>;
 
-export { fixtureUse, dottedId };
+export { dottedId };

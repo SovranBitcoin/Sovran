@@ -300,6 +300,25 @@ export const VISUAL_LIST_VIEWABILITY_CONFIG = {
   minimumViewTime: 0,
 };
 
+/**
+ * Collapse a viewability token batch into the {start,end} range the visual-list
+ * logger reports. Buffered bounds mirror the raw ones — FlashList already
+ * windows for us, so there is no extra buffer to account for.
+ */
+export function visualViewabilityRange(tokens: { index: number | null }[]): {
+  start: number;
+  end: number;
+  startBuffered: number;
+  endBuffered: number;
+} {
+  const indexes = tokens
+    .map((token) => token.index)
+    .filter((index): index is number => typeof index === 'number');
+  const start = indexes.length > 0 ? Math.min(...indexes) : 0;
+  const end = indexes.length > 0 ? Math.max(...indexes) : -1;
+  return { start, end, startBuffered: start, endBuffered: end };
+}
+
 function visualLoggingEnabled(enabled = true): boolean {
   if (!enabled) return false;
   const isLevelEnabled = feedLog.isLevelEnabled;

@@ -190,7 +190,7 @@ function needsSpendableBalance(destination: Destination): boolean {
   return destination !== "mintQuote";
 }
 
-function methodRequirementForDestination(
+export function methodRequirementForDestination(
   destination: Destination,
   ctx: FlowContext,
   unit: string,

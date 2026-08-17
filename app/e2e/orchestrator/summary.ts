@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { type Platform } from '../schema/capabilities';
 import type { AttemptRecord, ChunkState, OrchestratorState } from './state';
 
-export type PairStatus =
+type PairStatus =
   | 'pending'
   | 'passed'
   | 'flaky-pass'
@@ -20,7 +20,7 @@ export type PairStatus =
   | 'skipped'
   | 'out-of-scope';
 
-export interface PairSummary {
+interface PairSummary {
   scenarioId: string;
   platform: Platform;
   status: PairStatus;

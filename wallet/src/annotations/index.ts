@@ -40,7 +40,6 @@ export {
   getDistribution,
   getLocation,
   getSwap,
-  getCreqCustomization,
   getPaymentRequest,
   getOnchainMelt,
   getZap,

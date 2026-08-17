@@ -39,11 +39,6 @@ const AUTHORING_CACHE_TTL_MS = 10_000;
 let scenarioFilesCache: { at: number; files: ScenarioFile[] } | undefined;
 let membershipCache: { at: number; membership: Map<string, string[]> } | undefined;
 
-export function invalidateAuthoringCache(): void {
-  scenarioFilesCache = undefined;
-  membershipCache = undefined;
-}
-
 async function loadScenarioFiles(): Promise<ScenarioFile[]> {
   if (scenarioFilesCache && Date.now() - scenarioFilesCache.at < AUTHORING_CACHE_TTL_MS) {
     return scenarioFilesCache.files;

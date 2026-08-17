@@ -16,12 +16,12 @@ interface ManagerLike {
   mint: { untrustMint: (url: string) => Promise<void> };
 }
 
-export interface StrandedMint {
+interface StrandedMint {
   url: string;
   balance: number;
 }
 
-export interface ReleaseTrustWindowResult {
+interface ReleaseTrustWindowResult {
   stranded: StrandedMint[];
   untrustErrors: { url: string; error: unknown }[];
 }

@@ -19,6 +19,8 @@ import type {
   CreateAmountActionManagerConfig,
 } from "../amount-actions/types";
 import { buildBip321OnchainUri } from "../bip321";
+import { looksLikeBitcoinAddress } from "../parse";
+import { extractP2PKPubkey } from "../p2pk";
 import {
   entryStateRank,
   isTerminalFailureState,
@@ -368,13 +370,6 @@ type ContentExtractor = (
   entry: EntryLike,
   ctx: EntryLike,
 ) => { text: string; target: string } | null;
-
-function looksLikeBitcoinAddress(value: string): boolean {
-  const candidate = value.trim();
-  if (!candidate) return false;
-  if (/^(bc|tb|bcrt)1[ac-hj-np-z02-9]{11,87}$/i.test(candidate)) return true;
-  return /^[123mn2][1-9A-HJ-NP-Za-km-z]{25,62}$/.test(candidate);
-}
 
 function getEntryMetadataRecord(entry: EntryLike): EntryLike | null {
   const metadata = entry.metadata as Record<string, unknown> | undefined;
@@ -785,30 +780,6 @@ export function mergeEntryUpdate(
   }
 
   return merged;
-}
-
-// ---------------------------------------------------------------------------
-// Entry decoration — formats timestamps, tokens, p2pk, payment requests
-//
-// Pure function that adds FormattedTimestamp, FormattedString, and payment
-// request metadata to raw screen action entries. Used as the built-in
-// default by useScreenActions; wallets can override via the bridge.
-// ---------------------------------------------------------------------------
-
-function extractP2PKPubkey(
-  proofs: readonly { secret: string }[],
-): string | null {
-  for (const proof of proofs) {
-    try {
-      const parsed = JSON.parse(proof.secret);
-      if (Array.isArray(parsed) && parsed[0] === "P2PK" && parsed[1]?.data) {
-        return parsed[1].data as string;
-      }
-    } catch {
-      /* not a structured secret */
-    }
-  }
-  return null;
 }
 
 function resolveTransportLabel(info: PaymentRequestInfo): string {

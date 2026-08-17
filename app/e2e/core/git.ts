@@ -20,14 +20,12 @@ const GIT_TIMEOUT_MS = 2_000;
  * to dirty: porcelain lines under the artifacts tree are always excluded. */
 const ARTIFACTS_PORCELAIN_PREFIX = 'app/e2e/artifacts/';
 
-export interface SourceFingerprintDependencies {
+interface SourceFingerprintDependencies {
   runGit?: (cwd: string, args: string[]) => string | undefined;
 }
 
-export type SourceFingerprintComparison =
-  | { status: 'stable'; fingerprint: string }
-  | { status: 'changed' }
-  | { status: 'unavailable' };
+type SourceFingerprintComparison =
+  { status: 'stable'; fingerprint: string } | { status: 'changed' } | { status: 'unavailable' };
 
 export function compareSourceFingerprints(
   beforeLoad: string | undefined,

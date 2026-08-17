@@ -17,7 +17,6 @@ import {
 } from '@/shared/lib/downloadedThemeRegistry';
 import {
   downloadWallpaper as downloadWallpaperFile,
-  deleteWallpaper as deleteWallpaperFile,
   isWallpaperDownloaded,
   getWallpaperUri,
   cleanupOrphanedFiles,
@@ -84,8 +83,6 @@ interface WallpaperState {
     entry: WallpaperCatalogEntry,
     onProgress?: (p: number) => void
   ) => Promise<boolean>;
-  removeDownloaded: (themeName: string) => Promise<void>;
-  removeAlbumDownloads: (albumSlug: string) => Promise<void>;
   verifyIntegrity: () => Promise<void>;
 }
 
@@ -211,48 +208,6 @@ export const useWallpaperStore = create<WallpaperState>()(
           });
 
           return false;
-        }
-      },
-
-      removeDownloaded: async (themeName) => {
-        // Active theme protection for the current profile: any unit that was
-        // using this wallpaper needs to be cleared from the per-unit override
-        // map so the resolver falls through to the album default or
-        // FALLBACK_THEME. Other profiles heal lazily on next load.
-        const themeState = useThemeStore.getState();
-        const affectedUnits = Object.entries(themeState.unitWallpapers)
-          .filter(([, theme]) => theme === themeName)
-          .map(([unitId]) => unitId);
-
-        if (affectedUnits.length > 0) {
-          useThemeStore.setState((prev) => {
-            const next = { ...prev.unitWallpapers };
-            for (const unitId of affectedUnits) delete next[unitId];
-            return { unitWallpapers: next };
-          });
-          // Wait a tick for state change to propagate to subscribers
-          await new Promise((r) => setTimeout(r, 50));
-        }
-
-        // Unregister from theme engine
-        unregisterDownloadedTheme(themeName);
-
-        // Delete file
-        await deleteWallpaperFile(themeName);
-
-        // Update store
-        set((s) => {
-          const { [themeName]: _, ...rest } = s.downloaded;
-          return { downloaded: rest };
-        });
-      },
-
-      removeAlbumDownloads: async (albumSlug) => {
-        const { downloaded } = get();
-        const toRemove = Object.values(downloaded).filter((w) => w.albumSlug === albumSlug);
-
-        for (const w of toRemove) {
-          await get().removeDownloaded(w.themeName);
         }
       },
 

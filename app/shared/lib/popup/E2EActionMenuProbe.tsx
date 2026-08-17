@@ -6,8 +6,8 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { isCustomSheetPayload, usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { serializeE2EActionMenuTarget } from '@/shared/lib/e2e/actionMenuTarget';
 
-export const E2E_ACTION_MENU_OPEN_ID = 'e2e-action-menu-open';
-export const E2E_HEROUI_MENU_OPEN_ID = 'e2e-heroui-menu-open';
+const E2E_ACTION_MENU_OPEN_ID = 'e2e-action-menu-open';
+const E2E_HEROUI_MENU_OPEN_ID = 'e2e-heroui-menu-open';
 
 /** State belongs in the id on Android: RN merges a labeled non-editable
  * node's accessibilityValue into content-desc, which cannot be separated

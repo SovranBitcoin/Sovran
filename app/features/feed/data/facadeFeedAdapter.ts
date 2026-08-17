@@ -36,7 +36,7 @@ export function isRootNote(event: { tags: string[][] }): boolean {
   return eTags.every((tag) => tag[3] === 'mention');
 }
 
-export interface FeedPageAdapterOptions {
+interface FeedPageAdapterOptions {
   /** Keep a note item? Profile feeds require author-owned root notes. */
   includeNote?: (event: FeedEvent) => boolean;
   /** Keep a repost item (judged by the repost event + its original, when hydrated)? */

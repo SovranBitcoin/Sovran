@@ -37,8 +37,6 @@ export interface BalanceDisplayProps {
   iconNode?: React.ReactNode;
   /** Image URL for the avatar (falls back to initials of `iconFallbackName`). */
   iconUrl?: string;
-  /** Initials seed when no `iconUrl` is available. */
-  iconFallbackName?: string;
   /** Skeleton placeholder text used by the title slot. */
   loadingTitlePlaceholder?: string;
   contentWidth?: number;
@@ -69,7 +67,6 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
   ctaLabel,
   iconNode,
   iconUrl,
-  iconFallbackName,
   loadingTitlePlaceholder = 'Title',
   contentWidth,
   contentHeight,
@@ -115,7 +112,7 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
                 state={isLoading ? 'loading' : iconUrl ? 'image' : 'fallback'}
                 picture={iconUrl}
                 size={iconBoxSize}
-                name={iconFallbackName ?? title}
+                name={title}
                 alt={`${title || 'Balance'} icon`}
               />
             )}

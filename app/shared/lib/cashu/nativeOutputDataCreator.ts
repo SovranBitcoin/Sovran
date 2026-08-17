@@ -108,7 +108,7 @@ const SELF_TEST_CASES: readonly SelfTestCase[] = [
 /** The stock cashu-ts implementation, used as the reference. */
 const referenceCreator: OutputDataCreator = OutputData;
 
-export type OutputDataImpl = 'cdk-native' | 'cashu-ts';
+type OutputDataImpl = 'cdk-native' | 'cashu-ts';
 
 function roundMs(ms: number): number {
   return Math.round(ms * 100) / 100;

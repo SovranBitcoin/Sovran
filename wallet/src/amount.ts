@@ -8,7 +8,7 @@ export type AmountLike =
       toNumber(): number;
     };
 
-export type AmountValue = AmountLike | null | undefined;
+type AmountValue = AmountLike | null | undefined;
 
 function amountValueKind(value: AmountValue): string {
   if (value == null) return "nullish";
@@ -58,32 +58,10 @@ export function amountToNumber(value: AmountValue): number {
   return result;
 }
 
-export function toCashuAmount(value: AmountValue): number {
-  const result = amountToNumber(value);
-  logAmountConversion("amount.toCashuAmount.result", value, result);
-  return result;
-}
-
 export function amountToNumberOrUndefined(
   value: AmountValue,
 ): number | undefined {
   const result = value == null ? undefined : amountToNumber(value);
   logAmountConversion("amount.toNumberOrUndefined.result", value, result);
   return result;
-}
-
-export function sumAmountNumbers(values: Iterable<AmountLike>): number {
-  let total = 0;
-  let count = 0;
-  for (const value of values) {
-    total += amountToNumber(value);
-    count += 1;
-  }
-  logger.debug("amount.sum.result", {
-    count,
-    isFinite: Number.isFinite(total),
-    isSafeInteger: Number.isSafeInteger(total),
-    total,
-  });
-  return total;
 }

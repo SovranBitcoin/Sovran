@@ -12,7 +12,7 @@ import type {
   StepDataMap,
 } from '../types';
 
-export type ReceiveFlowState =
+type ReceiveFlowState =
   | {
       type: 'enter-lightning-amount';
       unit: string;
@@ -21,19 +21,19 @@ export type ReceiveFlowState =
     }
   | { type: 'receive-hub'; unit: string };
 
-export type ReceiveFlowEvent =
+type ReceiveFlowEvent =
   | { type: 'START_RECEIVE_LIGHTNING'; unit: string }
   | { type: 'START_RECEIVE'; unit: string };
 
-export type ReceiveFlowAction = 'enterAmount' | 'showReceiveHub';
+type ReceiveFlowAction = 'enterAmount' | 'showReceiveHub';
 
-export interface ReceiveFlowTransitionResult<S extends FlowStep = FlowStep> {
+interface ReceiveFlowTransitionResult<S extends FlowStep = FlowStep> {
   step: S;
   context: FlowContext;
   data: StepDataMap[S];
 }
 
-export interface ReceiveFlowDefinition {
+interface ReceiveFlowDefinition {
   initial: ReceiveFlowState;
   transition: (
     event: ReceiveFlowEvent,

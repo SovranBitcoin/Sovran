@@ -15,7 +15,7 @@
  */
 import { create } from 'zustand';
 
-export type WallpaperRenderStatus = 'loaded' | 'failed';
+type WallpaperRenderStatus = 'loaded' | 'failed';
 
 interface WallpaperRenderState {
   statusByTheme: Record<string, WallpaperRenderStatus>;

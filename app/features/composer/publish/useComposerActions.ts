@@ -45,12 +45,7 @@ export function useOpenComposer(): (target: ComposerTarget, context?: ComposerOp
 }
 
 export type PublishOutcome =
-  | 'ok'
-  | 'no-key'
-  | 'media-pending'
-  | 'empty'
-  | 'poll-invalid'
-  | 'failed';
+  'ok' | 'no-key' | 'media-pending' | 'empty' | 'poll-invalid' | 'failed';
 
 /** Publishes a NIP-88 poll (kind:1068). The composer text is the question. */
 async function publishPoll(ndk: NDK, state: ComposerSnapshot): Promise<PublishOutcome> {
@@ -95,7 +90,7 @@ async function publishPoll(ndk: NDK, state: ComposerSnapshot): Promise<PublishOu
   return 'ok';
 }
 
-export interface ComposedDraft {
+interface ComposedDraft {
   blocks: readonly ComposerBlock[];
   target: ComposerTarget;
   mentionPubkeys?: readonly string[];

@@ -50,7 +50,7 @@ export function escapeInputText(value: string): string {
   return `'${value.replaceAll(' ', '%s')}'`;
 }
 
-export interface AndroidScreenSize {
+interface AndroidScreenSize {
   width: number;
   height: number;
 }

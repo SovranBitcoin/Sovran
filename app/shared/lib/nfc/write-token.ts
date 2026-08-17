@@ -17,14 +17,7 @@ import { sendApdu, getStatusMessage } from './apdu';
 import { writeNdefTextRecord } from './write';
 import { withSession } from './session';
 import { nfcLog } from '../logger';
-
-function nfcErrorFields(error: unknown): Record<string, unknown> {
-  return {
-    error: error instanceof Error ? error.message : String(error),
-    code: error instanceof NfcError ? error.code : undefined,
-    statusWord: error instanceof NfcError ? error.statusWord : undefined,
-  };
-}
+import { nfcErrorFields } from './adapter';
 
 export async function writeTokenToNFC(token: string): Promise<void> {
   nfcLog.info('nfc.write.start', { tokenLength: token.length });

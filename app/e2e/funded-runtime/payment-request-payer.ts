@@ -19,7 +19,7 @@ import { wrapEvent } from 'nostr-tools/nip17';
 import * as nip19 from 'nostr-tools/nip19';
 import { generateSecretKey } from 'nostr-tools/pure';
 
-export interface NostrPaymentRequestTarget {
+interface NostrPaymentRequestTarget {
   requestId: string;
   receiverPubkey: string;
   relays: string[];

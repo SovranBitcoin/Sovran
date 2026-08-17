@@ -500,9 +500,9 @@ export function MintInfoScreen() {
 
   const mintUrl = (entry?.mintUrl as string) ?? '';
   const displayName = (entry?.displayName as string) ?? mintUrl;
-  // The inspect paths seed mintInfoEntry with only { mintUrl } (see
-  // (mint-flow)/list.tsx), so KYM review data never arrives via the entry on
-  // that route. Fall back to the same review cache the mint list rows read,
+  // The inspect paths seed mintInfoEntry with only { mintUrl }, so KYM review
+  // data never arrives via the entry on that route. Fall back to the same
+  // review cache the mint list rows read,
   // otherwise the reviews header action and rating chart silently vanish.
   const cachedMeta = useCachedMintMetadata(mintUrl || null);
   const kymScore =

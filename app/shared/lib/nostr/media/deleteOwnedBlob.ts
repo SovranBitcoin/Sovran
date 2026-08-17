@@ -5,7 +5,7 @@ import { useOwnedMediaStore } from '@/shared/stores/profile/ownedMediaStore';
 
 import { checkBlobExists, deleteFromBlossom } from './blossomClient';
 
-export interface DeleteOwnedBlobArgs {
+interface DeleteOwnedBlobArgs {
   ndk: NDK;
   /** Blossom origin the blob lives on, e.g. 'https://blossom.primal.net'. */
   host: string;
@@ -15,7 +15,7 @@ export interface DeleteOwnedBlobArgs {
   signal?: AbortSignal;
 }
 
-export interface DeleteOwnedBlobResult {
+interface DeleteOwnedBlobResult {
   deleted: boolean;
   /** Failure reason when `deleted` is false; undefined on success. */
   error?: string;

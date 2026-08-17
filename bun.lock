@@ -137,7 +137,6 @@
       "devDependencies": {
         "@babel/core": "^7.20.0",
         "@expo/metro-config": "~56.0.0",
-        "@iconify-json/bx": "^1.2.3",
         "@iconify-json/circle-flags": "^1.2.10",
         "@iconify-json/clarity": "^1.2.4",
         "@iconify-json/feather": "^1.2.1",
@@ -152,7 +151,6 @@
         "@iconify-json/lucide": "^1.2.101",
         "@iconify-json/majesticons": "^1.2.4",
         "@iconify-json/material-symbols": "^1.2.65",
-        "@iconify-json/material-symbols-light": "^1.2.65",
         "@iconify-json/mdi": "^1.2.3",
         "@iconify-json/mingcute": "^1.2.7",
         "@iconify-json/nonicons": "^1.2.2",
@@ -777,7 +775,6 @@
 
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
 
-    "@iconify-json/bx": ["@iconify-json/bx@1.2.3", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-ihvX+2d688otgW7MAvUEdKVln+fZ28BJTlygazKUU/+RCODWT+2KObjAHe8+KPs4VhC8V6Tgoy1qrX0Myn/upA=="],
 
     "@iconify-json/circle-flags": ["@iconify-json/circle-flags@1.2.10", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-sZRxs689a281RtZvuAiKtV7pQHv8Tk0HkinSM7QvLgdLEK8xgGRCcbDvL09Rq+/KtemmsMzGhS9/qt+r3ca+Ug=="],
 
@@ -807,7 +804,6 @@
 
     "@iconify-json/material-symbols": ["@iconify-json/material-symbols@1.2.88", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-lx5EwRkKckCkczozRrKiyrtD+K2/tIn+/kf9HFrUez/6DGMQKb2sI7b+/agN7jItLvmY/VYUajs/ZcEjj6xiaA=="],
 
-    "@iconify-json/material-symbols-light": ["@iconify-json/material-symbols-light@1.2.88", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-Oof6+SgQC5wV5harblOSn5hHBGqDFc23T6Rwbe8AUoaAK2SGracVjKorwdkSgqV2xbHNPZKUJuxDdU7myN8+Fg=="],
 
     "@iconify-json/mdi": ["@iconify-json/mdi@1.2.3", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-O3cLwbDOK7NNDf2ihaQOH5F9JglnulNDFV7WprU2dSoZu3h3cWH//h74uQAB87brHmvFVxIOkuBX2sZSzYhScg=="],
 

@@ -26,7 +26,7 @@ export interface ExpectedMatrixPair {
   fundedAssets: FundedAsset[];
 }
 
-export interface FreshMatrixEvidenceInput {
+interface FreshMatrixEvidenceInput {
   cutoff: string;
   sourceFingerprint: string;
   scenarioCount: number;
@@ -36,28 +36,26 @@ export interface FreshMatrixEvidenceInput {
   artifactsRoot: string;
 }
 
-export type WorkspaceFreshMatrixSource = Omit<FreshMatrixEvidenceInput, 'cutoff'>;
+type WorkspaceFreshMatrixSource = Omit<FreshMatrixEvidenceInput, 'cutoff'>;
 
-export interface WorkspaceFreshMatrixSourceError {
+interface WorkspaceFreshMatrixSourceError {
   type: 'workspace-source';
   message: string;
 }
 
-export type WorkspaceFreshMatrixAuditError =
-  | WorkspaceFreshMatrixSourceError
-  | FreshMatrixAuditError;
+type WorkspaceFreshMatrixAuditError = WorkspaceFreshMatrixSourceError | FreshMatrixAuditError;
 
-export interface MatrixCoverage {
+interface MatrixCoverage {
   scenarioId: string;
   platform: Platform;
   runId: string;
 }
 
-export interface MissingMatrixPair extends ExpectedMatrixPair {
+interface MissingMatrixPair extends ExpectedMatrixPair {
   reasons: string[];
 }
 
-export interface FreshMatrixAuditReport {
+interface FreshMatrixAuditReport {
   cutoff: string;
   sourceFingerprint: string;
   scenarios: number;
@@ -70,7 +68,7 @@ export interface FreshMatrixAuditReport {
   complete: boolean;
 }
 
-export interface FreshMatrixAuditError {
+interface FreshMatrixAuditError {
   type: 'invalid-cutoff' | 'invalid-matrix';
   message: string;
 }

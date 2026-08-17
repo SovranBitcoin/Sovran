@@ -119,8 +119,6 @@ interface ListRowProps {
   subtitlePlaceholder?: string;
   /** Fallback rendered in the title slot when title is nullish and not loading. */
   titleFallback?: ReactNode;
-  /** Fallback rendered in the subtitle slot when subtitle is nullish and not loading. */
-  subtitleFallback?: ReactNode;
 
   testID?: string;
 
@@ -171,7 +169,6 @@ export function ListRow({
   titlePlaceholder = 'Display name',
   subtitlePlaceholder = 'Secondary line',
   titleFallback,
-  subtitleFallback,
   wrapSubtitle = false,
   testID,
   padding = 'default',
@@ -258,7 +255,7 @@ export function ListRow({
 
   const subtitleIsNode = typeof subtitle !== 'string' && subtitle != null;
   const subtitleEl =
-    subtitle == null && subtitleFallback == null && !loading ? null : subtitleIsNode ? (
+    subtitle == null && !loading ? null : subtitleIsNode ? (
       subtitle
     ) : (
       <Text
@@ -266,8 +263,7 @@ export function ListRow({
         numberOfLines={wrapSubtitle ? undefined : 1}
         color={opacity(foreground, 0.5)}
         loading={loading}
-        placeholder={subtitlePlaceholder}
-        fallback={subtitleFallback}>
+        placeholder={subtitlePlaceholder}>
         {subtitle as string | undefined}
       </Text>
     );

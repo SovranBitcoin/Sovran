@@ -24,9 +24,10 @@ import {
   LIGHTNING_PALETTES,
   type LightningPalette,
 } from '@/features/nearPay/components/LightningStrike';
-import { generateSkyBolts, type BoltVariant } from '@/features/nearPay/lib/boltGeometry';
+import { generateSkyBolts } from '@/features/nearPay/lib/boltGeometry';
 import type { CelebrationPhase } from '@/features/nearPay/lib/nutDropCelebration';
 import type { PeerLayoutSize } from '@/features/nearPay/lib/peerLayout';
+import { variantToSkPath } from '@/features/nearPay/lib/boltSkiaPath';
 import { alpha } from '@/shared/styles/tokens';
 
 /**
@@ -60,17 +61,6 @@ const SKY_BOLT_COUNT = 2;
 /** Resolve rings expand to this fraction of the field's short side. */
 const RING_MAX_RADIUS_FACTOR = 0.42;
 const RING_STAGGER_MS = 120;
-
-function variantToSkPath(variant: BoltVariant) {
-  const path = Skia.Path.Make();
-  const [first, ...rest] = variant.main;
-  path.moveTo(first.x, first.y);
-  for (const point of rest) path.lineTo(point.x, point.y);
-  const [forkStart, ...forkRest] = variant.fork;
-  path.moveTo(forkStart.x, forkStart.y);
-  for (const point of forkRest) path.lineTo(point.x, point.y);
-  return path;
-}
 
 export function NutDropCelebrationCanvas({
   fieldSize,

@@ -42,7 +42,11 @@ import { easeGradient } from './easeGradient';
 import type { ProfileInfo, VideoPostRecord } from './feedTypes';
 import { Log } from '@/shared/lib/logger';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
-import { remeasureVisualLayoutScope, useVisualListLogger } from '@/shared/lib/contentShiftLog';
+import {
+  remeasureVisualLayoutScope,
+  useVisualListLogger,
+  visualViewabilityRange,
+} from '@/shared/lib/contentShiftLog';
 
 // ============================================================================
 // Types
@@ -92,15 +96,6 @@ function storyVisualToken(token: ViewToken) {
     item,
     percentVisible: token.isViewable ? 100 : 0,
   };
-}
-
-function storyViewabilityRange(tokens: ViewToken[]) {
-  const indexes = tokens
-    .map((token) => token.index)
-    .filter((index): index is number => typeof index === 'number');
-  const start = indexes.length > 0 ? Math.min(...indexes) : 0;
-  const end = indexes.length > 0 ? Math.max(...indexes) : -1;
-  return { start, end, startBuffered: start, endBuffered: end };
 }
 
 // ============================================================================
@@ -211,7 +206,7 @@ export const StoriesCarousel: FC<CarouselProps> = ({
         setListCurrentIndex(viewableItems[0].index!);
       }
       onVisualViewableItemsChanged({
-        ...storyViewabilityRange([...viewableItems, ...changed]),
+        ...visualViewabilityRange([...viewableItems, ...changed]),
         viewableItems: viewableItems.map(storyVisualToken),
         changed: changed.map(storyVisualToken),
       });

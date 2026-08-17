@@ -181,11 +181,9 @@ const standaloneScreens: ModalConfig[] = [
   modalWithBlur('share', 'formSheet'),
   modalWithBlur('lightningSend', 'modal', 'Send Lightning'),
   modalWithBlur('onchainSend', 'modal', 'Send Onchain'),
-  modalWithBlur('meltQuote', 'modal', 'Send Lightning'),
   modalWithBlur('receiveToken', 'modal', 'Receive Ecash'),
   modalWithBlur('lightningReceive', 'modal', 'Receive Lightning'),
   modalWithBlur('onchainReceive', 'modal', 'Receive Onchain'),
-  modalWithBlur('mintQuote', 'modal', 'Receive Lightning'),
   modalWithBlur('paymentRequest', 'modal', 'Receive Ecash'),
   modalWithBlur('sendToken', 'modal', 'Send Ecash'),
   cardFade('claimUsername', {

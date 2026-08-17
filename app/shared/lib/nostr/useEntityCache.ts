@@ -2,11 +2,7 @@ import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 
 import { facade } from 'nostr';
 
-import type {
-  FeedEvent,
-  NoteMetrics,
-  ProfileInfo,
-} from '@/features/feed/components/nostr/feedTypes';
+import type { ProfileInfo } from '@/features/feed/components/nostr/feedTypes';
 import { buildNostrDataLayer } from '@/shared/lib/nostr/buildNostrDataLayer';
 import {
   NOSTR_METADATA_STALE_TTL_MS,
@@ -25,7 +21,7 @@ import {
 // useSyncExternalStore needs to avoid render loops.
 // ---------------------------------------------------------------------------
 
-export type ProfileStatus = 'cached' | 'loading' | 'absent';
+type ProfileStatus = 'cached' | 'loading' | 'absent';
 
 const NOOP_UNSUB = () => {};
 
@@ -84,7 +80,7 @@ export function useProfile(pubkey: string | undefined): {
  * (`useCachedNostrProfile`, `useNostrProfileMetadata*`) read through, so every
  * surface — feed rows and DMs/contacts/signer alike — renders the same record.
  */
-export function useProfileRecord(pubkey: string | undefined): facade.CachedProfile | undefined {
+function useProfileRecord(pubkey: string | undefined): facade.CachedProfile | undefined {
   const cache = buildNostrDataLayer()?.cache;
   return useCachedRecord(cache?.profiles, pubkey);
 }
@@ -189,28 +185,4 @@ export function seedLowConfidenceProfiles(
     };
   }
   buildNostrDataLayer()?.cache.ingestProfileInfos(normalized, 'cache');
-}
-
-/** A cached note body by id (structurally a FeedEvent). */
-export function useNote(id: string | undefined): FeedEvent | undefined {
-  const cache = buildNostrDataLayer()?.cache;
-  return useCachedRecord(cache?.notes, id);
-}
-
-/** Cached engagement metrics for a note id, mapped to the app's NoteMetrics shape. */
-export function useNoteStats(id: string | undefined): NoteMetrics | undefined {
-  const cache = buildNostrDataLayer()?.cache;
-  const record = useCachedRecord(cache?.noteStats, id);
-  return useMemo(
-    () =>
-      record
-        ? {
-            likeCount: record.likes,
-            repostCount: record.reposts,
-            replyCount: record.replies,
-            satsZapped: record.satsZapped,
-          }
-        : undefined,
-    [record]
-  );
 }

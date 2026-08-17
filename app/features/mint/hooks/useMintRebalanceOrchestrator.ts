@@ -51,13 +51,13 @@ function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, un
   };
 }
 
-export type RebalanceRunStatus = 'idle' | 'running' | 'finished' | 'cancelled';
+type RebalanceRunStatus = 'idle' | 'running' | 'finished' | 'cancelled';
 
-export interface MintLite {
+interface MintLite {
   mintUrl: string;
 }
 
-export interface UseMintRebalanceOrchestratorArgs {
+interface UseMintRebalanceOrchestratorArgs {
   unit: string;
   computedPlan: RebalancePlan;
   trustedMints: MintLite[];
@@ -66,7 +66,7 @@ export interface UseMintRebalanceOrchestratorArgs {
   minTransferThreshold: number;
 }
 
-export interface UseMintRebalanceOrchestratorResult {
+interface UseMintRebalanceOrchestratorResult {
   plan: RebalancePlan;
   runPlan: RebalancePlan | null;
   stepStates: Record<string, StepState>;
@@ -584,8 +584,7 @@ export function useMintRebalanceOrchestrator({
               preparedMeltOp = operationToExecute;
 
               const result = (await manager.ops.melt.execute(operationToExecute.id)) as unknown as
-                | { state?: string; id?: string }
-                | undefined;
+                { state?: string; id?: string } | undefined;
 
               if (result?.state === 'pending') {
                 const opId = result.id ?? operationToExecute.id;
@@ -966,8 +965,7 @@ export function useMintRebalanceOrchestrator({
                 // Execute melt
                 updateStepState(hopStepId, { status: 'melting' });
                 const hopResult = (await manager.ops.melt.execute(hopPrepared.id)) as unknown as
-                  | { state?: string; id?: string }
-                  | undefined;
+                  { state?: string; id?: string } | undefined;
 
                 // Handle pending state
                 if (hopResult?.state === 'pending') {

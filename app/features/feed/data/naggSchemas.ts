@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const NaggNoteMetrics = z
+const NaggNoteMetrics = z
   .object({
     likeCount: z.number().int().nonnegative(),
     repostCount: z.number().int().nonnegative(),
@@ -9,7 +9,7 @@ export const NaggNoteMetrics = z
   })
   .passthrough();
 
-export const NaggFeedEvent = z
+const NaggFeedEvent = z
   .object({
     id: z.string().min(1),
     kind: z.number().int(),
@@ -20,7 +20,7 @@ export const NaggFeedEvent = z
   })
   .passthrough();
 
-export const NaggProfileInfo = z
+const NaggProfileInfo = z
   .object({
     name: z.string(),
     picture: z.string().optional(),
@@ -58,7 +58,7 @@ const NaggRepostItem = z
   })
   .passthrough();
 
-export const NaggFeedItem = z.discriminatedUnion('type', [NaggNoteItem, NaggRepostItem]);
+const NaggFeedItem = z.discriminatedUnion('type', [NaggNoteItem, NaggRepostItem]);
 
 export const NaggFeedResponse = z
   .object({
@@ -70,5 +70,3 @@ export const NaggFeedResponse = z
     paginationOffset: z.number().int().nonnegative(),
   })
   .passthrough();
-
-export type NaggFeedResponseData = z.infer<typeof NaggFeedResponse>;

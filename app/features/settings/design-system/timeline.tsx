@@ -11,7 +11,7 @@ const LOADING_INDICATOR_SOURCE = 'shared/blocks/status/LoadingIndicator.tsx';
 const GRADIENT_CARD_SOURCE = 'shared/ui/composed/GradientCard.tsx';
 const BLUR_CARD_FRAME_SOURCE = 'shared/ui/composed/BlurCardFrame.tsx';
 
-export const DESIGN_SYSTEM_TIMELINE_CREATED_AT = Date.UTC(2026, 4, 22, 12, 0, 0);
+const DESIGN_SYSTEM_TIMELINE_CREATED_AT = Date.UTC(2026, 4, 22, 12, 0, 0);
 
 const TIMELINE_CASES = [
   {

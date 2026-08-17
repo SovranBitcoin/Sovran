@@ -13,7 +13,6 @@
  * - sendToken: Ecash token display after creation
  * - lightningSend: Lightning invoice payment
  * - onchainSend: Onchain payment
- * - meltQuote: legacy send quote dispatcher
  * - paymentRequest: NUT-18 payment request confirmation and delivery
  * - camera: QR code scanning
  *
@@ -51,10 +50,6 @@ const ONCHAIN_SEND_OPTIONS = {
   title: 'Send onchain',
   headerBackButtonMenuEnabled: false,
 };
-const MELT_QUOTE_OPTIONS = {
-  title: 'Send',
-  headerBackButtonMenuEnabled: false,
-};
 const PAYMENT_REQUEST_OPTIONS = {
   title: 'Payment request',
   headerBackButtonMenuEnabled: false,
@@ -83,7 +78,6 @@ export default function SendFlowLayout() {
         <Stack.Screen name="sendToken" options={SEND_TOKEN_OPTIONS} />
         <Stack.Screen name="lightningSend" options={LIGHTNING_SEND_OPTIONS} />
         <Stack.Screen name="onchainSend" options={ONCHAIN_SEND_OPTIONS} />
-        <Stack.Screen name="meltQuote" options={MELT_QUOTE_OPTIONS} />
         <Stack.Screen name="paymentRequest" options={PAYMENT_REQUEST_OPTIONS} />
         <Stack.Screen name="camera" options={CAMERA_OPTIONS} />
       </Stack>

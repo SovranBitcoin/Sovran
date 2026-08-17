@@ -4,9 +4,9 @@
  * app mirrors its measured centre through the stable row testID's AX value.
  * Drivers parse only this exact prefix and reject off-screen coordinates.
  */
-export const E2E_ACTION_MENU_TARGET_PREFIX = 'e2e-action-menu-target:';
+const E2E_ACTION_MENU_TARGET_PREFIX = 'e2e-action-menu-target:';
 
-export interface E2EActionMenuTarget {
+interface E2EActionMenuTarget {
   x: number;
   y: number;
 }

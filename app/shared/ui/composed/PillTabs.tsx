@@ -80,8 +80,6 @@ type PillTabsProps<F extends string> = {
   tabs: readonly F[];
   activeTab: F;
   onTabChange: (tab: F) => void;
-  /** Optional leading glyph per pill (e.g. the contacts "All filters" funnel). */
-  iconFor?: (tab: F) => string | null;
   /** Stable per-pill accessibility identifier. */
   testIDFor?: (tab: F) => string | undefined;
   /** Extra pills rendered inline at the end of the same scrollable row. */
@@ -92,7 +90,6 @@ export function PillTabs<F extends string>({
   tabs,
   activeTab,
   onTabChange,
-  iconFor,
   testIDFor,
   trailing = null,
 }: PillTabsProps<F>) {
@@ -112,7 +109,6 @@ export function PillTabs<F extends string>({
               flatListRef={flatListRef}
               activeTab={activeTab}
               onTabChange={onTabChange}
-              icon={iconFor?.(item)}
               testID={testIDFor?.(item)}
             />
           )}

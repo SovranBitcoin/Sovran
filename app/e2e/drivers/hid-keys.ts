@@ -5,7 +5,7 @@
  * QuickPath onboarding tip covering it. US layout only — the ephemeral e2e
  * simulators always boot with the default US hardware layout.
  */
-export interface HidKeystroke {
+interface HidKeystroke {
   usage: number;
   shift: boolean;
 }

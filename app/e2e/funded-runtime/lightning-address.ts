@@ -1,9 +1,6 @@
 import { isLightningInvoiceBolt11, parseLightningAddress, requestInvoiceFromLnurl } from 'wallet';
 
-export type RequestLightningAddressInvoice = (
-  address: string,
-  amountSats: number
-) => Promise<string>;
+type RequestLightningAddressInvoice = (address: string, amountSats: number) => Promise<string>;
 
 /**
  * Resolve a Lightning address for one exact sat-denominated funded-test

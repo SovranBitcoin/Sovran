@@ -38,9 +38,7 @@ function kebabCase(s: string): string {
 interface PaymentInfoProps {
   unit: string;
   data: string | { name: string; value: string }[];
-  link?: string;
   copyTarget: CopyTarget;
-  setUri?: (uri: string) => void;
   animated?: boolean;
   variant?: 'primary' | 'secondary';
 }
@@ -48,9 +46,7 @@ interface PaymentInfoProps {
 export function PaymentInfo({
   unit,
   data,
-  link,
   copyTarget,
-  setUri,
   animated = false,
   variant = 'primary',
 }: PaymentInfoProps): React.ReactElement {
@@ -92,13 +88,12 @@ export function PaymentInfo({
   const handleCopyPress = useCallback(async () => {
     paymentLog.info('ui.payment_info.copy', {
       copyTarget,
-      hasLink: Boolean(link),
       valueLength: selectedValue.length,
     });
     await EnhancedHaptics.copyHaptic();
-    await Clipboard.setStringAsync(link || selectedValue);
+    await Clipboard.setStringAsync(selectedValue);
     copyPopup(copyTarget);
-  }, [link, selectedValue, copyTarget]);
+  }, [selectedValue, copyTarget]);
 
   const loading = !selectedValue;
   if (loading) {
@@ -158,7 +153,7 @@ export function PaymentInfo({
               importantForAccessibility="yes"
               collapsable={false}>
               <Pressable onPress={handleCopyPress}>
-                <ViewShot captureMode="mount" onCapture={setUri}>
+                <ViewShot captureMode="mount">
                   <AnimatedQRCode
                     padding={32}
                     unit={unit}

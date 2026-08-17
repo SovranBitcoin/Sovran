@@ -5,7 +5,7 @@ import type { Destination, FlowContext, StepDataMap } from './types';
 
 type Suggestions = NonNullable<StepDataMap['chooseProofs']['suggestions']>;
 
-export interface ChooseAmountFallback {
+interface ChooseAmountFallback {
   mintUrl: string;
   proofAmounts: number[];
   suggestions: Suggestions;
@@ -60,7 +60,7 @@ export function buildProofSuggestions(
   return result;
 }
 
-export function buildBalanceSuggestions(
+function buildBalanceSuggestions(
   balance: number,
   amount: number,
 ): {

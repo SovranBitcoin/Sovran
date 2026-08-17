@@ -29,7 +29,7 @@ export interface PickedAsset {
   height?: number;
 }
 
-export interface UploadMediaOptions {
+interface UploadMediaOptions {
   ndk: NDK;
   asset: PickedAsset;
   alt?: string;

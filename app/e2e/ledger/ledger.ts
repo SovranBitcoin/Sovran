@@ -134,7 +134,7 @@ export const ledgerEntrySchema = z.discriminatedUnion('kind', [
 
 export type LedgerEntry = z.infer<typeof ledgerEntrySchema>;
 export type LegStatus = 'intent' | 'funded' | 'swept' | 'reconciled' | 'cancelled' | 'quarantined';
-export interface BlockingLeg {
+interface BlockingLeg {
   legId: string;
   status: Exclude<LegStatus, 'reconciled' | 'cancelled'>;
   asset: AssetLocation;

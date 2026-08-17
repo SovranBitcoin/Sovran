@@ -24,7 +24,7 @@ export type SecretKind =
 
 /** The only shape a secret may take once it crosses a reporter/artifact/log
  *  boundary. Fields here are classified safe to surface. */
-export interface SafeSecret {
+interface SafeSecret {
   secret: true;
   kind: SecretKind;
   len: number;
@@ -37,7 +37,7 @@ export interface SafeSecret {
 
 const fp = (raw: string) => createHash('sha256').update(raw).digest('hex').slice(0, 12);
 
-export type SecretExtra = Partial<Pick<SafeSecret, 'unit' | 'amountSat' | 'mintHost' | 'quoteId'>>;
+type SecretExtra = Partial<Pick<SafeSecret, 'unit' | 'amountSat' | 'mintHost' | 'quoteId'>>;
 
 export class Secret {
   readonly kind: SecretKind;

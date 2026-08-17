@@ -1,5 +1,5 @@
 export { createAmountActionManager } from './createManager';
-export { resolveAmount, resolutionEqual, type ResolveAmountInput } from './resolve';
+export { resolveAmount, resolutionEqual } from './resolve';
 export { computeQuickSendSuggestions } from './suggestions';
 export type {
   AmountInputMode,

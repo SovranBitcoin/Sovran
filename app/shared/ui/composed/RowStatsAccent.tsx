@@ -88,8 +88,6 @@ interface RowStatsAccentProps {
   animate?: boolean;
   /** Trailing note appended below the stats (e.g. a disabled reason). */
   note?: string;
-  /** Color for the note text. Defaults to a dim foreground. */
-  noteColor?: string;
   /** Optional NIP-05 pill rendered as the last entry on the stats line:
    *  `[stats] • <check> handle@relay.example.com` (truncated with ellipsis
    *  to fit remaining width). Always tinted `STAT_COLOR_SOCIAL` (blue) —
@@ -127,13 +125,13 @@ function RowStatPill({ stat, animate }: { stat: RowStat; animate?: boolean }) {
   );
 }
 
-export function RowStatsAccent({ stats, note, noteColor, nip05, animate }: RowStatsAccentProps) {
+export function RowStatsAccent({ stats, note, nip05, animate }: RowStatsAccentProps) {
   const [foreground] = useThemeColor(['foreground'] as const);
 
   const hasNip05 = !!nip05?.handle;
   if (stats.length === 0 && !note && !hasNip05) return null;
 
-  const resolvedNoteColor = noteColor ?? opacity(foreground, 0.6);
+  const resolvedNoteColor = opacity(foreground, 0.6);
   const hasStatsOrNip05 = stats.length > 0 || hasNip05;
 
   return (

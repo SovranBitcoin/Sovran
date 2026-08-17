@@ -135,7 +135,7 @@ export function stripCashuPrefixes(value: string): string {
  * downstream detection decides whether the extracted value is a valid
  * cashu token.
  */
-export function extractWebWalletToken(value: string): string | null {
+function extractWebWalletToken(value: string): string | null {
   const trimmed = sanitizeInput(value);
   if (!/^https?:\/\//i.test(trimmed)) {
     logger.debug('normalize.webWallet.skipped', {

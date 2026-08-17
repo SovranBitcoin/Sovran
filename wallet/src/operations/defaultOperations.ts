@@ -29,6 +29,7 @@ import type {
 } from "@cashu/coco-core";
 import { getEncodedToken } from "@cashu/coco-core";
 import { emitPaymentRequestCreated } from "../paymentRequestEvents";
+import { proofsHaveP2PK } from "../p2pk";
 import type { MachineOperations, StepDataMap } from "../machine/types";
 import type {
   MintCatalogEntry,
@@ -439,17 +440,6 @@ function ensureSendEntryToken(historyEntry: string, token: CoreToken): string {
   if (parsed.token)
     return JSON.stringify({ ...parsed, token: { ...parsed.token, ...token } });
   return JSON.stringify({ ...parsed, token });
-}
-
-function hasP2PKProofs(proofs: readonly { secret: string }[]): boolean {
-  return proofs.some((proof) => {
-    try {
-      const parsed = JSON.parse(proof.secret);
-      return Array.isArray(parsed) && parsed[0] === "P2PK";
-    } catch {
-      return false;
-    }
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1315,7 +1305,7 @@ export function createDefaultOperations(
       let tokenAmount = 0;
       try {
         const metadata = getTokenMetadata(tokenString);
-        hadP2PK = hasP2PKProofs(metadata.incompleteProofs);
+        hadP2PK = proofsHaveP2PK(metadata.incompleteProofs);
         tokenAmount = amountToNumber(metadata.amount);
         logger.info("operations.executeReceive.tokenDecoded", {
           ...mintUrlFields(mintUrl),

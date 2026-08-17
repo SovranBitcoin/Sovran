@@ -53,26 +53,14 @@ const TransactionsFilterContext = createContext<TransactionsFilterContextValue |
 
 interface TransactionsFilterProviderProps {
   children: ReactNode;
-  initialCurrency?: string;
-  initialPaymentType?: TransactionPaymentType;
-  initialDirection?: TransactionDirection;
-  initialStatus?: Status;
-  initialMintUrl?: string;
 }
 
-export function TransactionsFilterProvider({
-  children,
-  initialCurrency = 'sat',
-  initialPaymentType = 'all',
-  initialDirection = 'all',
-  initialStatus = 'All',
-  initialMintUrl = 'all',
-}: TransactionsFilterProviderProps) {
-  const [currency, setCurrency] = useState(initialCurrency);
-  const [paymentType, setPaymentType] = useState<TransactionPaymentType>(initialPaymentType);
-  const [direction, setDirection] = useState<TransactionDirection>(initialDirection);
-  const [status, setStatus] = useState<Status>(initialStatus);
-  const [mintUrl, setMintUrl] = useState(initialMintUrl);
+export function TransactionsFilterProvider({ children }: TransactionsFilterProviderProps) {
+  const [currency, setCurrency] = useState('sat');
+  const [paymentType, setPaymentType] = useState<TransactionPaymentType>('all');
+  const [direction, setDirection] = useState<TransactionDirection>('all');
+  const [status, setStatus] = useState<Status>('All');
+  const [mintUrl, setMintUrl] = useState('all');
   const [source, setSource] = useState<TransactionSourceFilter>('all');
   const [lock, setLock] = useState<TransactionLockFilter>('all');
   const [counterparty, setCounterparty] = useState<TransactionCounterpartyFilter>('all');

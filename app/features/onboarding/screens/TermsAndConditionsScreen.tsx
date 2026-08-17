@@ -142,17 +142,11 @@ These Terms represent the entire agreement between you and Sovran.`;
 interface TermsAndConditionsScreenProps {
   onClose: () => void;
   title?: string;
-  buttonText?: string;
-  checkboxText?: string;
-  showCheckbox?: boolean;
 }
 
 export function TermsAndConditionsScreen({
   onClose,
   title = 'Terms',
-  buttonText = 'Next',
-  checkboxText = 'I have read and agree to the Terms and Conditions',
-  showCheckbox = true,
 }: TermsAndConditionsScreenProps) {
   useLifecycleLogger('TermsAndConditionsScreen');
   const [isChecked, setIsChecked] = useState(false);
@@ -174,27 +168,21 @@ export function TermsAndConditionsScreen({
         </Card>
 
         <VStack spacing={16}>
-          {showCheckbox && (
-            <ControlField
-              testID="terms-acceptance"
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: isChecked }}
-              accessibilityValue={{ text: isChecked ? '1' : '0' }}
-              isSelected={isChecked}
-              onSelectedChange={setIsChecked}>
-              <View className="flex-1">
-                <Label>{checkboxText}</Label>
-              </View>
-              <ControlField.Indicator />
-            </ControlField>
-          )}
+          <ControlField
+            testID="terms-acceptance"
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: isChecked }}
+            accessibilityValue={{ text: isChecked ? '1' : '0' }}
+            isSelected={isChecked}
+            onSelectedChange={setIsChecked}>
+            <View className="flex-1">
+              <Label>I have read and agree to the Terms and Conditions</Label>
+            </View>
+            <ControlField.Indicator />
+          </ControlField>
 
-          <Button
-            variant="primary"
-            className="w-full"
-            onPress={onClose}
-            isDisabled={showCheckbox ? !isChecked : false}>
-            <Button.Label>{buttonText}</Button.Label>
+          <Button variant="primary" className="w-full" onPress={onClose} isDisabled={!isChecked}>
+            <Button.Label>Next</Button.Label>
           </Button>
         </VStack>
       </VStack>

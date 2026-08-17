@@ -22,13 +22,7 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 type SwapGroupState = 'running' | 'finished' | 'cancelled';
 
 export type SwapLegLocalStatus =
-  | 'pending'
-  | 'creatingInvoice'
-  | 'invoiceReady'
-  | 'melting'
-  | 'verifying'
-  | 'done'
-  | 'failed';
+  'pending' | 'creatingInvoice' | 'invoiceReady' | 'melting' | 'verifying' | 'done' | 'failed';
 
 export interface SwapLeg {
   id: string;
@@ -94,8 +88,6 @@ interface SwapTransactionsActions {
   ) => void;
 
   getGroup: (groupId: string) => SwapGroup | null;
-  getGroupsForUnit: (unit: string) => SwapGroup[];
-  getIndex: () => QuoteIdToGroupIndex;
 }
 
 type SwapTransactionsStore = SwapTransactionsState & SwapTransactionsActions;
@@ -309,13 +301,6 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
       getGroup: (groupId) => {
         return get().groups[groupId] ?? null;
       },
-
-      getGroupsForUnit: (unit) => {
-        const groups = Object.values(get().groups).filter((g) => g.unit === unit);
-        return groups.sort((a, b) => b.createdAt - a.createdAt);
-      },
-
-      getIndex: () => get().quoteIdToGroup,
     }),
     persistConfig({
       name: 'swap-transactions-store',

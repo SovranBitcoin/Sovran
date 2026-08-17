@@ -51,7 +51,7 @@ export const attemptRecordSchema = z.object({
 });
 export type AttemptRecord = z.infer<typeof attemptRecordSchema>;
 
-export const chunkStatusSchema = z.enum([
+const chunkStatusSchema = z.enum([
   'pending',
   'running',
   'passed',
@@ -61,7 +61,7 @@ export const chunkStatusSchema = z.enum([
   'funded-blocked',
   'skipped',
 ]);
-export type ChunkStatus = z.infer<typeof chunkStatusSchema>;
+type ChunkStatus = z.infer<typeof chunkStatusSchema>;
 
 export const chunkStateSchema = z.object({
   chunkId: z.string(),
@@ -120,7 +120,7 @@ export const DEFAULT_RETRIES = {
   infraAbort: { ios: 3, android: 4 },
 } as const;
 
-export interface CreateStateOptions {
+interface CreateStateOptions {
   campaignId: string;
   nowIso: string;
   sourceFingerprint: string;
@@ -157,7 +157,7 @@ function chunkFromPlan(chunk: ChunkPlanEntry): ChunkState {
   };
 }
 
-export const STATE_FILE = 'state.json';
+const STATE_FILE = 'state.json';
 
 export function saveState(campaignDir: string, state: OrchestratorState, nowIso: string): void {
   state.updatedAt = nowIso;

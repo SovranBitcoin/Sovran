@@ -4,20 +4,13 @@ import {
   defaultDetectors,
   DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
   parsePaymentInput,
+  looksLikeBitcoinAddress,
 } from 'wallet';
 
 import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
 import { cashuLog } from '@/shared/lib/logger';
 
 type EntryRecord = Record<string, unknown>;
-
-function looksLikeBitcoinAddress(value: string): boolean {
-  const candidate = value.trim();
-  if (!candidate) return false;
-
-  if (/^(bc|tb|bcrt)1[ac-hj-np-z02-9]{11,87}$/i.test(candidate)) return true;
-  return /^[123mn2][1-9A-HJ-NP-Za-km-z]{25,62}$/.test(candidate);
-}
 
 function getBip321OnchainAddress(value: string): string | null {
   if (!value.trim().toLowerCase().startsWith('bitcoin:')) return null;

@@ -45,7 +45,7 @@ const AX_FRESH_MS = 400;
 /** Dump-on-demand AX source with single-flight coalescing and a freshness
  * window. Every input action invalidates; a monotonic generation feeds
  * observeState() revisions exactly like the iOS AxWatcher. */
-export class AndroidAxSource {
+class AndroidAxSource {
   #adb: Adb;
   #snapshot: AxSnapshot | null = null;
   #takenAt = 0;
@@ -100,12 +100,12 @@ const PERMISSION_MAP: Record<'camera' | 'photos' | 'location', string[]> = {
   ],
 };
 
-export interface AndroidDriverConfig {
+interface AndroidDriverConfig {
   signal?: AbortSignal;
   pollMs?: number;
 }
 
-export interface AndroidDriverDeps {
+interface AndroidDriverDeps {
   install: (reset: 'erase' | 'reinstall' | 'none') => Promise<void>;
   reportInfrastructureFailure?: (error: SimulatorInfrastructureError) => void;
   screenshotSettleMs?: number;

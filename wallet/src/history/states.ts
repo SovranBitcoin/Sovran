@@ -75,11 +75,11 @@ export function normalizeContractState(flow: TimelineFlow, raw: string): string 
 // ---------------------------------------------------------------------------
 
 /** Sentinel the timeline uses for a terminally-failed mint. */
-export const MINT_FAILED_STATE = "failed";
+const MINT_FAILED_STATE = "failed";
 
 const MINT_QUOTE_STATES = new Set(["UNPAID", "PAID", "ISSUED"]);
 
-export function isMintQuoteStateValue(
+function isMintQuoteStateValue(
   value: unknown,
 ): value is "UNPAID" | "PAID" | "ISSUED" {
   return typeof value === "string" && MINT_QUOTE_STATES.has(value);

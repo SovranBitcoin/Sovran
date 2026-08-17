@@ -36,7 +36,7 @@ export const IDLE_SEGMENT_DASH = CIRC / IDLE_SEGMENT_COUNT - IDLE_SEGMENT_GAP;
 
 /** Static SVG dash geometry for one ring stroke: `strokeDasharray` tuple plus
  *  the `strokeDashoffset` that centers each dash within its step. */
-export interface RingDashPattern {
+interface RingDashPattern {
   /** Visible dash length in viewBox units. */
   dash: number;
   /** Seam gap in viewBox units (dasharray gap for the idle ring; step gap

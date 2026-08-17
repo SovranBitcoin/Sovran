@@ -8,7 +8,7 @@ export type TransactionProbeEntry = {
   state: unknown;
 };
 
-export type TransactionProbe = {
+type TransactionProbe = {
   direction: 'in' | 'out';
   amount: number;
   unit: string;

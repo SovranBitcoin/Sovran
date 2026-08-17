@@ -69,12 +69,6 @@ interface LiquidChatComposerProps {
    * bug and a silent no-op reads as broken.
    */
   plusDisabled?: boolean;
-  /**
-   * Tap handler for the voice icon rendered INSIDE the input. Currently a
-   * placeholder for future voice messaging — no surface implements it yet.
-   * Hidden when undefined.
-   */
-  onVoicePress?: () => void;
   /** Bottom padding below the bubble. Defaults to 12 (matches horizontal margin). */
   bottomPadding?: number;
   testID?: string;
@@ -139,7 +133,6 @@ export function LiquidChatComposer({
   placeholder = 'Write here',
   onPlusPress,
   plusDisabled,
-  onVoicePress,
   bottomPadding = 12,
   testID,
   surface,
@@ -358,23 +351,6 @@ export function LiquidChatComposer({
                       swiftAccessibilityLabel('Message composer'),
                     ]}
                   />
-
-                  {/* Inline voice affordance, only while empty. Conditional
-                      unmount is fine here — not part of the matched-geometry
-                      namespace, so there's no glass morph to break.
-                      `buttonStyle('plain')` strips the default tint/halo so
-                      the SF symbol sits flush. */}
-                  {isEmpty && onVoicePress ? (
-                    <SwiftUIButton
-                      modifiers={[buttonStyle('plain'), padding({ trailing: 12 })]}
-                      onPress={onVoicePress}>
-                      <SwiftUIImage
-                        systemName={'mic.fill' as never}
-                        size={ICON_SIZE}
-                        color={fieldPlaceholder}
-                      />
-                    </SwiftUIButton>
-                  ) : null}
                 </SwiftUIHStack>
 
                 {/* Trailing [→] glass button. ALWAYS rendered — toggling
@@ -430,18 +406,7 @@ export function LiquidChatComposer({
   // muddy tint). The [→] springs in/out via reanimated. The RN multiline
   // TextInput drives `fallbackRowHeight` so the bubble grows with content.
   const useBlur = Platform.OS === 'ios';
-  const insideIcons =
-    isEmpty && onVoicePress ? (
-      <HStack align="center" spacing={8} style={{ paddingRight: 4 }}>
-        <Pressable
-          onPress={onVoicePress}
-          hitSlop={6}
-          accessibilityLabel="Voice message"
-          testID={testID ? `${testID}-voice` : undefined}>
-          <Icon name="mdi:microphone" size={20} color={fieldPlaceholder} />
-        </Pressable>
-      </HStack>
-    ) : null;
+  const insideIcons = null;
 
   return (
     <View

@@ -1,7 +1,7 @@
 import { LANES, PLATFORMS, PLATFORM_DRIVERS, type Platform } from '../../schema/capabilities';
 import type { ScenarioCatalogEntry, TriggerRequest } from './types';
 
-export interface RunPlan {
+interface RunPlan {
   argvs: string[][];
   funded: boolean;
   platforms: Platform[];

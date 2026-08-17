@@ -1,3 +1,4 @@
+import { getCornerStyle } from './CapsuleButton.corners';
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
@@ -107,33 +108,5 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 12,
-  },
-});
-
-function getCornerStyle(roundedSide: NonNullable<CapsuleButtonProps['roundedSide']>) {
-  switch (roundedSide) {
-    case 'left':
-      return cornerStyles.leftCorners;
-    case 'right':
-      return cornerStyles.rightCorners;
-    case 'all':
-    default:
-      return cornerStyles.allCorners;
-  }
-}
-
-const CORNER_RADIUS = 24;
-
-const cornerStyles = StyleSheet.create({
-  allCorners: {
-    borderRadius: CORNER_RADIUS,
-  },
-  leftCorners: {
-    borderTopLeftRadius: CORNER_RADIUS,
-    borderBottomLeftRadius: CORNER_RADIUS,
-  },
-  rightCorners: {
-    borderTopRightRadius: CORNER_RADIUS,
-    borderBottomRightRadius: CORNER_RADIUS,
   },
 });

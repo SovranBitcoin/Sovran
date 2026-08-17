@@ -120,7 +120,6 @@ interface AmountEntryViewProps {
   nextDisabled?: boolean;
   nextText?: string;
   nextTestID?: string;
-  nextIcon?: string;
   /**
    * True when the entered amount exceeds the spendable balance. The owning
    * adapter derives this from the payment engine (colada) rather than this
@@ -206,7 +205,6 @@ export function AmountEntryView({
   nextDisabled = false,
   nextText = 'Next',
   nextTestID = 'amount-next',
-  nextIcon,
   exceedsBalance = false,
   noticeText = null,
   warningText = null,
@@ -614,7 +612,6 @@ export function AmountEntryView({
                 <Button
                   testID={nextTestID}
                   text={nextText}
-                  icon={nextIcon ? <Icon name={nextIcon} /> : undefined}
                   variant="primary"
                   loading={nextLoading}
                   disabled={nextDisabled}
@@ -631,7 +628,6 @@ export function AmountEntryView({
                 {
                   testID: nextTestID,
                   text: nextText,
-                  icon: nextIcon,
                   variant: 'primary',
                   onPress: async () => {
                     logNextPress('plain');

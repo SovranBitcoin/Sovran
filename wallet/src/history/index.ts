@@ -23,7 +23,6 @@ export { inFlightReceiveToHistoryEntry } from "./inFlightReceives";
 export {
   isPendingPaymentRequestEntry,
   pendingPaymentRequestToHistoryEntry,
-  PAYMENT_REQUEST_PENDING_FLAG,
 } from "./pendingPaymentRequests";
 export {
   listInFlightReceiveEntries,
@@ -32,12 +31,7 @@ export {
   PENDING_PAYMENT_REQUEST_MAX_AGE_MS,
   sameTransactionList,
 } from "./aggregate";
-export {
-  normalizeHistoryEntries,
-  normalizeHistoryEntry,
-  normalizeHistoryEntryState,
-  serializeHistoryEntry,
-} from "./normalize";
+export { normalizeHistoryEntry, serializeHistoryEntry } from "./normalize";
 export {
   entryStateRank,
   isTerminalFailureState,

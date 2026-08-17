@@ -6,6 +6,7 @@
 // into `metadata` (see `mergeAnnotationsIntoEntry`). The app never hand-parses
 // flat keys — it calls these.
 
+import { proofsHaveP2PK } from "../p2pk";
 import {
   decodeAnnotation,
   type AnnotationRecord,
@@ -53,12 +54,6 @@ export function getSwap(
   return getAnnotation(entry).swap ?? null;
 }
 
-export function getCreqCustomization(
-  entry: EntryWithMetadata,
-): TransactionAnnotation["creqCustomization"] | null {
-  return getAnnotation(entry).creqCustomization ?? null;
-}
-
 export function getPaymentRequest(
   entry: EntryWithMetadata,
 ): TransactionAnnotation["paymentRequest"] | null {
@@ -94,17 +89,6 @@ function entryProofs(entry: EntryWithToken): Array<{ secret: string }> {
     );
   }
   return [];
-}
-
-function proofsHaveP2PK(proofs: ReadonlyArray<{ secret: string }>): boolean {
-  return proofs.some((proof) => {
-    try {
-      const parsed = JSON.parse(proof.secret);
-      return Array.isArray(parsed) && parsed[0] === "P2PK";
-    } catch {
-      return false;
-    }
-  });
 }
 
 /**

@@ -22,8 +22,6 @@ interface InitializationGateProps {
    * fire when `run` rejects — see audit-46 F-001 for the catch-branch pitfall.
    */
   onSuccess?: () => void;
-  /** Optional UI shown when `run` rejects. Defaults to `null` so children never mount. */
-  errorFallback?: ReactNode;
   children: ReactNode;
 }
 
@@ -48,7 +46,6 @@ export function InitializationGate({
   logEvent,
   run,
   onSuccess,
-  errorFallback = null,
   children,
 }: InitializationGateProps) {
   useInitMount(tag);
@@ -90,7 +87,7 @@ export function InitializationGate({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (status === 'failed') return <>{errorFallback}</>;
+  if (status === 'failed') return null;
   if (status !== 'complete') return null;
 
   return <Log name={tag}>{children}</Log>;

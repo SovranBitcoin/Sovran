@@ -23,7 +23,7 @@ export interface FundedRunLock {
   release(): void;
 }
 
-export type FundedRunLockStatus =
+type FundedRunLockStatus =
   | { readonly status: 'none' }
   | {
       readonly status: 'active' | 'stale';
@@ -53,7 +53,7 @@ function parseLock(path: string): LockRecord {
   return record as LockRecord;
 }
 
-export function processIsAlive(pid: number): boolean {
+function processIsAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;

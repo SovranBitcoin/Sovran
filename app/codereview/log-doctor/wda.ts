@@ -21,7 +21,7 @@ import * as nodePath from 'path';
 
 export const WDA_BASE = process.env.WDA_BASE_URL || 'http://localhost:8100';
 
-export interface AXNode {
+interface AXNode {
   type?: string;
   label?: string | null;
   name?: string | null;
@@ -644,7 +644,7 @@ export async function relaunchApp(bundleId: string): Promise<void> {
  * Used by `relaunchApp` (long initial window) and by the test executor's
  * pre-tap pre-flight (short window — see preflightDismissDevMenu).
  */
-export async function dismissDevMenuRepeatedly(totalMs: number): Promise<void> {
+async function dismissDevMenuRepeatedly(totalMs: number): Promise<void> {
   const start = Date.now();
   let dismissedAt = 0;
   while (Date.now() - start < totalMs) {

@@ -25,7 +25,7 @@ export interface RecorderProcess {
   kill(signal?: number | NodeJS.Signals): void;
 }
 
-export interface SimVideoRecorderOptions {
+interface SimVideoRecorderOptions {
   udid: string;
   /** Run directory; the video lands at `<runDir>/<scenarioId>/video.mp4`. */
   runDir: string;

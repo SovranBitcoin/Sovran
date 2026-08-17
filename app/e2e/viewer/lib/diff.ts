@@ -108,7 +108,7 @@ async function readPng(runDirName: string, relPath: string): Promise<PNG | undef
   }
 }
 
-export interface DiffProgress {
+interface DiffProgress {
   done: number;
   total: number;
 }

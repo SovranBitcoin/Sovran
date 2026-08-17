@@ -24,6 +24,7 @@ import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import {
   remeasureVisualLayoutScope,
   useVisualListLogger,
+  visualViewabilityRange,
   VISUAL_LIST_VIEWABILITY_CONFIG,
 } from '@/shared/lib/contentShiftLog';
 import {
@@ -69,15 +70,6 @@ function followerVisualToken(token: ViewToken) {
     isViewable: token.isViewable,
     item: token.item as FeedNotification,
   };
-}
-
-function visualViewabilityRange(tokens: ViewToken[]) {
-  const indexes = tokens
-    .map((token) => token.index)
-    .filter((index): index is number => typeof index === 'number');
-  const start = indexes.length > 0 ? Math.min(...indexes) : 0;
-  const end = indexes.length > 0 ? Math.max(...indexes) : -1;
-  return { start, end, startBuffered: start, endBuffered: end };
 }
 
 export function NotificationFollowersScreen() {

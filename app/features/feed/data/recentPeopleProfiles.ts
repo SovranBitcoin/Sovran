@@ -21,7 +21,7 @@ const BASE_EVENT_SELECTION = `
   tags
 `;
 
-export const RECENT_PEOPLE_PROFILES_QUERY = `
+const RECENT_PEOPLE_PROFILES_QUERY = `
 query NaggRecentPeopleProfiles($input: EventQueryInput!) {
   events(input: $input) {
     nodes {

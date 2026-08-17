@@ -68,5 +68,3 @@ export interface PollDraft {
   /** Unix seconds; undefined = no expiry. */
   endsAt?: number;
 }
-
-export type ComposerMode = 'new' | 'reply' | 'quote';

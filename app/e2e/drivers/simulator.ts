@@ -42,7 +42,7 @@ import { BACKSPACE_USAGE, hidKeystrokesFor, LEFT_SHIFT_USAGE } from './hid-keys'
 import { SimulatorInfrastructureError } from './simulator-session';
 import { isProfileSecretAxId } from './ax-redaction';
 
-export interface SimConfig {
+interface SimConfig {
   udid: string;
   axEndpoint: string;
   touchEndpoint: string;
@@ -50,7 +50,7 @@ export interface SimConfig {
   signal?: AbortSignal;
 }
 
-export interface SimulatorDriverDeps {
+interface SimulatorDriverDeps {
   axWatcher?: AxWatcher;
   install?: (reset: 'erase' | 'reinstall' | 'none') => Promise<void>;
   press?: (x: number, y: number) => Promise<void>;
@@ -72,7 +72,7 @@ const SHOT_SETTLE_MS = 450;
 const WALLET_TAB_SELECTOR = { id: 'tab-wallet' } as const;
 const WALLET_READY_SELECTOR = { id: 'wallet-send' } as const;
 
-export interface PrivateScreenshotTarget {
+interface PrivateScreenshotTarget {
   directory: string;
   path: string;
   cleanup(): void;

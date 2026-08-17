@@ -28,7 +28,7 @@ export type ComposerTarget =
       relayHint?: string;
     };
 
-export interface BuildNoteInput {
+interface BuildNoteInput {
   blocks: readonly ComposerBlock[];
   target: ComposerTarget;
   mentionPubkeys?: readonly string[];
@@ -37,7 +37,7 @@ export interface BuildNoteInput {
   createdAt?: number;
 }
 
-export interface UnsignedNote {
+interface UnsignedNote {
   kind: 1;
   content: string;
   created_at: number;

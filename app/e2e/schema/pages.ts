@@ -57,6 +57,6 @@ export const CANONICAL_PAGES = [
   'map', // bitcoin merchant map (MapScreen, screen-map)
 ] as const;
 
-export const CANONICAL_PAGE_SET: ReadonlySet<string> = new Set(CANONICAL_PAGES);
+const CANONICAL_PAGE_SET: ReadonlySet<string> = new Set(CANONICAL_PAGES);
 
 export const isCanonicalPage = (name: string): boolean => CANONICAL_PAGE_SET.has(name);

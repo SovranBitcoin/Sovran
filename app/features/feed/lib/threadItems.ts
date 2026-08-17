@@ -55,7 +55,7 @@ export function buildThreadItemsFromResult(
   };
 }
 
-export type ThreadIgnoreFilters = {
+type ThreadIgnoreFilters = {
   pubkeys: ReadonlySet<string>;
   eventIds: ReadonlySet<string>;
 };

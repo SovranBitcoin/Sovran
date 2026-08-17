@@ -25,6 +25,7 @@ import { type NaggFeedPage } from 'nostr/map';
 import type { z } from 'zod';
 import { backendConfig } from '@/shared/config/backend';
 import { apiLog, feedLog, redactError } from '@/shared/lib/logger';
+import { isRootNote } from './facadeFeedAdapter';
 import { mapNaggFeedPage } from './mapNaggFeedPage';
 import type {
   FeedClient,
@@ -51,12 +52,6 @@ type FeedQueryOptions = {
   includeRepost?: (event: FeedEvent, originalEvent?: FeedEvent, rootEvent?: FeedEvent) => boolean;
   extraProfile?: { pubkey: string; profile: ProfileInfo };
 };
-
-function isRootNote(event: { tags: string[][] }): boolean {
-  const eTags = (event.tags || []).filter((tag) => tag[0] === 'e');
-  if (eTags.length === 0) return true;
-  return eTags.every((tag) => tag[3] === 'mention');
-}
 
 function endpointLogFields(): Record<string, unknown> {
   try {

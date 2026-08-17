@@ -27,10 +27,8 @@ export type BlossomError =
   | { type: 'too-large'; size: number }
   | { type: 'canceled' };
 
-export type BlossomDeleteError =
-  | { type: 'sign-failed' }
-  | { type: 'delete-failed'; status?: number }
-  | { type: 'canceled' };
+type BlossomDeleteError =
+  { type: 'sign-failed' } | { type: 'delete-failed'; status?: number } | { type: 'canceled' };
 
 // Primal's DELETE runs a synchronous server-side media purge that can take
 // >15s; too short a cap aborts a delete that actually succeeds (the client logs
@@ -95,7 +93,7 @@ function parseDescriptor(body: string): BlobDescriptor | null {
   }
 }
 
-export interface UploadOptions {
+interface UploadOptions {
   ndk: NDK;
   server: string;
   fileUri: string;
@@ -238,7 +236,7 @@ async function putOnce(
   }
 }
 
-export interface DeleteOptions {
+interface DeleteOptions {
   ndk: NDK;
   /**
    * Origin the blob lives on (scheme + host of the blob URL), e.g.

@@ -12,7 +12,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useQRButtonPressFeedback } from './useQRButtonPressFeedback';
 import { useQRButtonReveal } from './useQRButtonReveal';
 
-export interface QRButtonProps {
+interface QRButtonProps {
   onPress: () => void;
   accentColor?: string;
   color?: string;

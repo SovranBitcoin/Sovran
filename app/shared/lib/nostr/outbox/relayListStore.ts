@@ -18,7 +18,7 @@ import { DEFAULT_RELAYS, safeNormalizeRelay } from '@/shared/lib/nostr/outbox/de
 import type { RelayListEntry } from '@/shared/lib/nostr/outbox/nip65';
 
 /** Where the in-memory entries came from. `local` = edited, needs publishing. */
-export type RelayListSource = 'default' | 'relay' | 'local';
+type RelayListSource = 'default' | 'relay' | 'local';
 
 interface RelayListState {
   entries: RelayListEntry[];

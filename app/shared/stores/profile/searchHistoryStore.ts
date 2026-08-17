@@ -30,12 +30,6 @@ interface SearchHistoryState {
   addSearch: (query: string, context?: string) => void;
 
   /**
-   * Get recent searches for a context
-   * @param context The context to get searches for (defaults to 'default')
-   */
-  getRecentSearches: (context?: string) => SearchHistoryEntry[];
-
-  /**
    * Clear all recent searches for a context (defaults to 'default').
    * @param context The context to clear (defaults to 'default')
    */
@@ -89,11 +83,6 @@ export const useSearchHistoryStore = create<SearchHistoryState>()(
             },
           };
         });
-      },
-
-      getRecentSearches: (context: string = 'default') => {
-        const state = get();
-        return state.recentSearches[context] || [];
       },
 
       clearSearchHistory: (context: string = 'default') => {

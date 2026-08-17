@@ -1,9 +1,9 @@
-export interface TrustedMintInitializer {
+interface TrustedMintInitializer {
   isTrustedMint(mintUrl: string): Promise<boolean>;
   addMint(mintUrl: string, options: { trusted: true }): Promise<unknown>;
 }
 
-export interface EnsureTrustedMintResult {
+interface EnsureTrustedMintResult {
   status: 'already-trusted' | 'added';
   attempts: number;
 }

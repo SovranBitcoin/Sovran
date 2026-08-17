@@ -34,7 +34,7 @@ export class PlainReporter {
   };
 }
 
-export interface Term {
+interface Term {
   append(line: string): void;
   live(footerLine: string): void;
   end(): void;

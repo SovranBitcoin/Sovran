@@ -51,7 +51,7 @@ interface RuntimeRecord {
   supportedDeviceTypes?: RuntimeDevice[];
 }
 
-export interface SimulatorTarget {
+interface SimulatorTarget {
   runtimeIdentifier: string;
   runtimeName: string;
   runtimeVersion: string;
@@ -99,13 +99,13 @@ export function selectSimulatorTarget(raw: string, preferred = DEFAULT_DEVICE): 
 
 const UDID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
 
-export interface EphemeralDevice extends SimulatorTarget {
+interface EphemeralDevice extends SimulatorTarget {
   readonly udid: string;
   readonly name: string;
   dispose(): Promise<void>;
 }
 
-export interface CreateDeviceOptions {
+interface CreateDeviceOptions {
   runId: string;
   preferredDevice?: string;
   signal?: AbortSignal;
@@ -327,7 +327,7 @@ async function allocateLoopbackPort(): Promise<number> {
   });
 }
 
-export interface PrivateSeedExportServer {
+interface PrivateSeedExportServer {
   readonly endpoint: string;
   readonly token: string;
   stop(): Promise<void>;
@@ -458,7 +458,7 @@ async function metroRunning(url: string): Promise<boolean> {
   }
 }
 
-export interface MetroSession {
+interface MetroSession {
   readonly url: string;
   readonly port: number;
   readonly pid: number;
@@ -522,7 +522,7 @@ async function pumpSimulatorBridgeOutput(
   if (output) appendFileSync(logPath, `${sanitizeMetroLogLine(output)}\n`, { mode: 0o600 });
 }
 
-export interface MetroStartOptions {
+interface MetroStartOptions {
   onSeedExport?: (mnemonic: string) => void;
   controlledP2PKPubkey?: string;
   fundedAssets?: readonly E2EReadyProofAsset[];
@@ -896,7 +896,7 @@ const processSignals: SignalSource = {
   off: (signal, listener) => process.off(signal, listener),
 };
 
-export interface EphemeralSimulatorSession {
+interface EphemeralSimulatorSession {
   readonly udid: string;
   readonly name: string;
   readonly runtimeName: string;

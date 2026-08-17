@@ -11,6 +11,7 @@ import {
   skimmableFeedFilters,
 } from './facadeFeedAdapter';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
+import { emptyNotificationsResult } from '@/features/feed/lib/notificationResults';
 import {
   resolvedNotificationsToResult,
   toFacadeNotificationsRequest,
@@ -343,16 +344,5 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
         }
       );
     },
-  };
-}
-
-function emptyNotificationsResult(): FeedNotificationsResult {
-  return {
-    notifications: [],
-    profilesMap: new Map(),
-    metricsMap: new Map(),
-    quotedEventsMap: new Map(),
-    paginationUntil: 0,
-    hasNextPage: false,
   };
 }

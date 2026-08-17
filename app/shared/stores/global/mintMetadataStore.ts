@@ -127,8 +127,6 @@ interface MintMetadataState {
 
   /** Bulk upsert from a nagg `/nostr/mint/discover` response. */
   upsertFromDiscover: (mints: DiscoverMint[]) => void;
-
-  removeMint: (mintUrl: string) => void;
   clear: () => void;
 }
 
@@ -357,16 +355,6 @@ export const useMintMetadataStore = create<MintMetadataState>()(
             return { byMintUrl: next };
           });
           storeLog.debug('store.mint_metadata.upsert_discover', { count: mints.length });
-        },
-
-        removeMint: (mintUrl) => {
-          const key = normalizeMintUrlKey(mintUrl);
-          set((state) => {
-            if (!state.byMintUrl[key]) return state;
-            const next = { ...state.byMintUrl };
-            delete next[key];
-            return { byMintUrl: next };
-          });
         },
 
         clear: () => {

@@ -29,6 +29,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Log, log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
+import { DebugRow } from '@/shared/ui/composed/LayoutDebugWrapper';
 
 /** Measured iOS flow-modal (pageSheet) header height — a STABLE, frame-0 value
  *  used instead of the navigator header height, which react-native-screens seeds
@@ -38,25 +39,6 @@ import { zIndex } from '@/shared/styles/tokens';
  *  `insets.top + 44 = 83` overshot the real measured 70) — it's ~constant across
  *  devices. Confirm via the `modal.header.tune` log if a device looks off. */
 const IOS_MODAL_HEADER_HEIGHT = 70;
-
-const DebugRow = ({
-  label,
-  value,
-  color,
-  fontSize = 12,
-}: {
-  label: string;
-  value: string;
-  color: string;
-  fontSize?: number;
-}) => (
-  <View className="mb-1 flex-row justify-between">
-    <Text style={{ color, fontSize }}>{label}</Text>
-    <Text style={{ color, fontSize }} className="font-bold">
-      {value}
-    </Text>
-  </View>
-);
 
 /**
  * Owns the Reanimated shared value + scroll handler for the animated-scroll

@@ -9,11 +9,11 @@ import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 /** Discovery row + the app-local method field (the shared MintSearchResult
  *  schema predates the capability data; extend locally rather than changing
  *  the cross-repo contract). */
-export type MintSearchRow = MintSearchResult & {
+type MintSearchRow = MintSearchResult & {
   supported_methods: string[];
   /** NUT-04 (method, unit) pairs (lowercased) — the discovery filter matches the
    *  rail's exact pair, e.g. (bolt12, sat), not the method alone. */
-  supported_method_units: Array<{ method: string; unit: string }>;
+  supported_method_units: { method: string; unit: string }[];
 };
 
 interface UseMintSearchReturn {

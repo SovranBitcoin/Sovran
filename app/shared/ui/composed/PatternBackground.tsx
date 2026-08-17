@@ -45,14 +45,6 @@ function buildWrapperXml(innerXml: string, tileSize: number): string {
 
 interface PatternBackgroundProps {
   /**
-   * Pixel size of one tile of the pattern. The 1254×1254 source SVG is
-   * scaled into this square and repeated across the container. Smaller
-   * values = denser texture; ~240–360 reads as a fine wallpaper grain on
-   * phone screens.
-   * @default 280
-   */
-  tileSize?: number;
-  /**
    * Opacity of the pattern layer. Each path in `pattern.svg` already
    * carries `fill-opacity="0.08"`, so this multiplies on top — default
    * `1` lets the per-path alpha drive the contrast unmodified.
@@ -86,11 +78,7 @@ interface PatternBackgroundProps {
  * lifecycle (per-tab focus animations). The pattern layer is static, so
  * threading it through would only add bookkeeping for no payoff.
  */
-function PatternBackgroundComponent({
-  tileSize = 280,
-  opacity = 1,
-  color,
-}: PatternBackgroundProps) {
+function PatternBackgroundComponent({ opacity = 1, color }: PatternBackgroundProps) {
   const foreground = useThemeColor('foreground');
   const [innerXml, setInnerXml] = useState<string | null>(null);
 
@@ -116,7 +104,7 @@ function PatternBackgroundComponent({
   return (
     <View style={[StyleSheet.absoluteFill, { opacity }]} pointerEvents="none">
       <SvgXml
-        xml={buildWrapperXml(innerXml, tileSize)}
+        xml={buildWrapperXml(innerXml, 280)}
         width="100%"
         height="100%"
         color={color ?? foreground}

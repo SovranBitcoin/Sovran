@@ -25,9 +25,9 @@ import { useNotificationPolicyStore } from '@/features/feed/stores/notificationP
 import { notificationPolicyLabel } from '@/features/feed/lib/notificationCopy';
 import { useNip46RequestsStore } from '@/features/nostrSigner';
 
-export const name = Application.applicationName;
-export const version = Application.nativeApplicationVersion;
-export const buildNumber = Application.nativeBuildVersion;
+const name = Application.applicationName;
+const version = Application.nativeApplicationVersion;
+const buildNumber = Application.nativeBuildVersion;
 
 const ProfileButton = () => {
   const { keys: nostrKeys } = useNostrKeysContext();

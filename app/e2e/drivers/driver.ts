@@ -121,7 +121,7 @@ export interface NetworkChannel {
   set(mode: 'airplane' | 'online'): Promise<void>;
 }
 
-export const selectorKey = (s: Selector): string =>
+const selectorKey = (s: Selector): string =>
   'id' in s
     ? `id:${s.id}`
     : 'idPrefix' in s

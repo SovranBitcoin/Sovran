@@ -47,7 +47,7 @@ const InsetBorder = ({ color, strokeWidth = 2 }: { color: string; strokeWidth?: 
   );
 };
 
-const DebugRow = ({
+export const DebugRow = ({
   label,
   value,
   color,

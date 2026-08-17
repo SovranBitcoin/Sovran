@@ -33,8 +33,6 @@ interface TransactionLocationActions {
     entryId: string,
     location: Omit<TransactionLocation, 'createdAt'>
   ) => void;
-  /** Get the location for a transaction */
-  getTransactionLocation: (entryId: string) => TransactionLocation | null;
 }
 
 type TransactionLocationStore = TransactionLocationState & TransactionLocationActions;
@@ -73,11 +71,6 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
             },
           },
         }));
-      },
-
-      getTransactionLocation: (entryId: string) => {
-        const state = get();
-        return state.locations[entryId] ?? null;
       },
     }),
     persistConfig({

@@ -1,14 +1,8 @@
 import type { Fixture, Scenario, Suite } from '../schema';
 import { effectiveRequirements, unsafeCocodEffects } from './plan';
 
-export type CliCommand =
-  | 'list'
-  | 'validate'
-  | 'dry-run'
-  | 'run'
-  | 'funds-status'
-  | 'funds-write-off';
-export interface CliOptions {
+type CliCommand = 'list' | 'validate' | 'dry-run' | 'run' | 'funds-status' | 'funds-write-off';
+interface CliOptions {
   command: CliCommand;
   suite: string;
   scenario?: string;
@@ -152,7 +146,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
   };
 }
 
-export interface RegistryIssue {
+interface RegistryIssue {
   suite: string;
   path: string;
   message: string;
@@ -290,7 +284,7 @@ function shuffle<T>(items: T[], seed: number): T[] {
   return out;
 }
 
-export interface SelectionOptions {
+interface SelectionOptions {
   suite: string;
   scenario?: string;
   tag?: string;
@@ -299,12 +293,12 @@ export interface SelectionOptions {
   seed?: number;
 }
 
-export interface SelectedScenario {
+interface SelectedScenario {
   ref: Suite['scenarios'][number];
   scenario: Scenario;
 }
 
-export type ScenarioSessionGroup = SelectedScenario[];
+type ScenarioSessionGroup = SelectedScenario[];
 
 function sessionGroups(entries: SelectedScenario[]): ScenarioSessionGroup[] {
   const groups: ScenarioSessionGroup[] = [];

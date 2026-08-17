@@ -1182,7 +1182,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 
 const LIST_CONTENT_STYLE = { paddingBottom: 120 };
 
-export const DEFAULT_FEED_SPECS: FeedSpec[] = [
+const DEFAULT_FEED_SPECS: FeedSpec[] = [
   {
     name: FEED_FILTER_FOR_YOU,
     spec: JSON.stringify({ id: 'for-you', kind: 'notes', hours: 24 }),
@@ -1202,14 +1202,6 @@ export const DEFAULT_FEED_SPECS: FeedSpec[] = [
 // ============================================================================
 
 const styles = StyleSheet.create({
-  emptyState: {
-    paddingVertical: 32,
-    paddingHorizontal: 16,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: 'rgba(255,255,255,0.33)',
-  },
   loader: {
     alignSelf: 'center',
     marginTop: 48,

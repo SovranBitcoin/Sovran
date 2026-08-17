@@ -403,19 +403,6 @@ function parseStringArray(value: string | undefined): string[] | undefined {
   return undefined;
 }
 
-function parseOptionKinds(value: string | undefined): string[] | undefined {
-  if (!value) return undefined;
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    if (Array.isArray(parsed) && parsed.every((v) => typeof v === "string")) {
-      return parsed as string[];
-    }
-  } catch {
-    // fall through — malformed persisted value is treated as absent
-  }
-  return undefined;
-}
-
 function parseFiniteNumber(value: string | undefined): number | undefined {
   if (value == null || value === "") return undefined;
   const n = Number(value);
@@ -452,7 +439,7 @@ export function decodeAnnotation(
   const scanMethod = record[ANNOTATION_KEYS.scanMethod];
   const scanRaw = record[ANNOTATION_KEYS.scanRaw];
   const scanContainer = record[ANNOTATION_KEYS.scanContainer];
-  const optionKinds = parseOptionKinds(record[ANNOTATION_KEYS.scanOptionKinds]);
+  const optionKinds = parseStringArray(record[ANNOTATION_KEYS.scanOptionKinds]);
   const scanInputType = record[ANNOTATION_KEYS.scanInputType];
   if (scanMethod || scanRaw || scanContainer || optionKinds || scanInputType) {
     annotation.scan = {

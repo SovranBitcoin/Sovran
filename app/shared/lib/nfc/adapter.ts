@@ -20,7 +20,7 @@ import { writeNdefTextRecord } from './write';
 import { acquireSession, releaseSession } from './session';
 import { nfcLog } from '../logger';
 
-function nfcErrorFields(error: unknown): Record<string, unknown> {
+export function nfcErrorFields(error: unknown): Record<string, unknown> {
   return {
     error: error instanceof Error ? error.message : String(error),
     code: error instanceof NfcError ? error.code : undefined,

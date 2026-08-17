@@ -31,7 +31,7 @@ function relativeToRunDir(path: string, runDirName: string): string | undefined 
   return at === -1 ? undefined : path.slice(at + marker.length);
 }
 
-export interface ParsedEvents {
+interface ParsedEvents {
   scenarios: ScenarioTimeline[];
   runEnd?: {
     passed: number;

@@ -8,7 +8,7 @@ import {
   type E2EReadyProofRemainingAsset,
 } from './e2eReadyProofStatus';
 
-export interface E2EReadyProofReconciliationResult {
+interface E2EReadyProofReconciliationResult {
   assets: number;
   checked: number;
   spent: number;

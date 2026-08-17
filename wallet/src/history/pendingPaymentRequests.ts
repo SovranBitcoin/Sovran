@@ -31,7 +31,7 @@ const PENDING_REQUEST_STATE = "executing";
  * `source: 'payment-request'` too, so the row renderer keys its "Requested /
  * Awaiting payment" treatment off this pending flag, not off `source`.
  */
-export const PAYMENT_REQUEST_PENDING_FLAG = "paymentRequestPending";
+const PAYMENT_REQUEST_PENDING_FLAG = "paymentRequestPending";
 
 export function pendingPaymentRequestToHistoryEntry(
   operation: PaymentRequestReceiveOperation,

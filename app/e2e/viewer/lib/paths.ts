@@ -5,9 +5,8 @@ const LIB = dirname(new URL(import.meta.url).pathname);
 export const E2E_ROOT = resolve(LIB, '..', '..');
 export const APP_ROOT = resolve(E2E_ROOT, '..');
 export const ARTIFACTS = join(E2E_ROOT, 'artifacts');
-export const SCENARIOS = join(E2E_ROOT, 'scenarios');
 export const SUITES = join(E2E_ROOT, 'suites');
-export const VIEWER_CACHE = join(ARTIFACTS, 'viewer-cache');
+const VIEWER_CACHE = join(ARTIFACTS, 'viewer-cache');
 export const DIFF_CACHE = join(VIEWER_CACHE, 'diff');
 
 const RUN_ID_RE = /^run-[A-Za-z0-9][A-Za-z0-9._-]*$/;

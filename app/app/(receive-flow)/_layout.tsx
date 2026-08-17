@@ -9,7 +9,6 @@
  * - amount: Amount selector (pushes horizontally)
  * - lightningReceive: Lightning receive display (pushes horizontally)
  * - onchainReceive: Onchain receive display (pushes horizontally)
- * - mintQuote: legacy receive quote dispatcher
  *
  * The first screen shows a close button, subsequent screens show a back button.
  */
@@ -52,7 +51,6 @@ export default function ReceiveFlowLayout() {
         <Stack.Screen name="mintSelect" options={MINT_SELECT_OPTIONS} />
         <Stack.Screen name="lightningReceive" options={LIGHTNING_RECEIVE_OPTIONS} />
         <Stack.Screen name="onchainReceive" options={ONCHAIN_RECEIVE_OPTIONS} />
-        <Stack.Screen name="mintQuote" options={MINT_QUOTE_OPTIONS} />
         <Stack.Screen name="paymentRequest" options={MINT_QUOTE_OPTIONS} />
         <Stack.Screen name="receiveToken" options={RECEIVE_TOKEN_OPTIONS} />
         <Stack.Screen name="railList" options={RAIL_LIST_OPTIONS} />

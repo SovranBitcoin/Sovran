@@ -11,6 +11,7 @@ import { getTokenMetadata } from "@cashu/cashu-ts";
 
 import { amountToNumber } from "./amount";
 import { logger } from "./logger";
+import { extractP2PKPubkey } from "./p2pk";
 
 export interface EcashTokenMetadata {
   /** Total token amount in `unit`'s base unit (sats for `'sat'`). */
@@ -45,26 +46,6 @@ const tryDecode = <T>(fn: () => T): T | null => {
     return null;
   }
 };
-
-/**
- * Extract the first P2PK lock pubkey from a token's proofs, if any proof uses
- * a structured `["P2PK", { data }]` secret. Returns the `data` field, else null.
- */
-function extractP2PKPubkey(
-  proofs: readonly { secret: string }[],
-): string | null {
-  for (const proof of proofs) {
-    try {
-      const parsed = JSON.parse(proof.secret);
-      if (Array.isArray(parsed) && parsed[0] === "P2PK" && parsed[1]?.data) {
-        return parsed[1].data as string;
-      }
-    } catch {
-      // not a structured secret
-    }
-  }
-  return null;
-}
 
 /**
  * Decode a cashu token's metadata (amount, mint, unit, memo, P2PK lock). Pure

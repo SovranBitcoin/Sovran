@@ -1,7 +1,7 @@
 import type { AuditMintResponse } from '@/shared/lib/apiClient';
 import type { MintMetadataEntry } from '@/shared/stores/global/mintMetadataStore';
 
-export interface AuditInfo {
+interface AuditInfo {
   url: string;
   name: string;
   state: string;
@@ -65,7 +65,7 @@ export function transformAuditData(auditData: AuditMintResponse): AuditInfo {
 }
 
 /** Normalized presentation scalars projected from a cached metadata entry. */
-export interface MintMetaProjection {
+interface MintMetaProjection {
   kymScore?: number;
   reviewCount?: number;
   contactFollowers?: number;

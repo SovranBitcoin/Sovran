@@ -19,18 +19,17 @@ describe('mint flow e2e selectors', () => {
     expect(source.indexOf('testID="quote-mint-selector"', start)).toBe(marker);
   });
 
-  it.each([
-    'app/(receive-flow)/mintSelect.tsx',
-    'app/(send-flow)/mintSelect.tsx',
-    'app/(mint-flow)/list.tsx',
-  ])('pins mint-select-add on the %s header add action', (file) => {
-    const source = read(file);
-    expect(source).toContain('testID="mint-select-add"');
-    // HeaderGlassCircle sets accessible={!!accessibilityLabel} — a header
-    // action with only a testID is AX-invisible on liquid-glass devices, so
-    // the label is load-bearing for the e2e selector, not just for VoiceOver.
-    expect(source).toContain('accessibilityLabel="Add mint"');
-  });
+  it.each(['app/(receive-flow)/mintSelect.tsx', 'app/(send-flow)/mintSelect.tsx'])(
+    'pins mint-select-add on the %s header add action',
+    (file) => {
+      const source = read(file);
+      expect(source).toContain('testID="mint-select-add"');
+      // HeaderGlassCircle sets accessible={!!accessibilityLabel} — a header
+      // action with only a testID is AX-invisible on liquid-glass devices, so
+      // the label is load-bearing for the e2e selector, not just for VoiceOver.
+      expect(source).toContain('accessibilityLabel="Add mint"');
+    }
+  );
 
   it.each(['app/(receive-flow)/mintSelect.tsx', 'app/(send-flow)/mintSelect.tsx'])(
     'refreshes stale machine candidates when %s regains focus',

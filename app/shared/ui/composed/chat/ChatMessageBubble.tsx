@@ -17,13 +17,6 @@ interface ChatMessageBubbleProps {
   message: ChatBubbleMessage;
   isFirstInGroup: boolean;
   isLastInGroup: boolean;
-  /**
-   * Avatar override for non-own messages. When the surface has counterparty
-   * profile metadata (kind:0 picture / display name) it can supply a richer
-   * avatar than the default identicon-from-`senderId`. Pass `null` to hide
-   * the avatar slot entirely (e.g. ephemeral group chats with no identity).
-   */
-  ownAvatar?: React.ReactNode;
   counterpartyAvatar?: React.ReactNode | null;
   /**
    * When `message.deliveryStatus === 'failed'`, the bubble renders a small
@@ -39,7 +32,6 @@ export function ChatMessageBubble({
   message,
   isFirstInGroup,
   isLastInGroup,
-  ownAvatar,
   counterpartyAvatar,
   onRetry,
 }: ChatMessageBubbleProps) {
@@ -96,7 +88,6 @@ export function ChatMessageBubble({
       showAvatar,
       showName,
       showTimestamp,
-      hasOwnAvatar: !!ownAvatar,
       hasCounterpartyAvatarOverride: counterpartyAvatar !== undefined,
       canRetry: !!onRetry && message.deliveryStatus === 'failed',
     });
@@ -109,7 +100,6 @@ export function ChatMessageBubble({
     isLastInGroup,
     message,
     onRetry,
-    ownAvatar,
     showAvatar,
     showName,
     showTimestamp,
@@ -231,8 +221,6 @@ export function ChatMessageBubble({
             </Pressable>
           ) : null}
         </VStack>
-
-        {message.isOwn && ownAvatar ? ownAvatar : null}
       </HStack>
     </VStack>
   );

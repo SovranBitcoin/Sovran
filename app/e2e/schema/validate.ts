@@ -3,7 +3,7 @@ import { suiteSchema } from './suite';
 import { scenarioSchema, fixtureSchema, type Scenario, type Fixture } from './scenario';
 
 export type Issue = { path: string; message: string };
-export type Result<T> = { ok: true; value: T } | { ok: false; issues: Issue[] };
+type Result<T> = { ok: true; value: T } | { ok: false; issues: Issue[] };
 
 /** JSON.parse already rejects JSONC (comments) and trailing commas. */
 export function parseJson(text: string): Result<unknown> {
@@ -72,10 +72,10 @@ function validateWith<T>(schema: z.ZodType<T>, data: unknown): Result<T> {
     : { ok: false, issues: zodIssues(parsed.error) };
 }
 
-export const RAW_COCOD_FUNDED_MESSAGE =
+const RAW_COCOD_FUNDED_MESSAGE =
   'funded scenarios must use typed counterparty steps, not raw cocod commands';
 
-export function isRawCocodStep(node: unknown): boolean {
+function isRawCocodStep(node: unknown): boolean {
   if (!node || typeof node !== 'object') return false;
   const step = node as { action?: unknown; command?: unknown; from?: unknown };
   const argv =

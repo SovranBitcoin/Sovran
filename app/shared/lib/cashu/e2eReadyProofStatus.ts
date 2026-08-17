@@ -8,7 +8,7 @@ export interface E2EReadyProofRemainingAsset {
   amount: number;
 }
 
-export interface E2EReadyProofStatus {
+interface E2EReadyProofStatus {
   version: 1;
   phase: 'idle' | 'running' | 'complete' | 'failed';
   assets: number;

@@ -28,10 +28,7 @@ import { durableReplaceFile, ensurePrivateDirectory } from '../ledger/durable';
 import { RunLedger, type AssetLocation, type LedgerEntry } from '../ledger/ledger';
 
 type LiveLeg =
-  | FundingLeg<'intent'>
-  | FundingLeg<'funded'>
-  | FundingLeg<'swept'>
-  | FundingLeg<'reconciled'>;
+  FundingLeg<'intent'> | FundingLeg<'funded'> | FundingLeg<'swept'> | FundingLeg<'reconciled'>;
 
 interface RecoveryPort {
   readonly custodyPath: string;
@@ -97,7 +94,7 @@ interface CashuOutflowRecord {
   counterpartyDelta?: number;
 }
 
-export interface FundedScenarioRuntimeOptions {
+interface FundedScenarioRuntimeOptions {
   runDir: string;
   runId: string;
   assets: readonly DeclaredRecoveryAsset[];
@@ -274,7 +271,7 @@ class CocodAccounting {
   }
 }
 
-export class FundedScenarioRuntime implements CounterpartyExecutor {
+class FundedScenarioRuntime implements CounterpartyExecutor {
   readonly #runDir: string;
   readonly #runId: string;
   readonly #assets: DeclaredRecoveryAsset[];

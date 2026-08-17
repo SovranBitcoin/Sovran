@@ -11,8 +11,7 @@ import { interpolateDeep, type Vars } from './interpolate';
 import { redactString } from './redact';
 
 export type Phase = 'precondition' | 'test' | 'verify' | 'cleanup';
-export type Availability = 'ready' | 'deferred';
-export const FUNDED_EXECUTION_ENABLED = true;
+type Availability = 'ready' | 'deferred';
 
 export interface FixtureFrame {
   id: string;
@@ -31,7 +30,7 @@ export interface PlannedStep {
   step: Step;
   fixturePath: FixtureFrame[];
 }
-export interface PlannedScenario {
+interface PlannedScenario {
   id: string;
   name: string;
   lane: string;
