@@ -69,7 +69,7 @@
     "e2e:list": "bun e2e/cli.ts list",
     "e2e:dry-run": "bun e2e/cli.ts dry-run",
     "e2e:smoke": "bun e2e/cli.ts run --driver fake",
-    "e2e:test": "bun test e2e/*.test.ts e2e/**/*.test.ts shared/lib/e2e/**/*.test.ts",
+    "e2e:test": "bun test e2e/*.test.ts e2e/**/*.test.ts shared/lib/e2e/*.test.ts shared/lib/e2e/**/*.test.ts",
     "build:themes": "node scripts/build-background-themes.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
