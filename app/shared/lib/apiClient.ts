@@ -144,6 +144,12 @@ const DiscoverMintsResponse = z.object({
 
 const API_BASE_URL = backendConfig.apiBaseUrl;
 const SCORE_API_BASE_URL = backendConfig.scoreApiBaseUrl;
+/**
+ * Host for the `nostr/mint/*` routes. Defaults to SCORE_API_BASE_URL, so this
+ * is a no-op until EXPO_PUBLIC_MINT_APPVIEW_BASE_URL points at a mint-only nagg
+ * (`NAGG_MODULES=mint`). See backendConfig.mintAppViewBaseUrl.
+ */
+const MINT_APPVIEW_BASE_URL = backendConfig.mintAppViewBaseUrl;
 
 /**
  * Default per-request budget. React Native's `fetch` has no native timeout;
@@ -154,8 +160,9 @@ const SCORE_API_BASE_URL = backendConfig.scoreApiBaseUrl;
  * `DEFAULT_TIMEOUT_MS` (15s, tuned for arbitrary LNURL endpoints).
  */
 const DEFAULT_TIMEOUT_MS = 10_000;
+// /nostr/mint/reviews — a mint route, so it follows the mint host.
 const mintReviewsEnrichment = createNostrMintEnrichment({
-  appViewBaseUrl: backendConfig.nostrAppViewBaseUrl,
+  appViewBaseUrl: backendConfig.mintAppViewBaseUrl,
   appViewVersion: 'v1',
   timeoutMs: DEFAULT_TIMEOUT_MS,
 });
@@ -474,13 +481,13 @@ const parseMintInfo = (input: unknown): Result<GetInfoResponse, ParseError> => {
 /**
  * nagg mint discovery: one app-view call returning every known mint with audit
  * state, supported units, review + favourite aggregates, and the operator's
- * Nostr identity + Vertex reputation. Served by nagg (SCORE_API_BASE_URL), so
+ * Nostr identity + Vertex reputation. Served by nagg (MINT_APPVIEW_BASE_URL), so
  * the app no longer needs api.sovran.money's /cashu/mints/search + per-mint
  * review/profile fan-outs for discovery.
  */
 export const discoverMints = ({ limit, signal }: { limit?: number; signal?: AbortSignal } = {}) =>
   fetchJson(
-    `${SCORE_API_BASE_URL}/nostr/mint/discover${limit ? `?limit=${limit}` : ''}`,
+    `${MINT_APPVIEW_BASE_URL}/nostr/mint/discover${limit ? `?limit=${limit}` : ''}`,
     parseDiscoverMints,
     'nostr/mint/discover',
     undefined,
@@ -498,7 +505,7 @@ export const fetchMintChanges = ({
   signal,
 }: { limit?: number; signal?: AbortSignal } = {}) =>
   fetchJson(
-    `${SCORE_API_BASE_URL}/nostr/mint/changes?limit=${limit}`,
+    `${MINT_APPVIEW_BASE_URL}/nostr/mint/changes?limit=${limit}`,
     parseMintChanges,
     'nostr/mint/changes',
     undefined,

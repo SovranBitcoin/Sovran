@@ -31,6 +31,8 @@ const BackendEnv = z.object({
   EXPO_PUBLIC_NAGG_BASE_URL: OptionalUrl,
   EXPO_PUBLIC_API_BASE_URL: RequiredUrl(DEFAULT_API_BASE_URL),
   EXPO_PUBLIC_SCORE_API_BASE_URL: OptionalUrl,
+  // The `nostr/mint/*` host. See mintAppViewBaseUrl.
+  EXPO_PUBLIC_MINT_APPVIEW_BASE_URL: OptionalUrl,
   EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: OptionalUrl,
   // Primal public cache server (tier 2). Defaults to wss://cache2.primal.net/v1.
   EXPO_PUBLIC_PRIMAL_CACHE_URL: OptionalUrl,
@@ -42,6 +44,17 @@ type BackendConfig = {
   nostrAppViewBaseUrl: string;
   apiBaseUrl: string;
   scoreApiBaseUrl: string;
+  /**
+   * Host for the `nostr/mint/*` app-view routes (discovery, reviews, the NUT-06
+   * changelog). Split out from `scoreApiBaseUrl` because those can be served by
+   * a nagg running `NAGG_MODULES=mint` — the mint observatory alone, on a
+   * ClickHouse of nine tables instead of the full Nostr archive — while
+   * `/app/latest-version`, `/app/ai-lineup` and `/nostr/profile` stay on the
+   * full app-view. Defaults to `scoreApiBaseUrl`, so leaving
+   * EXPO_PUBLIC_MINT_APPVIEW_BASE_URL unset keeps every mint call exactly where
+   * it is today.
+   */
+  mintAppViewBaseUrl: string;
   /**
    * nagg's GraphQL endpoint. The feed/thread/notifications/DM data layer is
    * app-view-only (no client GraphQL); this remains ONLY for integrations that
@@ -60,6 +73,7 @@ function readBackendEnv(): BackendEnvInput {
     EXPO_PUBLIC_NAGG_BASE_URL: process.env.EXPO_PUBLIC_NAGG_BASE_URL,
     EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
     EXPO_PUBLIC_SCORE_API_BASE_URL: process.env.EXPO_PUBLIC_SCORE_API_BASE_URL,
+    EXPO_PUBLIC_MINT_APPVIEW_BASE_URL: process.env.EXPO_PUBLIC_MINT_APPVIEW_BASE_URL,
     EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: process.env.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT,
     EXPO_PUBLIC_PRIMAL_CACHE_URL: process.env.EXPO_PUBLIC_PRIMAL_CACHE_URL,
   };
@@ -81,10 +95,12 @@ export function parseBackendConfig(env: BackendEnvInput = readBackendEnv()): Bac
     parsed.data.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL ??
     parsed.data.EXPO_PUBLIC_NAGG_BASE_URL ??
     DEFAULT_NOSTR_APPVIEW_BASE_URL;
+  const scoreApiBaseUrl = parsed.data.EXPO_PUBLIC_SCORE_API_BASE_URL ?? nostrAppViewBaseUrl;
   return {
     nostrAppViewBaseUrl,
     apiBaseUrl: parsed.data.EXPO_PUBLIC_API_BASE_URL,
-    scoreApiBaseUrl: parsed.data.EXPO_PUBLIC_SCORE_API_BASE_URL ?? nostrAppViewBaseUrl,
+    scoreApiBaseUrl,
+    mintAppViewBaseUrl: parsed.data.EXPO_PUBLIC_MINT_APPVIEW_BASE_URL ?? scoreApiBaseUrl,
     nostrGraphqlEndpoint:
       parsed.data.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT ?? `${nostrAppViewBaseUrl}/graphql`,
     primalCacheUrl: parsed.data.EXPO_PUBLIC_PRIMAL_CACHE_URL ?? DEFAULT_PRIMAL_CACHE_URL,
