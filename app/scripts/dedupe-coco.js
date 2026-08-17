@@ -1,5 +1,5 @@
 /**
- * Collapses duplicate @cashu/coco-* installs down to the single copy at the
+ * Collapses duplicate @cashu/* installs down to the single copy at the
  * workspace root.
  *
  * Why this exists: coco is declared once, at the workspace root, but bun still
@@ -13,6 +13,16 @@
  * failure, just retries that stop happening. The duplicate reappears after any
  * `bun add` / `bun install`, so this runs on postinstall rather than being a
  * one-time cleanup.
+ *
+ * `cashu-ts` is covered too, defensively. Nothing currently `instanceof`-checks
+ * a cashu-ts export (coco-core re-exports the error classes, and those are what
+ * colada tests), and cashu-ts's classes carry no `#private` fields, so a second
+ * copy would most likely be inert rather than actively wrong. But it is the
+ * package that derives blinding factors and secrets, `app/package.json` and
+ * `wallet/package.json` both declare it directly, and coco-core has it as a hard
+ * dependency — so the single-realm invariant currently rests entirely on the
+ * root `overrides` pin. `metro.config.js` pins the three coco packages into
+ * `extraNodeModules` but not this one. Cheap belt to go with that brace.
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -22,7 +32,7 @@ const rootScope = path.join(repoRoot, 'node_modules', '@cashu');
 
 // Workspaces that may end up with their own copy.
 const WORKSPACES = ['app', 'wallet', 'nostr', 'docs'];
-const PACKAGES = ['coco-core', 'coco-react', 'coco-expo-sqlite'];
+const PACKAGES = ['coco-core', 'coco-react', 'coco-expo-sqlite', 'cashu-ts'];
 
 let removed = 0;
 

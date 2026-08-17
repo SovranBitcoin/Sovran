@@ -39,7 +39,13 @@ function resolvePkgFile(name, ...sub) {
   return path.join(appNodeModules, ...segs, ...sub);
 }
 
+// One realm for the whole @cashu stack. cashu-ts belongs here alongside the
+// coco packages: app/ and wallet/ both declare it directly and coco-core has it
+// as a hard dependency, so it is exactly as forkable as they are — and it is the
+// package that derives secrets and blinding factors, where two copies bundled
+// into one app is not a risk worth leaving to resolution order.
 const appCocoPackages = {
+  '@cashu/cashu-ts': resolvePkgDir('@cashu/cashu-ts'),
   '@cashu/coco-core': resolvePkgDir('@cashu/coco-core'),
   '@cashu/coco-expo-sqlite': resolvePkgDir('@cashu/coco-expo-sqlite'),
   '@cashu/coco-react': resolvePkgDir('@cashu/coco-react'),
