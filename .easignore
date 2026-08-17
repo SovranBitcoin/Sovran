@@ -9,6 +9,13 @@
 # The submodule causes git clone exit 128 during EAS tarball creation.
 app/coco/
 
+# E2E run artifacts (screenshots/state sidecars) — gigabytes, never needed in a build.
+app/e2e/artifacts/
+
+# Runtime logs picked up by log-doctor — not build inputs.
+app/log.txt
+app/wda.log
+
 # Standard exclusions (match any depth)
 node_modules/
 .expo/
