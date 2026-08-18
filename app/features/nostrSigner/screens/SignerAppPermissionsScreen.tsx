@@ -146,7 +146,7 @@ export function SignerAppPermissionsScreen(): React.ReactElement {
 
   return (
     <Screen name="SignerAppPermissionsScreen">
-      <VStack spacing={8} className="pb-8 pt-2">
+      <VStack gap={8} className="pb-8 pt-2">
         {sections.map((section) => (
           <View key={section.title ?? GROUP_TITLES[group]}>
             <Text

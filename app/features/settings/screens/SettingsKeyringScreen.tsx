@@ -118,7 +118,7 @@ const CurrentKeyItem: React.FC<{
         </View>
       </PressableFeedback>
 
-      <HStack align="center" spacing={8} className="mb-3.5 flex-wrap gap-y-2">
+      <HStack align="center" gap={8} className="mb-3.5 flex-wrap gap-y-2">
         <Badge variant="success" icon="solar:key-bold" size={11}>
           ACTIVE
         </Badge>
@@ -140,7 +140,7 @@ const CurrentKeyItem: React.FC<{
         </Text>
       </View>
 
-      <HStack spacing={10} className="mt-3.5">
+      <HStack gap={10} className="mt-3.5">
         <Button variant="secondary" className="flex-1" onPress={handleCopy}>
           <Icon name="lets-icons:copy" size={16} color={muted} />
           <Button.Label style={{ color: muted }}>Copy</Button.Label>
@@ -203,7 +203,7 @@ const KeyItem: React.FC<{
             {isDerived ? `Derived Key ${keypair.derivationIndex}` : 'Imported'}
           </Text>
         </ListGroup.ItemContent>
-        <HStack spacing={4}>
+        <HStack gap={4}>
           <Button variant="ghost" size="sm" isIconOnly onPress={() => onCopy(keypair.publicKeyHex)}>
             <Icon name="lets-icons:copy" size={16} />
           </Button>
@@ -424,7 +424,7 @@ export const SettingsKeyringScreen: React.FC = () => {
   }, []);
   const renderHeaderLeft = useCallback(
     () => (
-      <HStack spacing={spacing.xs}>
+      <HStack gap={spacing.xs}>
         <ScreenHeaderAction
           icon={
             isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
@@ -439,7 +439,7 @@ export const SettingsKeyringScreen: React.FC = () => {
   );
   const renderHeaderRight = useCallback(
     () => (
-      <HStack spacing={spacing.xs}>
+      <HStack gap={spacing.xs}>
         <ScreenHeaderAction
           icon="mdi:key-arrow-right"
           onPress={handleImportNsec}

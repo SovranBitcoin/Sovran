@@ -619,7 +619,7 @@ export const Transactions = React.memo(
 
     const renderSection = useCallback(
       ({ item: section }: { item: Section; index?: number }) => (
-        <VStack spacing={4} className="mb-4">
+        <VStack gap={4} className="mb-4">
           <Text size={14} heavy color={opacity(foreground, 0.33)} style={styles.dateHeader}>
             {section.title}
           </Text>
@@ -747,10 +747,10 @@ export const Transactions = React.memo(
         if (sects.length === 0) return null;
         return (
           <View>
-            <VStack spacing={8}>
+            <VStack gap={8}>
               {sects.map((section) => (
                 <View key={section.title}>
-                  <VStack spacing={8}>
+                  <VStack gap={8}>
                     <View style={[styles.card, { borderColor }]}>
                       <BlurCardFrame accentColor={muted}>
                         <View style={styles.content}>

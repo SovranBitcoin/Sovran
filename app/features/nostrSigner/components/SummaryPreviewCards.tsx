@@ -91,7 +91,7 @@ function PeerIdentityRow({
   const picture = pictureOverride ?? person.picture;
 
   return (
-    <HStack spacing={8} style={CENTER_ROW_STYLE}>
+    <HStack gap={8} style={CENTER_ROW_STYLE}>
       {prefix !== undefined ? (
         <Text size={13} bold color={prefixColor ?? foreground} style={PREFIX_BADGE_STYLE}>
           {prefix}
@@ -159,7 +159,7 @@ export function ReferencedNoteCard({
       visualSurface="nostr-signer"
       renderSkeleton={() => (
         <View className="bg-surface rounded-2xl p-3" style={PREVIEW_CARD_STYLE}>
-          <HStack spacing={8} style={CENTER_ROW_STYLE}>
+          <HStack gap={8} style={CENTER_ROW_STYLE}>
             <Skeleton style={SKELETON_AVATAR_STYLE} />
             <Skeleton style={SKELETON_NAME_STYLE} />
           </HStack>
@@ -226,7 +226,7 @@ export function FollowDiffCard({
   if (detail.baseline === 'unavailable') {
     return (
       <View className="bg-surface rounded-2xl p-3">
-        <HStack spacing={8} style={CENTER_ROW_STYLE}>
+        <HStack gap={8} style={CENTER_ROW_STYLE}>
           <Icon name="mdi:alert-circle-outline" size={16} color={warning} />
           <View style={FLEX_ONE_STYLE}>
             <Text size={13} color={muted}>
@@ -276,7 +276,7 @@ export function DecryptPeerCard({
   const name = boundedName(person.name, peerPubkey);
   return (
     <View className="bg-surface rounded-2xl p-3">
-      <HStack spacing={10} style={CENTER_ROW_STYLE}>
+      <HStack gap={10} style={CENTER_ROW_STYLE}>
         <Avatar
           state={person.picture ? 'image' : 'fallback'}
           picture={person.picture}
@@ -289,7 +289,7 @@ export function DecryptPeerCard({
             {name}
           </Text>
           {ciphertextLength !== undefined ? (
-            <HStack spacing={4} style={CENTER_ROW_STYLE}>
+            <HStack gap={4} style={CENTER_ROW_STYLE}>
               <Icon name="mdi:shield" size={12} color={muted} />
               <Text size={12} color={muted}>
                 {encryptedPayloadLabel(ciphertextLength)}
@@ -311,7 +311,7 @@ export function AppDataCard({ operationLine }: { operationLine: string }) {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   return (
     <View className="bg-surface rounded-2xl p-3">
-      <HStack spacing={8} style={CENTER_ROW_STYLE}>
+      <HStack gap={8} style={CENTER_ROW_STYLE}>
         <Icon name="fluent:apps-16-filled" size={16} color={muted} />
         <View style={FLEX_ONE_STYLE}>
           <Text size={14} color={foreground}>
@@ -334,7 +334,7 @@ export function ZapRequestCard({
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   return (
     <View className="bg-surface rounded-2xl p-3" style={PREVIEW_CARD_STYLE}>
-      <HStack spacing={8} style={BASELINE_ROW_STYLE}>
+      <HStack gap={8} style={BASELINE_ROW_STYLE}>
         <Text size={20} bold color={foreground}>
           {amountSats !== undefined ? `${amountSats} sats` : 'Unspecified amount'}
         </Text>
@@ -381,13 +381,13 @@ export function ExpandableEventJson({
   }, [fullJson]);
 
   return (
-    <VStack spacing={8}>
+    <VStack gap={8}>
       <Pressable
         haptics
         accessibilityRole="button"
         accessibilityLabel={expanded ? hideLabel : showLabel}
         onPress={toggle}>
-        <HStack spacing={4} style={CENTER_ROW_STYLE}>
+        <HStack gap={4} style={CENTER_ROW_STYLE}>
           <Text size={13} bold color={muted}>
             {expanded ? hideLabel : showLabel}
           </Text>

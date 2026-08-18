@@ -26,7 +26,7 @@ export const TransferErrorBanner = React.memo(({ message }: TransferErrorBannerP
   return (
     <Log name="TransferErrorBanner">
       <View style={[styles.errorBanner, { backgroundColor: opacity(dangerColor, 0.15) }]}>
-        <HStack spacing={8} align="center">
+        <HStack gap={8} align="center">
           <Icon name="mdi:alert-circle" size={16} color={dangerColor} />
           <UntranslatedText size={11} bold color={dangerColor} style={styles.message}>
             {message}

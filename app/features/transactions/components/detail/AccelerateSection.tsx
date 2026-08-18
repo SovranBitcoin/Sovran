@@ -83,9 +83,9 @@ export function AccelerateSection({ offer, accelerating, onAccelerate }: Acceler
         disabled={accelerating || busy}
         onPress={() => void handlePress()}
         style={styles.row}>
-        <HStack align="center" spacing={12}>
+        <HStack align="center" gap={12}>
           <Icon name="mdi:lightning-bolt" size={22} color={accent} />
-          <VStack spacing={2} style={styles.textColumn}>
+          <VStack gap={2} style={styles.textColumn}>
             {accelerating ? (
               <>
                 <Text size={15} bold color={foreground}>

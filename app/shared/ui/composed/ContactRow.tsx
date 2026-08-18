@@ -727,7 +727,7 @@ export function ContactRow({
     titleNode = titleBase;
   } else if (isCurrentSelf && titleBase) {
     titleNode = (
-      <HStack align="center" spacing={8}>
+      <HStack align="center" gap={8}>
         <Text size={16} bold numberOfLines={1} color={foreground}>
           {titleBase}
         </Text>

@@ -219,7 +219,7 @@ const ReceiveRailRowSkeleton = memo(function ReceiveRailRowSkeleton({
         />
       </ListGroup.ItemPrefix>
       <ListGroup.ItemContent>
-        <VStack spacing={6}>
+        <VStack gap={6}>
           {bar(150, 15)}
           {bar(96, 12)}
         </VStack>

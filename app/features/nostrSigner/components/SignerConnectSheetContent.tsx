@@ -465,11 +465,11 @@ export function SignerConnectSheetContent(props: SignerConnectContentProps): Rea
 function InvalidLinkBody({ close }: { close: () => void }): React.ReactElement {
   const [foreground, danger] = useThemeColor(['foreground', 'danger'] as const);
   return (
-    <VStack spacing={14} className="px-1 pb-2 pt-1">
+    <VStack gap={14} className="px-1 pb-2 pt-1">
       <BottomSheet.Title className="text-foreground text-lg font-bold">
         {CONNECT_TITLE}
       </BottomSheet.Title>
-      <HStack spacing={10} align="center">
+      <HStack gap={10} align="center">
         <Icon name="mdi:alert-circle-outline" size={22} color={danger} />
         <View style={FLEX_ONE_STYLE}>
           <Text size={14} color={foreground}>
@@ -751,7 +751,7 @@ function ConnectReview({
   }, [setFooterConfig, primaryLabel, isConnecting, connect, close]);
 
   return (
-    <VStack spacing={14} className="px-1 pb-2 pt-1">
+    <VStack gap={14} className="px-1 pb-2 pt-1">
       <BottomSheet.Title className="text-foreground text-lg font-bold">
         {variant === 'update'
           ? UPDATE_PERMISSIONS_LABEL
@@ -761,7 +761,7 @@ function ConnectReview({
       </BottomSheet.Title>
 
       {/* App identity (app-supplied metadata — bounded, untrusted) */}
-      <HStack spacing={12} align="center">
+      <HStack gap={12} align="center">
         <Avatar
           state={parsed.image !== undefined ? 'image' : 'fallback'}
           picture={parsed.image}
@@ -769,7 +769,7 @@ function ConnectReview({
           size={44}
           alt={appName}
         />
-        <VStack spacing={2} style={FLEX_ONE_STYLE}>
+        <VStack gap={2} style={FLEX_ONE_STYLE}>
           <Text size={16} bold color={foreground} numberOfLines={1}>
             {appName}
           </Text>
@@ -781,11 +781,11 @@ function ConnectReview({
       <SegmentedText segments={cautionSegments(appDomain ?? appName)} size={12} color={muted} />
 
       {/* Signing in as */}
-      <VStack spacing={6}>
+      <VStack gap={6}>
         <Text size={12} bold color={muted}>
           {SIGNING_IN_AS_LABEL}
         </Text>
-        <HStack spacing={12} align="center">
+        <HStack gap={12} align="center">
           <Avatar
             state={activeProfile?.cachedPicture ? 'image' : 'fallback'}
             picture={activeProfile?.cachedPicture}
@@ -793,7 +793,7 @@ function ConnectReview({
             size={40}
             alt={profileDisplayName}
           />
-          <VStack spacing={2} style={FLEX_ONE_STYLE}>
+          <VStack gap={2} style={FLEX_ONE_STYLE}>
             <Text size={15} bold color={foreground} numberOfLines={1}>
               {profileDisplayName}
             </Text>
@@ -816,7 +816,7 @@ function ConnectReview({
       {/* Blocked-before notice (metadata match on a blocked record) */}
       {variant === 'blocked-fresh' ? (
         <View className="bg-danger-soft rounded-2xl p-3">
-          <HStack spacing={8} align="center">
+          <HStack gap={8} align="center">
             <Icon name="mdi:alert-circle" size={18} color={danger} />
             <View style={FLEX_ONE_STYLE}>
               <SegmentedText
@@ -831,7 +831,7 @@ function ConnectReview({
 
       {/* Reconnect: minimal restore summary + opt-in review checklist */}
       {variant === 'reconnect' && previousConnection !== undefined ? (
-        <VStack spacing={10}>
+        <VStack gap={10}>
           <Text size={14} color={foreground} style={SUMMARY_TEXT_STYLE}>
             {RECONNECT_SUMMARY}
           </Text>
@@ -847,7 +847,7 @@ function ConnectReview({
             accessibilityState={reviewToggleA11yState}
             accessibilityLabel={REVIEW_PERMISSIONS_LABEL}
             onPress={toggleReview}>
-            <HStack spacing={4} align="center">
+            <HStack gap={4} align="center">
               <Text size={13} bold color={muted}>
                 {REVIEW_PERMISSIONS_LABEL}
               </Text>
@@ -899,7 +899,7 @@ function ConnectReview({
 
       {/* Requested permissions (hidden on Reconnect — the review list owns it) */}
       {variant !== 'reconnect' && permRows.length > 0 ? (
-        <VStack spacing={10}>
+        <VStack gap={10}>
           <Text size={12} bold color={muted}>
             {REQUESTING_LABEL}
           </Text>
@@ -916,7 +916,7 @@ function ConnectReview({
               accessibilityLabel={row.entry.permissionEditorLabel}
               onPress={() => toggleRow(row)}>
               <HStack
-                spacing={10}
+                gap={10}
                 align="center"
                 style={!row.eligible ? INELIGIBLE_ROW_STYLE : undefined}>
                 <SelectableCheck
@@ -949,14 +949,14 @@ function ConnectReview({
 
       {/* Common social actions preset (bundle minus URI-covered keys) */}
       {presetRows.length > 0 ? (
-        <VStack spacing={10}>
+        <VStack gap={10}>
           <Pressable
             haptics
             accessibilityRole="checkbox"
             accessibilityState={presetA11yState}
             accessibilityLabel={PRESET_TITLE}
             onPress={togglePresetAll}>
-            <HStack spacing={10} align="center">
+            <HStack gap={10} align="center">
               <SelectableCheck selected={presetAllChecked} style="square" />
               <View style={FLEX_ONE_STYLE}>
                 <Text size={14} bold color={foreground}>
@@ -990,7 +990,7 @@ function ConnectReview({
                   accessibilityLabel={row.entry.permissionEditorLabel}
                   onPress={() => toggleRow(row)}
                   style={PRESET_ROW_STYLE}>
-                  <HStack spacing={10} align="center">
+                  <HStack gap={10} align="center">
                     <SelectableCheck
                       selected={checked[row.grantKey] === true}
                       style="square"
@@ -1018,7 +1018,7 @@ function ConnectReview({
       {/* Inline failure state (relay unreachable / save failed / changed) */}
       {failure !== null ? (
         <View className="bg-danger-soft rounded-2xl p-3">
-          <HStack spacing={8} align="center">
+          <HStack gap={8} align="center">
             <Icon name="mdi:alert-circle" size={18} color={danger} />
             <View style={FLEX_ONE_STYLE}>
               <Text size={13} color={dangerSoftFg}>
@@ -1094,12 +1094,12 @@ export function SignerProfilePickerContent({
   const showRestartWarning = selectedIndex !== activeIndex;
 
   return (
-    <VStack spacing={14} className="px-1 pb-2 pt-1">
+    <VStack gap={14} className="px-1 pb-2 pt-1">
       <BottomSheet.Title className="text-foreground text-lg font-bold">
         {PICKER_TITLE}
       </BottomSheet.Title>
 
-      <VStack spacing={4}>
+      <VStack gap={4}>
         {profiles.map((profile) => {
           const displayName = resolveIdentityName({
             pubkey: profile.pubkey,
@@ -1114,7 +1114,7 @@ export function SignerProfilePickerContent({
               accessibilityState={{ selected: isSelected }}
               accessibilityLabel={displayName}
               onPress={() => selectProfile(profile)}>
-              <HStack spacing={12} align="center" style={PROFILE_ROW_STYLE}>
+              <HStack gap={12} align="center" style={PROFILE_ROW_STYLE}>
                 <Avatar
                   state={profile.cachedPicture ? 'image' : 'fallback'}
                   picture={profile.cachedPicture}
@@ -1122,7 +1122,7 @@ export function SignerProfilePickerContent({
                   size={40}
                   alt={displayName}
                 />
-                <VStack spacing={2} style={FLEX_ONE_STYLE}>
+                <VStack gap={2} style={FLEX_ONE_STYLE}>
                   <Text size={15} bold color={foreground} numberOfLines={1}>
                     {displayName}
                   </Text>
@@ -1138,9 +1138,9 @@ export function SignerProfilePickerContent({
       </VStack>
 
       {showRestartWarning ? (
-        <VStack spacing={10}>
+        <VStack gap={10}>
           <View className="bg-warning-soft rounded-2xl p-3">
-            <VStack spacing={4}>
+            <VStack gap={4}>
               <Text size={13} bold color={warningSoftFg}>
                 {RESTART_WARNING_TITLE}
               </Text>

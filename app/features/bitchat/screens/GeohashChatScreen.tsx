@@ -208,7 +208,7 @@ export function GeohashChatScreen({
               }
             />
           ) : (
-            <HStack spacing={8} align="center">
+            <HStack gap={8} align="center">
               <View
                 style={{
                   width: 8,
@@ -250,7 +250,7 @@ export function GeohashChatScreen({
     if (isMeshOnly) {
       bleDmBanner = (
         <HStack
-          spacing={8}
+          gap={8}
           align="center"
           style={{
             paddingHorizontal: 16,
@@ -266,7 +266,7 @@ export function GeohashChatScreen({
     } else if (isUnknownOrOffline) {
       bleDmBanner = (
         <HStack
-          spacing={8}
+          gap={8}
           align="center"
           style={{
             paddingHorizontal: 16,
@@ -333,7 +333,7 @@ export function GeohashChatScreen({
             : undefined
         }
         emptyContent={
-          <VStack align="center" spacing={12}>
+          <VStack align="center" gap={12}>
             <Icon
               name={isDM ? 'mdi:account-group' : 'mdi:map-marker-radius'}
               size={32}

@@ -40,7 +40,7 @@ export function DesignSystemProfileRow({
         name="Sovran"
         visualDisabled
       />
-      <VStack spacing={4} className="flex-1">
+      <VStack gap={4} className="flex-1">
         <Text loading={loading} placeholder="Display Name" bold size={15} visualDisabled>
           Satoshi Nakamoto
         </Text>

@@ -52,9 +52,9 @@ export function NotFoundScreen() {
         styles.container,
         { backgroundColor: surface, paddingTop: insets.top, paddingBottom: insets.bottom },
       ]}>
-      <VStack align="center" justify="center" spacing={spacing.xl} style={styles.content}>
+      <VStack align="center" justify="center" gap={spacing.xl} style={styles.content}>
         <Icon name="mdi:alert-circle-outline" color={muted} size={iconSize['3xl']} />
-        <VStack align="center" spacing={spacing.xs}>
+        <VStack align="center" gap={spacing.xs}>
           <Text size={20} bold style={{ color: foreground, textAlign: 'center' }}>
             This screen isn’t available
           </Text>

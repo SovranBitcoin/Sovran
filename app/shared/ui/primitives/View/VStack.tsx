@@ -4,8 +4,6 @@ import { View, ViewProps } from './View';
 import { supportsBlur } from '@/shared/lib/version';
 
 type VStackProps = ViewProps & {
-  /** @deprecated use `gap` */
-  spacing?: number;
   gap?: number;
   align?: FlexStyle['alignItems'];
   justify?: FlexStyle['justifyContent'];
@@ -18,7 +16,6 @@ type VStackProps = ViewProps & {
 
 const VStack = React.forwardRef<any, VStackProps>((props, ref) => {
   const {
-    spacing,
     gap,
     align = 'stretch',
     justify = 'flex-start',
@@ -34,8 +31,6 @@ const VStack = React.forwardRef<any, VStackProps>((props, ref) => {
     ...rest
   } = props;
 
-  const resolvedGap = gap ?? spacing;
-
   const stackStyle = StyleSheet.flatten([
     {
       flexDirection: 'column' as const,
@@ -46,7 +41,7 @@ const VStack = React.forwardRef<any, VStackProps>((props, ref) => {
       flexShrink,
       flexBasis,
       flexWrap: wrap,
-      gap: resolvedGap,
+      gap,
     },
     style,
   ]);

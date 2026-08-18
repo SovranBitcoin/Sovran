@@ -178,7 +178,7 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
         accessibilityRole="button"
         accessibilityLabel={isOwn ? 'Sent ecash token' : 'Received ecash token'}>
         <VStack
-          spacing={spacing.sm}
+          gap={spacing.sm}
           style={{
             backgroundColor: surfaceSecondary,
             borderRadius: radius.lg,
@@ -188,7 +188,7 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
             minWidth: 200,
           }}>
           {mintUrl ? (
-            <HStack align="center" spacing={spacing.xs}>
+            <HStack align="center" gap={spacing.xs}>
               <Icon name="mingcute:bank-fill" size={13} color={opacity(foreground, alpha.muted)} />
               <Text
                 size={12}
@@ -199,7 +199,7 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
             </HStack>
           ) : null}
 
-          <VStack spacing={2}>
+          <VStack gap={2}>
             <AmountFormatter
               amount={amount}
               unit={unit}
@@ -224,7 +224,7 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
               borderRadius: radius.md,
               alignItems: 'center',
             }}>
-            <HStack align="center" spacing={6}>
+            <HStack align="center" gap={6}>
               {!isOwn ? (
                 <Icon name="material-symbols:arrow-downward" size={16} color={actionColor} />
               ) : null}

@@ -77,7 +77,7 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
         <HStack
           align="center"
           justify="center"
-          spacing={8}
+          gap={8}
           style={[styles.content, widthStyle, { minHeight: height }, contentStyle]}>
           {iconNode ?? (icon ? <Icon name={icon} size={iconSize} color={contentColor} /> : null)}
           <Text

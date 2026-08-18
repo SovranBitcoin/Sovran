@@ -154,7 +154,7 @@ export function TermsAndConditionsScreen({
 
   return (
     <ScreenWrapper name="TermsAndConditionsScreen" scroll="custom" safeArea bgColor={surfaceColor}>
-      <VStack spacing={16} flex={1} className="p-4">
+      <VStack gap={16} flex={1} className="p-4">
         <Text bold size={32} className="text-foreground py-2 text-center">
           {title}
         </Text>
@@ -167,7 +167,7 @@ export function TermsAndConditionsScreen({
           </ScrollView>
         </Card>
 
-        <VStack spacing={16}>
+        <VStack gap={16}>
           <ControlField
             testID="terms-acceptance"
             accessibilityRole="checkbox"

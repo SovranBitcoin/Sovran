@@ -467,7 +467,7 @@ export const SettingsScreen = () => {
             testID="settings-version-row"
             accessible
             accessibilityLabel="App version">
-            <VStack spacing={4}>
+            <VStack gap={4}>
               <Text className="text-foreground/50 text-center" bold size={13}>
                 {name}
               </Text>

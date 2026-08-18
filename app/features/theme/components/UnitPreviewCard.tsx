@@ -158,7 +158,7 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
       )}
 
       {/* Phone-frame chrome mocks */}
-      <VStack align="center" className="absolute left-4 right-4 top-4" spacing={12}>
+      <VStack align="center" className="absolute left-4 right-4 top-4" gap={12}>
         <View className="h-[10px] w-[72px] rounded-[5px] bg-white/35" />
         {label ? (
           <View className="items-center gap-0.5">

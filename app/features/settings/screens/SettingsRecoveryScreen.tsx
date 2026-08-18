@@ -778,11 +778,11 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   const renderMintList = () => (
     <Card variant="secondary" className="w-full">
       <Card.Body>
-        <VStack spacing={12}>
+        <VStack gap={12}>
           {mints.map((mint) => {
             const displayName = getMintDisplayName(mint, mint.mintUrl);
             return (
-              <HStack key={mint.mintUrl} spacing={12} className="items-center">
+              <HStack key={mint.mintUrl} gap={12} className="items-center">
                 <MintIcon iconUrl={mint.mintInfo?.icon_url} name={displayName} size={36} />
                 <Text size={14} bold numberOfLines={1} style={{ color: foreground, flex: 1 }}>
                   {displayName}
@@ -798,15 +798,15 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   // ─── Idle state ─────────────────────────────────────────────────────────
 
   const renderIdleState = () => (
-    <VStack spacing={24} className="flex-1 px-6 pt-12">
-      <VStack spacing={24} className="flex-1 items-center justify-center">
+    <VStack gap={24} className="flex-1 px-6 pt-12">
+      <VStack gap={24} className="flex-1 items-center justify-center">
         <View
           className="h-24 w-24 items-center justify-center self-center rounded-full"
           style={{ backgroundColor: surfaceSecondary }}>
           <Icon name="mdi:shield" size={48} color={foreground} />
         </View>
 
-        <VStack spacing={8} className="items-center">
+        <VStack gap={8} className="items-center">
           <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
             Recover Wallet
           </Text>
@@ -820,11 +820,11 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         {mints.length > 0 && renderMintList()}
       </VStack>
 
-      <VStack spacing={12} className="w-full items-center pb-6">
+      <VStack gap={12} className="w-full items-center pb-6">
         <HStack
           className="w-full items-center justify-between rounded-2xl px-4 py-3"
           style={{ backgroundColor: surfaceSecondary }}>
-          <VStack spacing={2} style={{ flex: 1 }}>
+          <VStack gap={2} style={{ flex: 1 }}>
             <Text size={14} bold style={{ color: foreground }}>
               Search all mints
             </Text>
@@ -852,7 +852,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           <HStack
             className="w-full items-center justify-between rounded-2xl px-4 py-3"
             style={{ backgroundColor: surfaceSecondary }}>
-            <VStack spacing={2} style={{ flex: 1 }}>
+            <VStack gap={2} style={{ flex: 1 }}>
               <Text size={14} bold style={{ color: foreground }}>
                 Native crypto
               </Text>
@@ -916,8 +916,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     const active = currentMint(results);
     const activeMint = active ? mintsByUrl[active.mint] : undefined;
     return (
-      <VStack spacing={24} className="flex-1 px-6 pt-12">
-        <VStack spacing={24} className="flex-1 items-center justify-center">
+      <VStack gap={24} className="flex-1 px-6 pt-12">
+        <VStack gap={24} className="flex-1 items-center justify-center">
           <View
             className="h-24 w-24 items-center justify-center self-center rounded-full"
             style={{ backgroundColor: surfaceSecondary }}>
@@ -940,7 +940,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             />
           </View>
 
-          <VStack spacing={8} className="items-center">
+          <VStack gap={8} className="items-center">
             <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
               {isComplete
                 ? 'Recovery Complete'
@@ -985,7 +985,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
 
           <Card variant="secondary" className="w-full">
             <Card.Body>
-              <VStack spacing={12}>
+              <VStack gap={12}>
                 {visibleResults.map((r, i) => (
                   <MintRecoveryRow
                     key={r.mint}
@@ -1000,7 +1000,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           </Card>
         </VStack>
 
-        <VStack spacing={12} className="w-full pb-6">
+        <VStack gap={12} className="w-full pb-6">
           {isComplete ? (
             <Button
               variant="primary"
@@ -1039,8 +1039,8 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     const visibleFailureCount = visibleResults.filter((r) => r.status !== 'done').length;
 
     return (
-      <VStack spacing={24} className="flex-1 px-6 pt-12">
-        <VStack spacing={24} className="flex-1 items-center justify-center">
+      <VStack gap={24} className="flex-1 px-6 pt-12">
+        <VStack gap={24} className="flex-1 items-center justify-center">
           <View
             className="h-24 w-24 items-center justify-center self-center rounded-full"
             style={{ backgroundColor: surfaceSecondary }}>
@@ -1054,7 +1054,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             />
           </View>
 
-          <VStack spacing={8} className="items-center">
+          <VStack gap={8} className="items-center">
             <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
               {visibleSuccessCount > 0 ? 'Recovery Partial' : 'Recovery Failed'}
             </Text>
@@ -1070,14 +1070,14 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           {visibleResults.length > 0 && (
             <Card variant="secondary" className="w-full">
               <Card.Body>
-                <VStack spacing={12}>
+                <VStack gap={12}>
                   {visibleResults.map((result) => {
                     const mint = mintsByUrl[result.mint];
                     const displayName = getMintDisplayName(mint, result.mint);
                     return (
-                      <HStack key={result.mint} spacing={12} className="items-center">
+                      <HStack key={result.mint} gap={12} className="items-center">
                         <MintIcon iconUrl={mint?.mintInfo?.icon_url} name={displayName} size={36} />
-                        <VStack spacing={2} style={{ flex: 1, minWidth: 0 }}>
+                        <VStack gap={2} style={{ flex: 1, minWidth: 0 }}>
                           <Text size={14} bold numberOfLines={1} style={{ color: foreground }}>
                             {displayName}
                           </Text>
@@ -1110,7 +1110,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           )}
         </VStack>
 
-        <VStack spacing={12} className="w-full items-center pb-6">
+        <VStack gap={12} className="w-full items-center pb-6">
           <SlideToConfirm
             onConfirm={handleStartRecovery}
             iconName="mdi:shield-refresh"
@@ -1184,9 +1184,9 @@ const MintRecoveryRow: React.FC<{
   const progressLabel = describeMintProgress(state, Date.now());
 
   return (
-    <HStack spacing={12} className="items-center">
+    <HStack gap={12} className="items-center">
       <MintIcon iconUrl={mint?.mintInfo?.icon_url} name={displayName} size={36} />
-      <VStack spacing={2} style={{ flex: 1, minWidth: 0 }}>
+      <VStack gap={2} style={{ flex: 1, minWidth: 0 }}>
         <Text size={14} bold numberOfLines={1} style={{ color: foreground }}>
           {displayName}
         </Text>

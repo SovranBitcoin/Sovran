@@ -106,10 +106,10 @@ export function SettingsDesignSystemFadeStressScreen() {
   return (
     <ScreenWrapper name="SettingsDesignSystemFadeStressScreen" scroll="custom" safeArea>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <VStack spacing={12}>
+        <VStack gap={12}>
           <Card variant="secondary" style={styles.statsCard}>
             <HStack justify="space-between" align="center">
-              <VStack spacing={2}>
+              <VStack gap={2}>
                 <Text size={13} color={foreground} testID="fade-stress-stats">
                   cycle {cycle} · mounted {totals.mounted} · stuck {totals.stuck}
                 </Text>
@@ -117,7 +117,7 @@ export function SettingsDesignSystemFadeStressScreen() {
                   red tile = opacity never flushed · blank tile at stuck 0 = paint bug
                 </Text>
               </VStack>
-              <VStack spacing={6}>
+              <VStack gap={6}>
                 <Button size="sm" variant="secondary" onPress={() => setAuto((a) => !a)}>
                   <Button.Label>{auto ? 'Pause' : 'Run'}</Button.Label>
                 </Button>

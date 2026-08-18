@@ -60,7 +60,7 @@ function WaitingTag() {
   const tagTextStyle = useMemo(() => ({ color: opacity(foreground, 0.55) }), [foreground]);
 
   return (
-    <HStack align="center" spacing={4} style={tagStyle}>
+    <HStack align="center" gap={4} style={tagStyle}>
       <Icon name="mdi:lock-open-variant-outline" size={12} color={opacity(foreground, 0.55)} />
       <Text size={11} style={tagTextStyle}>
         Waiting
@@ -255,7 +255,7 @@ export function NearPayPeerListScreen() {
   );
   const emptyContent = useMemo(
     () => (
-      <VStack align="center" spacing={12} style={styles.emptyState}>
+      <VStack align="center" gap={12} style={styles.emptyState}>
         <Icon name="mdi:bluetooth" size={32} color={emptyIconColor} />
         <Text size={16} style={emptyTitleStyle}>
           No one nearby
@@ -272,7 +272,7 @@ export function NearPayPeerListScreen() {
     <View style={rootStyle}>
       <Stack.Screen options={STACK_OPTIONS} />
       <View style={contentStyle}>
-        <HStack align="center" spacing={8} style={summaryStyle}>
+        <HStack align="center" gap={8} style={summaryStyle}>
           <Icon name="mdi:bluetooth" size={18} color={BLUETOOTH_ACCENT} />
           <Text size={13} style={summaryTextStyle}>
             {subtitleText}

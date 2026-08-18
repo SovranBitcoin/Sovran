@@ -281,7 +281,7 @@ export function MapScreen() {
         cardWidth={statsCardWidth}
       />
 
-      <VStack style={styles.floatingButtons} spacing={8}>
+      <VStack style={styles.floatingButtons} gap={8}>
         <CircleActionButton
           icon="mdi:crosshairs-gps"
           systemIcon="location.fill"

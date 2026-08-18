@@ -445,7 +445,7 @@ export function SignerApprovalSheetContent({
   if (expiredNotice !== null) {
     return (
       <View className="px-1 pb-4 pt-1">
-        <HStack spacing={10} style={CENTER_ROW_STYLE}>
+        <HStack gap={10} style={CENTER_ROW_STYLE}>
           <Icon name="mdi:clock-alert-outline" size={22} color={warning} />
           <View style={FLEX_ONE_STYLE}>
             <Text size={14} color={foreground}>
@@ -466,7 +466,7 @@ export function SignerApprovalSheetContent({
     <Animated.View
       key={headGroupKey ?? head.id}
       entering={hasAdvancedRef.current ? SlideInRight.duration(ADVANCE_ANIMATION_MS) : undefined}>
-      <VStack spacing={14} className="px-1 pb-2 pt-1">
+      <VStack gap={14} className="px-1 pb-2 pt-1">
         {totalInBatch > 1 ? (
           <HStack style={QUEUE_STRIP_ROW_STYLE}>
             <Text size={12} bold color={muted}>
@@ -486,7 +486,7 @@ export function SignerApprovalSheetContent({
         ) : null}
 
         {/* App identity */}
-        <HStack spacing={12} style={CENTER_ROW_STYLE}>
+        <HStack gap={12} style={CENTER_ROW_STYLE}>
           <Avatar
             state={connection?.image ? 'image' : 'fallback'}
             picture={connection?.image}
@@ -494,7 +494,7 @@ export function SignerApprovalSheetContent({
             size={44}
             alt={appName}
           />
-          <VStack spacing={2} style={FLEX_ONE_STYLE}>
+          <VStack gap={2} style={FLEX_ONE_STYLE}>
             <Text size={16} bold color={foreground} numberOfLines={1}>
               {appName}
             </Text>
@@ -505,7 +505,7 @@ export function SignerApprovalSheetContent({
         </HStack>
 
         {/* Headline + body — summary overrides; catalog is the total fallback */}
-        <VStack spacing={6}>
+        <VStack gap={6}>
           <BottomSheet.Title className="text-foreground text-lg font-bold">
             {summary?.headline ?? entry.headline}
           </BottomSheet.Title>
@@ -563,7 +563,7 @@ export function SignerApprovalSheetContent({
                 ? 'bg-danger-soft rounded-2xl p-3'
                 : 'bg-warning-soft rounded-2xl p-3'
             }>
-            <HStack spacing={8} style={CENTER_ROW_STYLE}>
+            <HStack gap={8} style={CENTER_ROW_STYLE}>
               <Icon
                 name={banner.tone === 'danger' ? 'mdi:alert-circle' : 'mdi:alert-circle-outline'}
                 size={18}
@@ -592,7 +592,7 @@ export function SignerApprovalSheetContent({
                   ? 'bg-danger-soft rounded-2xl p-3'
                   : 'bg-warning-soft rounded-2xl p-3'
               }>
-              <HStack spacing={8} style={CENTER_ROW_STYLE}>
+              <HStack gap={8} style={CENTER_ROW_STYLE}>
                 <Icon
                   name="mdi:alert-circle"
                   size={18}
@@ -613,7 +613,7 @@ export function SignerApprovalSheetContent({
         {/* Actions: Session / (Always) / Deny / Block — one button stack with
             escalating severity. Self-decrypt keeps maximum friction:
             Approve (once) / Deny / Block only. */}
-        <VStack spacing={10}>
+        <VStack gap={10}>
           <HerouiButton variant="primary" className="bg-foreground" onPress={approvePrimary}>
             <HerouiButton.Label className="text-background">
               {approveOnceOnly

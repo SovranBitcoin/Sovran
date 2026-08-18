@@ -120,7 +120,7 @@ export function ChatMessageBubble({
   return (
     <VStack
       align={message.isOwn ? 'flex-end' : 'flex-start'}
-      spacing={0}
+      gap={0}
       style={{
         marginBottom,
         maxWidth: '85%',
@@ -129,7 +129,7 @@ export function ChatMessageBubble({
       <HStack
         align="flex-end"
         justify={message.isOwn ? 'flex-end' : 'flex-start'}
-        spacing={8}
+        gap={8}
         style={{ width: '100%' }}>
         {!message.isOwn && counterpartyAvatarNode !== null ? (
           showAvatar ? (
@@ -141,7 +141,7 @@ export function ChatMessageBubble({
 
         <VStack
           align={message.isOwn ? 'flex-end' : 'flex-start'}
-          spacing={2}
+          gap={2}
           style={{ flex: 1, maxWidth: '85%' }}>
           {showName && message.sender ? (
             <Text size={12} bold style={{ color: shade400, marginBottom: 2 }}>
@@ -178,7 +178,7 @@ export function ChatMessageBubble({
           {showTimestamp ? (
             <HStack
               align="center"
-              spacing={4}
+              gap={4}
               style={{ alignSelf: message.isOwn ? 'flex-end' : 'flex-start', marginTop: 2 }}>
               <Text size={11} style={{ color: shade400 }}>
                 {formatRelative(message.timestamp, 'chat-bubble')}

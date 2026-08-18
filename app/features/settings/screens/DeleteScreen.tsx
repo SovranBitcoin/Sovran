@@ -28,15 +28,15 @@ export function DeleteScreen() {
   return (
     <ScreenWrapper name="DeleteScreen" scroll="custom" safeArea>
       <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
-        <VStack spacing={24} className="flex-1 px-6 pt-12">
-          <VStack spacing={24} className="flex-1 items-center justify-center">
+        <VStack gap={24} className="flex-1 px-6 pt-12">
+          <VStack gap={24} className="flex-1 items-center justify-center">
             <View
               className="h-24 w-24 items-center justify-center self-center rounded-full"
               style={{ backgroundColor: danger }}>
               <Icon name="mdi:trash-can-outline" size={48} color={red400} />
             </View>
 
-            <VStack spacing={8} className="items-center">
+            <VStack gap={8} className="items-center">
               <Text size={24} bold className="text-foreground text-center">
                 Delete Account
               </Text>
@@ -84,7 +84,7 @@ export function DeleteScreen() {
             </Card>
           </VStack>
 
-          <VStack spacing={12} className="w-full items-center pb-6">
+          <VStack gap={12} className="w-full items-center pb-6">
             <SlideToConfirm
               onConfirm={handleDelete}
               iconName="mdi:trash-can-outline"

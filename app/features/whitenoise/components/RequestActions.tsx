@@ -35,7 +35,7 @@ export function RequestActions({ onAccept, onDecline, isBusy }: RequestActionsPr
   }
 
   return (
-    <HStack spacing={6} align="center">
+    <HStack gap={6} align="center">
       <Pressable
         onPress={onDecline}
         hitSlop={6}

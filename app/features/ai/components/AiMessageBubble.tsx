@@ -126,7 +126,7 @@ function ThinkingHeader({
   const showCost = !isLive && costSats != null && costSats > 0;
 
   const headerRow = (
-    <HStack align="center" spacing={4}>
+    <HStack align="center" gap={4}>
       {isLive ? (
         <Spinner size={14} color={color} />
       ) : (
@@ -231,9 +231,9 @@ function UserBubble({ message }: { message: RoutstrMessage }) {
   const isSending = message.pending === true;
   const attachments = message.attachments ?? [];
   return (
-    <VStack align="flex-end" spacing={2} style={{ alignSelf: 'flex-end', maxWidth: '85%' }}>
+    <VStack align="flex-end" gap={2} style={{ alignSelf: 'flex-end', maxWidth: '85%' }}>
       {attachments.length > 0 ? (
-        <HStack align="center" spacing={6} style={{ marginTop: 6 }}>
+        <HStack align="center" gap={6} style={{ marginTop: 6 }}>
           {attachments.map((attachment, index) => (
             <AttachmentThumb key={`${attachment.localUri}-${index}`} attachment={attachment} />
           ))}
@@ -252,7 +252,7 @@ function UserBubble({ message }: { message: RoutstrMessage }) {
           {message.content}
         </Text>
       </View>
-      <HStack align="center" spacing={4} style={{ marginRight: 4, marginBottom: 4 }}>
+      <HStack align="center" gap={4} style={{ marginRight: 4, marginBottom: 4 }}>
         <Text size={11} style={{ color: shade400 }}>
           {formatRelative(message.timestamp, 'chat-bubble')}
         </Text>
@@ -279,7 +279,7 @@ function BranchNavView({ index, total, onPrev, onNext, color, testIdPrefix }: Br
   // tap target) so the prev / next controls clear the iOS HIG 44pt
   // minimum without taking visible space from the bubble.
   return (
-    <HStack align="center" spacing={8}>
+    <HStack align="center" gap={8}>
       <Pressable
         onPress={onPrev}
         disabled={!onPrev}
@@ -384,7 +384,7 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
 
   return (
     <View style={{ alignSelf: 'stretch', marginVertical: 8, paddingHorizontal: 4 }}>
-      <VStack spacing={6} align="flex-start">
+      <VStack gap={6} align="flex-start">
         {showHeader ? (
           <ThinkingHeader
             isLive={isLive}
@@ -423,14 +423,14 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
             align="center"
             justify="space-between"
             style={{ marginTop: 4, alignSelf: 'stretch' }}>
-            <HStack align="center" spacing={12}>
+            <HStack align="center" gap={12}>
               <Pressable
                 onPress={handleCopy}
                 hitSlop={8}
                 accessibilityRole="button"
                 accessibilityLabel="Copy response"
                 testID={`ai-message-copy-${message.id}`}>
-                <HStack align="center" spacing={4}>
+                <HStack align="center" gap={4}>
                   <Icon name="lets-icons:copy" size={16} color={opacity(foreground, 0.6)} />
                   <Text size={12} style={{ color: opacity(foreground, 0.6) }}>
                     Copy
@@ -445,7 +445,7 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
                   accessibilityRole="button"
                   accessibilityLabel="Regenerate response"
                   testID={`ai-message-retry-${message.id}`}>
-                  <HStack align="center" spacing={4}>
+                  <HStack align="center" gap={4}>
                     <Icon name="mdi:refresh" size={16} color={opacity(foreground, 0.6)} />
                     <Text size={12} style={{ color: opacity(foreground, 0.6) }}>
                       Retry

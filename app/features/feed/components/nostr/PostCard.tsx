@@ -651,7 +651,7 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
             </VStack>
           </HStack>
 
-          <VStack spacing={0}>
+          <VStack gap={0}>
             {skeletonVariant.content.map((line) => (
               <Text
                 key={line}
@@ -707,7 +707,7 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
               placeholderTimestamp={skeletonVariant.timestamp}
             />
 
-            <VStack spacing={0}>
+            <VStack gap={0}>
               {skeletonVariant.content.map((line) => (
                 <Text
                   key={line}

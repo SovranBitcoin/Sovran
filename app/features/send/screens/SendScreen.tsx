@@ -563,7 +563,7 @@ export function SendScreen({ unit }: { unit: string }) {
       {/* Nearby: live Nut Drop peers, pinned above. Shown whenever peers are in
           range — at rest, focused, or searching. */}
       {freshPeers.length > 0 ? (
-        <VStack spacing={0}>
+        <VStack gap={0}>
           <SectionLabel text="Nearby" color={opacity(foreground, 0.5)} />
           {freshPeers.map((peer) => (
             <ListRow
@@ -584,7 +584,7 @@ export function SendScreen({ unit }: { unit: string }) {
           - otherwise (at rest OR focused-empty) → the recent-people list
             (searched / sent / received / Nut Drop peers). */}
       {isTyping ? (
-        <VStack spacing={0}>
+        <VStack gap={0}>
           {renderedPeople.length > 0 ? (
             <SectionLabel text="People" color={opacity(foreground, 0.5)} />
           ) : null}
@@ -608,7 +608,7 @@ export function SendScreen({ unit }: { unit: string }) {
           ) : null}
         </VStack>
       ) : quickPayPeople.length > 0 ? (
-        <VStack spacing={0}>
+        <VStack gap={0}>
           <SectionLabel text="Recent" color={opacity(foreground, 0.5)} />
           {quickPayPeople.map((person) => (
             <ContactRow

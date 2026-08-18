@@ -113,7 +113,7 @@ export function BluetoothInlineNotice({ bluetooth: bluetoothProp }: BluetoothNot
   const muted = opacity(foreground, alpha.muted);
   return (
     <HStack
-      spacing={8}
+      gap={8}
       align="center"
       style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: surfaceSecondary }}>
       <Icon name="mdi:bluetooth-off" size={16} color={muted} />

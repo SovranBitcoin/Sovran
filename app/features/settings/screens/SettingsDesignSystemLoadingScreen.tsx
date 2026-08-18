@@ -115,7 +115,7 @@ export function SettingsDesignSystemLoadingScreen() {
                 result={result}
               />
             </View>
-            <VStack align="center" spacing={2}>
+            <VStack align="center" gap={2}>
               <Text size={11} bold className="text-foreground/50 tracking-widest">
                 CURRENT STATE
               </Text>
@@ -131,7 +131,7 @@ export function SettingsDesignSystemLoadingScreen() {
             <Text size={11} bold className="text-foreground/50 tracking-widest">
               PHASE
             </Text>
-            <HStack spacing={8}>
+            <HStack gap={8}>
               <View className="flex-1">
                 <Button
                   variant={!auto && phase === 'idle' ? 'primary' : 'secondary'}
@@ -153,7 +153,7 @@ export function SettingsDesignSystemLoadingScreen() {
             <Text size={11} bold className="text-foreground/50 mt-2 tracking-widest">
               RESOLVE TO
             </Text>
-            <VStack spacing={8}>
+            <VStack gap={8}>
               <Button
                 variant={
                   !auto && phase === 'done' && result === 'success' ? 'primary' : 'secondary'
@@ -197,7 +197,7 @@ export function SettingsDesignSystemLoadingScreen() {
             </Text>
             <HStack gap={16} wrap="wrap" align="flex-end" justify="space-around" className="py-4">
               {LOADING_INDICATOR_SIZES.map((size) => (
-                <VStack key={size} align="center" spacing={6}>
+                <VStack key={size} align="center" gap={6}>
                   <LoadingIndicator size={size} phase={phase} result={result} />
                   <Text size={10} className="text-foreground/50">
                     {size}px

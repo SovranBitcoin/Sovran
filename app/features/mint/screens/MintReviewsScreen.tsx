@@ -180,7 +180,7 @@ const ReviewSkeleton = React.memo(function ReviewSkeleton({
           />
         </View>
 
-        <VStack spacing={6} className="min-w-0 flex-1">
+        <VStack gap={6} className="min-w-0 flex-1">
           <HStack align="center" justify="space-between" className="flex-1">
             <Skeleton
               style={{
@@ -214,7 +214,7 @@ const ReviewSkeleton = React.memo(function ReviewSkeleton({
             ))}
           </HStack>
 
-          <VStack spacing={4}>
+          <VStack gap={4}>
             <Skeleton
               style={{
                 width: '100%',
@@ -288,7 +288,7 @@ const HeaderStats = React.memo(function HeaderStats({
 
   return (
     <View className="items-center pb-6 pt-4">
-      <VStack align="center" spacing={4}>
+      <VStack align="center" gap={4}>
         <Animated.View style={scoreRoll}>
           <Text
             loading={loading && !hasScore}

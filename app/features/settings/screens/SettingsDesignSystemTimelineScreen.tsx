@@ -157,7 +157,7 @@ export function SettingsDesignSystemTimelineScreen() {
 
         <Card variant="secondary" className="mb-4 mt-3">
           <Card.Body className="gap-4 py-6">
-            <VStack align="center" spacing={2}>
+            <VStack align="center" gap={2}>
               <Text size={11} bold className="text-foreground/50 tracking-widest">
                 {selectedScenario.label.toUpperCase()}
               </Text>
@@ -187,7 +187,7 @@ export function SettingsDesignSystemTimelineScreen() {
                 {frameState.meaning}
               </Text>
               {frameState.detail?.length ? (
-                <VStack spacing={4} className="mt-2">
+                <VStack gap={4} className="mt-2">
                   {frameState.detail.map((row) => (
                     <HStack key={row.label} justify="space-between" align="center">
                       <Text size={11} className="text-foreground/50">
@@ -202,7 +202,7 @@ export function SettingsDesignSystemTimelineScreen() {
               ) : null}
             </View>
 
-            <HStack spacing={8}>
+            <HStack gap={8}>
               <View className="flex-1">
                 <Button
                   variant={timelineAuto ? 'primary' : 'secondary'}

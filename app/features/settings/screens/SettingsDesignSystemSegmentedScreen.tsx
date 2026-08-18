@@ -107,7 +107,7 @@ export function SettingsDesignSystemSegmentedScreen() {
                 }}
               />
             </View>
-            <VStack align="center" spacing={2}>
+            <VStack align="center" gap={2}>
               <Text size={11} bold className="text-foreground/50 tracking-widest">
                 SEGMENTED
               </Text>
@@ -132,7 +132,7 @@ export function SettingsDesignSystemSegmentedScreen() {
               ))}
             </HStack>
 
-            <HStack spacing={8}>
+            <HStack gap={8}>
               <View className="flex-1">
                 <Button
                   variant={segmentsAuto ? 'primary' : 'secondary'}

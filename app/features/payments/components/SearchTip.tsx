@@ -15,7 +15,7 @@ export function SearchTip({ icon, text }: SearchTipProps) {
   const mutedForeground = opacity(foreground, 0.5);
   return (
     <Log name="SearchTip">
-      <HStack spacing={0} align="center">
+      <HStack gap={0} align="center">
         <Icon name={icon} size={20} color={mutedForeground} />
         <Text className="flex-1 pl-2" size={14} color={mutedForeground}>
           {text}

@@ -95,7 +95,7 @@ function CopyableEventId({ eventId }: { eventId: string }) {
       accessibilityRole="button"
       accessibilityLabel="Copy event ID"
       style={{ paddingVertical: 2 }}>
-      <HStack spacing={6} style={{ alignItems: 'center' }}>
+      <HStack gap={6} style={{ alignItems: 'center' }}>
         <Text size={14} bold color={foreground}>
           {truncateMiddle(eventId, EVENT_ID_TRUNCATE_CHARS)}
         </Text>
@@ -111,7 +111,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   return (
     <ListGroup.Item disabled>
       <ListGroup.ItemContent>
-        <VStack spacing={2}>
+        <VStack gap={2}>
           <Text size={12} color={muted}>
             {label}
           </Text>
@@ -166,7 +166,7 @@ export function SignerActivityDetailScreen(): React.ReactElement {
     <Screen name="SignerActivityDetailScreen">
       <View className="pt-3">
         {/* App identity header (app-supplied metadata — bounded, untrusted) */}
-        <HStack spacing={12} style={{ alignItems: 'center' }}>
+        <HStack gap={12} style={{ alignItems: 'center' }}>
           <Avatar
             state={connection?.image ? 'image' : 'fallback'}
             picture={connection?.image}
@@ -174,7 +174,7 @@ export function SignerActivityDetailScreen(): React.ReactElement {
             size={44}
             alt={appName}
           />
-          <VStack spacing={2} style={{ flex: 1 }}>
+          <VStack gap={2} style={{ flex: 1 }}>
             <Text size={16} bold color={foreground} numberOfLines={1}>
               {appName}
             </Text>
@@ -215,7 +215,7 @@ export function SignerActivityDetailScreen(): React.ReactElement {
         ) : null}
         {isEncryptionMethod(entry.method) ? (
           <View className="pt-3">
-            <HStack spacing={8} style={{ alignItems: 'center' }}>
+            <HStack gap={8} style={{ alignItems: 'center' }}>
               <Icon name="mdi:shield" size={16} color={muted} />
               <View style={{ flex: 1 }}>
                 <Text size={13} color={muted}>
@@ -234,7 +234,7 @@ export function SignerActivityDetailScreen(): React.ReactElement {
           accessibilityLabel={TECHNICAL_DETAILS_LABEL}
           onPress={() => setTechExpanded((value) => !value)}
           style={{ paddingTop: 14 }}>
-          <HStack spacing={4} style={{ alignItems: 'center' }}>
+          <HStack gap={4} style={{ alignItems: 'center' }}>
             <Text size={13} bold color={muted}>
               {TECHNICAL_DETAILS_LABEL}
             </Text>

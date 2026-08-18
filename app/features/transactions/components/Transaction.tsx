@@ -191,10 +191,10 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
       className="flex-row items-center justify-between px-4 py-5"
       style={isRolledBack ? { opacity: 0.33 } : undefined}
       onPress={handlePress}>
-      <HStack spacing={12} flex={1}>
+      <HStack gap={12} flex={1}>
         <TransactionIcon historyEntry={historyEntry} isLoading={isReclaiming} />
 
-        <VStack spacing={0} flex={1}>
+        <VStack gap={0} flex={1}>
           <HStack justify="space-between" align="flex-end">
             <UntranslatedText color={foreground} bold size={14}>
               {displayLabel}
@@ -210,7 +210,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
           </HStack>
 
           <HStack justify="space-between" align="center">
-            <HStack align="center" spacing={4}>
+            <HStack align="center" gap={4}>
               <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
                 {historyEntry?.createdAt
                   ? formatDate(historyEntry.createdAt, 'short-date-time')

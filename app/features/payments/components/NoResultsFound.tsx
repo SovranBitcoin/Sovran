@@ -10,7 +10,7 @@ export function NoResultsFound() {
   const foreground = useThemeColor('foreground');
   return (
     <Log name="NoResultsFound">
-      <VStack spacing={24} align="center" className="mt-3 px-4">
+      <VStack gap={24} align="center" className="mt-3 px-4">
         <VStack
           justify="center"
           align="center"
@@ -18,7 +18,7 @@ export function NoResultsFound() {
           <Icon name="nonicons:error-16" size={40} color={opacity(foreground, 0.4)} />
         </VStack>
 
-        <VStack spacing={12}>
+        <VStack gap={12}>
           <Text className="text-center" color={opacity(foreground, 0.5)} bold size={20}>
             No Results Found
           </Text>
@@ -32,7 +32,7 @@ export function NoResultsFound() {
           <Text color={opacity(foreground, 0.66)} bold size={16}>
             Try adjusting your search:
           </Text>
-          <VStack spacing={12} className="mt-2">
+          <VStack gap={12} className="mt-2">
             <SearchTip icon="lucide:pencil-line" text="Check your spelling" />
             <SearchTip icon="solar:key-bold" text="Try using a complete public key" />
             <SearchTip icon="mdi:at" text="Use a different NIP-05 identifier" />

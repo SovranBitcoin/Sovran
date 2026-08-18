@@ -194,7 +194,7 @@ export function ThemePreviewScreen() {
             animation={false}
             testID="theme-preview-theme-button">
             <PressableFeedback.Scale>
-              <VStack align="center" spacing={6}>
+              <VStack align="center" gap={6}>
                 <View
                   className="h-12 w-12 items-center justify-center rounded-3xl"
                   style={{

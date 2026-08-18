@@ -218,7 +218,7 @@ export function ModelChip() {
       onPress={onPress}
       icon={<Icon name={currentProvider.icon} size={16} color={background} />}
       text={
-        <HStack align="center" spacing={4}>
+        <HStack align="center" gap={4}>
           <Text size={13} style={{ color: background, fontFamily: 'OxygenBold' }}>
             {chipLabel}
           </Text>

@@ -51,7 +51,7 @@ export function profileSwitcherPopup(payload: ProfileSwitcherPopupPayload): void
         />
       ),
       suffix: (
-        <HStack align="center" spacing={6}>
+        <HStack align="center" gap={6}>
           {profile.cachedBalanceSats != null ? (
             <AmountFormatter
               amount={profile.cachedBalanceSats}

@@ -441,7 +441,7 @@ export function ActionMenuHost() {
   const inputsNode =
     payload?.inputs && payload.inputs.length > 0 ? (
       <View className="px-3 pb-3 pt-1">
-        <VStack spacing={16}>
+        <VStack gap={16}>
           {payload.inputs.map((input) => (
             <MenuInputField
               key={input.id}

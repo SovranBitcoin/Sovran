@@ -147,7 +147,7 @@ function ProfileSwitcherButtons({
   if (profiles.length === 0) return null;
 
   return (
-    <HStack align="center" spacing={spacing.md}>
+    <HStack align="center" gap={spacing.md}>
       {profiles
         .filter((profile: ProfileEntry) => profile.accountIndex !== activeAccountIndex)
         .sort((a, b) => (a.source === 'imported' ? 0 : 1) - (b.source === 'imported' ? 0 : 1))
@@ -263,7 +263,7 @@ export const DrawerProfileChrome = React.memo(function DrawerProfileChrome({
         onPress={handleAvatarPress}
         testID="drawer-profile-name"
         accessibilityLabel={displayName}>
-        <VStack align="flex-start" spacing={spacing.xs}>
+        <VStack align="flex-start" gap={spacing.xs}>
           <Text bold size={20} style={{ color: foreground }}>
             {displayName}
           </Text>
@@ -278,8 +278,8 @@ export const DrawerProfileChrome = React.memo(function DrawerProfileChrome({
         </VStack>
       </Pressable>
       <Spacer size={spacing.md} />
-      <HStack align="center" spacing={spacing.lg}>
-        <HStack align="baseline" spacing={spacing.xs}>
+      <HStack align="center" gap={spacing.lg}>
+        <HStack align="baseline" gap={spacing.xs}>
           <Text bold size={14} style={{ color: foreground }}>
             {ownFollowingCount.toLocaleString()}
           </Text>
@@ -287,7 +287,7 @@ export const DrawerProfileChrome = React.memo(function DrawerProfileChrome({
             Following
           </Text>
         </HStack>
-        <HStack align="baseline" spacing={spacing.xs}>
+        <HStack align="baseline" gap={spacing.xs}>
           <Text
             bold
             size={14}

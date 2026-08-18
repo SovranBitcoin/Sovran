@@ -415,7 +415,7 @@ export function LiquidChatComposer({
         paddingTop: 8,
         paddingBottom: bottomPadding,
       }}>
-      <HStack align="flex-end" spacing={GAP}>
+      <HStack align="flex-end" gap={GAP}>
         <Pressable
           onPress={disabled ? undefined : handlePlusPress}
           disabled={disabled || plusDisabled}
@@ -470,7 +470,7 @@ export function LiquidChatComposer({
               backgroundColor: surfaceSecondary,
             }}
           />
-          <HStack align="center" spacing={8} style={{ paddingHorizontal: 16 }}>
+          <HStack align="center" gap={8} style={{ paddingHorizontal: 16 }}>
             <TextInput
               value={value}
               onChangeText={onChangeText}

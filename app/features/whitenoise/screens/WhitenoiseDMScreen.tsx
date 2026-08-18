@@ -88,7 +88,7 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
           lastDeliveryStatus: last?.deliveryStatus ?? null,
         })}
         emptyContent={
-          <VStack align="center" spacing={12}>
+          <VStack align="center" gap={12}>
             <Icon name="internal:whitenoise" size={48} />
             <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
               {!isClientReady

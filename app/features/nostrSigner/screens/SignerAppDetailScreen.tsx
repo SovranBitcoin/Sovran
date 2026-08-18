@@ -718,7 +718,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
         onScroll={onScroll}
         scrollEventThrottle={16}>
         {/* Identity card — logo + name fade out as their header twins fade in */}
-        <VStack align="center" spacing={4} className="pb-2 pt-4">
+        <VStack align="center" gap={4} className="pb-2 pt-4">
           <Animated.View style={contentIdentityComposed}>
             <Avatar
               state={app.image ? 'image' : 'fallback'}
@@ -750,7 +750,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
         {/* Throttle flag */}
         {throttled ? (
           <View className="bg-warning-soft mt-2 rounded-2xl p-3">
-            <HStack spacing={8} style={CENTER_ROW_STYLE}>
+            <HStack gap={8} style={CENTER_ROW_STYLE}>
               <Icon name="mdi:alert-circle-outline" size={18} color={warning} />
               <View style={FLEX_ONE_STYLE}>
                 <Text size={13} bold color={warningSoftFg}>
@@ -802,7 +802,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
 
         {/* Permissions — group headers carry the structure, no extra title */}
         <View className="pt-2">
-          <VStack spacing={8}>
+          <VStack gap={8}>
             {permissionGroups.map(({ group, label, bundles, lockedRows }) => (
               <View key={group}>
                 <Text

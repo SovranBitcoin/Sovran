@@ -114,7 +114,7 @@ export function SignerAppPersonScreen(): React.ReactElement {
 
   return (
     <Screen name="SignerAppPersonScreen">
-      <VStack spacing={14} className="pb-8 pt-3">
+      <VStack gap={14} className="pb-8 pt-3">
         {/* Person identity */}
         <HStack gap={14} style={{ alignItems: 'center' }}>
           <Avatar
@@ -124,7 +124,7 @@ export function SignerAppPersonScreen(): React.ReactElement {
             size={64}
             alt={name}
           />
-          <VStack spacing={2} style={{ flex: 1 }}>
+          <VStack gap={2} style={{ flex: 1 }}>
             <Text size={18} bold color={foreground} numberOfLines={1}>
               {name}
             </Text>

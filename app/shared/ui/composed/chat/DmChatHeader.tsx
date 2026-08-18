@@ -152,7 +152,7 @@ export function DmChatHeader({
               name={displayName}
             />
             <VStack
-              spacing={2}
+              gap={2}
               style={{
                 marginLeft: 8,
                 flex: 1,

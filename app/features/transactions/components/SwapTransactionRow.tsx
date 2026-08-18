@@ -45,12 +45,12 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
         className="flex-row items-center justify-between px-4 py-5"
         testID={`swap-row-${group.id}`}
         onPress={handlePress}>
-        <HStack spacing={12} flex={1}>
+        <HStack gap={12} flex={1}>
           <View className="h-7 w-7 items-center justify-center">
             <Icon name="mdi:swap-horizontal" color={opacity(foreground, 0.9)} size={28} />
           </View>
 
-          <VStack spacing={0} flex={1}>
+          <VStack gap={0} flex={1}>
             <HStack justify="space-between" align="flex-end">
               <UntranslatedText color={foreground} bold size={14}>
                 Swap

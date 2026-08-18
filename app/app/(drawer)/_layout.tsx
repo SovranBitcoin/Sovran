@@ -153,7 +153,7 @@ const MenuButton = React.memo(function MenuButton({
       accessible
       accessibilityLabel={label}
       style={({ pressed }) => [styles.menuButton, pressed && { opacity: alpha.strong }]}>
-      <HStack align="center" spacing={spacing.md}>
+      <HStack align="center" gap={spacing.md}>
         <Icon
           name={isActive ? icon.selected : icon.default}
           color={foreground}
@@ -230,7 +230,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
         style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}>
         <DrawerProfileChrome closeDrawer={closeDrawer} />
-        <VStack spacing={0}>
+        <VStack gap={0}>
           {MENU_ITEMS.map((item, index) => (
             <MenuButton
               key={index}

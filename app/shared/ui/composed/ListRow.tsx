@@ -291,7 +291,7 @@ export function ListRow({
         gap: ROW_GAP,
       }}>
       {leadingEl}
-      <VStack style={styles.textCol} spacing={2}>
+      <VStack style={styles.textCol} gap={2}>
         {titleEl}
         {subtitleEl}
         {accentBelow ? null : accent}

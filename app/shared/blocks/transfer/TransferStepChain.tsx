@@ -339,7 +339,7 @@ export const TransferStepChain = React.memo(
 
           {isRouting && routingDetail ? (
             <View style={[styles.routingBanner, { backgroundColor: opacity(foreground, 0.08) }]}>
-              <HStack spacing={6} align="center" justify="center">
+              <HStack gap={6} align="center" justify="center">
                 <Spinner size={12} />
                 <UntranslatedText size={11} color={labelColor}>
                   {routingDetail}

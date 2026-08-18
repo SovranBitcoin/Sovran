@@ -81,14 +81,14 @@ export function RecentSearches({
 
       <RecentPeopleSearchStrip showClear title="Recent people" />
 
-      <VStack spacing={24} align="center" className="mt-3 px-4" style={styles.prompt}>
+      <VStack gap={24} align="center" className="mt-3 px-4" style={styles.prompt}>
         <VStack
           justify="center"
           align="center"
           className="bg-surface-secondary h-20 w-20 rounded-full">
           <Icon name={prompt.icon} size={40} color={muted} />
         </VStack>
-        <VStack spacing={12}>
+        <VStack gap={12}>
           <Text className="text-center" color={foreground} bold size={20}>
             {prompt.title}
           </Text>

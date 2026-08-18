@@ -132,7 +132,7 @@ export default function NetworkSheet() {
 
       <HStack
         align="center"
-        spacing={8}
+        gap={8}
         style={{
           paddingHorizontal: 20,
           paddingVertical: 10,
@@ -162,10 +162,7 @@ export default function NetworkSheet() {
           bluetoothBlocked ? (
             <BluetoothNotice bluetooth={bluetooth} />
           ) : (
-            <VStack
-              align="center"
-              spacing={12}
-              style={{ paddingHorizontal: 40, alignItems: 'center' }}>
+            <VStack align="center" gap={12} style={{ paddingHorizontal: 40, alignItems: 'center' }}>
               <Icon name="mdi:bluetooth" size={32} color={opacity(foreground, 0.3)} />
               <Text size={16} style={{ color: opacity(foreground, 0.5) }}>
                 No devices found yet

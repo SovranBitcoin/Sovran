@@ -314,7 +314,7 @@ export function AmountEntryView({
                   {s.label}
                 </Text>
               ) : isSendAll ? (
-                <HStack align="center" spacing={4}>
+                <HStack align="center" gap={4}>
                   <Text size={13} weight="heavy" style={{ color: foreground }}>
                     Send all
                   </Text>
@@ -438,7 +438,7 @@ export function AmountEntryView({
     <View style={{ flex: 1, backgroundColor: background }}>
       <View style={{ flex: 1, paddingTop: topPadding, paddingHorizontal: 16 }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <VStack align="center" spacing={centerSpacing}>
+          <VStack align="center" gap={centerSpacing}>
             <View
               testID="amount-value"
               accessible

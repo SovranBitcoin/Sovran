@@ -419,7 +419,7 @@ export const Button = ({
           collapsable={false}
           align="center"
           justify="center"
-          spacing={layoutText && layoutIcon ? sz.iconTextSpacing : 0}
+          gap={layoutText && layoutIcon ? sz.iconTextSpacing : 0}
           style={loading ? styles.hiddenContent : undefined}>
           <>
             {layoutIcon}

@@ -191,7 +191,7 @@ function AlbumCard({
   const foreground = useThemeColor('foreground');
   const isNew = album.newestAt > 0 && Date.now() - album.newestAt < NEW_BADGE_WINDOW_MS;
   return (
-    <VStack spacing={6} style={{ marginRight: CARD_SPACING }} align="center">
+    <VStack gap={6} style={{ marginRight: CARD_SPACING }} align="center">
       <UnitPreviewCard
         themeName={album.coverThemeName || 'dark'}
         width={cardWidth}

@@ -68,7 +68,7 @@ export const TransferEntryRow = React.memo(
     const defaultSubtitleColor = opacity(foreground, 0.8);
 
     const content = (
-      <HStack spacing={12} flex={1}>
+      <HStack gap={12} flex={1}>
         {/* Avatar with small arrow overlay */}
         <View style={styles.avatarWrapper}>
           <MintIcon iconUrl={mintIconUrl} size={36} name={mintName} />
@@ -81,12 +81,12 @@ export const TransferEntryRow = React.memo(
           </View>
         </View>
 
-        <VStack spacing={0} flex={1}>
+        <VStack gap={0} flex={1}>
           <HStack justify="space-between" align="flex-end">
             <UntranslatedText color={foreground} bold size={14} numberOfLines={1}>
               {mintName}
             </UntranslatedText>
-            <HStack align="center" spacing={0}>
+            <HStack align="center" gap={0}>
               <AmountFormatter
                 amount={amount}
                 unit={unit}

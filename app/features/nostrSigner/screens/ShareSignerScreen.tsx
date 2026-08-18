@@ -168,7 +168,7 @@ export function ShareSignerScreen(): React.ReactElement {
       </View>
 
       {state.status === 'error' ? (
-        <VStack align="center" spacing={10} className="px-5 pt-4">
+        <VStack align="center" gap={10} className="px-5 pt-4">
           <Text size={14} color={danger} style={{ textAlign: 'center' }}>
             {MINT_FAILED_MESSAGE}
           </Text>
