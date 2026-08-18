@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView, BlurTint } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
-import { easeGradient } from 'react-native-easing-gradient';
+import { easeGradient } from '@/shared/lib/easeGradient';
 import { withAlpha } from '@/shared/lib/color';
 import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';

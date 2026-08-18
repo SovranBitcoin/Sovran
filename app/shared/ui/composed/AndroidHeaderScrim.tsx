@@ -30,7 +30,7 @@
  */
 import { memo, useMemo } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { easeGradient } from 'react-native-easing-gradient';
+import { easeGradient } from '@/shared/lib/easeGradient';
 import { withAlpha } from '@/shared/lib/color';
 
 /** Default solid anchor for the clipped native-header path (fade spans the

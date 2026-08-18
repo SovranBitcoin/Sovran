@@ -38,7 +38,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import Icon from 'assets/icons';
 import { StoriesContainer } from './StoriesContainer';
 import { StoryProgressBar } from './StoryProgressBar';
-import { easeGradient } from './easeGradient';
+import { easeGradient } from '@/shared/lib/easeGradient';
 import type { ProfileInfo, VideoPostRecord } from './feedTypes';
 import { Log } from '@/shared/lib/logger';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';

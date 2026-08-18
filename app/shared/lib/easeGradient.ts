@@ -1,9 +1,20 @@
 /**
- * Easing gradient utilities for smooth gradient overlays.
+ * Eased colour stops for gradient overlays: given sparse stops, returns the
+ * densely-sampled `colors` / `locations` arrays `expo-linear-gradient` wants,
+ * interpolated along an easing curve instead of linearly.
  *
- * Adapted from https://github.com/phamfoo/react-native-easing-gradient (MIT)
+ * Adapted from https://github.com/phamfoo/react-native-easing-gradient (MIT).
+ * That package was also installed, so the app carried two copies of this
+ * function; this one won because it returns the non-empty tuples
+ * `LinearGradient` requires and guards against a missing stop.
  */
 
+// Reanimated is the house animation library and `Animated`/`Easing` are banned
+// in its favour, but nothing here animates: this reaches into
+// `Animated.Interpolation.__createInterpolation` purely as a colour-space
+// interpolator, called at module scope to precompute static gradient stops.
+// Reanimated has no equivalent colour interpolator usable off the UI thread.
+// eslint-disable-next-line no-restricted-imports
 import { Animated, Easing, type EasingFunction } from 'react-native';
 
 // @ts-expect-error - internal RN API for color interpolation

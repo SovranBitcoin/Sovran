@@ -42,11 +42,6 @@
       "count": 1
     }
   },
-  "features/feed/components/nostr/easeGradient.ts": {
-    "no-restricted-imports": {
-      "count": 2
-    }
-  },
   "features/feed/components/nostr/image-overlay/AnimatedImageOverlay.tsx": {
     "no-restricted-syntax": {
       "count": 1

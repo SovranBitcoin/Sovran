@@ -27,7 +27,7 @@ import { Platform, StyleSheet } from 'react-native';
 import { BlurView, type BlurTint } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
-import { easeGradient } from 'react-native-easing-gradient';
+import { easeGradient } from '@/shared/lib/easeGradient';
 import { withAlpha } from '@/shared/lib/color';
 
 import { View } from '@/shared/ui/primitives/View/View';
