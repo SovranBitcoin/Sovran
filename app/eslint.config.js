@@ -3,21 +3,6 @@ const { defineConfig } = require('eslint/config');
 const expoConfig = require('eslint-config-expo/flat');
 const eslintPluginPrettierRecommended = require('eslint-plugin-prettier/recommended');
 
-// eslint-plugin-react-compiler@19.1.0-rc.2 calls zod@3's `z.function().args()`,
-// which the repo-wide `zod@4` override (package.json `overrides`) removes — so
-// `require`-ing it throws at config-load and crashes the ENTIRE lint run. Load
-// it defensively: lint must keep working (the dozens of correctness rules below
-// matter far more than this single non-blocking `warn`). Re-enable
-// unconditionally once the plugin supports zod 4, or migrate the rule to
-// eslint-plugin-react-hooks v6 (`react-hooks/react-compiler`).
-// Revisit when the plugin can load under the repo-wide zod v4 override.
-let reactCompilerPlugin = null;
-try {
-  reactCompilerPlugin = require('eslint-plugin-react-compiler');
-} catch {
-  reactCompilerPlugin = null;
-}
-
 module.exports = defineConfig([
   // Global ignores — apply to every config below. Listed first because a
   // flat-config block with only `ignores` (no `files`) is treated as a
@@ -106,10 +91,8 @@ module.exports = defineConfig([
   //
   // Set at `warn` initially — the rules are precise but historically
   // noisy in codebases that haven't been pass-optimised. Surfaces in PR
-  // review without failing CI. Pairs with the react-compiler rule
-  // above: react-compiler flags compiler bailouts, react-perf flags
-  // the props that *would* prevent memoisation even with the compiler
-  // active.
+  // review without failing CI. Flags the props that would prevent
+  // memoisation even with the React Compiler active.
   //
   // `jsx-no-jsx-as-prop` (passing a `<Component />` as a prop) is also
   // available but commonly used in real patterns (slot props, list
@@ -123,32 +106,6 @@ module.exports = defineConfig([
       'react-perf/jsx-no-new-function-as-prop': 'warn',
     },
   },
-  // React Compiler ESLint rule. Flags components and effects that the
-  // compiler can't auto-memoize: render-body mutations, prop mutations,
-  // refs misuse, conditional hooks, derived collections that aren't
-  // stable across renders, etc. Direct payoff for the perf-slice cluster
-  // (`stabilize derived collections in mintSelect`, `narrow zustand
-  // selectors and store subscriptions`, `stabilise relay-flush re-fire
-  // in contact-discovery hooks`, `drop redundant React.memo wrappers`,
-  // `stop stale derived state from polluting virtualised lists`, etc.).
-  //
-  // Set at `warn` initially — the rule is precise but the warning floor
-  // is unknown and we want the perf signal in PR review before failing
-  // CI on it. Promote to `error` once the warning floor is at zero (a
-  // future audit-fix slice). Warnings don't appear in
-  // `eslint-suppressions.json`; they show up in the lint output and
-  // surface in editor integrations.
-  ...(reactCompilerPlugin
-    ? [
-        {
-          files: ['**/*.ts', '**/*.tsx'],
-          plugins: { 'react-compiler': reactCompilerPlugin },
-          rules: {
-            'react-compiler/react-compiler': 'warn',
-          },
-        },
-      ]
-    : []),
   {
     plugins: {
       'unused-imports': require('eslint-plugin-unused-imports'),

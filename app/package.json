@@ -243,7 +243,6 @@
     "eslint-config-expo": "~55.0.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-prettier": "^5.5.0",
-    "eslint-plugin-react-compiler": "19.1.0-rc.2",
     "eslint-plugin-react-perf": "^3.3.3",
     "eslint-plugin-unused-imports": "^4.1.4",
     "fast-check": "4.8.0",
