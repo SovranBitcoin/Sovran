@@ -20,6 +20,11 @@
     // months. Positional parameters that genuinely must stay (a `String.replace`
     // whole-match, a middleware `next`) opt out with a leading underscore.
     "noUnusedParameters": true,
+    // Fails the build on a `case` that falls through into the next one with a
+    // non-empty body. Every deliberate multi-case label (`case 'a': case 'b':`)
+    // still compiles; only an accidentally missing `break`/`return` errors.
+    // Free to enable here (zero current violations).
+    "noFallthroughCasesInSwitch": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
     "moduleSuffixes": [".ios", ".android", ""],
