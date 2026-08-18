@@ -41,9 +41,8 @@ import Animated, {
   withDelay,
 } from 'react-native-reanimated';
 import { z } from 'zod';
-import { NPC_BASE_URL, NPC_DOMAIN } from '@/shared/lib/cashu/npc';
-import { fetchStatus } from '@/shared/lib/apiClient';
-import { NPCClient, JWTAuthProvider, PaymentRequiredError } from 'npubcash-sdk';
+import { NPC_DOMAIN, createNpcClient } from '@/shared/lib/cashu/npc';
+import { PaymentRequiredError } from 'npubcash-sdk';
 
 // Available domains for Lightning addresses
 const DOMAINS = [
@@ -80,33 +79,34 @@ function hashUsername(username: string): string {
   return h.toString(16).padStart(8, '0');
 }
 
-// Public availability lookup against the NPC server. 200 with a body means the
-// username is taken; 404 means free. We treat any unrecognised shape as
-// "unknown" (returning available=true so the user can still try) — matches
-// eNuts, which has no pre-check at all and surfaces conflicts at submit time.
-async function checkUsernameAvailability(
+/**
+ * Local validation only — npub.cash v2 has no availability endpoint.
+ *
+ * This used to GET `/api/v1/info/username/<name>`, where 404 meant free. The
+ * v1 API was retired at the 2026-08-07 cutover and that path now serves the
+ * marketing SPA, so the request stopped being a lookup and became an HTML
+ * fetch. It failed OPEN — any non-404, non-2xx returned `available: true` — so
+ * every name rendered a green "Available" and the user only learned otherwise
+ * when the claim itself failed. Lying confidently is worse than saying nothing.
+ *
+ * v2 has no replacement: `GET /api/v2/user/username` and
+ * `/api/v2/user/username/<name>` both fall through to the SPA. Availability is
+ * only knowable by attempting `POST /api/v2/user/username`. cashu.me and eNuts
+ * both do exactly that and carry no pre-check at all.
+ *
+ * So: validate the shape locally (that part never needed a server), and return
+ * `null` — "unknown" — for anything a claim attempt has to answer. The badge
+ * renderer already treats `null` as "show no badge".
+ */
+function checkUsernameAvailability(
   username: string,
-  domain: string,
-  signal?: AbortSignal
-): Promise<{ available: boolean; error?: string }> {
+  _domain: string
+): { available: boolean | null; error?: string } {
   const parsed = usernameSchema.safeParse(username);
   if (!parsed.success) {
     return { available: false, error: parsed.error.issues[0]?.message ?? 'Invalid' };
   }
-
-  // Only the NPC domain has a backend. Other domains (e.g. sovran.money)
-  // aren't wired yet — report available so the UI doesn't lie.
-  if (domain !== NPC_DOMAIN) {
-    return { available: true };
-  }
-
-  const url = `${NPC_BASE_URL}/api/v1/info/username/${encodeURIComponent(username)}`;
-  const res = await fetchStatus(url, { method: 'GET' }, { signal });
-  if (res.isErr()) return { available: true };
-  const { ok, status } = res.value;
-  if (status === 404) return { available: true };
-  if (ok) return { available: false };
-  return { available: true };
+  return { available: null };
 }
 
 // Username input with inline domain display
@@ -288,12 +288,12 @@ function DomainOption({
   );
 }
 
-// Build an NPCClient bound to the active Nostr identity. Mirrors the
-// JWTAuthProvider pattern eNuts uses in src/services/NpcService.ts.
-function createNpcClient(privateKey: Uint8Array): NPCClient {
-  const signer = async (template: EventTemplate): Promise<VerifiedEvent> =>
-    finalizeEvent(template, privateKey);
-  return new NPCClient(NPC_BASE_URL, new JWTAuthProvider(NPC_BASE_URL, signer));
+// Sign with the active Nostr identity; the client itself (and the base URL
+// both halves of it must agree on) comes from `shared/lib/cashu/npc`.
+function npcClientForKey(privateKey: Uint8Array) {
+  return createNpcClient(async (template: EventTemplate): Promise<VerifiedEvent> =>
+    finalizeEvent(template, privateKey)
+  );
 }
 
 export function ClaimUsernameScreen() {
@@ -386,7 +386,7 @@ export function ClaimUsernameScreen() {
     const results = await Promise.all(
       DOMAINS.map(async (domain) => {
         try {
-          const result = await checkUsernameAvailability(name, domain.value, signal);
+          const result = checkUsernameAvailability(name, domain.value);
           return {
             domain: domain.value,
             available: result.available,
@@ -484,7 +484,7 @@ export function ClaimUsernameScreen() {
 
     setIsClaiming(true);
     try {
-      const client = createNpcClient(nostrKeys.privateKey);
+      const client = npcClientForKey(nostrKeys.privateKey);
       await client.setUsername(username);
       log.info('onboarding.claim.success', { usernameHash: hashUsername(username) });
       Alert.alert('Claimed', `${username}@${NPC_DOMAIN} is yours.`, [

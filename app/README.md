@@ -90,7 +90,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
   - [x] **Copy as text** — raw `cashuB...` token
   - [x] **Copy as emoji** — token encoded as emoji-only string for paste into emoji-tolerant apps (Twitter, iMessage)
   - [x] **Pending-ecash sweeper** — outgoing tokens the recipient never claimed stay live on the mint; the Transactions screen's Pending tab surfaces a "Cancel N pending" footer that mass-reclaims every visible row back into your wallet in one tap (with per-row swipe-to-cancel for single sends)
-- [x] **NPubCash (NPC)** — receive to an `npubx.cash` Lightning address through `coco-cashu-plugin-npc`; paid quotes sync into Coco using a persisted since-cursor. The username screen supports availability checks and free claims today; paid username claims are surfaced but not completed in that screen yet.
+- [x] **NPubCash (NPC)** — receive to an `npub.cash` Lightning address through `coco-cashu-plugin-npc`; paid quotes sync into Coco using a persisted since-cursor. The v2 API returns paid mint-quote metadata rather than proofs, so the app mints each quote itself and dedupes on `(mintUrl, quoteId)`. The username screen offers free claims; npub.cash v2 has no availability endpoint, so names are validated locally and conflicts surface at claim time. Paid username claims are surfaced but not completed in that screen yet.
 
 ### Mint management & discovery
 

@@ -20,6 +20,7 @@ import {
   NPC_BASE_URL,
   NPC_SYNC_INTERVAL_MS,
   AsyncStorageSinceStore,
+  createNpcClient,
   getNpcSinceStoreKey,
 } from './npc';
 import {
@@ -33,7 +34,7 @@ import { maybeCreateMintFaultWebSocketFactory } from '@/shared/lib/e2e/mintFault
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, getPublicKey, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
-import { cashuLog, initLog, initPhase } from '../logger';
+import { cashuLog, initLog, initPhase, redactError } from '../logger';
 import { resolveOutputDataCreator } from './nativeOutputDataCreator';
 import { logCocoVersions, reportCocoApiFailure, reportCocoIssue } from './cocoFeedback';
 import {
@@ -1052,7 +1053,57 @@ export class CocoManager {
       autoStart: true,
     });
     initLog('CocoManager', 'NPC account added');
+    await this.ensureNpcQuotesUnlocked(this.npcAccount, signerFunction);
     return this.npcAccount;
+  }
+
+  /**
+   * Make sure npub.cash issues UNLOCKED mint quotes for this account.
+   *
+   * A NUT-20 locked quote can only be minted by signing with the pubkey the
+   * quote is locked to, and this app deliberately refuses to serve a key for
+   * that purpose — `cocoRepositories`' keyring overlay never answers a
+   * `nut20_mint_quote` query, because doing so would NUT-20-sign a mint quote
+   * with the profile identity key. So a locked quote is not slow, it is
+   * permanently unmintable: coco throws `MintQuoteKeyError` on every attempt.
+   *
+   * That would be survivable if it cost only the one payment, but it does not.
+   * The plugin's watermark is failure-safe — it advances `since` only up to the
+   * LOWEST failed `paidAt` — so one locked quote pins the cursor and every
+   * later receive stalls behind it. The whole lane stops.
+   *
+   * The server-side switch is the fix: `lockQuotes: false` and quotes arrive
+   * mintable. Read before writing so the common case costs one GET and no
+   * write. Never throws — a failure here means we might meet a locked quote
+   * later, which is strictly better than blocking wallet startup on a
+   * third-party HTTP call, and the next launch retries.
+   *
+   * This is defensive, not a fix for anything observed. Checked 2026-08-18: no
+   * shipping client sets `lockQuotes` — cashu.me reads the field and never
+   * calls `setLock`, and npub.cash's own website and npubcash-cli reference
+   * neither `lockQuotes` nor `/api/v2/user/lock`. The docs describe it as an
+   * opt-in user setting with no stated default. So the true branch is
+   * currently unreachable; it is here because the flag is server-side and
+   * sticky, this app has no UI to clear it, and the failure it would cause is
+   * a silent total stall rather than one lost payment. Delete it if upstream
+   * ever guarantees quotes are never locked for wallets that cannot sign.
+   */
+  private static async ensureNpcQuotesUnlocked(
+    account: NPCAccountApi,
+    signer: NpcSigner
+  ): Promise<void> {
+    try {
+      const info = await account.getInfo();
+      if (!info.lockQuote) {
+        cashuLog.debug('cashu.manager.npc_quotes_already_unlocked');
+        return;
+      }
+      cashuLog.warn('cashu.manager.npc_quotes_locked_disabling');
+      await createNpcClient(signer).settings.setLock(false);
+      cashuLog.info('cashu.manager.npc_quotes_unlocked');
+    } catch (error) {
+      cashuLog.warn('cashu.manager.npc_unlock_check_failed', { error: redactError(error) });
+    }
   }
 
   /**

@@ -338,7 +338,7 @@ export const counterpartyStepSchema = z.discriminatedUnion('operation', [
     setClipboard: z.boolean().optional(),
     timeoutMs: timeoutMs.optional(),
   }),
-  // Trusted-delivery acknowledgment for an app→npubx.cash send. cocod 0.0.16
+  // Trusted-delivery acknowledgment for an app→npub.cash send. cocod 0.0.16
   // exposes no `npc claim`/npc-balance surface, so the credit side is
   // unobservable — this op records the outflow on app-side evidence instead
   // of a cocod call. Author it ONLY after the scenario's PAID tx assert

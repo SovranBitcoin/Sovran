@@ -1,13 +1,12 @@
 import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
-import { NPCClient, JWTAuthProvider } from 'npubcash-sdk';
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from 'nostr-tools';
 import { z } from 'zod';
 import { redactError, storeLog } from '@/shared/lib/logger';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
-import { NPC_BASE_URL } from '@/shared/lib/cashu/npc';
+import { createNpcClient } from '@/shared/lib/cashu/npc';
 
 const NPC_DEFAULT_MINT_URL = 'https://mint.minibits.cash/Bitcoin';
 
@@ -16,11 +15,6 @@ interface NpcMintState {
   mintUrl: string | undefined;
   isSyncing: boolean;
   isUpdating: boolean;
-}
-
-interface NpcInfo {
-  mintUrl?: string;
-  mint_url?: string;
 }
 
 interface NpcMintActions {
@@ -38,11 +32,10 @@ type NpcMintStore = NpcMintState & NpcMintActions;
 type V1Persisted = { mintUrls?: Record<string, string | undefined> };
 type V2Persisted = { mintUrl?: string };
 
-function createNpcClient(privateKey: Uint8Array): NPCClient {
-  const signer = async (eventTemplate: EventTemplate): Promise<VerifiedEvent> =>
-    finalizeEvent(eventTemplate, privateKey);
-  const authProvider = new JWTAuthProvider(NPC_BASE_URL, signer);
-  return new NPCClient(NPC_BASE_URL, authProvider);
+function npcClientForKey(privateKey: Uint8Array) {
+  return createNpcClient(async (eventTemplate: EventTemplate): Promise<VerifiedEvent> =>
+    finalizeEvent(eventTemplate, privateKey)
+  );
 }
 
 const PersistedNpcMintStore = z.object({
@@ -87,7 +80,7 @@ export const useNpcMintStore = create<NpcMintStore>()(
           const startTime = performance.now();
           set({ isUpdating: true });
           try {
-            const client = createNpcClient(privateKey);
+            const client = npcClientForKey(privateKey);
             await client.settings.setMintUrl(newMintUrl);
 
             storeLog.info('store.npc_mint.update.success', {

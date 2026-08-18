@@ -909,7 +909,7 @@ export function UserProfileScreen() {
   const rawLud16 = cachedProfile?.lud16;
   const lud16 = rawLud16 && LightningAddress.safeParse(rawLud16).success ? rawLud16 : undefined;
   // No (valid) lud16 in the profile → fall back to the recipient's npub.cash
-  // address: every Nostr pubkey is payable at <npub>@npubx.cash, so money can
+  // address: every Nostr pubkey is payable at <npub>@npub.cash, so money can
   // always be sent. The send flow's Select-option menu labels the Lightning
   // variant "to npub.cash" for npc targets, so the destination stays explicit.
   const npcFallback = npub ? getNpcAddress(undefined, npub) : undefined;

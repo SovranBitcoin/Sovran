@@ -3,7 +3,7 @@
   "id": "send.search.npub",
   "name": "Find a contact by their public ID and send them money",
   "description": "Searches for our test partner wallet by its public ID, opens the profile from the results, and sends 40 sats. The contact has no regular Lightning address, so the app falls back to their ecash address, and the payment goes through.",
-  "details": "Fund 50 at Sovran, search cocod's npub from the wallet header search, open the profile from the results, and send 40 with Send Money — the profile has no lud16, so the send falls back to <npub>@npubx.cash and the Select-option menu shows 'to npub.cash'. The melt is proven PAID app-side and ledgered via npc.outflow (cocod exposes no npc claim surface; receipt at its own npubx.cash address is trusted)",
+  "details": "Fund 50 at Sovran, search cocod's npub from the wallet header search, open the profile from the results, and send 40 with Send Money — the profile has no lud16, so the send falls back to <npub>@npub.cash and the Select-option menu shows 'to npub.cash'. The melt is proven PAID app-side and ledgered via npc.outflow (cocod exposes no npc claim surface; receipt at its own npub.cash address is trusted)",
   "lane": "funded",
   "tags": ["flow:send","instrument:npc","amount:fixed","outcome:settled","check:search"],
   "requires": ["fresh-install","cocod.send.bolt11","cocod.npc.address","cocod.receive.cashu","unit.sat"],
