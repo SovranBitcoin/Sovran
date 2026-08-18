@@ -4,7 +4,6 @@
  * <name>" centered below — the alternative to the MintSelector pill that
  * the screen renders by default.
  */
-import React from 'react';
 
 import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

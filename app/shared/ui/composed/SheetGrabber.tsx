@@ -5,7 +5,6 @@
  * (FormSheetChrome) and the flow-sheet header (FlowSheetHeader) stay
  * pixel-identical.
  */
-import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

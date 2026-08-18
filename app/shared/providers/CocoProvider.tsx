@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState, ReactNode, useRef } from 'react';
+import { createContext, useEffect, useState, ReactNode, useRef } from 'react';
 import { CocoCashuProvider } from '@cashu/coco-react';
 import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';

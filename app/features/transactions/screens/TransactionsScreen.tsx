@@ -16,7 +16,7 @@
  *   reclaims every visible row, plus per-row swipe-to-cancel.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from '@/shared/ui/primitives/View/View';
 import {
   Transactions,

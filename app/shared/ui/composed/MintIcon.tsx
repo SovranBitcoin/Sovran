@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image as ExpoImage } from 'expo-image';
 import opacity from 'hex-color-opacity';
 import { StyleSheet, type StyleProp, View, type ViewStyle } from 'react-native';

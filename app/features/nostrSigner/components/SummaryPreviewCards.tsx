@@ -12,7 +12,7 @@
  * length-bounded before display and never logged.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Button as HerouiButton } from 'heroui-native';

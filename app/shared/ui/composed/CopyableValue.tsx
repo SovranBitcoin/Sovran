@@ -6,7 +6,7 @@
  * full `value` with the standard haptic + toast pattern (mirrors PaymentInfo).
  */
 
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';

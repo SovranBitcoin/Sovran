@@ -2,7 +2,6 @@
  * @fileoverview Canonical Onchain send route shell.
  */
 
-import React from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 

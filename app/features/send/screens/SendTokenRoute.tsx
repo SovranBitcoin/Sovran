@@ -16,7 +16,6 @@
  * banner (audit 19#F-001).
  */
 
-import React from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 import { SendTokenScreen } from './SendTokenScreen';

@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import { ReactNode } from 'react';
 
 import { signalMigrationsComplete } from '@/shared/lib/cashu/profileScopedStorage';
 import { runGlobalMigrations } from '@/shared/lib/migrations/globalMigrations';

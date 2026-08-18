@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { wnLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { VStack } from '@/shared/ui/primitives/View/VStack';

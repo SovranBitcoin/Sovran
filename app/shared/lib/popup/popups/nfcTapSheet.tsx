@@ -14,7 +14,7 @@
  * also exists inside send-flow route modals.
  */
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, {
   Easing,

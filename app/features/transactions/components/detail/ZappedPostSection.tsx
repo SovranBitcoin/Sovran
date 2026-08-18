@@ -18,7 +18,7 @@
  * from here opened the thread BEHIND the transactions modal.
  */
 
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';

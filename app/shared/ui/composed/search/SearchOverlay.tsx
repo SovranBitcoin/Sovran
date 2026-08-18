@@ -5,7 +5,7 @@
  * Wallet, Feed, or Contacts surface mounted while search is active, so closing
  * search returns to the exact same tab/list state.
  */
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Image } from 'expo-image';
 import { Text } from '@/shared/ui/primitives/Text';
 

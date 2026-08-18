@@ -9,7 +9,6 @@
  * away BEFORE the native send-flow modal opens, so the invisible-menu trap
  * (menus inside iOS route modals) is avoided by design.
  */
-import React from 'react';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';

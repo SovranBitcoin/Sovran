@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { TextInput } from 'react-native';
 import opacity from 'hex-color-opacity';
 

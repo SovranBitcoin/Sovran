@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- catalog metadata must stay import-side-effect free; native preview dependencies load only when rendered. */
-import React from 'react';
 
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';

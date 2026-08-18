@@ -16,7 +16,6 @@
  * `type: 'custom'` item, keeping the legacy props for Android (which ignores
  * the iOS-only items API).
  */
-import React from 'react';
 import { Platform } from 'react-native';
 import type { NativeStackNavigationOptions } from 'expo-router';
 

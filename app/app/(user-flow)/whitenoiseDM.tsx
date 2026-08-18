@@ -6,7 +6,6 @@
  * AUDIT.md dim-5.
  */
 
-import React from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 import { Hex64 } from '@sovranbitcoin/schemas';

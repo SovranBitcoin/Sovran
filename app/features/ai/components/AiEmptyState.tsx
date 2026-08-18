@@ -1,4 +1,3 @@
-import React from 'react';
 import { View } from '@/shared/ui/primitives/View/View';
 
 /**

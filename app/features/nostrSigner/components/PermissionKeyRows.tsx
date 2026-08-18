@@ -9,7 +9,7 @@
  * (and the "(kind N)" disambiguation jargon) lives on the Advanced screen.
  */
 
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { ListGroup, PressableFeedback, Switch as HeroSwitch } from 'heroui-native';
 
 import Icon from 'assets/icons';

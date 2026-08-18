@@ -13,7 +13,6 @@
  * malformed input or renders a spoofed melt entry.
  */
 
-import React from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 import { LightningSendScreen } from './LightningSendScreen';

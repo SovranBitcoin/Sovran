@@ -6,7 +6,7 @@
  * rail-specific screen.
  */
 
-import React, { useEffect, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 import { useScreenActions, type BoundAction } from 'wallet/react';

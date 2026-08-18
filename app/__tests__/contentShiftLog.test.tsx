@@ -7,7 +7,6 @@
  * with prev/delta/firstMeasure — so these tests lock that contract.
  */
 
-import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import {

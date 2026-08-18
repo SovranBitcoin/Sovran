@@ -6,7 +6,6 @@
  * drawer chrome.
  */
 
-import React from 'react';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, interpolate } from 'react-native-reanimated';
 import { useDrawerProgress } from 'expo-router/drawer';

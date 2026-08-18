@@ -5,7 +5,7 @@
  * via QR code. Can be used standalone or within flow navigators.
  */
 
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { Section } from '@/shared/ui/composed/Section';
 import Icon, { CurrencyIcon } from 'assets/icons';

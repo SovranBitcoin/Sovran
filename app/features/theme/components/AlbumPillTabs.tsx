@@ -4,7 +4,7 @@
  * Used in the Background modal to filter the wallpaper grid by album.
  */
 
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { ScrollView } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';

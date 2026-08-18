@@ -8,7 +8,7 @@
  * The only local state is the selected currency tab.
  */
 
-import React, { memo, useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { memo, useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useSharedValue } from 'react-native-reanimated';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 

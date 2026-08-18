@@ -11,7 +11,7 @@
  * the Nostr identity (name + pfp) and tap → `onStartContactSend`, mirroring
  * selecting a contact.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fetchNip05Pubkey, type DestinationDescriptor, type DestinationIcon } from 'wallet';
 import { nip19 } from 'nostr-tools';
 

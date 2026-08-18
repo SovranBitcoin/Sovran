@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 

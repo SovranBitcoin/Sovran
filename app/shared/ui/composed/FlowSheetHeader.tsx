@@ -30,7 +30,6 @@
  * back/close affordance is the flows' own headerLeft (FlowHeaderButton).
  * No top safe-area inset — the sheet already sits below the status bar.
  */
-import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { NativeStackHeaderProps } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

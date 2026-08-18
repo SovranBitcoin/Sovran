@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-syntax -- [DEBUG-inv] tile colors are fixed
  * screenshot targets for the pixel-count loop; they must NOT follow the theme. */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 
 import { Button, Card } from 'heroui-native';

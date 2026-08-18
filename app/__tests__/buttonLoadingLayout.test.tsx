@@ -2,7 +2,6 @@
  * @jest-environment node
  */
 
-import React from 'react';
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { Button } from '@/shared/ui/primitives/Button';

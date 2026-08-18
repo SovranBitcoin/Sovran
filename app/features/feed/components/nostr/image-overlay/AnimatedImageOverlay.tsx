@@ -3,7 +3,7 @@
  * Renders only when ImageOverlayProvider is present and activeUrl is set.
  */
 
-import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { BackHandler, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import {

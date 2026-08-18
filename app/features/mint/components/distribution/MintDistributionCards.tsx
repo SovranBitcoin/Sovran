@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { View } from 'react-native';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { Card, Slider, Switch as HeroSwitch } from 'heroui-native';

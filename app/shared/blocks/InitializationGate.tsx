@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 
 import { initLog, log, Log, useInitMount, useLifecycleLogger } from '@/shared/lib/logger';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';

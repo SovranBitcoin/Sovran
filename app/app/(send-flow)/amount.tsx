@@ -6,7 +6,6 @@
  * decodes via `useScreenActions`.
  */
 
-import React from 'react';
 import { z } from 'zod';
 
 import { AmountFlowScreen } from '@/features/send/screens/AmountFlowScreen';

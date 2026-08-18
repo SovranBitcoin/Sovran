@@ -1,4 +1,3 @@
-import React from 'react';
 import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { HStack } from '@/shared/ui/primitives/View/HStack';

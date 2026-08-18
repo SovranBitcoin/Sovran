@@ -7,7 +7,7 @@
  * and a consistent empty-query recents view. A single `selectedScope` value
  * drives the highlight, so two tabs can never read as selected at once.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

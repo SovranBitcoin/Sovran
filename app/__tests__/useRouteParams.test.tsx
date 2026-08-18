@@ -2,7 +2,6 @@
  * @jest-environment jsdom
  */
 
-import React from 'react';
 import { z } from 'zod';
 import TestRenderer, { act } from 'react-test-renderer';
 import { useRouteParams, type UseRouteParamsOptions } from '@/shared/lib/nav/useRouteParams';

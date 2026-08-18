@@ -20,7 +20,7 @@
  * expected.
  */
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { Menu, useMenu } from 'heroui-native';
 import { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';

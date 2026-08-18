@@ -1,11 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PropsWithChildren,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import Animated, {
   cancelAnimation,

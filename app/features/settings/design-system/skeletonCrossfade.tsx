@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- catalog metadata must stay import-side-effect free; native preview dependencies load only when rendered. */
-import React from 'react';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';

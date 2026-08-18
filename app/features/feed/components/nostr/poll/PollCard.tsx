@@ -6,7 +6,7 @@
  * viewer has voted or the poll has closed. Voting publishes a kind:1018 through
  * the central seam and works with the local signer (no key gating).
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 

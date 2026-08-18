@@ -7,7 +7,7 @@
  * Reads the same cached changelog response as the list, so opening a row costs
  * no fetch.
  */
-import React, { useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { FlatList, StyleSheet } from 'react-native';
 import { z } from 'zod';
 

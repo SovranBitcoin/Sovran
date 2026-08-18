@@ -9,7 +9,7 @@
  * - Bottom button to continue with claim process
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TextInput, Alert, Keyboard, StyleSheet, View as RNView } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';

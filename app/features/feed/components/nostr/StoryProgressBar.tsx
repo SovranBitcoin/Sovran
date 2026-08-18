@@ -5,7 +5,7 @@
  * Past stories show 100%, future stories show 0%.
  */
 
-import React, { FC } from 'react';
+import { FC } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Extrapolation,

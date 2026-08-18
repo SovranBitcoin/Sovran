@@ -5,7 +5,7 @@
  * and the TransactionsScreen component.
  */
 
-import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import type { ScanMethod, TransactionDirection, TransactionPaymentType } from 'wallet';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';

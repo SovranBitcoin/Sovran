@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { LoadingIndicator, type Phase, type Result } from '@/shared/blocks/status';
 
 import type { DesignSystemScenario } from './catalog';

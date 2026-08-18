@@ -11,7 +11,7 @@
  * ListGroup row height drifts.
  */
 
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 
 import { ListGroup } from 'heroui-native';

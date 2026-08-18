@@ -8,7 +8,7 @@
 // a single boundary timeout). Rows are keyed by the engine's semantic
 // `step.rowKey`, so shape changes morph slots in place.
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { MintQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';

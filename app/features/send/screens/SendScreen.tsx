@@ -24,7 +24,7 @@
  * token delivered to them over an encrypted Nostr DM.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { usePaymentFlowMachine } from 'wallet/react';

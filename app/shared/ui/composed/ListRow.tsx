@@ -19,7 +19,7 @@
  * 12, row gap 12. `padding="compact"` drops the vertical to 8 for denser lists.
  */
 
-import React, { ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { View, StyleProp, ViewStyle, StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';

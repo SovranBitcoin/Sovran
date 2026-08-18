@@ -11,7 +11,7 @@
  * entry; the pay action handles LNURL resolution + prepareMeltBolt11 + executeMelt.
  */
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 import { Stack } from 'expo-router';

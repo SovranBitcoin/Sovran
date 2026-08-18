@@ -3,7 +3,6 @@
  * Scale and opacity are driven by pagerOffsetSv for smooth page-change animation.
  */
 
-import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
 import type { SharedValue } from 'react-native-reanimated';

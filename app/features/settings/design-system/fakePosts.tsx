@@ -10,7 +10,7 @@
  * first mounted fake post, removed from the store when the last one unmounts,
  * so fixture rows don't linger in the persisted cache after leaving the screen.
  */
-import React, { useLayoutEffect, useMemo } from 'react';
+import { useLayoutEffect, useMemo } from 'react';
 
 import type {
   FeedEvent,

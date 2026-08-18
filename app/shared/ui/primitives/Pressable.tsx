@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback } from 'react';
+import { forwardRef, useCallback } from 'react';
 import {
   Pressable as RNPressable,
   type PressableProps as RNPressableProps,

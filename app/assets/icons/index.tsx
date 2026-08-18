@@ -1,4 +1,3 @@
-import React from 'react';
 import Svg, { Circle, Defs, Path, Stop, LinearGradient } from 'react-native-svg';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

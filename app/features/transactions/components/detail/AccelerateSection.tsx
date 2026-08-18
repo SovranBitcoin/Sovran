@@ -9,7 +9,7 @@
  * the card to set it apart from the static detail sections without shouting.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
   cancelAnimation,

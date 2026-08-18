@@ -5,7 +5,7 @@
  * Active card rotates 0° → -90° (right pivot), next card rotates 90° → 0° (left pivot).
  */
 
-import React, { FC, PropsWithChildren } from 'react';
+import { FC, PropsWithChildren } from 'react';
 import { Platform, useWindowDimensions } from 'react-native';
 import Animated, {
   Extrapolation,

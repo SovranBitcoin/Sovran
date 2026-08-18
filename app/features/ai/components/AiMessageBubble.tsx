@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import * as Clipboard from 'expo-clipboard';

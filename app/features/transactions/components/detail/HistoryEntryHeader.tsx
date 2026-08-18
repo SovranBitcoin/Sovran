@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 
 import { HistoryEntry } from '@cashu/coco-core';
 import { getCounterparty } from 'wallet';

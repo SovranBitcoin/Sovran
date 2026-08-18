@@ -5,7 +5,7 @@
  * large (expanded) and small (compact) sizes based on scroll position.
  */
 
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { ScrollView } from 'react-native';
 import Animated, {
   useAnimatedStyle,

@@ -7,7 +7,6 @@
  * AUDIT.md dim-5 — `groupId` is used as a swap-store map key downstream.
  */
 
-import React from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 import { SwapTransactionScreen } from '@/features/transactions';

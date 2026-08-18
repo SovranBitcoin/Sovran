@@ -22,7 +22,7 @@
  * bottom section.
  */
 
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { Platform, StyleSheet } from 'react-native';
 import { BlurView, type BlurTint } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';

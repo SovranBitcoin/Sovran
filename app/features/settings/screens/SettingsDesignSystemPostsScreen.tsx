@@ -1,4 +1,3 @@
-import React from 'react';
 import { ScrollView } from 'react-native';
 
 import { getDesignSystemFamily } from '@/features/settings/design-system/catalog';

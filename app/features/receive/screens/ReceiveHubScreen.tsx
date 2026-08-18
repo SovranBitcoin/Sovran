@@ -18,7 +18,7 @@
  * colada-owned.
  */
 
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import opacity from 'hex-color-opacity';

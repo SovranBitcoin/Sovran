@@ -11,7 +11,7 @@
  *                  ("don't ask again").
  * - unsupported  → text only (emulators / BLE-less hardware).
  */
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { Platform } from 'react-native';
 import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';

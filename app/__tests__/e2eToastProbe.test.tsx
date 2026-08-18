@@ -2,7 +2,6 @@
  * @jest-environment node
  */
 
-import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import {

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { WhitenoiseSetupScreen } from '@/features/whitenoise/screens/WhitenoiseSetupScreen';

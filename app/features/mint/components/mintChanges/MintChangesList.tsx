@@ -6,7 +6,7 @@
  * Scope is deliberate: only trusted mints. When none of them changed there is
  * no ecosystem-wide fallback — a quiet empty state is the honest answer.
  */
-import React, { useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { FlatList, RefreshControl, StyleSheet, type ViewToken } from 'react-native';
 import opacity from 'hex-color-opacity';
 

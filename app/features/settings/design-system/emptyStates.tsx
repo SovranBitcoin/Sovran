@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 
 import type { DesignSystemScenario } from './catalog';

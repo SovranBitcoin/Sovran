@@ -6,7 +6,7 @@
  * scan history linking) is handled by the receiveToken.redeem handler.
  */
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 
 import type { ReceiveHistoryEntry } from '@cashu/coco-core';
 import { isReceiveTokenPending, isReceiveTokenRedeemed } from 'wallet';

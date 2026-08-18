@@ -7,7 +7,6 @@
  * screens by path; the body lives here so their header options and title
  * cannot drift apart.
  */
-import React from 'react';
 import { Stack } from 'expo-router';
 
 import { CameraScreen } from './CameraScreen';

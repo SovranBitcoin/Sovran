@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useCallback, ReactNode } from 'react';
 import { useSharedValue, withTiming, SharedValue, Easing } from 'react-native-reanimated';
 import { useFocusEffect } from 'expo-router';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';

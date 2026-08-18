@@ -1,4 +1,3 @@
-import React from 'react';
 import { getPublicKey, nip19 } from 'nostr-tools';
 
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';

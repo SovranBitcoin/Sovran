@@ -11,7 +11,7 @@
  * — which is exactly why this tab is NOT the receive hub's default.
  */
 
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { setStringAsync } from 'expo-clipboard';

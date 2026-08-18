@@ -9,7 +9,6 @@
  * alphabet so a malformed link cannot reach the native bitchat module.
  */
 
-import React from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 

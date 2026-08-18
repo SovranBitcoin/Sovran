@@ -14,7 +14,6 @@
  * body to maintain.
  */
 
-import React from 'react';
 import { z } from 'zod';
 
 import { Hex64 } from '@/shared/lib/nav/routeSchemas';

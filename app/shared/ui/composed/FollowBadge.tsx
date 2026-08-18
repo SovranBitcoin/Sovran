@@ -6,7 +6,6 @@
  * "Mutual" require the server (nagg `followStatus`) — pass `relationship` when
  * available; otherwise the badge falls back to local following knowledge.
  */
-import React from 'react';
 import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';

@@ -12,7 +12,6 @@
  * Currency selection (USD/EUR/GBP) is owned by `useSettingsStore`. This
  * component only reads it.
  */
-import React from 'react';
 
 import Icon, { CurrencyIcon } from '@/assets/icons';
 import BalancePill from '@/shared/ui/composed/BalancePill';

@@ -14,7 +14,7 @@
  * via `useScreenActions`.
  */
 
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 import { LightningReceiveScreen } from './LightningReceiveScreen';

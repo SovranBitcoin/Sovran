@@ -3,7 +3,7 @@
  *
  * The feed's only write entry point — opens the composer for a fresh post.
  */
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

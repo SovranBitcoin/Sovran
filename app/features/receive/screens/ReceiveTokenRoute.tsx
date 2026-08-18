@@ -12,7 +12,6 @@
  * on malformed input or renders a spoofed receive entry.
  */
 
-import React from 'react';
 import { z } from 'zod';
 import { ReceiveTokenScreen } from './ReceiveTokenScreen';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';

@@ -1,4 +1,4 @@
-import React, { type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
 import { useConnectSheetOpener } from '@/features/nostrSigner/hooks/useConnectSheetOpener';
 import { useNostrSignerService } from '@/features/nostrSigner/hooks/useNostrSignerService';

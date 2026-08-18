@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { usePathname } from 'expo-router';

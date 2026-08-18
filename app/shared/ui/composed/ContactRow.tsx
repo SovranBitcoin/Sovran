@@ -18,7 +18,7 @@
  * Spec: see `docs/contact-row.md`.
  */
 
-import React, { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect } from 'react';
 import opacity from 'hex-color-opacity';
 import type { MintListItem } from 'wallet';
 

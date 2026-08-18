@@ -5,7 +5,7 @@
  * resolver) fetches their posts, rendered read-only with `PostCard` — tapping a
  * post opens its thread.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { List } from '@/shared/ui/composed/List';

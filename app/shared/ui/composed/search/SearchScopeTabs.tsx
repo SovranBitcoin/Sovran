@@ -8,7 +8,6 @@
  * fragile `suppressActiveHighlight` flag to stay single-selected) and the Feed's
  * inline search-tab branch.
  */
-import React from 'react';
 import { FlatList, StyleSheet } from 'react-native';
 
 import { FeedTabButton } from '@/features/feed/components/FeedTabButton';

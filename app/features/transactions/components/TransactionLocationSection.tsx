@@ -13,7 +13,6 @@
  * OnchainReceiveScreen, and LightningSendScreen.
  */
 
-import React from 'react';
 import { Platform, StyleSheet } from 'react-native';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';

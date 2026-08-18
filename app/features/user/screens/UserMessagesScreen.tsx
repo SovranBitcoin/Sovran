@@ -10,7 +10,7 @@
  * boundary. Legacy NIP-04 conversations are no longer surfaced.
  */
 
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useFocusEffect } from 'expo-router';
 import { staticPopup } from '@/shared/lib/popup';

@@ -7,7 +7,6 @@
  *   2. Recent people strip — shared across surfaces (`recentPeopleStore`).
  * Followed by a prompt explaining what can be searched.
  */
-import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import Icon from '@/assets/icons';

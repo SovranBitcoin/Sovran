@@ -16,7 +16,7 @@
  * `actionMenuPopup` lane). Each item's `onPress` receives the sheet `close`.
  */
 
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { BottomSheet, Menu } from 'heroui-native';
 

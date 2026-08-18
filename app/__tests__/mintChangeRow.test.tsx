@@ -6,7 +6,6 @@
  * verbose" is the whole point of this surface.
  */
 
-import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { MintChangeRow } from '@/features/mint/components/mintChanges/MintChangeRow';

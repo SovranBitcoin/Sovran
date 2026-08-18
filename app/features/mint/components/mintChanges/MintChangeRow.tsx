@@ -7,7 +7,7 @@
  * or a follow. The glyph is the change's own (a bolt for a Lightning rail, a
  * key for a rotation); its tint says whether the mint gained or lost something.
  */
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 

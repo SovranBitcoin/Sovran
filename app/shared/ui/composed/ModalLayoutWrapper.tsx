@@ -4,7 +4,7 @@
  * Set debug={true} to see layout debug indicators.
  */
 
-import React, { ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import {
   NativeScrollEvent,
   Platform,

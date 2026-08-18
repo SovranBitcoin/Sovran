@@ -1,5 +1,3 @@
-import React from 'react';
-
 import opacity from 'hex-color-opacity';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

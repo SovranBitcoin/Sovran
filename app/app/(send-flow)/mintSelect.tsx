@@ -13,7 +13,7 @@
  * `useScreenActions`.
  */
 
-import React, { useCallback, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 

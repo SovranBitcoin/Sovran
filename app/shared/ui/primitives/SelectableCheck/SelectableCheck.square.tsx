@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
 // eslint-disable-next-line import/namespace

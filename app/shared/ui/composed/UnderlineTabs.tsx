@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import { Log, log } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';

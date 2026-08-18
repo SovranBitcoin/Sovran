@@ -5,7 +5,7 @@
  * are handled by the screen-action system.
  */
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 import type { MintHistoryEntry } from '@cashu/coco-core';

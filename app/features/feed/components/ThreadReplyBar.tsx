@@ -8,7 +8,7 @@
  * full composer (carrying the typed draft + the original post for context).
  * Sticks above the keyboard via `KeyboardStickyView`, like the chat composer.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Keyboard, StyleSheet, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';

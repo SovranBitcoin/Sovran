@@ -14,7 +14,6 @@
  * cipher path.
  */
 
-import React from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 

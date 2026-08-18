@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import opacity from 'hex-color-opacity';
 import Icon from '@/assets/icons';

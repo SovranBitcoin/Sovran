@@ -5,7 +5,7 @@
  * picker. The composer's text becomes the poll question; this edits the
  * `PollDraft` on the composer store.
  */
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import Icon from 'assets/icons';

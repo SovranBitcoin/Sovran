@@ -7,7 +7,6 @@
  * destination input, and contact search.
  */
 
-import React from 'react';
 import { z } from 'zod';
 
 import { SendScreen } from '@/features/send/screens/SendScreen';

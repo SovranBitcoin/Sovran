@@ -10,7 +10,7 @@
  * the menu renders in the root window, below the modal, and is invisible.
  */
 
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { BottomSheet, Menu } from 'heroui-native';
 import { decodeEcashTokenMetadata, defaultDetectors, type AnnotatedOption } from 'wallet';

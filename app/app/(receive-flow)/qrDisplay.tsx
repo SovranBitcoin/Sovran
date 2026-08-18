@@ -10,7 +10,6 @@
  * boundary per AUDIT.md dim-5 — `receiveEntry` is JSON-encoded.
  */
 
-import React from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 

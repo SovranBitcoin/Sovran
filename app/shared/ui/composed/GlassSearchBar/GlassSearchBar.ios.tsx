@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { TextInput, StyleSheet } from 'react-native';
 
 import { GlassView } from 'expo-glass-effect';
