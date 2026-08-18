@@ -35,7 +35,7 @@ const TOKENS =
   /(\[[^\]]+\])|(\b(?:TEST START|TEST|VERIFY|PRECONDITION|CLEANUP)\b)|((?:\d+ms|\d+(?:\.\d+)?s)\s*$)/g;
 
 function tokenize(escaped: string): string {
-  return escaped.replace(TOKENS, (match, bracket, phase, duration) => {
+  return escaped.replace(TOKENS, (_match, bracket, phase, duration) => {
     if (bracket) return `<span class="tok-id">${bracket}</span>`;
     if (phase) return `<span class="tok-kind">${phase}</span>`;
     return `<span class="tok-dur">${duration}</span>`;

@@ -238,7 +238,7 @@ function OwnEventsSync() {
 // RootLayoutContent) so its component identity never changes between renders —
 // otherwise React Navigation tears down and remounts the header's left button
 // (re-parsing its SVG icon) on every root re-render.
-const CloseButton = React.memo(function CloseButton({ foreground }: { foreground: string }) {
+const CloseButton = React.memo(function CloseButton() {
   return <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={() => router.back()} />;
 });
 
@@ -296,9 +296,7 @@ function RootLayoutContent() {
           ...headerStyleOverride,
           ...(screen.title !== undefined ? { headerTitle: screen.title } : {}),
           // Add close button for modal presentations (only when header is shown)
-          ...(isModalPresentation
-            ? { headerLeft: () => <CloseButton foreground={foreground} /> }
-            : {}),
+          ...(isModalPresentation ? { headerLeft: () => <CloseButton /> } : {}),
         });
       }
 

@@ -71,11 +71,7 @@ export async function downloadWallpaper(
     // file:// URI while the bytes were still being written. The background
     // then registered that theme and `<Image>` decoded a truncated/empty file
     // ("Downloaded image decode failed") and rendered black.
-    const result = await withTimeout(
-      downloadResumable.downloadAsync(),
-      DOWNLOAD_TIMEOUT_MS,
-      themeName
-    );
+    const result = await withTimeout(downloadResumable.downloadAsync(), DOWNLOAD_TIMEOUT_MS);
 
     const status = result?.status ?? 0;
     if (status < 200 || status >= 300) {
@@ -106,7 +102,7 @@ export async function downloadWallpaper(
 
 /** Reject a download that never resolves so a stalled native handle can't wedge
  *  the theme-commit chain. */
-async function withTimeout<T>(promise: Promise<T>, ms: number, themeName: string): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms);

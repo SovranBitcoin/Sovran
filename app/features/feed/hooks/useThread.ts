@@ -160,7 +160,7 @@ export function useThread(eventId: string): UseThreadResult {
   const applyThreadResult = useCallback(
     (result: ThreadResult, source: 'initial' | 'more'): BuiltThreadItems | null => {
       const orderedReplyIds = orderedReplyIdsForThreadResult(result, source, replyOrderRef.current);
-      const built = buildThreadItemsFromResult(eventId, result, orderedReplyIds);
+      const built = buildThreadItemsFromResult(result, orderedReplyIds);
       if (!built) return null;
 
       replyOrderRef.current = built.items

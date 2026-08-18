@@ -50,7 +50,7 @@ const PersistedSearchHistoryStore = z.object({
 
 export const useSearchHistoryStore = create<SearchHistoryState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       recentSearches: {},
 
       addSearch: (query: string, context: string = 'default') => {

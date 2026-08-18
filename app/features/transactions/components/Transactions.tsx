@@ -600,7 +600,7 @@ export const Transactions = React.memo(
     );
 
     const renderTimelineItem = useCallback(
-      (item: TimelineItem, rowIndex?: number) => {
+      (item: TimelineItem) => {
         const key = getTimelineKey(item);
         if (item.kind === 'swap') {
           return <SwapTransactionRow key={key} group={item.data} />;
@@ -625,9 +625,7 @@ export const Transactions = React.memo(
           </Text>
           <View style={[styles.card, { borderColor }]}>
             <BlurCardFrame accentColor={muted}>
-              <View style={styles.content}>
-                {section.data.map((item, rowIndex) => renderTimelineItem(item, rowIndex))}
-              </View>
+              <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
             </BlurCardFrame>
           </View>
         </VStack>

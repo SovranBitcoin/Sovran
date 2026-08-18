@@ -171,7 +171,7 @@ describe('thread item builders', () => {
     };
 
     const orderedIds = orderedReplyIdsForThreadResult(result, 'more', ['seeded-reply']);
-    const built = buildThreadItemsFromResult('root', result, orderedIds);
+    const built = buildThreadItemsFromResult(result, orderedIds);
 
     expect(orderedIds).toEqual(['seeded-reply', 'next-reply']);
     expect(

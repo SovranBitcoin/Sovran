@@ -29,7 +29,6 @@ export function bucketsFromThreadResult(result: ThreadResult): ThreadSeedBuckets
 }
 
 export function buildThreadItemsFromResult(
-  eventId: string,
   result: ThreadResult,
   orderedReplyIds?: readonly string[]
 ): BuiltThreadItems | null {
@@ -143,7 +142,6 @@ export function buildThreadItemsFromSeed(
       ? uniqueIds(previewReplyIds)
       : thread.replies.map((event) => event.id);
   return buildThreadItemsFromResult(
-    eventId,
     {
       allEvents: seed.allEvents,
       profiles: seed.profiles,

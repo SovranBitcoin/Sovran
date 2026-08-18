@@ -131,7 +131,7 @@ describe('getCachedRelayInfo SWR', () => {
     fetchMock.mockRejectedValue(new Error('down'));
     await getCachedRelayInfo(RELAY);
     // Age the failure past the retry window.
-    useRelayMetadataStore.setState((s) => ({
+    useRelayMetadataStore.setState(() => ({
       byRelayUrl: { [relayMetadataKey(RELAY)]: { failedAt: Date.now() - 11 * 60 * 1000 } },
     }));
     fetchMock.mockResolvedValue(okResponse(BUZZ_NIP11));

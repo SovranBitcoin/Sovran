@@ -97,13 +97,11 @@ function distributeProportionally(
 /**
  * Redistributes a delta among eligible mints
  * @param currentDistribution Current bp values for all mints
- * @param changedMintUrl The mint that was changed
  * @param delta Amount to redistribute (positive = take from others, negative = give to others)
  * @param eligibleMints Mints eligible for redistribution
  */
 function redistributeDelta(
   currentDistribution: Record<string, number>,
-  changedMintUrl: string,
   delta: number,
   eligibleMints: string[]
 ): Record<string, number> {
@@ -241,12 +239,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
             }
 
             // Perform redistribution
-            const newDistribution = redistributeDelta(
-              currentDistribution,
-              mintUrl,
-              delta,
-              eligibleMints
-            );
+            const newDistribution = redistributeDelta(currentDistribution, delta, eligibleMints);
 
             // Verify sum equals 10,000 and correct if needed
             const sum = Object.values(newDistribution).reduce((s, v) => s + v, 0);

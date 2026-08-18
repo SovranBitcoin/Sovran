@@ -52,7 +52,7 @@ const PersistedTransactionLocationStore = z.object({
 
 export const useTransactionLocationStore = create<TransactionLocationStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       // Initial state
       locations: {},
 
