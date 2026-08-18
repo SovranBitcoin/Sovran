@@ -1,14 +1,12 @@
 import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 
-/**
- * Informs the user that a Nut Drop can't be sent because we share no mint the
- * recipient accepts (read from their `creq`). A token from a mint they don't
- * accept would be unredeemable, so the send is blocked. Single acknowledge.
- *
- * (Nut Drops deliver as a private Noise DM encrypted to the recipient, so there
- * is no public-exposure consent — only this mint-compatibility notice.)
- */
-export function notifyNoSharedMint(displayName: string): Promise<void> {
+/** A one-button notice, resolved once — on the button or on dismiss. */
+function acknowledge(notice: {
+  title: string;
+  testID: string;
+  description: string;
+  icon: string;
+}): Promise<void> {
   return new Promise((resolve) => {
     let settled = false;
     const settle = () => {
@@ -17,13 +15,13 @@ export function notifyNoSharedMint(displayName: string): Promise<void> {
       resolve();
     };
     actionMenuPopup({
-      title: 'No shared mint',
+      title: notice.title,
       buttons: [
         {
-          testID: 'near-pay-no-shared-mint-ok',
+          testID: notice.testID,
           text: 'OK',
-          description: `You and ${displayName} don't have a mint in common, so they couldn't redeem the payment. Add one of their mints to pay them.`,
-          icon: 'mdi:bank-off-outline',
+          description: notice.description,
+          icon: notice.icon,
           variant: 'secondary',
           onPress: (close) => {
             settle();
@@ -33,6 +31,23 @@ export function notifyNoSharedMint(displayName: string): Promise<void> {
       ],
       onDismiss: () => settle(),
     });
+  });
+}
+
+/**
+ * Informs the user that a Nut Drop can't be sent because we share no mint the
+ * recipient accepts (read from their `creq`). A token from a mint they don't
+ * accept would be unredeemable, so the send is blocked. Single acknowledge.
+ *
+ * (Nut Drops deliver as a private Noise DM encrypted to the recipient, so there
+ * is no public-exposure consent — only this mint-compatibility notice.)
+ */
+export function notifyNoSharedMint(displayName: string): Promise<void> {
+  return acknowledge({
+    title: 'No shared mint',
+    testID: 'near-pay-no-shared-mint-ok',
+    description: `You and ${displayName} don't have a mint in common, so they couldn't redeem the payment. Add one of their mints to pay them.`,
+    icon: 'mdi:bank-off-outline',
   });
 }
 
@@ -89,29 +104,10 @@ export function confirmBearerDowngrade(displayName: string): Promise<boolean> {
  * dropped by a stock or stale client.
  */
 export function notifyNutDropPeerNotReady(displayName: string): Promise<void> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const settle = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-    actionMenuPopup({
-      title: 'Not ready for Nut Drop',
-      buttons: [
-        {
-          testID: 'near-pay-peer-not-ready-ok',
-          text: 'OK',
-          description: `${displayName} has not advertised a Sovran payment request yet. Keep both apps open nearby and try again.`,
-          icon: 'mdi:bluetooth-off',
-          variant: 'secondary',
-          onPress: (close) => {
-            settle();
-            close();
-          },
-        },
-      ],
-      onDismiss: () => settle(),
-    });
+  return acknowledge({
+    title: 'Not ready for Nut Drop',
+    testID: 'near-pay-peer-not-ready-ok',
+    description: `${displayName} has not advertised a Sovran payment request yet. Keep both apps open nearby and try again.`,
+    icon: 'mdi:bluetooth-off',
   });
 }
