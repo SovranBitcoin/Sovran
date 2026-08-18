@@ -79,7 +79,8 @@ import {
 import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
-import { useDominantColor, getContrastColors } from '@/shared/lib/colorExtraction';
+import { getContrastColors } from '@/shared/lib/color';
+import { useDominantColor } from '@/shared/lib/colorExtraction';
 import type { VideoPostRecord, StoryUser } from '@/features/feed';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';

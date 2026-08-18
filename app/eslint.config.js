@@ -392,6 +392,7 @@ module.exports = defineConfig([
   //   - shared/lib/themeEngine.ts: palette generation / OKLCH math.
   //   - shared/lib/brandColors.ts: cross-theme brand constants
   //     (BITCOIN_ACCENT etc).
+  //   - shared/lib/color.ts: the colour-maths module (blend fallback).
   //   - shared/lib/colorExtraction.ts: image-to-palette color math.
   //   - config/backgroundImageThemes.ts: art-directed gradient stops.
   {
@@ -399,6 +400,7 @@ module.exports = defineConfig([
       'themes.ts',
       'shared/lib/themeEngine.ts',
       'shared/lib/brandColors.ts',
+      'shared/lib/color.ts',
       'shared/lib/colorExtraction.ts',
       'config/backgroundImageThemes.ts',
     ],

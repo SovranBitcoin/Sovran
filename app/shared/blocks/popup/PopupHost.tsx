@@ -20,7 +20,7 @@ import {
   isCustomSheetPayload,
   type StandardSheetPayload,
 } from '@/shared/stores/runtime/popupStore';
-import { blendColors, sanitizeColor } from '@/shared/lib/colorExtraction';
+import { blend, sanitize } from '@/shared/lib/color';
 import {
   registerToast,
   resolvePopupIcon,
@@ -124,7 +124,7 @@ type ConfirmedAnimation = {
 function sanitizeStyle(style: Record<string, unknown>): ViewStyle {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(style)) {
-    result[key] = typeof value === 'string' && value.includes('px') ? sanitizeColor(value) : value;
+    result[key] = typeof value === 'string' && value.includes('px') ? sanitize(value) : value;
   }
   return result as ViewStyle;
 }
@@ -742,8 +742,8 @@ function SheetPopup() {
   const confirmedProgress = useSharedValue(standardPayload?.status === 'confirmed' ? 1 : 0);
 
   // Opaque muted green: blend overlay (card bg) with success. success-soft is transparent; we need solid.
-  const overlayColor = useMemo(() => sanitizeColor(String(overlay)), [overlay]);
-  const successMutedColor = useMemo(() => blendColors(overlay, success, 0.15), [overlay, success]);
+  const overlayColor = useMemo(() => sanitize(String(overlay)), [overlay]);
+  const successMutedColor = useMemo(() => blend(overlay, success, 0.15), [overlay, success]);
 
   useEffect(() => {
     if (standardPayload?.status === 'confirmed') {

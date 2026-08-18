@@ -1,4 +1,5 @@
 import { THEMES, type ThemeName, type ThemePalette } from '@/themes';
+import { luminance } from '@/shared/lib/color';
 import {
   backgroundThemeDominantColors,
   backgroundThemeGradientColors,
@@ -127,18 +128,6 @@ const STATIC_COLORS: SemanticVars = Object.fromEntries(
 );
 
 /**
- * Perceived brightness of a hex color (0 = black, 1 = white).
- * Uses the ITU-R BT.601 luma formula.
- */
-function hexLuminance(hex: string): number {
-  const c = hex.replace('#', '');
-  const r = parseInt(c.slice(0, 2), 16) / 255;
-  const g = parseInt(c.slice(2, 4), 16) / 255;
-  const b = parseInt(c.slice(4, 6), 16) / 255;
-  return 0.299 * r + 0.587 * g + 0.114 * b;
-}
-
-/**
  * Map a 0-950 palette to HeroUI Native's semantic theme variables.
  *
  * Convention in themes.ts:
@@ -146,7 +135,7 @@ function hexLuminance(hex: string): number {
  *   0   = foreground end   (lightest for dark themes, darkest for light themes)
  */
 function buildSemanticVars(palette: ThemePalette): SemanticVars {
-  const bgIsDark = hexLuminance(palette[950]) < 0.5;
+  const bgIsDark = luminance(palette[950]) < 0.5;
 
   return {
     '--background': palette[950],

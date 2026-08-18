@@ -1,5 +1,5 @@
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { getLuminance, sanitizeColor } from '@/shared/lib/colorExtraction';
+import { luminance, sanitize } from '@/shared/lib/color';
 
 /**
  * Resolves the toast's "always-dark surface" colors against the active theme.
@@ -22,14 +22,14 @@ export function useToastSurface(): { bg: string; fg: string } {
     'surface-tertiary',
     'default-foreground',
   ] as const);
-  const fgIsDark = getLuminance(sanitizeColor(String(foreground))) < 0.5;
+  const fgIsDark = luminance(sanitize(String(foreground))) < 0.5;
   return fgIsDark
     ? {
-        bg: sanitizeColor(String(defaultForeground)),
-        fg: sanitizeColor(String(background)),
+        bg: sanitize(String(defaultForeground)),
+        fg: sanitize(String(background)),
       }
     : {
-        bg: sanitizeColor(String(surfaceTertiary)),
-        fg: sanitizeColor(String(foreground)),
+        bg: sanitize(String(surfaceTertiary)),
+        fg: sanitize(String(foreground)),
       };
 }

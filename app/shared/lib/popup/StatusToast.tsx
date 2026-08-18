@@ -13,7 +13,7 @@ import opacity from 'hex-color-opacity';
 import { LoadingIndicator, type Phase, type Result } from '@/shared/blocks/status';
 import { popupLog } from '@/shared/lib/logger';
 
-import { blendColors } from '@/shared/lib/colorExtraction';
+import { blend } from '@/shared/lib/color';
 
 import { useToastSurface } from './useToastSurface';
 import {
@@ -113,7 +113,7 @@ export function StatusToast({
   // raw SUCCESS/DANGER hexes at full opacity read far too strong.
   const targetBgTint = frosted
     ? opacity(targetBg, TINT_ALPHA)
-    : blendColors(surfaceBg, targetBg, OPAQUE_TINT_MIX);
+    : blend(surfaceBg, targetBg, OPAQUE_TINT_MIX);
 
   const indicatorPhase: Phase = isTerminal ? 'done' : 'loading';
   const indicatorResult: Result =

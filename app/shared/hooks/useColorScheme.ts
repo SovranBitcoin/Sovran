@@ -1,3 +1,5 @@
+import { luminance } from '@/shared/lib/color';
+
 import { useThemeColor } from './useThemeColor';
 
 /**
@@ -12,15 +14,15 @@ import { useThemeColor } from './useThemeColor';
  *     primitive.
  *   - `ActionSheetIOS.userInterfaceStyle`, which has no token form.
  *
- * BT.601 luma — matches `hexLuminance` in `shared/lib/themeEngine.ts`.
+ * BT.601 luma via the shared `luminance` helper — the same function
+ * `themeEngine` uses to pick foreground contrast pairs.
  */
 export function useColorScheme(): 'light' | 'dark' {
   const background = useThemeColor('background');
-  const c = background.replace('#', '');
-  if (c.length < 6) return 'dark';
-  const r = parseInt(c.slice(0, 2), 16) / 255;
-  const g = parseInt(c.slice(2, 4), 16) / 255;
-  const b = parseInt(c.slice(4, 6), 16) / 255;
-  const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-  return luma >= 0.5 ? 'light' : 'dark';
+
+  // Anything that isn't a full hex triple stays dark, as before — the app-wide
+  // `userInterfaceStyle` is locked dark, so dark is the safe guess.
+  if (background.replace('#', '').length < 6) return 'dark';
+
+  return luminance(background) >= 0.5 ? 'light' : 'dark';
 }
