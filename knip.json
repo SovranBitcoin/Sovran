@@ -31,7 +31,6 @@
         "buffer",
         "process",
         "expo-screen-corner-radius",
-        "cashu-kym",
         "@monicon/metro",
         "metro-minify-terser",
         "patch-package",

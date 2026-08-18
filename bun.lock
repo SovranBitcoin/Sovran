@@ -43,7 +43,6 @@
         "@sovranbitcoin/schemas": "^2.2.0",
         "bitchat-module": "file:./modules/bitchat-module",
         "buffer": "^6.0.3",
-        "cashu-kym": "^0.4.1",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "coco-cashu-plugin-npc": "3.0.0-rc.20260707.3.1.sha.debd5dd",
@@ -1627,8 +1626,6 @@
     "canvaskit-wasm": ["canvaskit-wasm@0.41.0", "", { "dependencies": { "@webgpu/types": "0.1.21" } }, "sha512-cnbL02NFB3yOYMF/MtxViZHgD1vh55Pvy+zR8q4JuFvyCPejZP3eClkt2GuZ0S7jOmGMCJXaHBasbMChbR9JZg=="],
 
     "caseless": ["caseless@0.12.0", "", {}, "sha512-4tYFyifaFfGacoiObjJegolkwSU4xQNGbVgUiNYVUxbQ2x2lUsFvY4hVgVzGiIe6WLOPqycWXA40l+PWsxthUw=="],
-
-    "cashu-kym": ["cashu-kym@0.4.1", "", { "dependencies": { "nostr-tools": "^2.16.2" } }, "sha512-8if0H7jRK3SYPbfb3ELJzhMvmyqMPOQ1KsWe1kpRWTwhfUvG7W96Om8l5V/qoh31a8J7s/ZgeUnombUKAjxOrw=="],
 
     "cbor-sync": ["cbor-sync@1.0.4", "", {}, "sha512-GWlXN4wiz0vdWWXBU71Dvc1q3aBo0HytqwAZnXF1wOwjqNnDWA1vZ1gDMFLlqohak31VQzmhiYfiCX5QSSfagA=="],
 

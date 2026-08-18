@@ -94,7 +94,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Mint management & discovery
 
-<!-- code: features/mint/screens/MintListScreen.tsx; features/mint/screens/MintAddScreen.tsx; features/mint/screens/MintDistributionScreen.tsx; features/mint/screens/MintInfoScreen.tsx; features/mint/screens/MintReviewsScreen.tsx; features/mint/screens/MintRebalancePlanScreen.tsx; features/mint/hooks/useAuditedMints.ts; features/mint/hooks/useMintCatalog.ts; features/mint/hooks/useNostrDiscoveredMints.ts; features/mint/hooks/useSovranDiscoveredMints.ts; features/mint/hooks/useMintRebalanceOrchestrator.ts; shared/lib/buildMintListItems.ts; shared/stores/global/auditMintStore.ts; shared/stores/global/kymMintStore.ts; shared/stores/global/mintInfoCache.ts; shared/stores/profile/mintStore.ts -->
+<!-- code: features/mint/screens/MintListScreen.tsx; features/mint/screens/MintAddScreen.tsx; features/mint/screens/MintDistributionScreen.tsx; features/mint/screens/MintInfoScreen.tsx; features/mint/screens/MintReviewsScreen.tsx; features/mint/screens/MintRebalancePlanScreen.tsx; features/mint/hooks/useAuditedMints.ts; features/mint/hooks/useMintCatalog.ts; features/mint/hooks/useNostrDiscoveredMints.ts; features/mint/hooks/useSovranDiscoveredMints.ts; features/mint/hooks/useMintRebalanceOrchestrator.ts; shared/lib/buildMintListItems.ts; shared/stores/global/auditMintStore.ts; shared/stores/global/mintInfoCache.ts; shared/stores/profile/mintStore.ts -->
 
 - [x] **Multi-mint** — track balances across many mints simultaneously
 - [x] **Mint rebalance** — orchestrated planner that moves proofs across mints with Split/Reset/Focus actions
@@ -103,7 +103,6 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 - [x] **Nostr mint reviews** — community reviews surfaced from Nostr alongside auditor data
 - [x] **Mint state badges** — `OK` / `DEGRADED` / `DOWN` rolled up from recent swap history
 - [x] **Mint info screen** — name, contact, TOS, audit score, swap stats
-- [x] **KYM catalog** — [`cashu-kym`](https://www.npmjs.com/package/cashu-kym) "know your mint" data for onboarding
 - [x] **Mint selector with dimming** — under-funded mints are dimmed inline rather than throwing
 - [x] **Inactive-mint reclaim** — proofs from removed mints are reclaimable
 
