@@ -99,15 +99,12 @@ export const StyledText = ({
 type TextProps = DefaultText['props'] & { id?: string };
 
 interface CustomTextProps extends TextProps {
-  thin?: boolean;
-  extralight?: boolean;
-  light?: boolean;
   medium?: boolean;
   semibold?: boolean;
   bold?: boolean;
-  extrabold?: boolean;
   heavy?: boolean;
-  black?: boolean;
+  /** Any key of the family weight maps, including the lighter faces the
+   *  boolean props above do not cover. */
   weight?: string;
 
   /** Use the Overpass font family instead of the default Oxygen. */
@@ -136,9 +133,13 @@ interface CustomTextProps extends TextProps {
   visualDisabled?: boolean;
 }
 
+/** The boolean weight props, in the order they win when more than one is set. */
+const BOOLEAN_WEIGHTS = ['medium', 'semibold', 'bold', 'heavy'] as const;
+
 /**
  * Resolve weight props to one of the three Oxygen font families.
- * Oxygen only ships Light, Regular, and Bold.
+ * Oxygen only ships Light, Regular, and Bold, so every one of the boolean
+ * weights above resolves to Bold here; `weight="light"` reaches OxygenLight.
  */
 function getOxygenFamily(props: CustomTextProps): string {
   if (props.weight) {
@@ -147,9 +148,7 @@ function getOxygenFamily(props: CustomTextProps): string {
     if (w === 'regular') return 'OxygenRegular';
     return 'OxygenBold';
   }
-  if (props.thin || props.extralight || props.light) return 'OxygenLight';
-  if (props.bold || props.semibold || props.medium || props.extrabold || props.heavy || props.black)
-    return 'OxygenBold';
+  if (props.bold || props.semibold || props.medium || props.heavy) return 'OxygenBold';
   return 'OxygenRegular';
 }
 
@@ -173,8 +172,8 @@ function getOverpassFamily(props: CustomTextProps): string {
 
   if (props.weight && WEIGHT_MAP[props.weight]) return WEIGHT_MAP[props.weight];
 
-  for (const key of Object.keys(WEIGHT_MAP)) {
-    if ((props as Record<string, unknown>)[key]) return WEIGHT_MAP[key];
+  for (const key of BOOLEAN_WEIGHTS) {
+    if (props[key]) return WEIGHT_MAP[key];
   }
   return 'OverpassRegular';
 }
