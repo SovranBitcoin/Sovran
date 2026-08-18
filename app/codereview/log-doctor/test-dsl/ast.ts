@@ -53,7 +53,7 @@ export type Selector =
  * Optional `when visible` clause on a `tap`, which makes the tap poll for
  * the target before acting (rather than failing immediately if missing).
  */
-export interface WhenVisibleModifier {
+interface WhenVisibleModifier {
   whenVisible: true;
   /** Optional `within Ns` clause attached to the `when visible`. */
   withinMs?: number;
@@ -124,7 +124,7 @@ export interface HomeStep {
   pos: SourcePos;
 }
 
-export interface BackStep {
+interface BackStep {
   kind: 'back';
   pos: SourcePos;
 }

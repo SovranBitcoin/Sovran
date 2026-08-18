@@ -1,7 +1,7 @@
 import { normalizeMintUrl } from './mint-url';
 import type { DeclaredRecoveryAsset } from './types';
 
-export type CocodStatus = 'UNINITIALIZED' | 'LOCKED' | 'UNLOCKED' | 'ERROR';
+type CocodStatus = 'UNINITIALIZED' | 'LOCKED' | 'UNLOCKED' | 'ERROR';
 
 export interface CocodCommandResult {
   code: number;

@@ -10,7 +10,7 @@ import type { CustodyHandle } from './custody';
 import type { DurableLease } from './durable';
 import { RunLedger, type AssetLocation, type FundingLiability, type LegStatus } from './ledger';
 
-export type FundingLegState = 'intent' | 'funded' | 'swept' | 'quarantined' | 'reconciled';
+type FundingLegState = 'intent' | 'funded' | 'swept' | 'quarantined' | 'reconciled';
 
 declare const fundingLegBrand: unique symbol;
 export interface FundingLeg<State extends FundingLegState> extends FundingLiability {
@@ -19,7 +19,7 @@ export interface FundingLeg<State extends FundingLegState> extends FundingLiabil
   readonly [fundingLegBrand]: true;
 }
 
-export interface CustodyReadinessRequest {
+interface CustodyReadinessRequest {
   runId: string;
   legId: string;
   custody: CustodyHandle;
@@ -31,31 +31,31 @@ export interface CustodyReadiness {
   assertReady(request: CustodyReadinessRequest): void;
 }
 
-export interface FundingEffectRequest extends CustodyReadinessRequest {
+interface FundingEffectRequest extends CustodyReadinessRequest {
   counterparty: string;
   expectedAmount: number;
 }
 
-export interface FundingEffectResult {
+interface FundingEffectResult {
   amount: number;
   fees: number;
   txId?: string;
 }
 
-export interface OutflowEffectRequest extends CustodyReadinessRequest {
+interface OutflowEffectRequest extends CustodyReadinessRequest {
   counterparty: string;
   amount: number;
 }
 
-export interface OutflowEffectResult {
+interface OutflowEffectResult {
   amount: number;
   fees: number;
   txId?: string;
 }
 
-export type SweepEffectRequest = CustodyReadinessRequest;
+type SweepEffectRequest = CustodyReadinessRequest;
 
-export interface SweepEffectResult {
+interface SweepEffectResult {
   ok: boolean;
   recoveredAmount: number;
   residualAmount: number;

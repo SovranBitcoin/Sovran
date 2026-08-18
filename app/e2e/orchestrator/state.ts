@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { PLATFORMS } from '../schema/capabilities';
 import type { ChunkPlan, ChunkPlanEntry } from './matrix';
 
-export const attemptOutcomeSchema = z.enum([
+const attemptOutcomeSchema = z.enum([
   'passed',
   'scenario-failed',
   'infra-aborted',
@@ -23,7 +23,7 @@ export const attemptOutcomeSchema = z.enum([
 ]);
 export type AttemptOutcome = z.infer<typeof attemptOutcomeSchema>;
 
-export const attemptRecordSchema = z.object({
+const attemptRecordSchema = z.object({
   attempt: z.number().int().min(1),
   startedAt: z.string(),
   endedAt: z.string().optional(),
@@ -63,7 +63,7 @@ const chunkStatusSchema = z.enum([
 ]);
 type ChunkStatus = z.infer<typeof chunkStatusSchema>;
 
-export const chunkStateSchema = z.object({
+const chunkStateSchema = z.object({
   chunkId: z.string(),
   platform: z.enum(PLATFORMS),
   driver: z.enum(['sim', 'android']),
@@ -82,7 +82,7 @@ export const chunkStateSchema = z.object({
 });
 export type ChunkState = z.infer<typeof chunkStateSchema>;
 
-export const orchestratorStateSchema = z.object({
+const orchestratorStateSchema = z.object({
   version: z.literal(1),
   campaignId: z.string(),
   /** ISO start — doubles as the fresh-matrix audit cutoff. */

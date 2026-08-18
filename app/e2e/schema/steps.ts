@@ -250,7 +250,7 @@ const network = z.strictObject({
 
 /** Value-moving counterparty operations stay semantic and exact-asset. The
  * runtime adapter owns argv; authored funded plans never spell cocod commands. */
-export const counterpartyStepSchema = z.discriminatedUnion('operation', [
+const counterpartyStepSchema = z.discriminatedUnion('operation', [
   z.strictObject({
     action: z.literal('counterparty'),
     operation: z.literal('cashu.create'),

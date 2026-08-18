@@ -18,7 +18,7 @@ export interface SimulatorBridgeNative {
   axDescribe(udid: string): Promise<string>;
 }
 
-export interface SimulatorBridge {
+interface SimulatorBridge {
   readonly port: number;
   readonly axEndpoint: string;
   readonly touchEndpoint: string;

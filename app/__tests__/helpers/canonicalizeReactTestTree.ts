@@ -1,6 +1,6 @@
 const OMIT = Symbol('omit');
 
-export type CanonicalReactTestValue =
+type CanonicalReactTestValue =
   | null
   | boolean
   | number

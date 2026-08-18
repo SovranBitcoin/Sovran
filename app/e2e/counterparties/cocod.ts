@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 export const COCOD_ALLOWED_VERSIONS = new Set(['0.0.16']);
 
-export interface ExecResult {
+interface ExecResult {
   code: number;
   stdout: string;
   stderr: string;

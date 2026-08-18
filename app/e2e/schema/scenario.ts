@@ -23,7 +23,7 @@ const fixtureUse = z.strictObject({
 const phaseItem = z.union([fixtureUse, stepSchema]);
 
 /** Maximum value this scenario may place in one exact app-wallet asset. */
-export const fundedAssetSchema = z.strictObject({
+const fundedAssetSchema = z.strictObject({
   mintUrl: z.string().url(),
   unit: unitSchema,
   accountIndex: z.literal(0),

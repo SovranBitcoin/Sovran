@@ -7,7 +7,7 @@ import { appendFileSync } from 'node:fs';
 
 import { listRunDirNames } from '../viewer/lib/scan';
 
-export interface ChildResult {
+interface ChildResult {
   exitCode: number;
   /** The run dir the child created (diffed against a pre-spawn snapshot). */
   runDirName?: string;

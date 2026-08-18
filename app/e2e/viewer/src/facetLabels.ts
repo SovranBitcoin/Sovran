@@ -11,7 +11,7 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
   android: 'Android',
 };
 
-export const FLOW_GROUP_LABELS: Record<(typeof FACETS)['flow'][number], string> = {
+const FLOW_GROUP_LABELS: Record<(typeof FACETS)['flow'][number], string> = {
   onboarding: 'Getting started',
   recovery: 'Wallet recovery',
   receive: 'Receiving money',

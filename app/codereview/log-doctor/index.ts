@@ -3866,7 +3866,7 @@ function spanCorrelationId(entry: LogEntry): string | null {
   return null;
 }
 
-export interface SpanAggregate {
+interface SpanAggregate {
   base: string;
   samples: number[];
   failures: number;
@@ -3995,7 +3995,7 @@ const WASTE_VOLATILE_KEYS = new Set([
   'aliveMs',
 ]);
 
-export interface WasteRow {
+interface WasteRow {
   event: string;
   count: number;
   firstT: number;

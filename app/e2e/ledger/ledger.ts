@@ -22,7 +22,7 @@ import {
 const nonNegativeAmount = z.number().int().nonnegative();
 const positiveAmount = z.number().int().positive();
 
-export const assetLocationSchema = z.strictObject({
+const assetLocationSchema = z.strictObject({
   mintUrl: z.string().url(),
   unit: z.string().min(1).max(16),
   accountIndex: z.number().int().nonnegative(),
@@ -55,7 +55,7 @@ const entryBase = {
   ts: z.number().int().nonnegative(),
 };
 
-export const ledgerEntrySchema = z.discriminatedUnion('kind', [
+const ledgerEntrySchema = z.discriminatedUnion('kind', [
   z.strictObject({
     ...entryBase,
     kind: z.literal('intent'),

@@ -146,8 +146,7 @@ export interface ScenarioCatalogEntry {
   runs: CatalogRunRef[];
 }
 
-export type DiffPairStatus =
-  'diff' | 'identical' | 'added' | 'removed' | 'dimension-mismatch' | 'error';
+type DiffPairStatus = 'diff' | 'identical' | 'added' | 'removed' | 'dimension-mismatch' | 'error';
 
 export interface DiffPairResult {
   key: string;
@@ -203,7 +202,7 @@ export interface PageCapture {
   stepId?: string;
 }
 
-export interface PageGroup {
+interface PageGroup {
   page: string;
   captures: PageCapture[];
 }

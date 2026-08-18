@@ -18,7 +18,7 @@ export interface JobView {
   killArmed?: boolean;
 }
 
-export type ModalView =
+type ModalView =
   | {
       kind: 'trigger';
       title: string;

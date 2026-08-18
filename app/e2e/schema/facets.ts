@@ -66,7 +66,7 @@ export const FACETS = {
 } as const;
 
 export type FacetName = keyof typeof FACETS;
-export type FacetValue<F extends FacetName> = (typeof FACETS)[F][number];
+type FacetValue<F extends FacetName> = (typeof FACETS)[F][number];
 
 const SINGLE_VALUED: readonly FacetName[] = ['flow', 'instrument', 'amount', 'io', 'outcome'];
 

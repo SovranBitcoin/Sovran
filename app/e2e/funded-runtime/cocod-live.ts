@@ -22,7 +22,7 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 const PREFLIGHT_TIMEOUT_MS = 10_000;
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
 
-export interface CocodProcessOptions {
+interface CocodProcessOptions {
   readonly env: NodeJS.ProcessEnv;
   readonly timeoutMs: number;
 }

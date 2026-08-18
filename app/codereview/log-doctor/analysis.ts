@@ -194,7 +194,7 @@ const SUSPICIOUS_PATTERNS: SuspiciousPattern[] = [
 const REDACTED_SUBSTR_RE = /<REDACTED:([^>]+)>/g;
 const MAX_DEPTH = 8;
 
-export interface SuspiciousFinding {
+interface SuspiciousFinding {
   category: string;
   count: number;
   highSignal: boolean;

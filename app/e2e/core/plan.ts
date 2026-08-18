@@ -13,7 +13,7 @@ import { redactString } from './redact';
 export type Phase = 'precondition' | 'test' | 'verify' | 'cleanup';
 type Availability = 'ready' | 'deferred';
 
-export interface FixtureFrame {
+interface FixtureFrame {
   id: string;
   /** Distinguishes repeated invocations of the same fixture in one scenario. */
   invocation: number;

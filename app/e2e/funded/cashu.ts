@@ -50,7 +50,7 @@ export interface RecoveredCashuAsset {
   readonly proofFingerprints: readonly string[];
 }
 
-export interface PreparedCashuToken {
+interface PreparedCashuToken {
   readonly asset: DeclaredRecoveryAsset;
   readonly token: string;
   readonly restoredAmount: number;
