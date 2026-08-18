@@ -13,7 +13,7 @@
  */
 import type { MediaDescriptor } from '@/shared/lib/nostr/media/types';
 
-export type RailId = 'nostr';
+type RailId = 'nostr';
 
 export type OptionalCapability = 'media' | 'poll' | 'altText' | 'sensitive';
 

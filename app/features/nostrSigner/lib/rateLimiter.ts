@@ -17,7 +17,7 @@ export const RATE_TRIP_LIMIT = 3;
 export const RATE_TRIP_WINDOW_MS = 600_000;
 export const RATE_COOLDOWN_MS = 300_000;
 
-export interface RateLimitResult {
+interface RateLimitResult {
   /** Process this request. False → engine silently denies with "rate limited". */
   allowed: boolean;
   /** Pubkey is inside a trip-escalation cooldown — surface the UI flag. */

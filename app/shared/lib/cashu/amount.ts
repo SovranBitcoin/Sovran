@@ -1,6 +1,6 @@
 import { cashuLog } from '@/shared/lib/logger';
 
-export type AmountLike = number | bigint | string | { toNumber(): number };
+type AmountLike = number | bigint | string | { toNumber(): number };
 
 export type AmountValue = AmountLike | null | undefined;
 

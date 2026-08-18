@@ -19,7 +19,7 @@ export interface ProfileInfo {
   picture?: string;
 }
 
-export interface ReposterInfo {
+interface ReposterInfo {
   pubkey: string;
   event: FeedEvent;
 }

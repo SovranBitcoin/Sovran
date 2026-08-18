@@ -9,7 +9,7 @@
  * is biased outward so the jagged path bulges away from the portrait.
  */
 
-export interface BoltPoint {
+interface BoltPoint {
   x: number;
   y: number;
 }

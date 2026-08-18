@@ -10,7 +10,7 @@
  * `./detect`. The variant-dispatch helper is `./defineVariants`.
  */
 
-export type IconSource = 'sf-symbol' | 'monicon';
+type IconSource = 'sf-symbol' | 'monicon';
 
 export interface Capabilities {
   /**

@@ -23,7 +23,7 @@ import { decodePointer, pairPatchOps, type PatchOp } from './decode';
 import { NUT_TITLES } from './nuts';
 
 export type Direction = 'receive' | 'send';
-export type FactAction = 'added' | 'removed';
+type FactAction = 'added' | 'removed';
 
 export type MintChangeFact =
   /** NUT-21/22 — the mint gated (or ungated) access behind sign-in. */

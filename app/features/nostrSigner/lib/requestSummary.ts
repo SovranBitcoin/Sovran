@@ -26,11 +26,11 @@ import type { Nip46ParamsPreview } from '@/features/nostrSigner/data/nip46Reques
 // ── Output contract ─────────────────────────────────────────────
 
 /** Structurally identical to the catalog's CopySegment/PermissionCopyContext. */
-export interface SummaryCopySegment {
+interface SummaryCopySegment {
   text: string;
   bold?: boolean;
 }
-export interface SummaryCopyContext {
+interface SummaryCopyContext {
   appName: string;
   peerLabel?: string;
   relayLabel?: string;
@@ -39,8 +39,7 @@ export interface SummaryCopyContext {
 export type SummaryRisk =
   'never_sign_anomaly' | 'financial' | 'wallet_credential' | 'full_list_replace';
 
-export type SummaryReaction =
-  { kind: 'like' } | { kind: 'dislike' } | { kind: 'emoji'; emoji: string };
+type SummaryReaction = { kind: 'like' } | { kind: 'dislike' } | { kind: 'emoji'; emoji: string };
 
 export type SummaryDetail =
   | { type: 'post'; text: string }

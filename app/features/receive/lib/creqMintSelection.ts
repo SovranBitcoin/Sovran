@@ -23,7 +23,7 @@ export interface CreqMintCandidate {
   mintInfo?: { name?: string; icon_url?: string; nuts?: unknown } | null;
 }
 
-export interface CreqMintOption {
+interface CreqMintOption {
   mintUrl: string;
   displayName: string;
   /** Mint-advertised icon for the row's MintIcon (falls back internally). */

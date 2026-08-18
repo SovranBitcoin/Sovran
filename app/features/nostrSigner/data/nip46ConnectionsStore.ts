@@ -57,11 +57,11 @@ export function isCriticalGrantKey(grantKey: GrantKey): boolean {
   return classifyRequest(parseGrantKey(grantKey)).class === 'critical';
 }
 
-export type ConnectionOrigin = 'bunker' | 'nostrconnect';
+type ConnectionOrigin = 'bunker' | 'nostrconnect';
 export type ConnectionEncryption = 'nip44' | 'nip04';
 type GrantOrigin = 'pairing' | 'prompt';
 
-export interface Nip46Grant {
+interface Nip46Grant {
   verdict: GrantVerdict;
   origin: GrantOrigin;
   createdAt: number;
@@ -75,7 +75,7 @@ export interface Nip46Grant {
  * enumerates, and the critical-always ceiling on `grants` must keep rejecting
  * blanket decrypt grants byte-for-byte (see the schema refine below).
  */
-export interface PeerDecryptGrant {
+interface PeerDecryptGrant {
   methods: DecryptMethod[];
   createdAt: number;
   lastUsedAt?: number;

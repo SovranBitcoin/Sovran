@@ -1,6 +1,6 @@
-export type SelectableCheckStyle = 'circle' | 'square';
+type SelectableCheckStyle = 'circle' | 'square';
 
-export type SelectableCheckVariant = 'default' | 'primary' | 'success' | 'warning' | 'error';
+type SelectableCheckVariant = 'default' | 'primary' | 'success' | 'warning' | 'error';
 
 export interface SelectableCheckProps {
   /** Whether the option is currently selected. */

@@ -33,7 +33,7 @@ const PairingIntentSchema = z.strictObject({
   createdAt: z.int().min(0),
   expiresAt: z.int().min(0),
 });
-export type PairingIntent = z.infer<typeof PairingIntentSchema>;
+type PairingIntent = z.infer<typeof PairingIntentSchema>;
 
 export type PairingIntentError =
   | { type: 'invalid-pubkey' }

@@ -113,7 +113,7 @@ export type ConnectionStatus = z.infer<typeof ConnectionStatusSchema>;
 export type DecryptMethod = 'nip04_decrypt' | 'nip44_decrypt';
 
 /** Methods that can hold a standing grant without a kind qualifier. */
-export const ENCRYPTION_GRANT_METHODS = [
+const ENCRYPTION_GRANT_METHODS = [
   'nip04_encrypt',
   'nip04_decrypt',
   'nip44_encrypt',
@@ -126,7 +126,7 @@ export type EncryptionGrantKey = (typeof ENCRYPTION_GRANT_METHODS)[number];
  * a wildcard `sign_event` grant is unrepresentable at both type and runtime
  * level (`grantKeyFor` is the only constructor; this guard is the validator).
  */
-export type SignEventGrantKey = `sign_event:${number}`;
+type SignEventGrantKey = `sign_event:${number}`;
 export type GrantKey = SignEventGrantKey | EncryptionGrantKey;
 
 // No leading zeros, max 5 digits; range-checked against MAX_EVENT_KIND below.

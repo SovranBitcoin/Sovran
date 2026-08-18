@@ -44,7 +44,7 @@ const httpsMintUrl = z
  * out of reach even for careless rules. */
 const mintMatch = z.union([z.literal('*'), httpsMintUrl]);
 
-export const mintFaultResponseSchema = z.discriminatedUnion('mode', [
+const mintFaultResponseSchema = z.discriminatedUnion('mode', [
   // NUT-protocol error: status + {code, detail} body → coco MintOperationError
   // (or HttpResponseError when status ≥ 500 despite the parseable body).
   z.strictObject({

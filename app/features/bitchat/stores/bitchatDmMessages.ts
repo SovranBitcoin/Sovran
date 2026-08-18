@@ -13,7 +13,7 @@ import type {
 
 const MESSAGE_BUFFER_CAP = 500;
 
-export type BleDmDeliveryStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+type BleDmDeliveryStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 
 export interface BleDmMessage extends ChatMessage {
   /** Status only set on own (outbound) messages. */

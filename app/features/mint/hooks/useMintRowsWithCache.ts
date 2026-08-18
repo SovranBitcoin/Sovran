@@ -27,7 +27,7 @@ import {
   type MintMetadataEntry,
 } from '@/shared/stores/global/mintMetadataStore';
 
-export type MintRowMetaState = 'cold' | 'cached' | 'live';
+type MintRowMetaState = 'cold' | 'cached' | 'live';
 
 export interface MintRow extends MintListItem {
   metaState: MintRowMetaState;

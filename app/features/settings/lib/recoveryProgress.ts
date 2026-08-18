@@ -27,7 +27,7 @@ export type RecoveryPhase =
  * `skipped` means we never tried — the mint was cancelled past, or its keysets
  * were not restorable NUT-02 ids.
  */
-export type MintRecoveryStatus =
+type MintRecoveryStatus =
   'waiting' | 'restoring' | 'done' | 'already-recovered' | 'skipped' | 'failed';
 
 export interface MintRecoveryState {

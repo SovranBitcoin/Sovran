@@ -18,7 +18,7 @@ export type ReachabilityProbe = {
   test?: (response: Response) => boolean;
 };
 
-export type ReachabilityProbeAttempt = {
+type ReachabilityProbeAttempt = {
   name: string;
   host: string;
   ok: boolean;

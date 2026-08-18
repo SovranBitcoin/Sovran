@@ -25,7 +25,7 @@
 
 export type CelebrationPhase = 'idle' | 'centering' | 'awaiting' | 'held' | 'returning';
 
-export interface CelebrationRequest {
+interface CelebrationRequest {
   peerID: string;
   /** Confirmed redeemed amount — null until the strike reports success. */
   amount: number | null;

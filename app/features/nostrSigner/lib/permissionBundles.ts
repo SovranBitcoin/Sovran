@@ -20,7 +20,7 @@
 import type { GrantKey } from './nip46Types';
 
 /** Identical to the catalog's PermissionEditorGroup (lib must not import components). */
-export type PermissionBundleGroup = 'public' | 'account' | 'signin' | 'private' | 'wallet';
+type PermissionBundleGroup = 'public' | 'account' | 'signin' | 'private' | 'wallet';
 
 export interface PermissionBundle {
   id: string;

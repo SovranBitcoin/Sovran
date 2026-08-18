@@ -96,7 +96,7 @@ const ProviderLineupSchema = z.object({
 });
 type ProviderLineup = z.infer<typeof ProviderLineupSchema>;
 
-export const AiLineupSchema = z.object({
+const AiLineupSchema = z.object({
   openai: ProviderLineupSchema,
   claude: ProviderLineupSchema,
   grok: ProviderLineupSchema,

@@ -1,6 +1,6 @@
 export const NEAR_PAY_EXIT_ANIMATION_MS = 460;
 
-export type PeerLayoutPhase = 'visible' | 'exiting';
+type PeerLayoutPhase = 'visible' | 'exiting';
 
 export interface NearPayLayoutPeer {
   peerID: string;

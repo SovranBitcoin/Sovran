@@ -650,7 +650,7 @@ function* parseSSEFromText(text: string): Generator<ChatCompletionChunk> {
 export type RoutstrContentPart =
   { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
 
-export type RoutstrMessageContent = string | RoutstrContentPart[];
+type RoutstrMessageContent = string | RoutstrContentPart[];
 
 export interface RoutstrChatMessage {
   role: 'user' | 'assistant' | 'system';

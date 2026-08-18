@@ -117,7 +117,7 @@ export type Nip46EngineError =
   | { type: 'upsert-failed'; cause: UpsertAppError }
   | { type: 'adopt-failed'; cause: AdoptConnectionError | 'inherit_mismatch' };
 
-export interface Nip46EngineStartConfig {
+interface Nip46EngineStartConfig {
   /** Raw bytes are wrapped into an NDKPrivateKeySigner; held only in module state. */
   signer: NDKPrivateKeySigner | Uint8Array;
   /** Hex pubkey of the active profile (= remote-signer pubkey, Amber model). */
@@ -148,7 +148,7 @@ export interface CompleteNostrconnectPairingInput {
 }
 
 /** Structural subset of Nip46Transport the engine drives — injectable in tests. */
-export interface Nip46EngineTransport {
+interface Nip46EngineTransport {
   readonly isStarted: boolean;
   start(params: {
     signer: NDKPrivateKeySigner | Uint8Array;
@@ -184,7 +184,7 @@ export interface Nip46EngineDeps {
   mintRpcId: () => string;
 }
 
-export type OnUserVerdictNeeded = (request: Nip46PendingRequest) => void;
+type OnUserVerdictNeeded = (request: Nip46PendingRequest) => void;
 
 // ── Internals ───────────────────────────────────────────────────
 

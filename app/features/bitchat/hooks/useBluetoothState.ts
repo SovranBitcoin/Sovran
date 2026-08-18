@@ -13,7 +13,7 @@ import {
  * (poweredOn/poweredOff/unauthorized/unsupported/unknown/unavailable) into
  * what the notice UI needs, plus the actions to fix each state.
  */
-export type BluetoothStatus = 'ready' | 'poweredOff' | 'unauthorized' | 'unsupported' | 'unknown';
+type BluetoothStatus = 'ready' | 'poweredOff' | 'unauthorized' | 'unsupported' | 'unknown';
 
 export interface UseBluetoothStateResult {
   status: BluetoothStatus;
