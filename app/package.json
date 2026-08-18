@@ -89,7 +89,6 @@
     "@cashu/coco-react": "2.0.0",
     "@cashudevkit/react-native": "github:crodas/cdk-nitro#v0.17.3",
     "@expo/metro-runtime": "~56.0.17",
-    "@expo/react-native-action-sheet": "^4.1.0",
     "@expo/ui": "~56.0.18",
     "@gandlaf21/bc-ur": "^1.1.12",
     "@gandlaf21/bolt11-decode": "^3.1.1",

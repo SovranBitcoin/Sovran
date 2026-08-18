@@ -22,7 +22,6 @@ import {
   useInitializationState,
   useInitializationReset,
 } from '@/shared/providers/InitializationProvider';
-import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { compose } from '@/shared/lib/utils';
 import { NostrKeysProvider, useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { NostrNDKProvider } from '@/shared/providers/NostrNDKProvider';
@@ -140,7 +139,6 @@ function AccountScopedProviders({
         CocoProvider,
         WalletContextProvider,
         SovranColadaProvider,
-        ActionSheetProvider,
         PricelistProvider,
         // Mounts BitChat DM listeners once per account scope without
         // starting BLE on app launch. BLE discovery announces to nearby

@@ -146,7 +146,7 @@ export function getMeltQuoteTimeUntilExpiry(
  *   [NostrProvider, { relayUrls: RELAY_URLS }],
  *   [WhitenoiseProvider, { accountIndex }],
  *   ThemeProvider,  // Direct component (no props needed)
- *   ActionSheetProvider, // Automatically wrapped in Fragment for single-child requirement
+ *   PricelistProvider, // Automatically wrapped in Fragment for single-child requirement
  * ]);
  *
  * <AppProviders>
