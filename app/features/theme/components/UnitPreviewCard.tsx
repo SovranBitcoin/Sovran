@@ -177,7 +177,7 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
       <View className="absolute bottom-4 left-4 right-4 h-14 rounded-xl bg-black/25" />
 
       {badge ? (
-        <View className="absolute right-2.5 top-2.5 rounded-[10px] bg-[#EF4444] px-2 py-[3px]">
+        <View className="absolute right-2.5 top-2.5 rounded-[10px] bg-red-300 px-2 py-[3px]">
           <Text size={10} bold style={{ color: '#fff' }}>
             {badge}
           </Text>

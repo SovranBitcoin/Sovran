@@ -31,6 +31,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useCountRollIn } from '@/shared/ui/composed/AnimatedCountValue';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { staticColor } from '@/shared/lib/themeEngine';
 
 /** Canonical iconify glyphs for row-accent stats. Use these names so a star
  *  is a star everywhere, an account-group is followers everywhere, etc. */
@@ -56,13 +57,12 @@ export const STAT_ICONS = {
   nip05: 'mdi:check-decagram',
 } as const;
 
-/** Theme blue-300 — shared tint for social / identity stats. Mirrors the
- *  design-system blue ramp (Apple-blue hue at green-matched saturation). */
-export const STAT_COLOR_SOCIAL = '#2A7AD0';
+/** Shared tint for social / identity stats — the design-system blue ramp's
+ *  anchor (Apple-blue hue at green-matched saturation). */
+export const STAT_COLOR_SOCIAL = staticColor['blue-300'];
 
-/** Theme red-300 (Tailwind red-500) — shared tint for audit/error states.
- *  Mirrors the design-system red ramp. */
-export const STAT_COLOR_ERROR = '#EF4444';
+/** Shared tint for audit/error states — the design-system red ramp's anchor. */
+export const STAT_COLOR_ERROR = staticColor['red-300'];
 
 export interface RowStat {
   /** iconify name. Prefer a value from `STAT_ICONS` to stay on-palette. */

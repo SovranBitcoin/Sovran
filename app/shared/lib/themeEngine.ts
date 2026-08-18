@@ -107,6 +107,14 @@ const STATIC_COLOR_VALUES = {
 export type StaticColorToken = keyof typeof STATIC_COLOR_VALUES;
 export const STATIC_COLOR_TOKENS = Object.keys(STATIC_COLOR_VALUES) as StaticColorToken[];
 
+/**
+ * The static ramps as a plain lookup, for the handful of module-scope constants
+ * that need a ramp colour outside a component and so cannot call
+ * `useThemeColor`. These values are identical in every theme, so reading one
+ * here is not a theme bypass — re-typing the hex would be.
+ */
+export const staticColor: Readonly<Record<StaticColorToken, string>> = STATIC_COLOR_VALUES;
+
 /** Wallpaper-derived tokens produced by `getDominantVars` / `getGradientVars`. */
 export const WALLPAPER_TOKENS = [
   'dominant-100',

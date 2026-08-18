@@ -272,11 +272,6 @@
       "count": 1
     }
   },
-  "shared/ui/composed/RowStatsAccent.tsx": {
-    "no-restricted-syntax": {
-      "count": 2
-    }
-  },
   "shared/ui/composed/SpriteView.tsx": {
     "no-restricted-imports": {
       "count": 1
