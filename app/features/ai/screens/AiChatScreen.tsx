@@ -49,14 +49,6 @@ const MESSAGE_ROW_STYLE = { paddingHorizontal: 16 } as const;
  *  is sitting on the keyboard" instead of floating mid-air. */
 const COMPOSER_FOCUSED_BOTTOM_GAP = 0;
 
-/** Hint for FlashList's virtualization math. Measured AI bubbles run
- *  ~74pt for short user pills and 150–400pt for assistant blocks; 80 is
- *  closer to the short-bubble median than to the long-tail average. The
- *  value isn't load-bearing for correctness — only first-render scroll
- *  position accuracy — and FlashList recomputes once real layouts
- *  measure. */
-const ESTIMATED_BUBBLE_HEIGHT = 80;
-
 /**
  * AI tab chat surface. Built directly on FlashList rather than going
  * through the shared `<ChatScreen />` because the AI surface needs a
@@ -174,7 +166,6 @@ export function AiChatScreen() {
       messageCount: activeMessages.length,
       bottomInset,
       headerHeight,
-      estimatedItemSize: ESTIMATED_BUBBLE_HEIGHT,
     });
     return () => {
       aiLog.info('ai.list.unmount', {});
