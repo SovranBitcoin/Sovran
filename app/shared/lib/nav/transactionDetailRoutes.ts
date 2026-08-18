@@ -42,16 +42,6 @@ export function getMeltDetailPathname(entry: HistoryEntry): MeltDetailPathname {
 }
 
 /**
- * Robust melt-route resolution for a VIEWED (persisted) history row.
- *
- * coco's projected melt entry carries no payment method (only `quoteId`,
- * `amount`, `state`), so the sync `getMeltDetailPathname` — which reads a
- * synthetic entry's `metadata.method` / bridged scan annotation — falls back to
- * Lightning for a re-opened onchain send (it looked like "Send Lightning" for a
- * scanned bitcoin address). Here we resolve the method from the canonical melt
- * QUOTE (source of truth) via `quoteId`, so the title/screen are always right.
- */
-/**
  * Confident, synchronous melt route when the entry already knows its method — a
  * fresh/synthetic entry (buildMeltEntry) or a bridged scan annotation. Returns
  * null when the method is unknown (a persisted coco entry), signalling the
@@ -65,6 +55,16 @@ function syncMeltDetailPathname(entry: HistoryEntry): MeltDetailPathname | null 
   return null;
 }
 
+/**
+ * Robust melt-route resolution for a VIEWED (persisted) history row.
+ *
+ * coco's projected melt entry carries no payment method (only `quoteId`,
+ * `amount`, `state`), so the sync `getMeltDetailPathname` — which reads a
+ * synthetic entry's `metadata.method` / bridged scan annotation — falls back to
+ * Lightning for a re-opened onchain send (it looked like "Send Lightning" for a
+ * scanned bitcoin address). Here we resolve the method from the canonical melt
+ * QUOTE (source of truth) via `quoteId`, so the title/screen are always right.
+ */
 async function resolveMeltDetailPathname(entry: HistoryEntry): Promise<MeltDetailPathname> {
   const known = syncMeltDetailPathname(entry);
   if (known) return known;
