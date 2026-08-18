@@ -5,7 +5,7 @@
  * free of any bridge into app state — no `injectedJavaScript`, no `onMessage`
  * wired to wallet/identity surfaces, file access disabled, http(s) only. The
  * web view must never receive nsec / seed / profile data. See
- * `sovran-security-keys` / `critical-failures`.
+ * `sovran-security`.
  */
 import React, { useCallback } from 'react';
 import { StyleSheet } from 'react-native';

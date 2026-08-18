@@ -10,7 +10,7 @@
  * SECURITY: a key embedded in the app bundle is extractable by anyone who
  * reverse-engineers a build, so "only our app can unlock" is best-effort. Only
  * lock LOW-VALUE, rotatable giveaways to this key. See
- * ../.agents/skills/sovran-security-keys/references/secure-storage-key-derivation.md.
+ * ../.agents/skills/sovran-security/references/secure-storage-key-derivation.md.
  *
  * Usage:  node scripts/gen-giveaway-key.mjs
  */

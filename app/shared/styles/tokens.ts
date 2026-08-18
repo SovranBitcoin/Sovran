@@ -21,7 +21,7 @@
  * light/wallpaper switches take effect. These tokens are static module
  * constants baked into the bundle.
  *
- * See `../.agents/skills/sovran-ui-patterns/references/design-tokens.md` for usage guidance.
+ * See `../.agents/skills/sovran-ui/references/design-tokens.md` for usage guidance.
  */
 
 import { Platform, type ViewStyle } from 'react-native';

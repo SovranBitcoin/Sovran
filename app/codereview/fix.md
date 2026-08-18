@@ -14,18 +14,16 @@ behavior. Do not push.
 
 Before selecting a slice, load:
 
-- `sovran-workspace-ops`
-- `sovran-architecture-workflow`
+- `sovran-workspace`
+- `sovran-architecture`
 - `improve-codebase-architecture`
-- `diagnose`
+- `diagnosing-bugs`
 - `tdd`
-- `zoom-out`
-- `sovran-code-quality`
-- `sovran-compatibility-policy`
+- `sovran-quality`
 - domain skills matching the target area
 
 If the slice reveals a reusable rule, update the matching root skill. If the
-right rule wording is unclear, use `sovran-skill-stewardship` and
+right rule wording is unclear, use `sovran-workspace` and
 `grill-with-docs` before adding guidance.
 
 ## Slice Selection
@@ -51,7 +49,7 @@ Good clusters:
 - add missing schema validation at a boundary
 - remove dead exports/files confirmed by knip and grep
 - move code toward Colada/Nagg/Nagg-TS/Schemas ownership
-- fix a critical failure class in `sovran-critical-failures`
+- fix a critical failure class in `sovran-security`
 
 ## Plan Before Editing
 
@@ -76,7 +74,7 @@ Write a short plan with:
 
 ## Verification
 
-Use `sovran-code-quality`. At minimum:
+Use `sovran-quality`. At minimum:
 
 ```bash
 git diff --check
@@ -89,4 +87,4 @@ slice. Before committing, run the full relevant repo gates when practical.
 ## Commit
 
 Commit only if asked or if the active task explicitly calls for a shipped slice.
-Use `sovran-git-pr-quality`. One logical commit per slice. Never push.
+Use `sovran-workspace`. One logical commit per slice. Never push.

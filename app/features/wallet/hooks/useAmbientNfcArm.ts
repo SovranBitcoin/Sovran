@@ -111,7 +111,7 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
           }
           setArmed(true);
           setAmbientNfcCycle(true);
-          // Root-entry reset (sovran-payment-flow-guards): wallet focused +
+          // Root-entry reset (sovran-payments): wallet focused +
           // no payment popup up means no flow is active, so clearing stale
           // amount/mint context before a read can enter the machine is safe.
           clearPaymentContext('wallet.nfc_ambient');

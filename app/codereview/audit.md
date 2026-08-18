@@ -18,13 +18,11 @@ from source/runtime evidence as `UNVERIFIED`.
 
 Load matching root skills from `../.agents/skills` before choosing an entry:
 
-- `sovran-workspace-ops`
-- `sovran-architecture-workflow`
+- `sovran-workspace`
+- `sovran-architecture`
 - `improve-codebase-architecture`
-- `sovran-critical-failures`
-- `sovran-compatibility-policy`
-- `sovran-code-quality`
-- `sovran-log-doctor`
+- `sovran-security`
+- `sovran-quality`
 - domain skills matching the target area
 
 If an audit discovers a reusable failure class, recommend an update to the

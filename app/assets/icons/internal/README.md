@@ -15,4 +15,4 @@ Brand and product-specific glyphs that are bundled into the Monicon registry alo
 - No external `<image>`, `<style>`, or font references — the runtime renders these as static SVG, not a full DOM.
 - Multi-color or gradient icons need to stay as `react-native-svg` components (see the currency icons in `../index.tsx`); the registry's flat-string body format only carries shape data with a single colorable fill/stroke.
 
-See [`sovran-ui-patterns`](../../../../.agents/skills/sovran-ui-patterns/references/icons.md) for when to add to this namespace vs reach for an Iconify glyph.
+See [`sovran-ui`](../../../../../.agents/skills/sovran-ui/references/icons.md) for when to add to this namespace vs reach for an Iconify glyph.
