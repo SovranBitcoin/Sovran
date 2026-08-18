@@ -94,7 +94,6 @@
         "nostr": "workspace:*",
         "nostr-tools": "^2.10.4",
         "npubcash-sdk": "^0.3.2",
-        "number-flow-react-native": "^0.2.5",
         "polished": "^4.3.1",
         "process": "^0.11.10",
         "react": "19.2.3",
@@ -2762,8 +2761,6 @@
     "nth-check": ["nth-check@2.1.1", "", { "dependencies": { "boolbase": "^1.0.0" } }, "sha512-lqjrjmaOoAnWfMmBPL+XNnynZh2+swxiX3WUE0s4yEHI6m+AwrK2UZOimIRl3X/4QctVqS8AiZjFqyOGrMXb/w=="],
 
     "nullthrows": ["nullthrows@1.1.1", "", {}, "sha512-2vPPEi+Z7WqML2jZYddDIfy5Dqb0r2fze2zTxNNknZaFpVHU3mFB3R+DWeJWGVx0ecvttSGlJTI+WG+8Z4cDWw=="],
-
-    "number-flow-react-native": ["number-flow-react-native@0.2.5", "", { "peerDependencies": { "react": ">=18", "react-native": ">=0.73", "react-native-reanimated": ">=3.0.0" } }, "sha512-U7M2elPIhR6op1RiAFJWS5BsMCf59gT6PNA0CC4zno1e1QEIV83+qUemArQ8c/6MVYzWe6ySd5B4aP/jloJ4OA=="],
 
     "nwsapi": ["nwsapi@2.2.24", "", {}, "sha512-7YRhZ3jS45LwmSCT4b2sVFHt/WuovaktDU07QrtOBY2PXskss5a9jfmR9jptyumwXST+rFjrmppMY1KT/yn35A=="],
 

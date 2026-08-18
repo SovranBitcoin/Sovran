@@ -34,7 +34,6 @@
         "cashu-kym",
         "@monicon/metro",
         "metro-minify-terser",
-        "number-flow-react-native",
         "patch-package",
         "react-native-fast-squircle",
         "@noble/curves"
