@@ -80,6 +80,15 @@ interface SkeletonMint {
 
 const noop = () => {};
 
+/** Quiet period the discovered list must hold before the skeleton hands over.
+ *  Operator profiles resolve one at a time and each arrival re-renders a row,
+ *  so swapping in real content on the first result makes the list shift under
+ *  the reader. */
+const RESULTS_SETTLE_QUIET_MS = 500;
+/** Ceiling from mount. A slow trickle of profile resolutions must never hold
+ *  the skeleton open, so the quiet period stops being chased after this. */
+const RESULTS_SETTLE_CEILING_MS = 3000;
+
 /** Stable placeholder rows for the initial-search loading state. Fixed identity
  *  so FlashList keys are stable and each row's seeded placeholder width holds. */
 const SKELETON_MINTS: SkeletonMint[] = Array.from({ length: 5 }, (_, i) => ({
@@ -393,16 +402,6 @@ export function MintAddScreen() {
     { method: methodFilter }
   );
 
-  // Hold a skeleton until the discovered list stops changing for 500ms.
-  // Individual fetchMintInfo calls resolve at different times, causing the list
-  // to shift as mints pop in one-by-one. This waits for them to settle.
-  const [settled, setSettled] = useState(false);
-  useEffect(() => {
-    setSettled(false);
-    const timer = setTimeout(() => setSettled(true), 500);
-    return () => clearTimeout(timer);
-  }, [searchResults]);
-
   const { mints: knownMints } = useMintManagement();
 
   // Subscribe to the unified metadata cache so that when `useMintProfiles`
@@ -459,6 +458,20 @@ export function MintAddScreen() {
     });
     return adapted;
   }, [searchResults, knownMints, searchQuery, validationState, customMintInfo, mintProfileCache]);
+
+  // Hold the skeleton until the discovered list stops changing, so rows do not
+  // pop in one-by-one as operator profiles resolve. One-way: once settled the
+  // skeleton never returns over content already shown.
+  const [resultsSettled, setResultsSettled] = useState(false);
+  useEffect(() => {
+    if (resultsSettled) return;
+    const timer = setTimeout(() => setResultsSettled(true), RESULTS_SETTLE_QUIET_MS);
+    return () => clearTimeout(timer);
+  }, [displayMints, resultsSettled]);
+  useEffect(() => {
+    const ceiling = setTimeout(() => setResultsSettled(true), RESULTS_SETTLE_CEILING_MS);
+    return () => clearTimeout(ceiling);
+  }, []);
 
   // Kick off Nostr profile fetches for any search result that has an operator
   // pubkey in NUT-06 contact info. Results land in `mintMetadataStore`
@@ -608,12 +621,11 @@ export function MintAddScreen() {
   );
 
   const keyExtractor = useCallback((item: SearchableMint) => item.url, []);
-  const showContent = !searchLoading || displayMints.length > 0;
 
   // Feed the result List skeleton placeholders during the first search so the
   // loading rows render through the SAME List + ContactRow path as real rows —
   // identical container chrome, no content shift on the data swap.
-  const isInitialLoading = searchLoading && displayMints.length === 0;
+  const isInitialLoading = searchLoading || !resultsSettled;
   const getItemType = useCallback(
     (item: SearchableMint) => ('isSkeleton' in item ? 'skeleton' : 'mint'),
     []
@@ -637,7 +649,7 @@ export function MintAddScreen() {
   // Log list render state for performance analysis
   useEffect(() => {
     cashuLog.debug('mint.add.list.render', {
-      showContent,
+      isInitialLoading,
       searchLoading,
       itemCount: displayMints.length,
       isSearching,
@@ -646,7 +658,7 @@ export function MintAddScreen() {
       selectedCount: selectedMints.size,
     });
   }, [
-    showContent,
+    isInitialLoading,
     searchLoading,
     displayMints.length,
     isSearching,
