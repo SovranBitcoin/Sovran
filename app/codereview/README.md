@@ -220,7 +220,6 @@ npx tsx codereview/log-doctor/index.ts timeline --event 'visual\\.layout|\\.shif
 # Visual mode joins item-size, measured-position, full virtual-position, and buffered rows by stable row key.
 # `VIEWABLE POSITION COVERAGE` flags visible rows missing measured or virtual positions.
 # `--scope`, `--component`, `--key`, and `--item-type` narrow visual summaries by params.
-# `__tests__/visualLayoutCoverage.test.ts` guards direct LegendList call-site coverage.
 
 # Perf-hunting sequence: measured spans, repeated identical work, nostr waterfall health.
 npx tsx codereview/log-doctor/index.ts perf  --latest

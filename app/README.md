@@ -27,7 +27,7 @@ On-chain Bitcoin inputs are recognized by the parser and by BIP-321 option ranki
 
 ## Current status
 
-<!-- code: app.json; app.config.js; eas.json; package.json; targets/widget/expo-target.config.js; plugins/withLowerPodDeploymentTarget.js; modules/liquid-glass-text/src/LiquidGlassText.tsx; modules/bitchat-module/src/BitChatModule.ts; features/map/screens/MapScreen.tsx; ../colada/src/screen-actions/availability.ts -->
+<!-- code: app.json; app.config.js; eas.json; package.json; targets/widget/expo-target.config.js; plugins/withLowerPodDeploymentTarget.js; modules/liquid-glass-text/src/LiquidGlassText.tsx; modules/bitchat-module/src/BitChatModule.ts; features/map/screens/MapScreen.tsx; ../wallet/src/screen-actions/availability.ts -->
 
 - **Primary target:** iOS app, minimum iOS 16.4.
 - **Version in `app.json`:** 0.1.1.
@@ -38,39 +38,39 @@ On-chain Bitcoin inputs are recognized by the parser and by BIP-321 option ranki
 
 ## Protocol vocabulary
 
-<!-- code: ../nuts/00.md; ../nuts/01.md; ../nuts/02.md; ../nuts/03.md; ../nuts/04.md; ../nuts/05.md; ../nuts/10.md; ../nuts/11.md; ../nuts/13.md; ../nuts/17.md; ../nuts/18.md; ../cashu-ts/src/model/PaymentRequest.ts; ../luds/06.md; ../luds/16.md; ../nips/05.md; ../nips/06.md; ../nips/17.md; ../nips/44.md; ../nips/59.md; ../bips/bip-0321.mediawiki; ../coco/README.md; ../cashu-ts/README.md -->
+<!-- code: ../../nuts/00.md; ../../nuts/01.md; ../../nuts/02.md; ../../nuts/03.md; ../../nuts/04.md; ../../nuts/05.md; ../../nuts/10.md; ../../nuts/11.md; ../../nuts/13.md; ../../nuts/17.md; ../../nuts/18.md; ../../cashu-ts/src/model/PaymentRequest.ts; ../../luds/06.md; ../../luds/16.md; ../../nips/05.md; ../../nips/06.md; ../../nips/17.md; ../../nips/44.md; ../../nips/59.md; ../../bips/bip-0321.mediawiki; ../../coco/README.md; ../../cashu-ts/README.md -->
 
 Sovran uses the names below in the same sense as the sibling protocol repositories.
 
-| Term                      | Meaning in this app                                                                                                                                                            | Reference                                                  |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| Cashu proof               | Spendable ecash input generated from a mint's blind signature.                                                                                                                 | `../nuts/00.md`                                            |
-| Mint / melt / swap        | Minting receives ecash after paying a quote, melting pays a Lightning invoice with proofs, swapping rotates or changes proofs.                                                 | `../nuts/03.md`, `../nuts/04.md`, `../nuts/05.md`          |
-| Keyset                    | The mint's active signing keys for each amount and unit.                                                                                                                       | `../nuts/01.md`, `../nuts/02.md`                           |
-| NUT-10 spending condition | A well-known `Proof.secret` format for extra spend requirements.                                                                                                               | `../nuts/10.md`                                            |
-| NUT-11 P2PK               | Pay-to-Public-Key locked ecash that requires a Schnorr signature from the recipient key to spend.                                                                              | `../nuts/11.md`                                            |
-| NUT-13 restore            | Deterministic secret/counter restore used by Coco-backed recovery flows.                                                                                                       | `../nuts/13.md`                                            |
-| NUT-17 subscriptions      | Mint WebSocket subscriptions used by Coco/NPC-style quote watching where supported.                                                                                            | `../nuts/17.md`                                            |
-| NUT-18 payment request    | Receiver-authored Cashu payment request, encoded as `creqA...` or `creqB...`.                                                                                                  | `../nuts/18.md`, `../cashu-ts/src/model/PaymentRequest.ts` |
-| BOLT-11                   | Lightning invoice format used for mint quotes and melt quotes.                                                                                                                 | `@gandlaf21/bolt11-decode`, Lightning BOLTs                |
-| LNURL-pay                 | Static pay endpoint flow that returns a BOLT-11 invoice after amount selection.                                                                                                | `../luds/06.md`                                            |
-| Lightning address         | `name@domain` identifier that resolves to an LNURL-pay endpoint.                                                                                                               | `../luds/16.md`                                            |
-| NIP-05                    | DNS-based mapping from an internet identifier to a Nostr pubkey.                                                                                                               | `../nips/05.md`                                            |
-| NIP-06                    | BIP-39/BIP-32 derivation path `m/44'/1237'/<account>'/0/0` for Nostr keys.                                                                                                     | `../nips/06.md`                                            |
-| NIP-17 / NIP-44 / NIP-59  | Private DMs: unsigned rumors, NIP-44 v2 encryption, seals, and gift wraps.                                                                                                     | `../nips/17.md`, `../nips/44.md`, `../nips/59.md`          |
-| BIP-321                   | Modern `bitcoin:` URI replacement for BIP-21, including standard payment-instruction query parameters. Sovran also recognizes non-standard `cashu` hints inside the container. | `../bips/bip-0321.mediawiki`                               |
-| Coco                      | Headless TypeScript Cashu wallet toolkit; Sovran uses `@cashu/coco-core`, `@cashu/coco-react`, and `@cashu/coco-expo-sqlite`.                                                  | `../coco/README.md`                                        |
-| cashu-ts                  | TypeScript Cashu protocol library used for low-level token/payment-request parsing and Cashu helpers.                                                                          | `../cashu-ts/README.md`                                    |
+| Term                      | Meaning in this app                                                                                                                                                            | Reference                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| Cashu proof               | Spendable ecash input generated from a mint's blind signature.                                                                                                                 | `../../nuts/00.md`                                               |
+| Mint / melt / swap        | Minting receives ecash after paying a quote, melting pays a Lightning invoice with proofs, swapping rotates or changes proofs.                                                 | `../../nuts/03.md`, `../../nuts/04.md`, `../../nuts/05.md`       |
+| Keyset                    | The mint's active signing keys for each amount and unit.                                                                                                                       | `../../nuts/01.md`, `../../nuts/02.md`                           |
+| NUT-10 spending condition | A well-known `Proof.secret` format for extra spend requirements.                                                                                                               | `../../nuts/10.md`                                               |
+| NUT-11 P2PK               | Pay-to-Public-Key locked ecash that requires a Schnorr signature from the recipient key to spend.                                                                              | `../../nuts/11.md`                                               |
+| NUT-13 restore            | Deterministic secret/counter restore used by Coco-backed recovery flows.                                                                                                       | `../../nuts/13.md`                                               |
+| NUT-17 subscriptions      | Mint WebSocket subscriptions used by Coco/NPC-style quote watching where supported.                                                                                            | `../../nuts/17.md`                                               |
+| NUT-18 payment request    | Receiver-authored Cashu payment request, encoded as `creqA...` or `creqB...`.                                                                                                  | `../../nuts/18.md`, `../../cashu-ts/src/model/PaymentRequest.ts` |
+| BOLT-11                   | Lightning invoice format used for mint quotes and melt quotes.                                                                                                                 | `@gandlaf21/bolt11-decode`, Lightning BOLTs                      |
+| LNURL-pay                 | Static pay endpoint flow that returns a BOLT-11 invoice after amount selection.                                                                                                | `../../luds/06.md`                                               |
+| Lightning address         | `name@domain` identifier that resolves to an LNURL-pay endpoint.                                                                                                               | `../../luds/16.md`                                               |
+| NIP-05                    | DNS-based mapping from an internet identifier to a Nostr pubkey.                                                                                                               | `../../nips/05.md`                                               |
+| NIP-06                    | BIP-39/BIP-32 derivation path `m/44'/1237'/<account>'/0/0` for Nostr keys.                                                                                                     | `../../nips/06.md`                                               |
+| NIP-17 / NIP-44 / NIP-59  | Private DMs: unsigned rumors, NIP-44 v2 encryption, seals, and gift wraps.                                                                                                     | `../../nips/17.md`, `../../nips/44.md`, `../../nips/59.md`       |
+| BIP-321                   | Modern `bitcoin:` URI replacement for BIP-21, including standard payment-instruction query parameters. Sovran also recognizes non-standard `cashu` hints inside the container. | `../../bips/bip-0321.mediawiki`                                  |
+| Coco                      | Headless TypeScript Cashu wallet toolkit; Sovran uses `@cashu/coco-core`, `@cashu/coco-react`, and `@cashu/coco-expo-sqlite`.                                                  | `../../coco/README.md`                                           |
+| cashu-ts                  | TypeScript Cashu protocol library used for low-level token/payment-request parsing and Cashu helpers.                                                                          | `../../cashu-ts/README.md`                                       |
 
 ## Feature inventory
 
-<!-- code: features/; shared/; ../colada/; modules/; targets/widget/ -->
+<!-- code: features/; shared/; ../wallet/; modules/; targets/widget/ -->
 
 _Reference — every capability Sovran ships today, organized by concern. Each item is either checked (`[x]` — shipping) or unchecked (`[ ]` — recognized in the code but not yet enabled)._
 
 ### Payment rails
 
-<!-- code: ../colada/src/parse.ts; ../colada/src/detectors.ts; ../colada/src/machine/createMachine.ts; ../colada/src/operations/defaultOperations.ts; features/send/lib/sovranPaymentConfig.ts; shared/lib/cashu/manager.ts; shared/lib/cashu/npc.ts; shared/stores/profile/npcMintStore.ts; features/onboarding/screens/ClaimUsernameScreen.tsx; shared/ui/composed/QRCode.tsx -->
+<!-- code: ../wallet/src/parse.ts; ../wallet/src/detectors.ts; ../wallet/src/machine/createMachine.ts; ../wallet/src/operations/defaultOperations.ts; features/send/lib/sovranPaymentConfig.ts; shared/lib/cashu/manager.ts; shared/lib/cashu/npc.ts; shared/stores/profile/npcMintStore.ts; features/onboarding/screens/ClaimUsernameScreen.tsx; shared/ui/composed/QRCode.tsx -->
 
 - [x] **Cashu ecash** — proofs, tokens, payment requests via [`@cashu/cashu-ts`](https://github.com/cashubtc/cashu-ts)
   - [x] **P2PK receive** — receive tokens whose proofs carry a NUT-10 well-known secret of kind `P2PK` (NUT-11) locked to your pubkey; unlocked automatically with the active profile's key
@@ -197,7 +197,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Scanning & input
 
-<!-- code: features/camera/screens/CameraScreen/CameraScreen.tsx; features/camera/screens/CameraScreen/CameraLayout.tsx; features/camera/hooks/useHandleCameraPermission.ts; features/camera/screens/StandaloneCameraScreen.tsx; ../colada/src/parse.ts; ../colada/src/normalize.ts; ../colada/src/detectors.ts; ../colada/src/machine/createMachine.ts; features/send/lib/sovranPaymentConfig.ts -->
+<!-- code: features/camera/screens/CameraScreen/CameraScreen.tsx; features/camera/screens/CameraScreen/CameraLayout.tsx; features/camera/hooks/useHandleCameraPermission.ts; features/camera/screens/StandaloneCameraScreen.tsx; ../wallet/src/parse.ts; ../wallet/src/normalize.ts; ../wallet/src/detectors.ts; ../wallet/src/machine/createMachine.ts; features/send/lib/sovranPaymentConfig.ts -->
 
 - [x] **Unified parser** — one parser handles paste / scan / NFC / deeplink and ranks results so the most useful option surfaces first
 - [x] **Recognized payloads**
@@ -218,7 +218,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Deeplinks & URL schemes
 
-<!-- code: app.json; app.config.js; app/_layout.tsx; ../colada/src/react/ColadaProvider.tsx; ../colada/src/normalize.ts; ../colada/src/parse.ts; ../colada/src/intent.ts; shared/lib/nav/routeSchemas.ts -->
+<!-- code: app.json; app.config.js; app/_layout.tsx; ../wallet/src/react/ColadaProvider.tsx; ../wallet/src/normalize.ts; ../wallet/src/parse.ts; ../wallet/src/intent.ts; shared/lib/nav/routeSchemas.ts -->
 
 - [x] **Custom schemes** — `bitcoin:`, `lightning:`, `lnurl:`, `cashu:`, `nostr:`, `web+nostr:`
 - [x] **Sovran scheme** — `sovran://` for in-app routes
@@ -276,7 +276,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Send & receive
 
-<!-- code: features/send/providers/Colada.tsx; features/send/lib/sovranPaymentConfig.ts; features/send/lib/createSovranScreenActionsBridge.ts; features/send/screens/AmountFlowScreen.tsx; features/send/screens/AmountSelector.tsx; features/send/screens/LightningSendScreen.tsx; features/send/screens/OnchainSendScreen.tsx; features/send/screens/PaymentRequestScreen.tsx; features/send/screens/SendTokenScreen.tsx; features/receive/screens/ReceiveScreen.tsx; features/receive/screens/LightningReceiveScreen.tsx; features/receive/screens/OnchainReceiveScreen.tsx; features/receive/screens/ReceiveTokenScreen.tsx; ../colada/src/machine/transitions.ts; ../colada/src/screen-actions/availability.ts -->
+<!-- code: features/send/providers/Colada.tsx; features/send/lib/sovranPaymentConfig.ts; features/send/lib/createSovranScreenActionsBridge.ts; features/send/screens/AmountFlowScreen.tsx; features/send/screens/AmountSelector.tsx; features/send/screens/LightningSendScreen.tsx; features/send/screens/OnchainSendScreen.tsx; features/send/screens/PaymentRequestScreen.tsx; features/send/screens/SendTokenScreen.tsx; features/receive/screens/ReceiveScreen.tsx; features/receive/screens/LightningReceiveScreen.tsx; features/receive/screens/OnchainReceiveScreen.tsx; features/receive/screens/ReceiveTokenScreen.tsx; ../wallet/src/machine/transitions.ts; ../wallet/src/screen-actions/availability.ts -->
 
 - [x] **Send flow state machine** — `colada` machine drives amount → mint → recipient → execute
 - [x] **Recipient identity enrichment** — NIP-05 + Nostr profile resolved before you confirm
@@ -365,14 +365,14 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Not yet shipped
 
-<!-- code: ../colada/src/screen-actions/availability.ts; ../colada/src/screen-actions/defaultHandlers.ts; ../colada/src/intent.ts; ../colada/src/parse.ts; app.json; eas.json; modules/bitchat-module/src/BitChatModule.ts; features/map/screens/MapScreen.tsx -->
+<!-- code: ../wallet/src/screen-actions/availability.ts; ../wallet/src/screen-actions/defaultHandlers.ts; ../wallet/src/intent.ts; ../wallet/src/parse.ts; app.json; eas.json; modules/bitchat-module/src/BitChatModule.ts; features/map/screens/MapScreen.tsx -->
 
 - [ ] **On-chain send/receive rail** — the parser recognizes addresses and BIP-321 onchain hints, but `availability.ts` marks the rail "Coming soon" and the send handler logs `onchainNotSupported`. No mint-quote-driven on-chain receive yet.
 - [ ] **Production Android release** — Android app config, EAS scripts, JS fallbacks, and many Android-specific UI branches exist, but iOS remains the shipping target and some native features are iOS-only.
 
 ## Technical shape
 
-<!-- code: package.json; bun.lock; tsconfig.json; eslint.config.js; jest.config.js; patches/; app/; features/; shared/; modules/; targets/widget/; ../colada/; ../../skills/; AGENTS.md; CLAUDE.md -->
+<!-- code: package.json; bun.lock; tsconfig.json; eslint.config.js; jest.config.js; patches/; app/; features/; shared/; modules/; targets/widget/; ../wallet/; ../../skills/; AGENTS.md; CLAUDE.md -->
 
 ### Stack
 
@@ -395,7 +395,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Repository map
 
-<!-- code: app/; features/; shared/; ../colada/; modules/; targets/widget/; patches/; ../../skills/; AGENTS.md -->
+<!-- code: app/; features/; shared/; ../wallet/; modules/; targets/widget/; patches/; ../../skills/; AGENTS.md -->
 
 - `app/` — Expo Router routes and route-group stacks.
 - `features/` — domain modules for wallet, send, receive, mint, transactions, feed, contacts, AI, map, split bill, settings, BitChat, Whitenoise, theme, and onboarding.
