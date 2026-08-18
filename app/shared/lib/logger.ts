@@ -44,6 +44,7 @@ export {
   wnLog,
   popupLog,
   mapLog,
+  themeLog,
 } from './loggerCore';
 
 export { applyFileLogging, exportLogFile, clearLogFile, getLogFileInfo } from './loggerFile';

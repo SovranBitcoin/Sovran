@@ -15,7 +15,7 @@ type SemanticVars = Record<string, string>;
  *
  * Uniwind's runtime does NOT follow var() chains, so both forms are needed.
  */
-const STATIC_COLOR_VALUES: Record<string, string> = {
+const STATIC_COLOR_VALUES = {
   // shade-* mirrors the blue ramp (the brand-neutral). shade-0 and -50
   // are near-white surface tints; -100 through -500 match blue-100..500.
   'shade-0': '#F8FAFC',
@@ -97,6 +97,27 @@ const STATIC_COLOR_VALUES: Record<string, string> = {
   'orange-400': '#C87614',
   'orange-500': '#9A5A0F',
 };
+
+/**
+ * The app-owned colour tokens, derived from the declarations above rather than
+ * restated by hand. `useThemeColor`'s `ColorToken` builds on these, and
+ * `__tests__/themeTokens.test.ts` asserts the two stay in step.
+ */
+export type StaticColorToken = keyof typeof STATIC_COLOR_VALUES;
+export const STATIC_COLOR_TOKENS = Object.keys(STATIC_COLOR_VALUES) as StaticColorToken[];
+
+/** Wallpaper-derived tokens produced by `getDominantVars` / `getGradientVars`. */
+export const WALLPAPER_TOKENS = [
+  'dominant-100',
+  'dominant-200',
+  'dominant-300',
+  'dominant-400',
+  'dominant-500',
+  'gradient-100',
+  'gradient-200',
+  'gradient-300',
+] as const;
+export type WallpaperToken = (typeof WALLPAPER_TOKENS)[number];
 
 const STATIC_COLORS: SemanticVars = Object.fromEntries(
   Object.entries(STATIC_COLOR_VALUES).flatMap(([name, hex]) => [
