@@ -33,13 +33,5 @@
       "neverthrow/*": ["./node_modules/neverthrow/*", "../node_modules/neverthrow/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"],
-  "exclude": [
-    "sovran.money/**",
-    "coco/**",
-    "eNuts/**",
-    "heroui-native/**",
-    "coco-cashu-plugin-p2pk-import/node_modules/**",
-    "coco-cashu-plugin-p2pk-import/dist/**"
-  ]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
 }
