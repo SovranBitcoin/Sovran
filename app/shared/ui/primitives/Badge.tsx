@@ -55,12 +55,16 @@ import { withAlpha } from '@/shared/lib/color';
  * difference is entirely in `getVariantStyles` / `getTextColor` below, which
  * switch on `variant` to pick theme colours.
  *
- * This was a `cva()` call whose six variant entries were all empty strings, so
- * it only ever returned this constant. The class list is unchanged from that
- * call, web-only utilities included.
+ * The web-only tail this carried from its shadcn origins
+ * (`transition-colors focus:outline-none focus:ring-2 focus:ring-ring
+ * focus:ring-offset-2`) is gone. `transition-colors` animates colour properties
+ * set by classes, and this className sets none — the badge's colours come from
+ * the `style` object below, which a class transition cannot observe. The
+ * `focus:` variants need an element that can take focus, and the badge renders a
+ * plain `View`. `focus:ring-ring` was the last reference to the shadcn
+ * `--color-ring` alias.
  */
-const BADGE_CLASS =
-  'rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2';
+const BADGE_CLASS = 'rounded-full border';
 
 type BadgeVariant = 'star' | 'primary' | 'secondary' | 'warning' | 'error' | 'success';
 

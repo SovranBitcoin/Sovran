@@ -1,3 +1,4 @@
+import type { ThemeColor } from 'heroui-native/hooks';
 import { useCSSVariable } from 'uniwind';
 
 import { themeLog } from '@/shared/lib/logger';
@@ -32,15 +33,23 @@ import type { StaticColorToken, WallpaperToken } from '@/shared/lib/themeEngine'
  */
 
 /**
- * HeroUI semantic tokens. Hand-maintained because 22 of them are declared by
- * vendored heroui CSS rather than by this repo — see the note above. Keep it a
- * `const` array, not a bare union: the parity test needs the names at runtime.
+ * Tokens this repo owns on top of HeroUI's set. `skeleton` is declared by
+ * `themeEngine` and `global.css`, not by heroui.
+ */
+const APP_SEMANTIC_TOKENS = ['skeleton'] as const;
+
+/**
+ * HeroUI's semantic tokens, mirrored so the parity test has the names at
+ * runtime — heroui declares them but does not export the array, only the
+ * `ThemeColor` union built from it.
+ *
+ * The two assertions below make this a mirror rather than a copy: `satisfies`
+ * rejects a name heroui does not have, and `Exhaustive` fails to compile if
+ * heroui gains one this list is missing, naming the token. A `bun update
+ * heroui-native` that changes the token set is a type error, not a surprise.
  */
 export const SEMANTIC_TOKENS = [
   'background',
-  'background-secondary',
-  'background-tertiary',
-  'background-inverse',
   'foreground',
   'surface',
   'surface-foreground',
@@ -51,50 +60,73 @@ export const SEMANTIC_TOKENS = [
   'surface-tertiary-foreground',
   'overlay',
   'overlay-foreground',
+  'backdrop',
   'muted',
-  'default',
-  'default-foreground',
-  'default-hover',
   'accent',
   'accent-foreground',
-  'accent-hover',
-  'accent-soft',
-  'accent-soft-foreground',
-  'danger',
-  'danger-foreground',
-  'danger-hover',
-  'danger-soft',
-  'danger-soft-foreground',
-  'success',
-  'success-foreground',
-  'success-hover',
-  'success-soft',
-  'success-soft-foreground',
-  'warning',
-  'warning-foreground',
-  'warning-hover',
-  'warning-soft',
-  'warning-soft-foreground',
   'segment',
   'segment-foreground',
-  'skeleton',
   'border',
-  'border-secondary',
-  'border-tertiary',
   'separator',
-  'separator-secondary',
-  'separator-tertiary',
   'focus',
   'link',
+  'default',
+  'default-foreground',
+  'success',
+  'success-foreground',
+  'warning',
+  'warning-foreground',
+  'danger',
+  'danger-foreground',
   'field',
   'field-foreground',
   'field-placeholder',
   'field-border',
-] as const;
+  'background-secondary',
+  'background-tertiary',
+  'background-inverse',
+  'default-hover',
+  'accent-hover',
+  'success-hover',
+  'warning-hover',
+  'danger-hover',
+  'field-hover',
+  'field-focus',
+  'field-border-hover',
+  'field-border-focus',
+  'default-soft',
+  'default-soft-foreground',
+  'default-soft-hover',
+  'accent-soft',
+  'accent-soft-foreground',
+  'accent-soft-hover',
+  'danger-soft',
+  'danger-soft-foreground',
+  'danger-soft-hover',
+  'warning-soft',
+  'warning-soft-foreground',
+  'warning-soft-hover',
+  'success-soft',
+  'success-soft-foreground',
+  'success-soft-hover',
+  'separator-secondary',
+  'separator-tertiary',
+  'border-secondary',
+  'border-tertiary',
+  ...APP_SEMANTIC_TOKENS,
+] as const satisfies readonly (ThemeColor | AppSemanticToken)[];
 
+type AppSemanticToken = (typeof APP_SEMANTIC_TOKENS)[number];
 type SemanticToken = (typeof SEMANTIC_TOKENS)[number];
 
-type ColorToken = SemanticToken | StaticColorToken | WallpaperToken;
+/** Resolves to `never` only while every heroui token is mirrored above. */
+type Exhaustive<T extends never> = T;
+type AllHerouiTokensMirrored = Exhaustive<Exclude<ThemeColor, SemanticToken>>;
+
+// `AllHerouiTokensMirrored` is `never`, so it adds nothing to this union — it is
+// here so the check above is *used*, and so a heroui upgrade that adds a token
+// fails type-check here, naming it, instead of silently falling back at runtime.
+type ColorToken = SemanticToken | StaticColorToken | WallpaperToken | AllHerouiTokensMirrored;
 
 type StringTuple<N extends number, A extends string[] = []> = A['length'] extends N
   ? A

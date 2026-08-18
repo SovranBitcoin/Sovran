@@ -70,19 +70,6 @@
 
   /* Skeleton loading placeholder — decoupled from accent */
   --color-skeleton: var(--skeleton);
-
-  /* Backward-compat aliases for shadcn class names -> HeroUI tokens */
-  --color-card: var(--surface);
-  --color-card-foreground: var(--surface-foreground);
-  --color-popover: var(--overlay);
-  --color-popover-foreground: var(--overlay-foreground);
-  --color-secondary: var(--surface-secondary);
-  --color-secondary-foreground: var(--surface-secondary-foreground);
-  --color-destructive: var(--danger);
-  --color-destructive-foreground: var(--danger-foreground);
-  --color-input: var(--field-background, var(--default));
-  --color-ring: var(--focus);
-  --color-muted-foreground: var(--muted);
 }
 
 @layer base {
