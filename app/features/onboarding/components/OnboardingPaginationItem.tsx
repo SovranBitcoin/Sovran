@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { Log } from '@/shared/lib/logger';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 
 import Animated, {
   cancelAnimation,
@@ -166,7 +167,7 @@ const OnboardingPaginationItem: React.FC<OnboardingPaginationItemProps> = ({
         ]}>
         <Animated.View
           style={[
-            { backgroundColor: 'white', position: 'absolute', top: 0, bottom: 0, left: 0 },
+            { backgroundColor: INVARIANT_WHITE, position: 'absolute', top: 0, bottom: 0, left: 0 },
             barProgressStyle,
           ]}
         />

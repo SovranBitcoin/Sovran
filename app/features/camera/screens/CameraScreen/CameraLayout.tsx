@@ -8,6 +8,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import type { CameraScreenShared } from './types';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 import { Log } from '@/shared/lib/logger';
+import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface CameraLayoutProps extends CameraScreenShared {
@@ -90,8 +91,8 @@ export function CameraLayout({
             style={{
               borderLeftWidth: 4,
               borderTopWidth: 4,
-              borderColor: 'white',
-              shadowColor: 'black',
+              borderColor: INVARIANT_WHITE,
+              shadowColor: INVARIANT_BLACK,
               shadowOffset: { width: 0, height: 1 },
               shadowOpacity: 0.2,
               shadowRadius: 1,
@@ -103,8 +104,8 @@ export function CameraLayout({
             style={{
               borderTopWidth: 4,
               borderRightWidth: 4,
-              borderColor: 'white',
-              shadowColor: 'black',
+              borderColor: INVARIANT_WHITE,
+              shadowColor: INVARIANT_BLACK,
               shadowOffset: { width: 0, height: 1 },
               shadowOpacity: 0.2,
               shadowRadius: 1,
@@ -116,8 +117,8 @@ export function CameraLayout({
             style={{
               borderBottomWidth: 4,
               borderLeftWidth: 4,
-              borderColor: 'white',
-              shadowColor: 'black',
+              borderColor: INVARIANT_WHITE,
+              shadowColor: INVARIANT_BLACK,
               shadowOffset: { width: 0, height: 1 },
               shadowOpacity: 0.2,
               shadowRadius: 1,
@@ -129,8 +130,8 @@ export function CameraLayout({
             style={{
               borderBottomWidth: 4,
               borderRightWidth: 4,
-              borderColor: 'white',
-              shadowColor: 'black',
+              borderColor: INVARIANT_WHITE,
+              shadowColor: INVARIANT_BLACK,
               shadowOffset: { width: 0, height: 1 },
               shadowOpacity: 0.2,
               shadowRadius: 1,

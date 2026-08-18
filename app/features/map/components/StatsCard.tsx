@@ -8,7 +8,7 @@ import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { alpha, radius, shadow, spacing, fontSize } from '@/shared/styles/tokens';
 import { useCapabilities } from '@/shared/ui/capability';
-import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
+import { BITCOIN_ACCENT, INVARIANT_BLACK } from '@/shared/lib/brandColors';
 import { MERCHANT_CATEGORIES, type MerchantCategoryId } from '@/shared/lib/map/categories';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    shadowColor: 'black',
+    shadowColor: INVARIANT_BLACK,
     ...shadow.md,
   },
   fallbackText: {

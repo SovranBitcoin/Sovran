@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { StoriesCarousel, type StoryUser } from '@/features/feed/components/nostr/StoriesCarousel';
 import { Log, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { INVARIANT_BLACK } from '@/shared/lib/brandColors';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const CLOSE_DELAY_MS = 350;
@@ -74,7 +75,7 @@ export function StoriesScreen() {
       name="StoriesScreen"
       style={{
         flex: 1,
-        backgroundColor: 'black',
+        backgroundColor: INVARIANT_BLACK,
         paddingTop: insets.top + 6,
         paddingBottom: insets.bottom + 6,
       }}>

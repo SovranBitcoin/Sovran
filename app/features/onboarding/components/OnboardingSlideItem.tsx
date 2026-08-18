@@ -12,6 +12,7 @@ import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { OnboardingSlide } from './types';
 import { Log } from '@/shared/lib/logger';
+import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 
 type OnboardingSlideItemProps = {
   item: OnboardingSlide;
@@ -48,7 +49,7 @@ const OnboardingSlideItem: React.FC<OnboardingSlideItemProps> = ({
             paddingHorizontal: 24,
             borderRadius: 24,
             backgroundColor: item.bgColor,
-            shadowColor: 'black',
+            shadowColor: INVARIANT_BLACK,
             shadowOffset: { width: 0, height: 12 },
             shadowOpacity: 0.25,
             shadowRadius: 3.84,
@@ -56,7 +57,7 @@ const OnboardingSlideItem: React.FC<OnboardingSlideItemProps> = ({
             gap: 16,
           }}>
           <Icon name={item.icon} size={64} color="rgba(255,255,255,0.9)" />
-          <Text bold size={28} style={{ color: 'white', textAlign: 'center' }}>
+          <Text bold size={28} style={{ color: INVARIANT_WHITE, textAlign: 'center' }}>
             {item.title}
           </Text>
           <Text size={15} style={{ color: 'rgba(255,255,255,0.8)', textAlign: 'center' }}>
