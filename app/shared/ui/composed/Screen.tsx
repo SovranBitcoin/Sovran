@@ -68,7 +68,6 @@ interface ScreenProps {
    * measured footer height (or 16 when no footer).
    */
   bottomPadding?: number;
-  debug?: boolean;
   disableHeaderSpacer?: boolean;
   onHeaderHeightChange?: (height: number) => void;
   scrollIndicatorInsets?: { top?: number; right?: number; bottom?: number; left?: number };
@@ -114,7 +113,6 @@ export function Screen({
   headerGradientHeight,
   bgColor,
   bottomPadding,
-  debug,
   disableHeaderSpacer,
   onHeaderHeightChange,
   scrollIndicatorInsets,
@@ -202,7 +200,6 @@ export function Screen({
       <ScreenBackgroundContext.Provider value={resolvedBgColor}>
         <ScreenFooterContext.Provider value={footerContextValue}>
           <ModalLayoutWrapper
-            debug={debug}
             contentPadding={contentPadding}
             headerGradient={headerGradient}
             headerGradientHeight={headerGradientHeight}

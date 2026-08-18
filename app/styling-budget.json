@@ -907,7 +907,6 @@
     "stylesheet-create": 1
   },
   "shared/ui/composed/LayoutDebugWrapper.tsx": {
-    "inline-style": 11,
     "content-container-style": 1
   },
   "shared/ui/composed/ListRow.tsx": {
@@ -920,7 +919,7 @@
   },
   "shared/ui/composed/ModalLayoutWrapper.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 11,
+    "inline-style": 5,
     "content-container-style": 3
   },
   "shared/ui/composed/PillTabs.tsx": {

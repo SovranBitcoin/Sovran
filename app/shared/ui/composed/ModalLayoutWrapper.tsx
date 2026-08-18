@@ -1,12 +1,10 @@
 /**
- * Reusable wrapper for modal screens with optional debug overlays.
+ * Reusable wrapper for modal screens.
  * Handles safe areas, scroll behavior, header gradient, sticky content.
- * Set debug={true} to see layout debug indicators.
  */
 
-import { ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { ReactNode, useContext, useEffect, useState } from 'react';
 import {
-  NativeScrollEvent,
   Platform,
   ScrollView,
   StyleSheet,
@@ -21,15 +19,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { HeaderHeightContext } from 'expo-router/react-navigation';
 import { SheetHeaderHeightContext } from '@/shared/ui/composed/AndroidSheetRoot';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScrollEdgeFade } from './ScrollEdgeFade';
 import { FLOW_SHEET_SCRIM_OVERHANG } from './FlowSheetHeader';
-import { Text } from '@/shared/ui/primitives/Text';
 import { Log, log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
-import { DebugRow } from '@/shared/ui/composed/LayoutDebugWrapper';
 
 /** Measured iOS flow-modal (pageSheet) header height — a STABLE, frame-0 value
  *  used instead of the navigator header height, which react-native-screens seeds
@@ -92,8 +87,6 @@ function AnimatedScrollContainer({
 
 interface ModalLayoutWrapperProps {
   children: ReactNode;
-  /** Enable debug overlays to visualize safe areas and header height */
-  debug?: boolean;
   /** Additional horizontal padding for content container (default: 16) */
   contentPadding?: number;
   /** Enable blur/gradient effect below the native header */
@@ -136,7 +129,6 @@ interface ModalLayoutWrapperProps {
 
 export function ModalLayoutWrapper({
   children,
-  debug = false,
   contentPadding = 16,
   headerGradient = false,
   headerGradientHeight,
@@ -163,7 +155,6 @@ export function ModalLayoutWrapper({
   const sheetHeaderHeight = useContext(SheetHeaderHeightContext);
   const navigatorHeaderHeight = useContext(HeaderHeightContext) ?? 0;
   const headerHeight = sheetHeaderHeight ?? navigatorHeaderHeight;
-  const insets = useSafeAreaInsets();
   // Inside an Android formSheet the JS FlowSheetHeader paints a scrim whose
   // ~32dp eased fade tail deliberately overhangs below the measured bar — and
   // that absolute scrim doesn't feed HeaderHeightContext, so the reserved inset
@@ -184,23 +175,9 @@ export function ModalLayoutWrapper({
   const themeBackground = useThemeColor('background');
   const background = bgColor ?? themeBackground;
 
-  const [adjustedInsets, setAdjustedInsets] = useState({ top: 0, bottom: 0, left: 0, right: 0 });
-
   // The animated-scroll shared value + handler live in AnimatedScrollContainer
   // below, so every non-animated modal (the common case) doesn't pay the
   // per-mount Reanimated worklet/shared-value registration.
-
-  const handleScroll = useCallback((event: { nativeEvent: NativeScrollEvent }) => {
-    const { contentInset } = event.nativeEvent;
-    if (contentInset) {
-      setAdjustedInsets({
-        top: contentInset.top,
-        bottom: contentInset.bottom,
-        left: contentInset.left,
-        right: contentInset.right,
-      });
-    }
-  }, []);
 
   const gradientHeight = headerGradientHeight ?? stableHeaderBottom;
   // The declared stickyContentHeight prop is only a first-frame estimate —
@@ -245,20 +222,10 @@ export function ModalLayoutWrapper({
   return (
     <Log name="ModalLayoutWrapper">
       <View className="flex-1" style={{ backgroundColor: background }}>
-        {/* Debug-only outlines/zones. Kept off the tree entirely when not
-            debugging so `react-native-screens`' `findScrollViewInFirstDescendant`
-            chain finder can walk through `subviews[0]` and reach the actual
-            scroll view — iOS 26's `scrollEdgeEffects` screen option only
-            applies if the finder can reach the scroll view, and a leaf View
-            at index 0 breaks that traversal. */}
-        {debug && (
-          <View
-            className="absolute inset-0"
-            pointerEvents="none"
-            style={{ borderWidth: 2, borderColor: 'blue' }}
-          />
-        )}
-
+        {/* Nothing may be added as the first child here: `react-native-screens`'
+            `findScrollViewInFirstDescendant` chain finder walks `subviews[0]` to
+            reach the scroll view, and iOS 26's `scrollEdgeEffects` screen option
+            only applies if it gets there. A leaf View at index 0 breaks it. */}
         {/* Skip inside Android formSheets: FlowSheetHeader already paints the
             header scrim there, and this fade's entire ramp lands inside the
             header band (its lower half paints nothing) — it only doubled the
@@ -280,28 +247,6 @@ export function ModalLayoutWrapper({
           </View>
         )}
 
-        {debug && (
-          <View
-            className="absolute left-0 right-0 top-0 z-[100] items-center justify-end pb-1"
-            style={{ height: headerHeight, backgroundColor: 'rgba(255,0,0,0.2)' }}
-            pointerEvents="none">
-            <Text className="text-[10px] font-bold" style={{ color: 'red' }}>
-              header: {headerHeight}px
-            </Text>
-          </View>
-        )}
-
-        {debug && (
-          <View
-            className="absolute bottom-0 left-0 right-0 z-[100] items-center justify-center"
-            style={{ height: insets.bottom, backgroundColor: 'rgba(0,255,255,0.3)' }}
-            pointerEvents="none">
-            <Text className="text-[9px] font-bold" style={{ color: 'cyan' }}>
-              safe: {insets.bottom}px
-            </Text>
-          </View>
-        )}
-
         {useCustomScrollView ? (
           <View style={{ flex: 1 }}>{children}</View>
         ) : useAnimatedScroll ? (
@@ -317,8 +262,6 @@ export function ModalLayoutWrapper({
           <ScrollView
             className="flex-1"
             contentInsetAdjustmentBehavior="automatic"
-            scrollEventThrottle={16}
-            onScroll={handleScroll}
             // Android: see the nested-scroll note on AnimatedScrollContainer
             // above — required so the native form-sheet scrolls the content
             // instead of dismissing when the user drags back toward the top.
@@ -330,51 +273,6 @@ export function ModalLayoutWrapper({
         )}
 
         {bottomContent}
-
-        {debug && (
-          <View
-            className="absolute right-2 rounded-lg border border-white/30 bg-black/90 p-3"
-            style={{ top: headerHeight + stickyContentHeight + 8 }}
-            pointerEvents="none">
-            <Text className="mb-2 text-[10px] font-bold text-white">📐 Debug</Text>
-            <DebugRow label="header" value={`${headerHeight}px`} color="red" fontSize={10} />
-            <DebugRow label="insets.top" value={`${insets.top}px`} color="orange" fontSize={10} />
-            <DebugRow
-              label="insets.bottom"
-              value={`${insets.bottom}px`}
-              color="cyan"
-              fontSize={10}
-            />
-            <DebugRow
-              label="contentInset.top"
-              value={`${adjustedInsets.top}px`}
-              color="lime"
-              fontSize={10}
-            />
-            <DebugRow
-              label="contentInset.bottom"
-              value={`${adjustedInsets.bottom}px`}
-              color="lime"
-              fontSize={10}
-            />
-            {headerGradient && (
-              <DebugRow
-                label="gradientHeight"
-                value={`${gradientHeight}px`}
-                color="magenta"
-                fontSize={10}
-              />
-            )}
-            {stickyContentHeight > 0 && (
-              <DebugRow
-                label="stickyHeight"
-                value={`${stickyContentHeight}px`}
-                color="yellow"
-                fontSize={10}
-              />
-            )}
-          </View>
-        )}
       </View>
     </Log>
   );
