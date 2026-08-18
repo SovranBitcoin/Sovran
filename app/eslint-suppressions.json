@@ -4,11 +4,6 @@
       "count": 4
     }
   },
-  "app/(mint-flow)/list.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "app/(stories-flow)/_layout.tsx": {
     "no-restricted-syntax": {
       "count": 1
@@ -297,19 +292,9 @@
       "count": 4
     }
   },
-  "shared/ui/primitives/Button.tsx": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  },
   "shared/ui/primitives/SelectableCheck/SelectableCheck.circle.tsx": {
     "no-restricted-syntax": {
       "count": 1
-    }
-  },
-  "shared/ui/primitives/Text.tsx": {
-    "no-restricted-syntax": {
-      "count": 3
     }
   },
   "shared/ui/primitives/View/HStack.tsx": {
