@@ -11,11 +11,12 @@ codereview/
 │   ├── lenses/          # one heuristic checklist per review dimension (11 files)
 │   ├── reports/         # full per-run reports (findings + evidence + refutations)
 │   └── LEDGER.md        # fingerprinted findings + coverage log (novelty across runs)
-├── analyze-structure/   # repo-wide structural metrics + lookalikes subcommand
+├── analyze-structure/   # repo-wide structural metrics
 │   ├── index.mjs              # CLI dispatch + structural reports
-│   ├── lookalikes-mode.mjs    # `lookalikes` subcommand entry
 │   ├── extract.mjs            # exports / imports / identifiers
 │   └── metrics.mjs            # LOC, complexity, type-smells, components, depth
+├── lookalikes/          # cross-file declaration similarity
+│   └── index.mjs              # name / value / color / edit-distance reports
 ├── log-doctor/          # session-log preprocessing for LLM debugging
 │   ├── index.ts               # CLI dispatch + 18 modes
 │   └── test-dsl/              # phone-test runner used by `phone` mode
@@ -39,7 +40,7 @@ shapes per tool.
 
 | Convention                     | What it means                                                                                                                                                              |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Positional first arg**       | Scopes the run. For `analyze-structure` and its `lookalikes` subcommand, it's a path (subtree to scan). For `log-doctor`, it's a mode name (`stats`, `errors`, `slow`, …). |
+| **Positional first arg**       | Scopes the run. For `analyze-structure` and `lookalikes`, it's a path (subtree to scan). For `log-doctor`, it's a mode name (`stats`, `errors`, `slow`, …). |
 | `--json`                       | Machine-readable output — present everywhere. Pipe through `jq` to filter.                                                                                                 |
 | Compact output for LLM context | `analyze-structure --llm` (~5K tokens), `log-doctor full --format md` (~6K).                                                                                               |
 | `--no-<report>`                | Suppress a default-on report to compress output.                                                                                                                           |
@@ -56,10 +57,10 @@ slice plan, or commit message.
 | "Where should we refactor next?"                  | `analyze-structure`            | `--llm` (score block)           |
 | "Which files are too coupled?"                    | `analyze-structure`            | default — fanin/coupling/cycles |
 | "Does this one file show up in any hotspot?"      | `analyze-structure`            | `--focus path/to/file.ts`       |
-| "Where are the duplicate names?"                  | `analyze-structure lookalikes` | default reports                 |
-| "Two values look the same — are they?"            | `analyze-structure lookalikes` | `--by-value '#FF0000'`          |
-| "What's `red` defined as in this repo?"           | `analyze-structure lookalikes` | `--by-name red`                 |
-| "Did this file change touch any near-duplicates?" | `analyze-structure lookalikes` | `--focus path/to/file.ts`       |
+| "Where are the duplicate names?"                  | `lookalikes`                   | default reports                 |
+| "Two values look the same — are they?"            | `lookalikes`                   | `--by-value '#FF0000'`          |
+| "What's `red` defined as in this repo?"           | `lookalikes`                   | `--by-name red`                 |
+| "Did this file change touch any near-duplicates?" | `lookalikes`                   | `--focus path/to/file.ts`       |
 | "What broke in the last session?"                 | `log-doctor`                   | `errors --latest --context 5`   |
 | "Why is the app slow on launch?"                  | `log-doctor`                   | `startup --latest`              |
 | "What screens did the user hit before crashing?"  | `log-doctor`                   | `screens --latest`              |
@@ -68,16 +69,16 @@ slice plan, or commit message.
 
 ## analyze-structure
 
-Repo-wide structural metrics. One CLI, two modes:
+Repo-wide structural metrics: structural / depth / quality / symbol / concept
+reports plus the `--llm` compact summary (which includes the structural-health
+score).
 
-- **default** — structural / depth / quality / symbol / concept reports plus
-  the `--llm` compact summary (which includes the structural-health score).
-- **`lookalikes` subcommand** — cross-file declaration similarity reports
-  (name collisions, value collisions, color near-matches, name similarities,
-  focus / by-name / by-value / inventory lookups).
+Declaration similarity lives in its own CLI, `codereview/lookalikes/index.mjs`
+— name collisions, value collisions, color near-matches, name similarities, and
+focus / by-name / by-value / inventory lookups.
 
 Both share the file walker, source utilities, and ignore lists from
-`shared/`. The default mode also pulls per-file metrics from
+`shared/`. analyze-structure also pulls per-file metrics from
 `metrics.mjs` and structural extraction from `extract.mjs`.
 
 ### Dense-output recipes
@@ -108,31 +109,31 @@ node codereview/analyze-structure/index.mjs --llm \
 node codereview/analyze-structure/index.mjs --llm --focus features/foo/Bar.tsx
 ```
 
-### lookalikes subcommand recipes
+### lookalikes recipes
 
 ```bash
 # Default reports (whole repo).
-node codereview/analyze-structure/index.mjs lookalikes
+node codereview/lookalikes/index.mjs
 
 # Subtree only.
-node codereview/analyze-structure/index.mjs lookalikes features/payments
+node codereview/lookalikes/index.mjs features/payments
 
 # Targeted lookups (each <500 tokens). Use when an existing finding cites
 # a literal value or identifier and you want to know where else it lives.
-node codereview/analyze-structure/index.mjs lookalikes --by-name red
-node codereview/analyze-structure/index.mjs lookalikes --by-value '#FF0000'
+node codereview/lookalikes/index.mjs --by-name red
+node codereview/lookalikes/index.mjs --by-value '#FF0000'
 
 # Focus mode — full reports filtered to pairs involving one file.
-node codereview/analyze-structure/index.mjs lookalikes --focus shared/theme.ts
+node codereview/lookalikes/index.mjs --focus shared/theme.ts
 
 # Inventory dump — every variable name in the repo, alphabetised.
 # ~40K tokens; pipe through grep to narrow.
-node codereview/analyze-structure/index.mjs lookalikes --dump variables | grep -i color
+node codereview/lookalikes/index.mjs --dump variables | grep -i color
 ```
 
 ### Tuning flags
 
-**Default mode**
+**analyze-structure**
 
 | Flag                     | Default | What it does                            |
 | ------------------------ | ------- | --------------------------------------- |
@@ -147,7 +148,7 @@ Opt-in (off by default): `--history --since 6` (months of git history),
 `--reach`, `--leakage`, `--vocab-drift`, `--architecture` (uses
 `.architecture.json`), `--boundary <a> <b>`.
 
-**`lookalikes` subcommand**
+**lookalikes**
 
 | Flag                                                     | Default | What it does                                      |
 | -------------------------------------------------------- | ------- | ------------------------------------------------- |
@@ -254,7 +255,7 @@ npx tsx codereview/log-doctor/index.ts timeline --limit 200 --offset 0
 **audit.md, Pass 1:**
 
 1. `analyze-structure --llm` (score block first) — picks a dimension.
-2. `analyze-structure lookalikes <subtree>` (focused) — checks for duplicate-pattern clusters.
+2. `lookalikes <subtree>` (focused) — checks for duplicate-pattern clusters.
 3. `log-doctor stats/errors/slow/coco --latest` — pulls runtime evidence.
 
 **fix.md** does the same plus a mandatory cross-link rule: when picking

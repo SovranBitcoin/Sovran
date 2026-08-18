@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * find-lookalikes.mjs
+ * lookalikes/index.mjs
  *
  * Companion to analyze-structure.mjs. Walks the project tree and extracts
  * EVERY declaration regardless of nesting:
@@ -21,17 +21,19 @@
  *   3. Color near-matches — hex / named / rgb() values within RGB distance N
  *   4. Name similarities  — Levenshtein-close identifiers, bucketed by length
  *
- * Usage:
- *   node scripts/find-lookalikes.mjs                    # default reports
- *   node scripts/find-lookalikes.mjs features/payments  # subtree
- *   node scripts/find-lookalikes.mjs --json
- *   node scripts/find-lookalikes.mjs --focus shared/theme.ts
- *                                                       # scan whole repo,
- *                                                       # only show look-alikes
- *                                                       # involving theme.ts
- *   node scripts/find-lookalikes.mjs --by-name red      # show every `red` definition
- *   node scripts/find-lookalikes.mjs --by-value '#FF0000'
- *   node scripts/find-lookalikes.mjs --dump variables   # alphabetised name list
+ * Usage (run from app/):
+ *   node codereview/lookalikes/index.mjs
+ *     # default reports, whole repo
+ *   node codereview/lookalikes/index.mjs features/payments
+ *     # subtree only
+ *   node codereview/lookalikes/index.mjs --json
+ *   node codereview/lookalikes/index.mjs --focus shared/theme.ts
+ *     # scan whole repo, show only look-alikes involving theme.ts
+ *   node codereview/lookalikes/index.mjs --by-name red
+ *     # every `red` definition
+ *   node codereview/lookalikes/index.mjs --by-value '#FF0000'
+ *   node codereview/lookalikes/index.mjs --dump variables
+ *     # alphabetised name list
  *
  * Tuning:
  *   --color-distance 30        # max RGB distance for color near-matches

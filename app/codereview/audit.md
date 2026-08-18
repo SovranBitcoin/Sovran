@@ -60,7 +60,7 @@ Use focused commands as needed:
 
 ```bash
 node codereview/analyze-structure/index.mjs <path> --llm
-node codereview/analyze-structure/index.mjs lookalikes --focus <file>
+node codereview/lookalikes/index.mjs --focus <file>
 npx tsx codereview/log-doctor/index.ts full --latest
 npx tsx codereview/log-doctor/index.ts full --event js_thread_blocked --latest
 rg -n "nsec|mnemonic|privateKey|cashu.*token|proof|invoice|dumpForLLM|clipboard" .
