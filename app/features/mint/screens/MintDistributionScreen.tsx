@@ -342,7 +342,7 @@ export function MintDistributionScreen() {
         onScroll={handleScroll}
         scrollEventThrottle={16}
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 120 }}>
+        contentContainerClassName="pb-30">
         <View style={{ height: totalHeaderHeight }} />
 
         {mintsForCurrency.length === 0 ? (

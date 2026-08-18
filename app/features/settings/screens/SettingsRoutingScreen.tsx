@@ -49,7 +49,7 @@ export function SettingsRoutingScreen() {
       <ScrollView
         className="px-4"
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingBottom: 32 }}>
+        contentContainerClassName="pb-8">
         <Section title="Rebalancing">
           <VStack gap={12}>
             <Card variant="secondary">

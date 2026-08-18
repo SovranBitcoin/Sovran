@@ -1134,7 +1134,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     <ScreenWrapper name="SettingsRecoveryScreen" scroll="custom" safeArea>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerClassName="grow"
         // Scrolling stays enabled throughout. Locking it during a run was
         // conflating "don't navigate away" with "don't move" — navigation is
         // already blocked by the beforeRemove guard above, and with a mint list

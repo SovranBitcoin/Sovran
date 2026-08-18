@@ -38,7 +38,7 @@ export function AlbumPillTabs({ tabs, selectedTab, onSelect }: AlbumPillTabsProp
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 16 }}>
+        contentContainerClassName="items-center px-4">
         <View className="flex-row items-center gap-1.5">
           {tabs.map((tab) => {
             const isSelected = selectedTab === tab;

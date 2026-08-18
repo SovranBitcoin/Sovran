@@ -154,7 +154,7 @@ export function SettingsNetworkScreen() {
       <ScrollView
         className="px-4"
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerClassName="pb-8"
         refreshControl={
           <RefreshControl refreshing={tierHealth.isRefreshing} onRefresh={tierHealth.refresh} />
         }>

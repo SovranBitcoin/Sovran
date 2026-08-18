@@ -331,7 +331,7 @@ export const MintListScreen = memo(function MintListScreen({
         maintainVisibleContentPosition={{ disabled: true }}
         contentInsetAdjustmentBehavior="never"
         style={{ flex: 1, height: 0 }}
-        contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 }}
+        contentContainerClassName="pt-3 pb-30"
         ListHeaderComponent={listHeader}
         // Skeleton data is non-empty, so the empty text can't flash mid-load.
         ListEmptyComponent={skeleton ? undefined : emptyComponent}

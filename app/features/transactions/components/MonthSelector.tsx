@@ -93,7 +93,7 @@ export function MonthSelector({
           ref={scrollViewRef}
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingRight: 16 }}>
+          contentContainerClassName="pr-4">
           <HStack align="center">
             {months.map((item) => (
               <View key={item.key} onLayout={handleItemLayout(item.key)}>

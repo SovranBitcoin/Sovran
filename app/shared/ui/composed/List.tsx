@@ -13,7 +13,31 @@
  * transaction timeline — render FlashList directly rather than through `<List>`.
  */
 import type { Ref } from 'react';
-import { FlashList, type FlashListProps, type FlashListRef } from '@shopify/flash-list';
+import {
+  FlashList as BaseFlashList,
+  type FlashListProps,
+  type FlashListRef,
+} from '@shopify/flash-list';
+import { withUniwind } from 'uniwind';
+
+/**
+ * Uniwind patches `className` onto React Native's own components, but not onto
+ * third-party ones — FlashList is not RN core, so its `*Style` props have no
+ * class equivalent out of the box. `withUniwind` supplies them: every `xStyle`
+ * prop gains an `xClassName` counterpart, resolved against the same theme
+ * variables `useThemeColor` reads.
+ *
+ * Wrapping happens here, at the seam that already owns the only FlashList
+ * import for plain lists, so no caller needs to know the wrapper exists.
+ */
+const FlashList = withUniwind(BaseFlashList) as typeof BaseFlashList;
+
+/** Class-string counterparts `withUniwind` adds to FlashList's style props. */
+type ListClassNameProps = {
+  contentContainerClassName?: string;
+  ListHeaderComponentClassName?: string;
+  ListFooterComponentClassName?: string;
+};
 
 /**
  * Default over-render window (px). FlashList v2 measures synchronously, so this
@@ -31,7 +55,7 @@ export function List<T>({
   // no-op when the list isn't nested in another scrollable, and ignored on iOS.
   nestedScrollEnabled = true,
   ...props
-}: FlashListProps<T> & { ref?: Ref<FlashListRef<T>> }) {
+}: FlashListProps<T> & ListClassNameProps & { ref?: Ref<FlashListRef<T>> }) {
   return (
     <FlashList
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}

@@ -160,7 +160,7 @@ export function TermsAndConditionsScreen({
         </Text>
 
         <Card variant="secondary" className="flex-1">
-          <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
+          <ScrollView className="flex-1" contentContainerClassName="p-4">
             <Text size={14} className="text-foreground leading-[22px]">
               {TERMS_TEXT}
             </Text>

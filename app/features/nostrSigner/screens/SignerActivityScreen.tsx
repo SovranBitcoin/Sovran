@@ -212,7 +212,7 @@ export function SignerActivityScreen(): React.ReactElement {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, gap: 8 }}>
+      contentContainerClassName="gap-2 px-4 py-2.5">
       <FilterChip
         selected={filter.kind === 'all'}
         label="All"

@@ -365,7 +365,7 @@ export function EmojiPickerContent({
         // Match the SectionAnchorList draw window so search and
         // sectioned mode have the same buffer behavior on fast scroll.
         drawDistance={150}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerClassName="pb-6"
         keyboardShouldPersistTaps="handled"
         renderScrollComponent={({ children, ...props }) => (
           <BottomSheetScrollView {...props}>{children}</BottomSheetScrollView>

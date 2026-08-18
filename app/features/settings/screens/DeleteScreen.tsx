@@ -27,7 +27,7 @@ export function DeleteScreen() {
 
   return (
     <ScreenWrapper name="DeleteScreen" scroll="custom" safeArea>
-      <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
+      <ScrollView className="flex-1" contentContainerClassName="grow">
         <VStack gap={24} className="flex-1 px-6 pt-12">
           <VStack gap={24} className="flex-1 items-center justify-center">
             <View

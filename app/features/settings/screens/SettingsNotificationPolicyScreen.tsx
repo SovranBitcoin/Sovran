@@ -42,7 +42,7 @@ export function SettingsNotificationPolicyScreen() {
       <ScrollView
         className="px-4"
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingBottom: 32 }}>
+        contentContainerClassName="pb-8">
         <Section title="Policy">
           <ListGroup variant="secondary">
             {NOTIFICATION_POLICIES.map((option, index) => (

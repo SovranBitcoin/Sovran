@@ -261,7 +261,7 @@ export function MintCurrencyTabs({
         // the band itself never re-measures, so the sticky header (and the list's
         // reserved top space) never shifts. See MINT_CURRENCY_TABS_HEIGHT.
         style={{ height: MINT_CURRENCY_TABS_HEIGHT }}
-        contentContainerStyle={{ alignItems: 'center' }}>
+        contentContainerClassName="items-center">
         <Animated.View className="flex-row items-center" style={animatedListGapStyle}>
           {currencies.map((currency) => (
             <AnimatedCurrencyTab
