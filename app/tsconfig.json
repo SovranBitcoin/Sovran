@@ -12,9 +12,14 @@
     // Fails the build on a declared-and-never-read local. Dead locals are how
     // a half-removed feature survives review looking intentional — the
     // Add-mint skeleton hold sat unread behind one for months. Free to enable
-    // here (zero current violations); `noUnusedParameters` is not yet, and is
-    // a separate call.
+    // here (zero current violations).
     "noUnusedLocals": true,
+    // Same rule for parameters, so a signature can't keep advertising a value
+    // the body ignores — `CloseButton(foreground)` and
+    // `buildThreadItemsFromResult(eventId, …)` both lied to their callers for
+    // months. Positional parameters that genuinely must stay (a `String.replace`
+    // whole-match, a middleware `next`) opt out with a leading underscore.
+    "noUnusedParameters": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
     "moduleSuffixes": [".ios", ".android", ""],
