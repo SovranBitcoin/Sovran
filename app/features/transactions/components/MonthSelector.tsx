@@ -3,7 +3,7 @@ import { ScrollView, LayoutChangeEvent } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
@@ -35,7 +35,7 @@ function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
         <Text
           className="text-center"
           style={{
-            color: isSelected ? foreground : opacity(foreground, 0.4),
+            color: isSelected ? foreground : withAlpha(foreground, 0.4),
             fontFamily: 'OxygenBold',
             fontSize: 15,
           }}>

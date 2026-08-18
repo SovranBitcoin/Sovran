@@ -22,7 +22,10 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({
     Array.isArray(tokens) ? tokens.map((token) => `theme-${token}`) : 'theme-single',
 }));
 
-jest.mock('hex-color-opacity', () => jest.fn(() => 'rgba(0,0,0,0.12)'));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: jest.fn(() => 'rgba(0,0,0,0.12)'),
+}));
 
 jest.mock('@/shared/lib/date', () => ({
   formatRelative: jest.fn(() => '2d'),

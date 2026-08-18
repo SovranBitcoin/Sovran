@@ -38,7 +38,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useHandleCameraPermission } from '@/features/camera';
@@ -464,7 +464,7 @@ export function SendScreen({ unit }: { unit: string }) {
       }
       title={m.title}
       subtitle={m.subtitle}
-      trailing={<Icon name="mdi:chevron-right" size={24} color={opacity(foreground, 0.25)} />}
+      trailing={<Icon name="mdi:chevron-right" size={24} color={withAlpha(foreground, 0.25)} />}
       onPress={m.onPress}
       testID={`send-method-${m.id}`}
     />
@@ -481,7 +481,7 @@ export function SendScreen({ unit }: { unit: string }) {
       <E2EToastProbe />
       {/* Destination input + Paste/Cancel */}
       <View style={[styles.inputWrap, { backgroundColor: surfaceSecondary }]}>
-        <Icon name="mdi:magnify" size={20} color={opacity(foreground, 0.5)} />
+        <Icon name="mdi:magnify" size={20} color={withAlpha(foreground, 0.5)} />
         <TextInput
           ref={inputRef}
           value={query}
@@ -490,7 +490,7 @@ export function SendScreen({ unit }: { unit: string }) {
           onBlur={() => setFocused(false)}
           onSubmitEditing={handleSubmitDestination}
           placeholder="Name, address, or token"
-          placeholderTextColor={opacity(foreground, 0.4)}
+          placeholderTextColor={withAlpha(foreground, 0.4)}
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="go"
@@ -564,7 +564,7 @@ export function SendScreen({ unit }: { unit: string }) {
           range — at rest, focused, or searching. */}
       {freshPeers.length > 0 ? (
         <VStack gap={0}>
-          <SectionLabel text="Nearby" color={opacity(foreground, 0.5)} />
+          <SectionLabel text="Nearby" color={withAlpha(foreground, 0.5)} />
           {freshPeers.map((peer) => (
             <ListRow
               key={peer.peerID}
@@ -586,7 +586,7 @@ export function SendScreen({ unit }: { unit: string }) {
       {isTyping ? (
         <VStack gap={0}>
           {renderedPeople.length > 0 ? (
-            <SectionLabel text="People" color={opacity(foreground, 0.5)} />
+            <SectionLabel text="People" color={withAlpha(foreground, 0.5)} />
           ) : null}
           {renderedPeople.map((row) => (
             <ContactRow
@@ -603,13 +603,13 @@ export function SendScreen({ unit }: { unit: string }) {
           ))}
           {!searchLoading && renderedPeople.length === 0 && freshPeers.length === 0 ? (
             <View style={styles.emptyWrap}>
-              <Text color={opacity(foreground, 0.5)}>No people found</Text>
+              <Text color={withAlpha(foreground, 0.5)}>No people found</Text>
             </View>
           ) : null}
         </VStack>
       ) : quickPayPeople.length > 0 ? (
         <VStack gap={0}>
-          <SectionLabel text="Recent" color={opacity(foreground, 0.5)} />
+          <SectionLabel text="Recent" color={withAlpha(foreground, 0.5)} />
           {quickPayPeople.map((person) => (
             <ContactRow
               key={person.pubkey}

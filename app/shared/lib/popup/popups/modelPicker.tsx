@@ -29,7 +29,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BottomSheet, Menu } from 'heroui-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
@@ -280,7 +280,7 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
                 <Text
                   size={12}
                   bold
-                  style={{ color: isSelected ? foreground : opacity(foreground, 0.7) }}>
+                  style={{ color: isSelected ? foreground : withAlpha(foreground, 0.7) }}>
                   {p.label}
                 </Text>
               </Pressable>

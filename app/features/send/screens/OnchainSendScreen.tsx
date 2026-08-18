@@ -14,7 +14,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import type { HistoryEntry, MeltHistoryEntry } from '@cashu/coco-core';
 import {
@@ -347,7 +347,7 @@ function OpenInExplorerLink({ url, inferred }: { url: string; inferred?: boolean
         <Icon name="lucide:arrow-up-right" size={14} color={linkColor} />
       </Pressable>
       {inferred && (
-        <Text size={11} color={opacity(foreground, 0.5)} style={styles.explorerCaption}>
+        <Text size={11} color={withAlpha(foreground, 0.5)} style={styles.explorerCaption}>
           Matched by amount and destination — the mint hasn&apos;t confirmed this is the exact
           transaction.
         </Text>

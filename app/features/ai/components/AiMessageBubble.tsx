@@ -18,7 +18,7 @@ import {
   useStreamingReasoning,
   useStreamingStartedAt,
 } from '../lib/streamingBuffer';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 /** Active-branch widget data for one assistant message. Provided by the
  *  screen, which owns the conversation tree and the `setActiveBranch`
@@ -288,7 +288,7 @@ function BranchNavView({ index, total, onPrev, onNext, color, testIdPrefix }: Br
         accessibilityLabel="Previous response"
         accessibilityState={{ disabled: !onPrev }}
         testID={`${testIdPrefix}-branch-prev`}>
-        <Icon name="mdi:chevron-left" size={20} color={onPrev ? color : opacity(color, 0.35)} />
+        <Icon name="mdi:chevron-left" size={20} color={onPrev ? color : withAlpha(color, 0.35)} />
       </Pressable>
       <Text size={12} style={{ color, fontVariant: ['tabular-nums'] }}>
         {index} / {total}
@@ -301,7 +301,7 @@ function BranchNavView({ index, total, onPrev, onNext, color, testIdPrefix }: Br
         accessibilityLabel="Next response"
         accessibilityState={{ disabled: !onNext }}
         testID={`${testIdPrefix}-branch-next`}>
-        <Icon name="mdi:chevron-right" size={20} color={onNext ? color : opacity(color, 0.35)} />
+        <Icon name="mdi:chevron-right" size={20} color={onNext ? color : withAlpha(color, 0.35)} />
       </Pressable>
     </HStack>
   );
@@ -402,7 +402,7 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
           <Text size={16} style={{ color: foreground, lineHeight: 24 }}>
             {displayedContent}
             {isStreaming ? (
-              <Text size={16} style={{ color: opacity(foreground, 0.5) }}>
+              <Text size={16} style={{ color: withAlpha(foreground, 0.5) }}>
                 {' ▍'}
               </Text>
             ) : null}
@@ -431,8 +431,8 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
                 accessibilityLabel="Copy response"
                 testID={`ai-message-copy-${message.id}`}>
                 <HStack align="center" gap={4}>
-                  <Icon name="lets-icons:copy" size={16} color={opacity(foreground, 0.6)} />
-                  <Text size={12} style={{ color: opacity(foreground, 0.6) }}>
+                  <Icon name="lets-icons:copy" size={16} color={withAlpha(foreground, 0.6)} />
+                  <Text size={12} style={{ color: withAlpha(foreground, 0.6) }}>
                     Copy
                   </Text>
                 </HStack>
@@ -446,8 +446,8 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
                   accessibilityLabel="Regenerate response"
                   testID={`ai-message-retry-${message.id}`}>
                   <HStack align="center" gap={4}>
-                    <Icon name="mdi:refresh" size={16} color={opacity(foreground, 0.6)} />
-                    <Text size={12} style={{ color: opacity(foreground, 0.6) }}>
+                    <Icon name="mdi:refresh" size={16} color={withAlpha(foreground, 0.6)} />
+                    <Text size={12} style={{ color: withAlpha(foreground, 0.6) }}>
                       Retry
                     </Text>
                   </HStack>
@@ -458,7 +458,7 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
             {showActions && branchNav ? (
               <BranchNavView
                 {...branchNav}
-                color={opacity(foreground, 0.6)}
+                color={withAlpha(foreground, 0.6)}
                 testIdPrefix={`ai-message-${message.id}`}
               />
             ) : null}

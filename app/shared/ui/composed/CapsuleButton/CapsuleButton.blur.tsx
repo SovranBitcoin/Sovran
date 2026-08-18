@@ -2,7 +2,7 @@ import { getCornerStyle } from './CapsuleButton.corners';
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -66,7 +66,7 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
         {isActive ? (
           <View
             pointerEvents="none"
-            style={[StyleSheet.absoluteFill, { backgroundColor: opacity(foreground, 0.12) }]}
+            style={[StyleSheet.absoluteFill, { backgroundColor: withAlpha(foreground, 0.12) }]}
           />
         ) : null}
         <PressableFeedback
@@ -98,7 +98,7 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
           StyleSheet.absoluteFill,
           cornerStyle,
           styles.borderOverlay,
-          { borderColor: opacity(borderColor, 0.3) },
+          { borderColor: withAlpha(borderColor, 0.3) },
         ]}
       />
     </View>

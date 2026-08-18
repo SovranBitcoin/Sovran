@@ -2,7 +2,7 @@ import React from 'react';
 import { Log } from '@/shared/lib/logger';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -41,7 +41,7 @@ export const Card = ({
         return danger;
       case 'info':
       default:
-        return opacity(foreground, 0.8);
+        return withAlpha(foreground, 0.8);
     }
   };
 
@@ -51,7 +51,7 @@ export const Card = ({
         return danger;
       case 'info':
       default:
-        return opacity(foreground, 0.8);
+        return withAlpha(foreground, 0.8);
     }
   };
 
@@ -69,7 +69,7 @@ export const Card = ({
             heavy
             className="text-base"
             style={{
-              color: opacity(foreground, 0.5),
+              color: withAlpha(foreground, 0.5),
               paddingLeft: 16,
               paddingRight: 4,
               paddingTop: 16,

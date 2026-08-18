@@ -24,7 +24,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import Animated from 'react-native-reanimated';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -109,7 +109,7 @@ function RowStatPill({ stat, animate }: { stat: RowStat; animate?: boolean }) {
     <Text size={12} bold color={stat.color}>
       {stat.value}
       {stat.meta ? (
-        <Text size={12} color={opacity(stat.color, 0.7)}>
+        <Text size={12} color={withAlpha(stat.color, 0.7)}>
           {' ('}
           {stat.meta}
           {')'}
@@ -131,7 +131,7 @@ export function RowStatsAccent({ stats, note, nip05, animate }: RowStatsAccentPr
   const hasNip05 = !!nip05?.handle;
   if (stats.length === 0 && !note && !hasNip05) return null;
 
-  const resolvedNoteColor = opacity(foreground, 0.6);
+  const resolvedNoteColor = withAlpha(foreground, 0.6);
   const hasStatsOrNip05 = stats.length > 0 || hasNip05;
 
   return (
@@ -141,7 +141,7 @@ export function RowStatsAccent({ stats, note, nip05, animate }: RowStatsAccentPr
           {stats.map((stat, i) => (
             <React.Fragment key={`${stat.icon}-${i}`}>
               {i > 0 && (
-                <Text size={9} color={opacity(foreground, 0.15)}>
+                <Text size={9} color={withAlpha(foreground, 0.15)}>
                   {'•'}
                 </Text>
               )}
@@ -151,7 +151,7 @@ export function RowStatsAccent({ stats, note, nip05, animate }: RowStatsAccentPr
           {hasNip05 ? (
             <>
               {stats.length > 0 && (
-                <Text size={9} color={opacity(foreground, 0.15)}>
+                <Text size={9} color={withAlpha(foreground, 0.15)}>
                   {'•'}
                 </Text>
               )}
@@ -200,7 +200,7 @@ export function RowStatsAccentSkeleton({ seed }: { seed?: string }) {
   // `bg-skeleton` token (nor its own `animate-pulse`, which those siblings lack)
   // — so every skeleton element in a row reads as one consistent shade and the
   // shared crossfade wave is the only motion.
-  const dotColor = opacity(foreground, 0.07);
+  const dotColor = withAlpha(foreground, 0.07);
   return (
     <HStack align="center" style={{ gap: 4, marginTop: 2 }}>
       {[`accent:${seed ?? 'x'}`, `accent2:${seed ?? 'x'}`].map((key, i) => (

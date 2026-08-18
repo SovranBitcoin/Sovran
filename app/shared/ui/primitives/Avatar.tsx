@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -99,7 +99,7 @@ export const Avatar = ({
   const foreground = useThemeColor('foreground');
   // Match the skeleton fill used by `Text` — low-opacity foreground reads
   // as ambient "loading" rather than a solid silhouette.
-  const loadingColor = useMemo(() => opacity(foreground, 0.07), [foreground]);
+  const loadingColor = useMemo(() => withAlpha(foreground, 0.07), [foreground]);
 
   useEffect(() => {
     void prefetchImage(picture);

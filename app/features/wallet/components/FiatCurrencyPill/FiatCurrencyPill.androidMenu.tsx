@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
@@ -80,7 +80,7 @@ export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React
           // these sit over the same wallet wallpaper as those buttons do.
           backgroundColor: surfaceSecondary,
           borderWidth: 1,
-          borderColor: opacity(muted, 0.3),
+          borderColor: withAlpha(muted, 0.3),
           paddingHorizontal: 14,
           paddingVertical: 6,
           minHeight: iosHeight,

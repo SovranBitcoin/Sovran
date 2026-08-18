@@ -19,7 +19,7 @@
  */
 
 import { ReactNode, useEffect } from 'react';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import type { MintListItem } from 'wallet';
 
 import Icon from 'assets/icons';
@@ -736,7 +736,7 @@ export function ContactRow({
             paddingHorizontal: 8,
             paddingVertical: 2,
             borderRadius: 10,
-            backgroundColor: opacity(accent, 0.15),
+            backgroundColor: withAlpha(accent, 0.15),
           }}>
           <Text size={11} bold style={{ color: accent }}>
             CURRENT
@@ -819,7 +819,9 @@ export function ContactRow({
 
   // ---- Trailing ---------------------------------------------------------
 
-  const chevronNode = <Icon name="mdi:chevron-right" size={24} color={opacity(foreground, 0.25)} />;
+  const chevronNode = (
+    <Icon name="mdi:chevron-right" size={24} color={withAlpha(foreground, 0.25)} />
+  );
 
   const selectionNode = selectable ? (
     resolvedLoading ? (
@@ -874,7 +876,7 @@ export function ContactRow({
   const bleConnectionNode =
     ble && ble.isConnected !== undefined ? (
       !ble.isConnected ? (
-        <Icon name="mdi:clock-outline" size={20} color={opacity(foreground, 0.3)} />
+        <Icon name="mdi:clock-outline" size={20} color={withAlpha(foreground, 0.3)} />
       ) : ble.hasDirectLink === false ? (
         <Icon name="mdi:lan-disconnect" size={20} color={warning} />
       ) : (

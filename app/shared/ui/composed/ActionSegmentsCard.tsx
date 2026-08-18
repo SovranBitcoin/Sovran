@@ -7,7 +7,7 @@
  */
 
 import React, { memo } from 'react';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { PressableFeedback } from 'heroui-native';
 
 import Icon from 'assets/icons';
@@ -37,7 +37,7 @@ export const ActionSegmentsCard = memo(function ActionSegmentsCard({
 }) {
   const foreground = useThemeColor('foreground');
   const tint = (segment: ActionSegment) =>
-    segment.active ? foreground : opacity(foreground, segment.dimmed ? 0.25 : 0.5);
+    segment.active ? foreground : withAlpha(foreground, segment.dimmed ? 0.25 : 0.5);
 
   return (
     <GradientCard style={{ marginHorizontal: 16 }}>
@@ -48,7 +48,7 @@ export const ActionSegmentsCard = memo(function ActionSegmentsCard({
               <View
                 style={{
                   width: 1,
-                  backgroundColor: opacity(foreground, 0.08),
+                  backgroundColor: withAlpha(foreground, 0.08),
                   marginVertical: 10,
                 }}
               />

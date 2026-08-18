@@ -7,7 +7,7 @@ import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { supportsLiquidGlass } from '@/shared/lib/version';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import type { GlassSearchBarProps } from './types';
 
 export const GlassSearchBar = memo(function GlassSearchBar({
@@ -70,7 +70,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
       key={clearKey}
       defaultValue={seedText}
       placeholder={placeholder}
-      placeholderTextColor={opacity(foreground, 0.33)}
+      placeholderTextColor={withAlpha(foreground, 0.33)}
       onChangeText={handleTextChange}
       keyboardType={keyboardType}
       autoCorrect={false}

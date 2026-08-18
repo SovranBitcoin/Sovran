@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { alpha, spacing, fontSize } from '@/shared/styles/tokens';
@@ -41,7 +41,7 @@ export function EmptyState({
     <VStack align="center" style={styles.container}>
       <Icon name={icon} size={iconSize} color={defaultColor} />
       <Spacer size={spacing.sm} />
-      <Text bold size={fontSize.lg} style={{ color: opacity(foreground, alpha.disabled) }}>
+      <Text bold size={fontSize.lg} style={{ color: withAlpha(foreground, alpha.disabled) }}>
         {title}
       </Text>
       {subtitle ? (
@@ -49,7 +49,7 @@ export function EmptyState({
           <Spacer size={spacing.xs} />
           <Text
             size={fontSize.sm}
-            style={[styles.subtitle, { color: opacity(foreground, alpha.muted) }]}>
+            style={[styles.subtitle, { color: withAlpha(foreground, alpha.muted) }]}>
             {subtitle}
           </Text>
         </>

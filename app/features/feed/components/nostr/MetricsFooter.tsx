@@ -1,5 +1,5 @@
 import React from 'react';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { alpha, iconSize } from '@/shared/styles/tokens';
 import { AnimatedCountValue } from '@/shared/ui/composed/AnimatedCountValue';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -99,8 +99,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
 }) {
   const repostedColor = useThemeColor('success');
   const repliedColor = COMMENT_ACCENT;
-  const iconColor = opacity(borderColor, alpha.disabled);
-  const textColor = opacity(borderColor, alpha.disabled);
+  const iconColor = withAlpha(borderColor, alpha.disabled);
+  const textColor = withAlpha(borderColor, alpha.disabled);
   const likedColor = '#ff5a7a';
   const iconSizes = compact ? POST_ACTION_ICON_SIZES.compact : POST_ACTION_ICON_SIZES.regular;
   const textSize = compact ? 11 : 13;
@@ -117,7 +117,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
       style={[
         sharedStyles.noteFooter,
         showBorder && sharedStyles.footerBorder,
-        showBorder && { borderBottomColor: opacity(borderColor, 0.1) },
+        showBorder && { borderBottomColor: withAlpha(borderColor, 0.1) },
       ]}>
       <HStack align="center" justify="space-between">
         <Pressable

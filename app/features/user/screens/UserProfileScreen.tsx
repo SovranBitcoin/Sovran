@@ -68,7 +68,7 @@ import { UserFeed } from '@/features/feed';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { formatDate } from '@/shared/lib/date';
 import { LinearGradient } from 'expo-linear-gradient';
-import opacity from 'hex-color-opacity';
+import { getContrastColors, withAlpha } from '@/shared/lib/color';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { buildProfileHref, useActiveProfileFlowGroup } from '@/shared/lib/nav/profileRoutes';
 import { buildMintInfoHref, getProfileMintInfoUrl } from '@/shared/lib/nav/mintInfoRoutes';
@@ -79,7 +79,6 @@ import {
 import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
-import { getContrastColors } from '@/shared/lib/color';
 import { useDominantColor } from '@/shared/lib/colorExtraction';
 import type { VideoPostRecord, StoryUser } from '@/features/feed';
 import { ListGroup, PressableFeedback } from 'heroui-native';
@@ -223,7 +222,7 @@ function ProfileStatsGridComponent({
         <View
           style={[
             styles.statCardSkeleton,
-            { backgroundColor: opacity(foreground, SKELETON_FILL_ALPHA) },
+            { backgroundColor: withAlpha(foreground, SKELETON_FILL_ALPHA) },
           ]}
         />
       ) : (
@@ -232,7 +231,7 @@ function ProfileStatsGridComponent({
             styles.statCard,
             { backgroundColor: surfaceSecondary, borderColor: surfaceTertiary },
           ]}>
-          <Text bold size={12} style={{ color: opacity(foreground, 0.66), marginBottom: 4 }}>
+          <Text bold size={12} style={{ color: withAlpha(foreground, 0.66), marginBottom: 4 }}>
             {stat.label.toUpperCase()}
           </Text>
           <Text
@@ -243,7 +242,7 @@ function ProfileStatsGridComponent({
             style={{ color: foreground, marginBottom: 2 }}>
             {stat.value}
           </Text>
-          <Text bold size={12} style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
+          <Text bold size={12} style={{ color: withAlpha(foreground, 0.5), opacity: 0.8 }}>
             {stat.description}
           </Text>
         </View>
@@ -294,7 +293,7 @@ function ProfileStatsGridComponent({
         <Text
           size={13}
           style={{
-            color: opacity(foreground, 0.5),
+            color: withAlpha(foreground, 0.5),
             textAlign: 'center',
             marginTop: 12,
             paddingHorizontal: 6,
@@ -403,7 +402,7 @@ function TopFollowersComponent({
         bold
         numberOfLines={1}
         style={{
-          color: opacity(foreground, 0.66),
+          color: withAlpha(foreground, 0.66),
           marginTop: 6,
           textAlign: 'center',
           width: itemWidth - 8,
@@ -422,7 +421,7 @@ function TopFollowersComponent({
           height: 12,
           borderRadius: 4,
           marginTop: 6,
-          backgroundColor: opacity(foreground, SKELETON_FILL_ALPHA),
+          backgroundColor: withAlpha(foreground, SKELETON_FILL_ALPHA),
         }}
       />
     </View>
@@ -440,7 +439,7 @@ function TopFollowersComponent({
       <Text
         bold
         size={12}
-        style={{ color: opacity(foreground, 0.4), marginBottom: 12, marginLeft: 4 }}>
+        style={{ color: withAlpha(foreground, 0.4), marginBottom: 12, marginLeft: 4 }}>
         TOP FOLLOWERS
       </Text>
       {isLoading ? (
@@ -646,7 +645,7 @@ function BannerWithAvatarComponent({
               />
             ) : null}
             <View
-              style={[StyleSheet.absoluteFill, { backgroundColor: opacity(foreground, 0.5) }]}
+              style={[StyleSheet.absoluteFill, { backgroundColor: withAlpha(foreground, 0.5) }]}
             />
           </>
         ) : bannerState === 'image' ? (
@@ -664,11 +663,11 @@ function BannerWithAvatarComponent({
                 <View
                   style={[
                     StyleSheet.absoluteFill,
-                    { backgroundColor: opacity(imageGradientColors[0], 0.05) },
+                    { backgroundColor: withAlpha(imageGradientColors[0], 0.05) },
                   ]}
                 />
                 <LinearGradient
-                  colors={[opacity(imageGradientColors[0], 0.28), 'transparent']}
+                  colors={[withAlpha(imageGradientColors[0], 0.28), 'transparent']}
                   locations={[0, 0.8]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
@@ -676,9 +675,9 @@ function BannerWithAvatarComponent({
                 />
                 <LinearGradient
                   colors={[
-                    opacity(imageGradientColors[1], 0.2),
+                    withAlpha(imageGradientColors[1], 0.2),
                     'transparent',
-                    opacity(imageGradientColors[0], 0.18),
+                    withAlpha(imageGradientColors[0], 0.18),
                   ]}
                   locations={[0, 0.55, 1]}
                   start={{ x: 1, y: 0 }}
@@ -747,13 +746,13 @@ function BannerWithAvatarComponent({
             <View style={{ alignSelf: 'center' }}>
               <HStack align="center" gap={4}>
                 {!isLoading && (
-                  <Icon name="mdi:check-decagram" size={16} color={opacity(foreground, 0.4)} />
+                  <Icon name="mdi:check-decagram" size={16} color={withAlpha(foreground, 0.4)} />
                 )}
                 <Text
                   loading={isLoading}
                   placeholder="username@relay.example"
                   size={14}
-                  style={{ color: opacity(foreground, 0.4) }}>
+                  style={{ color: withAlpha(foreground, 0.4) }}>
                   {nip05 || '\u00A0'}
                 </Text>
               </HStack>
@@ -765,7 +764,7 @@ function BannerWithAvatarComponent({
                 style={[
                   styles.followButton,
                   {
-                    backgroundColor: opacity(foreground, SKELETON_FILL_ALPHA),
+                    backgroundColor: withAlpha(foreground, SKELETON_FILL_ALPHA),
                     borderColor: 'transparent',
                   },
                 ]}
@@ -1126,7 +1125,7 @@ export function UserProfileScreen() {
   // PROFILE INFO ITEMS (data-driven)
   // ===========================
 
-  const iconColor = opacity(foreground, 0.4);
+  const iconColor = withAlpha(foreground, 0.4);
 
   const profileInfoItems = useMemo(() => {
     const items: {

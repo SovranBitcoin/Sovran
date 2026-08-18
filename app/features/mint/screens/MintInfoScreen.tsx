@@ -34,7 +34,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { useScreenActions } from 'wallet/react';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -300,7 +300,7 @@ function StatsGridComponent({
                     placeholder="SUCCESS RATE"
                     bold
                     size={12}
-                    style={{ color: opacity(foreground, 0.66), marginBottom: 4 }}>
+                    style={{ color: withAlpha(foreground, 0.66), marginBottom: 4 }}>
                     {stat.label.toUpperCase()}
                   </Text>
                   <Text
@@ -316,7 +316,7 @@ function StatsGridComponent({
                     placeholder="Completion rate"
                     bold
                     size={12}
-                    style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
+                    style={{ color: withAlpha(foreground, 0.5), opacity: 0.8 }}>
                     {stat.description}
                   </Text>
                 </View>
@@ -423,7 +423,7 @@ function RatingBarChartComponent({ score }: { score: number }) {
               {formattedScore}
             </Text>
           </Animated.View>
-          <Text size={12} style={{ color: opacity(foreground, 0.5) }}>
+          <Text size={12} style={{ color: withAlpha(foreground, 0.5) }}>
             out of 5
           </Text>
         </Animated.View>
@@ -442,7 +442,7 @@ function RatingBarChartComponent({ score }: { score: number }) {
                     </Animated.View>
                   ) : (
                     <View key={i}>
-                      <Icon name="ic:round-star" size={12} color={opacity(foreground, 0.4)} />
+                      <Icon name="ic:round-star" size={12} color={withAlpha(foreground, 0.4)} />
                     </View>
                   )
                 )}
@@ -658,14 +658,14 @@ export function MintInfoScreen() {
                 <PressableFeedback.Scale>
                   <ListGroup.Item disabled>
                     <ListGroup.ItemPrefix>
-                      <Icon name="humbleicons:url" size={20} color={opacity(foreground, 0.4)} />
+                      <Icon name="humbleicons:url" size={20} color={withAlpha(foreground, 0.4)} />
                     </ListGroup.ItemPrefix>
                     <ListGroup.ItemContent>
                       <ListGroup.ItemTitle numberOfLines={3}>{mintUrl}</ListGroup.ItemTitle>
                       <ListGroup.ItemDescription>Tap to copy</ListGroup.ItemDescription>
                     </ListGroup.ItemContent>
                     <ListGroup.ItemSuffix>
-                      <Icon name="lets-icons:copy" size={18} color={opacity(foreground, 0.4)} />
+                      <Icon name="lets-icons:copy" size={18} color={withAlpha(foreground, 0.4)} />
                     </ListGroup.ItemSuffix>
                   </ListGroup.Item>
                 </PressableFeedback.Scale>
@@ -724,10 +724,10 @@ export function MintInfoScreen() {
                             <Icon
                               name="hugeicons:new-twitter"
                               size={20}
-                              color={opacity(foreground, 0.4)}
+                              color={withAlpha(foreground, 0.4)}
                             />
                           ) : c.method.toUpperCase() === 'EMAIL' ? (
-                            <Icon name="mdi:at" size={20} color={opacity(foreground, 0.4)} />
+                            <Icon name="mdi:at" size={20} color={withAlpha(foreground, 0.4)} />
                           ) : undefined}
                         </ListGroup.ItemPrefix>
                         <ListGroup.ItemContent>
@@ -754,7 +754,7 @@ export function MintInfoScreen() {
                       <Icon
                         name="fluent:split-vertical-24-filled"
                         size={20}
-                        color={opacity(foreground, 0.4)}
+                        color={withAlpha(foreground, 0.4)}
                       />
                     </ListGroup.ItemPrefix>
                     <ListGroup.ItemContent>

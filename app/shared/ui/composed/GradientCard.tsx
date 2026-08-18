@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View as RNView, type StyleProp, type ViewStyle } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
@@ -34,7 +34,7 @@ export function GradientCard({
   testID,
 }: GradientCardProps) {
   const muted = useThemeColor('muted');
-  const borderColor = opacity(muted, 0.3);
+  const borderColor = withAlpha(muted, 0.3);
 
   return (
     <Log name="GradientCard">

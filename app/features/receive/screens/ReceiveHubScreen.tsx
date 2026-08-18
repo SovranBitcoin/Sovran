@@ -21,7 +21,7 @@
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { useScreenActions, type UseScreenActionsResult } from 'wallet/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -113,7 +113,9 @@ export function ReceiveHubScreen({ receiveHubEntry, unit }: ReceiveHubScreenProp
             title={method.title}
             // An unavailable row explains itself in place of the subtitle.
             subtitle={(!available && action.reason) || method.subtitle}
-            trailing={<Icon name="mdi:chevron-right" size={24} color={opacity(foreground, 0.25)} />}
+            trailing={
+              <Icon name="mdi:chevron-right" size={24} color={withAlpha(foreground, 0.25)} />
+            }
             disabled={!available || action.loading}
             onPress={async () => {
               paymentLog.info('receive.hub.method', { method: method.id, unit });

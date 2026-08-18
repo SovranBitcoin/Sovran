@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { tryNpubEncode } from '@/features/feed/components/nostr/feedParse';
 import type { FeedNotification, FeedNotificationsResult } from '@/features/feed/data/feedClient';
@@ -445,7 +445,7 @@ export function NotificationFollowersScreen() {
                 itemKey="empty:initial-spinner"
                 itemType="spinner"
                 extra={{ phase: visualPhase }}>
-                <Spinner size={22} color={opacity(foreground, 0.65)} style={styles.loader} />
+                <Spinner size={22} color={withAlpha(foreground, 0.65)} style={styles.loader} />
               </VisualLayoutProbe>
             ) : (
               <VisualLayoutProbe
@@ -469,7 +469,11 @@ export function NotificationFollowersScreen() {
                 itemKey="footer:pagination-spinner"
                 itemType="spinner"
                 extra={{ followers: followers.length }}>
-                <Spinner size={18} color={opacity(foreground, 0.65)} style={styles.footerSpinner} />
+                <Spinner
+                  size={18}
+                  color={withAlpha(foreground, 0.65)}
+                  style={styles.footerSpinner}
+                />
               </VisualLayoutProbe>
             ) : null
           }
@@ -495,7 +499,7 @@ export function NotificationFollowersScreen() {
                 result={result}
                 foreground={foreground}
                 muted={muted}
-                pressedBackground={opacity(surfaceTertiary, 0.45)}
+                pressedBackground={withAlpha(surfaceTertiary, 0.45)}
                 onPress={() => openProfile(item)}
               />
             </VisualLayoutProbe>

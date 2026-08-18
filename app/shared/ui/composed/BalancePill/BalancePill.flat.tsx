@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 
 import { PressableFeedback } from 'heroui-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -43,7 +43,7 @@ export default function BalancePillFlat({
           height: cardHeight,
           borderRadius: cardRadius,
           backgroundColor: surfaceSecondary,
-          borderColor: opacity(muted, 0.3),
+          borderColor: withAlpha(muted, 0.3),
         },
       ]}>
       <PressableFeedback

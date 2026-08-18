@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from '@/assets/icons';
 import type {
@@ -849,7 +849,7 @@ export function NotificationsScreen() {
                   itemKey="empty:initial-spinner"
                   itemType="spinner"
                   extra={{ tab: activeTab, phase: visualPhase }}>
-                  <Spinner size={22} color={opacity(foreground, 0.65)} style={styles.loader} />
+                  <Spinner size={22} color={withAlpha(foreground, 0.65)} style={styles.loader} />
                 </VisualLayoutProbe>
               ) : (
                 <VisualLayoutProbe
@@ -880,7 +880,7 @@ export function NotificationsScreen() {
                   extra={{ tab: activeTab, items: notificationItems.length }}>
                   <Spinner
                     size={18}
-                    color={opacity(foreground, 0.65)}
+                    color={withAlpha(foreground, 0.65)}
                     style={styles.footerSpinner}
                   />
                 </VisualLayoutProbe>
@@ -912,7 +912,7 @@ export function NotificationsScreen() {
                   foreground={foreground}
                   surface={surface}
                   muted={muted}
-                  pressedBackground={opacity(surfaceTertiary, 0.45)}
+                  pressedBackground={withAlpha(surfaceTertiary, 0.45)}
                   onPressNotification={openNotification}
                   onPressFollowGroup={openFollowGroup}
                 />
@@ -1009,7 +1009,7 @@ function WelcomeNotificationRow({
     <View style={styles.row}>
       <VStack gap={8}>
         <HStack align="flex-start" gap={12}>
-          <View style={[styles.welcomeGlyph, { backgroundColor: opacity(accent, 0.13) }]}>
+          <View style={[styles.welcomeGlyph, { backgroundColor: withAlpha(accent, 0.13) }]}>
             <Icon name="iconamoon:heart-fill" size={22} color={accent} />
           </View>
           <VStack gap={4} flex={1}>
@@ -1201,7 +1201,7 @@ function AvatarCluster({
 
 function NotificationReasonIcon({ reason, color }: { reason: string; color: string }) {
   return (
-    <View style={[styles.reasonIcon, { backgroundColor: opacity(color, 0.13) }]}>
+    <View style={[styles.reasonIcon, { backgroundColor: withAlpha(color, 0.13) }]}>
       <Icon name={notificationIcon(reason)} size={17} color={color} />
     </View>
   );
@@ -1329,7 +1329,7 @@ function NotificationReferencedPost({
   const name = profile?.name || `${event.pubkey.slice(0, 8)}...`;
   const content = event.content.trim();
   const isContained = showAuthorAvatar || contained;
-  const targetPostBackground = isContained ? opacity(foreground, 0.055) : 'transparent';
+  const targetPostBackground = isContained ? withAlpha(foreground, 0.055) : 'transparent';
 
   return (
     <VStack
@@ -1339,7 +1339,7 @@ function NotificationReferencedPost({
         isContained && styles.referencedPostContained,
         isContained && {
           backgroundColor: targetPostBackground,
-          borderColor: opacity(foreground, 0.08),
+          borderColor: withAlpha(foreground, 0.08),
         },
       ]}>
       <HStack align="center" gap={6}>
@@ -1352,7 +1352,7 @@ function NotificationReferencedPost({
             size={18}
           />
         ) : null}
-        <Text bold numberOfLines={1} size={13} style={{ color: opacity(foreground, 0.72) }}>
+        <Text bold numberOfLines={1} size={13} style={{ color: withAlpha(foreground, 0.72) }}>
           {name}
         </Text>
       </HStack>
@@ -1526,7 +1526,7 @@ function EmptyNotifications({
       testID={`notifications-empty:${errorMessage ? 'error' : viewerReady ? 'none' : 'no-profile'}`}
       accessible
       accessibilityLabel={title}>
-      <Icon name={icon} size={34} color={opacity(foreground, 0.45)} />
+      <Icon name={icon} size={34} color={withAlpha(foreground, 0.45)} />
       <Text size={18} bold style={{ color: foreground, textAlign: 'center' }}>
         {title}
       </Text>

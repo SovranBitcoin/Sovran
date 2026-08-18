@@ -7,7 +7,7 @@
  * available; otherwise the badge falls back to local following knowledge.
  */
 import { StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { alpha, radius, spacing } from '@/shared/styles/tokens';
@@ -46,7 +46,7 @@ export function FollowBadge({ pubkey }: FollowBadgeProps) {
     <HStack
       align="center"
       gap={spacing.xs}
-      style={[styles.pill, { backgroundColor: opacity(color, alpha.faint) }]}>
+      style={[styles.pill, { backgroundColor: withAlpha(color, alpha.faint) }]}>
       {icon ? <Icon name={icon} size={12} color={color} /> : null}
       <Text size={11} bold style={{ color }}>
         {label}

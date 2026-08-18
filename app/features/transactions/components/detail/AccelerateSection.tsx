@@ -22,7 +22,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { formatAmount } from '@/shared/lib/currency';
 import { paymentLog } from '@/shared/lib/logger';
@@ -91,7 +91,7 @@ export function AccelerateSection({ offer, accelerating, onAccelerate }: Acceler
                 <Text size={15} bold color={foreground}>
                   Accelerating
                 </Text>
-                <Text size={12} color={opacity(foreground, 0.5)}>
+                <Text size={12} color={withAlpha(foreground, 0.5)}>
                   Miners are prioritizing this transaction
                 </Text>
               </>
@@ -100,14 +100,14 @@ export function AccelerateSection({ offer, accelerating, onAccelerate }: Acceler
                 <Text size={15} bold color={foreground}>
                   {busy ? 'Preparing invoice…' : `Accelerate for ${fiat} / ${sats} sats`}
                 </Text>
-                <Text size={12} color={opacity(foreground, 0.5)}>
+                <Text size={12} color={withAlpha(foreground, 0.5)}>
                   Cuts confirmation time to ≈{offer!.etaMinutes} min · mempool.space
                 </Text>
               </>
             )}
           </VStack>
           {!accelerating && (
-            <Icon name="lucide:arrow-up-right" size={16} color={opacity(foreground, 0.5)} />
+            <Icon name="lucide:arrow-up-right" size={16} color={withAlpha(foreground, 0.5)} />
           )}
         </HStack>
       </Pressable>
@@ -151,7 +151,7 @@ function AccelerateSheen({ color }: { color: string }) {
     <View pointerEvents="none" onLayout={handleLayout} style={StyleSheet.absoluteFill}>
       <Animated.View style={[styles.sheenBar, { width: sheenWidth }, sheenStyle]}>
         <LinearGradient
-          colors={[opacity(color, 0), opacity(color, 0.1), opacity(color, 0)]}
+          colors={[withAlpha(color, 0), withAlpha(color, 0.1), withAlpha(color, 0)]}
           locations={[0, 0.5, 1]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}

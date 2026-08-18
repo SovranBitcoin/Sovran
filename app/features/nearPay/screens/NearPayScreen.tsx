@@ -25,7 +25,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { usePaymentFlowMachine } from 'wallet/react';
 
 import Icon from 'assets/icons';
@@ -627,7 +627,7 @@ const PeerNode = React.memo(function PeerNode({
     ? nodeStyles.peerPressableHidden
     : nodeStyles.peerPressable;
   const peerAvatarNameStyle = useMemo(
-    () => [styles.peerAvatarName, { color: opacity(foreground, alpha.prominent) }],
+    () => [styles.peerAvatarName, { color: withAlpha(foreground, alpha.prominent) }],
     [foreground]
   );
   const bearerBadgeStyle = useMemo(
@@ -682,7 +682,7 @@ const PeerNode = React.memo(function PeerNode({
               <Icon
                 name="mdi:lock-open-variant-outline"
                 size={sizing.bearerBadgeIconSize}
-                color={opacity(foreground, alpha.prominent)}
+                color={withAlpha(foreground, alpha.prominent)}
               />
             </View>
           ) : null}
@@ -2144,9 +2144,9 @@ export function NearPayScreen() {
   const bluetoothBlocked = bluetooth.status !== 'ready' && bluetooth.status !== 'unknown';
   const amountActive = hasInlineAmountEntry;
   const sharedAvatarVisible = !!sharedAvatarPeer || inlinePhase === 'transitioning';
-  const foregroundSoft = useMemo(() => opacity(foreground, alpha.soft), [foreground]);
-  const foregroundProminent = useMemo(() => opacity(foreground, alpha.prominent), [foreground]);
-  const foregroundMuted = useMemo(() => opacity(foreground, alpha.muted), [foreground]);
+  const foregroundSoft = useMemo(() => withAlpha(foreground, alpha.soft), [foreground]);
+  const foregroundProminent = useMemo(() => withAlpha(foreground, alpha.prominent), [foreground]);
+  const foregroundMuted = useMemo(() => withAlpha(foreground, alpha.muted), [foreground]);
   const emptyTitleStyle = useMemo(() => ({ color: foregroundProminent }), [foregroundProminent]);
   const emptyTextStyle = useMemo(
     () => [styles.emptyText, { color: foregroundMuted }],

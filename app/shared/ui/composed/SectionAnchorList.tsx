@@ -60,7 +60,7 @@ import {
   type ListRenderItemInfo,
   type ViewToken,
 } from '@shopify/flash-list';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { ScrollEdgeFade } from './ScrollEdgeFade';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -555,7 +555,7 @@ export function SectionAnchorList<T>({
                       <Text
                         size={12}
                         bold
-                        style={{ color: isSelected ? foreground : opacity(foreground, 0.7) }}>
+                        style={{ color: isSelected ? foreground : withAlpha(foreground, 0.7) }}>
                         {s.anchor.label}
                       </Text>
                     </Pressable>

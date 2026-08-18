@@ -1,4 +1,4 @@
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
@@ -33,7 +33,7 @@ export function SelectableCheckCircle({
         height: size,
         borderRadius: size / 2,
         borderWidth: 1.5,
-        borderColor: selected ? accent : opacity(foreground, 0.25),
+        borderColor: selected ? accent : withAlpha(foreground, 0.25),
         backgroundColor: selected ? accent : 'transparent',
         alignItems: 'center',
         justifyContent: 'center',

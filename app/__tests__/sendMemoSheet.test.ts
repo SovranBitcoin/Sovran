@@ -20,9 +20,10 @@ jest.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 jest.mock('heroui-native', () => ({
   BottomSheet: { Title: 'BottomSheet.Title' },
 }));
-jest.mock('hex-color-opacity', () =>
-  jest.fn((color: string, value: number) => `${color}:${value}`)
-);
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: jest.fn((color: string, value: number) => `${color}:${value}`),
+}));
 jest.mock('nostr-tools', () => ({
   nip19: { nprofileEncode: jest.fn(({ pubkey }) => `nprofile:${pubkey}`) },
 }));

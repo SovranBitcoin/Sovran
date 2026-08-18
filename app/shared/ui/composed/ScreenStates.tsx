@@ -4,7 +4,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { Screen } from '@/shared/ui/composed/Screen';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface ScreenErrorStateProps {
@@ -31,7 +31,7 @@ export function ScreenErrorState({ message, title, onGoBack }: ScreenErrorStateP
               size={18}
               bold
               style={{
-                color: opacity(foreground, 0.9),
+                color: withAlpha(foreground, 0.9),
                 marginBottom: 16,
                 textAlign: 'center',
               }}>
@@ -40,7 +40,7 @@ export function ScreenErrorState({ message, title, onGoBack }: ScreenErrorStateP
             <Text
               size={14}
               style={{
-                color: opacity(foreground, 0.5),
+                color: withAlpha(foreground, 0.5),
                 marginBottom: 24,
                 textAlign: 'center',
               }}>
@@ -48,7 +48,7 @@ export function ScreenErrorState({ message, title, onGoBack }: ScreenErrorStateP
             </Text>
           </>
         ) : (
-          <Text color={opacity(foreground, 0.66)}>{message}</Text>
+          <Text color={withAlpha(foreground, 0.66)}>{message}</Text>
         )}
         <ButtonHandler
           buttons={[
@@ -81,7 +81,7 @@ export function ScreenLoadingState({ message }: ScreenLoadingStateProps) {
         accessibilityState={{ busy: true }}
         style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <Spinner size={32} />
-        <Text size={16} style={{ color: opacity(foreground, 0.5), marginTop: 16 }}>
+        <Text size={16} style={{ color: withAlpha(foreground, 0.5), marginTop: 16 }}>
           {message}
         </Text>
       </VStack>

@@ -5,14 +5,14 @@
  * gradient highlights — matching the exact same card treatment used by
  * the Transactions component on the home page:
  *   accentColor = primaryColor('300')
- *   borderColor = opacity(accentColor, 0.3)
+ *   borderColor = withAlpha(accentColor, 0.3)
  *
  * Used by both SwapTransactionScreen and RebalanceStepRow.
  */
 
 import React, { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { View } from '@/shared/ui/primitives/View/View';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
@@ -34,7 +34,7 @@ export const TransferCard = React.memo(
     const accentColor = useMemo(() => accentColorProp ?? muted, [accentColorProp, muted]);
 
     // Always show the tinted border — matches Transactions component exactly.
-    const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
+    const borderColor = useMemo(() => withAlpha(accentColor, 0.3), [accentColor]);
 
     return (
       <Log name="TransferCard">

@@ -98,9 +98,10 @@ jest.mock('assets/icons', () => ({
   },
 }));
 
-jest.mock('hex-color-opacity', () =>
-  jest.fn((color: string, value: number) => `${color}/${value}`)
-);
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: jest.fn((color: string, value: number) => `${color}/${value}`),
+}));
 
 jest.mock('expo-blur', () => ({
   BlurView: (props: Record<string, unknown>) => {

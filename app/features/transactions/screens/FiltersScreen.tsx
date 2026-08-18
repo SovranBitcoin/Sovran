@@ -23,7 +23,7 @@ import { extractDomain } from '@/shared/lib/url';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
 import { spacing, radius, alpha } from '@/shared/styles/tokens';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import {
@@ -86,21 +86,21 @@ const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress, testID })
       style={[
         styles.chip,
         {
-          backgroundColor: isSelected ? accentSoft : opacity(foreground, alpha.faint),
-          borderColor: isSelected ? accent : opacity(foreground, alpha.subtle),
+          backgroundColor: isSelected ? accentSoft : withAlpha(foreground, alpha.faint),
+          borderColor: isSelected ? accent : withAlpha(foreground, alpha.subtle),
         },
       ]}>
       {icon ? (
         <Icon
           name={icon}
           size={16}
-          color={isSelected ? accent : opacity(foreground, alpha.muted)}
+          color={isSelected ? accent : withAlpha(foreground, alpha.muted)}
         />
       ) : null}
       <Text
         size={14}
         style={{
-          color: isSelected ? foreground : opacity(foreground, alpha.muted),
+          color: isSelected ? foreground : withAlpha(foreground, alpha.muted),
           fontFamily: 'OxygenBold',
         }}>
         {label}
@@ -121,7 +121,7 @@ const Section: React.FC<{ title: string; children: React.ReactNode; scroll?: boo
       <Text
         size={13}
         style={{
-          color: opacity(foreground, alpha.muted),
+          color: withAlpha(foreground, alpha.muted),
           fontFamily: 'OxygenBold',
           textTransform: 'uppercase',
           letterSpacing: 1,
@@ -169,8 +169,8 @@ const MintSelectorChip: React.FC<{
       style={[
         styles.mintChip,
         {
-          backgroundColor: isSelected ? accentSoft : opacity(foreground, alpha.faint),
-          borderColor: isSelected ? accent : opacity(foreground, alpha.subtle),
+          backgroundColor: isSelected ? accentSoft : withAlpha(foreground, alpha.faint),
+          borderColor: isSelected ? accent : withAlpha(foreground, alpha.subtle),
         },
       ]}>
       {showIcon ? <MintIcon iconUrl={iconUrl} size={22} name={name} alt={`${name} icon`} /> : null}
@@ -178,7 +178,7 @@ const MintSelectorChip: React.FC<{
         size={13}
         numberOfLines={1}
         style={{
-          color: isSelected ? foreground : opacity(foreground, alpha.strong),
+          color: isSelected ? foreground : withAlpha(foreground, alpha.strong),
           fontFamily: 'OxygenBold',
           maxWidth: 140,
         }}>
@@ -324,7 +324,7 @@ export function FiltersScreen() {
             style={[styles.resetButton, { opacity: hasActiveFilters ? 1 : 0 }]}>
             <Text
               size={14}
-              style={{ color: opacity(foreground, alpha.muted), fontFamily: 'OxygenBold' }}>
+              style={{ color: withAlpha(foreground, alpha.muted), fontFamily: 'OxygenBold' }}>
               Reset
             </Text>
           </Pressable>

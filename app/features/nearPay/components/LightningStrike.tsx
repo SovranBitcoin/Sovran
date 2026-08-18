@@ -27,7 +27,7 @@ import {
   generateStrikeVariants,
 } from '@/features/nearPay/lib/boltGeometry';
 import type { StrikeStatus } from '@/features/nearPay/lib/nutDropStrikeState';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { variantToSkPath } from '@/features/nearPay/lib/boltSkiaPath';
 
 import {
@@ -153,7 +153,7 @@ export function LightningStrike({
   );
   const frameTransform = useMemo(() => [{ scale: frameScale }], [frameScale]);
   const haloGradientColors = useMemo(
-    () => [opacity(outerGlow, op(0.45)), opacity(outerGlow, 0)],
+    () => [withAlpha(outerGlow, op(0.45)), withAlpha(outerGlow, 0)],
     [outerGlow]
   );
   const variants = useMemo(() => generateStrikeVariants(seed), [seed]);

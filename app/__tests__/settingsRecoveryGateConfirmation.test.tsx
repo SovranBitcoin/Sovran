@@ -85,9 +85,9 @@ jest.mock('expo-router', () => ({
   useNavigation: () => ({ setOptions: jest.fn(), addListener: jest.fn(() => jest.fn()) }),
 }));
 jest.mock('@/shared/lib/popup', () => ({ staticPopup: jest.fn(), paramPopup: jest.fn() }));
-jest.mock('hex-color-opacity', () => ({
-  __esModule: true,
-  default: (color: string) => color,
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (color: string) => color,
 }));
 
 jest.mock('@/shared/ui/composed/SlideToConfirm', () => {

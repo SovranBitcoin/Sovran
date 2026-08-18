@@ -10,7 +10,7 @@ import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { FiatCurrencyPill } from '@/features/wallet/components/FiatCurrencyPill';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
@@ -61,7 +61,7 @@ const LIQUID_GLASS_BALANCE_VARIANT: GlassVariant = 'clear';
 // Alpha applied to the theme foreground to produce the glass tint. Using the
 // foreground (same colour as the Send/Receive/Pending pill labels) keeps the
 // balance visually part of the same text layer across themes; the 0.5 alpha
-// lets the frosted refraction/specular come through. `opacity()` emits
+// lets the frosted refraction/specular come through. `withAlpha()` emits
 // `#RRGGBBAA` and the native module parses the alpha channel
 // (see LiquidGlassTextView.color(hex:)).
 const LIQUID_GLASS_BALANCE_TINT_ALPHA = 0.75;
@@ -122,7 +122,7 @@ function EcashStatusPill({
         label={text}
         icon="majesticons:coins"
         onPress={isPlaceholder ? () => {} : onPress}
-        color={opacity(foreground, 0.85)}
+        color={withAlpha(foreground, 0.85)}
         height={PILL_HEIGHT}
         fitContent
         iconSize={PILL_ICON_SIZE}
@@ -185,7 +185,7 @@ export function PrimaryBalance({
   const currencyConfig = CURRENCY_CONFIG[displayCurrency];
   const fiatValue = btcPrice ? ((btcPrice / 100_000_000) * balance).toFixed(2) : '0.00';
   const foreground = useThemeColor('foreground');
-  const balanceTint = opacity(foreground, LIQUID_GLASS_BALANCE_TINT_ALPHA);
+  const balanceTint = withAlpha(foreground, LIQUID_GLASS_BALANCE_TINT_ALPHA);
 
   useEffect(() => {
     walletLog.debug('wallet.balance.ecash_status', {

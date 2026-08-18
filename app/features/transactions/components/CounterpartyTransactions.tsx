@@ -8,7 +8,7 @@
 
 import React, { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { getCounterparty } from 'wallet';
@@ -41,8 +41,8 @@ export function CounterpartyTransactions({ pubkey, excludeId }: CounterpartyTran
   const { history } = useHistoryWithMelts();
   const { metadata } = useNostrProfileMetadata(pubkey);
   const name = resolveIdentityName({ pubkey, nostrProfile: metadata });
-  const ruleStrong = opacity(foreground, alpha.soft);
-  const ruleFaint = opacity(foreground, alpha.faint);
+  const ruleStrong = withAlpha(foreground, alpha.soft);
+  const ruleFaint = withAlpha(foreground, alpha.faint);
   const leftRuleColors = useMemo(() => [ruleFaint, ruleStrong] as const, [ruleFaint, ruleStrong]);
   const rightRuleColors = useMemo(() => [ruleStrong, ruleFaint] as const, [ruleFaint, ruleStrong]);
   const headingStyle = useMemo(() => [styles.heading, { color: ruleStrong }], [ruleStrong]);

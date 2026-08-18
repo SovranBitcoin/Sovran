@@ -6,7 +6,7 @@
  * The stops come from react-native-easing-gradient (the same recipe
  * ScrollEdgeFade/BottomButtons use): ~14 dense stops with zero slope at both
  * ends, so there is no visible kink mid-fade and no hard line where the
- * gradient terminates. The fade interpolates bg → opacity(bg, 0) — never the
+ * gradient terminates. The fade interpolates bg → withAlpha(bg, 0) — never the
  * literal 'transparent', which would fade through black.
  *
  * Two geometries:
@@ -31,7 +31,7 @@
 import { memo, useMemo } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { easeGradient } from 'react-native-easing-gradient';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 /** Default solid anchor for the clipped native-header path (fade spans the
  *  bottom ~45% of the taller native bar). */
@@ -54,7 +54,7 @@ export const AndroidHeaderScrim = memo(function AndroidHeaderScrim({
       colorStops: {
         0: { color: backgroundColor },
         [solidUntil]: { color: backgroundColor },
-        1: { color: opacity(backgroundColor, 0) },
+        1: { color: withAlpha(backgroundColor, 0) },
       },
     });
     return {

@@ -21,7 +21,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBTCMapStore, BTCMapPlaceDetails } from '@/shared/stores/global/btcMapStore';
 import { ListGroup, PressableFeedback } from 'heroui-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { getMarkerColor } from '@/shared/lib/map/categories';
@@ -180,7 +180,7 @@ export function MerchantDetailScreen() {
       <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.loadingContainer}>
           <Spinner size={32} color={BITCOIN_ACCENT} />
-          <Text size={14} style={{ color: opacity(foreground, 0.5), marginTop: 12 }}>
+          <Text size={14} style={{ color: withAlpha(foreground, 0.5), marginTop: 12 }}>
             Loading merchant details...
           </Text>
         </View>
@@ -192,8 +192,8 @@ export function MerchantDetailScreen() {
     return (
       <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.loadingContainer}>
-          <Icon name="mdi:alert-circle" size={48} color={opacity(foreground, 0.4)} />
-          <Text size={14} style={{ color: opacity(foreground, 0.5), marginTop: 12 }}>
+          <Icon name="mdi:alert-circle" size={48} color={withAlpha(foreground, 0.4)} />
+          <Text size={14} style={{ color: withAlpha(foreground, 0.5), marginTop: 12 }}>
             No merchant data available
           </Text>
         </View>
@@ -218,11 +218,11 @@ export function MerchantDetailScreen() {
             <Icon name="mdi:store" size={28} color="#fff" />
           </View>
           <VStack style={{ flex: 1, marginLeft: 16 }}>
-            <Text size={20} heavy style={{ color: opacity(foreground, 0.9) }}>
+            <Text size={20} heavy style={{ color: withAlpha(foreground, 0.9) }}>
               {place.name || 'Unknown Merchant'}
             </Text>
             {place.address && (
-              <Text size={13} style={{ color: opacity(foreground, 0.4), marginTop: 4 }}>
+              <Text size={13} style={{ color: withAlpha(foreground, 0.4), marginTop: 4 }}>
                 {place.address}
               </Text>
             )}
@@ -248,7 +248,7 @@ export function MerchantDetailScreen() {
                     <ListGroup.ItemTitle>On-chain</ListGroup.ItemTitle>
                   </ListGroup.ItemContent>
                   <ListGroup.ItemSuffix>
-                    <Icon name="mdi:check-circle" size={20} color={opacity(foreground, 0.4)} />
+                    <Icon name="mdi:check-circle" size={20} color={withAlpha(foreground, 0.4)} />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>
               )}
@@ -261,7 +261,7 @@ export function MerchantDetailScreen() {
                     <ListGroup.ItemTitle>Lightning</ListGroup.ItemTitle>
                   </ListGroup.ItemContent>
                   <ListGroup.ItemSuffix>
-                    <Icon name="mdi:check-circle" size={20} color={opacity(foreground, 0.4)} />
+                    <Icon name="mdi:check-circle" size={20} color={withAlpha(foreground, 0.4)} />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>
               )}
@@ -274,7 +274,7 @@ export function MerchantDetailScreen() {
                     <ListGroup.ItemTitle>Contactless</ListGroup.ItemTitle>
                   </ListGroup.ItemContent>
                   <ListGroup.ItemSuffix>
-                    <Icon name="mdi:check-circle" size={20} color={opacity(foreground, 0.4)} />
+                    <Icon name="mdi:check-circle" size={20} color={withAlpha(foreground, 0.4)} />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>
               )}
@@ -295,7 +295,7 @@ export function MerchantDetailScreen() {
                   <PressableFeedback.Scale>
                     <ListGroup.Item disabled>
                       <ListGroup.ItemPrefix>
-                        <Icon name={contact.icon} size={20} color={opacity(foreground, 0.4)} />
+                        <Icon name={contact.icon} size={20} color={withAlpha(foreground, 0.4)} />
                       </ListGroup.ItemPrefix>
                       <ListGroup.ItemContent>
                         <ListGroup.ItemTitle>{contact.info}</ListGroup.ItemTitle>
@@ -318,7 +318,7 @@ export function MerchantDetailScreen() {
                 padding: 16,
                 borderRadius: 12,
               }}>
-              <Text size={14} style={{ color: opacity(foreground, 0.66), lineHeight: 22 }}>
+              <Text size={14} style={{ color: withAlpha(foreground, 0.66), lineHeight: 22 }}>
                 {place.opening_hours}
               </Text>
             </View>
@@ -333,14 +333,14 @@ export function MerchantDetailScreen() {
                 padding: 16,
                 borderRadius: 12,
               }}>
-              <Text size={14} style={{ color: opacity(foreground, 0.66), lineHeight: 22 }}>
+              <Text size={14} style={{ color: withAlpha(foreground, 0.66), lineHeight: 22 }}>
                 {place.description}
               </Text>
             </View>
           </Section>
         )}
 
-        <View style={[styles.sourceInfo, { borderTopColor: opacity(foreground, 0.1) }]}>
+        <View style={[styles.sourceInfo, { borderTopColor: withAlpha(foreground, 0.1) }]}>
           <Text size={11} style={{ color: defaultColor, textAlign: 'center' }}>
             Data from BTCMap.org • Last updated {formatDate(place.updated_at, 'short-date')}
           </Text>

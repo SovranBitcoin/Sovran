@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { MeshGradientView } from 'expo-mesh-gradient';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBackgroundContext } from '@/shared/providers/BackgroundProvider';
 import React, { memo, ReactNode, useMemo, useSyncExternalStore } from 'react';
@@ -175,7 +175,7 @@ function ScrollableGradientOverlayComponent({
   const androidBackgroundMeshColors = useMemo(
     () =>
       getScrollableOverlayMeshColors({
-        top: opacity(screenBackgroundColor, 0),
+        top: withAlpha(screenBackgroundColor, 0),
         mid: screenBackgroundColor,
         bottom: screenBackgroundColor,
       }),
@@ -213,8 +213,8 @@ function ScrollableGradientOverlayComponent({
         ) : (
           <LinearGradient
             colors={[
-              opacity(screenBackgroundColor, 0),
-              opacity(screenBackgroundColor, 0),
+              withAlpha(screenBackgroundColor, 0),
+              withAlpha(screenBackgroundColor, 0),
               screenBackgroundColor,
               screenBackgroundColor,
             ]}
@@ -504,7 +504,7 @@ const WallpaperLayer = memo(function WallpaperLayer({
       ) : (
         <LinearGradient
           colors={[
-            opacity(gradientColor || layerSurface, gradientTopOpacity),
+            withAlpha(gradientColor || layerSurface, gradientTopOpacity),
             gradientColor || layerSurface,
           ]}
           locations={[0, 1]}

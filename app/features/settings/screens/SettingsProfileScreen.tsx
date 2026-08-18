@@ -7,7 +7,7 @@ import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import Icon from 'assets/icons';
 import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
 import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -21,10 +21,10 @@ const DebugRow: React.FC<{ label: string; value: string }> = ({ label, value }) 
   const foreground = useThemeColor('foreground');
   return (
     <View>
-      <Text size={11} style={{ color: opacity(foreground, 0.5) }} className="uppercase">
+      <Text size={11} style={{ color: withAlpha(foreground, 0.5) }} className="uppercase">
         {label}
       </Text>
-      <Text size={13} style={{ color: opacity(foreground, 0.85) }} className="mt-0.5 font-mono">
+      <Text size={13} style={{ color: withAlpha(foreground, 0.85) }} className="mt-0.5 font-mono">
         {value}
       </Text>
     </View>
@@ -146,7 +146,7 @@ export const SettingsProfileScreen = () => {
           style={{
             borderWidth: 1,
             borderColor: dangerColor,
-            backgroundColor: opacity(dangerColor, 0.08),
+            backgroundColor: withAlpha(dangerColor, 0.08),
           }}>
           <Card.Body className="flex-row items-start gap-3 py-4">
             <Icon name="mdi:shield" size={20} color={dangerColor} />

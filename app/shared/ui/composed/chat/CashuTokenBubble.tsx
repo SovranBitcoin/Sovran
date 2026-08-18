@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { getTokenMetadata } from '@cashu/cashu-ts';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -161,7 +161,7 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
   // no nested gradients, modest type — so an ecash drop reads as a calm
   // affordance in the message stream rather than a loud hero banner. The action
   // is a subtle tinted pill (success for Redeem, muted for Cancel).
-  const actionColor = isOwn ? opacity(foreground, alpha.strong) : success;
+  const actionColor = isOwn ? withAlpha(foreground, alpha.strong) : success;
   const { amount, unit, mintUrl } = decodedToken;
 
   return (
@@ -189,11 +189,15 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
           }}>
           {mintUrl ? (
             <HStack align="center" gap={spacing.xs}>
-              <Icon name="mingcute:bank-fill" size={13} color={opacity(foreground, alpha.muted)} />
+              <Icon
+                name="mingcute:bank-fill"
+                size={13}
+                color={withAlpha(foreground, alpha.muted)}
+              />
               <Text
                 size={12}
                 numberOfLines={1}
-                style={{ color: opacity(foreground, alpha.muted), flexShrink: 1 }}>
+                style={{ color: withAlpha(foreground, alpha.muted), flexShrink: 1 }}>
                 {mintUrl}
               </Text>
             </HStack>
@@ -208,7 +212,7 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
               color={foreground}
             />
             {usdAmount ? (
-              <Text size={13} style={{ color: opacity(foreground, alpha.muted) }}>
+              <Text size={13} style={{ color: withAlpha(foreground, alpha.muted) }}>
                 {usdAmount}
               </Text>
             ) : null}
@@ -220,7 +224,7 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
               marginTop: spacing.xs,
               paddingVertical: spacing.sm,
               paddingHorizontal: spacing.md,
-              backgroundColor: opacity(actionColor, alpha.subtle),
+              backgroundColor: withAlpha(actionColor, alpha.subtle),
               borderRadius: radius.md,
               alignItems: 'center',
             }}>

@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { BottomSheet } from 'heroui-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -457,11 +457,11 @@ function MentionEmptyState({
 }): React.ReactElement {
   return (
     <View style={styles.mentionEmpty}>
-      <Icon name={icon} size={30} color={opacity(foreground, 0.3)} />
-      <Text size={16} bold style={{ color: opacity(foreground, 0.7), textAlign: 'center' }}>
+      <Icon name={icon} size={30} color={withAlpha(foreground, 0.3)} />
+      <Text size={16} bold style={{ color: withAlpha(foreground, 0.7), textAlign: 'center' }}>
         {title}
       </Text>
-      <Text size={14} style={{ color: opacity(foreground, 0.5), textAlign: 'center' }}>
+      <Text size={14} style={{ color: withAlpha(foreground, 0.5), textAlign: 'center' }}>
         {body}
       </Text>
     </View>

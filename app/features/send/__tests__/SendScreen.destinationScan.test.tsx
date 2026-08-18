@@ -62,7 +62,10 @@ jest.mock('react-native-reanimated', () => {
   };
 });
 
-jest.mock('hex-color-opacity', () => ({ __esModule: true, default: (c: string) => c }));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (c: string) => c,
+}));
 
 jest.mock('expo-router/react-navigation', () => ({ useHeaderHeight: () => 0 }));
 

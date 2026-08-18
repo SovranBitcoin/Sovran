@@ -11,7 +11,7 @@ import { StyleSheet, View } from 'react-native';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 
 import Icon from 'assets/icons';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -82,7 +82,7 @@ export function PollCard({ event }: { event: FeedEvent }) {
   }, [ndk, selected, poll.id, poll.relays]);
 
   return (
-    <View style={[styles.card, { borderColor: opacity(foreground, 0.12) }]}>
+    <View style={[styles.card, { borderColor: withAlpha(foreground, 0.12) }]}>
       {poll.question ? (
         <Text size={15} bold style={{ color: foreground, marginBottom: 8 }}>
           {poll.question}
@@ -99,12 +99,12 @@ export function PollCard({ event }: { event: FeedEvent }) {
             key={option.id}
             onPress={() => toggleSelect(option.id)}
             disabled={showResults}
-            style={[styles.option, { borderColor: opacity(foreground, 0.12) }]}>
+            style={[styles.option, { borderColor: withAlpha(foreground, 0.12) }]}>
             {showResults ? (
               <View
                 style={[
                   styles.bar,
-                  { width: `${pct}%`, backgroundColor: opacity(mine ? success : accent, 0.18) },
+                  { width: `${pct}%`, backgroundColor: withAlpha(mine ? success : accent, 0.18) },
                 ]}
               />
             ) : null}
@@ -149,7 +149,7 @@ export function PollCard({ event }: { event: FeedEvent }) {
             disabled={voting || selected.length === 0}
             style={[
               styles.voteButton,
-              { backgroundColor: selected.length === 0 ? opacity(accent, 0.4) : accent },
+              { backgroundColor: selected.length === 0 ? withAlpha(accent, 0.4) : accent },
             ]}>
             <Text size={13} bold style={{ color: foreground }}>
               {voting ? 'Voting…' : 'Vote'}

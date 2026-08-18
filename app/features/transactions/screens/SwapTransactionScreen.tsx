@@ -39,7 +39,7 @@ import {
   useSwapTransactionsStore,
   type SwapLeg,
 } from '@/shared/stores/profile/swapTransactionsStore';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { DetailsList } from '@/shared/ui/composed/DetailsList';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
@@ -172,13 +172,13 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
           <UntranslatedText
             bold
             size={13}
-            color={opacity(foreground, 0.9)}
+            color={withAlpha(foreground, 0.9)}
             numberOfLines={1}
             style={{ flex: 1 }}>
             {srcName}
           </UntranslatedText>
         </HStack>
-        <View style={[styles.collapsedArrow, { backgroundColor: opacity(foreground, 0.33) }]}>
+        <View style={[styles.collapsedArrow, { backgroundColor: withAlpha(foreground, 0.33) }]}>
           <Icon name="mdi:arrow-right" size={10} color="#fff" />
         </View>
         <HStack gap={8} align="center" flex={1}>
@@ -186,7 +186,7 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
           <UntranslatedText
             bold
             size={13}
-            color={opacity(foreground, 0.9)}
+            color={withAlpha(foreground, 0.9)}
             numberOfLines={1}
             style={{ flex: 1 }}>
             {dstName}
@@ -355,7 +355,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
     return (
       <Screen name="SwapTransactionScreen">
         <View style={styles.center}>
-          <Text color={opacity(foreground, 0.66)}>Swap not found.</Text>
+          <Text color={withAlpha(foreground, 0.66)}>Swap not found.</Text>
         </View>
       </Screen>
     );
@@ -399,8 +399,8 @@ export function SwapTransactionScreen({ groupId }: Props) {
                 color={headerColor}
               />
             </HStack>
-            <Text overpass size={18} color={opacity(foreground, 0.9)} bold>
-              <Text overpass size={18} color={opacity(foreground, 0.9)} style={{ marginLeft: 8 }}>
+            <Text overpass size={18} color={withAlpha(foreground, 0.9)} bold>
+              <Text overpass size={18} color={withAlpha(foreground, 0.9)} style={{ marginLeft: 8 }}>
                 {fiatAmount}
               </Text>
             </Text>
@@ -408,21 +408,21 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
           {/* Swap icon — same style as TransactionIcon in HistoryEntryHeader */}
           <View className="scale-125 transform p-4">
-            <Icon name="mdi:swap-horizontal" size={28} color={opacity(foreground, 0.9)} />
+            <Icon name="mdi:swap-horizontal" size={28} color={withAlpha(foreground, 0.9)} />
           </View>
         </HStack>
 
         {/* ── Disclosure toggle (animated chevron, like SwiftUI DisclosureGroup) ── */}
         <Pressable onPress={toggleExpanded} style={{ marginHorizontal: 16 }}>
           <HStack align="center" justify="space-between" style={styles.toggleHeader}>
-            <UntranslatedText bold size={13} color={opacity(foreground, 0.66)}>
+            <UntranslatedText bold size={13} color={withAlpha(foreground, 0.66)}>
               Transactions
             </UntranslatedText>
             <Animated.View style={chevronAnimatedStyle}>
               <Icon
                 name="material-symbols:keyboard-arrow-down-rounded"
                 size={16}
-                color={opacity(foreground, 0.5)}
+                color={withAlpha(foreground, 0.5)}
               />
             </Animated.View>
           </HStack>
@@ -534,7 +534,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
                       <View
                         style={{
                           height: StyleSheet.hairlineWidth,
-                          backgroundColor: opacity(foreground, 0.1),
+                          backgroundColor: withAlpha(foreground, 0.1),
                           marginHorizontal: 16,
                         }}
                       />

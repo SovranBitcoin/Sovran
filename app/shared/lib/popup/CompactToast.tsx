@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { Toast } from 'heroui-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { resolvePopupIcon, type PopupIcon } from './icons';
 import { useToastSurface } from './useToastSurface';
@@ -38,7 +38,7 @@ export function CompactToast({
   // Opaque surface bg on non-frosted platforms so the toast doesn't look
   // ghosted (the slab renders no BlurView there).
   const frosted = useToastFrosted();
-  const tintColor = frosted ? opacity(bg, TINT_ALPHA) : bg;
+  const tintColor = frosted ? withAlpha(bg, TINT_ALPHA) : bg;
 
   return (
     <ToastSlab

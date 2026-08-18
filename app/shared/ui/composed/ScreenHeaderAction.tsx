@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -11,7 +11,7 @@ import { alpha, headerButtonSize, hitSlop } from '@/shared/styles/tokens';
 /**
  * Canonical header icon button (headerLeft / headerRight). One component so
  * every header action shares the mint-selector chrome on BOTH platforms:
- * a surface-secondary circle with a 1px `opacity(muted, 0.3)` border and a
+ * a surface-secondary circle with a 1px `withAlpha(muted, 0.3)` border and a
  * slightly dimmed glyph — the flat analog of the liquid-glass circle, sized
  * to match the wallet mint selector (54 on Android; 44 on iOS, whose native
  * nav bars cap custom views). ≥44pt touch target everywhere.
@@ -60,13 +60,13 @@ export function ScreenHeaderAction({
   const content =
     children ??
     (icon ? (
-      <Icon name={icon} size={size} color={color ?? opacity(foreground, alpha.prominent)} />
+      <Icon name={icon} size={size} color={color ?? withAlpha(foreground, alpha.prominent)} />
     ) : null);
 
   const circleStyle = React.useMemo(
     () => [
       styles.circle,
-      { backgroundColor: surfaceSecondary, borderColor: opacity(muted, 0.3) },
+      { backgroundColor: surfaceSecondary, borderColor: withAlpha(muted, 0.3) },
       { opacity: disabled ? 0.4 : 1 },
     ],
     [disabled, muted, surfaceSecondary]

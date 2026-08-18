@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef } from 'react';
 import { TextInput } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -84,7 +84,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
           defaultValue={seedText}
           onChangeText={handleTextChange}
           placeholder={placeholder}
-          placeholderTextColor={opacity(foreground, 0.33)}
+          placeholderTextColor={withAlpha(foreground, 0.33)}
           accessibilityLabel={placeholder}
           accessibilityRole="search"
           style={{

@@ -16,7 +16,7 @@ import { HeaderGlassCircle } from '@/shared/ui/composed/HeaderGlassCircle';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { headerButtonSize } from '@/shared/styles/tokens';
 
@@ -54,7 +54,7 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
           borderRadius: ANDROID_BUTTON_SIZE / 2,
           backgroundColor: flatSurface,
           borderWidth: 1,
-          borderColor: opacity(muted, 0.3),
+          borderColor: withAlpha(muted, 0.3),
           alignItems: 'center' as const,
           justifyContent: 'center' as const,
         }

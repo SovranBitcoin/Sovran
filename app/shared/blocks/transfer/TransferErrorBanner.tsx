@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { UntranslatedText } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -25,7 +25,7 @@ export const TransferErrorBanner = React.memo(({ message }: TransferErrorBannerP
 
   return (
     <Log name="TransferErrorBanner">
-      <View style={[styles.errorBanner, { backgroundColor: opacity(dangerColor, 0.15) }]}>
+      <View style={[styles.errorBanner, { backgroundColor: withAlpha(dangerColor, 0.15) }]}>
         <HStack gap={8} align="center">
           <Icon name="mdi:alert-circle" size={16} color={dangerColor} />
           <UntranslatedText size={11} bold color={dangerColor} style={styles.message}>

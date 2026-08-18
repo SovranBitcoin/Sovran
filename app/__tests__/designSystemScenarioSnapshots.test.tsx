@@ -153,9 +153,9 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({
   },
 }));
 
-jest.mock('hex-color-opacity', () => ({
-  __esModule: true,
-  default: jest.fn((_color: string, opacity: number) => `rgba(16, 16, 16, ${opacity})`),
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: jest.fn((_color: string, opacity: number) => `rgba(16, 16, 16, ${opacity})`),
 }));
 
 jest.mock('@monicon/native', () => {

@@ -6,14 +6,14 @@
  * pixel-identical.
  */
 import { StyleSheet, View } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { alpha, spacing } from '@/shared/styles/tokens';
 
 export function SheetGrabber() {
   const [foreground] = useThemeColor(['foreground'] as const);
   return (
-    <View style={[styles.grabber, { backgroundColor: opacity(foreground, alpha.disabled) }]} />
+    <View style={[styles.grabber, { backgroundColor: withAlpha(foreground, alpha.disabled) }]} />
   );
 }
 

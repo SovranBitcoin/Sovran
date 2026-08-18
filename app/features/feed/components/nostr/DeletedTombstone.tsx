@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from '@/assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -25,9 +25,9 @@ const AVATAR_SIZE = 36;
  */
 export function DeletedTombstone() {
   const foreground = useThemeColor('foreground');
-  const muted = opacity(foreground, 0.4);
-  const dimmed = opacity(foreground, 0.3);
-  const stubBg = opacity(foreground, 0.06);
+  const muted = withAlpha(foreground, 0.4);
+  const dimmed = withAlpha(foreground, 0.3);
+  const stubBg = withAlpha(foreground, 0.06);
 
   return (
     <Log name="DeletedTombstone">

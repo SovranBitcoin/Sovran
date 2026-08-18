@@ -25,7 +25,7 @@ import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import Icon from 'assets/icons';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { log, redactError, useLifecycleLogger } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from 'nostr-tools';
@@ -139,22 +139,22 @@ function UsernameInput({
       style={[
         styles.inputContainer,
         {
-          backgroundColor: opacity(accentColor, alpha.faint),
+          backgroundColor: withAlpha(accentColor, alpha.faint),
           borderColor:
-            value.length > 0 ? opacity(accentColor, alpha.strong) : opacity(accentColor, 0.25),
+            value.length > 0 ? withAlpha(accentColor, alpha.strong) : withAlpha(accentColor, 0.25),
         },
       ]}>
       <TextInput
         value={value}
         onChangeText={handleChange}
         placeholder="username"
-        placeholderTextColor={opacity(accentColor, alpha.muted)}
-        style={[styles.input, { color: opacity(foreground, alpha.prominent) }]}
+        placeholderTextColor={withAlpha(accentColor, alpha.muted)}
+        style={[styles.input, { color: withAlpha(foreground, alpha.prominent) }]}
         autoCorrect={false}
         autoCapitalize="none"
         autoFocus
       />
-      <Text size={18} style={{ color: opacity(accentColor, alpha.prominent) }}>
+      <Text size={18} style={{ color: withAlpha(accentColor, alpha.prominent) }}>
         @{selectedDomain}
       </Text>
       {isChecking && (
@@ -197,7 +197,7 @@ function DomainOption({
     if (!availabilityResult) return null;
     if (availabilityResult.loading)
       return {
-        color: opacity(foreground, alpha.soft),
+        color: withAlpha(foreground, alpha.soft),
         text: 'Checking...',
         indicator: { phase: 'loading' },
       };
@@ -231,7 +231,7 @@ function DomainOption({
       style={[
         styles.domainOption,
         {
-          backgroundColor: isSelected ? opacity(accent, 0.15) : surface,
+          backgroundColor: isSelected ? withAlpha(accent, 0.15) : surface,
           borderColor: isSelected ? accent : surfaceSecondary,
         },
       ]}>
@@ -240,20 +240,20 @@ function DomainOption({
           style={[
             styles.domainIcon,
             {
-              backgroundColor: isSelected ? opacity(muted, 0.2) : surfaceSecondary,
+              backgroundColor: isSelected ? withAlpha(muted, 0.2) : surfaceSecondary,
             },
           ]}>
           <Icon
             name="mingcute:lightning-fill"
             size={16}
-            color={isSelected ? opacity(foreground, 0.4) : opacity(foreground, alpha.soft)}
+            color={isSelected ? withAlpha(foreground, 0.4) : withAlpha(foreground, alpha.soft)}
           />
         </View>
         <Text
           size={15}
           heavy={isSelected}
           style={{
-            color: isSelected ? opacity(foreground, alpha.prominent) : opacity(foreground, 0.5),
+            color: isSelected ? withAlpha(foreground, alpha.prominent) : withAlpha(foreground, 0.5),
           }}>
           @{domain.label}
         </Text>
@@ -564,7 +564,7 @@ export function ClaimUsernameScreen() {
             style={[
               styles.heroCard,
               {
-                borderColor: opacity(accentColor, alpha.soft),
+                borderColor: withAlpha(accentColor, alpha.soft),
                 opacity: hero.isHidden('claimUsername', 'destination') ? 0 : 1,
                 marginTop: -topOffset,
                 paddingTop: 52 + topOffset * 2,
@@ -577,20 +577,23 @@ export function ClaimUsernameScreen() {
               <VStack style={{ paddingHorizontal: 20, paddingBottom: 20, zIndex: zIndex.raised }}>
                 <HStack align="center" style={{ marginBottom: 14 }}>
                   <View
-                    style={[styles.heroSmallIcon, { backgroundColor: opacity(accentColor, 0.15) }]}>
+                    style={[
+                      styles.heroSmallIcon,
+                      { backgroundColor: withAlpha(accentColor, 0.15) },
+                    ]}>
                     <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
                   </View>
                   <VStack style={{ flex: 1, marginLeft: 12 }}>
-                    <Text size={18} heavy style={{ color: opacity(foreground, alpha.prominent) }}>
+                    <Text size={18} heavy style={{ color: withAlpha(foreground, alpha.prominent) }}>
                       Claim Your Address
                     </Text>
-                    <Text size={12} style={{ color: opacity(accentColor, alpha.strong) }}>
+                    <Text size={12} style={{ color: withAlpha(accentColor, alpha.strong) }}>
                       Get a memorable Lightning URL
                     </Text>
                   </VStack>
                 </HStack>
 
-                <Text size={14} style={{ color: opacity(foreground, 0.5), marginBottom: 14 }}>
+                <Text size={14} style={{ color: withAlpha(foreground, 0.5), marginBottom: 14 }}>
                   Choose a memorable username for receiving Bitcoin.
                 </Text>
 
@@ -612,7 +615,7 @@ export function ClaimUsernameScreen() {
                   size={12}
                   heavy
                   style={{
-                    color: opacity(foreground, alpha.soft),
+                    color: withAlpha(foreground, alpha.soft),
                     marginLeft: 4,
                     marginBottom: 4,
                   }}>
@@ -636,7 +639,7 @@ export function ClaimUsernameScreen() {
                   <Text
                     size={13}
                     heavy
-                    style={{ color: opacity(foreground, 0.5), marginBottom: 12 }}>
+                    style={{ color: withAlpha(foreground, 0.5), marginBottom: 12 }}>
                     Username Guidelines
                   </Text>
                   <VStack style={{ gap: 10 }}>
@@ -646,8 +649,14 @@ export function ClaimUsernameScreen() {
                       { text: 'No spaces or special characters', icon: 'mdi:check' },
                     ].map((item, index) => (
                       <HStack key={index} align="center">
-                        <Icon name={item.icon} size={16} color={opacity(foreground, alpha.soft)} />
-                        <Text size={13} style={{ color: opacity(foreground, 0.4), marginLeft: 10 }}>
+                        <Icon
+                          name={item.icon}
+                          size={16}
+                          color={withAlpha(foreground, alpha.soft)}
+                        />
+                        <Text
+                          size={13}
+                          style={{ color: withAlpha(foreground, 0.4), marginLeft: 10 }}>
                           {item.text}
                         </Text>
                       </HStack>
@@ -662,15 +671,15 @@ export function ClaimUsernameScreen() {
                   style={[
                     styles.previewBox,
                     {
-                      backgroundColor: opacity(accent, 0.08),
-                      borderColor: opacity(accent, 0.2),
+                      backgroundColor: withAlpha(accent, 0.08),
+                      borderColor: withAlpha(accent, 0.2),
                     },
                   ]}>
                   <Text
                     size={11}
                     heavy
                     style={{
-                      color: opacity(foreground, alpha.soft),
+                      color: withAlpha(foreground, alpha.soft),
                       marginBottom: 8,
                       letterSpacing: 1,
                     }}>
@@ -680,7 +689,7 @@ export function ClaimUsernameScreen() {
                     size={18}
                     heavy
                     style={{
-                      color: opacity(foreground, alpha.prominent),
+                      color: withAlpha(foreground, alpha.prominent),
                       fontFamily: 'monospace',
                     }}>
                     {username}@{selectedDomainLabel}

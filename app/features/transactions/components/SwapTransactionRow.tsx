@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import Icon from 'assets/icons';
@@ -23,7 +23,7 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
   const aggregate = useMemo(() => {
     const anyFailed = group.legs.some((l) => l.localStatus === 'failed');
     if (anyFailed) return { text: 'Failed', color: danger };
-    if (group.state === 'running') return { text: 'Pending', color: opacity(foreground, 0.5) };
+    if (group.state === 'running') return { text: 'Pending', color: withAlpha(foreground, 0.5) };
     return { text: 'Completed', color: success };
   }, [group.legs, group.state, foreground, danger, success]);
 
@@ -47,7 +47,7 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
         onPress={handlePress}>
         <HStack gap={12} flex={1}>
           <View className="h-7 w-7 items-center justify-center">
-            <Icon name="mdi:swap-horizontal" color={opacity(foreground, 0.9)} size={28} />
+            <Icon name="mdi:swap-horizontal" color={withAlpha(foreground, 0.9)} size={28} />
           </View>
 
           <VStack gap={0} flex={1}>
@@ -61,10 +61,10 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
             </HStack>
 
             <HStack justify="space-between" align="center">
-              <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
+              <UntranslatedText size={10} color={withAlpha(foreground, 0.8)}>
                 {formatDate(group.createdAt, 'short-date-time')}
               </UntranslatedText>
-              <UntranslatedText bold size={10} color={opacity(foreground, 0.8)}>
+              <UntranslatedText bold size={10} color={withAlpha(foreground, 0.8)}>
                 {group.legs.length} {group.legs.length === 1 ? 'step' : 'steps'}
               </UntranslatedText>
             </HStack>

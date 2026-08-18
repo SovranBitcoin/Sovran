@@ -23,7 +23,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTransactionLocationSection } from '@/shared/hooks/useTransactionLocationSection';
 import Icon from 'assets/icons';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 
@@ -79,7 +79,7 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
       <View
         className="absolute inset-0"
         style={{
-          backgroundColor: opacity(surfaceSecondary, 0.35),
+          backgroundColor: withAlpha(surfaceSecondary, 0.35),
           // @ts-ignore - mixBlendMode works on iOS
           mixBlendMode: 'overlay',
         }}
@@ -88,7 +88,7 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
       <View
         className="absolute inset-0"
         style={{
-          backgroundColor: opacity(surfaceSecondary, 1),
+          backgroundColor: withAlpha(surfaceSecondary, 1),
           // @ts-ignore - mixBlendMode works on iOS
           mixBlendMode: 'color',
         }}
@@ -99,8 +99,8 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
       <LinearGradient
         colors={[
           surfaceSecondary,
-          opacity(surfaceSecondary, 0.1),
-          opacity(surfaceSecondary, 0.1),
+          withAlpha(surfaceSecondary, 0.1),
+          withAlpha(surfaceSecondary, 0.1),
           surfaceSecondary,
         ]}
         locations={[0, 0.3, 0.7, 1]}
@@ -112,8 +112,8 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
       <LinearGradient
         colors={[
           surfaceSecondary,
-          opacity(surfaceSecondary, 0.1),
-          opacity(surfaceSecondary, 0.1),
+          withAlpha(surfaceSecondary, 0.1),
+          withAlpha(surfaceSecondary, 0.1),
           surfaceSecondary,
         ]}
         locations={[0, 0.25, 0.75, 1]}
@@ -165,8 +165,8 @@ function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
 
         <View className="absolute inset-0 items-center justify-center">
           <VStack align="center" gap={6}>
-            <Icon name="mdi:map-marker" size={24} color={opacity(foreground, 0.75)} />
-            <Text heavy size={13} style={{ color: opacity(foreground, 0.75) }}>
+            <Icon name="mdi:map-marker" size={24} color={withAlpha(foreground, 0.75)} />
+            <Text heavy size={13} style={{ color: withAlpha(foreground, 0.75) }}>
               Tap to reveal location
             </Text>
           </VStack>

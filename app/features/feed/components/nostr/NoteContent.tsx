@@ -11,7 +11,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import Icon from 'assets/icons';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { decode as bolt11Decode } from '@gandlaf21/bolt11-decode';
 import { log, feedLog } from '@/shared/lib/logger';
 import { useShiftLogger, useVisualLayoutLogger } from '@/shared/lib/contentShiftLog';
@@ -71,7 +71,7 @@ const InlineMention = React.memo(function InlineMention({
     <Text
       bold
       size={NOTE_CONTENT_FONT_SIZE}
-      style={{ color: opacity(foreground, 0.5) }}
+      style={{ color: withAlpha(foreground, 0.5) }}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => {
@@ -85,7 +85,7 @@ const InlineMention = React.memo(function InlineMention({
 const InlineHashtag = React.memo(function InlineHashtag({ tag }: { tag: string }) {
   const foreground = useThemeColor('foreground');
   return (
-    <Text bold size={NOTE_CONTENT_FONT_SIZE} style={{ color: opacity(foreground, 0.5) }}>
+    <Text bold size={NOTE_CONTENT_FONT_SIZE} style={{ color: withAlpha(foreground, 0.5) }}>
       #{tag}
     </Text>
   );
@@ -108,7 +108,7 @@ const InlineLink = React.memo(function InlineLink({
   return (
     <Text
       size={NOTE_CONTENT_FONT_SIZE}
-      style={{ color: opacity(foreground, 0.5) }}
+      style={{ color: withAlpha(foreground, 0.5) }}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={async () => {
@@ -252,12 +252,12 @@ const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { melt
           { backgroundColor: surface, borderColor: surfaceTertiary },
         ]}>
         <HStack align="center" gap={8}>
-          <Icon name="mingcute:lightning-fill" size={20} color={opacity(foreground, 0.2)} />
+          <Icon name="mingcute:lightning-fill" size={20} color={withAlpha(foreground, 0.2)} />
           <VStack style={sharedStyles.flex1}>
-            <Text bold size={13} style={{ color: opacity(foreground, 0.4) }}>
+            <Text bold size={13} style={{ color: withAlpha(foreground, 0.4) }}>
               Invalid Lightning invoice
             </Text>
-            <Text size={11} numberOfLines={1} style={{ color: opacity(foreground, 0.25) }}>
+            <Text size={11} numberOfLines={1} style={{ color: withAlpha(foreground, 0.25) }}>
               {meltTarget.slice(0, 30)}…
             </Text>
           </VStack>
@@ -279,16 +279,16 @@ const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { melt
       }}
       style={[sharedStyles.mediaCard, { backgroundColor: surface, borderColor: surfaceTertiary }]}>
       <HStack align="center" gap={8}>
-        <Icon name="mingcute:lightning-fill" size={20} color={opacity(foreground, 0.4)} />
+        <Icon name="mingcute:lightning-fill" size={20} color={withAlpha(foreground, 0.4)} />
         <VStack style={sharedStyles.flex1}>
-          <Text bold size={13} style={{ color: opacity(foreground, 0.66) }}>
+          <Text bold size={13} style={{ color: withAlpha(foreground, 0.66) }}>
             Lightning Invoice
           </Text>
-          <Text size={11} numberOfLines={1} style={{ color: opacity(foreground, 0.33) }}>
+          <Text size={11} numberOfLines={1} style={{ color: withAlpha(foreground, 0.33) }}>
             {subtitle}
           </Text>
         </VStack>
-        <Icon name="mdi:chevron-right" size={18} color={opacity(foreground, 0.33)} />
+        <Icon name="mdi:chevron-right" size={18} color={withAlpha(foreground, 0.33)} />
       </HStack>
     </Pressable>
   );
@@ -339,8 +339,8 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
           { backgroundColor: surface, borderColor: surfaceTertiary },
         ]}>
         <HStack align="center" gap={6}>
-          <Icon name="mdi:message-text" size={14} color={opacity(foreground, 0.33)} />
-          <Text size={13} italic style={{ color: opacity(foreground, 0.33) }}>
+          <Icon name="mdi:message-text" size={14} color={withAlpha(foreground, 0.33)} />
+          <Text size={13} italic style={{ color: withAlpha(foreground, 0.33) }}>
             Quoted post
           </Text>
         </HStack>
@@ -373,16 +373,16 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
           <Text
             bold
             size={13}
-            style={{ color: opacity(foreground, 0.66), flex: 1 }}
+            style={{ color: withAlpha(foreground, 0.66), flex: 1 }}
             numberOfLines={1}>
             {displayName}
           </Text>
           {timestamp ? (
             <>
-              <Text bold size={11} style={{ color: opacity(foreground, 0.25), marginRight: 4 }}>
+              <Text bold size={11} style={{ color: withAlpha(foreground, 0.25), marginRight: 4 }}>
                 {'•'}
               </Text>
-              <Text size={11} style={{ color: opacity(foreground, 0.33) }}>
+              <Text size={11} style={{ color: withAlpha(foreground, 0.33) }}>
                 {timestamp}
               </Text>
             </>
@@ -690,8 +690,8 @@ export const NoteContent = React.memo(function NoteContent({
 
   const activeSegments = expanded ? inlineSegments : displaySegments;
 
-  const textColor = { color: opacity(foreground, 0.9) };
-  const accentColor = { color: opacity(foreground, 0.5) };
+  const textColor = { color: withAlpha(foreground, 0.9) };
+  const accentColor = { color: withAlpha(foreground, 0.5) };
 
   const renderSegment = (seg: ContentSegment, i: number) => {
     switch (seg.kind) {

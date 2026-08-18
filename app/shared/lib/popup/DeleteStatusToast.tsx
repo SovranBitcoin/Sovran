@@ -1,5 +1,5 @@
 import { useShallow } from 'zustand/react/shallow';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useDeleteStatusStore } from '@/shared/stores/runtime/deleteStatusStore';
@@ -75,7 +75,7 @@ export function DeleteStatusToast({ hide, ...toastProps }: DeleteStatusToastProp
       subtitle={subtitle}
       indicatorSize={RING_SIZE}
       segmentedProgress={{ completedSegments: view.settled, segmentCount: view.total }}
-      ringColor={opacity(muted, 0.3)}
+      ringColor={withAlpha(muted, 0.3)}
       ringSuccessColor={success}
       toastProps={{ ...toastProps, hide }}
     />

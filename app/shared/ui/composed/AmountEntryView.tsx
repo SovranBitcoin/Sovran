@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, Text as RNText, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import type { QuickSendSuggestion } from 'wallet/react';
 
@@ -263,8 +263,8 @@ export function AmountEntryView({
   const hasInput = rawInput.length > 0;
   const hasNotice = noticeText != null && noticeText.length > 0;
   const isProblem = hasInput && (hasNotice || exceedsBalance);
-  const amountColor = !hasInput ? opacity(foreground, 0.4) : isProblem ? danger : foreground;
-  const placeholderColor = opacity(foreground, 0.35);
+  const amountColor = !hasInput ? withAlpha(foreground, 0.4) : isProblem ? danger : foreground;
+  const placeholderColor = withAlpha(foreground, 0.35);
 
   const suggestionsRow = useMemo(() => {
     if (transactionType !== 'send' || suggestions.length === 0) return null;
@@ -306,7 +306,7 @@ export function AmountEntryView({
                 paddingHorizontal: 14,
                 paddingVertical: 7,
                 borderRadius: 20,
-                backgroundColor: isPrimary ? foreground : opacity(foreground, 0.06),
+                backgroundColor: isPrimary ? foreground : withAlpha(foreground, 0.06),
                 opacity: pressed ? 0.6 : 1,
               })}>
               {isPrimary ? (

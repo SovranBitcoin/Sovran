@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { Log, initLog } from '@/shared/lib/logger';
@@ -97,14 +97,14 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
             <SquircleView style={[styles.container, containerStyle]} pointerEvents="none">
               <View style={[StyleSheet.absoluteFill, { backgroundColor: background }]} />
               <View
-                style={[StyleSheet.absoluteFill, { backgroundColor: opacity(foreground, 0.65) }]}
+                style={[StyleSheet.absoluteFill, { backgroundColor: withAlpha(foreground, 0.65) }]}
               />
               <LinearGradient
                 colors={[
                   foreground,
-                  opacity(foreground, 0.8),
-                  opacity(foreground, 0.7),
-                  opacity(foreground, 0.6),
+                  withAlpha(foreground, 0.8),
+                  withAlpha(foreground, 0.7),
+                  withAlpha(foreground, 0.6),
                 ]}
                 locations={[0, 0.35, 0.6, 1]}
                 start={{ x: 0.5, y: 0 }}
@@ -114,7 +114,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
               <View
                 style={[
                   StyleSheet.absoluteFill,
-                  { borderWidth: 1, borderColor: opacity(foreground, 0.4) },
+                  { borderWidth: 1, borderColor: withAlpha(foreground, 0.4) },
                 ]}
               />
             </SquircleView>

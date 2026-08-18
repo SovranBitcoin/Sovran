@@ -19,7 +19,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import Icon from 'assets/icons';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import type { BLEPeer } from 'bitchat-module';
 
 import { ContactRow, bleIdentity } from '@/shared/ui/composed/ContactRow';
@@ -137,10 +137,10 @@ export default function NetworkSheet() {
           paddingHorizontal: 20,
           paddingVertical: 10,
           borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: opacity(foreground, 0.08),
+          borderBottomColor: withAlpha(foreground, 0.08),
         }}>
         <Icon name="mdi:bluetooth" size={18} color={BLUETOOTH_ACCENT} />
-        <Text size={13} style={{ color: opacity(foreground, 0.6) }}>
+        <Text size={13} style={{ color: withAlpha(foreground, 0.6) }}>
           {subtitleText}
         </Text>
       </HStack>
@@ -163,11 +163,11 @@ export default function NetworkSheet() {
             <BluetoothNotice bluetooth={bluetooth} />
           ) : (
             <VStack align="center" gap={12} style={{ paddingHorizontal: 40, alignItems: 'center' }}>
-              <Icon name="mdi:bluetooth" size={32} color={opacity(foreground, 0.3)} />
-              <Text size={16} style={{ color: opacity(foreground, 0.5) }}>
+              <Icon name="mdi:bluetooth" size={32} color={withAlpha(foreground, 0.3)} />
+              <Text size={16} style={{ color: withAlpha(foreground, 0.5) }}>
                 No devices found yet
               </Text>
-              <Text size={13} style={{ color: opacity(foreground, 0.35) }}>
+              <Text size={13} style={{ color: withAlpha(foreground, 0.35) }}>
                 Keep Sovran open; nearby bitchat users will appear as they connect.
               </Text>
             </VStack>

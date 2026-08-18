@@ -10,7 +10,7 @@ import { StyleSheet, useWindowDimensions } from 'react-native';
 
 import { FlashList, type FlashListRef, type ViewToken } from '@shopify/flash-list';
 import { Link } from 'expo-router';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import groupBy from 'lodash/groupBy';
 import orderBy from 'lodash/orderBy';
 
@@ -221,7 +221,7 @@ export const Transactions = React.memo(
     // its state flips to `rolledBack`, killing the animation mid-frame.
     const collapsing = useRollbackStore((s) => s.collapsing);
 
-    const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
+    const borderColor = useMemo(() => withAlpha(muted, 0.3), [muted]);
     const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
 
     const swapGroups = useMemo(() => {
@@ -620,7 +620,7 @@ export const Transactions = React.memo(
     const renderSection = useCallback(
       ({ item: section }: { item: Section; index?: number }) => (
         <VStack gap={4} className="mb-4">
-          <Text size={14} heavy color={opacity(foreground, 0.33)} style={styles.dateHeader}>
+          <Text size={14} heavy color={withAlpha(foreground, 0.33)} style={styles.dateHeader}>
             {section.title}
           </Text>
           <View style={[styles.card, { borderColor }]}>
@@ -651,11 +651,15 @@ export const Transactions = React.memo(
             <View style={[styles.card, { borderColor }]}>
               <BlurCardFrame accentColor={muted}>
                 <View style={styles.emptyState}>
-                  <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
+                  <Icon
+                    name="fluent:clock-12-filled"
+                    size={36}
+                    color={withAlpha(foreground, 0.33)}
+                  />
                   <Text
                     size={16}
                     style={{
-                      color: opacity(foreground, 0.66),
+                      color: withAlpha(foreground, 0.66),
                       fontFamily: 'OxygenBold',
                       textAlign: 'center',
                     }}>
@@ -664,7 +668,7 @@ export const Transactions = React.memo(
                   <Text
                     size={14}
                     style={{
-                      color: opacity(foreground, 0.4),
+                      color: withAlpha(foreground, 0.4),
                       textAlign: 'center',
                     }}>
                     Try adjusting your filters or check back later
@@ -700,11 +704,11 @@ export const Transactions = React.memo(
               minHeight: screenHeight / 2,
             }}>
             <Spacer size={24} />
-            <Spinner size={32} color={opacity(foreground, 0.33)} />
-            <Text heavy size={16} style={{ color: opacity(foreground, 0.66) }}>
+            <Spinner size={32} color={withAlpha(foreground, 0.33)} />
+            <Text heavy size={16} style={{ color: withAlpha(foreground, 0.66) }}>
               Loading Transactions...
             </Text>
-            <Text color={opacity(foreground, 0.4)} size={16}>
+            <Text color={withAlpha(foreground, 0.4)} size={16}>
               Please wait while we fetch your history
             </Text>
           </View>
@@ -718,11 +722,15 @@ export const Transactions = React.memo(
             <View style={[styles.card, { borderColor }]}>
               <BlurCardFrame accentColor={muted}>
                 <View style={styles.emptyState}>
-                  <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
+                  <Icon
+                    name="fluent:clock-12-filled"
+                    size={36}
+                    color={withAlpha(foreground, 0.33)}
+                  />
                   <Text
                     size={16}
                     style={{
-                      color: opacity(foreground, 0.66),
+                      color: withAlpha(foreground, 0.66),
                       fontFamily: 'OxygenBold',
                       textAlign: 'center',
                     }}>
@@ -731,7 +739,7 @@ export const Transactions = React.memo(
                   <Text
                     size={14}
                     style={{
-                      color: opacity(foreground, 0.4),
+                      color: withAlpha(foreground, 0.4),
                       textAlign: 'center',
                     }}>
                     Your history will show up here
@@ -758,7 +766,7 @@ export const Transactions = React.memo(
                             <Text heavy size={16} color={foreground}>
                               {label}
                             </Text>
-                            <Text size={12} color={opacity(foreground, 0.66)}>
+                            <Text size={12} color={withAlpha(foreground, 0.66)}>
                               {section.title}
                             </Text>
                           </View>

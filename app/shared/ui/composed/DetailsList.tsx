@@ -8,7 +8,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { BlurView } from 'expo-blur';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
@@ -48,7 +48,7 @@ export function DetailsList({ items, style, camera = false, special, gradient }:
 
     return (
       <HStack key={rowKey} justify="space-between" className="p-2">
-        <Text id={titleId} heavy size={16} color={opacity(foreground, 0.9)}>
+        <Text id={titleId} heavy size={16} color={withAlpha(foreground, 0.9)}>
           {titleText}
         </Text>
         {titleText !== '' && <Spacer size={8} />}
@@ -110,7 +110,7 @@ export function DetailsList({ items, style, camera = false, special, gradient }:
       case 'email':
         return (
           <VStack align="center" className="flex-1" justify="center">
-            <Text size={18} color={opacity(foreground, 0.9)} style={{ textAlign: 'center' }}>
+            <Text size={18} color={withAlpha(foreground, 0.9)} style={{ textAlign: 'center' }}>
               {truncateMiddle(layout.username, 8)}
             </Text>
             <Pressable className="flex-row items-center">
@@ -142,7 +142,7 @@ export function DetailsList({ items, style, camera = false, special, gradient }:
             <Text
               bold
               size={12}
-              color={opacity(foreground, 0.9)}
+              color={withAlpha(foreground, 0.9)}
               style={{
                 textAlign: 'left',
                 wordBreak: 'break-all',
@@ -188,7 +188,7 @@ export function DetailsList({ items, style, camera = false, special, gradient }:
         <Text
           bold
           size={12}
-          color={opacity(foreground, 0.9)}
+          color={withAlpha(foreground, 0.9)}
           style={{
             textAlign: 'center',
           }}>

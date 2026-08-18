@@ -27,7 +27,7 @@ import Animated, {
   LinearTransition,
   useAnimatedStyle,
 } from 'react-native-reanimated';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
@@ -360,8 +360,8 @@ export function ThreadReplyBar({
     transform: [{ translateY: keyboardHeight.value + keyboardProgress.value * safeBottom }],
   }));
 
-  const borderColor = opacity(foreground, 0.1);
-  const fieldBg = opacity(foreground, 0.06);
+  const borderColor = withAlpha(foreground, 0.1);
+  const fieldBg = withAlpha(foreground, 0.06);
 
   const barContent = (
     <Animated.View

@@ -2,7 +2,7 @@ import { getCornerStyle } from './CapsuleButton.corners';
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { controlHeight } from '@/shared/styles/tokens';
@@ -52,13 +52,13 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
   const backgroundColor = filled
     ? foreground
     : isActive
-      ? opacity(foreground, 0.14)
+      ? withAlpha(foreground, 0.14)
       : surfaceSecondary;
   const borderColor = filled
     ? foreground
     : isActive
-      ? opacity(foreground, 0.3)
-      : opacity(muted, 0.3);
+      ? withAlpha(foreground, 0.3)
+      : withAlpha(muted, 0.3);
 
   return (
     <View

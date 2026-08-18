@@ -1,6 +1,6 @@
 import React from 'react';
 import { Platform, StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -70,7 +70,11 @@ export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: B
       {/* Render gradients based on variant - fixed size boxes with pixel-based fade */}
       {(variant === 'topLeft' || variant === 'diagonal') && (
         <LinearGradient
-          colors={[opacity(accentColor, 0.6), opacity(accentColor, 0.1), opacity(accentColor, 0)]}
+          colors={[
+            withAlpha(accentColor, 0.6),
+            withAlpha(accentColor, 0.1),
+            withAlpha(accentColor, 0),
+          ]}
           locations={LOCATIONS}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -81,7 +85,11 @@ export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: B
 
       {(variant === 'topRight' || variant === 'diagonal' || variant === 'right') && (
         <LinearGradient
-          colors={[opacity(accentColor, 0.6), opacity(accentColor, 0.1), opacity(accentColor, 0)]}
+          colors={[
+            withAlpha(accentColor, 0.6),
+            withAlpha(accentColor, 0.1),
+            withAlpha(accentColor, 0),
+          ]}
           locations={LOCATIONS}
           start={{ x: 1, y: 0 }}
           end={{ x: 0, y: 1 }}
@@ -92,7 +100,11 @@ export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: B
 
       {variant === 'bottomLeft' && (
         <LinearGradient
-          colors={[opacity(accentColor, 0.6), opacity(accentColor, 0.1), opacity(accentColor, 0)]}
+          colors={[
+            withAlpha(accentColor, 0.6),
+            withAlpha(accentColor, 0.1),
+            withAlpha(accentColor, 0),
+          ]}
           locations={LOCATIONS}
           start={{ x: 0, y: 1 }}
           end={{ x: 1, y: 0 }}
@@ -103,7 +115,11 @@ export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: B
 
       {(variant === 'bottomRight' || variant === 'diagonal' || variant === 'right') && (
         <LinearGradient
-          colors={[opacity(accentColor, 0.45), opacity(accentColor, 0.1), opacity(accentColor, 0)]}
+          colors={[
+            withAlpha(accentColor, 0.45),
+            withAlpha(accentColor, 0.1),
+            withAlpha(accentColor, 0),
+          ]}
           locations={LOCATIONS}
           start={{ x: 1, y: 1 }}
           end={{ x: 0, y: 0 }}

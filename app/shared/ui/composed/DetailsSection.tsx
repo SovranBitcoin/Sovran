@@ -7,7 +7,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { DetailsList } from '@/shared/ui/composed/DetailsList';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import Icon from 'assets/icons';
 
 interface SectionItem {
@@ -56,10 +56,10 @@ export function DetailsSection({
           <HStack align="center" gap={6}>
             <Icon
               name={expanded ? 'mdi:chevron-down' : 'mdi:chevron-right'}
-              color={opacity(foreground, 0.5)}
+              color={withAlpha(foreground, 0.5)}
               size={18}
             />
-            <Text size={14} bold style={{ color: opacity(foreground, 0.5) }}>
+            <Text size={14} bold style={{ color: withAlpha(foreground, 0.5) }}>
               {label}
             </Text>
           </HStack>

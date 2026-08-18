@@ -21,7 +21,7 @@ import {
   type ChainOnchainConfirmationProgress as OnchainConfirmationProgress,
   type TimelineStep,
 } from 'wallet';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import type { HistoryEntry } from '@cashu/coco-core';
 
@@ -130,8 +130,8 @@ export function HistoryEntryTimeline({
     };
   }, [entryId, historyEntry.type]);
 
-  const foreground66 = opacity(foreground, 0.66);
-  const foreground50 = opacity(foreground, 0.5);
+  const foreground66 = withAlpha(foreground, 0.66);
+  const foreground50 = withAlpha(foreground, 0.5);
 
   const isOnchainMint = historyEntry.type === 'mint' && !!getOnchainMintAddress(historyEntry);
 

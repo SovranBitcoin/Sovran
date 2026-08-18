@@ -10,7 +10,7 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import type { NativeStackNavigationOptions } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
 
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import Icon from 'assets/icons';
 import { supportsLiquidGlass } from '@/shared/lib/version';
@@ -92,7 +92,7 @@ export function HeaderIconButton({
           borderRadius: headerButtonSize / 2,
           backgroundColor: flatSurface,
           borderWidth: 1,
-          borderColor: opacity(muted, 0.3),
+          borderColor: withAlpha(muted, 0.3),
           alignItems: 'center',
           justifyContent: 'center',
         },

@@ -8,7 +8,7 @@
  */
 import { useCallback, useMemo } from 'react';
 import { FlatList, RefreshControl, StyleSheet, type ViewToken } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { MintChangeRow } from './MintChangeRow';
@@ -108,7 +108,9 @@ export function MintChangesList() {
 
   const listEmpty = useMemo(() => {
     if (isLoading) {
-      return <Spinner size={22} color={opacity(foreground, alpha.strong)} style={styles.loader} />;
+      return (
+        <Spinner size={22} color={withAlpha(foreground, alpha.strong)} style={styles.loader} />
+      );
     }
     if (errorMessage) {
       return (

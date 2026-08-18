@@ -13,7 +13,7 @@
  */
 import { useCallback } from 'react';
 import { Platform } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import Icon from 'assets/icons';
 import { useBluetoothState, type UseBluetoothStateResult } from '../hooks/useBluetoothState';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -110,7 +110,7 @@ export function BluetoothInlineNotice({ bluetooth: bluetoothProp }: BluetoothNot
 
   if (!copy) return null;
 
-  const muted = opacity(foreground, alpha.muted);
+  const muted = withAlpha(foreground, alpha.muted);
   return (
     <HStack
       gap={8}

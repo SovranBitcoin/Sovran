@@ -1,6 +1,6 @@
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Text } from '@/shared/ui/primitives/Text';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import Icon from 'assets/icons';
 import { SearchTip } from './SearchTip';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -15,21 +15,21 @@ export function NoResultsFound() {
           justify="center"
           align="center"
           className="bg-surface-secondary h-20 w-20 rounded-full">
-          <Icon name="nonicons:error-16" size={40} color={opacity(foreground, 0.4)} />
+          <Icon name="nonicons:error-16" size={40} color={withAlpha(foreground, 0.4)} />
         </VStack>
 
         <VStack gap={12}>
-          <Text className="text-center" color={opacity(foreground, 0.5)} bold size={20}>
+          <Text className="text-center" color={withAlpha(foreground, 0.5)} bold size={20}>
             No Results Found
           </Text>
 
-          <Text className="text-center" color={opacity(foreground, 0.4)} size={16}>
+          <Text className="text-center" color={withAlpha(foreground, 0.4)} size={16}>
             {"We couldn't find any users matching your search"}
           </Text>
         </VStack>
 
         <VStack className="bg-surface-secondary w-full rounded-xl p-4">
-          <Text color={opacity(foreground, 0.66)} bold size={16}>
+          <Text color={withAlpha(foreground, 0.66)} bold size={16}>
             Try adjusting your search:
           </Text>
           <VStack gap={12} className="mt-2">

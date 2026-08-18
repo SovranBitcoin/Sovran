@@ -9,7 +9,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { router } from 'expo-router';
 import { ClaimUsernameCardFrame } from '@/shared/blocks/claim/ClaimUsernameCardFrame';
@@ -45,7 +45,7 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
   const primary950 = background;
   const primary50 = surfaceForeground;
   const gold = '#f59e0b';
-  const overlayBorderColor = opacity(gold, 0.3);
+  const overlayBorderColor = withAlpha(gold, 0.3);
 
   const refs = useRef<Record<HeroId, Partial<Record<HeroRole, any>>>>({
     claimUsername: {},

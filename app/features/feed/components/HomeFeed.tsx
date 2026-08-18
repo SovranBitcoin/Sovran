@@ -18,7 +18,7 @@ import {
 import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { View } from '@/shared/ui/primitives/View/View';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { log, Log, feedLog } from '@/shared/lib/logger';
 import { List } from '@/shared/ui/composed/List';
@@ -166,7 +166,7 @@ function FeedThreadPair({
     return [
       styles.threadPairConnector,
       {
-        backgroundColor: opacity(foreground, 0.28),
+        backgroundColor: withAlpha(foreground, 0.28),
         height: Math.max(0, connectorBottom - FEED_THREAD_CONNECTOR_TOP),
       },
     ];
@@ -1102,7 +1102,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     ]
   );
 
-  const refreshTintColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
+  const refreshTintColor = useMemo(() => withAlpha(foreground, 0.5), [foreground]);
 
   const pullToAi = usePullToAiRefreshControl({
     // Suppress the pull-to-refresh spinner during the initial (cold-start) load

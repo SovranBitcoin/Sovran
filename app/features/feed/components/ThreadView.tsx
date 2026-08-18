@@ -10,7 +10,7 @@ import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { FlashList } from '@shopify/flash-list';
 import { useHeaderHeight } from 'expo-router/react-navigation';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -179,8 +179,8 @@ function ReplySortPicker({
   foreground: string;
   surfaceTertiary: string;
 }) {
-  const activeBg = useMemo(() => opacity(surfaceTertiary, 0.5), [surfaceTertiary]);
-  const pressedBg = useMemo(() => opacity(surfaceTertiary, 0.65), [surfaceTertiary]);
+  const activeBg = useMemo(() => withAlpha(surfaceTertiary, 0.5), [surfaceTertiary]);
+  const pressedBg = useMemo(() => withAlpha(surfaceTertiary, 0.65), [surfaceTertiary]);
   const selectedOption =
     REPLY_SORT_OPTIONS.find((option) => option.id === selected) ?? REPLY_SORT_OPTIONS[0];
 
@@ -220,10 +220,10 @@ function ReplySortPicker({
               size={14}
               medium
               numberOfLines={1}
-              style={[styles.replySortLabel, { color: opacity(foreground, 0.95) }]}>
+              style={[styles.replySortLabel, { color: withAlpha(foreground, 0.95) }]}>
               {selectedOption.label}
             </Text>
-            <Icon name="mdi:chevron-down" size={16} color={opacity(foreground, 0.95)} />
+            <Icon name="mdi:chevron-down" size={16} color={withAlpha(foreground, 0.95)} />
           </View>
         </Pressable>
       </View>
@@ -435,10 +435,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 
       if (item.type === 'spam-separator') {
         return (
-          <View style={[styles.spamSeparator, { borderColor: opacity(foreground, 0.1) }]}>
+          <View style={[styles.spamSeparator, { borderColor: withAlpha(foreground, 0.1) }]}>
             <Text
               size={12}
-              style={[styles.spamSeparatorLabel, { color: opacity(foreground, 0.4) }]}>
+              style={[styles.spamSeparatorLabel, { color: withAlpha(foreground, 0.4) }]}>
               Might be spam · {item.count}
             </Text>
           </View>
@@ -584,7 +584,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         ]}>
         <Icon name="mdi:message-text" size={40} color={defaultColor} />
         <Spacer size={12} />
-        <Text size={15} style={{ color: opacity(foreground, 0.5) }}>
+        <Text size={15} style={{ color: withAlpha(foreground, 0.5) }}>
           {error}
         </Text>
       </View>
@@ -642,7 +642,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               ListFooterComponent={
                 isLoadingMoreReplies ? (
                   <View style={styles.hiddenReplyFooter}>
-                    <Spinner size={18} color={opacity(foreground, 0.45)} />
+                    <Spinner size={18} color={withAlpha(foreground, 0.45)} />
                   </View>
                 ) : null
               }

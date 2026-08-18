@@ -11,7 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
@@ -90,7 +90,7 @@ function shimmerColors(
   fallbackHighlight: string
 ): readonly [string, string, string] {
   if (highlightColor)
-    return [opacity(highlightColor, 0), highlightColor, opacity(highlightColor, 0)];
+    return [withAlpha(highlightColor, 0), highlightColor, withAlpha(highlightColor, 0)];
   return ['transparent', fallbackHighlight, 'transparent'];
 }
 
@@ -167,7 +167,7 @@ export function SkeletonExitReveal({
   });
 
   const gradientColors = useMemo<readonly [string, string, string]>(() => {
-    return shimmerColors(highlightColor, opacity(foreground, 0.55));
+    return shimmerColors(highlightColor, withAlpha(foreground, 0.55));
   }, [foreground, highlightColor]);
 
   const shimmerBarStyle = useMemo(
@@ -275,7 +275,7 @@ export function SkeletonLoadingShimmer({
   });
 
   const gradientColors = useMemo<readonly [string, string, string]>(() => {
-    return shimmerColors(highlightColor, opacity(background, 0.85));
+    return shimmerColors(highlightColor, withAlpha(background, 0.85));
   }, [background, highlightColor]);
 
   const widthStyle = useMemo(() => ({ width: highlightWidth }), [highlightWidth]);

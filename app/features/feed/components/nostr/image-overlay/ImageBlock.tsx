@@ -17,7 +17,7 @@ import { BlurView } from '@/shared/ui/primitives/BlurView';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import Icon from 'assets/icons';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../feedTypes';
 import { useImageOverlay } from './provider';
@@ -402,9 +402,9 @@ export const ImageBlock = React.memo(function ImageBlock({
           alt ? `Image unavailable: ${alt}. Tap to open.` : 'Image unavailable. Tap to open.'
         }
         onPress={() => void openExternalUrl(url)}
-        style={[styles.unavailable, { backgroundColor: opacity(foreground, 0.06) }]}>
-        <Icon name="mdi:image-broken-variant" size={22} color={opacity(foreground, 0.4)} />
-        <Text size={12} style={{ color: opacity(foreground, 0.4), marginTop: 4 }}>
+        style={[styles.unavailable, { backgroundColor: withAlpha(foreground, 0.06) }]}>
+        <Icon name="mdi:image-broken-variant" size={22} color={withAlpha(foreground, 0.4)} />
+        <Text size={12} style={{ color: withAlpha(foreground, 0.4), marginTop: 4 }}>
           Image unavailable — tap to open
         </Text>
       </Pressable>

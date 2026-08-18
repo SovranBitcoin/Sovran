@@ -28,7 +28,7 @@ import { BlurView, type BlurTint } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { easeGradient } from 'react-native-easing-gradient';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -123,8 +123,8 @@ export function ScrollEdgeFade({
   // bands.
   const colorGradientColors = useMemo(() => {
     if (!fillColor) return null;
-    const transparent = opacity(fillColor, 0);
-    const mid = opacity(fillColor, 0.75);
+    const transparent = withAlpha(fillColor, 0);
+    const mid = withAlpha(fillColor, 0.75);
     const solid = fillColor;
     return isTop ? ([solid, mid, transparent] as const) : ([transparent, mid, solid] as const);
   }, [fillColor, isTop]);

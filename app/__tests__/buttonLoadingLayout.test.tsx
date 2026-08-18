@@ -13,7 +13,10 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({
     Array.isArray(tokens) ? tokens.map(() => 'black') : 'black',
 }));
 
-jest.mock('hex-color-opacity', () => jest.fn(() => 'black'));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: jest.fn(() => 'black'),
+}));
 
 jest.mock('@/shared/lib/version', () => ({
   supportsBlur: () => false,

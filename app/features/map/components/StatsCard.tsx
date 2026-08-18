@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { LiquidGlassMenu } from 'liquid-glass-menu';
 import { ActionSheetIOS, Platform, StyleSheet, Text } from 'react-native';
 import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import Icon from 'assets/icons';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -73,7 +73,7 @@ export const StatsCard = memo(function StatsCard({
               // surface-secondary fill + muted border, so the bottom card isn't
               // darker than the floating locate/zoom buttons.
               backgroundColor: surfaceSecondary,
-              borderColor: opacity(muted, 0.3),
+              borderColor: withAlpha(muted, 0.3),
             },
           ]}>
           <Icon name="mdi:bitcoin" size={26} color={BITCOIN_ACCENT} />
@@ -82,12 +82,12 @@ export const StatsCard = memo(function StatsCard({
               {visibleText}
             </Text>
             <Text
-              style={[styles.fallbackSubtitle, { color: opacity(foreground, alpha.strong) }]}
+              style={[styles.fallbackSubtitle, { color: withAlpha(foreground, alpha.strong) }]}
               numberOfLines={1}>
               {totalText}
             </Text>
           </View>
-          <Icon name="mdi:chevron-down" size={20} color={opacity(foreground, alpha.muted)} />
+          <Icon name="mdi:chevron-down" size={20} color={withAlpha(foreground, alpha.muted)} />
         </Pressable>
       </View>
     );

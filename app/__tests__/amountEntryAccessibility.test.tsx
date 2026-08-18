@@ -12,9 +12,9 @@ import { AmountEntryView } from '@/shared/ui/composed/AmountEntryView';
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: jest.fn(() => ({ top: 0, bottom: 0, left: 0, right: 0 })),
 }));
-jest.mock('hex-color-opacity', () => ({
-  __esModule: true,
-  default: (color: string) => color,
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (color: string) => color,
 }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | string[]) =>

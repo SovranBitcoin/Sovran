@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
@@ -20,7 +20,7 @@ export function PostProgressBar({
   failed?: boolean;
 }) {
   const [accent, danger, muted] = useThemeColor(['accent', 'danger', 'muted'] as const);
-  const pending = opacity(muted, 0.25);
+  const pending = withAlpha(muted, 0.25);
   const fill = failed ? danger : accent;
 
   return (

@@ -27,7 +27,7 @@ import { useCountRollIn } from '@/shared/ui/composed/AnimatedCountValue';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { cashuLog, Log, redactError, useLifecycleLogger } from '@/shared/lib/logger';
 import { formatDate } from '@/shared/lib/date';
 
@@ -131,7 +131,7 @@ const ReviewItem = React.memo(function ReviewItem({
               {displayName}
             </Text>
             {formattedDate && (
-              <Text size={12} style={{ color: opacity(foreground, 0.35), flexShrink: 0 }}>
+              <Text size={12} style={{ color: withAlpha(foreground, 0.35), flexShrink: 0 }}>
                 {formattedDate}
               </Text>
             )}
@@ -146,7 +146,7 @@ const ReviewItem = React.memo(function ReviewItem({
           {reviewText.length > 0 && (
             <Text
               size={14}
-              style={{ color: opacity(foreground, 0.6), lineHeight: 20, marginTop: 6 }}
+              style={{ color: withAlpha(foreground, 0.6), lineHeight: 20, marginTop: 6 }}
               numberOfLines={10}>
               {reviewText}
             </Text>
@@ -254,7 +254,7 @@ const EmptyState = React.memo(function EmptyState() {
       <Text
         size={14}
         style={{
-          color: opacity(foreground, 0.4),
+          color: withAlpha(foreground, 0.4),
           textAlign: 'center',
           paddingHorizontal: 32,
         }}>
@@ -323,7 +323,7 @@ const HeaderStats = React.memo(function HeaderStats({
             loading={loading && totalReviews === 0}
             placeholder="0 reviews"
             size={14}
-            style={{ color: opacity(foreground, 0.4), marginTop: 4 }}>
+            style={{ color: withAlpha(foreground, 0.4), marginTop: 4 }}>
             {reviewsLabel}
           </Text>
         </Animated.View>
@@ -474,7 +474,7 @@ export function MintReviewsScreen() {
         <Text
           size={14}
           style={{
-            color: opacity(foreground, 0.4),
+            color: withAlpha(foreground, 0.4),
             textAlign: 'center',
             paddingHorizontal: 32,
             marginTop: 24,

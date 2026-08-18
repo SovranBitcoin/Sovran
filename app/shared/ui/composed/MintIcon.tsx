@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image as ExpoImage } from 'expo-image';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { StyleSheet, type StyleProp, View, type ViewStyle } from 'react-native';
 
 import Icon from '@/assets/icons';
@@ -56,7 +56,7 @@ export function MintIcon({
   // Loading placeholder matches the thread-reply pfp / `Text` skeleton fill —
   // a low-opacity foreground tint that reads as ambient "loading" and stays
   // consistent with the Avatar/Text placeholders rendered beside it in a row.
-  const loadingColor = useMemo(() => opacity(foreground, 0.07), [foreground]);
+  const loadingColor = useMemo(() => withAlpha(foreground, 0.07), [foreground]);
   const fallbackBackground = muted;
   const borderRadius = size / 2;
   const imageAlt = alt ?? `${name || 'Mint'} icon`;

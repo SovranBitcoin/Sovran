@@ -56,7 +56,7 @@ import {
   type MintRecoveryState,
   type RecoveryPhase,
 } from '@/features/settings/lib/recoveryProgress';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { LoadingIndicator, mapCheckpointStatusToIndicator } from '@/shared/blocks/status';
 import {
@@ -812,7 +812,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           </Text>
           <Text
             size={16}
-            style={{ color: opacity(foreground, 0.5), textAlign: 'center', lineHeight: 24 }}>
+            style={{ color: withAlpha(foreground, 0.5), textAlign: 'center', lineHeight: 24 }}>
             Recover ecash from your mints using your seed phrase.
           </Text>
         </VStack>
@@ -828,7 +828,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             <Text size={14} bold style={{ color: foreground }}>
               Search all mints
             </Text>
-            <Text size={12} style={{ color: opacity(foreground, 0.4) }}>
+            <Text size={12} style={{ color: withAlpha(foreground, 0.4) }}>
               {isDiscovering
                 ? 'Loading mint list…'
                 : deepProbe && discoveredMintUrls.length > 0
@@ -856,7 +856,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
               <Text size={14} bold style={{ color: foreground }}>
                 Native crypto
               </Text>
-              <Text size={12} style={{ color: opacity(foreground, 0.4) }}>
+              <Text size={12} style={{ color: withAlpha(foreground, 0.4) }}>
                 {useNativeCrypto ? 'Rust CDK bindings' : 'cashu-ts fallback (slower)'}
               </Text>
             </VStack>
@@ -951,7 +951,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             <Text
               size={isComplete ? 16 : 14}
               style={{
-                color: opacity(foreground, 0.5),
+                color: withAlpha(foreground, 0.5),
                 textAlign: 'center',
                 lineHeight: isComplete ? 24 : undefined,
               }}>
@@ -970,14 +970,14 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
               <ElapsedSeconds
                 running={ACTIVE_PHASES.has(phase)}
                 size={13}
-                color={opacity(foreground, 0.4)}
+                color={withAlpha(foreground, 0.4)}
                 testID="recovery-elapsed"
               />
             )}
             {/* Naming the mint in flight only became possible once mints run
                 one at a time. */}
             {active && (
-              <Text size={13} numberOfLines={1} style={{ color: opacity(foreground, 0.6) }}>
+              <Text size={13} numberOfLines={1} style={{ color: withAlpha(foreground, 0.6) }}>
                 {getMintDisplayName(activeMint, active.mint)}
               </Text>
             )}
@@ -1060,7 +1060,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             </Text>
             <Text
               size={16}
-              style={{ color: opacity(foreground, 0.5), textAlign: 'center', lineHeight: 24 }}>
+              style={{ color: withAlpha(foreground, 0.5), textAlign: 'center', lineHeight: 24 }}>
               {visibleSuccessCount > 0
                 ? `Recovered from ${visibleSuccessCount} mint${visibleSuccessCount !== 1 ? 's' : ''}, but ${visibleFailureCount} failed.`
                 : errorMessage || 'An unexpected error occurred during recovery.'}
@@ -1193,7 +1193,7 @@ const MintRecoveryRow: React.FC<{
         <Text
           size={12}
           numberOfLines={1}
-          style={{ color: state.status === 'failed' ? dangerColor : opacity(foreground, 0.4) }}>
+          style={{ color: state.status === 'failed' ? dangerColor : withAlpha(foreground, 0.4) }}>
           {progressLabel ?? `${mintBalance.toLocaleString()} sats`}
         </Text>
       </VStack>

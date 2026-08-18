@@ -69,11 +69,10 @@ export const radius = {
 } as const;
 
 // ─── Alpha (opacity values) ───────────────────────────────────────────────
-// The big consolidation. Audit found 32 unique stops in `opacity(color, x)`
-// calls; this scale collapses them to seven intent-named tokens. Named
-// `alpha` (not `opacity`) to avoid collision with the `hex-color-opacity`
-// package's `opacity()` function — reads naturally as
-// `opacity(themeColor, alpha.muted)` or `style={{ opacity: alpha.disabled }}`.
+// The big consolidation. Audit found 32 unique stops in alpha-blend calls;
+// this scale collapses them to seven intent-named tokens. Reads naturally as
+// `withAlpha(themeColor, alpha.muted)` (see `shared/lib/color.ts`) or
+// `style={{ opacity: alpha.disabled }}`.
 
 export const alpha = {
   /** 0.08 — barely-there separators, divider lines on dark surfaces. */

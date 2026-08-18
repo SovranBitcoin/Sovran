@@ -22,7 +22,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 import { useFocusEffect } from 'expo-router';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -328,11 +328,11 @@ export function PermissionGestureDemo(): React.ReactElement {
   );
 
   // Theme-derived plain strings, captured by the worklets below.
-  const rowFill = opacity(foreground, 0.06);
-  const trackOff = opacity(foreground, 0.15);
-  const knobBorder = opacity(foreground, 0.2);
-  const menuBorder = opacity(foreground, 0.15);
-  const menuBar = opacity(foreground, 0.35);
+  const rowFill = withAlpha(foreground, 0.06);
+  const trackOff = withAlpha(foreground, 0.15);
+  const knobBorder = withAlpha(foreground, 0.2);
+  const menuBorder = withAlpha(foreground, 0.15);
+  const menuBar = withAlpha(foreground, 0.35);
 
   const gloveStyle = useAnimatedStyle(() => {
     const bob =

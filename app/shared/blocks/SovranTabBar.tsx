@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 
@@ -84,8 +84,8 @@ export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
 
   const activeColor = foreground;
-  const inactiveColor = opacity(foreground, 0.5);
-  const dividerColor = opacity(foreground, 0.12);
+  const inactiveColor = withAlpha(foreground, 0.5);
+  const dividerColor = withAlpha(foreground, 0.12);
 
   return (
     <View

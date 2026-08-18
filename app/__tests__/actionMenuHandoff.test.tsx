@@ -158,7 +158,10 @@ jest.mock('assets/icons', () => ({
   },
 }));
 
-jest.mock('hex-color-opacity', () => jest.fn((color: string) => color));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: jest.fn((color: string) => color),
+}));
 
 function Harness({ successorRendered = false }: { successorRendered?: boolean }) {
   return (

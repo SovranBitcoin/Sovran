@@ -14,7 +14,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -241,8 +241,8 @@ export const TransferStepChain = React.memo(
       'warning',
     ] as const);
 
-    const labelColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
-    const dimLabelColor = useMemo(() => opacity(foreground, 0.25), [foreground]);
+    const labelColor = useMemo(() => withAlpha(foreground, 0.5), [foreground]);
+    const dimLabelColor = useMemo(() => withAlpha(foreground, 0.25), [foreground]);
 
     const chain = useMemo(() => buildChain(status, middleLabel), [middleLabel, status]);
     const currentIdx = statusToCurrentIdx(status);
@@ -338,7 +338,7 @@ export const TransferStepChain = React.memo(
           </View>
 
           {isRouting && routingDetail ? (
-            <View style={[styles.routingBanner, { backgroundColor: opacity(foreground, 0.08) }]}>
+            <View style={[styles.routingBanner, { backgroundColor: withAlpha(foreground, 0.08) }]}>
               <HStack gap={6} align="center" justify="center">
                 <Spinner size={12} />
                 <UntranslatedText size={11} color={labelColor}>

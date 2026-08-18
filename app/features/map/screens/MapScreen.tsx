@@ -20,7 +20,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import * as Location from 'expo-location';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { InteractionManager, Platform, StyleSheet, useWindowDimensions } from 'react-native';
@@ -204,8 +204,8 @@ export function MapScreen() {
     return (
       <Log name="MapScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.errorContainer}>
-          <Icon name="mdi:alert-circle" size={48} color={opacity(foreground, 0.4)} />
-          <Text size={16} style={{ color: opacity(foreground, 0.5), marginTop: 16 }}>
+          <Icon name="mdi:alert-circle" size={48} color={withAlpha(foreground, 0.4)} />
+          <Text size={16} style={{ color: withAlpha(foreground, 0.5), marginTop: 16 }}>
             {mapUnavailableOnAndroid
               ? 'Google Maps is not configured for Android. Set EXPO_PUBLIC_GOOGLE_MAPS_API_KEY and rebuild.'
               : error}
@@ -228,7 +228,7 @@ export function MapScreen() {
       {!isMapReady && (
         <View style={[StyleSheet.absoluteFill, styles.mapSkeleton, { backgroundColor: skeleton }]}>
           <Spinner size={32} color={BITCOIN_ACCENT} />
-          <Text size={14} style={{ color: opacity(foreground, 0.8), marginTop: 16 }}>
+          <Text size={14} style={{ color: withAlpha(foreground, 0.8), marginTop: 16 }}>
             Loading map...
           </Text>
         </View>

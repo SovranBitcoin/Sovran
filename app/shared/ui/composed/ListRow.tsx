@@ -22,7 +22,7 @@
 import { ReactNode } from 'react';
 import { View, StyleProp, ViewStyle, StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 
@@ -215,7 +215,7 @@ export function ListRow({
             width: size,
             height: size,
             borderRadius: size / 2,
-            backgroundColor: iconCircle.backgroundColor ?? opacity(iconCircle.color, 0.12),
+            backgroundColor: iconCircle.backgroundColor ?? withAlpha(iconCircle.color, 0.12),
           },
         ]}>
         <Icon name={iconCircle.icon} size={iconSize} color={iconCircle.color} />
@@ -261,7 +261,7 @@ export function ListRow({
       <Text
         size={14}
         numberOfLines={wrapSubtitle ? undefined : 1}
-        color={opacity(foreground, 0.5)}
+        color={withAlpha(foreground, 0.5)}
         loading={loading}
         placeholder={subtitlePlaceholder}>
         {subtitle as string | undefined}

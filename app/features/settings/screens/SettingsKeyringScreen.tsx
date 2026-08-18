@@ -27,7 +27,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import {
   Button,
   ListGroup,
@@ -192,14 +192,14 @@ const KeyItem: React.FC<{
           <Icon
             name={isDerived ? 'mdi:key-arrow-right' : 'ph:user-bold'}
             size={16}
-            color={opacity(foreground, 0.5)}
+            color={withAlpha(foreground, 0.5)}
           />
         </View>
         <ListGroup.ItemContent>
           <Text size={11} style={{ color: foreground }}>
             {truncateMiddle(displayKey, 7)}
           </Text>
-          <Text size={10} className="mt-0.5" style={{ color: opacity(foreground, 0.4) }}>
+          <Text size={10} className="mt-0.5" style={{ color: withAlpha(foreground, 0.4) }}>
             {isDerived ? `Derived Key ${keypair.derivationIndex}` : 'Imported'}
           </Text>
         </ListGroup.ItemContent>
@@ -523,8 +523,8 @@ export const SettingsKeyringScreen: React.FC = () => {
         <ListGroup variant="secondary">
           {isLoading ? (
             <VStack align="center" className="p-6">
-              <LoadingIndicator size={20} phase="loading" color={opacity(foreground, 0.4)} />
-              <Text size={14} className="mt-2" style={{ color: opacity(foreground, 0.4) }}>
+              <LoadingIndicator size={20} phase="loading" color={withAlpha(foreground, 0.4)} />
+              <Text size={14} className="mt-2" style={{ color: withAlpha(foreground, 0.4) }}>
                 Loading keys...
               </Text>
             </VStack>
@@ -534,7 +534,7 @@ export const SettingsKeyringScreen: React.FC = () => {
               <Text
                 size={14}
                 className="mt-3 text-center"
-                style={{ color: opacity(foreground, 0.4) }}>
+                style={{ color: withAlpha(foreground, 0.4) }}>
                 Generate or import a key to get started with P2PK-locked ecash
               </Text>
             </VStack>

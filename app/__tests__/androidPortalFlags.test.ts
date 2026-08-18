@@ -85,7 +85,7 @@ describe('Android portal flags', () => {
     expect(source).toContain("Platform.OS === 'android'");
     expect(source).toContain('ANDROID_BUTTON_SIZE = headerButtonSize');
     expect(source).toContain('backgroundColor: flatSurface');
-    expect(source).toContain('borderColor: opacity(muted, 0.3)');
+    expect(source).toContain('borderColor: withAlpha(muted, 0.3)');
   });
 
   it('keeps Android bottom footers out of the masked blur native path', () => {

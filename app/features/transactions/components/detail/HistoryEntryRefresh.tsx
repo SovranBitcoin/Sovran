@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { ListGroup, PressableFeedback } from 'heroui-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { getHistoryEntryRefreshLabel } from 'wallet';
 
 import type { HistoryEntry } from '@cashu/coco-core';
@@ -80,7 +80,7 @@ export function HistoryEntryRefresh({
       </ListGroup.ItemContent>
       {onPress && (
         <ListGroup.ItemSuffix>
-          <Icon name="lucide:pencil-line" size={16} color={opacity(foreground, 0.4)} />
+          <Icon name="lucide:pencil-line" size={16} color={withAlpha(foreground, 0.4)} />
         </ListGroup.ItemSuffix>
       )}
     </ListGroup.Item>

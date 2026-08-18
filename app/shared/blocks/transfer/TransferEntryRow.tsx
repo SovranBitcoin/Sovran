@@ -15,7 +15,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { UntranslatedText } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -65,7 +65,7 @@ export const TransferEntryRow = React.memo(
 
     const isSend = type === 'send';
     const amountColor = isSend ? danger : success;
-    const defaultSubtitleColor = opacity(foreground, 0.8);
+    const defaultSubtitleColor = withAlpha(foreground, 0.8);
 
     const content = (
       <HStack gap={12} flex={1}>

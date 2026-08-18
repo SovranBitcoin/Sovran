@@ -9,7 +9,7 @@ import { useCallback } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import Icon from 'assets/icons';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -55,7 +55,7 @@ export function PollComposeForm() {
     poll.endsAt === undefined ? 0 : Math.max(0, poll.endsAt - Math.floor(Date.now() / 1000));
 
   return (
-    <View style={[styles.container, { borderColor: opacity(foreground, 0.12) }]}>
+    <View style={[styles.container, { borderColor: withAlpha(foreground, 0.12) }]}>
       <View style={styles.header}>
         <Text size={13} bold style={{ color: muted }}>
           POLL
@@ -77,7 +77,7 @@ export function PollComposeForm() {
             }
             placeholder={`Option ${index + 1}`}
             placeholderTextColor={muted}
-            style={[styles.input, { color: foreground, borderColor: opacity(foreground, 0.12) }]}
+            style={[styles.input, { color: foreground, borderColor: withAlpha(foreground, 0.12) }]}
           />
           {poll.options.length > MIN_OPTIONS ? (
             <Pressable
@@ -166,8 +166,8 @@ function Chip({
       style={[
         styles.chip,
         {
-          borderColor: active ? accent : opacity(foreground, 0.18),
-          backgroundColor: active ? opacity(accent, 0.15) : 'transparent',
+          borderColor: active ? accent : withAlpha(foreground, 0.18),
+          backgroundColor: active ? withAlpha(accent, 0.15) : 'transparent',
         },
       ]}>
       <Text size={13} style={{ color: active ? accent : muted }}>

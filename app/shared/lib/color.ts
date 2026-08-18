@@ -13,8 +13,7 @@
  * and 8-digit hex are the shapes to handle.
  *
  * Parity with the packages this replaced is pinned in `__tests__/color.test.ts`
- * against golden values captured from `hex-color-opacity@0.4.2` and
- * `polished@4.3.1` before they were removed.
+ * against golden values captured from the two npm packages before removal.
  */
 
 const HEX_PATTERN = /^#([A-Fa-f0-9]{3}$|[A-Fa-f0-9]{6}$|[A-Fa-f0-9]{8}$)/;
@@ -134,10 +133,10 @@ export function luminance(hex: string): number {
 /**
  * Apply an alpha channel to a hex colour, returning `#RRGGBBAA`.
  *
- * Behaviour is inherited from `hex-color-opacity`, which this replaces: an
- * existing alpha pair on the input is discarded rather than multiplied, output
- * is upper-cased, and invalid input throws rather than rendering something
- * arbitrary.
+ * Behaviour is inherited from the package this replaced: an existing alpha pair
+ * on the input is discarded rather than multiplied, output is upper-cased, and
+ * invalid input throws rather than rendering something arbitrary. 486 call sites
+ * depend on that contract.
  */
 export function withAlpha(hex: string, alpha: number): string {
   if (typeof hex !== 'string' || !HEX_PATTERN.test(hex)) {

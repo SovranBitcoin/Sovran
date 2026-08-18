@@ -22,7 +22,7 @@ import {
   resolveSelectedEntry,
 } from '../lib/format';
 import { aiLog } from '@/shared/lib/logger';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 /**
  * Inline pill chip showing the current AI tier + provider + the model the
@@ -222,7 +222,7 @@ export function ModelChip() {
           <Text size={13} style={{ color: background, fontFamily: 'OxygenBold' }}>
             {chipLabel}
           </Text>
-          <Icon name="mdi:chevron-down" size={12} color={opacity(background, 0.7)} />
+          <Icon name="mdi:chevron-down" size={12} color={withAlpha(background, 0.7)} />
         </HStack>
       }
     />

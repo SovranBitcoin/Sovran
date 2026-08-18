@@ -26,7 +26,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { BlurView } from 'expo-blur';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
@@ -1341,7 +1341,7 @@ function AnimatedImageOverlayContent({
                 <View
                   style={[
                     overlayStyles.panelHandleBar,
-                    { backgroundColor: opacity(panelForeground, 0.2) },
+                    { backgroundColor: withAlpha(panelForeground, 0.2) },
                   ]}
                 />
               </View>

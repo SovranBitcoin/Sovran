@@ -13,7 +13,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import * as Clipboard from 'expo-clipboard';
 import { copyPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
@@ -163,19 +163,19 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
                   <ListGroup.ItemPrefix>
                     {config.iconCurrency ? (
                       <CurrencyIcon
-                        colors={[opacity(foreground, 0.4)]}
+                        colors={[withAlpha(foreground, 0.4)]}
                         width={20}
                         currency={config.iconCurrency}
                       />
                     ) : config.iconName ? (
-                      <Icon name={config.iconName} size={20} color={opacity(foreground, 0.4)} />
+                      <Icon name={config.iconName} size={20} color={withAlpha(foreground, 0.4)} />
                     ) : undefined}
                   </ListGroup.ItemPrefix>
                   <ListGroup.ItemContent>
                     <ListGroup.ItemTitle>{truncateMiddle(activeData, 10)}</ListGroup.ItemTitle>
                   </ListGroup.ItemContent>
                   <ListGroup.ItemSuffix>
-                    <Icon name="lets-icons:copy" size={20} color={opacity(foreground, 0.4)} />
+                    <Icon name="lets-icons:copy" size={20} color={withAlpha(foreground, 0.4)} />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>
               </PressableFeedback.Scale>

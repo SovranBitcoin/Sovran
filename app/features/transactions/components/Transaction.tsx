@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import Animated, { Easing, LinearTransition } from 'react-native-reanimated';
 
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { SwipeableRow } from '@/features/transactions/components/SwipeableRow';
@@ -211,7 +211,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
 
           <HStack justify="space-between" align="center">
             <HStack align="center" gap={4}>
-              <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
+              <UntranslatedText size={10} color={withAlpha(foreground, 0.8)}>
                 {historyEntry?.createdAt
                   ? formatDate(historyEntry.createdAt, 'short-date-time')
                   : 'Unconfirmed'}
@@ -220,7 +220,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
                 <Icon
                   name={SOURCE_ICONS[transactionSource]}
                   size={10}
-                  color={opacity(foreground, 0.8)}
+                  color={withAlpha(foreground, 0.8)}
                 />
               )}
               {bip321Options &&
@@ -247,7 +247,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
                       key={item.name}
                       name={item.name}
                       size={10}
-                      color={opacity(foreground, item.used ? 0.8 : 0.4)}
+                      color={withAlpha(foreground, item.used ? 0.8 : 0.4)}
                     />
                   ));
                 })()}
@@ -256,7 +256,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
               overpass
               bold
               size={10}
-              color={opacity(foreground, 0.8)}
+              color={withAlpha(foreground, 0.8)}
               className="self-end text-right">
               {fiatAmount}
             </UntranslatedText>

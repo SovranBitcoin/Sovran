@@ -12,7 +12,7 @@ import { useCallback, useEffect } from 'react';
 import { Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -200,7 +200,7 @@ export function ThemePreviewScreen() {
                   style={{
                     backgroundColor: themeButtonBackground,
                     borderWidth: Platform.OS === 'android' ? 1 : 0,
-                    borderColor: opacity(muted, 0.3),
+                    borderColor: withAlpha(muted, 0.3),
                   }}>
                   <Icon name="mdi:palette" size={22} color={foreground} />
                 </View>

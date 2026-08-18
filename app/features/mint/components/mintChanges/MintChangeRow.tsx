@@ -9,7 +9,7 @@
  */
 import { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from '@/assets/icons';
 import type { MintChangeUpdate } from '@/features/mint/lib/mintChanges/groupEntries';
@@ -60,7 +60,7 @@ export function MintChangeGlyph({
       style={[
         styles.reasonIcon,
         {
-          backgroundColor: opacity(color, alpha.faint),
+          backgroundColor: withAlpha(color, alpha.faint),
           borderRadius: size / 2,
           height: size,
           width: size,
@@ -84,7 +84,10 @@ export function MintChangeRow({
     'surface-tertiary',
   ] as const);
   const metadata = useCachedMintMetadata(update.mintUrl);
-  const pressedBackground = useMemo(() => opacity(surfaceTertiary, alpha.muted), [surfaceTertiary]);
+  const pressedBackground = useMemo(
+    () => withAlpha(surfaceTertiary, alpha.muted),
+    [surfaceTertiary]
+  );
 
   const timestamp = update.at > 0 ? formatRelative(update.at * 1000, 'compact') : '';
   const sentence = mintChangeSentence(update.name, update.phrase);

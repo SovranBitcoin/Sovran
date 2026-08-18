@@ -130,9 +130,9 @@ jest.mock('@/shared/hooks/useThemeColor', () => ({
 }));
 jest.mock('@/shared/lib/currency', () => ({ formatAmount: () => '$0.00' }));
 jest.mock('@/shared/lib/cashu/utils', () => ({ buildReceiveHistoryEntry: jest.fn() }));
-jest.mock('hex-color-opacity', () => ({
-  __esModule: true,
-  default: (color: string) => color,
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (color: string) => color,
 }));
 
 jest.mock('@/shared/ui/composed/Screen', () => ({

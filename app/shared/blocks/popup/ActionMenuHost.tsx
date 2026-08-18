@@ -15,7 +15,7 @@ import {
   BottomSheetScrollView,
   BottomSheetTextInput,
 } from '@gorhom/bottom-sheet';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -179,7 +179,7 @@ function MenuSearchField({
           onPress={onClear}
           hitSlop={8}
           style={{ position: 'absolute', right: 10, padding: 4 }}>
-          <Icon name="mdi:close-circle" size={18} color={opacity(foreground, 0.33)} />
+          <Icon name="mdi:close-circle" size={18} color={withAlpha(foreground, 0.33)} />
         </Pressable>
       ) : null}
     </View>

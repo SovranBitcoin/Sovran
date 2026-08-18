@@ -19,7 +19,7 @@ import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
 import { setStringAsync } from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import type { Manager } from '@cashu/coco-core';
 import { standingPaymentRequestKey } from 'wallet';
@@ -249,7 +249,7 @@ export function ReceiveRailListScreen() {
     'surface-secondary',
     'success',
   ] as const);
-  const muted = opacity(foreground, 0.4);
+  const muted = withAlpha(foreground, 0.4);
 
   const rail = params?.rail;
   const unit = params?.unit ?? 'sat';

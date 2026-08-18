@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import Icon from '@/assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -23,8 +23,8 @@ export function FeedTabButton({
   onPress?: () => void;
 }) {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
-  const activeBg = useMemo(() => opacity(surfaceTertiary, 0.5), [surfaceTertiary]);
-  const pressedBg = useMemo(() => opacity(surfaceTertiary, 0.65), [surfaceTertiary]);
+  const activeBg = useMemo(() => withAlpha(surfaceTertiary, 0.5), [surfaceTertiary]);
+  const pressedBg = useMemo(() => withAlpha(surfaceTertiary, 0.65), [surfaceTertiary]);
   return (
     <Pressable
       accessibilityRole="button"

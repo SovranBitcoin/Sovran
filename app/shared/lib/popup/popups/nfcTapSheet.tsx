@@ -23,7 +23,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -123,7 +123,7 @@ export function NfcTapContent({ close, setFooterConfig }: CustomSheetSharedProps
     <VStack align="center" gap={spacing.md} style={styles.body}>
       <View style={styles.glyphArea}>
         <Animated.View
-          style={[styles.ring, { backgroundColor: opacity(accent, 0.4) }, ringStyle]}
+          style={[styles.ring, { backgroundColor: withAlpha(accent, 0.4) }, ringStyle]}
         />
         <View style={[styles.glyphCircle, { backgroundColor: surfaceSecondary }]}>
           <Icon name="lucide:nfc" size={44} color={foreground} />
@@ -132,7 +132,7 @@ export function NfcTapContent({ close, setFooterConfig }: CustomSheetSharedProps
       <Text bold size={fontSize['2xl']} style={styles.title}>
         {title}
       </Text>
-      <Text size={fontSize.md} color={opacity(foreground, 0.6)} style={styles.title}>
+      <Text size={fontSize.md} color={withAlpha(foreground, 0.6)} style={styles.title}>
         {subtitle}
       </Text>
     </VStack>

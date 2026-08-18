@@ -15,7 +15,7 @@ import { useWindowDimensions } from 'react-native';
 import EQRCode from 'react-native-qrcode-svg';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { LinearGradient } from 'expo-linear-gradient';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
@@ -255,7 +255,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
         alignItems: 'center',
         padding: 20,
       }}>
-      <Icon name="ri:error-warning-line" size={48} color={opacity(QR_DARK, 0.5)} />
+      <Icon name="ri:error-warning-line" size={48} color={withAlpha(QR_DARK, 0.5)} />
     </View>
   ) : canRenderQR ? (
     // `transparent` on light mode lets the `GradientCard`'s frosted
@@ -418,8 +418,12 @@ export const QRSpeedControls = memo(function QRSpeedControls({
           style={{ flex: 1 }}>
           <PressableFeedback.Scale>
             <HStack align="center" justify="center" gap={6} style={{ paddingVertical: 12 }}>
-              <SpeedGaugeIcon size={16} color={opacity(foreground, 0.5)} speedIndex={speedIndex} />
-              <Text size={13} color={opacity(foreground, 0.5)}>
+              <SpeedGaugeIcon
+                size={16}
+                color={withAlpha(foreground, 0.5)}
+                speedIndex={speedIndex}
+              />
+              <Text size={13} color={withAlpha(foreground, 0.5)}>
                 {SPEED_PRESETS[speedIndex].label}
               </Text>
             </HStack>
@@ -428,7 +432,7 @@ export const QRSpeedControls = memo(function QRSpeedControls({
         </PressableFeedback>
 
         <View
-          style={{ width: 1, backgroundColor: opacity(foreground, 0.08), marginVertical: 10 }}
+          style={{ width: 1, backgroundColor: withAlpha(foreground, 0.08), marginVertical: 10 }}
         />
 
         <PressableFeedback
@@ -438,8 +442,8 @@ export const QRSpeedControls = memo(function QRSpeedControls({
           style={{ flex: 1 }}>
           <PressableFeedback.Scale>
             <HStack align="center" justify="center" gap={6} style={{ paddingVertical: 12 }}>
-              <Icon name="stash:qr-code" size={16} color={opacity(foreground, 0.5)} />
-              <Text size={13} color={opacity(foreground, 0.5)}>
+              <Icon name="stash:qr-code" size={16} color={withAlpha(foreground, 0.5)} />
+              <Text size={13} color={withAlpha(foreground, 0.5)}>
                 {DENSITY_PRESETS[densityIndex].label}
               </Text>
             </HStack>

@@ -1,4 +1,4 @@
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import Icon from 'assets/icons';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -64,7 +64,7 @@ export function Bip321MethodIcons({
             key={item.name}
             name={item.name}
             size={16}
-            color={opacity(foreground, item.used ? 0.8 : 0.4)}
+            color={withAlpha(foreground, item.used ? 0.8 : 0.4)}
           />
         ))}
       </HStack>

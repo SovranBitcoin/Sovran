@@ -40,7 +40,7 @@ import { useOpenComposer } from '@/features/composer/publish/useComposerActions'
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, {
   useSharedValue,
@@ -269,8 +269,12 @@ export const RepostCard = React.memo(function RepostCard({
             align="center"
             gap={6}
             style={{ paddingHorizontal: 16, paddingTop: 10, marginLeft: 36 + 12 }}>
-            <Icon name="garden:arrow-retweet-fill-16" size={14} color={opacity(foreground, 0.33)} />
-            <Text size={12} semibold style={{ color: opacity(foreground, 0.33) }}>
+            <Icon
+              name="garden:arrow-retweet-fill-16"
+              size={14}
+              color={withAlpha(foreground, 0.33)}
+            />
+            <Text size={12} semibold style={{ color: withAlpha(foreground, 0.33) }}>
               {repostHeaderText}
             </Text>
           </HStack>
@@ -316,8 +320,8 @@ export const RepostCard = React.memo(function RepostCard({
               },
             ]}>
             <HStack align="center" gap={6}>
-              <Icon name="mdi:message-text" size={14} color={opacity(foreground, 0.33)} />
-              <Text size={13} italic style={{ color: opacity(foreground, 0.33) }}>
+              <Icon name="mdi:message-text" size={14} color={withAlpha(foreground, 0.33)} />
+              <Text size={13} italic style={{ color: withAlpha(foreground, 0.33) }}>
                 Original post unavailable
               </Text>
             </HStack>
@@ -1062,7 +1066,7 @@ export function UserFeed({
     <View>
       {ListHeaderComponent}
       <View style={styles.feedContainer}>
-        <Text medium size={13} style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
+        <Text medium size={13} style={[styles.sectionTitle, { color: withAlpha(foreground, 0.5) }]}>
           Notes
         </Text>
         {isLoading ? (

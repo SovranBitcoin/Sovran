@@ -21,7 +21,7 @@ import React from 'react';
 import { MenuView, type MenuAction } from '@react-native-menu/menu';
 import { GlassView } from 'expo-glass-effect';
 import { LiquidGlassMenu } from 'liquid-glass-menu';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -58,7 +58,7 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
         label={text}
         labelColor={textColor}
         labelSize={textSize}
-        tint={opacity(INVARIANT_WHITE, 0.15)}
+        tint={withAlpha(INVARIANT_WHITE, 0.15)}
         colorScheme={colorScheme}
         menuTitle="Display currency"
         hasPrimaryAction={!!onPress}
@@ -101,7 +101,7 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
       // NOT `isInteractive`: on iOS 26 the interactive glass layer contends for
       // touches with the wrapping Pressable/MenuView, making taps flaky. Keep
       // the glass decorative; the pressable/menu owns the tap.
-      tintColor={opacity(INVARIANT_WHITE, 0.15)}
+      tintColor={withAlpha(INVARIANT_WHITE, 0.15)}
       style={{
         borderRadius: 999,
         overflow: 'hidden',

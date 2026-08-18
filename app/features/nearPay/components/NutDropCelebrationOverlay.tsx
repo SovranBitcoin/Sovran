@@ -8,7 +8,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import {
   LightningStrike,
@@ -252,7 +252,10 @@ export function NutDropCelebrationOverlay({
     [centerRect, labelStyle]
   );
   const receivedTextStyle = useMemo(() => ({ color: foreground }), [foreground]);
-  const fromTextStyle = useMemo(() => ({ color: opacity(foreground, alpha.muted) }), [foreground]);
+  const fromTextStyle = useMemo(
+    () => ({ color: withAlpha(foreground, alpha.muted) }),
+    [foreground]
+  );
   const handleSkip = useCallback(() => {
     onSkip();
   }, [onSkip]);

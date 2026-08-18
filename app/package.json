@@ -153,7 +153,6 @@
     "expo-video": "~56.1.4",
     "expo-widgets": "~56.0.19",
     "heroui-native": "1.0.4",
-    "hex-color-opacity": "^0.4.2",
     "intl": "^1.2.5",
     "liquid-glass-menu": "file:./modules/liquid-glass-menu",
     "liquid-glass-text": "file:./modules/liquid-glass-text",

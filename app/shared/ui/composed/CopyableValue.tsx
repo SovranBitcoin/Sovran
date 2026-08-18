@@ -17,7 +17,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { paymentLog } from '@/shared/lib/logger';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 interface CopyableValueProps {
   /** Full value copied to the clipboard. */
@@ -49,7 +49,7 @@ export function CopyableValue({ value, display, copyTarget }: CopyableValueProps
           {display ?? value}
         </Text>
         <Spacer size={6} />
-        <Icon name="lets-icons:copy" color={opacity(foreground, 0.6)} size={16} />
+        <Icon name="lets-icons:copy" color={withAlpha(foreground, 0.6)} size={16} />
       </HStack>
     </Pressable>
   );

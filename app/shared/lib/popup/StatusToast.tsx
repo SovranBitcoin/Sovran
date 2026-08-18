@@ -8,12 +8,10 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import opacity from 'hex-color-opacity';
+import { blend, withAlpha } from '@/shared/lib/color';
 
 import { LoadingIndicator, type Phase, type Result } from '@/shared/blocks/status';
 import { popupLog } from '@/shared/lib/logger';
-
-import { blend } from '@/shared/lib/color';
 
 import { useToastSurface } from './useToastSurface';
 import {
@@ -103,7 +101,7 @@ export function StatusToast({
   const { bg: surfaceBg, fg: surfaceFg } = useToastSurface();
   // Opaque on non-frosted platforms (Android) — see ToastSlab.
   const frosted = useToastFrosted();
-  const surfaceBgTint = frosted ? opacity(surfaceBg, TINT_ALPHA) : surfaceBg;
+  const surfaceBgTint = frosted ? withAlpha(surfaceBg, TINT_ALPHA) : surfaceBg;
 
   const isTerminal = status === 'confirmed' || status === 'warning' || status === 'failed';
   const targetBg =
@@ -112,7 +110,7 @@ export function StatusToast({
   // composite the same tint into the surface slab mathematically —
   // raw SUCCESS/DANGER hexes at full opacity read far too strong.
   const targetBgTint = frosted
-    ? opacity(targetBg, TINT_ALPHA)
+    ? withAlpha(targetBg, TINT_ALPHA)
     : blend(surfaceBg, targetBg, OPAQUE_TINT_MIX);
 
   const indicatorPhase: Phase = isTerminal ? 'done' : 'loading';

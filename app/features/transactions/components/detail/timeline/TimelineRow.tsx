@@ -20,7 +20,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 import type { TimelineStep, TimelineStepType } from 'wallet';
 
@@ -224,8 +224,8 @@ export function TimelineRow({
     'danger',
     'warning',
   ] as const);
-  const foreground66 = opacity(foreground, 0.66);
-  const foreground50 = opacity(foreground, 0.5);
+  const foreground66 = withAlpha(foreground, 0.66);
+  const foreground50 = withAlpha(foreground, 0.5);
 
   const isFutureState = step.stepType === 'next-pending' || step.stepType === 'future-small';
   const isWaitingStep = step.stepType === 'waiting';

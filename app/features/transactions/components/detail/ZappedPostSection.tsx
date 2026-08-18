@@ -21,7 +21,7 @@
 import { useCallback } from 'react';
 import { StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { getZap } from 'wallet';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -88,12 +88,12 @@ export function ZappedPostSection({ entry }: ZappedPostSectionProps) {
                 bold
                 size={13}
                 numberOfLines={1}
-                style={[styles.flex, { color: opacity(foreground, 0.66) }]}>
+                style={[styles.flex, { color: withAlpha(foreground, 0.66) }]}>
                 {authorName}
               </Text>
             </HStack>
             {zap.contentPreview ? (
-              <Text size={13} numberOfLines={3} style={{ color: opacity(foreground, 0.55) }}>
+              <Text size={13} numberOfLines={3} style={{ color: withAlpha(foreground, 0.55) }}>
                 {zap.contentPreview}
               </Text>
             ) : null}

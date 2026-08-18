@@ -43,7 +43,7 @@ import {
 } from '@/features/mint/components/MintCurrencyTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { log, cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
@@ -179,7 +179,7 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
   const [green400, danger] = useThemeColor(['green-400', 'danger'] as const);
 
   const getStatusColor = () => {
-    if (validationState.isLoading) return opacity(foreground, 0.4);
+    if (validationState.isLoading) return withAlpha(foreground, 0.4);
     if (validationState.isValid === true) return green400;
     if (validationState.isValid === false) return danger;
     return defaultColor;
@@ -211,7 +211,7 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
         onFocus={onFocus}
         onBlur={onBlur}
         placeholder="Search mints or enter URL..."
-        placeholderTextColor={opacity(foreground, 0.33)}
+        placeholderTextColor={withAlpha(foreground, 0.33)}
         style={{
           flex: 1,
           color: foreground,
@@ -227,7 +227,7 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
           size={20}
           phase={validationState.isLoading ? 'loading' : 'done'}
           result={validationState.isValid === false ? 'error' : 'success'}
-          color={opacity(foreground, 0.4)}
+          color={withAlpha(foreground, 0.4)}
           successColor={green400}
           errorColor={danger}
         />

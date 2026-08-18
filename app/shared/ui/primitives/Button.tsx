@@ -47,7 +47,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { StyleProp, ViewStyle, GestureResponderEvent, Platform, StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { controlHeight, fontSize } from '@/shared/styles/tokens';
@@ -309,13 +309,13 @@ export const Button = ({
         return {
           ...base,
           backgroundColor: foreground,
-          borderColor: opacity(foregroundSecondary, 0.25),
+          borderColor: withAlpha(foregroundSecondary, 0.25),
         };
       case 'secondary':
         return {
           ...base,
           backgroundColor: surfaceSecondary,
-          borderColor: opacity(foregroundSecondary, 0.25),
+          borderColor: withAlpha(foregroundSecondary, 0.25),
         };
       case 'dangerous':
         return {

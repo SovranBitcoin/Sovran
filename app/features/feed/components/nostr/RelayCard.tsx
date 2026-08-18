@@ -15,7 +15,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image as ExpoImage } from 'expo-image';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { StyleSheet, View as RNView } from 'react-native';
 
 import Icon from 'assets/icons';
@@ -72,7 +72,7 @@ const RelayIcon = React.memo(function RelayIcon({
   }, [safeUri]);
 
   const containerStyle = useMemo(
-    () => [styles.icon, { backgroundColor: ink ? opacity(ink, 0.12) : muted }],
+    () => [styles.icon, { backgroundColor: ink ? withAlpha(ink, 0.12) : muted }],
     [ink, muted]
   );
 
@@ -93,7 +93,7 @@ const RelayIcon = React.memo(function RelayIcon({
   }
   return (
     <RNView style={containerStyle}>
-      <Icon name={RELAY_GLYPH} size={20} color={ink ?? opacity(foreground, 0.4)} />
+      <Icon name={RELAY_GLYPH} size={20} color={ink ?? withAlpha(foreground, 0.4)} />
     </RNView>
   );
 });
@@ -106,7 +106,7 @@ function RelayCardBody({ url, info }: { url: string; info: RelayInformation | un
   ] as const);
   const domain = relayDomain(url);
   const brand = relayBrandForSoftware(info?.software);
-  const textColor = brand ? brand.ink : opacity(foreground, 0.8);
+  const textColor = brand ? brand.ink : withAlpha(foreground, 0.8);
 
   const join = useCallback(async () => {
     feedLog.info('feed.relay_card.join', { host: domain });
@@ -123,7 +123,7 @@ function RelayCardBody({ url, info }: { url: string; info: RelayInformation | un
         sharedStyles.mediaCard,
         styles.card,
         brand
-          ? { backgroundColor: brand.accent, borderColor: opacity(brand.ink, 0.15) }
+          ? { backgroundColor: brand.accent, borderColor: withAlpha(brand.ink, 0.15) }
           : { backgroundColor: surface, borderColor: surfaceTertiary },
       ]}>
       <HStack align="center" gap={10}>

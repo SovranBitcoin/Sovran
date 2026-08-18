@@ -8,7 +8,7 @@ import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { formatAmount } from '@/shared/lib/currency';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import Icon from 'assets/icons';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import type { HistoryEntry } from '@cashu/coco-core';
@@ -142,11 +142,11 @@ const MonthlyChart = React.memo(function MonthlyChart({
 
   const config = MODE_CONFIG[mode];
 
-  const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
+  const borderColor = useMemo(() => withAlpha(muted, 0.3), [muted]);
 
   const actualLineColor = mode === 'spent' ? dangerColor : successColor;
-  const projectedLineColor = useMemo(() => opacity(foreground, 0.3), [foreground]);
-  const labelColor = useMemo(() => opacity(foreground, 0.66), [foreground]);
+  const projectedLineColor = useMemo(() => withAlpha(foreground, 0.3), [foreground]);
+  const labelColor = useMemo(() => withAlpha(foreground, 0.66), [foreground]);
 
   // Use a unique gradient ID per mode to avoid SVG collisions when both charts render
   const gradientId = `monthlyGradient-${mode}`;
@@ -323,7 +323,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
             {/* Header */}
             <RNView style={styles.header}>
               <RNView style={styles.headerLeft}>
-                <Text size={14} semibold color={opacity(foreground, 0.66)}>
+                <Text size={14} semibold color={withAlpha(foreground, 0.66)}>
                   {config.title}
                 </Text>
                 <RNView style={styles.amountRow}>
@@ -337,7 +337,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
                     <RNView
                       style={[
                         styles.changeChip,
-                        { backgroundColor: opacity(actualLineColor, 0.12) },
+                        { backgroundColor: withAlpha(actualLineColor, 0.12) },
                       ]}>
                       <Icon name={changeIcon} size={14} color={actualLineColor} />
                       <Text overpass size={13} semibold color={actualLineColor}>
@@ -354,7 +354,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
                     unit={unit}
                     size={14}
                     weight="medium"
-                    color={opacity(foreground, 0.66)}
+                    color={withAlpha(foreground, 0.66)}
                   />
                 </RNView>
               ) : null}

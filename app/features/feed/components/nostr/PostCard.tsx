@@ -11,7 +11,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import Reanimated, {
   type SharedValue,
   useSharedValue,
@@ -96,9 +96,9 @@ function PostCardGutterHeader({
   onNestedPressIn?: () => void;
   onNestedPressOut?: () => void;
 }) {
-  const textPrimary = { color: opacity(foreground, 0.9) };
-  const textMuted = { color: opacity(foreground, 0.4) };
-  const textDimmed = { color: opacity(foreground, 0.3) };
+  const textPrimary = { color: withAlpha(foreground, 0.9) };
+  const textMuted = { color: withAlpha(foreground, 0.4) };
+  const textDimmed = { color: withAlpha(foreground, 0.3) };
   return (
     <HStack align="center" gap={6} style={sharedStyles.mb4}>
       <HStack align="center" gap={6} style={pcStyles.headerTextRow}>
@@ -153,7 +153,7 @@ function PostCardGutterHeader({
             onPress={onMorePress}
             haptics
             style={pcStyles.moreButton}>
-            <Icon name="tabler:dots" size={18} color={opacity(foreground, 0.5)} />
+            <Icon name="tabler:dots" size={18} color={withAlpha(foreground, 0.5)} />
           </Pressable>
         )
       ) : null}
@@ -274,8 +274,8 @@ export const PostCard = React.memo(function PostCard({
   const isFeed = variant === 'feed';
 
   // Pre-compute opacity color styles to avoid inline object creation
-  const textPrimary = { color: opacity(foreground, 0.9) };
-  const textMuted = { color: opacity(foreground, 0.4) };
+  const textPrimary = { color: withAlpha(foreground, 0.9) };
+  const textMuted = { color: withAlpha(foreground, 0.4) };
 
   // Entry animation — only for feed variant on initial load
   const shouldAnimate = isFeed && !skipAnimation;
@@ -554,7 +554,7 @@ export const PostCard = React.memo(function PostCard({
               : pcStyles.inlineMetricsWrap,
             fullBleedFooterBorder && showMetricsBorder && pcStyles.inlineMetricsWrapFullBleedBorder,
             fullBleedFooterBorder &&
-              showMetricsBorder && { borderBottomColor: opacity(foreground, 0.1) },
+              showMetricsBorder && { borderBottomColor: withAlpha(foreground, 0.1) },
           ]}>
           <MetricsFooter
             metrics={metrics}
@@ -614,7 +614,7 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
   exiting?: boolean;
 }) {
   const [foreground, loadingShimmerSurface] = useThemeColor(['foreground', 'surface'] as const);
-  const textMuted = useMemo(() => ({ color: opacity(foreground, alpha.muted) }), [foreground]);
+  const textMuted = useMemo(() => ({ color: withAlpha(foreground, alpha.muted) }), [foreground]);
   const targetDateStyle = useMemo(() => [textMuted, pcStyles.targetDate], [textMuted]);
   const replyVariant = REPLY_SKELETON_VARIANTS[index % REPLY_SKELETON_VARIANTS.length];
 
@@ -752,12 +752,12 @@ const MetricsFooterSkeleton = React.memo(function MetricsFooterSkeleton({
   // size (via a `Text loading` placeholder) — a hardcoded label rectangle was ~7px
   // shorter, which made the reply row grow when real text replaced the skeleton.
   const labelTextSize = compact ? 11 : 13;
-  const skeletonFill = useMemo(() => opacity(borderColor, 0.07), [borderColor]);
+  const skeletonFill = useMemo(() => withAlpha(borderColor, 0.07), [borderColor]);
   const footerStyle = useMemo(
     () => [
       sharedStyles.noteFooter,
       sharedStyles.footerBorder,
-      { borderBottomColor: opacity(borderColor, alpha.faint) },
+      { borderBottomColor: withAlpha(borderColor, alpha.faint) },
     ],
     [borderColor]
   );

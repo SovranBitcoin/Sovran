@@ -23,7 +23,7 @@ import { StyleSheet } from 'react-native';
 import { MenuView, type MenuAction } from '@react-native-menu/menu';
 import { GlassView } from 'expo-glass-effect';
 import { LiquidGlassMenu } from 'liquid-glass-menu';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -66,7 +66,7 @@ export function UnitSwitcherPillLiquid(props: UnitSwitcherPillProps): React.Reac
           label={label}
           labelColor={textColor}
           labelSize={textSize}
-          tint={opacity(INVARIANT_WHITE, 0.15)}
+          tint={withAlpha(INVARIANT_WHITE, 0.15)}
           colorScheme={colorScheme}
           menuTitle={MENU_TITLE}
           actions={availableOptions.map((option) => ({
@@ -95,7 +95,7 @@ export function UnitSwitcherPillLiquid(props: UnitSwitcherPillProps): React.Reac
       // NOT `isInteractive`: on iOS 26 the interactive glass layer contends for
       // touches with the wrapping MenuView, making taps flaky. Keep the glass
       // decorative; the menu owns the tap.
-      tintColor={opacity(INVARIANT_WHITE, 0.15)}
+      tintColor={withAlpha(INVARIANT_WHITE, 0.15)}
       style={styles.glassPill}>
       <Text overpass size={textSize} bold color={textColor} style={styles.pillText}>
         {label}

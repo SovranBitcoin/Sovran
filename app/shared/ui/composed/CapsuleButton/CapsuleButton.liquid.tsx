@@ -2,7 +2,7 @@ import { getCornerStyle } from './CapsuleButton.corners';
 import React, { useMemo, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { GlassView } from 'expo-glass-effect';
 
@@ -59,7 +59,7 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
   // default → untinted clear glass, matching the status pills. An explicit
   // `color` always wins for the content.
   const contentColor = color ?? (filled ? background : foreground);
-  const tintColor = filled ? foreground : isActive ? opacity(foreground, 0.18) : undefined;
+  const tintColor = filled ? foreground : isActive ? withAlpha(foreground, 0.18) : undefined;
 
   // Preserve the single-flight guard PressableFeedback's onPress used to provide
   // so a rapid double-tap can't fire Send/Receive twice.

@@ -9,7 +9,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import Icon from 'assets/icons';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
@@ -129,7 +129,7 @@ function MapPreview({
             style={[
               StyleSheet.absoluteFill,
               {
-                backgroundColor: opacity(surfaceSecondary, 0.35),
+                backgroundColor: withAlpha(surfaceSecondary, 0.35),
                 // @ts-ignore - mixBlendMode works on iOS
                 mixBlendMode: 'overlay',
               },
@@ -140,7 +140,7 @@ function MapPreview({
             style={[
               StyleSheet.absoluteFill,
               {
-                backgroundColor: opacity(surfaceSecondary, 1),
+                backgroundColor: withAlpha(surfaceSecondary, 1),
                 // @ts-ignore - mixBlendMode works on iOS
                 mixBlendMode: 'color',
               },
@@ -151,8 +151,8 @@ function MapPreview({
           <LinearGradient
             colors={[
               surfaceSecondary,
-              opacity(surfaceSecondary, 0.1),
-              opacity(surfaceSecondary, 0.1),
+              withAlpha(surfaceSecondary, 0.1),
+              withAlpha(surfaceSecondary, 0.1),
               surfaceSecondary,
             ]}
             locations={[0, 0.3, 0.7, 1]}
@@ -164,8 +164,8 @@ function MapPreview({
           <LinearGradient
             colors={[
               surfaceSecondary,
-              opacity(surfaceSecondary, 0.1),
-              opacity(surfaceSecondary, 0.1),
+              withAlpha(surfaceSecondary, 0.1),
+              withAlpha(surfaceSecondary, 0.1),
               surfaceSecondary,
             ]}
             locations={[0, 0.25, 0.75, 1]}
@@ -295,7 +295,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
         ? `${totalCount.toLocaleString()} worldwide`
         : '30,000+ locations';
 
-  const titleColor = opacity(foreground, 0.66);
+  const titleColor = withAlpha(foreground, 0.66);
 
   return (
     <Log name="BitcoinNearYou">
@@ -310,7 +310,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
               borderRadius: 20,
               borderWidth: 1,
               borderCurve: 'continuous',
-              borderColor: opacity(muted, 0.3),
+              borderColor: withAlpha(muted, 0.3),
             }}>
             <BlurCardFrame accentColor={muted}>
               <RNView className="z-[1]">
@@ -332,7 +332,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
                     className="flex-row items-center gap-1 rounded-full px-2 py-1"
                     style={{
                       borderCurve: 'continuous',
-                      backgroundColor: opacity(foreground, 0.1),
+                      backgroundColor: withAlpha(foreground, 0.1),
                     }}>
                     <Icon name="mdi:map-marker" size={12} color={titleColor} />
                     <Text size={11} semibold color={titleColor}>

@@ -12,7 +12,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import Icon from 'assets/icons';
 import { Button, Card } from 'heroui-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 export function DeleteScreen() {
   useLifecycleLogger('DeleteScreen');
@@ -43,7 +43,7 @@ export function DeleteScreen() {
               <Text
                 size={16}
                 className="text-center leading-6"
-                style={{ color: opacity(foreground, 0.5) }}>
+                style={{ color: withAlpha(foreground, 0.5) }}>
                 This will permanently erase all wallet data, all profiles, and all keys from this
                 device. The app will restart as if freshly installed. This action cannot be
                 reversed.

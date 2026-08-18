@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -37,13 +37,13 @@ export function P2PKLockIndicator(): React.ReactElement {
       styles.indicator,
       {
         backgroundColor: surfaceSecondary,
-        borderColor: opacity(foreground, alpha.subtle),
+        borderColor: withAlpha(foreground, alpha.subtle),
       },
     ],
     [foreground, surfaceSecondary]
   );
   const textStyle = React.useMemo(
-    () => ({ color: opacity(foreground, alpha.strong) }),
+    () => ({ color: withAlpha(foreground, alpha.strong) }),
     [foreground]
   );
   return (
@@ -54,7 +54,7 @@ export function P2PKLockIndicator(): React.ReactElement {
       accessibilityLabel="P2PK lock enabled"
       gap={spacing.xs}
       style={indicatorStyle}>
-      <Icon name="mdi:lock-outline" size={14} color={opacity(foreground, alpha.strong)} />
+      <Icon name="mdi:lock-outline" size={14} color={withAlpha(foreground, alpha.strong)} />
       <Text size={12} bold style={textStyle}>
         P2PK locked
       </Text>

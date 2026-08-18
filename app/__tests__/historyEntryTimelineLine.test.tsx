@@ -21,7 +21,10 @@ jest.mock('@/shared/lib/version', () => ({
   liquidGlassModifiers: <T,>(...modifiers: T[]) => modifiers,
 }));
 
-jest.mock('hex-color-opacity', () => jest.fn((color: string) => color));
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: jest.fn((color: string) => color),
+}));
 
 jest.mock('@/shared/lib/utils', () => ({
   meltQuoteExpired: () => false,

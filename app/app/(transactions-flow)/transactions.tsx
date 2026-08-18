@@ -22,7 +22,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { navigateToTransactionDetail } from '@/shared/lib/nav/transactionDetailRoutes';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { cashuLog } from '@/shared/lib/logger';
 
 const ParamsSchema = z.object({
@@ -49,7 +49,7 @@ function FilterButton() {
     <ScreenHeaderAction
       icon="fluent:filter-16-filled"
       size={22}
-      color={hasActiveFilters ? opacity(foreground, 0.4) : foreground}
+      color={hasActiveFilters ? withAlpha(foreground, 0.4) : foreground}
       onPress={openFilterSheet}
       testID="transactions-filter-open"
       accessibilityLabel="Open transaction filters"

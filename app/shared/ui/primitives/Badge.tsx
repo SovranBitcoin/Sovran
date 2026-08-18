@@ -49,7 +49,7 @@ import { Text } from './Text';
 import { cn } from '@/shared/lib/utils';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 /**
  * Badge variant styles using class-variance-authority
@@ -159,37 +159,37 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
     switch (variant) {
       case 'primary':
         return {
-          backgroundColor: opacity(defaultForeground, 0.2),
+          backgroundColor: withAlpha(defaultForeground, 0.2),
           borderColor: 'transparent',
         };
       case 'secondary':
         return {
-          backgroundColor: opacity(defaultForeground, 0.2),
+          backgroundColor: withAlpha(defaultForeground, 0.2),
           borderColor: 'transparent',
         };
       case 'warning':
         return {
-          backgroundColor: opacity(danger, 0.2),
+          backgroundColor: withAlpha(danger, 0.2),
           borderColor: 'transparent',
         };
       case 'error':
         return {
-          backgroundColor: opacity(danger, 0.2),
+          backgroundColor: withAlpha(danger, 0.2),
           borderColor: 'transparent',
         };
       case 'success':
         return {
-          backgroundColor: opacity(green500, 0.2),
+          backgroundColor: withAlpha(green500, 0.2),
           borderColor: 'transparent',
         };
       case 'star':
         return {
-          backgroundColor: opacity(warning, 0.2),
+          backgroundColor: withAlpha(warning, 0.2),
           borderColor: 'transparent',
         };
       default:
         return {
-          backgroundColor: opacity(defaultForeground, 0.2),
+          backgroundColor: withAlpha(defaultForeground, 0.2),
           borderColor: 'transparent',
         };
     }
@@ -247,7 +247,7 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
       justify="center"
       align="center"
       blur
-      colorBlur={opacity(textColor, 0.2)}
+      colorBlur={withAlpha(textColor, 0.2)}
       style={{
         ...variantStyles,
         paddingHorizontal: isIconOnly ? 0 : 10, // px-2.5 equivalent

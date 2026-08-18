@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { ActionSheetIOS, StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -34,7 +34,7 @@ export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactE
       styles.pill,
       {
         backgroundColor: surfaceSecondary,
-        borderColor: opacity(muted, 0.3),
+        borderColor: withAlpha(muted, 0.3),
         minHeight: iosHeight,
       },
     ],

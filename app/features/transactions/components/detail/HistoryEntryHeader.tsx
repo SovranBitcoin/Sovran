@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 
 import { HistoryEntry } from '@cashu/coco-core';
 import { getCounterparty } from 'wallet';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
@@ -138,7 +138,11 @@ export function HistoryEntryHeader({
               borderWidth: 2,
               borderColor: background,
             }}>
-            <Icon name={overlayIcon} color={opacity(foreground, 0.9)} size={iconOverlaySize - 8} />
+            <Icon
+              name={overlayIcon}
+              color={withAlpha(foreground, 0.9)}
+              size={iconOverlaySize - 8}
+            />
           </View>
         </View>
       );
@@ -156,7 +160,7 @@ export function HistoryEntryHeader({
       <View className="scale-125 transform p-4">
         <Icon
           name={isSend ? 'fluent:arrow-upload-16-filled' : 'fluent:arrow-download-16-filled'}
-          color={opacity(foreground, 0.9)}
+          color={withAlpha(foreground, 0.9)}
           size={28}
         />
       </View>
@@ -185,7 +189,7 @@ export function HistoryEntryHeader({
               color={isReceive ? success : danger}
             />
           </HStack>
-          <Text overpass size={18} color={opacity(foreground, 0.9)} bold>
+          <Text overpass size={18} color={withAlpha(foreground, 0.9)} bold>
             {formatAmount(
               { amount: Math.abs(numericAmount), unit },
               {

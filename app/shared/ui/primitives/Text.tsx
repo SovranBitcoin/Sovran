@@ -8,7 +8,7 @@ import {
   type LayoutChangeEvent,
   type ViewStyle,
 } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -234,7 +234,7 @@ export function Text({ loading, size = 14, italic = false, ...props }: CustomTex
   // ambient "stuff is loading" rather than a row of bold rectangles. The
   // foreground color (theme-aware) ensures it remains visible on any
   // background tint.
-  const loadingColor = opacity(foreground, 0.07);
+  const loadingColor = withAlpha(foreground, 0.07);
 
   if (loading) {
     return (

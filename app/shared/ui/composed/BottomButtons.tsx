@@ -5,7 +5,7 @@ import { BlurView, BlurTint } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { easeGradient } from 'react-native-easing-gradient';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -106,9 +106,9 @@ export function BottomButtons({
     () =>
       resolvedGradientColor
         ? ([
-            opacity(resolvedGradientColor, 0),
-            opacity(resolvedGradientColor, 0.75),
-            opacity(resolvedGradientColor, 1),
+            withAlpha(resolvedGradientColor, 0),
+            withAlpha(resolvedGradientColor, 0.75),
+            withAlpha(resolvedGradientColor, 1),
           ] as const)
         : null,
     [resolvedGradientColor]

@@ -10,7 +10,7 @@
 import React, { useMemo, useRef, type RefObject } from 'react';
 import { FlatList, Text, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -43,8 +43,8 @@ function PillTabItem<F extends string>({
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
 
   // Pre-compute colors on JS thread so they can be used safely in worklets
-  const pressedBg = useMemo(() => opacity(surfaceTertiary, 0.6), [surfaceTertiary]);
-  const activeBg = useMemo(() => opacity(surfaceTertiary, 0.5), [surfaceTertiary]);
+  const pressedBg = useMemo(() => withAlpha(surfaceTertiary, 0.6), [surfaceTertiary]);
+  const activeBg = useMemo(() => withAlpha(surfaceTertiary, 0.5), [surfaceTertiary]);
 
   const rStyle = useAnimatedStyle(() => {
     return {

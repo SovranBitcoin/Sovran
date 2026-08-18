@@ -19,7 +19,7 @@ import type { MintRow } from '@/features/mint/hooks/useMintRowsWithCache';
 
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
@@ -229,7 +229,7 @@ export const MintListScreen = memo(function MintListScreen({
 
   const emptyComponent = useMemo(
     () => (
-      <Text style={{ color: opacity(foreground, 0.66), textAlign: 'center', marginTop: 20 }}>
+      <Text style={{ color: withAlpha(foreground, 0.66), textAlign: 'center', marginTop: 20 }}>
         {selectedCurrency === 'ALL'
           ? 'No mints available'
           : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}

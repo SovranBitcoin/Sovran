@@ -24,7 +24,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useLifecycleLogger, log } from '@/shared/lib/logger';
 import { refreshCatalog } from '@/shared/lib/wallpaperSync';
 import { STAT_COLOR_SOCIAL, STAT_ICONS } from '@/shared/ui/composed/RowStatsAccent';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { UnitPreviewCard } from '@/features/theme/components/UnitPreviewCard';
 import { useThemeDraft } from '@/features/theme/lib/themeDraft';
 import {
@@ -142,7 +142,7 @@ function SectionHeader({ topic, author }: { topic: string; author: AlbumAuthor |
           </PressableFeedback>
         ) : null}
         <VStack style={{ flex: 1 }}>
-          <Text size={13} medium style={{ color: opacity(foreground, 0.5), letterSpacing: 1.5 }}>
+          <Text size={13} medium style={{ color: withAlpha(foreground, 0.5), letterSpacing: 1.5 }}>
             {topic.toUpperCase()}
           </Text>
           {author?.displayName ? (
@@ -154,7 +154,7 @@ function SectionHeader({ topic, author }: { topic: string; author: AlbumAuthor |
                   </Text>
                   {author.followers ? (
                     <>
-                      <Text size={9} style={{ color: opacity(foreground, 0.15) }}>
+                      <Text size={9} style={{ color: withAlpha(foreground, 0.15) }}>
                         {'•'}
                       </Text>
                       <HStack style={{ alignItems: 'center', gap: 3 }}>

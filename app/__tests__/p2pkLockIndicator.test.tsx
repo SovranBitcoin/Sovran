@@ -9,9 +9,9 @@ import { hasP2PKLock, P2PKLockIndicator } from '@/features/send/components/P2PKL
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-jest.mock('hex-color-opacity', () => ({
-  __esModule: true,
-  default: (color: string) => color,
+jest.mock('@/shared/lib/color', () => ({
+  ...jest.requireActual('@/shared/lib/color'),
+  withAlpha: (color: string) => color,
 }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | string[]) =>

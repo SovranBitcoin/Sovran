@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -28,7 +28,7 @@ export function CircleActionButtonFlat(props: CircleActionButtonProps): React.Re
           styles.circle,
           {
             backgroundColor: surfaceSecondary,
-            borderColor: opacity(muted, 0.3),
+            borderColor: withAlpha(muted, 0.3),
           },
           pressed && interactive ? { opacity: 0.8 } : null,
         ]}

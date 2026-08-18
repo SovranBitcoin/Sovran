@@ -3,7 +3,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet } from 'react
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Image } from 'expo-image';
 import { Button, Card } from 'heroui-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import Icon from 'assets/icons';
 
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
@@ -58,7 +58,10 @@ function statusInfo(
 function StatusPill({ state, colors }: { state: BlobDeleteState; colors: StatusColors }) {
   const { label, color, spinner } = statusInfo(state, colors);
   return (
-    <HStack align="center" gap={6} style={[styles.pill, { backgroundColor: opacity(color, 0.14) }]}>
+    <HStack
+      align="center"
+      gap={6}
+      style={[styles.pill, { backgroundColor: withAlpha(color, 0.14) }]}>
       {spinner ? <ActivityIndicator size="small" color={color} /> : null}
       <Text size={11} style={{ color, fontWeight: '600' }}>
         {label}

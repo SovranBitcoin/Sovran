@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -56,7 +56,10 @@ export function CircleActionButtonShell({
       ]}>
       {children}
       {label ? (
-        <Text size={12} weight="medium" style={[styles.label, { color: opacity(foreground, 0.7) }]}>
+        <Text
+          size={12}
+          weight="medium"
+          style={[styles.label, { color: withAlpha(foreground, 0.7) }]}>
           {label}
         </Text>
       ) : null}

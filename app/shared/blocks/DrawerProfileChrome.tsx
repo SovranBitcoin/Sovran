@@ -11,7 +11,7 @@ import React, { useCallback, useMemo, useRef } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { nip19 } from 'nostr-tools';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -224,7 +224,7 @@ export const DrawerProfileChrome = React.memo(function DrawerProfileChrome({
     return '';
   }, [metadata?.nip05, pubkey]);
 
-  const mutedColor = opacity(foreground, alpha.disabled);
+  const mutedColor = withAlpha(foreground, alpha.disabled);
 
   const handleAvatarPress = useCallback(() => {
     if (!nostrKeys?.pubkey) return;

@@ -18,7 +18,7 @@ import {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import {
   LIGHTNING_PALETTES,
@@ -223,7 +223,7 @@ export function NutDropCelebrationCanvas({
   const boltOpacities = [boltPrimary, boltSecondary];
   const bloomRadius = Math.max(fieldSize.width, fieldSize.height) * 0.75;
   const bloomGradientColors = useMemo(
-    () => [opacity(outerGlow, op(0.5)), opacity(outerGlow, 0)],
+    () => [withAlpha(outerGlow, op(0.5)), withAlpha(outerGlow, 0)],
     [outerGlow]
   );
 

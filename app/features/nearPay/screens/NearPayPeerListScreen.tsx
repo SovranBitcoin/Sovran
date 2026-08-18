@@ -5,7 +5,7 @@ import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import type { BLEPeer } from 'bitchat-module';
 import { usePaymentFlowMachine } from 'wallet/react';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
@@ -54,14 +54,14 @@ function peerHasValidCreq(peer: Pick<BLEPeer, 'creq' | 'nostrPubkeyHex'>): boole
 function WaitingTag() {
   const [foreground] = useThemeColor(['foreground'] as const);
   const tagStyle = useMemo(
-    () => [styles.bearerTag, { backgroundColor: opacity(foreground, 0.08) }],
+    () => [styles.bearerTag, { backgroundColor: withAlpha(foreground, 0.08) }],
     [foreground]
   );
-  const tagTextStyle = useMemo(() => ({ color: opacity(foreground, 0.55) }), [foreground]);
+  const tagTextStyle = useMemo(() => ({ color: withAlpha(foreground, 0.55) }), [foreground]);
 
   return (
     <HStack align="center" gap={4} style={tagStyle}>
-      <Icon name="mdi:lock-open-variant-outline" size={12} color={opacity(foreground, 0.55)} />
+      <Icon name="mdi:lock-open-variant-outline" size={12} color={withAlpha(foreground, 0.55)} />
       <Text size={11} style={tagTextStyle}>
         Waiting
       </Text>
@@ -151,17 +151,17 @@ export function NearPayPeerListScreen() {
     [headerHeight]
   );
   const summaryStyle = useMemo(
-    () => [styles.summary, { borderBottomColor: opacity(foreground, 0.08) }],
+    () => [styles.summary, { borderBottomColor: withAlpha(foreground, 0.08) }],
     [foreground]
   );
-  const summaryTextStyle = useMemo(() => ({ color: opacity(foreground, 0.6) }), [foreground]);
-  const emptyIconColor = useMemo(() => opacity(foreground, 0.3), [foreground]);
+  const summaryTextStyle = useMemo(() => ({ color: withAlpha(foreground, 0.6) }), [foreground]);
+  const emptyIconColor = useMemo(() => withAlpha(foreground, 0.3), [foreground]);
   const emptyTitleStyle = useMemo(
-    () => ({ color: opacity(foreground, 0.5), textAlign: 'center' as const }),
+    () => ({ color: withAlpha(foreground, 0.5), textAlign: 'center' as const }),
     [foreground]
   );
   const emptyTextStyle = useMemo(
-    () => ({ color: opacity(foreground, 0.35), textAlign: 'center' as const }),
+    () => ({ color: withAlpha(foreground, 0.35), textAlign: 'center' as const }),
     [foreground]
   );
 

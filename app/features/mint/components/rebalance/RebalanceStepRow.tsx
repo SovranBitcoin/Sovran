@@ -13,7 +13,7 @@
  */
 
 import React, { useEffect, useMemo } from 'react';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -110,8 +110,8 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
 }) => {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
   const primaryColor0 = foreground;
-  const primaryColor300 = useMemo(() => opacity(foreground, 0.5), [foreground]);
-  const primaryColor400 = useMemo(() => opacity(foreground, 0.4), [foreground]);
+  const primaryColor300 = useMemo(() => withAlpha(foreground, 0.5), [foreground]);
+  const primaryColor400 = useMemo(() => withAlpha(foreground, 0.4), [foreground]);
   const primaryColor700 = surfaceTertiary;
 
   const fromName = getMintDisplayName(fromMintUrl, fromMintInfo);

@@ -25,7 +25,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { BottomSheet } from 'heroui-native';
 import * as Clipboard from 'expo-clipboard';
-import opacity from 'hex-color-opacity';
+import { withAlpha } from '@/shared/lib/color';
 import Icon, { CurrencyIcon } from 'assets/icons';
 
 import { encode } from '@/shared/lib/third-party/emoji';
@@ -189,7 +189,7 @@ function EmojiSearchField({
             onPress={onClear}
             hitSlop={8}
             style={{ position: 'absolute', right: 10, padding: 4 }}>
-            <Icon name="mdi:close-circle" size={18} color={opacity(foreground, 0.33)} />
+            <Icon name="mdi:close-circle" size={18} color={withAlpha(foreground, 0.33)} />
           </Pressable>
         ) : null}
       </View>
@@ -353,7 +353,7 @@ export function EmojiPickerContent({
         <View
           testID="emoji-picker-no-results"
           style={{ alignItems: 'center', paddingVertical: 32 }}>
-          <Text style={{ color: opacity(foreground, 0.4), fontSize: 14 }}>No emoji found</Text>
+          <Text style={{ color: withAlpha(foreground, 0.4), fontSize: 14 }}>No emoji found</Text>
         </View>
       );
     }
