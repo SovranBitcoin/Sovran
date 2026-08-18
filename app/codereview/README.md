@@ -20,12 +20,11 @@ codereview/
 ├── log-doctor/          # session-log preprocessing for LLM debugging
 │   ├── index.ts               # CLI dispatch + 18 modes
 │   └── test-dsl/              # phone-test runner used by `phone` mode
-└── shared/              # ignore lists, source utils, walker, ANSI, args
+└── shared/              # ignore lists, source utils, walker, ANSI
     ├── ignore.mjs       # IGNORE_DIRS, IGNORE_FILES, TS_EXTS, isTestPath
-    ├── walk.mjs         # walkFiles
+    ├── walk.mjs         # walkFiles (lookalikes only)
     ├── source.mjs       # stripCodeNoise, findMatchingBrace, line-index helpers
-    ├── ansi.mjs         # dim/bold/yellow/red/green/cyan/magenta
-    └── args.mjs         # getNumericArg, getStringArg
+    └── ansi.mjs         # dim/bold/yellow/green/cyan (lookalikes only)
 ```
 
 `bun run audit`, `bun run fix`, `bun run optimize`, `bun run analyze-structure`,

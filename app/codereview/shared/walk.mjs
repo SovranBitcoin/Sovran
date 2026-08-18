@@ -1,5 +1,6 @@
 /**
- * File-system walker shared by analyze-structure and lookalikes.
+ * File-system walker for lookalikes. (analyze-structure has its own inline
+ * walker; the two share only the ignore lists below.)
  * Honours IGNORE_DIRS / IGNORE_FILES / TS_EXTS from ./ignore.mjs.
  */
 

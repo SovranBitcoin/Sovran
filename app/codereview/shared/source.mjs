@@ -52,7 +52,3 @@ export function lineOf(offsets, idx) {
   }
   return lo + 1;
 }
-
-export function readRange(src, start, end) {
-  return src.slice(start, end);
-}

@@ -54,8 +54,8 @@ import { join, relative, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 import { walkFiles } from '../shared/walk.mjs';
-import { stripCodeNoise, buildLineIndex, lineOf, readRange } from '../shared/source.mjs';
-import { dim, bold, yellow, red, green, cyan } from '../shared/ansi.mjs';
+import { stripCodeNoise, buildLineIndex, lineOf } from '../shared/source.mjs';
+import { dim, bold, yellow, green, cyan } from '../shared/ansi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -611,8 +611,8 @@ function levenshtein(a, b, max = Infinity) {
 }
 
 // ─── Reports ─────────────────────────────────────────────────────────────────
-// ANSI color helpers (dim/bold/yellow/red/green/cyan/magenta) are imported
-// from ../shared/ansi.mjs.
+// ANSI color helpers (dim/bold/yellow/green/cyan) are imported from
+// ../shared/ansi.mjs.
 
 function rel(p) {
   return relative(targetDir, p);
