@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
 import { redactError, storeLog } from '@/shared/lib/logger';
+import { sensitiveFieldKind } from '@/shared/lib/sensitiveFieldNames';
 
 const GLOBAL_ZUSTAND_STORE_KEYS = [
   'settings-store',
@@ -288,45 +289,12 @@ function redactString(s: string): string {
     .replace(LIGHTNING_INVOICE_PATTERN, '<REDACTED:lightning-invoice>');
 }
 
-function normalizeFieldName(name: string): string {
-  return name.replace(/[^a-z0-9]/gi, '').toLowerCase();
-}
-
-function sensitiveStorageKind(fieldName: string): string | null {
-  const normalized = normalizeFieldName(fieldName);
-  if (
-    normalized === 'secret' ||
-    normalized === 'nsec' ||
-    normalized.endsWith('nsec') ||
-    normalized === 'privkey' ||
-    normalized.endsWith('privatekey') ||
-    normalized.endsWith('privatekeyhex') ||
-    normalized.endsWith('secretkey') ||
-    normalized.endsWith('signerkey') ||
-    normalized.endsWith('xpriv')
-  ) {
-    return 'private-key';
-  }
-  if (
-    normalized === 'mnemonic' ||
-    normalized.endsWith('mnemonic') ||
-    normalized === 'seed' ||
-    normalized.endsWith('seed') ||
-    normalized.endsWith('seedhex') ||
-    normalized.endsWith('passphrase') ||
-    normalized.endsWith('password')
-  ) {
-    return 'secret';
-  }
-  return null;
-}
-
 function isSensitiveStorageField(fieldName: string): boolean {
-  return sensitiveStorageKind(fieldName) !== null;
+  return sensitiveFieldKind(fieldName) !== null;
 }
 
 function redactSensitiveStorageValue(value: unknown, fieldName: string): string {
-  const kind = sensitiveStorageKind(fieldName) ?? 'secret';
+  const kind = sensitiveFieldKind(fieldName) ?? 'secret';
   if (typeof value === 'string') {
     const redacted = redactString(value);
     if (redacted !== value && redacted.startsWith('<REDACTED:')) {

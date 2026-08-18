@@ -89,6 +89,34 @@ describe('redactStorageDump', () => {
     expect(legacy.keys.publicKeyHex).toBe('a'.repeat(64));
   });
 
+  it('redacts bearer-credential fields by key name, not just by value shape', () => {
+    // The dump path used to carry its own field list, which never learned about
+    // `token`/`authorization`. A credential whose value did not match one of the
+    // bearer-instrument value patterns therefore reached Share.share in the clear.
+    const out = redactStorageDump({
+      'some-api-store': {
+        accessToken: 'opaque-service-credential-not-a-cashu-token',
+        authorization: 'Bearer abc123',
+        refreshToken: 'rt_abc123',
+        endpoint: 'https://example.com',
+      },
+    });
+    const store = out['some-api-store'] as Record<string, string>;
+    expect(store.accessToken).toBe('<REDACTED:secret>');
+    expect(store.authorization).toBe('<REDACTED:secret>');
+    expect(store.refreshToken).toBe('<REDACTED:secret>');
+    expect(store.endpoint).toBe('https://example.com');
+  });
+
+  it('still brands a cashu token by its value, not the generic field kind', () => {
+    const out = redactStorageDump({
+      'nut-drop-redeem-queue': { token: 'cashuAeyJ0b2tlbiI6' + 'x'.repeat(40) },
+    });
+    expect((out['nut-drop-redeem-queue'] as { token: string }).token).toBe(
+      '<REDACTED:cashu-token>'
+    );
+  });
+
   it('preserves non-sensitive primitive values unchanged', () => {
     const out = redactStorageDump({
       'settings-store': { theme: 'dark', count: 42, enabled: true, deleted: null },

@@ -23,6 +23,8 @@
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
+import { sensitiveFieldKind as sensitiveFieldNameKind } from './sensitiveFieldNames';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
@@ -398,45 +400,11 @@ function summarizeString(s: string, maxLen: number): Compact {
   return { _kind: c.name, len: s.length, preview: s.slice(0, 32) + '…' };
 }
 
-function normalizeFieldName(name: string): string {
-  return name.replace(/[^a-z0-9]/gi, '').toLowerCase();
-}
-
+// The logger brands raw key material `private_key`; the shared vocabulary
+// spells that kind `private-key` for the storage dump's `<REDACTED:…>` form.
 function sensitiveFieldKind(fieldName: string): string | null {
-  const normalized = normalizeFieldName(fieldName);
-  if (
-    normalized === 'secret' ||
-    normalized === 'nsec' ||
-    normalized.endsWith('nsec') ||
-    normalized === 'privkey' ||
-    normalized.endsWith('privatekey') ||
-    normalized.endsWith('privatekeyhex') ||
-    normalized.endsWith('secretkey') ||
-    normalized.endsWith('signerkey')
-  ) {
-    return 'private_key';
-  }
-  if (
-    normalized === 'mnemonic' ||
-    normalized.endsWith('mnemonic') ||
-    normalized === 'seed' ||
-    normalized.endsWith('seed') ||
-    normalized.endsWith('seedhex') ||
-    normalized.endsWith('xpriv') ||
-    normalized.endsWith('passphrase') ||
-    normalized.endsWith('password')
-  ) {
-    return 'secret';
-  }
-  if (
-    normalized === 'token' ||
-    normalized.endsWith('token') ||
-    normalized === 'authorization' ||
-    normalized.endsWith('authorization')
-  ) {
-    return 'secret';
-  }
-  return null;
+  const kind = sensitiveFieldNameKind(fieldName);
+  return kind === 'private-key' ? 'private_key' : kind;
 }
 
 function compactSensitiveField(value: unknown, fieldName: string | undefined): unknown | undefined {
