@@ -34,6 +34,7 @@ import { persist, subscribeWithSelector } from 'zustand/middleware';
 
 import { transformAuditData } from '@/features/mint/lib/auditInfo';
 import type { AuditMintResponse, DiscoverMint } from '@/shared/lib/apiClient';
+import { evictLruOverCap } from '@/shared/lib/cache/evictLruOverCap';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -178,19 +179,8 @@ function lastTouched(entry: MintMetadataEntry): number {
 }
 
 function evictIfOverCap(byMintUrl: Record<string, MintMetadataEntry>): void {
-  const keys = Object.keys(byMintUrl);
-  if (keys.length <= MAX_ENTRIES) return;
-  // Always evict at least the overflow so a bulk discover/migration write can't
-  // leave the map permanently over cap; round up to a 10% batch so steady-state
-  // single-entry writes don't re-sort and trim one at a time at the boundary.
-  const overflow = keys.length - MAX_ENTRIES;
-  const evictCount = Math.max(overflow, Math.floor(MAX_ENTRIES * 0.1));
-  const sorted = keys.sort((a, b) => lastTouched(byMintUrl[a]) - lastTouched(byMintUrl[b]));
-  for (let i = 0; i < evictCount; i++) delete byMintUrl[sorted[i]];
-  storeLog.debug('store.mint_metadata.evicted', {
-    evicted: evictCount,
-    remaining: Object.keys(byMintUrl).length,
-  });
+  const trimmed = evictLruOverCap(byMintUrl, MAX_ENTRIES, lastTouched);
+  if (trimmed) storeLog.debug('store.mint_metadata.evicted', trimmed);
 }
 
 /** Identity convenience scalars projected from a raw NUT-06 blob. */

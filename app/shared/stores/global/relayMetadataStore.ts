@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { evictLruOverCap } from '@/shared/lib/cache/evictLruOverCap';
 import { storeLog } from '@/shared/lib/logger';
 import {
   fetchRelayInformation,
@@ -74,18 +75,8 @@ function lastTouched(entry: RelayMetadataEntry): number {
 }
 
 function evictIfOverCap(byRelayUrl: Record<string, RelayMetadataEntry>): void {
-  const keys = Object.keys(byRelayUrl);
-  if (keys.length <= MAX_ENTRIES) return;
-  // Evict at least the overflow; round up to a 10% batch so steady-state
-  // single-entry writes don't re-sort and trim one at a time at the boundary.
-  const overflow = keys.length - MAX_ENTRIES;
-  const evictCount = Math.max(overflow, Math.floor(MAX_ENTRIES * 0.1));
-  const sorted = keys.sort((a, b) => lastTouched(byRelayUrl[a]) - lastTouched(byRelayUrl[b]));
-  for (let i = 0; i < evictCount; i++) delete byRelayUrl[sorted[i]];
-  storeLog.debug('store.relay_metadata.evicted', {
-    evicted: evictCount,
-    remaining: Object.keys(byRelayUrl).length,
-  });
+  const trimmed = evictLruOverCap(byRelayUrl, MAX_ENTRIES, lastTouched);
+  if (trimmed) storeLog.debug('store.relay_metadata.evicted', trimmed);
 }
 
 export const useRelayMetadataStore = create<RelayMetadataState>()(

@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { evictLruOverCap } from '@/shared/lib/cache/evictLruOverCap';
 import { log, storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { MempoolAddressStatsSchema, type MempoolAddressStats } from 'wallet';
@@ -48,17 +49,6 @@ function summarizeAddress(address: string): Record<string, unknown> {
   return { addressLength: address.trim().length };
 }
 
-function evictIfOverCap(byAddress: Record<string, MempoolAddressCacheEntry>): void {
-  if (Object.keys(byAddress).length <= MAX_ENTRIES) return;
-  const evictCount = Math.max(1, Math.floor(MAX_ENTRIES * 0.1));
-  const sorted = Object.entries(byAddress).sort((a, b) => a[1].fetchedAt - b[1].fetchedAt);
-  for (let i = 0; i < evictCount; i++) delete byAddress[sorted[i][0]];
-  storeLog.debug('store.mempool_address.evicted', {
-    evicted: evictCount,
-    remaining: Object.keys(byAddress).length,
-  });
-}
-
 export const useMempoolAddressCache = create<MempoolAddressCacheState>()(
   persist(
     (set) => ({
@@ -91,7 +81,8 @@ export const useMempoolAddressCache = create<MempoolAddressCacheState>()(
             ...state.byAddress,
             [key]: { stats: mergedStats, fetchedAt: Date.now() },
           };
-          evictIfOverCap(next);
+          const trimmed = evictLruOverCap(next, MAX_ENTRIES, (entry) => entry.fetchedAt);
+          if (trimmed) storeLog.debug('store.mempool_address.evicted', trimmed);
           storeLog.debug('store.mempool_address.set', {
             ...summarizeAddress(address),
             confirmedTxCount: mergedStats.chain_stats.tx_count,

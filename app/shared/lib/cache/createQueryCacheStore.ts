@@ -20,6 +20,7 @@ import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStor
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { currentCacheEpoch } from './cacheSession';
+import { evictLruOverCap } from './evictLruOverCap';
 import type { QueryCacheEntry } from './queryCacheTypes';
 
 interface QueryCacheStoreOptions {
@@ -102,20 +103,6 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
 
   storeLog.info('query_cache.create', logCtx);
 
-  function evictIfOverCap(byKey: Record<string, QueryCacheEntry<TData>>): void {
-    const keys = Object.keys(byKey);
-    if (keys.length <= maxEntries) return;
-    const evictCount = Math.max(1, Math.floor(maxEntries * 0.1));
-    const sorted = Object.entries(byKey).sort((a, b) => a[1].fetchedAt - b[1].fetchedAt);
-    for (let i = 0; i < evictCount; i++) delete byKey[sorted[i][0]];
-    storeLog.warn('query_cache.evict_lru', {
-      ...logCtx,
-      beforeCount: keys.length,
-      evictCount,
-      afterCount: Object.keys(byKey).length,
-    });
-  }
-
   const creator: StateCreator<QueryCacheState<TData>> = (set) => ({
     byKey: {},
     setEntry: (key, data, meta) => {
@@ -129,7 +116,15 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
             ...(meta.cursor ? { cursor: meta.cursor } : {}),
           },
         };
-        evictIfOverCap(next);
+        const trimmed = evictLruOverCap(next, maxEntries, (entry) => entry.fetchedAt);
+        if (trimmed) {
+          storeLog.warn('query_cache.evict_lru', {
+            ...logCtx,
+            beforeCount: trimmed.evicted + trimmed.remaining,
+            evictCount: trimmed.evicted,
+            afterCount: trimmed.remaining,
+          });
+        }
         storeLog.debug('query_cache.entry.set', {
           ...logCtx,
           ...keyMeta(key),
