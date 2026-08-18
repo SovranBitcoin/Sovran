@@ -149,7 +149,6 @@ export function LiquidChatComposer({
 
   const trimmedHasText = value.trim().length > 0;
   const canSend = trimmedHasText && !disabled;
-  const isEmpty = value.length === 0;
   const { liquidGlass: useNativeGlass } = useCapabilities();
 
   // Stable namespace id for `glassEffectId(_:in:)` matched-geometry. `useId`

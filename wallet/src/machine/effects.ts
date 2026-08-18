@@ -9,7 +9,6 @@ import type {
   FlowContext,
   MachineOperations,
   MeltQuotePreview,
-  MintQuoteMethod,
   NotificationHandlerMap,
   NfcIOAdapter,
   RecipientProfile,

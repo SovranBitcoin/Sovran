@@ -276,7 +276,6 @@ export const PostCard = React.memo(function PostCard({
   // Pre-compute opacity color styles to avoid inline object creation
   const textPrimary = { color: opacity(foreground, 0.9) };
   const textMuted = { color: opacity(foreground, 0.4) };
-  const textDimmed = { color: opacity(foreground, 0.3) };
 
   // Entry animation — only for feed variant on initial load
   const shouldAnimate = isFeed && !skipAnimation;

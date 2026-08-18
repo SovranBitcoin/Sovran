@@ -259,12 +259,6 @@ function findFirstButtonDescendant(node: AXNode): AXNode | null {
   return null;
 }
 
-function countDescendantButtons(node: AXNode): number {
-  let n = node.type === 'XCUIElementTypeButton' ? 1 : 0;
-  if (node.children) for (const c of node.children) n += countDescendantButtons(c);
-  return n;
-}
-
 interface NavBackHit {
   button: AXNode;
   centerX: number;

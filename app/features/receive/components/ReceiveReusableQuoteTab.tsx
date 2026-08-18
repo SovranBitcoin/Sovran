@@ -108,7 +108,7 @@ export const ReceiveReusableQuoteTab = memo(function ReceiveReusableQuoteTab({
   // (which create their own fresh reusable quotes) can never displace it.
   // `subscribe` lets the hook pick up EXTERNAL rotations (the global
   // deposit-received listener retiring a paid onchain address).
-  const { quote, isLoading, error, rotate } = useReusableMintQuote(
+  const { quote, error, rotate } = useReusableMintQuote(
     methodMint && mintSupports ? { mintUrl: methodMint, method, unit } : null,
     standingQuoteIdentityStore
   );

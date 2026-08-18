@@ -1,6 +1,5 @@
 import type { HistoryEntry } from '@cashu/coco-core';
 import { isMintQuotePaymentObserved } from 'wallet';
-import type { MempoolAddressSummary } from 'wallet';
 
 import {
   getMintQuotePaymentValue,
@@ -28,20 +27,6 @@ describe('isMintQuotePaymentObserved', () => {
 });
 
 describe('mint quote screen presentation', () => {
-  const emptySummary: MempoolAddressSummary = {
-    address: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
-    confirmedTxCount: 0,
-    confirmedReceivedSats: 0,
-    confirmedBalanceSats: 0,
-    confirmedFundingConfirmations: null,
-    unconfirmedTxCount: 0,
-    unconfirmedReceivedSats: 0,
-    unconfirmedNetSats: 0,
-    totalReceivedSats: 0,
-    explorerUrl: 'https://mempool.space/address/bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
-    transactionExplorerUrl: null,
-  };
-
   it('encodes onchain mint quotes as BIP321 with the requested amount', () => {
     const address = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080';
 

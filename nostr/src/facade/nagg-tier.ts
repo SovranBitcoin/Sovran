@@ -28,7 +28,6 @@ import {
   bundleFromFeedPage,
   type FeedBundle,
   type FeedPageRequest,
-  type FeedSpec,
 } from './feed';
 import { bundleFromThread, type ThreadBundle, type ThreadRequest } from './thread';
 import {

@@ -12,7 +12,7 @@ import { LiquidGlassText } from 'liquid-glass-text';
 import type { GlassVariant } from 'liquid-glass-text';
 
 import { formatAmount } from '@/shared/lib/currency';
-import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
+import { type AmountValue } from '@/shared/lib/cashu/amount';
 import { Log, paymentLog } from '@/shared/lib/logger';
 import { cn } from '@/shared/lib/utils';
 import { useCapabilities } from '@/shared/ui/capability';
@@ -107,7 +107,6 @@ export function AmountFormatter({
   const foreground = useThemeColor('foreground');
   const storedDisplayPreference = useSettingsStore((state) => state.getDisplayBtc());
   const displayBtc = displayPreference ?? storedDisplayPreference;
-  const numericAmount = amountToNumber(amount);
 
   const decorated = decorate(
     formatAmount({ amount, unit }, { useUserPreference: true, displayPreference: displayBtc }),

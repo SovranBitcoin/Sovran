@@ -45,7 +45,6 @@ import {
   type ScrollUntilStep,
   type SetClipboardStep,
   type SnapshotStep,
-  type SourcePos,
   type StableStep,
   type StageDef,
   type Step,

@@ -11,7 +11,6 @@
 
 import { logger } from '../logger';
 import {
-  isFiatUnit,
   majorToMinor,
   minorToRawInput,
   unitSymbol as symbolForUnit,

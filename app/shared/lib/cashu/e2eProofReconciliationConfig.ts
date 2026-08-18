@@ -7,11 +7,6 @@ export interface E2EReadyProofAsset {
   unit: string;
 }
 
-interface E2EReadyProofReconciliationConfig {
-  version: 1;
-  assets: E2EReadyProofAsset[];
-}
-
 function normalizeAsset(value: unknown): E2EReadyProofAsset {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('E2E ready-proof asset must be an object');
