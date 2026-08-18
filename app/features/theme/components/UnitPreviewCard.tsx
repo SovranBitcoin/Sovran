@@ -18,12 +18,7 @@ import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
 import { describeImageLoadError } from '@/shared/lib/imageError';
-
-/** A thumbUrl is only usable if it's a real http(s) URL — empty/whitespace/junk
- *  must fall through to the gradient rather than render a blank `<Image>`. */
-function isLikelyImageUrl(url: string | undefined | null): url is string {
-  return typeof url === 'string' && /^https?:\/\/\S+/i.test(url.trim());
-}
+import { isLikelyHttpUrl } from '@/shared/lib/url';
 
 interface UnitPreviewCardProps {
   themeName: string;
@@ -70,7 +65,7 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
   const hasCatalogEntry = !!catalogEntry;
   const hasDownloaded = !!downloaded;
   const hasPalette = !!palette;
-  const remoteThumb = isLikelyImageUrl(rawThumbUrl) ? rawThumbUrl.trim() : undefined;
+  const remoteThumb = isLikelyHttpUrl(rawThumbUrl) ? rawThumbUrl.trim() : undefined;
   const uriSource = downloadedLocalUri ?? remoteThumb;
   const useDownloadedUri =
     hasDownloaded && !!downloadedLocalUri && downloadedLocalUri !== failedUri;

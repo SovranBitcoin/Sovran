@@ -5,10 +5,7 @@ import {
 } from '@/shared/stores/global/wallpaperStore';
 import { fetchWallpaperCatalog } from '@/shared/lib/apiClient';
 import { PUBLIC_KEYS } from '@/shared/lib/constants';
-
-function isLikelyHttpUrl(url: string | undefined | null): url is string {
-  return typeof url === 'string' && /^https?:\/\/\S+/i.test(url.trim());
-}
+import { isLikelyHttpUrl } from '@/shared/lib/url';
 
 /**
  * Refresh the wallpaper catalog from the API. `signal` aborts the fetch

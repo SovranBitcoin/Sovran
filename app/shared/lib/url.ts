@@ -224,3 +224,14 @@ export function getMintDisplayName(url: string, mintInfo?: { name?: string } | n
   });
   return result;
 }
+
+/**
+ * True when `url` is a usable http(s) URL. Catalog-supplied strings arrive as
+ * empty, whitespace, or junk like "null" as often as real URLs, and callers
+ * need those to fall through to a fallback (gradient, placeholder, skipped
+ * download) rather than reach an `<Image>` or a fetch. Deliberately looser than
+ * {@link validateExternalUrl}: no parse, no allowlist — a shape check only.
+ */
+export function isLikelyHttpUrl(url: string | undefined | null): url is string {
+  return typeof url === 'string' && /^https?:\/\/\S+/i.test(url.trim());
+}

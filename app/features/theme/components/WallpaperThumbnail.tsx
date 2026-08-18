@@ -20,13 +20,7 @@ import type { WallpaperCatalogEntry } from '@/shared/stores/global/wallpaperStor
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
 import { describeImageLoadError } from '@/shared/lib/imageError';
-
-/** A thumbUrl is only usable if it's a real http(s) URL — empty strings,
- *  whitespace, or junk like "null" must fall through to the gradient rather
- *  than render a blank `<Image>`. */
-function isLikelyImageUrl(url: string | undefined | null): url is string {
-  return typeof url === 'string' && /^https?:\/\/\S+/i.test(url.trim());
-}
+import { isLikelyHttpUrl } from '@/shared/lib/url';
 
 interface WallpaperThumbnailProps {
   themeName: string;
@@ -66,7 +60,7 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
   const hasEntry = !!entry;
   const hasDownloaded = !!downloaded;
   const hasPalette = !!paletteColors;
-  const remoteThumb = isLikelyImageUrl(rawThumbUrl) ? rawThumbUrl.trim() : undefined;
+  const remoteThumb = isLikelyHttpUrl(rawThumbUrl) ? rawThumbUrl.trim() : undefined;
   const sourceUri = downloadedLocalUri ?? remoteThumb;
   const imageSource = sourceUri && sourceUri !== failedUri ? { uri: sourceUri } : null;
   const hasImageSource = !!imageSource;
