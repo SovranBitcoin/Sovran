@@ -3,16 +3,13 @@
  *
  * This module contains various utility functions used throughout the application,
  * including number formatting, Lightning Network payment request handling,
- * Tailwind CSS class merging utilities,
  * and React provider composition.
  */
 
 import React from 'react';
 
 import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
-import { type ClassValue, clsx } from 'clsx';
 import { decodeBolt11Invoice } from 'wallet';
-import { twMerge } from 'tailwind-merge';
 
 import type { HistoryEntry } from '@cashu/coco-core';
 import { log } from './logger';
@@ -131,36 +128,6 @@ export function getMeltQuoteTimeUntilExpiry(
   if (hours > 0) return `expires in ${hours}h ${minutes}m ${seconds}s`;
   if (minutes > 0) return `expires in ${minutes}m ${seconds}s`;
   return `expires in ${seconds}s`;
-}
-
-/**
- * Utility function to merge Tailwind CSS classes with proper conflict resolution
- *
- * This function combines clsx for conditional class handling and tailwind-merge
- * for intelligent Tailwind CSS class merging. It resolves conflicts by keeping
- * the last conflicting class and removes duplicates.
- *
- * @param inputs - Variable number of class values to merge (strings, objects, arrays, etc.)
- * @returns A merged string of CSS classes with conflicts resolved and duplicates removed
- *
- * @example
- * // Basic usage
- * cn('px-2 py-1', 'px-4') // 'py-1 px-4' (px-2 is overridden by px-4)
- *
- * // Conditional classes
- * cn('text-red-500', { 'text-blue-500': isBlue }) // 'text-blue-500' if isBlue is true
- *
- * // Complex conditional logic
- * cn('base-class', condition && 'conditional-class', isActive && 'active-class')
- *
- * // Arrays and mixed types
- * cn(['class1', 'class2'], { 'class3': true }, 'class4')
- *
- * @see {@link https://github.com/dcastil/tailwind-merge} tailwind-merge documentation
- * @see {@link https://github.com/lukeed/clsx} clsx documentation
- */
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
 }
 
 /**

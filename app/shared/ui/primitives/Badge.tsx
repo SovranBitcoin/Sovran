@@ -43,57 +43,38 @@
 
 import * as React from 'react';
 import { ViewStyle } from 'react-native';
-import { cva, type VariantProps } from 'class-variance-authority';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from './Text';
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@/shared/lib/classNames';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { withAlpha } from '@/shared/lib/color';
 
 /**
- * Badge variant styles using class-variance-authority
+ * Shared badge chrome. Every variant renders the same classes — the visual
+ * difference is entirely in `getVariantStyles` / `getTextColor` below, which
+ * switch on `variant` to pick theme colours.
  *
- * @description
- * Defines the base styling and variant classes for the Badge component.
- * Uses CVA for type-safe variant management with Tailwind CSS classes.
- *
- * **Variants:**
- * - primary: Default theme colors
- * - secondary: Secondary theme colors
- * - warning: Warning/alert colors
- * - error: Error/danger colors
- * - success: Success/positive colors
+ * This was a `cva()` call whose six variant entries were all empty strings, so
+ * it only ever returned this constant. The class list is unchanged from that
+ * call, web-only utilities included.
  */
-const badgeVariants = cva(
-  'rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-  {
-    variants: {
-      variant: {
-        star: '',
-        primary: '',
-        secondary: '',
-        warning: '',
-        error: '',
-        success: '',
-      },
-    },
-    defaultVariants: {
-      variant: 'primary',
-    },
-  }
-);
+const BADGE_CLASS =
+  'rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2';
+
+type BadgeVariant = 'star' | 'primary' | 'secondary' | 'warning' | 'error' | 'success';
 
 /**
  * Props for the Badge component
  *
  * @interface BadgeProps
- * @extends VariantProps<typeof badgeVariants>
  * @description
  * Comprehensive props interface supporting both icon and text content
  * with theme integration and custom styling options.
  */
-interface BadgeProps extends VariantProps<typeof badgeVariants> {
+interface BadgeProps {
+  /** Semantic register; drives the colour switches below. */
+  variant?: BadgeVariant;
   /** Icon name for the badge (optional) */
   icon?: string;
   /** Size of the badge content in pixels (default: 12) */
@@ -243,7 +224,7 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
   return (
     <HStack
       gap={isIconOnly ? 0 : 4}
-      className={cn(badgeVariants({ variant }), className)}
+      className={cn(BADGE_CLASS, className)}
       justify="center"
       align="center"
       blur
@@ -267,10 +248,4 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
   );
 }
 
-/**
- * Exports the Badge component and badge variants
- *
- * @exports Badge - Main Badge component
- * @exports badgeVariants - CVA variant configuration for external use
- */
 export { Badge };

@@ -112,8 +112,6 @@
     "@sovranbitcoin/schemas": "^2.2.0",
     "bitchat-module": "file:./modules/bitchat-module",
     "buffer": "^6.0.3",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
     "coco-cashu-plugin-npc": "3.0.0-rc.20260707.3.1.sha.debd5dd",
     "expo": "^56.0.16",
     "expo-application": "~56.0.3",

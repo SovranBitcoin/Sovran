@@ -7,7 +7,7 @@ import {
   type VisualLayoutConfig,
 } from '@/shared/lib/contentShiftLog';
 import { IS_ANDROID_E2E } from '@/shared/lib/e2e/isAndroidE2E';
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@/shared/lib/classNames';
 
 // NativeWind's `animate-pulse` is a Reanimated opacity loop that never stops
 // while the skeleton is mounted. On an offline screen a skeleton can be mounted

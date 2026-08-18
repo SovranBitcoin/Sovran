@@ -14,7 +14,7 @@ import type { GlassVariant } from 'liquid-glass-text';
 import { formatAmount } from '@/shared/lib/currency';
 import { type AmountValue } from '@/shared/lib/cashu/amount';
 import { Log, paymentLog } from '@/shared/lib/logger';
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@/shared/lib/classNames';
 import { useCapabilities } from '@/shared/ui/capability';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
