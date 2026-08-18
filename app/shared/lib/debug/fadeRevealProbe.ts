@@ -25,7 +25,6 @@ import { log } from '@/shared/lib/logger';
 // session, on first probe-module load.
 if (__DEV__) {
   log.info('visual.fadeprobe.armed', {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     reanimated: (require('react-native-reanimated/package.json') as { version: string }).version,
   });
 }

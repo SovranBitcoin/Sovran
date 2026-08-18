@@ -114,7 +114,6 @@ export function ModelChip() {
       cancelled = true;
     };
     // Mount-only, same rationale as the catalog fetch below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

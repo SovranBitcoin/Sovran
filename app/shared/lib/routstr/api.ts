@@ -274,7 +274,6 @@ function getUserFriendlyErrorMessage(status: number, errorData: ParsedErrorData)
  * paths that need regression tests.
  */
 function routstrStoreState() {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useRoutstrStore } =
     require('@/shared/stores/profile/routstrStore') as typeof import('@/shared/stores/profile/routstrStore');
   return useRoutstrStore.getState();
