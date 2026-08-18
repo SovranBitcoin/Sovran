@@ -476,7 +476,7 @@ Sovran lives inside a workspace checkout of related repos (see [`CLAUDE.md`](../
 
 <!-- code: LICENSE -->
 
-Sovran is licensed under the **Mozilla Public License 2.0**. See [`LICENSE`](./LICENSE) for the full text.
+Sovran is licensed under the **Mozilla Public License 2.0**. See [`LICENSE`](../LICENSE) for the full text.
 
 ---
 
