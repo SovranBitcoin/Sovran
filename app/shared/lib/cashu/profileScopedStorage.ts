@@ -9,27 +9,19 @@
  * Falls back to bare `{name}` only during first-launch bootstrap before
  * a profile entry exists.
  *
- * Also provides `rehydrateProfileStores()` to reset + reload all
- * profile-scoped stores during a profile switch.
- *
  * Migration from old index-based keys lives in
  * `shared/lib/migrations/globalMigrations.ts`.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { unstable_batchedUpdates } from 'react-native';
 import { StateStorage } from 'zustand/middleware';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
-import { log } from '../logger';
 
 /**
- * Module-level flag to prevent persist middleware from writing to storage
- * while we reset store state during a profile switch. Without this, the
- * empty reset state is written to AsyncStorage before rehydrate() can read
- * the real data — permanently destroying the stored profile data.
- *
- * Also used by `withSkippedPersistWrites` to keep runtime-only mutations
- * (e.g. mock-mode demo data injection) out of the persisted blob.
+ * Module-level flag that keeps the persist middleware from writing while a
+ * store is mutated. Raised by `withSkippedPersistWrites` so runtime-only
+ * mutations (e.g. mock-mode demo data injection) stay out of the persisted
+ * blob rather than overwriting the profile's stored data.
  */
 let _skipPersistWrite = false;
 
@@ -150,115 +142,3 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'dm-messages-cache',
   'own-profile-stats-cache',
 ];
-
-/**
- * Reset all profile-scoped stores to their initial state and rehydrate
- * from the new profile's AsyncStorage keys.
- *
- * **Currently unused** — profile switches go through a full app reload
- * (see profileSessionOrchestrator.ts), which rehydrates everything from
- * scratch. Retained for a potential future non-reload switch path.
- *
- * If called, must run AFTER setting the new activeAccountIndex
- * in the profile store and BEFORE inner providers remount.
- */
-async function rehydrateProfileStores(): Promise<void> {
-  // Lazy imports to avoid circular dependencies
-  const { useMintStore } = await import('@/shared/stores/profile/mintStore');
-  const { useMintDistributionStore } =
-    await import('@/shared/stores/profile/mintDistributionStore');
-  const { useRoutstrStore } = await import('@/shared/stores/profile/routstrStore');
-  const { useScanHistoryStore } = await import('@/shared/stores/profile/scanHistoryStore');
-  const { useSearchHistoryStore } = await import('@/shared/stores/profile/searchHistoryStore');
-  const { useRecentPeopleStore } = await import('@/shared/stores/profile/recentPeopleStore');
-  const { useSwapTransactionsStore } =
-    await import('@/shared/stores/profile/swapTransactionsStore');
-  const { useTransactionLocationStore } =
-    await import('@/shared/stores/profile/transactionLocationStore');
-  const { useTransactionDistributionStore } =
-    await import('@/shared/stores/profile/transactionDistributionStore');
-  const { useNostrSocialStore } = await import('@/shared/stores/profile/nostrSocialStore');
-  const { useOwnContentStore } = await import('@/shared/stores/profile/ownContentStore');
-  const { useNpcMintStore } = await import('@/shared/stores/profile/npcMintStore');
-  const { useThemeStore } = await import('@/shared/stores/profile/themeStore');
-  const { useBitchatDmMessagesStore } = await import('@/features/bitchat/stores/bitchatDmMessages');
-  const { useFeedIgnoreStore } = await import('@/features/feed/stores/ignoreStore');
-  const { useNotificationPolicyStore } =
-    await import('@/features/feed/stores/notificationPolicyStore');
-
-  // Reset each store to its initial state. Batched to reduce re-render cascade.
-  // Skip persist writes so the empty reset state doesn't overwrite
-  // the target profile's stored data before rehydrate() can read it.
-  _skipPersistWrite = true;
-  try {
-    unstable_batchedUpdates(() => {
-      useMintStore.setState({ selectedMint: undefined });
-      useMintDistributionStore.setState({ distributions: {} });
-      useRoutstrStore.setState({
-        apiKey: null,
-        balance: null,
-        conversationHistory: [],
-        selectedModel: null,
-        modelsCache: null,
-        sessions: [],
-        currentSessionId: null,
-        isAnonymousMode: false,
-      });
-      useScanHistoryStore.setState({ entries: [] });
-      useSearchHistoryStore.setState({ recentSearches: {} });
-      useRecentPeopleStore.setState({ entries: [] });
-      useSwapTransactionsStore.setState({ groups: {}, quoteIdToGroup: {} });
-      useTransactionLocationStore.setState({ locations: {} });
-      useTransactionDistributionStore.setState({ distributions: {} });
-      useNpcMintStore.setState({
-        mintUrl: undefined,
-        isSyncing: false,
-        isUpdating: false,
-      });
-      useNostrSocialStore.setState({
-        contactsTags: [],
-        contactsContent: '',
-        contactsUpdatedAt: 0,
-        followingPubkeys: {},
-        engagementByEventId: {},
-        deletedRepostOriginalIds: {},
-        optimisticFollowsByPubkey: {},
-        optimisticLikesByEventId: {},
-        optimisticRepostsByEventId: {},
-      });
-      useOwnContentStore.setState({ byId: {} });
-      useThemeStore.setState({
-        _hasHydrated: false,
-        activeAlbumSlug: null,
-        unitWallpapers: {},
-      });
-      useBitchatDmMessagesStore.setState({ byPeer: {} });
-      useFeedIgnoreStore.setState({ ignoredPubkeys: [], ignoredEventIds: [] });
-      useNotificationPolicyStore.setState({ policy: 'STRICT' });
-    });
-  } finally {
-    _skipPersistWrite = false;
-  }
-
-  // Rehydrate from the new profile's AsyncStorage keys
-  await Promise.all([
-    useMintStore.persist.rehydrate(),
-    useMintDistributionStore.persist.rehydrate(),
-    useRoutstrStore.persist.rehydrate(),
-    useScanHistoryStore.persist.rehydrate(),
-    useSearchHistoryStore.persist.rehydrate(),
-    useRecentPeopleStore.persist.rehydrate(),
-    useSwapTransactionsStore.persist.rehydrate(),
-    useTransactionLocationStore.persist.rehydrate(),
-    useTransactionDistributionStore.persist.rehydrate(),
-    useNpcMintStore.persist.rehydrate(),
-    useNostrSocialStore.persist.rehydrate(),
-    useOwnContentStore.persist.rehydrate(),
-    useThemeStore.persist.rehydrate(),
-    useBitchatDmMessagesStore.persist.rehydrate(),
-    useFeedIgnoreStore.persist.rehydrate(),
-    useNotificationPolicyStore.persist.rehydrate(),
-  ]);
-
-  log.info('cashu.storage.rehydrated');
-}
