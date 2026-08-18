@@ -293,7 +293,7 @@ module.exports = defineConfig([
         },
         // `borderWidth: 0.5` (and the directional variants) rounds DOWN
         // to 0 on DPR=1 devices — the border vanishes. Documented in
-        // `../.agents/skills/sovran-ui/references/responsive-scaling.md`.
+        // `skills/sovran-ui/references/responsive-scaling.md`.
         // Use `StyleSheet.hairlineWidth`
         // (== `1 / PixelRatio.get()`, guaranteed to render as exactly
         // one physical pixel on every density). 1pt is also fine if the
@@ -302,11 +302,11 @@ module.exports = defineConfig([
           selector:
             "Property[key.name=/^border(Top|Bottom|Left|Right|Start|End)?Width$/][value.type='Literal'][value.value=0.5]",
           message:
-            '`borderWidth: 0.5` rounds to 0 on DPR=1 devices and the border disappears. Use `StyleSheet.hairlineWidth` (1 physical pixel on every density) or a literal `1`. See ../.agents/skills/sovran-ui/references/responsive-scaling.md.',
+            '`borderWidth: 0.5` rounds to 0 on DPR=1 devices and the border disappears. Use `StyleSheet.hairlineWidth` (1 physical pixel on every density) or a literal `1`. See skills/sovran-ui/references/responsive-scaling.md.',
         },
         // `Date#toLocaleDateString` / `Date#toLocaleTimeString` bypass the
         // canonical date pipeline in `shared/lib/date.ts` (rule:
-        // `../.agents/skills/sovran-data/references/dates.md`). The shared
+        // `skills/sovran-data/references/dates.md`). The shared
         // `formatDate(input, style)` and
         // `formatRelative(input, style)` resolve locale automatically
         // (in-app language override → device locale → `'en'`) and lock the
@@ -318,7 +318,7 @@ module.exports = defineConfig([
         {
           selector: 'MemberExpression[property.name=/^toLocale(Date|Time)String$/]',
           message:
-            "Use `formatDate(input, style)` from '@/shared/lib/date' (or `formatRelative` for relative timestamps). The shared helpers resolve locale automatically and lock the style vocabulary. See ../.agents/skills/sovran-data/references/dates.md for the catalog of styles.",
+            "Use `formatDate(input, style)` from '@/shared/lib/date' (or `formatRelative` for relative timestamps). The shared helpers resolve locale automatically and lock the style vocabulary. See skills/sovran-data/references/dates.md for the catalog of styles.",
         },
       ],
     },

@@ -28,7 +28,7 @@ Principal mobile engineer reviewing a production Expo SDK 56 / RN 0.85
 
 Load before selecting lenses:
 
-- Skills (from `../.agents/skills`): `sovran-quality` (log-doctor + gates),
+- Skills (from `skills/`): `sovran-quality` (log-doctor + gates),
   `sovran-ui` (skeleton/content-shift rules), plus the domain skill matching
   chosen lenses (`sovran-feed`, `sovran-payments`, `sovran-data`,
   `sovran-architecture`).
@@ -184,9 +184,9 @@ finding — detail lives in the report file, never in the ledger.
 - Patterns a loaded skill explicitly sanctions, or gaps already listed in
   `STATE_MACHINE.md` §11.
 - Anything already `wontfix` or on the ledger's "Never flag" list.
-- Suppressed lint findings — with one exception: `react-compiler` /
-  `react-hooks` suppressions are perf-relevant (they disable compilation for
-  the component) and stay in scope for the render-perf lens.
+- Suppressed lint findings — with one exception: `react-hooks` suppressions
+  are perf-relevant (they disable compilation for the component) and stay in
+  scope for the render-perf lens.
 
 ## Ledger template
 

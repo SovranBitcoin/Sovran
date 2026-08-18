@@ -49,7 +49,7 @@ import Constants from 'expo-constants';
 // so any install can redeem giveaway ecash P2PK-locked to its public key. The
 // plugin accepts an nsec or 64-hex string and decodes it. SECURITY: a bundled
 // key is extractable; only lock low-value, rotatable giveaways to it. See
-// ../.agents/skills/sovran-security/references/secure-storage-key-derivation.md.
+// skills/sovran-security/references/secure-storage-key-derivation.md.
 const GIVEAWAY_P2PK_SECRET: string | null =
   typeof Constants.expoConfig?.extra?.giveawayP2pkSecret === 'string' &&
   Constants.expoConfig.extra.giveawayP2pkSecret.length > 0

@@ -53,7 +53,7 @@ bun run docs:preview   # preview the build
 
 - **Expo SDK 56** / **React Native 0.85.3** / **React 19.2.3** / **Hermes**
 - **Bun** as package manager and CI runtime
-- **TypeScript** with `noImplicitOverride`, type-aware ESLint, `eslint-plugin-react-compiler`, `eslint-plugin-react-perf`
+- **TypeScript** with `noImplicitOverride`, type-aware ESLint, `eslint-plugin-react-perf`
 - **Reanimated v4** (legacy `Animated` banned by lint), **Gesture Handler**, **Nitro Modules**, **Worklets**
 - **Zustand** with Zod-validated persistence
 - **Zod v4**; `@sovranbitcoin/schemas` for shared payloads

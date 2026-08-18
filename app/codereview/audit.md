@@ -16,7 +16,7 @@ from source/runtime evidence as `UNVERIFIED`.
 
 ## Required Skills
 
-Load matching root skills from `../.agents/skills` before choosing an entry:
+Load matching root skills from `skills/` before choosing an entry:
 
 - `sovran-workspace`
 - `sovran-architecture`

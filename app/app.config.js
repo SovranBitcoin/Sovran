@@ -41,7 +41,7 @@ module.exports = ({ config }) => {
   // shared/lib/cashu/manager.ts. SECURITY: a key embedded in the bundle is
   // extractable by anyone who reverses a build — only use low-value, rotatable
   // giveaway keys. Generate one with `node scripts/gen-giveaway-key.mjs`.
-  // See ../.agents/skills/sovran-security/references/secure-storage-key-derivation.md.
+  // See skills/sovran-security/references/secure-storage-key-derivation.md.
   const giveawayP2pkSecret = process.env.GIVEAWAY_P2PK_SECRET || undefined;
 
   // Spread the static config from app.json and override only what's needed

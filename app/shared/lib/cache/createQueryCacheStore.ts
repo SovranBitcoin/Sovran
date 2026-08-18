@@ -2,7 +2,7 @@
  * Generic query-cache store factory. Produces one Zustand persist store per
  * domain (feed, notifications, search, DM conversations, DM message pages),
  * modeled on `shared/stores/global/nostrMetadataCache.ts` and the rules in
- * `../.agents/skills/sovran-data/references/caching.md`:
+ * `skills/sovran-data/references/caching.md`:
  *   - Zustand `persist` + Zod `looseObject` envelope (data stored as
  *     `z.unknown()`, re-validated on read by the consumer).
  *   - profile-scoped storage by default (`createProfileScopedStorage`),

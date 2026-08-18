@@ -21,7 +21,7 @@
  * high-frequency surfaces (feed, chat, transactions list) don't
  * re-allocate on every render.
  *
- * See `../.agents/skills/sovran-data/references/dates.md` for guidance on which style to pick.
+ * See `skills/sovran-data/references/dates.md` for guidance on which style to pick.
  */
 
 import * as Localization from 'expo-localization';

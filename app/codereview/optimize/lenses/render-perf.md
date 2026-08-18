@@ -8,8 +8,8 @@ components, so the biggest wins are components the compiler **skips**.
 
 - The compiler silently skips any component with a Rules-of-React violation.
   A skipped component gets zero automatic memoization. Detect:
-  `eslint-disable` on `react-hooks/*` or `react-compiler/*` rules — treat each
-  as "this component is uncompiled", then judge its render cost.
+  `eslint-disable` on `react-hooks/*` rules — treat each as "this component is
+  uncompiled", then judge its render cost.
 - `'use no memo'` directives opt components out entirely — each needs a
   justification comment; flag bare ones on hot components.
 - Compiler comparison is shallow: selectors/props that rebuild nested
@@ -50,7 +50,7 @@ components, so the biggest wins are components the compiler **skips**.
 
 ```bash
 npx tsx codereview/log-doctor/index.ts renders --latest   # re-render counts + why-did-update
-rg -n "eslint-disable.*(react-hooks|react-compiler)" app features shared
+rg -n "eslint-disable.*react-hooks" app features shared
 rg -n "'use no memo'" app features shared
 rg -n "useShallow" features shared        # then find object selectors missing it
 bun run check:react-compiler
