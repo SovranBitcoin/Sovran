@@ -31,7 +31,7 @@ export function CameraLayout({
 
   if (!hasPermission) {
     return (
-      <View className="relative flex-1 items-center justify-center bg-black px-8">
+      <View className="flex-1 items-center justify-center bg-black px-8">
         {/* Grant access on a blocked permission fires the camera-permission
             HeroUI toast (FWO/AX-invisible) — mirror it for simulator plans. */}
         <E2EToastProbe />
@@ -59,7 +59,7 @@ export function CameraLayout({
 
   return (
     <Log name="CameraLayout">
-      <View className="relative flex-1 bg-black">
+      <View className="flex-1 bg-black">
         <CameraView
           mute
           style={{

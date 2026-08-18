@@ -72,7 +72,7 @@ function LoadingContent({ borderRadius, color }: { borderRadius: number; color: 
 // child swap, NOT a remount — a remount forces a relayout that nudges neighbours
 // a couple px ("padding-top"-like content shift when a pfp finishes loading).
 // Do not switch any of these roots back to `VStack` (a different component type).
-const avatarFrameStyle = { position: 'relative' as const, overflow: 'hidden' as const };
+const avatarFrameStyle = { overflow: 'hidden' as const };
 /** Fade duration (ms) for a profile picture loading in over its placeholder.
  *  expo-image skips this for memory-cached images, so recycled avatars stay
  *  instant — only a real network/disk load fades. */

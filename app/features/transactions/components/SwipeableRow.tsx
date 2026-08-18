@@ -122,7 +122,6 @@ export function SwipeableRow({ children, onCommit, enabled = true, testID }: Swi
 
 const styles = StyleSheet.create({
   container: {
-    position: 'relative',
     overflow: 'hidden',
   },
   track: {

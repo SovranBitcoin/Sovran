@@ -195,7 +195,6 @@ function buildPeerNodeStyles(sizing: PeerFieldSizing) {
     peerPressable: pressableBase,
     peerPressableHidden: { ...pressableBase, opacity: 0 },
     peerAvatarFrame: {
-      position: 'relative' as const,
       width: sizing.avatarSize,
       height: sizing.avatarSize,
     },
@@ -2129,7 +2128,6 @@ export function NearPayScreen() {
   );
   const sharedAvatarFrameStyle = useMemo(
     () => ({
-      position: 'relative' as const,
       width: fieldSizing.avatarSize,
       height: fieldSizing.avatarSize,
     }),

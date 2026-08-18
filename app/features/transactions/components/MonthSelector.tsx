@@ -88,7 +88,7 @@ export function MonthSelector({
 
   return (
     <Log name="MonthSelector">
-      <View className="bg-transparent px-4 py-2">
+      <View className="px-4 py-2">
         <ScrollView
           ref={scrollViewRef}
           horizontal

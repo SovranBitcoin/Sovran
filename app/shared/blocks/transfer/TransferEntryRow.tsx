@@ -142,13 +142,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'transparent',
     padding: 20,
     paddingLeft: 16,
     paddingRight: 16,
   },
   avatarWrapper: {
-    position: 'relative',
     width: 36,
     height: 36,
   },

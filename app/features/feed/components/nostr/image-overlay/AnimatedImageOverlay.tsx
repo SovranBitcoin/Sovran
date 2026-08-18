@@ -1507,7 +1507,6 @@ const overlayStyles = StyleSheet.create({
     right: 0,
     zIndex: zIndex.raised,
     justifyContent: 'flex-end',
-    backgroundColor: 'transparent',
   },
   verticalOverlayBarPager: {
     position: 'absolute',

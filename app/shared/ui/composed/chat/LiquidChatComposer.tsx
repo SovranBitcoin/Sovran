@@ -453,7 +453,6 @@ export function LiquidChatComposer({
           style={{
             flex: 1,
             height: fallbackRowHeight,
-            position: 'relative',
             justifyContent: 'center',
           }}>
           <View

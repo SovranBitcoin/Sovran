@@ -176,11 +176,7 @@ export function SkeletonExitReveal({
   );
 
   return (
-    <View
-      ref={visualLayout.ref}
-      collapsable={false}
-      onLayout={handleLayout}
-      style={styles.container}>
+    <View ref={visualLayout.ref} collapsable={false} onLayout={handleLayout}>
       <Animated.View style={active ? fadeStyle : undefined}>{children}</Animated.View>
       {active && (
         <Animated.View pointerEvents="none" style={shimmerBarStyle}>
@@ -319,9 +315,6 @@ export function SkeletonLoadingShimmer({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    position: 'relative',
-  },
   loadingContainer: {
     position: 'absolute',
     top: 0,

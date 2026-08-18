@@ -156,7 +156,7 @@ function MenuSearchField({
     'field-placeholder',
   ] as const);
   return (
-    <View style={{ position: 'relative', justifyContent: 'center', marginTop: 8 }}>
+    <View style={{ justifyContent: 'center', marginTop: 8 }}>
       <BottomSheetTextInput
         value={value}
         onChangeText={onChangeText}

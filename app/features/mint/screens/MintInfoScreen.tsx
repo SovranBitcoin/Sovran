@@ -82,7 +82,7 @@ function ProgressRingComponent({
   }, [fadeAnim]);
 
   return (
-    <View style={{ width: size, height: size, position: 'relative' }}>
+    <View style={{ width: size, height: size }}>
       <Animated.View style={fadeStyle}>
         <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
           <Circle
@@ -191,7 +191,7 @@ function AnimatedAvatarComponent({
     ) : null;
 
   return (
-    <View className="relative">
+    <View>
       <MintIcon iconUrl={picture} size={size} name={name} alt={alt} isLoading={isLoading} />
       {statusBadge && (
         <Animated.View style={badgeStyle}>
@@ -839,7 +839,6 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    alignItems: 'stretch',
     width: '100%',
   },
   statItem: {

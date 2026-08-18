@@ -78,7 +78,7 @@ export const Card = ({
           </Text>
         )}
 
-        <HStack className="bg-transparent">
+        <HStack>
           <Text
             className="flex-1 text-base"
             style={{ color: getTextColor(), padding: 16, paddingRight: 4 }}>

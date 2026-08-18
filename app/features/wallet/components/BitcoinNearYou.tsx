@@ -313,7 +313,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
               borderColor: opacity(muted, 0.3),
             }}>
             <BlurCardFrame accentColor={muted}>
-              <RNView className="relative z-[1]">
+              <RNView className="z-[1]">
                 <MapPreview
                   latitude={coords.latitude}
                   longitude={coords.longitude}

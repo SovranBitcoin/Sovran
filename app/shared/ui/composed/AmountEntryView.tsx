@@ -658,6 +658,8 @@ const styles = StyleSheet.create({
     height: 1,
   },
   bottomButtons: {
+    // Overrides BottomButtons' own `position: 'absolute'` container so the
+    // buttons sit in normal flow inside the amount-entry column.
     position: 'relative',
   },
   bottomRow: {

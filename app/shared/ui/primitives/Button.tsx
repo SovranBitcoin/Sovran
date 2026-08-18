@@ -384,7 +384,6 @@ export const Button = ({
               height: sz.iconOnlyDimension,
               paddingVertical: 0,
               paddingHorizontal: 0,
-              position: 'relative',
             },
             style,
           ]}
@@ -412,7 +411,7 @@ export const Button = ({
       hitSlop={BUTTON_HIT_SLOP}
       {...a11yProps}>
       <View
-        style={[getButtonStyles(), { position: 'relative', minHeight: sz.minHeight }, style]}
+        style={[getButtonStyles(), { minHeight: sz.minHeight }, style]}
         blur={shouldUseBlur}
         blurIntensity={intensity}
         blurTint={tint}>

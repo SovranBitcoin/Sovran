@@ -116,7 +116,7 @@ export function HistoryEntryHeader({
         ? 'fluent:arrow-upload-16-filled'
         : 'fluent:arrow-download-16-filled';
       return (
-        <View className="relative">
+        <View>
           <Avatar
             state={recipientPicture ? 'image' : 'fallback'}
             picture={recipientPicture}
@@ -146,14 +146,14 @@ export function HistoryEntryHeader({
 
     if (historyEntry) {
       return (
-        <View className="scale-125 transform bg-transparent p-4">
+        <View className="scale-125 transform p-4">
           <TransactionIcon historyEntry={historyEntry} isLoading={isLoading} />
         </View>
       );
     }
 
     return (
-      <View className="scale-125 transform bg-transparent p-4">
+      <View className="scale-125 transform p-4">
         <Icon
           name={isSend ? 'fluent:arrow-upload-16-filled' : 'fluent:arrow-download-16-filled'}
           color={opacity(foreground, 0.9)}

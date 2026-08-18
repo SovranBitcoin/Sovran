@@ -471,7 +471,6 @@ function MentionEmptyState({
 const styles = StyleSheet.create({
   inputWrap: {
     paddingHorizontal: 12,
-    position: 'relative',
   },
   input: {
     height: 56,

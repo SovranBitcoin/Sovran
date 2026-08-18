@@ -666,7 +666,6 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   methodsContainer: {
-    position: 'relative',
     overflow: 'hidden',
     marginBottom: 4,
   },

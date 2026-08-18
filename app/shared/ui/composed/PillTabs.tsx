@@ -135,7 +135,6 @@ const styles = StyleSheet.create({
   },
   pressable: {
     borderRadius: 999,
-    backgroundColor: 'transparent',
   },
   inner: {
     flexDirection: 'row',

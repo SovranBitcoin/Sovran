@@ -104,9 +104,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
 
   return (
     <Log name="CustomKeyboard">
-      <View
-        className="items-center justify-center bg-transparent"
-        style={{ opacity: loading ? 0.5 : 1 }}>
+      <View className="items-center justify-center" style={{ opacity: loading ? 0.5 : 1 }}>
         {buttons.map((row, rowIndex) => (
           <View key={rowIndex} className="mb-0.25 flex-row justify-between">
             {row.map(renderButton)}

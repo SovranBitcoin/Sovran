@@ -331,7 +331,6 @@ const styles = StyleSheet.create({
     height: CELEBRATION_AVATAR_SIZE,
   },
   avatarFrame: {
-    position: 'relative',
     width: CELEBRATION_AVATAR_SIZE,
     height: CELEBRATION_AVATAR_SIZE,
   },

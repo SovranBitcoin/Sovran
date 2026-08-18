@@ -82,9 +82,7 @@ export default function TransactionIcon({
 
   return (
     <Log name="TransactionIcon">
-      <View
-        className="h-7 w-7 shrink-0 items-center justify-center bg-transparent"
-        style={{ marginTop: 6 }}>
+      <View className="h-7 w-7 shrink-0 items-center justify-center" style={{ marginTop: 6 }}>
         {isLoading ? (
           <Spinner size={22} color={foreground} />
         ) : showAvatar ? (

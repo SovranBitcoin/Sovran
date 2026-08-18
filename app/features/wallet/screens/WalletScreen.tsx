@@ -301,7 +301,6 @@ const styles = StyleSheet.create({
     height: PRIMARY_ACTION_ROW_HEIGHT,
     justifyContent: 'center',
     paddingHorizontal: 12,
-    position: 'relative',
     width: '100%',
   },
   capsuleRow: {

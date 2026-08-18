@@ -1419,7 +1419,6 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    alignItems: 'stretch',
   },
   statItem: {
     flex: 1,

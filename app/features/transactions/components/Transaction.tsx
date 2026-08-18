@@ -188,7 +188,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
     <Pressable
       key={historyEntry?.id}
       testID={testID}
-      className="flex-row items-center justify-between bg-transparent px-4 py-5"
+      className="flex-row items-center justify-between px-4 py-5"
       style={isRolledBack ? { opacity: 0.33 } : undefined}
       onPress={handlePress}>
       <HStack spacing={12} flex={1}>

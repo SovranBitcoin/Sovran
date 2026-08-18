@@ -407,7 +407,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
           </VStack>
 
           {/* Swap icon — same style as TransactionIcon in HistoryEntryHeader */}
-          <View className="scale-125 transform bg-transparent p-4">
+          <View className="scale-125 transform p-4">
             <Icon name="mdi:swap-horizontal" size={28} color={opacity(foreground, 0.9)} />
           </View>
         </HStack>

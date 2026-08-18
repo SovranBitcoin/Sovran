@@ -173,7 +173,7 @@ function FeedThreadPair({
   }, [firstHeight, foreground, secondAvatarCenterY]);
 
   return (
-    <View style={styles.threadPair}>
+    <View>
       {firstHeight > 0 ? <View pointerEvents="none" style={connectorStyle} /> : null}
       <View onLayout={handleFirstLayout}>{first}</View>
       {second}
@@ -1209,9 +1209,6 @@ const styles = StyleSheet.create({
   loadMoreSpinner: {
     alignSelf: 'center',
     paddingVertical: 24,
-  },
-  threadPair: {
-    position: 'relative',
   },
   threadPairConnector: {
     position: 'absolute',

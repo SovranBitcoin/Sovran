@@ -377,7 +377,6 @@ function TextLoadingPlaceholder({
 }
 
 const loadingWrapperStyle = {
-  position: 'relative' as const,
   overflow: 'hidden' as const,
   alignSelf: 'flex-start' as const,
 };
