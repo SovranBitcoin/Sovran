@@ -1,0 +1,28 @@
+name: Styling
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  APP_DIR: app
+
+jobs:
+  styling:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout app
+        uses: actions/checkout@v6
+
+      # Pure source scan (no dependencies needed). The app styles with Tailwind
+      # classes through Uniwind; StyleSheet.create, inline style objects, the
+      # VStack/HStack layout props and contentContainerStyle are recorded debt in
+      # styling-budget.json. This fails when any per-file count goes up, so the
+      # migration can only move in one direction.
+      - name: Check styling budget
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/check-styling.mjs
