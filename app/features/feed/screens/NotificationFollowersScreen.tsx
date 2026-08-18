@@ -24,6 +24,7 @@ import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import {
   remeasureVisualLayoutScope,
   useVisualListLogger,
+  visualToken,
   visualViewabilityRange,
   VISUAL_LIST_VIEWABILITY_CONFIG,
 } from '@/shared/lib/contentShiftLog';
@@ -62,15 +63,6 @@ type VisualFlatListMetrics = {
   scroll: number;
   size: number | null;
 };
-
-function followerVisualToken(token: ViewToken) {
-  return {
-    index: typeof token.index === 'number' ? token.index : null,
-    key: token.key,
-    isViewable: token.isViewable,
-    item: token.item as FeedNotification,
-  };
-}
 
 export function NotificationFollowersScreen() {
   useLifecycleLogger('NotificationFollowersScreen', feedLog);
@@ -396,8 +388,8 @@ export function NotificationFollowersScreen() {
     ({ viewableItems, changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
       onVisualViewableItemsChanged({
         ...visualViewabilityRange([...viewableItems, ...changed]),
-        viewableItems: viewableItems.map(followerVisualToken),
-        changed: changed.map(followerVisualToken),
+        viewableItems: viewableItems.map(visualToken<FeedNotification>),
+        changed: changed.map(visualToken<FeedNotification>),
       });
     },
     [onVisualViewableItemsChanged]

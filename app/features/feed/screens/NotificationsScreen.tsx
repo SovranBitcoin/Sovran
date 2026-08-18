@@ -47,6 +47,7 @@ import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import {
   remeasureVisualLayoutScope,
   useVisualListLogger,
+  visualToken,
   visualViewabilityRange,
   VISUAL_LIST_VIEWABILITY_CONFIG,
 } from '@/shared/lib/contentShiftLog';
@@ -117,15 +118,6 @@ function notificationItemBreakdown(items: readonly NotificationListItem[]): Reco
 
 /** Where an applied page-0 came from — the axis visual inconsistency hides on. */
 type AppliedPageSource = 'network' | 'cache' | 'client-tab' | 'error-reset';
-
-function notificationVisualToken(token: ViewToken) {
-  return {
-    index: typeof token.index === 'number' ? token.index : null,
-    key: token.key,
-    isViewable: token.isViewable,
-    item: token.item as NotificationListItem,
-  };
-}
 
 export function NotificationsScreen() {
   useLifecycleLogger('NotificationsScreen', feedLog);
@@ -732,8 +724,8 @@ export function NotificationsScreen() {
     ({ viewableItems, changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
       onVisualViewableItemsChanged({
         ...visualViewabilityRange([...viewableItems, ...changed]),
-        viewableItems: viewableItems.map(notificationVisualToken),
-        changed: changed.map(notificationVisualToken),
+        viewableItems: viewableItems.map(visualToken<NotificationListItem>),
+        changed: changed.map(visualToken<NotificationListItem>),
       });
     },
     [onVisualViewableItemsChanged]

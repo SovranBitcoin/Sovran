@@ -18,6 +18,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import {
   useVisualListLogger,
+  visualToken,
   visualViewabilityRange,
   VISUAL_LIST_VIEWABILITY_CONFIG,
 } from '@/shared/lib/contentShiftLog';
@@ -29,15 +30,6 @@ import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { View } from '@/shared/ui/primitives/View/View';
 
 const MINT_CHANGES_VISUAL_SCOPE = 'feed.notifications.mints.list';
-
-function mintChangeVisualToken(token: ViewToken) {
-  return {
-    index: typeof token.index === 'number' ? token.index : null,
-    key: token.key,
-    isViewable: token.isViewable,
-    item: token.item as MintChangeUpdate,
-  };
-}
 
 export function MintChangesList() {
   const { updates, trustedMintCount, isLoading, isRefreshing, errorMessage, refresh } =
@@ -61,8 +53,8 @@ export function MintChangesList() {
     ({ viewableItems, changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
       onVisualViewableItemsChanged({
         ...visualViewabilityRange([...viewableItems, ...changed]),
-        viewableItems: viewableItems.map(mintChangeVisualToken),
-        changed: changed.map(mintChangeVisualToken),
+        viewableItems: viewableItems.map(visualToken<MintChangeUpdate>),
+        changed: changed.map(visualToken<MintChangeUpdate>),
       });
     },
     [onVisualViewableItemsChanged]

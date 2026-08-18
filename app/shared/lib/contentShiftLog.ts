@@ -26,6 +26,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   useWindowDimensions,
+  type ViewToken,
 } from 'react-native';
 
 import { feedLog, monotonicNow } from '@/shared/lib/logger';
@@ -166,6 +167,21 @@ type VisualViewToken<ItemT> = {
   size?: number;
   sizeVisible?: number;
 };
+
+/**
+ * Adapt a FlatList/FlashList `ViewToken` into the shape the visual-list logger
+ * consumes. RN types `index` as `number | null` but hands `undefined` through
+ * on some paths, and `item` as `any`; the caller names the row type it is
+ * rendering. Cast only — no runtime narrowing.
+ */
+export function visualToken<ItemT>(token: ViewToken): VisualViewToken<ItemT> {
+  return {
+    index: typeof token.index === 'number' ? token.index : null,
+    key: token.key,
+    isViewable: token.isViewable,
+    item: token.item as ItemT,
+  };
+}
 
 type VisualViewabilityInfo<ItemT> = {
   changed: VisualViewToken<ItemT>[];
