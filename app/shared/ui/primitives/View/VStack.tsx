@@ -14,16 +14,28 @@ type VStackProps = ViewProps & {
   flexBasis?: DimensionValue;
 };
 
+/**
+ * Vertical flex stack.
+ *
+ * `align` / `justify` / `wrap` deliberately have **no defaults**. They used to
+ * default to `'stretch'` / `'flex-start'` / `'nowrap'` — which are Yoga's own
+ * defaults, so writing them changed nothing visually, but it did put a concrete
+ * value into the `style` object on every render. Uniwind renders
+ * `style={[classNameStyle, props.style]}`, and later entries win in React
+ * Native, so those restated defaults silently overrode any `items-*`,
+ * `justify-*` or `flex-wrap` class a caller passed. Leaving them undefined lets
+ * Yoga apply the same defaults *and* lets a className take effect.
+ */
 const VStack = React.forwardRef<any, VStackProps>((props, ref) => {
   const {
     gap,
-    align = 'stretch',
-    justify = 'flex-start',
+    align,
+    justify,
     flex,
     flexGrow,
     flexShrink,
     flexBasis,
-    wrap = 'nowrap',
+    wrap,
     style,
     children,
     className,
@@ -31,17 +43,21 @@ const VStack = React.forwardRef<any, VStackProps>((props, ref) => {
     ...rest
   } = props;
 
+  // Only the properties the caller actually set are written. A key present with
+  // an `undefined` value still wins: React Native's `flattenStyle` copies every
+  // own key, and Uniwind renders `style={[classNameStyle, props.style]}`, so an
+  // `undefined` here would blank out whatever the className resolved to.
   const stackStyle = StyleSheet.flatten([
     {
       flexDirection: 'column' as const,
-      alignItems: align,
-      justifyContent: justify,
-      flex,
-      flexGrow,
-      flexShrink,
-      flexBasis,
-      flexWrap: wrap,
-      gap,
+      ...(align !== undefined && { alignItems: align }),
+      ...(justify !== undefined && { justifyContent: justify }),
+      ...(wrap !== undefined && { flexWrap: wrap }),
+      ...(flex !== undefined && { flex }),
+      ...(flexGrow !== undefined && { flexGrow }),
+      ...(flexShrink !== undefined && { flexShrink }),
+      ...(flexBasis !== undefined && { flexBasis }),
+      ...(gap !== undefined && { gap }),
     },
     style,
   ]);
