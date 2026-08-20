@@ -4,8 +4,6 @@ import { StatusBar } from 'expo-status-bar';
 import { setBackgroundColorAsync } from 'expo-system-ui';
 import { HeroUINativeProvider } from 'heroui-native/provider';
 import 'global.css';
-import 'intl';
-import 'intl/locale-data/jsonp/en';
 import Animated from 'react-native-reanimated';
 
 import { useFonts } from '@/shared/hooks/useFonts';

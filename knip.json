@@ -32,7 +32,6 @@
         "process",
         "expo-screen-corner-radius",
         "@monicon/metro",
-        "metro-minify-terser",
         "patch-package",
         "react-native-fast-squircle",
         "@noble/curves"

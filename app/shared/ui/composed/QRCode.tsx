@@ -1,7 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { useInterval } from 'usehooks-ts';
 import { UR, UREncoder } from '@gandlaf21/bc-ur';
 import { PressableFeedback } from 'heroui-native';
 import { log, Log } from '@/shared/lib/logger';
@@ -178,10 +177,12 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   }, [address, needsAnimation, activeFragmentSize]);
 
   // Cycle through QR code parts at the selected speed
-  useInterval(
-    () => setIndex((prev) => (prev + 1) % parts.length),
-    needsAnimation && parts.length > 1 ? activeIntervalMs : null
-  );
+  const cycling = needsAnimation && parts.length > 1;
+  useEffect(() => {
+    if (!cycling) return;
+    const id = setInterval(() => setIndex((prev) => (prev + 1) % parts.length), activeIntervalMs);
+    return () => clearInterval(id);
+  }, [cycling, parts.length, activeIntervalMs]);
 
   // Determine what data to show
   const qrData = needsAnimation && parts.length > 0 ? parts[index] : address;

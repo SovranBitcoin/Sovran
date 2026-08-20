@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 
 import * as Application from 'expo-application';
-import semver from 'semver';
 
 import { getLatestVersion } from '@/shared/lib/apiClient';
 import { paramPopup } from '@/shared/lib/popup';
@@ -16,6 +15,18 @@ import { useBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
  * work. Holding the new-version popup 1–2 extra seconds while the wallet
  * renders is fine.
  */
+/** Numeric x.y.z comparison; non-numeric segments compare as 0. */
+function isNewerVersion(candidate: string, current: string): boolean {
+  const parse = (v: string) => v.split('.').map((n) => parseInt(n, 10) || 0);
+  const a = parse(candidate);
+  const b = parse(current);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d !== 0) return d > 0;
+  }
+  return false;
+}
+
 export const useVersionCheck = () => {
   const bootDone = useBootMorphCompleted();
   useEffect(() => {
@@ -46,7 +57,7 @@ export const useVersionCheck = () => {
         payload &&
         typeof payload === 'object' &&
         'version' in payload &&
-        semver.gt(payload.version, currentVersion)
+        isNewerVersion(payload.version, currentVersion)
       ) {
         log.info('hook.version_check.update_available', {
           currentVersion,

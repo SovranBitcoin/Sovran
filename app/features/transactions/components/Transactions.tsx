@@ -11,8 +11,7 @@ import { StyleSheet, useWindowDimensions } from 'react-native';
 import { FlashList, type FlashListRef, type ViewToken } from '@shopify/flash-list';
 import { Link } from 'expo-router';
 import { withAlpha } from '@/shared/lib/color';
-import groupBy from 'lodash/groupBy';
-import orderBy from 'lodash/orderBy';
+import { groupBy } from '@/shared/lib/groupBy';
 
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 
@@ -308,7 +307,7 @@ export const Transactions = React.memo(
     }, [filteredHistory, swapGroups, filter, type, embedded]);
 
     const sortedTimeline = useMemo(
-      () => orderBy(timelineItems, [(item) => getTimelineCreatedAt(item)], ['desc']),
+      () => [...timelineItems].sort((a, b) => getTimelineCreatedAt(b) - getTimelineCreatedAt(a)),
       [timelineItems]
     );
 
@@ -348,10 +347,8 @@ export const Transactions = React.memo(
         });
 
         // Sort by original date in descending order (newest first)
-        const sortedDateEntries = orderBy(
-          dateEntries,
-          (entry) => entry.originalDate.getTime(),
-          'desc'
+        const sortedDateEntries = [...dateEntries].sort(
+          (a, b) => b.originalDate.getTime() - a.originalDate.getTime()
         );
 
         // Embedded mode shows every date group (no one-day cap).
@@ -420,14 +417,14 @@ export const Transactions = React.memo(
         dateString,
         originalDate: new Date(getTimelineCreatedAt(groupedByDate[dateString][0])),
       }));
-      return orderBy(dateEntries, (e) => e.originalDate.getTime(), 'desc').map(
-        ({ dateString }) => ({
+      return [...dateEntries]
+        .sort((a, b) => b.originalDate.getTime() - a.originalDate.getTime())
+        .map(({ dateString }) => ({
           title: dateString,
           data: groupedByDate[dateString],
           index: `embedded-${dateString}`,
           monthKey: monthKeyOf(getTimelineCreatedAt(groupedByDate[dateString][0])),
-        })
-      );
+        }));
     }, [embedded, sortedTimeline]);
 
     // Cancellable subset of the visible pending bucket: ecash sends only.
