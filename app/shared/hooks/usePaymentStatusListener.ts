@@ -201,6 +201,56 @@ function showConfirmedReceiveEcashToast(input: {
   });
 }
 
+/**
+ * Mark a receive quote as processing and raise its status popup, unless the
+ * same quote is already the active status (then only the store is refreshed).
+ * The caller supplies its existing source-specific processing log event.
+ */
+function activateReceiveProcessing({
+  processingLogEvent,
+  quoteId,
+  mintUrl,
+  amount,
+  unit,
+}: {
+  processingLogEvent:
+    'hook.payment_status.receive_processing' | 'hook.payment_status.npc_receive_processing';
+  quoteId: string;
+  mintUrl: string;
+  amount: number;
+  unit: string;
+}): void {
+  const existingActive = usePaymentStatusStore.getState().active;
+  const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
+
+  paymentLog.info(processingLogEvent, {
+    quoteId,
+    ...mintUrlLogFields(mintUrl),
+    amount,
+    unit,
+    isDuplicate,
+  });
+  usePaymentStatusStore.getState().setActive({
+    variant: 'receive',
+    id: quoteId,
+    mintUrl,
+    amount,
+    unit,
+    state: 'processing',
+  });
+
+  if (isDuplicate) {
+    paymentLog.info('hook.payment_status.receive_popup_suppressed', {
+      quoteId,
+      ...mintUrlLogFields(mintUrl),
+      reason: 'already_active',
+    });
+    return;
+  }
+
+  paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
+}
+
 export function usePaymentStatusListener(): void {
   const { manager } = useManagerContext();
 
@@ -243,35 +293,13 @@ export function usePaymentStatusListener(): void {
         const amount = amountToNumber(quote.amount);
         const unit = quote.unit;
 
-        const existingActive = usePaymentStatusStore.getState().active;
-        const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
-
-        paymentLog.info('hook.payment_status.receive_processing', {
+        activateReceiveProcessing({
+          processingLogEvent: 'hook.payment_status.receive_processing',
           quoteId,
-          ...mintUrlLogFields(mintUrl),
-          amount,
-          unit,
-          isDuplicate,
-        });
-        usePaymentStatusStore.getState().setActive({
-          variant: 'receive',
-          id: quoteId,
           mintUrl,
           amount,
           unit,
-          state: 'processing',
         });
-
-        if (isDuplicate) {
-          paymentLog.info('hook.payment_status.receive_popup_suppressed', {
-            quoteId,
-            ...mintUrlLogFields(mintUrl),
-            reason: 'already_active',
-          });
-          return;
-        }
-
-        paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
       }
     );
 
@@ -353,35 +381,13 @@ export function usePaymentStatusListener(): void {
           return;
         }
 
-        const existingActive = usePaymentStatusStore.getState().active;
-        const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
-
-        paymentLog.info('hook.payment_status.npc_receive_processing', {
+        activateReceiveProcessing({
+          processingLogEvent: 'hook.payment_status.npc_receive_processing',
           quoteId,
-          ...mintUrlLogFields(mintUrl),
-          amount,
-          unit,
-          isDuplicate,
-        });
-        usePaymentStatusStore.getState().setActive({
-          variant: 'receive',
-          id: quoteId,
           mintUrl,
           amount,
           unit,
-          state: 'processing',
         });
-
-        if (isDuplicate) {
-          paymentLog.info('hook.payment_status.receive_popup_suppressed', {
-            quoteId,
-            ...mintUrlLogFields(mintUrl),
-            reason: 'already_active',
-          });
-          return;
-        }
-
-        paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
       })();
     });
 

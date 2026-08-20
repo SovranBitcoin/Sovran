@@ -19,7 +19,6 @@ import { Text } from '@/shared/ui/primitives/Text';
 import Icon from 'assets/icons';
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import type { FeedEvent, NoteMetrics, ProfileInfo } from '../feedTypes';
 import { useImageOverlay } from './provider';
 import type { ImageOverlayPost, MediaType, ThumbnailLayout } from './types';
 import { ANDROID_THUMB_DIM_MAX_OPACITY, THUMB_BLUR_MAX_INTENSITY } from './config';
@@ -39,28 +38,6 @@ type GestureTouchPoint = { pageX: number; pageY: number; locationX: number; loca
 
 const AnimatedBlurView = Reanimated.createAnimatedComponent(BlurView);
 
-/** Optional post payload for image overlay bottom panel (passed when opening from PostCard). */
-interface ImageBlockOverlayPostProps {
-  event: FeedEvent;
-  metrics: NoteMetrics;
-  profile?: ProfileInfo | null;
-  reposted?: boolean;
-  liked?: boolean;
-  replied?: boolean;
-  zapped?: boolean;
-  repostPending?: boolean;
-  likePending?: boolean;
-  zapPending?: boolean;
-  repostPendingDirection?: 'activating' | 'deactivating';
-  likePendingDirection?: 'activating' | 'deactivating';
-  onCommentPress?: () => void;
-  onRepostPress?: () => void;
-  onLikePress?: () => void;
-  onZapPress?: () => void;
-  onActionPressIn?: () => void;
-  onActionPressOut?: () => void;
-}
-
 export const ImageBlock = React.memo(function ImageBlock({
   url,
   alt,
@@ -74,24 +51,8 @@ export const ImageBlock = React.memo(function ImageBlock({
   onBeforeOpen,
   onPressIn,
   onPressOut,
-  event: overlayEvent,
-  metrics: overlayMetrics,
-  profile: overlayProfile,
-  reposted,
-  liked,
-  replied,
-  zapped,
-  repostPending,
-  likePending,
-  zapPending,
-  repostPendingDirection,
-  likePendingDirection,
-  onCommentPress,
-  onRepostPress,
-  onLikePress,
-  onZapPress,
-  onActionPressIn,
-  onActionPressOut,
+  eventId,
+  overlayPost,
 }: {
   url: string;
   /** NIP-92 imeta alt text, used as the image's accessibility label. */
@@ -119,7 +80,11 @@ export const ImageBlock = React.memo(function ImageBlock({
   onBeforeOpen?: () => void;
   onPressIn?: () => void;
   onPressOut?: () => void;
-} & Partial<ImageBlockOverlayPostProps>) {
+  /** Event identity is available even when metrics are not, unlike the panel payload. */
+  eventId: string | undefined;
+  /** Post payload for the overlay bottom panel (built once by NoteContent). */
+  overlayPost?: ImageOverlayPost | null;
+}) {
   const [foreground] = useThemeColor(['foreground'] as const);
   // Seed the reserved size from what we already know (a ratio learned from a
   // prior onLoad, else the post's imeta dim) so the image doesn't flash 16:9 and
@@ -135,11 +100,12 @@ export const ImageBlock = React.memo(function ImageBlock({
   const imageOverlay = useImageOverlay();
   const layoutIndex = mediaIndex ?? imageIndex ?? 0;
   const imageHost = urlHost(url);
+  const overlayEventId = eventId ?? overlayPost?.event.id;
   const visualLayout = useVisualLayoutLogger({
-    scope: `feed.media.${overlayEvent?.id?.slice(0, 12) ?? imageHost}`,
+    scope: `feed.media.${overlayEventId?.slice(0, 12) ?? imageHost}`,
     surface: 'feed',
     component: 'ImageBlock',
-    itemKey: overlayEvent?.id ? `${overlayEvent.id}:${layoutIndex}` : `${imageHost}:${layoutIndex}`,
+    itemKey: overlayEventId ? `${overlayEventId}:${layoutIndex}` : `${imageHost}:${layoutIndex}`,
     itemType: mediaTypes?.[layoutIndex] ?? 'image',
     index: layoutIndex,
     extra: () => ({
@@ -220,15 +186,15 @@ export const ImageBlock = React.memo(function ImageBlock({
       imageOverlay?.registerThumbnailLayout(
         url,
         { pageX, pageY, width, height },
-        overlayEvent?.id != null && layoutIndex != null
-          ? { eventId: overlayEvent.id, imageIndex: layoutIndex, measureNow }
+        overlayEventId != null && layoutIndex != null
+          ? { eventId: overlayEventId, imageIndex: layoutIndex, measureNow }
           : { measureNow }
       );
     });
   }, [
     imageOverlay,
     url,
-    overlayEvent?.id,
+    overlayEventId,
     layoutIndex,
     measureSourceRef,
     measureCorrected,
@@ -282,45 +248,10 @@ export const ImageBlock = React.memo(function ImageBlock({
         imageOverlay.registerThumbnailLayout(
           url,
           { pageX, pageY, width, height },
-          overlayEvent?.id != null
-            ? { eventId: overlayEvent.id, imageIndex: layoutIndex, measureNow }
+          overlayEventId != null
+            ? { eventId: overlayEventId, imageIndex: layoutIndex, measureNow }
             : { measureNow }
         );
-        const post: ImageOverlayPost | undefined =
-          overlayEvent && overlayMetrics
-            ? {
-                event: {
-                  id: overlayEvent.id,
-                  kind: overlayEvent.kind,
-                  pubkey: overlayEvent.pubkey,
-                  content: overlayEvent.content,
-                  tags: overlayEvent.tags,
-                  created_at: overlayEvent.created_at,
-                },
-                metrics: {
-                  replyCount: overlayMetrics.replyCount,
-                  repostCount: overlayMetrics.repostCount,
-                  likeCount: overlayMetrics.likeCount,
-                  satsZapped: overlayMetrics.satsZapped,
-                },
-                profile: overlayProfile ?? null,
-                reposted,
-                liked,
-                replied,
-                zapped,
-                repostPending,
-                likePending,
-                zapPending,
-                repostPendingDirection,
-                likePendingDirection,
-                onCommentPress,
-                onRepostPress,
-                onLikePress,
-                onZapPress,
-                onActionPressIn,
-                onActionPressOut,
-              }
-            : undefined;
         const urls =
           allMediaUrls && allMediaUrls.length > 0
             ? allMediaUrls
@@ -338,7 +269,7 @@ export const ImageBlock = React.memo(function ImageBlock({
           mediaTypes:
             mediaTypes && urls && mediaTypes.length === urls.length ? mediaTypes : undefined,
           initialIndex: mediaIndex ?? imageIndex ?? 0,
-          post: post ?? null,
+          post: overlayPost ?? null,
         });
       });
     },
@@ -356,24 +287,8 @@ export const ImageBlock = React.memo(function ImageBlock({
       imageIndex,
       layoutIndex,
       onBeforeOpen,
-      overlayEvent,
-      overlayMetrics,
-      overlayProfile,
-      reposted,
-      liked,
-      replied,
-      zapped,
-      repostPending,
-      likePending,
-      zapPending,
-      repostPendingDirection,
-      likePendingDirection,
-      onCommentPress,
-      onRepostPress,
-      onLikePress,
-      onZapPress,
-      onActionPressIn,
-      onActionPressOut,
+      overlayEventId,
+      overlayPost,
     ]
   );
 

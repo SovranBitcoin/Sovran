@@ -29,6 +29,7 @@ import {
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import Icon from 'assets/icons';
+import { RebalanceActionPill } from './RebalanceActionPill';
 import { extractDomain, getMintDisplayName } from '@/shared/lib/url';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log, paymentLog } from '@/shared/lib/logger';
@@ -304,7 +305,9 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                     </VStack>
                   </Pressable>
                 ) : onRetry ? (
-                  <Pressable
+                  <RebalanceActionPill
+                    icon="mdi:refresh"
+                    label="Retry"
                     onPress={() => {
                       paymentLog.info('mint.rebalance.step_row.press', {
                         action: 'retry',
@@ -315,23 +318,12 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                       });
                       onRetry();
                     }}
-                    haptics
-                    style={{
-                      backgroundColor: primaryColor700,
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderRadius: 6,
-                    }}>
-                    <HStack align="center" gap={4}>
-                      <Icon name="mdi:refresh" size={14} color={primaryColor0} />
-                      <Text bold size={12} className="text-foreground">
-                        Retry
-                      </Text>
-                    </HStack>
-                  </Pressable>
+                  />
                 ) : null}
                 {onSkip && (
-                  <Pressable
+                  <RebalanceActionPill
+                    icon="mdi:skip-next"
+                    label="Skip"
                     onPress={() => {
                       paymentLog.info('mint.rebalance.step_row.press', {
                         action: 'skip',
@@ -341,20 +333,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                       });
                       onSkip();
                     }}
-                    haptics
-                    style={{
-                      backgroundColor: primaryColor700,
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderRadius: 6,
-                    }}>
-                    <HStack align="center" gap={4}>
-                      <Icon name="mdi:skip-next" size={14} color={primaryColor0} />
-                      <Text bold size={12} className="text-foreground">
-                        Skip
-                      </Text>
-                    </HStack>
-                  </Pressable>
+                  />
                 )}
               </HStack>
             </VStack>

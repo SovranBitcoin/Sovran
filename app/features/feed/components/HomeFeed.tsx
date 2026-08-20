@@ -57,6 +57,7 @@ import {
 } from '@/features/feed/lib/feedRows';
 
 import { PostCard } from './nostr/PostCard';
+import { createFeedPostCardProps } from './nostr/feedPostCardProps';
 import { RepostCard } from './UserFeed';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
@@ -737,6 +738,29 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     });
   }, [feedItems.length, feedRows.length, isLoading, activeSpecIndex, feedSpecs]);
 
+  const feedPostCardProps = useMemo(
+    () =>
+      createFeedPostCardProps({
+        getMetrics,
+        getZapState,
+        onOverlayOpenedFromIndex,
+        toggleLike: (event: FeedEvent) => void toggleLikeRef.current(event),
+        toggleRepost: (event: FeedEvent) => void toggleRepostRef.current(event),
+        openZapMenu: (event: FeedEvent, baseSats: number) =>
+          openZapMenuRef.current(event, baseSats),
+        openPostActions,
+      }),
+    [
+      getMetrics,
+      getZapState,
+      onOverlayOpenedFromIndex,
+      openPostActions,
+      openZapMenuRef,
+      toggleLikeRef,
+      toggleRepostRef,
+    ]
+  );
+
   const renderFeedItem = useCallback(
     ({ item: row, index }: { item: FeedRow; index: number }) => {
       const item = row.item;
@@ -752,27 +776,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
               first={
                 <PostCard
                   variant="feed"
-                  event={item.event}
-                  metrics={metrics}
-                  index={index}
-                  feedIndex={feedIndex}
-                  onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-                  quotedEvents={row.quotedEvents}
-                  profiles={row.profiles}
-                  getMetrics={getMetrics}
-                  liked={engagement.liked}
-                  replied={engagement.replied}
-                  reposted={engagement.reposted}
-                  likePending={engagement.likePending}
-                  repostPending={engagement.repostPending}
-                  likePendingDirection={engagement.likePendingDirection}
-                  repostPendingDirection={engagement.repostPendingDirection}
-                  zapped={getZapState(item.event.id).zapped}
-                  zapPending={getZapState(item.event.id).zapPending}
-                  onLikePress={() => toggleLikeRef.current(item.event)}
-                  onMorePress={() => openPostActions(item.event)}
-                  onRepostPress={() => toggleRepostRef.current(item.event)}
-                  onZapPress={() => openZapMenuRef.current(item.event, metrics.satsZapped)}
+                  {...feedPostCardProps(row, index, item.event, metrics, engagement)}
                   skipAnimation={!isFirstRender.current}
                   getThreadContext={() => getThreadContextRef.current(replyPreviewEvents)}
                   showFooterBorder={false}
@@ -789,29 +793,13 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                       <PostCard
                         key={replyEvent.id}
                         variant="feed"
-                        event={replyEvent}
-                        metrics={replyMetrics}
-                        index={index}
-                        feedIndex={feedIndex}
-                        onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-                        quotedEvents={row.quotedEvents}
-                        profiles={row.profiles}
-                        getMetrics={getMetrics}
-                        liked={replyEngagement.liked}
-                        replied={replyEngagement.replied}
-                        reposted={replyEngagement.reposted}
-                        likePending={replyEngagement.likePending}
-                        repostPending={replyEngagement.repostPending}
-                        likePendingDirection={replyEngagement.likePendingDirection}
-                        repostPendingDirection={replyEngagement.repostPendingDirection}
-                        zapped={getZapState(replyEvent.id).zapped}
-                        zapPending={getZapState(replyEvent.id).zapPending}
-                        onLikePress={() => toggleLikeRef.current(replyEvent)}
-                        onMorePress={() => openPostActions(replyEvent)}
-                        onRepostPress={() => toggleRepostRef.current(replyEvent)}
-                        onZapPress={() =>
-                          openZapMenuRef.current(replyEvent, replyMetrics.satsZapped)
-                        }
+                        {...feedPostCardProps(
+                          row,
+                          index,
+                          replyEvent,
+                          replyMetrics,
+                          replyEngagement
+                        )}
                         getThreadContext={() => getThreadContextRef.current()}
                         showFooterBorder={isLastReply}
                         fullBleedFooterBorder
@@ -832,27 +820,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
               first={
                 <PostCard
                   variant="feed"
-                  event={rootEvent}
-                  metrics={rootMetrics}
-                  index={index}
-                  feedIndex={feedIndex}
-                  onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-                  quotedEvents={row.quotedEvents}
-                  profiles={row.profiles}
-                  getMetrics={getMetrics}
-                  liked={rootEngagement.liked}
-                  replied={rootEngagement.replied}
-                  reposted={rootEngagement.reposted}
-                  likePending={rootEngagement.likePending}
-                  repostPending={rootEngagement.repostPending}
-                  likePendingDirection={rootEngagement.likePendingDirection}
-                  repostPendingDirection={rootEngagement.repostPendingDirection}
-                  zapped={getZapState(rootEvent.id).zapped}
-                  zapPending={getZapState(rootEvent.id).zapPending}
-                  onLikePress={() => toggleLikeRef.current(rootEvent)}
-                  onMorePress={() => openPostActions(rootEvent)}
-                  onRepostPress={() => toggleRepostRef.current(rootEvent)}
-                  onZapPress={() => openZapMenuRef.current(rootEvent, rootMetrics.satsZapped)}
+                  {...feedPostCardProps(row, index, rootEvent, rootMetrics, rootEngagement)}
                   skipAnimation={!isFirstRender.current}
                   getThreadContext={() => getThreadContextRef.current()}
                   showFooterBorder={false}
@@ -862,27 +830,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
               second={
                 <PostCard
                   variant="feed"
-                  event={item.event}
-                  metrics={metrics}
-                  index={index}
-                  feedIndex={feedIndex}
-                  onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-                  quotedEvents={row.quotedEvents}
-                  profiles={row.profiles}
-                  getMetrics={getMetrics}
-                  liked={engagement.liked}
-                  replied={engagement.replied}
-                  reposted={engagement.reposted}
-                  likePending={engagement.likePending}
-                  repostPending={engagement.repostPending}
-                  likePendingDirection={engagement.likePendingDirection}
-                  repostPendingDirection={engagement.repostPendingDirection}
-                  zapped={getZapState(item.event.id).zapped}
-                  zapPending={getZapState(item.event.id).zapPending}
-                  onLikePress={() => toggleLikeRef.current(item.event)}
-                  onMorePress={() => openPostActions(item.event)}
-                  onRepostPress={() => toggleRepostRef.current(item.event)}
-                  onZapPress={() => openZapMenuRef.current(item.event, metrics.satsZapped)}
+                  {...feedPostCardProps(row, index, item.event, metrics, engagement)}
                   getThreadContext={() => getThreadContextRef.current()}
                   fullBleedFooterBorder
                 />
@@ -893,27 +841,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         return (
           <PostCard
             variant="feed"
-            event={item.event}
-            metrics={metrics}
-            index={index}
-            feedIndex={feedIndex}
-            onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-            quotedEvents={row.quotedEvents}
-            profiles={row.profiles}
-            getMetrics={getMetrics}
-            liked={engagement.liked}
-            replied={engagement.replied}
-            reposted={engagement.reposted}
-            likePending={engagement.likePending}
-            repostPending={engagement.repostPending}
-            likePendingDirection={engagement.likePendingDirection}
-            repostPendingDirection={engagement.repostPendingDirection}
-            zapped={getZapState(item.event.id).zapped}
-            zapPending={getZapState(item.event.id).zapPending}
-            onLikePress={() => toggleLikeRef.current(item.event)}
-            onMorePress={() => openPostActions(item.event)}
-            onRepostPress={() => toggleRepostRef.current(item.event)}
-            onZapPress={() => openZapMenuRef.current(item.event, metrics.satsZapped)}
+            {...feedPostCardProps(row, index, item.event, metrics, engagement)}
             skipAnimation={!isFirstRender.current}
             getThreadContext={() => getThreadContextRef.current()}
             fullBleedFooterBorder
@@ -934,27 +862,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             first={
               <PostCard
                 variant="feed"
-                event={rootEvent}
-                metrics={rootMetrics}
-                index={index}
-                feedIndex={feedIndex}
-                onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-                quotedEvents={row.quotedEvents}
-                profiles={row.profiles}
-                getMetrics={getMetrics}
-                liked={rootEngagement.liked}
-                replied={rootEngagement.replied}
-                reposted={rootEngagement.reposted}
-                likePending={rootEngagement.likePending}
-                repostPending={rootEngagement.repostPending}
-                likePendingDirection={rootEngagement.likePendingDirection}
-                repostPendingDirection={rootEngagement.repostPendingDirection}
-                zapped={getZapState(rootEvent.id).zapped}
-                zapPending={getZapState(rootEvent.id).zapPending}
-                onLikePress={() => toggleLikeRef.current(rootEvent)}
-                onMorePress={() => openPostActions(rootEvent)}
-                onRepostPress={() => toggleRepostRef.current(rootEvent)}
-                onZapPress={() => openZapMenuRef.current(rootEvent, rootMetrics.satsZapped)}
+                {...feedPostCardProps(row, index, rootEvent, rootMetrics, rootEngagement)}
                 skipAnimation={!isFirstRender.current}
                 getThreadContext={() => getThreadContextRef.current()}
                 showFooterBorder={false}
@@ -1037,6 +945,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       );
     },
     [
+      feedPostCardProps,
       getMetrics,
       getDisplayMetrics,
       getEngagementState,

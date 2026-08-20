@@ -74,6 +74,7 @@ import {
 } from '@/features/feed/lib/feedRows';
 
 import { PostCard } from './nostr/PostCard';
+import { createFeedPostCardProps } from './nostr/feedPostCardProps';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useVideoOverlayNavigation } from '@/features/feed/hooks/useVideoOverlayNavigation';
@@ -796,6 +797,29 @@ export function UserFeed({
     });
   }, [feedItems.length, feedRows.length, isLoading]);
 
+  const feedPostCardProps = useMemo(
+    () =>
+      createFeedPostCardProps({
+        getMetrics,
+        getZapState,
+        onOverlayOpenedFromIndex,
+        toggleLike: (event: FeedEvent) => void toggleLikeRef.current(event),
+        toggleRepost: (event: FeedEvent) => void toggleRepostRef.current(event),
+        openZapMenu: (event: FeedEvent, baseSats: number) =>
+          openZapMenuRef.current(event, baseSats),
+        openPostActions,
+      }),
+    [
+      getMetrics,
+      getZapState,
+      onOverlayOpenedFromIndex,
+      openPostActions,
+      openZapMenuRef,
+      toggleLikeRef,
+      toggleRepostRef,
+    ]
+  );
+
   const renderFeedItem = useCallback(
     ({ item: row, index }: { item: FeedRow; index: number }) => {
       const item = row.item;
@@ -811,54 +835,14 @@ export function UserFeed({
             <View>
               <PostCard
                 variant="feed"
-                event={rootEvent}
-                metrics={rootMetrics}
-                index={index}
-                feedIndex={index}
-                onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-                quotedEvents={row.quotedEvents}
-                profiles={row.profiles}
-                getMetrics={getMetrics}
-                liked={rootEngagement.liked}
-                replied={rootEngagement.replied}
-                reposted={rootEngagement.reposted}
-                likePending={rootEngagement.likePending}
-                repostPending={rootEngagement.repostPending}
-                likePendingDirection={rootEngagement.likePendingDirection}
-                repostPendingDirection={rootEngagement.repostPendingDirection}
-                zapped={getZapState(rootEvent.id).zapped}
-                zapPending={getZapState(rootEvent.id).zapPending}
-                onLikePress={() => toggleLikeRef.current(rootEvent)}
-                onMorePress={() => openPostActions(rootEvent)}
-                onRepostPress={() => toggleRepostRef.current(rootEvent)}
-                onZapPress={() => openZapMenuRef.current(rootEvent, rootMetrics.satsZapped)}
+                {...feedPostCardProps(row, index, rootEvent, rootMetrics, rootEngagement)}
                 skipAnimation={!isFirstRender.current}
                 showLineBelow
                 getThreadContext={() => getThreadContextRef.current()}
               />
               <PostCard
                 variant="thread-reply"
-                event={item.event}
-                metrics={metrics}
-                index={index}
-                feedIndex={index}
-                onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-                quotedEvents={row.quotedEvents}
-                profiles={row.profiles}
-                getMetrics={getMetrics}
-                liked={engagement.liked}
-                replied={engagement.replied}
-                reposted={engagement.reposted}
-                likePending={engagement.likePending}
-                repostPending={engagement.repostPending}
-                likePendingDirection={engagement.likePendingDirection}
-                repostPendingDirection={engagement.repostPendingDirection}
-                zapped={getZapState(item.event.id).zapped}
-                zapPending={getZapState(item.event.id).zapPending}
-                onLikePress={() => toggleLikeRef.current(item.event)}
-                onMorePress={() => openPostActions(item.event)}
-                onRepostPress={() => toggleRepostRef.current(item.event)}
-                onZapPress={() => openZapMenuRef.current(item.event, metrics.satsZapped)}
+                {...feedPostCardProps(row, index, item.event, metrics, engagement)}
                 showLineAbove
                 getThreadContext={() => getThreadContextRef.current()}
               />
@@ -868,27 +852,7 @@ export function UserFeed({
         return (
           <PostCard
             variant="feed"
-            event={item.event}
-            metrics={metrics}
-            index={index}
-            feedIndex={index}
-            onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-            quotedEvents={row.quotedEvents}
-            profiles={row.profiles}
-            getMetrics={getMetrics}
-            liked={engagement.liked}
-            replied={engagement.replied}
-            reposted={engagement.reposted}
-            likePending={engagement.likePending}
-            repostPending={engagement.repostPending}
-            likePendingDirection={engagement.likePendingDirection}
-            repostPendingDirection={engagement.repostPendingDirection}
-            zapped={getZapState(item.event.id).zapped}
-            zapPending={getZapState(item.event.id).zapPending}
-            onLikePress={() => toggleLikeRef.current(item.event)}
-            onMorePress={() => openPostActions(item.event)}
-            onRepostPress={() => toggleRepostRef.current(item.event)}
-            onZapPress={() => openZapMenuRef.current(item.event, metrics.satsZapped)}
+            {...feedPostCardProps(row, index, item.event, metrics, engagement)}
             skipAnimation={!isFirstRender.current}
             getThreadContext={() => getThreadContextRef.current()}
           />
@@ -905,27 +869,7 @@ export function UserFeed({
           <View>
             <PostCard
               variant="feed"
-              event={rootEvent}
-              metrics={rootMetrics}
-              index={index}
-              feedIndex={index}
-              onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-              quotedEvents={row.quotedEvents}
-              profiles={row.profiles}
-              getMetrics={getMetrics}
-              liked={rootEngagement.liked}
-              replied={rootEngagement.replied}
-              reposted={rootEngagement.reposted}
-              likePending={rootEngagement.likePending}
-              repostPending={rootEngagement.repostPending}
-              likePendingDirection={rootEngagement.likePendingDirection}
-              repostPendingDirection={rootEngagement.repostPendingDirection}
-              zapped={getZapState(rootEvent.id).zapped}
-              zapPending={getZapState(rootEvent.id).zapPending}
-              onLikePress={() => toggleLikeRef.current(rootEvent)}
-              onMorePress={() => openPostActions(rootEvent)}
-              onRepostPress={() => toggleRepostRef.current(rootEvent)}
-              onZapPress={() => openZapMenuRef.current(rootEvent, rootMetrics.satsZapped)}
+              {...feedPostCardProps(row, index, rootEvent, rootMetrics, rootEngagement)}
               skipAnimation={!isFirstRender.current}
               showLineBelow
               getThreadContext={() => getThreadContextRef.current()}
@@ -999,6 +943,7 @@ export function UserFeed({
       );
     },
     [
+      feedPostCardProps,
       getMetrics,
       getZapState,
       onOverlayOpenedFromIndex,

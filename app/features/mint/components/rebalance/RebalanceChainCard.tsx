@@ -8,21 +8,18 @@
 
 import React from 'react';
 
-import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import {
   TransferCard,
   TransferEntryRow,
   TransferStepChain,
   TransferErrorBanner,
 } from '@/shared/blocks/transfer';
-import Icon from 'assets/icons';
+import { RebalanceActionPill } from './RebalanceActionPill';
 
 import { getMintDisplayName } from '@/shared/lib/url';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 
 import type { TransferStep } from './rebalancePlanner';
@@ -54,10 +51,6 @@ export const RebalanceChainCard: React.FC<RebalanceChainCardProps> = ({
   onRetry,
   onSkip,
 }) => {
-  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
-  const primaryColor0 = foreground;
-  const primaryColor700 = surfaceTertiary;
-
   const { steps } = group;
 
   const allDone = steps.every((s) => stepStates[s.id]?.status === 'done');
@@ -113,40 +106,18 @@ export const RebalanceChainCard: React.FC<RebalanceChainCardProps> = ({
 
               <HStack gap={8} className="px-4">
                 {!isRunning && onRetry && (
-                  <Pressable
+                  <RebalanceActionPill
+                    icon="mdi:refresh"
+                    label="Retry"
                     onPress={() => onRetry(failedStep)}
-                    haptics
-                    style={{
-                      backgroundColor: primaryColor700,
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderRadius: 6,
-                    }}>
-                    <HStack align="center" gap={4}>
-                      <Icon name="mdi:refresh" size={14} color={primaryColor0} />
-                      <Text bold size={12} className="text-foreground">
-                        Retry
-                      </Text>
-                    </HStack>
-                  </Pressable>
+                  />
                 )}
                 {!isRunning && onSkip && (
-                  <Pressable
+                  <RebalanceActionPill
+                    icon="mdi:skip-next"
+                    label="Skip"
                     onPress={() => onSkip(failedStep)}
-                    haptics
-                    style={{
-                      backgroundColor: primaryColor700,
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderRadius: 6,
-                    }}>
-                    <HStack align="center" gap={4}>
-                      <Icon name="mdi:skip-next" size={14} color={primaryColor0} />
-                      <Text bold size={12} className="text-foreground">
-                        Skip
-                      </Text>
-                    </HStack>
-                  </Pressable>
+                  />
                 )}
               </HStack>
             </VStack>

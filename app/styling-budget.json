@@ -217,12 +217,11 @@
     "content-container-style": 1
   },
   "features/mint/components/rebalance/RebalanceChainCard.tsx": {
-    "inline-style": 2,
-    "stack-layout-props": 4
+    "stack-layout-props": 2
   },
   "features/mint/components/rebalance/RebalanceStepRow.tsx": {
-    "inline-style": 9,
-    "stack-layout-props": 10
+    "inline-style": 7,
+    "stack-layout-props": 8
   },
   "features/mint/screens/MintAddScreen.tsx": {
     "inline-style": 5

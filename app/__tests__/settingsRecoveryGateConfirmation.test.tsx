@@ -73,6 +73,7 @@ jest.mock('@sovranbitcoin/schemas', () => ({
 jest.mock('@/shared/lib/apiClient', () => ({ fetchJson: jest.fn() }));
 jest.mock('@/shared/lib/logger', () => ({
   cashuLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  mintUrlLogFields: jest.fn(() => ({ mintHost: 'mint.example', mintHash: 'mock-hash' })),
   useLifecycleLogger: jest.fn(),
 }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({

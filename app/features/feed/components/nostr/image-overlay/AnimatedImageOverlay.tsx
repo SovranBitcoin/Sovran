@@ -11,6 +11,7 @@ import {
   Gesture,
   GestureDetector,
   ScrollView as GHScrollView,
+  type PanGesture,
 } from 'react-native-gesture-handler';
 import { FullWindowOverlay } from 'react-native-screens';
 import Animated, {
@@ -132,8 +133,6 @@ function AnimatedImageOverlayContent({
     imageYCoord,
     imageWidth,
     imageHeight,
-    closeTargetPageX,
-    closeTargetPageY,
     closeTargetWidth,
     closeTargetHeight,
     blurIntensity,
@@ -457,25 +456,15 @@ function AnimatedImageOverlayContent({
    * - multi-image (horizontal pager): vertical dismiss only
    * - vertical video feed (vertical pager): horizontal dismiss only
    */
-  const pan = useMemo(
-    () => {
-      const gesture = Gesture.Pan().minDistance(DISMISS_MIN_DISTANCE);
-      if (isVerticalFeed) {
-        // Vertical pager owns Y axis; dismiss should activate only on horizontal intent.
-        gesture
-          .activeOffsetX([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
-          .failOffsetY([-PAGER_ACTIVE_OFFSET_X, PAGER_ACTIVE_OFFSET_X]);
-      } else if (hasMultipleMedia) {
-        // Horizontal pager owns X axis; dismiss should activate only on vertical intent.
-        gesture
-          .activeOffsetY([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
-          .failOffsetX([-PAGER_ACTIVE_OFFSET_X, PAGER_ACTIVE_OFFSET_X]);
-      } else {
-        gesture
-          .activeOffsetX([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
-          .activeOffsetY([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y]);
-      }
-      return gesture
+  const dismissPanRef = useRef<GestureType | undefined>(undefined);
+
+  /**
+   * Drag-to-dismiss handler chain shared by the overlay dismiss pan and the
+   * vertical-feed bar pan; callers supply only the activation config.
+   */
+  const withDismissDragHandlers = useCallback(
+    (gesture: PanGesture): PanGesture =>
+      gesture
         .onStart(() => {
           dismissPanActive.value = 1;
           scheduleOnRN(setDismissPanActive, true);
@@ -502,7 +491,7 @@ function AnimatedImageOverlayContent({
           imageScale.value = scale;
           blurIntensity.value = blur;
         })
-        .onFinalize((_event) => {
+        .onFinalize(() => {
           const wasActive = dismissPanActive.value === 1;
           dismissPanActive.value = 0;
           const deltaX = imageXCoord.value - panStartX.value;
@@ -524,27 +513,48 @@ function AnimatedImageOverlayContent({
             imageScale.value = withTiming(1, IMAGE_OVERLAY_TIMING_CONFIG);
             openToCenter();
           }
-        })
-        .withRef(dismissPanRef);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- shared values are stable refs
+        }),
     [
-      isVerticalFeed,
-      hasMultipleMedia,
-      expandedWidth,
-      expandedHeight,
+      dismissPanActive,
+      setDismissPanActive,
+      panStartX,
+      panStartY,
+      imageXCoord,
+      imageYCoord,
+      closeBtnOpacity,
+      imageState,
+      screenWidth,
+      imageScale,
+      blurIntensity,
       expandedWidthSv,
       expandedHeightSv,
-      screenWidth,
-      setDismissPanActive,
-      triggerClose,
+      expandedWidth,
+      expandedHeight,
       pagerOffsetSv,
-      closeTargetPageX,
-      closeTargetPageY,
-      closeTargetWidth,
-      closeTargetHeight,
+      triggerClose,
+      openToCenter,
     ]
   );
+
+  const pan = useMemo(() => {
+    const gesture = Gesture.Pan().minDistance(DISMISS_MIN_DISTANCE);
+    if (isVerticalFeed) {
+      // Vertical pager owns Y axis; dismiss should activate only on horizontal intent.
+      gesture
+        .activeOffsetX([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
+        .failOffsetY([-PAGER_ACTIVE_OFFSET_X, PAGER_ACTIVE_OFFSET_X]);
+    } else if (hasMultipleMedia) {
+      // Horizontal pager owns X axis; dismiss should activate only on vertical intent.
+      gesture
+        .activeOffsetY([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
+        .failOffsetX([-PAGER_ACTIVE_OFFSET_X, PAGER_ACTIVE_OFFSET_X]);
+    } else {
+      gesture
+        .activeOffsetX([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
+        .activeOffsetY([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y]);
+    }
+    return withDismissDragHandlers(gesture).withRef(dismissPanRef);
+  }, [hasMultipleMedia, isVerticalFeed, withDismissDragHandlers]);
 
   const toggleOverlayUI = useCallback(() => {
     scheduleOnUI(() => {
@@ -646,6 +656,40 @@ function AnimatedImageOverlayContent({
   /** When sheet is below this height, any drag resizes; above it, only at-top + drag-down resizes. */
   const scrollVsDragMidHeight = (snap60Height + panelMaxHeight) / 2;
 
+  /**
+   * Settle the bottom panel after a pan: snap to 0 / 60% / 100% by velocity
+   * then position; closing the sheet when it lands at 0.
+   */
+  const settlePanelHeight = useCallback(
+    (current: number, velocityY: number) => {
+      'worklet';
+      const SNAP_0 = 0;
+      const SNAP_60 = snap60Height;
+      const SNAP_100 = panelMaxHeight;
+      const t30 = screenHeight * 0.3;
+      const t80 = screenHeight * 0.8;
+      let snapTo: number;
+      if (velocityY > 250) snapTo = SNAP_100;
+      else if (velocityY < -250) snapTo = current < screenHeight * 0.5 ? SNAP_0 : SNAP_60;
+      else if (current < t30) snapTo = SNAP_0;
+      else if (current < t80) snapTo = SNAP_60;
+      else snapTo = SNAP_100;
+      const closeSheet = snapTo <= 0;
+      panelHeightSv.value = withTiming(
+        snapTo,
+        {
+          duration: BOTTOM_PANEL_STIFF_DURATION_MS,
+          easing: Easing.out(Easing.cubic),
+        },
+        (finished) => {
+          'worklet';
+          if (finished && closeSheet) scheduleOnRN(setSheetOpenFromReaction, false);
+        }
+      );
+    },
+    [panelHeightSv, snap60Height, panelMaxHeight, screenHeight, setSheetOpenFromReaction]
+  );
+
   /** Handle-only pan: only sheet resize, no scroll. Snap to 0 / 60% / 100%; at 0 run setSheetOpen(false). */
   const handlePan = useMemo(
     () =>
@@ -660,40 +704,9 @@ function AnimatedImageOverlayContent({
         })
         .onEnd((e) => {
           'worklet';
-          const current = panelHeightSv.value;
-          const velocityY = -e.velocityY;
-          const SNAP_0 = 0;
-          const SNAP_60 = snap60Height;
-          const SNAP_100 = panelMaxHeight;
-          const t30 = screenHeight * 0.3;
-          const t80 = screenHeight * 0.8;
-          let snapTo: number;
-          if (velocityY > 250) snapTo = SNAP_100;
-          else if (velocityY < -250) snapTo = current < screenHeight * 0.5 ? SNAP_0 : SNAP_60;
-          else if (current < t30) snapTo = SNAP_0;
-          else if (current < t80) snapTo = SNAP_60;
-          else snapTo = SNAP_100;
-          const closeSheet = snapTo <= 0;
-          panelHeightSv.value = withTiming(
-            snapTo,
-            {
-              duration: BOTTOM_PANEL_STIFF_DURATION_MS,
-              easing: Easing.out(Easing.cubic),
-            },
-            (finished) => {
-              'worklet';
-              if (finished && closeSheet) scheduleOnRN(setSheetOpenFromReaction, false);
-            }
-          );
+          settlePanelHeight(panelHeightSv.value, -e.velocityY);
         }),
-    [
-      panelHeightSv,
-      panelDragStartSv,
-      panelMaxHeight,
-      snap60Height,
-      screenHeight,
-      setSheetOpenFromReaction,
-    ]
+    [panelHeightSv, panelDragStartSv, panelMaxHeight, settlePanelHeight]
   );
 
   /**
@@ -701,7 +714,6 @@ function AnimatedImageOverlayContent({
    * Snap to 0 / 60% / 100%; at 0 run setSheetOpen(false).
    */
   const scrollAreaPanRef = useRef<GestureType | undefined>(undefined);
-  const dismissPanRef = useRef<GestureType | undefined>(undefined);
   const scrollAreaPan = useMemo(
     () =>
       Gesture.Pan()
@@ -765,43 +777,17 @@ function AnimatedImageOverlayContent({
         })
         .onEnd((e) => {
           'worklet';
-          const current = panelHeightSv.value;
-          const velocityY = -e.velocityY;
-          const SNAP_0 = 0;
-          const SNAP_60 = snap60Height;
-          const SNAP_100 = panelMaxHeight;
-          const t30 = screenHeight * 0.3;
-          const t80 = screenHeight * 0.8;
-          let snapTo: number;
-          if (velocityY > 250) snapTo = SNAP_100;
-          else if (velocityY < -250) snapTo = current < screenHeight * 0.5 ? SNAP_0 : SNAP_60;
-          else if (current < t30) snapTo = SNAP_0;
-          else if (current < t80) snapTo = SNAP_60;
-          else snapTo = SNAP_100;
-          const closeSheet = snapTo <= 0;
-          panelHeightSv.value = withTiming(
-            snapTo,
-            {
-              duration: BOTTOM_PANEL_STIFF_DURATION_MS,
-              easing: Easing.out(Easing.cubic),
-            },
-            (finished) => {
-              'worklet';
-              if (finished && closeSheet) scheduleOnRN(setSheetOpenFromReaction, false);
-            }
-          );
+          settlePanelHeight(panelHeightSv.value, -e.velocityY);
         })
         .withRef(scrollAreaPanRef),
     [
+      settlePanelHeight,
       panelHeightSv,
       panelDragStartSv,
       panelMaxHeight,
-      snap60Height,
-      screenHeight,
       scrollVsDragMidHeight,
       panelTouchStartYSv,
       scrollOffsetYInPanel,
-      setSheetOpenFromReaction,
     ]
   );
 
@@ -1051,82 +1037,14 @@ function AnimatedImageOverlayContent({
   /** Bar-area dismiss pan in vertical feed mode, using the same drag animation path as overlay dismiss. */
   const barDismissPan = useMemo(
     () =>
-      Gesture.Pan()
-        .enabled(isVerticalFeed && !sheetOpen)
-        .activeOffsetX([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
-        .failOffsetY([-PAGER_ACTIVE_OFFSET_X, PAGER_ACTIVE_OFFSET_X])
-        .minDistance(DISMISS_MIN_DISTANCE)
-        .onStart(() => {
-          dismissPanActive.value = 1;
-          scheduleOnRN(setDismissPanActive, true);
-          panStartX.value = imageXCoord.value;
-          panStartY.value = imageYCoord.value;
-          closeBtnOpacity.value = withTiming(0, {
-            duration: DISMISS_CLOSE_BTN_FADE_DURATION_MS,
-          });
-        })
-        .onChange((event) => {
-          if (imageState.value === 'close') return;
-          imageXCoord.value += event.changeX * DISMISS_DRAG_FOLLOW;
-          imageYCoord.value += event.changeY * DISMISS_DRAG_FOLLOW;
-          const deltaX = imageXCoord.value - panStartX.value;
-          const deltaY = imageYCoord.value - panStartY.value;
-          const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-          const dragRange = screenWidth * DISMISS_DRAG_RANGE_FRACTION;
-          const scale = interpolate(distance, [0, dragRange], [1, DISMISS_SCALE_AT_DRAG], {
-            extrapolateRight: 'clamp',
-          });
-          const blur = interpolate(distance, [0, dragRange], [DISMISS_BLUR_AT_REST, 0], {
-            extrapolateRight: 'clamp',
-          });
-          imageScale.value = scale;
-          blurIntensity.value = blur;
-        })
-        .onFinalize(() => {
-          const wasActive = dismissPanActive.value === 1;
-          dismissPanActive.value = 0;
-          const deltaX = imageXCoord.value - panStartX.value;
-          const deltaY = imageYCoord.value - panStartY.value;
-          const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-          const ew = expandedWidthSv.value || expandedWidth;
-          const eh = expandedHeightSv.value || expandedHeight;
-          const threshold = Math.max(ew, eh) * DISMISS_THRESHOLD_FRACTION;
-          const dismissed = distance > threshold;
-          scheduleOnRN(setDismissPanActive, false);
-          if (!wasActive) return;
-          if (dismissed) {
-            // Avoid transform-origin drift while closing; return animation should be driven by x/y/size only.
-            imageScale.value = 1;
-            cancelAnimation(pagerOffsetSv);
-            pagerOffsetSv.value = Math.round(pagerOffsetSv.value);
-            scheduleOnRN(triggerClose, Math.round(pagerOffsetSv.value));
-          } else {
-            imageScale.value = withTiming(1, IMAGE_OVERLAY_TIMING_CONFIG);
-            openToCenter();
-          }
-        }),
-    [
-      isVerticalFeed,
-      sheetOpen,
-      dismissPanActive,
-      setDismissPanActive,
-      panStartX,
-      panStartY,
-      imageXCoord,
-      imageYCoord,
-      closeBtnOpacity,
-      imageState,
-      screenWidth,
-      imageScale,
-      blurIntensity,
-      expandedWidthSv,
-      expandedHeightSv,
-      expandedWidth,
-      expandedHeight,
-      pagerOffsetSv,
-      triggerClose,
-      openToCenter,
-    ]
+      withDismissDragHandlers(
+        Gesture.Pan()
+          .enabled(isVerticalFeed && !sheetOpen)
+          .activeOffsetX([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
+          .failOffsetY([-PAGER_ACTIVE_OFFSET_X, PAGER_ACTIVE_OFFSET_X])
+          .minDistance(DISMISS_MIN_DISTANCE)
+      ),
+    [isVerticalFeed, sheetOpen, withDismissDragHandlers]
   );
 
   return (

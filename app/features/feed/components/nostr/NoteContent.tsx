@@ -831,24 +831,8 @@ export const NoteContent = React.memo(function NoteContent({
                     onBeforeOpen={onBeforeOpen}
                     onPressIn={onImagePressIn}
                     onPressOut={onImagePressOut}
-                    event={overlayEvent}
-                    metrics={overlayMetrics}
-                    profile={overlayProfile}
-                    reposted={reposted}
-                    liked={liked}
-                    replied={replied}
-                    zapped={zapped}
-                    repostPending={repostPending}
-                    likePending={likePending}
-                    zapPending={zapPending}
-                    repostPendingDirection={repostPendingDirection}
-                    likePendingDirection={likePendingDirection}
-                    onCommentPress={onCommentPress}
-                    onRepostPress={onRepostPress}
-                    onLikePress={onLikePress}
-                    onZapPress={onZapPress}
-                    onActionPressIn={onActionPressIn}
-                    onActionPressOut={onActionPressOut}
+                    eventId={overlayEvent?.id}
+                    overlayPost={overlayPost}
                   />
                 );
               }
