@@ -5,13 +5,15 @@
  * (receive-flow, send-flow, mint-flow, transactions-flow) to ensure consistency.
  */
 
-import { memo } from 'react';
+import { memo, useMemo, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 import type { NativeStackHeaderProps, NativeStackNavigationOptions } from 'expo-router';
 import type { ParamListBase, NavigationProp } from 'expo-router/react-navigation';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
-import { FlowSheetHeader } from '@/shared/ui/composed/FlowSheetHeader';
+import { FLOW_SHEET_HEADER_HEIGHT, FlowSheetHeader } from '@/shared/ui/composed/FlowSheetHeader';
 import { AndroidHeaderScrim } from '@/shared/ui/composed/AndroidHeaderScrim';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
 
@@ -129,6 +131,25 @@ export const createFlowLayoutScreenOptions = (
     });
   };
 };
+
+/**
+ * Shared orchestration for modal flows presented as Android form sheets.
+ * Route modules supply only their Stack.Screen declarations; theme, header,
+ * sheet geometry, and stack policy stay local to this module.
+ */
+export function AndroidSheetFlowStack({ children }: { children: ReactNode }) {
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const screenOptions = useMemo(
+    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
+    [foreground, background]
+  );
+
+  return (
+    <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
+      <Stack screenOptions={screenOptions}>{children}</Stack>
+    </AndroidSheetRoot>
+  );
+}
 
 /**
  * Base header options shared across root modal screens.

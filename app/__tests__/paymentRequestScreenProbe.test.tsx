@@ -112,6 +112,10 @@ function assertFixedReadyProbe(renderer: TestRenderer.ReactTestRenderer) {
   expect(ready.children).toEqual([]);
 }
 
+function findNativeProbe(renderer: TestRenderer.ReactTestRenderer, testID: string) {
+  return renderer.root.find((node) => node.type === 'view' && node.props.testID === testID);
+}
+
 describe('PaymentRequestScreen QA probes', () => {
   beforeEach(() => {
     mockUseScreenActions.mockReset();
@@ -138,7 +142,7 @@ describe('PaymentRequestScreen QA probes', () => {
     });
 
     assertFixedReadyProbe(renderer!);
-    const probe = renderer!.root.findByProps({ testID: 'transaction-probe-pr-preview-1' });
+    const probe = findNativeProbe(renderer!, 'transaction-probe-pr-preview-1');
     expect(JSON.parse(probe.props.accessibilityValue.text)).toEqual({
       direction: 'out',
       amount: 30,
@@ -177,7 +181,7 @@ describe('PaymentRequestScreen QA probes', () => {
     });
 
     assertFixedReadyProbe(renderer!);
-    const probe = renderer!.root.findByProps({ testID: 'transaction-probe-send-operation-1' });
+    const probe = findNativeProbe(renderer!, 'transaction-probe-send-operation-1');
     expect(JSON.parse(probe.props.accessibilityValue.text)).toEqual({
       direction: 'out',
       amount: 30,

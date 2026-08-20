@@ -136,6 +136,39 @@ const SettingsListActionItem: React.FC<{
   );
 };
 
+const SettingsToggleItem: React.FC<{
+  title: string;
+  description?: string;
+  isSelected: boolean;
+  onSelectedChange: (selected: boolean) => void;
+  testID?: string;
+}> = ({ title, description, isSelected, onSelectedChange, testID }) => (
+  <PressableFeedback
+    animation={false}
+    onPress={() => onSelectedChange(!isSelected)}
+    testID={testID}
+    accessible={testID ? true : undefined}
+    accessibilityRole={testID ? 'switch' : undefined}
+    accessibilityLabel={testID ? title : undefined}
+    accessibilityState={testID ? { checked: isSelected } : undefined}
+    accessibilityValue={testID ? { text: isSelected ? '1' : '0' } : undefined}>
+    <PressableFeedback.Scale>
+      <ListGroup.Item disabled>
+        <ListGroup.ItemContent>
+          <ListGroup.ItemTitle>{title}</ListGroup.ItemTitle>
+          {description ? (
+            <ListGroup.ItemDescription>{description}</ListGroup.ItemDescription>
+          ) : null}
+        </ListGroup.ItemContent>
+        <ListGroup.ItemSuffix>
+          <HeroSwitch isSelected={isSelected} onSelectedChange={onSelectedChange} />
+        </ListGroup.ItemSuffix>
+      </ListGroup.Item>
+    </PressableFeedback.Scale>
+    <PressableFeedback.Ripple />
+  </PressableFeedback>
+);
+
 /**
  * Phase-2 of the deferred mount. Screen's deferContent already delays the
  * whole tree one tick so the card can present instantly; this stages the
@@ -267,28 +300,12 @@ export const SettingsScreen = () => {
         <BelowFold>
           <Section title="Privacy">
             <ListGroup variant="secondary">
-              <PressableFeedback
-                animation={false}
-                onPress={() => setSendLocationEnabled(!(sendLocationEnabled ?? false))}>
-                <PressableFeedback.Scale>
-                  <ListGroup.Item disabled>
-                    <ListGroup.ItemContent>
-                      <ListGroup.ItemTitle>Location Stamps</ListGroup.ItemTitle>
-                      <ListGroup.ItemDescription>
-                        Attach your approximate location when making transactions. (metadata only
-                        stored on your device)
-                      </ListGroup.ItemDescription>
-                    </ListGroup.ItemContent>
-                    <ListGroup.ItemSuffix>
-                      <HeroSwitch
-                        isSelected={sendLocationEnabled ?? false}
-                        onSelectedChange={setSendLocationEnabled}
-                      />
-                    </ListGroup.ItemSuffix>
-                  </ListGroup.Item>
-                </PressableFeedback.Scale>
-                <PressableFeedback.Ripple />
-              </PressableFeedback>
+              <SettingsToggleItem
+                title="Location Stamps"
+                description="Attach your approximate location when making transactions. (metadata only stored on your device)"
+                isSelected={sendLocationEnabled ?? false}
+                onSelectedChange={setSendLocationEnabled}
+              />
               <Separator className="mx-4" />
               <SettingsListLinkItem
                 href="/(settings-flow)/media"
@@ -317,137 +334,50 @@ export const SettingsScreen = () => {
                   testID="settings-design-system-row"
                 />
                 <Separator className="mx-4" />
-                <PressableFeedback animation={false} onPress={() => setMockMode(!mockMode)}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Mock Mode</ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch isSelected={mockMode} onSelectedChange={setMockMode} />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
+                <SettingsToggleItem
+                  title="Mock Mode"
+                  isSelected={mockMode}
+                  onSelectedChange={setMockMode}
+                />
                 <Separator className="mx-4" />
-                <PressableFeedback
-                  animation={false}
-                  onPress={() => setMockOffline(!mockOffline)}
+                <SettingsToggleItem
+                  title="Mock Offline"
+                  isSelected={mockOffline}
+                  onSelectedChange={setMockOffline}
                   testID="settings-mock-offline-toggle"
-                  accessible
-                  accessibilityRole="switch"
-                  accessibilityLabel="Mock Offline"
-                  accessibilityState={{ checked: mockOffline }}
-                  accessibilityValue={{ text: mockOffline ? '1' : '0' }}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Mock Offline</ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch isSelected={mockOffline} onSelectedChange={setMockOffline} />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
+                />
                 <Separator className="mx-4" />
-                <PressableFeedback
-                  animation={false}
-                  onPress={() => setMockFailSend(!mockFailSend)}
+                <SettingsToggleItem
+                  title="Mock Fail Send"
+                  isSelected={mockFailSend}
+                  onSelectedChange={setMockFailSend}
                   testID="settings-mock-fail-send-toggle"
-                  accessible
-                  accessibilityRole="switch"
-                  accessibilityLabel="Mock Fail Send"
-                  accessibilityState={{ checked: mockFailSend }}
-                  accessibilityValue={{ text: mockFailSend ? '1' : '0' }}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Mock Fail Send</ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch isSelected={mockFailSend} onSelectedChange={setMockFailSend} />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
+                />
                 <Separator className="mx-4" />
-                <PressableFeedback
-                  animation={false}
-                  onPress={() => setMockFailMelt(!mockFailMelt)}
+                <SettingsToggleItem
+                  title="Mock Fail Melt"
+                  isSelected={mockFailMelt}
+                  onSelectedChange={setMockFailMelt}
                   testID="settings-mock-fail-melt-toggle"
-                  accessible
-                  accessibilityRole="switch"
-                  accessibilityLabel="Mock Fail Melt"
-                  accessibilityState={{ checked: mockFailMelt }}
-                  accessibilityValue={{ text: mockFailMelt ? '1' : '0' }}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Mock Fail Melt</ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch isSelected={mockFailMelt} onSelectedChange={setMockFailMelt} />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
+                />
                 <Separator className="mx-4" />
-                <PressableFeedback
-                  animation={false}
-                  onPress={() => setMockFailPaymentRequest(!mockFailPaymentRequest)}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Mock Fail Payment Request</ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch
-                          isSelected={mockFailPaymentRequest}
-                          onSelectedChange={setMockFailPaymentRequest}
-                        />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
+                <SettingsToggleItem
+                  title="Mock Fail Payment Request"
+                  isSelected={mockFailPaymentRequest}
+                  onSelectedChange={setMockFailPaymentRequest}
+                />
                 <Separator className="mx-4" />
-                <PressableFeedback
-                  animation={false}
-                  onPress={() => setWhitenoiseEnabled(!whitenoiseEnabled)}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>White Noise</ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch
-                          isSelected={whitenoiseEnabled}
-                          onSelectedChange={setWhitenoiseEnabled}
-                        />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
+                <SettingsToggleItem
+                  title="White Noise"
+                  isSelected={whitenoiseEnabled}
+                  onSelectedChange={setWhitenoiseEnabled}
+                />
                 <Separator className="mx-4" />
-                <PressableFeedback animation={false} onPress={() => setMockNoGlass(!mockNoGlass)}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Mock no-glass</ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch isSelected={mockNoGlass} onSelectedChange={setMockNoGlass} />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
+                <SettingsToggleItem
+                  title="Mock no-glass"
+                  isSelected={mockNoGlass}
+                  onSelectedChange={setMockNoGlass}
+                />
               </ListGroup>
             </Section>
           ) : null}

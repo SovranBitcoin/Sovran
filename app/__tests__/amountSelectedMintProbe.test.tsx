@@ -21,9 +21,8 @@ describe('AmountSelectedMintProbe', () => {
       );
     });
 
-    const probe = renderer!.root.findByProps({
-      testID: 'amount-selected-mint:mint.minibits.cash',
-    });
+    const probe = renderer!.root.find((node) => node.type === 'view');
+    expect(probe.props.testID).toBe('amount-selected-mint:mint.minibits.cash');
     expect(probe.props.accessibilityValue).toEqual({ text: 'mint.minibits.cash' });
     expect(JSON.stringify(probe.props)).not.toContain('Bitcoin');
     expect(JSON.stringify(probe.props)).not.toContain('never-expose');

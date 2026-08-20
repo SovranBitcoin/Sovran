@@ -1,5 +1,5 @@
 import React, { useMemo, useSyncExternalStore } from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform } from 'react-native';
 
 import {
   E2E_READY_PROOF_STATUS_ID,
@@ -7,7 +7,7 @@ import {
   serializeE2EReadyProofStatus,
   subscribeE2EReadyProofStatus,
 } from '@/shared/lib/cashu/e2eReadyProofStatus';
-import { View } from '@/shared/ui/primitives/View/View';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 
 /** Accessibility-only, non-secret completion evidence for the owned funded
  * simulator. Release bundles and ordinary dev sessions never render it. */
@@ -23,10 +23,6 @@ export function E2EReadyProofProbe(): React.ReactElement | null {
   // commas/quotes/braces make Android drop the whole content-desc, exactly as
   // with TransactionProbe. iOS keeps the label + JSON accessibilityValue split.
   const androidPayload = Platform.OS === 'android' ? encodeURIComponent(serialized) : undefined;
-  const value = useMemo(
-    () => (androidPayload ? undefined : { text: serialized }),
-    [androidPayload, serialized]
-  );
   if (
     !__DEV__ ||
     !process.env.EXPO_PUBLIC_E2E_SEED_EXPORT_ENDPOINT ||
@@ -36,26 +32,10 @@ export function E2EReadyProofProbe(): React.ReactElement | null {
     return null;
   }
   return (
-    <View
+    <E2EAccessibilityProbe
       testID={E2E_READY_PROOF_STATUS_ID}
-      accessible
-      accessibilityRole="text"
       accessibilityLabel={androidPayload ?? 'Funded test proof reconciliation'}
-      accessibilityValue={value}
-      importantForAccessibility="yes"
-      collapsable={false}
-      pointerEvents="none"
-      style={styles.probe}
+      value={androidPayload ? undefined : serialized}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  probe: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 1,
-    height: 1,
-  },
-});

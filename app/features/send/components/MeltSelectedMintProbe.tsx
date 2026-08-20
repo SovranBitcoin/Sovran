@@ -1,7 +1,6 @@
-import React from 'react';
-import { StyleSheet } from 'react-native';
+import type { ReactElement } from 'react';
 
-import { View } from '@/shared/ui/primitives/View/View';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 
 export function meltSelectedMintHost(mintUrl: string): string {
   try {
@@ -22,30 +21,13 @@ export function MeltSelectedMintProbe({
 }: {
   mintUrl: string;
   transactionId: string;
-}): React.ReactElement {
+}): ReactElement {
   const host = meltSelectedMintHost(mintUrl);
-  const accessibilityValue = React.useMemo(() => ({ text: host }), [host]);
   return (
-    <View
+    <E2EAccessibilityProbe
       testID={`melt-selected-mint:${host}:${transactionId}`}
-      accessible
-      accessibilityRole="text"
       accessibilityLabel={`Selected payment mint ${host}`}
-      accessibilityValue={accessibilityValue}
-      importantForAccessibility="yes"
-      collapsable={false}
-      pointerEvents="none"
-      style={styles.probe}
+      value={host}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  probe: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 1,
-    height: 1,
-  },
-});

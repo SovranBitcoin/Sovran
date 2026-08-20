@@ -25,9 +25,7 @@ const PROFILE_OPTIONS = { title: 'Profile' };
 // (blank DM thread) — keep in sync with config/modalScreens.ts.
 const USER_MESSAGES_OPTIONS = { headerShown: true };
 const SHARE_OPTIONS = { title: 'Share profile' };
-const GEOHASH_CHAT_OPTIONS = { headerShown: false };
-const BITCHAT_NETWORK_OPTIONS = { headerShown: false };
-const BITCHAT_DM_OPTIONS = { headerShown: false };
+const HIDDEN_HEADER_OPTIONS = { headerShown: false };
 
 export default function UserFlowLayout() {
   const [foreground, background, surface] = useThemeColor([
@@ -54,9 +52,9 @@ export default function UserFlowLayout() {
       <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
       <Stack.Screen name="share" options={SHARE_OPTIONS} />
       <Stack.Screen name="thread" options={threadOptions} />
-      <Stack.Screen name="geohashChat" options={GEOHASH_CHAT_OPTIONS} />
-      <Stack.Screen name="bitchatNetwork" options={BITCHAT_NETWORK_OPTIONS} />
-      <Stack.Screen name="bitchatDM" options={BITCHAT_DM_OPTIONS} />
+      <Stack.Screen name="geohashChat" options={HIDDEN_HEADER_OPTIONS} />
+      <Stack.Screen name="bitchatNetwork" options={HIDDEN_HEADER_OPTIONS} />
+      <Stack.Screen name="bitchatDM" options={HIDDEN_HEADER_OPTIONS} />
     </Stack>
   );
 }

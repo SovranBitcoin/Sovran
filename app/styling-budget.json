@@ -362,15 +362,6 @@
   "features/receive/screens/ReceiveScreen.tsx": {
     "stylesheet-create": 1
   },
-  "features/send/components/AmountSelectedMintProbe.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/send/components/MeltDestinationFingerprintProbe.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/send/components/MeltSelectedMintProbe.tsx": {
-    "stylesheet-create": 1
-  },
   "features/send/components/P2PKLockIndicator.tsx": {
     "stylesheet-create": 1,
     "stack-layout-props": 1
@@ -556,9 +547,6 @@
     "stylesheet-create": 1,
     "stack-layout-props": 1
   },
-  "features/transactions/components/detail/TransactionProbe.tsx": {
-    "stylesheet-create": 1
-  },
   "features/transactions/components/detail/TransactionSourceSection.tsx": {
     "stack-layout-props": 1
   },
@@ -610,9 +598,6 @@
     "stylesheet-create": 1,
     "inline-style": 2
   },
-  "features/wallet/components/E2EReadyProofProbe.tsx": {
-    "stylesheet-create": 1
-  },
   "features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.androidMenu.tsx": {
     "inline-style": 2,
     "stack-layout-props": 1
@@ -635,12 +620,6 @@
   "features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.liquid.tsx": {
     "stylesheet-create": 1,
     "inline-style": 1
-  },
-  "features/wallet/components/WalletSelectedMintProbe.tsx": {
-    "stylesheet-create": 1
-  },
-  "features/wallet/components/WalletWallpaperProbe.tsx": {
-    "stylesheet-create": 1
   },
   "features/wallet/screens/WalletScreen.tsx": {
     "stylesheet-create": 1,

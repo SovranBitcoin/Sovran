@@ -6,27 +6,15 @@
  * Used for transaction filtering options.
  */
 
-import { useMemo } from 'react';
 import { Stack } from 'expo-router';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
-import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
-import { FLOW_SHEET_HEADER_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
+import { AndroidSheetFlowStack } from '../../config/flowLayoutOptions';
 
 const FILTERS_OPTIONS = { title: 'Filters' };
 
 export default function FilterFlowLayout() {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
-    [foreground, background]
-  );
-
   return (
-    <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
-      <Stack screenOptions={screenOptions}>
-        <Stack.Screen name="filters" options={FILTERS_OPTIONS} />
-      </Stack>
-    </AndroidSheetRoot>
+    <AndroidSheetFlowStack>
+      <Stack.Screen name="filters" options={FILTERS_OPTIONS} />
+    </AndroidSheetFlowStack>
   );
 }

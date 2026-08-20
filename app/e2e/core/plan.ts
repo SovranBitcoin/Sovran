@@ -10,7 +10,7 @@ import type { Selector } from '../schema/selectors';
 import { interpolateDeep, type Vars } from './interpolate';
 import { redactString } from './redact';
 
-export type Phase = 'precondition' | 'test' | 'verify' | 'cleanup';
+type Phase = 'precondition' | 'test' | 'verify' | 'cleanup';
 type Availability = 'ready' | 'deferred';
 
 interface FixtureFrame {

@@ -13,13 +13,9 @@
  * The first screen shows a close button, subsequent screens show a back button.
  */
 
-import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
-import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
-import { FLOW_SHEET_HEADER_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
+import { AndroidSheetFlowStack } from '../../config/flowLayoutOptions';
 
 const RECEIVE_OPTIONS = { title: 'Receive' };
 const AMOUNT_OPTIONS = { title: 'Select amount' };
@@ -36,26 +32,18 @@ const CAMERA_OPTIONS = {
 };
 
 export default function ReceiveFlowLayout() {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
-    [foreground, background]
-  );
-
   return (
-    <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
-      <Stack screenOptions={screenOptions}>
-        <Stack.Screen name="receive" options={RECEIVE_OPTIONS} />
-        <Stack.Screen name="qrDisplay" options={RECEIVE_OPTIONS} />
-        <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
-        <Stack.Screen name="mintSelect" options={MINT_SELECT_OPTIONS} />
-        <Stack.Screen name="lightningReceive" options={LIGHTNING_RECEIVE_OPTIONS} />
-        <Stack.Screen name="onchainReceive" options={ONCHAIN_RECEIVE_OPTIONS} />
-        <Stack.Screen name="paymentRequest" options={MINT_QUOTE_OPTIONS} />
-        <Stack.Screen name="receiveToken" options={RECEIVE_TOKEN_OPTIONS} />
-        <Stack.Screen name="railList" options={RAIL_LIST_OPTIONS} />
-        <Stack.Screen name="camera" options={CAMERA_OPTIONS} />
-      </Stack>
-    </AndroidSheetRoot>
+    <AndroidSheetFlowStack>
+      <Stack.Screen name="receive" options={RECEIVE_OPTIONS} />
+      <Stack.Screen name="qrDisplay" options={RECEIVE_OPTIONS} />
+      <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
+      <Stack.Screen name="mintSelect" options={MINT_SELECT_OPTIONS} />
+      <Stack.Screen name="lightningReceive" options={LIGHTNING_RECEIVE_OPTIONS} />
+      <Stack.Screen name="onchainReceive" options={ONCHAIN_RECEIVE_OPTIONS} />
+      <Stack.Screen name="paymentRequest" options={MINT_QUOTE_OPTIONS} />
+      <Stack.Screen name="receiveToken" options={RECEIVE_TOKEN_OPTIONS} />
+      <Stack.Screen name="railList" options={RAIL_LIST_OPTIONS} />
+      <Stack.Screen name="camera" options={CAMERA_OPTIONS} />
+    </AndroidSheetFlowStack>
   );
 }

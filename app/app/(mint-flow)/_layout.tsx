@@ -10,12 +10,8 @@
  * The first screen shows a close button, subsequent screens show a back button.
  */
 
-import { useMemo } from 'react';
 import { Stack } from 'expo-router';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
-import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
-import { FLOW_SHEET_HEADER_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
+import { AndroidSheetFlowStack } from '../../config/flowLayoutOptions';
 
 const ADD_OPTIONS = { title: 'Add mints' };
 const INFO_OPTIONS = { title: 'Mint details' };
@@ -28,22 +24,14 @@ const REBALANCE_PLAN_OPTIONS = { title: 'Rebalance plan' };
 const USER_MESSAGES_OPTIONS = { headerShown: true };
 
 export default function MintFlowLayout() {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
-    [foreground, background]
-  );
-
   return (
-    <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
-      <Stack screenOptions={screenOptions}>
-        <Stack.Screen name="add" options={ADD_OPTIONS} />
-        <Stack.Screen name="info" options={INFO_OPTIONS} />
-        <Stack.Screen name="reviews" options={REVIEWS_OPTIONS} />
-        <Stack.Screen name="distribution" options={DISTRIBUTION_OPTIONS} />
-        <Stack.Screen name="rebalancePlan" options={REBALANCE_PLAN_OPTIONS} />
-        <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
-      </Stack>
-    </AndroidSheetRoot>
+    <AndroidSheetFlowStack>
+      <Stack.Screen name="add" options={ADD_OPTIONS} />
+      <Stack.Screen name="info" options={INFO_OPTIONS} />
+      <Stack.Screen name="reviews" options={REVIEWS_OPTIONS} />
+      <Stack.Screen name="distribution" options={DISTRIBUTION_OPTIONS} />
+      <Stack.Screen name="rebalancePlan" options={REBALANCE_PLAN_OPTIONS} />
+      <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
+    </AndroidSheetFlowStack>
   );
 }

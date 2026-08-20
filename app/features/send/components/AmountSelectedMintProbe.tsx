@@ -1,7 +1,6 @@
-import React from 'react';
-import { StyleSheet } from 'react-native';
+import type { ReactElement } from 'react';
 
-import { View } from '@/shared/ui/primitives/View/View';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 
 import { meltSelectedMintHost } from './MeltSelectedMintProbe';
 
@@ -12,30 +11,13 @@ import { meltSelectedMintHost } from './MeltSelectedMintProbe';
  * this probe is the only signal that the balance-aware preselection picked
  * the funded mint.
  */
-export function AmountSelectedMintProbe({ mintUrl }: { mintUrl: string }): React.ReactElement {
+export function AmountSelectedMintProbe({ mintUrl }: { mintUrl: string }): ReactElement {
   const host = meltSelectedMintHost(mintUrl);
-  const accessibilityValue = React.useMemo(() => ({ text: host }), [host]);
   return (
-    <View
+    <E2EAccessibilityProbe
       testID={`amount-selected-mint:${host}`}
-      accessible
-      accessibilityRole="text"
       accessibilityLabel={`Selected amount mint ${host}`}
-      accessibilityValue={accessibilityValue}
-      importantForAccessibility="yes"
-      collapsable={false}
-      pointerEvents="none"
-      style={styles.probe}
+      value={host}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  probe: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 1,
-    height: 1,
-  },
-});

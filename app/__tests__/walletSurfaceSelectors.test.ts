@@ -119,9 +119,10 @@ describe('wallet surface e2e selectors', () => {
     expect(settings).toContain('testID="settings-version-row"');
     expect(settings).toContain('testID="settings-mock-offline-toggle"');
     expect(settings).toContain('testID="settings-mock-fail-melt-toggle"');
-    expect(settings.match(/accessibilityRole="switch"/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(settings).toContain("accessibilityRole={testID ? 'switch' : undefined}");
+    expect(settings).toContain('accessibilityState={testID ? { checked: isSelected } : undefined}');
     for (const state of ['mockOffline', 'mockFailSend', 'mockFailMelt']) {
-      expect(settings).toContain(`accessibilityState={{ checked: ${state} }}`);
+      expect(settings).toContain(`isSelected={${state}}`);
     }
   });
 

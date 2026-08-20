@@ -1,12 +1,12 @@
 import React from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform } from 'react-native';
 
-import { View } from '@/shared/ui/primitives/View/View';
 import {
   createTransactionProbe,
   serializeTransactionProbe,
   type TransactionProbeEntry,
 } from '@/features/transactions/lib/transactionProbe';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 
 export function TransactionProbe({
   entry,
@@ -31,26 +31,10 @@ export function TransactionProbe({
   // + JSON(accessibilityValue) split, which it reads natively.
   const androidPayload = Platform.OS === 'android' ? encodeURIComponent(serialized) : undefined;
   return (
-    <View
+    <E2EAccessibilityProbe
       testID={`transaction-probe-${transactionId}`}
-      accessible
-      accessibilityRole="text"
       accessibilityLabel={androidPayload ?? summary}
-      accessibilityValue={androidPayload ? undefined : { text: serialized }}
-      importantForAccessibility="yes"
-      collapsable={false}
-      pointerEvents="none"
-      style={styles.probe}
+      value={androidPayload ? undefined : serialized}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  probe: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 1,
-    height: 1,
-  },
-});

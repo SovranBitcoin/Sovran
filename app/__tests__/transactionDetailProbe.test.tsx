@@ -73,7 +73,9 @@ describe('TransactionDetailShell device probe', () => {
       );
     });
 
-    const probe = renderer!.root.findByProps({ testID: 'transaction-probe-receive-1' });
+    const probe = renderer!.root.find(
+      (node) => node.type === 'view' && node.props.testID === 'transaction-probe-receive-1'
+    );
     const routeReady = renderer!.root.find(
       (node) => node.type === 'view' && node.props.testID === 'receive-token-id-receive-1'
     );

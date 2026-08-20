@@ -6,7 +6,7 @@
  */
 import { redactDeep } from './redact';
 
-export type Phase = 'precondition' | 'test' | 'verify' | 'cleanup';
+type Phase = 'precondition' | 'test' | 'verify' | 'cleanup';
 export type FundsState = 'reconciled' | 'quarantined' | 'n/a';
 export type RunProof = 'orchestration-smoke' | 'product-run';
 

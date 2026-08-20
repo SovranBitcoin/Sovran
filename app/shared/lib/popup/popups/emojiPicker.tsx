@@ -160,11 +160,11 @@ function EmojiSearchField({
     // with the first/last tab pill outer edge. Parent wrapper is at
     // `paddingHorizontal: 12` and the anchor bar's first pill sits at
     // `anchorBarStyle.paddingHorizontal: 24`, so 12 (parent) + 12 (here)
-    // = 24 lines up exactly. Inner wrapper holds `position: 'relative'`
-    // so the clear button's absolute `right: 10` is measured from the
-    // input's edge, not from the outer padding edge.
+    // = 24 lines up exactly. The inner wrapper is the clear button's
+    // containing block, so absolute `right: 10` is measured from the input's
+    // edge, not from the outer padding edge.
     <View style={{ marginTop: 8, paddingHorizontal: 12 }}>
-      <View style={{ position: 'relative', justifyContent: 'center' }}>
+      <View style={{ justifyContent: 'center' }}>
         <BottomSheetTextInput
           testID="emoji-picker-search"
           value={value}

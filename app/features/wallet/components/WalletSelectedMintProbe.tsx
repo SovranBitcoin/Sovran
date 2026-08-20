@@ -1,9 +1,8 @@
-import React from 'react';
-import { StyleSheet } from 'react-native';
+import type { ReactElement } from 'react';
 
 import { meltSelectedMintHost } from '@/features/send/components/MeltSelectedMintProbe';
+import { E2EAccessibilityProbe } from '@/shared/lib/e2e/E2EAccessibilityProbe';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { View } from '@/shared/ui/primitives/View/View';
 
 /**
  * Accessibility-only evidence of the wallet's currently preferred mint. The
@@ -12,32 +11,15 @@ import { View } from '@/shared/ui/primitives/View/View';
  * pill itself — this probe is the only stable signal that a unit switch
  * re-snapped `selectedMint` (e.g. USD → mint.cubabitcoin.org).
  */
-export function WalletSelectedMintProbe(): React.ReactElement | null {
+export function WalletSelectedMintProbe(): ReactElement | null {
   const selectedMint = useMintStore((state) => state.selectedMint);
   const host = selectedMint ? meltSelectedMintHost(selectedMint) : undefined;
-  const accessibilityValue = React.useMemo(() => (host ? { text: host } : undefined), [host]);
   if (!host) return null;
   return (
-    <View
+    <E2EAccessibilityProbe
       testID={`wallet-selected-mint:${host}`}
-      accessible
-      accessibilityRole="text"
       accessibilityLabel={`Selected wallet mint ${host}`}
-      accessibilityValue={accessibilityValue}
-      importantForAccessibility="yes"
-      collapsable={false}
-      pointerEvents="none"
-      style={styles.probe}
+      value={host}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  probe: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 1,
-    height: 1,
-  },
-});

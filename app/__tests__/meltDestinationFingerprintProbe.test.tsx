@@ -22,9 +22,8 @@ describe('MeltDestinationFingerprintProbe', () => {
     });
 
     const fingerprint = paymentDestinationFingerprint(destination);
-    const probe = renderer!.root.findByProps({
-      testID: `melt-destination-fingerprint:${fingerprint}`,
-    });
+    const probe = renderer!.root.find((node) => node.type === 'view');
+    expect(probe.props.testID).toBe(`melt-destination-fingerprint:${fingerprint}`);
     expect(probe.props.accessibilityValue).toEqual({
       text: fingerprint,
     });
