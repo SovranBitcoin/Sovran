@@ -1,9 +1,10 @@
 import { facade } from 'nostr';
 
 import { parseJson } from '../components/nostr/feedParse';
-import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
+import type { FeedEvent, FeedItem, ProfileInfo } from '../components/nostr/feedTypes';
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 import type { FeedParseResult } from './feedClient';
+import { mapFacadePageEnrichment } from './facadePageMaps';
 
 // Pure shape bridge between the tier-selecting facade and the app's feed UI.
 // Kept dependency-light (facade types + feed types only) so it's unit-testable
@@ -97,28 +98,10 @@ export function resolvedFeedPageToParseResult(
     recordDebugTiers(ids, page.tier);
   }
 
-  const metricsMap = new Map<string, NoteMetrics>();
-  for (const [id, s] of Object.entries(page.stats)) {
-    metricsMap.set(id, {
-      likeCount: s.likes,
-      repostCount: s.reposts,
-      replyCount: s.replies,
-      satsZapped: s.satsZapped,
-    });
-  }
-
-  const profilesMap = new Map<string, ProfileInfo>(
-    Object.entries(page.profiles).map(([pk, p]) => [
-      pk,
-      { name: p.name, ...(p.picture ? { picture: p.picture } : {}) },
-    ])
-  );
+  const { metricsMap, profilesMap, quotedEventsMap } = mapFacadePageEnrichment(page);
   if (options.extraProfile && !profilesMap.has(options.extraProfile.pubkey)) {
     profilesMap.set(options.extraProfile.pubkey, options.extraProfile.profile);
   }
-  const quotedEventsMap = new Map<string, FeedEvent>(
-    Object.entries(page.quoted) as [string, FeedEvent][]
-  );
 
   // Gaps the existing enrichment path (delegated to the old client) can fill.
   const neededPubkeys = new Set<string>();

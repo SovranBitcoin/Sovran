@@ -2,13 +2,14 @@ import { facade } from 'nostr';
 
 import { recordDebugTiers } from '@/shared/stores/runtime/debugTierStore';
 
-import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
+import type { FeedEvent } from '../components/nostr/feedTypes';
 import type {
   FeedNotification,
   FeedNotificationActor,
   FeedNotificationsRequest,
   FeedNotificationsResult,
 } from './feedClient';
+import { mapFacadePageEnrichment } from './facadePageMaps';
 
 // Pure shape bridge: facade ResolvedNotifications → app FeedNotificationsResult.
 // Dependency-light so it's unit-testable without the facade-builder's RN chain.
@@ -67,25 +68,7 @@ export function resolvedNotificationsToResult(
     recordDebugTiers(ids, page.tier);
   }
 
-  const metricsMap = new Map<string, NoteMetrics>();
-  for (const [id, s] of Object.entries(page.stats)) {
-    metricsMap.set(id, {
-      likeCount: s.likes,
-      repostCount: s.reposts,
-      replyCount: s.replies,
-      satsZapped: s.satsZapped,
-    });
-  }
-
-  const profilesMap = new Map<string, ProfileInfo>(
-    Object.entries(page.profiles).map(([pk, p]) => [
-      pk,
-      { name: p.name, ...(p.picture ? { picture: p.picture } : {}) },
-    ])
-  );
-  const quotedEventsMap = new Map<string, FeedEvent>(
-    Object.entries(page.quoted) as [string, FeedEvent][]
-  );
+  const { metricsMap, profilesMap, quotedEventsMap } = mapFacadePageEnrichment(page);
 
   return {
     notifications,

@@ -6,6 +6,7 @@ import {
 const TARGET = 'a'.repeat(64);
 const PUB = 'c'.repeat(64);
 const ACTOR = 'd'.repeat(64);
+const QUOTED = 'e'.repeat(64);
 
 function event(id: string, created_at: number) {
   return { id, kind: 1, pubkey: PUB, content: `e ${id}`, tags: [], created_at };
@@ -45,7 +46,7 @@ describe('resolvedNotificationsToResult', () => {
       ],
       stats: { [TARGET]: { likes: 12, reposts: 0, replies: 1, zaps: 0, satsZapped: 0 } },
       profiles: { [PUB]: { name: 'alice' } },
-      quoted: {},
+      quoted: { [QUOTED]: event(QUOTED, 90) },
       cursor: { createdAt: 100, id: 'b'.repeat(64) },
       missingIds: [],
     });
@@ -58,6 +59,7 @@ describe('resolvedNotificationsToResult', () => {
     expect(grouped.sampleActors?.[0]?.pubkey).toBe(ACTOR);
     expect(result.metricsMap.get(TARGET)?.likeCount).toBe(12);
     expect(result.profilesMap.get(PUB)?.name).toBe('alice');
+    expect(result.quotedEventsMap.get(QUOTED)?.id).toBe(QUOTED);
     expect(result.paginationUntil).toBe(100);
     expect(result.hasNextPage).toBe(true);
   });
