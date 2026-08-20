@@ -7,7 +7,14 @@ import { useInitializationStage } from '@/shared/providers/InitializationProvide
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { attachMintMetadataToManager } from '@/shared/stores/global/mintMetadataStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
+import {
+  log,
+  initLog,
+  initPhase,
+  useInitMount,
+  deferWork,
+  mintUrlLogFields,
+} from '@/shared/lib/logger';
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
@@ -31,13 +38,6 @@ const CocoContext = createContext<CocoContextValue>({
 
 interface CocoProviderProps {
   children: ReactNode;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 function defaultSelectedMintLogFields(mintUrl: string | null | undefined): Record<string, unknown> {

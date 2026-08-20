@@ -3,14 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import type { MintInfo } from '@cashu/cashu-ts';
 
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
-import { cashuLog } from '@/shared/lib/logger';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
+import { cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
 
 /**
  * Loads mint info for a given mint URL.

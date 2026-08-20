@@ -31,7 +31,7 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { paramPopup, staticPopup } from '@/shared/lib/popup';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
 import { useManager } from '@cashu/coco-react';
 import { attemptRollback } from '@/shared/lib/cashu/utils';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
@@ -58,13 +58,6 @@ const MONTH_SELECTOR_HEIGHT = 48;
 // FlashList fires it immediately while content is shorter than the
 // viewport, so the first screen self-fills).
 const HISTORY_PAGE_SIZE = 10;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 interface TransactionsScreenProps {
   initialTab?: StatusTab;

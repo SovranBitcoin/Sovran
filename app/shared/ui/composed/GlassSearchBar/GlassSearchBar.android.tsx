@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef } from 'react';
+import { memo, useRef } from 'react';
 import { TextInput } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
 
@@ -7,6 +7,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { radius } from '@/shared/styles/tokens';
 import type { GlassSearchBarProps } from './types';
+import { useDebouncedSearchText } from './useDebouncedSearchText';
 
 export const GlassSearchBar = memo(function GlassSearchBar({
   testID,
@@ -25,40 +26,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
     'surface-secondary',
   ] as const);
   const inputRef = useRef<TextInput>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onChangeTextRef = useRef(onChangeText);
-  const latestTextRef = useRef('');
-
-  useEffect(() => {
-    onChangeTextRef.current = onChangeText;
-  }, [onChangeText]);
-
-  // Cancel pending debounce when clearKey changes (user pressed X)
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    latestTextRef.current = '';
-  }, [clearKey]);
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
-
-  const handleTextChange = useCallback(
-    (text: string) => {
-      if (!debounceMs) {
-        onChangeTextRef.current(text);
-        return;
-      }
-      latestTextRef.current = text;
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        onChangeTextRef.current(latestTextRef.current);
-      }, debounceMs);
-    },
-    [debounceMs]
-  );
+  const handleTextChange = useDebouncedSearchText({ onChangeText, debounceMs, clearKey });
 
   return (
     <Log name="GlassSearchBar">

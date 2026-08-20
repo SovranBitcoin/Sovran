@@ -44,7 +44,7 @@ import {
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { withAlpha } from '@/shared/lib/color';
-import { log, cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, cashuLog, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 
@@ -52,13 +52,6 @@ import type { GetInfoResponse } from '@cashu/cashu-ts';
 const CURRENCY_TABS_HEIGHT = MINT_CURRENCY_TABS_HEIGHT;
 
 // MintStatCell removed — stats now rendered inline
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 interface PseudoMint {
   url: string;

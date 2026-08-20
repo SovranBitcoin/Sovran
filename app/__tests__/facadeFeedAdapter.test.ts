@@ -7,7 +7,14 @@ import {
   MAX_FEED_POST_CHARS,
   resolvedFeedPageToParseResult,
   skimmableFeedFilters,
+  isRootNote,
 } from '@/features/feed/data/facadeFeedAdapter';
+
+// ---------------------------------------------------------------------------
+// Profile-feed filter options: the legacy nagg-only user feed kept author-owned
+// root notes + author-owned reposts. Routing user feeds through the facade must
+// preserve those semantics no matter which tier answered.
+// ---------------------------------------------------------------------------
 
 const NOTE = 'a'.repeat(64);
 const REPOST = 'b'.repeat(64);
@@ -79,14 +86,6 @@ describe('resolvedFeedPageToParseResult', () => {
     expect(result.missingProfilePubkeys).toEqual([]);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Profile-feed filter options: the legacy nagg-only user feed kept author-owned
-// root notes + author-owned reposts. Routing user feeds through the facade must
-// preserve those semantics no matter which tier answered.
-// ---------------------------------------------------------------------------
-
-import { isRootNote } from '@/features/feed/data/facadeFeedAdapter';
 
 const OTHER_PUB = 'f'.repeat(64);
 

@@ -39,7 +39,7 @@ import {
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import { paymentLog } from '@/shared/lib/logger';
+import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { actionMenuSheet } from '@/shared/lib/popup/popups/actionMenuSheet';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
@@ -83,13 +83,6 @@ const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' }
 // true cache miss; SWR hits resolve synchronously. Kept well under coco's
 // 10s `updateMint` timeout so one dead mint can't visibly gate the list.
 const FIRST_OPEN_DEADLINE_MS = 3000;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 export function SovranColadaProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();

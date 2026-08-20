@@ -32,18 +32,11 @@ import {
   useMintDistributionStore,
   TOTAL_BASIS_POINTS,
 } from '@/shared/stores/profile/mintDistributionStore';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
 
 const ParamsSchema = z.object({
   unit: z.string().max(16).optional(),
 });
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 /**
  * Every commit redistributes the OTHER mints' shares in one store write, which

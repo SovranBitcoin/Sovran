@@ -33,7 +33,7 @@ import type { MintCatalogEntry } from 'wallet';
 
 import { projectMintMeta, transformAuditData } from '@/features/mint/lib/auditInfo';
 import { auditMint, fetchNostrProfile, reviewMint } from '@/shared/lib/apiClient';
-import { log } from '@/shared/lib/logger';
+import { log, mintUrlLogFields } from '@/shared/lib/logger';
 import {
   extractMintNostrPubkey,
   type MintInfoForNostr,
@@ -58,13 +58,6 @@ function isMintInfoObject(value: unknown): value is Record<string, unknown> {
 
 function hasCatalogFields(entry: MintCatalogEntry): boolean {
   return Object.values(entry).some((value) => value !== undefined);
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 function readCachedEntry(mintUrl: string): { entry: MintCatalogEntry; info: unknown } {

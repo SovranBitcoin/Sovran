@@ -28,7 +28,13 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withAlpha } from '@/shared/lib/color';
-import { cashuLog, Log, redactError, useLifecycleLogger } from '@/shared/lib/logger';
+import {
+  cashuLog,
+  Log,
+  redactError,
+  useLifecycleLogger,
+  mintUrlLogFields,
+} from '@/shared/lib/logger';
 import { formatDate } from '@/shared/lib/date';
 
 const ParamsSchema = z.object({
@@ -38,13 +44,6 @@ const ParamsSchema = z.object({
     .max(2048)
     .regex(/^https?:\/\//, 'mintUrl must be http(s)'),
 });
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 const StarRating = React.memo(function StarRating({
   score,

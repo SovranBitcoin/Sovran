@@ -15,15 +15,8 @@ import { type Manager } from '@cashu/coco-core';
 import { decodeEcashTokenMetadata } from 'wallet';
 import type { SyntheticReceiveHistoryEntry } from './syntheticHistory';
 
-import { log } from '../logger';
+import { log, mintUrlLogFields } from '../logger';
 import { mintLocalId } from '../id';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 /**
  * Builds a `ReceiveHistoryEntry` from a decoded token.

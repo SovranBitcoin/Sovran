@@ -16,7 +16,7 @@ import * as Clipboard from 'expo-clipboard';
 import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { paymentLog } from '@/shared/lib/logger';
+import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { runAfterInteractions } from '@/shared/lib/interactions';
 import { mintLocalId } from '@/shared/lib/id';
 
@@ -126,13 +126,6 @@ function isRecoverableReceiveError(err: unknown): boolean {
 
 function receiveHistoryId(operationId: string): string {
   return `receive:${operationId}`;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 async function findReceiveHistoryEntryForOperation(

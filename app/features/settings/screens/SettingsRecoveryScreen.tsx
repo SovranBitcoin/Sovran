@@ -10,7 +10,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Switch, Button, Card } from 'heroui-native';
-import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { cashuLog, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useMintManagement } from '@/features/mint';
 import { useNavigation } from 'expo-router';
@@ -74,13 +74,6 @@ const SOVRAN_MINTS_API = 'https://api.sovran.money/api/cashu/mints';
 const MAX_DISCOVERED_MINTS = 100;
 
 const parseMintList = parseWith(MintListResponse, 'cashu/mints');
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 function normalizeMintUrl(url: string): string {
   return url.replace(/\/$/, '').toLowerCase();

@@ -29,7 +29,7 @@
 
 import type { CoreProof, Manager } from '@cashu/coco-core';
 import type { Wallet } from '@cashu/cashu-ts';
-import { cashuLog } from '@/shared/lib/logger';
+import { cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
 
 interface ManagerInternals {
   proofRepository: {
@@ -69,13 +69,6 @@ function internals(manager: Manager): ManagerInternals {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 /**

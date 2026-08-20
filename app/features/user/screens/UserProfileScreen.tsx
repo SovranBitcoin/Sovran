@@ -85,7 +85,13 @@ import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useVisualStateLogger } from '@/shared/lib/contentShiftLog';
-import { Log, nostrLog, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
+import {
+  Log,
+  nostrLog,
+  paymentLog,
+  useLifecycleLogger,
+  mintUrlLogFields,
+} from '@/shared/lib/logger';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 
 const BANNER_HEIGHT = 150;
@@ -102,13 +108,6 @@ const UserProfileParamsSchema = z
     message: 'either npub or pubkey is required',
     path: ['pubkey'],
   });
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 function buildUpdatedContactTags(
   existingTags: string[][],

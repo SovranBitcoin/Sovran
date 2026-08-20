@@ -4,19 +4,12 @@ import type { GetInfoResponse } from '@cashu/cashu-ts';
 
 import { fetchMintInfo } from '@/shared/lib/apiClient';
 import { normalizeUrlForApi } from '@/shared/lib/url';
-import { log } from '@/shared/lib/logger';
+import { log, mintUrlLogFields } from '@/shared/lib/logger';
 
 interface ValidationState {
   isValid: boolean | null;
   isLoading: boolean;
   error: string | null;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 /**

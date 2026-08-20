@@ -17,7 +17,7 @@ import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedee
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
-import { paymentLog } from '@/shared/lib/logger';
+import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 
 /**
  * Drains the persisted Nut Drop redeem queue through colada's mesh redeem
@@ -38,13 +38,6 @@ function restoreSettled(): boolean {
 
 function getManager() {
   return CocoManager.isInitialized() ? CocoManager.getInstance() : null;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 let orchestrator: MeshRedeemOrchestrator | null = null;

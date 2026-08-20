@@ -49,11 +49,6 @@ import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from './nostr/feed
 import { DEFAULT_METRICS } from './nostr/feedTypes';
 import { tryNpubEncode } from './nostr/feedParse';
 import {
-  buildVideoOverlayLayout,
-  computeFeedIndicesWithVideo,
-  MAX_VIDEO_FEED_PAGES,
-} from './nostr/videoLayout';
-import {
   buildFeedRows,
   DEFAULT_ENGAGEMENT_STATE,
   getFeedRowItemType,
@@ -63,13 +58,9 @@ import {
 
 import { PostCard } from './nostr/PostCard';
 import { RepostCard } from './UserFeed';
-import {
-  ImageOverlayProvider,
-  useImageOverlay,
-  AnimatedImageOverlay,
-  type ImageOverlayReplaceLayout,
-} from './nostr/image-overlay';
+import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
+import { useVideoOverlayNavigation } from '@/features/feed/hooks/useVideoOverlayNavigation';
 import { useZap } from '@/features/feed/hooks/useZap';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
@@ -648,60 +639,17 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const { openZapMenu } = useZap();
   const openZapMenuRef = useLatestRef(openZapMenu);
 
-  const overlaySourceIndexRef = useRef(-1);
-  const feedIndicesWithVideo = useMemo(() => computeFeedIndicesWithVideo(feedItems), [feedItems]);
-
-  const onOverlayOpenedFromIndex = useCallback((index: number) => {
-    overlaySourceIndexRef.current = index;
-  }, []);
-
-  const buildLayoutForVideoIndex = useCallback(
-    (feedIndex: number): ImageOverlayReplaceLayout | null =>
-      buildVideoOverlayLayout(
-        feedIndex,
-        feedItems,
-        getDisplayMetrics,
-        getEngagementState,
-        profilesRef,
-        toggleLike,
-        toggleRepost,
-        { getZapState, openZapMenu }
-      ),
-    [
+  const { onOverlayOpenedFromIndex, getVideoFeedLayoutsAndIndex, onSwipeUpToNextPost } =
+    useVideoOverlayNavigation({
       feedItems,
       getDisplayMetrics,
       getEngagementState,
-      getZapState,
-      openZapMenu,
+      profilesRef,
       toggleLike,
       toggleRepost,
-    ]
-  );
-
-  const getVideoFeedLayoutsAndIndex = useCallback((): {
-    layouts: ImageOverlayReplaceLayout[];
-    initialIndex: number;
-  } | null => {
-    const start = overlaySourceIndexRef.current;
-    const indices = feedIndicesWithVideo.filter((i) => i >= start).slice(0, MAX_VIDEO_FEED_PAGES);
-    const layouts = indices
-      .map((i) => buildLayoutForVideoIndex(i))
-      .filter((l): l is ImageOverlayReplaceLayout => l != null);
-    return layouts.length ? { layouts, initialIndex: 0 } : null;
-  }, [feedIndicesWithVideo, buildLayoutForVideoIndex]);
-
-  const onSwipeUpToNextPost = useCallback(
-    (openNext: (layout: ImageOverlayReplaceLayout) => void) => {
-      const current = overlaySourceIndexRef.current;
-      const nextVideoIndex = feedIndicesWithVideo.find((i) => i > current);
-      if (typeof nextVideoIndex !== 'number') return;
-      const layout = buildLayoutForVideoIndex(nextVideoIndex);
-      if (!layout) return;
-      overlaySourceIndexRef.current = nextVideoIndex;
-      openNext(layout);
-    },
-    [feedIndicesWithVideo, buildLayoutForVideoIndex]
-  );
+      getZapState,
+      openZapMenu,
+    });
 
   // ── Render ──
 

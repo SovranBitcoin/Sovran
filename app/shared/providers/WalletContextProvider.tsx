@@ -33,18 +33,11 @@ import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useActiveUnit } from '@/features/wallet/hooks/useActiveUnit';
 import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
-import { walletLog, initLog, useInitMount } from '@/shared/lib/logger';
+import { walletLog, initLog, useInitMount, mintUrlLogFields } from '@/shared/lib/logger';
 
 initLog('Module', 'WalletContextProvider loaded');
 
 const WalletContextCtx = createContext<WalletContext | null>(null);
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 function preferredMintLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
   return {

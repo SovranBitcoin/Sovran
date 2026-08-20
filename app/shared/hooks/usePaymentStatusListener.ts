@@ -25,7 +25,7 @@ import { isSwapStatusActive } from '@/shared/stores/runtime/swapStatusStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
-import { paymentLog } from '@/shared/lib/logger';
+import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 
 const NPC_RECEIVE_POPUP_MAX_AGE_MS = 5 * 60 * 1000;
 
@@ -130,13 +130,6 @@ async function persistOnchainMeltAnnotation(
       error: error instanceof Error ? error.message : String(error),
     });
   }
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 function activeMintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { Mint } from '@cashu/coco-core';
 import { useManager } from '@cashu/coco-react';
-import { log } from '@/shared/lib/logger';
+import { log, mintUrlLogFields } from '@/shared/lib/logger';
 import { getCachedMintInfo } from '@/shared/stores/global/mintMetadataStore';
 import { deferWhileRecovering } from '@/shared/lib/cashu/recoverySuppression';
 
@@ -21,13 +21,6 @@ let inflightLoad: Promise<Mint[]> | null = null;
 // background. Keyed by the Manager it came from: a profile switch creates a
 // new Manager instance, so the prior profile's mints can never bleed across.
 let lastLoad: { manager: unknown; mints: Mint[] } | null = null;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 /**
  * Subscribes to the trusted-mints list and re-exposes `getMintInfo` behind

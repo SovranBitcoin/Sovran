@@ -1,13 +1,6 @@
 import { extractDomain } from '@/shared/lib/url';
 import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
-import { cashuLog } from '@/shared/lib/logger';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
+import { cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
 
 type BalanceMap = Record<string, { total?: AmountValue } | undefined>;
 

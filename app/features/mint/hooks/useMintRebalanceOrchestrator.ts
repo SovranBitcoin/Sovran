@@ -9,7 +9,7 @@ import { prepareBolt11MeltQuote, prepareBolt11MintQuote } from '@/shared/lib/cas
 import { auditMint, type AuditMintResponse } from '@/shared/lib/apiClient';
 import { extractDomain } from '@/shared/lib/url';
 import { mintLocalId } from '@/shared/lib/id';
-import { cashuLog } from '@/shared/lib/logger';
+import { cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { swapStatusPopup } from '@/shared/lib/popup';
 import {
   useSwapTransactionsStore,
@@ -43,13 +43,6 @@ import {
   normalizeRebalanceTransferError,
   resetFailedStepStates,
 } from '@/features/mint/lib/rebalanceRunState';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 type RebalanceRunStatus = 'idle' | 'running' | 'finished' | 'cancelled';
 

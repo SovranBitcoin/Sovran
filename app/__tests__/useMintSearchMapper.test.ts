@@ -86,7 +86,7 @@ describe('discoverMintToSearchResult', () => {
 });
 
 describe('discoveryMethodMatches — unit-aware (method, unit) pair filter', () => {
-  const mint = (mintUrl: string, methods: Array<{ method: string; unit: string }>) =>
+  const mint = (mintUrl: string, methods: { method: string; unit: string }[]) =>
     discoverMintToSearchResult({
       mintUrl,
       averageScore: null,

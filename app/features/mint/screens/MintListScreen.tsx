@@ -32,7 +32,7 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { cashuLog, useLifecycleLogger, mintUrlLogFields } from '@/shared/lib/logger';
 import { E2EToastProbe } from '@/shared/lib/popup/E2EToastProbe';
 
 const CURRENCY_TABS_HEIGHT = MINT_CURRENCY_TABS_HEIGHT;
@@ -55,13 +55,6 @@ const SKELETON_ITEMS: MintRow[] = Array.from({ length: SKELETON_ITEM_COUNT }, (_
   isPreferred: false,
   metaState: 'cold',
 }));
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 interface MintListScreenProps {
   /** Pre-built mint rows (base colada rows overlaid with cached metadata, each

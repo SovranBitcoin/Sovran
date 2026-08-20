@@ -2,17 +2,17 @@
  * @jest-environment node
  */
 
-jest.mock('@/shared/lib/logger', () => ({
-  __esModule: true,
-  cashuLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
-}));
-
 import {
   beginRecoverySuppression,
   deferWhileRecovering,
   endRecoverySuppression,
   isRecoverySuppressed,
 } from '@/shared/lib/cashu/recoverySuppression';
+
+jest.mock('@/shared/lib/logger', () => ({
+  __esModule: true,
+  cashuLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+}));
 
 afterEach(() => {
   // Module singleton — leaving it suppressed would break the next test file.

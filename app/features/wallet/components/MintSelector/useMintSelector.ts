@@ -13,7 +13,7 @@ import {
 } from '@/features/wallet/lib/walletHeader';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
-import { walletLog } from '@/shared/lib/logger';
+import { walletLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 
 export interface MintSelectorProps {
@@ -49,13 +49,6 @@ interface MintSelectorShared {
     buttonWidth: number;
     contentWidth: number;
     contentHeight: number;
-  };
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
   };
 }
 

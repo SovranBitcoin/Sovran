@@ -19,33 +19,35 @@ describe('mint flow e2e selectors', () => {
     expect(source.indexOf('testID="quote-mint-selector"', start)).toBe(marker);
   });
 
-  it.each(['app/(receive-flow)/mintSelect.tsx', 'app/(send-flow)/mintSelect.tsx'])(
-    'pins mint-select-add on the %s header add action',
-    (file) => {
-      const source = read(file);
-      expect(source).toContain('testID="mint-select-add"');
-      // HeaderGlassCircle sets accessible={!!accessibilityLabel} — a header
-      // action with only a testID is AX-invisible on liquid-glass devices, so
-      // the label is load-bearing for the e2e selector, not just for VoiceOver.
-      expect(source).toContain('accessibilityLabel="Add mint"');
-    }
-  );
+  const MINT_SELECT_SCREEN = 'features/mint/screens/MintSelectFlowScreen.tsx';
 
-  it.each(['app/(receive-flow)/mintSelect.tsx', 'app/(send-flow)/mintSelect.tsx'])(
-    'refreshes stale machine candidates when %s regains focus',
-    (file) => {
-      const source = read(file);
-      expect(source).toContain('useRefreshMintSelectorOnFocus({');
-      expect(source).toContain('const trackedTrustedMintUrls = useColadaTrustedMintUrls();');
-      expect(source).toContain(
-        'trustedMintUrls: trackedTrustedMintUrls ?? walletContext.trustedMintUrls'
-      );
-      expect(source).toContain('refresh: refreshMintSelector');
-      expect(source).toContain(
-        'liveSelectMint?.scope ? { scope: liveSelectMint.scope } : undefined'
-      );
-    }
-  );
+  it.each([
+    ['app/(receive-flow)/mintSelect.tsx', 'receive'],
+    ['app/(send-flow)/mintSelect.tsx', 'send'],
+  ])('%s renders the shared MintSelectFlowScreen as the %s flow', (file, flow) => {
+    const source = read(file);
+    expect(source).toContain(`<MintSelectFlowScreen flow="${flow}"`);
+  });
+
+  it('pins mint-select-add on the mint-select header add action', () => {
+    const source = read(MINT_SELECT_SCREEN);
+    expect(source).toContain('testID="mint-select-add"');
+    // HeaderGlassCircle sets accessible={!!accessibilityLabel} — a header
+    // action with only a testID is AX-invisible on liquid-glass devices, so
+    // the label is load-bearing for the e2e selector, not just for VoiceOver.
+    expect(source).toContain('accessibilityLabel="Add mint"');
+  });
+
+  it('refreshes stale machine candidates when the mint-select screen regains focus', () => {
+    const source = read(MINT_SELECT_SCREEN);
+    expect(source).toContain('useRefreshMintSelectorOnFocus({');
+    expect(source).toContain('const trackedTrustedMintUrls = useColadaTrustedMintUrls();');
+    expect(source).toContain(
+      'trustedMintUrls: trackedTrustedMintUrls ?? walletContext.trustedMintUrls'
+    );
+    expect(source).toContain('refresh: refreshMintSelector');
+    expect(source).toContain('liveSelectMint?.scope ? { scope: liveSelectMint.scope } : undefined');
+  });
 
   it('keeps the mint-add search header actions accessible on liquid glass', () => {
     const source = read('features/mint/screens/MintAddScreen.tsx');

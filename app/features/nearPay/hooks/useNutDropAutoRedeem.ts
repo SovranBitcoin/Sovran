@@ -8,18 +8,11 @@ import {
 import { classifyMeshToken, meshTokenDedupeKey } from 'wallet';
 
 import { drainNutDropRedeemQueue } from '@/features/nearPay/lib/nutDropAutoRedeem';
-import { paymentLog } from '@/shared/lib/logger';
+import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { extractCashuToken } from '@/shared/ui/composed/chat/extractCashuToken';
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 /**
  * App-wide Nut Drop receive pipeline. Mounted in BitchatBLEProvider (inside

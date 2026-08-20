@@ -63,12 +63,7 @@ import type {
   VideoPostRecord,
 } from './nostr/feedTypes';
 import { DEFAULT_METRICS } from './nostr/feedTypes';
-import {
-  buildVideoOverlayLayout,
-  computeFeedIndicesWithVideo,
-  buildDedupedVideoPosts,
-  MAX_VIDEO_FEED_PAGES,
-} from './nostr/videoLayout';
+import { buildDedupedVideoPosts } from './nostr/videoLayout';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import {
   buildFeedRows,
@@ -79,13 +74,9 @@ import {
 } from '@/features/feed/lib/feedRows';
 
 import { PostCard } from './nostr/PostCard';
-import {
-  ImageOverlayProvider,
-  useImageOverlay,
-  AnimatedImageOverlay,
-  type ImageOverlayReplaceLayout,
-} from './nostr/image-overlay';
+import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
+import { useVideoOverlayNavigation } from '@/features/feed/hooks/useVideoOverlayNavigation';
 import { useZap } from '@/features/feed/hooks/useZap';
 import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
@@ -401,7 +392,6 @@ export function UserFeed({
   // (protects against accidental taps). Nagg's app-view cache will catch up eventually.
   const deletedRepostIdsRef = useRef<Record<string, number> | null>(null);
 
-  const overlaySourceIndexRef = useRef(-1);
   const scrollOffsetRef = useRef(0);
 
   useEffect(() => {
@@ -719,46 +709,17 @@ export function UserFeed({
     onVideoPostsReady?.(videoPosts);
   }, [videoPosts, onVideoPostsReady]);
 
-  const feedIndicesWithVideo = useMemo(() => computeFeedIndicesWithVideo(feedItems), [feedItems]);
-
-  const onOverlayOpenedFromIndex = useCallback((index: number) => {
-    overlaySourceIndexRef.current = index;
-  }, []);
-
-  const buildLayoutForVideoIndex = useCallback(
-    (feedIndex: number): ImageOverlayReplaceLayout | null =>
-      buildVideoOverlayLayout(
-        feedIndex,
-        feedItems,
-        getDisplayMetrics,
-        getEngagementState,
-        profilesRef,
-        toggleLike,
-        toggleRepost,
-        { getZapState, openZapMenu }
-      ),
-    [
+  const { onOverlayOpenedFromIndex, getVideoFeedLayoutsAndIndex, onSwipeUpToNextPost } =
+    useVideoOverlayNavigation({
       feedItems,
       getDisplayMetrics,
       getEngagementState,
-      getZapState,
-      openZapMenu,
+      profilesRef,
       toggleLike,
       toggleRepost,
-    ]
-  );
-
-  const getVideoFeedLayoutsAndIndex = useCallback((): {
-    layouts: ImageOverlayReplaceLayout[];
-    initialIndex: number;
-  } | null => {
-    const start = overlaySourceIndexRef.current;
-    const indices = feedIndicesWithVideo.filter((i) => i >= start).slice(0, MAX_VIDEO_FEED_PAGES);
-    const layouts = indices
-      .map((i) => buildLayoutForVideoIndex(i))
-      .filter((l): l is ImageOverlayReplaceLayout => l != null);
-    return layouts.length ? { layouts, initialIndex: 0 } : null;
-  }, [feedIndicesWithVideo, buildLayoutForVideoIndex]);
+      getZapState,
+      openZapMenu,
+    });
 
   // ---------------------------
   // Render
@@ -1111,19 +1072,6 @@ export function UserFeed({
         scrollEventThrottle={16}
       />
     );
-
-  const onSwipeUpToNextPost = useCallback(
-    (openNext: (layout: ImageOverlayReplaceLayout) => void) => {
-      const current = overlaySourceIndexRef.current;
-      const nextVideoIndex = feedIndicesWithVideo.find((i) => i > current);
-      if (typeof nextVideoIndex !== 'number') return;
-      const layout = buildLayoutForVideoIndex(nextVideoIndex);
-      if (!layout) return;
-      overlaySourceIndexRef.current = nextVideoIndex;
-      openNext(layout);
-    },
-    [feedIndicesWithVideo, buildLayoutForVideoIndex]
-  );
 
   return (
     <Log name="UserFeed">

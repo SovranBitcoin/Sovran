@@ -1106,6 +1106,17 @@ export const themeLog = log.child({ module: 'theme' });
  * would otherwise dump every enumerable field. Always route catch sites
  * through this helper.
  */
+/**
+ * Redacted log fields for a mint URL. Mint URLs are user data (they can
+ * identify a custodian); only presence and length are safe to log.
+ */
+export function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 /** The stable `{ name, message }` shape `redactError` produces. */
 export type RedactedError = { name: string; message: string };
 

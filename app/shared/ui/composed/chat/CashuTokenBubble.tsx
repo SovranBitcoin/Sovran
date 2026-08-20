@@ -16,7 +16,7 @@ import { formatAmount } from '@/shared/lib/currency';
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { staticPopup } from '@/shared/lib/popup';
-import { log } from '@/shared/lib/logger';
+import { log, mintUrlLogFields } from '@/shared/lib/logger';
 import { alpha, radius, spacing } from '@/shared/styles/tokens';
 
 interface CashuTokenBubbleProps {
@@ -30,13 +30,6 @@ interface DecodedCashuTokenBubble {
   mintUrl: string;
   proofCount: number;
   hasP2PKProofs: boolean;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 function tokenLogFields(token: string): Record<string, unknown> {

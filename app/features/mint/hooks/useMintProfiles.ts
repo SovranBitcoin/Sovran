@@ -15,18 +15,11 @@ import {
 } from '@/shared/lib/nostr/extractMintNostrPubkey';
 import { useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-import { cashuLog } from '@/shared/lib/logger';
+import { cashuLog, mintUrlLogFields } from '@/shared/lib/logger';
 
 interface MintWithInfo {
   url: string;
   mintInfo?: MintInfoForNostr;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 /**

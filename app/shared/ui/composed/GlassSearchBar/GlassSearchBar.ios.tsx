@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef } from 'react';
+import { memo } from 'react';
 import { TextInput, StyleSheet } from 'react-native';
 
 import { GlassView } from 'expo-glass-effect';
@@ -9,6 +9,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { withAlpha } from '@/shared/lib/color';
 import type { GlassSearchBarProps } from './types';
+import { useDebouncedSearchText } from './useDebouncedSearchText';
 
 export const GlassSearchBar = memo(function GlassSearchBar({
   testID,
@@ -26,40 +27,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
     'foreground',
     'surface-secondary',
   ] as const);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onChangeTextRef = useRef(onChangeText);
-  const latestTextRef = useRef('');
-
-  useEffect(() => {
-    onChangeTextRef.current = onChangeText;
-  }, [onChangeText]);
-
-  // Cancel pending debounce when clearKey changes (user pressed X)
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    latestTextRef.current = '';
-  }, [clearKey]);
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
-
-  const handleTextChange = useCallback(
-    (text: string) => {
-      if (!debounceMs) {
-        onChangeTextRef.current(text);
-        return;
-      }
-      latestTextRef.current = text;
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        onChangeTextRef.current(latestTextRef.current);
-      }, debounceMs);
-    },
-    [debounceMs]
-  );
+  const handleTextChange = useDebouncedSearchText({ onChangeText, debounceMs, clearKey });
 
   // Liquid devices get a real glass capsule (the component's namesake);
   // everywhere else keeps the flat surface-secondary field.

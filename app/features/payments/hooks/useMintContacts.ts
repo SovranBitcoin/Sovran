@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Mint } from '@cashu/coco-core';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
-import { paymentLog } from '@/shared/lib/logger';
+import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { prefetchImages } from '@/shared/lib/imageCache';
 import type { DmConversation } from './useDmConversations';
@@ -14,13 +14,6 @@ interface NostrKeys {
 interface MintWithInfo {
   mint: Mint;
   mintInfo: GetInfoResponse;
-}
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
 }
 
 export interface MintContact {

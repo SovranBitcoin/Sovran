@@ -1,15 +1,15 @@
 import type { HistoryEntry } from '@cashu/coco-core';
 
-jest.mock('@/shared/hooks/useGuardedRouter', () => ({
-  guardedRouter: { navigate: jest.fn() },
-}));
-
 import {
   getMeltDetailPathname,
   getMintDetailPathname,
   navigateToTransactionDetail,
 } from '@/shared/lib/nav/transactionDetailRoutes';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
+
+jest.mock('@/shared/hooks/useGuardedRouter', () => ({
+  guardedRouter: { navigate: jest.fn() },
+}));
 
 const navigate = guardedRouter.navigate as jest.Mock;
 

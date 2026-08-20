@@ -239,169 +239,44 @@ function SubmessageRenderer({
   return <>{submessage}</>;
 }
 
+/** Props every custom-sheet renderer receives; `payload` is typed per sheet id. */
+type CustomSheetContentProps<P = unknown> = {
+  payload: P;
+  close: () => void;
+  pushCustomPage: <K extends keyof ActionSheetPayloads>(
+    sheetId: K,
+    payload: ActionSheetPayloads[K]
+  ) => void;
+  popCustomPage: () => void;
+  canPop: boolean;
+  setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+};
+type CustomSheetRenderer = React.ComponentType<CustomSheetContentProps>;
+
 // Custom-sheet registry. Surfaces here render through heroui's standalone
 // `<BottomSheet>`, which (unlike heroui `<Menu presentation="bottom-sheet">`)
 // reliably mounts inside iOS FullWindowOverlay — i.e. above route modals.
 // Use this lane only when the menu lane can't deliver above-modal stacking;
 // for everything else, prefer `actionMenuPopup`.
-const CUSTOM_SHEET_CONTENT: Record<
-  keyof ActionSheetPayloads,
-  React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>
-> = {
-  'action-menu': ActionMenuSheetContent as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
-  'emoji-picker': EmojiPickerContent as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
-  'model-picker': ModelPickerContent as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
+const CUSTOM_SHEET_CONTENT: Record<keyof ActionSheetPayloads, CustomSheetRenderer> = {
+  'action-menu': ActionMenuSheetContent as CustomSheetRenderer,
+  'emoji-picker': EmojiPickerContent as CustomSheetRenderer,
+  'model-picker': ModelPickerContent as CustomSheetRenderer,
   // `payment-options` and `payment-fallback` share one renderer; the
   // `isFallback` prop decides title + per-row red-wash. Wrapping keeps the
   // registry's `Record<keyof ActionSheetPayloads, ...>` shape intact.
-  'payment-options': ((props: {
-    payload: ActionSheetPayloads['payment-options'];
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }) => <PaymentOptionsContent {...props} isFallback={false} />) as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
-  'payment-fallback': ((props: {
-    payload: ActionSheetPayloads['payment-fallback'];
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }) => <PaymentOptionsContent {...props} isFallback={true} />) as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
-  'proof-selector': ProofSelectorContent as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
-  'send-memo': SendMemoContent as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
-  'signer-approval': SignerApprovalSheetContent as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
-  'signer-connect': SignerConnectSheetContent as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
-  'signer-profile-picker': SignerProfilePickerContent as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
-  'nfc-tap': NfcTapContent as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
+  'payment-options': ((props: CustomSheetContentProps<ActionSheetPayloads['payment-options']>) => (
+    <PaymentOptionsContent {...props} isFallback={false} />
+  )) as CustomSheetRenderer,
+  'payment-fallback': ((
+    props: CustomSheetContentProps<ActionSheetPayloads['payment-fallback']>
+  ) => <PaymentOptionsContent {...props} isFallback={true} />) as CustomSheetRenderer,
+  'proof-selector': ProofSelectorContent as CustomSheetRenderer,
+  'send-memo': SendMemoContent as CustomSheetRenderer,
+  'signer-approval': SignerApprovalSheetContent as CustomSheetRenderer,
+  'signer-connect': SignerConnectSheetContent as CustomSheetRenderer,
+  'signer-profile-picker': SignerProfilePickerContent as CustomSheetRenderer,
+  'nfc-tap': NfcTapContent as CustomSheetRenderer,
 };
 
 function SheetContent({

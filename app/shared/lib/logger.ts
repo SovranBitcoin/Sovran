@@ -30,6 +30,7 @@ export {
   initPhaseSync,
   useInitMount,
   redactError,
+  mintUrlLogFields,
   nfcLog,
   cashuLog,
   nostrLog,

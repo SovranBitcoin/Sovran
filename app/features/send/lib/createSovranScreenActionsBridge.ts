@@ -23,7 +23,7 @@ import {
 } from 'wallet';
 
 import { projectMintMeta } from '@/features/mint/lib/auditInfo';
-import { paymentLog } from '@/shared/lib/logger';
+import { paymentLog, mintUrlLogFields } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { getCachedMintInfo, useMintMetadataStore } from '@/shared/stores/global/mintMetadataStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -33,13 +33,6 @@ import { useTransactionDistributionStore } from '@/shared/stores/profile/transac
 import { setDistributionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 
 type EntryRecord = Record<string, unknown>;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 const HISTORY_TYPE_BY_SCREEN: Partial<Record<ScreenType, string>> = {
   meltQuote: 'melt',

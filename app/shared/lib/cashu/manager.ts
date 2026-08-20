@@ -34,7 +34,7 @@ import { maybeCreateMintFaultWebSocketFactory } from '@/shared/lib/e2e/mintFault
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, getPublicKey, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
-import { cashuLog, initLog, initPhase, redactError } from '../logger';
+import { cashuLog, initLog, initPhase, redactError, mintUrlLogFields } from '../logger';
 import { resolveOutputDataCreator } from './nativeOutputDataCreator';
 import { logCocoVersions, reportCocoApiFailure, reportCocoIssue } from './cocoFeedback';
 import {
@@ -55,13 +55,6 @@ const GIVEAWAY_P2PK_SECRET: string | null =
   Constants.expoConfig.extra.giveawayP2pkSecret.length > 0
     ? Constants.expoConfig.extra.giveawayP2pkSecret
     : null;
-
-function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
-  return {
-    hasMintUrl: !!mintUrl,
-    mintUrlLength: mintUrl?.length ?? 0,
-  };
-}
 
 interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
