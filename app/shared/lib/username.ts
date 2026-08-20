@@ -1,5 +1,3 @@
-import { uniqueUsernameGenerator } from 'unique-username-generator';
-
 const adjectives = [
   'brave',
   'clever',
@@ -837,10 +835,33 @@ const nouns = [
   'barbet',
 ];
 
-export const getUsername = (seed: string) =>
-  uniqueUsernameGenerator({
-    seed,
-    separator: '-',
-    length: 64,
-    dictionaries: [[...adjectives, ...verbs], nouns],
-  });
+const usernamePrefixes = [...adjectives, ...verbs];
+
+/**
+ * The exact xmur3 + mulberry32 sequence used by unique-username-generator
+ * 1.5.1. This is deterministic display-name mapping, never secret entropy.
+ */
+function seededRandom(seed: string): () => number {
+  let hash = 1779033703 ^ seed.length;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = Math.imul(hash ^ seed.charCodeAt(index), 3432918353);
+    hash = (hash << 13) | (hash >>> 19);
+  }
+  hash = Math.imul(hash ^ (hash >>> 16), 2246822507);
+  hash = Math.imul(hash ^ (hash >>> 13), 3266489909);
+  let state = (hash ^ (hash >>> 16)) >>> 0;
+
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let value = Math.imul(state ^ (state >>> 15), 1 | state);
+    value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export const getUsername = (seed: string) => {
+  const random = seededRandom(String(seed));
+  const prefix = usernamePrefixes[Math.floor(random() * usernamePrefixes.length)];
+  const noun = nouns[Math.floor(random() * nouns.length)];
+  return `${prefix}-${noun}`.slice(0, 64);
+};

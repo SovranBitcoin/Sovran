@@ -1,5 +1,4 @@
-import 'text-encoding-polyfill';
-import 'react-native-get-random-values';
+import '@bacons/text-decoder/install';
 import './polyfills';
 
 // Install react-native-quick-crypto FIRST so `globalThis.crypto.subtle` is
@@ -8,35 +7,27 @@ import './polyfills';
 // which Hermes does not provide natively.
 import { install as installQuickCrypto } from 'react-native-quick-crypto';
 
-import * as c from 'expo-crypto';
 installQuickCrypto();
 
-if (
-  typeof global?.Crypto === 'undefined' &&
-  typeof global?.crypto === 'undefined' &&
-  typeof global?.window?.crypto === 'undefined'
-) {
-  // @ts-expect-error -- crypto types do not align across polyfill + shim
-  global.crypto = c;
+if (typeof globalThis.TextEncoder !== 'function' || typeof globalThis.TextDecoder !== 'function') {
+  throw new Error('UTF-8 bootstrap failed: TextEncoder or TextDecoder is unavailable');
+}
+if (typeof globalThis.crypto?.getRandomValues !== 'function') {
+  throw new Error('Secure random bootstrap failed: crypto.getRandomValues is unavailable');
+}
+try {
+  globalThis.crypto.getRandomValues(new Uint8Array(1));
+} catch {
+  throw new Error('Secure random bootstrap failed: native provider is unavailable');
+}
+if (!globalThis.crypto.subtle) {
+  throw new Error('Secure crypto bootstrap failed: crypto.subtle is unavailable');
 }
 
 if (typeof __dirname === 'undefined') global.__dirname = '/';
 if (typeof __filename === 'undefined') global.__filename = '';
-if (typeof process === 'undefined') {
-  global.process = require('process');
-} else {
-  const bProcess = require('process');
-  for (let p in bProcess) {
-    if (!(p in process)) {
-      process[p] = bProcess[p];
-    }
-  }
-}
+process.env ??= {};
 
-process.browser = false;
-if (typeof Buffer === 'undefined') global.Buffer = require('buffer').Buffer;
-
-// global.location = global.location || { port: 80 }
 const isDev = typeof __DEV__ === 'boolean' && __DEV__;
 process.env['NODE_ENV'] = isDev ? 'development' : 'production';
 if (typeof localStorage !== 'undefined') {

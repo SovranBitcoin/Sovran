@@ -27,11 +27,8 @@
       "project": ["**/*.{ts,tsx,js,jsx}"],
       "ignore": ["modules/**", "targets/**"],
       "ignoreDependencies": [
-        "^@iconify-json/",
         "buffer",
-        "process",
         "expo-screen-corner-radius",
-        "@monicon/metro",
         "patch-package",
         "react-native-fast-squircle",
         "@noble/curves"

@@ -34,12 +34,6 @@ const ICON_PROPERTY_NAMES = new Set([
   'suffixIcon',
 ]);
 
-const packageJson = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
-  devDependencies?: Record<string, string>;
-};
-const iconifyDependencyNames = Object.keys(packageJson.devDependencies ?? {}).filter((dependency) =>
-  dependency.startsWith('@iconify-json/')
-);
 const registrySource = readFileSync(path.join(ROOT, '.monicon', 'icons.js'), 'utf8');
 const registryJson = registrySource.match(/module\.exports = ([\s\S]*);\s*$/)?.[1];
 if (!registryJson) throw new Error('Could not parse .monicon/icons.js');
@@ -47,12 +41,6 @@ if (!registryJson) throw new Error('Could not parse .monicon/icons.js');
 const registry = JSON.parse(registryJson) as Record<string, unknown>;
 const registryNames = new Set(Object.keys(registry));
 const iconPrefixes = new Set<string>(['internal']);
-
-for (const dependency of iconifyDependencyNames) {
-  if (dependency.startsWith('@iconify-json/')) {
-    iconPrefixes.add(dependency.slice('@iconify-json/'.length));
-  }
-}
 
 for (const name of registryNames) {
   const [prefix] = name.split(':');
@@ -239,24 +227,26 @@ describe('Monicon registry', () => {
     expect(unusedGeneratedIcons).toEqual([]);
   });
 
-  it('keeps installed Iconify collections aligned with registered icon prefixes', () => {
+  it('keeps committed and registered Iconify prefixes aligned', () => {
     const registeredIconifyPrefixes = new Set(
       collectRegisteredIconNames()
         .map((name) => name.split(':')[0])
-        .filter(Boolean)
+        .filter((prefix) => prefix && prefix !== 'internal')
     );
-    const installedIconifyPrefixes = new Set(
-      iconifyDependencyNames.map((dependency) => dependency.slice('@iconify-json/'.length))
+    const generatedIconifyPrefixes = new Set(
+      [...registryNames]
+        .map((name) => name.split(':')[0])
+        .filter((prefix) => prefix && prefix !== 'internal')
     );
 
-    const unusedInstalledCollections = [...installedIconifyPrefixes].filter(
+    const unregisteredGeneratedPrefixes = [...generatedIconifyPrefixes].filter(
       (prefix) => !registeredIconifyPrefixes.has(prefix)
     );
-    const missingInstalledCollections = [...registeredIconifyPrefixes].filter(
-      (prefix) => !installedIconifyPrefixes.has(prefix)
+    const missingGeneratedPrefixes = [...registeredIconifyPrefixes].filter(
+      (prefix) => !generatedIconifyPrefixes.has(prefix)
     );
 
-    expect(unusedInstalledCollections).toEqual([]);
-    expect(missingInstalledCollections).toEqual([]);
+    expect(unregisteredGeneratedPrefixes).toEqual([]);
+    expect(missingGeneratedPrefixes).toEqual([]);
   });
 });

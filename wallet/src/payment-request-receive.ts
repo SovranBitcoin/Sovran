@@ -20,6 +20,7 @@
 
 import { PaymentRequest, decodePaymentRequest } from "@cashu/cashu-ts";
 import type { Manager } from "@cashu/coco-core";
+import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 
 import { logger } from "./logger";
 import type { ReusableQuoteIdentityStore } from "./quotes/reusable";
@@ -70,7 +71,7 @@ export function standingPaymentRequestKey(unit: string): string {
 }
 
 function generateRequestId(): string {
-  return `sov${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  return `sov${bytesToHex(randomBytes(16))}`;
 }
 
 /**

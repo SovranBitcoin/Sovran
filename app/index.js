@@ -1,5 +1,4 @@
 // Entry point - polyfills MUST be imported before anything else
-import 'react-native-get-random-values';
 import './shim';
 
 // E2e-only mint-fault interceptor (no-op without the harness env gate) must

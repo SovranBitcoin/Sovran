@@ -46,6 +46,7 @@ const PUBKEY_A = 'a'.repeat(64);
 const PUBKEY_B = 'b'.repeat(64);
 const KEY_A = `nip46_bunker_secrets_${PUBKEY_A}`;
 const T0 = 1_700_000_000_000;
+const originalCryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
 
 async function expectOk<T, E>(resultAsync: ResultAsync<T, E>): Promise<T> {
   const result = await resultAsync;
@@ -56,6 +57,14 @@ async function expectOk<T, E>(resultAsync: ResultAsync<T, E>): Promise<T> {
 beforeEach(() => {
   mocked.__backing.clear();
   jest.clearAllMocks();
+});
+
+afterEach(() => {
+  if (originalCryptoDescriptor) {
+    Object.defineProperty(globalThis, 'crypto', originalCryptoDescriptor);
+  } else {
+    Reflect.deleteProperty(globalThis, 'crypto');
+  }
 });
 
 describe('mintSecret', () => {
@@ -71,6 +80,24 @@ describe('mintSecret', () => {
     const first = await expectOk(mintSecret(PUBKEY_A, T0));
     const second = await expectOk(mintSecret(PUBKEY_A, T0));
     expect(first).not.toBe(second);
+  });
+
+  it('fails closed and persists nothing when the CSPRNG throws', async () => {
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      value: {
+        getRandomValues: () => {
+          throw new Error('native rng unavailable');
+        },
+      },
+    });
+
+    const result = await mintSecret(PUBKEY_A, T0);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().type).toBe('csprng-failed');
+    expect(mocked.setItemAsync).not.toHaveBeenCalled();
+    expect(mocked.__backing.has(KEY_A)).toBe(false);
   });
 
   it('caps outstanding secrets at 8, evicting oldest first', async () => {

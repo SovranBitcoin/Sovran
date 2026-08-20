@@ -11,24 +11,19 @@
 const MIN_DISTANCE_M = 750;
 const MAX_DISTANCE_M = 1800;
 
-/** Approximate metres per degree of latitude (constant everywhere on Earth). */
-const METERS_PER_DEG_LAT = 111_320;
+const EARTH_RADIUS_M = 6_371_000;
 
 // Cached per session --------------------------------------------------------
 
-let _offset: { lat: number; lon: number } | null = null;
+let _offset: { bearing: number; distance: number } | null = null;
 
-function ensureOffset(): { lat: number; lon: number } {
+function ensureOffset(): { bearing: number; distance: number } {
   if (_offset) return _offset;
 
-  const angle = Math.random() * 2 * Math.PI;
-  const distance = MIN_DISTANCE_M + Math.random() * (MAX_DISTANCE_M - MIN_DISTANCE_M);
-
+  const random = crypto.getRandomValues(new Uint32Array(2));
   _offset = {
-    lat: (distance * Math.cos(angle)) / METERS_PER_DEG_LAT,
-    // longitude degrees shrink with latitude – but for a privacy jitter we
-    // don't need geodesic precision, so we use the same constant.
-    lon: (distance * Math.sin(angle)) / METERS_PER_DEG_LAT,
+    bearing: (random[0] / 2 ** 32) * 2 * Math.PI,
+    distance: MIN_DISTANCE_M + (random[1] / 2 ** 32) * (MAX_DISTANCE_M - MIN_DISTANCE_M),
   };
 
   return _offset;
@@ -41,6 +36,23 @@ export function applySafetyOffset(
   lat: number,
   lon: number
 ): { latitude: number; longitude: number } {
-  const o = ensureOffset();
-  return { latitude: lat + o.lat, longitude: lon + o.lon };
+  const { bearing, distance } = ensureOffset();
+  const latitude = (lat * Math.PI) / 180;
+  const longitude = (lon * Math.PI) / 180;
+  const angularDistance = distance / EARTH_RADIUS_M;
+  const safeLatitude = Math.asin(
+    Math.sin(latitude) * Math.cos(angularDistance) +
+      Math.cos(latitude) * Math.sin(angularDistance) * Math.cos(bearing)
+  );
+  const safeLongitude =
+    longitude +
+    Math.atan2(
+      Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latitude),
+      Math.cos(angularDistance) - Math.sin(latitude) * Math.sin(safeLatitude)
+    );
+
+  return {
+    latitude: (safeLatitude * 180) / Math.PI,
+    longitude: (((safeLongitude * 180) / Math.PI + 540) % 360) - 180,
+  };
 }

@@ -106,8 +106,10 @@ describe('probePrimalHealth', () => {
 
     const result = await promise;
     expect(result._unsafeUnwrap()).toBe(true);
-    expect(socket!.sent.some((m) => m.includes('REQ'))).toBe(true);
-    expect(socket!.sent.some((m) => m.includes('CLOSE'))).toBe(true);
+    expect(socket!.sent.map((message) => JSON.parse(message))).toEqual([
+      ['REQ', 'health', { kinds: [1], limit: 1 }],
+      ['CLOSE', 'health'],
+    ]);
     expect(socket!.closed).toBe(true);
   });
 

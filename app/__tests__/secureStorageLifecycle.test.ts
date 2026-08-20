@@ -26,6 +26,7 @@ jest.mock('@/shared/lib/logger', () => ({
 import * as SecureStore from 'expo-secure-store';
 import {
   clearAllSecureData,
+  ensureMnemonicExists,
   retrieveCashuSeed,
   retrieveMnemonic,
   storeCashuSeed,
@@ -37,6 +38,7 @@ const VALID_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const INVALID_CHECKSUM =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon';
+const originalCryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
 
 async function flushBookkeeping(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -47,6 +49,61 @@ describe('secureStorage mnemonic and seed lifecycle', () => {
     await flushBookkeeping();
     mockSecureBacking.clear();
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (originalCryptoDescriptor) {
+      Object.defineProperty(globalThis, 'crypto', originalCryptoDescriptor);
+    } else {
+      Reflect.deleteProperty(globalThis, 'crypto');
+    }
+  });
+
+  it('uses exactly 128 bits from crypto.getRandomValues for a fresh mnemonic', async () => {
+    const getRandomValues = jest.fn((entropy: Uint8Array) => {
+      entropy.fill(0);
+      return entropy;
+    });
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      value: { getRandomValues },
+    });
+
+    await expect(ensureMnemonicExists()).resolves.toBe(VALID_MNEMONIC);
+
+    expect(getRandomValues).toHaveBeenCalledTimes(1);
+    const [entropy] = getRandomValues.mock.calls[0];
+    expect(entropy).toBeInstanceOf(Uint8Array);
+    expect(entropy).toHaveLength(16);
+    expect(mockSecureBacking.get('user_mnemonic')).toBe(VALID_MNEMONIC);
+  });
+
+  it('fails closed when crypto.getRandomValues is unavailable', async () => {
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      value: {},
+    });
+
+    await expect(ensureMnemonicExists()).resolves.toBeNull();
+
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    expect(mockSecureBacking.has('user_mnemonic')).toBe(false);
+  });
+
+  it('persists no mnemonic when the native CSPRNG throws', async () => {
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      value: {
+        getRandomValues: () => {
+          throw new Error('native rng unavailable');
+        },
+      },
+    });
+
+    await expect(ensureMnemonicExists()).resolves.toBeNull();
+
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    expect(mockSecureBacking.has('user_mnemonic')).toBe(false);
   });
 
   it.each([

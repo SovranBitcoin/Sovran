@@ -109,7 +109,7 @@ const deleteItem = (key: string): ResultAsync<void, BunkerSecretsError> =>
 const generateSecret = Result.fromThrowable(
   () => {
     const bytes = new Uint8Array(SECRET_BYTES);
-    // CSPRNG via the react-native-get-random-values shim loaded in index.js.
+    // CSPRNG via the react-native-quick-crypto bootstrap loaded in index.js.
     crypto.getRandomValues(bytes);
     return bytesToHex(bytes);
   },

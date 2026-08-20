@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   PaymentRequest,
   PaymentRequestTransportType,
@@ -15,6 +15,18 @@ import {
 import type { ReusableQuoteIdentityStore } from "../../src/quotes/reusable";
 
 const MINTS = ["https://mint.example.com"];
+const originalCryptoDescriptor = Object.getOwnPropertyDescriptor(
+  globalThis,
+  "crypto",
+);
+
+afterEach(() => {
+  if (originalCryptoDescriptor) {
+    Object.defineProperty(globalThis, "crypto", originalCryptoDescriptor);
+  } else {
+    Reflect.deleteProperty(globalThis, "crypto");
+  }
+});
 
 /** A realistic coco encodedRequest: amount floor 1, nostr transport. */
 function encodedFixture(requestId: string, mints: string[] = MINTS): string {
@@ -84,6 +96,45 @@ const KEY = standingPaymentRequestKey("sat");
 const INPUT = { unit: "sat", mints: MINTS };
 
 describe("ensureStandingPaymentRequest", () => {
+  it("uses a 128-bit CSPRNG request id", async () => {
+    const getRandomValues = vi.fn((values: Uint8Array) => {
+      values.fill(0xab);
+      return values;
+    });
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: { getRandomValues },
+    });
+    const create = vi.fn().mockResolvedValue(operation());
+
+    await ensureStandingPaymentRequest(
+      mockManager({ create }),
+      INPUT,
+      memoryStore(),
+    );
+
+    expect(getRandomValues).toHaveBeenCalledOnce();
+    expect(getRandomValues.mock.calls[0]?.[0]).toHaveLength(16);
+    expect(create.mock.calls[0]?.[0].requestId).toBe(`sov${"ab".repeat(16)}`);
+  });
+
+  it("fails before creating an operation when the CSPRNG is unavailable", async () => {
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: {},
+    });
+    const create = vi.fn();
+
+    await expect(
+      ensureStandingPaymentRequest(
+        mockManager({ create }),
+        INPUT,
+        memoryStore(),
+      ),
+    ).rejects.toThrow();
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it("creates a reusable 1-unit-floor op and records it when none is recorded", async () => {
     const create = vi.fn().mockResolvedValue(operation());
     const manager = mockManager({ create });

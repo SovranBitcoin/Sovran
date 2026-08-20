@@ -24,7 +24,7 @@
   "dependencies": {
     "@cashu/cashu-ts": "5.0.0-rc.4",
     "@gandlaf21/bolt11-decode": "^3.1.1",
-    "@noble/hashes": "^2.0.0",
+    "@noble/hashes": "2.3.0",
     "@scure/bip39": "2.0.1",
     "@sovranbitcoin/schemas": "^2.2.0",
     "neverthrow": "^8.2.0",

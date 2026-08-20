@@ -685,6 +685,47 @@ describe('nostrconnect pairing', () => {
     expect(activityEntries()).toMatchObject([{ method: 'connect', verdict: 'approved_pairing' }]);
   });
 
+  it('uses the platform CSPRNG UUID for the default handshake request id', async () => {
+    const id = '00000000-0000-4000-8000-000000000000';
+    const randomUUID = jest.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(id);
+
+    try {
+      const { engine, sent } = makeEngine({ mintRpcId: undefined });
+      const parsed = nostrconnectUri();
+      engine.startNostrconnectPairing(parsed);
+
+      const result = await engine.completeNostrconnectPairing({
+        parsed,
+        acceptedGrantKeys: [],
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(randomUUID).toHaveBeenCalledTimes(1);
+      expect(parsedResponse(sent[0]!)).toEqual({ id, result: parsed.secret });
+    } finally {
+      randomUUID.mockRestore();
+    }
+  });
+
+  it('fails closed without mutating pairing state when request-id entropy throws', async () => {
+    const { engine, sent } = makeEngine({
+      mintRpcId: () => {
+        throw new Error('native rng unavailable');
+      },
+    });
+    const parsed = nostrconnectUri();
+    engine.startNostrconnectPairing(parsed);
+
+    const result = await engine.completeNostrconnectPairing({
+      parsed,
+      acceptedGrantKeys: ['sign_event:1'],
+    });
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({ type: 'csprng-failed' });
+    expect(connectionFor(APP_B)).toBeUndefined();
+    expect(sent).toEqual([]);
+  });
+
   it('re-pair downgrades an unchecked presented grant from always back to ask', async () => {
     // App already paired with sign_event:1 'always' and an editor-set deny on
     // sign_event:6. The user re-pairs and UNCHECKS sign_event:1 (both keys are

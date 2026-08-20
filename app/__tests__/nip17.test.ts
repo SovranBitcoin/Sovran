@@ -67,6 +67,80 @@ function changeFirstHex(value: string): string {
 }
 
 describe('NIP-17 gift wraps', () => {
+  it('uses CSPRNG draws for every privacy timestamp', () => {
+    const originalCryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    const originalCrypto = globalThis.crypto;
+    const getRandomValues = jest.fn((values: Uint8Array | Uint32Array) => {
+      return originalCrypto.getRandomValues(values);
+    });
+    const cryptoProxy = new Proxy(originalCrypto, {
+      get(target, property) {
+        if (property === 'getRandomValues') return getRandomValues;
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: cryptoProxy });
+    const senderPrivateKey = generateSecretKey();
+    const recipientPrivateKey = generateSecretKey();
+
+    try {
+      buildGiftWrappedDMPair({
+        content: 'private hello',
+        senderPrivateKey,
+        recipientPublicKey: getPublicKey(recipientPrivateKey),
+      });
+
+      const privacyDraws = getRandomValues.mock.calls.filter(
+        ([values]) => values instanceof Uint32Array
+      );
+      expect(privacyDraws).toHaveLength(4);
+      expect(privacyDraws.every(([values]) => values.length === 1)).toBe(true);
+    } finally {
+      if (originalCryptoDescriptor) {
+        Object.defineProperty(globalThis, 'crypto', originalCryptoDescriptor);
+      } else {
+        Reflect.deleteProperty(globalThis, 'crypto');
+      }
+    }
+  });
+
+  it('fails closed when privacy timestamp entropy is unavailable', () => {
+    const originalCryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    const originalCrypto = globalThis.crypto;
+    const cryptoProxy = new Proxy(originalCrypto, {
+      get(target, property) {
+        if (property === 'getRandomValues') {
+          return (values: Uint8Array | Uint32Array) => {
+            if (values instanceof Uint32Array) throw new Error('native rng unavailable');
+            return originalCrypto.getRandomValues(values);
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: cryptoProxy });
+
+    try {
+      const senderPrivateKey = generateSecretKey();
+      const recipientPrivateKey = generateSecretKey();
+      expect(() =>
+        buildGiftWrappedDMPair({
+          content: 'private hello',
+          senderPrivateKey,
+          recipientPublicKey: getPublicKey(recipientPrivateKey),
+        })
+      ).toThrow('native rng unavailable');
+    } finally {
+      if (originalCryptoDescriptor) {
+        Object.defineProperty(globalThis, 'crypto', originalCryptoDescriptor);
+      } else {
+        Reflect.deleteProperty(globalThis, 'crypto');
+      }
+    }
+  });
+
   it('round-trips the recipient and sender self-copy with one recipient-bound rumor', () => {
     const senderPrivateKey = generateSecretKey();
     const senderPublicKey = getPublicKey(senderPrivateKey);

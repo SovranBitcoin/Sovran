@@ -39,8 +39,11 @@ const TWO_DAYS = 2 * 24 * 60 * 60;
 
 const now = (): number => Math.round(Date.now() / 1000);
 
-/** Return a random timestamp within the last 2 days (for metadata privacy). */
-const randomNow = (): number => Math.round(now() - Math.random() * TWO_DAYS);
+/** Return a CSPRNG-random timestamp within the last 2 days for metadata privacy. */
+const randomNow = (): number => {
+  const random = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
+  return Math.round(now() - random * TWO_DAYS);
+};
 
 const nip44ConversationKey = (privateKey: Uint8Array, publicKey: string): Uint8Array =>
   nip44.v2.utils.getConversationKey(privateKey, publicKey);

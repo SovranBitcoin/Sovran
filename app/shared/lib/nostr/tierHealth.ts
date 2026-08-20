@@ -67,7 +67,7 @@ export function probePrimalHealth(
   const WebSocketCtor = options.WebSocketImpl ?? WebSocket;
   return ResultAsync.fromSafePromise(
     new Promise<boolean>((resolve) => {
-      const subId = `health-${Math.random().toString(36).slice(2, 10)}`;
+      const subId = 'health';
       let settled = false;
       let ws: WebSocket | null = null;
       const finish = (online: boolean) => {

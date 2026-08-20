@@ -120,6 +120,8 @@ const RELAY_UNREACHABLE_MESSAGE =
   "Couldn't reach the app's relays. Check your connection and try again.";
 const SAVE_FAILED_MESSAGE =
   "This connection couldn't be saved. You may have reached the connected-app limit.";
+const SECURE_RANDOM_UNAVAILABLE_MESSAGE =
+  "Secure randomness isn't available. Restart Sovran and try again.";
 
 const PICKER_TITLE = 'Sign In As';
 const RESTART_WARNING_TITLE = 'Switching profiles restarts Sovran.';
@@ -418,9 +420,10 @@ async function completePairingWhenHot(
   return outcome;
 }
 
-type ConnectFailure = 'relays' | 'save' | 'changed';
+type ConnectFailure = 'relays' | 'save' | 'changed' | 'security';
 
 function failureFor(error: Nip46EngineError): ConnectFailure {
+  if (error.type === 'csprng-failed') return 'security';
   if (error.type === 'adopt-failed') {
     return error.cause === 'inherit_mismatch' ? 'changed' : 'save';
   }
@@ -435,6 +438,8 @@ function failureMessageFor(failure: ConnectFailure): string {
       return SAVE_FAILED_MESSAGE;
     case 'changed':
       return ADOPT_CHANGED_MESSAGE;
+    case 'security':
+      return SECURE_RANDOM_UNAVAILABLE_MESSAGE;
   }
 }
 

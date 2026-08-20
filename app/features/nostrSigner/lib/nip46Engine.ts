@@ -101,7 +101,7 @@ import {
   type PendingRequestContext,
   type VerdictResolverSeam,
 } from '@/features/nostrSigner/lib/verdictResolver';
-import { nostrLog, redactError } from '@/shared/lib/logger';
+import { nostrLog, redactError, type RedactedError } from '@/shared/lib/logger';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 import { relays as defaultSignerRelays } from '@/shared/ndk';
 
@@ -112,6 +112,7 @@ export const EXPIRY_SWEEP_INTERVAL_MS = 10_000;
 
 export type Nip46EngineError =
   | { type: 'not-started' }
+  | { type: 'csprng-failed'; cause: RedactedError }
   | { type: 'transport'; cause: Nip46TransportError }
   | { type: 'unknown-request' }
   | { type: 'upsert-failed'; cause: UpsertAppError }
@@ -248,7 +249,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     hasOutstandingSecret: overrides.hasOutstandingSecret ?? hasOutstandingBunkerSecret,
     defaultRelays: overrides.defaultRelays ?? defaultSignerRelays,
     now: overrides.now ?? Date.now,
-    mintRpcId: overrides.mintRpcId ?? (() => Math.floor(Math.random() * 0xffffffff).toString(16)),
+    mintRpcId: overrides.mintRpcId ?? (() => crypto.randomUUID()),
   };
 
   let state: EngineState | null = null;
@@ -927,6 +928,12 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     if (!engine) return errAsync(NOT_STARTED);
     const { parsed } = input;
     const clientPubkey = parsed.clientPubkey.toLowerCase();
+    let responseId: string;
+    try {
+      responseId = deps.mintRpcId();
+    } catch (error) {
+      return errAsync({ type: 'csprng-failed', cause: redactError(error) });
+    }
     const nowMs = deps.now();
 
     const grants = Object.fromEntries(
@@ -1000,7 +1007,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     // pin re-aligns from the client's first inbound request if it is nip04-only.
     return respond(
       clientPubkey,
-      { id: deps.mintRpcId(), result: parsed.secret },
+      { id: responseId, result: parsed.secret },
       connections().apps[clientPubkey]?.encryption ?? 'nip44'
     )
       .map(() => {
