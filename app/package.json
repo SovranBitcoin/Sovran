@@ -110,7 +110,7 @@
     "@sovranbitcoin/schemas": "^2.2.0",
     "bitchat-module": "file:./modules/bitchat-module",
     "buffer": "^6.0.3",
-    "coco-cashu-plugin-npc": "3.0.0-rc.20260707.3.1.sha.debd5dd",
+    "coco-cashu-plugin-npc": "3.0.0",
     "expo": "^56.0.16",
     "expo-application": "~56.0.3",
     "expo-asset": "~56.0.17",
