@@ -29,11 +29,6 @@ import { withAlpha } from '@/shared/lib/color';
 import { usePaymentFlowMachine } from 'wallet/react';
 
 import Icon from 'assets/icons';
-import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
-import {
-  BLE_PEER_FRESHNESS_TICK_MS,
-  filterFreshBLEPeers,
-} from '@/features/bitchat/lib/blePeerSnapshots';
 import { LightningStrike } from '@/features/nearPay/components/LightningStrike';
 import {
   CELEBRATION_LIGHTNING_PALETTE,
@@ -41,7 +36,7 @@ import {
   type CelebrationPeerIdentity,
 } from '@/features/nearPay/components/NutDropCelebrationOverlay';
 import { useNutDropCelebration } from '@/features/nearPay/hooks/useNutDropCelebration';
-import { useEagerPeerFavorite } from '@/features/nearPay/hooks/useEagerPeerFavorite';
+import { useFreshNearbyPeers } from '@/features/nearPay/hooks/useFreshNearbyPeers';
 import { useNutDropStrike } from '@/features/nearPay/hooks/useNutDropStrike';
 import type { StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
 import { peerAvatarState, peerNostrPubkey, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
@@ -368,6 +363,21 @@ function peerTargetsEqual(a: PeerLayoutTarget, b: PeerLayoutTarget): boolean {
   );
 }
 
+type PeerNodeProps = {
+  target: PeerLayoutTarget;
+  fieldSize: PeerLayoutSize;
+  sizing: PeerFieldSizing;
+  layoutConfig: PeerLayoutConfig;
+  panX: SharedValue<number>;
+  panY: SharedValue<number>;
+  overviewScale: SharedValue<number>;
+  overviewTranslateX: SharedValue<number>;
+  overviewTranslateY: SharedValue<number>;
+  onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
+  hideSharedElementSource?: boolean;
+  strike?: StrikeState | null;
+};
+
 const PeerNode = React.memo(function PeerNode({
   target,
   fieldSize,
@@ -381,20 +391,7 @@ const PeerNode = React.memo(function PeerNode({
   onSelect,
   hideSharedElementSource,
   strike,
-}: {
-  target: PeerLayoutTarget;
-  fieldSize: PeerLayoutSize;
-  sizing: PeerFieldSizing;
-  layoutConfig: PeerLayoutConfig;
-  panX: SharedValue<number>;
-  panY: SharedValue<number>;
-  overviewScale: SharedValue<number>;
-  overviewTranslateX: SharedValue<number>;
-  overviewTranslateY: SharedValue<number>;
-  onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
-  hideSharedElementSource?: boolean;
-  strike?: StrikeState | null;
-}) {
+}: PeerNodeProps) {
   const [foreground, surface] = useThemeColor(PEER_NODE_THEME_KEYS);
   const hasAnimatedInRef = useRef(false);
   const baseX = useSharedValue(target.x);
@@ -743,36 +740,7 @@ function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function arePeerNodePropsEqual(
-  prev: {
-    target: PeerLayoutTarget;
-    fieldSize: PeerLayoutSize;
-    sizing: PeerFieldSizing;
-    layoutConfig: PeerLayoutConfig;
-    panX: SharedValue<number>;
-    panY: SharedValue<number>;
-    overviewScale: SharedValue<number>;
-    overviewTranslateX: SharedValue<number>;
-    overviewTranslateY: SharedValue<number>;
-    onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
-    hideSharedElementSource?: boolean;
-    strike?: StrikeState | null;
-  },
-  next: {
-    target: PeerLayoutTarget;
-    fieldSize: PeerLayoutSize;
-    sizing: PeerFieldSizing;
-    layoutConfig: PeerLayoutConfig;
-    panX: SharedValue<number>;
-    panY: SharedValue<number>;
-    overviewScale: SharedValue<number>;
-    overviewTranslateX: SharedValue<number>;
-    overviewTranslateY: SharedValue<number>;
-    onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
-    hideSharedElementSource?: boolean;
-    strike?: StrikeState | null;
-  }
-): boolean {
+function arePeerNodePropsEqual(prev: PeerNodeProps, next: PeerNodeProps): boolean {
   return (
     prev.onSelect === next.onSelect &&
     prev.hideSharedElementSource === next.hideSharedElementSource &&
@@ -1485,25 +1453,8 @@ export function NearPayScreen() {
   // NearPay is sat-pinned at the protocol level — it does NOT follow the
   // wallet's active mint unit.
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
-  // Every bitchat peer is on the radar so the favorite exchange can run, but a
-  // token DM is only enabled after the peer advertises a valid creq capability.
-  // Ghost entries (a nearby device's previous profile identities, which
-  // upstream's registry can retain forever) are dropped by the freshness
-  // filter; the periodic tick re-evaluates it as lastSeen values age out.
-  const { peers: blePeers } = useBLEPeers();
-  const [peerFreshnessNow, setPeerFreshnessNow] = useState(() => Date.now());
-  useEffect(() => {
-    const interval = setInterval(() => setPeerFreshnessNow(Date.now()), BLE_PEER_FRESHNESS_TICK_MS);
-    return () => clearInterval(interval);
-  }, []);
-  const peers = useMemo(
-    () => filterFreshBLEPeers(blePeers, peerFreshnessNow),
-    [blePeers, peerFreshnessNow]
-  );
-  // Eagerly favorite each nearby peer so Sovran peers reciprocate and become
-  // lockable-on-sight — bitchat's only native mesh channel for exchanging a
-  // Nostr identity. Bounded to while the radar is mounted.
-  useEagerPeerFavorite(peers);
+  // A token DM is only enabled after the peer advertises a valid creq capability.
+  const peers = useFreshNearbyPeers();
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const nearPaySession = useNearPaySessionStore((state) => state.active);
   const inlineAmountEntry = nearPaySession?.amountEntry ?? null;

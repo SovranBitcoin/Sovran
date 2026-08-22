@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Keyboard, ScrollView, View as RNView, type LayoutChangeEvent } from 'react-native';
+import { Keyboard, ScrollView, View as RNView } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
@@ -11,7 +11,6 @@ import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { PatternBackground } from '@/shared/ui/composed/PatternBackground';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import {
   useRoutstrStore,
   type ChatAttachment,
@@ -22,6 +21,8 @@ import { E2EActionMenuProbe, E2EHerouiMenuProbe } from '@/shared/lib/popup/E2EAc
 import {
   useChatKeyboardAnimationLogger,
   useChatSurfacePerfLogger,
+  useComposerHeight,
+  useLoggedChatSend,
 } from '@/shared/ui/composed/chat/useChatSurfacePerfLogger';
 import { aiLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
@@ -207,7 +208,7 @@ export function AiChatScreen() {
   // dispatch.
   const [draft, setDraft] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
-  const [composerHeight, setComposerHeight] = useState(0);
+  const [composerHeight, handleComposerLayout] = useComposerHeight();
 
   // Picked-but-unsent images are only valid against a vision-capable
   // model. If the user switches the slot to a text-only model after
@@ -221,10 +222,6 @@ export function AiChatScreen() {
       return [];
     });
   }, [canAttachImages]);
-  const handleComposerLayout = useCallback((e: LayoutChangeEvent) => {
-    const next = e.nativeEvent.layout.height;
-    setComposerHeight((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
-  }, []);
 
   // Composer + list both ride the keyboard via a single shared translate
   // (UI thread, no Yoga re-layout per frame). The math:
@@ -263,28 +260,15 @@ export function AiChatScreen() {
     ],
   }));
 
-  const dispatchSend = useSingleFlight(async (text: string, attachments: ChatAttachment[]) => {
-    const sendStart = performance.now();
-    aiLog.info('chat.send.dispatch', {
-      surface: SURFACE,
+  const dispatchSend = useLoggedChatSend({
+    log: aiLog,
+    surface: SURFACE,
+    send,
+    dispatchExtras: (text: string, attachments: ChatAttachment[]) => ({
       textLen: text.length,
       attachmentCount: attachments.length,
       historyCount: activeMessages.length,
-    });
-    try {
-      await send(text, attachments);
-      aiLog.info('chat.send.complete', {
-        surface: SURFACE,
-        duration_ms: Math.round((performance.now() - sendStart) * 100) / 100,
-      });
-    } catch (err) {
-      aiLog.warn('chat.send.failed', {
-        surface: SURFACE,
-        duration_ms: Math.round((performance.now() - sendStart) * 100) / 100,
-        err,
-      });
-      throw err;
-    }
+    }),
   });
 
   const handleSubmit = useCallback(() => {

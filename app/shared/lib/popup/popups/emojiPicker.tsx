@@ -22,11 +22,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { BottomSheet } from 'heroui-native';
 import * as Clipboard from 'expo-clipboard';
 import { withAlpha } from '@/shared/lib/color';
-import Icon, { CurrencyIcon } from 'assets/icons';
+import { CurrencyIcon } from 'assets/icons';
 
 import { encode } from '@/shared/lib/third-party/emoji';
 import { log, useRenderLogger } from '@/shared/lib/logger';
@@ -36,6 +36,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 import { List } from '@/shared/ui/composed/List';
+import { SheetSearchField } from '../SheetSearchField';
 
 import { showActionSheet } from './bridge';
 import { copyPopup } from './copy';
@@ -132,70 +133,6 @@ const searchRowKeyExtractor = (row: EmojiEntry[], index: number): string => {
     .join('|');
   return rowKey.length > 0 ? rowKey : `search-row-${index}`;
 };
-
-/**
- * Search field — copy of `ActionMenuHost`'s `MenuSearchField` so the
- * emoji picker's search input is byte-identical to Select Profile's
- * (when sections + searchable are wired). Uses `BottomSheetTextInput`
- * so gorhom's keyboard avoidance lifts the sheet on focus.
- */
-function EmojiSearchField({
-  placeholder,
-  value,
-  onChangeText,
-  onClear,
-}: {
-  placeholder?: string;
-  value: string;
-  onChangeText: (next: string) => void;
-  onClear: () => void;
-}) {
-  const [foreground, surfaceSecondary, placeholderColor] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'field-placeholder',
-  ] as const);
-  return (
-    // Outer wrapper: `paddingHorizontal: 12` aligns the input's bg edges
-    // with the first/last tab pill outer edge. Parent wrapper is at
-    // `paddingHorizontal: 12` and the anchor bar's first pill sits at
-    // `anchorBarStyle.paddingHorizontal: 24`, so 12 (parent) + 12 (here)
-    // = 24 lines up exactly. The inner wrapper is the clear button's
-    // containing block, so absolute `right: 10` is measured from the input's
-    // edge, not from the outer padding edge.
-    <View style={{ marginTop: 8, paddingHorizontal: 12 }}>
-      <View style={{ justifyContent: 'center' }}>
-        <BottomSheetTextInput
-          testID="emoji-picker-search"
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder ?? 'Search...'}
-          placeholderTextColor={placeholderColor}
-          autoCorrect={false}
-          autoCapitalize="none"
-          style={{
-            height: 38,
-            borderRadius: 12,
-            paddingHorizontal: 12,
-            paddingRight: 36,
-            backgroundColor: surfaceSecondary,
-            color: foreground,
-            fontSize: 15,
-          }}
-        />
-        {value.length > 0 ? (
-          <Pressable
-            testID="emoji-picker-search-clear"
-            onPress={onClear}
-            hitSlop={8}
-            style={{ position: 'absolute', right: 10, padding: 4 }}>
-            <Icon name="mdi:close-circle" size={18} color={withAlpha(foreground, 0.33)} />
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
-  );
-}
 
 interface EmojiPickerContentProps extends CustomSheetSharedProps {
   payload: ActionSheetPayloads['emoji-picker'];
@@ -410,12 +347,23 @@ export function EmojiPickerContent({
           <BottomSheet.Title className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
             Emoji
           </BottomSheet.Title>
-          <EmojiSearchField
-            placeholder="Search emoji..."
-            value={inputText}
-            onChangeText={handleSearchChange}
-            onClear={handleSearchClear}
-          />
+          {/*
+            `paddingHorizontal: 12` aligns the input's background edges with
+            the first/last tab pill's outer edge: this parent sits at 12 and
+            the anchor bar's first pill at 24, so 12 + 12 lines up exactly.
+            It has to be an outer wrapper because SheetSearchField's own View
+            is the clear button's containing block.
+          */}
+          <View style={{ marginTop: 8, paddingHorizontal: 12 }}>
+            <SheetSearchField
+              testID="emoji-picker-search"
+              clearTestID="emoji-picker-search-clear"
+              placeholder="Search emoji..."
+              value={inputText}
+              onChangeText={handleSearchChange}
+              onClear={handleSearchClear}
+            />
+          </View>
         </View>
       }
     />
@@ -441,7 +389,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     // Align the first/last cell's outer edge with the search bar bg
-    // (which sits at 24px from the sheet edge — see `EmojiSearchField`)
+    // (which sits at 24px from the sheet edge — see the search field wrapper)
     // and the first/last tab pill's outer edge (also 24px from the
     // sheet edge — see `anchorBarStyle.paddingHorizontal: 24`).
     paddingHorizontal: 24,

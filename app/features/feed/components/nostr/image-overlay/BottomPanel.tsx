@@ -31,6 +31,48 @@ import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { Log } from '@/shared/lib/logger';
 import { POST_ACTION_ICON_SIZES } from '../MetricsFooter';
 
+const METRIC_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+
+/**
+ * Icon + count for one metric in the overlay. Mirrors `AnimatedMetric` in
+ * `MetricsFooter`, but with plain `Text`: the overlay sits over media and does
+ * not animate counts, and the panel's reply metric is inert while the bar's is
+ * pressable. Callers therefore own the wrapper (`View` or `Pressable`) and this
+ * component never branches on interactivity.
+ *
+ * `inactiveColor` is a value, not a mode: the scrollable panel resolves it from
+ * the theme while the absolute bar sits on the image and uses a fixed light
+ * tone.
+ */
+const OverlayMetric = React.memo(function OverlayMetric({
+  iconName,
+  iconSize,
+  text,
+  active = false,
+  activeColor,
+  inactiveColor,
+  overpass = false,
+}: {
+  iconName: string;
+  iconSize: number;
+  text: string;
+  /** Absent reads as inactive: the overlay's post flags are optional. */
+  active?: boolean;
+  activeColor: string;
+  inactiveColor: string;
+  overpass?: boolean;
+}) {
+  const color = active ? activeColor : inactiveColor;
+  return (
+    <>
+      <Icon name={iconName} size={iconSize} color={color} />
+      <Text overpass={overpass} size={13} style={{ color }}>
+        {text}
+      </Text>
+    </>
+  );
+});
+
 // The Repost/Quote menu can't render over the image overlay (a FullWindowOverlay
 // the menu's bottom sheet mounts beneath), so the overlay closes first, then the
 // menu opens once it's on its way out.
@@ -238,6 +280,71 @@ function InlinePanelImage({ uri }: { uri: string }) {
   );
 }
 
+/**
+ * Repost / like / zap metrics for the overlay, with the reply metric supplied
+ * as `children` so each surface keeps its own: the scrollable panel renders an
+ * inert one (its live composer is the ThreadReplyBar) while the absolute bar
+ * renders a pressable one that opens the sheet.
+ *
+ * Owns the repost-menu and zap wiring so both surfaces share one behavior.
+ */
+const OverlayMetricsRow = React.memo(function OverlayMetricsRow({
+  post,
+  inactiveColor,
+  onRequestClose,
+  children,
+}: {
+  post: ImageOverlayPost;
+  inactiveColor: string;
+  onRequestClose?: () => void;
+  children: React.ReactNode;
+}) {
+  const repostedColor = useThemeColor('success');
+  const handleRepostPress = useOverlayRepostMenu(post, onRequestClose);
+  const handleZapPress = useOverlayZapPress(post, onRequestClose);
+  const { metrics, reposted, liked, zapped, onLikePress } = post;
+  return (
+    <View style={styles.metricsRow}>
+      {children}
+      <Pressable onPress={handleRepostPress} hitSlop={METRIC_HIT_SLOP} style={styles.metricBtn}>
+        <OverlayMetric
+          iconName="garden:arrow-retweet-fill-16"
+          iconSize={POST_ACTION_ICON_SIZES.regular.repost}
+          text={formatCount(metrics.repostCount)}
+          active={reposted}
+          activeColor={repostedColor}
+          inactiveColor={inactiveColor}
+        />
+      </Pressable>
+      <Pressable onPress={onLikePress} hitSlop={METRIC_HIT_SLOP} style={styles.metricBtn}>
+        <OverlayMetric
+          iconName="iconamoon:heart-fill"
+          iconSize={POST_ACTION_ICON_SIZES.regular.base}
+          text={formatCount(metrics.likeCount)}
+          active={liked}
+          activeColor={LIKED_COLOR}
+          inactiveColor={inactiveColor}
+        />
+      </Pressable>
+      <Pressable
+        onPress={handleZapPress}
+        disabled={!post.onZapPress}
+        hitSlop={METRIC_HIT_SLOP}
+        style={styles.metricBtn}>
+        <OverlayMetric
+          iconName="mingcute:lightning-fill"
+          iconSize={POST_ACTION_ICON_SIZES.regular.base}
+          text={metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
+          active={zapped}
+          activeColor={ZAP_ACCENT}
+          inactiveColor={inactiveColor}
+          overpass
+        />
+      </Pressable>
+    </View>
+  );
+});
+
 /** Scrollable part of the bottom panel: author, note content (with show more), metrics. */
 export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBottomPanelContent({
   post,
@@ -253,11 +360,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
   /** Dismisses the lightbox so the Repost/Quote menu can render over it. */
   onRequestClose?: () => void;
 }) {
-  const [foreground, muted, repostedColor] = useThemeColor([
-    'foreground',
-    'muted',
-    'success',
-  ] as const);
+  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   const repliedColor = COMMENT_ACCENT;
   const [contentExpanded, setContentExpanded] = useState(initialContentExpanded ?? false);
 
@@ -267,9 +370,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
       onConsumedExpand?.();
     }
   }, [initialContentExpanded, onConsumedExpand]);
-  const { event, metrics, profile, reposted, liked, replied, zapped, onLikePress } = post;
-  const handleRepostPress = useOverlayRepostMenu(post, onRequestClose);
-  const handleZapPress = useOverlayZapPress(post, onRequestClose);
+  const { event, metrics, profile, replied } = post;
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
@@ -374,58 +475,19 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
           </View>
         ) : null}
         {/* Stats / actions row */}
-        <View style={styles.metricsRow}>
+        <OverlayMetricsRow post={post} inactiveColor={muted} onRequestClose={onRequestClose}>
+          {/* Reply is inert in the panel: the live composer is the ThreadReplyBar below. */}
           <View style={styles.metricBtn}>
-            <Icon
-              name="iconamoon:comment-fill"
-              size={POST_ACTION_ICON_SIZES.regular.comment}
-              color={replied ? repliedColor : muted}
+            <OverlayMetric
+              iconName="iconamoon:comment-fill"
+              iconSize={POST_ACTION_ICON_SIZES.regular.comment}
+              text={formatCount(metrics.replyCount)}
+              active={replied}
+              activeColor={repliedColor}
+              inactiveColor={muted}
             />
-            <Text size={13} style={{ color: replied ? repliedColor : muted }}>
-              {formatCount(metrics.replyCount)}
-            </Text>
           </View>
-          <Pressable
-            onPress={handleRepostPress}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={styles.metricBtn}>
-            <Icon
-              name="garden:arrow-retweet-fill-16"
-              size={POST_ACTION_ICON_SIZES.regular.repost}
-              color={reposted ? repostedColor : muted}
-            />
-            <Text size={13} style={{ color: reposted ? repostedColor : muted }}>
-              {formatCount(metrics.repostCount)}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={onLikePress}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={styles.metricBtn}>
-            <Icon
-              name="iconamoon:heart-fill"
-              size={POST_ACTION_ICON_SIZES.regular.base}
-              color={liked ? LIKED_COLOR : muted}
-            />
-            <Text size={13} style={{ color: liked ? LIKED_COLOR : muted }}>
-              {formatCount(metrics.likeCount)}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={handleZapPress}
-            disabled={!post.onZapPress}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={styles.metricBtn}>
-            <Icon
-              name="mingcute:lightning-fill"
-              size={POST_ACTION_ICON_SIZES.regular.base}
-              color={zapped ? ZAP_ACCENT : muted}
-            />
-            <Text overpass size={13} style={{ color: zapped ? ZAP_ACCENT : muted }}>
-              {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
-            </Text>
-          </Pressable>
-        </View>
+        </OverlayMetricsRow>
       </View>
     </Log>
   );
@@ -446,11 +508,8 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
   /** Dismisses the lightbox so the Repost/Quote menu can render over it. */
   onRequestClose?: () => void;
 }) {
-  const repostedColor = useThemeColor('success');
   const repliedColor = COMMENT_ACCENT;
-  const handleRepostPress = useOverlayRepostMenu(post, onRequestClose);
-  const handleZapPress = useOverlayZapPress(post, onRequestClose);
-  const { event, metrics, profile, reposted, liked, replied, zapped, onLikePress } = post;
+  const { event, metrics, profile, replied } = post;
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
@@ -512,61 +571,24 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
             )}
           </View>
         ) : null}
-        <View style={styles.metricsRow}>
+        <OverlayMetricsRow
+          post={post}
+          inactiveColor={PANEL_TEXT_MUTED}
+          onRequestClose={onRequestClose}>
           <Pressable
             onPress={handleCommentPress}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={METRIC_HIT_SLOP}
             style={styles.metricBtn}>
-            <Icon
-              name="iconamoon:comment-fill"
-              size={POST_ACTION_ICON_SIZES.regular.comment}
-              color={replied ? repliedColor : PANEL_TEXT_MUTED}
+            <OverlayMetric
+              iconName="iconamoon:comment-fill"
+              iconSize={POST_ACTION_ICON_SIZES.regular.comment}
+              text={formatCount(metrics.replyCount)}
+              active={replied}
+              activeColor={repliedColor}
+              inactiveColor={PANEL_TEXT_MUTED}
             />
-            <Text size={13} style={{ color: replied ? repliedColor : PANEL_TEXT_MUTED }}>
-              {formatCount(metrics.replyCount)}
-            </Text>
           </Pressable>
-          <Pressable
-            onPress={handleRepostPress}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={styles.metricBtn}>
-            <Icon
-              name="garden:arrow-retweet-fill-16"
-              size={POST_ACTION_ICON_SIZES.regular.repost}
-              color={reposted ? repostedColor : PANEL_TEXT_MUTED}
-            />
-            <Text size={13} style={{ color: reposted ? repostedColor : PANEL_TEXT_MUTED }}>
-              {formatCount(metrics.repostCount)}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={onLikePress}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={styles.metricBtn}>
-            <Icon
-              name="iconamoon:heart-fill"
-              size={POST_ACTION_ICON_SIZES.regular.base}
-              color={liked ? LIKED_COLOR : PANEL_TEXT_MUTED}
-            />
-            <Text size={13} style={{ color: liked ? LIKED_COLOR : PANEL_TEXT_MUTED }}>
-              {formatCount(metrics.likeCount)}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={handleZapPress}
-            disabled={!post.onZapPress}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={styles.metricBtn}>
-            <Icon
-              name="mingcute:lightning-fill"
-              size={POST_ACTION_ICON_SIZES.regular.base}
-              color={zapped ? ZAP_ACCENT : PANEL_TEXT_MUTED}
-            />
-            <Text overpass size={13} style={{ color: zapped ? ZAP_ACCENT : PANEL_TEXT_MUTED }}>
-              {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
-            </Text>
-          </Pressable>
-        </View>
+        </OverlayMetricsRow>
       </View>
     </Log>
   );

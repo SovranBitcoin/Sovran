@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router';
@@ -8,12 +8,7 @@ import { usePaymentFlowMachine } from 'wallet/react';
 import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
-import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
-import {
-  BLE_PEER_FRESHNESS_TICK_MS,
-  filterFreshBLEPeers,
-} from '@/features/bitchat/lib/blePeerSnapshots';
-import { useEagerPeerFavorite } from '@/features/nearPay/hooks/useEagerPeerFavorite';
+import { useFreshNearbyPeers } from '@/features/nearPay/hooks/useFreshNearbyPeers';
 import { peerDisplayName, peerIdentitySeed } from '@/features/nearPay/lib/peerProfile';
 import { planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
 import { creqParseDiagnostics, lockableMintsFromCreq } from '@/shared/lib/nutCreq';
@@ -102,27 +97,11 @@ export function NearPayPeerListScreen() {
   // wallet's active mint unit.
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
   const { isOffline } = useOfflineStatus();
-  const { peers: blePeers } = useBLEPeers();
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
 
-  // Ghost entries (a nearby device's previous profile identities) are
-  // dropped by the freshness filter — same rule as the radar; the tick
-  // re-evaluates it as lastSeen values age out.
-  const [peerFreshnessNow, setPeerFreshnessNow] = useState(() => Date.now());
-  useEffect(() => {
-    const interval = setInterval(() => setPeerFreshnessNow(Date.now()), BLE_PEER_FRESHNESS_TICK_MS);
-    return () => clearInterval(interval);
-  }, []);
-  const peers = useMemo(
-    () => filterFreshBLEPeers(blePeers, peerFreshnessNow),
-    [blePeers, peerFreshnessNow]
-  );
-  // Eagerly favorite nearby peers so Sovran peers reciprocate their Nostr
-  // identity (bitchat's only native mesh identity channel) and become lockable.
-  useEagerPeerFavorite(peers);
+  const peers = useFreshNearbyPeers();
 
-  // Every bitchat peer is listed so the favorite exchange can run, but token DMs
-  // are only enabled after the peer advertises a valid creq capability.
+  // Token DMs are only enabled after a peer advertises a valid creq capability.
   const connectedCount = useMemo(() => peers.filter((peer) => peer.isConnected).length, [peers]);
   const directLinkCount = useMemo(() => peers.filter((peer) => peer.hasDirectLink).length, [peers]);
   const sortedPeers = useMemo(() => {

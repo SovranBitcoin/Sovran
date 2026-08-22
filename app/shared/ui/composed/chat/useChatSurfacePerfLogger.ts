@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -10,6 +10,7 @@ import {
   useReanimatedKeyboardAnimation,
 } from 'react-native-keyboard-controller';
 import { runOnJS, useAnimatedReaction, useSharedValue } from 'react-native-reanimated';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import type { Logger } from '@/shared/lib/logger';
 
 interface ChatSurfaceMessage {
@@ -350,4 +351,56 @@ export function useChatKeyboardAnimationLogger({
     },
     [reportStart, reportEnd]
   );
+}
+
+/** Milliseconds since `start`, at the 2-decimal precision the chat.send.* events use. */
+function elapsedMs(start: number): number {
+  return Math.round((performance.now() - start) * 100) / 100;
+}
+
+interface UseLoggedChatSendOptions<TArgs extends unknown[]> {
+  log: Logger;
+  surface: string;
+  /** The surface's actual send; awaited whether or not it returns a promise. Rejections propagate after being logged. */
+  send: (...args: TArgs) => unknown;
+  /** Extra fields appended to the `chat.send.dispatch` emit for this surface. */
+  dispatchExtras: (...args: TArgs) => Record<string, unknown>;
+}
+
+/**
+ * Single-flight send wrapped in the canonical `chat.send.dispatch` /
+ * `chat.send.complete` / `chat.send.failed` taxonomy, so every chat surface
+ * reports send latency with the same event names and `duration_ms` rounding
+ * that log-doctor's `--event chat.send` filter expects.
+ *
+ * Surfaces pass their own scoped logger, surface tag, and whatever per-surface
+ * fields belong on the dispatch emit (history size, attachment count, …).
+ */
+export function useLoggedChatSend<TArgs extends unknown[]>({
+  log,
+  surface,
+  send,
+  dispatchExtras,
+}: UseLoggedChatSendOptions<TArgs>): (...args: TArgs) => Promise<void | undefined> {
+  return useSingleFlight(async (...args: TArgs) => {
+    const sendStart = performance.now();
+    log.info('chat.send.dispatch', { surface, ...dispatchExtras(...args) });
+    try {
+      await send(...args);
+      log.info('chat.send.complete', { surface, duration_ms: elapsedMs(sendStart) });
+    } catch (err) {
+      log.warn('chat.send.failed', { surface, duration_ms: elapsedMs(sendStart), err });
+      throw err;
+    }
+  });
+}
+
+/** Composer height with hysteresis: sub-pixel layout jitter must not re-render the list padding. */
+export function useComposerHeight(): [number, (e: LayoutChangeEvent) => void] {
+  const [composerHeight, setComposerHeight] = useState(0);
+  const handleComposerLayout = useCallback((e: LayoutChangeEvent) => {
+    const next = e.nativeEvent.layout.height;
+    setComposerHeight((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
+  }, []);
+  return [composerHeight, handleComposerLayout];
 }

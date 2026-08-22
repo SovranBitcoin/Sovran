@@ -22,6 +22,32 @@ import {
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
+/**
+ * Width the shimmer sweeps across, plus the layout handler that measures it.
+ *
+ * The container's own width is authoritative once measured; the screen width is
+ * the pre-measure stand-in so the very first frame still sweeps a sane
+ * distance. Rounding plus the equality guard keeps sub-pixel layout jitter from
+ * re-rendering the sweep. The caller's visual-layout logger still sees every
+ * layout event.
+ */
+function useShimmerSweep(visualLayout: { onLayout: (event: LayoutChangeEvent) => void }): {
+  sweepWidth: number;
+  handleLayout: (event: LayoutChangeEvent) => void;
+} {
+  const { width: screenWidth } = useWindowDimensions();
+  const [containerWidth, setContainerWidth] = useState(0);
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const w = Math.round(event.nativeEvent.layout.width);
+      setContainerWidth((prev) => (prev === w ? prev : w));
+      visualLayout.onLayout(event);
+    },
+    [visualLayout]
+  );
+  return { sweepWidth: containerWidth > 0 ? containerWidth : screenWidth, handleLayout };
+}
+
 const SKELETON_EXIT_DURATION_MS = 620;
 // Internal timing — not exported (only this module reads them).
 const SKELETON_LOADING_SHIMMER_DURATION_MS = 2200;
@@ -111,9 +137,7 @@ export function SkeletonExitReveal({
   visualExtra,
   visualDisabled,
 }: PropsWithChildren<{ active: boolean; highlightColor?: string } & SkeletonShimmerVisualProps>) {
-  const { width: screenWidth } = useWindowDimensions();
   const foreground = useThemeColor('foreground');
-  const [containerWidth, setContainerWidth] = useState(0);
   const progress = useSharedValue(0);
   const visualLayout = useSkeletonShimmerVisualLayout({
     active,
@@ -142,16 +166,7 @@ export function SkeletonExitReveal({
     return () => cancelAnimation(progress);
   }, [active, progress]);
 
-  const handleLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const w = Math.round(event.nativeEvent.layout.width);
-      setContainerWidth((prev) => (prev === w ? prev : w));
-      visualLayout.onLayout(event);
-    },
-    [visualLayout]
-  );
-
-  const sweepWidth = containerWidth > 0 ? containerWidth : screenWidth;
+  const { sweepWidth, handleLayout } = useShimmerSweep(visualLayout);
 
   const fadeStyle = useAnimatedStyle(() => ({
     opacity: 1 - progress.get(),
@@ -212,9 +227,7 @@ export function SkeletonLoadingShimmer({
   active: boolean;
   highlightColor?: string;
 } & SkeletonShimmerVisualProps) {
-  const { width: screenWidth } = useWindowDimensions();
   const background = useThemeColor('background');
-  const [containerWidth, setContainerWidth] = useState(0);
   const progress = useSharedValue(0);
   const visualLayout = useSkeletonShimmerVisualLayout({
     active,
@@ -253,16 +266,7 @@ export function SkeletonLoadingShimmer({
     return () => cancelAnimation(progress);
   }, [active, progress]);
 
-  const handleLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const w = Math.round(event.nativeEvent.layout.width);
-      setContainerWidth((prev) => (prev === w ? prev : w));
-      visualLayout.onLayout(event);
-    },
-    [visualLayout]
-  );
-
-  const sweepWidth = containerWidth > 0 ? containerWidth : screenWidth;
+  const { sweepWidth, handleLayout } = useShimmerSweep(visualLayout);
   const highlightWidth = Math.max(40, Math.round(sweepWidth * LOADING_HIGHLIGHT_WIDTH_RATIO));
 
   const shimmerStyle = useAnimatedStyle(() => {

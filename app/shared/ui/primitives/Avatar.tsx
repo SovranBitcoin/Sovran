@@ -224,43 +224,13 @@ export const Avatar = ({
     );
   }
 
-  // 2. Fallback state — selected fallback style.
-  if (state === 'fallback') {
-    return (
-      <View style={avatarFrameStyle}>
-        <View style={containerStyle} accessibilityRole="image" accessibilityLabel={imageAlt}>
-          <AvatarFallbackContent
-            fallbackSeed={fallbackSeed}
-            borderRadius={borderRadius}
-            size={size}
-          />
-        </View>
-        {StatusBadgeWrapper}
-      </View>
-    );
-  }
-
-  // 3. Image state — dev misuse without picture, fall back safely.
-  if (!picture) {
-    if (__DEV__) {
+  // 2/3/4. Every non-image outcome renders the same frame: an explicit
+  // fallback state, dev misuse (image state with no picture), or a load that
+  // failed. Only the middle case is a bug worth warning about.
+  if (state === 'fallback' || !picture || imageStatus === 'failed') {
+    if (__DEV__ && state !== 'fallback' && !picture) {
       log.warn('avatar.image_missing_picture');
     }
-    return (
-      <View style={avatarFrameStyle}>
-        <View style={containerStyle} accessibilityRole="image" accessibilityLabel={imageAlt}>
-          <AvatarFallbackContent
-            fallbackSeed={fallbackSeed}
-            borderRadius={borderRadius}
-            size={size}
-          />
-        </View>
-        {StatusBadgeWrapper}
-      </View>
-    );
-  }
-
-  // 4. Image state — image failed to load → selected fallback style.
-  if (imageStatus === 'failed') {
     return (
       <View style={avatarFrameStyle}>
         <View style={containerStyle} accessibilityRole="image" accessibilityLabel={imageAlt}>

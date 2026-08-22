@@ -1029,28 +1029,44 @@ export function useInitMount(tag: string): void {
   }, []);
 }
 
+/**
+ * Terminal `init.timing` emits for one init phase. Shared by the async and sync
+ * phase runners, which differ only in whether they await `fn` — the emitted
+ * payload must stay identical so log-doctor sees one taxonomy.
+ *
+ * `durationMs` is sampled before `offsetMs` so it excludes the second clock
+ * read, matching how these emits have always been measured.
+ */
+function logPhaseEnd(label: string, start: number): void {
+  const durationMs = +(now() - start).toFixed(2);
+  log.info('init.timing', {
+    tag: label,
+    msg: 'end',
+    offsetMs: now(),
+    durationMs,
+  });
+}
+
+function logPhaseError(label: string, start: number, error: unknown): void {
+  const durationMs = +(now() - start).toFixed(2);
+  log.warn('init.timing', {
+    tag: label,
+    msg: 'error',
+    offsetMs: now(),
+    durationMs,
+    error: error instanceof Error ? error.message : String(error),
+  });
+}
+
 export async function initPhase<T>(label: string, fn: () => Promise<T>): Promise<T> {
   const start = now();
   initLog(label, 'start');
   try {
     const result = await fn();
-    const durationMs = +(now() - start).toFixed(2);
-    log.info('init.timing', {
-      tag: label,
-      msg: 'end',
-      offsetMs: now(),
-      durationMs,
-    });
+    logPhaseEnd(label, start);
     return result;
   } catch (error) {
-    const durationMs = +(now() - start).toFixed(2);
-    log.warn('init.timing', {
-      tag: label,
-      msg: 'error',
-      offsetMs: now(),
-      durationMs,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logPhaseError(label, start, error);
     throw error;
   }
 }
@@ -1060,23 +1076,10 @@ export function initPhaseSync<T>(label: string, fn: () => T): T {
   initLog(label, 'start');
   try {
     const result = fn();
-    const durationMs = +(now() - start).toFixed(2);
-    log.info('init.timing', {
-      tag: label,
-      msg: 'end',
-      offsetMs: now(),
-      durationMs,
-    });
+    logPhaseEnd(label, start);
     return result;
   } catch (error) {
-    const durationMs = +(now() - start).toFixed(2);
-    log.warn('init.timing', {
-      tag: label,
-      msg: 'error',
-      offsetMs: now(),
-      durationMs,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logPhaseError(label, start, error);
     throw error;
   }
 }

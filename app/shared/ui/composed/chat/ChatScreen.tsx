@@ -1,11 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  Keyboard,
-  ScrollView,
-  StyleSheet,
-  View as RNView,
-  type LayoutChangeEvent,
-} from 'react-native';
+import { Keyboard, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -18,7 +12,6 @@ import { FlashList } from '@shopify/flash-list';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import type { Logger } from '@/shared/lib/logger';
 
 import { LiquidChatComposer } from './LiquidChatComposer';
@@ -26,6 +19,8 @@ import { ChatMessageBubble } from './ChatMessageBubble';
 import {
   useChatKeyboardAnimationLogger,
   useChatSurfacePerfLogger,
+  useComposerHeight,
+  useLoggedChatSend,
 } from './useChatSurfacePerfLogger';
 import { useMessageGrouping } from './useMessageGrouping';
 import type { ChatBubbleMessage, ChatBubbleRenderArgs } from './types';
@@ -171,11 +166,7 @@ export function ChatScreen({
   // composer itself is absolutely positioned over the chat — older bubbles
   // slide *under* the composer's translucent glass on scroll-up (the
   // iMessage / Telegram bleed-under-input look).
-  const [composerHeight, setComposerHeight] = useState(0);
-  const handleComposerLayout = useCallback((e: LayoutChangeEvent) => {
-    const next = e.nativeEvent.layout.height;
-    setComposerHeight((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
-  }, []);
+  const [composerHeight, handleComposerLayout] = useComposerHeight();
 
   // Keyboard avoidance split across two mechanisms:
   //
@@ -231,27 +222,11 @@ export function ChatScreen({
 
   const groupingMap = useMessageGrouping(messages);
 
-  const dispatchSend = useSingleFlight(async (text: string) => {
-    const sendStart = performance.now();
-    log.info('chat.send.dispatch', {
-      surface,
-      textLen: text.length,
-      historyCount: messages.length,
-    });
-    try {
-      await onSend(text);
-      log.info('chat.send.complete', {
-        surface,
-        duration_ms: Math.round((performance.now() - sendStart) * 100) / 100,
-      });
-    } catch (err) {
-      log.warn('chat.send.failed', {
-        surface,
-        duration_ms: Math.round((performance.now() - sendStart) * 100) / 100,
-        err,
-      });
-      throw err;
-    }
+  const dispatchSend = useLoggedChatSend({
+    log,
+    surface,
+    send: onSend,
+    dispatchExtras: (text: string) => ({ textLen: text.length, historyCount: messages.length }),
   });
 
   const handleSubmit = useCallback(() => {

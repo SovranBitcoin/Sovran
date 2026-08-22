@@ -58,6 +58,17 @@ export interface ImageOverlayLayout {
   post?: ImageOverlayPost | null;
 }
 
+/**
+ * The subset of a layout that decides what media the overlay shows and how
+ * large it renders. Both `open` (which has a measured thumbnail rect) and
+ * `openReplace` (which does not) supply exactly these fields; the difference
+ * between them is the fallback aspect ratio, which they pass as a value.
+ */
+export type OverlayMediaLayout = Pick<
+  ImageOverlayLayout,
+  'url' | 'aspectRatio' | 'urls' | 'mediaTypes' | 'initialIndex'
+>;
+
 /** Layout for replacing overlay content in-place (e.g. next video post). Provider fills pageX/pageY/width/height. */
 export type ImageOverlayReplaceLayout = Omit<
   ImageOverlayLayout,

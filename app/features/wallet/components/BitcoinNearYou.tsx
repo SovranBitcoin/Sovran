@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, View as RNView } from 'react-native';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import * as Location from 'expo-location';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -10,6 +9,7 @@ import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import Icon from 'assets/icons';
 import { withAlpha } from '@/shared/lib/color';
+import { MapVignette } from '@/shared/ui/composed/MapVignette';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
@@ -148,32 +148,7 @@ function MapPreview({
             pointerEvents="none"
           />
 
-          <LinearGradient
-            colors={[
-              surfaceSecondary,
-              withAlpha(surfaceSecondary, 0.1),
-              withAlpha(surfaceSecondary, 0.1),
-              surfaceSecondary,
-            ]}
-            locations={[0, 0.3, 0.7, 1]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          />
-          <LinearGradient
-            colors={[
-              surfaceSecondary,
-              withAlpha(surfaceSecondary, 0.1),
-              withAlpha(surfaceSecondary, 0.1),
-              surfaceSecondary,
-            ]}
-            locations={[0, 0.25, 0.75, 1]}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          />
+          <MapVignette color={surfaceSecondary} />
         </>
       )}
     </RNView>

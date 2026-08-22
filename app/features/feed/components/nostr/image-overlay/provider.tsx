@@ -43,6 +43,8 @@ import type {
   ImageOverlayPost,
   ImageOverlayLayout,
   ImageOverlayReplaceLayout,
+  MediaType,
+  OverlayMediaLayout,
   ThumbnailLayout,
   ImageOverlayContextValue,
 } from './types';
@@ -105,10 +107,67 @@ export function computeExpandedSize(
   return { width: screenHeight * aspectRatio, height: screenHeight };
 }
 
+/** Aspect ratio for a single replaced image that declares none (no measured thumbnail rect exists). */
+const REPLACE_FALLBACK_ASPECT_RATIO = 16 / 9;
+
 const VIDEO_EXT = /\.(mp4|webm|mov|m4v|avi)(\?\S*)?$/i;
 
 export function inferMediaType(url: string): 'image' | 'video' {
   return VIDEO_EXT.test(url) ? 'video' : 'image';
+}
+
+/** What the overlay shows for one open, and the rect it expands into. */
+interface OverlayMedia {
+  urls: string[];
+  mediaTypes: MediaType[];
+  initialIndex: number;
+  aspectRatio: number;
+  expandedWidth: number;
+  expandedHeight: number;
+}
+
+/**
+ * Resolve the pager contents and expanded rect for one overlay open.
+ *
+ * Videos render at natural aspect via contentFit=contain inside the pager
+ * container, so the container itself must fill the full viewport — otherwise a
+ * portrait video letterboxed inside a 16:9 rect ends up narrow. A multi-item
+ * pager (any video, or more than one image) therefore fills the viewport so
+ * every page shows at its own natural size, always as large as it fits. Sizing
+ * the container to the tapped image's aspect instead would letterbox every
+ * other (differently-shaped) image into that one box, which read as the
+ * container "randomly" changing size between pages. A single image keeps its
+ * own aspect so the shared-element transition lands precisely on the feed
+ * thumbnail.
+ *
+ * `fallbackAspectRatio` is used only when the layout carries no `aspectRatio`
+ * and the pager holds a single image: callers with a measured thumbnail rect
+ * pass its ratio, callers without one pass a default.
+ */
+export function resolveOverlayMedia(
+  layout: OverlayMediaLayout,
+  screenWidth: number,
+  availableHeight: number,
+  fallbackAspectRatio: number
+): OverlayMedia {
+  const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
+  const mediaTypes =
+    layout.mediaTypes && layout.mediaTypes.length === urls.length
+      ? layout.mediaTypes
+      : urls.map((u) => inferMediaType(u));
+  const fillViewport = mediaTypes.some((t) => t === 'video') || urls.length > 1;
+  const aspectRatio = fillViewport
+    ? screenWidth / availableHeight
+    : (layout.aspectRatio ?? fallbackAspectRatio);
+  const { width, height } = computeExpandedSize(screenWidth, availableHeight, aspectRatio);
+  return {
+    urls,
+    mediaTypes,
+    initialIndex: Math.min(layout.initialIndex ?? 0, Math.max(0, urls.length - 1)),
+    aspectRatio,
+    expandedWidth: width,
+    expandedHeight: height,
+  };
 }
 
 /**
@@ -439,38 +498,17 @@ export function ImageOverlayProvider({
       // When hasPanel we start with sheet closed: image centered in viewport (below notch to bottom); absolute overlay sits on top.
       const availableHeight = imageViewportHeight;
 
-      const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
-      const types =
-        layout.mediaTypes && layout.mediaTypes.length === urls.length
-          ? layout.mediaTypes
-          : urls.map((u) => inferMediaType(u));
-      // Videos render at natural aspect via contentFit=contain inside the
-      // pager container, so the container itself must fill the full viewport
-      // — otherwise a portrait video letterboxed inside a 16:9 rect ends up
-      // narrow. Override the thumbnail aspect ratio whenever the pager
-      // contains any video; pure-image overlays keep their thumbnail aspect
-      // so the shared-element transition lands precisely.
-      const hasVideo = types.some((t) => t === 'video');
-      // A multi-item pager (any video, or more than one image) fills the full
-      // viewport so every page shows at its own natural size via
-      // contentFit="contain" — exactly like a solo image, always as large as it
-      // fits. Sizing the container to the tapped image's aspect instead would
-      // letterbox every other (differently-shaped) image into that one box,
-      // which read as the container "randomly" changing size between pages.
-      // A single image keeps its own aspect so the shared-element transition
-      // lands precisely on the feed thumbnail.
-      const fillViewport = hasVideo || urls.length > 1;
-      const aspectRatio = fillViewport
-        ? screenWidth / availableHeight
-        : (layout.aspectRatio ?? layout.width / layout.height);
-      // Use actual thumbnail aspect ratio so overlay image rect matches the feed image; shared-element close animates correctly.
-      const { width: expW, height: expH } = computeExpandedSize(
-        screenWidth,
-        availableHeight,
-        aspectRatio
-      );
+      const {
+        urls,
+        mediaTypes: types,
+        initialIndex,
+        aspectRatio,
+        expandedWidth: expW,
+        expandedHeight: expH,
+        // Fall back to the measured thumbnail aspect so the overlay image rect
+        // matches the feed image and the shared-element close lands on it.
+      } = resolveOverlayMedia(layout, screenWidth, availableHeight, layout.width / layout.height);
       const imageAreaCenterY = safeTop + availableHeight / 2;
-      const initialIndex = Math.min(layout.initialIndex ?? 0, Math.max(0, urls.length - 1));
       setActiveUrls(urls);
       setActiveMediaTypes(types);
       setActiveIndexState(initialIndex);
@@ -629,30 +667,19 @@ export function ImageOverlayProvider({
       const hasPanel = !!layout.post;
       const availableHeight = imageViewportHeight;
 
-      const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
-      const types =
-        layout.mediaTypes && layout.mediaTypes.length === urls.length
-          ? layout.mediaTypes
-          : urls.map((u) => inferMediaType(u));
-      // See open() above — a multi-item pager (video, or more than one image)
-      // needs a full-viewport container so contentFit=contain shows every page
-      // at its natural aspect at max size, instead of letterboxing the others
-      // into the first item's box.
-      const hasVideo = types.some((t) => t === 'video');
-      const fillViewport = hasVideo || urls.length > 1;
-      // Replace layout has no pageX/pageY/width/height; use aspectRatio only.
-      const aspectRatio = fillViewport
-        ? screenWidth / availableHeight
-        : (layout.aspectRatio ?? 16 / 9);
-      const { width: expW, height: expH } = computeExpandedSize(
-        screenWidth,
-        availableHeight,
-        aspectRatio
-      );
+      const {
+        urls,
+        mediaTypes: types,
+        initialIndex,
+        aspectRatio,
+        expandedWidth: expW,
+        expandedHeight: expH,
+        // Replace layout carries no measured thumbnail rect, so a single image
+        // with no declared aspect ratio falls back to 16:9.
+      } = resolveOverlayMedia(layout, screenWidth, availableHeight, REPLACE_FALLBACK_ASPECT_RATIO);
       const imageAreaCenterY = safeTop + availableHeight / 2;
       const centerX = screenWidth / 2;
       const toCenterY = hasPanel ? imageAreaCenterY : screenCenterY;
-      const initialIndex = Math.min(layout.initialIndex ?? 0, Math.max(0, urls.length - 1));
       setActiveUrls(urls);
       setActiveMediaTypes(types);
       setActiveIndexState(initialIndex);

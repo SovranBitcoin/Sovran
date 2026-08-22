@@ -20,10 +20,10 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useTransactionLocationSection } from '@/shared/hooks/useTransactionLocationSection';
 import Icon from 'assets/icons';
 import { withAlpha } from '@/shared/lib/color';
+import { MapVignette } from '@/shared/ui/composed/MapVignette';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 
@@ -95,33 +95,7 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
         pointerEvents="none"
       />
 
-      {/* Vignette gradients - edges opaque, center transparent */}
-      <LinearGradient
-        colors={[
-          surfaceSecondary,
-          withAlpha(surfaceSecondary, 0.1),
-          withAlpha(surfaceSecondary, 0.1),
-          surfaceSecondary,
-        ]}
-        locations={[0, 0.3, 0.7, 1]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-      <LinearGradient
-        colors={[
-          surfaceSecondary,
-          withAlpha(surfaceSecondary, 0.1),
-          withAlpha(surfaceSecondary, 0.1),
-          surfaceSecondary,
-        ]}
-        locations={[0, 0.25, 0.75, 1]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
+      <MapVignette color={surfaceSecondary} />
     </>
   );
 }

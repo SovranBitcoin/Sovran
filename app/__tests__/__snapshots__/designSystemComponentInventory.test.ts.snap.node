@@ -197,6 +197,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/LazyTabContent.tsx",
     "shared/ui/composed/List.tsx",
     "shared/ui/composed/ListRow.tsx",
+    "shared/ui/composed/MapVignette.tsx",
     "shared/ui/composed/ModalLayoutWrapper.tsx",
     "shared/ui/composed/PatternBackground.tsx",
     "shared/ui/composed/QRButton/QRButton.android.tsx",
@@ -233,6 +234,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/Pressable.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 227,
+  "total": 228,
 }
 `;

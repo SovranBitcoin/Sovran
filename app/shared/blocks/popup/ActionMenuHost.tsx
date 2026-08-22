@@ -7,7 +7,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent } from 'react-native';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Menu } from 'heroui-native';
 import {
@@ -15,7 +14,6 @@ import {
   BottomSheetScrollView,
   BottomSheetTextInput,
 } from '@gorhom/bottom-sheet';
-import { withAlpha } from '@/shared/lib/color';
 
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -37,6 +35,7 @@ import {
 } from '@/shared/lib/popup/popups/actionMenu';
 import Icon from 'assets/icons';
 import { markE2EHerouiMenu } from '@/shared/lib/popup/E2EActionMenuProbe';
+import { SheetSearchField } from '@/shared/lib/popup/SheetSearchField';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 
 const hostLog = log.child({ module: 'actionMenuHost' });
@@ -129,59 +128,6 @@ function MenuInputField({
           borderCurve: 'continuous',
         }}
       />
-    </View>
-  );
-}
-
-/**
- * Search input rendered above the anchor bar in tabbed menus. Uses
- * `BottomSheetTextInput` (same reasoning as `MenuInputField` above) so the
- * sheet lifts above the keyboard on focus. Includes a clear button that
- * appears once the input has content.
- */
-function MenuSearchField({
-  placeholder,
-  value,
-  onChangeText,
-  onClear,
-}: {
-  placeholder?: string;
-  value: string;
-  onChangeText: (next: string) => void;
-  onClear: () => void;
-}) {
-  const [foreground, surfaceSecondary, placeholderColor] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'field-placeholder',
-  ] as const);
-  return (
-    <View style={{ justifyContent: 'center', marginTop: 8 }}>
-      <BottomSheetTextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder ?? 'Search...'}
-        placeholderTextColor={placeholderColor}
-        autoCorrect={false}
-        autoCapitalize="none"
-        style={{
-          height: 38,
-          borderRadius: 12,
-          paddingHorizontal: 12,
-          paddingRight: 36,
-          backgroundColor: surfaceSecondary,
-          color: foreground,
-          fontSize: 15,
-        }}
-      />
-      {value.length > 0 ? (
-        <Pressable
-          onPress={onClear}
-          hitSlop={8}
-          style={{ position: 'absolute', right: 10, padding: 4 }}>
-          <Icon name="mdi:close-circle" size={18} color={withAlpha(foreground, 0.33)} />
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -513,11 +459,12 @@ export function ActionMenuHost() {
   }, [payload?.sections]);
 
   const searchInputNode = payload?.searchable ? (
-    <MenuSearchField
+    <SheetSearchField
       placeholder={payload.searchable.placeholder}
       value={inputText}
       onChangeText={handleSearchChange}
       onClear={handleSearchClear}
+      style={{ marginTop: 8 }}
     />
   ) : null;
 
