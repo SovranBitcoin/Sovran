@@ -1,45 +1,22 @@
 /**
- * @fileoverview Standalone Share route wrapper
+ * @fileoverview Standalone Share route wrapper.
  *
- * Validates deep-link params at the route boundary per AUDIT.md dim-5
- * (audit 18#F-001): without an allowlist on `type` and a shape check on
- * `data` the QR + clipboard would render attacker-crafted Lightning
- * addresses under the user's identity, funnelling payments away from
- * the user.
+ * Deep-link params are validated at the route boundary by the shared
+ * `shareRouteParamsSchema` — see there for why the allowlist matters.
  */
 
 import { useCallback, useState } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import { z } from 'zod';
 
 import { ShareScreen, SHARE_CONFIGS, ShareType } from '@/features/user';
+import { shareRouteParamsSchema } from '@/features/user/lib/shareRouteParams';
 import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 import { useScreenOptions } from '@/shared/ui/composed/Screen';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { withGlassHeaderItems } from '@/navigation/headerItems';
-import { CompressedPubkey, Hex64, LightningAddress, Npub } from '@/shared/lib/nav/routeSchemas';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
-const NpubOrHex64 = z.union([Npub, Hex64]);
-
-const ParamsSchema = z
-  .object({
-    type: z.enum(['npub', 'profile', 'p2pk', 'lud16']).default('profile'),
-    data: z.string().min(1).max(512),
-    npub: Npub.optional(),
-  })
-  .superRefine((v, ctx) => {
-    const dataSchema =
-      v.type === 'p2pk' ? CompressedPubkey : v.type === 'lud16' ? LightningAddress : NpubOrHex64;
-    const r = dataSchema.safeParse(v.data);
-    if (!r.success) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['data'],
-        message: `data does not match type=${v.type}`,
-      });
-    }
-  });
+const ParamsSchema = shareRouteParamsSchema('profile');
 
 function ShareRoute() {
   const parsed = useRouteParams(ParamsSchema, { where: 'app.share' });

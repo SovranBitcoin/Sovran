@@ -10,8 +10,8 @@ import { withAlpha } from '@/shared/lib/color';
 import Icon from 'assets/icons';
 import { useFreshNearbyPeers } from '@/features/nearPay/hooks/useFreshNearbyPeers';
 import { peerDisplayName, peerIdentitySeed } from '@/features/nearPay/lib/peerProfile';
-import { planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
-import { creqParseDiagnostics, lockableMintsFromCreq } from '@/shared/lib/nutCreq';
+import { nearPayPeerTapLog, planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
+import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';
 import {
   confirmBearerDowngrade,
   notifyNoSharedMint,
@@ -156,16 +156,8 @@ export function NearPayPeerListScreen() {
         isOffline,
       });
       paymentLog.info('near_pay.peer.tap', {
-        peerID: peer.peerID,
         source: 'peer-list',
-        mode: plan.mode,
-        // Did we decode the receiver's creq, and which mints did we get?
-        ...creqParseDiagnostics(peer),
-        ourMints: walletContext.trustedMintUrls,
-        allowedMints: plan.mode === 'block' ? null : plan.allowedMints,
-        isOffline,
-        hasDirectLink: peer.hasDirectLink,
-        isConnected: peer.isConnected,
+        ...nearPayPeerTapLog({ peer, plan, ourMints: walletContext.trustedMintUrls, isOffline }),
       });
       // No valid creq ⇒ not confirmed patched; no mint in common ⇒ the
       // recipient couldn't redeem. Block before any session/navigation state.

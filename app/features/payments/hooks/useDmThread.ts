@@ -10,9 +10,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { paymentLog } from '@/shared/lib/logger';
-import { fetchDmConversation, type DmEnvelopePage } from '../data/dmEnvelopeClient';
+import { fetchDmConversation } from '../data/dmEnvelopeClient';
 import { decryptDmEnvelopes, type DecryptedDm, type DmProtocol } from '../data/dmDecryptPipeline';
-import { CURSOR_SLACK_SECONDS, pageOldestWrapTs } from '../data/dmPagination';
+import { createDmEnvelopeCursor } from '../data/dmPagination';
 
 const PAGE_LIMIT = 50;
 
@@ -37,30 +37,12 @@ export function useDmThread(
   const [error, setError] = useState<Error | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Cursor is over ALL envelope wrap times (not the decrypted rumor time, which
-  // uses a different clock). seenWrapIds detects "no progress"; seenMsgIds dedups
+  // The cursor walks ALL envelope wrap times (not the decrypted rumor time,
+  // which uses a different clock) and detects "no progress"; seenMsgIds dedups
   // the messages actually shown for this counterparty.
-  const oldestWrapTsRef = useRef<number | undefined>(undefined);
-  const seenWrapIdsRef = useRef(new Set<string>());
+  const cursorRef = useRef(createDmEnvelopeCursor());
   const seenMsgIdsRef = useRef(new Set<string>());
   const loadingMoreRef = useRef(false);
-
-  // Track the envelope cursor; returns the number of fresh (unseen) envelopes.
-  const trackEnvelopes = useCallback((page: DmEnvelopePage): number => {
-    let fresh = 0;
-    for (const envelope of page.envelopes) {
-      if (!seenWrapIdsRef.current.has(envelope.id)) {
-        seenWrapIdsRef.current.add(envelope.id);
-        fresh += 1;
-      }
-    }
-    const oldest = pageOldestWrapTs(page);
-    if (oldest !== undefined) {
-      oldestWrapTsRef.current =
-        oldestWrapTsRef.current === undefined ? oldest : Math.min(oldestWrapTsRef.current, oldest);
-    }
-    return fresh;
-  }, []);
 
   const ingestMessages = useCallback(
     (decrypted: DecryptedDm[]) => {
@@ -95,9 +77,8 @@ export function useDmThread(
       return;
     }
     const controller = new AbortController();
-    seenWrapIdsRef.current = new Set();
+    cursorRef.current.reset();
     seenMsgIdsRef.current = new Set();
-    oldestWrapTsRef.current = undefined;
     setMessages([]);
     setError(null);
     setLoading(true);
@@ -114,7 +95,7 @@ export function useDmThread(
         signal: controller.signal,
       });
       if (controller.signal.aborted) return;
-      trackEnvelopes(page);
+      cursorRef.current.track(page);
       ingestMessages(decryptDmEnvelopes(page.envelopes, viewerPubkey, viewerPrivateKey));
       if (!controller.signal.aborted) setHasMore(page.envelopes.length >= PAGE_LIMIT);
     })()
@@ -128,29 +109,21 @@ export function useDmThread(
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [
-    counterparty,
-    protocol,
-    viewerPubkey,
-    viewerPrivateKey,
-    refreshKey,
-    trackEnvelopes,
-    ingestMessages,
-  ]);
+  }, [counterparty, protocol, viewerPubkey, viewerPrivateKey, refreshKey, ingestMessages]);
 
   const loadMore = useCallback(async () => {
+    const until = cursorRef.current.nextUntil();
     if (
       loadingMoreRef.current ||
       !hasMore ||
       !viewerPubkey ||
       !viewerPrivateKey ||
-      oldestWrapTsRef.current === undefined
+      until === undefined
     ) {
       return;
     }
     loadingMoreRef.current = true;
     try {
-      const until = oldestWrapTsRef.current + CURSOR_SLACK_SECONDS;
       const page = await fetchDmConversation({
         viewer: viewerPubkey,
         counterparty,
@@ -158,7 +131,7 @@ export function useDmThread(
         until,
         limit: PAGE_LIMIT,
       });
-      const freshEnvelopes = trackEnvelopes(page);
+      const freshEnvelopes = cursorRef.current.track(page);
       ingestMessages(decryptDmEnvelopes(page.envelopes, viewerPubkey, viewerPrivateKey));
       // Keep paging while envelopes are full (a page may hold no messages for THIS
       // counterparty yet still have older ones behind it); stop on a short page or
@@ -169,15 +142,7 @@ export function useDmThread(
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [
-    hasMore,
-    viewerPubkey,
-    viewerPrivateKey,
-    counterparty,
-    protocol,
-    trackEnvelopes,
-    ingestMessages,
-  ]);
+  }, [hasMore, viewerPubkey, viewerPrivateKey, counterparty, protocol, ingestMessages]);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 

@@ -40,8 +40,7 @@ import { useFreshNearbyPeers } from '@/features/nearPay/hooks/useFreshNearbyPeer
 import { useNutDropStrike } from '@/features/nearPay/hooks/useNutDropStrike';
 import type { StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
 import { peerAvatarState, peerNostrPubkey, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
-import { planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
-import { creqParseDiagnostics } from '@/shared/lib/nutCreq';
+import { nearPayPeerTapLog, planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
 import {
   notifyNoSharedMint,
   notifyNutDropPeerNotReady,
@@ -1685,7 +1684,13 @@ export function NearPayScreen() {
     [endSharedAvatarTransitionSpan, sharedAvatarOpacity]
   );
 
-  const stopSharedElementAnimations = useCallback(() => {
+  /**
+   * Drop the not-yet-fired handles that would START the shared-avatar
+   * transition. Both the interrupt path and the effect teardown need this
+   * before they decide what else to unwind, and a missed handle fires the
+   * transition after its peer is gone.
+   */
+  const clearSharedAvatarStartHandles = useCallback(() => {
     if (sharedAvatarStartTimerRef.current !== null) {
       clearTimeout(sharedAvatarStartTimerRef.current);
       sharedAvatarStartTimerRef.current = null;
@@ -1694,6 +1699,10 @@ export function NearPayScreen() {
       cancelAnimationFrame(sharedAvatarStartFrameRef.current);
       sharedAvatarStartFrameRef.current = null;
     }
+  }, []);
+
+  const stopSharedElementAnimations = useCallback(() => {
+    clearSharedAvatarStartHandles();
     const interruptedToken = sharedAvatarTransitionTokenRef.current;
     sharedAvatarTransitionTokenRef.current = interruptedToken + 1;
     endSharedAvatarTransitionSpan({
@@ -1717,6 +1726,7 @@ export function NearPayScreen() {
     amountPanelTranslateY,
     amountContentOpacity,
     amountContentTranslateY,
+    clearSharedAvatarStartHandles,
     endSharedAvatarTransitionSpan,
     pickerOpacity,
     sharedAvatarOpacity,
@@ -1763,17 +1773,10 @@ export function NearPayScreen() {
         ourMints: walletContext.trustedMintUrls,
         isOffline,
       });
-      paymentLog.info('near_pay.peer.tap', {
-        peerID: peer.peerID,
-        mode: plan.mode,
-        // Did we decode the receiver's creq, and which mints did we get?
-        ...creqParseDiagnostics(peer),
-        ourMints: walletContext.trustedMintUrls,
-        allowedMints: plan.mode === 'block' ? null : plan.allowedMints,
-        isOffline,
-        hasDirectLink: peer.hasDirectLink,
-        isConnected: peer.isConnected,
-      });
+      paymentLog.info(
+        'near_pay.peer.tap',
+        nearPayPeerTapLog({ peer, plan, ourMints: walletContext.trustedMintUrls, isOffline })
+      );
       // No valid creq ⇒ not confirmed patched; no mint in common ⇒ the
       // recipient couldn't redeem. Block BEFORE any session/transition state
       // (leaves the radar exactly as it was; also covers the Random button).
@@ -1995,14 +1998,7 @@ export function NearPayScreen() {
       });
     }, AMOUNT_CONTENT_PREWARM_MS);
     return () => {
-      if (sharedAvatarStartTimerRef.current !== null) {
-        clearTimeout(sharedAvatarStartTimerRef.current);
-        sharedAvatarStartTimerRef.current = null;
-      }
-      if (sharedAvatarStartFrameRef.current !== null) {
-        cancelAnimationFrame(sharedAvatarStartFrameRef.current);
-        sharedAvatarStartFrameRef.current = null;
-      }
+      clearSharedAvatarStartHandles();
       if (sharedAvatarTransitionTokenRef.current === transitionToken) {
         stopSharedElementAnimations();
       }
@@ -2014,6 +2010,7 @@ export function NearPayScreen() {
     amountOpacity,
     amountPanelTranslateX,
     amountPanelTranslateY,
+    clearSharedAvatarStartHandles,
     fieldSizing.avatarSize,
     headerAvatarRect,
     inlineAmountEntry,

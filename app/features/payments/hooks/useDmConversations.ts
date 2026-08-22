@@ -10,7 +10,7 @@ import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { paymentLog } from '@/shared/lib/logger';
 import { fetchDmEnvelopes, type DmEnvelopePage } from '../data/dmEnvelopeClient';
 import { decryptDmEnvelopes, type DmProtocol } from '../data/dmDecryptPipeline';
-import { CURSOR_SLACK_SECONDS, pageOldestWrapTs } from '../data/dmPagination';
+import { createDmEnvelopeCursor } from '../data/dmPagination';
 
 /** Fetched DM kinds: NIP-04 (kind 4) + NIP-17 gift wraps (kind 1059). */
 const DM_KINDS = [4, 1059];
@@ -44,27 +44,13 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
 
   // Accumulators persist across pages so cross-page bucketing keeps "latest wins".
   const bucketRef = useRef(new Map<string, DmConversation>());
-  const seenWrapIdsRef = useRef(new Set<string>());
-  const oldestWrapTsRef = useRef<number | undefined>(undefined);
+  const cursorRef = useRef(createDmEnvelopeCursor());
   const loadingMoreRef = useRef(false);
 
   // Bucket a page; returns the number of fresh (unseen) envelopes ingested.
   const ingest = useCallback(
     (page: DmEnvelopePage, viewer: string, privateKey: Uint8Array): number => {
-      let fresh = 0;
-      for (const envelope of page.envelopes) {
-        if (!seenWrapIdsRef.current.has(envelope.id)) {
-          seenWrapIdsRef.current.add(envelope.id);
-          fresh += 1;
-        }
-      }
-      const oldest = pageOldestWrapTs(page);
-      if (oldest !== undefined) {
-        oldestWrapTsRef.current =
-          oldestWrapTsRef.current === undefined
-            ? oldest
-            : Math.min(oldestWrapTsRef.current, oldest);
-      }
+      const fresh = cursorRef.current.track(page);
       const decrypted = decryptDmEnvelopes(page.envelopes, viewer, privateKey);
       for (const dm of decrypted) {
         // One conversation per counterparty across protocols; the most recent
@@ -98,8 +84,7 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
     }
     const controller = new AbortController();
     bucketRef.current = new Map();
-    seenWrapIdsRef.current = new Set();
-    oldestWrapTsRef.current = undefined;
+    cursorRef.current.reset();
     setConversations([]);
     setError(null);
     setLoading(true);
@@ -135,18 +120,18 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
   }, [viewerPubkey, viewerPrivateKey, refreshKey, ingest]);
 
   const loadMore = useCallback(async () => {
+    const until = cursorRef.current.nextUntil();
     if (
       loadingMoreRef.current ||
       !hasMore ||
       !viewerPubkey ||
       !viewerPrivateKey ||
-      oldestWrapTsRef.current === undefined
+      until === undefined
     ) {
       return;
     }
     loadingMoreRef.current = true;
     try {
-      const until = oldestWrapTsRef.current + CURSOR_SLACK_SECONDS;
       const page = await fetchDmEnvelopes({
         viewer: viewerPubkey,
         kinds: DM_KINDS,

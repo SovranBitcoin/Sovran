@@ -73,6 +73,25 @@ function resolveZapTarget(event: FeedEvent): ZapTarget | null {
   };
 }
 
+/**
+ * The half of a pending-zap record that is identical for preset and custom
+ * zaps — everything derived from the post and its resolved recipient. Callers
+ * add only what distinguishes their path (`emoji`, `comment`, `presetSats`).
+ */
+function pendingZapPostContext(event: FeedEvent, target: ZapTarget, baseSats: number) {
+  return {
+    meltTarget: target.meltTarget,
+    eventId: event.id,
+    eventKind: event.kind,
+    authorPubkey: event.pubkey,
+    authorName: target.displayName,
+    authorAvatarUrl: target.avatarUrl,
+    contentPreview: zapContentPreview(event.content),
+    baseSats,
+    createdAt: Date.now(),
+  };
+}
+
 function showZapUnavailable(): void {
   paramPopup('action-unavailable', {
     title: "Can't zap",
@@ -102,18 +121,10 @@ export function useZap() {
       // Root-entry clear FIRST (it evicts pending zaps), then register.
       clearPaymentContext('feed.zap_post');
       registerPendingZap({
-        meltTarget: target.meltTarget,
-        eventId: event.id,
-        eventKind: event.kind,
-        authorPubkey: event.pubkey,
-        authorName: target.displayName,
-        authorAvatarUrl: target.avatarUrl,
-        contentPreview: zapContentPreview(event.content),
+        ...pendingZapPostContext(event, target, baseSats),
         emoji: preset.emoji,
         comment: preset.message,
         presetSats: preset.sats,
-        baseSats,
-        createdAt: Date.now(),
       });
       paymentLog.info('feed.zap.preset_start', {
         eventIdPrefix: event.id.slice(0, 8),
@@ -157,17 +168,9 @@ export function useZap() {
       // Root-entry clear FIRST (it evicts pending zaps), then register.
       clearPaymentContext('feed.zap_post');
       registerPendingZap({
-        meltTarget: target.meltTarget,
-        eventId: event.id,
-        eventKind: event.kind,
-        authorPubkey: event.pubkey,
-        authorName: target.displayName,
-        authorAvatarUrl: target.avatarUrl,
-        contentPreview: zapContentPreview(event.content),
+        ...pendingZapPostContext(event, target, baseSats),
         emoji: '⚡',
         comment: '',
-        baseSats,
-        createdAt: Date.now(),
       });
       paymentLog.info('feed.zap.custom_start', {
         eventIdPrefix: event.id.slice(0, 8),

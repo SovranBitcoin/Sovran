@@ -19,11 +19,58 @@ function envelopeUnixSeconds(createdAt: DmEnvelope['createdAt']): number {
 }
 
 /** Oldest envelope (wrap) timestamp in a page — the correct `until` cursor. */
-export function pageOldestWrapTs(page: DmEnvelopePage): number | undefined {
+function pageOldestWrapTs(page: DmEnvelopePage): number | undefined {
   let oldest: number | undefined;
   for (const envelope of page.envelopes) {
     const ts = envelopeUnixSeconds(envelope.createdAt);
     if (ts > 0 && (oldest === undefined || ts < oldest)) oldest = ts;
   }
   return oldest;
+}
+
+/**
+ * Cursor state for walking the shared gift-wrap inbox backwards.
+ *
+ * Both DM paginators (the conversation list and a single thread) need the same
+ * three things per page — count the envelopes they hadn't seen, keep the oldest
+ * wrap time across ALL pages, and turn that into the next `until` — plus the
+ * slack correction above. Keeping them together means a caller can't apply the
+ * slack to a per-page minimum by mistake.
+ */
+interface DmEnvelopeCursor {
+  /** Forget every tracked envelope — for a fresh first page. */
+  reset(): void;
+  /** Record a page; returns how many of its envelopes were previously unseen. */
+  track(page: DmEnvelopePage): number;
+  /** `until` for the next (older) page, or undefined while nothing is tracked. */
+  nextUntil(): number | undefined;
+}
+
+export function createDmEnvelopeCursor(): DmEnvelopeCursor {
+  let seenWrapIds = new Set<string>();
+  let oldestWrapTs: number | undefined;
+
+  return {
+    reset() {
+      seenWrapIds = new Set();
+      oldestWrapTs = undefined;
+    },
+    track(page) {
+      let fresh = 0;
+      for (const envelope of page.envelopes) {
+        if (!seenWrapIds.has(envelope.id)) {
+          seenWrapIds.add(envelope.id);
+          fresh += 1;
+        }
+      }
+      const oldest = pageOldestWrapTs(page);
+      if (oldest !== undefined) {
+        oldestWrapTs = oldestWrapTs === undefined ? oldest : Math.min(oldestWrapTs, oldest);
+      }
+      return fresh;
+    },
+    nextUntil() {
+      return oldestWrapTs === undefined ? undefined : oldestWrapTs + CURSOR_SLACK_SECONDS;
+    },
+  };
 }

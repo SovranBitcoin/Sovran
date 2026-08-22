@@ -60,6 +60,53 @@ function appendChatMessage(prev: ChatMessage[], msg: ChatMessage): ChatMessage[]
   return next.length > MESSAGE_BUFFER_CAP ? next.slice(next.length - MESSAGE_BUFFER_CAP) : next;
 }
 
+/** Both Nostr transports carry the same event shape; only privacy differs. */
+function nostrChatMessage(
+  event: NostrMessageEvent | NostrPrivateMessageEvent,
+  isPrivate: boolean
+): ChatMessage {
+  return {
+    id: event.id,
+    content: event.content,
+    sender: event.sender,
+    senderId: event.senderPubkey,
+    timestamp: event.timestamp,
+    isPrivate,
+    isOwn: event.isOwn,
+  };
+}
+
+/**
+ * Bring up Nostr and join `geohash`, resolving `true` once connected.
+ *
+ * Native keeps a SINGLE active geohash that fans out to both the public chat
+ * sub (`geo-{g}`) and the gift-wrap DM sub (`geo-dm-{g}`), which is why
+ * neither caller may call `leaveGeohash` on unmount — doing so tears down any
+ * concurrent thread on the same geohash. The next `joinGeohash(other)`
+ * replaces the active channel; full-app teardown calls `leaveGeohash()` in
+ * BitChatNostrBridge.swift.
+ */
+async function connectNostrGeohash(
+  geohash: string,
+  profileScope: string | undefined,
+  isCancelled: () => boolean,
+  failureEvent: string
+): Promise<boolean> {
+  try {
+    if (!profileScope) return false;
+    await startNostr(profileScope);
+    if (isCancelled()) return false;
+    await joinGeohash(geohash);
+    if (isCancelled()) return false;
+    return true;
+  } catch (err) {
+    bitchatLog.error(failureEvent, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return false;
+  }
+}
+
 /**
  * Public channel transports: `'ble'` = BLE mesh public chat,
  * `'nostr'` = geohash public chat via Nostr.
@@ -252,44 +299,22 @@ export function useBitChat(
 
     const sub = addNostrMessageListener((event: NostrMessageEvent) => {
       if (event.geohash !== geohash) return;
-      const msg: ChatMessage = {
-        id: event.id,
-        content: event.content,
-        sender: event.sender,
-        senderId: event.senderPubkey,
-        timestamp: event.timestamp,
-        isPrivate: false,
-        isOwn: event.isOwn,
-      };
-      setMessages((prev) => appendChatMessage(prev, msg));
+      setMessages((prev) => appendChatMessage(prev, nostrChatMessage(event, false)));
     });
 
-    void (async () => {
-      try {
-        if (!profileScope) return;
-        await startNostr(profileScope);
-        if (cancelled) return;
-        await joinGeohash(geohash);
-        if (cancelled) return;
-        setIsConnected(true);
-      } catch (err) {
-        bitchatLog.error('bitchat.hook.nostr_start_failed', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    })();
+    void connectNostrGeohash(
+      geohash,
+      profileScope,
+      () => cancelled,
+      'bitchat.hook.nostr_start_failed'
+    ).then((connected) => {
+      if (connected) setIsConnected(true);
+    });
 
     return () => {
       cancelled = true;
       sub.remove();
-      // Don't leave the geohash here — the native side keeps a single
-      // active geohash that fans out to BOTH the public chat sub
-      // (`geo-{g}`) AND the gift-wrap DM sub (`geo-dm-{g}`), so calling
-      // leaveGeohash on public-screen unmount tears down any concurrent
-      // nostr-dm thread on the same geohash. Matches the nostr-dm
-      // cleanup below. The next joinGeohash(other) replaces the active
-      // channel; full-app stop in BitChatNostrBridge.swift calls
-      // leaveGeohash() during teardown.
+      // No leaveGeohash — see connectNostrGeohash.
       setIsConnected(false);
     };
   }, [geohash, transport, profileScope]);
@@ -317,37 +342,22 @@ export function useBitChat(
       if (event.geohash !== geohash) return;
       // Only surface messages from this peer into this thread.
       if (event.senderPubkey !== dmPeerID) return;
-      const msg: ChatMessage = {
-        id: event.id,
-        content: event.content,
-        sender: event.sender,
-        senderId: event.senderPubkey,
-        timestamp: event.timestamp,
-        isPrivate: true,
-        isOwn: event.isOwn,
-      };
-      setMessages((prev) => appendChatMessage(prev, msg));
+      setMessages((prev) => appendChatMessage(prev, nostrChatMessage(event, true)));
     });
 
-    void (async () => {
-      try {
-        if (!profileScope) return;
-        await startNostr(profileScope);
-        if (cancelled) return;
-        await joinGeohash(geohash);
-        if (cancelled) return;
-        setIsConnected(true);
-      } catch (err) {
-        bitchatLog.error('bitchat.hook.nostr_dm_start_failed', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    })();
+    void connectNostrGeohash(
+      geohash,
+      profileScope,
+      () => cancelled,
+      'bitchat.hook.nostr_dm_start_failed'
+    ).then((connected) => {
+      if (connected) setIsConnected(true);
+    });
 
     return () => {
       cancelled = true;
       sub.remove();
-      // Don't leave the geohash — other screens may be using it.
+      // No leaveGeohash — other screens may be using it. See connectNostrGeohash.
       setIsConnected(false);
     };
     // `nickname` is omitted for the same reason as the public-nostr effect.
@@ -357,35 +367,57 @@ export function useBitChat(
   //  Send
   // ===========================================================
 
+  /**
+   * Optimistic local echo, shared by every transport whose bubbles live in
+   * this hook's own buffer: show the row immediately, clear `isPending` when
+   * the transport accepts it, drop it again if the send throws. `ble-dm` is
+   * the exception — its rows live in the global store so the app-wide
+   * delivery-status listener can drive them.
+   */
+  const sendWithLocalEcho = useCallback(
+    async (
+      content: string,
+      isPrivate: boolean,
+      failureEvent: string,
+      send: () => Promise<unknown>
+    ) => {
+      const ownMsg: ChatMessage = {
+        id: mintLocalId('own'),
+        content,
+        sender: nickname || 'You',
+        senderId: '',
+        timestamp: Date.now(),
+        isPrivate,
+        isOwn: true,
+        isPending: true,
+      };
+      setMessages((prev) => [...prev, ownMsg]);
+      try {
+        await send();
+        setMessages((prev) =>
+          prev.map((m) => (m.id === ownMsg.id ? { ...m, isPending: false } : m))
+        );
+      } catch (err) {
+        bitchatLog.error(failureEvent, {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        setMessages((prev) => prev.filter((m) => m.id !== ownMsg.id));
+      }
+    },
+    [nickname]
+  );
+
   const sendMessage = useCallback(
     async (content: string) => {
       bitchatLog.info('bitchat.hook.send', { transport, contentLen: content.length });
 
       switch (transport) {
         case 'ble': {
-          // Public BLE — no own-echo, add locally.
-          const ownMsg: ChatMessage = {
-            id: mintLocalId('own'),
-            content,
-            sender: nickname || 'You',
-            senderId: '',
-            timestamp: Date.now(),
-            isPrivate: false,
-            isOwn: true,
-            isPending: true,
-          };
-          setMessages((prev) => [...prev, ownMsg]);
-          try {
-            await sendBLEMessage(content);
-            setMessages((prev) =>
-              prev.map((m) => (m.id === ownMsg.id ? { ...m, isPending: false } : m))
-            );
-          } catch (err) {
-            bitchatLog.error('bitchat.hook.ble_send_failed', {
-              error: err instanceof Error ? err.message : String(err),
-            });
-            setMessages((prev) => prev.filter((m) => m.id !== ownMsg.id));
-          }
+          // Public BLE — the mesh sends no own-echo, so the local row is the
+          // only one this bubble will ever get.
+          await sendWithLocalEcho(content, false, 'bitchat.hook.ble_send_failed', () =>
+            sendBLEMessage(content)
+          );
           break;
         }
 
@@ -495,67 +527,27 @@ export function useBitChat(
 
         case 'nostr': {
           // Public geohash chat echoes our own message back via the
-          // subscription, so we add an optimistic row keyed on the local
-          // mint id; once the relay round-trip resolves we flip its pending
-          // flag. The native echo arrives later as a separate message —
-          // distinct id, harmless visual duplicate that the relay wins.
-          const ownMsg: ChatMessage = {
-            id: mintLocalId('own'),
-            content,
-            sender: nickname || 'You',
-            senderId: '',
-            timestamp: Date.now(),
-            isPrivate: false,
-            isOwn: true,
-            isPending: true,
-          };
-          setMessages((prev) => [...prev, ownMsg]);
-          try {
-            await sendGeohashMessage(content, nickname);
-            setMessages((prev) =>
-              prev.map((m) => (m.id === ownMsg.id ? { ...m, isPending: false } : m))
-            );
-          } catch (err) {
-            bitchatLog.error('bitchat.hook.nostr_send_failed', {
-              error: err instanceof Error ? err.message : String(err),
-            });
-            setMessages((prev) => prev.filter((m) => m.id !== ownMsg.id));
-          }
+          // subscription. The optimistic row is keyed on the local mint id,
+          // so the later relay echo arrives as a distinct message —
+          // `appendChatMessage` is what collapses the visual duplicate.
+          await sendWithLocalEcho(content, false, 'bitchat.hook.nostr_send_failed', () =>
+            sendGeohashMessage(content, nickname)
+          );
           break;
         }
 
         case 'nostr-dm': {
           if (!dmPeerID) return;
           // NIP-17 gift-wrap DMs don't echo back to the sender via the
-          // subscription, so add locally. Empty senderId for the same
-          // grouping reason as 'ble-dm' above.
-          const ownMsg: ChatMessage = {
-            id: mintLocalId('own'),
-            content,
-            sender: nickname || 'You',
-            senderId: '',
-            timestamp: Date.now(),
-            isPrivate: true,
-            isOwn: true,
-            isPending: true,
-          };
-          setMessages((prev) => [...prev, ownMsg]);
-          try {
-            await sendGeohashPrivateMessage(dmPeerID, content);
-            setMessages((prev) =>
-              prev.map((m) => (m.id === ownMsg.id ? { ...m, isPending: false } : m))
-            );
-          } catch (err) {
-            bitchatLog.error('bitchat.hook.nostr_dm_send_failed', {
-              error: err instanceof Error ? err.message : String(err),
-            });
-            setMessages((prev) => prev.filter((m) => m.id !== ownMsg.id));
-          }
+          // subscription, so the local row is the only one.
+          await sendWithLocalEcho(content, true, 'bitchat.hook.nostr_dm_send_failed', () =>
+            sendGeohashPrivateMessage(dmPeerID, content)
+          );
           break;
         }
       }
     },
-    [transport, nickname, dmPeerID]
+    [transport, nickname, dmPeerID, sendWithLocalEcho]
   );
 
   // For `ble-dm` the source of truth is the global store (populated by

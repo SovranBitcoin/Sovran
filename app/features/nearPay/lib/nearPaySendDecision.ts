@@ -1,7 +1,7 @@
 import type { BLEPeer } from 'bitchat-module';
 
 import { paymentLog } from '@/shared/lib/logger';
-import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';
+import { creqParseDiagnostics, lockableMintsFromCreq } from '@/shared/lib/nutCreq';
 
 /**
  * Decides how a Nut Drop sends to a peer, from the peer's standing `creq`
@@ -104,5 +104,31 @@ export function planNearPaySend(args: {
     recipientPubkey: peer.nostrPubkeyHex,
     allowedMints: shared,
     identityVerified: false,
+  };
+}
+
+/**
+ * Diagnostic payload for `near_pay.peer.tap`, shared by the radar and the peer
+ * list. Both surfaces must log the same creq/mint evidence — that pairing is
+ * what makes a refused Nut Drop explainable from the logs alone, so it lives
+ * with the decision it explains rather than being restated per screen.
+ */
+export function nearPayPeerTapLog(args: {
+  peer: Pick<BLEPeer, 'peerID' | 'creq' | 'nostrPubkeyHex' | 'hasDirectLink' | 'isConnected'>;
+  plan: NearPaySendPlan;
+  ourMints: readonly string[];
+  isOffline: boolean;
+}) {
+  const { peer, plan, ourMints, isOffline } = args;
+  return {
+    peerID: peer.peerID,
+    mode: plan.mode,
+    // Did we decode the receiver's creq, and which mints did we get?
+    ...creqParseDiagnostics(peer),
+    ourMints,
+    allowedMints: plan.mode === 'block' ? null : plan.allowedMints,
+    isOffline,
+    hasDirectLink: peer.hasDirectLink,
+    isConnected: peer.isConnected,
   };
 }

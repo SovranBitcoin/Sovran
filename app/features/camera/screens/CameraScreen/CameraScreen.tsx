@@ -74,8 +74,51 @@ interface CameraScreenProps {
   signerPairOnly?: boolean;
 }
 
+const GLASS_BUTTON_SIZE = 52;
+
+/** SF Symbol names accepted by `@expo/ui`, without pinning its symbol-set version. */
+type SFSymbolName = NonNullable<React.ComponentProps<typeof SwiftUIImage>['systemName']>;
+
+/**
+ * One circular Liquid Glass control in the camera overlay's action row. The
+ * three iOS buttons differ only by SF Symbol and handler; the Host sizing,
+ * glass modifiers, and centring stack must stay identical or the row's
+ * spacing drifts.
+ */
+function GlassCircleButton({
+  systemName,
+  onPress,
+}: {
+  systemName: SFSymbolName;
+  onPress: () => void;
+}) {
+  return (
+    <Host style={{ height: GLASS_BUTTON_SIZE, width: GLASS_BUTTON_SIZE }} matchContents={false}>
+      <SwiftUIButton
+        modifiers={[
+          buttonStyle('glass'),
+          frame({ height: GLASS_BUTTON_SIZE, width: GLASS_BUTTON_SIZE }),
+          glassEffect({ shape: 'circle', glass: { variant: 'regular', interactive: true } }),
+        ]}
+        onPress={onPress}>
+        <SwiftUIHStack
+          alignment="center"
+          modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
+          <SwiftUIImage systemName={systemName} size={22} color="white" />
+        </SwiftUIHStack>
+      </SwiftUIButton>
+    </Host>
+  );
+}
+
+interface ScanOutcome {
+  urInProgress?: boolean;
+  progress?: number;
+  lockedPending?: boolean;
+}
+
 function applyScanResult(
-  result: { urInProgress?: boolean; progress?: number; lockedPending?: boolean } | undefined,
+  result: ScanOutcome | undefined,
   setProgress: (n: number) => void,
   setLoading: (b: boolean) => void,
   isProcessingRef: React.MutableRefObject<boolean>
@@ -186,6 +229,31 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
     }
   }, []);
 
+  /**
+   * Run one scan attempt through the payment machine with the busy flags the
+   * overlay reads. Every entry point (live barcode, paste, gallery) must leave
+   * `isProcessingRef` / `loading` / `progress` unwound on failure or the screen
+   * stays stuck mid-scan with no way back.
+   */
+  const runScan = useCallback(
+    async (failureEvent: string, scan: () => Promise<ScanOutcome | undefined> | undefined) => {
+      isProcessingRef.current = true;
+      setLoading(true);
+      try {
+        const result = await scan();
+        applyScanResult(result, setProgress, setLoading, isProcessingRef);
+      } catch (err) {
+        log.error(failureEvent, {
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
+        setLoading(false);
+        setProgress(0);
+        isProcessingRef.current = false;
+      }
+    },
+    []
+  );
+
   const handleScan = useCallback(
     async (data: ScanningData) => {
       const isUr = data.data.toLowerCase().startsWith('ur:');
@@ -209,21 +277,11 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
         isUr,
         dataLength: data.data.length,
       });
-      isProcessingRef.current = true;
-      setLoading(true);
-      try {
-        const result = await machine.scan?.(data.data, { source: data.type ?? 'qr' });
-        applyScanResult(result, setProgress, setLoading, isProcessingRef);
-      } catch (err) {
-        log.error('camera.scan.failed', {
-          error: err instanceof Error ? err : new Error(String(err)),
-        });
-        setLoading(false);
-        setProgress(0);
-        isProcessingRef.current = false;
-      }
+      await runScan('camera.scan.failed', () =>
+        machine.scan?.(data.data, { source: data.type ?? 'qr' })
+      );
     },
-    [handleSignerScan, machine, shouldAcceptScan, signerPairOnly]
+    [handleSignerScan, machine, runScan, shouldAcceptScan, signerPairOnly]
   );
 
   const handleBarcodeScanned = useCallback(
@@ -247,20 +305,8 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
       handleSignerScan(text, PAIRING_ERROR_INVALID_LINK);
       return;
     }
-    isProcessingRef.current = true;
-    setLoading(true);
-    try {
-      const result = await machine.scan?.();
-      applyScanResult(result, setProgress, setLoading, isProcessingRef);
-    } catch (err) {
-      log.error('camera.scan.clipboard_failed', {
-        error: err instanceof Error ? err : new Error(String(err)),
-      });
-      setLoading(false);
-      setProgress(0);
-      isProcessingRef.current = false;
-    }
-  }, [handleSignerScan, machine, shouldAcceptScan, signerPairOnly]);
+    await runScan('camera.scan.clipboard_failed', () => machine.scan?.());
+  }, [handleSignerScan, machine, runScan, shouldAcceptScan, signerPairOnly]);
 
   const handleGalleryPress = useCallback(async () => {
     if (!shouldAcceptScan()) return;
@@ -309,59 +355,16 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
 
   const iosButtons = (
     <>
-      <Host style={{ height: 52, width: 52 }} matchContents={false}>
-        <SwiftUIButton
-          modifiers={[
-            buttonStyle('glass'),
-            frame({ height: 52, width: 52 }),
-            glassEffect({ shape: 'circle', glass: { variant: 'regular', interactive: true } }),
-          ]}
-          onPress={handleClipboardPress}>
-          <SwiftUIHStack
-            alignment="center"
-            modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
-            <SwiftUIImage systemName="doc.on.clipboard" size={22} color="white" />
-          </SwiftUIHStack>
-        </SwiftUIButton>
-      </Host>
+      <GlassCircleButton systemName="doc.on.clipboard" onPress={handleClipboardPress} />
       {/* Gallery decodes inside the payment machine — no pre-machine hook
           exists, so signer-pair mode hides it instead of half-supporting it. */}
       {!signerPairOnly ? (
-        <Host style={{ height: 52, width: 52 }} matchContents={false}>
-          <SwiftUIButton
-            modifiers={[
-              buttonStyle('glass'),
-              frame({ height: 52, width: 52 }),
-              glassEffect({ shape: 'circle', glass: { variant: 'regular', interactive: true } }),
-            ]}
-            onPress={handleGalleryPress}>
-            <SwiftUIHStack
-              alignment="center"
-              modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
-              <SwiftUIImage systemName="photo" size={22} color="white" />
-            </SwiftUIHStack>
-          </SwiftUIButton>
-        </Host>
+        <GlassCircleButton systemName="photo" onPress={handleGalleryPress} />
       ) : null}
-      <Host style={{ height: 52, width: 52 }} matchContents={false}>
-        <SwiftUIButton
-          modifiers={[
-            buttonStyle('glass'),
-            frame({ height: 52, width: 52 }),
-            glassEffect({ shape: 'circle', glass: { variant: 'regular', interactive: true } }),
-          ]}
-          onPress={toggleFlashlight}>
-          <SwiftUIHStack
-            alignment="center"
-            modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
-            <SwiftUIImage
-              systemName={flashlightOn ? 'flashlight.on.fill' : 'flashlight.off.fill'}
-              size={22}
-              color="white"
-            />
-          </SwiftUIHStack>
-        </SwiftUIButton>
-      </Host>
+      <GlassCircleButton
+        systemName={flashlightOn ? 'flashlight.on.fill' : 'flashlight.off.fill'}
+        onPress={toggleFlashlight}
+      />
     </>
   );
 

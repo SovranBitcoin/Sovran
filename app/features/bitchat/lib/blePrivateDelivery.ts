@@ -3,7 +3,7 @@ import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 
 import { mintLocalId } from '@/shared/lib/id';
 
-interface SendBLEPrivateMessageChunksDeps {
+interface BLEPrivateSendDeps {
   startBLE?: typeof startBLE;
   startBLEPrivateChat?: typeof startBLEPrivateChat;
   sendBLEPrivateMessage?: typeof sendBLEPrivateMessage;
@@ -12,25 +12,40 @@ interface SendBLEPrivateMessageChunksDeps {
   now?: () => number;
 }
 
-interface SendBLEPrivateMessageChunksOptions {
+/**
+ * Everything both private-DM senders need to reach a peer. The only thing
+ * that differs between them is how the payload is cut up.
+ */
+interface BLEPrivateSendOptions {
   peerID: string;
   content: string;
   nickname: string;
   profileScope: string;
   identityMaterial: BitchatBLEIdentityMaterial | null | undefined;
   messageIdPrefix?: string;
-  maxBytes?: number;
   handshakeDelayMs?: number;
-  deps?: SendBLEPrivateMessageChunksDeps;
+  deps?: BLEPrivateSendDeps;
 }
 
-interface SendBLEPrivateMessageChunksResult {
-  chunks: number;
-  messageIds: string[];
+interface SendBLEPrivateMessageChunksOptions extends BLEPrivateSendOptions {
+  maxBytes?: number;
+}
+
+interface BLEPrivateSessionTimings {
   startupMs: number;
   handshakeMs: number;
-  sendMs: number;
   handshakeError?: string;
+}
+
+interface SendBLEPrivateMessageChunksResult extends BLEPrivateSessionTimings {
+  chunks: number;
+  messageIds: string[];
+  sendMs: number;
+}
+
+interface SendBLEPrivateMessageWholeResult extends BLEPrivateSessionTimings {
+  messageId: string;
+  sendMs: number;
 }
 
 const DEFAULT_MAX_BYTES = 255;
@@ -73,17 +88,32 @@ export function chunkUtf8(text: string, maxBytes = DEFAULT_MAX_BYTES): string[] 
   return chunks;
 }
 
-export async function sendBLEPrivateMessageChunks({
+interface BLEPrivateSession {
+  now: () => number;
+  createMessageId: () => string;
+  /** Bring BLE up, run the Noise handshake, and let it settle. */
+  open: () => Promise<BLEPrivateSessionTimings>;
+  send: (content: string, messageId: string) => Promise<unknown>;
+}
+
+/**
+ * Validate the target and bind the native calls, WITHOUT touching the radio.
+ *
+ * Splitting preparation from `open()` is deliberate: every guard here must
+ * throw before any native call happens (the callers' "fails safely before
+ * native calls" contract), and the chunked sender additionally needs to run
+ * its splitter — which can throw on a bad `maxBytes` — while BLE is still
+ * untouched.
+ */
+function prepareBLEPrivateSend({
   peerID,
-  content,
   nickname,
   profileScope,
   identityMaterial,
   messageIdPrefix = 'bitchat',
-  maxBytes = DEFAULT_MAX_BYTES,
   handshakeDelayMs = DEFAULT_HANDSHAKE_DELAY_MS,
   deps,
-}: SendBLEPrivateMessageChunksOptions): Promise<SendBLEPrivateMessageChunksResult> {
+}: Omit<BLEPrivateSendOptions, 'content'>): BLEPrivateSession {
   if (!profileScope) throw new Error('BitChat profile scope unavailable');
   if (!identityMaterial) throw new Error('BitChat identity material unavailable');
   if (!peerID) throw new Error('BitChat peer unavailable');
@@ -97,64 +127,53 @@ export async function sendBLEPrivateMessageChunks({
   const now = deps?.now ?? (() => performance.now());
 
   const effectiveNickname = nickname || 'sovran';
+
+  return {
+    now,
+    createMessageId,
+    async open() {
+      const startupAt = now();
+      await startBLEFn(effectiveNickname, profileScope, identityMaterial);
+      const startupMs = now() - startupAt;
+
+      const handshakeAt = now();
+      let handshakeError: string | undefined;
+      await startPrivateChatFn(peerID).catch((err: unknown) => {
+        handshakeError = err instanceof Error ? err.message : String(err);
+      });
+      const handshakeMs = now() - handshakeAt;
+      await sleep(handshakeDelayMs);
+
+      return { startupMs, handshakeMs, ...(handshakeError ? { handshakeError } : {}) };
+    },
+    send: (content: string, messageId: string) =>
+      sendPrivateMessageFn(peerID, content, effectiveNickname, messageId),
+  };
+}
+
+export async function sendBLEPrivateMessageChunks({
+  content,
+  maxBytes = DEFAULT_MAX_BYTES,
+  ...target
+}: SendBLEPrivateMessageChunksOptions): Promise<SendBLEPrivateMessageChunksResult> {
+  const session = prepareBLEPrivateSend(target);
   const chunks = chunkUtf8(content, maxBytes);
+  const timings = await session.open();
 
-  const startupAt = now();
-  await startBLEFn(effectiveNickname, profileScope, identityMaterial);
-  const startupMs = now() - startupAt;
-
-  const handshakeAt = now();
-  let handshakeError: string | undefined;
-  await startPrivateChatFn(peerID).catch((err: unknown) => {
-    handshakeError = err instanceof Error ? err.message : String(err);
-  });
-  const handshakeMs = now() - handshakeAt;
-  await sleep(handshakeDelayMs);
-
-  const sendAt = now();
+  const sendAt = session.now();
   const messageIds: string[] = [];
   for (const chunk of chunks) {
-    const messageId = createMessageId();
-    await sendPrivateMessageFn(peerID, chunk, effectiveNickname, messageId);
+    const messageId = session.createMessageId();
+    await session.send(chunk, messageId);
     messageIds.push(messageId);
   }
 
   return {
     chunks: chunks.length,
     messageIds,
-    startupMs,
-    handshakeMs,
-    sendMs: now() - sendAt,
-    ...(handshakeError ? { handshakeError } : {}),
+    ...timings,
+    sendMs: session.now() - sendAt,
   };
-}
-
-interface SendBLEPrivateMessageWholeDeps {
-  startBLE?: typeof startBLE;
-  startBLEPrivateChat?: typeof startBLEPrivateChat;
-  sendBLEPrivateMessage?: typeof sendBLEPrivateMessage;
-  createMessageId?: () => string;
-  sleep?: (ms: number) => Promise<void>;
-  now?: () => number;
-}
-
-interface SendBLEPrivateMessageWholeOptions {
-  peerID: string;
-  content: string;
-  nickname: string;
-  profileScope: string;
-  identityMaterial: BitchatBLEIdentityMaterial | null | undefined;
-  messageIdPrefix?: string;
-  handshakeDelayMs?: number;
-  deps?: SendBLEPrivateMessageWholeDeps;
-}
-
-interface SendBLEPrivateMessageWholeResult {
-  messageId: string;
-  startupMs: number;
-  handshakeMs: number;
-  sendMs: number;
-  handshakeError?: string;
 }
 
 /**
@@ -173,50 +192,20 @@ interface SendBLEPrivateMessageWholeResult {
  * creq, so it never clears the advertised creq — only `stop()` does.
  */
 export async function sendBLEPrivateMessageWhole({
-  peerID,
   content,
-  nickname,
-  profileScope,
-  identityMaterial,
   messageIdPrefix = 'nutdrop',
-  handshakeDelayMs = DEFAULT_HANDSHAKE_DELAY_MS,
-  deps,
-}: SendBLEPrivateMessageWholeOptions): Promise<SendBLEPrivateMessageWholeResult> {
-  if (!profileScope) throw new Error('BitChat profile scope unavailable');
-  if (!identityMaterial) throw new Error('BitChat identity material unavailable');
-  if (!peerID) throw new Error('BitChat peer unavailable');
+  ...target
+}: BLEPrivateSendOptions): Promise<SendBLEPrivateMessageWholeResult> {
+  const session = prepareBLEPrivateSend({ ...target, messageIdPrefix });
+  const timings = await session.open();
 
-  const startBLEFn = deps?.startBLE ?? startBLE;
-  const startPrivateChatFn = deps?.startBLEPrivateChat ?? startBLEPrivateChat;
-  const sendPrivateMessageFn = deps?.sendBLEPrivateMessage ?? sendBLEPrivateMessage;
-  const createMessageId = deps?.createMessageId ?? (() => mintLocalId(messageIdPrefix));
-  const sleep =
-    deps?.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-  const now = deps?.now ?? (() => performance.now());
-
-  const effectiveNickname = nickname || 'sovran';
-
-  const startupAt = now();
-  await startBLEFn(effectiveNickname, profileScope, identityMaterial);
-  const startupMs = now() - startupAt;
-
-  const handshakeAt = now();
-  let handshakeError: string | undefined;
-  await startPrivateChatFn(peerID).catch((err: unknown) => {
-    handshakeError = err instanceof Error ? err.message : String(err);
-  });
-  const handshakeMs = now() - handshakeAt;
-  await sleep(handshakeDelayMs);
-
-  const sendAt = now();
-  const messageId = createMessageId();
-  await sendPrivateMessageFn(peerID, content, effectiveNickname, messageId);
+  const sendAt = session.now();
+  const messageId = session.createMessageId();
+  await session.send(content, messageId);
 
   return {
     messageId,
-    startupMs,
-    handshakeMs,
-    sendMs: now() - sendAt,
-    ...(handshakeError ? { handshakeError } : {}),
+    ...timings,
+    sendMs: session.now() - sendAt,
   };
 }
