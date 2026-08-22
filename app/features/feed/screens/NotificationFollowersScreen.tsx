@@ -1,13 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  type LayoutChangeEvent,
-  type ViewToken,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
+import { FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
@@ -22,10 +14,7 @@ import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import { takeNotificationFollowersSeed } from '@/features/feed/lib/notificationFollowersSeedCache';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import {
-  remeasureVisualLayoutScope,
-  useVisualListLogger,
-  visualToken,
-  visualViewabilityRange,
+  useVisualFlatListLogger,
   VISUAL_LIST_VIEWABILITY_CONFIG,
 } from '@/shared/lib/contentShiftLog';
 import {
@@ -56,12 +45,6 @@ const NOTIFICATION_FOLLOWERS_VISUAL_SCOPE = 'feed.notification_followers.list';
 type FollowFetchResult = {
   result: FeedNotificationsResult;
   hasMore: boolean;
-};
-
-type VisualFlatListMetrics = {
-  contentLength: number | null;
-  scroll: number;
-  size: number | null;
 };
 
 export function NotificationFollowersScreen() {
@@ -98,11 +81,6 @@ export function NotificationFollowersScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const loadSequenceRef = useRef(0);
   const refreshControllerRef = useRef<AbortController | null>(null);
-  const followerListMetricsRef = useRef<VisualFlatListMetrics>({
-    contentLength: null,
-    scroll: 0,
-    size: null,
-  });
   // True only for a real seed (fresh from the notifications screen → no fetch on
   // first focus). A warm-cache-derived initialResult stays false so the focus
   // effect runs loadFirstPage and applies the SWR isFresh gate.
@@ -338,81 +316,27 @@ export function NotificationFollowersScreen() {
 
   const followers = result.notifications;
   const visualPhase = isInitialLoading ? 'initial-loading' : isRefreshing ? 'refreshing' : 'ready';
-  const {
-    onMetricsChange: onVisualListMetricsChange,
-    onViewableItemsChanged: onVisualViewableItemsChanged,
-  } = useVisualListLogger<FeedNotification>({
-    scope: NOTIFICATION_FOLLOWERS_VISUAL_SCOPE,
-    surface: 'notifications',
-    component: 'NotificationFollowersFlatList',
-    phase: visualPhase,
-    extra: () => ({
-      followers: followers.length,
-      rows: followers.length,
-      loadingMore: isLoadingMore,
-    }),
-    getItemKey: (notification) => `follower:${notification.event.id}`,
-    getItemContext: (notification) => ({
-      itemType: notification.reason,
-      rowLabel: notification.reason,
-    }),
-  });
-  const reportFollowerListMetrics = useCallback(
-    (reason: string) => {
-      const metrics = followerListMetricsRef.current;
-      onVisualListMetricsChange({
-        reason,
-        size: metrics.size,
-        scroll: metrics.scroll,
-        scrollLength: metrics.size,
-        contentLength: metrics.contentLength,
-      });
-    },
-    [onVisualListMetricsChange]
-  );
-  const handleListLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      followerListMetricsRef.current.size = event.nativeEvent.layout.height;
-      reportFollowerListMetrics('layout');
-    },
-    [reportFollowerListMetrics]
-  );
-  const handleContentSizeChange = useCallback(
-    (_width: number, height: number) => {
-      followerListMetricsRef.current.contentLength = height;
-      reportFollowerListMetrics('content-size');
-    },
-    [reportFollowerListMetrics]
-  );
-  const handleListViewableItemsChanged = useCallback(
-    ({ viewableItems, changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
-      onVisualViewableItemsChanged({
-        ...visualViewabilityRange([...viewableItems, ...changed]),
-        viewableItems: viewableItems.map(visualToken<FeedNotification>),
-        changed: changed.map(visualToken<FeedNotification>),
-      });
-    },
-    [onVisualViewableItemsChanged]
-  );
-  const handleListScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-      followerListMetricsRef.current = {
-        contentLength: contentSize.height,
-        scroll: contentOffset.y,
-        size: layoutMeasurement.height,
-      };
-      reportFollowerListMetrics('scroll');
-      remeasureVisualLayoutScope(NOTIFICATION_FOLLOWERS_VISUAL_SCOPE, 'scroll', {
-        extra: {
-          phase: visualPhase,
-          followers: followers.length,
-          loadingMore: isLoadingMore,
-        },
-      });
-    },
-    [followers.length, isLoadingMore, reportFollowerListMetrics, visualPhase]
-  );
+  const { onListLayout, onListContentSizeChange, onListScroll, onListViewableItemsChanged } =
+    useVisualFlatListLogger<FeedNotification>({
+      scope: NOTIFICATION_FOLLOWERS_VISUAL_SCOPE,
+      surface: 'notifications',
+      component: 'NotificationFollowersFlatList',
+      phase: visualPhase,
+      extra: () => ({
+        followers: followers.length,
+        rows: followers.length,
+        loadingMore: isLoadingMore,
+      }),
+      remeasureExtra: () => ({
+        followers: followers.length,
+        loadingMore: isLoadingMore,
+      }),
+      getItemKey: (notification) => `follower:${notification.event.id}`,
+      getItemContext: (notification) => ({
+        itemType: notification.reason,
+        rowLabel: notification.reason,
+      }),
+    });
 
   return (
     <Screen name="NotificationFollowersScreen" scroll="custom" bgColor={surface}>
@@ -477,14 +401,14 @@ export function NotificationFollowersScreen() {
               </VisualLayoutProbe>
             ) : null
           }
-          onLayout={handleListLayout}
-          onContentSizeChange={handleContentSizeChange}
+          onLayout={onListLayout}
+          onContentSizeChange={onListContentSizeChange}
           onEndReached={loadMoreFollowers}
           onEndReachedThreshold={0.4}
-          onScroll={handleListScroll}
+          onScroll={onListScroll}
           scrollEventThrottle={250}
           viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
-          onViewableItemsChanged={handleListViewableItemsChanged}
+          onViewableItemsChanged={onListViewableItemsChanged}
           renderItem={({ item, index }) => (
             <VisualLayoutProbe
               scope={NOTIFICATION_FOLLOWERS_VISUAL_SCOPE}

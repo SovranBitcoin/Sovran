@@ -6,15 +6,7 @@
  * stats), with Primal cache / raw relays as fallback tiers.
  */
 
-import {
-  useMemo,
-  useRef,
-  useEffect,
-  useCallback,
-  useState,
-  useTransition,
-  type ReactNode,
-} from 'react';
+import { useMemo, useRef, useEffect, useCallback, useState, type ReactNode } from 'react';
 import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -45,11 +37,10 @@ import {
   type FeedEmptyMode,
 } from '@/features/feed/lib/feedEmptyStates';
 
-import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from './nostr/feedTypes';
+import type { FeedEvent, FeedItem, NoteMetrics } from './nostr/feedTypes';
 import { DEFAULT_METRICS } from './nostr/feedTypes';
 import { tryNpubEncode } from './nostr/feedParse';
 import {
-  buildFeedRows,
   DEFAULT_ENGAGEMENT_STATE,
   getFeedRowItemType,
   getFeedRowKey,
@@ -57,12 +48,12 @@ import {
 } from '@/features/feed/lib/feedRows';
 
 import { PostCard } from './nostr/PostCard';
-import { createFeedPostCardProps } from './nostr/feedPostCardProps';
 import { RepostCard } from './UserFeed';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
-import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
-import { useVideoOverlayNavigation } from '@/features/feed/hooks/useVideoOverlayNavigation';
-import { useZap } from '@/features/feed/hooks/useZap';
+import { useFeedCardProps } from '@/features/feed/hooks/useFeedCardProps';
+import { useFeedContentState } from '@/features/feed/hooks/useFeedContentState';
+import { useFeedInteractions } from '@/features/feed/hooks/useFeedInteractions';
+import { useFeedRows } from '@/features/feed/hooks/useFeedRows';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 
@@ -185,7 +176,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const userPubkey = nostrKeys?.pubkey;
   const ignoredPubkeysKey = useFeedIgnoreStore((state) => state.ignoredPubkeys.join('\u0000'));
   const ignoredEventIdsKey = useFeedIgnoreStore((state) => state.ignoredEventIds.join('\u0000'));
-  const [, startTransition] = useTransition();
   const feedSpecs = DEFAULT_FEED_SPECS;
   const activeSpecIndex = useMemo(() => {
     if (!activeFilter) return 0;
@@ -205,16 +195,19 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       ? feedPageCache.getEntry(initialCacheKey)?.data
       : undefined;
 
-  const [feedItems, setFeedItems] = useState<FeedItem[]>(() => seed?.orderedFeedItems ?? []);
-  const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(
-    () => seed?.metricsMap ?? new Map()
-  );
-  const [quotedEventsMap, setQuotedEventsMap] = useState<Map<string, FeedEvent>>(
-    () => seed?.quotedEventsMap ?? new Map()
-  );
-  const [profilesMap, setProfilesMap] = useState<Map<string, ProfileInfo>>(
-    () => seed?.profilesMap ?? new Map()
-  );
+  const {
+    feedItems,
+    metricsMap,
+    quotedEventsMap,
+    profilesMap,
+    metricsRef,
+    quotedRef,
+    profilesRef,
+    resetContent,
+    applyPage,
+    appendPage,
+    applyEnrichment,
+  } = useFeedContentState(seed);
   const [isLoading, setIsLoading] = useState(() => !seed);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -239,11 +232,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   // Tracks the request prefix of the most recently started loadFeed/loadMoreItems
   // — onUpdate callbacks captured by an older request bail out when this drifts.
   const activeLoadIdRef = useRef<string | null>(null);
-
-  const metricsRef = useLatestRef(metricsMap);
-  const quotedRef = useLatestRef(quotedEventsMap);
-  const profilesRef = useLatestRef(profilesMap);
-  const feedRowsRef = useRef<FeedRow[]>([]);
 
   const isFirstRender = useRef(true);
 
@@ -296,10 +284,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             item.type === 'note' ? item.event.id : item.repostEvent.id
           )
         );
-        setFeedItems(phase1.orderedFeedItems);
-        setMetricsMap(phase1.metricsMap);
-        setQuotedEventsMap(phase1.quotedEventsMap);
-        setProfilesMap(phase1.profilesMap);
+        applyPage(phase1);
       };
 
       isFirstRender.current = true;
@@ -328,10 +313,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           // linger under the spinner. (Replaces the old reset effect, which clobbered
           // the warm paint on every tab change.) On pull-to-refresh we keep the
           // current rows visible while the refresh spinner runs.
-          setFeedItems([]);
-          setMetricsMap(new Map());
-          setQuotedEventsMap(new Map());
-          setProfilesMap(new Map());
+          resetContent();
         }
         paginationRef.current = emptyPaginationState();
         feedItemIdsRef.current.clear();
@@ -398,39 +380,14 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           profiles: updates.profiles?.size ?? 0,
           isRefresh,
         });
-        startTransition(() => {
-          if (updates.quotedEvents) {
-            setQuotedEventsMap((prev) => {
-              const n = new Map(prev);
-              for (const [k, v] of updates.quotedEvents!) n.set(k, v);
-              return n;
-            });
-          }
-          if (updates.metrics) {
-            setMetricsMap((prev) => {
-              const n = new Map(prev);
-              for (const [k, v] of updates.metrics!) n.set(k, v);
-              return n;
-            });
-          }
-          if (updates.profiles) {
-            setProfilesMap((prev) => {
-              const n = new Map(prev);
-              for (const [k, v] of updates.profiles!) n.set(k, v);
-              return n;
-            });
-          }
-        });
+        applyEnrichment(updates);
       } catch (error) {
         if (!isActiveLoad(requestId)) return;
         log.error('feed.home.load_failed', {
           message: error instanceof Error ? error.message : String(error),
         });
         if (!isRefresh && !didApplyPage) {
-          setFeedItems([]);
-          setMetricsMap(new Map());
-          setQuotedEventsMap(new Map());
-          setProfilesMap(new Map());
+          resetContent();
         }
         setLoadError(true);
         setIsLoading(false);
@@ -442,7 +399,15 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         client.dispose?.();
       }
     },
-    [beginNetworkLoad, feedSpecs, isActiveLoad, userPubkey]
+    [
+      applyEnrichment,
+      applyPage,
+      beginNetworkLoad,
+      feedSpecs,
+      isActiveLoad,
+      resetContent,
+      userPubkey,
+    ]
   );
 
   // Trigger feed load when spec (page) changes
@@ -527,24 +492,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         total: feedItemIdsRef.current.size,
         paginationUntil: page.paginationUntil,
       });
-      startTransition(() => {
-        setFeedItems((prev) => [...prev, ...newItems]);
-        setMetricsMap((prev) => {
-          const n = new Map(prev);
-          for (const [k, v] of page.metricsMap) n.set(k, v);
-          return n;
-        });
-        setQuotedEventsMap((prev) => {
-          const n = new Map(prev);
-          for (const [k, v] of page.quotedEventsMap) n.set(k, v);
-          return n;
-        });
-        setProfilesMap((prev) => {
-          const n = new Map(prev);
-          for (const [k, v] of page.profilesMap) n.set(k, v);
-          return n;
-        });
-      });
+      appendPage(page, newItems);
 
       const missingQ = page.missingQuotedIds.filter((id) => !quotedRef.current.has(id));
       const missingP = page.missingProfilePubkeys.filter((pk) => !profilesRef.current.has(pk));
@@ -554,29 +502,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         signal: controller.signal,
       });
       if (!isActiveLoad(requestId)) return newItems;
-      startTransition(() => {
-        if (updates.quotedEvents) {
-          setQuotedEventsMap((prev) => {
-            const n = new Map(prev);
-            for (const [k, v] of updates.quotedEvents!) n.set(k, v);
-            return n;
-          });
-        }
-        if (updates.metrics) {
-          setMetricsMap((prev) => {
-            const n = new Map(prev);
-            for (const [k, v] of updates.metrics!) n.set(k, v);
-            return n;
-          });
-        }
-        if (updates.profiles) {
-          setProfilesMap((prev) => {
-            const n = new Map(prev);
-            for (const [k, v] of updates.profiles!) n.set(k, v);
-            return n;
-          });
-        }
-      });
+      applyEnrichment(updates);
       return newItems;
     } catch (error) {
       if (!isActiveLoad(requestId)) return [];
@@ -592,7 +518,16 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       loadingMoreRef.current = false;
       setIsLoadingMore(false);
     }
-  }, [beginNetworkLoad, currentSpec, isActiveLoad, userPubkey, startTransition]);
+  }, [
+    appendPage,
+    applyEnrichment,
+    beginNetworkLoad,
+    currentSpec,
+    isActiveLoad,
+    profilesRef,
+    quotedRef,
+    userPubkey,
+  ]);
 
   const handleEndReached = useCallback(() => {
     // Don't start pagination while the first page is still loading or a refresh
@@ -618,39 +553,17 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     [metricsMap]
   );
 
-  const actionableEvents = useMemo(() => {
-    const map = new Map<string, FeedEvent>();
-    for (const item of feedItems) {
-      if (item.rootEvent) {
-        map.set(item.rootEvent.id, item.rootEvent);
-      }
-      if (item.type === 'note') {
-        map.set(item.event.id, item.event);
-      } else if (item.originalEvent) {
-        map.set(item.originalEvent.id, item.originalEvent);
-      }
-    }
-    return Array.from(map.values());
-  }, [feedItems]);
-
-  const { getDisplayMetrics, getEngagementState, getZapState, toggleLike, toggleRepost } =
-    useNostrEngagement(actionableEvents, getMetrics);
-  const toggleLikeRef = useLatestRef(toggleLike);
-  const toggleRepostRef = useLatestRef(toggleRepost);
-  const { openZapMenu } = useZap();
-  const openZapMenuRef = useLatestRef(openZapMenu);
-
-  const { onOverlayOpenedFromIndex, getVideoFeedLayoutsAndIndex, onSwipeUpToNextPost } =
-    useVideoOverlayNavigation({
-      feedItems,
-      getDisplayMetrics,
-      getEngagementState,
-      profilesRef,
-      toggleLike,
-      toggleRepost,
-      getZapState,
-      openZapMenu,
-    });
+  const {
+    getDisplayMetrics,
+    getEngagementState,
+    getZapState,
+    toggleLikeRef,
+    toggleRepostRef,
+    openZapMenuRef,
+    onOverlayOpenedFromIndex,
+    getVideoFeedLayoutsAndIndex,
+    onSwipeUpToNextPost,
+  } = useFeedInteractions({ feedItems, getMetrics, profilesRef });
 
   // ── Render ──
 
@@ -698,31 +611,15 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     [profilesMap]
   );
 
-  const feedRows = useMemo(
-    () =>
-      buildFeedRows({
-        items: feedItems,
-        previousRows: feedRowsRef.current,
-        profilesMap,
-        quotedEventsMap,
-        getDisplayMetrics,
-        getEngagementState,
-        resolveReposter,
-      }),
-    [
-      feedItems,
-      metricsMap,
-      profilesMap,
-      quotedEventsMap,
-      getDisplayMetrics,
-      getEngagementState,
-      resolveReposter,
-    ]
-  );
-
-  useEffect(() => {
-    feedRowsRef.current = feedRows;
-  }, [feedRows]);
+  const feedRows = useFeedRows({
+    items: feedItems,
+    profilesMap,
+    quotedEventsMap,
+    metricsMap,
+    getDisplayMetrics,
+    getEngagementState,
+    resolveReposter,
+  });
 
   // Render boundary: how many feed items became rendered rows, and whether the
   // screen is currently showing the empty state. `feedItems > 0 && rows === 0`
@@ -738,33 +635,20 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     });
   }, [feedItems.length, feedRows.length, isLoading, activeSpecIndex, feedSpecs]);
 
-  const feedPostCardProps = useMemo(
-    () =>
-      createFeedPostCardProps({
-        getMetrics,
-        getZapState,
-        onOverlayOpenedFromIndex,
-        toggleLike: (event: FeedEvent) => void toggleLikeRef.current(event),
-        toggleRepost: (event: FeedEvent) => void toggleRepostRef.current(event),
-        openZapMenu: (event: FeedEvent, baseSats: number) =>
-          openZapMenuRef.current(event, baseSats),
-        openPostActions,
-      }),
-    [
-      getMetrics,
-      getZapState,
-      onOverlayOpenedFromIndex,
-      openPostActions,
-      openZapMenuRef,
-      toggleLikeRef,
-      toggleRepostRef,
-    ]
-  );
+  const { feedPostCardProps, repostCardProps } = useFeedCardProps({
+    getMetrics,
+    getZapState,
+    onOverlayOpenedFromIndex,
+    toggleLikeRef,
+    toggleRepostRef,
+    openZapMenuRef,
+    openPostActions,
+    fallbackReposterName: '',
+  });
 
   const renderFeedItem = useCallback(
     ({ item: row, index }: { item: FeedRow; index: number }) => {
       const item = row.item;
-      const feedIndex = index;
       if (item.type === 'note') {
         const metrics = row.metrics;
         const engagement = row.engagement;
@@ -850,7 +734,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       }
 
       const originalEvent = item.originalEvent;
-      const repostEngagement = row.engagement;
       const contextRootEvent = row.rootEvent;
       if (contextRootEvent && originalEvent) {
         const rootEvent = contextRootEvent;
@@ -871,35 +754,8 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             }
             second={
               <RepostCard
-                repostEvent={item.repostEvent}
-                originalEvent={item.originalEvent}
-                originalMetrics={row.metrics}
-                index={index}
-                feedIndex={feedIndex}
-                onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-                quotedEvents={row.quotedEvents}
-                profiles={row.profiles}
-                getMetrics={getMetrics}
-                reposterName={row.reposterName ?? ''}
-                reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
-                reposters={row.reposters}
-                liked={repostEngagement.liked}
-                replied={repostEngagement.replied}
-                reposted={repostEngagement.reposted}
-                likePending={repostEngagement.likePending}
-                repostPending={repostEngagement.repostPending}
-                likePendingDirection={repostEngagement.likePendingDirection}
-                repostPendingDirection={repostEngagement.repostPendingDirection}
-                zapped={originalEvent ? getZapState(originalEvent.id).zapped : false}
-                zapPending={originalEvent ? getZapState(originalEvent.id).zapPending : false}
-                onLikePress={() => toggleLikeRef.current(originalEvent)}
+                {...repostCardProps(row, index, item)}
                 onMorePress={() => openPostActions(originalEvent)}
-                onRepostPress={() => toggleRepostRef.current(originalEvent)}
-                onZapPress={
-                  originalEvent
-                    ? () => openZapMenuRef.current(originalEvent, row.metrics.satsZapped)
-                    : undefined
-                }
                 skipAnimation={!isFirstRender.current}
                 getThreadContext={() => getThreadContextRef.current()}
                 fullBleedFooterBorder
@@ -910,34 +766,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       }
       return (
         <RepostCard
-          repostEvent={item.repostEvent}
-          originalEvent={item.originalEvent}
-          originalMetrics={row.metrics}
-          index={index}
-          feedIndex={feedIndex}
-          onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-          quotedEvents={row.quotedEvents}
-          profiles={row.profiles}
-          getMetrics={getMetrics}
-          reposterName={row.reposterName ?? ''}
-          reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
-          reposters={row.reposters}
-          liked={repostEngagement.liked}
-          replied={repostEngagement.replied}
-          reposted={repostEngagement.reposted}
-          likePending={repostEngagement.likePending}
-          repostPending={repostEngagement.repostPending}
-          likePendingDirection={repostEngagement.likePendingDirection}
-          repostPendingDirection={repostEngagement.repostPendingDirection}
-          zapped={originalEvent ? getZapState(originalEvent.id).zapped : false}
-          zapPending={originalEvent ? getZapState(originalEvent.id).zapPending : false}
-          onLikePress={originalEvent ? () => toggleLikeRef.current(originalEvent) : undefined}
-          onRepostPress={originalEvent ? () => toggleRepostRef.current(originalEvent) : undefined}
-          onZapPress={
-            originalEvent
-              ? () => openZapMenuRef.current(originalEvent, row.metrics.satsZapped)
-              : undefined
-          }
+          {...repostCardProps(row, index, item)}
           skipAnimation={!isFirstRender.current}
           getThreadContext={() => getThreadContextRef.current()}
           fullBleedFooterBorder
@@ -946,14 +775,9 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     },
     [
       feedPostCardProps,
-      getMetrics,
+      repostCardProps,
       getDisplayMetrics,
       getEngagementState,
-      getZapState,
-      onOverlayOpenedFromIndex,
-      toggleLikeRef,
-      toggleRepostRef,
-      openZapMenuRef,
       getThreadContextRef,
       openPostActions,
     ]

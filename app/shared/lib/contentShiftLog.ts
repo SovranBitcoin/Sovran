@@ -1304,6 +1304,117 @@ export function useVisualListLogger<ItemT>(
   };
 }
 
+type VisualFlatListMetrics = {
+  contentLength: number | null;
+  scroll: number;
+  size: number | null;
+};
+
+type VisualFlatListConfig<ItemT> = VisualListConfig<ItemT> & {
+  /** Extra fields for the scroll-triggered scope remeasure, if it should differ. */
+  remeasureExtra?: VisualExtra;
+};
+
+type VisualFlatListReporter<ItemT> = VisualListReporter<ItemT> & {
+  onListLayout: (event: LayoutChangeEvent) => void;
+  onListContentSizeChange: (width: number, height: number) => void;
+  onListScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onListViewableItemsChanged: (info: { viewableItems: ViewToken[]; changed: ViewToken[] }) => void;
+};
+
+/**
+ * {@link useVisualListLogger} wired straight onto a `FlatList`.
+ *
+ * A plain `FlatList` reports its geometry through four separate callbacks and
+ * none of them carry the full picture, so every caller ends up keeping the same
+ * running metrics snapshot and re-reporting it on each event. This owns that
+ * snapshot and hands back handlers to spread onto the list, so a screen only
+ * describes what it is rendering — never how the measurements are stitched
+ * together.
+ */
+export function useVisualFlatListLogger<ItemT>(
+  config: VisualFlatListConfig<ItemT>
+): VisualFlatListReporter<ItemT> {
+  const reporter = useVisualListLogger<ItemT>(config);
+  const { onMetricsChange, onViewableItemsChanged } = reporter;
+  const configRef = useRef(config);
+  configRef.current = config;
+  const metricsRef = useRef<VisualFlatListMetrics>({
+    contentLength: null,
+    scroll: 0,
+    size: null,
+  });
+
+  const report = useCallback(
+    (reason: string) => {
+      const metrics = metricsRef.current;
+      onMetricsChange({
+        reason,
+        size: metrics.size,
+        scroll: metrics.scroll,
+        scrollLength: metrics.size,
+        contentLength: metrics.contentLength,
+      });
+    },
+    [onMetricsChange]
+  );
+
+  const onListLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      metricsRef.current.size = event.nativeEvent.layout.height;
+      report('layout');
+    },
+    [report]
+  );
+
+  const onListContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      metricsRef.current.contentLength = height;
+      report('content-size');
+    },
+    [report]
+  );
+
+  const onListScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      metricsRef.current = {
+        contentLength: contentSize.height,
+        scroll: contentOffset.y,
+        size: layoutMeasurement.height,
+      };
+      report('scroll');
+      const current = configRef.current;
+      remeasureVisualLayoutScope(current.scope, 'scroll', {
+        extra: {
+          phase: current.phase ?? null,
+          ...resolveExtra(current.remeasureExtra ?? current.extra),
+        },
+      });
+    },
+    [report]
+  );
+
+  const onListViewableItemsChanged = useCallback(
+    ({ viewableItems, changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
+      onViewableItemsChanged({
+        ...visualViewabilityRange([...viewableItems, ...changed]),
+        viewableItems: viewableItems.map(visualToken<ItemT>),
+        changed: changed.map(visualToken<ItemT>),
+      });
+    },
+    [onViewableItemsChanged]
+  );
+
+  return {
+    ...reporter,
+    onListLayout,
+    onListContentSizeChange,
+    onListScroll,
+    onListViewableItemsChanged,
+  };
+}
+
 export function useVisualScrollMetricsLogger(
   config: VisualScrollMetricsConfig
 ): VisualScrollMetricsReporter {

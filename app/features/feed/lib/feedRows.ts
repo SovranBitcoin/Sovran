@@ -93,6 +93,26 @@ export function getFeedRowItemType(row: FeedRow): string {
   }`;
 }
 
+/**
+ * The distinct events a viewer can like, repost, or zap from a list of feed
+ * items — the note itself, the reposted original, and any thread root shown
+ * above it. Deduped by id so engagement is subscribed once per event.
+ */
+export function collectActionableEvents(items: FeedItem[]): FeedEvent[] {
+  const map = new Map<string, FeedEvent>();
+  for (const item of items) {
+    if (item.rootEvent) {
+      map.set(item.rootEvent.id, item.rootEvent);
+    }
+    if (item.type === 'note') {
+      map.set(item.event.id, item.event);
+    } else if (item.originalEvent) {
+      map.set(item.originalEvent.id, item.originalEvent);
+    }
+  }
+  return Array.from(map.values());
+}
+
 function getPrimaryEventId(item: FeedItem): string {
   return item.type === 'note' ? item.event.id : item.originalEventId;
 }

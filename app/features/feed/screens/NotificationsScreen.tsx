@@ -1,13 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  type LayoutChangeEvent,
-  type ViewToken,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
+import { FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
@@ -45,10 +37,7 @@ import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
 import { MintChangesList } from '@/features/mint/components/mintChanges/MintChangesList';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import {
-  remeasureVisualLayoutScope,
-  useVisualListLogger,
-  visualToken,
-  visualViewabilityRange,
+  useVisualFlatListLogger,
   VISUAL_LIST_VIEWABILITY_CONFIG,
 } from '@/shared/lib/contentShiftLog';
 import { formatDate, formatRelative } from '@/shared/lib/date';
@@ -93,12 +82,6 @@ const MAX_GROUP_AVATARS = 3;
 const EMPTY_NOTIFICATIONS: readonly FeedNotification[] = [];
 
 type LoadMode = 'initial' | 'refresh';
-
-type VisualFlatListMetrics = {
-  contentLength: number | null;
-  scroll: number;
-  size: number | null;
-};
 
 function notificationItemType(item: NotificationListItem): string {
   if (item.type === 'single') return item.notification.reason;
@@ -154,11 +137,6 @@ export function NotificationsScreen() {
     () => `feed.notifications.${activeTab.toLowerCase()}.list`,
     [activeTab]
   );
-  const notificationListMetricsRef = useRef<VisualFlatListMetrics>({
-    contentLength: null,
-    scroll: 0,
-    size: null,
-  });
 
   // The unified three-source session (nagg + Primal + relays, concurrent).
   // Owns cross-source dedupe, per-source cursors, and the pooled-new-rows
@@ -672,91 +650,30 @@ export function NotificationsScreen() {
     return buildNotificationListItems(notifications);
   }, [notifications, activeTab, seedCreatedAt, termsDate]);
   const visualPhase = isInitialLoading ? 'initial-loading' : isRefreshing ? 'refreshing' : 'ready';
-  const {
-    onMetricsChange: onVisualListMetricsChange,
-    onViewableItemsChanged: onVisualViewableItemsChanged,
-  } = useVisualListLogger<NotificationListItem>({
-    scope: notificationsVisualScope,
-    surface: 'notifications',
-    component: 'NotificationsFlatList',
-    phase: visualPhase,
-    extra: () => ({
-      tab: activeTab,
-      replyScope,
-      items: notificationItems.length,
-      rows: notificationItems.length,
-      loadingMore: isLoadingMore,
-    }),
-    getItemKey: (item) => `notification:${item.id}`,
-    getItemContext: (item) => ({
-      itemType: notificationItemType(item),
-      rowLabel: item.type,
-    }),
-  });
-  const reportNotificationListMetrics = useCallback(
-    (reason: string) => {
-      const metrics = notificationListMetricsRef.current;
-      onVisualListMetricsChange({
-        reason,
-        size: metrics.size,
-        scroll: metrics.scroll,
-        scrollLength: metrics.size,
-        contentLength: metrics.contentLength,
-      });
-    },
-    [onVisualListMetricsChange]
-  );
-  const handleListLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      notificationListMetricsRef.current.size = event.nativeEvent.layout.height;
-      reportNotificationListMetrics('layout');
-    },
-    [reportNotificationListMetrics]
-  );
-  const handleContentSizeChange = useCallback(
-    (_width: number, height: number) => {
-      notificationListMetricsRef.current.contentLength = height;
-      reportNotificationListMetrics('content-size');
-    },
-    [reportNotificationListMetrics]
-  );
-  const handleListViewableItemsChanged = useCallback(
-    ({ viewableItems, changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
-      onVisualViewableItemsChanged({
-        ...visualViewabilityRange([...viewableItems, ...changed]),
-        viewableItems: viewableItems.map(visualToken<NotificationListItem>),
-        changed: changed.map(visualToken<NotificationListItem>),
-      });
-    },
-    [onVisualViewableItemsChanged]
-  );
-  const handleListScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-      notificationListMetricsRef.current = {
-        contentLength: contentSize.height,
-        scroll: contentOffset.y,
-        size: layoutMeasurement.height,
-      };
-      reportNotificationListMetrics('scroll');
-      remeasureVisualLayoutScope(notificationsVisualScope, 'scroll', {
-        extra: {
-          tab: activeTab,
-          phase: visualPhase,
-          items: notificationItems.length,
-          loadingMore: isLoadingMore,
-        },
-      });
-    },
-    [
-      activeTab,
-      isLoadingMore,
-      notificationItems.length,
-      notificationsVisualScope,
-      reportNotificationListMetrics,
-      visualPhase,
-    ]
-  );
+  const { onListLayout, onListContentSizeChange, onListScroll, onListViewableItemsChanged } =
+    useVisualFlatListLogger<NotificationListItem>({
+      scope: notificationsVisualScope,
+      surface: 'notifications',
+      component: 'NotificationsFlatList',
+      phase: visualPhase,
+      extra: () => ({
+        tab: activeTab,
+        replyScope,
+        items: notificationItems.length,
+        rows: notificationItems.length,
+        loadingMore: isLoadingMore,
+      }),
+      remeasureExtra: () => ({
+        tab: activeTab,
+        items: notificationItems.length,
+        loadingMore: isLoadingMore,
+      }),
+      getItemKey: (item) => `notification:${item.id}`,
+      getItemContext: (item) => ({
+        itemType: notificationItemType(item),
+        rowLabel: item.type,
+      }),
+    });
 
   // Render boundary for notifications: result rows → rendered list items under
   // the active filter options, plus a per-type breakdown of what's on screen.
@@ -889,14 +806,14 @@ export function NotificationsScreen() {
             // Load-more reveals pooled rows into their true chronological slots
             // (possibly above the viewport); keep the visible window anchored.
             maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-            onLayout={handleListLayout}
-            onContentSizeChange={handleContentSizeChange}
+            onLayout={onListLayout}
+            onContentSizeChange={onListContentSizeChange}
             onEndReached={loadMoreNotifications}
             onEndReachedThreshold={0.4}
-            onScroll={handleListScroll}
+            onScroll={onListScroll}
             scrollEventThrottle={250}
             viewabilityConfig={VISUAL_LIST_VIEWABILITY_CONFIG}
-            onViewableItemsChanged={handleListViewableItemsChanged}
+            onViewableItemsChanged={onListViewableItemsChanged}
             renderItem={({ item, index }) => (
               <VisualLayoutProbe
                 scope={notificationsVisualScope}

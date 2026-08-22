@@ -1,9 +1,7 @@
 import React, { useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
-import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';
 import { Log, initLog } from '@/shared/lib/logger';
@@ -12,6 +10,8 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useQRButtonPressFeedback } from './useQRButtonPressFeedback';
 import { useQRButtonReveal } from './useQRButtonReveal';
+import { QRButtonFace } from './QRButtonFace';
+import { qrButtonGeometry } from './qrButtonGeometry';
 
 export interface QRButtonProps {
   onPress: () => void;
@@ -29,25 +29,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const { onPress, size = DEFAULT_SIZE } = props;
 
-  const borderRadius = size * 0.18;
-  const glow = { color: foreground, opacity: 0.6, radius: 10, offset: { width: 0, height: 0 } };
-
-  const containerStyle = {
-    width: size,
-    height: size,
-    borderRadius,
-    borderCurve: 'continuous' as const,
-    overflow: 'hidden' as const,
-  };
-
-  const pressableStyle = {
-    ...containerStyle,
-    shadowColor: glow.color,
-    shadowOffset: glow.offset,
-    shadowOpacity: glow.opacity,
-    shadowRadius: glow.radius,
-    elevation: 5,
-  };
+  const { borderRadius, containerStyle, pressableStyle } = qrButtonGeometry(size, foreground);
 
   const animatedRef = useAnimatedRef<Animated.View>();
   const visibilityStyle = useQRButtonReveal();
@@ -95,28 +77,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
             onPressIn={pressFeedback.onPressIn}
             onPressOut={pressFeedback.onPressOut}>
             <SquircleView style={[styles.container, containerStyle]} pointerEvents="none">
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: background }]} />
-              <View
-                style={[StyleSheet.absoluteFill, { backgroundColor: withAlpha(foreground, 0.65) }]}
-              />
-              <LinearGradient
-                colors={[
-                  foreground,
-                  withAlpha(foreground, 0.8),
-                  withAlpha(foreground, 0.7),
-                  withAlpha(foreground, 0.6),
-                ]}
-                locations={[0, 0.35, 0.6, 1]}
-                start={{ x: 0.5, y: 0 }}
-                end={{ x: 0.5, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <View
-                style={[
-                  StyleSheet.absoluteFill,
-                  { borderWidth: 1, borderColor: withAlpha(foreground, 0.4) },
-                ]}
-              />
+              <QRButtonFace foreground={foreground} background={background} />
             </SquircleView>
             <View
               style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center' }]}

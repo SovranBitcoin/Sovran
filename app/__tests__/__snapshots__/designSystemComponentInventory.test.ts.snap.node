@@ -202,6 +202,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/PatternBackground.tsx",
     "shared/ui/composed/QRButton/QRButton.android.tsx",
     "shared/ui/composed/QRButton/QRButton.ios.tsx",
+    "shared/ui/composed/QRButton/QRButtonFace.tsx",
     "shared/ui/composed/QRCode.tsx",
     "shared/ui/composed/Screen.tsx",
     "shared/ui/composed/ScreenFooterContext.tsx",
@@ -234,6 +235,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/Pressable.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 228,
+  "total": 229,
 }
 `;
