@@ -43,10 +43,6 @@ module.exports = {
     // Match Metro's committed-runtime alias so component tests never depend on
     // @monicon/icon-loader's undeclared @monicon/runtime import being hoisted.
     '^@monicon/runtime$': '<rootDir>/.monicon/icons.js',
-    '^@scure/bip32$': [
-      '<rootDir>/node_modules/@scure/bip32/lib/esm/index.js',
-      '<rootDir>/../node_modules/@scure/bip32/lib/esm/index.js',
-    ],
     '^@/shared/(.*)$': '<rootDir>/shared/$1',
     '^@/features/(.*)$': '<rootDir>/features/$1',
     '^@/sheets/(.*)$': '<rootDir>/shared/lib/popup/sheets/$1',

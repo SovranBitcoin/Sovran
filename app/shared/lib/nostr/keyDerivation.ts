@@ -2,7 +2,7 @@ import * as nip19 from 'nostr-tools/nip19';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
-import { wordlist } from '@scure/bip39/wordlists/english';
+import { wordlist } from '@scure/bip39/wordlists/english.js';
 
 import { log } from '../logger';
 

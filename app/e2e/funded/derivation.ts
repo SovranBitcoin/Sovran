@@ -1,6 +1,6 @@
 import { HDKey } from '@scure/bip32';
 import { entropyToMnemonic, mnemonicToSeedSync, validateMnemonic } from '@scure/bip39';
-import { wordlist } from '@scure/bip39/wordlists/english';
+import { wordlist } from '@scure/bip39/wordlists/english.js';
 
 const SOVRAN_CASHU_ACCOUNT_0_PATH = `m/44'/129372'/0'/0'/0/0`;
 
