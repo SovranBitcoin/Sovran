@@ -10,7 +10,7 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { nip19 } from 'nostr-tools';
+import * as nip19 from 'nostr-tools/nip19';
 import { withAlpha } from '@/shared/lib/color';
 
 import Icon from 'assets/icons';

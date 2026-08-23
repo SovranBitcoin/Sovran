@@ -1,4 +1,5 @@
-import { getPublicKey, nip19 } from 'nostr-tools';
+import { getPublicKey } from 'nostr-tools/pure';
+import * as nip19 from 'nostr-tools/nip19';
 
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { Avatar } from '@/shared/ui/primitives/Avatar';

@@ -14,7 +14,7 @@
  */
 
 import { create } from 'zustand';
-import { nip19 } from 'nostr-tools';
+import * as nip19 from 'nostr-tools/nip19';
 import { storeLog } from '@/shared/lib/logger';
 import { useScanHistoryStore, type ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 import {

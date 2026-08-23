@@ -27,7 +27,8 @@ import {
   deriveCashuMnemonicForImported,
   pubkeyToAccountNumber,
 } from '@/shared/lib/nostr/keyDerivation';
-import { nip19, getPublicKey } from 'nostr-tools';
+import { getPublicKey } from 'nostr-tools/pure';
+import * as nip19 from 'nostr-tools/nip19';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { useInitializationStage } from './InitializationProvider';

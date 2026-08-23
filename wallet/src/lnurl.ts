@@ -22,7 +22,6 @@
 //     would otherwise reach `mgr.ops.melt.prepare` and drain the user.
 // ---------------------------------------------------------------------------
 
-import { decode } from '@gandlaf21/bolt11-decode';
 import {
   LnurlInvoiceCallback,
   LnurlPayParams as LnurlPayParamsSchema,
@@ -31,6 +30,7 @@ import {
   type LnurlPayParams,
 } from '@sovranbitcoin/schemas';
 
+import { decodeBolt11Invoice } from './bolt11';
 import { errField, logger } from './logger';
 import { isAbortError, safeFetch, type RequestControls } from './safeFetch';
 
@@ -210,31 +210,6 @@ function assertSecureCallback(callback: string): URL {
     isOnion,
   });
   return url;
-}
-
-/**
- * Pull the millisat amount out of a decoded bolt11. Zero-amount
- * invoices return `null`; LUD-06 forbids those, so the caller treats
- * `null` as a mismatch.
- */
-function decodedInvoiceMsats(invoice: string): number | null {
-  try {
-    const decoded = decode(invoice);
-    const section = decoded?.sections?.find(
-      (s: { name?: string }) => s?.name === 'amount',
-    );
-    const value = section?.value;
-    if (typeof value === 'string') {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-    }
-    if (typeof value === 'number') {
-      return value > 0 ? value : null;
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 export async function getLnurlPayParams(
@@ -455,7 +430,9 @@ export async function requestInvoiceFromLnurl(
   }
 
   const invoice = parsed.value.pr;
-  const decodedMsats = decodedInvoiceMsats(invoice);
+  // Zero-amount invoices decode to `null`; LUD-06 forbids those, so a null
+  // reads as a mismatch against the requested amount.
+  const decodedMsats = decodeBolt11Invoice(invoice)?.amountMsat ?? null;
   if (decodedMsats !== amountMsats) {
     logger.warn('lnurl.invoice.amountMismatch', {
       ...summarizeCallbackUrl(callbackUrl),

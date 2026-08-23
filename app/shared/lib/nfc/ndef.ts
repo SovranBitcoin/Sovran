@@ -2,13 +2,13 @@
  * NDEF Text record encode/decode for Type 4 Tag.
  */
 
-import { Buffer } from 'buffer';
+import { utf8ToBytes } from '@noble/hashes/utils.js';
 import { NfcError } from './errors';
 import { NDEF_TEXT_LANG, SHORT_RECORD_FLAG } from './constants';
 import { nfcLog } from '../logger';
 
 function toBytes(str: string): number[] {
-  return Array.from(Buffer.from(str, 'utf8'));
+  return Array.from(utf8ToBytes(str));
 }
 
 /**
@@ -143,7 +143,9 @@ export function decodeTextRecord(ndef: number[]): string {
   }
 
   const textBytes = ndef.slice(textStart, textStart + textLen);
-  const text = isUtf16 ? decodeUtf16(textBytes) : Buffer.from(textBytes).toString('utf8');
+  const text = isUtf16
+    ? decodeUtf16(textBytes)
+    : new TextDecoder().decode(Uint8Array.from(textBytes));
   nfcLog.debug('nfc.ndef.decoded', {
     textLen,
     chars: text.length,
@@ -155,22 +157,19 @@ export function decodeTextRecord(ndef: number[]): string {
 /**
  * Decode UTF-16 bytes per the NFC Forum Text RTD: an optional BOM at the
  * head selects byte order (FE FF = BE, FF FE = LE); without a BOM the spec
- * defaults to big-endian. Node's Buffer only decodes UTF-16LE natively, so
- * BE input is byte-swapped in place before decode.
+ * defaults to big-endian. Code units are assembled directly in the tag's own
+ * byte order, so neither endianness needs a byte-swap pass. A trailing odd
+ * byte is not a code unit and is dropped.
  */
 function decodeUtf16(bytes: number[]): string {
   const hasBeBom = bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff;
   const hasLeBom = bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe;
-  const isBigEndian = hasBeBom || (!hasLeBom && !hasBeBom);
-  const stripped = hasBeBom || hasLeBom ? bytes.slice(2) : bytes;
-  if (isBigEndian) {
-    const swapped = Buffer.from(stripped);
-    for (let i = 0; i + 1 < swapped.length; i += 2) {
-      const tmp = swapped[i];
-      swapped[i] = swapped[i + 1];
-      swapped[i + 1] = tmp;
-    }
-    return swapped.toString('utf16le');
+  const body = hasBeBom || hasLeBom ? bytes.slice(2) : bytes;
+  let text = '';
+  for (let i = 0; i + 1 < body.length; i += 2) {
+    text += String.fromCharCode(
+      hasLeBom ? body[i] | (body[i + 1] << 8) : (body[i] << 8) | body[i + 1]
+    );
   }
-  return Buffer.from(stripped).toString('utf16le');
+  return text;
 }

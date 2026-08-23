@@ -10,15 +10,15 @@
  *            https://github.com/nostr-protocol/nips/blob/master/17.md
  */
 
-import type { UnsignedEvent, VerifiedEvent, Event as NostrToolsEvent } from 'nostr-tools';
+import type { UnsignedEvent, VerifiedEvent, Event as NostrToolsEvent } from 'nostr-tools/core';
 import {
   getPublicKey,
   getEventHash,
-  nip44,
   finalizeEvent,
   generateSecretKey,
   verifyEvent,
-} from 'nostr-tools';
+} from 'nostr-tools/pure';
+import * as nip44 from 'nostr-tools/nip44';
 import { z } from 'zod';
 import { Hex64, Hex128 } from '@sovranbitcoin/schemas';
 

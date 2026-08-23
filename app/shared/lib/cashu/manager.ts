@@ -32,7 +32,8 @@ import { getInflightProofs, restoreProofsToReady } from './managerInternals';
 import { reconcileE2EReadyProofs } from './e2eReadyProofReconciliation';
 import { maybeCreateMintFaultWebSocketFactory } from '@/shared/lib/e2e/mintFaults/webSocketFactory';
 import * as FileSystem from 'expo-file-system/legacy';
-import { EventTemplate, finalizeEvent, getPublicKey, VerifiedEvent } from 'nostr-tools';
+import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
+import type { EventTemplate, VerifiedEvent } from 'nostr-tools/core';
 import * as Sharing from 'expo-sharing';
 import { cashuLog, initLog, initPhase, redactError, mintUrlLogFields } from '../logger';
 import { resolveOutputDataCreator } from './nativeOutputDataCreator';
@@ -1120,7 +1121,7 @@ export class CocoManager {
           return null;
         }
         const { retrieveImportedNsec } = await import('@/shared/lib/nostr/secureStorage');
-        const { nip19 } = await import('nostr-tools');
+        const nip19 = await import('nostr-tools/nip19');
         const nsecValue = await retrieveImportedNsec(activeProfile.pubkey);
         if (!nsecValue) {
           cashuLog.warn('cashu.manager.nsec_not_found');

@@ -18,6 +18,7 @@
     "userInterfaceStyle": "dark",
     "icon": "./assets/images/light.png",
     "assetBundlePatterns": ["**/*"],
+    "updates": { "enabled": false },
     "ios": {
       "buildNumber": "1",
       "userInterfaceStyle": "dark",

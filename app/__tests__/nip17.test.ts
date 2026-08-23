@@ -2,15 +2,9 @@
  * @jest-environment node
  */
 
-import {
-  finalizeEvent,
-  generateSecretKey,
-  getEventHash,
-  getPublicKey,
-  nip44,
-  type Event as NostrEvent,
-  type UnsignedEvent,
-} from 'nostr-tools';
+import { finalizeEvent, generateSecretKey, getEventHash, getPublicKey } from 'nostr-tools/pure';
+import * as nip44 from 'nostr-tools/nip44';
+import type { Event as NostrEvent, UnsignedEvent } from 'nostr-tools/core';
 
 import { buildGiftWrappedDMPair, unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
 

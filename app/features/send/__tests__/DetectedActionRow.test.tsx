@@ -25,12 +25,10 @@ jest.mock('wallet', () => ({
   fetchNip05Pubkey: async () => mockNip05Result,
 }));
 
-jest.mock('nostr-tools', () => ({
-  nip19: {
-    decode: (v: string) => {
-      if (v.startsWith('npub1')) return { type: 'npub', data: 'npubhex' };
-      throw new Error('bad bech32');
-    },
+jest.mock('nostr-tools/nip19', () => ({
+  decode: (v: string) => {
+    if (v.startsWith('npub1')) return { type: 'npub', data: 'npubhex' };
+    throw new Error('bad bech32');
   },
 }));
 

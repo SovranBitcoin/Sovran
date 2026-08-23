@@ -10,8 +10,7 @@
 
 import { MintQuoteState, type MeltQuoteBolt11Response } from "@cashu/cashu-ts";
 import type { HistoryEntry } from "@cashu/coco-core";
-import { decode } from "@gandlaf21/bolt11-decode";
-
+import { decodeBolt11Invoice } from "../../bolt11";
 import { defaultDetectors } from "../../detectors";
 import { looksLikeBitcoinAddress, parsePaymentInput } from "../../parse";
 import {
@@ -212,35 +211,34 @@ export function onchainPaidStepType(
 export function mintHistoryEntryExpired(
   historyEntry: Extract<HistoryEntry, { type: "mint" }>,
 ): boolean {
-  try {
-    if (!historyEntry.paymentRequest) {
-      logger.debug("history.timeline.mintExpired.result", {
-        reason: "missing-payment-request",
-        expired: false,
-      });
-      return false;
-    }
-    const paymentRequest = decode(historyEntry.paymentRequest);
-    const expiry = paymentRequest.expiry ?? 3600;
-    const timestamp =
-      paymentRequest.sections.find((section) => section.name === "timestamp")
-        ?.value ?? 0;
-    const expiryTime = (timestamp + expiry) * 1000;
-
-    const expired = Date.now() > expiryTime;
+  if (!historyEntry.paymentRequest) {
     logger.debug("history.timeline.mintExpired.result", {
-      reason: "decoded",
-      expired,
-      expiry,
-      paymentRequestLength: historyEntry.paymentRequest.length,
-    });
-    return expired;
-  } catch {
-    logger.warn("history.timeline.mintExpired.decodeFailed", {
-      paymentRequestLength: historyEntry.paymentRequest?.length ?? 0,
+      reason: "missing-payment-request",
+      expired: false,
     });
     return false;
   }
+
+  const decoded = decodeBolt11Invoice(historyEntry.paymentRequest);
+  if (!decoded) {
+    logger.warn("history.timeline.mintExpired.decodeFailed", {
+      paymentRequestLength: historyEntry.paymentRequest.length,
+    });
+    return false;
+  }
+
+  const expiry = decoded.expirySec ?? 3600;
+  const timestamp = decoded.timestampSec ?? 0;
+  const expiryTime = (timestamp + expiry) * 1000;
+
+  const expired = Date.now() > expiryTime;
+  logger.debug("history.timeline.mintExpired.result", {
+    reason: "decoded",
+    expired,
+    expiry,
+    paymentRequestLength: historyEntry.paymentRequest.length,
+  });
+  return expired;
 }
 
 export function meltQuoteExpired(

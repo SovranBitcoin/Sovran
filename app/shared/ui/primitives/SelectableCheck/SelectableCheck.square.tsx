@@ -1,7 +1,6 @@
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
-// eslint-disable-next-line import/namespace
-import * as CheckboxPrimitive from '@rn-primitives/checkbox';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 
 import type { SelectableCheckProps } from './types';
 
@@ -10,6 +9,10 @@ import type { SelectableCheckProps } from './types';
  * variant color when selected. Used by surfaces that want a familiar
  * platform checkbox affordance (onboarding terms, settings toggles, mint
  * lists). For in-app accent selection prefer the circle style.
+ *
+ * Built on the app's own `Pressable` seam rather than a checkbox library:
+ * a checkbox is a tap target that reports `accessibilityRole="checkbox"`
+ * and draws a mark when checked, which is all the seam already gives us.
  */
 export function SelectableCheckSquare({
   selected,
@@ -41,10 +44,8 @@ export function SelectableCheckSquare({
   const iconSize = Math.round(size * 0.6);
 
   return (
-    /* eslint-disable-next-line import/namespace */
-    <CheckboxPrimitive.Root
-      checked={selected}
-      onCheckedChange={onChange ?? (() => {})}
+    <Pressable
+      onPress={() => onChange?.(!selected)}
       disabled={disabled}
       accessibilityRole="checkbox"
       accessibilityLabel={accessibilityLabel}
@@ -61,12 +62,9 @@ export function SelectableCheckSquare({
         alignItems: 'center',
         opacity: disabled ? 0.5 : 1,
       }}>
-      {/* eslint-disable-next-line import/namespace */}
-      <CheckboxPrimitive.Indicator>
+      {selected ? (
         <Icon name="fluent:checkmark-16-filled" color={palette.mark} size={iconSize} />
-        {/* eslint-disable-next-line import/namespace */}
-      </CheckboxPrimitive.Indicator>
-      {/* eslint-disable-next-line import/namespace */}
-    </CheckboxPrimitive.Root>
+      ) : null}
+    </Pressable>
   );
 }

@@ -1,5 +1,6 @@
-import { finalizeEvent, getPublicKey, nip44 } from 'nostr-tools';
-import type { EventTemplate, UnsignedEvent } from 'nostr-tools';
+import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
+import * as nip44 from 'nostr-tools/nip44';
+import type { EventTemplate, UnsignedEvent } from 'nostr-tools/core';
 
 type EventSignerLike = {
   getPublicKey: () => string;

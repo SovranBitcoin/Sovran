@@ -81,7 +81,7 @@ function persistedActiveIndex(AsyncStorage: typeof AsyncStorageMock): number | u
 describe('switchToExistingProfile — persist-before-restart (BTC-13)', () => {
   it('persists the target and restarts without flipping the in-memory store', async () => {
     const { switchToExistingProfile, useProfileStore, mockRestart, AsyncStorage } = setup();
-    mockRestart.mockResolvedValue(true);
+    mockRestart.mockReturnValue(true);
 
     const ok = await switchToExistingProfile({ accountIndex: 1 });
 
@@ -95,7 +95,7 @@ describe('switchToExistingProfile — persist-before-restart (BTC-13)', () => {
 
   it('flips the in-memory store only when the restart fails (fallback boot)', async () => {
     const { switchToExistingProfile, useProfileStore, mockRestart, AsyncStorage } = setup();
-    mockRestart.mockResolvedValue(false);
+    mockRestart.mockReturnValue(false);
 
     const ok = await switchToExistingProfile({ accountIndex: 1 });
 
@@ -106,7 +106,7 @@ describe('switchToExistingProfile — persist-before-restart (BTC-13)', () => {
 
   it('refuses an unknown target without touching anything', async () => {
     const { switchToExistingProfile, useProfileStore, mockRestart, AsyncStorage } = setup();
-    mockRestart.mockResolvedValue(true);
+    mockRestart.mockReturnValue(true);
 
     const ok = await switchToExistingProfile({ accountIndex: 9 });
 
@@ -144,7 +144,7 @@ describe('switchToExistingProfile — bounded teardown (BTC-14)', () => {
         { accountIndex: 1, pubkey: 'b'.repeat(64), addedAt: 2 },
       ],
     });
-    jest.mocked(restartApp).mockResolvedValue(true);
+    jest.mocked(restartApp).mockReturnValue(true);
 
     const pending = orchestrator.switchToExistingProfile({ accountIndex: 1 });
     // Let the pre-cleanup awaits settle, then push past the 5s timeout.

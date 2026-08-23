@@ -22,6 +22,13 @@ export interface Bolt11Info {
    * invoice's own amount was charged. BTC-10.)
    */
   amountSat: number | null;
+  /**
+   * Amount in millisats exactly as the invoice encodes it, or null when the
+   * invoice is amountless. Callers that must compare against a requested
+   * amount (LNURL's LUD-06 assertion) read this rather than `amountSat` —
+   * the sat value is rounded and would make a sub-sat mismatch invisible.
+   */
+  amountMsat: number | null;
   /** Invoice creation time (unix seconds), or null. */
   timestampSec: number | null;
   /** Relative expiry in seconds (the invoice's `expiry`), or null. */
@@ -65,10 +72,11 @@ export function decodeBolt11Invoice(invoice: string): Bolt11Info | null {
   const msatsRaw = sectionValue(sections, "amount");
   const msats =
     typeof msatsRaw === "string" ? Number(msatsRaw) : (msatsRaw as number);
-  const amountSat =
+  const amountMsat =
     typeof msats === "number" && Number.isFinite(msats) && msats > 0
-      ? Math.ceil(msats / 1000)
+      ? msats
       : null;
+  const amountSat = amountMsat === null ? null : Math.ceil(amountMsat / 1000);
 
   const timestamp = sectionValue(sections, "timestamp");
   const description = sectionValue(sections, "description");
@@ -76,6 +84,7 @@ export function decodeBolt11Invoice(invoice: string): Bolt11Info | null {
 
   const info: Bolt11Info = {
     amountSat,
+    amountMsat,
     timestampSec: typeof timestamp === "number" ? timestamp : null,
     expirySec: typeof decoded.expiry === "number" ? decoded.expiry : null,
     description: typeof description === "string" ? description : null,

@@ -10,8 +10,9 @@
  * Reference: https://github.com/nostr-protocol/nips/blob/master/04.md
  */
 
-import type { VerifiedEvent } from 'nostr-tools';
-import { finalizeEvent, nip04 } from 'nostr-tools';
+import type { VerifiedEvent } from 'nostr-tools/core';
+import { finalizeEvent } from 'nostr-tools/pure';
+import * as nip04 from 'nostr-tools/nip04';
 
 import { nostrLog } from '../logger';
 

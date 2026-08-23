@@ -12,13 +12,13 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import Icon from 'assets/icons';
 import { withAlpha } from '@/shared/lib/color';
-import { decode as bolt11Decode } from '@gandlaf21/bolt11-decode';
 import { log, feedLog } from '@/shared/lib/logger';
 import { useShiftLogger, useVisualLayoutLogger } from '@/shared/lib/contentShiftLog';
 import { openExternalUrl } from '@/shared/lib/url';
 import { staticPopup } from '@/shared/lib/popup';
 import { ImageBlock, useImageOverlay } from './image-overlay';
 import type { ImageOverlayLayout, ImageOverlayPost } from './image-overlay';
+import { decodeBolt11Invoice } from 'wallet';
 import { usePaymentFlowMachine } from 'wallet/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -218,22 +218,6 @@ const VideoBlockInner = React.memo(function VideoBlockInner({
 
 const VideoBlock = VideoBlockInner;
 
-// Decode the bolt11 once at memo time. A meltTarget that fails decoding is
-// rendered as a non-tappable "Invalid Lightning invoice" chip so a relay-
-// supplied lnbc-shaped string can never reach `machine.execute`. When decode
-// succeeds, the chip surfaces the amount so the user knows what they're
-// tapping into before the payment machine takes over.
-function decodeFeedInvoice(invoice: string): { amountSat: number | null } | null {
-  try {
-    const decoded = bolt11Decode(invoice);
-    const msats = decoded?.sections?.find((s: { name?: string }) => s?.name === 'amount')?.value;
-    const sats = typeof msats === 'string' ? Number(msats) / 1000 : Number(msats ?? 0) / 1000;
-    return { amountSat: Number.isFinite(sats) && sats > 0 ? sats : null };
-  } catch {
-    return null;
-  }
-}
-
 const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { meltTarget: string }) {
   const [foreground, surface, surfaceTertiary] = useThemeColor([
     'foreground',
@@ -242,7 +226,13 @@ const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { melt
   ] as const);
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
-  const decoded = useMemo(() => decodeFeedInvoice(meltTarget), [meltTarget]);
+  // Decode the bolt11 once at memo time through colada's canonical decoder —
+  // the same one the payment machine seeds its amount from, so the chip can
+  // never advertise a different number than the flow charges. A meltTarget
+  // that fails decoding renders as a non-tappable "Invalid Lightning invoice"
+  // chip, so a relay-supplied lnbc-shaped string never reaches
+  // `machine.execute`.
+  const decoded = useMemo(() => decodeBolt11Invoice(meltTarget), [meltTarget]);
 
   if (!decoded) {
     return (

@@ -2,7 +2,7 @@
  * Low-level APDU transport for IsoDep (Type 4 Tag) communication.
  */
 
-import { Buffer } from 'buffer';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import NfcManager from 'react-native-nfc-manager';
 import { NfcError } from './errors';
 import { STATUS_CODES, STATUS_OK } from './constants';
@@ -16,7 +16,7 @@ interface ApduResponse {
 }
 
 function hex(bytes: number[]): string {
-  return Buffer.from(bytes).toString('hex').toUpperCase();
+  return bytesToHex(Uint8Array.from(bytes)).toUpperCase();
 }
 
 export function getStatusMessage(sw: string): string {

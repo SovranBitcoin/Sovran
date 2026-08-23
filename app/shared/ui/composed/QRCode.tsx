@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { Buffer } from 'buffer';
 import { UR, UREncoder } from '@gandlaf21/bc-ur';
 import { PressableFeedback } from 'heroui-native';
 import { log, Log } from '@/shared/lib/logger';
@@ -142,6 +143,9 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
     encodeStartRef.current = performance.now();
 
     try {
+      // bc-ur's UR API is typed against Node's Buffer, so the payload is
+      // converted explicitly here rather than leaning on whichever library
+      // happened to install a `Buffer` global first.
       const messageBuffer = Buffer.from(address);
       const ur = UR.fromBuffer(messageBuffer);
       const encoder = new UREncoder(ur, activeFragmentSize, 0);

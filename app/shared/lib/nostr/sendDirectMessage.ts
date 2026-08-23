@@ -16,7 +16,8 @@
  * answer.
  */
 
-import { nip19, SimplePool } from 'nostr-tools';
+import { SimplePool } from 'nostr-tools/pool';
+import * as nip19 from 'nostr-tools/nip19';
 
 import { withTimeout } from 'wallet';
 

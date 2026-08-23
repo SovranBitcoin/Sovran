@@ -13,12 +13,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { bech32 } from '@scure/base';
-import {
-  generateSecretKey,
-  getPublicKey,
-  verifyEvent,
-  type Event as NostrEvent,
-} from 'nostr-tools';
+import { generateSecretKey, getPublicKey, verifyEvent } from 'nostr-tools/pure';
+import type { Event as NostrEvent } from 'nostr-tools/core';
 
 import { buildSignedZapRequestJson, lnurlBech32 } from '@/shared/lib/nostr/zap/buildZapRequest';
 

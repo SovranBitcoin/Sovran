@@ -10,7 +10,7 @@
  */
 
 import { bech32 } from '@scure/base';
-import { finalizeEvent } from 'nostr-tools';
+import { finalizeEvent } from 'nostr-tools/pure';
 
 import { nostrLog } from '../../logger';
 

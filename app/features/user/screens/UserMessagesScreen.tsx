@@ -15,7 +15,7 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useFocusEffect } from 'expo-router';
 import { staticPopup } from '@/shared/lib/popup';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
-import { nip19 } from 'nostr-tools';
+import * as nip19 from 'nostr-tools/nip19';
 import { buildGiftWrappedDMPair } from '@/shared/lib/nostr/nip17';
 import { buildNip04DM } from '@/shared/lib/nostr/nip04';
 import type { DmProtocol } from '@/features/payments/data/dmDecryptPipeline';

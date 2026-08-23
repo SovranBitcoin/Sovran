@@ -68,42 +68,6 @@ jest.mock('@/shared/lib/popup', () => ({
   copyPopup: jest.fn(),
 }));
 
-jest.mock('@rn-primitives/checkbox', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
-  const CheckedContext = ReactActual.createContext(false);
-
-  return {
-    Root: ({
-      checked,
-      children,
-      onCheckedChange: _onCheckedChange,
-      ...props
-    }: {
-      checked: boolean;
-      children?: React.ReactNode;
-      onCheckedChange?: unknown;
-      [key: string]: unknown;
-    }) => {
-      const viewProps: React.ComponentProps<typeof View> & { checked: boolean } = {
-        testID: 'checkbox-root',
-        checked,
-        ...props,
-      };
-
-      return ReactActual.createElement(
-        CheckedContext.Provider,
-        { value: checked },
-        ReactActual.createElement(View, viewProps, children)
-      );
-    },
-    Indicator: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) =>
-      ReactActual.useContext(CheckedContext)
-        ? ReactActual.createElement(View, { testID: 'checkbox-indicator', ...props }, children)
-        : null,
-  };
-});
-
 jest.mock('heroui-native', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');

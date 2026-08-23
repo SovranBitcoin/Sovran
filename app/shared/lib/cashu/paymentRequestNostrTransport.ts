@@ -25,7 +25,8 @@
  * so polling resumes automatically after restart.
  */
 
-import { getPublicKey, nip19 } from 'nostr-tools';
+import { getPublicKey } from 'nostr-tools/pure';
+import * as nip19 from 'nostr-tools/nip19';
 import { PaymentRequestTransportType, type PaymentRequestTransport } from '@cashu/cashu-ts';
 import type { Plugin } from '@cashu/coco-core/plugin';
 import type { PaymentRequestReceiveOperation } from '@cashu/coco-core';

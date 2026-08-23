@@ -37,8 +37,8 @@ jest.mock('@/shared/lib/logger', () => ({
 }));
 
 import type { NDKPrivateKeySigner, NostrEvent } from '@nostr-dev-kit/ndk-mobile';
-import { finalizeEvent, generateSecretKey, getPublicKey, verifyEvent } from 'nostr-tools';
-import type { Event as NostrToolsEvent } from 'nostr-tools';
+import { finalizeEvent, generateSecretKey, getPublicKey, verifyEvent } from 'nostr-tools/pure';
+import type { Event as NostrToolsEvent } from 'nostr-tools/core';
 
 import {
   extractSignedEventId,

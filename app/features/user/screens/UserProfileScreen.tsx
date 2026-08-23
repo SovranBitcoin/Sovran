@@ -55,7 +55,7 @@ import { withGlassHeaderItems } from '@/navigation/headerItems';
 import { SendMessageMenu } from '@/features/user/components/SendMessageMenu';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts } from 'nostr-tools/kinds';
-import { nip19 } from 'nostr-tools';
+import * as nip19 from 'nostr-tools/nip19';
 import { copyPopup, type CopyTarget, staticPopup, paramPopup } from '@/shared/lib/popup';
 import {
   useNostrProfile,

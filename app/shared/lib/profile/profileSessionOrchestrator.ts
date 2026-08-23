@@ -116,7 +116,7 @@ async function teardownAndRestart(): Promise<boolean> {
   usePopupStore.getState().destroySheet();
   usePaymentStatusStore.getState().setActive(null);
 
-  const restarted = await restartApp();
+  const restarted = restartApp();
   if (!restarted) {
     log.error('profile.orchestrator.restart_failed');
   }

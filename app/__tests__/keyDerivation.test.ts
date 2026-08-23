@@ -9,7 +9,8 @@ import {
 } from '@/shared/lib/nostr/keyDerivation';
 import { getUsername } from '@/shared/lib/username';
 import { deriveStandardCashuSeed } from 'wallet';
-import { getPublicKey, nip19 } from 'nostr-tools';
+import { getPublicKey } from 'nostr-tools/pure';
+import * as nip19 from 'nostr-tools/nip19';
 
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes)

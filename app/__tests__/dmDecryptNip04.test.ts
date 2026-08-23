@@ -3,7 +3,8 @@
  * author, sent DMs key on the `p` tag (and are marked own), and undecryptable
  * envelopes are skipped (and negatively cached) rather than throwing.
  */
-import { finalizeEvent, generateSecretKey, getPublicKey, nip04 } from 'nostr-tools';
+import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
+import * as nip04 from 'nostr-tools/nip04';
 import { decryptDmEnvelopes } from '@/features/payments/data/dmDecryptPipeline';
 import type { DmEnvelope } from '@/features/payments/data/dmEnvelopeClient';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';

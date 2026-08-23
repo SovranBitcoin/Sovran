@@ -1,4 +1,4 @@
-import { nip19 } from 'nostr-tools';
+import * as nip19 from 'nostr-tools/nip19';
 import { mapNaggFeedPage } from '@/features/feed/data/mapNaggFeedPage';
 import { NaggFeedResponse } from '@/features/feed/data/naggSchemas';
 import { DEFAULT_METRICS, type FeedEvent } from '@/features/feed/components/nostr/feedTypes';

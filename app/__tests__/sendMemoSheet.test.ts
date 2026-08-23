@@ -24,8 +24,8 @@ jest.mock('@/shared/lib/color', () => ({
   ...jest.requireActual('@/shared/lib/color'),
   withAlpha: jest.fn((color: string, value: number) => `${color}:${value}`),
 }));
-jest.mock('nostr-tools', () => ({
-  nip19: { nprofileEncode: jest.fn(({ pubkey }) => `nprofile:${pubkey}`) },
+jest.mock('nostr-tools/nip19', () => ({
+  nprofileEncode: jest.fn(({ pubkey }: { pubkey: string }) => `nprofile:${pubkey}`),
 }));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: jest.fn(() => ({ top: 0, right: 0, bottom: 0, left: 0 })),

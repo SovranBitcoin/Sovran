@@ -19,7 +19,7 @@
 // this value cosmetically — the melt flow does not depend on it.
 // ---------------------------------------------------------------------------
 
-import { nip19 } from 'nostr-tools';
+import * as nip19 from 'nostr-tools/nip19';
 import { parseLightningAddress } from './lnurl';
 import { logger } from './logger';
 import { fetchNip05Pubkey } from './nip05';

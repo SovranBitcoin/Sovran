@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
-import { finalizeEvent, type EventTemplate, type VerifiedEvent } from 'nostr-tools';
+import { finalizeEvent } from 'nostr-tools/pure';
+import type { EventTemplate, VerifiedEvent } from 'nostr-tools/core';
 import { z } from 'zod';
 import { redactError, storeLog } from '@/shared/lib/logger';
 

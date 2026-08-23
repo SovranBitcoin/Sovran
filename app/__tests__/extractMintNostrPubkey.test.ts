@@ -10,7 +10,7 @@
  * and rejects everything else.
  */
 
-import { nip19 } from 'nostr-tools';
+import * as nip19 from 'nostr-tools/nip19';
 
 import { extractMintNostrPubkey } from '@/shared/lib/nostr/extractMintNostrPubkey';
 

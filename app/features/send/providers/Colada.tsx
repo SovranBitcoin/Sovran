@@ -19,7 +19,7 @@ import { URDecoder } from '@gandlaf21/bc-ur';
 import { useManager } from '@cashu/coco-react';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
-import { getPublicKey } from 'nostr-tools';
+import { getPublicKey } from 'nostr-tools/pure';
 
 import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'wallet';
 import {

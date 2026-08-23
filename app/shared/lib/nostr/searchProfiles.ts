@@ -1,4 +1,4 @@
-import { nip19 } from 'nostr-tools';
+import * as nip19 from 'nostr-tools/nip19';
 import { ok, type Result } from 'neverthrow';
 import type { facade } from 'nostr';
 import { NostrSearchResult, type SearchUsersResponse } from '@sovranbitcoin/schemas';

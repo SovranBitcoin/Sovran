@@ -8,7 +8,7 @@ import {
   serializeMemoWithMentions,
   type MemoMentionToken,
 } from '@/shared/lib/popup/popups/sendMemoMention';
-import { nip19 } from 'nostr-tools';
+import * as nip19 from 'nostr-tools/nip19';
 
 const PUBKEY = '3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d';
 const RELAYS = ['wss://relay.damus.io', 'wss://nos.lol'];

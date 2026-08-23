@@ -38,7 +38,7 @@ import {
   Switch as HeroSwitch,
 } from 'heroui-native';
 import { Result } from 'neverthrow';
-import { nip19 } from 'nostr-tools';
+import * as nip19 from 'nostr-tools/nip19';
 
 import Icon from 'assets/icons';
 import { SegmentedText, shortPubkey } from '@/features/nostrSigner/components/display';

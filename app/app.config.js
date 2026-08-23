@@ -48,6 +48,10 @@ module.exports = ({ config }) => {
   return {
     ...config,
     icon: appIcon,
+    // The app ships no OTA channel — restated here (app.json says the same)
+    // because the dynamic config is the one EAS and tooling actually read,
+    // and an absent key would otherwise imply expo-updates is expected.
+    updates: { ...config.updates, enabled: false },
     extra: {
       ...config.extra,
       ...(debugMnemonic ? { debugMnemonic } : {}),

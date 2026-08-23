@@ -14,7 +14,7 @@
  */
 
 import NDK, { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
-import type { VerifiedEvent } from 'nostr-tools';
+import type { VerifiedEvent } from 'nostr-tools/core';
 
 import { buildGiftWrappedDMPair } from './nip17';
 import { nostrLog } from '@/shared/lib/logger';

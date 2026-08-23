@@ -9,7 +9,7 @@ import {
   type RequestControls,
 } from 'wallet';
 import { ok, err, Result, ResultAsync } from 'neverthrow';
-import { nip19 } from 'nostr-tools';
+import * as nip19 from 'nostr-tools/nip19';
 import { z } from 'zod';
 import { apiLog } from './logger';
 import {
