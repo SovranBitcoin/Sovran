@@ -670,3 +670,167 @@ The remaining work order is:
    random choice needs no cryptographic replacement.
 5. Evaluate `supercluster` v9 separately with map correctness, memory, and
    performance fixtures; do not couple it to this deletion pass.
+
+## Bundle-reachability pass — 2026-08-23
+
+The 2026-08-20 audit above scoped itself to "non-Cashu, non-Nostr, non-React,
+non-Expo" candidates. This pass covers the surface that scope excluded, and it
+measures a different axis: not how many artifacts the lockfile installs, but how
+much of them Metro actually reaches from `app/index.js`. `knip` reports no
+unused direct dependency in either state, so nothing here was findable as dead
+code.
+
+### NDK's Cashu wallet stack was in every shipped bundle
+
+`@nostr-dev-kit/ndk-mobile@0.2.2` declares `@nostr-dev-kit/ndk-wallet@0.3.16` as
+a runtime dependency, and its `dist/module/index.js` re-exports
+`./hooks/index.js`, which re-exports `./hooks/session.js`, whose line 6 is a
+static `import { walletFromLoadingString } from '@nostr-dev-kit/ndk-wallet'`.
+That is the only value import of `ndk-wallet` anywhere in the package —
+`providers/session/wallet.js` is commented out in full upstream — but a static
+import inside a barrel is unconditional, so all 32 Sovran files importing
+`@nostr-dev-kit/ndk-mobile` dragged it in.
+
+`ndk-wallet` is a complete second Cashu wallet: `NDKCashuWallet`, `NDKNWCWallet`,
+`NDKNutzapMonitor`, plus `light-bolt11-decoder`, `webln`, `tseep`, `debug`, and
+the `@cashu/crypto` peer — which is a *different* Cashu crypto implementation
+from `@cashu/cashu-ts`, carrying its own `@noble/hashes@1.8.0` and
+`@scure/bip39@1.6.0` beside the exactly-pinned `2.3.0` this app standardizes on.
+Sovran's wallet is coco + cashu-ts + colada. It uses none of it: every symbol the
+app imports from `ndk-mobile` is either core NDK (`NDKEvent`, `NDKUser`,
+`NDKRelay`, `NDKRelaySet`, `NDKPrivateKeySigner`, `NDKPool`, `NDKSubscription`,
+`NDKFilter`, `NDKKind`, `NDKAuthPolicy`, `NDKRelayStatus`, `NostrEvent`,
+`normalizeRelayUrl`, default `NDK`) or one of three mobile-only exports
+(`NDKCacheAdapterSqlite`, `useNDK`, `useSubscribe`). `useNDKSession`,
+`useNDKWallet`, `useFollows`, `useMuteList`, `useWOT`, `useSessionEvents`, and
+`useNDKSessionEvent(s|Kind)` have zero references in the repo.
+
+`metro.config.js` resolves `@nostr-dev-kit/ndk-wallet` to `{ type: 'empty' }`,
+in the same `resolveRequest` chain that already pins `@monicon/runtime` and
+`heroui-native`. Measured with `expo export --platform ios --no-minify`, same
+machine, back to back:
+
+| iOS Hermes bundle | Bytes        |
+| ----------------- | -----------: |
+| Before            | 20,318,664   |
+| After             | 20,177,167   |
+| **Removed**       | **141,497 (0.70%)** |
+
+`strings` over the two `.hbc` files confirms the mechanism rather than inferring
+it: `NDKCashuWallet`, `NDKNWCWallet`, and `nutzap-monitor` each appear once in
+the before bundle and zero times in the after bundle.
+
+#### Why a resolver stub and not a patch
+
+A `patch-package` patch on `ndk-mobile`'s hooks barrel — dropping the
+`./session.js` and `./wallet.js` re-exports outright — was built and measured
+first. It removes 148,697 bytes, 7,200 more than the stub, because the ~300
+lines of `hooks/session.js`, `hooks/wallet.js`, `stores/session/*` and
+`stores/wallet.js` stop being bundled too rather than being bundled around an
+empty import. It was rejected anyway: it requires pinning `^0.2.2` to `0.2.2`,
+regenerating the patch on every bump, and maintaining a sixth entry in
+`app/patches`. 7 KB is not worth standing maintenance on a third-party build
+artifact. The stub is four lines, survives `ndk-mobile` upgrades untouched, and
+needs no exact pin.
+
+#### Why not simply remove the package
+
+Two exits were checked and both are closed:
+
+- **Upgrade.** The app is on `ndk-mobile@0.2.2`; latest is `0.8.43`. That version
+  *still* depends on `@nostr-dev-kit/ndk-wallet` (`0.7.1`) and adds
+  `@nostr-dev-kit/ndk-hooks@1.3.4`, which depends on `ndk-wallet@0.7.0` — a
+  second copy. It also pins `expo-secure-store ~14.0.1` and `expo-image ~2.0.7`
+  and peer-depends `expo ^53`, against this app's SDK 56. Upgrading makes the
+  dependency surface strictly worse. `@nostr-dev-kit/ndk-cache-sqlite@3.0.0` is
+  not a substitute either — it is built on `better-sqlite3`, a Node binding.
+- **Drop `ndk-mobile`, depend on `@nostr-dev-kit/ndk` directly.** Viable in
+  principle: only three of the sixteen imported symbols are not core NDK. But
+  owning them means vendoring ~750 lines — `stores/ndk.js` (121),
+  `hooks/ndk.js` (18), `hooks/subscribe.js` (242), and
+  `cache-adapter/sqlite.js` (305) plus `migrations.js` (62). The cache adapter
+  owns a SQLite schema and migration path on live user devices, which makes this
+  a planned piece of work with `sovran-data` review, not the tail of a cleanup
+  pass. Adding 750 lines of vendored third-party code to delete one root also
+  has to clear the AHA gate on its own merits.
+
+So this is a bundle-reachability result, not a lockfile result. `ndk-wallet`,
+`@cashu/crypto@0.3.4`, `@noble/hashes@1.8.0`, and `@scure/bip39@1.6.0` are still
+installed; they are simply no longer reachable from the app entry.
+
+`__tests__/ndkMobileBundleSurface.test.ts` guards the stub from three
+directions: `metro.config.js` still carries the `{ type: 'empty' }` resolution;
+no app source references any hook that depends on it (the tripwire — a future
+caller of `useNDKSession` fails here with the reason instead of at runtime with
+"walletFromLoadingString is not a function"); and `ndk-mobile` is still supplying
+`useNDK` / `useSubscribe` / `NDKCacheAdapterSqlite`, so the stub cannot be
+"fixed" by quietly dropping the surface that justifies the package.
+
+### Duplicate resolutions collapsed
+
+Two direct declarations were each resolving to a version nothing else wanted,
+so the lockfile carried a second copy of the package:
+
+| Declaration                     | Was        | Now      | Duplicate removed          |
+| ------------------------------- | ---------- | -------- | -------------------------- |
+| `wallet` devDep `react`         | `19.2.0`   | `19.2.3` | `react@19.2.0`             |
+| `app` devDep `tailwindcss`      | `^4.1.17`  | `4.3.2`  | `tailwindcss@4.3.3`        |
+
+`uniwind@1.11.0` depends on `@tailwindcss/node@4.3.2`, which pins
+`tailwindcss@4.3.2` exactly; the app's `^4.1.17` floated to `4.3.3` and forked
+the graph. The peer ranges that also want `tailwindcss` (`uniwind` `>=4`,
+`tailwind-variants` `*`) are both satisfied by `4.3.2`. Net lockfile change:
+2,322 → 2,320 package entries — exactly those two — and names resolving to more
+than one version: 225 → 223.
+
+### Rejected this pass
+
+- **Dropping the direct `jsdom` devDep.** It looks redundant — `jsdom@20.0.3`
+  arrives anyway through `jest-expo` → `jest-environment-jsdom@29.7.0`, and
+  removing the declaration changed zero lockfile entries. But knip's Jest plugin
+  resolves a `@jest-environment jsdom` docblock to the `jsdom` package itself,
+  so removal turned three passing files into "unlisted dependency" errors. The
+  choice was a redundant-looking declaration or a new `ignoreDependencies` entry,
+  and per the previous pass's principle — keep the surface visible to the static
+  check rather than hidden by configuration — the declaration stays.
+- **Replacing `@gandlaf21/bolt11-decode` in `wallet/src/bolt11.ts`.** Its whole
+  dependency footprint is `bech32@1`, `bn.js@4`, and `buffer`, and `@scure/base`
+  (already in the graph, and already supplying `bech32` to
+  `shared/lib/nostr/zap/buildZapRequest.ts`) could back an owned decoder. It is
+  still an invoice parser on the payment path, where `amountMsat` gates what the
+  user is shown and approved for — see the BTC-10 note in that file. Hand-rolling
+  it fails the security gate for a sub-1 MB win. Worth revisiting only with
+  invoice-vector coverage in place first.
+- **`react-dom` / `react-native-web`.** Neither is imported by app source and
+  the `web` block in `app.json` ships nothing, which reads as removable. It is
+  not: `jest-expo/config/getPlatformPreset.js` maps `^react-native$` to
+  `react-native-web`, so the entire 304-suite Jest lane runs on it, and
+  `react-dom` is a peer of both it and `expo-router`'s Radix dependencies.
+- **`tailwind-merge`.** Three `cn()` call sites is thin, but `heroui-native@1.0.4`
+  and `tailwind-variants` both peer-depend on it, so it is present regardless —
+  as `shared/lib/classNames.ts` already documents.
+
+### Still open
+
+- **Vendor `ndk-mobile`'s three used pieces and drop the root.** This is the only
+  path that removes `ndk-wallet`, `@cashu/crypto@0.3.4`, `@noble/hashes@1.8.0`
+  and `@scure/bip39@1.6.0` from the *lockfile* rather than the bundle. Sized
+  above (~750 lines); the SQLite cache adapter's on-device migration is the risk
+  that makes it a planned change. The repo already has a vendoring precedent in
+  `@internet-privacy/marmot-ts` (`file:./vendor/marmot-ts` plus a
+  `vendor:marmot-ts` script).
+- **Re-run barrel reachability on the other heavy roots.** This pass walked the
+  one that looked most suspicious. `heroui-native` (74 files), `@expo/ui`, and
+  `@gorhom/bottom-sheet` have not been checked with this lens.
+- Two Nostr client libraries coexist: `nostr-tools` (41 files) and
+  `@nostr-dev-kit/ndk-mobile` (32 files). Consolidating is a real architectural
+  decision, not a cleanup, and is out of scope for a dependency pass.
+- The remaining old crypto copies come from the vendored `marmot-ts` →
+  `applesauce-*` chain (`@noble/secp256k1@1.7.2`, the `@noble/ciphers` 2.1.1/2.3.0
+  split) and from `@cashu/crypto@0.3.4` as described above. Both are upstream
+  problems; a root `overrides` entry forcing Noble v2 onto a `^1.x` consumer
+  would be a silent API break on a crypto path and must not be used as a
+  deduplication shortcut.
+- `react-native-image-colors` still reaches `node-vibrant` → `jimp`
+  (`pixelmatch@4.0.2`, `file-type`, `buffer`). The 2026-08-20 assessment stands:
+  packaging split upstream, do not hand-roll.

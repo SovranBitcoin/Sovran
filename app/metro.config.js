@@ -185,6 +185,21 @@ const appResolveRequest = (context, moduleName, platform) => {
   if (moduleName === '@monicon/runtime') {
     return { type: 'sourceFile', filePath: moniconIconsPath };
   }
+  // `@nostr-dev-kit/ndk-mobile`'s entry re-exports its hooks barrel, whose
+  // `hooks/session.js` statically imports `walletFromLoadingString` from
+  // `@nostr-dev-kit/ndk-wallet`. That single unconditional import dragged NDK's
+  // whole Cashu/NWC wallet — plus its `@cashu/crypto` peer, and that package's
+  // `@noble/hashes@1` / `@scure/bip39@1` beside our pinned `2.3.0` — into every
+  // bundle. Sovran's wallet is coco + cashu-ts + colada and references none of
+  // it (`useNDKSession`, `useNDKWallet`, `useFollows`, `useMuteList`, `useWOT`,
+  // `useSessionEvents`, `useNDKSessionEvent(s|Kind)` have zero call sites), so
+  // resolve the package to nothing. Upgrading is not an escape: `ndk-mobile`
+  // through at least `0.8.43` still depends on `ndk-wallet` and pulls a second
+  // copy via `ndk-hooks`, on top of pinning SDK-53-era Expo packages.
+  // Guarded by `__tests__/ndkMobileBundleSurface.test.ts`.
+  if (moduleName === '@nostr-dev-kit/ndk-wallet') {
+    return { type: 'empty' };
+  }
   if (moduleName === 'expo-liquid-glass-native') {
     return { type: 'sourceFile', filePath: liquidGlassEntryPath };
   }
