@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import ViewShot from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
 import {
   AnimatedQRCode,
@@ -153,17 +152,15 @@ export function PaymentInfo({
               importantForAccessibility="yes"
               collapsable={false}>
               <Pressable onPress={handleCopyPress}>
-                <ViewShot captureMode="mount">
-                  <AnimatedQRCode
-                    padding={32}
-                    unit={unit}
-                    address={selectedValue}
-                    animate={animated}
-                    variant={variant}
-                    intervalMs={SPEED_PRESETS[speedIndex].intervalMs}
-                    fragmentSize={DENSITY_PRESETS[densityIndex].fragmentSize}
-                  />
-                </ViewShot>
+                <AnimatedQRCode
+                  padding={32}
+                  unit={unit}
+                  address={selectedValue}
+                  animate={animated}
+                  variant={variant}
+                  intervalMs={SPEED_PRESETS[speedIndex].intervalMs}
+                  fragmentSize={DENSITY_PRESETS[densityIndex].fragmentSize}
+                />
               </Pressable>
             </View>
 

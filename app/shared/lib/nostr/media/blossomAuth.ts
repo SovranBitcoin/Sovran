@@ -9,6 +9,7 @@
  */
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
+import { base64 } from '@scure/base';
 
 /** Blossom authorization event kind (BUD-01). */
 export const BLOSSOM_AUTH_KIND = 24242;
@@ -56,12 +57,7 @@ export function buildBlossomAuthEvent(opts: {
  * Accepts the serialized JSON of a signed event.
  */
 export function encodeAuthHeader(signedEventJson: string): string {
-  // base64 of the UTF-8 JSON. Uses the same byte helpers as the rest of the
-  // crypto layer rather than relying on a global btoa.
-  const bytes = utf8ToBytes(signedEventJson);
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-
-  const base64 = typeof btoa === 'function' ? btoa(binary) : Buffer.from(bytes).toString('base64');
-  return `Nostr ${base64}`;
+  // base64 of the UTF-8 JSON, through the same byte helpers as the rest of the
+  // crypto layer — no global `btoa`/`Buffer` in the path.
+  return `Nostr ${base64.encode(utf8ToBytes(signedEventJson))}`;
 }

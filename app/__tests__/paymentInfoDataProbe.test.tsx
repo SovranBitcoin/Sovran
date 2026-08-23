@@ -9,10 +9,6 @@ import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-jest.mock('react-native-view-shot', () => ({
-  __esModule: true,
-  default: ({ children }: React.PropsWithChildren) => <>{children}</>,
-}));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('@/shared/ui/composed/QRCode', () => ({
   AnimatedQRCode: () => null,

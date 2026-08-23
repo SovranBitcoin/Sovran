@@ -7,6 +7,7 @@
  * header. Returns the blob descriptor used to build the post's `imeta` tag.
  */
 import * as FileSystem from 'expo-file-system/legacy';
+import { base64 } from '@scure/base';
 import { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
 import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { ResultAsync, err, ok, type Result } from 'neverthrow';
@@ -69,14 +70,6 @@ const UPLOAD_TIMEOUT_MS = 60_000;
 /** Total attempts (1 initial + retries) for transient network failures. */
 const MAX_ATTEMPTS = 3;
 
-function base64ToBytes(base64: string): Uint8Array {
-  const binary =
-    typeof atob === 'function' ? atob(base64) : Buffer.from(base64, 'base64').toString('binary');
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
 function parseDescriptor(body: string): BlobDescriptor | null {
   try {
     const raw = JSON.parse(body) as Record<string, unknown>;
@@ -134,10 +127,10 @@ async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomE
   // 2. Hash the bytes (Blossom content address + imeta `x`).
   let sha256: string;
   try {
-    const base64 = await FileSystem.readAsStringAsync(opts.fileUri, {
+    const encoded = await FileSystem.readAsStringAsync(opts.fileUri, {
       encoding: FileSystem.EncodingType.Base64,
     });
-    sha256 = sha256Hex(base64ToBytes(base64));
+    sha256 = sha256Hex(base64.decode(encoded));
   } catch {
     nostrLog.warn('nostr.media.read_failed');
     return err({ type: 'read-failed' });
