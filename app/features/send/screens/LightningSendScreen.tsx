@@ -26,7 +26,7 @@ import {
   TransactionDetailShell,
   TransactionLocationSection,
   useBip321Info,
-  Bip321MethodIcons,
+  transactionLeadDetailItems,
   useIsTransactionHistoryView,
 } from '@/features/transactions';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -310,13 +310,12 @@ export function LightningSendScreen({
       }>
       <DetailsSection
         items={[
-          source && { title: 'Source', value: source },
-          bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-          bip321.optionKinds && {
-            title: 'Payment Methods',
-            value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />,
-          },
-          { title: 'Date', value: entry.createdAt.datetime },
+          ...transactionLeadDetailItems({
+            source,
+            bip321,
+            usedKind: 'lightning',
+            createdAt: entry.createdAt.datetime,
+          }),
           quoteDiverges && {
             title: 'Requested',
             value: formatAmount({ amount: entry.amount, unit: entry.unit }),
@@ -352,7 +351,7 @@ export function LightningSendScreen({
             value: truncateMiddle(entry.metadata.meltTarget, 12),
           },
           mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
-        ].flatMap((item) => (item ? [item] : []))}
+        ]}
       />
     </TransactionDetailShell>
   );

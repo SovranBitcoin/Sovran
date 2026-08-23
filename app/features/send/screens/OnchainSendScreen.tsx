@@ -31,7 +31,7 @@ import {
 
 import {
   AccelerateSection,
-  Bip321MethodIcons,
+  transactionLeadDetailItems,
   HistoryEntryTimeline,
   TransactionDetailShell,
   useBip321Info,
@@ -293,13 +293,12 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
       }>
       <DetailsSection
         items={[
-          source && { title: 'Source', value: source },
-          bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-          bip321.optionKinds && {
-            title: 'Payment Methods',
-            value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="onchain" />,
-          },
-          { title: 'Date', value: entry.createdAt.datetime },
+          ...transactionLeadDetailItems({
+            source,
+            bip321,
+            usedKind: 'onchain',
+            createdAt: entry.createdAt.datetime,
+          }),
           { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
           feeDisplay && {
             title: feeDisplay.title,
@@ -317,7 +316,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
           },
           outpoint && { title: 'Transaction', value: truncateMiddle(outpoint.txid, 10) },
           mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
-        ].flatMap((item) => (item ? [item] : []))}
+        ]}
       />
     </TransactionDetailShell>
   );

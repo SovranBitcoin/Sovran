@@ -26,7 +26,7 @@ export const DEFAULT_ENGAGEMENT_STATE: EngagementViewState = Object.freeze({
   repostPending: false,
 });
 
-type BuildFeedRowsOptions = {
+export type BuildFeedRowsOptions = {
   items: FeedItem[];
   previousRows: FeedRow[];
   profilesMap: Map<string, ProfileInfo>;

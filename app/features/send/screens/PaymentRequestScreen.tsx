@@ -23,7 +23,7 @@ import {
   HistoryEntryRefresh,
   HistoryEntryTimeline,
   useBip321Info,
-  Bip321MethodIcons,
+  transactionLeadDetailItems,
 } from '@/features/transactions';
 import { TransactionProbe } from '@/features/transactions/components/detail/TransactionProbe';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -153,15 +153,12 @@ export function PaymentRequestScreen({
 
         <DetailsSection
           items={[
-            source ? { title: 'Source', value: source } : null,
-            bip321.isBip321 ? { title: 'Format', value: 'BIP 321' } : null,
-            bip321.optionKinds
-              ? {
-                  title: 'Payment Methods',
-                  value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" />,
-                }
-              : null,
-            { title: 'Date', value: entry.createdAt.datetime },
+            ...transactionLeadDetailItems({
+              source,
+              bip321,
+              usedKind: 'ecash',
+              createdAt: entry.createdAt.datetime,
+            }),
             { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
             entry.transportLabel ? { title: 'Transport', value: entry.transportLabel } : null,
             entry.paymentRequestInfo?.mints?.length
@@ -174,7 +171,7 @@ export function PaymentRequestScreen({
               ? { title: 'Operation ID', value: truncateMiddle(entry.operationId, 7) }
               : null,
             mintUrl ? { title: 'Mint', value: truncateMiddle(mintUrl, 12) } : null,
-          ].flatMap((item) => (item ? [item] : []))}
+          ]}
         />
       </VStack>
     </Screen>

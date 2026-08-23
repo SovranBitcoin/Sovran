@@ -15,7 +15,7 @@ import type { DmEnvelope } from './dmEnvelopeClient';
 
 export type DmProtocol = 'nip04' | 'nip17';
 
-export interface DecryptedDm {
+interface DecryptedDm {
   /** Source event id (gift-wrap id for NIP-17, kind-4 event id for NIP-04). */
   id: string;
   /** The other party's pubkey (the conversation key). */

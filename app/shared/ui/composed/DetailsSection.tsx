@@ -18,7 +18,11 @@ interface SectionItem {
 }
 
 interface DetailsSectionProps {
-  items: SectionItem[];
+  /**
+   * Rows to show. Falsy entries are dropped, so callers can inline
+   * `condition && { title, value }` without compacting the array themselves.
+   */
+  items: (SectionItem | false | 0 | '' | null | undefined)[];
   /** Label for the toggle button (default: "Details") */
   label?: string;
   /** Whether to start expanded (default: false) */
@@ -39,9 +43,10 @@ export function DetailsSection({
 }: DetailsSectionProps) {
   const [expanded, setExpanded] = useState(initialExpanded);
   const foreground = useThemeColor('foreground');
+  const rows = items.filter((item): item is SectionItem => Boolean(item));
 
   // Don't render if there are no items
-  if (items.length === 0) return null;
+  if (rows.length === 0) return null;
 
   return (
     <Log name="DetailsSection">
@@ -65,7 +70,7 @@ export function DetailsSection({
           </HStack>
         </Pressable>
         {expanded ? (
-          <DetailsList items={items} camera={camera} gradient style={{ marginHorizontal: 0 }} />
+          <DetailsList items={rows} camera={camera} gradient style={{ marginHorizontal: 0 }} />
         ) : null}
       </View>
     </Log>

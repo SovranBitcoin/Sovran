@@ -8,7 +8,7 @@ import type { BoundAction } from 'wallet/react';
 
 import { MintSelector } from '@/features/wallet';
 import {
-  Bip321MethodIcons,
+  transactionLeadDetailItems,
   HistoryEntryRefresh,
   HistoryEntryTimeline,
   TransactionDetailShell,
@@ -246,13 +246,12 @@ export function OnchainReceiveScreen({
       <DetailsSection
         items={[
           entry.id && { title: 'ID', value: entry.id },
-          source && { title: 'Source', value: source },
-          bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-          bip321.optionKinds && {
-            title: 'Payment Methods',
-            value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="onchain" />,
-          },
-          { title: 'Date', value: entry.createdAt.datetime },
+          ...transactionLeadDetailItems({
+            source,
+            bip321,
+            usedKind: 'onchain',
+            createdAt: entry.createdAt.datetime,
+          }),
           {
             title: 'Amount',
             value: formatAmount({ amount: entry.amount, unit: entry.unit }),
@@ -268,7 +267,7 @@ export function OnchainReceiveScreen({
             title: 'Address',
             value: truncateMiddle(onchainAddress, 10),
           },
-        ].flatMap((item) => (item ? [item] : []))}
+        ]}
       />
     </TransactionDetailShell>
   );

@@ -23,7 +23,7 @@ import {
   TransactionDetailShell,
   TransactionLocationSection,
   useBip321Info,
-  Bip321MethodIcons,
+  transactionLeadDetailItems,
 } from '@/features/transactions';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
@@ -317,13 +317,12 @@ export function SendTokenScreen({
             title: 'Request ID',
             value: truncateMiddle(paymentRequest.requestId, 8),
           },
-          source && { title: 'Source', value: source },
-          bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-          bip321.optionKinds && {
-            title: 'Payment Methods',
-            value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" />,
-          },
-          { title: 'Date', value: entry.createdAt.datetime },
+          ...transactionLeadDetailItems({
+            source,
+            bip321,
+            usedKind: 'ecash',
+            createdAt: entry.createdAt.datetime,
+          }),
           {
             title: 'Amount',
             value: formatAmount({ amount: entry.amount, unit: entry.unit }),
@@ -338,7 +337,7 @@ export function SendTokenScreen({
             title: 'Token',
             value: entry.tokenString.truncate(6),
           },
-        ].flatMap((item) => (item ? [item] : []))}
+        ]}
       />
     </TransactionDetailShell>
   );

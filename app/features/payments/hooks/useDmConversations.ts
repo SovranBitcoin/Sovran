@@ -1,16 +1,15 @@
 /**
  * Server-backed Nostr DM conversation list. Fetches gift-wrap envelopes from nagg
- * (paginated), decrypts them client-side (reusing the proven `giftWrapCache`
- * path), and buckets them per counterparty (latest message wins). Scroll →
- * `loadMore()` fetches older envelopes via an envelope-wrap-time `until` cursor.
+ * (paginated by `useDmEnvelopePages`), decrypts them client-side (reusing the
+ * proven `giftWrapCache` path), and buckets them per counterparty (latest
+ * message wins).
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
-import { paymentLog } from '@/shared/lib/logger';
 import { fetchDmEnvelopes, type DmEnvelopePage } from '../data/dmEnvelopeClient';
 import { decryptDmEnvelopes, type DmProtocol } from '../data/dmDecryptPipeline';
-import { createDmEnvelopeCursor } from '../data/dmPagination';
+import { useDmEnvelopePages } from './useDmEnvelopePages';
 
 /** Fetched DM kinds: NIP-04 (kind 4) + NIP-17 gift wraps (kind 1059). */
 const DM_KINDS = [4, 1059];
@@ -31,27 +30,19 @@ const PAGE_LIMIT = 100;
 
 export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uint8Array) {
   const [conversations, setConversations] = useState<DmConversation[]>([]);
-  const [loading, setLoading] = useState(false);
-  // `loading` starts false and only flips true once the fetch effect runs, so a
-  // consumer that gates a first-load spinner on `!loading` would hide it on the
-  // very first render (before the fetch starts) and flash partial data. This
-  // latches true only after the first real fetch settles, so the contacts list
-  // can wait for genuine results instead of rendering early.
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
 
-  // Accumulators persist across pages so cross-page bucketing keeps "latest wins".
+  // Accumulator persists across pages so cross-page bucketing keeps "latest wins".
   const bucketRef = useRef(new Map<string, DmConversation>());
-  const cursorRef = useRef(createDmEnvelopeCursor());
-  const loadingMoreRef = useRef(false);
 
-  // Bucket a page; returns the number of fresh (unseen) envelopes ingested.
-  const ingest = useCallback(
-    (page: DmEnvelopePage, viewer: string, privateKey: Uint8Array): number => {
-      const fresh = cursorRef.current.track(page);
-      const decrypted = decryptDmEnvelopes(page.envelopes, viewer, privateKey);
+  const onReset = useCallback(() => {
+    bucketRef.current = new Map();
+    setConversations([]);
+  }, []);
+
+  const onPage = useCallback(
+    (page: DmEnvelopePage) => {
+      if (!viewerPubkey || !viewerPrivateKey) return;
+      const decrypted = decryptDmEnvelopes(page.envelopes, viewerPubkey, viewerPrivateKey);
       for (const dm of decrypted) {
         // One conversation per counterparty across protocols; the most recent
         // message wins (and sets the displayed protocol). Per-protocol threads
@@ -67,89 +58,41 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
           });
         }
       }
-      const list = [...bucketRef.current.values()].sort(
-        (a, b) => b.lastMessageAt - a.lastMessageAt
+      setConversations(
+        [...bucketRef.current.values()].sort((a, b) => b.lastMessageAt - a.lastMessageAt)
       );
-      setConversations(list);
-      return fresh;
     },
-    []
+    [viewerPubkey, viewerPrivateKey]
   );
 
-  useEffect(() => {
-    if (!viewerPubkey || !viewerPrivateKey) {
-      setConversations([]);
-      setHasMore(false);
-      return;
-    }
-    const controller = new AbortController();
-    bucketRef.current = new Map();
-    cursorRef.current.reset();
-    setConversations([]);
-    setError(null);
-    setLoading(true);
-    void (async () => {
-      await Promise.all([
-        giftWrapCache.cache.hydrate(viewerPubkey),
-        nip04Cache.hydrate(viewerPubkey),
-      ]);
-      const page = await fetchDmEnvelopes({
-        viewer: viewerPubkey,
+  const hydrate = useCallback(async () => {
+    if (!viewerPubkey) return;
+    await Promise.all([
+      giftWrapCache.cache.hydrate(viewerPubkey),
+      nip04Cache.hydrate(viewerPubkey),
+    ]);
+  }, [viewerPubkey]);
+
+  const fetchPage = useCallback(
+    (args: { until?: number; refresh: boolean; signal?: AbortSignal }) =>
+      fetchDmEnvelopes({
+        viewer: viewerPubkey ?? '',
         kinds: DM_KINDS,
         limit: PAGE_LIMIT,
-        refresh: refreshKey > 0,
-        signal: controller.signal,
-      });
-      if (controller.signal.aborted) return;
-      ingest(page, viewerPubkey, viewerPrivateKey);
-      if (!controller.signal.aborted) setHasMore(page.envelopes.length >= PAGE_LIMIT);
-    })()
-      .catch((e) => {
-        if (controller.signal.aborted) return;
-        const err = e instanceof Error ? e : new Error(String(e));
-        paymentLog.warn('payment.dm.conversations.failed', { error: err.message });
-        setError(err);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-          setHasLoadedOnce(true);
-        }
-      });
-    return () => controller.abort();
-  }, [viewerPubkey, viewerPrivateKey, refreshKey, ingest]);
+        ...args,
+      }),
+    [viewerPubkey]
+  );
 
-  const loadMore = useCallback(async () => {
-    const until = cursorRef.current.nextUntil();
-    if (
-      loadingMoreRef.current ||
-      !hasMore ||
-      !viewerPubkey ||
-      !viewerPrivateKey ||
-      until === undefined
-    ) {
-      return;
-    }
-    loadingMoreRef.current = true;
-    try {
-      const page = await fetchDmEnvelopes({
-        viewer: viewerPubkey,
-        kinds: DM_KINDS,
-        until,
-        limit: PAGE_LIMIT,
-      });
-      const fresh = ingest(page, viewerPubkey, viewerPrivateKey);
-      // Stop on a short page (end) OR a full page with nothing new (server ignored
-      // `until` / we've drained this window) so the spinner never loops forever.
-      setHasMore(page.envelopes.length >= PAGE_LIMIT && fresh > 0);
-    } catch (e) {
-      setError(e instanceof Error ? e : new Error(String(e)));
-    } finally {
-      loadingMoreRef.current = false;
-    }
-  }, [hasMore, viewerPubkey, viewerPrivateKey, ingest]);
-
-  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const { loading, hasLoadedOnce, hasMore, loadMore, refresh, error } = useDmEnvelopePages({
+    feedKey: viewerPubkey && viewerPrivateKey ? viewerPubkey : null,
+    pageLimit: PAGE_LIMIT,
+    hydrate,
+    fetchPage,
+    onPage,
+    onReset,
+    failureEvent: 'payment.dm.conversations.failed',
+  });
 
   return { conversations, loading, hasLoadedOnce, hasMore, loadMore, refresh, error };
 }

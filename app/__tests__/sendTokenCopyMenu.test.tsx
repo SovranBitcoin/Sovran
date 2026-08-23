@@ -69,7 +69,22 @@ jest.mock('@/features/transactions', () => ({
   ),
   TransactionLocationSection: () => null,
   useBip321Info: jest.fn(() => ({ isBip321: false, optionKinds: null })),
-  Bip321MethodIcons: () => null,
+  transactionLeadDetailItems: ({
+    source,
+    bip321,
+    usedKind,
+    createdAt,
+  }: {
+    source?: string | null;
+    bip321: { isBip321: boolean; optionKinds: string[] | null };
+    usedKind: string;
+    createdAt: string;
+  }) => [
+    source ? { title: 'Source', value: source } : null,
+    bip321.isBip321 ? { title: 'Format', value: 'BIP 321' } : null,
+    bip321.optionKinds ? { title: 'Payment Methods', value: usedKind } : null,
+    { title: 'Date', value: createdAt },
+  ],
 }));
 
 jest.mock('@/shared/lib/popup/popups/actionMenu', () => ({

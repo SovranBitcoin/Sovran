@@ -35,7 +35,7 @@ export function useBip321Info(transactionId: string | undefined): {
  * Renders BIP321 payment method icons with labels for use in DetailsSection.
  * The method matching `usedKind` renders at full opacity; others at 0.5.
  */
-export function Bip321MethodIcons({
+function Bip321MethodIcons({
   optionKinds,
   usedKind,
 }: {
@@ -70,4 +70,40 @@ export function Bip321MethodIcons({
       </HStack>
     </Log>
   );
+}
+
+/**
+ * The leading rows every transaction-detail screen opens its `DetailsSection`
+ * with, in the one order they all use: Source → Format → Payment Methods →
+ * Date. Each screen was rebuilding this block by hand, so a new row (or a
+ * reorder) had to be applied in seven places to stay consistent.
+ *
+ * Rows are returned including their falsy gaps — `DetailsSection` drops those —
+ * so the block spreads straight into a screen's item list:
+ * `...transactionLeadDetailItems({ source, bip321, usedKind: 'lightning', createdAt })`.
+ */
+export function transactionLeadDetailItems({
+  source,
+  bip321,
+  usedKind,
+  createdAt,
+}: {
+  source: string | null | undefined;
+  bip321: { isBip321: boolean; optionKinds: string[] | null };
+  /** Which payment category this screen actually used. */
+  usedKind: 'lightning' | 'ecash' | 'onchain';
+  /** Already-formatted datetime (`entry.createdAt.datetime`). */
+  createdAt: string;
+}) {
+  return [
+    source ? { title: 'Source', value: source } : null,
+    bip321.isBip321 ? { title: 'Format', value: 'BIP 321' } : null,
+    bip321.optionKinds
+      ? {
+          title: 'Payment Methods',
+          value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind={usedKind} />,
+        }
+      : null,
+    { title: 'Date', value: createdAt },
+  ];
 }

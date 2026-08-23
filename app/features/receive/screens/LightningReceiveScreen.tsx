@@ -21,7 +21,7 @@ import {
   TransactionDetailShell,
   TransactionLocationSection,
   useBip321Info,
-  Bip321MethodIcons,
+  transactionLeadDetailItems,
   useIsTransactionHistoryView,
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
@@ -162,13 +162,12 @@ export function LightningReceiveScreen({
       <DetailsSection
         items={[
           entry.id && { title: 'ID', value: entry.id },
-          source && { title: 'Source', value: source },
-          bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-          bip321.optionKinds && {
-            title: 'Payment Methods',
-            value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />,
-          },
-          { title: 'Date', value: entry.createdAt.datetime },
+          ...transactionLeadDetailItems({
+            source,
+            bip321,
+            usedKind: 'lightning',
+            createdAt: entry.createdAt.datetime,
+          }),
           {
             title: 'Amount',
             value: formatAmount({ amount: entry.amount, unit: entry.unit }),
@@ -189,7 +188,7 @@ export function LightningReceiveScreen({
             title: 'Invoice',
             value: truncateMiddle(entry.paymentRequest, 10),
           },
-        ].flatMap((item) => (item ? [item] : []))}
+        ]}
       />
     </TransactionDetailShell>
   );

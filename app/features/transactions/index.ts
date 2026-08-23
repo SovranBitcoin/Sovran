@@ -11,7 +11,10 @@ export { HistoryEntryRefresh } from './components/detail/HistoryEntryRefresh';
 export { HistoryEntryTimeline } from './components/detail/timeline';
 export { TransactionDetailShell } from './components/detail/TransactionDetailShell';
 export { AccelerateSection } from './components/detail/AccelerateSection';
-export { useBip321Info, Bip321MethodIcons } from './components/detail/TransactionSourceSection';
+export {
+  useBip321Info,
+  transactionLeadDetailItems,
+} from './components/detail/TransactionSourceSection';
 export {
   TransactionsFilterProvider,
   useTransactionsFilter,

@@ -65,6 +65,34 @@ interface SwapTransactionsState {
   quoteIdToGroup: QuoteIdToGroupIndex;
 }
 
+/**
+ * Replace one leg inside one group. Every leg-level action needs the same
+ * three-level immutable rewrite (state → groups → legs) and the same
+ * "silently do nothing if the group is gone" guard; each was carrying its own
+ * copy, so a fix to the guard only ever reached one of them. Returns the
+ * ORIGINAL state object when there is nothing to patch, so callers can detect
+ * a no-op by identity.
+ */
+function patchLeg(
+  state: SwapTransactionsState,
+  groupId: string,
+  legId: string,
+  patch: (leg: SwapLeg) => SwapLeg
+): SwapTransactionsState {
+  const group = state.groups[groupId];
+  if (!group) return state;
+  return {
+    ...state,
+    groups: {
+      ...state.groups,
+      [groupId]: {
+        ...group,
+        legs: group.legs.map((leg) => (leg.id === legId ? patch(leg) : leg)),
+      },
+    },
+  };
+}
+
 interface SwapTransactionsActions {
   startGroup: (params: { unit: string; title?: string }) => string;
   finalizeGroup: (groupId: string, state: Exclude<SwapGroupState, 'running'>) => void;
@@ -220,21 +248,12 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
         storeLog.debug('store.swap_tx.tag_mint_quote', { groupId, legId, quoteId });
 
         set((state) => {
-          const group = state.groups[groupId];
-          if (!group) return state;
-
-          const legs = group.legs.map((leg) =>
-            leg.id === legId ? { ...leg, mintQuoteId: quoteId } : leg
-          );
-
+          const next = patchLeg(state, groupId, legId, (leg) => ({ ...leg, mintQuoteId: quoteId }));
+          if (next === state) return state;
           return {
-            ...state,
-            groups: {
-              ...state.groups,
-              [groupId]: { ...group, legs },
-            },
+            ...next,
             quoteIdToGroup: {
-              ...state.quoteIdToGroup,
+              ...next.quoteIdToGroup,
               [quoteId]: { groupId, legId, kind: 'mint' },
             },
           };
@@ -246,21 +265,16 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
         storeLog.debug('store.swap_tx.tag_melt', { groupId, legId, quoteId, operationId });
 
         set((state) => {
-          const group = state.groups[groupId];
-          if (!group) return state;
-
-          const legs = group.legs.map((leg) =>
-            leg.id === legId ? { ...leg, meltQuoteId: quoteId, meltOperationId: operationId } : leg
-          );
-
+          const next = patchLeg(state, groupId, legId, (leg) => ({
+            ...leg,
+            meltQuoteId: quoteId,
+            meltOperationId: operationId,
+          }));
+          if (next === state) return state;
           return {
-            ...state,
-            groups: {
-              ...state.groups,
-              [groupId]: { ...group, legs },
-            },
+            ...next,
             quoteIdToGroup: {
-              ...state.quoteIdToGroup,
+              ...next.quoteIdToGroup,
               [quoteId]: { groupId, legId, kind: 'melt' },
             },
           };
@@ -274,28 +288,13 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
           localStatus,
           errorMessage,
         });
-        set((state) => {
-          const group = state.groups[groupId];
-          if (!group) return state;
-
-          const legs = group.legs.map((leg) => {
-            if (leg.id !== legId) return leg;
-            return {
-              ...leg,
-              localStatus,
-              errorMessage:
-                errorMessage ?? (localStatus === 'failed' ? leg.errorMessage : undefined),
-            };
-          });
-
-          return {
-            ...state,
-            groups: {
-              ...state.groups,
-              [groupId]: { ...group, legs },
-            },
-          };
-        });
+        set((state) =>
+          patchLeg(state, groupId, legId, (leg) => ({
+            ...leg,
+            localStatus,
+            errorMessage: errorMessage ?? (localStatus === 'failed' ? leg.errorMessage : undefined),
+          }))
+        );
       },
 
       getGroup: (groupId) => {

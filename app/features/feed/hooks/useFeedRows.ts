@@ -10,25 +10,19 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 
-import type { EngagementViewState } from './useNostrEngagement';
-import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
-import { buildFeedRows, type FeedRow } from '../lib/feedRows';
+import type { NoteMetrics } from '../components/nostr/feedTypes';
+import { buildFeedRows, type BuildFeedRowsOptions, type FeedRow } from '../lib/feedRows';
 
-type FeedRowsOptions = {
-  items: FeedItem[];
-  profilesMap: Map<string, ProfileInfo>;
-  quotedEventsMap: Map<string, FeedEvent>;
+/**
+ * Everything `buildFeedRows` takes except the previous rows — the hook owns
+ * those, since row-identity reuse is the protocol callers kept getting wrong.
+ */
+type FeedRowsOptions = Omit<BuildFeedRowsOptions, 'previousRows'> & {
   /**
    * Not read directly — rows come from `getDisplayMetrics`. Listed so late
    * aggregate counts rebuild the rows in the same commit they land in.
    */
   metricsMap: Map<string, NoteMetrics>;
-  getDisplayMetrics: (eventId: string) => NoteMetrics;
-  getEngagementState: (eventId: string) => EngagementViewState;
-  resolveReposter?: (item: Extract<FeedItem, { type: 'repost' }>) => {
-    name: string;
-    pubkey: string;
-  };
 };
 
 export function useFeedRows({
