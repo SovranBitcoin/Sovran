@@ -24,8 +24,6 @@
  * See `skills/sovran-data/references/dates.md` for guidance on which style to pick.
  */
 
-import * as Localization from 'expo-localization';
-
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 type DateInput = Date | number | string;
@@ -77,11 +75,17 @@ function toDate(input: DateInput): Date {
  * If the user has explicitly set a non-default app language (e.g. `'de'`,
  * `'ja'`), honor it — that's an intentional override. Empty string
  * collapses to device locale too.
+ *
+ * The device tag comes from `Intl` rather than a native locale module:
+ * every formatter below is an `Intl` formatter, so the locale `Intl`
+ * itself resolves to is the one that actually governs output. Reading it
+ * from a separate source could hand us a tag `Intl` then silently falls
+ * back from.
  */
 function resolveLocale(): string {
   const userPref = useSettingsStore.getState().language;
   if (userPref && userPref !== 'en') return userPref;
-  const deviceTag = Localization.getLocales()[0]?.languageTag;
+  const deviceTag = Intl.DateTimeFormat().resolvedOptions().locale;
   return deviceTag || userPref || 'en';
 }
 
@@ -138,8 +142,8 @@ const ISO_OPTIONS: Intl.DateTimeFormatOptions = {
 
 /**
  * Format an absolute timestamp. The output respects the user's iOS/Android
- * regional preferences via `expo-localization` (or the in-app language
- * override when set).
+ * regional preferences (or the in-app language override when set) — see
+ * `resolveLocale`.
  */
 export function formatDate(input: DateInput, style: AbsoluteDateStyle): string {
   const date = toDate(input);

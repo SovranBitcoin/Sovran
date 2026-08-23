@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import pixelmatch from 'pixelmatch';
-import { PNG } from 'pngjs';
+import sharp from 'sharp';
 
 import { ARTIFACTS, DIFF_CACHE } from './paths';
 import { getRunDetail } from './scan';
@@ -99,10 +99,23 @@ export function collectSources(a: RunDetail, b: RunDetail): PairSource[] {
   return [...sources.values()].sort((x, y) => x.key.localeCompare(y.key));
 }
 
-async function readPng(runDirName: string, relPath: string): Promise<PNG | undefined> {
+interface RawImage {
+  width: number;
+  height: number;
+  data: Buffer;
+}
+
+/** Decode a capture to raw RGBA. `sharp` is already the e2e lane's image
+ * codec (`drivers/simulator.ts`), so the viewer decodes through it too rather
+ * than carrying a second PNG implementation. */
+async function readPng(runDirName: string, relPath: string): Promise<RawImage | undefined> {
   try {
     const bytes = await Bun.file(join(ARTIFACTS, runDirName, relPath)).bytes();
-    return PNG.sync.read(Buffer.from(bytes));
+    const { data, info } = await sharp(Buffer.from(bytes))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return { width: info.width, height: info.height, data };
   } catch {
     return undefined;
   }
@@ -163,11 +176,11 @@ export async function computeDiff(
       } else if (pngA.width !== pngB.width || pngA.height !== pngB.height) {
         pairs.push({ ...base, status: 'dimension-mismatch', diffPct: 1 });
       } else {
-        const out = new PNG({ width: pngA.width, height: pngA.height });
+        const heatmap = Buffer.alloc(pngA.width * pngA.height * 4);
         const changed = pixelmatch(
           pngA.data,
           pngB.data,
-          out.data,
+          heatmap,
           pngA.width,
           pngA.height,
           PIXELMATCH_OPTIONS
@@ -177,7 +190,12 @@ export async function computeDiff(
           pairs.push({ ...base, status: 'identical', diffPct: 0 });
         } else {
           const diffFile = `pairs/${createHash('sha1').update(source.key).digest('hex')}.png`;
-          await Bun.write(join(cacheDir, diffFile), PNG.sync.write(out), { mode: 0o600 });
+          const encoded = await sharp(heatmap, {
+            raw: { width: pngA.width, height: pngA.height, channels: 4 },
+          })
+            .png()
+            .toBuffer();
+          await Bun.write(join(cacheDir, diffFile), encoded, { mode: 0o600 });
           pairs.push({ ...base, status: 'diff', diffPct, diffFile });
         }
       }
