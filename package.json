@@ -14,7 +14,7 @@
     "@cashu/cashu-ts": "5.0.0-rc.4",
     "zod": "4.4.3",
     "neverthrow": "8.2.0",
-    "react-native-quick-base64": "^3.0.0"
+    "nostr-tools": "2.24.2"
   },
   "scripts": {
     "postinstall": "cd app && node scripts/dedupe-coco.js && node scripts/apply-patches.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js",

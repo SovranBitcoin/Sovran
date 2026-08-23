@@ -29,11 +29,6 @@
     "@sovranbitcoin/schemas": "*",
     "zod": "^4.0.0"
   },
-  "peerDependenciesMeta": {
-    "@sovranbitcoin/schemas": {
-      "optional": true
-    }
-  },
   "devDependencies": {
     "@sovranbitcoin/schemas": "^2.1.0",
     "@types/bun": "^1.3.5",
