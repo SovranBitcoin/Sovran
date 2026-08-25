@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { RefreshControl, StyleSheet } from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
@@ -23,15 +23,19 @@ import {
   mergeNotificationsResult,
 } from '@/features/feed/lib/notificationResults';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
+import {
+  notificationListStyles,
+  NotificationRowPressable,
+} from '@/features/feed/components/notificationRowChrome';
+import { notificationTimestamp } from '@/features/feed/lib/notificationCopy';
+import { List } from '@/shared/ui/composed/List';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
-import { formatRelative } from '@/shared/lib/date';
 import { feedLog, Log, useLifecycleLogger } from '@/shared/lib/logger';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -340,14 +344,14 @@ export function NotificationFollowersScreen() {
 
   return (
     <Screen name="NotificationFollowersScreen" scroll="custom" bgColor={surface}>
-      <Log name="NotificationFollowersContent" style={styles.root}>
-        <FlatList
+      <Log name="NotificationFollowersContent" style={notificationListStyles.root}>
+        <List
           data={followers}
           keyExtractor={(notification) => notification.event.id}
           contentContainerStyle={[
-            styles.listContent,
+            notificationListStyles.listContent,
             { paddingBottom: tabBarPadding },
-            followers.length === 0 && styles.emptyListContent,
+            followers.length === 0 && notificationListStyles.emptyListContent,
           ]}
           contentInsetAdjustmentBehavior="never"
           refreshControl={
@@ -369,7 +373,11 @@ export function NotificationFollowersScreen() {
                 itemKey="empty:initial-spinner"
                 itemType="spinner"
                 extra={{ phase: visualPhase }}>
-                <Spinner size={22} color={withAlpha(foreground, 0.65)} style={styles.loader} />
+                <Spinner
+                  size={22}
+                  color={withAlpha(foreground, 0.65)}
+                  style={notificationListStyles.loader}
+                />
               </VisualLayoutProbe>
             ) : (
               <VisualLayoutProbe
@@ -396,7 +404,7 @@ export function NotificationFollowersScreen() {
                 <Spinner
                   size={18}
                   color={withAlpha(foreground, 0.65)}
-                  style={styles.footerSpinner}
+                  style={notificationListStyles.footerSpinner}
                 />
               </VisualLayoutProbe>
             ) : null
@@ -453,15 +461,10 @@ function FollowerRow({
   const npub = tryNpubEncode(notification.event.pubkey);
   const displayPubkey = truncateMiddle(npub || notification.event.pubkey, 10);
   const name = profile?.name || displayPubkey;
-  const timestamp = formatFollowTimestamp(notification.event.created_at);
+  const timestamp = notificationTimestamp(notification.event.created_at);
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      haptics
-      activeOpacity={1}
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: pressedBackground }]}>
+    <NotificationRowPressable pressedBackground={pressedBackground} onPress={onPress}>
       <HStack align="center" gap={12}>
         <Avatar
           state={profile?.picture ? 'image' : 'fallback'}
@@ -471,12 +474,22 @@ function FollowerRow({
           size={46}
         />
         <VStack gap={3} flex={1}>
-          <HStack align="flex-start" justify="space-between" gap={8} style={styles.titleLine}>
-            <Text numberOfLines={2} size={16} style={[styles.titleText, { color: foreground }]}>
+          <HStack
+            align="flex-start"
+            justify="space-between"
+            gap={8}
+            style={notificationListStyles.titleLine}>
+            <Text
+              numberOfLines={2}
+              size={16}
+              style={[notificationListStyles.titleText, { color: foreground }]}>
               {name} followed you
             </Text>
             {timestamp ? (
-              <Text numberOfLines={1} size={13} style={[styles.timestampText, { color: muted }]}>
+              <Text
+                numberOfLines={1}
+                size={13}
+                style={[notificationListStyles.timestampText, { color: muted }]}>
                 {timestamp}
               </Text>
             ) : null}
@@ -486,12 +499,8 @@ function FollowerRow({
           </Text>
         </VStack>
       </HStack>
-    </Pressable>
+    </NotificationRowPressable>
   );
-}
-
-function formatFollowTimestamp(createdAt: number): string {
-  return createdAt > 0 ? formatRelative(createdAt * 1000, 'compact') : '';
 }
 
 function EmptyFollowers({
@@ -504,7 +513,7 @@ function EmptyFollowers({
   muted: string;
 }) {
   return (
-    <VStack align="center" gap={10} style={styles.emptyState}>
+    <VStack align="center" gap={10} style={notificationListStyles.emptyState}>
       <Text size={18} bold style={{ color: foreground, textAlign: 'center' }}>
         {errorMessage ? 'Follows unavailable' : 'No follows'}
       </Text>
@@ -516,43 +525,9 @@ function EmptyFollowers({
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  listContent: {
-    paddingVertical: 8,
-  },
-  emptyListContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  row: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-  titleLine: {
-    width: '100%',
-  },
-  titleText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  timestampText: {
-    flexShrink: 0,
-    paddingTop: 2,
-  },
   separator: {
     height: StyleSheet.hairlineWidth,
+    // Avatar (46) + row padding — deeper inset than the notifications tab's.
     marginLeft: 78,
-  },
-  emptyState: {
-    paddingHorizontal: 28,
-  },
-  loader: {
-    alignSelf: 'center',
-  },
-  footerSpinner: {
-    alignSelf: 'center',
-    marginVertical: 18,
   },
 });

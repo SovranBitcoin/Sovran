@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { RefreshControl, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
@@ -20,7 +20,13 @@ import {
 import {
   notificationReasonLabel,
   notificationReplyScopeLabel,
+  notificationTimestamp,
 } from '@/features/feed/lib/notificationCopy';
+import {
+  notificationListStyles,
+  NotificationRowPressable,
+} from '@/features/feed/components/notificationRowChrome';
+import { List } from '@/shared/ui/composed/List';
 import { seedNotificationFollowers } from '@/features/feed/lib/notificationFollowersSeedCache';
 import {
   mergeNotificationsResult,
@@ -40,7 +46,7 @@ import {
   useVisualFlatListLogger,
   VISUAL_LIST_VIEWABILITY_CONFIG,
 } from '@/shared/lib/contentShiftLog';
-import { formatDate, formatRelative } from '@/shared/lib/date';
+import { formatDate } from '@/shared/lib/date';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -52,7 +58,6 @@ import { useOwnContentStore } from '@/shared/stores/profile/ownContentStore';
 import { actionMenuPopup } from '@/shared/lib/popup';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -704,7 +709,7 @@ export function NotificationsScreen() {
 
   return (
     <Screen name="NotificationsScreen" scroll="custom" bgColor={surface}>
-      <Log name="NotificationsContent" style={styles.root}>
+      <Log name="NotificationsContent" style={notificationListStyles.root}>
         <VisualLayoutProbe
           scope={notificationsVisualScope}
           surface="notifications"
@@ -738,13 +743,13 @@ export function NotificationsScreen() {
           // notifications list below stays untouched.
           <MintChangesList />
         ) : (
-          <FlatList
+          <List
             data={notificationItems}
             keyExtractor={(item) => item.id}
             contentContainerStyle={[
-              styles.listContent,
+              notificationListStyles.listContent,
               { paddingBottom: tabBarPadding },
-              notificationItems.length === 0 && styles.emptyListContent,
+              notificationItems.length === 0 && notificationListStyles.emptyListContent,
             ]}
             contentInsetAdjustmentBehavior="never"
             refreshControl={
@@ -766,7 +771,11 @@ export function NotificationsScreen() {
                   itemKey="empty:initial-spinner"
                   itemType="spinner"
                   extra={{ tab: activeTab, phase: visualPhase }}>
-                  <Spinner size={22} color={withAlpha(foreground, 0.65)} style={styles.loader} />
+                  <Spinner
+                    size={22}
+                    color={withAlpha(foreground, 0.65)}
+                    style={notificationListStyles.loader}
+                  />
                 </VisualLayoutProbe>
               ) : (
                 <VisualLayoutProbe
@@ -798,14 +807,14 @@ export function NotificationsScreen() {
                   <Spinner
                     size={18}
                     color={withAlpha(foreground, 0.65)}
-                    style={styles.footerSpinner}
+                    style={notificationListStyles.footerSpinner}
                   />
                 </VisualLayoutProbe>
               ) : null
             }
             // Load-more reveals pooled rows into their true chronological slots
-            // (possibly above the viewport); keep the visible window anchored.
-            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+            // (possibly above the viewport); FlashList v2's default
+            // maintainVisibleContentPosition keeps the visible window anchored.
             onLayout={onListLayout}
             onContentSizeChange={onListContentSizeChange}
             onEndReached={loadMoreNotifications}
@@ -923,7 +932,7 @@ function WelcomeNotificationRow({
     }
   }
   return (
-    <View style={styles.row}>
+    <View style={notificationListStyles.row}>
       <VStack gap={8}>
         <HStack align="flex-start" gap={12}>
           <View style={[styles.welcomeGlyph, { backgroundColor: withAlpha(accent, 0.13) }]}>
@@ -970,12 +979,7 @@ function NotificationRow({
   const timestamp = notificationEventTimestamp(notification);
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      haptics
-      activeOpacity={1}
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: pressedBackground }]}>
+    <NotificationRowPressable pressedBackground={pressedBackground} onPress={onPress}>
       <VStack gap={8}>
         <HStack align="flex-start" gap={12}>
           <NotificationReasonIcon reason={notification.reason} color={tone} />
@@ -1005,7 +1009,7 @@ function NotificationRow({
           muted={muted}
         />
       </VStack>
-    </Pressable>
+    </NotificationRowPressable>
   );
 }
 
@@ -1036,12 +1040,7 @@ function NotificationGroupRow({
   const timestamp = notificationGroupTimestamp(item.notifications);
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      haptics
-      activeOpacity={1}
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: pressedBackground }]}>
+    <NotificationRowPressable pressedBackground={pressedBackground} onPress={onPress}>
       <VStack gap={8}>
         <HStack align="flex-start" gap={12}>
           <NotificationReasonIcon reason={item.reason} color={tone} />
@@ -1072,7 +1071,7 @@ function NotificationGroupRow({
           </View>
         ) : null}
       </VStack>
-    </Pressable>
+    </NotificationRowPressable>
   );
 }
 
@@ -1139,13 +1138,23 @@ function NotificationTitleLine({
   badge?: React.ReactNode;
 }) {
   return (
-    <HStack align="flex-start" justify="space-between" gap={8} style={styles.titleLine}>
-      <Text numberOfLines={2} size={16} style={[styles.titleText, { color: foreground }]}>
+    <HStack
+      align="flex-start"
+      justify="space-between"
+      gap={8}
+      style={notificationListStyles.titleLine}>
+      <Text
+        numberOfLines={2}
+        size={16}
+        style={[notificationListStyles.titleText, { color: foreground }]}>
         {title}
       </Text>
       <HStack align="center" gap={4}>
         {timestamp ? (
-          <Text numberOfLines={1} size={13} style={[styles.timestampText, { color: muted }]}>
+          <Text
+            numberOfLines={1}
+            size={13}
+            style={[notificationListStyles.timestampText, { color: muted }]}>
             {timestamp}
           </Text>
         ) : null}
@@ -1291,7 +1300,7 @@ function notificationName(
 }
 
 function notificationEventTimestamp(notification: FeedNotification): string {
-  return formatNotificationTimestamp(notification.event.created_at);
+  return notificationTimestamp(notification.event.created_at);
 }
 
 function notificationGroupTimestamp(notifications: readonly FeedNotification[]): string {
@@ -1299,11 +1308,7 @@ function notificationGroupTimestamp(notifications: readonly FeedNotification[]):
     (max, notification) => Math.max(max, notification.event.created_at),
     0
   );
-  return formatNotificationTimestamp(latest);
-}
-
-function formatNotificationTimestamp(createdAt: number): string {
-  return createdAt > 0 ? formatRelative(createdAt * 1000, 'compact') : '';
+  return notificationTimestamp(latest);
 }
 
 // For a like/repost/zap, tapping the row should open the POST that was engaged
@@ -1439,7 +1444,7 @@ function EmptyNotifications({
     <VStack
       align="center"
       gap={12}
-      style={styles.emptyState}
+      style={notificationListStyles.emptyState}
       testID={`notifications-empty:${errorMessage ? 'error' : viewerReady ? 'none' : 'no-profile'}`}
       accessible
       accessibilityLabel={title}>
@@ -1457,9 +1462,6 @@ function EmptyNotifications({
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
   filtersRow: {
     height: 56,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -1470,28 +1472,6 @@ const styles = StyleSheet.create({
     gap: 4,
     height: 56,
     paddingHorizontal: 20,
-  },
-  listContent: {
-    paddingVertical: 8,
-  },
-  emptyListContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  row: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-  titleLine: {
-    width: '100%',
-  },
-  titleText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  timestampText: {
-    flexShrink: 0,
-    paddingTop: 2,
   },
   bodyContent: {
     paddingLeft: 40,
@@ -1538,16 +1518,7 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: StyleSheet.hairlineWidth,
+    // Reason icon (28) + gaps — shallower inset than the follows screen's.
     marginLeft: 72,
-  },
-  emptyState: {
-    paddingHorizontal: 28,
-  },
-  loader: {
-    alignSelf: 'center',
-  },
-  footerSpinner: {
-    alignSelf: 'center',
-    marginVertical: 18,
   },
 });

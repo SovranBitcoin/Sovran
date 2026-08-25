@@ -3,6 +3,13 @@ import type {
   FeedNotificationReplyScope,
 } from '@/features/feed/data/feedClient';
 
+import { formatRelative } from '@/shared/lib/date';
+
+/** Compact row timestamp for a notification event ('' when the time is unknown). */
+export function notificationTimestamp(createdAt: number): string {
+  return createdAt > 0 ? formatRelative(createdAt * 1000, 'compact') : '';
+}
+
 export function notificationReasonLabel(reason: string): string {
   switch (reason) {
     case 'follow':

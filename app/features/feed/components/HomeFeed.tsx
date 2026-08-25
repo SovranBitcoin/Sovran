@@ -649,6 +649,24 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const renderFeedItem = useCallback(
     ({ item: row, index }: { item: FeedRow; index: number }) => {
       const item = row.item;
+      // Both root-context pairs (reply-with-root, repost-with-root) open with
+      // the same "root post as first card" head.
+      const rootFirstCard = (rootEvent: FeedEvent) => (
+        <PostCard
+          variant="feed"
+          {...feedPostCardProps(
+            row,
+            index,
+            rootEvent,
+            row.rootMetrics ?? DEFAULT_METRICS,
+            row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE
+          )}
+          skipAnimation={!isFirstRender.current}
+          getThreadContext={() => getThreadContextRef.current()}
+          showFooterBorder={false}
+          fullBleedFooterBorder
+        />
+      );
       if (item.type === 'note') {
         const metrics = row.metrics;
         const engagement = row.engagement;
@@ -696,21 +714,9 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           );
         }
         if (contextRootEvent) {
-          const rootEvent = contextRootEvent;
-          const rootMetrics = row.rootMetrics ?? DEFAULT_METRICS;
-          const rootEngagement = row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE;
           return (
             <FeedThreadPair
-              first={
-                <PostCard
-                  variant="feed"
-                  {...feedPostCardProps(row, index, rootEvent, rootMetrics, rootEngagement)}
-                  skipAnimation={!isFirstRender.current}
-                  getThreadContext={() => getThreadContextRef.current()}
-                  showFooterBorder={false}
-                  fullBleedFooterBorder
-                />
-              }
+              first={rootFirstCard(contextRootEvent)}
               second={
                 <PostCard
                   variant="feed"
@@ -736,22 +742,10 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       const originalEvent = item.originalEvent;
       const contextRootEvent = row.rootEvent;
       if (contextRootEvent && originalEvent) {
-        const rootEvent = contextRootEvent;
-        const rootMetrics = row.rootMetrics ?? DEFAULT_METRICS;
-        const rootEngagement = row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE;
         return (
           <FeedThreadPair
             secondAvatarCenterY={FEED_REPOST_ORIGINAL_AVATAR_CENTER_Y}
-            first={
-              <PostCard
-                variant="feed"
-                {...feedPostCardProps(row, index, rootEvent, rootMetrics, rootEngagement)}
-                skipAnimation={!isFirstRender.current}
-                getThreadContext={() => getThreadContextRef.current()}
-                showFooterBorder={false}
-                fullBleedFooterBorder
-              />
-            }
+            first={rootFirstCard(contextRootEvent)}
             second={
               <RepostCard
                 {...repostCardProps(row, index, item)}
