@@ -47,6 +47,30 @@ const ParamsSchema = z.object({
   unit: z.string().max(16).optional(),
 });
 
+/** Success card for the two "nothing to do" outcomes (balanced / all-below-threshold). */
+function PlanDoneCard({ title, subtitle }: { title: string; subtitle: string }) {
+  const [foreground, green400] = useThemeColor(['foreground', 'green-400'] as const);
+  return (
+    <View className="items-center p-10">
+      <VStack gap={12} align="center">
+        <LoadingIndicator
+          size={48}
+          phase="done"
+          result="success"
+          successColor={green400}
+          playOnMount
+        />
+        <Text size={16} style={{ color: foreground, textAlign: 'center' }}>
+          {title}
+        </Text>
+        <Text size={14} style={{ color: withAlpha(foreground, 0.5), textAlign: 'center' }}>
+          {subtitle}
+        </Text>
+      </VStack>
+    </View>
+  );
+}
+
 export function MintRebalancePlanScreen() {
   useLifecycleLogger('MintRebalancePlanScreen');
   const [foreground, surfaceTertiary, surfaceSecondary, background] = useThemeColor([
@@ -416,43 +440,17 @@ export function MintRebalancePlanScreen() {
       </View>
 
       {alreadyBalanced && (
-        <View className="items-center p-10">
-          <VStack gap={12} align="center">
-            <LoadingIndicator
-              size={48}
-              phase="done"
-              result="success"
-              successColor={green400}
-              playOnMount
-            />
-            <Text size={16} style={{ color: foreground, textAlign: 'center' }}>
-              Already balanced!
-            </Text>
-            <Text size={14} style={{ color: fgMuted, textAlign: 'center' }}>
-              Your current balances match the desired distribution.
-            </Text>
-          </VStack>
-        </View>
+        <PlanDoneCard
+          title="Already balanced!"
+          subtitle="Your current balances match the desired distribution."
+        />
       )}
 
       {!alreadyBalanced && plan.steps.length === 0 && (
-        <View className="items-center p-10">
-          <VStack gap={12} align="center">
-            <LoadingIndicator
-              size={48}
-              phase="done"
-              result="success"
-              successColor={green400}
-              playOnMount
-            />
-            <Text size={16} style={{ color: foreground, textAlign: 'center' }}>
-              No transfers needed
-            </Text>
-            <Text size={14} style={{ color: fgMuted, textAlign: 'center' }}>
-              All differences are below the {minTransferThreshold} sat threshold.
-            </Text>
-          </VStack>
-        </View>
+        <PlanDoneCard
+          title="No transfers needed"
+          subtitle={`All differences are below the ${minTransferThreshold} sat threshold.`}
+        />
       )}
 
       {plan.steps.length > 0 && (

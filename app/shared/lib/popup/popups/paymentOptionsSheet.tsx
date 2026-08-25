@@ -17,10 +17,10 @@ import { decodeEcashTokenMetadata, defaultDetectors, type AnnotatedOption } from
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { cashuLog } from '@/shared/lib/logger';
 
 import { showActionSheet } from './bridge';
+import { SheetMenuRowContent } from './sheetMenuRow';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../sheets/types';
 
@@ -107,23 +107,18 @@ function OptionRow({ annotated, unit, isFailed, failedReason, onPress }: OptionR
 
   const item = (
     <Menu.Item isDisabled={disabled} variant={isFailed ? 'danger' : 'default'} onPress={onPress}>
-      <HStack align="center" gap={10} style={{ flex: 1 }}>
-        <Icon name={getMethodIcon(option.kind)} size={20} />
-        <View style={{ flex: 1 }}>
-          {/* `flex: 0` + `numberOfLines={1}` neutralises heroui's baked-in
-              `flex-1` on Menu.ItemTitle, which collapses to zero height
-              outside a `Menu.Content` host. Same defence as `modelPicker`. */}
-          <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
-            {getMethodLabel(option.kind)}
-          </Menu.ItemTitle>
-          {descriptionText ? <Menu.ItemDescription>{descriptionText}</Menu.ItemDescription> : null}
-        </View>
-        {hasAmount ? (
-          <View>
-            <AmountFormatter amount={amount} unit={unit} size={16} weight="medium" />
-          </View>
-        ) : null}
-      </HStack>
+      <SheetMenuRowContent
+        icon={<Icon name={getMethodIcon(option.kind)} size={20} />}
+        title={getMethodLabel(option.kind)}
+        description={descriptionText || null}
+        trailing={
+          hasAmount ? (
+            <View>
+              <AmountFormatter amount={amount} unit={unit} size={16} weight="medium" />
+            </View>
+          ) : null
+        }
+      />
     </Menu.Item>
   );
 

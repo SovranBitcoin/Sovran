@@ -1,13 +1,9 @@
-import React, { useCallback, useMemo } from 'react';
-import { ActionSheetIOS, StyleSheet } from 'react-native';
-import { withAlpha } from '@/shared/lib/color';
+import React, { useCallback } from 'react';
+import { ActionSheetIOS } from 'react-native';
 
-import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { Text } from '@/shared/ui/primitives/Text';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
+import { FiatPillShell, fiatPillHandlers } from './FiatCurrencyPill.shell';
 
 const CURRENCY_SHEET_OPTIONS = ['USD', 'EUR', 'GBP', 'Cancel'];
 const CANCEL_BUTTON_INDEX = 3;
@@ -24,22 +20,6 @@ export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactE
     accessibilityLabel,
   } = useFiatCurrencyPill(props);
   const colorScheme = useColorScheme();
-  const [textColor, surfaceSecondary, muted] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'muted',
-  ] as const);
-  const pillStyle = useMemo(
-    () => [
-      styles.pill,
-      {
-        backgroundColor: surfaceSecondary,
-        borderColor: withAlpha(muted, 0.3),
-        minHeight: iosHeight,
-      },
-    ],
-    [iosHeight, muted, surfaceSecondary]
-  );
 
   const openCurrencySheet = useCallback(() => {
     ActionSheetIOS.showActionSheetWithOptions(
@@ -56,37 +36,21 @@ export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactE
     );
   }, [handleSelectCurrency, colorScheme]);
 
-  const primaryHandler = enableCurrencyMenu && !onPress ? openCurrencySheet : onPress;
-  const longPressHandler = enableCurrencyMenu && onPress ? openCurrencySheet : undefined;
+  const { primaryHandler, longPressHandler } = fiatPillHandlers(
+    enableCurrencyMenu,
+    onPress,
+    openCurrencySheet
+  );
 
   return (
-    <Pressable
+    <FiatPillShell
+      text={text}
+      textSize={textSize}
+      iosHeight={iosHeight}
       testID={testID}
       accessibilityLabel={accessibilityLabel}
-      disabled={!primaryHandler && !longPressHandler}
-      onPress={primaryHandler}
-      onLongPress={longPressHandler}>
-      <HStack
-        align="center"
-        justify="center"
-        gap={6}
-        className="overflow-hidden rounded-full"
-        style={pillStyle}>
-        <Text overpass size={textSize} bold color={textColor} style={styles.text}>
-          {text}
-        </Text>
-      </HStack>
-    </Pressable>
+      primaryHandler={primaryHandler}
+      longPressHandler={longPressHandler}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  pill: {
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  text: {
-    letterSpacing: 0.3,
-  },
-});

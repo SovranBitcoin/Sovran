@@ -871,12 +871,17 @@ function getPeerAvatarOpacityFromRaw(rawScale: number, config: PeerLayoutConfig)
   return smoothstep(clamp(rawScale / config.minVisibleScale, 0, 1));
 }
 
-function getAvatarFitScale(
+/**
+ * Signed distance from the avatar center to the nearest padded container edge,
+ * with the avatar radius alongside. `null` for degenerate containers/avatars
+ * (callers return scale 0).
+ */
+function getAvatarEdgeGeometry(
   center: PeerLayoutOffset,
   size: PeerLayoutSize,
   config: PeerLayoutConfig
-): number {
-  if (size.width <= 0 || size.height <= 0 || config.avatarSize <= 0) return 0;
+): { avatarRadius: number; edgeDistance: number } | null {
+  if (size.width <= 0 || size.height <= 0 || config.avatarSize <= 0) return null;
   const avatarRadius = config.avatarSize / 2;
   const edgeDistance = Math.min(
     center.x - config.edgePadding,
@@ -884,6 +889,17 @@ function getAvatarFitScale(
     center.y - config.edgePadding,
     size.height - config.edgePadding - center.y
   );
+  return { avatarRadius, edgeDistance };
+}
+
+function getAvatarFitScale(
+  center: PeerLayoutOffset,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig
+): number {
+  const geometry = getAvatarEdgeGeometry(center, size, config);
+  if (!geometry) return 0;
+  const { avatarRadius, edgeDistance } = geometry;
 
   return clamp((edgeDistance + avatarRadius) / (avatarRadius * 2), 0, 1);
 }
@@ -893,15 +909,13 @@ function getAvatarEdgeLensScale(
   size: PeerLayoutSize,
   config: PeerLayoutConfig
 ): number {
-  if (size.width <= 0 || size.height <= 0 || config.avatarSize <= 0) return 0;
-  const avatarRadius = config.avatarSize / 2;
-  const edgeDistance = Math.min(
-    center.x - config.edgePadding,
-    size.width - config.edgePadding - center.x,
-    center.y - config.edgePadding,
-    size.height - config.edgePadding - center.y
+  const geometry = getAvatarEdgeGeometry(center, size, config);
+  if (!geometry) return 0;
+  const falloffProgress = getEdgeFalloffProgress(
+    geometry.edgeDistance,
+    geometry.avatarRadius,
+    config
   );
-  const falloffProgress = getEdgeFalloffProgress(edgeDistance, avatarRadius, config);
   const smoothedProgress = smoothstep(falloffProgress);
 
   return clamp(config.edgeBoundaryScale + (1 - config.edgeBoundaryScale) * smoothedProgress, 0, 1);

@@ -238,6 +238,53 @@ interface RoutstrActions {
 
 type RoutstrStore = RoutstrState & RoutstrActions;
 
+type SessionMirrorState = Pick<
+  RoutstrState,
+  'conversationHistory' | 'isAnonymousMode' | 'currentSessionId' | 'sessions'
+>;
+
+/**
+ * Set `conversationHistory` to `messages` and mirror the same list into the
+ * current session, unless anonymous mode is on (sessions stay untouched).
+ */
+function withSessionMirror(
+  state: SessionMirrorState,
+  messages: RoutstrMessage[]
+): Partial<SessionMirrorState> {
+  if (state.isAnonymousMode || !state.currentSessionId) {
+    return { conversationHistory: messages };
+  }
+  return {
+    conversationHistory: messages,
+    sessions: state.sessions.map((session) =>
+      session.id === state.currentSessionId ? { ...session, messages } : session
+    ),
+  };
+}
+
+/**
+ * Apply a per-message transform to the conversation AND to the current
+ * session's own message list (mapped independently, not replaced wholesale),
+ * unless anonymous mode is on.
+ */
+function mapSessionMessages(
+  state: SessionMirrorState,
+  apply: (msg: RoutstrMessage) => RoutstrMessage
+): Partial<SessionMirrorState> {
+  const conversationHistory = state.conversationHistory.map(apply);
+  if (state.isAnonymousMode || !state.currentSessionId) {
+    return { conversationHistory };
+  }
+  return {
+    conversationHistory,
+    sessions: state.sessions.map((session) =>
+      session.id === state.currentSessionId
+        ? { ...session, messages: session.messages.map(apply) }
+        : session
+    ),
+  };
+}
+
 // Tightly bounded + tolerant: one malformed attachment must never fail the
 // whole-blob parse (which would wipe sessions AND the apiKey — the exact
 // failure class documented on `createMergeWithSchema`). Invalid arrays
@@ -325,90 +372,33 @@ export const useRoutstrStore = create<RoutstrStore>()(
 
       addMessage: (message: RoutstrMessage) => {
         storeLog.debug('store.routstr.add_message', { role: message.role });
-        set((state) => {
-          const newHistory = [...state.conversationHistory, message];
-          // Skip saving to sessions if in anonymous mode
-          if (state.isAnonymousMode) {
-            return { conversationHistory: newHistory };
-          }
-          // Update current session's messages if it exists
-          if (state.currentSessionId) {
-            const updatedSessions = state.sessions.map((session) =>
-              session.id === state.currentSessionId ? { ...session, messages: newHistory } : session
-            );
-            return {
-              conversationHistory: newHistory,
-              sessions: updatedSessions,
-            };
-          }
-          return { conversationHistory: newHistory };
-        });
+        set((state) => withSessionMirror(state, [...state.conversationHistory, message]));
       },
 
       removeMessages: (ids: Set<string>) => {
         storeLog.debug('store.routstr.remove_messages', { count: ids.size });
-        set((state) => {
-          const filtered = state.conversationHistory.filter((msg) => !ids.has(msg.id));
-          if (state.isAnonymousMode) return { conversationHistory: filtered };
-          if (state.currentSessionId) {
-            const updatedSessions = state.sessions.map((session) =>
-              session.id === state.currentSessionId ? { ...session, messages: filtered } : session
-            );
-            return { conversationHistory: filtered, sessions: updatedSessions };
-          }
-          return { conversationHistory: filtered };
-        });
+        set((state) =>
+          withSessionMirror(
+            state,
+            state.conversationHistory.filter((msg) => !ids.has(msg.id))
+          )
+        );
       },
 
       setMessagePending: (id: string, pending: boolean) => {
-        set((state) => {
-          const apply = (msg: RoutstrMessage): RoutstrMessage =>
-            msg.id === id ? { ...msg, pending } : msg;
-          const updatedHistory = state.conversationHistory.map(apply);
-          if (state.isAnonymousMode) {
-            return { conversationHistory: updatedHistory };
-          }
-          if (state.currentSessionId) {
-            const updatedSessions = state.sessions.map((session) =>
-              session.id === state.currentSessionId
-                ? { ...session, messages: session.messages.map(apply) }
-                : session
-            );
-            return { conversationHistory: updatedHistory, sessions: updatedSessions };
-          }
-          return { conversationHistory: updatedHistory };
-        });
+        set((state) =>
+          mapSessionMessages(state, (msg) => (msg.id === id ? { ...msg, pending } : msg))
+        );
       },
 
       updateMessage: (id: string, content: string) => {
         storeLog.debug('store.routstr.update_message', { id, contentLength: content.length });
-        set((state) => {
-          const updatedHistory = state.conversationHistory.map((msg) =>
-            msg.id === id
-              ? {
-                  ...msg,
-                  content,
-                }
-              : msg
-          );
-          // Skip saving to sessions if in anonymous mode
-          if (state.isAnonymousMode) {
-            return { conversationHistory: updatedHistory };
-          }
-          // Update current session's messages if it exists
-          if (state.currentSessionId) {
-            const updatedSessions = state.sessions.map((session) =>
-              session.id === state.currentSessionId
-                ? { ...session, messages: updatedHistory }
-                : session
-            );
-            return {
-              conversationHistory: updatedHistory,
-              sessions: updatedSessions,
-            };
-          }
-          return { conversationHistory: updatedHistory };
-        });
+        set((state) =>
+          withSessionMirror(
+            state,
+            state.conversationHistory.map((msg) => (msg.id === id ? { ...msg, content } : msg))
+          )
+        );
       },
 
       finalizeAssistantMessage: (id, fields) => {
@@ -418,8 +408,8 @@ export const useRoutstrStore = create<RoutstrStore>()(
           hasReasoning: !!fields.reasoningContent,
           costSats: fields.costSats,
         });
-        set((state) => {
-          const apply = (msg: RoutstrMessage): RoutstrMessage =>
+        set((state) =>
+          mapSessionMessages(state, (msg) =>
             msg.id === id
               ? {
                   ...msg,
@@ -428,19 +418,9 @@ export const useRoutstrStore = create<RoutstrStore>()(
                   reasoningContent: fields.reasoningContent ?? msg.reasoningContent,
                   costSats: fields.costSats ?? msg.costSats,
                 }
-              : msg;
-          const updatedHistory = state.conversationHistory.map(apply);
-          if (state.isAnonymousMode) return { conversationHistory: updatedHistory };
-          if (state.currentSessionId) {
-            const updatedSessions = state.sessions.map((session) =>
-              session.id === state.currentSessionId
-                ? { ...session, messages: session.messages.map(apply) }
-                : session
-            );
-            return { conversationHistory: updatedHistory, sessions: updatedSessions };
-          }
-          return { conversationHistory: updatedHistory };
-        });
+              : msg
+          )
+        );
       },
 
       setActiveBranch: (parentId, childId) => {

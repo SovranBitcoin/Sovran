@@ -140,6 +140,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.androidMenu.tsx",
     "features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.flat.tsx",
     "features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.liquid.tsx",
+    "features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.shell.tsx",
     "features/wallet/components/MintSelector/MintSelector.tsx",
     "features/wallet/components/PrimaryBalance.tsx",
     "features/wallet/components/UnitSwitcherPill/UnitSwitcherPill.fallback.tsx",
@@ -237,6 +238,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 231,
+  "total": 232,
 }
 `;

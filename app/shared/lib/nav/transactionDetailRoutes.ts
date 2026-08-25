@@ -11,15 +11,18 @@ import { cashuLog } from '@/shared/lib/logger';
 type MintDetailPathname = '/lightningReceive' | '/onchainReceive';
 type MeltDetailPathname = '/lightningSend' | '/onchainSend';
 
+/** coco's projected entries carry `state` untyped — narrow it for logging. */
+function entryState(entry: HistoryEntry): string | null {
+  const state = (entry as Record<string, unknown>).state;
+  return typeof state === 'string' ? state : null;
+}
+
 export function getMintDetailPathname(entry: HistoryEntry): MintDetailPathname {
   const isOnchain = !!getOnchainMintAddress(entry);
   const pathname = isOnchain ? '/onchainReceive' : '/lightningReceive';
   cashuLog.debug('transactions.detail_route.mint', {
     type: entry.type,
-    state:
-      typeof (entry as Record<string, unknown>).state === 'string'
-        ? (entry as Record<string, unknown>).state
-        : null,
+    state: entryState(entry),
     isOnchain,
     pathname,
   });
@@ -31,10 +34,7 @@ export function getMeltDetailPathname(entry: HistoryEntry): MeltDetailPathname {
   const pathname = isOnchain ? '/onchainSend' : '/lightningSend';
   cashuLog.debug('transactions.detail_route.melt', {
     type: entry.type,
-    state:
-      typeof (entry as Record<string, unknown>).state === 'string'
-        ? (entry as Record<string, unknown>).state
-        : null,
+    state: entryState(entry),
     isOnchain,
     pathname,
   });
@@ -101,10 +101,7 @@ async function resolveMeltDetailPathname(entry: HistoryEntry): Promise<MeltDetai
  */
 export function navigateToTransactionDetail(entry: HistoryEntry, source: string): void {
   const serialized = JSON.stringify(entry);
-  const state =
-    typeof (entry as Record<string, unknown>).state === 'string'
-      ? ((entry as Record<string, unknown>).state as string)
-      : null;
+  const state = entryState(entry);
   const logOpen = (pathname: string): void =>
     cashuLog.info('transactions.detail.open', {
       source,

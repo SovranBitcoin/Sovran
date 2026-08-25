@@ -15,7 +15,7 @@ import { decodeUrlOrAddress, isLightningInvoiceBolt11 } from 'wallet';
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { SheetItemTitle, SheetMenuRowContent } from './sheetMenuRow';
 import { cashuLog } from '@/shared/lib/logger';
 
 import { showActionSheet } from './bridge';
@@ -113,31 +113,24 @@ export function shouldShowProofSelectorMintChange(
 function SuggestionRow({ text, icon, display, onPress }: SuggestionRowProps) {
   return (
     <Menu.Item onPress={onPress}>
-      <HStack align="center" gap={10} style={{ flex: 1 }}>
-        <Icon name={icon} size={20} />
-        <View style={{ flex: 1 }}>
-          {/* `flex: 0` + `numberOfLines={1}` neutralises heroui's baked-in
-              `flex-1` on Menu.ItemTitle, which collapses to zero height
-              outside a `Menu.Content` host. Same defence as `paymentOptionsSheet`. */}
-          <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
-            {text}
-          </Menu.ItemTitle>
-        </View>
-        <View>
-          {display.kind === 'fiat' ? (
-            <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
-              {display.label}
-            </Menu.ItemTitle>
-          ) : (
-            <AmountFormatter
-              amount={display.amount}
-              unit={display.unit}
-              size={16}
-              weight="medium"
-            />
-          )}
-        </View>
-      </HStack>
+      <SheetMenuRowContent
+        icon={<Icon name={icon} size={20} />}
+        title={text}
+        trailing={
+          <View>
+            {display.kind === 'fiat' ? (
+              <SheetItemTitle>{display.label}</SheetItemTitle>
+            ) : (
+              <AmountFormatter
+                amount={display.amount}
+                unit={display.unit}
+                size={16}
+                weight="medium"
+              />
+            )}
+          </View>
+        }
+      />
     </Menu.Item>
   );
 }
@@ -202,14 +195,10 @@ export function ProofSelectorContent({ payload, close }: ProofSelectorContentPro
                 void machine.requestMintSelector();
                 close();
               }}>
-              <HStack align="center" gap={10} style={{ flex: 1 }}>
-                <Icon name="mdi:swap-horizontal" size={20} />
-                <View style={{ flex: 1 }}>
-                  <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
-                    Change mint
-                  </Menu.ItemTitle>
-                </View>
-              </HStack>
+              <SheetMenuRowContent
+                icon={<Icon name="mdi:swap-horizontal" size={20} />}
+                title="Change mint"
+              />
             </Menu.Item>
           </>
         ) : null}

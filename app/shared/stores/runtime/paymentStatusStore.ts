@@ -35,6 +35,21 @@ type PaymentStatusStore = {
   setFailed: (id: string, error?: unknown) => void;
 };
 
+/** Debug-log a refused transition; call sites keep their literal event keys. */
+function logSkip(
+  event: string,
+  s: { active: ActivePaymentStatus | null },
+  requestedId: string,
+  reason: string
+): void {
+  paymentLog.debug(event, {
+    requestedId,
+    activeId: s.active?.id ?? null,
+    activeState: s.active?.state ?? null,
+    reason,
+  });
+}
+
 function withoutStatusCopy(active: ActivePaymentStatus): ActivePaymentStatus {
   const next = { ...active };
   delete next.titleOverride;
@@ -70,12 +85,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
   clearActive: (id) =>
     set((s) => {
       if (id !== undefined && s.active?.id !== id) {
-        paymentLog.debug('payment.status.clear_active.skipped', {
-          requestedId: id,
-          activeId: s.active?.id ?? null,
-          activeState: s.active?.state ?? null,
-          reason: 'id_mismatch',
-        });
+        logSkip('payment.status.clear_active.skipped', s, id, 'id_mismatch');
         return s;
       }
       paymentLog.info('payment.status.clear_active', {
@@ -88,21 +98,11 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
   setWaiting: (id, copy) =>
     set((s) => {
       if (s.active?.id !== id) {
-        paymentLog.debug('payment.status.waiting.skipped', {
-          requestedId: id,
-          activeId: s.active?.id ?? null,
-          activeState: s.active?.state ?? null,
-          reason: 'id_mismatch',
-        });
+        logSkip('payment.status.waiting.skipped', s, id, 'id_mismatch');
         return s;
       }
       if (s.active.state === 'confirmed' || s.active.state === 'failed') {
-        paymentLog.debug('payment.status.waiting.skipped', {
-          requestedId: id,
-          activeId: s.active.id,
-          activeState: s.active.state,
-          reason: 'terminal_state',
-        });
+        logSkip('payment.status.waiting.skipped', s, id, 'terminal_state');
         return s;
       }
       paymentLog.info('payment.status.waiting', {
@@ -124,12 +124,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
   setDelivered: (id) =>
     set((s) => {
       if (s.active?.id !== id) {
-        paymentLog.debug('payment.status.delivered.skipped', {
-          requestedId: id,
-          activeId: s.active?.id ?? null,
-          activeState: s.active?.state ?? null,
-          reason: 'id_mismatch',
-        });
+        logSkip('payment.status.delivered.skipped', s, id, 'id_mismatch');
         return s;
       }
       if (
@@ -137,12 +132,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
         s.active.state === 'confirmed' ||
         s.active.state === 'failed'
       ) {
-        paymentLog.debug('payment.status.delivered.skipped', {
-          requestedId: id,
-          activeId: s.active.id,
-          activeState: s.active.state,
-          reason: 'terminal_or_waiting_state',
-        });
+        logSkip('payment.status.delivered.skipped', s, id, 'terminal_or_waiting_state');
         return s;
       }
       paymentLog.info('payment.status.delivered', {
@@ -156,12 +146,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
   setConfirmed: (id, extra) =>
     set((s) => {
       if (s.active?.id !== id) {
-        paymentLog.debug('payment.status.confirmed.skipped', {
-          requestedId: id,
-          activeId: s.active?.id ?? null,
-          activeState: s.active?.state ?? null,
-          reason: 'id_mismatch',
-        });
+        logSkip('payment.status.confirmed.skipped', s, id, 'id_mismatch');
         return s;
       }
       if (s.active.state === 'confirmed') {
@@ -192,12 +177,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
   setFailed: (id, error) =>
     set((s) => {
       if (s.active?.id !== id) {
-        paymentLog.debug('payment.status.failed.skipped', {
-          requestedId: id,
-          activeId: s.active?.id ?? null,
-          activeState: s.active?.state ?? null,
-          reason: 'id_mismatch',
-        });
+        logSkip('payment.status.failed.skipped', s, id, 'id_mismatch');
         return s;
       }
       if (
@@ -205,12 +185,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
         s.active.state === 'failed' ||
         s.active.state === 'confirmed'
       ) {
-        paymentLog.debug('payment.status.failed.skipped', {
-          requestedId: id,
-          activeId: s.active.id,
-          activeState: s.active.state,
-          reason: 'terminal_or_waiting_state',
-        });
+        logSkip('payment.status.failed.skipped', s, id, 'terminal_or_waiting_state');
         return s;
       }
       const errorMessage = error !== undefined ? parsePaymentError(error) : undefined;

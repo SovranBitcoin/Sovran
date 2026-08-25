@@ -144,6 +144,17 @@ function enqueue(state: CelebrationState, request: CelebrationRequest): Celebrat
   return { ...state, queue: [...queue, request] };
 }
 
+/** Admit a fresh request: queue it while busy/gated, else start the ceremony. */
+function admit(
+  state: CelebrationState,
+  now: number,
+  fields: Pick<CelebrationRequest, 'peerID' | 'amount' | 'unit' | 'waiting'>
+): CelebrationState {
+  const request: CelebrationRequest = { ...fields, firedAt: now, abbreviated: false };
+  if (state.phase !== 'idle' || state.gated) return enqueue(state, request);
+  return startCeremony(state, request, now, false);
+}
+
 export function celebrationReducer(
   state: CelebrationState,
   event: CelebrationEvent
@@ -152,16 +163,12 @@ export function celebrationReducer(
     case 'strike-active': {
       // Already celebrating this sender — the success event will fold in.
       if (state.current?.peerID === event.peerID && isPlaying(state)) return state;
-      const request: CelebrationRequest = {
+      return admit(state, event.now, {
         peerID: event.peerID,
         amount: null,
         unit: event.unit,
         waiting: false,
-        firedAt: event.now,
-        abbreviated: false,
-      };
-      if (state.phase !== 'idle' || state.gated) return enqueue(state, request);
-      return startCeremony(state, request, event.now, false);
+      });
     }
 
     case 'strike-success': {
@@ -185,18 +192,14 @@ export function celebrationReducer(
         // is a fresh drop landing late; queue a fresh (abbreviated) one.
       }
 
-      const request: CelebrationRequest = {
+      // Success with no prior staging (ambient entries, races): play the
+      // whole ceremony with the amount known — impact on arrival.
+      return admit(state, event.now, {
         peerID: event.peerID,
         amount: event.amount,
         unit: event.unit,
         waiting: false,
-        firedAt: event.now,
-        abbreviated: false,
-      };
-      if (state.phase !== 'idle' || state.gated) return enqueue(state, request);
-      // Success with no prior staging (ambient entries, races): play the
-      // whole ceremony with the amount known — impact on arrival.
-      return startCeremony(state, request, event.now, false);
+      });
     }
 
     case 'strike-waiting': {
@@ -210,16 +213,12 @@ export function celebrationReducer(
         }
       }
 
-      const request: CelebrationRequest = {
+      return admit(state, event.now, {
         peerID: event.peerID,
         amount: null,
         unit: 'sat',
         waiting: true,
-        firedAt: event.now,
-        abbreviated: false,
-      };
-      if (state.phase !== 'idle' || state.gated) return enqueue(state, request);
-      return startCeremony(state, request, event.now, false);
+      });
     }
 
     case 'strike-failed': {

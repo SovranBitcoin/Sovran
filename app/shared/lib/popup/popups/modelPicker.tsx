@@ -37,7 +37,7 @@ import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import type { AiProviderId, LineupEntry } from '@/shared/lib/routstr/lineup';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { SheetMenuRowContent } from './sheetMenuRow';
 import { log } from '@/shared/lib/logger';
 
 import {
@@ -137,39 +137,27 @@ function TierRow({ tier, provider, entry, balanceSats, isCurrent, onPress }: Tie
       testID={`ai-model-${provider.id}-${tier.id}`}
       isDisabled={disabled}
       onPress={onPress}>
-      <HStack align="center" gap={10} style={{ flex: 1 }}>
-        <Icon name={tier.icon} size={20} />
-        <View style={{ flex: 1 }}>
-          {/* Heroui's `Menu.ItemTitle` ships with `flex-1` baked into
-              its tailwind variant. Inside a non-`Menu.Content` host
-              (our custom `<BottomSheet>` lane) the surrounding column
-              has no fixed height for `flex-grow` to claim, and the
-              title collapses to zero height. Two overrides defend
-              against that:
-                1. `style.flex: 0` — RN's `style` wins over className
-                   in the merge, so the tailwind `flex-1` is neutralised.
-                2. `numberOfLines={1}` — forces RN to allocate at least
-                   one line of layout height regardless of flex math.
-              The rest of heroui's typography
-              (`text-base font-medium text-foreground`) is preserved. */}
-          <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
-            {labelText}
-          </Menu.ItemTitle>
-          <Menu.ItemDescription>{descriptionText}</Menu.ItemDescription>
-        </View>
-        {entry.visionInput ? (
-          // Image-input capability marker — the user-facing signal for
-          // "you can attach photos with this model".
-          <View>
-            <Icon name="mdi:image-outline" size={14} />
-          </View>
-        ) : null}
-        {isCurrent ? (
-          <View>
-            <Icon name="mdi:check-circle" size={18} />
-          </View>
-        ) : null}
-      </HStack>
+      <SheetMenuRowContent
+        icon={<Icon name={tier.icon} size={20} />}
+        title={labelText}
+        description={descriptionText}
+        trailing={
+          <>
+            {entry.visionInput ? (
+              // Image-input capability marker — the user-facing signal for
+              // "you can attach photos with this model".
+              <View>
+                <Icon name="mdi:image-outline" size={14} />
+              </View>
+            ) : null}
+            {isCurrent ? (
+              <View>
+                <Icon name="mdi:check-circle" size={18} />
+              </View>
+            ) : null}
+          </>
+        }
+      />
     </Menu.Item>
   );
 }
@@ -314,19 +302,15 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
             if (rows.length === 0) {
               return (
                 <Menu.Item isDisabled onPress={() => {}}>
-                  <HStack align="center" gap={10} style={{ flex: 1 }}>
-                    <Icon name="mdi:cloud-off-outline" size={20} />
-                    <View style={{ flex: 1 }}>
-                      <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
-                        Models loading
-                      </Menu.ItemTitle>
-                      <Menu.ItemDescription>
-                        {lineupSource === 'empty'
-                          ? 'Connect to the internet to load the model list'
-                          : 'No models available for this provider right now'}
-                      </Menu.ItemDescription>
-                    </View>
-                  </HStack>
+                  <SheetMenuRowContent
+                    icon={<Icon name="mdi:cloud-off-outline" size={20} />}
+                    title="Models loading"
+                    description={
+                      lineupSource === 'empty'
+                        ? 'Connect to the internet to load the model list'
+                        : 'No models available for this provider right now'
+                    }
+                  />
                 </Menu.Item>
               );
             }

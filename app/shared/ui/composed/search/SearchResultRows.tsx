@@ -62,7 +62,9 @@ function GeohashJumpRow({ geohash }: { geohash: string }) {
   );
 }
 
-function TierRow({ tier }: { tier: TierEntry }) {
+/** Geohash location-tier row — shared by the search results and the Contacts
+ * Groups tab; `source` is telemetry only. */
+export function TierRow({ tier, source }: { tier: TierEntry; source: 'search' | 'contacts' }) {
   return (
     <ContactRow
       identity={geohashIdentity(tier.geohash, {
@@ -76,7 +78,7 @@ function TierRow({ tier }: { tier: TierEntry }) {
         paymentLog.info('contact.tier.press', {
           tier: tier.key,
           transport: tier.transport,
-          source: 'search',
+          source,
         });
         router.push({
           pathname: '/(user-flow)/geohashChat',
@@ -132,7 +134,7 @@ export function SearchResultRows({
       case 'geohash':
         return <GeohashJumpRow geohash={item.geohash} />;
       case 'tier':
-        return <TierRow tier={item.tier} />;
+        return <TierRow tier={item.tier} source="search" />;
       case 'mint':
         return <MintRow mint={item.mint} />;
       case 'contact':

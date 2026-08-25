@@ -3,7 +3,6 @@ import { View, Text, StyleSheet } from 'react-native';
 import { List } from '@/shared/ui/composed/List';
 import Icon from 'assets/icons';
 
-import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintManagement } from '@/features/mint';
@@ -21,11 +20,11 @@ import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import { Log, log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   ContactRow,
-  geohashIdentity,
   mintIdentity,
   nostrIdentity,
   type Identity,
 } from '@/shared/ui/composed/ContactRow';
+import { TierRow } from '@/shared/ui/composed/search/SearchResultRows';
 import { TierBadge } from '@/shared/ui/composed/TierBadge';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
@@ -60,37 +59,6 @@ function contactsListItemKey(item: ContactsListItem, index: number): string {
   if (item.type === 'request') return item.request.id || item.request.fromPubkey;
   if (item.type === 'mint') return item.mint?.mintUrl ?? item.pubkey ?? `mint-${index}`;
   return item.pubkey || `contact-${index}`;
-}
-
-function GroupsTierRow({ tier }: { tier: TierEntry }) {
-  const router = useGuardedRouter();
-  return (
-    <ContactRow
-      identity={geohashIdentity(tier.geohash, {
-        label: tier.label,
-        displayName: tier.displayName,
-        transport: tier.transport,
-        icon: tier.icon,
-      })}
-      trailingVariant="chevron"
-      onPress={() => {
-        paymentLog.info('contact.tier.press', {
-          tier: tier.key,
-          transport: tier.transport,
-          source: 'contacts',
-        });
-        router.push({
-          pathname: '/(user-flow)/geohashChat',
-          params: {
-            geohash: tier.geohash,
-            tierLabel: tier.label,
-            transport: tier.transport,
-          },
-        });
-      }}
-      testID={`contact-row:geohash:${tier.geohash}`}
-    />
-  );
 }
 
 export const ContactsScreen = () => {
@@ -392,7 +360,7 @@ export const ContactsScreen = () => {
     ]
   );
   const renderGroupItem = useCallback(
-    ({ item }: { item: TierEntry; index: number }) => <GroupsTierRow tier={item} />,
+    ({ item }: { item: TierEntry; index: number }) => <TierRow tier={item} source="contacts" />,
     []
   );
 

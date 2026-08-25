@@ -21,7 +21,7 @@ import { View } from 'react-native';
 import { BottomSheet, Menu } from 'heroui-native';
 
 import Icon from 'assets/icons';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { SheetMenuRowContent } from './sheetMenuRow';
 import { log } from '@/shared/lib/logger';
 import { E2EActionMenuRenderMarker, E2EActionMenuTargetMarker } from '../E2EActionMenuProbe';
 
@@ -98,19 +98,14 @@ export function ActionMenuSheetContent({ payload, close }: ActionMenuSheetConten
                 })();
               }}>
               <E2EActionMenuTargetMarker actionId={button.testID} disabled={disabled} />
-              <HStack align="center" gap={10} style={{ flex: 1 }}>
-                {button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)}
-                <View style={{ flex: 1 }}>
-                  {/* `flex: 0` + `numberOfLines={1}` neutralises heroui's baked-in
-                      `flex-1` on Menu.ItemTitle, which collapses to zero height
-                      outside a `Menu.Content` host. Same defence as `modelPicker`. */}
-                  <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
-                    {button.text}
-                  </Menu.ItemTitle>
-                  {description ? <Menu.ItemDescription>{description}</Menu.ItemDescription> : null}
-                </View>
-                {button.suffix ? <View>{button.suffix}</View> : null}
-              </HStack>
+              <SheetMenuRowContent
+                icon={
+                  button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)
+                }
+                title={button.text}
+                description={description || null}
+                trailing={button.suffix ? <View>{button.suffix}</View> : null}
+              />
             </Menu.Item>
           );
         })}
