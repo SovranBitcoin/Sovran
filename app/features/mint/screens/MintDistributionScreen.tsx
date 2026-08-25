@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { LayoutAnimation, ScrollView } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -72,14 +72,14 @@ export function MintDistributionScreen() {
   const { getMintInfo } = useMintManagement();
   const [mintInfoMap, setMintInfoMap] = useState<Record<string, any>>({});
 
-  const routeCurrency = useMemo(() => {
-    const raw = params?.unit;
-    if (!raw) return null;
-    const norm = raw.toLowerCase();
-    // Treat btc as sats in the UI selector
-    if (norm === 'btc' || norm === 'sat') return 'SAT';
-    return norm.toUpperCase();
-  }, [params?.unit]);
+  const rawUnit = params?.unit;
+  const normUnit = rawUnit?.toLowerCase();
+  // Treat btc as sats in the UI selector
+  const routeCurrency = !normUnit
+    ? null
+    : normUnit === 'btc' || normUnit === 'sat'
+      ? 'SAT'
+      : normUnit.toUpperCase();
 
   const [selectedCurrency, setSelectedCurrency] = useState<string>('SAT');
 
@@ -97,28 +97,22 @@ export function MintDistributionScreen() {
   // Keyset-backed: an advertised NUT-04 unit the mint holds no keys for
   // (chorus lists usd/eur with sat-only keysets) is not distributable.
   const keysetUnitsByMint = useMintKeysetUnits();
-  const supportedUnitsByMint = useMemo(
-    () =>
-      Object.fromEntries(
-        trustedMints.map((mint) => [
-          mint.mintUrl,
-          mint.mintInfo
-            ? deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl])
-            : ['sat'],
-        ])
-      ) as Record<string, string[]>,
-    [trustedMints, keysetUnitsByMint]
-  );
+  const supportedUnitsByMint = Object.fromEntries(
+    trustedMints.map((mint) => [
+      mint.mintUrl,
+      mint.mintInfo
+        ? deriveSupportedUnitsFromInfo(mint.mintInfo, keysetUnitsByMint[mint.mintUrl])
+        : ['sat'],
+    ])
+  ) as Record<string, string[]>;
 
-  const availableCurrencies = useMemo(() => {
-    const units = new Set<string>();
-    for (const supported of Object.values(supportedUnitsByMint)) {
-      for (const unit of supported) units.add(unit.toUpperCase());
-    }
-    // Filter to common currencies and ensure at least SAT
-    const filtered = [...units].filter((c) => ['SAT', 'USD', 'EUR', 'GBP'].includes(c));
-    return filtered.length > 0 ? filtered : ['SAT'];
-  }, [supportedUnitsByMint]);
+  const units = new Set<string>();
+  for (const supported of Object.values(supportedUnitsByMint)) {
+    for (const unit of supported) units.add(unit.toUpperCase());
+  }
+  // Filter to common currencies and ensure at least SAT
+  const commonUnits = [...units].filter((c) => ['SAT', 'USD', 'EUR', 'GBP'].includes(c));
+  const availableCurrencies = commonUnits.length > 0 ? commonUnits : ['SAT'];
 
   useEffect(() => {
     if (!routeCurrency) return;
@@ -127,15 +121,13 @@ export function MintDistributionScreen() {
     setSelectedCurrency((prev) => (prev === 'SAT' ? routeCurrency : prev));
   }, [routeCurrency, availableCurrencies]);
 
-  const mintsForCurrency = useMemo(() => {
-    return trustedMints.filter((mint) =>
-      (supportedUnitsByMint[mint.mintUrl] ?? ['sat']).some(
-        (unit) => unit.toUpperCase() === selectedCurrency
-      )
-    );
-  }, [trustedMints, selectedCurrency, supportedUnitsByMint]);
+  const mintsForCurrency = trustedMints.filter((mint) =>
+    (supportedUnitsByMint[mint.mintUrl] ?? ['sat']).some(
+      (unit) => unit.toUpperCase() === selectedCurrency
+    )
+  );
 
-  const mintUrls = useMemo(() => mintsForCurrency.map((m) => m.mintUrl), [mintsForCurrency]);
+  const mintUrls = mintsForCurrency.map((m) => m.mintUrl);
 
   useEffect(() => {
     if (mintUrls.length > 0) {
@@ -183,66 +175,57 @@ export function MintDistributionScreen() {
     void loadMintInfo();
   }, [trustedMints, getMintInfo]);
 
-  const handleDistributionChange = useCallback(
-    (mintUrl: string, bp: number) => {
-      log.debug('mint.distribution.change', {
-        ...mintUrlLogFields(mintUrl),
-        basisPoints: bp,
-        currency: selectedCurrency,
-      });
-      animateRedistribution();
-      setMintDistribution(selectedCurrency, mintUrl, bp, mintUrls);
-    },
-    [selectedCurrency, mintUrls, setMintDistribution]
-  );
+  const handleDistributionChange = (mintUrl: string, bp: number) => {
+    log.debug('mint.distribution.change', {
+      ...mintUrlLogFields(mintUrl),
+      basisPoints: bp,
+      currency: selectedCurrency,
+    });
+    animateRedistribution();
+    setMintDistribution(selectedCurrency, mintUrl, bp, mintUrls);
+  };
 
-  const handleSplitEvenlyToggle = useCallback(
-    (next: boolean) => {
-      log.info('mint.distribution.split_evenly.toggle', {
-        enabled: next,
-        currency: selectedCurrency,
-        mintCount: mintUrls.length,
-      });
-      if (next) {
-        animateRedistribution();
-        equalizeMints(selectedCurrency, mintUrls);
-      }
-      // Turning OFF keeps the current (even) values — it just frees the sliders.
-      setSplitEvenly(next);
-    },
-    [selectedCurrency, mintUrls, equalizeMints]
-  );
-
-  const handleToggleMint = useCallback(
-    (mintUrl: string, enabled: boolean) => {
-      log.info('mint.distribution.toggle', {
-        ...mintUrlLogFields(mintUrl),
-        enabled,
-        currency: selectedCurrency,
-        splitEvenly,
-      });
+  const handleSplitEvenlyToggle = (next: boolean) => {
+    log.info('mint.distribution.split_evenly.toggle', {
+      enabled: next,
+      currency: selectedCurrency,
+      mintCount: mintUrls.length,
+    });
+    if (next) {
       animateRedistribution();
-      if (enabled) {
-        // Re-enable with an even share; the store takes it from the active
-        // mints proportionally.
-        setMintDistribution(
-          selectedCurrency,
-          mintUrl,
-          Math.round(TOTAL_BASIS_POINTS / mintUrls.length),
-          mintUrls
-        );
-      } else {
-        minMint(selectedCurrency, mintUrl, mintUrls);
-      }
-      // In Split evenly mode the membership change must land exactly even —
-      // the proportional redistribution above only gets within rounding drift.
-      // Both writes batch into the same commit, so one animation runs.
-      if (splitEvenly) {
-        equalizeMints(selectedCurrency, mintUrls);
-      }
-    },
-    [selectedCurrency, mintUrls, setMintDistribution, minMint, splitEvenly, equalizeMints]
-  );
+      equalizeMints(selectedCurrency, mintUrls);
+    }
+    // Turning OFF keeps the current (even) values — it just frees the sliders.
+    setSplitEvenly(next);
+  };
+
+  const handleToggleMint = (mintUrl: string, enabled: boolean) => {
+    log.info('mint.distribution.toggle', {
+      ...mintUrlLogFields(mintUrl),
+      enabled,
+      currency: selectedCurrency,
+      splitEvenly,
+    });
+    animateRedistribution();
+    if (enabled) {
+      // Re-enable with an even share; the store takes it from the active
+      // mints proportionally.
+      setMintDistribution(
+        selectedCurrency,
+        mintUrl,
+        Math.round(TOTAL_BASIS_POINTS / mintUrls.length),
+        mintUrls
+      );
+    } else {
+      minMint(selectedCurrency, mintUrl, mintUrls);
+    }
+    // In Split evenly mode the membership change must land exactly even —
+    // the proportional redistribution above only gets within rounding drift.
+    // Both writes batch into the same commit, so one animation runs.
+    if (splitEvenly) {
+      equalizeMints(selectedCurrency, mintUrls);
+    }
+  };
 
   useEffect(() => {
     // `build` marker confirms which revision is actually running on device
@@ -265,30 +248,27 @@ export function MintDistributionScreen() {
     onCurrencyChange: setSelectedCurrency,
   });
 
-  const handleRebalance = useCallback(() => {
+  const handleRebalance = () => {
     log.info('mint.distribution.rebalance', { currency: selectedCurrency });
     router.navigate({
       pathname: '/rebalancePlan',
       params: { unit: selectedCurrency },
     });
-  }, [selectedCurrency]);
+  };
 
-  const bottomButtons = useMemo(
-    () => (
-      <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            {
-              text: 'Next',
-              variant: 'primary',
-              testID: 'mint-distribution-next',
-              onPress: handleRebalance,
-            },
-          ]}
-        />
-      </BottomButtons>
-    ),
-    [handleRebalance]
+  const bottomButtons = (
+    <BottomButtons>
+      <ButtonHandler
+        buttons={[
+          {
+            text: 'Next',
+            variant: 'primary',
+            testID: 'mint-distribution-next',
+            onPress: handleRebalance,
+          },
+        ]}
+      />
+    </BottomButtons>
   );
 
   return (

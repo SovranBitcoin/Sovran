@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { List } from '@/shared/ui/composed/List';
 import Icon from 'assets/icons';
@@ -119,35 +119,23 @@ export const ContactsScreen = () => {
     accept: acceptWhitenoiseRequest,
     decline: declineWhitenoiseRequest,
   } = useWhitenoiseRequests();
-  const requestPubkeys = useMemo(
-    () => (whitenoiseEnabled ? whitenoiseRequests.map((r) => r.fromPubkey) : []),
-    [whitenoiseEnabled, whitenoiseRequests]
-  );
+  const requestPubkeys = whitenoiseEnabled ? whitenoiseRequests.map((r) => r.fromPubkey) : [];
 
   // Accepted Marmot DM counterparties — Marmot uses kind-445 group events,
   // not kind-4/kind-14 DMs, so they don't show up via useRecentContacts.
   // Read them directly from our local DM-index and merge into the contact
   // sources below.
   const { entries: whitenoiseDmEntries } = useWhitenoiseDmContacts();
-  const whitenoiseContactPubkeys = useMemo(
-    () => (whitenoiseEnabled ? whitenoiseDmEntries.map((e) => e.pubkey) : []),
-    [whitenoiseEnabled, whitenoiseDmEntries]
-  );
+  const whitenoiseContactPubkeys = whitenoiseEnabled
+    ? whitenoiseDmEntries.map((e) => e.pubkey)
+    : [];
 
   // Profile metadata is served from the shared SWR cache. Cache hits paint
   // immediately; misses/stale entries trigger one batched kind-0 subscription
   // with `authors: missingOrStale`.
-  const allPubkeys = useMemo(
-    () => [
-      ...new Set([
-        ...contactPubkeys,
-        ...mintPubkeys,
-        ...requestPubkeys,
-        ...whitenoiseContactPubkeys,
-      ]),
-    ],
-    [contactPubkeys, mintPubkeys, requestPubkeys, whitenoiseContactPubkeys]
-  );
+  const allPubkeys = [
+    ...new Set([...contactPubkeys, ...mintPubkeys, ...requestPubkeys, ...whitenoiseContactPubkeys]),
+  ];
   const { metadata: profilesMap } = useNostrProfileMetadataMany(allPubkeys);
 
   useEffect(() => {
@@ -158,42 +146,31 @@ export const ContactsScreen = () => {
   // A mint with a valid npub but no profile metadata yet renders as a bare URL
   // with no picture / nip05 / reputation — reads as "no contact info" to the
   // user. The row reappears automatically when the kind-0 event arrives.
-  const mintsWithProfile = useMemo(
-    () => displayMints.filter((m) => !!m.pubkey && profilesMap.has(m.pubkey)),
-    [displayMints, profilesMap]
-  );
+  const mintsWithProfile = displayMints.filter((m) => !!m.pubkey && profilesMap.has(m.pubkey));
 
-  const requestRows = useMemo<WhitenoiseRequestRow[]>(
-    () =>
-      whitenoiseEnabled
-        ? whitenoiseRequests.map((r) => ({
-            type: 'request',
-            pubkey: r.fromPubkey,
-            request: r,
-          }))
-        : [],
-    [whitenoiseEnabled, whitenoiseRequests]
-  );
+  const requestRows: WhitenoiseRequestRow[] = whitenoiseEnabled
+    ? whitenoiseRequests.map((r) => ({
+        type: 'request',
+        pubkey: r.fromPubkey,
+        request: r,
+      }))
+    : [];
 
   // Map accepted Marmot DM counterparties into the same row shape used by
   // useRecentContacts entries so renderContactItem treats them identically.
   // timestamp 0 keeps them below entries with genuine recent activity.
-  const whitenoiseContactRows = useMemo<RecentContact[]>(
-    () =>
-      whitenoiseEnabled
-        ? whitenoiseDmEntries.map((e) => ({
-            type: 'contact',
-            pubkey: e.pubkey,
-            dmEvent: null,
-            nip17Content: undefined,
-            timestamp: 0,
-            protocol: 'whitenoise' as const,
-          }))
-        : [],
-    [whitenoiseEnabled, whitenoiseDmEntries]
-  );
+  const whitenoiseContactRows: RecentContact[] = whitenoiseEnabled
+    ? whitenoiseDmEntries.map((e) => ({
+        type: 'contact',
+        pubkey: e.pubkey,
+        dmEvent: null,
+        nip17Content: undefined,
+        timestamp: 0,
+        protocol: 'whitenoise' as const,
+      }))
+    : [];
 
-  const rawListData = useMemo<ContactsListItem[]>(() => {
+  const rawListData: ContactsListItem[] = (() => {
     switch (activeFilter) {
       case 'Recent': {
         // Merge NIP-17 recent contacts with accepted Marmot DM counterparties,
@@ -224,147 +201,133 @@ export const ContactsScreen = () => {
         return Array.from(byKey.values());
       }
     }
-  }, [activeFilter, displayContacts, mintsWithProfile, whitenoiseContactRows, requestRows]);
+  })();
 
   // Mock-mode allowlist filter: only show rows whose nostr pubkey is in
   // MOCK_ALLOWED_PUBKEYS_HEX (defined in mockDataStore). Mints / requests are
   // dropped entirely so the screen reads as a clean, hardcoded demo list.
-  const currentListData = useMemo<ContactsListItem[]>(() => {
-    if (!mockMode) return rawListData;
-    return rawListData.filter(
-      (item) => item.type === 'contact' && MOCK_ALLOWED_PUBKEYS_HEX.has(item.pubkey)
-    );
-  }, [rawListData, mockMode]);
-  const handleFilterChange = useCallback((filter: ContactsFilter) => {
+  const currentListData: ContactsListItem[] = mockMode
+    ? rawListData.filter(
+        (item) => item.type === 'contact' && MOCK_ALLOWED_PUBKEYS_HEX.has(item.pubkey)
+      )
+    : rawListData;
+  const handleFilterChange = (filter: ContactsFilter) => {
     log.debug('contacts.filter_changed', { filter });
     setActiveFilter(filter);
-  }, []);
+  };
 
-  const renderContactItem = useCallback(
-    ({ item }: { item: ContactsListItem; index: number }) => {
-      // White Noise pending invite — keep it in this list so the empty/
-      // loading/scrolling behaviour is the same as the other pills, but
-      // swap the trailing slot for accept/decline buttons.
-      if (item.type === 'request') {
-        const req = item.request;
-        const profile = profilesMap.get(req.fromPubkey);
-        // Strangers' kind-0 metadata may simply not be on the user's default
-        // relay set — that's the whole point of a "request". So render with
-        // the seeded fallback immediately rather than a skeleton forever.
-        return (
-          <ContactRow
-            identity={[nostrIdentity(req.fromPubkey, profile, { isLoadingProfile: false })]}
-            subtitle="Wants to start a White Noise chat"
-            hideMetadata
-            trailing={
-              <RequestActions
-                isBusy={whitenoiseBusyId === req.id}
-                onAccept={() => {
-                  paymentLog.info('contact.whitenoise.accept', { pubkey: req.fromPubkey });
-                  void acceptWhitenoiseRequest(req);
-                }}
-                onDecline={() => {
-                  paymentLog.info('contact.whitenoise.decline', { pubkey: req.fromPubkey });
-                  void declineWhitenoiseRequest(req);
-                }}
-              />
-            }
-            testID={`request-row:${req.fromPubkey}`}
-          />
-        );
-      }
-
-      const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
-      const lastMessage =
-        typeof item.dmEvent?.content === 'string' ? item.dmEvent.content : undefined;
-      // Relative date of the last message so it's obvious how long ago it was.
-      // RecentContact.timestamp is in Nostr seconds; formatRelative wants ms.
-      const lastMessageAt =
-        item.type === 'contact' &&
-        typeof item.timestamp === 'number' &&
-        item.timestamp > 0 &&
-        lastMessage
-          ? formatRelative(item.timestamp * 1000, 'compact')
-          : undefined;
-      // Label non-default DM protocols so a NIP-04 / White Noise conversation is
-      // distinguishable from the default NIP-17 in the now-mixed list.
-      const protocolLabel =
-        item.type === 'contact' && item.protocol === 'nip04'
-          ? 'NIP-04'
-          : item.type === 'contact' && item.protocol === 'whitenoise'
-            ? 'White Noise'
-            : undefined;
-      // Don't drive the avatar's loading skeleton off "profile is missing":
-      // for strangers (Marmot DM accept, Requests pill) kind-0 may simply not
-      // be on our relay set, so missing IS the steady state.
-      const isLoadingProfile = false;
-      const mintUrl = item.type === 'mint' ? item.mint?.mintUrl : undefined;
-      // Dev-only data-source chip (n/c/r) for DM-backed rows, keyed by the
-      // conversation's newest message id — same pattern as PostCard/notifications.
-      const sourceBadge =
-        item.type === 'contact' && item.newestMessageId ? (
-          <TierBadge eventId={item.newestMessageId} />
-        ) : undefined;
-
-      // Layered identity: mint-type items also have a nostr contact key
-      // (NIP-87 / NUT-06), so render the mint avatar/name with the nostr
-      // reputation pills + NIP-05 badge on the accent row.
-      const identity: Identity[] = [];
-      if (item.type === 'mint' && mintUrl) {
-        identity.push(
-          mintIdentity({
-            mintUrl,
-            displayName: item.mintInfo?.name ?? mintUrl,
-            iconUrl: item.mintInfo?.icon_url,
-          })
-        );
-      }
-      if (item.pubkey) {
-        identity.push(nostrIdentity(item.pubkey, profile, { isLoadingProfile }));
-      }
-
-      // Replies mode: a last-message preview takes the subtitle slot and
-      // suppresses metadata — the pill row would read as noise next to a
-      // human sentence.
+  const renderContactItem = ({ item }: { item: ContactsListItem; index: number }) => {
+    // White Noise pending invite — keep it in this list so the empty/
+    // loading/scrolling behaviour is the same as the other pills, but
+    // swap the trailing slot for accept/decline buttons.
+    if (item.type === 'request') {
+      const req = item.request;
+      const profile = profilesMap.get(req.fromPubkey);
+      // Strangers' kind-0 metadata may simply not be on the user's default
+      // relay set — that's the whole point of a "request". So render with
+      // the seeded fallback immediately rather than a skeleton forever.
       return (
         <ContactRow
-          identity={identity}
-          subtitle={lastMessage}
-          hideMetadata={!!lastMessage}
-          titleTrailing={
-            protocolLabel || lastMessageAt || sourceBadge ? (
-              <View style={styles.titleTrailingRow}>
-                {protocolLabel || lastMessageAt ? (
-                  <Text style={{ fontSize: 12, color: muted }}>
-                    {[protocolLabel, lastMessageAt].filter(Boolean).join(' · ')}
-                  </Text>
-                ) : null}
-                {sourceBadge}
-              </View>
-            ) : undefined
+          identity={[nostrIdentity(req.fromPubkey, profile, { isLoadingProfile: false })]}
+          subtitle="Wants to start a White Noise chat"
+          hideMetadata
+          trailing={
+            <RequestActions
+              isBusy={whitenoiseBusyId === req.id}
+              onAccept={() => {
+                paymentLog.info('contact.whitenoise.accept', { pubkey: req.fromPubkey });
+                void acceptWhitenoiseRequest(req);
+              }}
+              onDecline={() => {
+                paymentLog.info('contact.whitenoise.decline', { pubkey: req.fromPubkey });
+                void declineWhitenoiseRequest(req);
+              }}
+            />
           }
-          onPress={() => navigateToProfile(item.pubkey, mintUrl)}
-          testID={`contact-row:nostr:${item.pubkey}`}
+          testID={`request-row:${req.fromPubkey}`}
         />
       );
-    },
-    [
-      activeFilter,
-      activeTab,
-      currentListData.length,
-      profilesMap,
-      whitenoiseBusyId,
-      acceptWhitenoiseRequest,
-      declineWhitenoiseRequest,
-      muted,
-    ]
-  );
-  const renderGroupItem = useCallback(
-    ({ item }: { item: TierEntry; index: number }) => <TierRow tier={item} source="contacts" />,
-    []
+    }
+
+    const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
+    const lastMessage =
+      typeof item.dmEvent?.content === 'string' ? item.dmEvent.content : undefined;
+    // Relative date of the last message so it's obvious how long ago it was.
+    // RecentContact.timestamp is in Nostr seconds; formatRelative wants ms.
+    const lastMessageAt =
+      item.type === 'contact' &&
+      typeof item.timestamp === 'number' &&
+      item.timestamp > 0 &&
+      lastMessage
+        ? formatRelative(item.timestamp * 1000, 'compact')
+        : undefined;
+    // Label non-default DM protocols so a NIP-04 / White Noise conversation is
+    // distinguishable from the default NIP-17 in the now-mixed list.
+    const protocolLabel =
+      item.type === 'contact' && item.protocol === 'nip04'
+        ? 'NIP-04'
+        : item.type === 'contact' && item.protocol === 'whitenoise'
+          ? 'White Noise'
+          : undefined;
+    // Don't drive the avatar's loading skeleton off "profile is missing":
+    // for strangers (Marmot DM accept, Requests pill) kind-0 may simply not
+    // be on our relay set, so missing IS the steady state.
+    const isLoadingProfile = false;
+    const mintUrl = item.type === 'mint' ? item.mint?.mintUrl : undefined;
+    // Dev-only data-source chip (n/c/r) for DM-backed rows, keyed by the
+    // conversation's newest message id — same pattern as PostCard/notifications.
+    const sourceBadge =
+      item.type === 'contact' && item.newestMessageId ? (
+        <TierBadge eventId={item.newestMessageId} />
+      ) : undefined;
+
+    // Layered identity: mint-type items also have a nostr contact key
+    // (NIP-87 / NUT-06), so render the mint avatar/name with the nostr
+    // reputation pills + NIP-05 badge on the accent row.
+    const identity: Identity[] = [];
+    if (item.type === 'mint' && mintUrl) {
+      identity.push(
+        mintIdentity({
+          mintUrl,
+          displayName: item.mintInfo?.name ?? mintUrl,
+          iconUrl: item.mintInfo?.icon_url,
+        })
+      );
+    }
+    if (item.pubkey) {
+      identity.push(nostrIdentity(item.pubkey, profile, { isLoadingProfile }));
+    }
+
+    // Replies mode: a last-message preview takes the subtitle slot and
+    // suppresses metadata — the pill row would read as noise next to a
+    // human sentence.
+    return (
+      <ContactRow
+        identity={identity}
+        subtitle={lastMessage}
+        hideMetadata={!!lastMessage}
+        titleTrailing={
+          protocolLabel || lastMessageAt || sourceBadge ? (
+            <View style={styles.titleTrailingRow}>
+              {protocolLabel || lastMessageAt ? (
+                <Text style={{ fontSize: 12, color: muted }}>
+                  {[protocolLabel, lastMessageAt].filter(Boolean).join(' · ')}
+                </Text>
+              ) : null}
+              {sourceBadge}
+            </View>
+          ) : undefined
+        }
+        onPress={() => navigateToProfile(item.pubkey, mintUrl)}
+        testID={`contact-row:nostr:${item.pubkey}`}
+      />
+    );
+  };
+  const renderGroupItem = ({ item }: { item: TierEntry; index: number }) => (
+    <TierRow tier={item} source="contacts" />
   );
 
-  const renderEmpty = useCallback(() => {
+  const renderEmpty = () => {
     if (activeFilter === 'Mints' && mintInfoLoading) {
       return (
         <View style={styles.emptyContainer}>
@@ -388,16 +351,13 @@ export const ContactsScreen = () => {
         </Text>
       </View>
     );
-  }, [muted, activeFilter, mintInfoLoading]);
+  };
 
   // Idle Contacts-tab pills. Groups lives in the outer tab bar (not a pill),
   // and live search now has its own scope tabs in UnifiedSearch.
-  const visibleFilters = useMemo<readonly ContactsFilter[]>(() => {
-    const baseFilters: ContactsFilter[] = ['All', 'Recent'];
-    if (whitenoiseEnabled) baseFilters.push('Requests');
-    baseFilters.push('Mints');
-    return baseFilters;
-  }, [whitenoiseEnabled]);
+  const visibleFilters: readonly ContactsFilter[] = whitenoiseEnabled
+    ? ['All', 'Recent', 'Requests', 'Mints']
+    : ['All', 'Recent', 'Mints'];
 
   // If the active pill drops out of the visible set (e.g. White Noise gets
   // disabled while 'Requests' is active), fall back to 'All'.
@@ -415,10 +375,10 @@ export const ContactsScreen = () => {
   const TOP_TAB_KEYS: readonly TopTab[] = ['contacts', 'groups'];
   const TOP_TAB_LABELS = ['Contacts', 'Groups'] as const;
   const activeTabLabel = TOP_TAB_LABELS[TOP_TAB_KEYS.indexOf(activeTab)] ?? 'Contacts';
-  const handleTopTabPress = useCallback((_tab: string, index: number) => {
+  const handleTopTabPress = (_tab: string, index: number) => {
     const nextKey = TOP_TAB_KEYS[index];
     if (nextKey) setActiveTab(nextKey);
-  }, []);
+  };
 
   // --- Render helpers ---
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, Share } from 'react-native';
 
 import { Button, Card, Switch as HeroSwitch } from 'heroui-native';
@@ -189,17 +189,14 @@ export const SettingsStorageScreen = () => {
   const fileLoggingEnabled = useSettingsStore((state) => state.fileLoggingEnabled);
   const setFileLoggingEnabled = useSettingsStore((state) => state.setFileLoggingEnabled);
 
-  const refreshLogFileInfo = useCallback(() => setLogFileInfo(getLogFileInfo()), []);
+  const refreshLogFileInfo = () => setLogFileInfo(getLogFileInfo());
 
-  const handleToggleFileLogging = useCallback(
-    (next: boolean) => {
-      setFileLoggingEnabled(next);
-      refreshLogFileInfo();
-    },
-    [setFileLoggingEnabled, refreshLogFileInfo]
-  );
+  const handleToggleFileLogging = (next: boolean) => {
+    setFileLoggingEnabled(next);
+    refreshLogFileInfo();
+  };
 
-  const handleExportLogFile = useCallback(async () => {
+  const handleExportLogFile = async () => {
     setIsExportingLogs(true);
     try {
       const shared = await exportLogFile();
@@ -212,58 +209,55 @@ export const SettingsStorageScreen = () => {
       setIsExportingLogs(false);
       refreshLogFileInfo();
     }
-  }, [refreshLogFileInfo]);
+  };
 
-  const handleClearLogFile = useCallback(() => {
+  const handleClearLogFile = () => {
     clearLogFile();
     refreshLogFileInfo();
-  }, [refreshLogFileInfo]);
+  };
   const [zustandGroups, setZustandGroups] = useState<ZustandInventory>(EMPTY_ZUSTAND_GROUPS);
   const [secureStoreKeys, setSecureStoreKeys] = useState<string[]>([]);
   const [cocoDbFiles, setCocoDbFiles] = useState<string[]>([]);
   const [cocoBackupFiles, setCocoBackupFiles] = useState<string[]>([]);
   const [secureStoreMeta, setSecureStoreMeta] = useState({ existing: 0, total: 0 });
 
-  const loadSnapshot = useCallback(
-    async (refresh = false) => {
-      if (refresh) {
-        setIsRefreshing(true);
-      } else {
-        setIsLoading(true);
-      }
+  const loadSnapshot = async (refresh = false) => {
+    if (refresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
 
-      try {
-        setError(null);
-        const snapshot = await getStorageInventorySnapshot(profiles);
+    try {
+      setError(null);
+      const snapshot = await getStorageInventorySnapshot(profiles);
 
-        const secureEntries = snapshot.secureStore
-          .filter((entry) => entry.exists)
-          .map((entry) => entry.key)
-          .sort();
+      const secureEntries = snapshot.secureStore
+        .filter((entry) => entry.exists)
+        .map((entry) => entry.key)
+        .sort();
 
-        setZustandGroups(snapshot.zustand);
-        setSecureStoreKeys(secureEntries);
-        setCocoDbFiles(snapshot.cocoDatabases);
-        setCocoBackupFiles(snapshot.cocoBackups);
-        setSecureStoreMeta({
-          existing: secureEntries.length,
-          total: snapshot.secureStore.length,
-        });
-      } catch (snapshotError) {
-        setError(snapshotError instanceof Error ? snapshotError.message : 'Unknown error');
-      } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
-      }
-    },
-    [profiles]
-  );
+      setZustandGroups(snapshot.zustand);
+      setSecureStoreKeys(secureEntries);
+      setCocoDbFiles(snapshot.cocoDatabases);
+      setCocoBackupFiles(snapshot.cocoBackups);
+      setSecureStoreMeta({
+        existing: secureEntries.length,
+        total: snapshot.secureStore.length,
+      });
+    } catch (snapshotError) {
+      setError(snapshotError instanceof Error ? snapshotError.message : 'Unknown error');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     void loadSnapshot();
   }, [loadSnapshot]);
 
-  const handleShareDump = useCallback(async () => {
+  const handleShareDump = async () => {
     setIsSharing(true);
     try {
       const dump = await getFullAsyncStorageDump();
@@ -274,18 +268,18 @@ export const SettingsStorageScreen = () => {
     } finally {
       setIsSharing(false);
     }
-  }, []);
+  };
 
-  const handleCopyCocoReport = useCallback(async () => {
+  const handleCopyCocoReport = async () => {
     try {
       await Clipboard.setStringAsync(buildCocoFeedbackReport());
       Alert.alert('Copied', 'coco v2 feedback report copied — paste into a cashubtc/coco issue.');
     } catch (copyError) {
       setError(copyError instanceof Error ? copyError.message : 'Copy failed');
     }
-  }, []);
+  };
 
-  const handleCopyDebugLogs = useCallback(async () => {
+  const handleCopyDebugLogs = async () => {
     setIsCopyingLogs(true);
     try {
       await Clipboard.setStringAsync(log.dumpForLLM());
@@ -295,49 +289,40 @@ export const SettingsStorageScreen = () => {
     } finally {
       setIsCopyingLogs(false);
     }
-  }, []);
+  };
 
-  const subtitle = useMemo(() => {
-    if (isLoading) {
-      return 'Loading storage inventory...';
-    }
-    return 'Shows storage keys/files that currently exist on this device.';
-  }, [isLoading]);
+  const subtitle = isLoading
+    ? 'Loading storage inventory...'
+    : 'Shows storage keys/files that currently exist on this device.';
 
-  const secureStoreGrouped = useMemo(
-    () => ({
-      static: secureStoreKeys.filter(
-        (key) => key === 'user_mnemonic' || key === 'migrations_complete'
-      ),
-      migrationFlags: secureStoreKeys.filter((key) => key.startsWith('migrations_complete_')),
-      derivedCaches: secureStoreKeys.filter(
-        (key) => key.startsWith('derived_keys_') || key.startsWith('cashu_mnemonic_')
-      ),
-      importedNsec: secureStoreKeys.filter((key) => key.startsWith('imported_nsec_')),
-      other: secureStoreKeys.filter(
-        (key) =>
-          key !== 'user_mnemonic' &&
-          key !== 'migrations_complete' &&
-          !key.startsWith('migrations_complete_') &&
-          !key.startsWith('derived_keys_') &&
-          !key.startsWith('cashu_mnemonic_') &&
-          !key.startsWith('imported_nsec_')
-      ),
-    }),
-    [secureStoreKeys]
-  );
+  const secureStoreGrouped = {
+    static: secureStoreKeys.filter(
+      (key) => key === 'user_mnemonic' || key === 'migrations_complete'
+    ),
+    migrationFlags: secureStoreKeys.filter((key) => key.startsWith('migrations_complete_')),
+    derivedCaches: secureStoreKeys.filter(
+      (key) => key.startsWith('derived_keys_') || key.startsWith('cashu_mnemonic_')
+    ),
+    importedNsec: secureStoreKeys.filter((key) => key.startsWith('imported_nsec_')),
+    other: secureStoreKeys.filter(
+      (key) =>
+        key !== 'user_mnemonic' &&
+        key !== 'migrations_complete' &&
+        !key.startsWith('migrations_complete_') &&
+        !key.startsWith('derived_keys_') &&
+        !key.startsWith('cashu_mnemonic_') &&
+        !key.startsWith('imported_nsec_')
+    ),
+  };
 
-  const cocoGrouped = useMemo(
-    () => ({
-      mainDbFiles: cocoDbFiles.filter(
-        (file) => !file.includes('-wal') && !file.includes('-shm') && !file.includes('-journal')
-      ),
-      sqliteSidecars: cocoDbFiles.filter(
-        (file) => file.includes('-wal') || file.includes('-shm') || file.includes('-journal')
-      ),
-    }),
-    [cocoDbFiles]
-  );
+  const cocoGrouped = {
+    mainDbFiles: cocoDbFiles.filter(
+      (file) => !file.includes('-wal') && !file.includes('-shm') && !file.includes('-journal')
+    ),
+    sqliteSidecars: cocoDbFiles.filter(
+      (file) => file.includes('-wal') || file.includes('-shm') || file.includes('-journal')
+    ),
+  };
 
   return (
     <ScreenWrapper name="SettingsStorageScreen" scroll="custom" safeArea>

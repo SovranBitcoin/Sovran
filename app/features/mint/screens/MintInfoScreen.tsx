@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import Animated, {
   Easing,
@@ -54,7 +54,7 @@ const ParamsSchema = z.object({
   mintInfoEntry: z.string().min(1).max(64_000).optional(),
 });
 
-function ProgressRingComponent({
+function ProgressRing({
   size = 84,
   strokeWidth = 3,
   progress = 0.5,
@@ -110,9 +110,8 @@ function ProgressRingComponent({
     </View>
   );
 }
-const ProgressRing = React.memo(ProgressRingComponent);
 
-function AnimatedAvatarComponent({
+function AnimatedAvatar({
   picture,
   name,
   alt,
@@ -147,15 +146,7 @@ function AnimatedAvatarComponent({
     transform: [{ scale: badgeAnim.value }],
   }));
 
-  const statusBadge = useMemo(() => {
-    if (!status) return null;
-    const config: Record<string, { variant: 'success' | 'error' | 'secondary'; icon: string }> = {
-      OK: { variant: 'success', icon: 'fluent:checkmark-16-filled' },
-      ERROR: { variant: 'error', icon: 'nonicons:error-16' },
-      OFFLINE: { variant: 'secondary', icon: 'feather:wifi' },
-    };
-    return config[status];
-  }, [status]);
+  const statusBadge = status ? STATUS_BADGE_CONFIG[status] : null;
 
   useEffect(() => {
     if (status && !isLoading) {
@@ -203,9 +194,17 @@ function AnimatedAvatarComponent({
     </View>
   );
 }
-const AnimatedAvatar = React.memo(AnimatedAvatarComponent);
 
-function StatsGridComponent({
+const STATUS_BADGE_CONFIG: Record<
+  string,
+  { variant: 'success' | 'error' | 'secondary'; icon: string }
+> = {
+  OK: { variant: 'success', icon: 'fluent:checkmark-16-filled' },
+  ERROR: { variant: 'error', icon: 'nonicons:error-16' },
+  OFFLINE: { variant: 'secondary', icon: 'feather:wifi' },
+};
+
+function StatsGrid({
   successRate,
   avgTimeMs,
   swapSuccess,
@@ -226,15 +225,12 @@ function StatsGridComponent({
     'surface-tertiary',
   ] as const);
 
-  const displayValues = useMemo(
-    () => ({
-      successRate: successRate !== undefined ? (successRate * 100).toFixed(1) : '0.0',
-      avgTimeMs: avgTimeMs !== undefined ? Math.round(avgTimeMs).toString() : '0',
-      totalMints: totalMints !== undefined ? Math.round(totalMints).toString() : '0',
-      totalMelts: totalMelts !== undefined ? Math.round(totalMelts).toString() : '0',
-    }),
-    [successRate, avgTimeMs, totalMints, totalMelts]
-  );
+  const displayValues = {
+    successRate: successRate !== undefined ? (successRate * 100).toFixed(1) : '0.0',
+    avgTimeMs: avgTimeMs !== undefined ? Math.round(avgTimeMs).toString() : '0',
+    totalMints: totalMints !== undefined ? Math.round(totalMints).toString() : '0',
+    totalMelts: totalMelts !== undefined ? Math.round(totalMelts).toString() : '0',
+  };
 
   const hasValidData =
     successRate !== undefined ||
@@ -242,38 +238,35 @@ function StatsGridComponent({
     totalMints !== undefined ||
     totalMelts !== undefined;
 
-  const stats = useMemo(
-    () => [
-      {
-        label: 'Success rate',
-        description:
-          typeof swapSuccess === 'number' && typeof swapTotal === 'number'
-            ? `${swapSuccess} of ${swapTotal} swaps`
-            : 'Successful rate of swaps',
-        value: `${displayValues.successRate}%`,
-        accent: true,
-      },
-      {
-        label: 'Average time',
-        description: 'For successful swaps',
-        value: `${displayValues.avgTimeMs} ms`,
-        accent: true,
-      },
-      {
-        label: 'Total mints',
-        description: 'Total mint operations',
-        value: displayValues.totalMints,
-        accent: false,
-      },
-      {
-        label: 'Total melts',
-        description: 'Total melt operations',
-        value: displayValues.totalMelts,
-        accent: false,
-      },
-    ],
-    [displayValues, swapSuccess, swapTotal]
-  );
+  const stats = [
+    {
+      label: 'Success rate',
+      description:
+        typeof swapSuccess === 'number' && typeof swapTotal === 'number'
+          ? `${swapSuccess} of ${swapTotal} swaps`
+          : 'Successful rate of swaps',
+      value: `${displayValues.successRate}%`,
+      accent: true,
+    },
+    {
+      label: 'Average time',
+      description: 'For successful swaps',
+      value: `${displayValues.avgTimeMs} ms`,
+      accent: true,
+    },
+    {
+      label: 'Total mints',
+      description: 'Total mint operations',
+      value: displayValues.totalMints,
+      accent: false,
+    },
+    {
+      label: 'Total melts',
+      description: 'Total melt operations',
+      value: displayValues.totalMelts,
+      accent: false,
+    },
+  ];
 
   const showSkeleton = !hasValidData;
 
@@ -339,10 +332,9 @@ function StatsGridComponent({
     />
   );
 }
-const StatsGrid = React.memo(StatsGridComponent);
 
 /** Score with staggered star rows and distribution bars to the edge. */
-function RatingBarChartComponent({ score }: { score: number }) {
+function RatingBarChart({ score }: { score: number }) {
   const [foreground, defaultColor, surfaceTertiary, starColor] = useThemeColor([
     'foreground',
     'default',
@@ -476,7 +468,6 @@ function RatingBarChartComponent({ score }: { score: number }) {
     />
   );
 }
-const RatingBarChart = React.memo(RatingBarChartComponent);
 
 export function MintInfoScreen() {
   useLifecycleLogger('MintInfoScreen');
@@ -509,23 +500,20 @@ export function MintInfoScreen() {
     typeof entry?.kymScore === 'number' ? entry.kymScore : (cachedMeta?.averageScore ?? undefined);
   const contact = entry?.contact as
     { method: string; info: import('wallet').FormattedString }[] | undefined;
-  const contactRows = useMemo(() => getSortedMintInfoContacts(contact), [contact]);
-  const nostrContactPubkey = useMemo(
-    () => getMintInfoNostrContactPubkey(contactRows),
-    [contactRows]
-  );
+  const contactRows = getSortedMintInfoContacts(contact);
+  const nostrContactPubkey = getMintInfoNostrContactPubkey(contactRows);
   const { data: nostrContactProfile, isLoading: nostrContactLoading } = useNostrProfile(
     nostrContactPubkey ?? null
   );
   const nostrContactPicture = nostrContactProfile?.picture || nostrContactProfile?.image;
 
-  const handleMintUrlPress = useCallback(async () => {
+  const handleMintUrlPress = async () => {
     if (!mintUrl) return;
     log.info('mint.info.address.copy');
     await Clipboard.setStringAsync(mintUrl);
-  }, [mintUrl]);
+  };
 
-  const handleContactPress = useCallback(async (method: string, info: string, pubkey?: string) => {
+  const handleContactPress = async (method: string, info: string, pubkey?: string) => {
     log.info('mint.info.contact.press', { method });
     const open = async (raw: string) => {
       const result = await openExternalUrl(raw);
@@ -552,7 +540,7 @@ export function MintInfoScreen() {
       default:
         await Clipboard.setStringAsync(info);
     }
-  }, []);
+  };
 
   return (
     <Log name="MintInfoScreen" style={{ flex: 1, backgroundColor: background }}>

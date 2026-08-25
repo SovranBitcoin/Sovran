@@ -9,7 +9,7 @@
  * - Bottom button to continue with claim process
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TextInput, Alert, Keyboard, StyleSheet, View as RNView } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
@@ -126,14 +126,11 @@ function UsernameInput({
 }) {
   const foreground = useThemeColor('foreground');
 
-  const handleChange = useCallback(
-    (text: string) => {
-      // Only allow lowercase letters, numbers, and underscores
-      const sanitized = text.toLowerCase().replace(/[^a-z0-9_]/g, '');
-      onChangeText(sanitized);
-    },
-    [onChangeText]
-  );
+  const handleChange = (text: string) => {
+    // Only allow lowercase letters, numbers, and underscores
+    const sanitized = text.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    onChangeText(sanitized);
+  };
 
   return (
     <SquircleView
@@ -318,24 +315,21 @@ export function ClaimUsernameScreen() {
   const [isClaiming, setIsClaiming] = useState(false);
 
   // Close button for header
-  const handleClose = useCallback(() => {
+  const handleClose = () => {
     hero.closeClaimUsername();
-  }, [hero]);
+  };
 
-  const CloseButton = useCallback(
-    () => (
-      <ScreenHeaderAction
-        icon="material-symbols:close-rounded"
-        onPress={handleClose}
-        accessibilityLabel="Close"
-      />
-    ),
-    [handleClose]
+  const CloseButton = () => (
+    <ScreenHeaderAction
+      icon="material-symbols:close-rounded"
+      onPress={handleClose}
+      accessibilityLabel="Close"
+    />
   );
 
-  const handleHeroLayout = useCallback(() => {
+  const handleHeroLayout = () => {
     hero.registerRef('claimUsername', 'destination', heroRef.current);
-  }, [hero]);
+  };
 
   // ---------------------------------------------------------------------------
   // Safe fade-in animation (always mounted, no mount/unmount race with Core Animation)
@@ -365,7 +359,7 @@ export function ClaimUsernameScreen() {
 
   // Check availability for all domains; abortable so a stale in-flight check
   // cannot overwrite the latest user input.
-  const checkAvailability = useCallback(async (name: string, signal: AbortSignal) => {
+  const checkAvailability = async (name: string, signal: AbortSignal) => {
     if (name.length < 1) {
       setAvailabilityResults([]);
       return;
@@ -424,7 +418,7 @@ export function ClaimUsernameScreen() {
     });
     setAvailabilityResults(results);
     setIsChecking(false);
-  }, []);
+  };
 
   // Trigger availability check when username changes; abort the previous
   // in-flight check on every change so the latest input wins regardless of
@@ -447,31 +441,25 @@ export function ClaimUsernameScreen() {
   }, [username, checkAvailability]);
 
   // Get availability result for a domain
-  const getAvailabilityForDomain = useCallback(
-    (domainValue: string) => {
-      return availabilityResults.find((r) => r.domain === domainValue);
-    },
-    [availabilityResults]
-  );
+  const getAvailabilityForDomain = (domainValue: string) => {
+    return availabilityResults.find((r) => r.domain === domainValue);
+  };
 
   // Check if selected domain is available
-  const selectedDomainAvailable = useMemo(() => {
-    const selectedDomainValue = DOMAINS.find((d) => d.id === selectedDomain)?.value;
-    const result = availabilityResults.find((r) => r.domain === selectedDomainValue);
-    return result?.available === true;
-  }, [availabilityResults, selectedDomain]);
+  const selectedDomainValue = DOMAINS.find((d) => d.id === selectedDomain)?.value;
+  const selectedDomainAvailable =
+    availabilityResults.find((r) => r.domain === selectedDomainValue)?.available === true;
 
   // Claim the username via npubcash-sdk. Mirrors eNuts's NpcService.requestNpcUsername:
   // attempt setUsername; on PaymentRequiredError, surface the paid-claim path
   // (not yet wired in the Sovran UI). Other errors bubble as a generic alert.
-  const handleContinue = useCallback(async () => {
+  const handleContinue = async () => {
     Keyboard.dismiss();
     log.info('onboarding.claim.continue', {
       usernameHash: hashUsername(username),
       domain: selectedDomain,
     });
 
-    const selectedDomainValue = DOMAINS.find((d) => d.id === selectedDomain)?.value;
     if (selectedDomainValue !== NPC_DOMAIN) {
       Alert.alert('Not yet supported', `Claiming on ${selectedDomainValue} isn't wired up yet.`);
       return;
@@ -507,29 +495,26 @@ export function ClaimUsernameScreen() {
     } finally {
       setIsClaiming(false);
     }
-  }, [nostrKeys?.privateKey, username, selectedDomain, hero]);
+  };
 
   const selectedDomainLabel = DOMAINS.find((d) => d.id === selectedDomain)!.value;
 
   // Bottom buttons component
-  const bottomButtons = useMemo(
-    () => (
-      <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            {
-              text: isClaiming ? 'Claiming…' : 'Continue',
-              variant: 'secondary' as const,
-              disabled: isClaiming || !selectedDomainAvailable,
-              onPress: async () => {
-                await handleContinue();
-              },
+  const bottomButtons = (
+    <BottomButtons>
+      <ButtonHandler
+        buttons={[
+          {
+            text: isClaiming ? 'Claiming…' : 'Continue',
+            variant: 'secondary' as const,
+            disabled: isClaiming || !selectedDomainAvailable,
+            onPress: async () => {
+              await handleContinue();
             },
-          ]}
-        />
-      </BottomButtons>
-    ),
-    [handleContinue, isClaiming, selectedDomainAvailable]
+          },
+        ]}
+      />
+    </BottomButtons>
   );
 
   return (
