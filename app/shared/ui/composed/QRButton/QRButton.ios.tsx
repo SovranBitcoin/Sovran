@@ -1,25 +1,22 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
 import Animated, { measure, runOnJS, runOnUI, useAnimatedRef } from 'react-native-reanimated';
 
 import Icon from 'assets/icons';
 import { Log, initLog } from '@/shared/lib/logger';
-import { registerQRButtonRemeasure, setQRButtonAnchor } from '@/shared/lib/qrButtonAnchor';
+import { setQRButtonAnchor } from '@/shared/lib/qrButtonAnchor';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import {
+  DEFAULT_SIZE,
+  usePublishAnchorInWindow,
+  useQRButtonAnchorRegistration,
+} from './QRButton.shared';
+import type { QRButtonProps } from './QRButton.shared';
 import { useQRButtonPressFeedback } from './useQRButtonPressFeedback';
 import { useQRButtonReveal } from './useQRButtonReveal';
 import { QRButtonFace } from './QRButtonFace';
 import { qrButtonGeometry } from './qrButtonGeometry';
-
-interface QRButtonProps {
-  onPress: () => void;
-  accentColor?: string;
-  color?: string;
-  size?: number;
-}
-
-const DEFAULT_SIZE = 64;
 
 export function QRButton(props: QRButtonProps): React.ReactElement {
   // Inverts with the theme: on dark themes the base is the foreground (white)
@@ -34,6 +31,11 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   const animatedRef = useAnimatedRef<Animated.View>();
   const visibilityStyle = useQRButtonReveal();
   const pressFeedback = useQRButtonPressFeedback();
+
+  // JS-thread fallback: reanimated's measure() intermittently returns null
+  // on Fabric (especially right after layout), so always publish from the
+  // measureInWindow path too.
+  const publishInWindow = usePublishAnchorInWindow(animatedRef, borderRadius);
 
   const publishAnchor = useCallback(() => {
     // Try the worklet path first — UI-thread measurement, syncs with frame.
@@ -53,27 +55,10 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
         `measure(UI) — pageX=${m.pageX} pageY=${m.pageY} width=${m.width} height=${m.height}`
       );
     })();
-    // JS-thread fallback: reanimated's measure() intermittently returns null
-    // on Fabric (especially right after layout). measureInWindow is reliable
-    // and uses the same coordinate space, so always publish from here too.
-    // The store's identity check makes redundant publishes a no-op.
-    const node = animatedRef.current as unknown as {
-      measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
-    } | null;
-    node?.measureInWindow?.((x, y, w, h) => {
-      if (!w || !h) return;
-      setQRButtonAnchor({ x, y, width: w, height: h, borderRadius });
-      initLog('QRButtonAnchor', `measureInWindow(JS) — x=${x} y=${y} width=${w} height=${h}`);
-    });
-  }, [animatedRef, borderRadius]);
+    publishInWindow();
+  }, [animatedRef, borderRadius, publishInWindow]);
 
-  useEffect(() => {
-    const unregister = registerQRButtonRemeasure(publishAnchor);
-    return () => {
-      unregister();
-      setQRButtonAnchor(null);
-    };
-  }, [publishAnchor]);
+  useQRButtonAnchorRegistration(publishAnchor);
 
   return (
     <Log name="QRButton">

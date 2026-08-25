@@ -179,6 +179,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/composed/BottomButtons.tsx",
     "shared/ui/composed/ButtonHandler.tsx",
     "shared/ui/composed/CapsuleButton/CapsuleButton.blur.tsx",
+    "shared/ui/composed/CapsuleButton/CapsuleButton.content.tsx",
     "shared/ui/composed/CapsuleButton/CapsuleButton.flat.tsx",
     "shared/ui/composed/CapsuleButton/CapsuleButton.liquid.tsx",
     "shared/ui/composed/CircleActionButton/CircleActionButton.liquid.tsx",
@@ -233,8 +234,9 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/Haptics.tsx",
     "shared/ui/primitives/Image.tsx",
     "shared/ui/primitives/Pressable.tsx",
+    "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 229,
+  "total": 231,
 }
 `;

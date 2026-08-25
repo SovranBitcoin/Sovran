@@ -5,15 +5,9 @@ import { PressableFeedback } from 'heroui-native';
 import { withAlpha } from '@/shared/lib/color';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { controlHeight } from '@/shared/styles/tokens';
-import Icon from 'assets/icons';
-import { Text } from '@/shared/ui/primitives/Text';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
+import { CapsuleButtonContent, DEFAULT_HEIGHT, capsuleWidthStyle } from './CapsuleButton.content';
 import type { CapsuleButtonProps } from './CapsuleButton.types';
-
-// controlHeight.cta — matches the liquid variant (48) so all three tiers agree.
-const DEFAULT_HEIGHT = controlHeight.cta;
 
 export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement {
   const [foreground, surfaceSecondary, muted, background] = useThemeColor([
@@ -23,9 +17,6 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
     'background',
   ] as const);
   const {
-    label,
-    icon,
-    iconNode,
     onPress,
     color,
     isActive = false,
@@ -34,16 +25,11 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
     testID,
     roundedSide = 'all',
     fitContent = false,
-    iconSize = 16,
-    textSize = 14,
-    labelNumberOfLines,
     style,
-    contentStyle,
-    textStyle,
   } = props;
 
   const cornerStyle = getCornerStyle(roundedSide);
-  const widthStyle = fitContent ? null : styles.fullWidth;
+  const widthStyle = capsuleWidthStyle(fitContent);
 
   // filled → solid foreground CTA with inverted content; active → tinted fill;
   // default → the neutral surface used by the status pills. An explicit `color`
@@ -74,20 +60,12 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
         animation={false}
         onPress={onPress}
         style={[styles.pressable, widthStyle, { minHeight: height }]}>
-        <HStack
-          align="center"
-          justify="center"
-          gap={8}
-          style={[styles.content, widthStyle, { minHeight: height }, contentStyle]}>
-          {iconNode ?? (icon ? <Icon name={icon} size={iconSize} color={contentColor} /> : null)}
-          <Text
-            size={textSize}
-            bold
-            numberOfLines={labelNumberOfLines}
-            style={[{ color: contentColor }, textStyle]}>
-            {label}
-          </Text>
-        </HStack>
+        <CapsuleButtonContent
+          {...props}
+          contentColor={contentColor}
+          height={height}
+          widthStyle={widthStyle}
+        />
         <PressableFeedback.Ripple />
       </PressableFeedback>
     </View>
@@ -100,13 +78,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
   },
-  fullWidth: {
-    width: '100%',
-  },
   pressable: {
     overflow: 'hidden',
-  },
-  content: {
-    paddingHorizontal: 12,
   },
 });

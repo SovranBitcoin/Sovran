@@ -1,26 +1,22 @@
-import React, { useCallback, useEffect } from 'react';
+import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
 
 import Icon from 'assets/icons';
-import { Log, initLog } from '@/shared/lib/logger';
-import { registerQRButtonRemeasure, setQRButtonAnchor } from '@/shared/lib/qrButtonAnchor';
+import { Log } from '@/shared/lib/logger';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import {
+  DEFAULT_SIZE,
+  usePublishAnchorInWindow,
+  useQRButtonAnchorRegistration,
+} from './QRButton.shared';
+import type { QRButtonProps } from './QRButton.shared';
 import { useQRButtonPressFeedback } from './useQRButtonPressFeedback';
 import { useQRButtonReveal } from './useQRButtonReveal';
 import { QRButtonFace } from './QRButtonFace';
 import { qrButtonGeometry } from './qrButtonGeometry';
-
-export interface QRButtonProps {
-  onPress: () => void;
-  accentColor?: string;
-  color?: string;
-  size?: number;
-}
-
-const DEFAULT_SIZE = 64;
 
 export function QRButton(props: QRButtonProps): React.ReactElement {
   // Inverts with the theme: on dark themes the base is the foreground (white)
@@ -35,28 +31,12 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   const visibilityStyle = useQRButtonReveal();
   const pressFeedback = useQRButtonPressFeedback();
 
-  const publishAnchor = useCallback(() => {
-    // Android's UI-thread measurement can report pageX/pageY in a different
-    // space than the root view during boot on devices with variable system
-    // nav bars. The splash morph consumes window coordinates, so keep this
-    // path on measureInWindow only.
-    const node = animatedRef.current as unknown as {
-      measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
-    } | null;
-    node?.measureInWindow?.((x, y, w, h) => {
-      if (!w || !h) return;
-      setQRButtonAnchor({ x, y, width: w, height: h, borderRadius });
-      initLog('QRButtonAnchor', `measureInWindow(JS) — x=${x} y=${y} width=${w} height=${h}`);
-    });
-  }, [animatedRef, borderRadius]);
-
-  useEffect(() => {
-    const unregister = registerQRButtonRemeasure(publishAnchor);
-    return () => {
-      unregister();
-      setQRButtonAnchor(null);
-    };
-  }, [publishAnchor]);
+  // Android's UI-thread measurement can report pageX/pageY in a different
+  // space than the root view during boot on devices with variable system
+  // nav bars. The splash morph consumes window coordinates, so keep this
+  // path on measureInWindow only.
+  const publishAnchor = usePublishAnchorInWindow(animatedRef, borderRadius);
+  useQRButtonAnchorRegistration(publishAnchor);
 
   return (
     <Log name="QRButton">

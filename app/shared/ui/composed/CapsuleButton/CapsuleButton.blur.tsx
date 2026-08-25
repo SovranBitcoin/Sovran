@@ -4,18 +4,12 @@ import { StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
 import { withAlpha } from '@/shared/lib/color';
 
-import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { controlHeight } from '@/shared/styles/tokens';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
-import { Text } from '@/shared/ui/primitives/Text';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
+import { CapsuleButtonContent, DEFAULT_HEIGHT, capsuleWidthStyle } from './CapsuleButton.content';
 import { CapsuleButtonFlat } from './CapsuleButton.flat';
 import type { CapsuleButtonProps } from './CapsuleButton.types';
-
-// controlHeight.cta — matches the liquid variant (48) so all three tiers agree.
-const DEFAULT_HEIGHT = controlHeight.cta;
 
 export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
@@ -25,9 +19,6 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
   if (props.filled) return <CapsuleButtonFlat {...props} />;
 
   const {
-    label,
-    icon,
-    iconNode,
     onPress,
     color = foreground,
     isActive = false,
@@ -35,12 +26,7 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
     testID,
     roundedSide = 'all',
     fitContent = false,
-    iconSize = 16,
-    textSize = 14,
-    labelNumberOfLines,
     style,
-    contentStyle,
-    textStyle,
   } = props;
   const accentColor = muted;
   // Active → a foreground tint over the blur + a foreground border (the
@@ -48,7 +34,7 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
   // status pills.
   const borderColor = isActive ? foreground : accentColor;
   const cornerStyle = getCornerStyle(roundedSide);
-  const widthStyle = fitContent ? null : styles.fullWidth;
+  const widthStyle = capsuleWidthStyle(fitContent);
 
   return (
     <View
@@ -73,20 +59,12 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
           animation={false}
           onPress={onPress}
           style={[styles.pressable, widthStyle, { minHeight: height }]}>
-          <HStack
-            align="center"
-            justify="center"
-            gap={8}
-            style={[styles.content, widthStyle, { minHeight: height }, contentStyle]}>
-            {iconNode ?? (icon ? <Icon name={icon} size={iconSize} color={color} /> : null)}
-            <Text
-              size={textSize}
-              bold
-              numberOfLines={labelNumberOfLines}
-              style={[{ color }, textStyle]}>
-              {label}
-            </Text>
-          </HStack>
+          <CapsuleButtonContent
+            {...props}
+            contentColor={color}
+            height={height}
+            widthStyle={widthStyle}
+          />
           <PressableFeedback.Ripple />
         </PressableFeedback>
       </BlurCardFrame>
@@ -110,14 +88,8 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
-  fullWidth: {
-    width: '100%',
-  },
   pressable: {
     overflow: 'hidden',
-  },
-  content: {
-    paddingHorizontal: 12,
   },
   borderOverlay: {
     borderWidth: 1,

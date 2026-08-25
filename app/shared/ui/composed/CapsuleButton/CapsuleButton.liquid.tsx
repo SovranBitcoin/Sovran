@@ -6,16 +6,10 @@ import { withAlpha } from '@/shared/lib/color';
 
 import { GlassView } from 'expo-glass-effect';
 
-import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
-import { controlHeight } from '@/shared/styles/tokens';
-import { Text } from '@/shared/ui/primitives/Text';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { CapsuleButtonContent, DEFAULT_HEIGHT, capsuleWidthStyle } from './CapsuleButton.content';
 import type { CapsuleButtonProps } from './CapsuleButton.types';
-
-// controlHeight.cta — matches the blur/flat variants (48) so all tiers agree.
-const DEFAULT_HEIGHT = controlHeight.cta;
 
 // Render Liquid Glass via expo-glass-effect's GlassView (a UIVisualEffectView-
 // backed React Native view) rather than an @expo/ui SwiftUI `Host`. Host views
@@ -34,8 +28,6 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const {
     label,
-    icon,
-    iconNode,
     onPress,
     color,
     isActive = false,
@@ -44,15 +36,10 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
     testID,
     roundedSide = 'all',
     fitContent = false,
-    iconSize = 16,
-    textSize = 14,
-    labelNumberOfLines,
     style,
-    contentStyle,
-    textStyle,
   } = props;
   const cornerStyle = getCornerStyle(roundedSide);
-  const widthStyle = fitContent ? null : styles.fullWidth;
+  const widthStyle = capsuleWidthStyle(fitContent);
 
   // filled → a heavily foreground-tinted "prominent" glass (the inverted CTA),
   // with content flipped to `background`; active → a subtle foreground tint;
@@ -123,20 +110,12 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
         isInteractive
         tintColor={tintColor}
         style={[styles.glass, widthStyle, cornerStyle, { minHeight: height }, style]}>
-        <HStack
-          align="center"
-          justify="center"
-          gap={8}
-          style={[styles.content, widthStyle, { minHeight: height }, contentStyle]}>
-          {iconNode ?? (icon ? <Icon name={icon} size={iconSize} color={contentColor} /> : null)}
-          <Text
-            size={textSize}
-            bold
-            numberOfLines={labelNumberOfLines}
-            style={[{ color: contentColor }, textStyle]}>
-            {label}
-          </Text>
-        </HStack>
+        <CapsuleButtonContent
+          {...props}
+          contentColor={contentColor}
+          height={height}
+          widthStyle={widthStyle}
+        />
       </GlassView>
     </GestureDetector>
   );
@@ -146,11 +125,5 @@ const styles = StyleSheet.create({
   glass: {
     borderCurve: 'continuous',
     overflow: 'hidden',
-  },
-  fullWidth: {
-    width: '100%',
-  },
-  content: {
-    paddingHorizontal: 12,
   },
 });
