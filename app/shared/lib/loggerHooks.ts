@@ -57,9 +57,9 @@ export function useRenderLogger(
  *
  * This hook is also the React Compiler seam for that pattern: a mount-only
  * effect needs an `exhaustive-deps` suppression, and the compiler SKIPS any
- * component containing one (it renders unmemoized — see
- * scripts/react-compiler-file-audit.mjs). Keeping the suppression here, like
- * useLifecycleLogger does, keeps callers compilable.
+ * component containing one (it renders unmemoized — verifiable with a
+ * per-file babel-plugin-react-compiler audit). Keeping the suppression here,
+ * like useLifecycleLogger does, keeps callers compilable.
  */
 export function useMountLog(
   mountEvent: string,
