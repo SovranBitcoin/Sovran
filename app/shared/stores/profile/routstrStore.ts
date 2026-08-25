@@ -298,7 +298,9 @@ const PersistedChatAttachment = z.object({
 
 const PersistedRoutstrMessage = z.looseObject({
   id: z.string().max(128),
-  role: z.enum(['user', 'assistant']),
+  // `.catch('assistant')`: a bad role must not wipe every chat session
+  // (whole-blob discard); a mislabeled bubble is the cheaper failure.
+  role: z.enum(['user', 'assistant']).catch('assistant'),
   content: z.string().max(65_536),
   timestamp: z.number().int().nonnegative(),
   attachments: z.array(PersistedChatAttachment).max(4).optional().catch([]),

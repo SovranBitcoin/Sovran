@@ -111,7 +111,12 @@ const PersistedBleDmMessage = z.looseObject({
   isPrivate: z.boolean(),
   isOwn: z.boolean(),
   isPending: z.boolean().optional(),
-  deliveryStatus: z.enum(['sending', 'sent', 'delivered', 'read', 'failed']).optional(),
+  // `.catch(undefined)`: presentational badge — an unknown status hides the
+  // badge instead of discarding the whole DM history blob.
+  deliveryStatus: z
+    .enum(['sending', 'sent', 'delivered', 'read', 'failed'])
+    .optional()
+    .catch(undefined),
   failureReason: z.string().optional(),
 });
 

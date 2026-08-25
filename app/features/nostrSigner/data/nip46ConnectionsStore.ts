@@ -114,8 +114,13 @@ const HexPubkeySchema = z.custom<string>(isNostrPubkeyHex, 'invalid pubkey');
 
 const RelayUrlSchema = z.string().max(MAX_RELAY_URL_LENGTH).regex(RELAY_URL_RE);
 
+// Signer trust store: enums here are security semantics (grant origin,
+// decrypt methods, transport, encryption mode). Catching an unknown value to
+// a default would fail OPEN — deliberately bare so an unrecognized blob
+// hard-rejects and the user re-pairs instead of the app guessing crypto state.
 const PersistedGrant = z.looseObject({
   verdict: GrantVerdictSchema,
+  // ast-grep-ignore: persisted-enum-needs-catch
   origin: z.enum(['pairing', 'prompt']),
   createdAt: z.int().min(0),
   lastUsedAt: z.int().min(0).optional(),
@@ -123,6 +128,7 @@ const PersistedGrant = z.looseObject({
 });
 
 const PersistedPeerDecryptGrant = z.looseObject({
+  // ast-grep-ignore: persisted-enum-needs-catch
   methods: z.array(z.enum(['nip04_decrypt', 'nip44_decrypt'])).min(1),
   createdAt: z.int().min(0),
   lastUsedAt: z.int().min(0).optional(),
@@ -135,9 +141,11 @@ const PersistedConnection = z.looseObject({
   url: z.string().max(MAX_URL_LENGTH).optional(),
   image: z.string().max(MAX_IMAGE_URL_LENGTH).optional(),
   relays: z.array(RelayUrlSchema).min(1).max(MAX_RELAYS),
+  // ast-grep-ignore: persisted-enum-needs-catch
   origin: z.enum(['bunker', 'nostrconnect']),
   status: ConnectionStatusSchema,
   mode: ConnectionModeSchema,
+  // ast-grep-ignore: persisted-enum-needs-catch
   encryption: z.enum(['nip44', 'nip04']),
   pairedAt: z.int().min(0),
   lastUsedAt: z.int().min(0).optional(),

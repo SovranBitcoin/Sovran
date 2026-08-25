@@ -70,7 +70,10 @@ const PersistedEntry = z.looseObject({
   sourceNoteIds: z.array(z.string().max(128)).max(2000).default([]),
   firstSeen: z.number().int().nonnegative(),
   lastSeen: z.number().int().nonnegative(),
-  deleteState: z.enum(['live', 'delete-requested', 'deleted', 'delete-failed']),
+  // `.catch('live')`: an unknown future state must not fail the parse — one bad
+  // entry would discard the whole ownership ledger (persist merge drops the
+  // blob). 'live' is safe: the blob just shows in "My media" and re-checks.
+  deleteState: z.enum(['live', 'delete-requested', 'deleted', 'delete-failed']).catch('live'),
   lastCheckedAt: z.number().int().nonnegative().optional(),
 });
 

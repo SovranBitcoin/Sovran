@@ -130,7 +130,6 @@ function MapPreview({
               StyleSheet.absoluteFill,
               {
                 backgroundColor: withAlpha(surfaceSecondary, 0.35),
-                // @ts-ignore - mixBlendMode works on iOS
                 mixBlendMode: 'overlay',
               },
             ]}
@@ -141,7 +140,6 @@ function MapPreview({
               StyleSheet.absoluteFill,
               {
                 backgroundColor: withAlpha(surfaceSecondary, 1),
-                // @ts-ignore - mixBlendMode works on iOS
                 mixBlendMode: 'color',
               },
             ]}
@@ -329,7 +327,6 @@ const overlayStyles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: 'black',
     opacity: 1,
-    // @ts-ignore - mixBlendMode supported on iOS
     mixBlendMode: 'saturation',
   },
   darkVeilOverlay: {
@@ -340,7 +337,6 @@ const overlayStyles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: 'white',
     opacity: 0.55,
-    // @ts-ignore - mixBlendMode supported on iOS
     mixBlendMode: 'screen',
   },
 });

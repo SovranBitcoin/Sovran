@@ -793,6 +793,7 @@ exports[`persisted schema drift own-content-store schema matches the golden snap
               "type": "object",
             },
             "status": {
+              "default": "local",
               "enum": [
                 "pending",
                 "local",
@@ -843,6 +844,7 @@ exports[`persisted schema drift owned-media-store schema matches the golden snap
           "additionalProperties": {},
           "properties": {
             "deleteState": {
+              "default": "live",
               "enum": [
                 "live",
                 "delete-requested",
@@ -2940,6 +2942,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
                     "type": "string",
                   },
                   "role": {
+                    "default": "assistant",
                     "enum": [
                       "user",
                       "assistant",

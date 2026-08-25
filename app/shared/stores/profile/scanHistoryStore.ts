@@ -104,8 +104,13 @@ export function normaliseForDedupe(raw: string): string {
 const PersistedScanEntry = z.looseObject({
   id: z.string().max(128),
   raw: z.string().max(16_384),
-  type: z.enum(['npub', 'ecash', 'lightning', 'mint', 'paymentRequest', 'unknown']),
-  source: z.enum(['qr', 'nfc', 'paste', 'deeplink']),
+  // `.catch(...)`: display metadata — an unrecognized value must not fail the
+  // parse and discard the whole scan-history blob. Unknown types render as
+  // 'unknown'; an unknown source falls back to the plain qr icon.
+  type: z
+    .enum(['npub', 'ecash', 'lightning', 'mint', 'paymentRequest', 'unknown'])
+    .catch('unknown'),
+  source: z.enum(['qr', 'nfc', 'paste', 'deeplink']).catch('qr'),
   inputType: z.string().max(64).optional(),
   container: z.string().max(64).optional(),
   optionKinds: z.array(z.string().max(128)).max(64).optional(),

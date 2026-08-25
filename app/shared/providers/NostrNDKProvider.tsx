@@ -99,7 +99,12 @@ export function NostrNDKProvider({
     const timeoutId = setTimeout(() => {
       try {
         initPhaseSync('NDK.initializeNDK', () => {
-          // @ts-ignore - initializeNDK expects slightly different types
+          // ndk-mobile's InitNDKParams requires a `settingsStore` we deliberately
+          // don't provide (Sovran owns its own settings persistence); the lib
+          // tolerates its absence at runtime. Suppressed rather than passing a
+          // fake store.
+          // ast-grep-ignore: no-ts-ignore-tsx
+          // @ts-ignore - InitNDKParams demands settingsStore; intentionally omitted
           initializeNDK({
             cacheAdapter,
             explicitRelayUrls: relays,

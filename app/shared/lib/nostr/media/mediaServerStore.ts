@@ -23,7 +23,7 @@ interface MediaServerState {
 }
 
 const PersistedMediaServerStore = z.object({
-  server: z.string().url().default(DEFAULT_BLOSSOM_SERVER),
+  server: z.url().default(DEFAULT_BLOSSOM_SERVER),
 });
 
 function normalizeServer(server: string): string {

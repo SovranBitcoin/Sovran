@@ -72,60 +72,54 @@ type MintReviewsResponseType = {
 // state, units, reviews + favourite split, operator Nostr identity + Vertex
 // reputation), replacing the api.sovran.money search + per-mint review/profile
 // N+1 fan-outs. Lenient (passthrough) so a nagg field addition needs no release.
-const DiscoverMint = z
-  .object({
-    mintUrl: z.string().max(2048),
-    name: z.string().max(256).optional(),
-    iconUrl: z.string().max(2048).optional(),
-    description: z.string().max(4096).optional(),
-    supportedUnits: z.array(z.string().max(16)).max(64).optional(),
-    // The mint's NUT-06 `nuts` capability map, VERBATIM (nagg passes it
-    // through from the auditor's cached /v1/info; deliberately undistilled).
-    // Derive capabilities client-side via shared/lib/cashu/mintNuts —
-    // payment methods from nuts['4']/['5'], feature flags from
-    // nuts['7']/['10']/['17'] etc. Absent when the auditor had no info for
-    // the mint; the discovery method filter treats absence as "not known to
-    // support".
-    nuts: z.record(z.string(), z.unknown()).optional(),
-    averageScore: z.number().nullable(),
-    reviewCount: z.number().int().nonnegative(),
-    favouriteCount: z.number().int().nonnegative().optional(),
-    hasAudit: z.boolean().optional(),
-    state: z.string().max(32).optional(),
-    nMints: z.number().int().optional(),
-    nMelts: z.number().int().optional(),
-    nErrors: z.number().int().optional(),
-    operatorPubkey: z.string().max(128).optional(),
-    operatorNpub: z.string().max(128).optional(),
-    followers: z.number().int().optional(),
-    follows: z.number().int().optional(),
-    vertexRank: z.number().optional(),
-    vertexScore: z.number().nullable().optional(),
-  })
-  .passthrough();
+const DiscoverMint = z.looseObject({
+  mintUrl: z.string().max(2048),
+  name: z.string().max(256).optional(),
+  iconUrl: z.string().max(2048).optional(),
+  description: z.string().max(4096).optional(),
+  supportedUnits: z.array(z.string().max(16)).max(64).optional(),
+  // The mint's NUT-06 `nuts` capability map, VERBATIM (nagg passes it
+  // through from the auditor's cached /v1/info; deliberately undistilled).
+  // Derive capabilities client-side via shared/lib/cashu/mintNuts —
+  // payment methods from nuts['4']/['5'], feature flags from
+  // nuts['7']/['10']/['17'] etc. Absent when the auditor had no info for
+  // the mint; the discovery method filter treats absence as "not known to
+  // support".
+  nuts: z.record(z.string(), z.unknown()).optional(),
+  averageScore: z.number().nullable(),
+  reviewCount: z.number().int().nonnegative(),
+  favouriteCount: z.number().int().nonnegative().optional(),
+  hasAudit: z.boolean().optional(),
+  state: z.string().max(32).optional(),
+  nMints: z.number().int().optional(),
+  nMelts: z.number().int().optional(),
+  nErrors: z.number().int().optional(),
+  operatorPubkey: z.string().max(128).optional(),
+  operatorNpub: z.string().max(128).optional(),
+  followers: z.number().int().optional(),
+  follows: z.number().int().optional(),
+  vertexRank: z.number().optional(),
+  vertexScore: z.number().nullable().optional(),
+});
 export type DiscoverMint = z.infer<typeof DiscoverMint>;
 // nagg's mint-info changelog: every tracked mint's NUT-06 revisions, newest
 // first, each carrying the RFC-6902 patch that produced it. Lenient like
 // `DiscoverMint` — the `patch` ops are a wire shape we only ever read, and the
 // decoder (`features/mint/lib/mintChanges/decode`) tolerates unknown ops.
-const MintChangePatchOp = z
-  .object({
-    op: z.string().max(16),
-    path: z.string().max(1024),
-    value: z.unknown().optional(),
-  })
-  .passthrough();
-const MintChange = z
-  .object({
-    mintUrl: z.string().max(2048),
-    name: z.string().max(256).optional(),
-    at: z.number().int().nonnegative(),
-    previousLastSeenAt: z.number().int().nonnegative().optional(),
-    hash: z.string().max(128),
-    summary: z.array(z.string().max(512)).max(200).optional(),
-    patch: z.array(MintChangePatchOp).max(500).optional(),
-  })
-  .passthrough();
+const MintChangePatchOp = z.looseObject({
+  op: z.string().max(16),
+  path: z.string().max(1024),
+  value: z.unknown().optional(),
+});
+const MintChange = z.looseObject({
+  mintUrl: z.string().max(2048),
+  name: z.string().max(256).optional(),
+  at: z.number().int().nonnegative(),
+  previousLastSeenAt: z.number().int().nonnegative().optional(),
+  hash: z.string().max(128),
+  summary: z.array(z.string().max(512)).max(200).optional(),
+  patch: z.array(MintChangePatchOp).max(500).optional(),
+});
 const MintChangesResponse = z.object({
   trackedMints: z.number().int().nonnegative(),
   reachableMints: z.number().int().nonnegative(),
@@ -134,9 +128,10 @@ const MintChangesResponse = z.object({
 });
 export type MintChangesResponse = z.infer<typeof MintChangesResponse>;
 
-const ReviewerProfileInfo = z
-  .object({ name: z.string().optional(), picture: z.string().optional() })
-  .passthrough();
+const ReviewerProfileInfo = z.looseObject({
+  name: z.string().optional(),
+  picture: z.string().optional(),
+});
 const DiscoverMintsResponse = z.object({
   mints: z.array(DiscoverMint).max(10_000),
   profiles: z.record(z.string(), ReviewerProfileInfo).optional(),
@@ -421,14 +416,12 @@ const parseCatalog = parseWith(CatalogResponse, 'wallpapers/catalog');
  * cashu-ts; we narrow the validated input through a cast so callers get the
  * cashu-ts type without us re-asserting every NUT block.
  */
-const MintInfoSpine = z
-  .object({
-    name: z.string(),
-    pubkey: z.string(),
-    version: z.string(),
-    nuts: z.record(z.string(), z.unknown()).optional(),
-  })
-  .passthrough();
+const MintInfoSpine = z.looseObject({
+  name: z.string(),
+  pubkey: z.string(),
+  version: z.string(),
+  nuts: z.record(z.string(), z.unknown()).optional(),
+});
 
 const parseMintInfo = (input: unknown): Result<GetInfoResponse, ParseError> => {
   const r = MintInfoSpine.safeParse(input);

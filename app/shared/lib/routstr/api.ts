@@ -56,30 +56,24 @@ const ROUTSTR_TIMEOUT_MS = 30_000;
  * Validated at the SSE-chunk boundary by `ChatCompletionChunkSpine` below
  * so a malformed line warns-and-skips rather than crashing the stream.
  */
-const ChatCompletionDeltaSpine = z
-  .object({
-    content: z.string().nullish(),
-    reasoning_content: z.string().nullish(),
-    reasoning: z.string().nullish(),
-    message: z.object({ content: z.string().nullish() }).passthrough().nullish(),
-    text: z.string().nullish(),
-  })
-  .passthrough();
+const ChatCompletionDeltaSpine = z.looseObject({
+  content: z.string().nullish(),
+  reasoning_content: z.string().nullish(),
+  reasoning: z.string().nullish(),
+  message: z.looseObject({ content: z.string().nullish() }).nullish(),
+  text: z.string().nullish(),
+});
 
-const ChatCompletionChunkSpine = z
-  .object({
-    choices: z
-      .array(
-        z
-          .object({
-            delta: ChatCompletionDeltaSpine.optional(),
-            finish_reason: z.string().nullish(),
-          })
-          .passthrough()
-      )
-      .optional(),
-  })
-  .passthrough();
+const ChatCompletionChunkSpine = z.looseObject({
+  choices: z
+    .array(
+      z.looseObject({
+        delta: ChatCompletionDeltaSpine.optional(),
+        finish_reason: z.string().nullish(),
+      })
+    )
+    .optional(),
+});
 
 type ChatCompletionChunk = z.infer<typeof ChatCompletionChunkSpine>;
 
@@ -99,56 +93,45 @@ type ChatCompletionChunk = z.infer<typeof ChatCompletionChunkSpine>;
 // model menu the way the old unvalidated cast silently drifted.
 const undef = <T extends z.ZodTypeAny>(schema: T) => schema.optional().catch(undefined);
 
-const ModelsResponseSpine = z
-  .object({
-    data: z.array(
-      z
-        .object({
-          enabled: z.boolean().optional(),
-          created: undef(z.number()),
-          context_length: undef(z.number()),
-          name: undef(z.string()),
-          canonical_slug: undef(z.string().nullable()),
-          architecture: undef(
-            z
-              .object({
-                input_modalities: undef(z.array(z.string())),
-                output_modalities: undef(z.array(z.string())),
-              })
-              .passthrough()
-          ),
-          sats_pricing: undef(
-            z
-              .object({
-                prompt: undef(z.number()),
-                completion: undef(z.number()),
-                request: undef(z.number()),
-                image: undef(z.number()),
-                max_cost: undef(z.number()),
-              })
-              .passthrough()
-              .nullable()
-          ),
+const ModelsResponseSpine = z.looseObject({
+  data: z.array(
+    z.looseObject({
+      enabled: z.boolean().optional(),
+      created: undef(z.number()),
+      context_length: undef(z.number()),
+      name: undef(z.string()),
+      canonical_slug: undef(z.string().nullable()),
+      architecture: undef(
+        z.looseObject({
+          input_modalities: undef(z.array(z.string())),
+          output_modalities: undef(z.array(z.string())),
         })
-        .passthrough()
-    ),
-  })
-  .passthrough();
+      ),
+      sats_pricing: undef(
+        z
+          .looseObject({
+            prompt: undef(z.number()),
+            completion: undef(z.number()),
+            request: undef(z.number()),
+            image: undef(z.number()),
+            max_cost: undef(z.number()),
+          })
+          .nullable()
+      ),
+    })
+  ),
+});
 
-const BalanceSpine = z
-  .object({
-    balance: z.number().optional(),
-    total_spent: z.number().optional(),
-    api_key: z.string().optional(),
-    reserved: z.number().optional(),
-  })
-  .passthrough();
+const BalanceSpine = z.looseObject({
+  balance: z.number().optional(),
+  total_spent: z.number().optional(),
+  api_key: z.string().optional(),
+  reserved: z.number().optional(),
+});
 
-const TopUpSpine = z
-  .object({
-    msats: z.number().optional(),
-  })
-  .passthrough();
+const TopUpSpine = z.looseObject({
+  msats: z.number().optional(),
+});
 
 // ── Types ────────────────────────────────────────────────────────────────
 

@@ -110,7 +110,10 @@ const PersistedFeedEvent = z.looseObject({
 const PersistedOwnEntry = z.looseObject({
   event: PersistedFeedEvent,
   authorPubkey: z.string().max(128),
-  status: z.enum(['pending', 'local', 'confirmed']),
+  // `.catch('local')`: an unknown future status must not wipe the own-content
+  // blob. 'local' is the neutral fallback — the entry ages out via the cutoff
+  // instead of overclaiming 'confirmed' or re-entering publish flows.
+  status: z.enum(['pending', 'local', 'confirmed']).catch('local'),
   updatedAt: z.number().int().nonnegative(),
 });
 

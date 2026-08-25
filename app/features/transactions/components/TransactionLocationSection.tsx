@@ -80,7 +80,6 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
         className="absolute inset-0"
         style={{
           backgroundColor: withAlpha(surfaceSecondary, 0.35),
-          // @ts-ignore - mixBlendMode works on iOS
           mixBlendMode: 'overlay',
         }}
         pointerEvents="none"
@@ -89,7 +88,6 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
         className="absolute inset-0"
         style={{
           backgroundColor: withAlpha(surfaceSecondary, 1),
-          // @ts-ignore - mixBlendMode works on iOS
           mixBlendMode: 'color',
         }}
         pointerEvents="none"

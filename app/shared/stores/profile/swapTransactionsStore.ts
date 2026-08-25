@@ -153,6 +153,10 @@ const PersistedSwapGroup = z.looseObject({
 const PersistedQuoteIndexEntry = z.looseObject({
   groupId: z.string().max(128),
   legId: z.string().max(128),
+  // Deliberately bare: `kind` is funds-flow direction and must never be
+  // guessed; the per-entry safeParse below already drops just the bad row
+  // instead of the blob, so hard-reject is the safe failure.
+  // ast-grep-ignore: persisted-enum-needs-catch
   kind: z.enum(['mint', 'melt']),
 });
 
