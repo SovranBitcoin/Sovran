@@ -79,13 +79,13 @@ function signerRowDescription(pendingCount: number): string {
   return pendingCount === 1 ? '1 pending request' : `${pendingCount} pending requests`;
 }
 
-const SettingsListLinkItem: React.FC<{
-  href: Href;
+const SettingsListActionItem: React.FC<{
   title: string;
   description?: string;
+  onPress: () => void;
   isDanger?: boolean;
   testID?: string;
-}> = ({ href, title, description, isDanger, testID }) => {
+}> = ({ title, description, onPress, isDanger, testID }) => {
   const danger = useThemeColor('danger');
   return (
     <PressableFeedback
@@ -94,7 +94,7 @@ const SettingsListLinkItem: React.FC<{
       accessible={testID ? true : undefined}
       accessibilityLabel={testID ? `${title}${description ? `, ${description}` : ''}` : undefined}
       accessibilityRole={testID ? 'button' : undefined}
-      onPress={() => router.navigate(href)}>
+      onPress={onPress}>
       <PressableFeedback.Scale>
         <ListGroup.Item disabled>
           <ListGroup.ItemContent>
@@ -113,28 +113,15 @@ const SettingsListLinkItem: React.FC<{
   );
 };
 
-const SettingsListActionItem: React.FC<{
+const SettingsListLinkItem: React.FC<{
+  href: Href;
   title: string;
   description?: string;
-  onPress: () => void;
-}> = ({ title, description, onPress }) => {
-  return (
-    <PressableFeedback animation={false} onPress={onPress}>
-      <PressableFeedback.Scale>
-        <ListGroup.Item disabled>
-          <ListGroup.ItemContent>
-            <ListGroup.ItemTitle>{title}</ListGroup.ItemTitle>
-            {description ? (
-              <ListGroup.ItemDescription>{description}</ListGroup.ItemDescription>
-            ) : null}
-          </ListGroup.ItemContent>
-          <ListGroup.ItemSuffix />
-        </ListGroup.Item>
-      </PressableFeedback.Scale>
-      <PressableFeedback.Ripple />
-    </PressableFeedback>
-  );
-};
+  isDanger?: boolean;
+  testID?: string;
+}> = ({ href, ...item }) => (
+  <SettingsListActionItem {...item} onPress={() => router.navigate(href)} />
+);
 
 const SettingsToggleItem: React.FC<{
   title: string;

@@ -645,34 +645,13 @@ export const Transactions = React.memo(
           <Spinner size={22} style={{ alignSelf: 'center', marginTop: 48 }} />
         ) : (
           <View className="pt-8">
-            <View style={[styles.card, { borderColor }]}>
-              <BlurCardFrame accentColor={muted}>
-                <View style={styles.emptyState}>
-                  <Icon
-                    name="fluent:clock-12-filled"
-                    size={36}
-                    color={withAlpha(foreground, 0.33)}
-                  />
-                  <Text
-                    size={16}
-                    style={{
-                      color: withAlpha(foreground, 0.66),
-                      fontFamily: 'OxygenBold',
-                      textAlign: 'center',
-                    }}>
-                    No transactions found
-                  </Text>
-                  <Text
-                    size={14}
-                    style={{
-                      color: withAlpha(foreground, 0.4),
-                      textAlign: 'center',
-                    }}>
-                    Try adjusting your filters or check back later
-                  </Text>
-                </View>
-              </BlurCardFrame>
-            </View>
+            <EmptyStateCard
+              borderColor={borderColor}
+              muted={muted}
+              foreground={foreground}
+              title="No transactions found"
+              subtitle="Try adjusting your filters or check back later"
+            />
           </View>
         ),
       [borderColor, foreground, isFetching, muted]
@@ -716,34 +695,13 @@ export const Transactions = React.memo(
         return (
           <View>
             <Spacer size={24} />
-            <View style={[styles.card, { borderColor }]}>
-              <BlurCardFrame accentColor={muted}>
-                <View style={styles.emptyState}>
-                  <Icon
-                    name="fluent:clock-12-filled"
-                    size={36}
-                    color={withAlpha(foreground, 0.33)}
-                  />
-                  <Text
-                    size={16}
-                    style={{
-                      color: withAlpha(foreground, 0.66),
-                      fontFamily: 'OxygenBold',
-                      textAlign: 'center',
-                    }}>
-                    No History
-                  </Text>
-                  <Text
-                    size={14}
-                    style={{
-                      color: withAlpha(foreground, 0.4),
-                      textAlign: 'center',
-                    }}>
-                    Your history will show up here
-                  </Text>
-                </View>
-              </BlurCardFrame>
-            </View>
+            <EmptyStateCard
+              borderColor={borderColor}
+              muted={muted}
+              foreground={foreground}
+              title="No History"
+              subtitle="Your history will show up here"
+            />
           </View>
         );
       }
@@ -877,6 +835,47 @@ export const Transactions = React.memo(
 );
 
 Transactions.displayName = 'Transactions';
+
+function EmptyStateCard({
+  borderColor,
+  muted,
+  foreground,
+  title,
+  subtitle,
+}: {
+  borderColor: string;
+  muted: string;
+  foreground: string;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <View style={[styles.card, { borderColor }]}>
+      <BlurCardFrame accentColor={muted}>
+        <View style={styles.emptyState}>
+          <Icon name="fluent:clock-12-filled" size={36} color={withAlpha(foreground, 0.33)} />
+          <Text
+            size={16}
+            style={{
+              color: withAlpha(foreground, 0.66),
+              fontFamily: 'OxygenBold',
+              textAlign: 'center',
+            }}>
+            {title}
+          </Text>
+          <Text
+            size={14}
+            style={{
+              color: withAlpha(foreground, 0.4),
+              textAlign: 'center',
+            }}>
+            {subtitle}
+          </Text>
+        </View>
+      </BlurCardFrame>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   // Plain View, NOT SquircleView: react-native-fast-squircle's RN-0.83 source

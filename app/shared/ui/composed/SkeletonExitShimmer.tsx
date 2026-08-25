@@ -120,6 +120,18 @@ function shimmerColors(
   return ['transparent', fallbackHighlight, 'transparent'];
 }
 
+function ShimmerGradient({ colors }: { colors: readonly [string, string, string] }) {
+  return (
+    <AnimatedLinearGradient
+      colors={colors}
+      locations={GRADIENT_LOCATIONS}
+      start={GRADIENT_START}
+      end={GRADIENT_END}
+      style={StyleSheet.absoluteFill}
+    />
+  );
+}
+
 /**
  * Fades the wrapped skeleton out while a single bright shimmer line sweeps
  * across. The children stay mounted; only opacity changes. The shimmer line
@@ -129,13 +141,7 @@ export function SkeletonExitReveal({
   active,
   children,
   highlightColor,
-  visualScope,
-  visualKey,
-  visualSurface,
-  visualComponent,
-  visualPhase,
-  visualExtra,
-  visualDisabled,
+  ...visualProps
 }: PropsWithChildren<{ active: boolean; highlightColor?: string } & SkeletonShimmerVisualProps>) {
   const foreground = useThemeColor('foreground');
   const progress = useSharedValue(0);
@@ -144,13 +150,7 @@ export function SkeletonExitReveal({
     defaultComponent: 'SkeletonExitReveal',
     defaultItemType: 'skeleton-exit-shimmer',
     defaultPhase: 'exiting',
-    visualScope,
-    visualKey,
-    visualSurface,
-    visualComponent,
-    visualPhase,
-    visualExtra,
-    visualDisabled,
+    ...visualProps,
   });
 
   useEffect(() => {
@@ -195,13 +195,7 @@ export function SkeletonExitReveal({
       <Animated.View style={active ? fadeStyle : undefined}>{children}</Animated.View>
       {active && (
         <Animated.View pointerEvents="none" style={shimmerBarStyle}>
-          <AnimatedLinearGradient
-            colors={gradientColors}
-            locations={GRADIENT_LOCATIONS}
-            start={GRADIENT_START}
-            end={GRADIENT_END}
-            style={StyleSheet.absoluteFill}
-          />
+          <ShimmerGradient colors={gradientColors} />
         </Animated.View>
       )}
     </View>
@@ -216,13 +210,7 @@ export function SkeletonExitReveal({
 export function SkeletonLoadingShimmer({
   active,
   highlightColor,
-  visualScope,
-  visualKey,
-  visualSurface,
-  visualComponent,
-  visualPhase,
-  visualExtra,
-  visualDisabled,
+  ...visualProps
 }: {
   active: boolean;
   highlightColor?: string;
@@ -234,13 +222,7 @@ export function SkeletonLoadingShimmer({
     defaultComponent: 'SkeletonLoadingShimmer',
     defaultItemType: 'skeleton-loading-shimmer',
     defaultPhase: 'loading',
-    visualScope,
-    visualKey,
-    visualSurface,
-    visualComponent,
-    visualPhase,
-    visualExtra,
-    visualDisabled,
+    ...visualProps,
   });
 
   useEffect(() => {
@@ -306,13 +288,7 @@ export function SkeletonLoadingShimmer({
       pointerEvents="none"
       style={styles.loadingContainer}>
       <Animated.View style={shimmerBarStyle} pointerEvents="none">
-        <AnimatedLinearGradient
-          colors={gradientColors}
-          locations={GRADIENT_LOCATIONS}
-          start={GRADIENT_START}
-          end={GRADIENT_END}
-          style={StyleSheet.absoluteFill}
-        />
+        <ShimmerGradient colors={gradientColors} />
       </Animated.View>
     </View>
   );

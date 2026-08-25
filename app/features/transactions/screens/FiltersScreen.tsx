@@ -67,6 +67,30 @@ interface ChipProps {
   testID?: string;
 }
 
+/** Shared radio-chip a11y wiring; the testID doubles as the e2e probe (0/1 value). */
+function chipA11y(label: string, isSelected: boolean, testID?: string) {
+  return {
+    testID,
+    accessible: true,
+    accessibilityRole: 'radio',
+    accessibilityLabel: label,
+    accessibilityState: { checked: isSelected },
+    accessibilityValue: testID ? { text: isSelected ? '1' : '0' } : undefined,
+  } as const;
+}
+
+function chipSelectionColors(
+  isSelected: boolean,
+  foreground: string,
+  accent: string,
+  accentSoft: string
+) {
+  return {
+    backgroundColor: isSelected ? accentSoft : withAlpha(foreground, alpha.faint),
+    borderColor: isSelected ? accent : withAlpha(foreground, alpha.subtle),
+  };
+}
+
 const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress, testID }) => {
   const [foreground, accent, accentSoft] = useThemeColor([
     'foreground',
@@ -77,19 +101,8 @@ const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress, testID })
   return (
     <Pressable
       onPress={onPress}
-      testID={testID}
-      accessible
-      accessibilityRole="radio"
-      accessibilityLabel={label}
-      accessibilityState={{ checked: isSelected }}
-      accessibilityValue={testID ? { text: isSelected ? '1' : '0' } : undefined}
-      style={[
-        styles.chip,
-        {
-          backgroundColor: isSelected ? accentSoft : withAlpha(foreground, alpha.faint),
-          borderColor: isSelected ? accent : withAlpha(foreground, alpha.subtle),
-        },
-      ]}>
+      {...chipA11y(label, isSelected, testID)}
+      style={[styles.chip, chipSelectionColors(isSelected, foreground, accent, accentSoft)]}>
       {icon ? (
         <Icon
           name={icon}
@@ -160,19 +173,8 @@ const MintSelectorChip: React.FC<{
   return (
     <Pressable
       onPress={onPress}
-      testID={testID}
-      accessible
-      accessibilityRole="radio"
-      accessibilityLabel={name}
-      accessibilityState={{ checked: isSelected }}
-      accessibilityValue={testID ? { text: isSelected ? '1' : '0' } : undefined}
-      style={[
-        styles.mintChip,
-        {
-          backgroundColor: isSelected ? accentSoft : withAlpha(foreground, alpha.faint),
-          borderColor: isSelected ? accent : withAlpha(foreground, alpha.subtle),
-        },
-      ]}>
+      {...chipA11y(name, isSelected, testID)}
+      style={[styles.mintChip, chipSelectionColors(isSelected, foreground, accent, accentSoft)]}>
       {showIcon ? <MintIcon iconUrl={iconUrl} size={22} name={name} alt={`${name} icon`} /> : null}
       <Text
         size={13}

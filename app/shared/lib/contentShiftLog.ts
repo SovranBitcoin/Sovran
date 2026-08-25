@@ -667,6 +667,26 @@ function contextRowKey(context: VisualListItemContext): string | null {
   return typeof context.rowKey === 'string' && context.rowKey.length > 0 ? context.rowKey : null;
 }
 
+function visualRowLogEntry<ItemT>(
+  state: VisualListState<ItemT>,
+  config: Pick<VisualListConfig<ItemT>, 'getItemContext' | 'getItemKey'>,
+  fallbackKeyPrefix: string,
+  index: number
+): Record<string, unknown> | null {
+  const item = state.data?.[index];
+  if (item === undefined) return null;
+  const fallbackKey = `${fallbackKeyPrefix}:${index}`;
+  const context = config.getItemContext?.(item, index) ?? {};
+  const key =
+    config.getItemKey?.(item, index, fallbackKey) ?? contextRowKey(context) ?? fallbackKey;
+  return {
+    key: safeLogKey(key),
+    index,
+    ...visualVirtualMetrics(state, key, index),
+    ...safeContextKeys(context),
+  };
+}
+
 function visualBufferedRangeSummary<ItemT>(
   state: VisualListState<ItemT> | null | undefined,
   config: Pick<VisualListConfig<ItemT>, 'getItemContext' | 'getItemKey'>,
@@ -680,18 +700,8 @@ function visualBufferedRangeSummary<ItemT>(
   const end = Math.min(dataLength - 1, rawEnd + 2);
   const rows: Record<string, unknown>[] = [];
   for (let index = start; index <= end && rows.length < 40; index += 1) {
-    const item = state.data[index];
-    if (item === undefined) continue;
-    const fallbackKey = `${fallbackKeyPrefix}:${index}`;
-    const context = config.getItemContext?.(item, index) ?? {};
-    const key =
-      config.getItemKey?.(item, index, fallbackKey) ?? contextRowKey(context) ?? fallbackKey;
-    rows.push({
-      key: safeLogKey(key),
-      index,
-      ...visualVirtualMetrics(state, key, index),
-      ...safeContextKeys(context),
-    });
+    const row = visualRowLogEntry(state, config, fallbackKeyPrefix, index);
+    if (row) rows.push(row);
   }
   return rows;
 }
@@ -705,18 +715,8 @@ function visualVirtualPositionChunks<ItemT>(
 
   const rows: Record<string, unknown>[] = [];
   for (let index = 0; index < state.data.length; index += 1) {
-    const item = state.data[index];
-    if (item === undefined) continue;
-    const fallbackKey = `${fallbackKeyPrefix}:${index}`;
-    const context = config.getItemContext?.(item, index) ?? {};
-    const key =
-      config.getItemKey?.(item, index, fallbackKey) ?? contextRowKey(context) ?? fallbackKey;
-    rows.push({
-      key: safeLogKey(key),
-      index,
-      ...visualVirtualMetrics(state, key, index),
-      ...safeContextKeys(context),
-    });
+    const row = visualRowLogEntry(state, config, fallbackKeyPrefix, index);
+    if (row) rows.push(row);
   }
   const summary = visualVirtualPositionSummary(rows, state);
 

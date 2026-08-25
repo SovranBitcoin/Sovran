@@ -162,6 +162,24 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
     [overlayVisible, phase]
   );
 
+  // Seed the overlay at the measured source rect with a zeroed destination,
+  // ready for the morph to animate toward the real target once it's measurable.
+  const seedOverlayFrom = useCallback(
+    (fromRect: { x: number; y: number; width: number; height: number }) => {
+      cancelAnimation(progress);
+      fromX.set(fromRect.x);
+      fromY.set(fromRect.y);
+      fromW.set(fromRect.width);
+      fromH.set(fromRect.height);
+      toX.set(0);
+      toY.set(0);
+      toW.set(0);
+      toH.set(0);
+      progress.set(0);
+    },
+    [fromH, fromW, fromX, fromY, progress, toH, toW, toX, toY]
+  );
+
   const startClaimUsername = useCallback(async () => {
     if (phase.state !== 'idle') return;
 
@@ -174,17 +192,7 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
 
     setPhase({ state: 'forward_navigating', id: 'claimUsername' });
     setOverlayVisible(true);
-
-    cancelAnimation(progress);
-    fromX.set(fromRect.x);
-    fromY.set(fromRect.y);
-    fromW.set(fromRect.width);
-    fromH.set(fromRect.height);
-    toX.set(0);
-    toY.set(0);
-    toW.set(0);
-    toH.set(0);
-    progress.set(0);
+    seedOverlayFrom(fromRect);
 
     router.navigate('/claimUsername');
 
@@ -206,7 +214,7 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
 
     setOverlayVisible(false);
     setPhase({ state: 'idle' });
-  }, [animateOverlay, fromH, fromW, fromX, fromY, phase.state, progress, toH, toW, toX, toY]);
+  }, [animateOverlay, phase.state, seedOverlayFrom]);
 
   const closeClaimUsername = useCallback(async () => {
     if (phase.state !== 'idle') return;
@@ -220,17 +228,7 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
 
     setPhase({ state: 'back_navigating', id: 'claimUsername' });
     setOverlayVisible(true);
-
-    cancelAnimation(progress);
-    fromX.set(fromRect.x);
-    fromY.set(fromRect.y);
-    fromW.set(fromRect.width);
-    fromH.set(fromRect.height);
-    toX.set(0);
-    toY.set(0);
-    toW.set(0);
-    toH.set(0);
-    progress.set(0);
+    seedOverlayFrom(fromRect);
 
     router.back();
 
@@ -250,7 +248,7 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
 
     setOverlayVisible(false);
     setPhase({ state: 'idle' });
-  }, [animateOverlay, fromH, fromW, fromX, fromY, phase.state, progress, toH, toW, toX, toY]);
+  }, [animateOverlay, phase.state, seedOverlayFrom]);
 
   const value = useMemo<Ctx>(
     () => ({

@@ -369,6 +369,28 @@ export const PostCard = React.memo(function PostCard({
     return <DeletedTombstone />;
   }
 
+  // Interaction wiring shared by both layouts' MetricsFooter; layout-specific
+  // props (compact/showBorder/onCommentPress) stay at each site.
+  const metricsFooterShared = {
+    metrics,
+    borderColor: foreground,
+    onRepostPress,
+    onQuotePress: handleQuotePress,
+    onLikePress,
+    onZapPress,
+    reposted,
+    liked,
+    replied,
+    zapped,
+    repostPending,
+    likePending,
+    zapPending,
+    repostPendingDirection,
+    likePendingDirection,
+    onActionPressIn: handleNestedPressIn,
+    onActionPressOut: handleNestedPressOut,
+  };
+
   // ── Thread target: stacked layout (no gutter) ──
   if (isTarget) {
     const fullDate = event.created_at ? formatDate(event.created_at * 1000, 'short-date-time') : '';
@@ -431,24 +453,8 @@ export const PostCard = React.memo(function PostCard({
 
           <Reanimated.View style={[pcStyles.targetMetrics, footerFadeStyle]}>
             <MetricsFooter
-              metrics={metrics}
-              borderColor={foreground}
+              {...metricsFooterShared}
               onCommentPress={onCommentPress ?? navigateToThread}
-              onRepostPress={onRepostPress}
-              onQuotePress={handleQuotePress}
-              onLikePress={onLikePress}
-              onZapPress={onZapPress}
-              reposted={reposted}
-              liked={liked}
-              replied={replied}
-              zapped={zapped}
-              repostPending={repostPending}
-              likePending={likePending}
-              zapPending={zapPending}
-              repostPendingDirection={repostPendingDirection}
-              likePendingDirection={likePendingDirection}
-              onActionPressIn={handleNestedPressIn}
-              onActionPressOut={handleNestedPressOut}
             />
           </Reanimated.View>
         </View>
@@ -557,26 +563,10 @@ export const PostCard = React.memo(function PostCard({
               showMetricsBorder && { borderBottomColor: withAlpha(foreground, 0.1) },
           ]}>
           <MetricsFooter
-            metrics={metrics}
-            borderColor={foreground}
+            {...metricsFooterShared}
             compact={isThread}
             showBorder={!fullBleedFooterBorder && showMetricsBorder}
             onCommentPress={isThread ? (onCommentPress ?? navigateToThread) : undefined}
-            onRepostPress={onRepostPress}
-            onQuotePress={handleQuotePress}
-            onLikePress={onLikePress}
-            onZapPress={onZapPress}
-            reposted={reposted}
-            liked={liked}
-            replied={replied}
-            zapped={zapped}
-            repostPending={repostPending}
-            likePending={likePending}
-            zapPending={zapPending}
-            repostPendingDirection={repostPendingDirection}
-            likePendingDirection={likePendingDirection}
-            onActionPressIn={handleNestedPressIn}
-            onActionPressOut={handleNestedPressOut}
           />
         </View>
       </View>
