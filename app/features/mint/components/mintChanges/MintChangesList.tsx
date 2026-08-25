@@ -6,7 +6,6 @@
  * Scope is deliberate: only trusted mints. When none of them changed there is
  * no ecosystem-wide fallback — a quiet empty state is the honest answer.
  */
-import { useCallback, useMemo } from 'react';
 import { RefreshControl, StyleSheet, type ViewToken } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
 
@@ -32,6 +31,18 @@ import { View } from '@/shared/ui/primitives/View/View';
 
 const MINT_CHANGES_VISUAL_SCOPE = 'feed.notifications.mints.list';
 
+function openMint(update: MintChangeUpdate): void {
+  cashuLog.info('mint.changes.open', {
+    kind: update.phrase.icon,
+    hasMintUrl: !!update.mintUrl,
+    mintUrlLength: update.mintUrl.length,
+  });
+  router.push({
+    pathname: '/(drawer)/(tabs)/notifications/mint-changes',
+    params: { mintUrl: update.mintUrl },
+  });
+}
+
 export function MintChangesList() {
   const { updates, trustedMintCount, isLoading, isRefreshing, errorMessage, refresh } =
     useMintChanges();
@@ -50,90 +61,63 @@ export function MintChangesList() {
       getItemContext: (update) => ({ itemType: 'mint-change', rowLabel: update.host }),
     });
 
-  const handleViewableItemsChanged = useCallback(
-    ({ viewableItems, changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
-      onVisualViewableItemsChanged({
-        ...visualViewabilityRange([...viewableItems, ...changed]),
-        viewableItems: viewableItems.map(visualToken<MintChangeUpdate>),
-        changed: changed.map(visualToken<MintChangeUpdate>),
-      });
-    },
-    [onVisualViewableItemsChanged]
-  );
-
-  const openMint = useCallback((update: MintChangeUpdate) => {
-    cashuLog.info('mint.changes.open', {
-      kind: update.phrase.icon,
-      hasMintUrl: !!update.mintUrl,
-      mintUrlLength: update.mintUrl.length,
+  const handleViewableItemsChanged = ({
+    viewableItems,
+    changed,
+  }: {
+    viewableItems: ViewToken[];
+    changed: ViewToken[];
+  }) => {
+    onVisualViewableItemsChanged({
+      ...visualViewabilityRange([...viewableItems, ...changed]),
+      viewableItems: viewableItems.map(visualToken<MintChangeUpdate>),
+      changed: changed.map(visualToken<MintChangeUpdate>),
     });
-    router.push({
-      pathname: '/(drawer)/(tabs)/notifications/mint-changes',
-      params: { mintUrl: update.mintUrl },
-    });
-  }, []);
+  };
 
-  const contentContainerStyle = useMemo(
-    () => [
-      styles.listContent,
-      { paddingBottom: tabBarPadding },
-      updates.length === 0 && styles.emptyListContent,
-    ],
-    [updates.length, tabBarPadding]
+  const contentContainerStyle = [
+    styles.listContent,
+    { paddingBottom: tabBarPadding },
+    updates.length === 0 && styles.emptyListContent,
+  ];
+
+  const renderSeparator = () => <View style={[styles.separator, { backgroundColor: separator }]} />;
+
+  const renderItem = ({ item, index }: { item: MintChangeUpdate; index: number }) => (
+    <VisualLayoutProbe
+      scope={MINT_CHANGES_VISUAL_SCOPE}
+      surface="notifications"
+      component="MintChangeRow"
+      itemKey={item.id}
+      itemType="mint-change"
+      index={index}>
+      <MintChangeRow update={item} onPress={openMint} />
+    </VisualLayoutProbe>
   );
 
-  const renderSeparator = useCallback(
-    () => <View style={[styles.separator, { backgroundColor: separator }]} />,
-    [separator]
+  const refreshControl = (
+    <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={foreground} />
   );
 
-  const renderItem = useCallback(
-    ({ item, index }: { item: MintChangeUpdate; index: number }) => (
-      <VisualLayoutProbe
-        scope={MINT_CHANGES_VISUAL_SCOPE}
-        surface="notifications"
-        component="MintChangeRow"
-        itemKey={item.id}
-        itemType="mint-change"
-        index={index}>
-        <MintChangeRow update={item} onPress={openMint} />
-      </VisualLayoutProbe>
-    ),
-    [openMint]
+  const listEmpty = isLoading ? (
+    <Spinner size={22} color={withAlpha(foreground, alpha.strong)} style={styles.loader} />
+  ) : errorMessage ? (
+    <EmptyState
+      icon="mdi:alert-circle-outline"
+      title="Mint updates unavailable"
+      subtitle={errorMessage}
+    />
+  ) : (
+    <EmptyState
+      icon="mingcute:bank-fill"
+      title="No mint updates"
+      subtitle={
+        trustedMintCount === 0
+          ? 'Add a mint to follow what it changes about itself.'
+          : `Nothing new from your ${trustedMintCount === 1 ? 'mint' : `${trustedMintCount} mints`}.`
+      }
+    />
   );
-
-  const refreshControl = useMemo(
-    () => <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={foreground} />,
-    [isRefreshing, refresh, foreground]
-  );
-
-  const listEmpty = useMemo(() => {
-    if (isLoading) {
-      return (
-        <Spinner size={22} color={withAlpha(foreground, alpha.strong)} style={styles.loader} />
-      );
-    }
-    if (errorMessage) {
-      return (
-        <EmptyState
-          icon="mdi:alert-circle-outline"
-          title="Mint updates unavailable"
-          subtitle={errorMessage}
-        />
-      );
-    }
-    return (
-      <EmptyState
-        icon="mingcute:bank-fill"
-        title="No mint updates"
-        subtitle={
-          trustedMintCount === 0
-            ? 'Add a mint to follow what it changes about itself.'
-            : `Nothing new from your ${trustedMintCount === 1 ? 'mint' : `${trustedMintCount} mints`}.`
-        }
-      />
-    );
-  }, [isLoading, errorMessage, foreground, trustedMintCount]);
 
   return (
     <List

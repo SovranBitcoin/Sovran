@@ -12,7 +12,7 @@
  * length-bounded before display and never logged.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Platform } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Button as HerouiButton } from 'heroui-native';
@@ -216,10 +216,10 @@ export function FollowDiffCard({
     'danger',
     'warning',
   ] as const);
-  const shown = useMemo(
-    () => [...detail.added.slice(0, FOLLOW_ROW_CAP), ...detail.removed.slice(0, FOLLOW_ROW_CAP)],
-    [detail.added, detail.removed]
-  );
+  const shown = [
+    ...detail.added.slice(0, FOLLOW_ROW_CAP),
+    ...detail.removed.slice(0, FOLLOW_ROW_CAP),
+  ];
   // Warm the kind-0 cache for every shown row in one batched subscription.
   useNostrProfileMetadataMany(shown);
 
@@ -368,17 +368,14 @@ export function ExpandableEventJson({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
-  const fullJson = useMemo(() => JSON.stringify(event, null, 2), [event]);
-  const displayJson = useMemo(
-    () => boundDisplay(fullJson, FULL_EVENT_DISPLAY_MAX_CHARS),
-    [fullJson]
-  );
+  const fullJson = JSON.stringify(event, null, 2);
+  const displayJson = boundDisplay(fullJson, FULL_EVENT_DISPLAY_MAX_CHARS);
 
-  const toggle = useCallback(() => setExpanded((value) => !value), []);
-  const copyJson = useCallback(() => {
+  const toggle = () => setExpanded((value) => !value);
+  const copyJson = () => {
     void Clipboard.setStringAsync(fullJson);
     popup({ message: 'Copied', type: 'success', variant: 'toast', duration: 1500 });
-  }, [fullJson]);
+  };
 
   return (
     <VStack gap={8}>

@@ -22,7 +22,7 @@
  * none of it is ever logged.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { Button as HerouiButton } from 'heroui-native';
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -168,6 +168,39 @@ function tierIconColor(
   }
 }
 
+/** Promote the tapped row to the queue head and open the approval sheet. */
+function reviewRequest(id: string): void {
+  useNip46RequestsStore.getState().promote(id);
+  showActionSheet('signer-approval', {});
+}
+
+/**
+ * Batch-resolve a group. Re-derives from live state: requests may have
+ * resolved/expired since the chip was tapped, and approvals stay fail-closed
+ * to the standard tier even if a sensitive request slipped in after the
+ * confirm.
+ */
+async function resolveBatchInner(
+  clientPubkey: string,
+  action: 'approve_once' | 'deny_once'
+): Promise<void> {
+  const live = useNip46RequestsStore
+    .getState()
+    .pending.filter((request) => request.clientPubkey === clientPubkey);
+  const eligible =
+    action === 'approve_once'
+      ? live.filter((request) => permissionTierFor(lookupFor(request)) === 'standard')
+      : live;
+  for (const request of eligible) {
+    const resolved = await nip46Engine.resolveRequest(request.id, { action });
+    if (resolved.isErr()) {
+      nostrLog.warn('nostr.signer.requests_batch_resolve_failed', {
+        error: resolved.error.type,
+      });
+    }
+  }
+}
+
 // ── Screen ──────────────────────────────────────────────────────
 
 export function SignerRequestsScreen(): React.ReactElement {
@@ -192,66 +225,34 @@ export function SignerRequestsScreen(): React.ReactElement {
     }, [])
   );
 
-  const groups = useMemo(
-    () => groupByApp(pending.filter((request) => request.expiresAt > now)),
-    [pending, now]
-  );
+  const groups = groupByApp(pending.filter((request) => request.expiresAt > now));
 
   // ── Verdict plumbing ──────────────────────────────────────────
 
-  const reviewRequest = useCallback((id: string) => {
-    useNip46RequestsStore.getState().promote(id);
-    showActionSheet('signer-approval', {});
-  }, []);
+  const resolveBatch = useSingleFlight(resolveBatchInner);
 
-  const resolveBatch = useSingleFlight(
-    useCallback(async (clientPubkey: string, action: 'approve_once' | 'deny_once') => {
-      // Re-derive from live state: requests may have resolved/expired since
-      // the chip was tapped, and approvals stay fail-closed to the standard
-      // tier even if a sensitive request slipped in after the confirm.
-      const live = useNip46RequestsStore
-        .getState()
-        .pending.filter((request) => request.clientPubkey === clientPubkey);
-      const eligible =
-        action === 'approve_once'
-          ? live.filter((request) => permissionTierFor(lookupFor(request)) === 'standard')
-          : live;
-      for (const request of eligible) {
-        const resolved = await nip46Engine.resolveRequest(request.id, { action });
-        if (resolved.isErr()) {
-          nostrLog.warn('nostr.signer.requests_batch_resolve_failed', {
-            error: resolved.error.type,
-          });
-        }
-      }
-    }, [])
-  );
-
-  const confirmAllowAll = useCallback(
-    (clientPubkey: string, appName: string, count: number) => {
-      actionMenuPopup({
-        title: batchConfirmTitle(count, appName),
-        header: (
-          <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
-            <Text size={14} color={muted}>
-              {BATCH_CONFIRM_BODY}
-            </Text>
-          </View>
-        ),
-        buttons: [
-          {
-            text: allowAllLabel(count),
-            onPress: (close) => {
-              close();
-              void resolveBatch(clientPubkey, 'approve_once');
-            },
+  const confirmAllowAll = (clientPubkey: string, appName: string, count: number) => {
+    actionMenuPopup({
+      title: batchConfirmTitle(count, appName),
+      header: (
+        <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
+          <Text size={14} color={muted}>
+            {BATCH_CONFIRM_BODY}
+          </Text>
+        </View>
+      ),
+      buttons: [
+        {
+          text: allowAllLabel(count),
+          onPress: (close) => {
+            close();
+            void resolveBatch(clientPubkey, 'approve_once');
           },
-          { text: BATCH_CANCEL_LABEL, variant: 'secondary' },
-        ],
-      });
-    },
-    [muted, resolveBatch]
-  );
+        },
+        { text: BATCH_CANCEL_LABEL, variant: 'secondary' },
+      ],
+    });
+  };
 
   // ── Render ────────────────────────────────────────────────────
 

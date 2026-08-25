@@ -7,7 +7,6 @@
  * Reads the same cached changelog response as the list, so opening a row costs
  * no fetch.
  */
-import { useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { z } from 'zod';
 
@@ -129,34 +128,27 @@ export function MintChangesScreen() {
   const name = revisions[0]?.entry.name ?? metadata?.displayName ?? '';
   const host = revisions[0]?.entry.host ?? mintUrl ?? '';
 
-  const listHeader = useMemo(
-    () => (
-      <HStack align="center" gap={spacing.md} style={styles.header}>
-        <MintIcon iconUrl={metadata?.iconUrl} name={name} size={48} />
-        <VStack gap={2} flex={1}>
-          <Text bold numberOfLines={1} size={fontSize['2xl']} style={{ color: foreground }}>
-            {name || host}
-          </Text>
-          <Text numberOfLines={1} size={fontSize.sm} style={{ color: muted }}>
-            {revisions.length === 1 ? '1 update' : `${revisions.length} updates`}
-            {'  ·  '}
-            {host}
-          </Text>
-        </VStack>
-      </HStack>
-    ),
-    [metadata?.iconUrl, name, host, revisions.length, foreground, muted]
+  const listHeader = (
+    <HStack align="center" gap={spacing.md} style={styles.header}>
+      <MintIcon iconUrl={metadata?.iconUrl} name={name} size={48} />
+      <VStack gap={2} flex={1}>
+        <Text bold numberOfLines={1} size={fontSize['2xl']} style={{ color: foreground }}>
+          {name || host}
+        </Text>
+        <Text numberOfLines={1} size={fontSize.sm} style={{ color: muted }}>
+          {revisions.length === 1 ? '1 update' : `${revisions.length} updates`}
+          {'  ·  '}
+          {host}
+        </Text>
+      </VStack>
+    </HStack>
   );
 
-  const renderItem = useCallback(
-    ({ item }: { item: MintChangeRevision }) => <RevisionSection revision={item} />,
-    []
+  const renderItem = ({ item }: { item: MintChangeRevision }) => (
+    <RevisionSection revision={item} />
   );
 
-  const renderSeparator = useCallback(
-    () => <View style={[styles.separator, { backgroundColor: separator }]} />,
-    [separator]
-  );
+  const renderSeparator = () => <View style={[styles.separator, { backgroundColor: separator }]} />;
 
   return (
     <Screen name="MintChangesScreen" scroll="custom" bgColor={surface}>

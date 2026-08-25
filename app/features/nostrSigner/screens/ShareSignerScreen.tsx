@@ -69,39 +69,37 @@ export function ShareSignerScreen(): React.ReactElement {
   const { keys } = useNostrKeysContext();
   const [state, setState] = useState<ShareState>({ status: 'loading' });
 
-  const regenerate = useCallback(
-    (rotate: boolean) => {
-      const pubkey = keys?.pubkey;
-      if (pubkey === undefined) return; // keys still deriving — refires below
-      setState({ status: 'loading' });
-      const minted = rotate
-        ? clearSecrets(pubkey).andThen(() => mintSecret(pubkey))
-        : mintSecret(pubkey);
-      void minted.match(
-        (secret) => {
-          setState({
-            status: 'ready',
-            uri: buildBunkerUri({
-              signerPubkey: pubkey,
-              relays: [...defaultSignerRelays],
-              secret,
-            }),
-          });
-        },
-        (error) => {
-          // Error type only — the secret is a bearer credential.
-          nostrLog.error('nostr.signer.share_mint_failed', { error: error.type });
-          setState({ status: 'error' });
-        }
-      );
-    },
-    [keys?.pubkey]
-  );
+  const regenerate = (rotate: boolean) => {
+    const pubkey = keys?.pubkey;
+    if (pubkey === undefined) return; // keys still deriving — refires below
+    setState({ status: 'loading' });
+    const minted = rotate
+      ? clearSecrets(pubkey).andThen(() => mintSecret(pubkey))
+      : mintSecret(pubkey);
+    void minted.match(
+      (secret) => {
+        setState({
+          status: 'ready',
+          uri: buildBunkerUri({
+            signerPubkey: pubkey,
+            relays: [...defaultSignerRelays],
+            secret,
+          }),
+        });
+      },
+      (error) => {
+        // Error type only — the secret is a bearer credential.
+        nostrLog.error('nostr.signer.share_mint_failed', { error: error.type });
+        setState({ status: 'error' });
+      }
+    );
+  };
 
   // Fresh secret on every focus; hot engine while visible so the incoming
-  // `connect` is answered without a cold start. The callback identity changes
-  // when keys finish deriving, which re-runs the focus effect — that is the
-  // keys-arrived-while-focused path.
+  // `connect` is answered without a cold start. `regenerate`'s identity is
+  // compiler-memoized on `keys?.pubkey`, so the focus effect re-runs when
+  // keys finish deriving — that is the keys-arrived-while-focused path
+  // (verified by check:react-compiler's zero-bailout gate).
   useFocusEffect(
     useCallback(() => {
       useNip46RequestsStore.getState().setServiceHotRequested(true);
@@ -112,21 +110,19 @@ export function ShareSignerScreen(): React.ReactElement {
     }, [regenerate])
   );
 
-  const copyLink = useSingleFlight(
-    useCallback(async () => {
-      if (state.status !== 'ready') return;
-      await Clipboard.setStringAsync(state.uri);
-      popup({ message: 'Copied', type: 'success', variant: 'toast', duration: 1500 });
-    }, [state])
-  );
+  const copyLink = useSingleFlight(async () => {
+    if (state.status !== 'ready') return;
+    await Clipboard.setStringAsync(state.uri);
+    popup({ message: 'Copied', type: 'success', variant: 'toast', duration: 1500 });
+  });
 
-  const confirmRotate = useCallback(() => {
+  const confirmRotate = () => {
     popup({
       message: ROTATE_CONFIRM_TITLE,
       text: ROTATE_CONFIRM_BODY,
       buttons: [{ text: ROTATE_SECRET_LABEL, onPress: () => regenerate(true) }, { text: 'Cancel' }],
     });
-  }, [regenerate]);
+  };
 
   return (
     <Screen name="ShareSignerScreen">

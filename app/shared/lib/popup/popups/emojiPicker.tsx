@@ -19,7 +19,7 @@
  *   emojiPickerPopup({ token: getEncodedTokenV4(myToken) });
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
@@ -51,11 +51,12 @@ const COLS = 6;
 const CELL_WIDTH_PCT = `${100 / COLS}%` as const;
 
 /**
- * Single emoji cell. Memoized so the list's row recycling can detect
- * "same emoji + same onSelect identity = same content" and skip the
- * inner re-render. With ~6 cells per row and dozens of rows recycled
- * during a long scroll, this is the difference between a smooth jump
- * and a multi-second JS-thread block.
+ * Single emoji cell. The list's row recycling must detect "same emoji +
+ * same onSelect identity = same content" and skip the inner re-render —
+ * with ~6 cells per row and dozens of rows recycled during a long
+ * scroll, that skip is the difference between a smooth jump and a
+ * multi-second JS-thread block. The React Compiler's element-identity
+ * memoization provides it.
  *
  * `Pressable` instead of `TouchableOpacity` — TouchableOpacity wraps
  * an Animated.View + native gesture-responder setup per cell, which is
@@ -63,32 +64,26 @@ const CELL_WIDTH_PCT = `${100 / COLS}%` as const;
  * first interaction. The press-in opacity dim is achieved via the
  * style callback so the visual feedback stays the same.
  */
-const EmojiCell = React.memo(function EmojiCell({
-  entry,
-  onSelect,
-}: {
-  entry: EmojiEntry;
-  onSelect: (emoji: string) => void;
-}) {
-  const handlePress = useCallback(() => onSelect(entry.emoji), [entry.emoji, onSelect]);
+function EmojiCell({ entry, onSelect }: { entry: EmojiEntry; onSelect: (emoji: string) => void }) {
   return (
     <Pressable
       testID={emojiPickerOptionTestID(entry.emoji)}
-      onPress={handlePress}
+      onPress={() => onSelect(entry.emoji)}
       style={({ pressed }) => [styles.emojiCell, pressed && styles.emojiCellPressed]}>
       <Text style={styles.emojiText}>{entry.emoji}</Text>
     </Pressable>
   );
-});
+}
 
 /**
- * Single virtualized row of emojis (up to `COLS` cells). Memoized so
- * list row recycling skips the row's outer render when its `emojis`
- * array reference is stable. Used both as the per-row renderer for
- * category sections inside `SectionAnchorList` AND as the `renderItem`
- * for the search-results `List` override.
+ * Single virtualized row of emojis (up to `COLS` cells). List row
+ * recycling skips the row's outer render when its `emojis` array
+ * reference is stable (compiler element-identity memoization). Used
+ * both as the per-row renderer for category sections inside
+ * `SectionAnchorList` AND as the `renderItem` for the search-results
+ * `List` override.
  */
-const EmojiRow = React.memo(function EmojiRow({
+function EmojiRow({
   emojis,
   onSelect,
 }: {
@@ -102,7 +97,7 @@ const EmojiRow = React.memo(function EmojiRow({
       ))}
     </View>
   );
-});
+}
 
 /**
  * Chunk a flat emoji array into rows of `COLS` for virtualization. Used
@@ -133,6 +128,27 @@ const searchRowKeyExtractor = (row: EmojiEntry[], index: number): string => {
     .join('|');
   return rowKey.length > 0 ? rowKey : `search-row-${index}`;
 };
+
+// Each category becomes a virtualized section. `data` is the flat
+// emoji array — `SectionAnchorList` chunks it into rows of `COLS`
+// (passed via `rowChunkSize`) and only mounts the rows that fall
+// inside the draw window. No `renderHeader` so the anchor pill is
+// the section's only label, matching Select Profile semantics.
+// Reads only module data, so it's built once at module scope.
+const CATEGORY_SECTIONS: AnchorSection<EmojiEntry>[] = CATEGORIES.map((cat: EmojiCategory) => ({
+  id: cat.id,
+  anchor: {
+    icon:
+      cat.id === 'bitcoin' ? (
+        <CurrencyIcon width={16} currency="sat" />
+      ) : (
+        <Text style={{ fontSize: 14 }}>{cat.icon}</Text>
+      ),
+    label: cat.label,
+    testID: `emoji-tab-${cat.id}`,
+  },
+  data: cat.emojis,
+}));
 
 interface EmojiPickerContentProps extends CustomSheetSharedProps {
   payload: ActionSheetPayloads['emoji-picker'];
@@ -168,6 +184,9 @@ export function EmojiPickerContent({
   // Time the substring search so a slow query (the dataset is ~1500
   // emojis) shows up in `slow` / `errors` modes. The search runs on
   // the JS thread so a >50ms hit blocks input handling.
+  // ast-grep-ignore: no-manual-memo-tsx — the body logs a timing event
+  // that must fire exactly once per query change; the explicit dep
+  // array is the contract here, not an optimization.
   const searchResults = useMemo(() => {
     if (!isSearching) return [];
     const start = Date.now();
@@ -213,107 +232,70 @@ export function EmojiPickerContent({
     };
   }, []);
 
-  const handleEmojiSelect = useCallback(
-    async (emoji: string) => {
-      emojiLog.info('emojiPicker.select', { emoji, fromSearch: searchQuery.length > 0 });
-      const encodedEmoji = encode(emoji, payload.token);
-      await Clipboard.setStringAsync(encodedEmoji);
-      copyPopup('token', {
-        onOpen: close,
-        icon: <AnimatedEmoji emoji={emoji} size={28} />,
-      });
-    },
-    [payload.token, close, searchQuery]
-  );
+  const handleEmojiSelect = async (emoji: string) => {
+    emojiLog.info('emojiPicker.select', { emoji, fromSearch: searchQuery.length > 0 });
+    const encodedEmoji = encode(emoji, payload.token);
+    await Clipboard.setStringAsync(encodedEmoji);
+    copyPopup('token', {
+      onOpen: close,
+      icon: <AnimatedEmoji emoji={emoji} size={28} />,
+    });
+  };
 
-  const handleSearchChange = useCallback((text: string) => {
+  const handleSearchChange = (text: string) => {
     setInputText(text);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       emojiLog.debug('emojiPicker.search.debounced', { queryLen: text.length });
       setSearchQuery(text);
     }, 150);
-  }, []);
+  };
 
-  const handleSearchClear = useCallback(() => {
+  const handleSearchClear = () => {
     emojiLog.debug('emojiPicker.search.clear', {});
     setInputText('');
     setSearchQuery('');
     if (debounceRef.current) clearTimeout(debounceRef.current);
-  }, []);
-
-  // Each category becomes a virtualized section. `data` is the flat
-  // emoji array — `SectionAnchorList` chunks it into rows of `COLS`
-  // (passed via `rowChunkSize`) and only mounts the rows that fall
-  // inside the draw window. No `renderHeader` so the anchor pill is
-  // the section's only label, matching Select Profile semantics.
-  const categorySections = useMemo<AnchorSection<EmojiEntry>[]>(
-    () =>
-      CATEGORIES.map((cat: EmojiCategory) => ({
-        id: cat.id,
-        anchor: {
-          icon:
-            cat.id === 'bitcoin' ? (
-              <CurrencyIcon width={16} currency="sat" />
-            ) : (
-              <Text style={{ fontSize: 14 }}>{cat.icon}</Text>
-            ),
-          label: cat.label,
-          testID: `emoji-tab-${cat.id}`,
-        },
-        data: cat.emojis,
-      })),
-    []
-  );
+  };
 
   // Pre-chunk search results so the override `List` virtualizes
   // per row (not per cell) — matches the rowChunkSize=6 layout of the
   // sectioned mode, so cells stay on the same x-grid as the search bar.
-  const searchRows = useMemo(() => chunkEmojis(searchResults), [searchResults]);
+  const searchRows = chunkEmojis(searchResults);
 
-  const renderEmojiRow = useCallback(
-    (items: EmojiEntry[]) => <EmojiRow emojis={items} onSelect={handleEmojiSelect} />,
-    [handleEmojiSelect]
+  const renderEmojiRow = (items: EmojiEntry[]) => (
+    <EmojiRow emojis={items} onSelect={handleEmojiSelect} />
   );
-  const renderEmojiSearchRow = useCallback(
-    ({ item }: { item: EmojiEntry[] }) => <EmojiRow emojis={item} onSelect={handleEmojiSelect} />,
-    [handleEmojiSelect]
+  const renderEmojiSearchRow = ({ item }: { item: EmojiEntry[] }) => (
+    <EmojiRow emojis={item} onSelect={handleEmojiSelect} />
   );
 
   // `overrideContent` swaps the body wholesale. Empty search → centered
   // "No emoji found"; non-empty → its own virtualized `List` so the
   // override path stays cheap with hundreds of matches.
-  const overrideContent = useMemo(() => {
-    if (!isSearching) return null;
-    if (searchResults.length === 0) {
-      return (
-        <View
-          testID="emoji-picker-no-results"
-          style={{ alignItems: 'center', paddingVertical: 32 }}>
-          <Text style={{ color: withAlpha(foreground, 0.4), fontSize: 14 }}>No emoji found</Text>
-        </View>
-      );
-    }
-    return (
-      <List<EmojiEntry[]>
-        data={searchRows}
-        keyExtractor={searchRowKeyExtractor}
-        renderItem={renderEmojiSearchRow}
-        // Match the SectionAnchorList draw window so search and
-        // sectioned mode have the same buffer behavior on fast scroll.
-        drawDistance={150}
-        contentContainerClassName="pb-6"
-        keyboardShouldPersistTaps="handled"
-        renderScrollComponent={({ children, ...props }) => (
-          <BottomSheetScrollView {...props}>{children}</BottomSheetScrollView>
-        )}
-      />
-    );
-  }, [isSearching, searchResults.length, searchRows, foreground, renderEmojiSearchRow]);
+  const overrideContent = !isSearching ? null : searchResults.length === 0 ? (
+    <View testID="emoji-picker-no-results" style={{ alignItems: 'center', paddingVertical: 32 }}>
+      <Text style={{ color: withAlpha(foreground, 0.4), fontSize: 14 }}>No emoji found</Text>
+    </View>
+  ) : (
+    <List<EmojiEntry[]>
+      data={searchRows}
+      keyExtractor={searchRowKeyExtractor}
+      renderItem={renderEmojiSearchRow}
+      // Match the SectionAnchorList draw window so search and
+      // sectioned mode have the same buffer behavior on fast scroll.
+      drawDistance={150}
+      contentContainerClassName="pb-6"
+      keyboardShouldPersistTaps="handled"
+      renderScrollComponent={({ children, ...props }) => (
+        <BottomSheetScrollView {...props}>{children}</BottomSheetScrollView>
+      )}
+    />
+  );
 
   return (
     <SectionAnchorList<EmojiEntry>
-      sections={categorySections}
+      sections={CATEGORY_SECTIONS}
       // 6 emojis per row — `SectionAnchorList` chunks `data` into
       // `EmojiEntry[]` slices of this size and feeds each slice to
       // `renderRow`. The row, not the individual cell, is the

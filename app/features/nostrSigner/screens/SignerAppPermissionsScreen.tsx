@@ -13,7 +13,7 @@
  * Route params: `clientPubkey` (64-hex) + `group` (risk group id).
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React from 'react';
 import { ListGroup, Separator } from 'heroui-native';
 import { useLocalSearchParams } from 'expo-router';
 import { z } from 'zod';
@@ -85,24 +85,18 @@ export function SignerAppPermissionsScreen(): React.ReactElement {
   const strictModeOn = app?.mode === 'strict';
   const sessionGrants = useNip46RequestsStore((s) => s.sessionGrants);
   const sessionAllows = useNip46RequestsStore((s) => s.sessionAllows);
-  const appSessionGrants = useMemo(
-    () =>
-      clientPubkey === undefined
-        ? []
-        : sessionGrants.filter((grant) => grant.clientPubkey === clientPubkey),
-    [sessionGrants, clientPubkey]
-  );
-  const appSessionAllows = useMemo(
-    () =>
-      clientPubkey === undefined
-        ? []
-        : sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey),
-    [sessionAllows, clientPubkey]
-  );
+  const appSessionGrants =
+    clientPubkey === undefined
+      ? []
+      : sessionGrants.filter((grant) => grant.clientPubkey === clientPubkey);
+  const appSessionAllows =
+    clientPubkey === undefined
+      ? []
+      : sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey);
 
   // One section per bundle the group contains, then "Other" for unbundled
   // rows (locked keys, odd-kind extras). filter preserves row order.
-  const sections = useMemo<RowSection[]>(() => {
+  const sections: RowSection[] = (() => {
     if (app === undefined || group === undefined) return [];
     const rows = buildPermissionKeyRows(BASE_EDITOR_GRANT_KEYS, app.grants, group);
     const bundleSections: RowSection[] = PERMISSION_BUNDLES.filter(
@@ -122,19 +116,16 @@ export function SignerAppPermissionsScreen(): React.ReactElement {
       });
     }
     return bundleSections;
-  }, [app, group]);
+  })();
 
-  const onChange = useCallback(
-    (grantKey: GrantKey, state: TriState) => {
-      if (clientPubkey === undefined) return;
-      const verdict = state === 'ask' ? null : state === 'allow' ? 'always' : 'deny';
-      const result = setGrant(clientPubkey, grantKey, verdict);
-      if (result.isErr()) {
-        nostrLog.warn('nostr.signer.app_permissions.set_grant_failed', { error: result.error });
-      }
-    },
-    [clientPubkey, setGrant]
-  );
+  const onChange = (grantKey: GrantKey, state: TriState) => {
+    if (clientPubkey === undefined) return;
+    const verdict = state === 'ask' ? null : state === 'allow' ? 'always' : 'deny';
+    const result = setGrant(clientPubkey, grantKey, verdict);
+    if (result.isErr()) {
+      nostrLog.warn('nostr.signer.app_permissions.set_grant_failed', { error: result.error });
+    }
+  };
 
   if (app === undefined || group === undefined) {
     return (

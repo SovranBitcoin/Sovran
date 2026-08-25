@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { withAlpha } from '@/shared/lib/color';
@@ -78,6 +78,16 @@ const avatarFrameStyle = { overflow: 'hidden' as const };
  *  instant — only a real network/disk load fades. */
 const AVATAR_IMAGE_FADE_MS = 200;
 
+const STATUS_BADGE_CONFIG: Record<
+  string,
+  { variant: 'success' | 'error' | 'secondary'; icon: string; badge: boolean }
+> = {
+  OK: { variant: 'success', icon: 'fluent:checkmark-16-filled', badge: true },
+  ERROR: { variant: 'error', icon: 'nonicons:error-16', badge: true },
+  OFFLINE: { variant: 'secondary', icon: 'feather:wifi', badge: true },
+  VERIFIED: { variant: 'success', icon: 'material-symbols:verified-rounded', badge: false },
+};
+
 let avatarLoadingVisualInstance = 0;
 
 export const Avatar = ({
@@ -99,7 +109,7 @@ export const Avatar = ({
   const foreground = useThemeColor('foreground');
   // Match the skeleton fill used by `Text` — low-opacity foreground reads
   // as ambient "loading" rather than a solid silhouette.
-  const loadingColor = useMemo(() => withAlpha(foreground, 0.07), [foreground]);
+  const loadingColor = withAlpha(foreground, 0.07);
 
   useEffect(() => {
     void prefetchImage(picture);
@@ -112,45 +122,24 @@ export const Avatar = ({
     setImageStatus('loading');
   }, [picture]);
 
-  const handleImageLoad = useCallback(() => {
+  const handleImageLoad = () => {
     if (picture) setLoadedPicture(picture);
     setImageStatus('loaded');
-  }, [picture]);
-  const handleImageError = useCallback(() => setImageStatus('failed'), []);
+  };
+  const handleImageError = () => setImageStatus('failed');
 
   const borderRadius = size / 2;
   const statusIconSize = size * 0.33;
-  const avatarStyle = useMemo(
-    () => ({ width: size, height: size, borderRadius, overflow: 'hidden' as const }),
-    [borderRadius, size]
-  );
-  const containerStyle = useMemo(
-    () => ({
-      ...avatarStyle,
-      justifyContent: 'center' as const,
-      alignItems: 'center' as const,
-    }),
-    [avatarStyle]
-  );
+  const avatarStyle = { width: size, height: size, borderRadius, overflow: 'hidden' as const };
+  const containerStyle = {
+    ...avatarStyle,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  };
 
-  const fallbackSeed = useMemo(
-    () => sanitizeAvatarFallbackSeed(seed ?? name ?? alt ?? 'avatar'),
-    [alt, name, seed]
-  );
+  const fallbackSeed = sanitizeAvatarFallbackSeed(seed ?? name ?? alt ?? 'avatar');
 
-  const statusBadge = useMemo(() => {
-    if (!status) return null;
-    const statusConfig: Record<
-      string,
-      { variant: 'success' | 'error' | 'secondary'; icon: string; badge: boolean }
-    > = {
-      OK: { variant: 'success', icon: 'fluent:checkmark-16-filled', badge: true },
-      ERROR: { variant: 'error', icon: 'nonicons:error-16', badge: true },
-      OFFLINE: { variant: 'secondary', icon: 'feather:wifi', badge: true },
-      VERIFIED: { variant: 'success', icon: 'material-symbols:verified-rounded', badge: false },
-    };
-    return statusConfig[status] ?? null;
-  }, [status]);
+  const statusBadge = status ? (STATUS_BADGE_CONFIG[status] ?? null) : null;
 
   const StatusBadgeWrapper = statusBadge ? (
     <VStack
@@ -171,16 +160,13 @@ export const Avatar = ({
   const defaultAlt = 'Avatar';
   const imageAlt = alt || defaultAlt;
   const previousPicture = loadedPicture && loadedPicture !== picture ? loadedPicture : null;
-  const pictureSource = useMemo(() => ({ uri: picture }), [picture]);
-  const previousPictureSource = useMemo(
-    () => (previousPicture ? { uri: previousPicture } : null),
-    [previousPicture]
-  );
-  const overlayImageStyle = useMemo(() => [StyleSheet.absoluteFill, avatarStyle], [avatarStyle]);
+  const pictureSource = { uri: picture };
+  const previousPictureSource = previousPicture ? { uri: previousPicture } : null;
+  const overlayImageStyle = [StyleSheet.absoluteFill, avatarStyle];
   const showsLoadingPlaceholder =
     state === 'loading' ||
     (state === 'image' && !!picture && imageStatus !== 'loaded' && !previousPicture);
-  const visualInstanceKeyRef = React.useRef<string | null>(null);
+  const visualInstanceKeyRef = useRef<string | null>(null);
   if (visualInstanceKeyRef.current === null) {
     avatarLoadingVisualInstance += 1;
     visualInstanceKeyRef.current = `avatar-loading:${avatarLoadingVisualInstance}`;
@@ -202,12 +188,9 @@ export const Avatar = ({
       ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
     }),
   });
-  const handleVisualLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      visualLayout.onLayout(event);
-    },
-    [visualLayout]
-  );
+  const handleVisualLayout = (event: LayoutChangeEvent) => {
+    visualLayout.onLayout(event);
+  };
 
   // 1. Loading state — 50% foreground fill, no image, no gradient.
   if (state === 'loading') {
