@@ -29,7 +29,7 @@ import { withAlpha } from '@/shared/lib/color';
 import { CurrencyIcon } from 'assets/icons';
 
 import { encode } from '@/shared/lib/third-party/emoji';
-import { log, useRenderLogger } from '@/shared/lib/logger';
+import { log, useMountLog, useRenderLogger } from '@/shared/lib/logger';
 import { AnimatedEmoji } from '@/shared/ui/primitives/AnimatedEmoji';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -184,9 +184,9 @@ export function EmojiPickerContent({
   // Time the substring search so a slow query (the dataset is ~1500
   // emojis) shows up in `slow` / `errors` modes. The search runs on
   // the JS thread so a >50ms hit blocks input handling.
-  // ast-grep-ignore: no-manual-memo-tsx — the body logs a timing event
-  // that must fire exactly once per query change; the explicit dep
-  // array is the contract here, not an optimization.
+  // The body logs a timing event that must fire exactly once per query
+  // change; the explicit dep array is the contract here, not an optimization.
+  // ast-grep-ignore: no-manual-memo-tsx
   const searchResults = useMemo(() => {
     if (!isSearching) return [];
     const start = Date.now();
@@ -206,18 +206,20 @@ export function EmojiPickerContent({
   // Helps correlate later `sectionList.flatten` events to the picker
   // payload — and confirms the categories list isn't unexpectedly
   // empty (which has happened in the past after data refactors).
-  useEffect(() => {
-    const totalEmojis = CATEGORIES.reduce((acc, c) => acc + c.emojis.length, 0);
-    emojiLog.info('emojiPicker.mount', {
+  // Mount-only (single record per open cycle); the compiler-seam rationale
+  // lives in useMountLog (an inline exhaustive-deps suppression would make
+  // the compiler skip this whole component).
+  useMountLog(
+    'emojiPicker.mount',
+    {
       categories: CATEGORIES.length,
-      totalEmojis,
+      totalEmojis: CATEGORIES.reduce((acc, c) => acc + c.emojis.length, 0),
       cols: COLS,
       tokenLen: payload.token?.length ?? 0,
-    });
-    return () => emojiLog.info('emojiPicker.unmount', {});
-    // Mount-only — we want a single record per open cycle.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    },
+    'emojiPicker.unmount',
+    emojiLog
+  );
 
   useEffect(() => {
     setFooterConfig(

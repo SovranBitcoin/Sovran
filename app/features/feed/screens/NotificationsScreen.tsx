@@ -746,6 +746,11 @@ export function NotificationsScreen() {
           <List
             data={notificationItems}
             keyExtractor={(item) => item.id}
+            // Heterogeneous rows (welcome/group/single) — without this
+            // FlashList v2 recycles one variant's component into another's
+            // slot (recycling corruption). Module helper also feeds render
+            // logs, so pools split per notification reason.
+            getItemType={notificationItemType}
             contentContainerStyle={[
               notificationListStyles.listContent,
               { paddingBottom: tabBarPadding },

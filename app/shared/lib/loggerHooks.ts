@@ -49,6 +49,31 @@ export function useRenderLogger(
   }, []);
 }
 
+/**
+ * One-shot mount/unmount log pair with a caller-shaped payload, captured at
+ * MOUNT only — deliberately never re-fired when the payload's inputs change
+ * (a per-identity refire would spam mount events; deeper diagnostics belong
+ * to dedicated events).
+ *
+ * This hook is also the React Compiler seam for that pattern: a mount-only
+ * effect needs an `exhaustive-deps` suppression, and the compiler SKIPS any
+ * component containing one (it renders unmemoized — see
+ * scripts/react-compiler-file-audit.mjs). Keeping the suppression here, like
+ * useLifecycleLogger does, keeps callers compilable.
+ */
+export function useMountLog(
+  mountEvent: string,
+  payload: Record<string, unknown>,
+  unmountEvent: string,
+  logger: Logger = log
+): void {
+  useEffect(() => {
+    logger.info(mountEvent, payload);
+    return () => logger.info(unmountEvent, {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
 /** Logs mount and unmount events for a component. */
 export function useLifecycleLogger(componentName: string, logger: Logger = log): void {
   useEffect(() => {

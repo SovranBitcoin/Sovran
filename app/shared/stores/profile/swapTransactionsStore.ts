@@ -18,6 +18,7 @@ import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStor
 import { mintLocalId } from '@/shared/lib/id';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
 type SwapGroupState = 'running' | 'finished' | 'cancelled';
 
@@ -160,17 +161,7 @@ const PersistedQuoteIndexEntry = z.looseObject({
   kind: z.enum(['mint', 'melt']),
 });
 
-const PersistedQuoteIndex = z
-  .record(z.string().max(256), z.unknown())
-  .default({})
-  .transform((entries) =>
-    Object.fromEntries(
-      Object.entries(entries).flatMap(([quoteId, value]) => {
-        const parsed = PersistedQuoteIndexEntry.safeParse(value);
-        return parsed.success ? [[quoteId, parsed.data] as const] : [];
-      })
-    )
-  );
+const PersistedQuoteIndex = tolerantRecord(z.string().max(256), PersistedQuoteIndexEntry);
 
 const PersistedSwapStore = z.object({
   groups: z.record(z.string().max(128), PersistedSwapGroup).default({}),

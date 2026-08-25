@@ -65,7 +65,7 @@ import { ScrollEdgeFade } from './ScrollEdgeFade';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log, useRenderLogger } from '@/shared/lib/logger';
+import { log, useMountLog, useRenderLogger } from '@/shared/lib/logger';
 import { zIndex } from '@/shared/styles/tokens';
 
 const sectionListLog = log.child({ module: 'sectionAnchorList' });
@@ -160,6 +160,19 @@ const PROGRAMMATIC_SCROLL_SUPPRESS_MS = 400;
 const HEADROOM = 12;
 /** Portion of the anchor bar used for the gradient taper. */
 const FADE_RATIO = 0.5;
+
+/**
+ * Wraps a host-injected scroll container. Module-level because the
+ * `displayName` assignment is a mutation the React Compiler refuses inside a
+ * component body (it skipped the whole list component for it).
+ */
+function makeScrollComponentWrapper(
+  Inner: ComponentType<ScrollViewProps & { ref?: React.Ref<unknown> }>
+): ComponentType<ScrollViewProps> {
+  const Component = (props: ScrollViewProps) => <Inner {...props} />;
+  Component.displayName = 'SectionAnchorListScrollComponent';
+  return Component;
+}
 
 function listKeyExtractor<T>(item: FlatRow<T>): string {
   if (item.kind === 'header') return `header-${item.sectionId}`;
@@ -308,24 +321,21 @@ export function SectionAnchorList<T>({
 
   // One-shot mount log + the inverse for unmount. Captures the size of
   // the dataset so log-doctor's `stats` mode can correlate later events
-  // to the picker config.
-  useEffect(() => {
-    const totalDataItems = sections.reduce((acc, s) => acc + s.data.length, 0);
-    sectionListLog.info('sectionList.mount', {
+  // to the picker config. Mount-only refire semantics + the compiler-seam
+  // rationale live in useMountLog (an inline exhaustive-deps suppression
+  // would make the compiler skip this whole component).
+  useMountLog(
+    'sectionList.mount',
+    {
       sections: sections.length,
-      totalDataItems,
+      totalDataItems: sections.reduce((acc, s) => acc + s.data.length, 0),
       flatRows: flatItems.length,
       rowChunkSize,
       hasOverride: overrideContent != null,
-    });
-    return () => {
-      sectionListLog.info('sectionList.unmount', {});
-    };
-    // Deliberately mount-only — re-running on every dep change would
-    // spam `mount` events whenever the caller built a new `sections`
-    // identity. The deeper diagnostic for that case is `sectionList.flatten`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    },
+    'sectionList.unmount',
+    sectionListLog
+  );
 
   // Keep the anchor bar visible during the override path (e.g. emoji
   // search results) so the chrome stays visually continuous as the
@@ -460,13 +470,10 @@ export function SectionAnchorList<T>({
   // scroll container (scroll position reset). Compiler memoization is an
   // optimization, not a contract; the explicit memo makes it one.
   // ast-grep-ignore: no-manual-memo-tsx
-  const renderScrollComponent = useMemo(() => {
-    if (!ScrollComponent) return undefined;
-    const Inner = ScrollComponent;
-    const Component = (props: ScrollViewProps) => <Inner {...props} />;
-    Component.displayName = 'SectionAnchorListScrollComponent';
-    return Component;
-  }, [ScrollComponent]);
+  const renderScrollComponent = useMemo(
+    () => (ScrollComponent ? makeScrollComponentWrapper(ScrollComponent) : undefined),
+    [ScrollComponent]
+  );
 
   return (
     <View style={{ flex: 1 }}>

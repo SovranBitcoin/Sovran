@@ -43,6 +43,7 @@ import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
 /**
  * Possible outbound-distribution sources for a transaction. These are
@@ -78,16 +79,21 @@ interface TransactionDistributionActions {
 
 type TransactionDistributionStore = TransactionDistributionState & TransactionDistributionActions;
 
+const PersistedDistributionEntry = z.looseObject({
+  // Deliberately bare: each value renders a distinct attribution icon, so an
+  // unknown future value must never be guessed onto an existing meaning; the
+  // per-entry safeParse below drops just the bad row instead of the blob.
+  // ast-grep-ignore: persisted-enum-needs-catch
+  source: z.enum(['copy', 'share', 'airdrop', 'displayed']),
+  recordedAt: z.number().int().nonnegative(),
+});
+
 const PersistedTransactionDistributionStore = z.object({
-  distributions: z
-    .record(
-      z.string().max(256),
-      z.looseObject({
-        source: z.enum(['copy', 'share', 'airdrop', 'displayed']),
-        recordedAt: z.number().int().nonnegative(),
-      })
-    )
-    .default({}),
+  // An entry with an unrecognized `source` (written by a newer build) is
+  // dropped alone — `getDistribution` already treats a missing key as "never
+  // recorded" — instead of failing the whole-blob parse, which would wipe
+  // every recorded distribution (persist merge discards the blob).
+  distributions: tolerantRecord(z.string().max(256), PersistedDistributionEntry),
 });
 
 export const useTransactionDistributionStore = create<TransactionDistributionStore>()(

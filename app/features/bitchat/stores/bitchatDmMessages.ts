@@ -111,12 +111,15 @@ const PersistedBleDmMessage = z.looseObject({
   isPrivate: z.boolean(),
   isOwn: z.boolean(),
   isPending: z.boolean().optional(),
-  // `.catch(undefined)`: presentational badge — an unknown status hides the
-  // badge instead of discarding the whole DM history blob.
+  // `.catch('failed')`: fail VISIBLE. Catching an unknown status to
+  // undefined renders the message as unremarkably in-flight ('sending'
+  // rank), silently hiding a possible transport failure; 'failed' surfaces
+  // a retry affordance instead (worst case: a duplicate resend). Missing
+  // stays undefined via `.optional()` — inbound messages carry no status.
   deliveryStatus: z
     .enum(['sending', 'sent', 'delivered', 'read', 'failed'])
-    .optional()
-    .catch(undefined),
+    .catch('failed')
+    .optional(),
   failureReason: z.string().optional(),
 });
 

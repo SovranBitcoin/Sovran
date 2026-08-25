@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { withAlpha } from '@/shared/lib/color';
@@ -88,8 +88,6 @@ const STATUS_BADGE_CONFIG: Record<
   VERIFIED: { variant: 'success', icon: 'material-symbols:verified-rounded', badge: false },
 };
 
-let avatarLoadingVisualInstance = 0;
-
 export const Avatar = ({
   state,
   picture,
@@ -166,17 +164,16 @@ export const Avatar = ({
   const showsLoadingPlaceholder =
     state === 'loading' ||
     (state === 'image' && !!picture && imageStatus !== 'loaded' && !previousPicture);
-  const visualInstanceKeyRef = useRef<string | null>(null);
-  if (visualInstanceKeyRef.current === null) {
-    avatarLoadingVisualInstance += 1;
-    visualInstanceKeyRef.current = `avatar-loading:${avatarLoadingVisualInstance}`;
-  }
+  // Per-instance key via useId — the previous module-counter + lazy-ref-init
+  // pattern was a render side effect the React Compiler refuses to compile
+  // (the whole component rendered unmemoized).
+  const visualInstanceKey = `avatar-loading:${useId()}`;
   const visualLayout = useVisualLayoutLogger({
     enabled: visualDisabled !== true && showsLoadingPlaceholder,
     scope: visualScope,
     surface: visualSurface,
     component: visualComponent,
-    itemKey: visualKey ? visualLayoutScopePart(visualKey) : visualInstanceKeyRef.current,
+    itemKey: visualKey ? visualLayoutScopePart(visualKey) : visualInstanceKey,
     itemType: 'avatar-loading',
     phase: visualPhase,
     extra: () => ({
@@ -188,6 +185,10 @@ export const Avatar = ({
       ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
     }),
   });
+  // Destructured to a `*Ref` binding: the compiler can't tell that a `.ref`
+  // property read in JSX is a ref OBJECT (not a ref VALUE) and skips the
+  // whole component ("Cannot access refs during render") when passed inline.
+  const { ref: visualHostRef } = visualLayout;
   const handleVisualLayout = (event: LayoutChangeEvent) => {
     visualLayout.onLayout(event);
   };
@@ -196,7 +197,7 @@ export const Avatar = ({
   if (state === 'loading') {
     return (
       <View
-        ref={visualLayout.ref}
+        ref={visualHostRef}
         collapsable={false}
         style={containerStyle}
         accessibilityRole="image"
@@ -236,7 +237,7 @@ export const Avatar = ({
   // from a placeholder rather than from empty space.
   return (
     <View
-      ref={visualLayout.ref}
+      ref={visualHostRef}
       collapsable={false}
       style={avatarFrameStyle}
       onLayout={handleVisualLayout}>

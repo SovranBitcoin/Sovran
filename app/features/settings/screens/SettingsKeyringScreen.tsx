@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import * as Clipboard from 'expo-clipboard';
 import { Stack } from 'expo-router';
@@ -237,9 +237,15 @@ export const SettingsKeyringScreen: React.FC = () => {
   const setRegenerateP2PKOnReceive = useSettingsStore((state) => state.setRegenerateP2PKOnReceive);
 
   /**
-   * Loads all keypairs from the keyring
+   * Loads all keypairs from the keyring.
+   *
+   * Identity contract, not an optimization: this function is a dep of the
+   * load effect below, so its identity must be keyed on `manager` — a plain
+   * render-scoped function there re-fires the effect (and its setStates)
+   * every render. Compiler memoization is an optimization, not a contract.
    */
-  const loadKeypairs = async () => {
+  // ast-grep-ignore: no-manual-memo-tsx
+  const loadKeypairs = useCallback(async () => {
     if (!manager) return;
 
     try {
@@ -252,7 +258,7 @@ export const SettingsKeyringScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [manager]);
 
   useEffect(() => {
     void loadKeypairs();

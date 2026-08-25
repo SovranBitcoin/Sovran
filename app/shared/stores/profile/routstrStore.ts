@@ -18,6 +18,7 @@ import {
   type PersistedLineup,
 } from '@/shared/lib/routstr/lineup';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { tolerantArray } from '@/shared/lib/persist/tolerant';
 import { restoreActiveSessionView } from '@/shared/stores/profile/restoreActiveSessionView';
 
 // AI tab tier + provider ids — imported from the shared lineup module,
@@ -298,9 +299,12 @@ const PersistedChatAttachment = z.object({
 
 const PersistedRoutstrMessage = z.looseObject({
   id: z.string().max(128),
-  // `.catch('assistant')`: a bad role must not wipe every chat session
-  // (whole-blob discard); a mislabeled bubble is the cheaper failure.
-  role: z.enum(['user', 'assistant']).catch('assistant'),
+  // Deliberately bare: `role` is attribution — catching a bad value to
+  // 'assistant' would re-attribute the user's text as model output and
+  // replay it to the model as its own words. The per-message safeParse in
+  // PersistedRoutstrMessages drops just the bad message instead of the blob.
+  // ast-grep-ignore: persisted-enum-needs-catch
+  role: z.enum(['user', 'assistant']),
   content: z.string().max(65_536),
   timestamp: z.number().int().nonnegative(),
   attachments: z.array(PersistedChatAttachment).max(4).optional().catch([]),
@@ -311,11 +315,17 @@ const PersistedRoutstrMessage = z.looseObject({
   pending: z.boolean().optional(),
 });
 
+// A message whose role can't be trusted is dropped alone (a hole in the
+// transcript beats mis-attributed model context); the rest of the session
+// survives. Dropping a branch parent degrades branch nav for its children,
+// which is the acceptable cost.
+const PersistedRoutstrMessages = tolerantArray(PersistedRoutstrMessage, 10_000);
+
 const PersistedRoutstrSession = z.looseObject({
   id: z.string().max(128),
   title: z.string().max(512),
   createdAt: z.number().int().nonnegative(),
-  messages: z.array(PersistedRoutstrMessage).max(10_000),
+  messages: PersistedRoutstrMessages,
   activeChildren: z.record(z.string().max(128), z.string().max(128)).optional(),
 });
 

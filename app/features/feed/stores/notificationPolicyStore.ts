@@ -26,9 +26,19 @@ type NotificationPolicyActions = {
 
 type NotificationPolicyStore = NotificationPolicyState & NotificationPolicyActions;
 
+// `.default` rescues MISSING; `.catch` rescues INVALID. Both needed: a policy
+// value written by a newer build must reset only this preference to its
+// default, not fail the whole-blob parse (which would reset both fields
+// anyway, so the catch strictly narrows the loss).
 const PersistedNotificationPolicyStore = z.object({
-  policy: z.enum(['RELAXED', 'MODERATE', 'STRICT', 'FOLLOWS']).default(DEFAULT_NOTIFICATION_POLICY),
-  replyScope: z.enum(['DIRECT', 'THREAD']).default(DEFAULT_NOTIFICATION_REPLY_SCOPE),
+  policy: z
+    .enum(['RELAXED', 'MODERATE', 'STRICT', 'FOLLOWS'])
+    .default(DEFAULT_NOTIFICATION_POLICY)
+    .catch(DEFAULT_NOTIFICATION_POLICY),
+  replyScope: z
+    .enum(['DIRECT', 'THREAD'])
+    .default(DEFAULT_NOTIFICATION_REPLY_SCOPE)
+    .catch(DEFAULT_NOTIFICATION_REPLY_SCOPE),
 });
 
 export const useNotificationPolicyStore = create<NotificationPolicyStore>()(

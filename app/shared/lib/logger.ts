@@ -53,5 +53,5 @@ export type { LogFileInfo } from './loggerFile';
 
 export { stopJSThreadMonitor } from './loggerJsThread';
 export { deferWork } from './loggerDefer';
-export { useRenderLogger, useLifecycleLogger } from './loggerHooks';
+export { useRenderLogger, useLifecycleLogger, useMountLog } from './loggerHooks';
 export { Log } from './loggerUI';

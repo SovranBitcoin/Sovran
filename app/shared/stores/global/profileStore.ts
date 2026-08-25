@@ -80,11 +80,15 @@ const PersistedProfileEntry = z.looseObject({
   pubkey: z.string().max(128),
   addedAt: z.number().int().nonnegative(),
   cachedBalanceSats: z.number().int().nonnegative().optional(),
-  // `source` was historically absent and therefore means derived. Preserve
-  // that same conservative fallback for a value written by a newer build;
-  // rejecting one entry would otherwise discard the entire global profile
-  // store, including coco migration completion flags.
-  source: z.enum(['derived', 'imported']).catch('derived').optional(),
+  // `source` drives custody: 'imported' loads the nsec from SecureStore,
+  // anything else silently derives keys from the seed (NostrKeysProvider).
+  // A MISSING value historically means derived — `.optional()` preserves
+  // that. A PRESENT-but-unknown value (newer build) must fail CLOSED:
+  // `.catch('imported')` routes key loading through SecureStore, which
+  // errors visibly if no nsec exists, instead of deriving a different
+  // identity from the seed. Rejecting the entry would discard the entire
+  // global profile store, including coco migration completion flags.
+  source: z.enum(['derived', 'imported']).catch('imported').optional(),
   externalChain: z.number().int().nonnegative().optional(),
   cachedDisplayName: z.string().max(512).optional(),
   cachedPicture: z.string().max(2048).optional(),

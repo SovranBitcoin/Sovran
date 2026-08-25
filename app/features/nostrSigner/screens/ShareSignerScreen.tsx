@@ -69,37 +69,46 @@ export function ShareSignerScreen(): React.ReactElement {
   const { keys } = useNostrKeysContext();
   const [state, setState] = useState<ShareState>({ status: 'loading' });
 
-  const regenerate = (rotate: boolean) => {
-    const pubkey = keys?.pubkey;
-    if (pubkey === undefined) return; // keys still deriving — refires below
-    setState({ status: 'loading' });
-    const minted = rotate
-      ? clearSecrets(pubkey).andThen(() => mintSecret(pubkey))
-      : mintSecret(pubkey);
-    void minted.match(
-      (secret) => {
-        setState({
-          status: 'ready',
-          uri: buildBunkerUri({
-            signerPubkey: pubkey,
-            relays: [...defaultSignerRelays],
-            secret,
-          }),
-        });
-      },
-      (error) => {
-        // Error type only — the secret is a bearer credential.
-        nostrLog.error('nostr.signer.share_mint_failed', { error: error.type });
-        setState({ status: 'error' });
-      }
-    );
-  };
+  // Identity contract, not an optimization: `regenerate` is the dep of the
+  // focus effect below, and each refire mints a FRESH nostrconnect secret
+  // while the QR may be showing. Keying explicitly on `keys?.pubkey` pins
+  // the refire to exactly the keys-arrived-while-focused path — the compiler
+  // zero-bailout gate only proves the file compiled, not which values a memo
+  // is keyed on, so this security surface doesn't ride it.
+  // ast-grep-ignore: no-manual-memo-tsx
+  const regenerate = useCallback(
+    (rotate: boolean) => {
+      const pubkey = keys?.pubkey;
+      if (pubkey === undefined) return; // keys still deriving — refires below
+      setState({ status: 'loading' });
+      const minted = rotate
+        ? clearSecrets(pubkey).andThen(() => mintSecret(pubkey))
+        : mintSecret(pubkey);
+      void minted.match(
+        (secret) => {
+          setState({
+            status: 'ready',
+            uri: buildBunkerUri({
+              signerPubkey: pubkey,
+              relays: [...defaultSignerRelays],
+              secret,
+            }),
+          });
+        },
+        (error) => {
+          // Error type only — the secret is a bearer credential.
+          nostrLog.error('nostr.signer.share_mint_failed', { error: error.type });
+          setState({ status: 'error' });
+        }
+      );
+    },
+    [keys?.pubkey]
+  );
 
   // Fresh secret on every focus; hot engine while visible so the incoming
-  // `connect` is answered without a cold start. `regenerate`'s identity is
-  // compiler-memoized on `keys?.pubkey`, so the focus effect re-runs when
-  // keys finish deriving — that is the keys-arrived-while-focused path
-  // (verified by check:react-compiler's zero-bailout gate).
+  // `connect` is answered without a cold start. `regenerate` re-keys on
+  // `keys?.pubkey` (explicit useCallback above), so the focus effect re-runs
+  // when keys finish deriving — the keys-arrived-while-focused path.
   useFocusEffect(
     useCallback(() => {
       useNip46RequestsStore.getState().setServiceHotRequested(true);

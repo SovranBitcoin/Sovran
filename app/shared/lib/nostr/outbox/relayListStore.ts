@@ -51,7 +51,11 @@ const PersistedRelayListStore = z.object({
   entries: z.array(entrySchema).max(64).default([]),
   updatedAt: z.number().default(0),
   hasPublished: z.boolean().default(false),
-  source: z.enum(['default', 'relay', 'local']).default('default'),
+  // `.catch('default')`: unknown provenance degrades to "unpinned" — the
+  // next ingested kind:10002 wins (last-writer guard only applies to
+  // source==='relay'), converging with the relay copy. Without it one bad
+  // value wipes the whole store, entries included.
+  source: z.enum(['default', 'relay', 'local']).default('default').catch('default'),
 });
 
 function defaultEntries(): RelayListEntry[] {

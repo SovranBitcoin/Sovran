@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
 type SendReachabilityStatus = 'checking' | 'device-offline' | 'mint-unreachable' | 'mint-reachable';
 
@@ -30,17 +31,21 @@ type SendReachabilityStore = SendReachabilityState & SendReachabilityActions;
 
 const ENTRY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+const PersistedSendReachabilityEntry = z.looseObject({
+  // Deliberately bare: `status` IS the entry's payload — an unknown future
+  // value can't be mapped onto an existing reachability claim; the per-entry
+  // safeParse below drops just the bad row instead of the blob.
+  // ast-grep-ignore: persisted-enum-needs-catch
+  status: z.enum(['checking', 'device-offline', 'mint-unreachable', 'mint-reachable']),
+  mintUrl: z.string().min(1).max(2048),
+  updatedAt: z.number().int().nonnegative(),
+});
+
 const PersistedSendReachabilityStore = z.object({
-  byTransactionId: z
-    .record(
-      z.string().max(256),
-      z.looseObject({
-        status: z.enum(['checking', 'device-offline', 'mint-unreachable', 'mint-reachable']),
-        mintUrl: z.string().min(1).max(2048),
-        updatedAt: z.number().int().nonnegative(),
-      })
-    )
-    .default({}),
+  // An entry with an unrecognized `status` (written by a newer build) is
+  // dropped alone — `useSendReachability` already returns null for a missing
+  // key — instead of failing the whole-blob parse and wiping every entry.
+  byTransactionId: tolerantRecord(z.string().max(256), PersistedSendReachabilityEntry),
 });
 
 function setStatus(

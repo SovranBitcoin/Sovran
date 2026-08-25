@@ -9,7 +9,7 @@
  * - Bottom button to continue with claim process
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { TextInput, Alert, Keyboard, StyleSheet, View as RNView } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
@@ -359,7 +359,13 @@ export function ClaimUsernameScreen() {
 
   // Check availability for all domains; abortable so a stale in-flight check
   // cannot overwrite the latest user input.
-  const checkAvailability = async (name: string, signal: AbortSignal) => {
+  //
+  // Identity contract, not an optimization: dep of the debounce effect below —
+  // a plain render-scoped identity would re-fire it (aborting the in-flight
+  // check and re-arming the 400ms timer) on every render. Compiler
+  // memoization is an optimization, not a contract.
+  // ast-grep-ignore: no-manual-memo-tsx
+  const checkAvailability = useCallback(async (name: string, signal: AbortSignal) => {
     if (name.length < 1) {
       setAvailabilityResults([]);
       return;
@@ -418,7 +424,7 @@ export function ClaimUsernameScreen() {
     });
     setAvailabilityResults(results);
     setIsChecking(false);
-  };
+  }, []);
 
   // Trigger availability check when username changes; abort the previous
   // in-flight check on every change so the latest input wins regardless of

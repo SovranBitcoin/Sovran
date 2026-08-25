@@ -27,6 +27,7 @@ import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStor
 import { storeLog } from '@/shared/lib/logger';
 import { extractOwnedBlobs, type OwnedBlob } from '@/shared/lib/nostr/media/ownedBlobs';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { tolerantRecord } from '@/shared/lib/persist/tolerant';
 
 /** `deleted` is the only ✓ state; everything else renders ✗ on the media page. */
 export type BlobDeleteState = 'live' | 'delete-requested' | 'deleted' | 'delete-failed';
@@ -70,15 +71,20 @@ const PersistedEntry = z.looseObject({
   sourceNoteIds: z.array(z.string().max(128)).max(2000).default([]),
   firstSeen: z.number().int().nonnegative(),
   lastSeen: z.number().int().nonnegative(),
-  // `.catch('live')`: an unknown future state must not fail the parse — one bad
-  // entry would discard the whole ownership ledger (persist merge drops the
-  // blob). 'live' is safe: the blob just shows in "My media" and re-checks.
-  deleteState: z.enum(['live', 'delete-requested', 'deleted', 'delete-failed']).catch('live'),
+  // Deliberately bare: `deleteState` encodes deletion intent — catching an
+  // unknown state to 'live' resurfaces media the user may have deleted. The
+  // per-entry safeParse below drops just the bad row; a genuinely live blob
+  // is re-recorded by `recordBlobs` the next time it's seen in an own post.
+  // ast-grep-ignore: persisted-enum-needs-catch
+  deleteState: z.enum(['live', 'delete-requested', 'deleted', 'delete-failed']),
   lastCheckedAt: z.number().int().nonnegative().optional(),
 });
 
 const PersistedOwnedMediaStore = z.object({
-  byBlob: z.record(z.string().max(600), PersistedEntry).default({}),
+  // An entry with an unrecognized `deleteState` (written by a newer build) is
+  // dropped alone instead of failing the whole-blob parse, which would
+  // discard the entire ownership ledger.
+  byBlob: tolerantRecord(z.string().max(600), PersistedEntry),
 });
 
 export const useOwnedMediaStore = create<OwnedMediaStore>()(

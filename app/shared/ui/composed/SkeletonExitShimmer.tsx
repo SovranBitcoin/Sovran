@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PropsWithChildren } from 'react';
+import { useEffect, useId, useState, type PropsWithChildren } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -67,8 +67,6 @@ type SkeletonShimmerVisualProps = {
   visualDisabled?: boolean;
 };
 
-let skeletonShimmerVisualInstance = 0;
-
 function useSkeletonShimmerVisualLayout({
   active,
   defaultComponent,
@@ -87,18 +85,17 @@ function useSkeletonShimmerVisualLayout({
   defaultItemType: string;
   defaultPhase: string;
 }) {
-  const instanceKeyRef = useRef<string | null>(null);
-  if (instanceKeyRef.current === null) {
-    skeletonShimmerVisualInstance += 1;
-    instanceKeyRef.current = `shimmer:${skeletonShimmerVisualInstance}`;
-  }
+  // Per-instance key via useId — the previous module-counter + lazy-ref-init
+  // pattern was a render side effect the React Compiler refuses to compile
+  // (every shimmer component rendered unmemoized).
+  const instanceKey = `shimmer:${useId()}`;
 
-  return useVisualLayoutLogger({
+  const reporter = useVisualLayoutLogger({
     enabled: visualDisabled !== true,
     scope: visualScope,
     surface: visualSurface,
     component: visualComponent ?? defaultComponent,
-    itemKey: visualKey ? visualLayoutScopePart(visualKey) : instanceKeyRef.current,
+    itemKey: visualKey ? visualLayoutScopePart(visualKey) : instanceKey,
     itemType: defaultItemType,
     phase: visualPhase ?? (active ? defaultPhase : 'idle'),
     extra: () => ({
@@ -106,6 +103,11 @@ function useSkeletonShimmerVisualLayout({
       ...(typeof visualExtra === 'function' ? visualExtra() : (visualExtra ?? {})),
     }),
   });
+  // Destructured here, once for both shimmer components: the compiler can't
+  // tell a `.ref` property read in JSX is a ref OBJECT and would skip the
+  // consuming component ("Cannot access refs during render").
+  const { ref: hostRef } = reporter;
+  return { hostRef, onLayout: reporter.onLayout };
 }
 
 function shimmerColors(
@@ -142,7 +144,7 @@ export function SkeletonExitReveal({
 }: PropsWithChildren<{ active: boolean; highlightColor?: string } & SkeletonShimmerVisualProps>) {
   const foreground = useThemeColor('foreground');
   const progress = useSharedValue(0);
-  const visualLayout = useSkeletonShimmerVisualLayout({
+  const { hostRef, onLayout } = useSkeletonShimmerVisualLayout({
     active,
     defaultComponent: 'SkeletonExitReveal',
     defaultItemType: 'skeleton-exit-shimmer',
@@ -163,7 +165,7 @@ export function SkeletonExitReveal({
     return () => cancelAnimation(progress);
   }, [active, progress]);
 
-  const { sweepWidth, handleLayout } = useShimmerSweep(visualLayout);
+  const { sweepWidth, handleLayout } = useShimmerSweep({ onLayout });
 
   const fadeStyle = useAnimatedStyle(() => ({
     opacity: 1 - progress.get(),
@@ -183,7 +185,7 @@ export function SkeletonExitReveal({
   const shimmerBarStyle = [styles.shimmerBar, EXIT_SHIMMER_BAR_BASE, shimmerStyle];
 
   return (
-    <View ref={visualLayout.ref} collapsable={false} onLayout={handleLayout}>
+    <View ref={hostRef} collapsable={false} onLayout={handleLayout}>
       <Animated.View style={active ? fadeStyle : undefined}>{children}</Animated.View>
       {active && (
         <Animated.View pointerEvents="none" style={shimmerBarStyle}>
@@ -209,7 +211,7 @@ export function SkeletonLoadingShimmer({
 } & SkeletonShimmerVisualProps) {
   const background = useThemeColor('background');
   const progress = useSharedValue(0);
-  const visualLayout = useSkeletonShimmerVisualLayout({
+  const { hostRef, onLayout } = useSkeletonShimmerVisualLayout({
     active,
     defaultComponent: 'SkeletonLoadingShimmer',
     defaultItemType: 'skeleton-loading-shimmer',
@@ -240,7 +242,7 @@ export function SkeletonLoadingShimmer({
     return () => cancelAnimation(progress);
   }, [active, progress]);
 
-  const { sweepWidth, handleLayout } = useShimmerSweep(visualLayout);
+  const { sweepWidth, handleLayout } = useShimmerSweep({ onLayout });
   const highlightWidth = Math.max(40, Math.round(sweepWidth * LOADING_HIGHLIGHT_WIDTH_RATIO));
 
   const shimmerStyle = useAnimatedStyle(() => {
@@ -259,7 +261,7 @@ export function SkeletonLoadingShimmer({
   if (!active)
     return (
       <View
-        ref={visualLayout.ref}
+        ref={hostRef}
         collapsable={false}
         onLayout={handleLayout}
         style={StyleSheet.absoluteFill}
@@ -268,7 +270,7 @@ export function SkeletonLoadingShimmer({
 
   return (
     <View
-      ref={visualLayout.ref}
+      ref={hostRef}
       collapsable={false}
       onLayout={handleLayout}
       pointerEvents="none"

@@ -59,8 +59,11 @@ describe('profileStore persistence', () => {
       cachedBalanceSats: 21,
       cachedDisplayName: 'Primary',
     });
+    // Unknown custody source fails CLOSED: 'imported' routes key loading
+    // through SecureStore (visible error if absent) instead of silently
+    // deriving a different identity from the seed.
     expect(parsed.profiles[1]).toMatchObject({
-      source: 'derived',
+      source: 'imported',
       cachedBalanceSats: 34,
       cachedDisplayName: 'Future profile',
     });

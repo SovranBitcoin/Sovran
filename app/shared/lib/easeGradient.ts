@@ -17,6 +17,8 @@
 // eslint-disable-next-line no-restricted-imports
 import { Animated, Easing, type EasingFunction } from 'react-native';
 
+import { log } from '@/shared/lib/logger';
+
 // @ts-expect-error - internal RN API for color interpolation
 const AnimatedInterpolation = Animated.Interpolation;
 
@@ -84,8 +86,19 @@ export function easeGradient({
     }
   }
 
+  // The declared non-empty tuples are ENFORCED, not asserted: with <2 usable
+  // stops (empty/malformed colorStops) the old casts fabricated a tuple over
+  // an empty array — and call sites have deleted their own guards on the
+  // strength of this signature. Degrade to a real 2-stop identity gradient
+  // instead (LinearGradient requires ≥2 entries).
+  if (colors.length < 2 || locations.length < 2) {
+    log.warn('easeGradient.degenerate_stops', { colorCount: colors.length });
+    const fill = colors[0] ?? 'transparent';
+    const location = locations[0] ?? 0;
+    return { colors: [fill, fill], locations: [location, 1] };
+  }
   return {
-    colors: colors as [string, string, ...string[]],
-    locations: locations as [number, number, ...number[]],
+    colors: [colors[0]!, colors[1]!, ...colors.slice(2)],
+    locations: [locations[0]!, locations[1]!, ...locations.slice(2)],
   };
 }

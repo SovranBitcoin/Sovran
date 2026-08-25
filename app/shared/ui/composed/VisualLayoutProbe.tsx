@@ -63,6 +63,9 @@ export function VisualLayoutProbe({
     [extra, pointerEvents, style]
   );
   const layout = useVisualLayoutLogger({ ...config, extra: visualExtra });
+  // Destructured to a `*Ref` binding: the compiler can't tell that a `.ref`
+  // property read in JSX is a ref OBJECT and skips the component otherwise.
+  const { ref: hostRef } = layout;
   const handleLayout = useCallback(
     (event: LayoutChangeEvent) => {
       onLayout?.(event);
@@ -73,7 +76,7 @@ export function VisualLayoutProbe({
 
   return (
     <View
-      ref={layout.ref}
+      ref={hostRef}
       collapsable={false}
       className={className}
       pointerEvents={pointerEvents}

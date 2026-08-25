@@ -1,5 +1,155 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
+exports[`persisted schema drift bitchat-dm-messages-store schema matches the golden snapshot for its version: bitchat-dm-messages-store 1`] = `
+{
+  "name": "bitchat-dm-messages-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": {},
+    "properties": {
+      "byPeer": {
+        "additionalProperties": {
+          "items": {
+            "additionalProperties": {},
+            "properties": {
+              "content": {
+                "type": "string",
+              },
+              "deliveryStatus": {
+                "default": "failed",
+                "enum": [
+                  "sending",
+                  "sent",
+                  "delivered",
+                  "read",
+                  "failed",
+                ],
+                "type": "string",
+              },
+              "failureReason": {
+                "type": "string",
+              },
+              "id": {
+                "type": "string",
+              },
+              "isOwn": {
+                "type": "boolean",
+              },
+              "isPending": {
+                "type": "boolean",
+              },
+              "isPrivate": {
+                "type": "boolean",
+              },
+              "sender": {
+                "type": "string",
+              },
+              "senderId": {
+                "type": "string",
+              },
+              "timestamp": {
+                "type": "number",
+              },
+            },
+            "required": [
+              "id",
+              "content",
+              "sender",
+              "senderId",
+              "timestamp",
+              "isPrivate",
+              "isOwn",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "default": {},
+        "propertyNames": {
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "byPeer",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift btcmap-store schema matches the golden snapshot for its version: btcmap-store 1`] = `
+{
+  "name": "btcmap-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "placeDetailsCache": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "data": {},
+            "timestamp": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "data",
+            "timestamp",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 32,
+          "type": "string",
+        },
+        "type": "object",
+      },
+      "placesCache": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "data": {
+                "items": {},
+                "maxItems": 200000,
+                "type": "array",
+              },
+              "timestamp": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+            },
+            "required": [
+              "data",
+              "timestamp",
+            ],
+            "type": "object",
+          },
+          {
+            "type": "null",
+          },
+        ],
+        "default": null,
+      },
+    },
+    "required": [
+      "placesCache",
+      "placeDetailsCache",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift data-migration-store schema matches the golden snapshot for its version: data-migration-store 1`] = `
 {
   "name": "data-migration-store",
@@ -16,6 +166,83 @@ exports[`persisted schema drift data-migration-store schema matches the golden s
     },
     "required": [
       "level",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift feed-ignore-store schema matches the golden snapshot for its version: feed-ignore-store 1`] = `
+{
+  "name": "feed-ignore-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "ignoredEventIds": {
+        "default": [],
+        "items": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string",
+        },
+        "maxItems": 10000,
+        "type": "array",
+      },
+      "ignoredPubkeys": {
+        "default": [],
+        "items": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string",
+        },
+        "maxItems": 5000,
+        "type": "array",
+      },
+    },
+    "required": [
+      "ignoredPubkeys",
+      "ignoredEventIds",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift mempool-address-cache schema matches the golden snapshot for its version: mempool-address-cache 1`] = `
+{
+  "name": "mempool-address-cache",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "byAddress": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "fetchedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "stats": {},
+          },
+          "required": [
+            "stats",
+            "fetchedAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 256,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "byAddress",
     ],
     "type": "object",
   },
@@ -290,6 +517,470 @@ exports[`persisted schema drift mint-store schema matches the golden snapshot fo
     "type": "object",
   },
   "version": 2,
+}
+`;
+
+exports[`persisted schema drift nip46-activity-store schema matches the golden snapshot for its version: nip46-activity-store 1`] = `
+{
+  "name": "nip46-activity-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "entries": {
+        "default": [],
+        "items": {
+          "additionalProperties": {},
+          "properties": {
+            "at": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "clientPubkey": {},
+            "contentPreview": {
+              "maxLength": 120,
+              "type": "string",
+            },
+            "eventId": {},
+            "id": {
+              "maxLength": 128,
+              "type": "string",
+            },
+            "kind": {
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "method": {
+              "enum": [
+                "connect",
+                "sign_event",
+                "ping",
+                "get_public_key",
+                "nip04_encrypt",
+                "nip04_decrypt",
+                "nip44_encrypt",
+                "nip44_decrypt",
+              ],
+              "type": "string",
+            },
+            "summary": {
+              "additionalProperties": {},
+              "properties": {
+                "headline": {
+                  "maxLength": 64,
+                  "type": "string",
+                },
+                "line": {
+                  "maxLength": 120,
+                  "type": "string",
+                },
+                "refEventId": {},
+                "refPubkey": {},
+              },
+              "type": "object",
+            },
+            "verdict": {
+              "enum": [
+                "approved_once",
+                "approved_pairing",
+                "auto_approved_grant",
+                "auto_approved_session",
+                "auto_approved_peer_grant",
+                "auto_approved_method",
+                "denied_once",
+                "auto_denied_blocked",
+                "auto_denied_grant",
+                "auto_denied_forbidden",
+                "auto_denied_unauthorized",
+                "auto_denied_rate_limited",
+                "auto_denied_malformed",
+                "expired",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "id",
+            "clientPubkey",
+            "method",
+            "verdict",
+            "at",
+          ],
+          "type": "object",
+        },
+        "maxItems": 500,
+        "type": "array",
+      },
+    },
+    "required": [
+      "entries",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift nip46-connections-store schema matches the golden snapshot for its version: nip46-connections-store 1`] = `
+{
+  "name": "nip46-connections-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "apps": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "clientPubkey": {},
+            "deniedCount": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "encryption": {
+              "enum": [
+                "nip44",
+                "nip04",
+              ],
+              "type": "string",
+            },
+            "grants": {
+              "additionalProperties": {
+                "additionalProperties": {},
+                "properties": {
+                  "createdAt": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "lastUsedAt": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "origin": {
+                    "enum": [
+                      "pairing",
+                      "prompt",
+                    ],
+                    "type": "string",
+                  },
+                  "useCount": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "verdict": {
+                    "enum": [
+                      "always",
+                      "deny",
+                    ],
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "verdict",
+                  "origin",
+                  "createdAt",
+                  "useCount",
+                ],
+                "type": "object",
+              },
+              "propertyNames": {},
+              "type": "object",
+            },
+            "image": {
+              "maxLength": 1024,
+              "type": "string",
+            },
+            "lastUsedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "mode": {
+              "enum": [
+                "standard",
+                "strict",
+              ],
+              "type": "string",
+            },
+            "name": {
+              "maxLength": 120,
+              "type": "string",
+            },
+            "origin": {
+              "enum": [
+                "bunker",
+                "nostrconnect",
+              ],
+              "type": "string",
+            },
+            "pairedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "peerDecryptGrants": {
+              "additionalProperties": {
+                "additionalProperties": {},
+                "properties": {
+                  "createdAt": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "lastUsedAt": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "methods": {
+                    "items": {
+                      "enum": [
+                        "nip04_decrypt",
+                        "nip44_decrypt",
+                      ],
+                      "type": "string",
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                  },
+                  "useCount": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                },
+                "required": [
+                  "methods",
+                  "createdAt",
+                  "useCount",
+                ],
+                "type": "object",
+              },
+              "default": {},
+              "propertyNames": {},
+              "type": "object",
+            },
+            "previousClientPubkeys": {
+              "default": [],
+              "items": {},
+              "maxItems": 8,
+              "type": "array",
+            },
+            "relays": {
+              "items": {
+                "maxLength": 512,
+                "pattern": "^wss:\\/\\/\\S+$",
+                "type": "string",
+              },
+              "maxItems": 8,
+              "minItems": 1,
+              "type": "array",
+            },
+            "requestCount": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "status": {
+              "enum": [
+                "active",
+                "blocked",
+              ],
+              "type": "string",
+            },
+            "url": {
+              "maxLength": 512,
+              "type": "string",
+            },
+          },
+          "required": [
+            "clientPubkey",
+            "relays",
+            "origin",
+            "status",
+            "mode",
+            "encryption",
+            "pairedAt",
+            "requestCount",
+            "deniedCount",
+            "grants",
+            "peerDecryptGrants",
+            "previousClientPubkeys",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {},
+        "type": "object",
+      },
+    },
+    "required": [
+      "apps",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift nostr-media-server-store schema matches the golden snapshot for its version: nostr-media-server-store 1`] = `
+{
+  "name": "nostr-media-server-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "server": {
+        "default": "https://blossom.primal.net",
+        "format": "uri",
+        "type": "string",
+      },
+    },
+    "required": [
+      "server",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift nostr-metadata-cache schema matches the golden snapshot for its version: nostr-metadata-cache 1`] = `
+{
+  "name": "nostr-metadata-cache",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "byPubkey": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "about": {
+              "maxLength": 4096,
+              "type": "string",
+            },
+            "banner": {
+              "maxLength": 2048,
+              "type": "string",
+            },
+            "displayName": {
+              "maxLength": 512,
+              "type": "string",
+            },
+            "fetchedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "lud16": {
+              "maxLength": 512,
+              "type": "string",
+            },
+            "name": {
+              "maxLength": 512,
+              "type": "string",
+            },
+            "nip05": {
+              "maxLength": 512,
+              "type": "string",
+            },
+            "picture": {
+              "maxLength": 2048,
+              "type": "string",
+            },
+            "website": {
+              "maxLength": 2048,
+              "type": "string",
+            },
+          },
+          "required": [
+            "fetchedAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 128,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "byPubkey",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift nostr-relay-list-store schema matches the golden snapshot for its version: nostr-relay-list-store 1`] = `
+{
+  "name": "nostr-relay-list-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "entries": {
+        "default": [],
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "read": {
+              "type": "boolean",
+            },
+            "url": {
+              "type": "string",
+            },
+            "write": {
+              "type": "boolean",
+            },
+          },
+          "required": [
+            "url",
+            "read",
+            "write",
+          ],
+          "type": "object",
+        },
+        "maxItems": 64,
+        "type": "array",
+      },
+      "hasPublished": {
+        "default": false,
+        "type": "boolean",
+      },
+      "source": {
+        "default": "default",
+        "enum": [
+          "default",
+          "relay",
+          "local",
+        ],
+        "type": "string",
+      },
+      "updatedAt": {
+        "default": 0,
+        "type": "number",
+      },
+    },
+    "required": [
+      "entries",
+      "updatedAt",
+      "hasPublished",
+      "source",
+    ],
+    "type": "object",
+  },
+  "version": 1,
 }
 `;
 
@@ -612,6 +1303,42 @@ exports[`persisted schema drift nostr-social-store schema matches the golden sna
 }
 `;
 
+exports[`persisted schema drift notification-policy-store schema matches the golden snapshot for its version: notification-policy-store 1`] = `
+{
+  "name": "notification-policy-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "policy": {
+        "default": "RELAXED",
+        "enum": [
+          "RELAXED",
+          "MODERATE",
+          "STRICT",
+          "FOLLOWS",
+        ],
+        "type": "string",
+      },
+      "replyScope": {
+        "default": "DIRECT",
+        "enum": [
+          "DIRECT",
+          "THREAD",
+        ],
+        "type": "string",
+      },
+    },
+    "required": [
+      "policy",
+      "replyScope",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
 exports[`persisted schema drift npc-mint-store schema matches the golden snapshot for its version: npc-mint-store 1`] = `
 {
   "name": "npc-mint-store",
@@ -839,82 +1566,91 @@ exports[`persisted schema drift owned-media-store schema matches the golden snap
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
-      "byBlob": {
-        "additionalProperties": {
-          "additionalProperties": {},
-          "properties": {
-            "deleteState": {
-              "default": "live",
-              "enum": [
-                "live",
-                "delete-requested",
-                "deleted",
-                "delete-failed",
-              ],
-              "type": "string",
-            },
-            "firstSeen": {
-              "maximum": 9007199254740991,
-              "minimum": 0,
-              "type": "integer",
-            },
-            "host": {
-              "maxLength": 512,
-              "type": "string",
-            },
-            "lastCheckedAt": {
-              "maximum": 9007199254740991,
-              "minimum": 0,
-              "type": "integer",
-            },
-            "lastSeen": {
-              "maximum": 9007199254740991,
-              "minimum": 0,
-              "type": "integer",
-            },
-            "mimeType": {
-              "maxLength": 256,
-              "type": "string",
-            },
-            "sha256": {
-              "maxLength": 64,
-              "type": "string",
-            },
-            "sourceNoteIds": {
-              "default": [],
-              "items": {
-                "maxLength": 128,
-                "type": "string",
-              },
-              "maxItems": 2000,
-              "type": "array",
-            },
-            "url": {
-              "maxLength": 2048,
-              "type": "string",
-            },
-          },
-          "required": [
-            "sha256",
-            "url",
-            "host",
-            "sourceNoteIds",
-            "firstSeen",
-            "lastSeen",
-            "deleteState",
-          ],
-          "type": "object",
-        },
-        "default": {},
-        "propertyNames": {
-          "maxLength": 600,
-          "type": "string",
-        },
-        "type": "object",
-      },
+      "byBlob": {},
     },
     "required": [
       "byBlob",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift pricelist-store schema matches the golden snapshot for its version: pricelist-store 1`] = `
+{
+  "name": "pricelist-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "lastUpdated": {
+        "anyOf": [
+          {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer",
+          },
+          {
+            "type": "null",
+          },
+        ],
+        "default": null,
+      },
+      "pricelist": {
+        "anyOf": [
+          {
+            "additionalProperties": {},
+            "properties": {
+              "eur": {
+                "additionalProperties": {},
+                "properties": {
+                  "btc": {
+                    "type": "number",
+                  },
+                },
+                "required": [
+                  "btc",
+                ],
+                "type": "object",
+              },
+              "gbp": {
+                "additionalProperties": {},
+                "properties": {
+                  "btc": {
+                    "type": "number",
+                  },
+                },
+                "required": [
+                  "btc",
+                ],
+                "type": "object",
+              },
+              "usd": {
+                "additionalProperties": {},
+                "properties": {
+                  "btc": {
+                    "type": "number",
+                  },
+                },
+                "required": [
+                  "btc",
+                ],
+                "type": "object",
+              },
+            },
+            "type": "object",
+          },
+          {
+            "type": "null",
+          },
+        ],
+        "default": null,
+      },
+    },
+    "required": [
+      "pricelist",
+      "lastUpdated",
     ],
     "type": "object",
   },
@@ -973,7 +1709,7 @@ exports[`persisted schema drift profile-store schema matches the golden snapshot
               "type": "string",
             },
             "source": {
-              "default": "derived",
+              "default": "imported",
               "enum": [
                 "derived",
                 "imported",
@@ -999,6 +1735,65 @@ exports[`persisted schema drift profile-store schema matches the golden snapshot
     "type": "object",
   },
   "version": 2,
+}
+`;
+
+exports[`persisted schema drift recent-people-store schema matches the golden snapshot for its version: recent-people-store 1`] = `
+{
+  "name": "recent-people-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "entries": {
+        "default": [],
+        "items": {
+          "additionalProperties": {},
+          "properties": {
+            "displayName": {
+              "type": "string",
+            },
+            "firstOpenedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "lastOpenedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "pubkey": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string",
+            },
+            "reason": {
+              "default": "search",
+              "enum": [
+                "search",
+                "peer",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "pubkey",
+            "firstOpenedAt",
+            "lastOpenedAt",
+            "reason",
+          ],
+          "type": "object",
+        },
+        "maxItems": 20,
+        "type": "array",
+      },
+    },
+    "required": [
+      "entries",
+    ],
+    "type": "object",
+  },
+  "version": 1,
 }
 `;
 
@@ -2869,107 +3664,7 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
               "maxLength": 128,
               "type": "string",
             },
-            "messages": {
-              "items": {
-                "additionalProperties": {},
-                "properties": {
-                  "attachments": {
-                    "default": [],
-                    "items": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "height": {
-                          "default": 0,
-                          "maximum": 9007199254740991,
-                          "minimum": 0,
-                          "type": "integer",
-                        },
-                        "localUri": {
-                          "maxLength": 2048,
-                          "type": "string",
-                        },
-                        "mimeType": {
-                          "maxLength": 64,
-                          "type": "string",
-                        },
-                        "width": {
-                          "default": 0,
-                          "maximum": 9007199254740991,
-                          "minimum": 0,
-                          "type": "integer",
-                        },
-                      },
-                      "required": [
-                        "localUri",
-                        "mimeType",
-                        "width",
-                        "height",
-                      ],
-                      "type": "object",
-                    },
-                    "maxItems": 4,
-                    "type": "array",
-                  },
-                  "content": {
-                    "maxLength": 65536,
-                    "type": "string",
-                  },
-                  "costSats": {
-                    "maximum": 9007199254740991,
-                    "minimum": 0,
-                    "type": "integer",
-                  },
-                  "id": {
-                    "maxLength": 128,
-                    "type": "string",
-                  },
-                  "parentId": {
-                    "anyOf": [
-                      {
-                        "maxLength": 128,
-                        "type": "string",
-                      },
-                      {
-                        "type": "null",
-                      },
-                    ],
-                  },
-                  "pending": {
-                    "type": "boolean",
-                  },
-                  "reasoningContent": {
-                    "maxLength": 65536,
-                    "type": "string",
-                  },
-                  "role": {
-                    "default": "assistant",
-                    "enum": [
-                      "user",
-                      "assistant",
-                    ],
-                    "type": "string",
-                  },
-                  "thinkingDurationSec": {
-                    "minimum": 0,
-                    "type": "number",
-                  },
-                  "timestamp": {
-                    "maximum": 9007199254740991,
-                    "minimum": 0,
-                    "type": "integer",
-                  },
-                },
-                "required": [
-                  "id",
-                  "role",
-                  "content",
-                  "timestamp",
-                ],
-                "type": "object",
-              },
-              "maxItems": 10000,
-              "type": "array",
-            },
+            "messages": {},
             "title": {
               "maxLength": 512,
               "type": "string",
@@ -2995,6 +3690,96 @@ exports[`persisted schema drift routstr-store schema matches the golden snapshot
       "currentSessionId",
       "lastKnownLineup",
       "nodeBaseUrl",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift scan-history-store schema matches the golden snapshot for its version: scan-history-store 1`] = `
+{
+  "name": "scan-history-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "entries": {
+        "default": [],
+        "items": {
+          "additionalProperties": {},
+          "properties": {
+            "container": {
+              "maxLength": 64,
+              "type": "string",
+            },
+            "id": {
+              "maxLength": 128,
+              "type": "string",
+            },
+            "inputType": {
+              "maxLength": 64,
+              "type": "string",
+            },
+            "optionKinds": {
+              "items": {
+                "maxLength": 128,
+                "type": "string",
+              },
+              "maxItems": 64,
+              "type": "array",
+            },
+            "raw": {
+              "maxLength": 16384,
+              "type": "string",
+            },
+            "scannedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "source": {
+              "default": "qr",
+              "enum": [
+                "qr",
+                "nfc",
+                "paste",
+                "deeplink",
+              ],
+              "type": "string",
+            },
+            "transactionId": {
+              "maxLength": 256,
+              "type": "string",
+            },
+            "type": {
+              "default": "unknown",
+              "enum": [
+                "npub",
+                "ecash",
+                "lightning",
+                "mint",
+                "paymentRequest",
+                "unknown",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "id",
+            "raw",
+            "type",
+            "source",
+            "scannedAt",
+          ],
+          "type": "object",
+        },
+        "maxItems": 500,
+        "type": "array",
+      },
+    },
+    "required": [
+      "entries",
     ],
     "type": "object",
   },
@@ -3061,44 +3846,7 @@ exports[`persisted schema drift send-reachability-store schema matches the golde
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
-      "byTransactionId": {
-        "additionalProperties": {
-          "additionalProperties": {},
-          "properties": {
-            "mintUrl": {
-              "maxLength": 2048,
-              "minLength": 1,
-              "type": "string",
-            },
-            "status": {
-              "enum": [
-                "checking",
-                "device-offline",
-                "mint-unreachable",
-                "mint-reachable",
-              ],
-              "type": "string",
-            },
-            "updatedAt": {
-              "maximum": 9007199254740991,
-              "minimum": 0,
-              "type": "integer",
-            },
-          },
-          "required": [
-            "status",
-            "mintUrl",
-            "updatedAt",
-          ],
-          "type": "object",
-        },
-        "default": {},
-        "propertyNames": {
-          "maxLength": 256,
-          "type": "string",
-        },
-        "type": "object",
-      },
+      "byTransactionId": {},
     },
     "required": [
       "byTransactionId",
@@ -3106,6 +3854,209 @@ exports[`persisted schema drift send-reachability-store schema matches the golde
     "type": "object",
   },
   "version": 1,
+}
+`;
+
+exports[`persisted schema drift settings-store schema matches the golden snapshot for its version: settings-store 1`] = `
+{
+  "name": "settings-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "displayBtc": {
+        "default": 3,
+        "maximum": 8,
+        "minimum": 0,
+        "type": "integer",
+      },
+      "displayCurrency": {
+        "default": "usd",
+        "enum": [
+          "usd",
+          "eur",
+          "gbp",
+        ],
+        "type": "string",
+      },
+      "experimental": {
+        "default": false,
+        "type": "boolean",
+      },
+      "fileLoggingEnabled": {
+        "default": false,
+        "type": "boolean",
+      },
+      "hasSeenOnboarding": {
+        "default": false,
+        "type": "boolean",
+      },
+      "language": {
+        "default": "en",
+        "maxLength": 16,
+        "type": "string",
+      },
+      "middlemanRouting": {
+        "additionalProperties": {},
+        "default": {
+          "maxFee": 5,
+          "maxHops": 2,
+          "minSuccessRate": 0.9,
+          "requireLastOk": true,
+          "trustMode": "trusted_only",
+        },
+        "properties": {
+          "maxFee": {
+            "default": 5,
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer",
+          },
+          "maxHops": {
+            "default": 2,
+            "maximum": 8,
+            "minimum": 1,
+            "type": "integer",
+          },
+          "minSuccessRate": {
+            "default": 0.9,
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number",
+          },
+          "requireLastOk": {
+            "default": true,
+            "type": "boolean",
+          },
+          "trustMode": {
+            "default": "trusted_only",
+            "enum": [
+              "trusted_only",
+              "allow_untrusted",
+            ],
+            "type": "string",
+          },
+        },
+        "required": [
+          "maxHops",
+          "maxFee",
+          "minSuccessRate",
+          "requireLastOk",
+          "trustMode",
+        ],
+        "type": "object",
+      },
+      "minTransferThreshold": {
+        "default": 5,
+        "maximum": 9007199254740991,
+        "minimum": 0,
+        "type": "integer",
+      },
+      "mockFailMelt": {
+        "default": false,
+        "type": "boolean",
+      },
+      "mockFailPaymentRequest": {
+        "default": false,
+        "type": "boolean",
+      },
+      "mockFailSend": {
+        "default": false,
+        "type": "boolean",
+      },
+      "mockMode": {
+        "default": false,
+        "type": "boolean",
+      },
+      "mockNoGlass": {
+        "default": false,
+        "type": "boolean",
+      },
+      "mockOffline": {
+        "default": false,
+        "type": "boolean",
+      },
+      "naggTierEnabled": {
+        "default": true,
+        "type": "boolean",
+      },
+      "primalTierEnabled": {
+        "default": true,
+        "type": "boolean",
+      },
+      "quickAccessP2PK": {
+        "default": false,
+        "type": "boolean",
+      },
+      "regenerateP2PKOnReceive": {
+        "default": true,
+        "type": "boolean",
+      },
+      "relayTierEnabled": {
+        "default": true,
+        "type": "boolean",
+      },
+      "sendLocationEnabled": {
+        "default": false,
+        "type": "boolean",
+      },
+      "termsAccepted": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "date": {
+                "maxLength": 64,
+                "type": "string",
+              },
+              "termsAccepted": {
+                "type": "boolean",
+              },
+            },
+            "required": [
+              "termsAccepted",
+              "date",
+            ],
+            "type": "object",
+          },
+          {
+            "type": "null",
+          },
+        ],
+        "default": null,
+      },
+      "whitenoiseEnabled": {
+        "default": false,
+        "type": "boolean",
+      },
+    },
+    "required": [
+      "language",
+      "displayBtc",
+      "displayCurrency",
+      "experimental",
+      "mockMode",
+      "mockOffline",
+      "mockFailSend",
+      "mockFailMelt",
+      "mockFailPaymentRequest",
+      "whitenoiseEnabled",
+      "mockNoGlass",
+      "termsAccepted",
+      "hasSeenOnboarding",
+      "quickAccessP2PK",
+      "regenerateP2PKOnReceive",
+      "sendLocationEnabled",
+      "fileLoggingEnabled",
+      "naggTierEnabled",
+      "primalTierEnabled",
+      "relayTierEnabled",
+      "minTransferThreshold",
+      "middlemanRouting",
+    ],
+    "type": "object",
+  },
+  "version": 4,
 }
 `;
 
@@ -3255,6 +4206,59 @@ exports[`persisted schema drift swap-transactions-store schema matches the golde
 }
 `;
 
+exports[`persisted schema drift theme-store schema matches the golden snapshot for its version: theme-store 1`] = `
+{
+  "name": "theme-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "activeAlbumSlug": {
+        "anyOf": [
+          {
+            "maxLength": 64,
+            "type": "string",
+          },
+          {
+            "type": "null",
+          },
+        ],
+        "default": null,
+      },
+      "mode": {
+        "default": "dark",
+        "enum": [
+          "light",
+          "dark",
+        ],
+        "type": "string",
+      },
+      "unitWallpapers": {
+        "additionalProperties": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "activeAlbumSlug",
+      "unitWallpapers",
+      "mode",
+    ],
+    "type": "object",
+  },
+  "version": 2,
+}
+`;
+
 exports[`persisted schema drift transaction-annotation-store schema matches the golden snapshot for its version: transaction-annotation-store 1`] = `
 {
   "name": "transaction-annotation-store",
@@ -3298,38 +4302,7 @@ exports[`persisted schema drift transaction-distribution-store schema matches th
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
-      "distributions": {
-        "additionalProperties": {
-          "additionalProperties": {},
-          "properties": {
-            "recordedAt": {
-              "maximum": 9007199254740991,
-              "minimum": 0,
-              "type": "integer",
-            },
-            "source": {
-              "enum": [
-                "copy",
-                "share",
-                "airdrop",
-                "displayed",
-              ],
-              "type": "string",
-            },
-          },
-          "required": [
-            "source",
-            "recordedAt",
-          ],
-          "type": "object",
-        },
-        "default": {},
-        "propertyNames": {
-          "maxLength": 256,
-          "type": "string",
-        },
-        "type": "object",
-      },
+      "distributions": {},
     },
     "required": [
       "distributions",
@@ -3454,6 +4427,125 @@ exports[`persisted schema drift wallet-lifecycle schema matches the golden snaps
       "restoreStatus",
       "lastRestoreAt",
       "lastRestoreError",
+    ],
+    "type": "object",
+  },
+  "version": 1,
+}
+`;
+
+exports[`persisted schema drift wallpaper-store schema matches the golden snapshot for its version: wallpaper-store 1`] = `
+{
+  "name": "wallpaper-store",
+  "shape": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "albums": {
+        "default": [],
+        "items": {
+          "additionalProperties": {},
+          "properties": {
+            "slug": {
+              "maxLength": 64,
+              "type": "string",
+            },
+            "topic": {
+              "maxLength": 64,
+              "type": "string",
+            },
+          },
+          "required": [
+            "slug",
+            "topic",
+          ],
+          "type": "object",
+        },
+        "maxItems": 1000,
+        "type": "array",
+      },
+      "catalog": {
+        "default": [],
+        "items": {
+          "additionalProperties": {},
+          "properties": {
+            "albumSlug": {
+              "maxLength": 64,
+              "type": "string",
+            },
+            "blossomUrl": {
+              "maxLength": 2048,
+              "type": "string",
+            },
+            "themeName": {
+              "maxLength": 64,
+              "type": "string",
+            },
+          },
+          "required": [
+            "themeName",
+            "blossomUrl",
+            "albumSlug",
+          ],
+          "type": "object",
+        },
+        "maxItems": 10000,
+        "type": "array",
+      },
+      "catalogLastFetched": {
+        "default": 0,
+        "maximum": 9007199254740991,
+        "minimum": 0,
+        "type": "integer",
+      },
+      "downloaded": {
+        "additionalProperties": {
+          "additionalProperties": {},
+          "properties": {
+            "albumSlug": {
+              "maxLength": 64,
+              "type": "string",
+            },
+            "blossomUrl": {
+              "maxLength": 2048,
+              "type": "string",
+            },
+            "downloadedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "localUri": {
+              "maxLength": 4096,
+              "type": "string",
+            },
+            "themeName": {
+              "maxLength": 64,
+              "type": "string",
+            },
+          },
+          "required": [
+            "themeName",
+            "blossomUrl",
+            "albumSlug",
+            "localUri",
+            "downloadedAt",
+          ],
+          "type": "object",
+        },
+        "default": {},
+        "propertyNames": {
+          "maxLength": 64,
+          "type": "string",
+        },
+        "type": "object",
+      },
+    },
+    "required": [
+      "catalog",
+      "albums",
+      "catalogLastFetched",
+      "downloaded",
     ],
     "type": "object",
   },

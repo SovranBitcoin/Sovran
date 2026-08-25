@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, Share } from 'react-native';
 
 import { Button, Card, Switch as HeroSwitch } from 'heroui-native';
@@ -221,37 +221,45 @@ export const SettingsStorageScreen = () => {
   const [cocoBackupFiles, setCocoBackupFiles] = useState<string[]>([]);
   const [secureStoreMeta, setSecureStoreMeta] = useState({ existing: 0, total: 0 });
 
-  const loadSnapshot = async (refresh = false) => {
-    if (refresh) {
-      setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
-    }
+  // Identity contract, not an optimization: dep of the load effect below —
+  // keyed on `profiles` so a plain render-scoped identity can't re-fire the
+  // effect (and its setStates) every render. Compiler memoization is an
+  // optimization, not a contract.
+  // ast-grep-ignore: no-manual-memo-tsx
+  const loadSnapshot = useCallback(
+    async (refresh = false) => {
+      if (refresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
 
-    try {
-      setError(null);
-      const snapshot = await getStorageInventorySnapshot(profiles);
+      try {
+        setError(null);
+        const snapshot = await getStorageInventorySnapshot(profiles);
 
-      const secureEntries = snapshot.secureStore
-        .filter((entry) => entry.exists)
-        .map((entry) => entry.key)
-        .sort();
+        const secureEntries = snapshot.secureStore
+          .filter((entry) => entry.exists)
+          .map((entry) => entry.key)
+          .sort();
 
-      setZustandGroups(snapshot.zustand);
-      setSecureStoreKeys(secureEntries);
-      setCocoDbFiles(snapshot.cocoDatabases);
-      setCocoBackupFiles(snapshot.cocoBackups);
-      setSecureStoreMeta({
-        existing: secureEntries.length,
-        total: snapshot.secureStore.length,
-      });
-    } catch (snapshotError) {
-      setError(snapshotError instanceof Error ? snapshotError.message : 'Unknown error');
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
+        setZustandGroups(snapshot.zustand);
+        setSecureStoreKeys(secureEntries);
+        setCocoDbFiles(snapshot.cocoDatabases);
+        setCocoBackupFiles(snapshot.cocoBackups);
+        setSecureStoreMeta({
+          existing: secureEntries.length,
+          total: snapshot.secureStore.length,
+        });
+      } catch (snapshotError) {
+        setError(snapshotError instanceof Error ? snapshotError.message : 'Unknown error');
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [profiles]
+  );
 
   useEffect(() => {
     void loadSnapshot();

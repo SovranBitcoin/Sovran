@@ -24,7 +24,7 @@ import {
   useComposerHeight,
   useLoggedChatSend,
 } from '@/shared/ui/composed/chat/useChatSurfacePerfLogger';
-import { aiLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { aiLog, useLifecycleLogger, useMountLog } from '@/shared/lib/logger';
 import { isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
 import {
   SOVRAN_TAB_BAR_ROW_HEIGHT,
@@ -157,17 +157,15 @@ export function AiChatScreen() {
   // during streaming appends. Earlier attempts at setTimeout-based chasers
   // landed mid-list when item measurements settled async — fragile for
   // streaming content. Trust the library; reach for telemetry if it regresses.
-  useEffect(() => {
-    aiLog.info('ai.list.mount', {
-      messageCount: activeMessages.length,
-      bottomInset,
-      headerHeight,
-    });
-    return () => {
-      aiLog.info('ai.list.unmount', {});
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Mount-only refire semantics + the compiler-seam rationale live in
+  // useMountLog (an inline exhaustive-deps suppression would make the
+  // compiler skip this whole component).
+  useMountLog(
+    'ai.list.mount',
+    { messageCount: activeMessages.length, bottomInset, headerHeight },
+    'ai.list.unmount',
+    aiLog
+  );
 
   const branchNavById = (() => {
     const map = new Map<string, BranchNav>();

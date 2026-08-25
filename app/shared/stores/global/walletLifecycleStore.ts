@@ -29,9 +29,14 @@ interface WalletLifecycleState {
 
 const PersistedWalletLifecycleStore = z.object({
   seedCreatedAt: z.number().int().nonnegative().nullable().default(null),
+  // `.catch('unknown')`: 'unknown' is the genuine neutral member — AppGate
+  // re-resolves it. Without the catch, an unrecognized status fails the
+  // whole-blob parse and wipes `seedCreatedAt` too, which is exactly the
+  // false-fresh-install state AppGate guards against.
   restoreStatus: z
     .enum(['unknown', 'not-needed', 'pending', 'in-progress', 'complete', 'failed'])
-    .default('unknown'),
+    .default('unknown')
+    .catch('unknown'),
   lastRestoreAt: z.number().int().nonnegative().nullable().default(null),
   lastRestoreError: z.string().max(500).nullable().default(null),
 });
