@@ -6,6 +6,9 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState, type FC } from 'react';
+// Tolerated seam exception: horizontal story rail driven by Animated.FlatList
+// (reanimated scroll handler); the List seam wraps plain FlashList only.
+// ast-grep-ignore: flatlist-outside-list-seam-tsx
 import {
   FlatList,
   Platform,

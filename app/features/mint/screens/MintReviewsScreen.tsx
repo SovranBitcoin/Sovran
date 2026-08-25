@@ -1,5 +1,4 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import { FlatList } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -25,6 +24,7 @@ import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { useCountRollIn } from '@/shared/ui/composed/AnimatedCountValue';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
+import { List } from '@/shared/ui/composed/List';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withAlpha } from '@/shared/lib/color';
@@ -494,10 +494,8 @@ export function MintReviewsScreen() {
           <EmptyState />
         </View>
       ) : (
-        <FlatList
+        <List
           data={reviews}
-          // Android form-sheet: top-edge drag dismisses, mid-scroll scrolls.
-          nestedScrollEnabled
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           ListHeaderComponent={ListHeader}
@@ -508,10 +506,6 @@ export function MintReviewsScreen() {
             paddingTop: insets.top + 48,
             paddingBottom: 120,
           }}
-          showsVerticalScrollIndicator={false}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={5}
         />
       )}
 

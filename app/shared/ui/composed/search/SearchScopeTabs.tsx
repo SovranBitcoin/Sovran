@@ -8,6 +8,8 @@
  * fragile `suppressActiveHighlight` flag to stay single-selected) and the Feed's
  * inline search-tab branch.
  */
+// Tolerated seam exception: short fixed horizontal scope bar, not a data list.
+// ast-grep-ignore: flatlist-outside-list-seam-tsx
 import { FlatList, StyleSheet } from 'react-native';
 
 import { FeedTabButton } from '@/features/feed/components/FeedTabButton';

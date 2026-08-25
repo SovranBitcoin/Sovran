@@ -8,6 +8,8 @@
  */
 
 import React, { useMemo, useRef, type RefObject } from 'react';
+// Tolerated seam exception: short fixed horizontal pill bar, not a data list.
+// ast-grep-ignore: flatlist-outside-list-seam-tsx
 import { FlatList, Text, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { withAlpha } from '@/shared/lib/color';

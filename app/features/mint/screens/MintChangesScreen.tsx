@@ -8,7 +8,7 @@
  * no fetch.
  */
 import { useCallback, useMemo } from 'react';
-import { FlatList, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { z } from 'zod';
 
 import { MintChangeGlyph } from '@/features/mint/components/mintChanges/MintChangeRow';
@@ -22,6 +22,7 @@ import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
 import { alpha, fontSize, spacing } from '@/shared/styles/tokens';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
+import { List } from '@/shared/ui/composed/List';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Screen } from '@/shared/ui/composed/Screen';
@@ -160,7 +161,7 @@ export function MintChangesScreen() {
   return (
     <Screen name="MintChangesScreen" scroll="custom" bgColor={surface}>
       <Log name="MintChangesContent" style={styles.root}>
-        <FlatList
+        <List
           testID="mint-changes-detail"
           data={revisions}
           keyExtractor={(revision) => revision.entry.hash}

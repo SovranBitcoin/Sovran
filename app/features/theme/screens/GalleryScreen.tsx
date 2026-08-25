@@ -8,6 +8,9 @@
  */
 
 import { useCallback, useEffect } from 'react';
+// Tolerated seam exception: short horizontal album shelves nested inside the
+// page ScrollView — FlashList can't virtualize inside an unbounded parent.
+// ast-grep-ignore: flatlist-outside-list-seam-tsx
 import { FlatList, ScrollView, useWindowDimensions } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';

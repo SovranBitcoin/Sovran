@@ -7,7 +7,7 @@
  * no ecosystem-wide fallback — a quiet empty state is the honest answer.
  */
 import { useCallback, useMemo } from 'react';
-import { FlatList, RefreshControl, StyleSheet, type ViewToken } from 'react-native';
+import { RefreshControl, StyleSheet, type ViewToken } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -25,6 +25,7 @@ import {
 import { cashuLog } from '@/shared/lib/logger';
 import { alpha, spacing } from '@/shared/styles/tokens';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
+import { List } from '@/shared/ui/composed/List';
 import { VisualLayoutProbe } from '@/shared/ui/composed/VisualLayoutProbe';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -135,7 +136,7 @@ export function MintChangesList() {
   }, [isLoading, errorMessage, foreground, trustedMintCount]);
 
   return (
-    <FlatList
+    <List
       testID="mint-changes-list"
       data={updates}
       keyExtractor={(update) => update.id}

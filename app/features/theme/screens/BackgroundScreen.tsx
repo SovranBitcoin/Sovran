@@ -7,7 +7,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, useWindowDimensions } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useHeaderHeight } from 'expo-router/react-navigation';
@@ -16,6 +16,7 @@ import PagerView from 'react-native-pager-view';
 import { z } from 'zod';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
+import { List } from '@/shared/ui/composed/List';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useLifecycleLogger, log } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -202,14 +203,11 @@ const AlbumPage = React.memo(function AlbumPage({
 
   return (
     <View key={slug} className="flex-1">
-      <FlatList
+      <List
         data={themeNames}
         keyExtractor={(n) => n}
         numColumns={GRID_COLUMNS}
         renderItem={renderWallpaper}
-        // Android: this grid scrolls inside the theme form-sheet; opt into
-        // nested scrolling so dragging it down scrolls instead of dismissing.
-        nestedScrollEnabled
         contentContainerStyle={{
           paddingTop: 16,
           paddingHorizontal: GRID_HORIZONTAL_PADDING,
@@ -220,7 +218,6 @@ const AlbumPage = React.memo(function AlbumPage({
             No wallpapers in this album yet.
           </Text>
         }
-        showsVerticalScrollIndicator={false}
       />
     </View>
   );
