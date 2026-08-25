@@ -7,7 +7,7 @@
  * the unified search surface can feed it different buckets (All, People, Groups,
  * Mints) from one `useSearchAggregates` call without duplicating queries.
  */
-import React, { useCallback, useMemo } from 'react';
+import React from 'react';
 import { View, StyleSheet } from 'react-native';
 
 import { List } from '@/shared/ui/composed/List';
@@ -112,6 +112,42 @@ function MintRow({ mint }: { mint: Extract<AllSearchResult, { type: 'mint' }>['m
   );
 }
 
+function renderSearchResult(item: AllSearchResult) {
+  switch (item.type) {
+    case 'geohash':
+      return <GeohashJumpRow geohash={item.geohash} />;
+    case 'tier':
+      return <TierRow tier={item.tier} source="search" />;
+    case 'mint':
+      return <MintRow mint={item.mint} />;
+    case 'contact':
+      return (
+        <ContactRow
+          identity={nostrIdentity(item.pubkey, item.profile, {
+            isLoadingProfile: item.isLoadingProfile,
+          })}
+          titleTrailing={<FollowBadge pubkey={item.pubkey} />}
+          onPress={() => navigateToProfile(item.pubkey)}
+          testID={`contact-row:nostr:${item.pubkey}`}
+        />
+      );
+  }
+}
+
+const renderItem = ({ item }: { item: AllSearchResult }) => renderSearchResult(item);
+
+// Skeleton rows for a search in flight with nothing yet. `ContactRow` treats
+// `isLoadingProfile: true` as the skeleton trigger, so the regular render path
+// is reused instead of a parallel loader component.
+const PLACEHOLDER_DATA: AllSearchResult[] = Array.from({ length: 4 }, (_, i) => ({
+  type: 'contact' as const,
+  id: `placeholder-${i}`,
+  pubkey: `placeholder-${i}`,
+  profile: undefined,
+  isLoadingProfile: true,
+  score: 0,
+}));
+
 export function SearchResultRows({
   results,
   loading,
@@ -120,65 +156,18 @@ export function SearchResultRows({
 }: SearchResultRowsProps) {
   const tabBarPadding = useTabBarBottomPadding();
 
-  const showNoResults = useMemo(() => {
-    const trimmed = searchQuery.trim();
-    // Mirror useContactSearch's internal rule: short queries don't trigger a
-    // real search, so don't flash "no results" at the user.
-    if (trimmed.length < CONTACT_SEARCH_MIN_LENGTH) return false;
-    if (loading) return false;
-    return results.length === 0;
-  }, [results.length, loading, searchQuery]);
+  // Mirror useContactSearch's internal rule: short queries don't trigger a
+  // real search, so don't flash "no results" at the user.
+  const showNoResults =
+    searchQuery.trim().length >= CONTACT_SEARCH_MIN_LENGTH && !loading && results.length === 0;
 
-  const renderSearchResult = useCallback((item: AllSearchResult) => {
-    switch (item.type) {
-      case 'geohash':
-        return <GeohashJumpRow geohash={item.geohash} />;
-      case 'tier':
-        return <TierRow tier={item.tier} source="search" />;
-      case 'mint':
-        return <MintRow mint={item.mint} />;
-      case 'contact':
-        return (
-          <ContactRow
-            identity={nostrIdentity(item.pubkey, item.profile, {
-              isLoadingProfile: item.isLoadingProfile,
-            })}
-            titleTrailing={<FollowBadge pubkey={item.pubkey} />}
-            onPress={() => navigateToProfile(item.pubkey)}
-            testID={`contact-row:nostr:${item.pubkey}`}
-          />
-        );
-    }
-  }, []);
-
-  const renderEmpty = useCallback(() => {
+  const renderEmpty = () => {
     if (showNoResults) return <ListEmptyComponent />;
     return null;
-  }, [showNoResults, ListEmptyComponent]);
+  };
 
-  // While the search is in flight and we have nothing yet, render skeleton
-  // placeholder rows so the feed doesn't look empty. `ContactRow` treats
-  // `isLoadingProfile: true` as the skeleton trigger, so we reuse the regular
-  // render path instead of a parallel loader component.
   const showPlaceholders = loading && results.length === 0 && searchQuery.trim().length >= 2;
-  const placeholderData = useMemo<AllSearchResult[]>(
-    () =>
-      Array.from({ length: 4 }, (_, i) => ({
-        type: 'contact' as const,
-        id: `placeholder-${i}`,
-        pubkey: `placeholder-${i}`,
-        profile: undefined,
-        isLoadingProfile: true,
-        score: 0,
-      })),
-    []
-  );
-  const listData = showPlaceholders ? placeholderData : showNoResults ? [] : results;
-
-  const renderItem = useCallback(
-    ({ item }: { item: AllSearchResult }) => renderSearchResult(item),
-    [renderSearchResult]
-  );
+  const listData = showPlaceholders ? PLACEHOLDER_DATA : showNoResults ? [] : results;
 
   return (
     <View style={styles.container}>

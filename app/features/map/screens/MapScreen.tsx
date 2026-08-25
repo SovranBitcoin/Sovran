@@ -22,7 +22,7 @@ import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { InteractionManager, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
@@ -68,9 +68,9 @@ export function MapScreen() {
   // updateMarkersForCamera during render. The ref mutation is safe because
   // no settle callback fires before the first paint.
   const onCameraSettleRef = useRef<(lat: number, lon: number, zoom: number) => void>(() => {});
-  const onCameraSettle = useCallback((lat: number, lon: number, zoom: number) => {
+  const onCameraSettle = (lat: number, lon: number, zoom: number) => {
     onCameraSettleRef.current(lat, lon, zoom);
-  }, []);
+  };
 
   const mapCamera = useMapCamera({
     initial: { lat: DEFAULT_LAT, lon: DEFAULT_LON, zoom: DEFAULT_ZOOM },
@@ -139,7 +139,7 @@ export function MapScreen() {
     return () => task.cancel();
   }, [mapCamera, updateMarkersForCamera]);
 
-  const handleMyLocation = useCallback(async () => {
+  const handleMyLocation = async () => {
     try {
       const loc = await Location.getCurrentPositionAsync({});
       const safe = applySafetyOffset(loc.coords.latitude, loc.coords.longitude);
@@ -148,55 +148,52 @@ export function MapScreen() {
     } catch (err) {
       log.error('map.location.error', { error: err });
     }
-  }, [mapCamera, updateMarkersForCamera]);
+  };
 
-  const handleZoomIn = useCallback(() => {
+  const handleZoomIn = () => {
     const { lat, lon, zoom } = mapCamera.getCamera();
     const newZoom = Math.min(zoom + 2, 20);
     mapCamera.setCamera({ lat, lon, zoom: newZoom });
     updateMarkersForCamera(lat, lon, newZoom);
-  }, [mapCamera, updateMarkersForCamera]);
+  };
 
-  const handleZoomOut = useCallback(() => {
+  const handleZoomOut = () => {
     const { lat, lon, zoom } = mapCamera.getCamera();
     const newZoom = Math.max(zoom - 2, 1);
     mapCamera.setCamera({ lat, lon, zoom: newZoom });
     updateMarkersForCamera(lat, lon, newZoom);
-  }, [mapCamera, updateMarkersForCamera]);
+  };
 
-  const handleMarkerClick = useCallback(
-    async (marker: { id?: string }) => {
-      if (!marker.id) return;
+  const handleMarkerClick = async (marker: { id?: string }) => {
+    if (!marker.id) return;
 
-      const clusterMarker = resolveMarker(marker.id);
-      if (!clusterMarker) return;
+    const clusterMarker = resolveMarker(marker.id);
+    if (!clusterMarker) return;
 
-      if (clusterMarker.type === 'cluster' && clusterMarker.clusterId !== undefined) {
-        const manager = clusterManagerRef.current;
-        if (manager) {
-          // Supercluster's getClusterExpansionZoom returns the zoom at which
-          // this cluster's children become individually visible. We zoom one
-          // step past that so the children actually separate in the viewport
-          // instead of re-clustering at the threshold; capped at 18 to stay
-          // within Supercluster's maxZoom + 1.
-          const expansionZoom = manager.getClusterExpansionZoom(clusterMarker.clusterId);
-          const newZoom = Math.min(expansionZoom + 1, 18);
-          mapCamera.setCamera({
-            lat: clusterMarker.latitude,
-            lon: clusterMarker.longitude,
-            zoom: newZoom,
-          });
-          updateMarkersForCamera(clusterMarker.latitude, clusterMarker.longitude, newZoom);
-        }
-      } else if (clusterMarker.placeId) {
-        router.navigate({
-          pathname: '/(map-flow)/detail',
-          params: { placeId: clusterMarker.placeId.toString() },
+    if (clusterMarker.type === 'cluster' && clusterMarker.clusterId !== undefined) {
+      const manager = clusterManagerRef.current;
+      if (manager) {
+        // Supercluster's getClusterExpansionZoom returns the zoom at which
+        // this cluster's children become individually visible. We zoom one
+        // step past that so the children actually separate in the viewport
+        // instead of re-clustering at the threshold; capped at 18 to stay
+        // within Supercluster's maxZoom + 1.
+        const expansionZoom = manager.getClusterExpansionZoom(clusterMarker.clusterId);
+        const newZoom = Math.min(expansionZoom + 1, 18);
+        mapCamera.setCamera({
+          lat: clusterMarker.latitude,
+          lon: clusterMarker.longitude,
+          zoom: newZoom,
         });
+        updateMarkersForCamera(clusterMarker.latitude, clusterMarker.longitude, newZoom);
       }
-    },
-    [resolveMarker, clusterManagerRef, mapCamera, updateMarkersForCamera]
-  );
+    } else if (clusterMarker.placeId) {
+      router.navigate({
+        pathname: '/(map-flow)/detail',
+        params: { placeId: clusterMarker.placeId.toString() },
+      });
+    }
+  };
 
   const mapUnavailableOnAndroid = Platform.OS === 'android' && !HAS_ANDROID_GOOGLE_MAPS_KEY;
 

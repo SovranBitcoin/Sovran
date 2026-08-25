@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Image } from 'expo-image';
@@ -172,74 +172,61 @@ export const SettingsMediaScreen = () => {
     'success',
     'danger',
   ] as const);
-  const colors: StatusColors = useMemo(
-    () => ({ foreground, muted, success, danger }),
-    [foreground, muted, success, danger]
-  );
+  const colors: StatusColors = { foreground, muted, success, danger };
 
-  const runDelete = useCallback(
-    async (blob: OwnedBlobEntry) => {
-      if (!ndk) {
-        // The signer/NDK isn't ready — surface it instead of silently no-op'ing.
-        popup({
-          message: 'Could not delete',
-          text: 'Your signing key is still loading — try again in a moment.',
-          type: 'error',
-        });
-        return;
-      }
-      const { deleted } = await deleteOwnedBlob({
-        ndk,
-        host: blob.host,
-        sha256: blob.sha256,
-        url: blob.url,
+  const runDelete = async (blob: OwnedBlobEntry) => {
+    if (!ndk) {
+      // The signer/NDK isn't ready — surface it instead of silently no-op'ing.
+      popup({
+        message: 'Could not delete',
+        text: 'Your signing key is still loading — try again in a moment.',
+        type: 'error',
       });
-      if (deleted) {
-        popup({ message: 'Image deleted', type: 'success', variant: 'toast', duration: 1500 });
-      } else {
-        popup({
-          message: "Couldn't delete image",
-          text: 'The server kept it or rejected the request. Pull to refresh to re-check.',
-          type: 'error',
-        });
-      }
-    },
-    [ndk]
-  );
+      return;
+    }
+    const { deleted } = await deleteOwnedBlob({
+      ndk,
+      host: blob.host,
+      sha256: blob.sha256,
+      url: blob.url,
+    });
+    if (deleted) {
+      popup({ message: 'Image deleted', type: 'success', variant: 'toast', duration: 1500 });
+    } else {
+      popup({
+        message: "Couldn't delete image",
+        text: 'The server kept it or rejected the request. Pull to refresh to re-check.',
+        type: 'error',
+      });
+    }
+  };
 
-  const confirmDelete = useCallback(
-    (blob: OwnedBlobEntry) => {
-      actionMenuPopup({
-        title: 'Delete image?',
-        buttons: [
-          {
-            text: 'Delete',
-            icon: 'mdi:trash-can-outline',
-            variant: 'dangerous',
-            description: 'Removes it from the media server. This cannot be undone.',
-            onPress: (close) => {
-              close();
-              void runDelete(blob);
-            },
+  const confirmDelete = (blob: OwnedBlobEntry) => {
+    actionMenuPopup({
+      title: 'Delete image?',
+      buttons: [
+        {
+          text: 'Delete',
+          icon: 'mdi:trash-can-outline',
+          variant: 'dangerous',
+          description: 'Removes it from the media server. This cannot be undone.',
+          onPress: (close) => {
+            close();
+            void runDelete(blob);
           },
-        ],
-      });
-    },
-    [runDelete]
-  );
+        },
+      ],
+    });
+  };
 
   const byBlob = useOwnedMediaStore((s) => s.byBlob);
-  const { online, deleted } = useMemo(() => {
-    const all = Object.values(byBlob).sort((a, b) => b.lastSeen - a.lastSeen);
-    return {
-      online: all.filter((b) => b.deleteState !== 'deleted'),
-      deleted: all.filter((b) => b.deleteState === 'deleted'),
-    };
-  }, [byBlob]);
+  const all = Object.values(byBlob).sort((a, b) => b.lastSeen - a.lastSeen);
+  const online = all.filter((b) => b.deleteState !== 'deleted');
+  const deleted = all.filter((b) => b.deleteState === 'deleted');
   const total = online.length + deleted.length;
 
   const [refreshing, setRefreshing] = useState(false);
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
     try {
       const { markChecked } = useOwnedMediaStore.getState();
@@ -251,7 +238,7 @@ export const SettingsMediaScreen = () => {
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  };
 
   return (
     <ScreenWrapper name="SettingsMediaScreen" scroll="custom" safeArea>

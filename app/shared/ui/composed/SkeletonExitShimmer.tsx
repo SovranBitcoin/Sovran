@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
+import { useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -37,14 +37,11 @@ function useShimmerSweep(visualLayout: { onLayout: (event: LayoutChangeEvent) =>
 } {
   const { width: screenWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
-  const handleLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const w = Math.round(event.nativeEvent.layout.width);
-      setContainerWidth((prev) => (prev === w ? prev : w));
-      visualLayout.onLayout(event);
-    },
-    [visualLayout]
-  );
+  const handleLayout = (event: LayoutChangeEvent) => {
+    const w = Math.round(event.nativeEvent.layout.width);
+    setContainerWidth((prev) => (prev === w ? prev : w));
+    visualLayout.onLayout(event);
+  };
   return { sweepWidth: containerWidth > 0 ? containerWidth : screenWidth, handleLayout };
 }
 
@@ -181,14 +178,9 @@ export function SkeletonExitReveal({
     return { transform: [{ translateX }] };
   });
 
-  const gradientColors = useMemo<readonly [string, string, string]>(() => {
-    return shimmerColors(highlightColor, withAlpha(foreground, 0.55));
-  }, [foreground, highlightColor]);
+  const gradientColors = shimmerColors(highlightColor, withAlpha(foreground, 0.55));
 
-  const shimmerBarStyle = useMemo(
-    () => [styles.shimmerBar, EXIT_SHIMMER_BAR_BASE, shimmerStyle],
-    [shimmerStyle]
-  );
+  const shimmerBarStyle = [styles.shimmerBar, EXIT_SHIMMER_BAR_BASE, shimmerStyle];
 
   return (
     <View ref={visualLayout.ref} collapsable={false} onLayout={handleLayout}>
@@ -260,15 +252,9 @@ export function SkeletonLoadingShimmer({
     return { transform: [{ translateX }] };
   });
 
-  const gradientColors = useMemo<readonly [string, string, string]>(() => {
-    return shimmerColors(highlightColor, withAlpha(background, 0.85));
-  }, [background, highlightColor]);
+  const gradientColors = shimmerColors(highlightColor, withAlpha(background, 0.85));
 
-  const widthStyle = useMemo(() => ({ width: highlightWidth }), [highlightWidth]);
-  const shimmerBarStyle = useMemo(
-    () => [styles.shimmerBar, widthStyle, shimmerStyle],
-    [shimmerStyle, widthStyle]
-  );
+  const shimmerBarStyle = [styles.shimmerBar, { width: highlightWidth }, shimmerStyle];
 
   if (!active)
     return (

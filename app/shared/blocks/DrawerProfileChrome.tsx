@@ -7,7 +7,7 @@
  * route file only orchestrates routes.
  */
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import { useRef } from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as nip19 from 'nostr-tools/nip19';
@@ -55,71 +55,66 @@ function useProfileSwitcher(closeDrawer: () => void) {
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
   const switchingRef = useRef(false);
 
-  const executeProfileAction = useCallback(
-    async (action: ProfileSwitcherAction) => {
-      if (switchingRef.current) return;
-      switchingRef.current = true;
+  const executeProfileAction = async (action: ProfileSwitcherAction) => {
+    if (switchingRef.current) return;
+    switchingRef.current = true;
 
-      closeDrawer();
-      await waitForDrawerClose();
+    closeDrawer();
+    await waitForDrawerClose();
 
-      switch (action.type) {
-        case 'switch': {
-          if (action.accountIndex === activeAccountIndex) {
-            switchingRef.current = false;
-            return;
-          }
-          const switched = await switchToExistingProfile({ accountIndex: action.accountIndex });
-          if (!switched) {
-            switchingRef.current = false;
-            staticPopup('wallet-still-loading');
-          }
-          break;
+    switch (action.type) {
+      case 'switch': {
+        if (action.accountIndex === activeAccountIndex) {
+          switchingRef.current = false;
+          return;
         }
-        case 'create': {
-          const created = await createAndSwitchProfile();
-          if (!created) switchingRef.current = false;
-          break;
+        const switched = await switchToExistingProfile({ accountIndex: action.accountIndex });
+        if (!switched) {
+          switchingRef.current = false;
+          staticPopup('wallet-still-loading');
         }
-        case 'import': {
-          if (useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
-            staticPopup('key-import-failed', {
-              text: 'This identity already exists as a profile.',
-            });
-            return;
-          }
-
-          const stored = await storeImportedNsec(action.pubkeyHex, action.nsec);
-          if (!stored) {
-            staticPopup('key-import-failed', { text: 'Failed to store nsec securely.' });
-            return;
-          }
-
-          if (!useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
-            useProfileStore
-              .getState()
-              .addProfile(action.accountIndex, action.pubkeyHex, 'imported');
-          }
-
-          const imported = await switchToImportedProfile({ accountIndex: action.accountIndex });
-          if (!imported) {
-            switchingRef.current = false;
-            staticPopup('wallet-still-loading');
-          }
-          break;
-        }
+        break;
       }
-    },
-    [closeDrawer, activeAccountIndex]
-  );
+      case 'create': {
+        const created = await createAndSwitchProfile();
+        if (!created) switchingRef.current = false;
+        break;
+      }
+      case 'import': {
+        if (useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
+          staticPopup('key-import-failed', {
+            text: 'This identity already exists as a profile.',
+          });
+          return;
+        }
 
-  const openSheet = useCallback(() => {
+        const stored = await storeImportedNsec(action.pubkeyHex, action.nsec);
+        if (!stored) {
+          staticPopup('key-import-failed', { text: 'Failed to store nsec securely.' });
+          return;
+        }
+
+        if (!useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
+          useProfileStore.getState().addProfile(action.accountIndex, action.pubkeyHex, 'imported');
+        }
+
+        const imported = await switchToImportedProfile({ accountIndex: action.accountIndex });
+        if (!imported) {
+          switchingRef.current = false;
+          staticPopup('wallet-still-loading');
+        }
+        break;
+      }
+    }
+  };
+
+  const openSheet = () => {
     profileSwitcherPopup({
       onRequestAction: (action) => {
         void executeProfileAction(action);
       },
     });
-  }, [executeProfileAction]);
+  };
 
   return { executeProfileAction, openSheet };
 }
@@ -188,14 +183,12 @@ function ProfileSwitcherButtons({
   );
 }
 
-// Memoized: this 290-line chrome re-rendered inside the very commit
-// native-stack gates push animations on (the drawer re-renders when
-// useSegments flips). closeDrawer is a stable useCallback at the call site.
-export const DrawerProfileChrome = React.memo(function DrawerProfileChrome({
-  closeDrawer,
-}: {
-  closeDrawer: () => void;
-}) {
+// Render-skip matters here: this 290-line chrome re-rendered inside the very
+// commit native-stack gates push animations on (the drawer re-renders when
+// useSegments flips). The React Compiler's element-identity memoization now
+// provides the skip that React.memo used to — it holds as long as closeDrawer
+// stays stable at the call site.
+export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }) {
   const { keys: nostrKeys } = useNostrKeysContext();
   const foreground = useThemeColor('foreground');
   const insets = useSafeAreaInsets();
@@ -218,22 +211,22 @@ export const DrawerProfileChrome = React.memo(function DrawerProfileChrome({
   const { isOffline } = useOfflineStatus();
   const { executeProfileAction, openSheet } = useProfileSwitcher(closeDrawer);
 
-  const handleLine = useMemo(() => {
-    if (metadata?.nip05) return formatNip05Handle(metadata.nip05);
-    if (pubkey) return truncateMiddle(nip19.npubEncode(pubkey), 8);
-    return '';
-  }, [metadata?.nip05, pubkey]);
+  const handleLine = metadata?.nip05
+    ? formatNip05Handle(metadata.nip05)
+    : pubkey
+      ? truncateMiddle(nip19.npubEncode(pubkey), 8)
+      : '';
 
   const mutedColor = withAlpha(foreground, alpha.disabled);
 
-  const handleAvatarPress = useCallback(() => {
+  const handleAvatarPress = () => {
     if (!nostrKeys?.pubkey) return;
     closeDrawer();
     router.navigate({
       pathname: '/(user-flow)/profile',
       params: { pubkey: nostrKeys.pubkey },
     });
-  }, [nostrKeys, closeDrawer]);
+  };
 
   if (!nostrKeys?.pubkey) {
     return <View style={{ paddingTop: isOffline ? 0 : insets.top }} />;
@@ -304,4 +297,4 @@ export const DrawerProfileChrome = React.memo(function DrawerProfileChrome({
       <Spacer size={spacing.lg} />
     </View>
   );
-});
+}

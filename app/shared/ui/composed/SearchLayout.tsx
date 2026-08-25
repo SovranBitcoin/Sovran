@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import { useWindowDimensions, View as RNView } from 'react-native';
 import { Stack, useNavigation } from 'expo-router';
 import { DrawerActions } from 'expo-router/react-navigation';
@@ -125,97 +125,60 @@ export function SearchLayout({
   const navigation = useNavigation();
   const search = useHeaderSearch();
 
-  const openDrawer = useCallback(
-    () => navigation.dispatch(DrawerActions.openDrawer()),
-    [navigation]
-  );
+  const openDrawer = () => navigation.dispatch(DrawerActions.openDrawer());
 
   // Only render custom headerTitle when searching (shows GlassSearchBar).
   // When not searching, let React Navigation render the native title
   // so it picks up the correct tintColor / Liquid Glass styling.
-  const searchBarTitle = useCallback(
-    () => (
-      <SearchBarTitle
-        placeholder={placeholder}
-        testID={searchTestIDPrefix ? `${searchTestIDPrefix}-search-input` : undefined}
-      />
-    ),
-    [placeholder, searchTestIDPrefix]
+  const searchBarTitle = () => (
+    <SearchBarTitle
+      placeholder={placeholder}
+      testID={searchTestIDPrefix ? `${searchTestIDPrefix}-search-input` : undefined}
+    />
   );
-  const headerRight = useCallback(
-    () => (
-      <SearchHeaderRight
-        testID={searchTestIDPrefix ? `${searchTestIDPrefix}-search-toggle` : undefined}
-      />
-    ),
-    [searchTestIDPrefix]
+  const headerRight = () => (
+    <SearchHeaderRight
+      testID={searchTestIDPrefix ? `${searchTestIDPrefix}-search-toggle` : undefined}
+    />
   );
-  const headerLeft = useCallback(() => <HeaderProfileButton onPress={openDrawer} />, [openDrawer]);
+  const headerLeft = () => <HeaderProfileButton onPress={openDrawer} />;
 
-  const screenOptions = useMemo(
-    () =>
-      buildExpoRouterHeaderOptions({
-        iconColor,
-        headerLeft,
-        headerRight,
-        options: {
-          title,
-          // Without this, the native bar inherits the locked dark
-          // `userInterfaceStyle` and renders the title white — invisible on
-          // the light theme's `surface` background.
-          headerTitleStyle: { color: iconColor },
-          headerTintColor: iconColor,
-          ...(transparent
-            ? { headerTransparent: true, headerStyle: { backgroundColor: 'transparent' } }
-            : { headerStyle: { backgroundColor: surface } }),
-          // GlassSearchBar wins while searching; otherwise an optional custom
-          // idle title (Wallet's MintSelector), else the native `title`.
-          ...(search.isSearching
-            ? { headerTitle: searchBarTitle }
-            : renderIdleTitle
-              ? {
-                  headerTitle: () => (
-                    <RNView style={liquidTitleBiasStyle}>{renderIdleTitle()}</RNView>
-                  ),
-                }
-              : {}),
-        },
-      }),
-    [
-      iconColor,
-      headerLeft,
-      headerRight,
-      surface,
+  const screenOptions = buildExpoRouterHeaderOptions({
+    iconColor,
+    headerLeft,
+    headerRight,
+    options: {
       title,
-      search.isSearching,
-      searchBarTitle,
-      renderIdleTitle,
-      transparent,
-    ]
-  );
+      // Without this, the native bar inherits the locked dark
+      // `userInterfaceStyle` and renders the title white — invisible on
+      // the light theme's `surface` background.
+      headerTitleStyle: { color: iconColor },
+      headerTintColor: iconColor,
+      ...(transparent
+        ? { headerTransparent: true, headerStyle: { backgroundColor: 'transparent' } }
+        : { headerStyle: { backgroundColor: surface } }),
+      // GlassSearchBar wins while searching; otherwise an optional custom
+      // idle title (Wallet's MintSelector), else the native `title`.
+      ...(search.isSearching
+        ? { headerTitle: searchBarTitle }
+        : renderIdleTitle
+          ? {
+              headerTitle: () => <RNView style={liquidTitleBiasStyle}>{renderIdleTitle()}</RNView>,
+            }
+          : {}),
+    },
+  });
 
-  const contextValue: SearchContextValue = useMemo(
-    () => ({
-      isSearching: search.isSearching,
-      searchQuery: search.searchQuery,
-      clearKey: search.clearKey,
-      seedText: search.seedText,
-      onSearchChange: search.onSearchChange,
-      onOpenSearch: search.onOpenSearch,
-      onCloseSearch: search.onCloseSearch,
-      setQuery: search.setQuery,
-    }),
-    [
-      search.isSearching,
-      search.searchQuery,
-      search.clearKey,
-      search.seedText,
-      search.onSearchChange,
-      search.onOpenSearch,
-      search.onCloseSearch,
-      search.setQuery,
-    ]
-  );
+  const contextValue: SearchContextValue = {
+    isSearching: search.isSearching,
+    searchQuery: search.searchQuery,
+    clearKey: search.clearKey,
+    seedText: search.seedText,
+    onSearchChange: search.onSearchChange,
+    onOpenSearch: search.onOpenSearch,
+    onCloseSearch: search.onCloseSearch,
+    setQuery: search.setQuery,
+  };
 
   return (
     <SearchContext.Provider value={contextValue}>

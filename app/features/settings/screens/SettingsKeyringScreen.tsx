@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import * as Clipboard from 'expo-clipboard';
 import { Stack } from 'expo-router';
@@ -66,9 +66,9 @@ const CurrentKeyItem: React.FC<{
   const activeData = isNpubTab ? npubValue! : keypair.publicKeyHex;
   const displayKey = isDerived ? keypair.publicKeyHex : activeData;
 
-  const handleTabPress = useCallback((tab: string) => {
+  const handleTabPress = (tab: string) => {
     setSelectedTab(tab);
-  }, []);
+  };
 
   const handleShowQR = () => {
     router.navigate({
@@ -81,9 +81,9 @@ const CurrentKeyItem: React.FC<{
     });
   };
 
-  const handleCopy = useCallback(() => {
+  const handleCopy = () => {
     onCopy(activeData);
-  }, [activeData, onCopy]);
+  };
 
   return (
     <View className="p-4">
@@ -239,7 +239,7 @@ export const SettingsKeyringScreen: React.FC = () => {
   /**
    * Loads all keypairs from the keyring
    */
-  const loadKeypairs = useCallback(async () => {
+  const loadKeypairs = async () => {
     if (!manager) return;
 
     try {
@@ -252,7 +252,7 @@ export const SettingsKeyringScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [manager]);
+  };
 
   useEffect(() => {
     void loadKeypairs();
@@ -420,56 +420,46 @@ export const SettingsKeyringScreen: React.FC = () => {
 
   const canImportCurrentNsec = !!manager && nostrKeysReady && !!nostrKeys?.privateKey;
   const isKeyringActionPending = isGenerating || isImportingCurrentNsec;
-  const handleHeaderBack = useCallback(() => {
+  const handleHeaderBack = () => {
     router.back();
-  }, []);
-  const renderHeaderLeft = useCallback(
-    () => (
-      <HStack gap={spacing.xs}>
-        <ScreenHeaderAction
-          icon={
-            isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
-          }
-          onPress={handleHeaderBack}
-          accessibilityLabel={isFirstScreen ? 'Close settings' : 'Go back'}
-        />
-        <View pointerEvents="none" style={headerBalanceSpacerStyle} />
-      </HStack>
-    ),
-    [handleHeaderBack, isFirstScreen]
+  };
+  const renderHeaderLeft = () => (
+    <HStack gap={spacing.xs}>
+      <ScreenHeaderAction
+        icon={
+          isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
+        }
+        onPress={handleHeaderBack}
+        accessibilityLabel={isFirstScreen ? 'Close settings' : 'Go back'}
+      />
+      <View pointerEvents="none" style={headerBalanceSpacerStyle} />
+    </HStack>
   );
-  const renderHeaderRight = useCallback(
-    () => (
-      <HStack gap={spacing.xs}>
-        <ScreenHeaderAction
-          icon="mdi:key-arrow-right"
-          onPress={handleImportNsec}
-          disabled={isKeyringActionPending}
-          testID="keyring-import-trigger"
-          accessibilityLabel="Import P2PK key"
-        />
-        <ScreenHeaderAction
-          icon="mdi:key-plus"
-          onPress={isGenerating ? undefined : handleGenerateKey}
-          disabled={isKeyringActionPending && !isGenerating}
-          accessibilityLabel={isGenerating ? 'Generating P2PK key' : 'Generate P2PK key'}>
-          {isGenerating ? (
-            <LoadingIndicator size={22} phase="loading" color={foreground} />
-          ) : undefined}
-        </ScreenHeaderAction>
-      </HStack>
-    ),
-    [foreground, handleGenerateKey, handleImportNsec, isGenerating, isKeyringActionPending]
+  const renderHeaderRight = () => (
+    <HStack gap={spacing.xs}>
+      <ScreenHeaderAction
+        icon="mdi:key-arrow-right"
+        onPress={handleImportNsec}
+        disabled={isKeyringActionPending}
+        testID="keyring-import-trigger"
+        accessibilityLabel="Import P2PK key"
+      />
+      <ScreenHeaderAction
+        icon="mdi:key-plus"
+        onPress={isGenerating ? undefined : handleGenerateKey}
+        disabled={isKeyringActionPending && !isGenerating}
+        accessibilityLabel={isGenerating ? 'Generating P2PK key' : 'Generate P2PK key'}>
+        {isGenerating ? (
+          <LoadingIndicator size={22} phase="loading" color={foreground} />
+        ) : undefined}
+      </ScreenHeaderAction>
+    </HStack>
   );
-  const stackOptions = useMemo(
-    () =>
-      withGlassHeaderItems({
-        title: 'P2PK Keys',
-        headerLeft: renderHeaderLeft,
-        headerRight: renderHeaderRight,
-      }),
-    [renderHeaderLeft, renderHeaderRight]
-  );
+  const stackOptions = withGlassHeaderItems({
+    title: 'P2PK Keys',
+    headerLeft: renderHeaderLeft,
+    headerRight: renderHeaderRight,
+  });
 
   return (
     <Screen name="SettingsKeyringScreen">

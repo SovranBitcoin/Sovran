@@ -8,7 +8,7 @@
  * `useNostrTierHealth`. Toggling a tier does not change the fallback logic — it
  * only sets the persisted preference the data layer reads.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Button, Card, Input, ListGroup, Separator, Switch, TextField } from 'heroui-native';
@@ -60,56 +60,40 @@ export function SettingsNetworkScreen() {
     'danger',
   ] as const);
 
-  const healthColor = useMemo<Record<RelayHealth, string>>(
-    () => ({
-      connected: successColor,
-      connecting: accentColor,
-      disconnected: mutedColor,
-      failed: dangerColor,
-    }),
-    [successColor, accentColor, mutedColor, dangerColor]
-  );
+  const healthColor: Record<RelayHealth, string> = {
+    connected: successColor,
+    connecting: accentColor,
+    disconnected: mutedColor,
+    failed: dangerColor,
+  };
 
-  const tiers = useMemo(
-    () => [
-      {
-        name: 'nagg',
-        description: 'App-view. Ranked, fully bundled feeds.',
-        status: tierHealth.nagg,
-        enabled: naggTierEnabled,
-        onToggle: setNaggTierEnabled,
-      },
-      {
-        name: 'Primal cache',
-        description: 'Public fallback cache.',
-        status: tierHealth.primal,
-        enabled: primalTierEnabled,
-        onToggle: setPrimalTierEnabled,
-      },
-      {
-        name: 'Raw relays',
-        description: 'Decentralized floor. Direct relay reads.',
-        status: tierHealth.relay,
-        enabled: relayTierEnabled,
-        onToggle: setRelayTierEnabled,
-      },
-    ],
-    [
-      tierHealth.nagg,
-      tierHealth.primal,
-      tierHealth.relay,
-      naggTierEnabled,
-      primalTierEnabled,
-      relayTierEnabled,
-      setNaggTierEnabled,
-      setPrimalTierEnabled,
-      setRelayTierEnabled,
-    ]
-  );
+  const tiers = [
+    {
+      name: 'nagg',
+      description: 'App-view. Ranked, fully bundled feeds.',
+      status: tierHealth.nagg,
+      enabled: naggTierEnabled,
+      onToggle: setNaggTierEnabled,
+    },
+    {
+      name: 'Primal cache',
+      description: 'Public fallback cache.',
+      status: tierHealth.primal,
+      enabled: primalTierEnabled,
+      onToggle: setPrimalTierEnabled,
+    },
+    {
+      name: 'Raw relays',
+      description: 'Decentralized floor. Direct relay reads.',
+      status: tierHealth.relay,
+      enabled: relayTierEnabled,
+      onToggle: setRelayTierEnabled,
+    },
+  ];
 
   const hasUnpublished = source === 'local';
 
-  const handleAdd = useCallback(() => {
+  const handleAdd = () => {
     const normalized = safeNormalizeRelay(draftUrl.trim());
     if (!normalized || !/^wss?:\/\//.test(normalized)) {
       setAddError('Enter a valid relay URL (wss://…).');
@@ -118,9 +102,9 @@ export function SettingsNetworkScreen() {
     setAddError(null);
     addRelay(normalized, { read: true, write: true });
     setDraftUrl('');
-  }, [draftUrl, addRelay]);
+  };
 
-  const handlePublish = useCallback(async () => {
+  const handlePublish = async () => {
     if (!ndk) return;
     setPublishing(true);
     setPublishMsg(null);
@@ -142,12 +126,9 @@ export function SettingsNetworkScreen() {
     } finally {
       setPublishing(false);
     }
-  }, [ndk, entries, markPublished]);
+  };
 
-  const sortedEntries = useMemo(
-    () => [...entries].sort((a, b) => a.url.localeCompare(b.url)),
-    [entries]
-  );
+  const sortedEntries = [...entries].sort((a, b) => a.url.localeCompare(b.url));
 
   return (
     <ScreenWrapper name="SettingsNetworkScreen" scroll="custom" safeArea>

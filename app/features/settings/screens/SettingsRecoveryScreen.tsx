@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrollView } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
@@ -240,14 +240,14 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   const [isBenchmarking, setIsBenchmarking] = useState(false);
   const nativeAvailable = isNativeCryptoAvailable();
 
-  const setUseNativeCrypto = useCallback((next: boolean) => {
+  const setUseNativeCrypto = (next: boolean) => {
     // Write through to module scope so a remount cannot revert the choice, and
     // log the flip — otherwise a run that silently reverted looks identical to
     // one the user meant to run natively.
     preferNativeCrypto = next;
     setUseNativeCryptoState(next);
     cashuLog.info('recovery.native_crypto.preference', { useNativeCrypto: next });
-  }, []);
+  };
 
   useEffect(() => {
     if (!deepProbe) {
@@ -295,7 +295,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     return unsubscribe;
   }, [phase, navigation, gateMode]);
 
-  const handleStartRecovery = useCallback(async () => {
+  const handleStartRecovery = async () => {
     // Module-scoped, so a remount cannot reset it. Two concurrent recoveries
     // race the same counters and each takes ~1.8x as long.
     if (recoveryInFlight) {
@@ -305,10 +305,11 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     if (ACTIVE_PHASES.has(phase)) return;
     recoveryInFlight = true;
     recoveryCancelled = false;
-    // Read the module variable, NOT the `useNativeCrypto` state: this callback
-    // is memoised without it in the dependency list, so the closed-over value
-    // is whatever it was on first render. That stale `true` is why a run made
-    // right after switching the toggle off still came out `cdk-native`.
+    // Read the module variable, NOT the `useNativeCrypto` state: a stale
+    // closure over the state once decided the crypto implementation (a run
+    // made right after switching the toggle off still came out `cdk-native`).
+    // The module variable is the single source of truth, immune to closure
+    // freshness entirely.
     setNativeCryptoEnabled(preferNativeCrypto);
     // Hold the app-wide refresh storm until the run is over — see the module
     // doc for what it costs when left on.
@@ -731,7 +732,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       // would otherwise be the only thing that repopulated the screen.
       endRecoverySuppression();
     }
-  }, [phase, mints, deepProbe, discoveredMintUrls, loadMints, gateMode]);
+  };
 
   /**
    * Stops after the mint in flight finishes. Nothing is torn down mid-mint:
@@ -744,7 +745,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
    * recovery run because it takes seconds of solid crypto — folding it into
    * every restore would tax the thing it is meant to measure.
    */
-  const handleRunMicroBench = useCallback(async () => {
+  const handleRunMicroBench = async () => {
     if (recoveryInFlight || isBenchmarking) return;
     setIsBenchmarking(true);
     try {
@@ -756,15 +757,15 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     } finally {
       setIsBenchmarking(false);
     }
-  }, [isBenchmarking]);
+  };
 
-  const handleCancelRecovery = useCallback(() => {
+  const handleCancelRecovery = () => {
     recoveryCancelled = true;
     setFinalizingLabel('Stopping after this mint');
     cashuLog.info('recovery.cancel.requested', {});
-  }, []);
+  };
 
-  const handleClose = useCallback(() => router.back(), []);
+  const handleClose = () => router.back();
 
   // ─── Mint preview list (shared by idle + complete) ───────────────────────
 
