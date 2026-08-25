@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Keyboard, ScrollView, View as RNView } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -49,6 +49,8 @@ const MESSAGE_ROW_STYLE = { paddingHorizontal: 16 } as const;
  *  when focused. Matches the shared ChatScreen — 0pt reads as "the composer
  *  is sitting on the keyboard" instead of floating mid-air. */
 const COMPOSER_FOCUSED_BOTTOM_GAP = 0;
+
+const messageKeyExtractor = (m: RoutstrMessage) => m.id;
 
 /**
  * AI tab chat surface. Built directly on FlashList rather than going
@@ -136,24 +138,17 @@ export function AiChatScreen() {
   const balanceMsats = useRoutstrStore((s) => s.balance);
   const sessionLineup = useRoutstrStore((s) => s.lineup);
   const lastKnownLineup = useRoutstrStore((s) => s.lastKnownLineup);
-  const resolvedEntry = useMemo(
-    () =>
-      resolveSelectedEntry(
-        selectedProvider,
-        selectedTier,
-        balanceMsats != null ? Math.floor(balanceMsats / 1000) : 0,
-        sessionLineup ?? lastKnownLineup?.lineup ?? null
-      ),
-    [selectedProvider, selectedTier, balanceMsats, sessionLineup, lastKnownLineup]
+  const resolvedEntry = resolveSelectedEntry(
+    selectedProvider,
+    selectedTier,
+    balanceMsats != null ? Math.floor(balanceMsats / 1000) : 0,
+    sessionLineup ?? lastKnownLineup?.lineup ?? null
   );
   const canAttachImages = resolvedEntry?.visionInput === true;
 
   const { send, retry, isSending, streamingMessageId } = useAiSend();
 
-  const activeMessages = useMemo(
-    () => deriveActivePath(conversationHistory, activeChildren),
-    [conversationHistory, activeChildren]
-  );
+  const activeMessages = deriveActivePath(conversationHistory, activeChildren);
 
   // Mount visibility — narrow set, fires once. No imperative scroll-chase
   // plumbing: FlashList's `maintainVisibleContentPosition` with
@@ -174,7 +169,7 @@ export function AiChatScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const branchNavById = useMemo(() => {
+  const branchNavById = (() => {
     const map = new Map<string, BranchNav>();
     const normalized = withSynthesisedParents(conversationHistory);
     for (const m of activeMessages) {
@@ -192,15 +187,12 @@ export function AiChatScreen() {
       map.set(m.id, { index: info.index, total: info.total, onPrev, onNext });
     }
     return map;
-  }, [activeMessages, conversationHistory, setActiveBranch]);
+  })();
 
-  const handleRetry = useCallback(
-    (messageId: string) => {
-      aiLog.info('ai.retry.dispatch', { messageId });
-      void retry(messageId);
-    },
-    [retry]
-  );
+  const handleRetry = (messageId: string) => {
+    aiLog.info('ai.retry.dispatch', { messageId });
+    void retry(messageId);
+  };
 
   // Composer state (draft + pending image attachments + measured height
   // for list bottom padding). Attachments accumulate via repeated single
@@ -271,7 +263,7 @@ export function AiChatScreen() {
     }),
   });
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = () => {
     const text = draft.trim();
     if (!text) return;
     const attachments = pendingAttachments;
@@ -281,11 +273,11 @@ export function AiChatScreen() {
       // Errors already logged; consumer's onSend is expected to surface
       // user-visible feedback (popups/banners).
     });
-  }, [draft, pendingAttachments, dispatchSend]);
+  };
 
   // [+] → system photo library. Attachments cap at the per-request inline
   // budget; the button dims when the resolved model can't accept images.
-  const handlePlusPress = useCallback(() => {
+  const handlePlusPress = () => {
     if (pendingAttachments.length >= MAX_INLINE_IMAGES) {
       aiLog.info('ai.attach.limit_reached', { max: MAX_INLINE_IMAGES });
       return;
@@ -296,11 +288,11 @@ export function AiChatScreen() {
         prev.length >= MAX_INLINE_IMAGES ? prev : [...prev, picked]
       );
     });
-  }, [pendingAttachments.length]);
+  };
 
-  const handleRemoveAttachment = useCallback((index: number) => {
+  const handleRemoveAttachment = (index: number) => {
     setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  };
 
   // Perf loggers — same canonical emits the shared ChatScreen produces, so
   // the AI surface stays observable in chat.kav.* and chat.list.history_change
@@ -314,36 +306,28 @@ export function AiChatScreen() {
   });
   useChatKeyboardAnimationLogger({ log: aiLog, surface: SURFACE });
 
-  const renderItem = useCallback(
-    ({ item }: { item: RoutstrMessage; index: number }) => (
-      <RNView style={MESSAGE_ROW_STYLE}>
-        <AiMessageBubble
-          message={item}
-          isStreaming={item.id === streamingMessageId}
-          onRetry={isSending ? undefined : handleRetry}
-          branchNav={branchNavById.get(item.id)}
-        />
-      </RNView>
-    ),
-    [branchNavById, handleRetry, isSending, streamingMessageId]
+  const renderItem = ({ item }: { item: RoutstrMessage; index: number }) => (
+    <RNView style={MESSAGE_ROW_STYLE}>
+      <AiMessageBubble
+        message={item}
+        isStreaming={item.id === streamingMessageId}
+        onRetry={isSending ? undefined : handleRetry}
+        branchNav={branchNavById.get(item.id)}
+      />
+    </RNView>
   );
-
-  const keyExtractor = useCallback((m: RoutstrMessage) => m.id, []);
 
   // Tap-to-dismiss-keyboard on the empty placeholder mirrors the previous
   // behaviour. Mounted in place of the list when there are no messages; the
   // composer stays mounted over the top, ready to accept the first message.
-  const emptyContent = useMemo(
-    () => (
-      <Pressable
-        onPress={Keyboard.dismiss}
-        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-        accessible={false}
-        importantForAccessibility="no">
-        <AiEmptyState />
-      </Pressable>
-    ),
-    []
+  const emptyContent = (
+    <Pressable
+      onPress={Keyboard.dismiss}
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+      accessible={false}
+      importantForAccessibility="no">
+      <AiEmptyState />
+    </Pressable>
   );
 
   // Pad bottom of the list so the newest bubble rests just above the
@@ -357,12 +341,9 @@ export function AiChatScreen() {
   // padding it would otherwise insert). The AI Stack header is its own
   // opaque/translucent surface above the screen scene; content sliding
   // under it on scroll is the intended chat UX.
-  const listContentContainerStyle = useMemo(
-    () => ({
-      paddingBottom: composerHeight + bottomInset + 16,
-    }),
-    [composerHeight, bottomInset]
-  );
+  const listContentContainerStyle = {
+    paddingBottom: composerHeight + bottomInset + 16,
+  };
 
   return (
     <RNView style={{ flex: 1, backgroundColor: surfaceColor }}>
@@ -378,7 +359,7 @@ export function AiChatScreen() {
           ) : (
             <FlashList
               data={activeMessages}
-              keyExtractor={keyExtractor}
+              keyExtractor={messageKeyExtractor}
               renderItem={renderItem}
               // Chat-bottom behavior via FlashList v2's maintainVisibleContentPosition:
               // - `startRenderingFromBottom` lands the first paint at the latest

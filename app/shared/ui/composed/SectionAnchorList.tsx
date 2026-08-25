@@ -37,7 +37,6 @@
  */
 
 import React, {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -162,6 +161,15 @@ const HEADROOM = 12;
 /** Portion of the anchor bar used for the gradient taper. */
 const FADE_RATIO = 0.5;
 
+function listKeyExtractor<T>(item: FlatRow<T>): string {
+  if (item.kind === 'header') return `header-${item.sectionId}`;
+  return item.rowKey;
+}
+
+function getItemType<T>(item: FlatRow<T>): string {
+  return item.kind;
+}
+
 type FlatRow<T> =
   | { kind: 'header'; sectionId: string; render: () => ReactNode }
   | { kind: 'row'; sectionId: string; items: T[]; rowIndex: number; rowKey: string };
@@ -206,23 +214,23 @@ export function SectionAnchorList<T>({
   const [anchorBarHeight, setAnchorBarHeight] = useState(0);
   const chromeHeight = aboveAnchorsHeight + anchorBarHeight;
 
-  const handleAboveAnchorsLayout = useCallback((e: LayoutChangeEvent) => {
+  const handleAboveAnchorsLayout = (e: LayoutChangeEvent) => {
     const h = e.nativeEvent.layout.height;
     setAboveAnchorsHeight((prev) => {
       if (Math.abs(prev - h) <= 1) return prev;
       sectionListLog.debug('sectionList.chrome.aboveAnchors', { from: prev, to: h });
       return h;
     });
-  }, []);
+  };
 
-  const handleAnchorBarLayout = useCallback((e: LayoutChangeEvent) => {
+  const handleAnchorBarLayout = (e: LayoutChangeEvent) => {
     const h = e.nativeEvent.layout.height;
     setAnchorBarHeight((prev) => {
       if (Math.abs(prev - h) <= 1) return prev;
       sectionListLog.debug('sectionList.chrome.anchorBar', { from: prev, to: h });
       return h;
     });
-  }, []);
+  };
 
   // Keep the active anchor valid when the section list itself changes
   // (e.g. a section empties out and disappears from `sections`). If the
@@ -255,7 +263,7 @@ export function SectionAnchorList<T>({
   // a `row` row. `sectionFirstIndex` maps a sectionId to the index
   // of its first row in `flatItems` — used by `scrollToIndex` on
   // anchor-pill taps.
-  const { flatItems, sectionFirstIndex } = useMemo(() => {
+  const { flatItems, sectionFirstIndex } = (() => {
     const start = Date.now();
     const items: FlatRow<T>[] = [];
     const firstIndex: Record<string, number> = {};
@@ -296,7 +304,7 @@ export function SectionAnchorList<T>({
       elapsedMs: elapsed,
     });
     return { flatItems: items, sectionFirstIndex: firstIndex };
-  }, [sections, rowChunkSize, keyExtractor]);
+  })();
 
   // One-shot mount log + the inverse for unmount. Captures the size of
   // the dataset so log-doctor's `stats` mode can correlate later events
@@ -343,78 +351,71 @@ export function SectionAnchorList<T>({
   // Suppressed during programmatic scrolls so the animation doesn't
   // trip self-reinforcing setActiveAnchor() updates.
   //
-  // Ref-pattern for `activeAnchor` so the callback identity stays
-  // stable across renders. With `[activeAnchor]` as a dep, every
-  // anchor flip re-creates the callback → FlashList sees a new
-  // `onViewableItemsChanged` prop → re-runs viewability tracking.
-  // Empirically this added ~1 FlashList re-render per flip and
-  // amplified scroll-time JS thread blocks.
-  const handleViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken<FlatRow<T>>[] }) => {
-      if (programmaticScroll.current) return;
-      if (viewableItems.length === 0) return;
-      const top = viewableItems[0]!;
-      const row = top.item;
-      const sectionId = row?.sectionId;
-      if (sectionId && sectionId !== activeAnchorRef.current) {
-        sectionListLog.debug('sectionList.viewable.flip', {
-          from: activeAnchorRef.current,
-          to: sectionId,
-          viewableCount: viewableItems.length,
-          topIndex: top.index,
-        });
-        setActiveAnchor(sectionId);
-      }
-    },
-    []
-  );
+  // Ref-pattern for `activeAnchor` so the callback reads only stable refs:
+  // reading the state directly would give the handler a fresh identity on
+  // every anchor flip → FlashList sees a new `onViewableItemsChanged` prop →
+  // re-runs viewability tracking. Empirically that added ~1 FlashList
+  // re-render per flip and amplified scroll-time JS thread blocks.
+  const handleViewableItemsChanged = ({
+    viewableItems,
+  }: {
+    viewableItems: ViewToken<FlatRow<T>>[];
+  }) => {
+    if (programmaticScroll.current) return;
+    if (viewableItems.length === 0) return;
+    const top = viewableItems[0]!;
+    const row = top.item;
+    const sectionId = row?.sectionId;
+    if (sectionId && sectionId !== activeAnchorRef.current) {
+      sectionListLog.debug('sectionList.viewable.flip', {
+        from: activeAnchorRef.current,
+        to: sectionId,
+        viewableCount: viewableItems.length,
+        topIndex: top.index,
+      });
+      setActiveAnchor(sectionId);
+    }
+  };
 
-  const handleAnchorPress = useCallback(
-    (id: string) => {
-      setActiveAnchor(id);
-      const idx = sectionFirstIndex[id];
-      if (idx == null) {
-        sectionListLog.warn('sectionList.scrollTo.miss', { sectionId: id });
-        return;
-      }
-      programmaticScroll.current = true;
-      programmaticScrollStart.current = Date.now();
-      sectionListLog.info('sectionList.scrollTo', {
+  const handleAnchorPress = (id: string) => {
+    setActiveAnchor(id);
+    const idx = sectionFirstIndex[id];
+    if (idx == null) {
+      sectionListLog.warn('sectionList.scrollTo.miss', { sectionId: id });
+      return;
+    }
+    programmaticScroll.current = true;
+    programmaticScrollStart.current = Date.now();
+    sectionListLog.info('sectionList.scrollTo', {
+      sectionId: id,
+      index: idx,
+      viewOffset: viewportTopOffset,
+    });
+    // viewOffset shifts the destination so the target row settles
+    // BELOW the chrome (at y = viewportTopOffset from the viewport
+    // top edge), instead of behind it.
+    void listRef.current?.scrollToIndex({
+      index: idx,
+      animated: true,
+      viewOffset: viewportTopOffset,
+    });
+    setTimeout(() => {
+      programmaticScroll.current = false;
+      sectionListLog.debug('sectionList.scrollTo.complete', {
         sectionId: id,
-        index: idx,
-        viewOffset: viewportTopOffset,
+        durationMs: Date.now() - programmaticScrollStart.current,
       });
-      // viewOffset shifts the destination so the target row settles
-      // BELOW the chrome (at y = viewportTopOffset from the viewport
-      // top edge), instead of behind it.
-      void listRef.current?.scrollToIndex({
-        index: idx,
-        animated: true,
-        viewOffset: viewportTopOffset,
-      });
-      setTimeout(() => {
-        programmaticScroll.current = false;
-        sectionListLog.debug('sectionList.scrollTo.complete', {
-          sectionId: id,
-          durationMs: Date.now() - programmaticScrollStart.current,
-        });
-      }, PROGRAMMATIC_SCROLL_SUPPRESS_MS);
-    },
-    [viewportTopOffset, sectionFirstIndex]
-  );
+    }, PROGRAMMATIC_SCROLL_SUPPRESS_MS);
+  };
 
   // Merge component-managed paddingTop/paddingBottom with caller-supplied
   // listContentContainerStyle (the latter typically carries
   // paddingHorizontal). Computed lazily so a paddingHorizontal change
   // doesn't invalidate the chrome-height memo.
-  const listContentContainerStyleMerged = useMemo(
-    () =>
-      StyleSheet.flatten([
-        listContentContainerStyle,
-        { paddingTop: viewportTopOffset, paddingBottom: contentBottomInset },
-      ]),
-    [listContentContainerStyle, viewportTopOffset, contentBottomInset]
-  );
+  const listContentContainerStyleMerged = StyleSheet.flatten([
+    listContentContainerStyle,
+    { paddingTop: viewportTopOffset, paddingBottom: contentBottomInset },
+  ]);
 
   // Counter incremented every time FlashList invokes `renderListItem`
   // — i.e. every time a row enters the recycling pool with new data.
@@ -425,45 +426,40 @@ export function SectionAnchorList<T>({
 
   // Per-row renderer for FlashList. Headers render `section.renderHeader()`
   // wholesale; rows dispatch to `renderRow` (chunked) or `renderItem` (single).
-  const renderListItem = useCallback(
-    ({ item }: ListRenderItemInfo<FlatRow<T>>) => {
-      recycleCount.current += 1;
-      const now = Date.now();
-      // Throttle to one log per second so a burst of recycling shows
-      // up as a single rate-summary entry instead of N entries.
-      if (now - lastRecycleLog.current >= 1000) {
-        const rate = recycleCount.current;
-        recycleCount.current = 0;
-        lastRecycleLog.current = now;
-        if (rate > 0) {
-          sectionListLog.debug('sectionList.recycle.rate', { invokesLastSec: rate });
-        }
+  const renderListItem = ({ item }: ListRenderItemInfo<FlatRow<T>>) => {
+    recycleCount.current += 1;
+    const now = Date.now();
+    // Throttle to one log per second so a burst of recycling shows
+    // up as a single rate-summary entry instead of N entries.
+    if (now - lastRecycleLog.current >= 1000) {
+      const rate = recycleCount.current;
+      recycleCount.current = 0;
+      lastRecycleLog.current = now;
+      if (rate > 0) {
+        sectionListLog.debug('sectionList.recycle.rate', { invokesLastSec: rate });
       }
-      let content: ReactNode = null;
-      if (item.kind === 'header') {
-        content = item.render();
-      } else if (rowChunkSize > 1) {
-        content = renderRow ? renderRow(item.items, item.sectionId, item.rowIndex) : null;
-      } else {
-        const single = item.items[0];
-        content = single === undefined ? null : renderItem(single, item.sectionId);
-      }
+    }
+    let content: ReactNode = null;
+    if (item.kind === 'header') {
+      content = item.render();
+    } else if (rowChunkSize > 1) {
+      content = renderRow ? renderRow(item.items, item.sectionId, item.rowIndex) : null;
+    } else {
+      const single = item.items[0];
+      content = single === undefined ? null : renderItem(single, item.sectionId);
+    }
 
-      return <>{content}</>;
-    },
-    [renderItem, renderRow, rowChunkSize]
-  );
-
-  const listKeyExtractor = useCallback((item: FlatRow<T>) => {
-    if (item.kind === 'header') return `header-${item.sectionId}`;
-    return item.rowKey;
-  }, []);
-
-  const getItemType = useCallback((item: FlatRow<T>) => item.kind, []);
+    return <>{content}</>;
+  };
 
   // `renderScrollComponent` lets the host inject its scroll container
   // (e.g. `BottomSheetScrollView` for gorhom integration). Default to
   // the standard react-native ScrollView when no host wraps us.
+  // KEPT as an explicit useMemo: this creates a component type — if its
+  // identity ever changed between renders FlashList would remount its
+  // scroll container (scroll position reset). Compiler memoization is an
+  // optimization, not a contract; the explicit memo makes it one.
+  // ast-grep-ignore: no-manual-memo-tsx
   const renderScrollComponent = useMemo(() => {
     if (!ScrollComponent) return undefined;
     const Inner = ScrollComponent;

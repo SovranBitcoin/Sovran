@@ -9,7 +9,7 @@
  * - User feed (notes)
  */
 
-import React, { useEffect, useMemo, useCallback, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
@@ -134,6 +134,15 @@ function buildUpdatedContactTags(
   return deduped;
 }
 
+function safeNpubEncode(pubkey: string): string {
+  if (!pubkey) return '';
+  try {
+    return nip19.npubEncode(pubkey);
+  } catch {
+    return '';
+  }
+}
+
 // ============================================================================
 // Profile Stats Grid
 // ============================================================================
@@ -148,7 +157,7 @@ const STAT_CARD_HEIGHT = 96;
  */
 const SKELETON_FILL_ALPHA = 0.07;
 
-function ProfileStatsGridComponent({
+function ProfileStatsGrid({
   followingCount,
   followerCount,
   reputationScore,
@@ -317,13 +326,12 @@ function ProfileStatsGridComponent({
     </VisualLayoutProbe>
   );
 }
-const ProfileStatsGrid = React.memo(ProfileStatsGridComponent);
 
 // ============================================================================
 // Top Followers Section
 // ============================================================================
 
-function TopFollowersComponent({
+function TopFollowers({
   topFollowers,
   isLoading,
   visualScope,
@@ -342,7 +350,7 @@ function TopFollowersComponent({
   // silently drop the UI-thread-applied opacity (elements vanish while the
   // shared value still reads 1). A plain style can't be clobbered.
   const [fadeSettled, setFadeSettled] = useState(false);
-  const settleFade = useCallback(() => setFadeSettled(true), []);
+  const settleFade = () => setFadeSettled(true);
 
   const GRID_PADDING = 32;
   const GRID_GAP = 12;
@@ -350,10 +358,7 @@ function TopFollowersComponent({
   const itemWidth = (screenWidth - GRID_PADDING - GRID_GAP * (COLUMNS - 1)) / COLUMNS;
   const avatarSize = Math.min(itemWidth - 16, 64);
 
-  const followersWithProfiles = useMemo(
-    () => getFollowersWithProfiles(topFollowers).slice(0, 6),
-    [topFollowers]
-  );
+  const followersWithProfiles = getFollowersWithProfiles(topFollowers).slice(0, 6);
 
   useEffect(() => {
     if (followersWithProfiles.length > 0) {
@@ -455,13 +460,12 @@ function TopFollowersComponent({
     </VisualLayoutProbe>
   );
 }
-const TopFollowers = React.memo(TopFollowersComponent);
 
 // ============================================================================
 // Banner with Overlapping Avatar
 // ============================================================================
 
-function BannerWithAvatarComponent({
+function BannerWithAvatar({
   bannerUrl,
   pictureUrl,
   pubkey,
@@ -511,13 +515,10 @@ function BannerWithAvatarComponent({
   // a Fabric re-render commit can drop UI-thread-applied props (the invisible
   // pfp+ring), and this header re-renders constantly. See settledReveal.
   const [avatarSettled, setAvatarSettled] = useState(false);
-  const settleAvatar = useCallback(() => setAvatarSettled(true), []);
+  const settleAvatar = () => setAvatarSettled(true);
   const [bannerStatus, setBannerStatus] = useState<'loading' | 'loaded' | 'failed'>('loading');
 
-  const fallbackIndex = useMemo(
-    () => (pubkey ? parseInt(pubkey.slice(0, 8), 16) % 8 : 0),
-    [pubkey]
-  );
+  const fallbackIndex = pubkey ? parseInt(pubkey.slice(0, 8), 16) % 8 : 0;
   const bannerError = bannerStatus === 'failed';
   const hasBannerImage = Boolean(bannerUrl && !bannerError);
   // Mirror Avatar's state model for the banner:
@@ -541,18 +542,16 @@ function BannerWithAvatarComponent({
     fallbackIndex
   );
 
-  const bannerGradientTheme = useMemo(
-    () => generateSeededGradient(`${pubkey || 'default'}`),
-    [pubkey]
-  );
+  const bannerGradientTheme = generateSeededGradient(`${pubkey || 'default'}`);
 
-  const gradientSource = useMemo(() => {
-    if (pictureUrl && pfpColors.hasExtractedColors) return 'pfp';
-    if (hasBannerImage && bannerColors.hasExtractedColors) return 'banner';
-    return 'seeded';
-  }, [pictureUrl, hasBannerImage, pfpColors.hasExtractedColors, bannerColors.hasExtractedColors]);
+  const gradientSource =
+    pictureUrl && pfpColors.hasExtractedColors
+      ? 'pfp'
+      : hasBannerImage && bannerColors.hasExtractedColors
+        ? 'banner'
+        : 'seeded';
 
-  const imageGradientColors = useMemo(() => {
+  const imageGradientColors = (() => {
     if (gradientSource === 'pfp') {
       const { contrastColor } = getContrastColors(pfpColors.baseColor, 0.3);
       return [pfpColors.baseColor, contrastColor] as const;
@@ -562,7 +561,7 @@ function BannerWithAvatarComponent({
       return [bannerColors.baseColor, contrastColor] as const;
     }
     return null;
-  }, [gradientSource, pfpColors.baseColor, bannerColors.baseColor]);
+  })();
 
   useEffect(() => {
     setBannerStatus('loading');
@@ -810,7 +809,6 @@ function BannerWithAvatarComponent({
     </VisualLayoutProbe>
   );
 }
-const BannerWithAvatar = React.memo(BannerWithAvatarComponent);
 
 // ============================================================================
 // Main Component
@@ -830,32 +828,15 @@ export function UserProfileScreen() {
   const pubkeyParam = params?.pubkey;
   const mintUrlParam = params?.mintUrl;
 
-  const pubkey = useMemo(() => {
-    if (pubkeyParam) return pubkeyParam;
-    if (npubParam) return npubToPubkey(npubParam);
-    return '';
-  }, [npubParam, pubkeyParam]);
-  const profileHeaderVisualScope = useMemo(
-    () => `profile.${pubkey ? pubkey.slice(0, 12) : 'unknown'}.header`,
-    [pubkey]
-  );
+  const pubkey = pubkeyParam || (npubParam ? npubToPubkey(npubParam) : '');
+  const profileHeaderVisualScope = `profile.${pubkey ? pubkey.slice(0, 12) : 'unknown'}.header`;
   const addRecentPerson = useRecentPeopleStore((state) => state.addRecentPerson);
 
   useEffect(() => {
     if (pubkey) addRecentPerson(pubkey);
   }, [addRecentPerson, pubkey]);
 
-  const npub = useMemo(() => {
-    if (npubParam) return npubParam;
-    if (pubkey) {
-      try {
-        return nip19.npubEncode(pubkey);
-      } catch {
-        return '';
-      }
-    }
-    return '';
-  }, [npubParam, pubkey]);
+  const npub = npubParam || safeNpubEncode(pubkey);
 
   const isOwnProfile = !!nostrKeys?.pubkey && nostrKeys.pubkey === pubkey;
 
@@ -911,7 +892,7 @@ export function UserProfileScreen() {
   // variant "to npub.cash" for npc targets, so the destination stays explicit.
   const npcFallback = npub ? getNpcAddress(undefined, npub) : undefined;
   const meltTarget = lud16 ?? npcFallback;
-  const handleSendMoney = useCallback(() => {
+  const handleSendMoney = () => {
     if (!meltTarget) {
       paymentLog.warn('user.profile.send_money.unavailable', {
         recipientPubkeyLength: pubkey.length,
@@ -958,16 +939,7 @@ export function UserProfileScreen() {
         });
       }
     })();
-  }, [
-    meltTarget,
-    lud16,
-    machine,
-    pubkey,
-    displayName,
-    cachedProfile?.picture,
-    cachedProfile?.nip05,
-    rawLud16,
-  ]);
+  };
 
   const followerCount = profileData?.followers;
   const reputationScore = typeof profileData?.score === 'number' ? profileData.score : undefined;
@@ -988,9 +960,8 @@ export function UserProfileScreen() {
   // `followingPubkeys` set still drives follow/unfollow membership logic; only
   // the displayed total uses Vertex.
   const followingCount = profileData?.follows;
-  const isFollowingProfile = useNostrSocialStore(
-    useMemo(() => selectIsFollowingPubkey(pubkey || ''), [pubkey])
-  );
+  // Selector returns a primitive, so a per-render selector identity is safe.
+  const isFollowingProfile = useNostrSocialStore(selectIsFollowingPubkey(pubkey || ''));
   const followInFlight = !!followOptimisticEntry?.pending;
 
   // ===========================
@@ -1000,11 +971,11 @@ export function UserProfileScreen() {
   const [userVideoPosts, setUserVideoPosts] = useState<VideoPostRecord[]>([]);
   const hasStories = userVideoPosts.length > 0;
 
-  const handleVideoPostsReady = useCallback((videoPosts: VideoPostRecord[]) => {
+  const handleVideoPostsReady = (videoPosts: VideoPostRecord[]) => {
     setUserVideoPosts(videoPosts);
-  }, []);
+  };
 
-  const handleAvatarStoryPress = useCallback(() => {
+  const handleAvatarStoryPress = () => {
     if (userVideoPosts.length === 0) return;
     nostrLog.info('user.profile.story.view', { pubkey, videoCount: userVideoPosts.length });
     const storyUser: StoryUser = {
@@ -1019,13 +990,13 @@ export function UserProfileScreen() {
         storyUsersJson: JSON.stringify([storyUser]),
       },
     });
-  }, [userVideoPosts, pubkey, cachedProfile, displayName]);
+  };
 
   // ===========================
   // HANDLERS
   // ===========================
 
-  const handleCopy = useCallback(async (text: string, target: CopyTarget) => {
+  const handleCopy = async (text: string, target: CopyTarget) => {
     try {
       nostrLog.info('user.profile.copy', { target });
       await Clipboard.setStringAsync(text);
@@ -1037,9 +1008,9 @@ export function UserProfileScreen() {
       });
       staticPopup('copy-failed');
     }
-  }, []);
+  };
 
-  const handleOpenLink = useCallback(async (url: string) => {
+  const handleOpenLink = async (url: string) => {
     nostrLog.info('user.profile.open_link', { url });
     const fullUrl = url.startsWith('http') ? url : `https://${url}`;
     const result = await openExternalUrl(fullUrl);
@@ -1047,9 +1018,9 @@ export function UserProfileScreen() {
       nostrLog.error('user.profile.open_link.failed', { url, reason: result.error.type });
       staticPopup('open-link-failed');
     }
-  }, []);
+  };
 
-  const handleToggleFollowInner = useCallback(async () => {
+  const handleToggleFollowInner = async () => {
     if (!pubkey || !nostrKeys?.pubkey || !ndk) {
       nostrLog.warn('user.profile.follow.precondition_failed', {
         hasPubkey: !!pubkey,
@@ -1093,32 +1064,21 @@ export function UserProfileScreen() {
       clearFollowOptimistic(pubkey);
       paramPopup('engagement-update-failed', 'follow');
     }
-  }, [
-    pubkey,
-    nostrKeys?.pubkey,
-    ndk,
-    followInFlight,
-    isFollowingProfile,
-    contactsTags,
-    contactsContent,
-    setFollowOptimistic,
-    setContactsFromRelay,
-    clearFollowOptimistic,
-  ]);
+  };
 
   // `followInFlight` is store-derived state and lands a render too late;
   // a rapid double-tap on Follow runs `setFollowOptimistic` twice and races
   // a second kind-3 publish with the first's `clearFollowOptimistic`.
   const handleToggleFollow = useSingleFlight(handleToggleFollowInner);
 
-  const handleMintInfoPress = useCallback(() => {
+  const handleMintInfoPress = () => {
     if (!profileMintUrl) return;
     paymentLog.info('user.profile.mint_info.open', {
       ...mintUrlLogFields(profileMintUrl),
       source: mintUrlParam ? 'route_param' : 'profile_api',
     });
     router.navigate(buildMintInfoHref(profileMintUrl));
-  }, [mintUrlParam, profileMintUrl]);
+  };
 
   // ===========================
   // PROFILE INFO ITEMS (data-driven)
@@ -1126,7 +1086,7 @@ export function UserProfileScreen() {
 
   const iconColor = withAlpha(foreground, 0.4);
 
-  const profileInfoItems = useMemo(() => {
+  const profileInfoItems = (() => {
     const items: {
       key: string;
       prefix: React.ReactNode;
@@ -1185,7 +1145,7 @@ export function UserProfileScreen() {
     }
 
     return items;
-  }, [npub, cachedProfile, handleCopy, handleOpenLink, iconColor]);
+  })();
 
   useVisualStateLogger({
     enabled: !!pubkey,

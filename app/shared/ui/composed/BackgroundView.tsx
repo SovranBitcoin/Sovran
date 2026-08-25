@@ -3,7 +3,7 @@ import { MeshGradientView } from 'expo-mesh-gradient';
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBackgroundContext } from '@/shared/providers/BackgroundProvider';
-import React, { memo, ReactNode, useMemo, useSyncExternalStore } from 'react';
+import { ReactNode, useEffect, useSyncExternalStore } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
 import Animated, { interpolateColor, useAnimatedStyle } from 'react-native-reanimated';
 import {
@@ -136,7 +136,7 @@ interface ScrollableGradientOverlayProps {
  *   </ScrollView>
  * </BackgroundView>
  */
-function ScrollableGradientOverlayComponent({
+export function ScrollableGradientOverlay({
   contentHeight,
   blurGradientStart = 0.3,
   blurGradientEnd = 0.6,
@@ -157,7 +157,7 @@ function ScrollableGradientOverlayComponent({
 
   // Calculate gradient locations relative to content height
   // so they always appear at the same pixel position relative to viewport
-  const overlayLocations = useMemo((): [number, number] => {
+  const overlayLocations = ((): [number, number] => {
     if (contentHeight <= 0) {
       return [blurGradientStart, blurGradientEnd];
     }
@@ -165,22 +165,18 @@ function ScrollableGradientOverlayComponent({
     const start = Math.min(blurGradientStart * ratio, 1);
     const end = Math.min(blurGradientEnd * ratio, 1);
     return [start, end];
-  }, [viewportHeight, contentHeight, blurGradientStart, blurGradientEnd]);
+  })();
 
   const overlayHeight = contentHeight || viewportHeight;
-  const androidMeshPoints = useMemo(
-    () => getScrollableOverlayMeshPoints(overlayLocations[0], overlayLocations[1]),
-    [overlayLocations]
+  const androidMeshPoints = getScrollableOverlayMeshPoints(
+    overlayLocations[0],
+    overlayLocations[1]
   );
-  const androidBackgroundMeshColors = useMemo(
-    () =>
-      getScrollableOverlayMeshColors({
-        top: withAlpha(screenBackgroundColor, 0),
-        mid: screenBackgroundColor,
-        bottom: screenBackgroundColor,
-      }),
-    [screenBackgroundColor]
-  );
+  const androidBackgroundMeshColors = getScrollableOverlayMeshColors({
+    top: withAlpha(screenBackgroundColor, 0),
+    mid: screenBackgroundColor,
+    bottom: screenBackgroundColor,
+  });
 
   // On solid-colour themes the transparent→surface alpha ramp still paints
   // (dither banding, and a foreign colour band whenever the active theme's
@@ -228,8 +224,6 @@ function ScrollableGradientOverlayComponent({
   );
 }
 
-export const ScrollableGradientOverlay = memo(ScrollableGradientOverlayComponent);
-
 // ============================================================================
 // AnimatedBackgroundView - Layout-level background with animated blur transitions
 // ============================================================================
@@ -276,7 +270,7 @@ interface AnimatedBackgroundViewProps {
  *   </AnimatedBackgroundView>
  * </BackgroundProvider>
  */
-function AnimatedBackgroundViewComponent({
+export function AnimatedBackgroundView({
   children,
   blurTint = 'dark',
   style,
@@ -316,7 +310,7 @@ function AnimatedBackgroundViewComponent({
   const hasImageWallpaper =
     isBackgroundImageTheme(currentTheme) ||
     carouselPages.some((page) => isBackgroundImageTheme(page.theme));
-  React.useEffect(() => {
+  useEffect(() => {
     if (!hasImageWallpaper) return;
     return retainWallpaperMotion();
   }, [hasImageWallpaper]);
@@ -416,8 +410,6 @@ function AnimatedBackgroundViewComponent({
   );
 }
 
-export const AnimatedBackgroundView = memo(AnimatedBackgroundViewComponent);
-
 /**
  * One persistent wallpaper layer. Each layer carries its OWN theme's opaque
  * surface color (solid underlay + gradient tint), so crossfades never bleed
@@ -430,7 +422,7 @@ export const AnimatedBackgroundView = memo(AnimatedBackgroundViewComponent);
  * layers (see carouselLayerOpacity) or `overlayProgress` for the overlay —
  * so drags raise layers with zero React re-renders.
  */
-const WallpaperLayer = memo(function WallpaperLayer({
+function WallpaperLayer({
   theme,
   pageIndex,
   pageCount,
@@ -463,22 +455,15 @@ const WallpaperLayer = memo(function WallpaperLayer({
         ? carouselLayerOpacity(carouselX.value, pageIndex as number, pageCount as number)
         : 1,
   }));
-  const meshColors = useMemo(
-    () =>
-      getMeshGradientColors(
-        isBackgroundImageTheme(theme) ? getGradientColorScale(theme) : null,
-        gradientColor || layerSurface
-      ),
-    [theme, gradientColor, layerSurface]
+  const meshColors = getMeshGradientColors(
+    isBackgroundImageTheme(theme) ? getGradientColorScale(theme) : null,
+    gradientColor || layerSurface
   );
   // Without an image (and with no explicit tint colour) the transparent→
   // surface ramp composites to a flat surface fill — but `dither` still adds
   // visible noise to it. Paint the flat fill directly instead.
   const isFlatFill = !isBackgroundImageTheme(theme) && !gradientColor;
-  const flatFillStyle = useMemo(
-    () => [StyleSheet.absoluteFill, { backgroundColor: layerSurface }],
-    [layerSurface]
-  );
+  const flatFillStyle = [StyleSheet.absoluteFill, { backgroundColor: layerSurface }];
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, layerStyle]}>
       {showImage && (
@@ -515,4 +500,4 @@ const WallpaperLayer = memo(function WallpaperLayer({
       )}
     </Animated.View>
   );
-});
+}
