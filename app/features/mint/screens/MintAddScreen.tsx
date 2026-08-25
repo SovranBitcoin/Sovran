@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Platform, TextInput, useWindowDimensions } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -63,6 +63,26 @@ interface SkeletonMint {
 }
 
 const noop = () => {};
+
+const keyExtractor = (item: SearchableMint) => item.url;
+const getItemType = (item: SearchableMint) => ('isSkeleton' in item ? 'skeleton' : 'mint');
+
+/** Currency-tab values shown above the results; see `availableCurrencies`. */
+function extractAvailableCurrencies(searchResults: MintSearchResult[]): string[] {
+  const units = new Set<string>(['SAT']);
+  for (const result of searchResults) {
+    for (const unit of result.supported_units) {
+      units.add(unit.toUpperCase());
+    }
+  }
+  const allowed = ['SAT', 'USD', 'EUR', 'GBP'];
+  const currencies = ['ALL', ...[...units].filter((c) => allowed.includes(c))];
+  cashuLog.debug('mint.add.currencies.extracted', {
+    currencies,
+    resultCount: searchResults.length,
+  });
+  return currencies;
+}
 
 /** Quiet period the discovered list must hold before the skeleton hands over.
  *  Operator profiles resolve one at a time and each arrival re-renders a row,
@@ -138,7 +158,7 @@ function adaptSearchResult(result: MintSearchResult): DisplayMint {
 }
 
 // Fallback search header for Android with validation state
-const FallbackSearchHeader = memo(function FallbackSearchHeader({
+function FallbackSearchHeader({
   searchQuery,
   onSearchChange,
   validationState,
@@ -218,7 +238,33 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
       )}
     </View>
   );
-});
+}
+
+// Search-result preview only: the search endpoint returns `serverStats`
+// (`n_mints`/`n_melts`/`n_errors`) without the per-swap array, so we can't
+// route through `transformAuditData` like the catalog/info paths do. The
+// resulting score is an ops-aggregate approximation; it can disagree with
+// the swap-based score the user sees once the mint is opened. That's
+// accepted — this pill is best-effort during search; authoritative scores
+// come from `getMintCatalog` and `MintInfoScreen`.
+function computeAuditStats(mint: SearchableMint): {
+  auditScore: number | undefined;
+  auditTotalOps: number | undefined;
+} {
+  if (!('serverStats' in mint) || !mint.serverStats)
+    return { auditScore: undefined, auditTotalOps: undefined };
+  const { n_mints, n_melts, n_errors } = mint.serverStats;
+  // n_errors is a SEPARATE count of failed operations, not a subset of
+  // n_mints/n_melts (which count successes). So the success rate is
+  // successes / (successes + errors) — bounded 0..1. The old
+  // `1 - errors/successes` went deeply negative for error-heavy mints
+  // (e.g. coinos: 39 successes vs 235 errors → -503%).
+  const successOps = n_mints + n_melts;
+  const totalOps = successOps + n_errors;
+  if (totalOps <= 0) return { auditScore: undefined, auditTotalOps: undefined };
+  const successRate = Math.max(0, Math.min(1, successOps / totalOps)); // 0..1
+  return { auditScore: successRate * 5, auditTotalOps: totalOps };
+}
 
 // Pre-baked mint row — deferred to the shared `ContactRow` so search results
 // here visually match the mint list, contacts tab, and split-bill picker.
@@ -228,7 +274,7 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
 // title, subtitle, stats accent, checkbox) and can't drift in height. The mint
 // fields are read defensively because skeleton items carry only a synthetic
 // `url`; their values are never shown (loading swaps in placeholder bars).
-const MintItem = memo(function MintItem({
+function MintItem({
   mint,
   selected,
   onToggle,
@@ -242,33 +288,8 @@ const MintItem = memo(function MintItem({
   loading?: boolean;
 }) {
   const mintInfo = 'mintInfo' in mint ? mint.mintInfo : undefined;
-  const displayName = useMemo(() => getMintDisplayName(mint.url, mintInfo), [mint.url, mintInfo]);
-
-  // Search-result preview only: the search endpoint returns `serverStats`
-  // (`n_mints`/`n_melts`/`n_errors`) without the per-swap array, so we can't
-  // route through `transformAuditData` like the catalog/info paths do. The
-  // resulting score is an ops-aggregate approximation; it can disagree with
-  // the swap-based score the user sees once the mint is opened. That's
-  // accepted — this pill is best-effort during search; authoritative scores
-  // come from `getMintCatalog` and `MintInfoScreen`.
-  const { auditScore, auditTotalOps } = useMemo<{
-    auditScore: number | undefined;
-    auditTotalOps: number | undefined;
-  }>(() => {
-    if (!('serverStats' in mint) || !mint.serverStats)
-      return { auditScore: undefined, auditTotalOps: undefined };
-    const { n_mints, n_melts, n_errors } = mint.serverStats;
-    // n_errors is a SEPARATE count of failed operations, not a subset of
-    // n_mints/n_melts (which count successes). So the success rate is
-    // successes / (successes + errors) — bounded 0..1. The old
-    // `1 - errors/successes` went deeply negative for error-heavy mints
-    // (e.g. coinos: 39 successes vs 235 errors → -503%).
-    const successOps = n_mints + n_melts;
-    const totalOps = successOps + n_errors;
-    if (totalOps <= 0) return { auditScore: undefined, auditTotalOps: undefined };
-    const successRate = Math.max(0, Math.min(1, successOps / totalOps)); // 0..1
-    return { auditScore: successRate * 5, auditTotalOps: totalOps };
-  }, [mint]);
+  const displayName = getMintDisplayName(mint.url, mintInfo);
+  const { auditScore, auditTotalOps } = computeAuditStats(mint);
 
   return (
     <ContactRow
@@ -303,11 +324,11 @@ const MintItem = memo(function MintItem({
       testID={loading ? `contact-row:mint-skeleton:${mint.url}` : `contact-row:mint:${mint.url}`}
     />
   );
-});
+}
 
 export function MintAddScreen() {
   useLifecycleLogger('MintAddScreen');
-  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
+  const surface = useThemeColor('surface');
   const { width: windowWidth } = useWindowDimensions();
   const searchBarWidth = getHeaderTitleWidthFromWidth(windowWidth);
 
@@ -387,7 +408,13 @@ export function MintAddScreen() {
   // and the row picks up `contactFollowers` / `contactReputation`.
   const mintProfileCache = useMintMetadataStore((s) => s.byMintUrl);
 
-  // Adapt server results to display format, filter out already-known mints
+  // Adapt server results to display format, filter out already-known mints.
+  // KEPT under React Compiler: the dep array deliberately includes
+  // `mintProfileCache` (unused in the body) so the compute re-runs when the
+  // metadata store updates — `adaptSearchResult` reads the store non-reactively
+  // via getState(). The compiler would memoize on actual reads and drop that
+  // subscription-driven recompute.
+  // ast-grep-ignore: no-manual-memo-tsx
   const displayMints = useMemo((): SearchableMint[] => {
     const t0 = performance.now();
     const knownMintUrls = new Set(knownMints.map((mint) => normalizeMintUrlKey(mint.mintUrl)));
@@ -454,31 +481,16 @@ export function MintAddScreen() {
   // Kick off Nostr profile fetches for any search result that has an operator
   // pubkey in NUT-06 contact info. Results land in `mintMetadataStore`
   // and the memo above re-runs once they arrive.
-  const profileFetchInputs = useMemo(
-    () =>
-      displayMints.map((m) => ({ url: m.url, mintInfo: 'mintInfo' in m ? m.mintInfo : undefined })),
-    [displayMints]
-  );
+  const profileFetchInputs = displayMints.map((m) => ({
+    url: m.url,
+    mintInfo: 'mintInfo' in m ? m.mintInfo : undefined,
+  }));
   useMintProfiles(profileFetchInputs);
 
   // Extract available currencies from results
-  const availableCurrencies = useMemo(() => {
-    const units = new Set<string>(['SAT']);
-    for (const result of searchResults) {
-      for (const unit of result.supported_units) {
-        units.add(unit.toUpperCase());
-      }
-    }
-    const allowed = ['SAT', 'USD', 'EUR', 'GBP'];
-    const currencies = ['ALL', ...[...units].filter((c) => allowed.includes(c))];
-    cashuLog.debug('mint.add.currencies.extracted', {
-      currencies,
-      resultCount: searchResults.length,
-    });
-    return currencies;
-  }, [searchResults]);
+  const availableCurrencies = extractAvailableCurrencies(searchResults);
 
-  const handleToggleMint = useCallback((mintUrl: string) => {
+  const handleToggleMint = (mintUrl: string) => {
     setSelectedMints((prev) => {
       const next = new Set(prev);
       const wasSelected = next.has(mintUrl);
@@ -494,9 +506,9 @@ export function MintAddScreen() {
       });
       return next;
     });
-  }, []);
+  };
 
-  const handleSave = useCallback(async () => {
+  const handleSave = async () => {
     if (selectedMints.size === 0) {
       staticPopup('no-mints-selected');
       return;
@@ -589,33 +601,24 @@ export function MintAddScreen() {
     } finally {
       setIsAdding(false);
     }
-  }, [selectedMints, isAdding]);
-
-  const keyExtractor = useCallback((item: SearchableMint) => item.url, []);
+  };
 
   // Feed the result List skeleton placeholders during the first search so the
   // loading rows render through the SAME List + ContactRow path as real rows —
   // identical container chrome, no content shift on the data swap.
   const isInitialLoading = searchLoading || !resultsSettled;
-  const getItemType = useCallback(
-    (item: SearchableMint) => ('isSkeleton' in item ? 'skeleton' : 'mint'),
-    []
-  );
 
-  const renderItem = useCallback(
-    ({ item }: { item: SearchableMint }) =>
-      'isSkeleton' in item ? (
-        <MintItem mint={item} selected={false} onToggle={noop} globalLoading loading />
-      ) : (
-        <MintItem
-          mint={item}
-          selected={selectedMints.has(item.url)}
-          onToggle={handleToggleMint}
-          globalLoading={isAdding}
-        />
-      ),
-    [handleToggleMint, isAdding, selectedMints]
-  );
+  const renderItem = ({ item }: { item: SearchableMint }) =>
+    'isSkeleton' in item ? (
+      <MintItem mint={item} selected={false} onToggle={noop} globalLoading loading />
+    ) : (
+      <MintItem
+        mint={item}
+        selected={selectedMints.has(item.url)}
+        onToggle={handleToggleMint}
+        globalLoading={isAdding}
+      />
+    );
 
   // Log list render state for performance analysis
   useEffect(() => {
@@ -642,83 +645,64 @@ export function MintAddScreen() {
 
   // Stable header callbacks — must not swap between string title and render function,
   // otherwise React Navigation caches the old form. Always use render functions.
-  const renderHeaderTitle = useCallback(
-    () =>
-      isSearching ? (
-        Platform.OS === 'ios' ? (
-          <GlassSearchBar
-            testID="mint-add-search-input"
-            width={searchBarWidth}
-            onChangeText={onSearchChange}
-            clearKey={clearKey}
-            placeholder="Search mints or enter URL..."
-            keyboardType="url"
-            debounceMs={300}
-            autoFocus
-          />
-        ) : (
-          <FallbackSearchHeader
-            searchQuery={searchQuery}
-            onSearchChange={onSearchChange}
-            validationState={validationState}
-          />
-        )
+  const renderHeaderTitle = () =>
+    isSearching ? (
+      Platform.OS === 'ios' ? (
+        <GlassSearchBar
+          testID="mint-add-search-input"
+          width={searchBarWidth}
+          onChangeText={onSearchChange}
+          clearKey={clearKey}
+          placeholder="Search mints or enter URL..."
+          keyboardType="url"
+          debounceMs={300}
+          autoFocus
+        />
       ) : (
-        <Text className="text-foreground" size={17} bold>
-          {methodFilter ? `Add ${methodLabel} Mints` : 'Add Mints'}
-        </Text>
-      ),
-    [
-      isSearching,
-      searchBarWidth,
-      onSearchChange,
-      clearKey,
-      searchQuery,
-      validationState,
-      methodFilter,
-      methodLabel,
-    ]
-  );
+        <FallbackSearchHeader
+          searchQuery={searchQuery}
+          onSearchChange={onSearchChange}
+          validationState={validationState}
+        />
+      )
+    ) : (
+      <Text className="text-foreground" size={17} bold>
+        {methodFilter ? `Add ${methodLabel} Mints` : 'Add Mints'}
+      </Text>
+    );
 
   // ScreenHeaderAction + monicon glyphs (not IconSymbol/SF Symbols —
   // expo-symbols renders nothing on Android, which left this button invisible
   // there).
-  const renderHeaderRight = useCallback(
-    () =>
-      isSearching ? (
-        <ScreenHeaderAction
-          testID="mint-add-search-close"
-          accessibilityLabel="Close search"
-          icon="material-symbols:close-rounded"
-          size={20}
-          onPress={onCloseSearch}
-        />
-      ) : (
-        <ScreenHeaderAction
-          testID="mint-add-search-toggle"
-          accessibilityLabel="Search mints"
-          icon="material-symbols:search-rounded"
-          size={20}
-          onPress={onOpenSearch}
-        />
-      ),
-    [isSearching, onCloseSearch, onOpenSearch, foreground]
-  );
+  const renderHeaderRight = () =>
+    isSearching ? (
+      <ScreenHeaderAction
+        testID="mint-add-search-close"
+        accessibilityLabel="Close search"
+        icon="material-symbols:close-rounded"
+        size={20}
+        onPress={onCloseSearch}
+      />
+    ) : (
+      <ScreenHeaderAction
+        testID="mint-add-search-toggle"
+        accessibilityLabel="Search mints"
+        icon="material-symbols:search-rounded"
+        size={20}
+        onPress={onOpenSearch}
+      />
+    );
 
-  const screenOptions = useMemo(
-    () =>
-      withGlassHeaderItems({
-        headerTransparent: true as const,
-        // Declares the page background (bgColor={surface} below) so the Android
-        // sheet header's scrim fades from the page's color, not the darker
-        // theme background. FlowSheetHeader reads this; iOS ignores it under a
-        // transparent header.
-        headerStyle: { backgroundColor: surface },
-        headerTitle: renderHeaderTitle,
-        headerRight: renderHeaderRight,
-      }),
-    [renderHeaderTitle, renderHeaderRight, surface]
-  );
+  const screenOptions = withGlassHeaderItems({
+    headerTransparent: true as const,
+    // Declares the page background (bgColor={surface} below) so the Android
+    // sheet header's scrim fades from the page's color, not the darker
+    // theme background. FlowSheetHeader reads this; iOS ignores it under a
+    // transparent header.
+    headerStyle: { backgroundColor: surface },
+    headerTitle: renderHeaderTitle,
+    headerRight: renderHeaderRight,
+  });
 
   // ── Sticky content & bottom ────────────────────────────────────────────
 
@@ -733,85 +717,67 @@ export function MintAddScreen() {
     onCurrencyChange: setSelectedCurrency,
   });
 
-  const bottomButtons = useMemo(
-    () => (
-      <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            {
-              testID: 'mint-add-confirm',
-              text: isAdding ? 'Adding...' : `Add (${selectedMints.size})`,
-              variant: 'primary',
-              onPress: handleSave,
-              disabled: selectedMints.size === 0 || isAdding,
-            },
-            {
-              testID: 'mint-add-cancel',
-              text: 'Cancel',
-              variant: 'secondary',
-              onPress: async () => router.back(),
-            },
-          ]}
-        />
-      </BottomButtons>
-    ),
-    [isAdding, selectedMints.size, handleSave]
+  const bottomButtons = (
+    <BottomButtons>
+      <ButtonHandler
+        buttons={[
+          {
+            testID: 'mint-add-confirm',
+            text: isAdding ? 'Adding...' : `Add (${selectedMints.size})`,
+            variant: 'primary',
+            onPress: handleSave,
+            disabled: selectedMints.size === 0 || isAdding,
+          },
+          {
+            testID: 'mint-add-cancel',
+            text: 'Cancel',
+            variant: 'secondary',
+            onPress: async () => router.back(),
+          },
+        ]}
+      />
+    </BottomButtons>
   );
 
-  const emptyComponent = useMemo(
-    () => (
-      <View className="items-center pt-5">
-        <Text className="text-foreground text-center">
-          {searchQuery.trim()
-            ? 'No mints found matching your search'
-            : methodFilter
-              ? `No known mints support ${methodLabel} yet`
-              : selectedCurrency === 'ALL'
-                ? 'No mints available'
-                : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
-        </Text>
-      </View>
-    ),
-    [searchQuery, selectedCurrency, methodFilter, methodLabel]
+  const emptyComponent = (
+    <View className="items-center pt-5">
+      <Text className="text-foreground text-center">
+        {searchQuery.trim()
+          ? 'No mints found matching your search'
+          : methodFilter
+            ? `No known mints support ${methodLabel} yet`
+            : selectedCurrency === 'ALL'
+              ? 'No mints available'
+              : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
+      </Text>
+    </View>
   );
 
   // One List renderer for both crossfade branches: the skeleton branch and the
   // real branch render the SAME List + ContactRow path, so the swap shifts
   // nothing. Two List instances coexist only for the ~220ms fade.
-  const renderResultList = useCallback(
-    (data: SearchableMint[]) => (
-      <List
-        data={data}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        getItemType={getItemType}
-        extraData={selectedMints}
-        drawDistance={300}
-        // FlashList v2 enables maintainVisibleContentPosition by default (anchor
-        // sits before the ListHeaderComponent), which mis-anchors a short list
-        // with a tall spacer header and snaps on first scroll (flash-list#2050).
-        // Opt out so the JS spacer is the sole inset authority.
-        maintainVisibleContentPosition={{ disabled: true }}
-        contentInsetAdjustmentBehavior="never"
-        style={{ flex: 1, height: 0 }}
-        contentContainerClassName="pb-30"
-        ListHeaderComponent={listHeader}
-        // Skeleton data is non-empty, so the empty state can't flash mid-load.
-        ListEmptyComponent={isInitialLoading ? undefined : emptyComponent}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-      />
-    ),
-    [
-      renderItem,
-      keyExtractor,
-      getItemType,
-      selectedMints,
-      listHeader,
-      isInitialLoading,
-      emptyComponent,
-      handleScroll,
-    ]
+  const renderResultList = (data: SearchableMint[]) => (
+    <List
+      data={data}
+      renderItem={renderItem}
+      keyExtractor={keyExtractor}
+      getItemType={getItemType}
+      extraData={selectedMints}
+      drawDistance={300}
+      // FlashList v2 enables maintainVisibleContentPosition by default (anchor
+      // sits before the ListHeaderComponent), which mis-anchors a short list
+      // with a tall spacer header and snaps on first scroll (flash-list#2050).
+      // Opt out so the JS spacer is the sole inset authority.
+      maintainVisibleContentPosition={{ disabled: true }}
+      contentInsetAdjustmentBehavior="never"
+      style={{ flex: 1, height: 0 }}
+      contentContainerClassName="pb-30"
+      ListHeaderComponent={listHeader}
+      // Skeleton data is non-empty, so the empty state can't flash mid-load.
+      ListEmptyComponent={isInitialLoading ? undefined : emptyComponent}
+      onScroll={handleScroll}
+      scrollEventThrottle={16}
+    />
   );
 
   return (

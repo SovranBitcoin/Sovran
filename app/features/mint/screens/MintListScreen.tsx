@@ -8,7 +8,7 @@
  * The only local state is the selected currency tab.
  */
 
-import { memo, useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { List } from '@/shared/ui/composed/List';
 
@@ -76,6 +76,22 @@ function getMintDisabledReasonLabel(reason: MintListItem['reason']): string | nu
   return reason?.message ?? null;
 }
 
+function extractAvailableCurrencies(items: MintRow[]): string[] {
+  const units = new Set<string>();
+  for (const item of items) {
+    for (const unit of item.supportedUnits ?? []) {
+      units.add(unit.toUpperCase());
+    }
+  }
+  // Sat first, then the rest alphabetically — stable tab order.
+  const ordered = [...units].sort((a, b) =>
+    a === 'SAT' ? -1 : b === 'SAT' ? 1 : a.localeCompare(b)
+  );
+  return ['ALL', ...ordered];
+}
+
+const keyExtractor = (item: MintListItem) => item.mintUrl;
+
 // Same liquid-glass circle as the send/receive modal action rows (icon-only,
 // `tabler:dots` + `ellipsis` mirrors CircleActionRow's "More" button). The
 // liquid variant renders scroll-safe GlassView glass on supported devices and
@@ -94,7 +110,7 @@ function MintInspectButton({ mintUrl, onPress }: { mintUrl: string; onPress: () 
   );
 }
 
-export const MintListScreen = memo(function MintListScreen({
+export function MintListScreen({
   items,
   loading = false,
   isExecuting = false,
@@ -123,35 +139,23 @@ export const MintListScreen = memo(function MintListScreen({
   // denomination — every row carries the same value, which is why filtering
   // on it used to be a visible no-op. Fallback rows without supportedUnits
   // (pre-enrichment) contribute nothing here and pass every filter below.
-  const availableCurrencies = useMemo(() => {
-    const units = new Set<string>();
-    for (const item of items) {
-      for (const unit of item.supportedUnits ?? []) {
-        units.add(unit.toUpperCase());
-      }
-    }
-    // Sat first, then the rest alphabetically — stable tab order.
-    const ordered = [...units].sort((a, b) =>
-      a === 'SAT' ? -1 : b === 'SAT' ? 1 : a.localeCompare(b)
-    );
-    return ['ALL', ...ordered];
-  }, [items]);
+  const availableCurrencies = extractAvailableCurrencies(items);
 
   // Filter to mints that can issue the selected unit. Unknown supportedUnits
   // (fallback rows) always pass — never hide a mint on missing data.
-  const filteredItems = useMemo(() => {
-    if (selectedCurrency === 'ALL') return items;
-    return items.filter(
-      (item) =>
-        !item.supportedUnits ||
-        item.supportedUnits.some((unit) => unit.toUpperCase() === selectedCurrency)
-    );
-  }, [items, selectedCurrency]);
+  const filteredItems =
+    selectedCurrency === 'ALL'
+      ? items
+      : items.filter(
+          (item) =>
+            !item.supportedUnits ||
+            item.supportedUnits.some((unit) => unit.toUpperCase() === selectedCurrency)
+        );
 
-  const handleCurrencyChange = useCallback((currency: string) => {
+  const handleCurrencyChange = (currency: string) => {
     cashuLog.info('mint.list.currency.change', { currency });
     setSelectedCurrency(currency);
-  }, []);
+  };
 
   const {
     totalHeaderHeight,
@@ -183,143 +187,113 @@ export const MintListScreen = memo(function MintListScreen({
     }
   }, [availableCurrencies, selectedCurrency]);
 
-  const handleMintPress = useCallback(
-    (item: MintListItem) => {
-      if (isExecuting || item.status !== 'available') {
-        cashuLog.debug('mint.list.select.blocked', {
-          ...mintUrlLogFields(item.mintUrl),
-          isExecuting,
-          status: item.status,
-        });
-        return;
-      }
-      cashuLog.info('mint.list.select', { ...mintUrlLogFields(item.mintUrl), unit: item.unit });
-      onMintSelect(item);
-    },
-    [isExecuting, onMintSelect]
+  const handleMintPress = (item: MintListItem) => {
+    if (isExecuting || item.status !== 'available') {
+      cashuLog.debug('mint.list.select.blocked', {
+        ...mintUrlLogFields(item.mintUrl),
+        isExecuting,
+        status: item.status,
+      });
+      return;
+    }
+    cashuLog.info('mint.list.select', { ...mintUrlLogFields(item.mintUrl), unit: item.unit });
+    onMintSelect(item);
+  };
+
+  const emptyComponent = (
+    <Text style={{ color: withAlpha(foreground, 0.66), textAlign: 'center', marginTop: 20 }}>
+      {selectedCurrency === 'ALL'
+        ? 'No mints available'
+        : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
+    </Text>
   );
 
-  const emptyComponent = useMemo(
-    () => (
-      <Text style={{ color: withAlpha(foreground, 0.66), textAlign: 'center', marginTop: 20 }}>
-        {selectedCurrency === 'ALL'
-          ? 'No mints available'
-          : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
-      </Text>
-    ),
-    [selectedCurrency, foreground]
-  );
-  const keyExtractor = useCallback((item: MintListItem) => item.mintUrl, []);
-
-  const bottomButtons = useMemo(
-    () => (
-      <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            {
-              text: closeButtonLabel,
-              variant: 'secondary' as const,
-              onPress: async () => onClose(),
-            },
-          ]}
-        />
-      </BottomButtons>
-    ),
-    [closeButtonLabel, onClose]
+  const bottomButtons = (
+    <BottomButtons>
+      <ButtonHandler
+        buttons={[
+          {
+            text: closeButtonLabel,
+            variant: 'secondary' as const,
+            onPress: async () => onClose(),
+          },
+        ]}
+      />
+    </BottomButtons>
   );
 
-  const renderItem = useCallback(
-    ({ item }: { item: MintListItem }) => {
-      const inspectable = showDetailsButton && !!onInspectMint;
-      const trailing = inspectable ? (
-        <MintInspectButton mintUrl={item.mintUrl} onPress={() => onInspectMint!(item.mintUrl)} />
-      ) : null;
-      return (
-        <ContactRow
-          identity={mintIdentity(item)}
-          stats={MINT_ROW_STATS}
-          disabled={isExecuting || item.status !== 'available'}
-          disabledReason={getMintDisabledReasonLabel(item.reason) ?? undefined}
-          trailing={trailing}
-          trailingInteractive={inspectable}
-          trailingVariant={inspectable ? undefined : 'none'}
-          accentPosition="below"
-          // Stats roll in when cached values are replaced by fresh ones; the
-          // accent is keyed by mintUrl inside ContactRow against FlashList recycle.
-          animate
-          onPress={() => handleMintPress(item)}
-          testID={`contact-row:mint:${item.mintUrl}`}
-        />
-      );
-    },
-    [isExecuting, showDetailsButton, handleMintPress, onInspectMint]
-  );
+  const renderItem = ({ item }: { item: MintListItem }) => {
+    const inspectable = showDetailsButton && !!onInspectMint;
+    const trailing = inspectable ? (
+      <MintInspectButton mintUrl={item.mintUrl} onPress={() => onInspectMint!(item.mintUrl)} />
+    ) : null;
+    return (
+      <ContactRow
+        identity={mintIdentity(item)}
+        stats={MINT_ROW_STATS}
+        disabled={isExecuting || item.status !== 'available'}
+        disabledReason={getMintDisabledReasonLabel(item.reason) ?? undefined}
+        trailing={trailing}
+        trailingInteractive={inspectable}
+        trailingVariant={inspectable ? undefined : 'none'}
+        accentPosition="below"
+        // Stats roll in when cached values are replaced by fresh ones; the
+        // accent is keyed by mintUrl inside ContactRow against FlashList recycle.
+        animate
+        onPress={() => handleMintPress(item)}
+        testID={`contact-row:mint:${item.mintUrl}`}
+      />
+    );
+  };
 
   // Skeleton row through the SAME ContactRow path (pulsing avatar + title /
   // subtitle bars), so the crossfade to real rows shifts nothing.
-  const renderSkeletonItem = useCallback(
-    ({ item }: { item: MintListItem }) => (
-      <ContactRow
-        loading
-        identity={mintIdentity(item)}
-        accentPosition="below"
-        trailingVariant="none"
-        testID={`contact-row:mint-skeleton:${item.mintUrl}`}
-      />
-    ),
-    []
+  const renderSkeletonItem = ({ item }: { item: MintListItem }) => (
+    <ContactRow
+      loading
+      identity={mintIdentity(item)}
+      accentPosition="below"
+      trailingVariant="none"
+      testID={`contact-row:mint-skeleton:${item.mintUrl}`}
+    />
   );
 
   // Per-row branch: a cold row (no cache, not yet enriched) renders the skeleton
   // ContactRow; a cached/live row renders the real one. This is what guarantees
   // we never paint a bare url + bank-icon fallback — a row is either a skeleton
   // or carries a real cached/live name + icon.
-  const renderRow = useCallback(
-    ({ item }: { item: MintRow }) =>
-      item.metaState === 'cold' ? renderSkeletonItem({ item }) : renderItem({ item }),
-    [renderItem, renderSkeletonItem]
-  );
+  const renderRow = ({ item }: { item: MintRow }) =>
+    item.metaState === 'cold' ? renderSkeletonItem({ item }) : renderItem({ item });
 
   // The cohesive full-list shimmer wave shows only when EVERY row is cold (cold
   // first-ever open). A mixed/cached list renders real rows immediately and lets
   // the per-row branch skeleton just the cold ones.
   const showSkeleton = loading && filteredItems.length > 0;
 
-  const renderList = useCallback(
-    (data: MintRow[], skeleton: boolean) => (
-      <List
-        data={data}
-        renderItem={skeleton ? renderSkeletonItem : renderRow}
-        keyExtractor={keyExtractor}
-        extraData={isExecuting}
-        drawDistance={300}
-        // FlashList v2 enables maintainVisibleContentPosition by default and
-        // inserts its scroll anchor BEFORE the ListHeaderComponent, so with a
-        // tall spacer header and a short (non-screen-filling) list it mis-anchors
-        // the initial offset and snaps to the correct position on first scroll
-        // (Shopify/flash-list#2050). This list is a plain top-anchored list, so
-        // opt out. The JS spacer (header + max sticky-tab band) is then the sole
-        // inset authority; `never` keeps iOS from re-adjusting it natively.
-        maintainVisibleContentPosition={{ disabled: true }}
-        contentInsetAdjustmentBehavior="never"
-        style={{ flex: 1, height: 0 }}
-        contentContainerClassName="pt-3 pb-30"
-        ListHeaderComponent={listHeader}
-        // Skeleton data is non-empty, so the empty text can't flash mid-load.
-        ListEmptyComponent={skeleton ? undefined : emptyComponent}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-      />
-    ),
-    [
-      renderRow,
-      renderSkeletonItem,
-      keyExtractor,
-      isExecuting,
-      listHeader,
-      emptyComponent,
-      handleScroll,
-    ]
+  const renderList = (data: MintRow[], skeleton: boolean) => (
+    <List
+      data={data}
+      renderItem={skeleton ? renderSkeletonItem : renderRow}
+      keyExtractor={keyExtractor}
+      extraData={isExecuting}
+      drawDistance={300}
+      // FlashList v2 enables maintainVisibleContentPosition by default and
+      // inserts its scroll anchor BEFORE the ListHeaderComponent, so with a
+      // tall spacer header and a short (non-screen-filling) list it mis-anchors
+      // the initial offset and snaps to the correct position on first scroll
+      // (Shopify/flash-list#2050). This list is a plain top-anchored list, so
+      // opt out. The JS spacer (header + max sticky-tab band) is then the sole
+      // inset authority; `never` keeps iOS from re-adjusting it natively.
+      maintainVisibleContentPosition={{ disabled: true }}
+      contentInsetAdjustmentBehavior="never"
+      style={{ flex: 1, height: 0 }}
+      contentContainerClassName="pt-3 pb-30"
+      ListHeaderComponent={listHeader}
+      // Skeleton data is non-empty, so the empty text can't flash mid-load.
+      ListEmptyComponent={skeleton ? undefined : emptyComponent}
+      onScroll={handleScroll}
+      scrollEventThrottle={16}
+    />
   );
 
   return (
@@ -344,4 +318,4 @@ export const MintListScreen = memo(function MintListScreen({
       />
     </Screen>
   );
-});
+}

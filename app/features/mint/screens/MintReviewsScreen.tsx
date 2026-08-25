@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Animated from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -37,6 +37,17 @@ import {
 } from '@/shared/lib/logger';
 import { formatDate } from '@/shared/lib/date';
 
+/** Commented reviews first, each group newest-first. */
+function sortReviews(rawReviews: MintRecommendation[]): MintRecommendation[] {
+  const withContent = rawReviews.filter((r) => r.comment?.trim());
+  const withoutContent = rawReviews.filter((r) => !r.comment?.trim());
+  const byDate = (a: MintRecommendation, b: MintRecommendation) =>
+    (b.created_at ?? 0) - (a.created_at ?? 0);
+  return [...withContent.sort(byDate), ...withoutContent.sort(byDate)];
+}
+
+const keyExtractor = (item: MintRecommendation, index: number) => item.pubkey || `review-${index}`;
+
 const ParamsSchema = z.object({
   mintUrl: z
     .string()
@@ -45,13 +56,7 @@ const ParamsSchema = z.object({
     .regex(/^https?:\/\//, 'mintUrl must be http(s)'),
 });
 
-const StarRating = React.memo(function StarRating({
-  score,
-  size = 16,
-}: {
-  score: number;
-  size?: number;
-}) {
+function StarRating({ score, size = 16 }: { score: number; size?: number }) {
   const [defaultColor, warning] = useThemeColor(['default', 'yellow-300'] as const);
   const filledStars = Math.round(score);
 
@@ -67,15 +72,9 @@ const StarRating = React.memo(function StarRating({
       ))}
     </HStack>
   );
-});
+}
 
-const ReviewItem = React.memo(function ReviewItem({
-  review,
-  isLast,
-}: {
-  review: MintRecommendation;
-  isLast: boolean;
-}) {
+function ReviewItem({ review, isLast }: { review: MintRecommendation; isLast: boolean }) {
   const [foreground, surfaceSecondary] = useThemeColor([
     'foreground',
     'surface-secondary',
@@ -95,9 +94,9 @@ const ReviewItem = React.memo(function ReviewItem({
   const formattedDate = review.created_at
     ? formatDate(review.created_at * 1000, 'short-date')
     : null;
-  const handleAvatarPress = useCallback(() => {
+  const handleAvatarPress = () => {
     router.push(buildModalProfileHref({ pubkey: review.pubkey }));
-  }, [review.pubkey]);
+  };
 
   return (
     <View className="py-4">
@@ -156,13 +155,9 @@ const ReviewItem = React.memo(function ReviewItem({
       {!isLast && <View className="mt-4 h-px" style={{ backgroundColor: surfaceSecondary }} />}
     </View>
   );
-});
+}
 
-const ReviewSkeleton = React.memo(function ReviewSkeleton({
-  isLast = false,
-}: {
-  isLast?: boolean;
-}) {
+function ReviewSkeleton({ isLast = false }: { isLast?: boolean }) {
   const surfaceSecondary = useThemeColor('surface-secondary');
 
   return (
@@ -237,9 +232,9 @@ const ReviewSkeleton = React.memo(function ReviewSkeleton({
       {!isLast && <View className="mt-4 h-px" style={{ backgroundColor: surfaceSecondary }} />}
     </View>
   );
-});
+}
 
-const EmptyState = React.memo(function EmptyState() {
+function EmptyState() {
   const [foreground, yellow500] = useThemeColor(['foreground', 'yellow-500'] as const);
 
   return (
@@ -261,9 +256,9 @@ const EmptyState = React.memo(function EmptyState() {
       </Text>
     </VStack>
   );
-});
+}
 
-const HeaderStats = React.memo(function HeaderStats({
+function HeaderStats({
   score,
   totalReviews,
   loading,
@@ -329,7 +324,7 @@ const HeaderStats = React.memo(function HeaderStats({
       </VStack>
     </View>
   );
-});
+}
 
 export function MintReviewsScreen() {
   useLifecycleLogger('MintReviewsScreen');
@@ -410,35 +405,20 @@ export function MintReviewsScreen() {
   }, [mintUrl]);
 
   const isLoading = kymLoading;
-  const reviews = useMemo(() => {
-    const withContent = rawReviews.filter((r) => r.comment?.trim());
-    const withoutContent = rawReviews.filter((r) => !r.comment?.trim());
-    const byDate = (a: MintRecommendation, b: MintRecommendation) =>
-      (b.created_at ?? 0) - (a.created_at ?? 0);
-    return [...withContent.sort(byDate), ...withoutContent.sort(byDate)];
-  }, [rawReviews]);
+  const reviews = sortReviews(rawReviews);
   // Header count prefers the durable aggregate (survives a failed row fetch),
   // falling back to the freshly-fetched rows before the first aggregate lands.
   const totalReviews = aggregateCount ?? reviews.length;
 
-  const renderItem = useCallback(
-    ({ item, index }: { item: MintRecommendation; index: number }) => (
-      <ReviewItem review={item} isLast={!isLoading && index === reviews.length - 1} />
-    ),
-    [reviews.length, isLoading]
+  const renderItem = ({ item, index }: { item: MintRecommendation; index: number }) => (
+    <ReviewItem review={item} isLast={!isLoading && index === reviews.length - 1} />
   );
 
-  const keyExtractor = useCallback(
-    (item: MintRecommendation, index: number) => item.pubkey || `review-${index}`,
-    []
+  const ListHeader = (
+    <HeaderStats score={kymScore ?? null} totalReviews={totalReviews} loading={isLoading} />
   );
 
-  const ListHeader = useMemo(
-    () => <HeaderStats score={kymScore ?? null} totalReviews={totalReviews} loading={isLoading} />,
-    [kymScore, totalReviews, isLoading]
-  );
-
-  const ListFooter = useMemo(() => {
+  const ListFooter = (() => {
     if (!isLoading) return null;
     const skeletonCount = reviews.length > 0 ? 2 : 3;
     // Footer-only skeletons: the real reviews populate the list body, so there's
@@ -460,29 +440,25 @@ export function MintReviewsScreen() {
         renderContent={() => null}
       />
     );
-  }, [isLoading, reviews.length]);
+  })();
 
   const showEmptyState = !isLoading && totalReviews === 0;
 
   // We're in the list branch (a cached aggregate says reviews exist) but the
   // fresh row fetch returned nothing — distinguish "couldn't load" from the
   // genuine no-reviews EmptyState above, instead of a silent blank body.
-  const listEmpty = useMemo(
-    () =>
-      !isLoading ? (
-        <Text
-          size={14}
-          style={{
-            color: withAlpha(foreground, 0.4),
-            textAlign: 'center',
-            paddingHorizontal: 32,
-            marginTop: 24,
-          }}>
-          Couldn&apos;t load reviews right now. Reopen to try again.
-        </Text>
-      ) : null,
-    [isLoading, foreground]
-  );
+  const listEmpty = !isLoading ? (
+    <Text
+      size={14}
+      style={{
+        color: withAlpha(foreground, 0.4),
+        textAlign: 'center',
+        paddingHorizontal: 32,
+        marginTop: 24,
+      }}>
+      Couldn&apos;t load reviews right now. Reopen to try again.
+    </Text>
+  ) : null;
 
   return (
     <Log name="MintReviewsScreen" style={{ flex: 1, backgroundColor: background }}>

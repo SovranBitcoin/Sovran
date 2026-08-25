@@ -18,7 +18,7 @@
  * Route params: `clientPubkey` — the connected app's pubkey (64-hex).
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -165,6 +165,20 @@ const LOCKED_KEYS_BY_GROUP: Partial<Record<PermissionEditorGroup, readonly Grant
   wallet: ['sign_event:17375'],
 };
 
+// Top-level groups: capability bundles (one human concept per row) plus
+// the locked per-key rows (deletion / decrypt / wallet). Per-action
+// precision lives on the fine-grained page behind each group's link.
+// Pure function of module constants, so built once at module scope.
+const PERMISSION_GROUPS = GROUP_ORDER.map(({ group, label }) => {
+  const bundles = PERMISSION_BUNDLES.filter((bundle) => bundle.group === group);
+  const lockedRows = (LOCKED_KEYS_BY_GROUP[group] ?? []).map((grantKey) => ({
+    grantKey,
+    label: permissionEntryForGrantKey(grantKey).permissionEditorLabel,
+    allowEligible: alwaysAllowEligible(parseGrantKey(grantKey)),
+  }));
+  return { group, label, bundles, lockedRows };
+}).filter(({ bundles, lockedRows }) => bundles.length > 0 || lockedRows.length > 0);
+
 /**
  * Avatar + resolved name for a decrypt-access peer — kind-0 cache first,
  * one-shot nagg fallback (useNostrPersonDisplay), shortPubkey last.
@@ -219,9 +233,8 @@ function AppHeaderIdentity({
       { translateY: interpolate(progress.value, HEADER_FADE_PHASE, [6, 0], Extrapolation.CLAMP) },
     ],
   }));
-  const composed = useMemo(() => [HEADER_IDENTITY_ROW_STYLE, fadeStyle], [fadeStyle]);
   return (
-    <Animated.View style={composed}>
+    <Animated.View style={[HEADER_IDENTITY_ROW_STYLE, fadeStyle]}>
       <Avatar
         state={image ? 'image' : 'fallback'}
         picture={image}
@@ -298,11 +311,8 @@ export function SignerAppDetailScreen(): React.ReactElement {
   // header height instead of framing the whole screen below it.
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
-  const scrollContentStyle = useMemo(
-    () => ({ paddingTop: headerHeight, paddingBottom: 32 + insets.bottom }),
-    [headerHeight, insets.bottom]
-  );
-  const indicatorInsets = useMemo(() => ({ top: headerHeight }), [headerHeight]);
+  const scrollContentStyle = { paddingTop: headerHeight, paddingBottom: 32 + insets.bottom };
+  const indicatorInsets = { top: headerHeight };
 
   // ── Scroll-linked identity handoff (content ↔ header) ────────
   const flipProgress = useSharedValue(0);
@@ -322,10 +332,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
   const contentIdentityFade = useAnimatedStyle(() => ({
     opacity: interpolate(flipProgress.value, CONTENT_FADE_PHASE, [1, 0], Extrapolation.CLAMP),
   }));
-  const contentIdentityComposed = useMemo(
-    () => [CONTENT_IDENTITY_STYLE, contentIdentityFade],
-    [contentIdentityFade]
-  );
+  const contentIdentityComposed = [CONTENT_IDENTITY_STYLE, contentIdentityFade];
   const appImage = app?.image;
   useScreenOptions(
     () =>
@@ -344,48 +351,23 @@ export function SignerAppDetailScreen(): React.ReactElement {
     // flipProgress is a stable shared-value ref; app presence tracked via appImage/appName.
     [appName, appImage, clientPubkey, app === undefined]
   );
-  const dangerTextStyle = useMemo(() => ({ color: danger }), [danger]);
-
-  // Top-level groups: capability bundles (one human concept per row) plus
-  // the locked per-key rows (deletion / decrypt / wallet). Per-action
-  // precision lives on the fine-grained page behind each group's link.
-  const permissionGroups = useMemo(
-    () =>
-      GROUP_ORDER.map(({ group, label }) => {
-        const bundles = PERMISSION_BUNDLES.filter((bundle) => bundle.group === group);
-        const lockedRows = (LOCKED_KEYS_BY_GROUP[group] ?? []).map((grantKey) => ({
-          grantKey,
-          label: permissionEntryForGrantKey(grantKey).permissionEditorLabel,
-          allowEligible: alwaysAllowEligible(parseGrantKey(grantKey)),
-        }));
-        return { group, label, bundles, lockedRows };
-      }).filter(({ bundles, lockedRows }) => bundles.length > 0 || lockedRows.length > 0),
-    []
-  );
+  const dangerTextStyle = { color: danger };
 
   // ── Per-person decrypt access (persistent + this-session grants) ──
   const sessionGrants = useNip46RequestsStore((s) => s.sessionGrants);
-  const appSessionGrants = useMemo(
-    () =>
-      clientPubkey === undefined
-        ? []
-        : sessionGrants.filter((g) => g.clientPubkey === clientPubkey),
-    [sessionGrants, clientPubkey]
-  );
+  const appSessionGrants =
+    clientPubkey === undefined ? [] : sessionGrants.filter((g) => g.clientPubkey === clientPubkey);
   // Session labels are suppressed in strict mode: evaluate() returns 'ask'
   // BEFORE consulting session state there (same reason the approval sheet
   // hides session affordances on strict apps), so the persisted labels are
   // the truthful ones.
   const sessionAllows = useNip46RequestsStore((s) => s.sessionAllows);
-  const appSessionAllows = useMemo(
-    () =>
-      clientPubkey === undefined
-        ? []
-        : sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey),
-    [sessionAllows, clientPubkey]
-  );
+  const appSessionAllows =
+    clientPubkey === undefined
+      ? []
+      : sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey);
 
-  const decryptAccessRows = useMemo(() => {
+  const decryptAccessRows = (() => {
     const rows = new Map<string, { peer: string; sublabel: string; session: boolean }>();
     for (const [peer, grant] of Object.entries(app?.peerDecryptGrants ?? {})) {
       rows.set(peer, {
@@ -412,27 +394,21 @@ export function SignerAppDetailScreen(): React.ReactElement {
       });
     }
     return [...rows.values()].sort((a, b) => a.peer.localeCompare(b.peer));
-  }, [app?.peerDecryptGrants, appSessionGrants]);
+  })();
 
-  const openPerson = useCallback(
-    (peer: string) => {
-      if (clientPubkey === undefined) return;
-      router.push(`/(signer-flow)/app-person?clientPubkey=${clientPubkey}&peer=${peer}` as never);
-    },
-    [clientPubkey]
-  );
+  const openPerson = (peer: string) => {
+    if (clientPubkey === undefined) return;
+    router.push(`/(signer-flow)/app-person?clientPubkey=${clientPubkey}&peer=${peer}` as never);
+  };
 
   // Master switch over the whole people list — confirmed before applying,
   // because the change cascades to everyone below.
   const everyoneAllowed =
     decryptAccessRows.length > 0 &&
     decryptAccessRows.every((row) => app?.peerDecryptGrants[row.peer] !== undefined);
-  const everyoneA11yValue = useMemo(
-    () => ({ text: everyoneAllowed ? 'Always' : 'Ask' }),
-    [everyoneAllowed]
-  );
+  const everyoneA11yValue = { text: everyoneAllowed ? 'Always' : 'Ask' };
 
-  const onToggleEveryone = useCallback(() => {
+  const onToggleEveryone = () => {
     if (clientPubkey === undefined) return;
     const peers = decryptAccessRows.map((row) => row.peer);
     const count = peers.length;
@@ -514,20 +490,11 @@ export function SignerAppDetailScreen(): React.ReactElement {
         { text: 'Cancel', variant: 'secondary', onPress: (close) => close() },
       ],
     });
-  }, [
-    clientPubkey,
-    decryptAccessRows,
-    everyoneAllowed,
-    appName,
-    app?.peerDecryptGrants,
-    setPeerDecryptGrant,
-    revokePeerDecryptGrant,
-    revokeSessionGrant,
-  ]);
+  };
 
   // Back to the SAME defaults the connect sheet applies: clear everything,
   // then re-grant the common-social-actions preset.
-  const confirmRestoreDefaults = useCallback(() => {
+  const confirmRestoreDefaults = () => {
     if (clientPubkey === undefined || app === undefined) return;
     actionMenuPopup({
       title: 'Restore default permissions?',
@@ -553,17 +520,17 @@ export function SignerAppDetailScreen(): React.ReactElement {
         { text: 'Cancel', variant: 'secondary', onPress: (close) => close() },
       ],
     });
-  }, [clientPubkey, app, setGrant]);
+  };
 
   const strictModeOn = app?.mode === 'strict';
   // The whole row toggles (same affordance as the permission rows below) —
   // the switch itself is a pure visual inside a pointerEvents="none" wrapper.
-  const onPressStrictRow = useCallback(() => {
+  const onPressStrictRow = () => {
     if (clientPubkey === undefined) return;
     setMode(clientPubkey, strictModeOn ? 'standard' : 'strict');
-  }, [clientPubkey, setMode, strictModeOn]);
-  const strictA11yState = useMemo(() => ({ checked: strictModeOn }), [strictModeOn]);
-  const openStrictMenu = useCallback(() => {
+  };
+  const strictA11yState = { checked: strictModeOn };
+  const openStrictMenu = () => {
     if (clientPubkey === undefined) return;
     const checkSuffix = <Icon name="mdi:check" size={18} color={muted} />;
     actionMenuPopup({
@@ -592,51 +559,42 @@ export function SignerAppDetailScreen(): React.ReactElement {
         },
       ],
     });
-  }, [clientPubkey, muted, setMode, strictModeOn]);
+  };
 
-  const onSelectTriState = useCallback(
-    (grantKey: GrantKey, state: TriState) => {
-      if (clientPubkey === undefined) return;
-      const verdict = state === 'ask' ? null : state === 'allow' ? 'always' : 'deny';
-      const result = setGrant(clientPubkey, grantKey, verdict);
-      if (result.isErr()) {
-        nostrLog.warn('nostr.signer.app_detail.set_grant_failed', { error: result.error });
-      }
-    },
-    [clientPubkey, setGrant]
-  );
+  const onSelectTriState = (grantKey: GrantKey, state: TriState) => {
+    if (clientPubkey === undefined) return;
+    const verdict = state === 'ask' ? null : state === 'allow' ? 'always' : 'deny';
+    const result = setGrant(clientPubkey, grantKey, verdict);
+    if (result.isErr()) {
+      nostrLog.warn('nostr.signer.app_detail.set_grant_failed', { error: result.error });
+    }
+  };
 
   // One tap covers the whole bundle; a mixed bundle self-heals to the choice.
-  const onSelectBundleState = useCallback(
-    (bundle: PermissionBundle, state: TriState) => {
-      if (clientPubkey === undefined) return;
-      const verdict = state === 'ask' ? null : state === 'allow' ? 'always' : 'deny';
-      let failed = 0;
-      for (const grantKey of bundle.grantKeys) {
-        const result = setGrant(clientPubkey, grantKey, verdict);
-        if (result.isErr()) failed += 1;
-      }
-      if (failed > 0) {
-        nostrLog.warn('nostr.signer.app_detail.bundle_set_grant_failed', {
-          bundleId: bundle.id,
-          failed,
-        });
-      }
-    },
-    [clientPubkey, setGrant]
-  );
+  const onSelectBundleState = (bundle: PermissionBundle, state: TriState) => {
+    if (clientPubkey === undefined) return;
+    const verdict = state === 'ask' ? null : state === 'allow' ? 'always' : 'deny';
+    let failed = 0;
+    for (const grantKey of bundle.grantKeys) {
+      const result = setGrant(clientPubkey, grantKey, verdict);
+      if (result.isErr()) failed += 1;
+    }
+    if (failed > 0) {
+      nostrLog.warn('nostr.signer.app_detail.bundle_set_grant_failed', {
+        bundleId: bundle.id,
+        failed,
+      });
+    }
+  };
 
-  const openFineGrained = useCallback(
-    (group: PermissionEditorGroup) => {
-      if (clientPubkey === undefined) return;
-      router.push(
-        `/(signer-flow)/app-permissions?clientPubkey=${clientPubkey}&group=${group}` as never
-      );
-    },
-    [clientPubkey]
-  );
+  const openFineGrained = (group: PermissionEditorGroup) => {
+    if (clientPubkey === undefined) return;
+    router.push(
+      `/(signer-flow)/app-permissions?clientPubkey=${clientPubkey}&group=${group}` as never
+    );
+  };
 
-  const openRename = useCallback(() => {
+  const openRename = () => {
     if (clientPubkey === undefined) return;
     actionMenuPopup({
       title: 'Rename App',
@@ -658,14 +616,14 @@ export function SignerAppDetailScreen(): React.ReactElement {
         },
       },
     });
-  }, [app?.name, appName, clientPubkey, renameApp]);
+  };
 
-  const openActivity = useCallback(() => {
+  const openActivity = () => {
     if (clientPubkey === undefined) return;
     router.push(`/(signer-flow)/activity?clientPubkey=${clientPubkey}` as never);
-  }, [clientPubkey]);
+  };
 
-  const confirmDisconnect = useCallback(() => {
+  const confirmDisconnect = () => {
     if (clientPubkey === undefined) return;
     const nameAtConfirm = appName;
     actionMenuPopup({
@@ -698,7 +656,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
         { text: 'Cancel', variant: 'secondary', onPress: (close) => close() },
       ],
     });
-  }, [appName, clientPubkey, disconnectApp, revokeSessionGrant, revokeSessionAllows]);
+  };
 
   // Unknown pubkey, or the app was just disconnected — transient empty frame.
   if (clientPubkey === undefined || app === undefined) {
@@ -803,7 +761,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
         {/* Permissions — group headers carry the structure, no extra title */}
         <View className="pt-2">
           <VStack gap={8}>
-            {permissionGroups.map(({ group, label, bundles, lockedRows }) => (
+            {PERMISSION_GROUPS.map(({ group, label, bundles, lockedRows }) => (
               <View key={group}>
                 <Text
                   className="text-foreground/50 mb-1 ml-3 mt-1 uppercase tracking-wide"
