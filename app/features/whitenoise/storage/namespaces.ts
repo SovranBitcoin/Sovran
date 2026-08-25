@@ -5,16 +5,18 @@
  * iterates `Object.values(WhitenoiseNamespace)` so a new entry below is
  * automatically covered.
  */
-export enum WhitenoiseNamespace {
-  GroupState = 'group-state',
-  KeyPackage = 'key-package',
-  InviteReceived = 'invite-received',
-  InviteUnread = 'invite-unread',
-  InviteSeen = 'invite-seen',
-  InboxCursor = 'inbox-cursor',
-  History = 'history',
-  DmIndex = 'dm-index',
-}
+export const WhitenoiseNamespace = {
+  GroupState: 'group-state',
+  KeyPackage: 'key-package',
+  InviteReceived: 'invite-received',
+  InviteUnread: 'invite-unread',
+  InviteSeen: 'invite-seen',
+  InboxCursor: 'inbox-cursor',
+  History: 'history',
+  DmIndex: 'dm-index',
+} as const;
+
+export type WhitenoiseNamespace = (typeof WhitenoiseNamespace)[keyof typeof WhitenoiseNamespace];
 
 /**
  * Build the AsyncStorage prefix shared by every key in a given namespace.

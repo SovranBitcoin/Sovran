@@ -527,10 +527,7 @@ export async function migrateLegacyMintCaches(): Promise<void> {
   }
   let pairs: [string, string | null][];
   try {
-    pairs = (await AsyncStorage.multiGet(LEGACY_KEYS as unknown as string[])) as [
-      string,
-      string | null,
-    ][];
+    pairs = (await AsyncStorage.multiGet([...LEGACY_KEYS])) as [string, string | null][];
   } catch (err) {
     storeLog.warn('store.mint_metadata.migrate.read_failed', {
       error: err instanceof Error ? err : new Error(String(err)),
@@ -593,7 +590,7 @@ export async function migrateLegacyMintCaches(): Promise<void> {
   storeLog.info('store.mint_metadata.migrate.done', { mints: count });
 
   try {
-    await AsyncStorage.multiRemove(LEGACY_KEYS as unknown as string[]);
+    await AsyncStorage.multiRemove([...LEGACY_KEYS]);
   } catch (err) {
     storeLog.warn('store.mint_metadata.migrate.cleanup_failed', {
       error: err instanceof Error ? err : new Error(String(err)),

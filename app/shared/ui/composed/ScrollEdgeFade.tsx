@@ -157,8 +157,8 @@ export function ScrollEdgeFade({
           style={StyleSheet.absoluteFill}
           maskElement={
             <LinearGradient
-              colors={maskColors as unknown as readonly [string, string, ...string[]]}
-              locations={maskLocations as unknown as readonly [number, number, ...number[]]}
+              colors={maskColors}
+              locations={maskLocations}
               style={StyleSheet.absoluteFill}
             />
           }>

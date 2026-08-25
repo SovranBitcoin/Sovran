@@ -131,8 +131,8 @@ export function BottomButtons({
                 style={StyleSheet.absoluteFill}
                 maskElement={
                   <LinearGradient
-                    colors={MASK_COLORS as unknown as readonly [string, string, ...string[]]}
-                    locations={MASK_LOCATIONS as unknown as readonly [number, number, ...number[]]}
+                    colors={MASK_COLORS}
+                    locations={MASK_LOCATIONS}
                     style={StyleSheet.absoluteFill}
                   />
                 }>
