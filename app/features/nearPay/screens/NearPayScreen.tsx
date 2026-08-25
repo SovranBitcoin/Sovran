@@ -1102,6 +1102,22 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
 
   const targetCount = targets.length;
 
+  // Spring-completion callback shared by every pan settle (both axes, focus
+  // reset and gesture release): counts the two-axis settle down and releases
+  // the pan locks once the last axis lands.
+  const panSettleFinished = useCallback(
+    (finished?: boolean) => {
+      'worklet';
+      if (!finished) return;
+      const remaining = panSettleRemaining.get() - 1;
+      panSettleRemaining.set(remaining);
+      if (remaining > 0) return;
+      isPanSettling.set(false);
+      isPanning.set(false);
+    },
+    [isPanSettling, isPanning, panSettleRemaining]
+  );
+
   const handleFocus = useCallback(() => {
     paymentLog.debug('near_pay.perf.focus_start', {
       targetCount,
@@ -1117,26 +1133,8 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     panSettleRemaining.set(2);
     cancelAnimation(panX);
     cancelAnimation(panY);
-    panX.set(
-      withSpring(0, PEER_PAN_SETTLE_SPRING, (finished) => {
-        if (!finished) return;
-        const remaining = panSettleRemaining.get() - 1;
-        panSettleRemaining.set(remaining);
-        if (remaining > 0) return;
-        isPanSettling.set(false);
-        isPanning.set(false);
-      })
-    );
-    panY.set(
-      withSpring(0, PEER_PAN_SETTLE_SPRING, (finished) => {
-        if (!finished) return;
-        const remaining = panSettleRemaining.get() - 1;
-        panSettleRemaining.set(remaining);
-        if (remaining > 0) return;
-        isPanSettling.set(false);
-        isPanning.set(false);
-      })
-    );
+    panX.set(withSpring(0, PEER_PAN_SETTLE_SPRING, panSettleFinished));
+    panY.set(withSpring(0, PEER_PAN_SETTLE_SPRING, panSettleFinished));
   }, [
     isPanSettling,
     isPanning,
@@ -1144,6 +1142,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     panBounds.maxY,
     panBounds.minX,
     panBounds.minY,
+    panSettleFinished,
     panSettleRemaining,
     panX,
     panY,
@@ -1321,35 +1320,15 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
           panX.set(
             withSpring(
               finalX,
-              {
-                ...PEER_PAN_SETTLE_SPRING,
-                velocity: event.velocityX,
-              },
-              (finished) => {
-                if (!finished) return;
-                const remaining = panSettleRemaining.get() - 1;
-                panSettleRemaining.set(remaining);
-                if (remaining > 0) return;
-                isPanSettling.set(false);
-                isPanning.set(false);
-              }
+              { ...PEER_PAN_SETTLE_SPRING, velocity: event.velocityX },
+              panSettleFinished
             )
           );
           panY.set(
             withSpring(
               finalY,
-              {
-                ...PEER_PAN_SETTLE_SPRING,
-                velocity: event.velocityY,
-              },
-              (finished) => {
-                if (!finished) return;
-                const remaining = panSettleRemaining.get() - 1;
-                panSettleRemaining.set(remaining);
-                if (remaining > 0) return;
-                isPanSettling.set(false);
-                isPanning.set(false);
-              }
+              { ...PEER_PAN_SETTLE_SPRING, velocity: event.velocityY },
+              panSettleFinished
             )
           );
         })
@@ -1366,6 +1345,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
       maxPanY,
       minPanX,
       minPanY,
+      panSettleFinished,
       panSettleRemaining,
       panStartX,
       panStartY,

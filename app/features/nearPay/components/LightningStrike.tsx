@@ -132,6 +132,18 @@ function ambientFlicker(peak: number) {
   );
 }
 
+/** Endless rim breathing loop both the strike and idle entrances settle into. */
+function rimAmbientLoop() {
+  return withRepeat(
+    withSequence(
+      withTiming(op(0.45), { duration: 750, easing: Easing.inOut(Easing.quad) }),
+      withTiming(op(0.25), { duration: 750, easing: Easing.inOut(Easing.quad) })
+    ),
+    -1,
+    false
+  );
+}
+
 export function LightningStrike({
   status,
   entrance,
@@ -230,32 +242,13 @@ export function LightningStrike({
           withSequence(
             withTiming(op(0.9), { duration: 60 }),
             withTiming(op(0.35), { duration: 240 }),
-            withRepeat(
-              withSequence(
-                withTiming(op(0.45), { duration: 750, easing: Easing.inOut(Easing.quad) }),
-                withTiming(op(0.25), { duration: 750, easing: Easing.inOut(Easing.quad) })
-              ),
-              -1,
-              false
-            )
+            rimAmbientLoop()
           )
         );
       } else {
         haloOpacity.set(withTiming(op(0.3), { duration: 300 }));
         pulseScale.set(1);
-        rimOpacity.set(
-          withSequence(
-            withTiming(op(0.35), { duration: 300 }),
-            withRepeat(
-              withSequence(
-                withTiming(op(0.45), { duration: 750, easing: Easing.inOut(Easing.quad) }),
-                withTiming(op(0.25), { duration: 750, easing: Easing.inOut(Easing.quad) })
-              ),
-              -1,
-              false
-            )
-          )
-        );
+        rimOpacity.set(withSequence(withTiming(op(0.35), { duration: 300 }), rimAmbientLoop()));
       }
 
       boltOpacities.forEach((boltOpacity, index) => {

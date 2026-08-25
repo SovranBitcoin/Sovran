@@ -12,8 +12,8 @@
 import type { NfcIOAdapter } from 'wallet';
 
 import { NfcError } from './errors';
-import { SELECT_AID, SELECT_NDEF, readBinary, MAX_CHUNK_SIZE } from './constants';
-import { sendApdu, getStatusMessage } from './apdu';
+import { SELECT_NDEF, readBinary, MAX_CHUNK_SIZE } from './constants';
+import { sendApdu, getStatusMessage, selectNdefApp } from './apdu';
 import { decodeTextRecord } from './ndef';
 import { isNfcSupported, isNfcEnabled } from './status';
 import { writeNdefTextRecord } from './write';
@@ -35,25 +35,9 @@ export function createNfcAdapter(): NfcIOAdapter {
       await acquireSession();
 
       try {
-        let r = await sendApdu(SELECT_AID, 'SELECT AID');
-        if (!r.ok) {
-          throw new NfcError(
-            `AID not accepted by tag (${getStatusMessage(r.sw)})`,
-            'AID_SELECT_FAILED',
-            r.sw
-          );
-        }
+        await selectNdefApp();
 
-        r = await sendApdu(SELECT_NDEF, 'SELECT NDEF');
-        if (!r.ok) {
-          throw new NfcError(
-            `NDEF file not accessible (${getStatusMessage(r.sw)})`,
-            'NDEF_SELECT_FAILED',
-            r.sw
-          );
-        }
-
-        r = await sendApdu(readBinary(0, 2), 'READ NLEN');
+        let r = await sendApdu(readBinary(0, 2), 'READ NLEN');
         if (!r.ok) {
           throw new NfcError(
             `Failed reading NLEN (${getStatusMessage(r.sw)})`,

@@ -5,7 +5,7 @@
 import { bytesToHex } from '@noble/hashes/utils.js';
 import NfcManager from 'react-native-nfc-manager';
 import { NfcError } from './errors';
-import { STATUS_CODES, STATUS_OK } from './constants';
+import { SELECT_AID, SELECT_NDEF, STATUS_CODES, STATUS_OK } from './constants';
 import { nfcLog } from '../logger';
 
 interface ApduResponse {
@@ -55,6 +55,31 @@ export async function sendApdu(command: number[], label?: string): Promise<ApduR
     const errorStr = (error instanceof Error ? error.message : String(error)) || 'Unknown error';
     nfcLog.error('nfc.apdu.transceive_failed', { error: errorStr });
     throw mapTransceiveError(errorStr);
+  }
+}
+
+/**
+ * The Type 4 Tag open ceremony shared by the reader and writer: SELECT the
+ * NDEF application (AID), then SELECT its NDEF file. Throws a typed NfcError
+ * naming the step that failed.
+ */
+export async function selectNdefApp(): Promise<void> {
+  let r = await sendApdu(SELECT_AID, 'SELECT AID');
+  if (!r.ok) {
+    throw new NfcError(
+      `AID not accepted by tag (${getStatusMessage(r.sw)})`,
+      'AID_SELECT_FAILED',
+      r.sw
+    );
+  }
+
+  r = await sendApdu(SELECT_NDEF, 'SELECT NDEF');
+  if (!r.ok) {
+    throw new NfcError(
+      `NDEF file not accessible (${getStatusMessage(r.sw)})`,
+      'NDEF_SELECT_FAILED',
+      r.sw
+    );
   }
 }
 

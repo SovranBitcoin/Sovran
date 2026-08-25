@@ -9,24 +9,19 @@
  */
 
 import { memo, useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { useSharedValue } from 'react-native-reanimated';
-import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
 import { List } from '@/shared/ui/composed/List';
 
 import type { MintListItem } from 'wallet';
 import type { MintRow } from '@/features/mint/hooks/useMintRowsWithCache';
 
-import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { withAlpha } from '@/shared/lib/color';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
-import {
-  MintCurrencyTabs,
-  MINT_CURRENCY_TABS_HEIGHT,
-} from '@/features/mint/components/MintCurrencyTabs';
+import { MINT_CURRENCY_TABS_HEIGHT } from '@/features/mint/components/MintCurrencyTabs';
+import { useStickyCurrencyTabs } from '@/features/mint/hooks/useStickyCurrencyTabs';
 import { useShiftLogger } from '@/shared/lib/contentShiftLog';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -112,17 +107,7 @@ export const MintListScreen = memo(function MintListScreen({
   useLifecycleLogger('MintListScreen', cashuLog);
 
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
-  const scrollY = useSharedValue(0);
-  const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
   const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
-
-  // Content-shift telemetry: with the currency-tab strip pinned to a fixed
-  // height, the reserved header height should settle on the first measure and
-  // never produce a follow-up delta. A non-null delta here = a shift regressed.
-  const shift = useShiftLogger('MintListScreen');
-  useEffect(() => {
-    shift.report('mint.list.header.shift', 'totalHeaderHeight', totalHeaderHeight);
-  }, [totalHeaderHeight, shift]);
 
   const prevRenderKey = useRef('');
   const renderKey = `${items.length}:${isExecuting}`;
@@ -168,6 +153,26 @@ export const MintListScreen = memo(function MintListScreen({
     setSelectedCurrency(currency);
   }, []);
 
+  const {
+    totalHeaderHeight,
+    setTotalHeaderHeight,
+    handleScroll,
+    currencyTabs,
+    headerSpacer: listHeader,
+  } = useStickyCurrencyTabs({
+    currencies: availableCurrencies,
+    selectedCurrency,
+    onCurrencyChange: handleCurrencyChange,
+  });
+
+  // Content-shift telemetry: with the currency-tab strip pinned to a fixed
+  // height, the reserved header height should settle on the first measure and
+  // never produce a follow-up delta. A non-null delta here = a shift regressed.
+  const shift = useShiftLogger('MintListScreen');
+  useEffect(() => {
+    shift.report('mint.list.header.shift', 'totalHeaderHeight', totalHeaderHeight);
+  }, [totalHeaderHeight, shift]);
+
   // Enrichment can shrink the tab set (e.g. an advertised-but-keyless unit
   // disappears); never leave the filter pointing at a tab that no longer
   // exists.
@@ -192,32 +197,6 @@ export const MintListScreen = memo(function MintListScreen({
       onMintSelect(item);
     },
     [isExecuting, onMintSelect]
-  );
-
-  const handleScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      scrollY.value = Math.max(0, event.nativeEvent.contentOffset.y);
-    },
-    [scrollY]
-  );
-
-  const currencyTabs = useMemo(
-    () => (
-      <MintCurrencyTabs
-        currencies={availableCurrencies}
-        selectedCurrency={selectedCurrency}
-        onCurrencyChange={handleCurrencyChange}
-        scrollY={scrollY}
-      />
-    ),
-    [availableCurrencies, selectedCurrency, handleCurrencyChange, scrollY]
-  );
-
-  // Reserves the full header height (nav + sticky tabs). The wrapper now derives
-  // that from a frame-0-stable value on iOS, so this spacer no longer reflows.
-  const listHeader = useMemo(
-    () => <View style={{ height: totalHeaderHeight }} />,
-    [totalHeaderHeight]
   );
 
   const emptyComponent = useMemo(

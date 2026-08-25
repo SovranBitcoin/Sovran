@@ -112,6 +112,58 @@ function useOverlayZapPress(post: ImageOverlayPost, onRequestClose?: () => void)
 // over the sheet's `surface` background.
 const PANEL_TEXT = 'rgba(255,255,255,0.95)';
 const PANEL_TEXT_MUTED = 'rgba(255,255,255,0.6)';
+
+/**
+ * Pfp + name + timestamp row that pushes the author's profile — shared by the
+ * sheet panel (theme colors, 32pt pfp) and the absolute bar (fixed panel
+ * colors, 28pt pfp).
+ */
+function OverlayAuthorRow({
+  event,
+  profile,
+  avatarSize,
+  nameSize,
+  timeSize,
+  nameColor,
+  timeColor,
+}: {
+  event: ImageOverlayPost['event'];
+  profile: ImageOverlayPost['profile'];
+  avatarSize: number;
+  nameSize: number;
+  timeSize: number;
+  nameColor: string;
+  timeColor: string;
+}) {
+  const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
+  const shortTime = formatRelative(event.created_at * 1000, 'compact');
+  return (
+    <Pressable
+      onPress={() => {
+        router.push({
+          pathname: '/(user-flow)/profile',
+          params: { pubkey: event.pubkey },
+        });
+      }}
+      style={styles.authorRow}>
+      <Avatar
+        state={profile?.picture ? 'image' : 'fallback'}
+        picture={profile?.picture}
+        seed={event.pubkey}
+        size={avatarSize}
+        name={displayName}
+      />
+      <View style={styles.authorTextWrap}>
+        <Text bold size={nameSize} style={{ color: nameColor }} numberOfLines={1}>
+          {displayName}
+        </Text>
+        <Text size={timeSize} style={{ color: timeColor }}>
+          {shortTime}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
 const LIKED_COLOR = '#ff5a7a';
 
 const PANEL_CONTENT_TRUNCATE_LIMIT = 120;
@@ -371,8 +423,6 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
     }
   }, [initialContentExpanded, onConsumedExpand]);
   const { event, metrics, profile, replied } = post;
-  const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
-  const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
 
   const { blocks, showInlineImages, textContent } = useMemo(() => {
@@ -416,30 +466,15 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
     <Log name="ImageOverlayBottomPanelContent">
       <View style={styles.wrap}>
         {/* Author row */}
-        <Pressable
-          onPress={() => {
-            router.push({
-              pathname: '/(user-flow)/profile',
-              params: { pubkey: event.pubkey },
-            });
-          }}
-          style={styles.authorRow}>
-          <Avatar
-            state={profile?.picture ? 'image' : 'fallback'}
-            picture={profile?.picture}
-            seed={event.pubkey}
-            size={32}
-            name={displayName}
-          />
-          <View style={styles.authorTextWrap}>
-            <Text bold size={14} style={{ color: foreground }} numberOfLines={1}>
-              {displayName}
-            </Text>
-            <Text size={13} style={{ color: muted }}>
-              {shortTime}
-            </Text>
-          </View>
-        </Pressable>
+        <OverlayAuthorRow
+          event={event}
+          profile={profile}
+          avatarSize={32}
+          nameSize={14}
+          timeSize={13}
+          nameColor={foreground}
+          timeColor={muted}
+        />
         {/* Post content with inline image blocks only when captioned (text between images); otherwise text only */}
         {hasContent ? (
           <View>
@@ -510,8 +545,6 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
 }) {
   const repliedColor = COMMENT_ACCENT;
   const { event, metrics, profile, replied } = post;
-  const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
-  const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
   const textContent = useMemo(() => extractPanelText(fullContent), [fullContent]);
   const contentPreview = textContent.slice(0, 120);
@@ -528,30 +561,15 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
   return (
     <Log name="ImageOverlayAbsoluteBar">
       <View style={[styles.wrap, absoluteBarStyles.bar]}>
-        <Pressable
-          onPress={() => {
-            router.push({
-              pathname: '/(user-flow)/profile',
-              params: { pubkey: event.pubkey },
-            });
-          }}
-          style={styles.authorRow}>
-          <Avatar
-            state={profile?.picture ? 'image' : 'fallback'}
-            picture={profile?.picture}
-            seed={event.pubkey}
-            size={28}
-            name={displayName}
-          />
-          <View style={styles.authorTextWrap}>
-            <Text bold size={13} style={{ color: PANEL_TEXT }} numberOfLines={1}>
-              {displayName}
-            </Text>
-            <Text size={12} style={{ color: PANEL_TEXT_MUTED }}>
-              {shortTime}
-            </Text>
-          </View>
-        </Pressable>
+        <OverlayAuthorRow
+          event={event}
+          profile={profile}
+          avatarSize={28}
+          nameSize={13}
+          timeSize={12}
+          nameColor={PANEL_TEXT}
+          timeColor={PANEL_TEXT_MUTED}
+        />
         {textContent.length > 0 ? (
           <View style={absoluteBarStyles.contentRow}>
             <Text

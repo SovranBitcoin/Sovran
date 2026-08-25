@@ -1,12 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, memo } from 'react';
-import {
-  Platform,
-  TextInput,
-  useWindowDimensions,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
-import { useSharedValue } from 'react-native-reanimated';
+import { Platform, TextInput, useWindowDimensions } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -37,10 +30,8 @@ import { List } from '@/shared/ui/composed/List';
 import { SkeletonContentCrossfade } from '@/shared/ui/composed/SkeletonContentCrossfade';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { LoadingIndicator } from '@/shared/blocks/status';
-import {
-  MintCurrencyTabs,
-  MINT_CURRENCY_TABS_HEIGHT,
-} from '@/features/mint/components/MintCurrencyTabs';
+import { MINT_CURRENCY_TABS_HEIGHT } from '@/features/mint/components/MintCurrencyTabs';
+import { useStickyCurrencyTabs } from '@/features/mint/hooks/useStickyCurrencyTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { withAlpha } from '@/shared/lib/color';
@@ -319,12 +310,6 @@ export function MintAddScreen() {
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const { width: windowWidth } = useWindowDimensions();
   const searchBarWidth = getHeaderTitleWidthFromWidth(windowWidth);
-
-  // Scroll tracking for animated currency tabs
-  const scrollY = useSharedValue(0);
-
-  // Track header height from Screen
-  const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
 
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
   const [isAdding, setIsAdding] = useState(false);
@@ -606,13 +591,6 @@ export function MintAddScreen() {
     }
   }, [selectedMints, isAdding]);
 
-  const handleScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      scrollY.value = Math.max(0, event.nativeEvent.contentOffset.y);
-    },
-    [scrollY]
-  );
-
   const keyExtractor = useCallback((item: SearchableMint) => item.url, []);
 
   // Feed the result List skeleton placeholders during the first search so the
@@ -744,17 +722,16 @@ export function MintAddScreen() {
 
   // ── Sticky content & bottom ────────────────────────────────────────────
 
-  const currencyTabs = useMemo(
-    () => (
-      <MintCurrencyTabs
-        currencies={availableCurrencies}
-        selectedCurrency={selectedCurrency}
-        onCurrencyChange={setSelectedCurrency}
-        scrollY={scrollY}
-      />
-    ),
-    [availableCurrencies, selectedCurrency, setSelectedCurrency, scrollY]
-  );
+  const {
+    setTotalHeaderHeight,
+    handleScroll,
+    currencyTabs,
+    headerSpacer: listHeader,
+  } = useStickyCurrencyTabs({
+    currencies: availableCurrencies,
+    selectedCurrency,
+    onCurrencyChange: setSelectedCurrency,
+  });
 
   const bottomButtons = useMemo(
     () => (
@@ -779,13 +756,6 @@ export function MintAddScreen() {
       </BottomButtons>
     ),
     [isAdding, selectedMints.size, handleSave]
-  );
-
-  // Reserves the full header height; the wrapper derives it from a frame-0-stable
-  // value on iOS, so this spacer no longer reflows on a late header settle.
-  const listHeader = useMemo(
-    () => <View style={{ height: totalHeaderHeight }} />,
-    [totalHeaderHeight]
   );
 
   const emptyComponent = useMemo(

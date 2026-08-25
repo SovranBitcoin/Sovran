@@ -1,11 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import {
-  LayoutAnimation,
-  ScrollView,
-  type NativeSyntheticEvent,
-  type NativeScrollEvent,
-} from 'react-native';
-import { useSharedValue } from 'react-native-reanimated';
+import { LayoutAnimation, ScrollView } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
@@ -16,10 +10,8 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { ListGroup, Switch as HeroSwitch } from 'heroui-native';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import {
-  MintCurrencyTabs,
-  MINT_CURRENCY_TABS_HEIGHT,
-} from '@/features/mint/components/MintCurrencyTabs';
+import { MINT_CURRENCY_TABS_HEIGHT } from '@/features/mint/components/MintCurrencyTabs';
+import { useStickyCurrencyTabs } from '@/features/mint/hooks/useStickyCurrencyTabs';
 import { useMintKeysetUnits } from '@/features/wallet/hooks/useMintKeysetUnits';
 import { deriveSupportedUnitsFromInfo } from 'wallet';
 import { MintDistributionCards } from '@/features/mint/components/distribution/MintDistributionCards';
@@ -267,27 +259,11 @@ export function MintDistributionScreen() {
   // onHeaderHeightChange. nestedScrollEnabled keeps the Android form-sheet's
   // drag-to-dismiss working (the sheet reads this scroller's overscroll) — the
   // earlier in-body fallback predates the mint-list sticky pattern.
-  const scrollY = useSharedValue(0);
-  const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
-
-  const handleScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      scrollY.value = Math.max(0, event.nativeEvent.contentOffset.y);
-    },
-    [scrollY]
-  );
-
-  const currencyTabs = useMemo(
-    () => (
-      <MintCurrencyTabs
-        currencies={availableCurrencies}
-        selectedCurrency={selectedCurrency}
-        onCurrencyChange={setSelectedCurrency}
-        scrollY={scrollY}
-      />
-    ),
-    [availableCurrencies, selectedCurrency, scrollY]
-  );
+  const { setTotalHeaderHeight, handleScroll, currencyTabs, headerSpacer } = useStickyCurrencyTabs({
+    currencies: availableCurrencies,
+    selectedCurrency,
+    onCurrencyChange: setSelectedCurrency,
+  });
 
   const handleRebalance = useCallback(() => {
     log.info('mint.distribution.rebalance', { currency: selectedCurrency });
@@ -336,7 +312,7 @@ export function MintDistributionScreen() {
         scrollEventThrottle={16}
         style={{ flex: 1 }}
         contentContainerClassName="pb-30">
-        <View style={{ height: totalHeaderHeight }} />
+        {headerSpacer}
 
         {mintsForCurrency.length === 0 ? (
           <View className="items-center p-10">

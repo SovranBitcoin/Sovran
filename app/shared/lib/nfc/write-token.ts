@@ -12,8 +12,7 @@
  */
 
 import { NfcError, isUserCancelError } from './errors';
-import { SELECT_AID, SELECT_NDEF } from './constants';
-import { sendApdu, getStatusMessage } from './apdu';
+import { selectNdefApp } from './apdu';
 import { writeNdefTextRecord } from './write';
 import { withSession } from './session';
 import { nfcLog } from '../logger';
@@ -26,24 +25,7 @@ export async function writeTokenToNFC(token: string): Promise<void> {
   // owned by acquireSession inside withSession.
   try {
     await withSession(async () => {
-      let r = await sendApdu(SELECT_AID, 'SELECT AID');
-      if (!r.ok) {
-        throw new NfcError(
-          `AID not accepted (${getStatusMessage(r.sw)})`,
-          'AID_SELECT_FAILED',
-          r.sw
-        );
-      }
-
-      r = await sendApdu(SELECT_NDEF, 'SELECT NDEF');
-      if (!r.ok) {
-        throw new NfcError(
-          `NDEF file not accessible (${getStatusMessage(r.sw)})`,
-          'NDEF_SELECT_FAILED',
-          r.sw
-        );
-      }
-
+      await selectNdefApp();
       await writeNdefTextRecord(token);
       nfcLog.info('nfc.write.success', { tokenLength: token.length });
     });

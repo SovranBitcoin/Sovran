@@ -140,18 +140,7 @@ async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomE
   // 3. Sign the kind:24242 authorization event.
   let authHeader: string;
   try {
-    const unsigned = buildBlossomAuthEvent({
-      action: 'upload',
-      sha256,
-      createdAt: Math.floor(Date.now() / 1000),
-    });
-    const authEvent = new NDKEvent(opts.ndk);
-    authEvent.kind = unsigned.kind;
-    authEvent.content = unsigned.content;
-    authEvent.created_at = unsigned.created_at;
-    authEvent.tags = unsigned.tags;
-    await authEvent.sign();
-    authHeader = encodeAuthHeader(JSON.stringify(authEvent.rawEvent()));
+    authHeader = await signAuthHeader(opts.ndk, 'upload', sha256);
   } catch {
     nostrLog.warn('nostr.media.auth_sign_failed');
     return err({ type: 'sign-failed' });
@@ -171,6 +160,26 @@ async function run(opts: UploadOptions): Promise<Result<BlobDescriptor, BlossomE
     if (attempt < MAX_ATTEMPTS) await delay(500 * 2 ** (attempt - 1));
   }
   return last;
+}
+
+/** Signs a `kind:24242` authorization event and encodes the `Authorization: Nostr …` header. */
+async function signAuthHeader(
+  ndk: NDK,
+  action: 'upload' | 'delete',
+  sha256: string
+): Promise<string> {
+  const unsigned = buildBlossomAuthEvent({
+    action,
+    sha256,
+    createdAt: Math.floor(Date.now() / 1000),
+  });
+  const authEvent = new NDKEvent(ndk);
+  authEvent.kind = unsigned.kind;
+  authEvent.content = unsigned.content;
+  authEvent.created_at = unsigned.created_at;
+  authEvent.tags = unsigned.tags;
+  await authEvent.sign();
+  return encodeAuthHeader(JSON.stringify(authEvent.rawEvent()));
 }
 
 /** One PUT attempt: progress callbacks, timeout, and abort all wired to the task. */
@@ -263,18 +272,7 @@ async function runDelete(opts: DeleteOptions): Promise<Result<void, BlossomDelet
   // Fresh delete auth (5-min expiry) signed for THIS blob.
   let authHeader: string;
   try {
-    const unsigned = buildBlossomAuthEvent({
-      action: 'delete',
-      sha256: opts.sha256,
-      createdAt: Math.floor(Date.now() / 1000),
-    });
-    const authEvent = new NDKEvent(opts.ndk);
-    authEvent.kind = unsigned.kind;
-    authEvent.content = unsigned.content;
-    authEvent.created_at = unsigned.created_at;
-    authEvent.tags = unsigned.tags;
-    await authEvent.sign();
-    authHeader = encodeAuthHeader(JSON.stringify(authEvent.rawEvent()));
+    authHeader = await signAuthHeader(opts.ndk, 'delete', opts.sha256);
   } catch {
     nostrLog.warn('nostr.media.delete_auth_sign_failed');
     return err({ type: 'sign-failed' });
