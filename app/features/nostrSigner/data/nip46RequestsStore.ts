@@ -26,7 +26,7 @@ import {
   type UnsignedEvent,
 } from '@/features/nostrSigner/lib/nip46Types';
 import type { ParsedNostrConnectUri } from '@/features/nostrSigner/lib/nip46Uri';
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { storeLog } from '@/shared/lib/logger';
 
 export type Nip46ParamsPreview =

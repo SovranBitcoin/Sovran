@@ -7,7 +7,7 @@
  * padded to 64 chars — the regex-charset gate is the load-bearing part.
  */
 
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 
 describe('isNostrPubkeyHex', () => {
   it('accepts canonical 64-char lowercase hex', () => {

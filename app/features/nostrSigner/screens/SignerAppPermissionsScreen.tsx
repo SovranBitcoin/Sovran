@@ -38,7 +38,7 @@ import {
 } from '@/features/nostrSigner/lib/permissionBundles';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { nostrLog } from '@/shared/lib/logger';
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';

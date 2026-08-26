@@ -102,7 +102,7 @@ import {
   type VerdictResolverSeam,
 } from '@/features/nostrSigner/lib/verdictResolver';
 import { nostrLog, redactError, type RedactedError } from '@/shared/lib/logger';
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { relays as defaultSignerRelays } from '@/shared/ndk';
 
 const DEDUPE_LRU_SIZE = 512;

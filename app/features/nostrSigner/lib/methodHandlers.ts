@@ -35,7 +35,7 @@ import {
   type UnsignedEvent,
 } from '@/features/nostrSigner/lib/nip46Types';
 import { nostrLog, redactError, type RedactedError } from '@/shared/lib/logger';
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 
 type Nip46MethodHandlerError =
   { type: 'malformed-params' } | { type: 'execution-failed'; cause: RedactedError };

@@ -22,7 +22,7 @@ import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46Requests
 import { useNostrPersonDisplay } from '@/shared/hooks/useNostrPersonDisplay';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { nostrLog } from '@/shared/lib/logger';
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { popup } from '@/shared/lib/popup';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';

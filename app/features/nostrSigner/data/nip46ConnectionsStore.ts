@@ -34,7 +34,7 @@ import {
 import { classifyRequest, parseGrantKey } from '@/features/nostrSigner/lib/permissionPolicy';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { isNostrPubkeyHex, NostrPubkeyHexSchema } from '@/shared/lib/protocolIds';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 const profileStorage = createProfileScopedStorage();
@@ -110,7 +110,7 @@ export interface Nip46Connection {
 }
 
 // 64-char hex pubkey — the trust-boundary predicate used across the app.
-const HexPubkeySchema = z.custom<string>(isNostrPubkeyHex, 'invalid pubkey');
+// Canonical pubkey schema lives in protocolIds (branded output).
 
 const RelayUrlSchema = z.string().max(MAX_RELAY_URL_LENGTH).regex(RELAY_URL_RE);
 
@@ -136,7 +136,7 @@ const PersistedPeerDecryptGrant = z.looseObject({
 });
 
 const PersistedConnection = z.looseObject({
-  clientPubkey: HexPubkeySchema,
+  clientPubkey: NostrPubkeyHexSchema,
   name: z.string().max(MAX_NAME_LENGTH).optional(),
   url: z.string().max(MAX_URL_LENGTH).optional(),
   image: z.string().max(MAX_IMAGE_URL_LENGTH).optional(),
@@ -155,13 +155,13 @@ const PersistedConnection = z.looseObject({
   // `.default({})`/`.default([])` keep a blob missing these fields parseable —
   // a rejected blob falls back to in-memory defaults (createMergeWithSchema)
   // and would wipe every pairing, so default-fill rather than reject.
-  peerDecryptGrants: z.record(HexPubkeySchema, PersistedPeerDecryptGrant).default({}),
-  previousClientPubkeys: z.array(HexPubkeySchema).max(MAX_PREVIOUS_CLIENT_PUBKEYS).default([]),
+  peerDecryptGrants: z.record(NostrPubkeyHexSchema, PersistedPeerDecryptGrant).default({}),
+  previousClientPubkeys: z.array(NostrPubkeyHexSchema).max(MAX_PREVIOUS_CLIENT_PUBKEYS).default([]),
 });
 
 const PersistedConnectionsStore = z
   .object({
-    apps: z.record(HexPubkeySchema, PersistedConnection).default({}),
+    apps: z.record(NostrPubkeyHexSchema, PersistedConnection).default({}),
   })
   .refine((data) => Object.keys(data.apps).length <= MAX_CONNECTED_APPS, 'too many apps')
   .refine(

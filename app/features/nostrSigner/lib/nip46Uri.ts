@@ -12,6 +12,8 @@
 import { err, ok, Result } from 'neverthrow';
 import { z } from 'zod';
 
+import type { NostrPubkeyHex } from '@/shared/lib/protocolIds';
+
 import {
   MAX_EVENT_KIND,
   Nip46MethodSchema,
@@ -33,10 +35,13 @@ export type Nip46UriError =
   | { type: 'duplicate_param'; param: string }
   | { type: 'invalid_field'; issues: string[] };
 
+// Wire-input variant of protocolIds' NostrPubkeyHexSchema: URIs may carry
+// uppercase hex, so this one NORMALIZES to the NIP-01 lowercase form (a
+// boundary normalizer, not a duplicate — the canonical schema only reads).
 const PubkeyHexSchema = z
   .string()
   .regex(/^[0-9a-fA-F]{64}$/)
-  .transform((value) => value.toLowerCase());
+  .transform((value) => value.toLowerCase() as NostrPubkeyHex);
 
 const RelayListSchema = z
   .array(z.url({ protocol: /^wss$/ }).max(MAX_URL_LENGTH))

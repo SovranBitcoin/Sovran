@@ -17,18 +17,18 @@ import { z } from 'zod';
 import { safeJsonParse } from '@/features/nostrSigner/lib/json';
 import { PAIRING_INTENT_TTL_MS } from '@/features/nostrSigner/lib/nip46Types';
 import { nostrLog, redactError, type RedactedError } from '@/shared/lib/logger';
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { isNostrPubkeyHex, NostrPubkeyHexSchema } from '@/shared/lib/protocolIds';
 
 export const PAIRING_INTENT_STORAGE_KEY = 'nip46-pending-pairing';
 
 const MAX_URI_LENGTH = 4096;
 
-const PubkeyHexSchema = z.custom<string>(isNostrPubkeyHex, 'expected 64 hex chars');
+// Canonical pubkey schema lives in protocolIds (branded output).
 
 const PairingIntentSchema = z.strictObject({
   /** @SECRET full nostrconnect:// URI — carries the pairing secret; never log */
   uri: z.string().min(1).max(MAX_URI_LENGTH),
-  targetPubkey: PubkeyHexSchema,
+  targetPubkey: NostrPubkeyHexSchema,
   targetAccountIndex: z.int().min(0),
   createdAt: z.int().min(0),
   expiresAt: z.int().min(0),

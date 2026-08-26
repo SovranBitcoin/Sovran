@@ -8,6 +8,8 @@
  * Dictionary + spec citations: skills/sovran-deslop/references/terminology.md.
  */
 
+import { z } from 'zod';
+
 declare const brand: unique symbol;
 type Brand<T, B extends string> = T & { readonly [brand]: B };
 
@@ -46,6 +48,33 @@ export function asNostrPubkeyHex(value: string): NostrPubkeyHex {
   }
   return value as NostrPubkeyHex;
 }
+
+/** NIP-01 event id: sha256 of the serialized event — 64 hex, shape-identical
+ * to a pubkey but a DIFFERENT thing; never validate one as the other's type. */
+export type NostrEventId = Brand<string, 'nostr.event.id'>;
+
+// Shared case-tolerant 64-hex runtime check (reads must stay byte-compatible
+// with historically-accepted persisted data — sovran-data; NIP-01 says
+// lowercase, so CONSTRUCTION uses the strict regexes above instead).
+const isHex64 = (value: unknown): value is string =>
+  typeof value === 'string' && value.length === 64 && /^[0-9a-f]+$/i.test(value);
+
+/**
+ * Case-TOLERANT guard for reads (persisted blobs, wire input) — deliberately
+ * wider than the construction-side `NOSTR_PUBKEY_HEX_RE`; tightening a read
+ * path fails the parse and wipes persisted blobs.
+ */
+export function isNostrPubkeyHex(value: unknown): value is NostrPubkeyHex {
+  return isHex64(value);
+}
+
+/**
+ * Canonical zod schemas for 64-hex nostr fields — same tolerant acceptance,
+ * branded output. Replace the per-file `HexPubkeySchema`/`PubkeyHexSchema`/
+ * `Hex64Schema` copies; pick by MEANING, not shape.
+ */
+export const NostrPubkeyHexSchema = z.custom<NostrPubkeyHex>(isHex64, 'expected 64 hex chars');
+export const NostrEventIdSchema = z.custom<NostrEventId>(isHex64, 'expected 64-hex event id');
 
 /**
  * The only legal Nostr→Cashu key cast: lift a BIP-340 x-only pubkey to the

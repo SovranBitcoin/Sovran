@@ -40,7 +40,7 @@ import { connectionForClient } from '@/features/nostrSigner/lib/connectionMatch'
 import { ACTIVITY_CAP } from '@/features/nostrSigner/lib/nip46Types';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatRelative } from '@/shared/lib/date';
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { List } from '@/shared/ui/composed/List';
 import { ListRow } from '@/shared/ui/composed/ListRow';

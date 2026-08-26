@@ -14,7 +14,7 @@
  * here is ever logged.
  */
 
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { z } from 'zod';
 
 import { appDataOperationFor } from './appDataOps';

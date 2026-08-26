@@ -32,7 +32,7 @@ import {
 } from '@/features/nostrSigner/lib/nip46Types';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { mintLocalId } from '@/shared/lib/id';
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { NostrEventIdSchema, NostrPubkeyHexSchema } from '@/shared/lib/protocolIds';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 const profileStorage = createProfileScopedStorage();
@@ -68,25 +68,22 @@ export interface Nip46ActivityEntry {
   at: number;
 }
 
-// `isNostrPubkeyHex` is a generic 64-hex-char gate — event ids share the shape.
-const Hex64Schema = z.custom<string>(isNostrPubkeyHex, 'invalid 64-hex id');
-
 const PersistedSummary = z.looseObject({
   headline: z.string().max(64).optional(),
   line: z.string().max(MAX_SUMMARY_LENGTH).optional(),
-  refEventId: Hex64Schema.optional(),
-  refPubkey: Hex64Schema.optional(),
+  refEventId: NostrEventIdSchema.optional(),
+  refPubkey: NostrPubkeyHexSchema.optional(),
 });
 
 const PersistedActivityEntry = z.looseObject({
   id: z.string().max(128),
-  clientPubkey: Hex64Schema,
+  clientPubkey: NostrPubkeyHexSchema,
   method: Nip46MethodSchema,
   kind: EventKindSchema.optional(),
   verdict: ActivityVerdictSchema,
   summary: PersistedSummary.optional(),
   contentPreview: z.string().max(MAX_SUMMARY_LENGTH).optional(),
-  eventId: Hex64Schema.optional(),
+  eventId: NostrEventIdSchema.optional(),
   at: z.int().min(0),
 });
 

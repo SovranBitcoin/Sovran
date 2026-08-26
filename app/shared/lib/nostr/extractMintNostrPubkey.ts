@@ -1,6 +1,6 @@
 import * as nip19 from 'nostr-tools/nip19';
 
-import { isNostrPubkeyHex } from './secureStorage';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 
 type MintContactEntry = { method: string; info: string };
 export type MintInfoForNostr = { contact?: readonly MintContactEntry[] } | null | undefined;

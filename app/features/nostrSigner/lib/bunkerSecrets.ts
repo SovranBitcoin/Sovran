@@ -28,7 +28,7 @@ import { z } from 'zod';
 import { safeJsonParse } from '@/features/nostrSigner/lib/json';
 import { BUNKER_SECRET_TTL_MS } from '@/features/nostrSigner/lib/nip46Types';
 import { nostrLog, redactError, type RedactedError } from '@/shared/lib/logger';
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 
 const STORAGE_KEY_PREFIX = 'nip46_bunker_secrets_';
 const MAX_OUTSTANDING_SECRETS = 8;

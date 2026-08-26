@@ -69,7 +69,7 @@ import { useNostrPersonDisplay } from '@/shared/hooks/useNostrPersonDisplay';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatDate, formatRelative } from '@/shared/lib/date';
 import { nostrLog } from '@/shared/lib/logger';
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { isNostrPubkeyHex } from '@/shared/lib/protocolIds';
 import { actionMenuPopup, popup } from '@/shared/lib/popup';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { ListRow } from '@/shared/ui/composed/ListRow';
