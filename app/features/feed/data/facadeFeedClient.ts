@@ -97,6 +97,31 @@ function ingestFeedPageIntoCache(result: FeedParseResult): void {
 // the waterfall still has Primal + relays after it.
 const FEED_READ_TIMEOUT_MS = 15_000;
 
+/**
+ * The transport half of a feed-page read — everything except which feed it is.
+ * Every `getFeedPage` caller below spreads this, so the timeout default and the
+ * cursor encoding are decided once instead of per spec.
+ *
+ * `until` is falsy-checked deliberately: `0` is this codebase's "no more pages"
+ * sentinel (`paginationUntil > 0` is how every caller tests for another page),
+ * so a zero cursor means no cursor, not "everything before the epoch".
+ */
+function feedPageTransport(request: {
+  limit?: number;
+  refresh?: boolean;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  until?: number;
+}) {
+  return {
+    limit: request.limit,
+    refresh: request.refresh,
+    signal: request.signal,
+    timeoutMs: request.timeoutMs ?? FEED_READ_TIMEOUT_MS,
+    cursor: request.until ? { createdAt: request.until, id: '' } : null,
+  };
+}
+
 export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>): FeedClient {
   return {
     ...fallback,
@@ -116,11 +141,7 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
 
       const result = await layer.getFeedPage({
         spec,
-        limit: request.limit,
-        refresh: request.refresh,
-        signal: request.signal,
-        timeoutMs: request.timeoutMs ?? FEED_READ_TIMEOUT_MS,
-        cursor: request.until ? { createdAt: request.until, id: '' } : null,
+        ...feedPageTransport(request),
         // Rank-paged specs advance by absolute offset (rank order is not
         // chronological); the nagg tier consumes it, time-paged tiers ignore it.
         ...(request.offset ? { offset: request.offset } : {}),
@@ -187,11 +208,7 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
 
       const result = await layer.getFeedPage({
         spec: { kind: 'user', pubkey: request.pubkey },
-        limit: request.limit,
-        refresh: request.refresh,
-        signal: request.signal,
-        timeoutMs: request.timeoutMs ?? FEED_READ_TIMEOUT_MS,
-        cursor: request.until ? { createdAt: request.until, id: '' } : null,
+        ...feedPageTransport(request),
       });
 
       return result.match(
@@ -233,11 +250,7 @@ export function createFacadeFeedClient(fallback: Omit<FeedClient, 'getThread'>):
       const pubkeySet = new Set(request.pubkeys);
       const result = await layer.getFeedPage({
         spec: { kind: 'following-recent', authors: request.pubkeys },
-        limit: request.limit,
-        refresh: request.refresh,
-        signal: request.signal,
-        timeoutMs: request.timeoutMs ?? FEED_READ_TIMEOUT_MS,
-        cursor: request.until ? { createdAt: request.until, id: '' } : null,
+        ...feedPageTransport(request),
       });
 
       return result.match(

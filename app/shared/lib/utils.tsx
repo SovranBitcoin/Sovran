@@ -16,6 +16,26 @@ import { log } from './logger';
 
 type AnyMintHistoryEntry = Extract<HistoryEntry, { type: 'mint' }>;
 
+/**
+ * Countdown for an expiring quote or invoice — "expires in 1h 4m 9s", dropping
+ * the leading units once they reach zero, and `null` once the deadline has
+ * passed so a caller renders nothing rather than a frozen "expires in 0s".
+ *
+ * Deliberately here rather than in `shared/lib/date` (the usual home for
+ * formatting): both callers are in this file, and `date` pulls in the settings
+ * store, so every component suite that mocks it hand-lists its exports — moving
+ * this there makes those factories silently return `undefined` for it.
+ */
+function formatExpiryCountdown(secondsRemaining: number): string | null {
+  if (secondsRemaining <= 0) return null;
+  const hours = Math.floor(secondsRemaining / 3600);
+  const minutes = Math.floor((secondsRemaining % 3600) / 60);
+  const seconds = secondsRemaining % 60;
+  if (hours > 0) return `expires in ${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `expires in ${minutes}m ${seconds}s`;
+  return `expires in ${seconds}s`;
+}
+
 /** Outgoing = ecash send or Lightning melt */
 export function isOutgoingTransaction(entry: Pick<HistoryEntry, 'type'>): boolean {
   return entry.type === 'send' || entry.type === 'melt';
@@ -76,21 +96,7 @@ export function getMintHistoryEntryTimeUntilExpiry(
   const timestamp = info.timestampSec ?? 0;
   const expiryTime = (timestamp + expiry) * 1000;
 
-  const timeLeft = Math.floor((expiryTime - Date.now()) / 1000);
-
-  if (timeLeft <= 0) return null;
-
-  const hours = Math.floor(timeLeft / 3600);
-  const minutes = Math.floor((timeLeft % 3600) / 60);
-  const seconds = timeLeft % 60;
-
-  if (hours > 0) {
-    return `expires in ${hours}h ${minutes}m ${seconds}s`;
-  } else if (minutes > 0) {
-    return `expires in ${minutes}m ${seconds}s`;
-  } else {
-    return `expires in ${seconds}s`;
-  }
+  return formatExpiryCountdown(Math.floor((expiryTime - Date.now()) / 1000));
 }
 
 /**
@@ -117,17 +123,7 @@ export function getMeltQuoteTimeUntilExpiry(
 ): string | null {
   if (!meltQuote.expiry) return null;
   const nowSec = Math.floor((currentTimeMs ?? Date.now()) / 1000);
-  const timeLeft = meltQuote.expiry - nowSec;
-
-  if (timeLeft <= 0) return null;
-
-  const hours = Math.floor(timeLeft / 3600);
-  const minutes = Math.floor((timeLeft % 3600) / 60);
-  const seconds = timeLeft % 60;
-
-  if (hours > 0) return `expires in ${hours}h ${minutes}m ${seconds}s`;
-  if (minutes > 0) return `expires in ${minutes}m ${seconds}s`;
-  return `expires in ${seconds}s`;
+  return formatExpiryCountdown(meltQuote.expiry - nowSec);
 }
 
 /**

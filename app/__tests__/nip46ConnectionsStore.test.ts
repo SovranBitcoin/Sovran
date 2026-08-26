@@ -358,6 +358,30 @@ describe('app lifecycle actions', () => {
     expect(app.url).toBe('https://primal.net');
     expect(app.relays).toEqual(['wss://relay.primal.net']);
   });
+
+  // Pins the omit-means-keep half of `sanitizedAppMetadata`: the three display
+  // fields are spread only when a sanitized value survived. Without that guard
+  // a later refresh that carries no name writes `name: undefined` straight
+  // through persist, and the app's label disappears from the signer list for
+  // good. An over-long URL must be dropped the same way, not truncated.
+  it('updateMetadataAfterApproval keeps stored metadata a later refresh omits', () => {
+    const store = useNip46ConnectionsStore.getState();
+    store.updateMetadataAfterApproval(client, {
+      name: 'Primal',
+      url: 'https://primal.net',
+      image: 'https://primal.net/icon.png',
+    });
+
+    store.updateMetadataAfterApproval(client, {
+      url: `https://primal.net/${'x'.repeat(600)}`,
+      relays: ['wss://relay.primal.net'],
+    });
+
+    const app = useNip46ConnectionsStore.getState().apps[client];
+    expect(app.name).toBe('Primal');
+    expect(app.url).toBe('https://primal.net');
+    expect(app.image).toBe('https://primal.net/icon.png');
+  });
 });
 
 describe('per-peer decrypt grants', () => {

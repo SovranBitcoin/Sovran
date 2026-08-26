@@ -62,11 +62,29 @@ interface NostrMetadataCacheState {
 }
 
 /**
+ * The kind-0 profile fields, with the length caps that bound what a relay can
+ * push into the persisted cache. Declared once and spread into both schemas
+ * below: the wire parse and the persisted validator have to accept the same
+ * fields at the same caps, and one shared object is what makes that structural
+ * rather than a "keep these in sync" comment.
+ */
+const NOSTR_PROFILE_FIELDS = {
+  displayName: z.string().max(512).optional(),
+  name: z.string().max(512).optional(),
+  picture: z.string().max(2048).optional(),
+  banner: z.string().max(2048).optional(),
+  nip05: z.string().max(512).optional(),
+  lud16: z.string().max(512).optional(),
+  website: z.string().max(2048).optional(),
+  about: z.string().max(4096).optional(),
+};
+
+/**
  * Wire shape of a Nostr kind-0 metadata event's `content` after
- * `JSON.parse`. Same fields as `NostrProfileMetadata` plus the snake_case
- * `display_name` alias the spec permits. `looseObject` ignores unknown
- * keys (relays serve all sorts of vendor extensions on kind-0). Field
- * caps come from the persisted-cache schema below — keep the two in sync.
+ * `JSON.parse` — the shared fields plus the snake_case `display_name` alias
+ * the spec permits, which is normalized away before anything is persisted.
+ * `looseObject` ignores unknown keys (relays serve all sorts of vendor
+ * extensions on kind-0).
  *
  * Exported so the runtime parse path in `useNostrProfileMetadata` shares
  * one definition with the persisted-cache validator instead of casting
@@ -74,25 +92,11 @@ interface NostrMetadataCacheState {
  */
 export const Kind0MetadataSchema = z.looseObject({
   display_name: z.string().max(512).optional(),
-  displayName: z.string().max(512).optional(),
-  name: z.string().max(512).optional(),
-  picture: z.string().max(2048).optional(),
-  banner: z.string().max(2048).optional(),
-  nip05: z.string().max(512).optional(),
-  lud16: z.string().max(512).optional(),
-  website: z.string().max(2048).optional(),
-  about: z.string().max(4096).optional(),
+  ...NOSTR_PROFILE_FIELDS,
 });
 
 const PersistedNostrMetadataEntry = z.looseObject({
-  displayName: z.string().max(512).optional(),
-  name: z.string().max(512).optional(),
-  picture: z.string().max(2048).optional(),
-  banner: z.string().max(2048).optional(),
-  nip05: z.string().max(512).optional(),
-  lud16: z.string().max(512).optional(),
-  website: z.string().max(2048).optional(),
-  about: z.string().max(4096).optional(),
+  ...NOSTR_PROFILE_FIELDS,
   fetchedAt: z.number().int().nonnegative(),
 });
 

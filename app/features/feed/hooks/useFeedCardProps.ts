@@ -37,51 +37,45 @@ export function useFeedCardProps({
   fallbackReposterName,
   fallbackReposterPubkey,
 }: FeedCardPropsOptions) {
-  const feedPostCardProps = useMemo(
-    () =>
-      createFeedPostCardProps({
-        getMetrics,
-        getZapState,
-        onOverlayOpenedFromIndex,
-        toggleLike: (event: FeedEvent) => void toggleLikeRef.current(event),
-        toggleRepost: (event: FeedEvent) => void toggleRepostRef.current(event),
-        openZapMenu: (event: FeedEvent, baseSats: number) =>
-          openZapMenuRef.current(event, baseSats),
-        openPostActions,
-      }),
+  // The engagement wiring both card kinds take, bound once. Memoized rather
+  // than rebuilt per card kind so the two `createXCardProps` results keep the
+  // identity they had when each spelled the block out: they change exactly when
+  // one of these six inputs does, and card props reach a recycling list where a
+  // fresh identity means a re-render of every row.
+  // ast-grep-ignore: no-manual-memo-ts — list-boundary identity, see above.
+  const engagement = useMemo(
+    () => ({
+      getMetrics,
+      getZapState,
+      onOverlayOpenedFromIndex,
+      toggleLike: (event: FeedEvent) => void toggleLikeRef.current(event),
+      toggleRepost: (event: FeedEvent) => void toggleRepostRef.current(event),
+      openZapMenu: (event: FeedEvent, baseSats: number) => openZapMenuRef.current(event, baseSats),
+    }),
     [
       getMetrics,
       getZapState,
       onOverlayOpenedFromIndex,
-      openPostActions,
       openZapMenuRef,
       toggleLikeRef,
       toggleRepostRef,
     ]
   );
 
+  // ast-grep-ignore: no-manual-memo-ts — list-boundary identity, see above.
+  const feedPostCardProps = useMemo(
+    () => createFeedPostCardProps({ ...engagement, openPostActions }),
+    [engagement, openPostActions]
+  );
+
+  // ast-grep-ignore: no-manual-memo-ts — list-boundary identity, see above.
   const repostCardProps = useMemo(
     () =>
       createRepostCardProps({
-        getMetrics,
-        getZapState,
-        onOverlayOpenedFromIndex,
-        toggleLike: (event: FeedEvent) => void toggleLikeRef.current(event),
-        toggleRepost: (event: FeedEvent) => void toggleRepostRef.current(event),
-        openZapMenu: (event: FeedEvent, baseSats: number) =>
-          openZapMenuRef.current(event, baseSats),
+        ...engagement,
         fallbackReposter: { name: fallbackReposterName, pubkey: fallbackReposterPubkey },
       }),
-    [
-      getMetrics,
-      getZapState,
-      onOverlayOpenedFromIndex,
-      openZapMenuRef,
-      toggleLikeRef,
-      toggleRepostRef,
-      fallbackReposterName,
-      fallbackReposterPubkey,
-    ]
+    [engagement, fallbackReposterName, fallbackReposterPubkey]
   );
 
   return { feedPostCardProps, repostCardProps };

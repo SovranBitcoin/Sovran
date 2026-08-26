@@ -11,7 +11,7 @@
  * "X mSats required … Y available".
  */
 
-import { sendMessage } from '@/shared/lib/routstr/api';
+import { checkBalance, sendMessage } from '@/shared/lib/routstr/api';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
 const mockMemory: Record<string, string> = {};
@@ -98,5 +98,34 @@ describe('402 → balance truth-sync', () => {
     ).rejects.toMatchObject({ status: 402 });
 
     expect(useRoutstrStore.getState().balance).toBe(299_841);
+  });
+});
+
+/**
+ * `readRoutstrEnvelope` checks HTTP status BEFORE shape. That order is
+ * load-bearing and easy to lose: every Routstr spine is a `looseObject` of
+ * optional fields, so an error body parses cleanly, and the balance reader's
+ * `?? 0` defaults would turn a rejected key into a confident "0 sats" — the
+ * figure every affordability check then gates against.
+ */
+describe('envelope reads gate on HTTP status before shape', () => {
+  // eslint-disable-next-line no-restricted-properties -- restore seam for the stub
+  const realFetch = global.fetch;
+  afterEach(() => {
+    // eslint-disable-next-line no-restricted-properties -- restore seam for the stub
+    global.fetch = realFetch;
+  });
+
+  it('rejects a 401 /wallet/info rather than reading the error body as a zero balance', async () => {
+    // eslint-disable-next-line no-restricted-properties -- test stub for the routstr 401 response
+    global.fetch = jest.fn(
+      async () =>
+        new Response(JSON.stringify({ detail: 'Invalid API key' }), {
+          status: 401,
+          headers: { 'content-type': 'application/json' },
+        })
+    ) as unknown as typeof fetch;
+
+    await expect(checkBalance('sk-expired')).rejects.toMatchObject({ status: 401 });
   });
 });

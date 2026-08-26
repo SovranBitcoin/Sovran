@@ -316,6 +316,30 @@ function sanitizeUrl(value: string | undefined, max: number): string | undefined
   return trimmed && trimmed.length <= max ? trimmed : undefined;
 }
 
+/**
+ * The three display fields a client app tells us about itself, sanitized and
+ * emitted only when a usable value survived — a missing or over-long value
+ * leaves whatever is already stored alone rather than erasing it.
+ *
+ * Every path that lets a client write its own metadata (pairing, adoption,
+ * post-approval refresh) spreads this, so a field can't end up sanitized on one
+ * path and raw on another.
+ */
+function sanitizedAppMetadata(meta: {
+  name?: string;
+  url?: string;
+  image?: string;
+}): Partial<Pick<Nip46Connection, 'name' | 'url' | 'image'>> {
+  const name = sanitizeName(meta.name);
+  const url = sanitizeUrl(meta.url, MAX_URL_LENGTH);
+  const image = sanitizeUrl(meta.image, MAX_IMAGE_URL_LENGTH);
+  return {
+    ...(name !== undefined && { name }),
+    ...(url !== undefined && { url }),
+    ...(image !== undefined && { image }),
+  };
+}
+
 function sanitizeGrants(
   grants: Partial<Record<GrantKey, Nip46Grant>>
 ): Partial<Record<GrantKey, Nip46Grant>> {
@@ -361,9 +385,6 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
           }
 
           const now = Date.now();
-          const name = sanitizeName(input.name);
-          const url = sanitizeUrl(input.url, MAX_URL_LENGTH);
-          const image = sanitizeUrl(input.image, MAX_IMAGE_URL_LENGTH);
           const base: Nip46Connection = existing ?? {
             clientPubkey: input.clientPubkey,
             relays,
@@ -382,9 +403,7 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
             ...base,
             relays,
             origin: input.origin,
-            ...(name !== undefined && { name }),
-            ...(url !== undefined && { url }),
-            ...(image !== undefined && { image }),
+            ...sanitizedAppMetadata(input),
             ...(input.mode !== undefined && { mode: input.mode }),
             ...(input.encryption !== undefined && { encryption: input.encryption }),
             grants: { ...base.grants, ...sanitizeGrants(input.grants ?? {}) },
@@ -418,9 +437,6 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
           }
 
           const now = Date.now();
-          const name = sanitizeName(input.name);
-          const url = sanitizeUrl(input.url, MAX_URL_LENGTH);
-          const image = sanitizeUrl(input.image, MAX_IMAGE_URL_LENGTH);
           // Attribution chain: carry the old record's own chain, append the
           // old key, drop collisions with the new key, keep the most recent.
           const chain = [...previous.previousClientPubkeys, previous.clientPubkey]
@@ -461,9 +477,7 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
             // Pairing-time grants (accepted checklist keys) merge on top of
             // anything carried — same additive semantics as upsertApp.
             grants: { ...carried.grants, ...sanitizeGrants(input.grants ?? {}) },
-            ...(name !== undefined && { name }),
-            ...(url !== undefined && { url }),
-            ...(image !== undefined && { image }),
+            ...sanitizedAppMetadata(input),
             ...(input.mode !== undefined && { mode: input.mode }),
             previousClientPubkeys: chain,
           };
@@ -633,15 +647,10 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
 
         updateMetadataAfterApproval: (clientPubkey, meta) => {
           patchApp(clientPubkey, (app) => {
-            const name = sanitizeName(meta.name);
-            const url = sanitizeUrl(meta.url, MAX_URL_LENGTH);
-            const image = sanitizeUrl(meta.image, MAX_IMAGE_URL_LENGTH);
             const relays = meta.relays ? sanitizeRelays(meta.relays) : null;
             return {
               ...app,
-              ...(name !== undefined && { name }),
-              ...(url !== undefined && { url }),
-              ...(image !== undefined && { image }),
+              ...sanitizedAppMetadata(meta),
               ...(relays !== null && { relays }),
             };
           });

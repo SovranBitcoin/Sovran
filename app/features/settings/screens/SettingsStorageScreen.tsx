@@ -150,6 +150,20 @@ async function copyDebugLogsAction(io: {
   }
 }
 
+/** Section title with its item tally on the right — shared by both section kinds. */
+function SectionHeading({ title, count }: { title: string; count: number }) {
+  return (
+    <View className="mb-2 ml-2 flex-row items-center justify-between">
+      <Text bold size={12} className="uppercase tracking-wide">
+        {title}
+      </Text>
+      <Text size={11} className="text-foreground/50 mr-1">
+        {count}
+      </Text>
+    </View>
+  );
+}
+
 interface SectionProps {
   title: string;
   subtitle: string;
@@ -167,14 +181,7 @@ const InventorySection: React.FC<SectionProps> = ({
 }) => {
   return (
     <View className="mb-4">
-      <View className="mb-2 ml-2 flex-row items-center justify-between">
-        <Text bold size={12} className="uppercase tracking-wide">
-          {title}
-        </Text>
-        <Text size={11} className="text-foreground/50 mr-1">
-          {items.length}
-        </Text>
-      </View>
+      <SectionHeading title={title} count={items.length} />
       <Card variant="secondary">
         <Card.Body className="gap-3">
           <View>
@@ -239,14 +246,7 @@ const GroupedInventorySection: React.FC<GroupedSectionProps> = ({
 
   return (
     <View className="mb-4">
-      <View className="mb-2 ml-2 flex-row items-center justify-between">
-        <Text bold size={12} className="uppercase tracking-wide">
-          {title}
-        </Text>
-        <Text size={11} className="text-foreground/50 mr-1">
-          {total}
-        </Text>
-      </View>
+      <SectionHeading title={title} count={total} />
       <Card variant="secondary">
         <Card.Body className="gap-3">
           <Text medium size={11} className="text-foreground/70">

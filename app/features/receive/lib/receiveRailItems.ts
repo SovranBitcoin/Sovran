@@ -132,6 +132,31 @@ function resolveMintDisplay(mintUrl: string): { name: string; iconUrl?: string }
   };
 }
 
+/**
+ * The row fields every mint-quote rail carries whatever its method: which mint
+ * issued the quote and how it is labelled, how much has landed on it so far,
+ * and whether it is the surface the Receive screen is currently standing on.
+ * Only `status`, `copyTarget` and the method-specific extras differ per rail.
+ */
+function mintQuoteRailFields(
+  quote: MintQuote,
+  standingIds: Set<string>
+): Pick<
+  ReceiveRailItem,
+  'isCurrent' | 'mintUrl' | 'mintName' | 'mintIconUrl' | 'amount' | 'createdAt'
+> {
+  const mint = resolveMintDisplay(quote.mintUrl);
+  const paid = quoteAmountPaid(quote);
+  return {
+    isCurrent: standingIds.has(quote.quoteId),
+    mintUrl: quote.mintUrl,
+    mintName: mint.name,
+    mintIconUrl: mint.iconUrl,
+    amount: paid > 0 ? { value: paid, unit: quote.unit } : undefined,
+    createdAt: quote.createdAt,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // History index — join paid surfaces to their resulting transaction.
 // ---------------------------------------------------------------------------
@@ -222,22 +247,15 @@ export async function buildOnchainItems(
     paymentLog.warn('receive.rail_list.history_truncated', { rail: 'onchain' });
   }
   return sorted.map((q) => {
-    const paid = quoteAmountPaid(q);
     const expired = isQuoteExpired(q, nowSeconds);
-    const status = classifyOnchainQuote(paid, expired);
-    const mint = resolveMintDisplay(q.mintUrl);
+    const status = classifyOnchainQuote(quoteAmountPaid(q), expired);
     return {
       key: `onchain-${q.mintUrl}-${q.quoteId}`,
       rail: 'onchain',
       request: q.request,
       copyTarget: 'address',
       status,
-      isCurrent: opts.standingIds.has(q.quoteId),
-      mintUrl: q.mintUrl,
-      mintName: mint.name,
-      mintIconUrl: mint.iconUrl,
-      amount: paid > 0 ? { value: paid, unit: q.unit } : undefined,
-      createdAt: q.createdAt,
+      ...mintQuoteRailFields(q, opts.standingIds),
       linkEntry: status === 'paid' ? index?.byQuoteId.get(q.quoteId) : undefined,
       // coco watches until expiry (see `listening` docs); a reusable onchain
       // address keeps being watched even after a deposit, so this is `!expired`
@@ -263,21 +281,14 @@ export async function buildBolt12Items(
   // subscribed to them. A genuinely live offer (null/future expiry) is
   // `reusable` (copyable, "Listening").
   return sorted.map((q) => {
-    const paid = quoteAmountPaid(q);
     const expired = isQuoteExpired(q, nowSeconds);
-    const mint = resolveMintDisplay(q.mintUrl);
     return {
       key: `bolt12-${q.mintUrl}-${q.quoteId}`,
       rail: 'bolt12',
       request: q.request,
       copyTarget: 'bolt12Offer',
       status: expired ? 'expired' : 'reusable',
-      isCurrent: opts.standingIds.has(q.quoteId),
-      mintUrl: q.mintUrl,
-      mintName: mint.name,
-      mintIconUrl: mint.iconUrl,
-      amount: paid > 0 ? { value: paid, unit: q.unit } : undefined,
-      createdAt: q.createdAt,
+      ...mintQuoteRailFields(q, opts.standingIds),
       listening: !expired,
     };
   });

@@ -82,6 +82,18 @@ export function createLegProgressStore<Meta extends object>(opts: {
         return { active: { ...s.active, legs } };
       });
 
+    // complete and cancel report the same thing — how long the run took and how
+    // far the legs actually got — and differ only in the state they land on.
+    // `fail` deliberately stays separate: it logs at warn, and the leg tallies
+    // are noise beside the error text.
+    const logSettled = (event: 'complete' | 'cancel', active: ActiveProgress<Meta>) =>
+      log.info(`${name}.status.${event}`, {
+        id: active.id,
+        durationMs: Date.now() - active.startedAt,
+        doneLegs: active.legs.filter((l) => l.status === 'done').length,
+        totalLegs: active.legs.length,
+      });
+
     return {
       active: null,
       start: ({ id, legs, meta }) => {
@@ -107,12 +119,7 @@ export function createLegProgressStore<Meta extends object>(opts: {
       complete: () => {
         const cur = get().active;
         if (!cur) return;
-        log.info(`${name}.status.complete`, {
-          id: cur.id,
-          durationMs: Date.now() - cur.startedAt,
-          doneLegs: cur.legs.filter((l) => l.status === 'done').length,
-          totalLegs: cur.legs.length,
-        });
+        logSettled('complete', cur);
         set({ active: { ...cur, state: 'done' } });
       },
       fail: (errorMessage) => {
@@ -128,12 +135,7 @@ export function createLegProgressStore<Meta extends object>(opts: {
       cancel: (errorMessage) => {
         const cur = get().active;
         if (!cur) return;
-        log.info(`${name}.status.cancel`, {
-          id: cur.id,
-          durationMs: Date.now() - cur.startedAt,
-          doneLegs: cur.legs.filter((l) => l.status === 'done').length,
-          totalLegs: cur.legs.length,
-        });
+        logSettled('cancel', cur);
         set({ active: { ...cur, state: 'cancelled', errorMessage } });
       },
       clear: () => {

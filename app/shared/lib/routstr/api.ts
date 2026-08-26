@@ -374,6 +374,31 @@ interface ModelsResponse {
   data: RoutstrModel[];
 }
 
+/**
+ * Read one Routstr JSON envelope: HTTP status first, then shape. A body that
+ * doesn't parse is a hard failure — the per-field `?? 0` defaults the callers
+ * apply are for absent optionals in a well-formed envelope, not a stand-in for
+ * a response that isn't one, and silently zeroing a balance is the shape of
+ * error that gates sends against a number the server never sent.
+ *
+ * `invalidShapeEvent` is passed as a whole literal rather than composed here so
+ * every log-doctor scope stays greppable at its call site.
+ */
+async function readRoutstrEnvelope<TSpine extends z.ZodType>(
+  response: Response,
+  spine: TSpine,
+  meta: { route: string; invalidShapeEvent: string }
+): Promise<z.infer<TSpine>> {
+  if (!response.ok) await throwResponseError(response);
+
+  const validated = spine.safeParse(await response.json());
+  if (!validated.success) {
+    apiLog.warn(meta.invalidShapeEvent, { issues: validated.error.issues.length });
+    throw new Error(`Routstr ${meta.route} returned a malformed envelope`);
+  }
+  return validated.data;
+}
+
 // ── Public API ───────────────────────────────────────────────────────────
 
 export async function getModels(controls: RequestControls = {}): Promise<RoutstrModel[]> {
@@ -385,17 +410,10 @@ export async function getModels(controls: RequestControls = {}): Promise<Routstr
       headers: { 'Content-Type': 'application/json' },
       signal: buildAbortSignal({ timeoutMs: ROUTSTR_TIMEOUT_MS, ...controls }),
     });
-    if (!response.ok) await throwResponseError(response);
-
-    const raw = await response.json();
-    const validated = ModelsResponseSpine.safeParse(raw);
-    if (!validated.success) {
-      apiLog.warn('api.routstr.models.invalid_shape', {
-        issues: validated.error.issues.length,
-      });
-      throw new Error('Routstr /models returned a malformed envelope');
-    }
-    const data = validated.data as unknown as ModelsResponse;
+    const data = (await readRoutstrEnvelope(response, ModelsResponseSpine, {
+      route: '/models',
+      invalidShapeEvent: 'api.routstr.models.invalid_shape',
+    })) as unknown as ModelsResponse;
     const enabled = data.data.filter((model) => model.enabled);
     apiLog.info('api.routstr.models.success', {
       count: enabled.length,
@@ -429,17 +447,10 @@ export async function checkBalance(
       status: response.status,
       duration_ms: Math.round(performance.now() - start),
     });
-    if (!response.ok) await throwResponseError(response);
-
-    const raw = await response.json();
-    const validated = BalanceSpine.safeParse(raw);
-    if (!validated.success) {
-      apiLog.warn('api.routstr.balance.invalid_shape', {
-        issues: validated.error.issues.length,
-      });
-      throw new Error('Routstr /wallet/info returned a malformed envelope');
-    }
-    const data = validated.data;
+    const data = await readRoutstrEnvelope(response, BalanceSpine, {
+      route: '/wallet/info',
+      invalidShapeEvent: 'api.routstr.balance.invalid_shape',
+    });
     const result = {
       balance: data.balance ?? 0,
       total_spent: data.total_spent ?? 0,
@@ -484,17 +495,11 @@ export async function topUpBalance(
       status: response.status,
       duration_ms: Math.round(performance.now() - start),
     });
-    if (!response.ok) await throwResponseError(response);
-
-    const raw = await response.json();
-    const validated = TopUpSpine.safeParse(raw);
-    if (!validated.success) {
-      apiLog.warn('api.routstr.wallet.topup.invalid_shape', {
-        issues: validated.error.issues.length,
-      });
-      throw new Error('Routstr /wallet/topup returned a malformed envelope');
-    }
-    const result = { added_amount: validated.data.msats ?? 0 };
+    const data = await readRoutstrEnvelope(response, TopUpSpine, {
+      route: '/wallet/topup',
+      invalidShapeEvent: 'api.routstr.wallet.topup.invalid_shape',
+    });
+    const result = { added_amount: data.msats ?? 0 };
     apiLog.info('api.routstr.wallet.topup.success', {
       addedAmount: result.added_amount,
       duration_ms: Math.round(performance.now() - start),
