@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
 import { DisplayCurrency, useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 export interface FiatCurrencyPillProps {
   /** Display string, e.g. "≈ $12.34" */
@@ -22,13 +21,24 @@ export interface FiatCurrencyPillProps {
 }
 
 interface FiatCurrencyPillShared {
-  success: string;
   handleSelectCurrency: (currency: DisplayCurrency) => void;
   text: string;
   iosHeight: number;
   iosWidth: number;
   onPress?: () => void;
   enableCurrencyMenu: boolean;
+  /**
+   * The tap/long-press arbitration, as data: with an external `onPress`, tap
+   * toggles sats/fiat and long-press opens the currency menu; otherwise tap
+   * opens it. Native-menu variants feed this straight into their
+   * `shouldOpenOnLongPress`-style flags.
+   */
+  menuOpensOnLongPress: boolean;
+  /** Same arbitration as handlers, for variants that own their menu opener. */
+  handlersFor: (openMenu: () => void) => {
+    primaryHandler?: () => void;
+    longPressHandler?: () => void;
+  };
   textSize: number;
   testID?: string;
   accessibilityLabel?: string;
@@ -44,7 +54,6 @@ export function useFiatCurrencyPill({
   testID,
   accessibilityLabel,
 }: FiatCurrencyPillProps): FiatCurrencyPillShared {
-  const [success] = useThemeColor(['success'] as const);
   const setDisplayCurrency = useSettingsStore((state) => state.setDisplayCurrency);
 
   const handleSelectCurrency = useCallback(
@@ -62,14 +71,21 @@ export function useFiatCurrencyPill({
   const iosHeight = 34;
   const iosWidth = Math.max(72, Math.round(text.length * (textSize * 0.62) + 28));
 
+  const menuOpensOnLongPress = enableCurrencyMenu && !!onPress;
+  const handlersFor = (openMenu: () => void) => ({
+    primaryHandler: enableCurrencyMenu && !onPress ? openMenu : onPress,
+    longPressHandler: menuOpensOnLongPress ? openMenu : undefined,
+  });
+
   return {
-    success,
     handleSelectCurrency,
     text,
     iosHeight,
     iosWidth,
     onPress,
     enableCurrencyMenu,
+    menuOpensOnLongPress,
+    handlersFor,
     textSize,
     testID,
     accessibilityLabel,

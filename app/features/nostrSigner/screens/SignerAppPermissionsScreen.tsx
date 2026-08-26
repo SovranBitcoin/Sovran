@@ -66,6 +66,33 @@ interface RowSection {
   rows: PermissionKeyRowModel[];
 }
 
+/**
+ * One section per bundle the group contains, then "Other" for unbundled
+ * rows (locked keys, odd-kind extras). filter preserves row order.
+ */
+function buildRowSections(
+  app: { grants: Parameters<typeof buildPermissionKeyRows>[1] } | undefined,
+  group: z.infer<typeof ParamsSchema>['group'] | undefined
+): RowSection[] {
+  if (app === undefined || group === undefined) return [];
+  const rows = buildPermissionKeyRows(BASE_EDITOR_GRANT_KEYS, app.grants, group);
+  const bundleSections: RowSection[] = PERMISSION_BUNDLES.filter((bundle) => bundle.group === group)
+    .map((bundle) => ({
+      title: bundle.label,
+      rows: rows.filter((row) => bundleForGrantKey(row.grantKey)?.id === bundle.id),
+    }))
+    .filter((section) => section.rows.length > 0);
+  const otherRows = rows.filter((row) => bundleForGrantKey(row.grantKey) === null);
+  if (otherRows.length > 0) {
+    bundleSections.push({
+      // A lone card needs no redundant "Other" header (wallet group).
+      title: bundleSections.length > 0 ? OTHER_SECTION_TITLE : null,
+      rows: otherRows,
+    });
+  }
+  return bundleSections;
+}
+
 export function SignerAppPermissionsScreen(): React.ReactElement {
   const params = useLocalSearchParams<{ clientPubkey?: string; group?: string }>();
   const parsed = ParamsSchema.safeParse(params);
@@ -94,29 +121,7 @@ export function SignerAppPermissionsScreen(): React.ReactElement {
       ? []
       : sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey);
 
-  // One section per bundle the group contains, then "Other" for unbundled
-  // rows (locked keys, odd-kind extras). filter preserves row order.
-  const sections: RowSection[] = (() => {
-    if (app === undefined || group === undefined) return [];
-    const rows = buildPermissionKeyRows(BASE_EDITOR_GRANT_KEYS, app.grants, group);
-    const bundleSections: RowSection[] = PERMISSION_BUNDLES.filter(
-      (bundle) => bundle.group === group
-    )
-      .map((bundle) => ({
-        title: bundle.label,
-        rows: rows.filter((row) => bundleForGrantKey(row.grantKey)?.id === bundle.id),
-      }))
-      .filter((section) => section.rows.length > 0);
-    const otherRows = rows.filter((row) => bundleForGrantKey(row.grantKey) === null);
-    if (otherRows.length > 0) {
-      bundleSections.push({
-        // A lone card needs no redundant "Other" header (wallet group).
-        title: bundleSections.length > 0 ? OTHER_SECTION_TITLE : null,
-        rows: otherRows,
-      });
-    }
-    return bundleSections;
-  })();
+  const sections: RowSection[] = buildRowSections(app, group);
 
   const onChange = (grantKey: GrantKey, state: TriState) => {
     if (clientPubkey === undefined) return;

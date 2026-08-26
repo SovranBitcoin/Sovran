@@ -187,6 +187,61 @@ type FlatRow<T> =
   | { kind: 'header'; sectionId: string; render: () => ReactNode }
   | { kind: 'row'; sectionId: string; items: T[]; rowIndex: number; rowKey: string };
 
+/**
+ * Flatten sections into a single virtualizable row stream. Each section's
+ * optional `renderHeader` becomes a `header` row; its `data` is split into
+ * `rowChunkSize`-sized chunks, each becoming a `row` row. `sectionFirstIndex`
+ * maps a sectionId to the index of its first row in `flatItems` — used by
+ * `scrollToIndex` on anchor-pill taps.
+ */
+function flattenSections<T>(
+  sections: AnchorSection<T>[],
+  rowChunkSize: number,
+  keyExtractor: (item: T, sectionId: string) => string
+): { flatItems: FlatRow<T>[]; sectionFirstIndex: Record<string, number> } {
+  const start = Date.now();
+  const items: FlatRow<T>[] = [];
+  const firstIndex: Record<string, number> = {};
+  for (const section of sections) {
+    let firstRowForSection: number | undefined;
+    if (section.renderHeader) {
+      firstRowForSection = items.length;
+      items.push({ kind: 'header', sectionId: section.id, render: section.renderHeader });
+    }
+    const chunkSize = Math.max(1, rowChunkSize);
+    for (let i = 0; i < section.data.length; i += chunkSize) {
+      const chunk = section.data.slice(i, i + chunkSize);
+      const rowIndex = i / chunkSize;
+      const firstKey = keyExtractor(chunk[0]!, section.id);
+      const rowKey = chunkSize === 1 ? firstKey : `${section.id}-row-${rowIndex}-${firstKey}`;
+      if (firstRowForSection === undefined) firstRowForSection = items.length;
+      items.push({
+        kind: 'row',
+        sectionId: section.id,
+        items: chunk,
+        rowIndex,
+        rowKey,
+      });
+    }
+    if (firstRowForSection !== undefined) {
+      firstIndex[section.id] = firstRowForSection;
+    }
+  }
+  const elapsed = Date.now() - start;
+  // Recomputed every render this component makes (the compiler may cache it
+  // while `sections` / `rowChunkSize` / `keyExtractor` are stable). If this
+  // logs hot, it's almost always because the caller is rebuilding `sections`
+  // every render.
+  sectionListLog.debug('sectionList.flatten', {
+    sectionsIn: sections.length,
+    flatRowsOut: items.length,
+    headers: items.filter((it) => it.kind === 'header').length,
+    rows: items.filter((it) => it.kind === 'row').length,
+    elapsedMs: elapsed,
+  });
+  return { flatItems: items, sectionFirstIndex: firstIndex };
+}
+
 export function SectionAnchorList<T>({
   sections,
   renderItem,
@@ -270,54 +325,7 @@ export function SectionAnchorList<T>({
     }
   }, [activeAnchor]);
 
-  // Flatten sections into a single virtualizable row stream. Each
-  // section's optional `renderHeader` becomes a `header` row; its
-  // `data` is split into `rowChunkSize`-sized chunks, each becoming
-  // a `row` row. `sectionFirstIndex` maps a sectionId to the index
-  // of its first row in `flatItems` — used by `scrollToIndex` on
-  // anchor-pill taps.
-  const { flatItems, sectionFirstIndex } = (() => {
-    const start = Date.now();
-    const items: FlatRow<T>[] = [];
-    const firstIndex: Record<string, number> = {};
-    for (const section of sections) {
-      let firstRowForSection: number | undefined;
-      if (section.renderHeader) {
-        firstRowForSection = items.length;
-        items.push({ kind: 'header', sectionId: section.id, render: section.renderHeader });
-      }
-      const chunkSize = Math.max(1, rowChunkSize);
-      for (let i = 0; i < section.data.length; i += chunkSize) {
-        const chunk = section.data.slice(i, i + chunkSize);
-        const rowIndex = i / chunkSize;
-        const firstKey = keyExtractor(chunk[0]!, section.id);
-        const rowKey = chunkSize === 1 ? firstKey : `${section.id}-row-${rowIndex}-${firstKey}`;
-        if (firstRowForSection === undefined) firstRowForSection = items.length;
-        items.push({
-          kind: 'row',
-          sectionId: section.id,
-          items: chunk,
-          rowIndex,
-          rowKey,
-        });
-      }
-      if (firstRowForSection !== undefined) {
-        firstIndex[section.id] = firstRowForSection;
-      }
-    }
-    const elapsed = Date.now() - start;
-    // The flatten happens whenever `sections` / `rowChunkSize` /
-    // `keyExtractor` identity changes. If this runs hot, it's almost
-    // always because the caller is rebuilding `sections` every render.
-    sectionListLog.debug('sectionList.flatten', {
-      sectionsIn: sections.length,
-      flatRowsOut: items.length,
-      headers: items.filter((it) => it.kind === 'header').length,
-      rows: items.filter((it) => it.kind === 'row').length,
-      elapsedMs: elapsed,
-    });
-    return { flatItems: items, sectionFirstIndex: firstIndex };
-  })();
+  const { flatItems, sectionFirstIndex } = flattenSections(sections, rowChunkSize, keyExtractor);
 
   // One-shot mount log + the inverse for unmount. Captures the size of
   // the dataset so log-doctor's `stats` mode can correlate later events
@@ -420,8 +428,7 @@ export function SectionAnchorList<T>({
 
   // Merge component-managed paddingTop/paddingBottom with caller-supplied
   // listContentContainerStyle (the latter typically carries
-  // paddingHorizontal). Computed lazily so a paddingHorizontal change
-  // doesn't invalidate the chrome-height memo.
+  // paddingHorizontal).
   const listContentContainerStyleMerged = StyleSheet.flatten([
     listContentContainerStyle,
     { paddingTop: viewportTopOffset, paddingBottom: contentBottomInset },

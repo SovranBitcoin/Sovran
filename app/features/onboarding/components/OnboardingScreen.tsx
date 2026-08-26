@@ -13,6 +13,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+// ast-grep-ignore: flatlist-outside-list-seam-tsx
+// FlatList here is only the ref type for OnboardingInnerCarousel's RNGH
+// pager (see the exemption there); Gesture/GestureDetector are the real use.
 import { FlatList, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { scheduleOnRN } from 'react-native-worklets';

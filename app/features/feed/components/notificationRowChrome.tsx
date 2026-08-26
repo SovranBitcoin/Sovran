@@ -54,15 +54,21 @@ export const notificationListStyles = StyleSheet.create({
 export function NotificationRowPressable({
   pressedBackground,
   onPress,
+  testID,
+  accessibilityLabel,
   children,
 }: {
   pressedBackground: string;
   onPress: () => void;
+  testID?: string;
+  accessibilityLabel?: string;
   children: ReactNode;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
       haptics
       activeOpacity={1}
       onPress={onPress}

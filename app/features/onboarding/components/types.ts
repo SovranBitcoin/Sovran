@@ -1,4 +1,7 @@
 import { SharedValue } from 'react-native-reanimated';
+// ast-grep-ignore: flatlist-outside-list-seam-ts
+// Ref type for OnboardingInnerCarousel's RNGH FlatList pager (see the
+// exemption there) — type-only, no list is rendered here.
 import { FlatList } from 'react-native-gesture-handler';
 
 export type OnboardingSlide = {

@@ -418,29 +418,26 @@ export function MintReviewsScreen() {
     <HeaderStats score={kymScore ?? null} totalReviews={totalReviews} loading={isLoading} />
   );
 
-  const ListFooter = (() => {
-    if (!isLoading) return null;
-    const skeletonCount = reviews.length > 0 ? 2 : 3;
-    // Footer-only skeletons: the real reviews populate the list body, so there's
-    // no in-place content to fade into. Route through the canonical helper for
-    // the region wave; `exit="none"` lets them unmount as the list fills.
-    return (
-      <SkeletonContentCrossfade
-        loading
-        exit="none"
-        visualKey="mint-reviews-list"
-        visualSurface="mint-reviews"
-        renderSkeleton={() => (
-          <View>
-            {Array.from({ length: skeletonCount }).map((_, i) => (
-              <ReviewSkeleton key={`skeleton-${i}`} isLast={i === skeletonCount - 1} />
-            ))}
-          </View>
-        )}
-        renderContent={() => null}
-      />
-    );
-  })();
+  // Footer-only skeletons: the real reviews populate the list body, so there's
+  // no in-place content to fade into. Route through the canonical helper for
+  // the region wave; `exit="none"` lets them unmount as the list fills.
+  const skeletonCount = reviews.length > 0 ? 2 : 3;
+  const ListFooter = isLoading ? (
+    <SkeletonContentCrossfade
+      loading
+      exit="none"
+      visualKey="mint-reviews-list"
+      visualSurface="mint-reviews"
+      renderSkeleton={() => (
+        <View>
+          {Array.from({ length: skeletonCount }).map((_, i) => (
+            <ReviewSkeleton key={`skeleton-${i}`} isLast={i === skeletonCount - 1} />
+          ))}
+        </View>
+      )}
+      renderContent={() => null}
+    />
+  ) : null;
 
   const showEmptyState = !isLoading && totalReviews === 0;
 

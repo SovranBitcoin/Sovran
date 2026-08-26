@@ -3,7 +3,8 @@
  * lane (a bare `<Menu>` outside any `Menu.Content` host): leading icon,
  * collapse-proof title, optional description, optional trailing accessory.
  * Used by the action-menu / payment-options / proof-selector / model-picker
- * sheets so the heroui title defence lives in one place.
+ * sheets, the `ActionMenuHost` menu lane, and `ActionMenuButton`'s popover so
+ * the row body and the heroui title defence live in one place.
  */
 
 import type { ReactNode } from 'react';

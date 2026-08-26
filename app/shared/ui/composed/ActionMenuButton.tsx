@@ -43,6 +43,7 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { SheetMenuRowContent } from '@/shared/lib/popup/popups/sheetMenuRow';
 import Icon from 'assets/icons';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 import { actionMenuPopup, type ActionMenuItem } from '@/shared/lib/popup/popups/actionMenu';
@@ -355,17 +356,11 @@ function renderPopoverPortal(
                 }
               })();
             }}>
-            <HStack align="center" gap={10} style={{ flex: 1 }}>
-              {v.iconNode ?? (v.icon ? <Icon name={v.icon} size={18} /> : null)}
-              <View style={{ flex: 1 }}>
-                <Menu.ItemTitle>{v.label}</Menu.ItemTitle>
-                {(v.description || (v.isDisabled && v.reason)) && (
-                  <Menu.ItemDescription>
-                    {v.isDisabled && v.reason ? v.reason : v.description}
-                  </Menu.ItemDescription>
-                )}
-              </View>
-            </HStack>
+            <SheetMenuRowContent
+              icon={v.iconNode ?? (v.icon ? <Icon name={v.icon} size={18} /> : null)}
+              title={v.label}
+              description={(v.isDisabled && v.reason ? v.reason : v.description) || undefined}
+            />
           </Menu.Item>
         ))}
       </Menu.Content>

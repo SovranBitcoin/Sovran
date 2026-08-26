@@ -27,7 +27,7 @@ import {
   notificationListStyles,
   NotificationRowPressable,
 } from '@/features/feed/components/notificationRowChrome';
-import { notificationTimestamp } from '@/features/feed/lib/notificationCopy';
+import { formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { List } from '@/shared/ui/composed/List';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
@@ -461,7 +461,7 @@ function FollowerRow({
   const npub = tryNpubEncode(notification.event.pubkey);
   const displayPubkey = truncateMiddle(npub || notification.event.pubkey, 10);
   const name = profile?.name || displayPubkey;
-  const timestamp = notificationTimestamp(notification.event.created_at);
+  const timestamp = formatRelativeUnixSeconds(notification.event.created_at);
 
   return (
     <NotificationRowPressable pressedBackground={pressedBackground} onPress={onPress}>

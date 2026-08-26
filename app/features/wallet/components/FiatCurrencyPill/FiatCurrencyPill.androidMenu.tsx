@@ -5,7 +5,7 @@ import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
-import { FiatPillShell, fiatPillHandlers } from './FiatCurrencyPill.shell';
+import { FiatPillShell } from './FiatCurrencyPill.shell';
 
 const CURRENCY_OPTIONS: {
   currency: DisplayCurrency;
@@ -22,8 +22,7 @@ export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React
     text,
     iosHeight,
     handleSelectCurrency,
-    onPress,
-    enableCurrencyMenu,
+    handlersFor,
     textSize,
     testID,
     accessibilityLabel,
@@ -55,11 +54,7 @@ export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React
     });
   }, [displayCurrency, success, handleSelectCurrency]);
 
-  const { primaryHandler, longPressHandler } = fiatPillHandlers(
-    enableCurrencyMenu,
-    onPress,
-    openCurrencyMenu
-  );
+  const { primaryHandler, longPressHandler } = handlersFor(openCurrencyMenu);
 
   return (
     <FiatPillShell

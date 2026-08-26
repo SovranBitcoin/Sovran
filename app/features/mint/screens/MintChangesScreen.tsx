@@ -15,7 +15,7 @@ import { useMintChangeRevisions } from '@/features/mint/hooks/useMintChanges';
 import type { MintChangeRevision } from '@/features/mint/lib/mintChanges/groupEntries';
 import { capitalize, type MintChangePhrase } from '@/features/mint/lib/mintChanges/phrase';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { formatDate, formatRelative } from '@/shared/lib/date';
+import { formatDate, formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { Log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
@@ -90,7 +90,7 @@ function RevisionSection({ revision }: { revision: MintChangeRevision }) {
           {formatDate(entry.at * 1000, 'short-date-time')}
         </Text>
         <Text size={fontSize.sm} style={{ color: muted }}>
-          {formatRelative(entry.at * 1000, 'compact')}
+          {formatRelativeUnixSeconds(entry.at)}
         </Text>
       </HStack>
       {window ? (

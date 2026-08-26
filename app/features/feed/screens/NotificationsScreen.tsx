@@ -20,8 +20,8 @@ import {
 import {
   notificationReasonLabel,
   notificationReplyScopeLabel,
-  notificationTimestamp,
 } from '@/features/feed/lib/notificationCopy';
+import { formatRelativeUnixSeconds } from '@/shared/lib/date';
 import {
   notificationListStyles,
   NotificationRowPressable,
@@ -1305,7 +1305,7 @@ function notificationName(
 }
 
 function notificationEventTimestamp(notification: FeedNotification): string {
-  return notificationTimestamp(notification.event.created_at);
+  return formatRelativeUnixSeconds(notification.event.created_at);
 }
 
 function notificationGroupTimestamp(notifications: readonly FeedNotification[]): string {
@@ -1313,7 +1313,7 @@ function notificationGroupTimestamp(notifications: readonly FeedNotification[]):
     (max, notification) => Math.max(max, notification.event.created_at),
     0
   );
-  return notificationTimestamp(latest);
+  return formatRelativeUnixSeconds(latest);
 }
 
 // For a like/repost/zap, tapping the row should open the POST that was engaged

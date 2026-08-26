@@ -52,6 +52,31 @@ const COMPOSER_FOCUSED_BOTTOM_GAP = 0;
 
 const messageKeyExtractor = (m: RoutstrMessage) => m.id;
 
+/** Prev/next sibling navigation per assistant message on the active path. */
+function buildBranchNavById(
+  conversationHistory: RoutstrMessage[],
+  activeMessages: RoutstrMessage[],
+  setActiveBranch: (parentId: string, childId: string) => void
+): Map<string, BranchNav> {
+  const map = new Map<string, BranchNav>();
+  const normalized = withSynthesisedParents(conversationHistory);
+  for (const m of activeMessages) {
+    if (m.role !== 'assistant') continue;
+    const info = getSiblingInfo(m.id, normalized);
+    if (!info) continue;
+    const onPrev =
+      info.index > 1
+        ? () => setActiveBranch(m.parentId ?? '', info.siblings[info.index - 2].id)
+        : undefined;
+    const onNext =
+      info.index < info.total
+        ? () => setActiveBranch(m.parentId ?? '', info.siblings[info.index].id)
+        : undefined;
+    map.set(m.id, { index: info.index, total: info.total, onPrev, onNext });
+  }
+  return map;
+}
+
 /**
  * AI tab chat surface. Built directly on FlashList rather than going
  * through the shared `<ChatScreen />` because the AI surface needs a
@@ -167,25 +192,7 @@ export function AiChatScreen() {
     aiLog
   );
 
-  const branchNavById = (() => {
-    const map = new Map<string, BranchNav>();
-    const normalized = withSynthesisedParents(conversationHistory);
-    for (const m of activeMessages) {
-      if (m.role !== 'assistant') continue;
-      const info = getSiblingInfo(m.id, normalized);
-      if (!info) continue;
-      const onPrev =
-        info.index > 1
-          ? () => setActiveBranch(m.parentId ?? '', info.siblings[info.index - 2].id)
-          : undefined;
-      const onNext =
-        info.index < info.total
-          ? () => setActiveBranch(m.parentId ?? '', info.siblings[info.index].id)
-          : undefined;
-      map.set(m.id, { index: info.index, total: info.total, onPrev, onNext });
-    }
-    return map;
-  })();
+  const branchNavById = buildBranchNavById(conversationHistory, activeMessages, setActiveBranch);
 
   const handleRetry = (messageId: string) => {
     aiLog.info('ai.retry.dispatch', { messageId });

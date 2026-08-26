@@ -2,7 +2,8 @@
  * Shared pill chrome for the non-glass FiatCurrencyPill variants (flat +
  * androidMenu). The variants differ only in how the currency menu opens
  * (ActionSheetIOS vs the app-wide `actionMenuPopup` host); the pressable pill
- * itself and the tap/long-press arbitration are identical.
+ * itself is identical, and the tap/long-press arbitration comes from
+ * `useFiatCurrencyPill`.
  */
 
 import React from 'react';
@@ -12,21 +13,6 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-
-/**
- * With an external `onPress`, tap toggles sats/fiat and long-press opens the
- * currency menu; otherwise tap opens it. Mirrors `useFiatCurrencyPill`.
- */
-export function fiatPillHandlers(
-  enableCurrencyMenu: boolean,
-  onPress: (() => void) | undefined,
-  openMenu: () => void
-): { primaryHandler?: () => void; longPressHandler?: () => void } {
-  return {
-    primaryHandler: enableCurrencyMenu && !onPress ? openMenu : onPress,
-    longPressHandler: enableCurrencyMenu && onPress ? openMenu : undefined,
-  };
-}
 
 interface FiatPillShellProps {
   text: string;

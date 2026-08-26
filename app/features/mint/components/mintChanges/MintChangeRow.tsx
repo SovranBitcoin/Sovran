@@ -15,11 +15,11 @@ import Icon from '@/assets/icons';
 import type { MintChangeUpdate } from '@/features/mint/lib/mintChanges/groupEntries';
 import { mintChangeSentence, type MintChangeTone } from '@/features/mint/lib/mintChanges/phrase';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { formatRelative } from '@/shared/lib/date';
+import { formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { alpha, fontSize, radius, spacing } from '@/shared/styles/tokens';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { useCachedMintMetadata } from '@/shared/stores/global/mintMetadataStore';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { NotificationRowPressable } from '@/features/feed/components/notificationRowChrome';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -89,18 +89,15 @@ export function MintChangeRow({
     [surfaceTertiary]
   );
 
-  const timestamp = update.at > 0 ? formatRelative(update.at * 1000, 'compact') : '';
+  const timestamp = formatRelativeUnixSeconds(update.at);
   const sentence = mintChangeSentence(update.name, update.phrase);
 
   return (
-    <Pressable
-      accessibilityRole="button"
+    <NotificationRowPressable
       accessibilityLabel={sentence}
       testID={`mint-change-row:${update.id}`}
-      haptics
-      activeOpacity={1}
-      onPress={() => onPress(update)}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: pressedBackground }]}>
+      pressedBackground={pressedBackground}
+      onPress={() => onPress(update)}>
       <HStack align="flex-start" gap={spacing.md}>
         <MintChangeGlyph icon={update.phrase.icon} tone={update.phrase.tone} />
         <MintIcon
@@ -128,15 +125,11 @@ export function MintChangeRow({
           </HStack>
         </VStack>
       </HStack>
-    </Pressable>
+    </NotificationRowPressable>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-  },
   reasonIcon: {
     alignItems: 'center',
     justifyContent: 'center',

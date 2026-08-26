@@ -143,6 +143,82 @@ function safeNpubEncode(pubkey: string): string {
   }
 }
 
+/** [base, contrast] gradient pair for a header color extracted from an image. */
+function gradientPair(base: string): readonly [string, string] {
+  const { contrastColor } = getContrastColors(base, 0.3);
+  return [base, contrastColor] as const;
+}
+
+interface ProfileInfoItem {
+  key: string;
+  prefix: React.ReactNode;
+  title: string;
+  suffixIcon: string;
+  onPress: () => void;
+}
+
+/** The copyable identity rows (npub, then nip05/lud16/website when known). */
+function buildProfileInfoItems(
+  npub: string,
+  cachedProfile: { nip05?: string; lud16?: string; website?: string } | null | undefined,
+  iconColor: string,
+  handleCopy: (text: string, target: CopyTarget) => Promise<void>,
+  handleOpenLink: (url: string) => Promise<void>
+): ProfileInfoItem[] {
+  const items: ProfileInfoItem[] = [
+    {
+      key: 'npub',
+      prefix: <CurrencyIcon colors={[iconColor]} width={20} currency="nostr" />,
+      title: truncateMiddle(npub, 10),
+      suffixIcon: 'lets-icons:copy',
+      onPress: () => {
+        void handleCopy(npub, 'npub');
+      },
+    },
+  ];
+
+  if (cachedProfile?.nip05) {
+    const nip05 = cachedProfile.nip05;
+    items.push({
+      key: 'nip05',
+      prefix: <Icon name="mdi:check-decagram" size={20} color={iconColor} />,
+      title: nip05,
+      suffixIcon: 'lets-icons:copy',
+      onPress: () => {
+        void handleCopy(nip05, 'nip05');
+      },
+    });
+  }
+
+  if (cachedProfile?.lud16) {
+    const lud16 = cachedProfile.lud16;
+    items.push({
+      key: 'lud16',
+      prefix: <Icon name="mdi:lightning-bolt" size={20} color={iconColor} />,
+      title: lud16,
+      suffixIcon: 'lets-icons:copy',
+      onPress: () => {
+        void handleCopy(lud16, 'lud16');
+      },
+    });
+  }
+
+  if (cachedProfile?.website) {
+    const website = cachedProfile.website;
+    items.push({
+      key: 'website',
+      prefix: <Icon name="mdi:web" size={20} color={iconColor} />,
+      title: website,
+      suffixIcon: 'mdi:open-in-new',
+      onPress: () => {
+        void handleOpenLink(website);
+      },
+    });
+  }
+
+  return items;
+}
+
 // ============================================================================
 // Profile Stats Grid
 // ============================================================================
@@ -551,17 +627,12 @@ function BannerWithAvatar({
         ? 'banner'
         : 'seeded';
 
-  const imageGradientColors = (() => {
-    if (gradientSource === 'pfp') {
-      const { contrastColor } = getContrastColors(pfpColors.baseColor, 0.3);
-      return [pfpColors.baseColor, contrastColor] as const;
-    }
-    if (gradientSource === 'banner') {
-      const { contrastColor } = getContrastColors(bannerColors.baseColor, 0.3);
-      return [bannerColors.baseColor, contrastColor] as const;
-    }
-    return null;
-  })();
+  const imageGradientColors =
+    gradientSource === 'pfp'
+      ? gradientPair(pfpColors.baseColor)
+      : gradientSource === 'banner'
+        ? gradientPair(bannerColors.baseColor)
+        : null;
 
   useEffect(() => {
     setBannerStatus('loading');
@@ -1086,66 +1157,13 @@ export function UserProfileScreen() {
 
   const iconColor = withAlpha(foreground, 0.4);
 
-  const profileInfoItems = (() => {
-    const items: {
-      key: string;
-      prefix: React.ReactNode;
-      title: string;
-      suffixIcon: string;
-      onPress: () => void;
-    }[] = [
-      {
-        key: 'npub',
-        prefix: <CurrencyIcon colors={[iconColor]} width={20} currency="nostr" />,
-        title: truncateMiddle(npub, 10),
-        suffixIcon: 'lets-icons:copy',
-        onPress: () => {
-          void handleCopy(npub, 'npub');
-        },
-      },
-    ];
-
-    if (cachedProfile?.nip05) {
-      const nip05 = cachedProfile.nip05;
-      items.push({
-        key: 'nip05',
-        prefix: <Icon name="mdi:check-decagram" size={20} color={iconColor} />,
-        title: nip05,
-        suffixIcon: 'lets-icons:copy',
-        onPress: () => {
-          void handleCopy(nip05, 'nip05');
-        },
-      });
-    }
-
-    if (cachedProfile?.lud16) {
-      const lud16 = cachedProfile.lud16;
-      items.push({
-        key: 'lud16',
-        prefix: <Icon name="mdi:lightning-bolt" size={20} color={iconColor} />,
-        title: lud16,
-        suffixIcon: 'lets-icons:copy',
-        onPress: () => {
-          void handleCopy(lud16, 'lud16');
-        },
-      });
-    }
-
-    if (cachedProfile?.website) {
-      const website = cachedProfile.website;
-      items.push({
-        key: 'website',
-        prefix: <Icon name="mdi:web" size={20} color={iconColor} />,
-        title: website,
-        suffixIcon: 'mdi:open-in-new',
-        onPress: () => {
-          void handleOpenLink(website);
-        },
-      });
-    }
-
-    return items;
-  })();
+  const profileInfoItems = buildProfileInfoItems(
+    npub,
+    cachedProfile,
+    iconColor,
+    handleCopy,
+    handleOpenLink
+  );
 
   useVisualStateLogger({
     enabled: !!pubkey,

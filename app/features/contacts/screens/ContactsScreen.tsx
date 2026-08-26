@@ -15,7 +15,7 @@ import { useMintContacts, type MintContact } from '@/features/payments/hooks/use
 import { prefetchImages } from '@/shared/lib/imageCache';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { formatRelative } from '@/shared/lib/date';
+import { formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import { Log, log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import {
@@ -59,6 +59,46 @@ function contactsListItemKey(item: ContactsListItem, index: number): string {
   if (item.type === 'request') return item.request.id || item.request.fromPubkey;
   if (item.type === 'mint') return item.mint?.mintUrl ?? item.pubkey ?? `mint-${index}`;
   return item.pubkey || `contact-${index}`;
+}
+
+/** Rows for the active filter; All/Recent merge sources deduped by pubkey. */
+function buildContactsListData(
+  activeFilter: ContactsFilter,
+  whitenoiseContactRows: RecentContact[],
+  displayContacts: RecentContact[],
+  mintsWithProfile: MintContact[],
+  requestRows: WhitenoiseRequestRow[]
+): ContactsListItem[] {
+  switch (activeFilter) {
+    case 'Recent': {
+      // Merge NIP-17 recent contacts with accepted Marmot DM counterparties,
+      // deduped by nostr pubkey.
+      const byKey = new Map<string, ContactsListItem>();
+      for (const item of whitenoiseContactRows) byKey.set(item.pubkey, item);
+      for (const item of displayContacts) {
+        if (item.pubkey) byKey.set(item.pubkey, item);
+      }
+      return Array.from(byKey.values());
+    }
+    case 'Mints':
+      return mintsWithProfile;
+    case 'Requests':
+      return requestRows;
+    default: {
+      const byKey = new Map<string, ContactsListItem>();
+      for (const item of whitenoiseContactRows) {
+        byKey.set(item.pubkey, item);
+      }
+      for (const item of displayContacts) {
+        if (item.pubkey) byKey.set(item.pubkey, item);
+      }
+      for (const item of mintsWithProfile) {
+        const key = item.pubkey || item.mint?.mintUrl;
+        if (key) byKey.set(key, item);
+      }
+      return Array.from(byKey.values());
+    }
+  }
 }
 
 export const ContactsScreen = () => {
@@ -170,38 +210,13 @@ export const ContactsScreen = () => {
       }))
     : [];
 
-  const rawListData: ContactsListItem[] = (() => {
-    switch (activeFilter) {
-      case 'Recent': {
-        // Merge NIP-17 recent contacts with accepted Marmot DM counterparties,
-        // deduped by nostr pubkey.
-        const byKey = new Map<string, ContactsListItem>();
-        for (const item of whitenoiseContactRows) byKey.set(item.pubkey, item);
-        for (const item of displayContacts) {
-          if (item.pubkey) byKey.set(item.pubkey, item);
-        }
-        return Array.from(byKey.values());
-      }
-      case 'Mints':
-        return mintsWithProfile;
-      case 'Requests':
-        return requestRows;
-      default: {
-        const byKey = new Map<string, ContactsListItem>();
-        for (const item of whitenoiseContactRows) {
-          byKey.set(item.pubkey, item);
-        }
-        for (const item of displayContacts) {
-          if (item.pubkey) byKey.set(item.pubkey, item);
-        }
-        for (const item of mintsWithProfile) {
-          const key = item.pubkey || item.mint?.mintUrl;
-          if (key) byKey.set(key, item);
-        }
-        return Array.from(byKey.values());
-      }
-    }
-  })();
+  const rawListData: ContactsListItem[] = buildContactsListData(
+    activeFilter,
+    whitenoiseContactRows,
+    displayContacts,
+    mintsWithProfile,
+    requestRows
+  );
 
   // Mock-mode allowlist filter: only show rows whose nostr pubkey is in
   // MOCK_ALLOWED_PUBKEYS_HEX (defined in mockDataStore). Mints / requests are
@@ -253,13 +268,12 @@ export const ContactsScreen = () => {
     const lastMessage =
       typeof item.dmEvent?.content === 'string' ? item.dmEvent.content : undefined;
     // Relative date of the last message so it's obvious how long ago it was.
-    // RecentContact.timestamp is in Nostr seconds; formatRelative wants ms.
     const lastMessageAt =
       item.type === 'contact' &&
       typeof item.timestamp === 'number' &&
       item.timestamp > 0 &&
       lastMessage
-        ? formatRelative(item.timestamp * 1000, 'compact')
+        ? formatRelativeUnixSeconds(item.timestamp)
         : undefined;
     // Label non-default DM protocols so a NIP-04 / White Noise conversation is
     // distinguishable from the default NIP-17 in the now-mixed list.

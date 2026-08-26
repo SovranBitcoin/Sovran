@@ -18,7 +18,7 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { formatRelative } from '@/shared/lib/date';
+import { formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { formatCount, formatSats } from '../feedFormat';
 import { parseContent } from '../feedParse';
 import type { ContentSegment } from '../feedTypes';
@@ -136,7 +136,7 @@ function OverlayAuthorRow({
   timeColor: string;
 }) {
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
-  const shortTime = formatRelative(event.created_at * 1000, 'compact');
+  const shortTime = formatRelativeUnixSeconds(event.created_at);
   return (
     <Pressable
       onPress={() => {

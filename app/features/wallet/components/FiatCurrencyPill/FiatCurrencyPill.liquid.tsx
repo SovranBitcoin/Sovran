@@ -39,6 +39,7 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
     handleSelectCurrency,
     onPress,
     enableCurrencyMenu,
+    menuOpensOnLongPress,
     textSize,
     testID,
     accessibilityLabel,
@@ -61,7 +62,7 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
         tint={withAlpha(INVARIANT_WHITE, 0.15)}
         colorScheme={colorScheme}
         menuTitle="Display currency"
-        hasPrimaryAction={!!onPress}
+        hasPrimaryAction={menuOpensOnLongPress}
         actions={[
           { id: 'usd', title: 'USD', image: 'dollarsign', selected: displayCurrency === 'usd' },
           { id: 'eur', title: 'EUR', image: 'eurosign', selected: displayCurrency === 'eur' },
@@ -128,7 +129,7 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
     <MenuView
       title="Display currency"
       actions={actions}
-      shouldOpenOnLongPress={!!onPress}
+      shouldOpenOnLongPress={menuOpensOnLongPress}
       onPressAction={({ nativeEvent }) =>
         handleSelectCurrency(nativeEvent.event as DisplayCurrency)
       }>

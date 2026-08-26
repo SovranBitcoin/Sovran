@@ -215,6 +215,14 @@ function formatConversationList(timestampMs: number): string {
 }
 
 /**
+ * Compact relative timestamp from a unix-seconds value (Nostr `created_at`,
+ * mint-update `at`, contact `timestamp`); '' when the time is unknown (≤ 0).
+ */
+export function formatRelativeUnixSeconds(seconds: number): string {
+  return seconds > 0 ? formatRelative(seconds * 1000, 'compact') : '';
+}
+
+/**
  * Format a relative-or-anchored timestamp. Accepts unix milliseconds,
  * a `Date`, or anything `new Date(input)` parses; non-millisecond inputs
  * are coerced first.

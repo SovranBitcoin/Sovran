@@ -3,7 +3,7 @@ import { ActionSheetIOS } from 'react-native';
 
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
-import { FiatPillShell, fiatPillHandlers } from './FiatCurrencyPill.shell';
+import { FiatPillShell } from './FiatCurrencyPill.shell';
 
 const CURRENCY_SHEET_OPTIONS = ['USD', 'EUR', 'GBP', 'Cancel'];
 const CANCEL_BUTTON_INDEX = 3;
@@ -13,8 +13,7 @@ export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactE
     text,
     iosHeight,
     handleSelectCurrency,
-    onPress,
-    enableCurrencyMenu,
+    handlersFor,
     textSize,
     testID,
     accessibilityLabel,
@@ -36,11 +35,7 @@ export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactE
     );
   }, [handleSelectCurrency, colorScheme]);
 
-  const { primaryHandler, longPressHandler } = fiatPillHandlers(
-    enableCurrencyMenu,
-    onPress,
-    openCurrencySheet
-  );
+  const { primaryHandler, longPressHandler } = handlersFor(openCurrencySheet);
 
   return (
     <FiatPillShell

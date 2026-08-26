@@ -66,6 +66,23 @@ function PeerRow({ peer }: PeerRowProps) {
 const keyExtractor = (peer: BLEPeer) => peer.peerID;
 const renderPeerItem = ({ item }: { item: BLEPeer }) => <PeerRow peer={item} />;
 
+function networkSubtitle(
+  bluetoothBlocked: boolean,
+  peerCount: number,
+  connectedCount: number,
+  directLinkCount: number
+): string {
+  if (bluetoothBlocked) return 'Bluetooth unavailable';
+  if (peerCount === 0) return 'Scanning for devices…';
+  if (connectedCount === 0) return `${peerCount} nearby · 0 connected`;
+  if (directLinkCount === connectedCount) {
+    return `${connectedCount} connected · ${peerCount} nearby`;
+  }
+  // Some peers are reachable only via mesh relay — call it out so users
+  // know not every "connected" peer is good for a DM.
+  return `${directLinkCount} direct · ${connectedCount - directLinkCount} mesh · ${peerCount} nearby`;
+}
+
 export default function NetworkSheet() {
   useLifecycleLogger('BitchatNetworkSheet', bitchatLog);
   const [foreground, surfaceSecondary] = useThemeColor([
@@ -96,17 +113,12 @@ export default function NetworkSheet() {
     router.back();
   };
 
-  const subtitleText = (() => {
-    if (bluetoothBlocked) return 'Bluetooth unavailable';
-    if (peers.length === 0) return 'Scanning for devices…';
-    if (connectedCount === 0) return `${peers.length} nearby · 0 connected`;
-    if (directLinkCount === connectedCount) {
-      return `${connectedCount} connected · ${peers.length} nearby`;
-    }
-    // Some peers are reachable only via mesh relay — call it out so users
-    // know not every "connected" peer is good for a DM.
-    return `${directLinkCount} direct · ${connectedCount - directLinkCount} mesh · ${peers.length} nearby`;
-  })();
+  const subtitleText = networkSubtitle(
+    bluetoothBlocked,
+    peers.length,
+    connectedCount,
+    directLinkCount
+  );
 
   return (
     <Log name="BitchatNetworkSheet" style={{ flex: 1 }}>

@@ -113,10 +113,10 @@ function chunkEmojis(emojis: EmojiEntry[]): EmojiEntry[][] {
   return rows;
 }
 
-// Module-level stable callbacks. `keyExtractor` is used as a `useMemo`
-// dep inside `SectionAnchorList`'s flatten step — passing an inline
-// function was rebuilding the 228-row flat array on every parent
-// re-render (verified via `sectionList.flatten` log frequency).
+// Module-level stable callbacks. `keyExtractor` identity feeds
+// `SectionAnchorList`'s flatten step — an inline function defeated its
+// caching and rebuilt the 228-row flat array on every parent re-render
+// (verified via `sectionList.flatten` log frequency).
 // `noop` covers the unused `renderItem` slot since this picker only
 // uses the chunked `renderRow` path.
 const emojiKeyExtractor = (item: EmojiEntry): string => item.emoji;

@@ -341,6 +341,27 @@ function reconnectRowsFor(uriRows: readonly PermRow[], previous: Nip46Connection
   return [...eligibleUriRows, ...extra];
 }
 
+/**
+ * Review list speaks the editor's bundle vocabulary: one switch per
+ * capability bundle (toggling covers every member key in the review set),
+ * plus individual rows for unbundled keys.
+ */
+function groupReviewRows(reviewRows: readonly PermRow[]): {
+  bundles: { bundle: (typeof PERMISSION_BUNDLES)[number]; rows: PermRow[] }[];
+  others: PermRow[];
+} {
+  const byKey = new Map(reviewRows.map((row) => [row.grantKey, row]));
+  const bundles = PERMISSION_BUNDLES.map((bundle) => ({
+    bundle,
+    rows: bundle.grantKeys
+      .map((grantKey) => byKey.get(grantKey))
+      .filter((row): row is PermRow => row !== undefined),
+  })).filter(({ rows }) => rows.length > 0);
+  const bundled = new Set(bundles.flatMap(({ rows }) => rows.map((row) => row.grantKey)));
+  const others = reviewRows.filter((row) => !bundled.has(row.grantKey));
+  return { bundles, others };
+}
+
 function defaultCheckedFor(
   rows: readonly PermRow[],
   existingGrants: Partial<Record<GrantKey, { verdict: string }>> | undefined,
@@ -601,21 +622,7 @@ function ConnectReview({
     });
   };
 
-  // Review list speaks the editor's bundle vocabulary: one switch per
-  // capability bundle (toggling covers every member key in the review set),
-  // plus individual rows for unbundled keys.
-  const reviewGroups = (() => {
-    const byKey = new Map(reviewRows.map((row) => [row.grantKey, row]));
-    const bundles = PERMISSION_BUNDLES.map((bundle) => ({
-      bundle,
-      rows: bundle.grantKeys
-        .map((grantKey) => byKey.get(grantKey))
-        .filter((row): row is PermRow => row !== undefined),
-    })).filter(({ rows }) => rows.length > 0);
-    const bundled = new Set(bundles.flatMap(({ rows }) => rows.map((row) => row.grantKey)));
-    const others = reviewRows.filter((row) => !bundled.has(row.grantKey));
-    return { bundles, others };
-  })();
+  const reviewGroups = groupReviewRows(reviewRows);
 
   const toggleReviewBundle = (rows: readonly PermRow[]) => {
     setChecked((current) => {

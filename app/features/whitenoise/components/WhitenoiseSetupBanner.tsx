@@ -83,16 +83,10 @@ export function WhitenoiseSetupBanner({ testID }: { testID?: string }) {
   // Render gates — idle state hides when there's nothing to set up.
   // Once the user starts, we keep rendering through the full sequence
   // even if upstream `isReady` flips during the animation.
-  const shouldRenderCard = (() => {
-    if (!whitenoiseEnabled) return false;
-    if (phase === 'gone') return false;
-    if (phase !== 'idle') return true;
-    if (!pathname.includes('/contacts')) return false;
-    if (!client) return false;
-    if (isLoading) return false;
-    if (isReady) return false;
-    return true;
-  })();
+  const shouldRenderCard =
+    whitenoiseEnabled &&
+    phase !== 'gone' &&
+    (phase !== 'idle' || (pathname.includes('/contacts') && !!client && !isLoading && !isReady));
 
   const bottomOffset = insets.bottom + (TAB_BAR_HEIGHT_ESTIMATE ?? 49) + FLOAT_GAP;
 

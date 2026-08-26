@@ -131,6 +131,25 @@ interface SignerApprovalContentProps extends CustomSheetSharedProps {
 }
 
 /** Relay/url tag value for kind 22242/27235 login bodies. Bounded by catalog. */
+/**
+ * Kind-3 diff baseline — only when the cached follow list belongs to the
+ * signing identity (the store is active-profile-scoped; a kind 3 carrying a
+ * foreign pubkey must fall back to the count-only presentation).
+ */
+function kind3CurrentFollows(
+  head: { kind?: number } | null,
+  signEvent: unknown,
+  keys: { pubkey: string } | null,
+  contactsUpdatedAt: number,
+  followingPubkeys: Record<string, unknown>
+): Set<string> | undefined {
+  if (head?.kind !== 3 || contactsUpdatedAt <= 0 || keys === null) return undefined;
+  const eventPubkey = (signEvent as { pubkey?: unknown } | null)?.pubkey;
+  if (typeof eventPubkey === 'string' && eventPubkey.toLowerCase() !== keys.pubkey.toLowerCase())
+    return undefined;
+  return new Set(Object.keys(followingPubkeys));
+}
+
 function loginTargetFor(event: UnsignedEvent): string | undefined {
   for (const tag of event.tags) {
     if ((tag[0] === 'relay' || tag[0] === 'u') && typeof tag[1] === 'string' && tag[1].length > 0) {
@@ -308,18 +327,15 @@ export function SignerApprovalSheetContent({
           ...(signEvent !== null && { params: [JSON.stringify(signEvent)] }),
         });
 
-  // Kind-3 diff baseline — only when the cached follow list belongs to the
-  // signing identity (the store is active-profile-scoped; a kind 3 carrying a
-  // foreign pubkey must fall back to the count-only presentation).
   const followingPubkeys = useNostrSocialStore((s) => s.followingPubkeys);
   const contactsUpdatedAt = useNostrSocialStore((s) => s.contactsUpdatedAt);
-  const currentFollows = (() => {
-    if (head?.kind !== 3 || contactsUpdatedAt <= 0 || keys === null) return undefined;
-    const eventPubkey = (signEvent as { pubkey?: unknown } | null)?.pubkey;
-    if (typeof eventPubkey === 'string' && eventPubkey.toLowerCase() !== keys.pubkey.toLowerCase())
-      return undefined;
-    return new Set(Object.keys(followingPubkeys));
-  })();
+  const currentFollows = kind3CurrentFollows(
+    head,
+    signEvent,
+    keys,
+    contactsUpdatedAt,
+    followingPubkeys
+  );
 
   const summary: RequestSummary | null =
     head === null

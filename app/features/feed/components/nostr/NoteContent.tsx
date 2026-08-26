@@ -34,7 +34,7 @@ import {
 import { PollCard } from './poll/PollCard';
 import { RelayCard } from './RelayCard';
 import { POLL_KIND } from './poll/pollParse';
-import { formatRelative } from '@/shared/lib/date';
+import { formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { sharedStyles } from './feedStyles';
 import { fontSize } from '@/shared/styles/tokens';
 import { NOTE_CONTENT_LINE_HEIGHT } from '@/features/feed/lib/threadListLayout';
@@ -338,7 +338,7 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
     );
   }
 
-  const timestamp = event.created_at ? formatRelative(event.created_at * 1000, 'compact') : '';
+  const timestamp = formatRelativeUnixSeconds(event.created_at);
   const profile = profiles.get(event.pubkey);
   const displayName = profile?.name || `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
 

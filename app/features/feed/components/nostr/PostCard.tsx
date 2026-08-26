@@ -30,7 +30,7 @@ import {
   useNostrSocialStore,
 } from '@/shared/stores/profile/nostrSocialStore';
 import { TierBadge } from '@/shared/ui/composed/TierBadge';
-import { formatDate, formatRelative } from '@/shared/lib/date';
+import { formatDate, formatRelativeUnixSeconds } from '@/shared/lib/date';
 import { tryNpubEncode } from './feedParse';
 import { useQuotePost } from '@/features/feed/lib/useQuotePost';
 import { NoteContent, NOTE_CONTENT_FONT_SIZE, NOTE_CONTENT_LINE_HEIGHT } from './NoteContent';
@@ -267,7 +267,7 @@ export const PostCard = React.memo(function PostCard({
   // `fallback` prop so the name never flashes through a pubkey placeholder.
   const displayName = profile?.name;
   const nameFallback = `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
-  const shortTime = event.created_at ? formatRelative(event.created_at * 1000, 'compact') : '';
+  const shortTime = formatRelativeUnixSeconds(event.created_at);
 
   const isTarget = variant === 'thread-target';
   const isThread = variant === 'thread-reply';

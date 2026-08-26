@@ -19,9 +19,7 @@
 import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
-import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
-import { FLOW_SHEET_HEADER_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
+import { AndroidSheetFlowStack } from '../../config/flowLayoutOptions';
 import { TransactionsFilterProvider } from '@/features/transactions';
 
 const TRANSPARENT_HEADER_STYLE = { backgroundColor: 'transparent' };
@@ -43,11 +41,10 @@ const SWAP_OPTIONS = { title: 'Swap' };
 const THREAD_OPTIONS = { title: 'Thread' };
 
 function TransactionsFlowContent() {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
-    [foreground, background]
-  );
+  const background = useThemeColor('background');
+  // KEPT as an explicit useMemo: react-navigation re-applies options on
+  // identity change, so the entry screen's options object must stay stable.
+  // ast-grep-ignore: no-manual-memo-tsx
   const transactionsOptions = useMemo(
     () => ({
       title: 'Transactions',
@@ -61,19 +58,17 @@ function TransactionsFlowContent() {
   );
 
   return (
-    <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
-      <Stack screenOptions={screenOptions}>
-        <Stack.Screen name="transactions" options={transactionsOptions} />
-        <Stack.Screen name="lightningReceive" options={LIGHTNING_RECEIVE_OPTIONS} />
-        <Stack.Screen name="onchainReceive" options={ONCHAIN_RECEIVE_OPTIONS} />
-        <Stack.Screen name="lightningSend" options={LIGHTNING_SEND_OPTIONS} />
-        <Stack.Screen name="onchainSend" options={ONCHAIN_SEND_OPTIONS} />
-        <Stack.Screen name="sendToken" options={SEND_TOKEN_OPTIONS} />
-        <Stack.Screen name="receiveToken" options={RECEIVE_TOKEN_OPTIONS} />
-        <Stack.Screen name="swap" options={SWAP_OPTIONS} />
-        <Stack.Screen name="thread" options={THREAD_OPTIONS} />
-      </Stack>
-    </AndroidSheetRoot>
+    <AndroidSheetFlowStack>
+      <Stack.Screen name="transactions" options={transactionsOptions} />
+      <Stack.Screen name="lightningReceive" options={LIGHTNING_RECEIVE_OPTIONS} />
+      <Stack.Screen name="onchainReceive" options={ONCHAIN_RECEIVE_OPTIONS} />
+      <Stack.Screen name="lightningSend" options={LIGHTNING_SEND_OPTIONS} />
+      <Stack.Screen name="onchainSend" options={ONCHAIN_SEND_OPTIONS} />
+      <Stack.Screen name="sendToken" options={SEND_TOKEN_OPTIONS} />
+      <Stack.Screen name="receiveToken" options={RECEIVE_TOKEN_OPTIONS} />
+      <Stack.Screen name="swap" options={SWAP_OPTIONS} />
+      <Stack.Screen name="thread" options={THREAD_OPTIONS} />
+    </AndroidSheetFlowStack>
   );
 }
 

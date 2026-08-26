@@ -103,8 +103,7 @@ export function NostrNDKProvider({
           // don't provide (Sovran owns its own settings persistence); the lib
           // tolerates its absence at runtime. Suppressed rather than passing a
           // fake store.
-          // ast-grep-ignore: no-ts-ignore-tsx
-          // @ts-ignore - InitNDKParams demands settingsStore; intentionally omitted
+          // @ts-expect-error - InitNDKParams demands settingsStore; intentionally omitted
           initializeNDK({
             cacheAdapter,
             explicitRelayUrls: relays,

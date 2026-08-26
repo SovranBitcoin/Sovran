@@ -146,6 +146,44 @@ const SESSION_ACCESS_LABEL = 'This session';
 const DECRYPT_ACCESS_CAPTION =
   'People this app may decrypt your conversations with, without asking. Revoking prompts again on the next message.';
 
+interface DecryptAccessRow {
+  peer: string;
+  sublabel: string;
+  session: boolean;
+}
+
+function buildDecryptAccessRows(
+  peerDecryptGrants: Record<string, { lastUsedAt?: number; createdAt: number }>,
+  appSessionGrants: readonly { peerPubkey: string }[]
+): DecryptAccessRow[] {
+  const rows = new Map<string, DecryptAccessRow>();
+  for (const [peer, grant] of Object.entries(peerDecryptGrants)) {
+    rows.set(peer, {
+      peer,
+      sublabel:
+        grant.lastUsedAt !== undefined
+          ? `Always · last used ${formatRelative(grant.lastUsedAt, 'chat-bubble')}`
+          : `Always · granted ${formatRelative(grant.createdAt, 'chat-bubble')}`,
+      session: false,
+    });
+  }
+  // Session grants live until the engine stops. Persistent rows keep their
+  // "Always" label when a peer holds both.
+  for (const grant of appSessionGrants) {
+    const existing = rows.get(grant.peerPubkey);
+    if (existing !== undefined) {
+      existing.session = true; // persistent dominates the label; revoke covers both
+      continue;
+    }
+    rows.set(grant.peerPubkey, {
+      peer: grant.peerPubkey,
+      sublabel: SESSION_ACCESS_LABEL,
+      session: true,
+    });
+  }
+  return [...rows.values()].sort((a, b) => a.peer.localeCompare(b.peer));
+}
+
 // Risk-based grouping: what the app can do TO you, not protocol taxonomy.
 const GROUP_ORDER: readonly { group: PermissionEditorGroup; label: string }[] = [
   { group: 'public', label: 'Public Posting' },
@@ -367,34 +405,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
       ? []
       : sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey);
 
-  const decryptAccessRows = (() => {
-    const rows = new Map<string, { peer: string; sublabel: string; session: boolean }>();
-    for (const [peer, grant] of Object.entries(app?.peerDecryptGrants ?? {})) {
-      rows.set(peer, {
-        peer,
-        sublabel:
-          grant.lastUsedAt !== undefined
-            ? `Always · last used ${formatRelative(grant.lastUsedAt, 'chat-bubble')}`
-            : `Always · granted ${formatRelative(grant.createdAt, 'chat-bubble')}`,
-        session: false,
-      });
-    }
-    // Session grants live until the engine stops. Persistent rows keep their
-    // "Always" label when a peer holds both.
-    for (const grant of appSessionGrants) {
-      const existing = rows.get(grant.peerPubkey);
-      if (existing !== undefined) {
-        existing.session = true; // persistent dominates the label; revoke covers both
-        continue;
-      }
-      rows.set(grant.peerPubkey, {
-        peer: grant.peerPubkey,
-        sublabel: SESSION_ACCESS_LABEL,
-        session: true,
-      });
-    }
-    return [...rows.values()].sort((a, b) => a.peer.localeCompare(b.peer));
-  })();
+  const decryptAccessRows = buildDecryptAccessRows(app?.peerDecryptGrants ?? {}, appSessionGrants);
 
   const openPerson = (peer: string) => {
     if (clientPubkey === undefined) return;

@@ -18,7 +18,6 @@ import {
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
@@ -35,6 +34,7 @@ import {
 } from '@/shared/lib/popup/popups/actionMenu';
 import Icon from 'assets/icons';
 import { markE2EHerouiMenu } from '@/shared/lib/popup/E2EActionMenuProbe';
+import { SheetMenuRowContent } from '@/shared/lib/popup/popups/sheetMenuRow';
 import { SheetSearchField } from '@/shared/lib/popup/SheetSearchField';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 
@@ -347,16 +347,12 @@ export function ActionMenuHost() {
         isDisabled={isDisabled}
         variant={isDanger ? 'danger' : 'default'}
         onPress={() => handleItemPress(button)}>
-        <HStack align="center" gap={10} style={{ flex: 1 }}>
-          {button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)}
-          <View style={{ flex: 1 }}>
-            <Menu.ItemTitle>{button.text}</Menu.ItemTitle>
-            {descriptionText ? (
-              <Menu.ItemDescription>{descriptionText}</Menu.ItemDescription>
-            ) : null}
-          </View>
-          {button.suffix ? <View>{button.suffix}</View> : null}
-        </HStack>
+        <SheetMenuRowContent
+          icon={button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)}
+          title={button.text}
+          description={descriptionText || undefined}
+          trailing={button.suffix ? <View>{button.suffix}</View> : undefined}
+        />
       </Menu.Item>
     );
     return (
@@ -415,16 +411,16 @@ export function ActionMenuHost() {
         onPress={() => {
           void handlePrimaryPress(payload.primaryAction!);
         }}>
-        <HStack align="center" gap={10} style={{ flex: 1 }}>
-          {payload.primaryAction.icon ? <Icon name={payload.primaryAction.icon} size={20} /> : null}
-          <View style={{ flex: 1 }}>
-            <Menu.ItemTitle>
-              {isSubmitting
-                ? (payload.primaryAction.loadingText ?? payload.primaryAction.text)
-                : payload.primaryAction.text}
-            </Menu.ItemTitle>
-          </View>
-        </HStack>
+        <SheetMenuRowContent
+          icon={
+            payload.primaryAction.icon ? <Icon name={payload.primaryAction.icon} size={20} /> : null
+          }
+          title={
+            isSubmitting
+              ? (payload.primaryAction.loadingText ?? payload.primaryAction.text)
+              : payload.primaryAction.text
+          }
+        />
       </Menu.Item>
     </>
   ) : null;

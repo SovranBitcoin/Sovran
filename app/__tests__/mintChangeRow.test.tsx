@@ -28,7 +28,7 @@ jest.mock('@/shared/lib/color', () => ({
 }));
 
 jest.mock('@/shared/lib/date', () => ({
-  formatRelative: jest.fn(() => '2d'),
+  formatRelativeUnixSeconds: jest.fn(() => '2d'),
 }));
 
 jest.mock('@/shared/stores/global/mintMetadataStore', () => ({
