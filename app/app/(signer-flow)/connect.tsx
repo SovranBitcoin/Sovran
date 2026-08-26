@@ -20,6 +20,7 @@ import {
   PAIRING_ERROR_INVALID_LINK,
   PAIRING_ERROR_TITLE,
 } from '@/features/nostrSigner';
+import { MAX_NOSTRCONNECT_URI_LENGTH } from '@/features/nostrSigner/lib/nip46Uri';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { popup } from '@/shared/lib/popup';
@@ -27,12 +28,10 @@ import { E2EActionMenuProbe } from '@/shared/lib/popup/E2EActionMenuProbe';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { View } from '@/shared/ui/primitives/View/View';
 
-const MAX_URI_PARAM_LENGTH = 4096;
-
 const BACKDROP_STYLE = { flex: 1 } as const;
 
 const ParamsSchema = z.object({
-  uri: z.string().min(1).max(MAX_URI_PARAM_LENGTH),
+  uri: z.string().min(1).max(MAX_NOSTRCONNECT_URI_LENGTH),
 });
 
 function toastAndGoToHub(body: string): void {

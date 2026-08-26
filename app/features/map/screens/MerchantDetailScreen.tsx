@@ -78,13 +78,47 @@ async function loadMerchantDetails(ctx: {
   }
 }
 
+// BTCMap advertises support via OSM payment tags; each row renders identically
+// (icon + title + check), so the list is data, not three copied blocks.
+const PAYMENT_METHOD_ROWS = [
+  { osmTag: 'osm:payment:onchain', icon: 'mdi:bitcoin', title: 'On-chain' },
+  { osmTag: 'osm:payment:lightning', icon: 'mingcute:lightning-fill', title: 'Lightning' },
+  {
+    osmTag: 'osm:payment:lightning_contactless',
+    icon: 'ph:contactless-payment-fill',
+    title: 'Contactless',
+  },
+] as const;
+
+/** Rounded prose card ("Opening Hours", "About") — one chrome for every
+ *  free-text merchant section. */
+function MerchantTextSection({ title, body }: { title: string; body: string }) {
+  const [foreground, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+  ] as const);
+  return (
+    <Section title={title}>
+      <View
+        style={{
+          backgroundColor: surfaceSecondary,
+          padding: 16,
+          borderRadius: 12,
+        }}>
+        <Text size={14} style={{ color: withAlpha(foreground, 0.66), lineHeight: 22 }}>
+          {body}
+        </Text>
+      </View>
+    </Section>
+  );
+}
+
 export function MerchantDetailScreen() {
   useLifecycleLogger('MerchantDetailScreen');
   const navigation = useNavigation();
-  const [foreground, defaultColor, surfaceSecondary, background] = useThemeColor([
+  const [foreground, defaultColor, background] = useThemeColor([
     'foreground',
     'default',
-    'surface-secondary',
     'background',
   ] as const);
   const insets = useSafeAreaInsets();
@@ -137,9 +171,9 @@ export function MerchantDetailScreen() {
 
   const handleEmail = async (email: string) => handleOpenURL(`mailto:${email.trim()}`);
 
-  const supportsOnchain = place?.['osm:payment:onchain'] === 'yes';
-  const supportsLightning = place?.['osm:payment:lightning'] === 'yes';
-  const supportsContactless = place?.['osm:payment:lightning_contactless'] === 'yes';
+  const supportedPaymentMethods = PAYMENT_METHOD_ROWS.filter(
+    (method) => place?.[method.osmTag] === 'yes'
+  );
 
   const phone = place?.['osm:contact:phone'] || place?.phone;
   const website = place?.['osm:contact:website'] || place?.website;
@@ -242,48 +276,22 @@ export function MerchantDetailScreen() {
           </VStack>
         </View>
 
-        {(supportsOnchain || supportsLightning || supportsContactless) && (
+        {supportedPaymentMethods.length > 0 && (
           <Section title="Payment Methods">
             <ListGroup variant="secondary">
-              {supportsOnchain && (
-                <ListGroup.Item>
+              {supportedPaymentMethods.map((method) => (
+                <ListGroup.Item key={method.title}>
                   <ListGroup.ItemPrefix>
-                    <Icon name="mdi:bitcoin" size={20} color={BITCOIN_ACCENT} />
+                    <Icon name={method.icon} size={20} color={BITCOIN_ACCENT} />
                   </ListGroup.ItemPrefix>
                   <ListGroup.ItemContent>
-                    <ListGroup.ItemTitle>On-chain</ListGroup.ItemTitle>
+                    <ListGroup.ItemTitle>{method.title}</ListGroup.ItemTitle>
                   </ListGroup.ItemContent>
                   <ListGroup.ItemSuffix>
                     <Icon name="mdi:check-circle" size={20} color={withAlpha(foreground, 0.4)} />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>
-              )}
-              {supportsLightning && (
-                <ListGroup.Item>
-                  <ListGroup.ItemPrefix>
-                    <Icon name="mingcute:lightning-fill" size={20} color={BITCOIN_ACCENT} />
-                  </ListGroup.ItemPrefix>
-                  <ListGroup.ItemContent>
-                    <ListGroup.ItemTitle>Lightning</ListGroup.ItemTitle>
-                  </ListGroup.ItemContent>
-                  <ListGroup.ItemSuffix>
-                    <Icon name="mdi:check-circle" size={20} color={withAlpha(foreground, 0.4)} />
-                  </ListGroup.ItemSuffix>
-                </ListGroup.Item>
-              )}
-              {supportsContactless && (
-                <ListGroup.Item>
-                  <ListGroup.ItemPrefix>
-                    <Icon name="ph:contactless-payment-fill" size={20} color={BITCOIN_ACCENT} />
-                  </ListGroup.ItemPrefix>
-                  <ListGroup.ItemContent>
-                    <ListGroup.ItemTitle>Contactless</ListGroup.ItemTitle>
-                  </ListGroup.ItemContent>
-                  <ListGroup.ItemSuffix>
-                    <Icon name="mdi:check-circle" size={20} color={withAlpha(foreground, 0.4)} />
-                  </ListGroup.ItemSuffix>
-                </ListGroup.Item>
-              )}
+              ))}
             </ListGroup>
           </Section>
         )}
@@ -317,34 +325,10 @@ export function MerchantDetailScreen() {
         )}
 
         {place.opening_hours && (
-          <Section title="Opening Hours">
-            <View
-              style={{
-                backgroundColor: surfaceSecondary,
-                padding: 16,
-                borderRadius: 12,
-              }}>
-              <Text size={14} style={{ color: withAlpha(foreground, 0.66), lineHeight: 22 }}>
-                {place.opening_hours}
-              </Text>
-            </View>
-          </Section>
+          <MerchantTextSection title="Opening Hours" body={place.opening_hours} />
         )}
 
-        {place.description && (
-          <Section title="About">
-            <View
-              style={{
-                backgroundColor: surfaceSecondary,
-                padding: 16,
-                borderRadius: 12,
-              }}>
-              <Text size={14} style={{ color: withAlpha(foreground, 0.66), lineHeight: 22 }}>
-                {place.description}
-              </Text>
-            </View>
-          </Section>
-        )}
+        {place.description && <MerchantTextSection title="About" body={place.description} />}
 
         <View style={[styles.sourceInfo, { borderTopColor: withAlpha(foreground, 0.1) }]}>
           <Text size={11} style={{ color: defaultColor, textAlign: 'center' }}>

@@ -26,6 +26,10 @@ const MAX_PERMS_ENTRIES = 32;
 const MAX_SECRET_LENGTH = 64;
 const MAX_NAME_LENGTH = 120;
 const MAX_URL_LENGTH = 2048;
+/** Total-length bound for a `nostrconnect://` URI wherever it crosses a
+ *  boundary (route param, persisted pairing intent) — one constant so the
+ *  gates can't drift apart. */
+export const MAX_NOSTRCONNECT_URI_LENGTH = 4096;
 // Rejected perms entries surface in UI/logs — cap attacker-controlled length.
 const MAX_DROPPED_ENTRY_LENGTH = 64;
 
