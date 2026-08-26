@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import Icon from 'assets/icons';
 import { withAlpha } from '@/shared/lib/color';
 
 /**
@@ -44,5 +45,20 @@ export function QRButtonFace({
         ]}
       />
     </>
+  );
+}
+
+/**
+ * The QR glyph centered over the face. Rendered as a sibling of the clipped
+ * face container (not inside it) so the icon isn't affected by the container's
+ * squircle clipping.
+ */
+export function QRButtonGlyph({ background }: { background: string }): React.ReactElement {
+  return (
+    <View
+      style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center' }]}
+      pointerEvents="none">
+      <Icon name="stash:qr-code" size={38} color={background} />
+    </View>
   );
 }

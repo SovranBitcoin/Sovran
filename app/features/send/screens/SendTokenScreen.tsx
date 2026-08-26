@@ -24,8 +24,10 @@ import {
   TransactionLocationSection,
   useBip321Info,
   transactionLeadDetailItems,
+  amountDetailItem,
+  stateDetailItem,
+  mintDetailItem,
 } from '@/features/transactions';
-import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -323,16 +325,13 @@ export function SendTokenScreen({
             usedKind: 'ecash',
             createdAt: entry.createdAt.datetime,
           }),
-          {
-            title: 'Amount',
-            value: formatAmount({ amount: entry.amount, unit: entry.unit }),
-          },
-          { title: 'State', value: entry.state },
+          amountDetailItem({ amount: entry.amount, unit: entry.unit }),
+          stateDetailItem(entry.state),
           entry.operationId && {
             title: 'Operation ID',
             value: truncateMiddle(entry.operationId, 7),
           },
-          mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+          mintDetailItem(mintUrl),
           entry.tokenString && {
             title: 'Token',
             value: entry.tokenString.truncate(6),

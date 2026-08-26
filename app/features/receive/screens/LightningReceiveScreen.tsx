@@ -14,7 +14,6 @@ import { useScreenActions } from 'wallet/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 import { MintSelector } from '@/features/wallet';
-import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
 import {
   HistoryEntryRefresh,
@@ -23,6 +22,10 @@ import {
   useBip321Info,
   transactionLeadDetailItems,
   useIsTransactionHistoryView,
+  amountDetailItem,
+  stateDetailItem,
+  quoteIdDetailItem,
+  mintDetailItem,
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -30,7 +33,6 @@ import type { ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Card } from '@/shared/ui/composed/Card';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
-import { CopyableValue } from '@/shared/ui/composed/CopyableValue';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
@@ -168,22 +170,10 @@ export function LightningReceiveScreen({
             usedKind: 'lightning',
             createdAt: entry.createdAt.datetime,
           }),
-          {
-            title: 'Amount',
-            value: formatAmount({ amount: entry.amount, unit: entry.unit }),
-          },
-          { title: 'State', value: entry.state },
-          entry.quoteId && {
-            title: 'Quote ID',
-            value: (
-              <CopyableValue
-                value={entry.quoteId}
-                display={truncateMiddle(entry.quoteId, 7)}
-                copyTarget="quoteId"
-              />
-            ),
-          },
-          mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+          amountDetailItem({ amount: entry.amount, unit: entry.unit }),
+          stateDetailItem(entry.state),
+          quoteIdDetailItem(entry.quoteId),
+          mintDetailItem(mintUrl),
           {
             title: 'Invoice',
             value: truncateMiddle(entry.paymentRequest, 10),

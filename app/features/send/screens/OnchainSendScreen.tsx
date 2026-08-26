@@ -35,6 +35,9 @@ import {
   HistoryEntryTimeline,
   TransactionDetailShell,
   useBip321Info,
+  amountDetailItem,
+  stateDetailItem,
+  mintDetailItem,
 } from '@/features/transactions';
 import {
   canOnchainMeltQuoteExpire,
@@ -303,12 +306,12 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
             usedKind: 'onchain',
             createdAt: entry.createdAt.datetime,
           }),
-          { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+          amountDetailItem({ amount: entry.amount, unit: entry.unit }),
           feeDisplay && {
             title: feeDisplay.title,
             value: formatAmount({ amount: feeDisplay.sats, unit: 'sat' }),
           },
-          { title: 'State', value: meltState ?? entry.state },
+          stateDetailItem(meltState ?? entry.state),
           annotation.onchainMelt?.accelerated === true && {
             title: 'Accelerated',
             value: 'mempool.space',
@@ -319,7 +322,7 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
             value: truncateMiddle(onchainAddress, 12),
           },
           outpoint && { title: 'Transaction', value: truncateMiddle(outpoint.txid, 10) },
-          mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+          mintDetailItem(mintUrl),
         ]}
       />
     </TransactionDetailShell>

@@ -1,9 +1,14 @@
 import { useCallback, useEffect } from 'react';
 import type Animated from 'react-native-reanimated';
+import { useAnimatedRef } from 'react-native-reanimated';
 import type { AnimatedRef } from 'react-native-reanimated';
 
 import { initLog } from '@/shared/lib/logger';
 import { registerQRButtonRemeasure, setQRButtonAnchor } from '@/shared/lib/qrButtonAnchor';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { qrButtonGeometry } from './qrButtonGeometry';
+import { useQRButtonPressFeedback } from './useQRButtonPressFeedback';
+import { useQRButtonReveal } from './useQRButtonReveal';
 
 export interface QRButtonProps {
   onPress: () => void;
@@ -13,6 +18,33 @@ export interface QRButtonProps {
 }
 
 export const DEFAULT_SIZE = 64;
+
+/**
+ * Everything the two platform shells must agree on: theme colors, geometry,
+ * the anchor ref, and the reveal/press-feedback animations. Only the press
+ * surface and the anchor-measurement strategy stay platform-specific.
+ *
+ * Colours invert with the theme: on dark themes the base is the foreground
+ * (white) with a soft white gradient and a dark icon; on light themes the base
+ * is the foreground (black) with a soft black gradient and a light icon.
+ */
+export function useQRButtonChrome(size: number) {
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const { borderRadius, containerStyle, pressableStyle } = qrButtonGeometry(size, foreground);
+  const animatedRef = useAnimatedRef<Animated.View>();
+  const visibilityStyle = useQRButtonReveal();
+  const pressFeedback = useQRButtonPressFeedback();
+  return {
+    foreground,
+    background,
+    borderRadius,
+    containerStyle,
+    pressableStyle,
+    animatedRef,
+    visibilityStyle,
+    pressFeedback,
+  };
+}
 
 /**
  * JS-thread anchor publish. measureInWindow is reliable on both platforms and

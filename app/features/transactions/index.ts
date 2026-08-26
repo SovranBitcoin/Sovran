@@ -16,6 +16,12 @@ export {
   transactionLeadDetailItems,
 } from './components/detail/TransactionSourceSection';
 export {
+  amountDetailItem,
+  stateDetailItem,
+  quoteIdDetailItem,
+  mintDetailItem,
+} from './components/detail/transactionDetailRows';
+export {
   TransactionsFilterProvider,
   useTransactionsFilter,
 } from './components/TransactionsFilterContext';

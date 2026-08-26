@@ -17,8 +17,9 @@ import {
   TransactionLocationSection,
   useBip321Info,
   transactionLeadDetailItems,
+  amountDetailItem,
+  mintDetailItem,
 } from '@/features/transactions';
-import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -148,8 +149,8 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
             usedKind: 'ecash',
             createdAt: entry.createdAt.datetime,
           }),
-          { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
-          mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+          amountDetailItem({ amount: entry.amount, unit: entry.unit }),
+          mintDetailItem(mintUrl),
           entry.p2pkPubkey && { title: 'P2PK', value: entry.p2pkPubkey.truncate(8) },
           entry.tokenString && { title: 'Token', value: entry.tokenString.truncate(6) },
         ]}

@@ -16,7 +16,6 @@ import { isPaymentRequestPreview } from 'wallet';
 import { useScreenActions } from 'wallet/react';
 import { MintSelector } from '@/features/wallet';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
-import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
 import {
   HistoryEntryHeader,
@@ -24,6 +23,8 @@ import {
   HistoryEntryTimeline,
   useBip321Info,
   transactionLeadDetailItems,
+  amountDetailItem,
+  mintDetailItem,
 } from '@/features/transactions';
 import { TransactionProbe } from '@/features/transactions/components/detail/TransactionProbe';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -159,7 +160,7 @@ export function PaymentRequestScreen({
               usedKind: 'ecash',
               createdAt: entry.createdAt.datetime,
             }),
-            { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+            amountDetailItem({ amount: entry.amount, unit: entry.unit }),
             entry.transportLabel ? { title: 'Transport', value: entry.transportLabel } : null,
             entry.paymentRequestInfo?.mints?.length
               ? {
@@ -170,7 +171,7 @@ export function PaymentRequestScreen({
             entry.operationId
               ? { title: 'Operation ID', value: truncateMiddle(entry.operationId, 7) }
               : null,
-            mintUrl ? { title: 'Mint', value: truncateMiddle(mintUrl, 12) } : null,
+            mintDetailItem(mintUrl),
           ]}
         />
       </VStack>

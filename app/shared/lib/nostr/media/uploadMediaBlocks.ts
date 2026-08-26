@@ -9,9 +9,10 @@ import type { MediaDescriptor } from '@/shared/lib/nostr/media/types';
  * The structural shape a composing surface's media block must have to ride
  * this uploader. Both composer's `ComposerBlock` media variant and the reply
  * bar's local block satisfy it structurally — deliberately NOT imported from
- * a feature (shared code never depends on feature types).
+ * a feature (shared code never depends on feature types), and deliberately not
+ * exported: callers pass their own structurally-compatible block types.
  */
-export interface UploadableMediaBlock {
+interface UploadableMediaBlock {
   id: string;
   localUri?: string;
   mimeType?: string;

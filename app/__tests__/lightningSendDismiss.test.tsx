@@ -34,6 +34,13 @@ jest.mock('@/features/transactions', () => ({
   TransactionLocationSection: () => null,
   HistoryEntryRefresh: () => null,
   useBip321Info: jest.fn(() => ({ isBip321: false, optionKinds: null })),
+  amountDetailItem: ({ amount, unit }: { amount: unknown; unit: string }) => ({
+    title: 'Amount',
+    value: `${String(amount)} ${unit}`,
+  }),
+  stateDetailItem: (state: string) => ({ title: 'State', value: state }),
+  quoteIdDetailItem: (quoteId?: string) => (quoteId ? { title: 'Quote ID', value: quoteId } : null),
+  mintDetailItem: (mintUrl?: string | null) => (mintUrl ? { title: 'Mint', value: mintUrl } : null),
   transactionLeadDetailItems: ({
     source,
     bip321,

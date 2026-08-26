@@ -16,6 +16,9 @@ import {
   TransactionLocationSection,
   useBip321Info,
   useIsTransactionHistoryView,
+  amountDetailItem,
+  stateDetailItem,
+  mintDetailItem,
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { useMempoolAddressSummary } from '@/shared/hooks/useMempoolAddressSummary';
@@ -27,7 +30,6 @@ import {
   getOnchainMintQuoteRequiredConfirmations,
 } from '@/shared/lib/cashu/onchainMint';
 import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
-import { formatAmount } from '@/shared/lib/currency';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { openExternalUrl } from '@/shared/lib/url';
 import { truncateMiddle } from '@/shared/lib/strings';
@@ -248,13 +250,10 @@ export function OnchainReceiveScreen({
             usedKind: 'onchain',
             createdAt: entry.createdAt.datetime,
           }),
-          {
-            title: 'Amount',
-            value: formatAmount({ amount: entry.amount, unit: entry.unit }),
-          },
-          { title: 'State', value: entry.state },
+          amountDetailItem({ amount: entry.amount, unit: entry.unit }),
+          stateDetailItem(entry.state),
           entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
-          mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+          mintDetailItem(mintUrl),
           {
             title: 'Network Fee',
             value: 'Paid by sender',
