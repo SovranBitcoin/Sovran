@@ -47,7 +47,7 @@
     "stack-layout-props": 1
   },
   "features/camera/screens/CameraScreen/CameraScreen.tsx": {
-    "inline-style": 3
+    "inline-style": 1
   },
   "features/composer/ui/ComposeFab.tsx": {
     "stylesheet-create": 1
@@ -143,7 +143,7 @@
   },
   "features/feed/components/nostr/image-overlay/BottomPanel.tsx": {
     "stylesheet-create": 2,
-    "inline-style": 12
+    "inline-style": 3
   },
   "features/feed/components/nostr/image-overlay/ImageBlock.tsx": {
     "stylesheet-create": 1,
@@ -155,6 +155,9 @@
   "features/feed/components/nostr/poll/PollCard.tsx": {
     "stylesheet-create": 1,
     "inline-style": 5
+  },
+  "features/feed/components/notificationRowChrome.tsx": {
+    "stylesheet-create": 1
   },
   "features/feed/components/thread-embed/EmbedActionBar.tsx": {
     "stylesheet-create": 1
@@ -197,7 +200,7 @@
   },
   "features/map/screens/MerchantDetailScreen.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 14,
+    "inline-style": 12,
     "stack-layout-props": 1,
     "content-container-style": 1
   },
@@ -223,8 +226,11 @@
     "inline-style": 7,
     "stack-layout-props": 8
   },
+  "features/mint/hooks/useStickyCurrencyTabs.tsx": {
+    "inline-style": 1
+  },
   "features/mint/screens/MintAddScreen.tsx": {
-    "inline-style": 5
+    "inline-style": 4
   },
   "features/mint/screens/MintChangesScreen.tsx": {
     "stylesheet-create": 1,
@@ -233,7 +239,7 @@
     "content-container-style": 1
   },
   "features/mint/screens/MintDistributionScreen.tsx": {
-    "inline-style": 3
+    "inline-style": 2
   },
   "features/mint/screens/MintInfoScreen.tsx": {
     "stylesheet-create": 1,
@@ -242,11 +248,11 @@
     "content-container-style": 1
   },
   "features/mint/screens/MintListScreen.tsx": {
-    "inline-style": 4
+    "inline-style": 3
   },
   "features/mint/screens/MintRebalancePlanScreen.tsx": {
-    "inline-style": 17,
-    "stack-layout-props": 8
+    "inline-style": 15,
+    "stack-layout-props": 7
   },
   "features/mint/screens/MintReviewsScreen.tsx": {
     "inline-style": 22,
@@ -528,7 +534,7 @@
   },
   "features/transactions/components/Transactions.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 8,
+    "inline-style": 6,
     "stack-layout-props": 3,
     "content-container-style": 1
   },
@@ -598,16 +604,12 @@
     "stylesheet-create": 1,
     "inline-style": 2
   },
-  "features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.androidMenu.tsx": {
-    "inline-style": 2,
-    "stack-layout-props": 1
-  },
-  "features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.flat.tsx": {
-    "stylesheet-create": 1,
-    "stack-layout-props": 1
-  },
   "features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.liquid.tsx": {
     "inline-style": 3
+  },
+  "features/wallet/components/FiatCurrencyPill/FiatCurrencyPill.shell.tsx": {
+    "inline-style": 2,
+    "stack-layout-props": 1
   },
   "features/wallet/components/PrimaryBalance.tsx": {
     "stylesheet-create": 1,
@@ -659,8 +661,8 @@
     "inline-style": 1
   },
   "shared/blocks/popup/ActionMenuHost.tsx": {
-    "inline-style": 15,
-    "stack-layout-props": 3,
+    "inline-style": 9,
+    "stack-layout-props": 1,
     "content-container-style": 1
   },
   "shared/blocks/popup/PopupHost.tsx": {
@@ -700,45 +702,39 @@
   "shared/lib/popup/PaymentStatusToast.tsx": {
     "inline-style": 3
   },
+  "shared/lib/popup/SheetSearchField.tsx": {
+    "inline-style": 2
+  },
   "shared/lib/popup/StatusToast.tsx": {
     "inline-style": 5
   },
   "shared/lib/popup/ToastSlab.tsx": {
     "inline-style": 1
   },
-  "shared/lib/popup/popups/actionMenuSheet.tsx": {
-    "inline-style": 3,
-    "stack-layout-props": 1
-  },
   "shared/lib/popup/popups/actionSheets.tsx": {
     "stack-layout-props": 1
   },
   "shared/lib/popup/popups/emojiPicker.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 8
+    "inline-style": 5
   },
   "shared/lib/popup/popups/modelPicker.tsx": {
     "stylesheet-create": 1,
-    "inline-style": 10,
-    "stack-layout-props": 2,
+    "inline-style": 4,
     "content-container-style": 1
   },
   "shared/lib/popup/popups/nfcTapSheet.tsx": {
     "stylesheet-create": 1,
     "stack-layout-props": 1
   },
-  "shared/lib/popup/popups/paymentOptionsSheet.tsx": {
-    "inline-style": 3,
-    "stack-layout-props": 1
-  },
-  "shared/lib/popup/popups/proofSelectorSheet.tsx": {
-    "inline-style": 7,
-    "stack-layout-props": 2
-  },
   "shared/lib/popup/popups/sendMemoSheet.tsx": {
     "stylesheet-create": 1,
     "inline-style": 2,
     "content-container-style": 1
+  },
+  "shared/lib/popup/popups/sheetMenuRow.tsx": {
+    "inline-style": 3,
+    "stack-layout-props": 1
   },
   "shared/providers/OfflineProvider.tsx": {
     "stylesheet-create": 1
@@ -747,8 +743,8 @@
     "inline-style": 1
   },
   "shared/ui/composed/ActionMenuButton.tsx": {
-    "inline-style": 5,
-    "stack-layout-props": 2
+    "inline-style": 3,
+    "stack-layout-props": 1
   },
   "shared/ui/composed/ActionSegmentsCard.tsx": {
     "inline-style": 5,
@@ -797,6 +793,9 @@
     "stack-layout-props": 1
   },
   "shared/ui/composed/CapsuleButton/CapsuleButton.blur.tsx": {
+    "stylesheet-create": 1
+  },
+  "shared/ui/composed/CapsuleButton/CapsuleButton.content.tsx": {
     "stylesheet-create": 1,
     "stack-layout-props": 1
   },
@@ -804,12 +803,10 @@
     "stylesheet-create": 1
   },
   "shared/ui/composed/CapsuleButton/CapsuleButton.flat.tsx": {
-    "stylesheet-create": 1,
-    "stack-layout-props": 1
+    "stylesheet-create": 1
   },
   "shared/ui/composed/CapsuleButton/CapsuleButton.liquid.tsx": {
-    "stylesheet-create": 1,
-    "stack-layout-props": 1
+    "stylesheet-create": 1
   },
   "shared/ui/composed/Card.tsx": {
     "inline-style": 4
