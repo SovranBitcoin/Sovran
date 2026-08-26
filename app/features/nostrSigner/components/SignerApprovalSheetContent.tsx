@@ -27,7 +27,7 @@
  * length-bounded before render and never logged.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { BottomSheet, Button as HerouiButton } from 'heroui-native';
 import Animated, { SlideInRight } from 'react-native-reanimated';
@@ -202,7 +202,13 @@ export function SignerApprovalSheetContent({
   ] as const);
 
   // Consolidated view: one DECISION per group of identical spam requests.
-  const groups = consolidatePending(pending);
+  // KEPT as an explicit useMemo — identity contract, not an optimization.
+  // `headGroup` is the sole dep of the group-departure effect below. The
+  // compiler declines to cache this (the scope would span the useThemeColor
+  // call), so a render-scoped identity re-fires that effect on every render,
+  // and the re-fire clears the expired-notice timeout without re-arming it.
+  // ast-grep-ignore: no-manual-memo-tsx
+  const groups = useMemo(() => consolidatePending(pending), [pending]);
   const headGroup: Nip46RequestGroup | null = groups.length > 0 ? groups[0] : null;
   const head: Nip46PendingRequest | null = headGroup?.requests[0] ?? null;
   const headGroupKey = headGroup?.key ?? null;

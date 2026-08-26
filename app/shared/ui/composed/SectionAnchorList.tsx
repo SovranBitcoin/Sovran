@@ -325,7 +325,15 @@ export function SectionAnchorList<T>({
     }
   }, [activeAnchor]);
 
-  const { flatItems, sectionFirstIndex } = flattenSections(sections, rowChunkSize, keyExtractor);
+  // KEPT as an explicit useMemo — identity contract, not an optimization.
+  // The compiler declines to cache this (the scope would span the hooks
+  // above), so without it every viewability flip mid-scroll re-chunks the
+  // whole dataset and hands FlashList a new `data` identity.
+  // ast-grep-ignore: no-manual-memo-tsx
+  const { flatItems, sectionFirstIndex } = useMemo(
+    () => flattenSections(sections, rowChunkSize, keyExtractor),
+    [sections, rowChunkSize, keyExtractor]
+  );
 
   // One-shot mount log + the inverse for unmount. Captures the size of
   // the dataset so log-doctor's `stats` mode can correlate later events

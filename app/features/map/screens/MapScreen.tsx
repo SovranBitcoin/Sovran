@@ -22,7 +22,7 @@ import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { withAlpha } from '@/shared/lib/color';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { InteractionManager, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
@@ -68,9 +68,16 @@ export function MapScreen() {
   // updateMarkersForCamera during render. The ref mutation is safe because
   // no settle callback fires before the first paint.
   const onCameraSettleRef = useRef<(lat: number, lon: number, zoom: number) => void>(() => {});
-  const onCameraSettle = (lat: number, lon: number, zoom: number) => {
+  // KEPT as an explicit useCallback — identity contract, not an optimization.
+  // This file does not compile under the React Compiler (the ref write below
+  // is an Immutability bailout), so nothing memoizes this for us. A fresh
+  // identity each render churns useMapCamera's memoized return object, which
+  // is a dep of the mount-only "get user location" effect — re-running it
+  // re-reads GPS and snaps the camera back while the user is panning.
+  // ast-grep-ignore: no-manual-memo-tsx
+  const onCameraSettle = useCallback((lat: number, lon: number, zoom: number) => {
     onCameraSettleRef.current(lat, lon, zoom);
-  };
+  }, []);
 
   const mapCamera = useMapCamera({
     initial: { lat: DEFAULT_LAT, lon: DEFAULT_LON, zoom: DEFAULT_ZOOM },

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Keyboard, ScrollView, View as RNView } from 'react-native';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -173,7 +173,17 @@ export function AiChatScreen() {
 
   const { send, retry, isSending, streamingMessageId } = useAiSend();
 
-  const activeMessages = deriveActivePath(conversationHistory, activeChildren);
+  // KEPT as explicit useMemos — identity contract, not an optimization.
+  // The compiler declines to cache these (each scope would span an
+  // intervening hook call). `draft` is local state, so every keystroke
+  // re-renders this screen; without the memos each keystroke walks the
+  // conversation twice, rebuilds the branch-nav closure Map, invalidates
+  // the `renderItem` memoized on it, and gives FlashList new `data`.
+  // ast-grep-ignore: no-manual-memo-tsx
+  const activeMessages = useMemo(
+    () => deriveActivePath(conversationHistory, activeChildren),
+    [conversationHistory, activeChildren]
+  );
 
   // Mount visibility — narrow set, fires once. No imperative scroll-chase
   // plumbing: FlashList's `maintainVisibleContentPosition` with
@@ -192,7 +202,11 @@ export function AiChatScreen() {
     aiLog
   );
 
-  const branchNavById = buildBranchNavById(conversationHistory, activeMessages, setActiveBranch);
+  // ast-grep-ignore: no-manual-memo-tsx
+  const branchNavById = useMemo(
+    () => buildBranchNavById(conversationHistory, activeMessages, setActiveBranch),
+    [conversationHistory, activeMessages, setActiveBranch]
+  );
 
   const handleRetry = (messageId: string) => {
     aiLog.info('ai.retry.dispatch', { messageId });
