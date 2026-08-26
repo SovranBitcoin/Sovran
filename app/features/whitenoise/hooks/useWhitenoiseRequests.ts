@@ -43,19 +43,7 @@ export function useWhitenoiseRequests(): UseWhitenoiseRequestsState {
     if (!inviteReader) return;
     let cancelled = false;
 
-    async function refresh() {
-      try {
-        const unread = await inviteReader!.getUnread();
-        if (cancelled) return;
-        const mapped = unread.map(toRequest);
-        mapped.sort((a, b) => b.createdAt - a.createdAt);
-        setRequests(mapped);
-      } catch (err) {
-        wnLog.warn('whitenoise.requests.refresh_failed', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
+    const refresh = () => refreshRequestsImpl(inviteReader, () => cancelled, setRequests);
 
     void refresh();
 
@@ -71,63 +59,14 @@ export function useWhitenoiseRequests(): UseWhitenoiseRequestsState {
   }, [inviteReader]);
 
   const acceptInner = useCallback(
-    async (request: WhitenoiseRequest) => {
-      if (!client || !inviteReader) {
-        setError('White Noise client not ready');
-        return;
-      }
-      setBusyId(request.id);
-      setError(null);
-      try {
-        const { group } = await client.joinGroupFromWelcome({
-          welcomeRumor: request.rumor as Parameters<
-            typeof client.joinGroupFromWelcome
-          >[0]['welcomeRumor'],
-        });
-        const index = new WhitenoiseDmIndex(accountIndex);
-        await index.set(request.fromPubkey, bytesToHex(group.id));
-        await inviteReader.markAsRead(request.id);
-        wnLog.info('whitenoise.requests.accepted', {
-          inviteId: request.id.slice(0, 8),
-          groupId: bytesToHex(group.id),
-          from: request.fromPubkey.slice(0, 16),
-        });
-        // Open the new chat so the user lands directly in the conversation
-        // instead of staring at an empty Requests pill.
-        router.push({
-          pathname: '/(user-flow)/whitenoiseDM' as never,
-          params: { pubkey: request.fromPubkey },
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        setError(message);
-        wnLog.error('whitenoise.requests.accept_failed', { error: message });
-      } finally {
-        setBusyId(null);
-      }
-    },
+    (request: WhitenoiseRequest) =>
+      acceptRequestImpl(client, inviteReader, accountIndex, request, { setBusyId, setError }),
     [accountIndex, client, inviteReader]
   );
 
   const declineInner = useCallback(
-    async (request: WhitenoiseRequest) => {
-      if (!inviteReader) return;
-      setBusyId(request.id);
-      setError(null);
-      try {
-        await inviteReader.markAsRead(request.id);
-        wnLog.info('whitenoise.requests.declined', {
-          inviteId: request.id.slice(0, 8),
-          from: request.fromPubkey.slice(0, 16),
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        setError(message);
-        wnLog.error('whitenoise.requests.decline_failed', { error: message });
-      } finally {
-        setBusyId(null);
-      }
-    },
+    (request: WhitenoiseRequest) =>
+      declineRequestImpl(inviteReader, request, { setBusyId, setError }),
     [inviteReader]
   );
 
@@ -155,4 +94,93 @@ function toRequest(rumor: UnreadInvite): WhitenoiseRequest {
     createdAt: rumor.created_at,
     rumor,
   };
+}
+
+// Bodies live at module scope: try/finally cannot be lowered by the React
+// Compiler and made every consumer of this hook carry an uncompiled hook slot.
+type WhitenoiseClient = ReturnType<typeof useWhitenoise>['client'];
+type WhitenoiseInviteReader = ReturnType<typeof useWhitenoise>['inviteReader'];
+type WhitenoiseAccountIndex = ReturnType<typeof useWhitenoise>['accountIndex'];
+
+async function refreshRequestsImpl(
+  inviteReader: NonNullable<WhitenoiseInviteReader>,
+  isCancelled: () => boolean,
+  setRequests: (value: WhitenoiseRequest[]) => void
+): Promise<void> {
+  try {
+    const unread = await inviteReader.getUnread();
+    if (isCancelled()) return;
+    const mapped = unread.map(toRequest);
+    mapped.sort((a, b) => b.createdAt - a.createdAt);
+    setRequests(mapped);
+  } catch (err) {
+    wnLog.warn('whitenoise.requests.refresh_failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+async function acceptRequestImpl(
+  client: WhitenoiseClient,
+  inviteReader: WhitenoiseInviteReader,
+  accountIndex: WhitenoiseAccountIndex,
+  request: WhitenoiseRequest,
+  io: { setBusyId: (value: string | null) => void; setError: (value: string | null) => void }
+): Promise<void> {
+  if (!client || !inviteReader) {
+    io.setError('White Noise client not ready');
+    return;
+  }
+  io.setBusyId(request.id);
+  io.setError(null);
+  try {
+    const { group } = await client.joinGroupFromWelcome({
+      welcomeRumor: request.rumor as Parameters<
+        typeof client.joinGroupFromWelcome
+      >[0]['welcomeRumor'],
+    });
+    const index = new WhitenoiseDmIndex(accountIndex);
+    await index.set(request.fromPubkey, bytesToHex(group.id));
+    await inviteReader.markAsRead(request.id);
+    wnLog.info('whitenoise.requests.accepted', {
+      inviteId: request.id.slice(0, 8),
+      groupId: bytesToHex(group.id),
+      from: request.fromPubkey.slice(0, 16),
+    });
+    // Open the new chat so the user lands directly in the conversation
+    // instead of staring at an empty Requests pill.
+    router.push({
+      pathname: '/(user-flow)/whitenoiseDM' as never,
+      params: { pubkey: request.fromPubkey },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    io.setError(message);
+    wnLog.error('whitenoise.requests.accept_failed', { error: message });
+  } finally {
+    io.setBusyId(null);
+  }
+}
+
+async function declineRequestImpl(
+  inviteReader: WhitenoiseInviteReader,
+  request: WhitenoiseRequest,
+  io: { setBusyId: (value: string | null) => void; setError: (value: string | null) => void }
+): Promise<void> {
+  if (!inviteReader) return;
+  io.setBusyId(request.id);
+  io.setError(null);
+  try {
+    await inviteReader.markAsRead(request.id);
+    wnLog.info('whitenoise.requests.declined', {
+      inviteId: request.id.slice(0, 8),
+      from: request.fromPubkey.slice(0, 16),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    io.setError(message);
+    wnLog.error('whitenoise.requests.decline_failed', { error: message });
+  } finally {
+    io.setBusyId(null);
+  }
 }

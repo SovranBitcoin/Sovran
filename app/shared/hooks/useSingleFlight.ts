@@ -1,5 +1,44 @@
 import { useCallback, useRef } from 'react';
 
+// Guard bodies live at module scope: their try/finally cannot be lowered by
+// the React Compiler and would make the hooks (and thus every consuming
+// component's hook slot) skip compilation.
+async function runSingleFlight<TArgs extends unknown[], TResult>(
+  inFlightRef: { current: Promise<TResult> | null },
+  fn: (...args: TArgs) => Promise<TResult>,
+  args: TArgs
+): Promise<TResult | undefined> {
+  if (inFlightRef.current) return undefined;
+  const promise = fn(...args);
+  inFlightRef.current = promise;
+  try {
+    return await promise;
+  } finally {
+    if (inFlightRef.current === promise) {
+      inFlightRef.current = null;
+    }
+  }
+}
+
+async function runKeyedSingleFlight<TArgs extends unknown[], TResult>(
+  inFlightRef: { current: Map<string, Promise<TResult>> },
+  fn: (...args: TArgs) => Promise<TResult>,
+  keyOf: (...args: TArgs) => string,
+  args: TArgs
+): Promise<TResult | undefined> {
+  const key = keyOf(...args);
+  if (inFlightRef.current.has(key)) return undefined;
+  const promise = fn(...args);
+  inFlightRef.current.set(key, promise);
+  try {
+    return await promise;
+  } finally {
+    if (inFlightRef.current.get(key) === promise) {
+      inFlightRef.current.delete(key);
+    }
+  }
+}
+
 /**
  * Wraps an async callback so that calls made while a previous call is still
  * in flight are dropped synchronously. The guard sits on a `useRef` so it
@@ -22,21 +61,7 @@ export function useSingleFlight<TArgs extends unknown[], TResult>(
 ): (...args: TArgs) => Promise<TResult | undefined> {
   const inFlightRef = useRef<Promise<TResult> | null>(null);
 
-  return useCallback(
-    async (...args: TArgs) => {
-      if (inFlightRef.current) return undefined;
-      const promise = fn(...args);
-      inFlightRef.current = promise;
-      try {
-        return await promise;
-      } finally {
-        if (inFlightRef.current === promise) {
-          inFlightRef.current = null;
-        }
-      }
-    },
-    [fn]
-  );
+  return useCallback((...args: TArgs) => runSingleFlight(inFlightRef, fn, args), [fn]);
 }
 
 /**
@@ -56,19 +81,7 @@ export function useKeyedSingleFlight<TArgs extends unknown[], TResult>(
   const inFlightRef = useRef<Map<string, Promise<TResult>>>(new Map());
 
   return useCallback(
-    async (...args: TArgs) => {
-      const key = keyOf(...args);
-      if (inFlightRef.current.has(key)) return undefined;
-      const promise = fn(...args);
-      inFlightRef.current.set(key, promise);
-      try {
-        return await promise;
-      } finally {
-        if (inFlightRef.current.get(key) === promise) {
-          inFlightRef.current.delete(key);
-        }
-      }
-    },
+    (...args: TArgs) => runKeyedSingleFlight(inFlightRef, fn, keyOf, args),
     [fn, keyOf]
   );
 }

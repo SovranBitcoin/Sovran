@@ -49,7 +49,12 @@ import {
 
 import { PostCard } from './nostr/PostCard';
 import { RepostCard } from './UserFeed';
-import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
+import {
+  ImageOverlayProvider,
+  useImageOverlay,
+  AnimatedImageOverlay,
+  trackFeedScrollOffset,
+} from './nostr/image-overlay';
 import { useFeedCardProps } from '@/features/feed/hooks/useFeedCardProps';
 import { useFeedContentState } from '@/features/feed/hooks/useFeedContentState';
 import { useFeedInteractions } from '@/features/feed/hooks/useFeedInteractions';
@@ -262,149 +267,44 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   }, []);
 
   // ── Phase 1–3: Load feed content for selected spec ──
+  // Body lives in module-scope `loadFeedImpl` — try/finally inside the
+  // component would make the React Compiler skip the whole component.
 
   const loadFeed = useCallback(
-    async (specIndex: number, isRefresh = false) => {
-      const spec = feedSpecs[specIndex]?.spec;
-      if (!spec) return;
-      feedLog.info('feed.ui.load', {
-        spec: feedSpecs[specIndex]?.name,
-        specIndex,
-        isRefresh,
-        hasViewer: !!userPubkey,
-      });
-      const cacheKey = feedPageKey(spec, userPubkey);
-
-      // Applies a page-0 result to state + pagination refs. Used both for the
-      // instant warm-nav paint and for the fresh fetch.
-      const applyPhase1 = (phase1: FeedParseResult) => {
-        paginationRef.current = seededPaginationState(phase1, isRankedFeedSpec(spec));
-        feedItemIdsRef.current = new Set(
-          phase1.orderedFeedItems.map((item) =>
-            item.type === 'note' ? item.event.id : item.repostEvent.id
-          )
-        );
-        applyPage(phase1);
-      };
-
-      isFirstRender.current = true;
-      loadingMoreRef.current = false;
-      setIsLoadingMore(false);
-
-      // Warm navigation (key touched earlier this session): paint the cached
-      // page-0 instantly (keeping its pagination cursor). If it's still fresh,
-      // that paint is authoritative and we skip the network entirely; if stale,
-      // we revalidate silently below (no spinner). Cold start / refresh: show
-      // loading, never a stale first paint.
-      let paintedFromCache = false;
-      const cachedEntry =
-        !isRefresh && !feedPageCache.isColdStart(cacheKey)
-          ? feedPageCache.getEntry(cacheKey)
-          : undefined;
-      if (cachedEntry) {
-        applyPhase1(cachedEntry.data);
-        setIsLoading(false);
-        paintedFromCache = true;
-      }
-      if (!paintedFromCache) {
-        if (!isRefresh) {
-          setIsLoading(true);
-          // Cold load for this spec: clear the previous spec's rows so they don't
-          // linger under the spinner. (Replaces the old reset effect, which clobbered
-          // the warm paint on every tab change.) On pull-to-refresh we keep the
-          // current rows visible while the refresh spinner runs.
-          resetContent();
-        }
-        paginationRef.current = emptyPaginationState();
-        feedItemIdsRef.current.clear();
-      } else if (feedPageCache.isFresh(cachedEntry)) {
-        // Warm + fresh: the instant paint above is complete and authoritative.
-        // Cancel any in-flight load so a slower previous fetch can't overwrite
-        // this paint, then skip the network — no spinner, no request.
-        activeAbortControllerRef.current?.abort();
-        activeAbortControllerRef.current = null;
-        activeLoadIdRef.current = null;
-        requestAnimationFrame(() => {
-          isFirstRender.current = false;
-        });
-        return;
-      }
-
-      const { requestId, controller } = beginNetworkLoad();
-      const client = getFeedClient();
-      let didApplyPage = paintedFromCache;
-
-      try {
-        const phase1 = await client.getFeed({
-          spec,
+    (specIndex: number, isRefresh = false) =>
+      loadFeedImpl(
+        {
           userPubkey,
-          limit: FEED_INITIAL_LIMIT,
-          refresh: isRefresh,
-          signal: controller.signal,
-        });
-
-        if (!isActiveLoad(requestId)) return;
-
-        feedLog.info('feed.ui.fetch.applied', {
-          spec: feedSpecs[specIndex]?.name,
-          items: phase1.orderedFeedItems.length,
-          paginationUntil: phase1.paginationUntil,
-          isRefresh,
-        });
-        applyPhase1(phase1);
-        feedPageCache.setEntry(cacheKey, phase1, { viewerKey: userPubkey || '' });
-        feedPageCache.markTouched(cacheKey);
-        didApplyPage = true;
-        setLoadError(false);
-        setIsLoading(false);
-        setIsRefreshing(false);
-        requestAnimationFrame(() => {
-          isFirstRender.current = false;
-        });
-
-        const updates = await client.enrich({
-          missingQuotedIds: phase1.missingQuotedIds,
-          missingProfilePubkeys: phase1.missingProfilePubkeys,
-          refresh: isRefresh,
-          signal: controller.signal,
-        });
-        if (!isActiveLoad(requestId)) return;
-        // Enrichment arrives after the first paint: quoted posts resolve from
-        // placeholders, mention/author names and avatars fill in. Each updates
-        // a map that re-renders rows and can grow their height — log the counts
-        // so a post-paint shift can be tied to which enrichment landed.
-        feedLog.info('feed.shift.enrich', {
-          spec: feedSpecs[specIndex]?.name,
-          quotedEvents: updates.quotedEvents?.size ?? 0,
-          metrics: updates.metrics?.size ?? 0,
-          profiles: updates.profiles?.size ?? 0,
-          isRefresh,
-        });
-        applyEnrichment(updates);
-      } catch (error) {
-        if (!isActiveLoad(requestId)) return;
-        log.error('feed.home.load_failed', {
-          message: error instanceof Error ? error.message : String(error),
-        });
-        if (!isRefresh && !didApplyPage) {
-          resetContent();
-        }
-        setLoadError(true);
-        setIsLoading(false);
-        setIsRefreshing(false);
-      } finally {
-        if (activeAbortControllerRef.current === controller) {
-          activeAbortControllerRef.current = null;
-        }
-        client.dispose?.();
-      }
-    },
+          paginationRef,
+          feedItemIdsRef,
+          loadingMoreRef,
+          isFirstRender,
+          activeAbortControllerRef,
+          activeLoadIdRef,
+          quotedRef,
+          profilesRef,
+          applyPage,
+          appendPage,
+          applyEnrichment,
+          resetContent,
+          setIsLoading,
+          setIsLoadingMore,
+          setIsRefreshing,
+          setLoadError,
+          beginNetworkLoad,
+          isActiveLoad,
+        },
+        specIndex,
+        isRefresh
+      ),
     [
       applyEnrichment,
       applyPage,
+      appendPage,
       beginNetworkLoad,
-      feedSpecs,
       isActiveLoad,
+      profilesRef,
+      quotedRef,
       resetContent,
       userPubkey,
     ]
@@ -438,96 +338,45 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 
   // ── Pagination: load older items ──
 
-  const loadMoreItems = useCallback(async (): Promise<FeedItem[]> => {
-    const ranked = isRankedFeedSpec(currentSpec);
-    if (
-      loadingMoreRef.current ||
-      !paginationRef.current.hasMore ||
-      !currentSpec ||
-      (!ranked && paginationRef.current.until === 0)
-    )
-      return [];
-
-    loadingMoreRef.current = true;
-    setIsLoadingMore(true);
-    const { requestId, controller } = beginNetworkLoad();
-    const client = getFeedClient();
-
-    try {
-      const page = await client.getFeed({
-        spec: currentSpec,
-        userPubkey,
-        limit: FEED_PAGE_LIMIT,
-        until: paginationRef.current.until > 0 ? paginationRef.current.until : undefined,
-        offset: paginationRef.current.offset > 0 ? paginationRef.current.offset : undefined,
-        signal: controller.signal,
-      });
-
-      if (!isActiveLoad(requestId)) return [];
-
-      const advanced = advancedPaginationState(paginationRef.current, page, ranked);
-      paginationRef.current = advanced;
-      if (!advanced.hasMore) return [];
-
-      const newItems = page.orderedFeedItems.filter((item) => {
-        const id = item.type === 'note' ? item.event.id : item.repostEvent.id;
-        return !feedItemIdsRef.current.has(id);
-      });
-
-      if (newItems.length === 0) {
-        paginationRef.current = { ...paginationRef.current, hasMore: false };
-        return [];
-      }
-
-      for (const item of newItems) {
-        feedItemIdsRef.current.add(item.type === 'note' ? item.event.id : item.repostEvent.id);
-      }
-
-      // Appending a page extends the list below the fold. With a stable
-      // `estimatedItemSize`/key list this should not move the viewport, but a
-      // mismatch between estimated and real row heights does — log the append
-      // so a scroll jump on "load more" can be correlated.
-      feedLog.info('feed.shift.append', {
-        appended: newItems.length,
-        total: feedItemIdsRef.current.size,
-        paginationUntil: page.paginationUntil,
-      });
-      appendPage(page, newItems);
-
-      const missingQ = page.missingQuotedIds.filter((id) => !quotedRef.current.has(id));
-      const missingP = page.missingProfilePubkeys.filter((pk) => !profilesRef.current.has(pk));
-      const updates = await client.enrich({
-        missingQuotedIds: missingQ,
-        missingProfilePubkeys: missingP,
-        signal: controller.signal,
-      });
-      if (!isActiveLoad(requestId)) return newItems;
-      applyEnrichment(updates);
-      return newItems;
-    } catch (error) {
-      if (!isActiveLoad(requestId)) return [];
-      log.error('feed.home.load_more_failed', {
-        message: error instanceof Error ? error.message : String(error),
-      });
-      return [];
-    } finally {
-      if (activeAbortControllerRef.current === controller) {
-        activeAbortControllerRef.current = null;
-      }
-      client.dispose?.();
-      loadingMoreRef.current = false;
-      setIsLoadingMore(false);
-    }
-  }, [
-    appendPage,
-    applyEnrichment,
-    beginNetworkLoad,
-    currentSpec,
-    isActiveLoad,
-    profilesRef,
-    quotedRef,
-    userPubkey,
-  ]);
+  const loadMoreItems = useCallback(
+    (): Promise<FeedItem[]> =>
+      loadMoreItemsImpl(
+        {
+          userPubkey,
+          paginationRef,
+          feedItemIdsRef,
+          loadingMoreRef,
+          isFirstRender,
+          activeAbortControllerRef,
+          activeLoadIdRef,
+          quotedRef,
+          profilesRef,
+          applyPage,
+          appendPage,
+          applyEnrichment,
+          resetContent,
+          setIsLoading,
+          setIsLoadingMore,
+          setIsRefreshing,
+          setLoadError,
+          beginNetworkLoad,
+          isActiveLoad,
+        },
+        currentSpec
+      ),
+    [
+      appendPage,
+      applyEnrichment,
+      applyPage,
+      beginNetworkLoad,
+      currentSpec,
+      isActiveLoad,
+      profilesRef,
+      quotedRef,
+      resetContent,
+      userPubkey,
+    ]
+  );
 
   const handleEndReached = useCallback(() => {
     // Don't start pagination while the first page is still loading or a refresh
@@ -788,12 +637,8 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   });
 
   const onScroll = useCallback(
-    (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-      scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
-      if (imageOverlay?.scrollOffsetY != null) {
-        imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
-      }
-    },
+    (e: { nativeEvent: { contentOffset: { y: number } } }) =>
+      trackFeedScrollOffset(scrollOffsetRef, imageOverlay, e.nativeEvent.contentOffset.y),
     [imageOverlay]
   );
 
@@ -871,6 +716,297 @@ const DEFAULT_FEED_SPECS: FeedSpec[] = [
     spec: JSON.stringify({ id: 'following-recent', kind: 'notes' }),
   },
 ];
+
+// ============================================================================
+// Feed loading — module scope
+// ============================================================================
+// These bodies contain try/finally, which the React Compiler cannot lower
+// (BuildHIR TryStatement); keeping them inside HomeFeed made it skip the whole
+// component. Hoisted here, the component compiles and the loaders stay plain
+// async functions over an explicit context.
+
+type FeedPaginationState = ReturnType<typeof emptyPaginationState>;
+type FeedContentState = ReturnType<typeof useFeedContentState>;
+
+interface HomeFeedLoadCtx {
+  userPubkey: string | undefined;
+  paginationRef: { current: FeedPaginationState };
+  feedItemIdsRef: { current: Set<string> };
+  loadingMoreRef: { current: boolean };
+  isFirstRender: { current: boolean };
+  activeAbortControllerRef: { current: AbortController | null };
+  activeLoadIdRef: { current: string | null };
+  quotedRef: FeedContentState['quotedRef'];
+  profilesRef: FeedContentState['profilesRef'];
+  applyPage: FeedContentState['applyPage'];
+  appendPage: FeedContentState['appendPage'];
+  applyEnrichment: FeedContentState['applyEnrichment'];
+  resetContent: FeedContentState['resetContent'];
+  setIsLoading: (value: boolean) => void;
+  setIsLoadingMore: (value: boolean) => void;
+  setIsRefreshing: (value: boolean) => void;
+  setLoadError: (value: boolean) => void;
+  beginNetworkLoad: () => { requestId: string; controller: AbortController };
+  isActiveLoad: (requestId: string) => boolean;
+}
+
+async function loadFeedImpl(
+  ctx: HomeFeedLoadCtx,
+  specIndex: number,
+  isRefresh: boolean
+): Promise<void> {
+  const {
+    userPubkey,
+    paginationRef,
+    feedItemIdsRef,
+    loadingMoreRef,
+    isFirstRender,
+    activeAbortControllerRef,
+    activeLoadIdRef,
+    applyPage,
+    applyEnrichment,
+    resetContent,
+    setIsLoading,
+    setIsLoadingMore,
+    setIsRefreshing,
+    setLoadError,
+    beginNetworkLoad,
+    isActiveLoad,
+  } = ctx;
+  const feedSpecs = DEFAULT_FEED_SPECS;
+  const spec = feedSpecs[specIndex]?.spec;
+  if (!spec) return;
+  feedLog.info('feed.ui.load', {
+    spec: feedSpecs[specIndex]?.name,
+    specIndex,
+    isRefresh,
+    hasViewer: !!userPubkey,
+  });
+  const cacheKey = feedPageKey(spec, userPubkey);
+
+  // Applies a page-0 result to state + pagination refs. Used both for the
+  // instant warm-nav paint and for the fresh fetch.
+  const applyPhase1 = (phase1: FeedParseResult) => {
+    paginationRef.current = seededPaginationState(phase1, isRankedFeedSpec(spec));
+    feedItemIdsRef.current = new Set(
+      phase1.orderedFeedItems.map((item) =>
+        item.type === 'note' ? item.event.id : item.repostEvent.id
+      )
+    );
+    applyPage(phase1);
+  };
+
+  isFirstRender.current = true;
+  loadingMoreRef.current = false;
+  setIsLoadingMore(false);
+
+  // Warm navigation (key touched earlier this session): paint the cached
+  // page-0 instantly (keeping its pagination cursor). If it's still fresh,
+  // that paint is authoritative and we skip the network entirely; if stale,
+  // we revalidate silently below (no spinner). Cold start / refresh: show
+  // loading, never a stale first paint.
+  let paintedFromCache = false;
+  const cachedEntry =
+    !isRefresh && !feedPageCache.isColdStart(cacheKey)
+      ? feedPageCache.getEntry(cacheKey)
+      : undefined;
+  if (cachedEntry) {
+    applyPhase1(cachedEntry.data);
+    setIsLoading(false);
+    paintedFromCache = true;
+  }
+  if (!paintedFromCache) {
+    if (!isRefresh) {
+      setIsLoading(true);
+      // Cold load for this spec: clear the previous spec's rows so they don't
+      // linger under the spinner. (Replaces the old reset effect, which clobbered
+      // the warm paint on every tab change.) On pull-to-refresh we keep the
+      // current rows visible while the refresh spinner runs.
+      resetContent();
+    }
+    paginationRef.current = emptyPaginationState();
+    feedItemIdsRef.current.clear();
+  } else if (feedPageCache.isFresh(cachedEntry)) {
+    // Warm + fresh: the instant paint above is complete and authoritative.
+    // Cancel any in-flight load so a slower previous fetch can't overwrite
+    // this paint, then skip the network — no spinner, no request.
+    activeAbortControllerRef.current?.abort();
+    activeAbortControllerRef.current = null;
+    activeLoadIdRef.current = null;
+    requestAnimationFrame(() => {
+      isFirstRender.current = false;
+    });
+    return;
+  }
+
+  const { requestId, controller } = beginNetworkLoad();
+  const client = getFeedClient();
+  let didApplyPage = paintedFromCache;
+
+  try {
+    const phase1 = await client.getFeed({
+      spec,
+      userPubkey,
+      limit: FEED_INITIAL_LIMIT,
+      refresh: isRefresh,
+      signal: controller.signal,
+    });
+
+    if (!isActiveLoad(requestId)) return;
+
+    feedLog.info('feed.ui.fetch.applied', {
+      spec: feedSpecs[specIndex]?.name,
+      items: phase1.orderedFeedItems.length,
+      paginationUntil: phase1.paginationUntil,
+      isRefresh,
+    });
+    applyPhase1(phase1);
+    feedPageCache.setEntry(cacheKey, phase1, { viewerKey: userPubkey || '' });
+    feedPageCache.markTouched(cacheKey);
+    didApplyPage = true;
+    setLoadError(false);
+    setIsLoading(false);
+    setIsRefreshing(false);
+    requestAnimationFrame(() => {
+      isFirstRender.current = false;
+    });
+
+    const updates = await client.enrich({
+      missingQuotedIds: phase1.missingQuotedIds,
+      missingProfilePubkeys: phase1.missingProfilePubkeys,
+      refresh: isRefresh,
+      signal: controller.signal,
+    });
+    if (!isActiveLoad(requestId)) return;
+    // Enrichment arrives after the first paint: quoted posts resolve from
+    // placeholders, mention/author names and avatars fill in. Each updates
+    // a map that re-renders rows and can grow their height — log the counts
+    // so a post-paint shift can be tied to which enrichment landed.
+    feedLog.info('feed.shift.enrich', {
+      spec: feedSpecs[specIndex]?.name,
+      quotedEvents: updates.quotedEvents?.size ?? 0,
+      metrics: updates.metrics?.size ?? 0,
+      profiles: updates.profiles?.size ?? 0,
+      isRefresh,
+    });
+    applyEnrichment(updates);
+  } catch (error) {
+    if (!isActiveLoad(requestId)) return;
+    log.error('feed.home.load_failed', {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    if (!isRefresh && !didApplyPage) {
+      resetContent();
+    }
+    setLoadError(true);
+    setIsLoading(false);
+    setIsRefreshing(false);
+  } finally {
+    if (activeAbortControllerRef.current === controller) {
+      activeAbortControllerRef.current = null;
+    }
+    client.dispose?.();
+  }
+}
+
+async function loadMoreItemsImpl(
+  ctx: HomeFeedLoadCtx,
+  currentSpec: string | undefined
+): Promise<FeedItem[]> {
+  const {
+    userPubkey,
+    paginationRef,
+    feedItemIdsRef,
+    loadingMoreRef,
+    activeAbortControllerRef,
+    quotedRef,
+    profilesRef,
+    appendPage,
+    applyEnrichment,
+    setIsLoadingMore,
+    beginNetworkLoad,
+    isActiveLoad,
+  } = ctx;
+  const ranked = isRankedFeedSpec(currentSpec);
+  if (
+    loadingMoreRef.current ||
+    !paginationRef.current.hasMore ||
+    !currentSpec ||
+    (!ranked && paginationRef.current.until === 0)
+  )
+    return [];
+
+  loadingMoreRef.current = true;
+  setIsLoadingMore(true);
+  const { requestId, controller } = beginNetworkLoad();
+  const client = getFeedClient();
+
+  try {
+    const page = await client.getFeed({
+      spec: currentSpec,
+      userPubkey,
+      limit: FEED_PAGE_LIMIT,
+      until: paginationRef.current.until > 0 ? paginationRef.current.until : undefined,
+      offset: paginationRef.current.offset > 0 ? paginationRef.current.offset : undefined,
+      signal: controller.signal,
+    });
+
+    if (!isActiveLoad(requestId)) return [];
+
+    const advanced = advancedPaginationState(paginationRef.current, page, ranked);
+    paginationRef.current = advanced;
+    if (!advanced.hasMore) return [];
+
+    const newItems = page.orderedFeedItems.filter((item) => {
+      const id = item.type === 'note' ? item.event.id : item.repostEvent.id;
+      return !feedItemIdsRef.current.has(id);
+    });
+
+    if (newItems.length === 0) {
+      paginationRef.current = { ...paginationRef.current, hasMore: false };
+      return [];
+    }
+
+    for (const item of newItems) {
+      feedItemIdsRef.current.add(item.type === 'note' ? item.event.id : item.repostEvent.id);
+    }
+
+    // Appending a page extends the list below the fold. With a stable
+    // `estimatedItemSize`/key list this should not move the viewport, but a
+    // mismatch between estimated and real row heights does — log the append
+    // so a scroll jump on "load more" can be correlated.
+    feedLog.info('feed.shift.append', {
+      appended: newItems.length,
+      total: feedItemIdsRef.current.size,
+      paginationUntil: page.paginationUntil,
+    });
+    appendPage(page, newItems);
+
+    const missingQ = page.missingQuotedIds.filter((id) => !quotedRef.current.has(id));
+    const missingP = page.missingProfilePubkeys.filter((pk) => !profilesRef.current.has(pk));
+    const updates = await client.enrich({
+      missingQuotedIds: missingQ,
+      missingProfilePubkeys: missingP,
+      signal: controller.signal,
+    });
+    if (!isActiveLoad(requestId)) return newItems;
+    applyEnrichment(updates);
+    return newItems;
+  } catch (error) {
+    if (!isActiveLoad(requestId)) return [];
+    log.error('feed.home.load_more_failed', {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return [];
+  } finally {
+    if (activeAbortControllerRef.current === controller) {
+      activeAbortControllerRef.current = null;
+    }
+    client.dispose?.();
+    loadingMoreRef.current = false;
+    setIsLoadingMore(false);
+  }
+}
 
 // ============================================================================
 // Styles

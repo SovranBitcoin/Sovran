@@ -73,7 +73,12 @@ import {
 } from '@/features/feed/lib/feedRows';
 
 import { PostCard } from './nostr/PostCard';
-import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
+import {
+  ImageOverlayProvider,
+  useImageOverlay,
+  AnimatedImageOverlay,
+  trackFeedScrollOffset,
+} from './nostr/image-overlay';
 import { useFeedCardProps } from '@/features/feed/hooks/useFeedCardProps';
 import { useFeedContentState } from '@/features/feed/hooks/useFeedContentState';
 import { useFeedInteractions } from '@/features/feed/hooks/useFeedInteractions';
@@ -414,192 +419,92 @@ export function UserFeed({
     activeLoadMoreIdRef.current = null;
     deletedRepostIdsRef.current = null;
 
-    const loadFeedFromClient = async () => {
-      const client = getFeedClient();
-
-      try {
-        const phase1 = await client.getUserFeed({
+    // Body lives in module-scope `loadUserFeedImpl` — try/finally inside the
+    // component would make the React Compiler skip the whole component.
+    const task = InteractionManager.runAfterInteractions(() => {
+      void loadUserFeedImpl(
+        {
           pubkey,
           authorName,
           authorPicture,
-          limit: 50,
-        });
-        if (cancelled) return;
-
-        paginationUntilRef.current = phase1.paginationUntil;
-        hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
-        paginationOffsetRef.current = phase1.paginationOffset;
-        feedItemIdsRef.current = new Set(
-          phase1.orderedFeedItems.map((item) =>
-            item.type === 'note' ? item.event.id : item.repostEvent.id
-          )
-        );
-
-        if (isOwnProfile && deletedRepostIdsRef.current === null) {
-          deletedRepostIdsRef.current = useNostrSocialStore.getState().deletedRepostOriginalIds;
-        }
-
-        const displayItems =
-          isOwnProfile && deletedRepostIdsRef.current
-            ? phase1.orderedFeedItems.filter((item) => {
-                if (item.type !== 'repost') return true;
-                return !deletedRepostIdsRef.current![item.originalEventId];
-              })
-            : phase1.orderedFeedItems;
-
-        applyPage(phase1, displayItems);
-        setIsLoading(false);
-        // After initial render, mark first render done so subsequent items skip animation
-        requestAnimationFrame(() => {
-          isFirstRender.current = false;
-        });
-
-        if (!cancelled) {
-          const updates = await client.enrich({
-            missingQuotedIds: phase1.missingQuotedIds,
-            missingProfilePubkeys: phase1.missingProfilePubkeys,
-          });
-          if (cancelled) return;
-          // Async enrichment lands after first paint and reflows rows (quoted
-          // posts resolving, author names/avatars filling in). See HomeFeed.
-          feedLog.info('feed.shift.enrich', {
-            surface: 'user',
-            quotedEvents: updates.quotedEvents?.size ?? 0,
-            metrics: updates.metrics?.size ?? 0,
-            profiles: updates.profiles?.size ?? 0,
-          });
-          applyEnrichment(updates);
-        }
-      } catch (error) {
-        log.error('feed.user.load_failed', { error });
-        if (!cancelled) {
-          resetContent();
-          setIsLoading(false);
-        }
-      } finally {
-        client.dispose?.();
-      }
-    };
-
-    const task = InteractionManager.runAfterInteractions(() => {
-      void loadFeedFromClient();
+          isOwnProfile,
+          hasMoreRef,
+          paginationUntilRef,
+          paginationOffsetRef,
+          loadingMoreRef,
+          feedItemIdsRef,
+          activeLoadMoreIdRef,
+          isFirstRender,
+          deletedRepostIdsRef,
+          quotedRef,
+          profilesRef,
+          applyPage,
+          appendPage,
+          applyEnrichment,
+          resetContent,
+          setIsLoading,
+          setIsLoadingMore,
+        },
+        () => cancelled
+      );
     });
 
     return () => {
       cancelled = true;
       task.cancel();
     };
-  }, [applyEnrichment, applyPage, authorName, authorPicture, isOwnProfile, pubkey, resetContent]);
-
-  // ── Pagination: load older items ──
-
-  const loadMoreItems = useCallback(async (): Promise<FeedItem[]> => {
-    if (
-      loadingMoreRef.current ||
-      !hasMoreRef.current ||
-      !pubkey ||
-      paginationUntilRef.current === 0
-    )
-      return [];
-
-    loadingMoreRef.current = true;
-    setIsLoadingMore(true);
-    const rp = Date.now().toString(36);
-    activeLoadMoreIdRef.current = rp;
-    const client = getFeedClient();
-
-    try {
-      const page = await client.getUserFeed({
-        pubkey,
-        authorName,
-        authorPicture,
-        limit: 30,
-        until: paginationUntilRef.current,
-        offset: paginationOffsetRef.current > 0 ? paginationOffsetRef.current : undefined,
-      });
-
-      if (page.orderedFeedItems.length === 0) {
-        hasMoreRef.current = false;
-        return [];
-      }
-
-      if (page.paginationUntil > 0 && page.paginationUntil < paginationUntilRef.current) {
-        paginationUntilRef.current = page.paginationUntil;
-        paginationOffsetRef.current = page.paginationOffset;
-      } else if (page.paginationUntil === paginationUntilRef.current) {
-        // Same cursor (score-based feeds) — accumulate offset
-        paginationOffsetRef.current += page.paginationOffset;
-      } else {
-        // No valid cursor from FeedRange — fallback to oldest item timestamp
-        let oldest = paginationUntilRef.current;
-        for (const item of page.orderedFeedItems) {
-          if (item.timestamp < oldest) oldest = item.timestamp;
-        }
-        if (oldest >= paginationUntilRef.current) {
-          hasMoreRef.current = false;
-          return [];
-        }
-        paginationUntilRef.current = oldest;
-        paginationOffsetRef.current = page.paginationOffset;
-      }
-
-      const dedupedItems = page.orderedFeedItems.filter((item) => {
-        const id = item.type === 'note' ? item.event.id : item.repostEvent.id;
-        return !feedItemIdsRef.current.has(id);
-      });
-
-      if (dedupedItems.length === 0) {
-        hasMoreRef.current = false;
-        return [];
-      }
-
-      for (const item of dedupedItems) {
-        feedItemIdsRef.current.add(item.type === 'note' ? item.event.id : item.repostEvent.id);
-      }
-
-      const newItems =
-        isOwnProfile && deletedRepostIdsRef.current
-          ? dedupedItems.filter((item) => {
-              if (item.type !== 'repost') return true;
-              return !deletedRepostIdsRef.current![item.originalEventId];
-            })
-          : dedupedItems;
-
-      feedLog.info('feed.shift.append', {
-        surface: 'user',
-        appended: newItems.length,
-        total: feedItemIdsRef.current.size,
-        paginationUntil: page.paginationUntil,
-      });
-      appendPage(page, newItems);
-
-      const missingQ = page.missingQuotedIds.filter((id) => !quotedRef.current.has(id));
-      const missingP = page.missingProfilePubkeys.filter((pk) => !profilesRef.current.has(pk));
-      const updates = await client.enrich({
-        missingQuotedIds: missingQ,
-        missingProfilePubkeys: missingP,
-      });
-      if (activeLoadMoreIdRef.current !== rp) return dedupedItems;
-      applyEnrichment(updates);
-      return dedupedItems;
-    } catch (error) {
-      log.error('feed.user.load_more_failed', { error });
-      return [];
-    } finally {
-      client.dispose?.();
-      loadingMoreRef.current = false;
-      setIsLoadingMore(false);
-    }
   }, [
     appendPage,
     applyEnrichment,
+    applyPage,
     authorName,
     authorPicture,
     isOwnProfile,
     profilesRef,
     pubkey,
     quotedRef,
+    resetContent,
   ]);
+
+  // ── Pagination: load older items ──
+
+  const loadMoreItems = useCallback(
+    (): Promise<FeedItem[]> =>
+      loadMoreUserItemsImpl({
+        pubkey,
+        authorName,
+        authorPicture,
+        isOwnProfile,
+        hasMoreRef,
+        paginationUntilRef,
+        paginationOffsetRef,
+        loadingMoreRef,
+        feedItemIdsRef,
+        activeLoadMoreIdRef,
+        isFirstRender,
+        deletedRepostIdsRef,
+        quotedRef,
+        profilesRef,
+        applyPage,
+        appendPage,
+        applyEnrichment,
+        resetContent,
+        setIsLoading,
+        setIsLoadingMore,
+      }),
+    [
+      appendPage,
+      applyEnrichment,
+      applyPage,
+      authorName,
+      authorPicture,
+      isOwnProfile,
+      profilesRef,
+      pubkey,
+      quotedRef,
+      resetContent,
+    ]
+  );
 
   const handleEndReached = useCallback(() => {
     // Defensive: never paginate during the first load (the footer spinner would
@@ -786,13 +691,8 @@ export function UserFeed({
   );
 
   const handleListScroll = useCallback(
-    (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-      const y = e.nativeEvent.contentOffset.y;
-      scrollOffsetRef.current = y;
-      if (imageOverlay?.scrollOffsetY != null) {
-        imageOverlay.scrollOffsetY.value = y;
-      }
-    },
+    (e: { nativeEvent: { contentOffset: { y: number } } }) =>
+      trackFeedScrollOffset(scrollOffsetRef, imageOverlay, e.nativeEvent.contentOffset.y),
     [imageOverlay]
   );
 
@@ -858,6 +758,234 @@ export function UserFeed({
       </ImageOverlayProvider>
     </Log>
   );
+}
+
+// ============================================================================
+// Feed loading — module scope
+// ============================================================================
+// These bodies contain try/finally, which the React Compiler cannot lower
+// (BuildHIR TryStatement); keeping them inside UserFeed made it skip the whole
+// component. Hoisted here, the component compiles and the loaders stay plain
+// async functions over an explicit context.
+
+type UserFeedContentState = ReturnType<typeof useFeedContentState>;
+
+interface UserFeedLoadCtx {
+  pubkey: string;
+  authorName: string | undefined;
+  authorPicture: string | undefined;
+  isOwnProfile: boolean | undefined;
+  hasMoreRef: { current: boolean };
+  paginationUntilRef: { current: number };
+  paginationOffsetRef: { current: number };
+  loadingMoreRef: { current: boolean };
+  feedItemIdsRef: { current: Set<string> };
+  activeLoadMoreIdRef: { current: string | null };
+  isFirstRender: { current: boolean };
+  deletedRepostIdsRef: { current: Record<string, number> | null };
+  quotedRef: UserFeedContentState['quotedRef'];
+  profilesRef: UserFeedContentState['profilesRef'];
+  applyPage: UserFeedContentState['applyPage'];
+  appendPage: UserFeedContentState['appendPage'];
+  applyEnrichment: UserFeedContentState['applyEnrichment'];
+  resetContent: UserFeedContentState['resetContent'];
+  setIsLoading: (value: boolean) => void;
+  setIsLoadingMore: (value: boolean) => void;
+}
+
+async function loadUserFeedImpl(ctx: UserFeedLoadCtx, isCancelled: () => boolean): Promise<void> {
+  const {
+    pubkey,
+    authorName,
+    authorPicture,
+    isOwnProfile,
+    hasMoreRef,
+    paginationUntilRef,
+    paginationOffsetRef,
+    feedItemIdsRef,
+    isFirstRender,
+    deletedRepostIdsRef,
+    applyPage,
+    applyEnrichment,
+    resetContent,
+    setIsLoading,
+  } = ctx;
+  const client = getFeedClient();
+
+  try {
+    const phase1 = await client.getUserFeed({
+      pubkey,
+      authorName,
+      authorPicture,
+      limit: 50,
+    });
+    if (isCancelled()) return;
+
+    paginationUntilRef.current = phase1.paginationUntil;
+    hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
+    paginationOffsetRef.current = phase1.paginationOffset;
+    feedItemIdsRef.current = new Set(
+      phase1.orderedFeedItems.map((item) =>
+        item.type === 'note' ? item.event.id : item.repostEvent.id
+      )
+    );
+
+    if (isOwnProfile && deletedRepostIdsRef.current === null) {
+      deletedRepostIdsRef.current = useNostrSocialStore.getState().deletedRepostOriginalIds;
+    }
+
+    const displayItems =
+      isOwnProfile && deletedRepostIdsRef.current
+        ? phase1.orderedFeedItems.filter((item) => {
+            if (item.type !== 'repost') return true;
+            return !deletedRepostIdsRef.current![item.originalEventId];
+          })
+        : phase1.orderedFeedItems;
+
+    applyPage(phase1, displayItems);
+    setIsLoading(false);
+    // After initial render, mark first render done so subsequent items skip animation
+    requestAnimationFrame(() => {
+      isFirstRender.current = false;
+    });
+
+    if (!isCancelled()) {
+      const updates = await client.enrich({
+        missingQuotedIds: phase1.missingQuotedIds,
+        missingProfilePubkeys: phase1.missingProfilePubkeys,
+      });
+      if (isCancelled()) return;
+      // Async enrichment lands after first paint and reflows rows (quoted
+      // posts resolving, author names/avatars filling in). See HomeFeed.
+      feedLog.info('feed.shift.enrich', {
+        surface: 'user',
+        quotedEvents: updates.quotedEvents?.size ?? 0,
+        metrics: updates.metrics?.size ?? 0,
+        profiles: updates.profiles?.size ?? 0,
+      });
+      applyEnrichment(updates);
+    }
+  } catch (error) {
+    log.error('feed.user.load_failed', { error });
+    if (!isCancelled()) {
+      resetContent();
+      setIsLoading(false);
+    }
+  } finally {
+    client.dispose?.();
+  }
+}
+
+async function loadMoreUserItemsImpl(ctx: UserFeedLoadCtx): Promise<FeedItem[]> {
+  const {
+    pubkey,
+    authorName,
+    authorPicture,
+    isOwnProfile,
+    hasMoreRef,
+    paginationUntilRef,
+    paginationOffsetRef,
+    loadingMoreRef,
+    feedItemIdsRef,
+    activeLoadMoreIdRef,
+    deletedRepostIdsRef,
+    quotedRef,
+    profilesRef,
+    appendPage,
+    applyEnrichment,
+    setIsLoadingMore,
+  } = ctx;
+  if (loadingMoreRef.current || !hasMoreRef.current || !pubkey || paginationUntilRef.current === 0)
+    return [];
+
+  loadingMoreRef.current = true;
+  setIsLoadingMore(true);
+  const rp = Date.now().toString(36);
+  activeLoadMoreIdRef.current = rp;
+  const client = getFeedClient();
+
+  try {
+    const page = await client.getUserFeed({
+      pubkey,
+      authorName,
+      authorPicture,
+      limit: 30,
+      until: paginationUntilRef.current,
+      offset: paginationOffsetRef.current > 0 ? paginationOffsetRef.current : undefined,
+    });
+
+    if (page.orderedFeedItems.length === 0) {
+      hasMoreRef.current = false;
+      return [];
+    }
+
+    if (page.paginationUntil > 0 && page.paginationUntil < paginationUntilRef.current) {
+      paginationUntilRef.current = page.paginationUntil;
+      paginationOffsetRef.current = page.paginationOffset;
+    } else if (page.paginationUntil === paginationUntilRef.current) {
+      // Same cursor (score-based feeds) — accumulate offset
+      paginationOffsetRef.current += page.paginationOffset;
+    } else {
+      // No valid cursor from FeedRange — fallback to oldest item timestamp
+      let oldest = paginationUntilRef.current;
+      for (const item of page.orderedFeedItems) {
+        if (item.timestamp < oldest) oldest = item.timestamp;
+      }
+      if (oldest >= paginationUntilRef.current) {
+        hasMoreRef.current = false;
+        return [];
+      }
+      paginationUntilRef.current = oldest;
+      paginationOffsetRef.current = page.paginationOffset;
+    }
+
+    const dedupedItems = page.orderedFeedItems.filter((item) => {
+      const id = item.type === 'note' ? item.event.id : item.repostEvent.id;
+      return !feedItemIdsRef.current.has(id);
+    });
+
+    if (dedupedItems.length === 0) {
+      hasMoreRef.current = false;
+      return [];
+    }
+
+    for (const item of dedupedItems) {
+      feedItemIdsRef.current.add(item.type === 'note' ? item.event.id : item.repostEvent.id);
+    }
+
+    const newItems =
+      isOwnProfile && deletedRepostIdsRef.current
+        ? dedupedItems.filter((item) => {
+            if (item.type !== 'repost') return true;
+            return !deletedRepostIdsRef.current![item.originalEventId];
+          })
+        : dedupedItems;
+
+    feedLog.info('feed.shift.append', {
+      surface: 'user',
+      appended: newItems.length,
+      total: feedItemIdsRef.current.size,
+      paginationUntil: page.paginationUntil,
+    });
+    appendPage(page, newItems);
+
+    const missingQ = page.missingQuotedIds.filter((id) => !quotedRef.current.has(id));
+    const missingP = page.missingProfilePubkeys.filter((pk) => !profilesRef.current.has(pk));
+    const updates = await client.enrich({
+      missingQuotedIds: missingQ,
+      missingProfilePubkeys: missingP,
+    });
+    if (activeLoadMoreIdRef.current !== rp) return dedupedItems;
+    applyEnrichment(updates);
+    return dedupedItems;
+  } catch (error) {
+    log.error('feed.user.load_more_failed', { error });
+    return [];
+  } finally {
+    client.dispose?.();
+    loadingMoreRef.current = false;
+    setIsLoadingMore(false);
+  }
 }
 
 // ============================================================================

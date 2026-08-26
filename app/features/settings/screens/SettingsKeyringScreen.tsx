@@ -217,6 +217,160 @@ const KeyItem: React.FC<{
   );
 };
 
+// ── Handler bodies — module scope ──
+// try/finally cannot be lowered by the React Compiler; inside the component
+// these key-management handlers made it skip the whole screen. Bodies are
+// verbatim moves — key material flows exactly as before (same references, no
+// added logging or copies).
+
+type CocoManagerHandle = ReturnType<typeof useManager>;
+type NostrKeysHandle = ReturnType<typeof useNostrKeysContext>['keys'];
+
+async function loadKeypairsImpl(
+  manager: CocoManagerHandle,
+  io: { setIsLoading: (value: boolean) => void; setKeypairs: (value: Keypair[]) => void }
+): Promise<void> {
+  if (!manager) return;
+
+  try {
+    io.setIsLoading(true);
+    const allKeys = await manager.keyring.getAllKeyPairs();
+    io.setKeypairs(allKeys);
+  } catch (error) {
+    log.error('settings.keyring.load_failed', { error });
+    staticPopup('keys-load-failed');
+  } finally {
+    io.setIsLoading(false);
+  }
+}
+
+async function generateKeyImpl(
+  manager: CocoManagerHandle,
+  loadKeypairs: () => Promise<void>,
+  setIsGenerating: (value: boolean) => void
+): Promise<void> {
+  if (!manager) return;
+
+  try {
+    setIsGenerating(true);
+    await manager.keyring.generateKeyPair();
+    staticPopup('key-generated');
+    await loadKeypairs();
+  } catch (error) {
+    log.error('settings.keyring.generate_failed', { error });
+    staticPopup('key-generate-failed');
+  } finally {
+    setIsGenerating(false);
+  }
+}
+
+/**
+ * Try to import a key with multiple strategies without manipulating the input.
+ */
+async function tryImportKeyImpl(manager: CocoManagerHandle, input: string): Promise<boolean> {
+  if (!manager) return false;
+
+  const parsed = parseP2PKSecretInput(input);
+  if (!parsed.success) {
+    log.warn('settings.keyring.import.invalid_input', { error: parsed.error });
+    return false;
+  }
+
+  const keypair = await manager.keyring.addKeyPair(parsed.secretKey);
+  log.info('settings.keyring.import.key_imported', {
+    publicKeyHex: keypair.publicKeyHex,
+    source: parsed.source,
+  });
+  return true;
+}
+
+async function importNsecSubmitImpl(
+  manager: CocoManagerHandle,
+  loadKeypairs: () => Promise<void>,
+  rawValue: string,
+  io: { setError: (message: string) => void; close: () => void; finalize: () => void }
+): Promise<void> {
+  if (!manager) {
+    io.setError('Wallet not ready.');
+    return;
+  }
+  const trimmedValue = rawValue.trim();
+  try {
+    const success = await tryImportKeyImpl(manager, trimmedValue);
+    if (!success) {
+      io.setError('Enter nsec or 64-character hex key.');
+      return;
+    }
+    staticPopup('key-imported');
+    await loadKeypairs();
+  } catch (error) {
+    log.error('settings.keyring.import_failed', { error });
+    staticPopup('key-import-failed');
+  } finally {
+    // Host suppresses `onDismiss` once an action commits, so
+    // release the single-flight guard explicitly here.
+    io.finalize();
+    io.close();
+  }
+}
+
+/**
+ * Adds the active Sovran/Nostr identity key to Coco's P2PK keyring. Coco
+ * stores P2PK public keys as SEC1-compressed strings with the Nostr x-only
+ * key prefixed by `02`, matching KeyRingService.getPublicKeyHex().
+ */
+async function importCurrentNsecImpl(
+  manager: CocoManagerHandle,
+  nostrKeys: NostrKeysHandle,
+  loadKeypairs: () => Promise<void>,
+  io: {
+    setIsImportingCurrentNsec: (value: boolean) => void;
+    setKeypairs: (value: Keypair[]) => void;
+  }
+): Promise<void> {
+  if (!manager) {
+    staticPopup('wallet-still-loading');
+    return;
+  }
+
+  if (!nostrKeys?.privateKey) {
+    staticPopup('key-import-failed', {
+      text: 'Current Nostr key is not ready yet.',
+    });
+    return;
+  }
+
+  try {
+    io.setIsImportingCurrentNsec(true);
+    const publicKeyHex = `02${getPublicKey(nostrKeys.privateKey)}`;
+    const existingKeypairs = await manager.keyring.getAllKeyPairs();
+
+    if (existingKeypairs.some((keypair) => keypair.publicKeyHex === publicKeyHex)) {
+      io.setKeypairs(existingKeypairs);
+      staticPopup('key-imported', {
+        text: 'Your active Nostr key is already available for P2PK-locked ecash.',
+      });
+      return;
+    }
+
+    const keypair = await manager.keyring.addKeyPair(nostrKeys.privateKey);
+    log.info('settings.keyring.import_current_nsec.key_imported', {
+      publicKeyHex: keypair.publicKeyHex,
+    });
+    staticPopup('key-imported', {
+      text: 'Your active Nostr key can now receive P2PK-locked ecash.',
+    });
+    await loadKeypairs();
+  } catch (error) {
+    log.error('settings.keyring.import_current_nsec_failed', { error });
+    staticPopup('key-import-failed', {
+      text: 'Failed to add your current Nostr key.',
+    });
+  } finally {
+    io.setIsImportingCurrentNsec(false);
+  }
+}
+
 /**
  * KeyringSettings - P2PK key management page
  */
@@ -245,20 +399,10 @@ export const SettingsKeyringScreen: React.FC = () => {
    * every render. Compiler memoization is an optimization, not a contract.
    */
   // ast-grep-ignore: no-manual-memo-tsx
-  const loadKeypairs = useCallback(async () => {
-    if (!manager) return;
-
-    try {
-      setIsLoading(true);
-      const allKeys = await manager.keyring.getAllKeyPairs();
-      setKeypairs(allKeys);
-    } catch (error) {
-      log.error('settings.keyring.load_failed', { error });
-      staticPopup('keys-load-failed');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [manager]);
+  const loadKeypairs = useCallback(
+    () => loadKeypairsImpl(manager, { setIsLoading, setKeypairs }),
+    [manager]
+  );
 
   useEffect(() => {
     void loadKeypairs();
@@ -269,41 +413,9 @@ export const SettingsKeyringScreen: React.FC = () => {
    * late to block a rapid double-tap on Generate, which would otherwise
    * write two new keypairs into the secure-store keyring.
    */
-  const handleGenerateKey = useSingleFlight(async () => {
-    if (!manager) return;
-
-    try {
-      setIsGenerating(true);
-      await manager.keyring.generateKeyPair();
-      staticPopup('key-generated');
-      await loadKeypairs();
-    } catch (error) {
-      log.error('settings.keyring.generate_failed', { error });
-      staticPopup('key-generate-failed');
-    } finally {
-      setIsGenerating(false);
-    }
-  });
-
-  /**
-   * Try to import a key with multiple strategies without manipulating the input.
-   */
-  const tryImportKey = async (input: string): Promise<boolean> => {
-    if (!manager) return false;
-
-    const parsed = parseP2PKSecretInput(input);
-    if (!parsed.success) {
-      log.warn('settings.keyring.import.invalid_input', { error: parsed.error });
-      return false;
-    }
-
-    const keypair = await manager.keyring.addKeyPair(parsed.secretKey);
-    log.info('settings.keyring.import.key_imported', {
-      publicKeyHex: keypair.publicKeyHex,
-      source: parsed.source,
-    });
-    return true;
-  };
+  const handleGenerateKey = useSingleFlight(() =>
+    generateKeyImpl(manager, loadKeypairs, setIsGenerating)
+  );
 
   /**
    * Imports an existing private key (nsec or hex format). The single-flight
@@ -340,30 +452,12 @@ export const SettingsKeyringScreen: React.FC = () => {
             icon: 'mdi:key-arrow-right',
             testID: 'keyring-import-submit',
             isDisabled: (v) => !v.key.trim(),
-            onPress: async (values, { setError, close }) => {
-              if (!manager) {
-                setError('Wallet not ready.');
-                return;
-              }
-              const trimmedValue = values.key.trim();
-              try {
-                const success = await tryImportKey(trimmedValue);
-                if (!success) {
-                  setError('Enter nsec or 64-character hex key.');
-                  return;
-                }
-                staticPopup('key-imported');
-                await loadKeypairs();
-              } catch (error) {
-                log.error('settings.keyring.import_failed', { error });
-                staticPopup('key-import-failed');
-              } finally {
-                // Host suppresses `onDismiss` once an action commits, so
-                // release the single-flight guard explicitly here.
-                finalize();
-                close();
-              }
-            },
+            onPress: (values, { setError, close }) =>
+              importNsecSubmitImpl(manager, loadKeypairs, values.key, {
+                setError,
+                close,
+                finalize,
+              }),
           },
           onDismiss: finalize,
         });
@@ -375,49 +469,12 @@ export const SettingsKeyringScreen: React.FC = () => {
    * stores P2PK public keys as SEC1-compressed strings with the Nostr x-only
    * key prefixed by `02`, matching KeyRingService.getPublicKeyHex().
    */
-  const handleImportCurrentNsec = useSingleFlight(async () => {
-    if (!manager) {
-      staticPopup('wallet-still-loading');
-      return;
-    }
-
-    if (!nostrKeys?.privateKey) {
-      staticPopup('key-import-failed', {
-        text: 'Current Nostr key is not ready yet.',
-      });
-      return;
-    }
-
-    try {
-      setIsImportingCurrentNsec(true);
-      const publicKeyHex = `02${getPublicKey(nostrKeys.privateKey)}`;
-      const existingKeypairs = await manager.keyring.getAllKeyPairs();
-
-      if (existingKeypairs.some((keypair) => keypair.publicKeyHex === publicKeyHex)) {
-        setKeypairs(existingKeypairs);
-        staticPopup('key-imported', {
-          text: 'Your active Nostr key is already available for P2PK-locked ecash.',
-        });
-        return;
-      }
-
-      const keypair = await manager.keyring.addKeyPair(nostrKeys.privateKey);
-      log.info('settings.keyring.import_current_nsec.key_imported', {
-        publicKeyHex: keypair.publicKeyHex,
-      });
-      staticPopup('key-imported', {
-        text: 'Your active Nostr key can now receive P2PK-locked ecash.',
-      });
-      await loadKeypairs();
-    } catch (error) {
-      log.error('settings.keyring.import_current_nsec_failed', { error });
-      staticPopup('key-import-failed', {
-        text: 'Failed to add your current Nostr key.',
-      });
-    } finally {
-      setIsImportingCurrentNsec(false);
-    }
-  });
+  const handleImportCurrentNsec = useSingleFlight(() =>
+    importCurrentNsecImpl(manager, nostrKeys, loadKeypairs, {
+      setIsImportingCurrentNsec,
+      setKeypairs,
+    })
+  );
 
   const handleCopyKey = async (publicKey: string) => {
     await Clipboard.setStringAsync(publicKey);

@@ -233,228 +233,42 @@ export function useThread(eventId: string): UseThreadResult {
     setDataVersion((v) => v + 1);
   }, []);
 
-  /**
-   * Background "Might be spam" second opinion. Runs once per thread open when
-   * nagg served the primary list: Primal→relays are consulted below it, their
-   * direct replies diffed against everything nagg acknowledged. OP-authored
-   * finds are promoted into the main list's OP block (nagg's ingest cap can
-   * drop legit OP replies); the rest render under the spam separator — which
-   * ThreadView shows only after the primary list is exhausted.
-   */
-  const runSpamAudit = useCallback(
-    async (result: ThreadResult, generation: number) => {
-      if (result.tier !== 'nagg' || spamAuditStartedRef.current) {
-        if (result.tier && result.tier !== 'nagg') {
-          feedLog.info('thread.spam.skipped', {
-            eventId,
-            reason: 'primary_tier',
-            tier: result.tier,
-          });
-        }
-        return;
-      }
-      const opPubkey = result.thread.target?.pubkey;
-      if (!opPubkey) return;
-      spamAuditStartedRef.current = true;
-
-      const layer = buildNostrDataLayer();
-      if (!layer) return;
-      feedLog.info('thread.spam.start', { eventId, known: knownReplyIdsRef.current.size });
-      try {
-        // Deliberately unsignalled: the layer memoizes this promise (~5 min), so
-        // aborting on unmount would poison the shared entry. Staleness is handled
-        // by the generation guard below instead.
-        const audit = await layer.auditThreadReplies({
-          noteId: eventId,
-          opPubkey,
-          primaryTier: 'nagg',
-          knownReplyIds: [...knownReplyIdsRef.current],
-          timeoutMs: THREAD_AUDIT_TIMEOUT_MS,
-        });
-        if (generation !== requestGenerationRef.current) return;
-
-        const toEvent = (item: facade.FeedItem): FeedEvent | undefined =>
-          item.type === 'note' ? (item.event as FeedEvent) : undefined;
-
-        // Merge audit hydration so promoted/spam cards render names/metrics.
-        const profiles = new Map<string, ProfileInfo>(
-          Object.entries(audit.profiles).map(([pk, p]) => [
-            pk,
-            { name: p.name, ...(p.picture ? { picture: p.picture } : {}) },
-          ])
-        );
-        const metrics = new Map<string, NoteMetrics>();
-        for (const [id, s] of Object.entries(audit.stats)) {
-          metrics.set(id, {
-            likeCount: s.likes,
-            repostCount: s.reposts,
-            replyCount: s.replies,
-            satsZapped: s.satsZapped,
-          });
-        }
-        mergeIntoRef(profilesRef, profiles);
-        mergeIntoRef(metricsRef, metrics);
-
-        // Promote OP-authored finds into the OP block: after the leading run of
-        // OP direct replies, before everyone else's.
-        const opEvents = audit.opExtras
-          .map(toEvent)
-          .filter(
-            (event): event is FeedEvent => !!event && !knownReplyIdsRef.current.has(event.id)
-          );
-        if (opEvents.length > 0 && threadSeedRef.current) {
-          for (const event of opEvents) {
-            threadSeedRef.current.allEvents.set(event.id, event);
-            knownReplyIdsRef.current.add(event.id);
-          }
-          const seedEvents = threadSeedRef.current.allEvents;
-          const isOpDirect = (id: string): boolean => {
-            const event = seedEvents.get(id);
-            return !!event && event.pubkey === opPubkey && facade.isDirectReplyTo(event, eventId);
-          };
-          let opBlockEnd = 0;
-          while (
-            opBlockEnd < replyOrderRef.current.length &&
-            isOpDirect(replyOrderRef.current[opBlockEnd])
-          ) {
-            opBlockEnd += 1;
-          }
-          replyOrderRef.current = [
-            ...replyOrderRef.current.slice(0, opBlockEnd),
-            ...opEvents.map((event) => event.id),
-            ...replyOrderRef.current.slice(opBlockEnd),
-          ];
-          rebuildRepliesFromOrder();
-        }
-
-        const spamEvents = audit.extras
-          .map(toEvent)
-          .filter(
-            (event): event is FeedEvent => !!event && !knownReplyIdsRef.current.has(event.id)
-          );
-        setSpamReplies(spamEvents);
-        if (spamEvents.length > 0) setDataVersion((v) => v + 1);
-
-        feedLog.info('thread.spam.done', {
-          eventId,
-          tier: audit.tier,
-          spam: spamEvents.length,
-          promotedOp: opEvents.length,
-        });
-      } catch (err) {
-        feedLog.warn('thread.spam.error', {
-          eventId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    },
-    [eventId, rebuildRepliesFromOrder]
-  );
-
-  const loadMoreReplies = useCallback(async () => {
-    if (
-      !eventId ||
-      isInitialFetchingRef.current ||
-      isLoadingMoreRepliesRef.current ||
-      !hasMoreRepliesRef.current ||
-      !threadSeedRef.current
-    ) {
-      return;
-    }
-
-    // Memory first: every source delivers its full ordered stack up front, so
-    // a scroll to the end reveals the next window instantly. The network is
-    // touched only in the rare case where nagg's fetch cap left a server
-    // continuation beyond the stack.
-    const allSorted = allSortedReplyIdsRef.current;
-    if (allSorted) {
-      const shown = replyOrderRef.current.length;
-      const next = allSorted.slice(shown, shown + THREAD_REPLY_PAGE_SIZE);
-      if (next.length > 0) {
-        replyOrderRef.current = [...replyOrderRef.current, ...next];
-        for (const id of next) knownReplyIdsRef.current.add(id);
-        const exhausted =
-          replyOrderRef.current.length >= allSorted.length && !serverHasMoreRef.current;
-        hasMoreRepliesRef.current = !exhausted;
-        setHasMoreReplies(!exhausted);
-        rebuildRepliesFromOrder();
-        feedLog.info('thread.replies.load_more.done', {
-          eventId,
-          replies: next.length,
-          fromMemory: true,
-          hasMoreReplies: !exhausted,
-          replySort,
-        });
-        return;
-      }
-      if (!serverHasMoreRef.current) {
-        hasMoreRepliesRef.current = false;
-        setHasMoreReplies(false);
-        return;
-      }
-      // Stack drained but the server holds more — fall through to extend it.
-    }
-
-    const generation = requestGenerationRef.current;
-    const offset = allSortedReplyIdsRef.current?.length ?? replyOffsetRef.current;
-    const seed = threadSeedRef.current;
-    const controller = new AbortController();
-    loadMoreAbortControllerRef.current?.abort();
-    loadMoreAbortControllerRef.current = controller;
-    isLoadingMoreRepliesRef.current = true;
-    setIsLoadingMoreReplies(true);
-
-    const client = getFeedClient();
-
-    feedLog.info('thread.replies.load_more.start', {
-      eventId,
-      limit: THREAD_REPLY_PAGE_SIZE,
-      offset,
-      replySort,
-    });
-
-    try {
-      const result = await client.getThread({
+  // The load/audit bodies live in module scope (`loadMoreRepliesImpl`,
+  // `fetchThreadImpl`, `runSpamAuditImpl`) — their try/finally and
+  // conditionals-inside-try would make the React Compiler skip this whole hook.
+  const loadMoreReplies = useCallback(
+    () =>
+      loadMoreRepliesImpl({
         eventId,
-        limit: THREAD_REPLY_PAGE_SIZE,
-        offset,
-        sort: replySort,
         viewerPubkey,
-        seed,
-        signal: controller.signal,
-      });
-      if (generation !== requestGenerationRef.current) return;
-
-      replyOffsetRef.current += result.loadedReplyCount;
-      if (result.loadedReplyCount === 0) {
-        hasMoreRepliesRef.current = false;
-        setHasMoreReplies(false);
-        return;
-      }
-
-      if (!applyThreadResult(result, 'more')) {
-        hasMoreRepliesRef.current = false;
-        setHasMoreReplies(false);
-      }
-    } catch (err) {
-      if (generation === requestGenerationRef.current) {
-        feedLog.error('thread.replies.load_more.error', {
-          eventId,
-          replySort,
-          error: err instanceof Error ? err : new Error(String(err)),
-        });
-      }
-    } finally {
-      if (loadMoreAbortControllerRef.current === controller) {
-        loadMoreAbortControllerRef.current = null;
-      }
-      client.dispose?.();
-      if (generation === requestGenerationRef.current) {
-        isLoadingMoreRepliesRef.current = false;
-        setIsLoadingMoreReplies(false);
-      }
-    }
-  }, [applyThreadResult, eventId, rebuildRepliesFromOrder, replySort, viewerPubkey]);
+        replySort,
+        profilesRef,
+        metricsRef,
+        quotedEventsRef,
+        threadSeedRef,
+        replyOrderRef,
+        replyOffsetRef,
+        hasMoreRepliesRef,
+        knownReplyIdsRef,
+        spamAuditStartedRef,
+        allSortedReplyIdsRef,
+        serverHasMoreRef,
+        isInitialFetchingRef,
+        isLoadingMoreRepliesRef,
+        requestGenerationRef,
+        loadMoreAbortControllerRef,
+        setSpamReplies,
+        setIsLoading,
+        setIsFetching,
+        setIsLoadingMoreReplies,
+        setHasMoreReplies,
+        setError,
+        setDataVersion,
+        applyThreadResult,
+        rebuildRepliesFromOrder,
+      }),
+    [applyThreadResult, eventId, rebuildRepliesFromOrder, replySort, viewerPubkey]
+  );
 
   useEffect(() => {
     if (!eventId) return;
@@ -527,58 +341,39 @@ export function useThread(eventId: string): UseThreadResult {
       viewerPubkey: !!viewerPubkey,
     });
 
-    const fetchThread = async () => {
-      const client = getFeedClient();
-
-      try {
-        const result = await client.getThread({
-          eventId,
-          limit: THREAD_REPLY_PAGE_SIZE,
-          offset: 0,
-          sort: replySort,
-          viewerPubkey,
-          seed,
-          signal: controller.signal,
-        });
-        if (cancelled || generation !== requestGenerationRef.current) return;
-        replyOffsetRef.current = result.loadedReplyCount;
-
-        if (!applyThreadResult(result, 'initial')) {
-          // A locally-seeded own note may not be on nagg yet — keep the seeded
-          // render instead of clobbering it with a not-found error.
-          if (!seed) setError('Post not found');
-          setIsLoading(false);
-          setIsFetching(false);
-          return;
-        }
-
-        setIsLoading(false);
-        setIsFetching(false);
-        // Primary painted — the second opinion runs quietly behind it.
-        void runSpamAudit(result, generation);
-      } catch (err) {
-        if (!cancelled && generation === requestGenerationRef.current) {
-          feedLog.error('thread.load.error', {
-            eventId,
-            replySort,
-            error: err instanceof Error ? err : new Error(String(err)),
-          });
-          if (!seed) {
-            setError('Failed to load thread');
-            setIsLoading(false);
-          }
-          setIsFetching(false);
-        }
-      } finally {
-        client.dispose?.();
-        if (!cancelled && generation === requestGenerationRef.current) {
-          isInitialFetchingRef.current = false;
-        }
-      }
-    };
-
     const task = InteractionManager.runAfterInteractions(() => {
-      void fetchThread();
+      void fetchThreadImpl(
+        {
+          eventId,
+          viewerPubkey,
+          replySort,
+          profilesRef,
+          metricsRef,
+          quotedEventsRef,
+          threadSeedRef,
+          replyOrderRef,
+          replyOffsetRef,
+          hasMoreRepliesRef,
+          knownReplyIdsRef,
+          spamAuditStartedRef,
+          allSortedReplyIdsRef,
+          serverHasMoreRef,
+          isInitialFetchingRef,
+          isLoadingMoreRepliesRef,
+          requestGenerationRef,
+          loadMoreAbortControllerRef,
+          setSpamReplies,
+          setIsLoading,
+          setIsFetching,
+          setIsLoadingMoreReplies,
+          setHasMoreReplies,
+          setError,
+          setDataVersion,
+          applyThreadResult,
+          rebuildRepliesFromOrder,
+        },
+        { seed, generation, controller, isCancelled: () => cancelled }
+      );
     });
 
     return () => {
@@ -591,7 +386,7 @@ export function useThread(eventId: string): UseThreadResult {
       isLoadingMoreRepliesRef.current = false;
       task.cancel();
     };
-  }, [applyThreadResult, eventId, replySort, runSpamAudit, viewerPubkey]);
+  }, [applyThreadResult, eventId, rebuildRepliesFromOrder, replySort, viewerPubkey]);
 
   // Final composition: ignore filters over replies AND the spam bucket, and the
   // "Might be spam" section appears only once the primary list is exhausted.
@@ -621,4 +416,365 @@ export function useThread(eventId: string): UseThreadResult {
     quotedEventsRef,
     loadMoreReplies,
   };
+}
+
+// ============================================================================
+// Load / audit bodies — module scope
+// ============================================================================
+// try/finally (and conditionals inside try) cannot be lowered by the React
+// Compiler; inside the hook they made it skip the whole hook. Hoisted here the
+// hook compiles and these stay plain async functions over an explicit context.
+
+interface ThreadLoadCtx {
+  eventId: string;
+  viewerPubkey: string | undefined;
+  replySort: ThreadReplySort;
+  profilesRef: React.MutableRefObject<Map<string, ProfileInfo>>;
+  metricsRef: React.MutableRefObject<Map<string, NoteMetrics>>;
+  quotedEventsRef: React.MutableRefObject<Map<string, FeedEvent>>;
+  threadSeedRef: { current: ThreadSeedBuckets | null };
+  replyOrderRef: { current: string[] };
+  replyOffsetRef: { current: number };
+  hasMoreRepliesRef: { current: boolean };
+  knownReplyIdsRef: { current: Set<string> };
+  spamAuditStartedRef: { current: boolean };
+  allSortedReplyIdsRef: { current: string[] | null };
+  serverHasMoreRef: { current: boolean };
+  isInitialFetchingRef: { current: boolean };
+  isLoadingMoreRepliesRef: { current: boolean };
+  requestGenerationRef: { current: number };
+  loadMoreAbortControllerRef: { current: AbortController | null };
+  setSpamReplies: React.Dispatch<React.SetStateAction<FeedEvent[]>>;
+  setIsLoading: (value: boolean) => void;
+  setIsFetching: (value: boolean) => void;
+  setIsLoadingMoreReplies: (value: boolean) => void;
+  setHasMoreReplies: (value: boolean) => void;
+  setError: (value: string | null) => void;
+  setDataVersion: React.Dispatch<React.SetStateAction<number>>;
+  applyThreadResult: (result: ThreadResult, source: 'initial' | 'more') => BuiltThreadItems | null;
+  rebuildRepliesFromOrder: () => void;
+}
+
+/**
+ * Background "Might be spam" second opinion. Runs once per thread open when
+ * nagg served the primary list: Primal→relays are consulted below it, their
+ * direct replies diffed against everything nagg acknowledged. OP-authored
+ * finds are promoted into the main list's OP block (nagg's ingest cap can
+ * drop legit OP replies); the rest render under the spam separator — which
+ * ThreadView shows only after the primary list is exhausted.
+ */
+async function runSpamAuditImpl(
+  ctx: ThreadLoadCtx,
+  result: ThreadResult,
+  generation: number
+): Promise<void> {
+  const {
+    eventId,
+    profilesRef,
+    metricsRef,
+    threadSeedRef,
+    replyOrderRef,
+    knownReplyIdsRef,
+    spamAuditStartedRef,
+    requestGenerationRef,
+    setSpamReplies,
+    setDataVersion,
+    rebuildRepliesFromOrder,
+  } = ctx;
+  if (result.tier !== 'nagg' || spamAuditStartedRef.current) {
+    if (result.tier && result.tier !== 'nagg') {
+      feedLog.info('thread.spam.skipped', {
+        eventId,
+        reason: 'primary_tier',
+        tier: result.tier,
+      });
+    }
+    return;
+  }
+  const opPubkey = result.thread.target?.pubkey;
+  if (!opPubkey) return;
+  spamAuditStartedRef.current = true;
+
+  const layer = buildNostrDataLayer();
+  if (!layer) return;
+  feedLog.info('thread.spam.start', { eventId, known: knownReplyIdsRef.current.size });
+  try {
+    // Deliberately unsignalled: the layer memoizes this promise (~5 min), so
+    // aborting on unmount would poison the shared entry. Staleness is handled
+    // by the generation guard below instead.
+    const audit = await layer.auditThreadReplies({
+      noteId: eventId,
+      opPubkey,
+      primaryTier: 'nagg',
+      knownReplyIds: [...knownReplyIdsRef.current],
+      timeoutMs: THREAD_AUDIT_TIMEOUT_MS,
+    });
+    if (generation !== requestGenerationRef.current) return;
+
+    const toEvent = (item: facade.FeedItem): FeedEvent | undefined =>
+      item.type === 'note' ? (item.event as FeedEvent) : undefined;
+
+    // Merge audit hydration so promoted/spam cards render names/metrics.
+    const profiles = new Map<string, ProfileInfo>(
+      Object.entries(audit.profiles).map(([pk, p]) => [
+        pk,
+        { name: p.name, ...(p.picture ? { picture: p.picture } : {}) },
+      ])
+    );
+    const metrics = new Map<string, NoteMetrics>();
+    for (const [id, s] of Object.entries(audit.stats)) {
+      metrics.set(id, {
+        likeCount: s.likes,
+        repostCount: s.reposts,
+        replyCount: s.replies,
+        satsZapped: s.satsZapped,
+      });
+    }
+    mergeIntoRef(profilesRef, profiles);
+    mergeIntoRef(metricsRef, metrics);
+
+    // Promote OP-authored finds into the OP block: after the leading run of
+    // OP direct replies, before everyone else's.
+    const opEvents = audit.opExtras
+      .map(toEvent)
+      .filter((event): event is FeedEvent => !!event && !knownReplyIdsRef.current.has(event.id));
+    if (opEvents.length > 0 && threadSeedRef.current) {
+      for (const event of opEvents) {
+        threadSeedRef.current.allEvents.set(event.id, event);
+        knownReplyIdsRef.current.add(event.id);
+      }
+      const seedEvents = threadSeedRef.current.allEvents;
+      const isOpDirect = (id: string): boolean => {
+        const event = seedEvents.get(id);
+        return !!event && event.pubkey === opPubkey && facade.isDirectReplyTo(event, eventId);
+      };
+      let opBlockEnd = 0;
+      while (
+        opBlockEnd < replyOrderRef.current.length &&
+        isOpDirect(replyOrderRef.current[opBlockEnd])
+      ) {
+        opBlockEnd += 1;
+      }
+      replyOrderRef.current = [
+        ...replyOrderRef.current.slice(0, opBlockEnd),
+        ...opEvents.map((event) => event.id),
+        ...replyOrderRef.current.slice(opBlockEnd),
+      ];
+      rebuildRepliesFromOrder();
+    }
+
+    const spamEvents = audit.extras
+      .map(toEvent)
+      .filter((event): event is FeedEvent => !!event && !knownReplyIdsRef.current.has(event.id));
+    setSpamReplies(spamEvents);
+    if (spamEvents.length > 0) setDataVersion((v) => v + 1);
+
+    feedLog.info('thread.spam.done', {
+      eventId,
+      tier: audit.tier,
+      spam: spamEvents.length,
+      promotedOp: opEvents.length,
+    });
+  } catch (err) {
+    feedLog.warn('thread.spam.error', {
+      eventId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+async function loadMoreRepliesImpl(ctx: ThreadLoadCtx): Promise<void> {
+  const {
+    eventId,
+    viewerPubkey,
+    replySort,
+    threadSeedRef,
+    replyOrderRef,
+    replyOffsetRef,
+    hasMoreRepliesRef,
+    knownReplyIdsRef,
+    allSortedReplyIdsRef,
+    serverHasMoreRef,
+    isInitialFetchingRef,
+    isLoadingMoreRepliesRef,
+    requestGenerationRef,
+    loadMoreAbortControllerRef,
+    setIsLoadingMoreReplies,
+    setHasMoreReplies,
+    applyThreadResult,
+    rebuildRepliesFromOrder,
+  } = ctx;
+  if (
+    !eventId ||
+    isInitialFetchingRef.current ||
+    isLoadingMoreRepliesRef.current ||
+    !hasMoreRepliesRef.current ||
+    !threadSeedRef.current
+  ) {
+    return;
+  }
+
+  // Memory first: every source delivers its full ordered stack up front, so
+  // a scroll to the end reveals the next window instantly. The network is
+  // touched only in the rare case where nagg's fetch cap left a server
+  // continuation beyond the stack.
+  const allSorted = allSortedReplyIdsRef.current;
+  if (allSorted) {
+    const shown = replyOrderRef.current.length;
+    const next = allSorted.slice(shown, shown + THREAD_REPLY_PAGE_SIZE);
+    if (next.length > 0) {
+      replyOrderRef.current = [...replyOrderRef.current, ...next];
+      for (const id of next) knownReplyIdsRef.current.add(id);
+      const exhausted =
+        replyOrderRef.current.length >= allSorted.length && !serverHasMoreRef.current;
+      hasMoreRepliesRef.current = !exhausted;
+      setHasMoreReplies(!exhausted);
+      rebuildRepliesFromOrder();
+      feedLog.info('thread.replies.load_more.done', {
+        eventId,
+        replies: next.length,
+        fromMemory: true,
+        hasMoreReplies: !exhausted,
+        replySort,
+      });
+      return;
+    }
+    if (!serverHasMoreRef.current) {
+      hasMoreRepliesRef.current = false;
+      setHasMoreReplies(false);
+      return;
+    }
+    // Stack drained but the server holds more — fall through to extend it.
+  }
+
+  const generation = requestGenerationRef.current;
+  const offset = allSortedReplyIdsRef.current?.length ?? replyOffsetRef.current;
+  const seed = threadSeedRef.current;
+  const controller = new AbortController();
+  loadMoreAbortControllerRef.current?.abort();
+  loadMoreAbortControllerRef.current = controller;
+  isLoadingMoreRepliesRef.current = true;
+  setIsLoadingMoreReplies(true);
+
+  const client = getFeedClient();
+
+  feedLog.info('thread.replies.load_more.start', {
+    eventId,
+    limit: THREAD_REPLY_PAGE_SIZE,
+    offset,
+    replySort,
+  });
+
+  try {
+    const result = await client.getThread({
+      eventId,
+      limit: THREAD_REPLY_PAGE_SIZE,
+      offset,
+      sort: replySort,
+      viewerPubkey,
+      seed,
+      signal: controller.signal,
+    });
+    if (generation !== requestGenerationRef.current) return;
+
+    replyOffsetRef.current += result.loadedReplyCount;
+    if (result.loadedReplyCount === 0) {
+      hasMoreRepliesRef.current = false;
+      setHasMoreReplies(false);
+      return;
+    }
+
+    if (!applyThreadResult(result, 'more')) {
+      hasMoreRepliesRef.current = false;
+      setHasMoreReplies(false);
+    }
+  } catch (err) {
+    if (generation === requestGenerationRef.current) {
+      feedLog.error('thread.replies.load_more.error', {
+        eventId,
+        replySort,
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+    }
+  } finally {
+    if (loadMoreAbortControllerRef.current === controller) {
+      loadMoreAbortControllerRef.current = null;
+    }
+    client.dispose?.();
+    if (generation === requestGenerationRef.current) {
+      isLoadingMoreRepliesRef.current = false;
+      setIsLoadingMoreReplies(false);
+    }
+  }
+}
+
+async function fetchThreadImpl(
+  ctx: ThreadLoadCtx,
+  run: {
+    seed: ThreadSeedBuckets | undefined;
+    generation: number;
+    controller: AbortController;
+    isCancelled: () => boolean;
+  }
+): Promise<void> {
+  const {
+    eventId,
+    viewerPubkey,
+    replySort,
+    replyOffsetRef,
+    isInitialFetchingRef,
+    requestGenerationRef,
+    setIsLoading,
+    setIsFetching,
+    setError,
+    applyThreadResult,
+  } = ctx;
+  const { seed, generation, controller, isCancelled } = run;
+  const client = getFeedClient();
+
+  try {
+    const result = await client.getThread({
+      eventId,
+      limit: THREAD_REPLY_PAGE_SIZE,
+      offset: 0,
+      sort: replySort,
+      viewerPubkey,
+      seed,
+      signal: controller.signal,
+    });
+    if (isCancelled() || generation !== requestGenerationRef.current) return;
+    replyOffsetRef.current = result.loadedReplyCount;
+
+    if (!applyThreadResult(result, 'initial')) {
+      // A locally-seeded own note may not be on nagg yet — keep the seeded
+      // render instead of clobbering it with a not-found error.
+      if (!seed) setError('Post not found');
+      setIsLoading(false);
+      setIsFetching(false);
+      return;
+    }
+
+    setIsLoading(false);
+    setIsFetching(false);
+    // Primary painted — the second opinion runs quietly behind it.
+    void runSpamAuditImpl(ctx, result, generation);
+  } catch (err) {
+    if (!isCancelled() && generation === requestGenerationRef.current) {
+      feedLog.error('thread.load.error', {
+        eventId,
+        replySort,
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+      if (!seed) {
+        setError('Failed to load thread');
+        setIsLoading(false);
+      }
+      setIsFetching(false);
+    }
+  } finally {
+    client.dispose?.();
+    if (!isCancelled() && generation === requestGenerationRef.current) {
+      isInitialFetchingRef.current = false;
+    }
+  }
 }

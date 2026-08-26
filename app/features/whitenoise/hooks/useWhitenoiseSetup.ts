@@ -20,6 +20,77 @@ async function readCount(client: MarmotClient): Promise<number> {
   return client.keyPackages.count();
 }
 
+// Bodies live at module scope: try/finally cannot be lowered by the React
+// Compiler and made every consumer of this hook carry an uncompiled hook slot.
+type WhitenoiseClient = ReturnType<typeof useWhitenoise>['client'];
+type WhitenoiseRelays = ReturnType<typeof useWhitenoise>['relays'];
+
+async function refreshImpl(
+  client: WhitenoiseClient,
+  io: {
+    setKeyPackageCount: (value: number) => void;
+    setIsLoading: (value: boolean) => void;
+    setError: (value: string | null) => void;
+  }
+): Promise<void> {
+  if (!client) return;
+  io.setIsLoading(true);
+  try {
+    const count = await readCount(client);
+    io.setKeyPackageCount(count);
+    io.setError(null);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    io.setError(message);
+    wnLog.warn('whitenoise.setup.refresh_failed', { error: message });
+  } finally {
+    io.setIsLoading(false);
+  }
+}
+
+async function bootstrapImpl(
+  client: WhitenoiseClient,
+  relays: WhitenoiseRelays,
+  io: {
+    setKeyPackageCount: (value: number) => void;
+    setIsBootstrapping: (value: boolean) => void;
+    setError: (value: string | null) => void;
+  }
+): Promise<void> {
+  if (!client) {
+    io.setError('White Noise client not ready');
+    return;
+  }
+  if (relays.length === 0) {
+    io.setError('No relays configured');
+    return;
+  }
+  io.setIsBootstrapping(true);
+  io.setError(null);
+  const targetRelays = [...relays];
+  try {
+    const startCount = await readCount(client);
+    const need = Math.max(0, TARGET_KEY_PACKAGE_COUNT - startCount);
+    wnLog.info('whitenoise.setup.bootstrap.start', {
+      startCount,
+      need,
+      relays: targetRelays.length,
+    });
+    for (let i = 0; i < need; i++) {
+      await client.keyPackages.create({ relays: targetRelays, isLastResort: true });
+    }
+    const finalCount = await readCount(client);
+    io.setKeyPackageCount(finalCount);
+    wnLog.info('whitenoise.setup.bootstrap.done', { count: finalCount });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    io.setError(message);
+    wnLog.error('whitenoise.setup.bootstrap_failed', { error: message });
+  } finally {
+    io.setIsBootstrapping(false);
+  }
+}
+
 export function useWhitenoiseSetup(): WhitenoiseSetupState {
   const { client, relays } = useWhitenoise();
   const [keyPackageCount, setKeyPackageCount] = useState(0);
@@ -27,21 +98,10 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    if (!client) return;
-    setIsLoading(true);
-    try {
-      const count = await readCount(client);
-      setKeyPackageCount(count);
-      setError(null);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-      wnLog.warn('whitenoise.setup.refresh_failed', { error: message });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [client]);
+  const refresh = useCallback(
+    () => refreshImpl(client, { setKeyPackageCount, setIsLoading, setError }),
+    [client]
+  );
 
   useEffect(() => {
     void refresh();
@@ -60,40 +120,10 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
     };
   }, [client, refresh]);
 
-  const bootstrapInner = useCallback(async () => {
-    if (!client) {
-      setError('White Noise client not ready');
-      return;
-    }
-    if (relays.length === 0) {
-      setError('No relays configured');
-      return;
-    }
-    setIsBootstrapping(true);
-    setError(null);
-    const targetRelays = [...relays];
-    try {
-      const startCount = await readCount(client);
-      const need = Math.max(0, TARGET_KEY_PACKAGE_COUNT - startCount);
-      wnLog.info('whitenoise.setup.bootstrap.start', {
-        startCount,
-        need,
-        relays: targetRelays.length,
-      });
-      for (let i = 0; i < need; i++) {
-        await client.keyPackages.create({ relays: targetRelays, isLastResort: true });
-      }
-      const finalCount = await readCount(client);
-      setKeyPackageCount(finalCount);
-      wnLog.info('whitenoise.setup.bootstrap.done', { count: finalCount });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-      wnLog.error('whitenoise.setup.bootstrap_failed', { error: message });
-    } finally {
-      setIsBootstrapping(false);
-    }
-  }, [client, relays]);
+  const bootstrapInner = useCallback(
+    () => bootstrapImpl(client, relays, { setKeyPackageCount, setIsBootstrapping, setError }),
+    [client, relays]
+  );
 
   // Key-package creation is finite-resource work — a duplicate concurrent
   // bootstrap would publish two key packages per slot and burn relay

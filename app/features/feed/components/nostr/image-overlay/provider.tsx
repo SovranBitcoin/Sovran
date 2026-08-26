@@ -1181,3 +1181,21 @@ export function useImageOverlay(): ImageOverlayContextValue | null {
 }
 
 export const IMAGE_OVERLAY_TIMING_CONFIG = TIMING_CONFIG;
+
+/**
+ * Feed scroll handler core: mirrors the list's scroll offset into the caller's
+ * ref and the overlay's `scrollOffsetY` shared value. Lives at module scope in
+ * the overlay's own module because (a) the React Compiler treats a shared-value
+ * `.value =` write inside a component as modifying an immutable and skips the
+ * whole component, and (b) HomeFeed and UserFeed both need the identical body.
+ */
+export function trackFeedScrollOffset(
+  scrollOffsetRef: { current: number },
+  imageOverlay: ImageOverlayContextValue | null,
+  offsetY: number
+): void {
+  scrollOffsetRef.current = offsetY;
+  if (imageOverlay?.scrollOffsetY != null) {
+    imageOverlay.scrollOffsetY.value = offsetY;
+  }
+}

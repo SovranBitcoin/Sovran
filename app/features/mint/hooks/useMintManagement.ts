@@ -22,6 +22,73 @@ let inflightLoad: Promise<Mint[]> | null = null;
 // new Manager instance, so the prior profile's mints can never bleed across.
 let lastLoad: { manager: unknown; mints: Mint[] } | null = null;
 
+// Bodies live at module scope: their try/finally cannot be lowered by the
+// React Compiler and made every consumer of this hook carry an uncompiled
+// hook slot. Verbatim moves over the same module-level dedupe state.
+async function loadMintsImpl(
+  manager: ReturnType<typeof useManager>,
+  reason: string,
+  io: { setIsLoading: (value: boolean) => void; setMints: (value: Mint[]) => void }
+): Promise<void> {
+  log.debug('mint.list.load.request', { reason, hasInflight: !!inflightLoad });
+  // Only surface a loading state when there is nothing cached to show for
+  // this Manager — a warm re-open keeps the prior mints visible while the
+  // refresh runs underneath.
+  const hasCached = lastLoad?.manager === manager && lastLoad.mints.length > 0;
+  io.setIsLoading(!hasCached);
+
+  try {
+    // Reuse an in-flight promise if another consumer is already loading.
+    let promise = inflightLoad;
+    if (promise) {
+      log.debug('mint.list.load.join_inflight', { reason });
+    } else {
+      promise = inflightLoad = (async () => {
+        log.debug('mint.list.load.start', { reason });
+        try {
+          return await manager.mint.getAllTrustedMints();
+        } finally {
+          inflightLoad = null;
+          log.debug('mint.list.load.clear_inflight', { reason });
+        }
+      })();
+    }
+    const allMints = await promise;
+    lastLoad = { manager, mints: allMints };
+    io.setMints(allMints);
+    log.info('mint.list.load.success', { reason, count: allMints.length });
+  } catch (err) {
+    log.error('mint.list.load.error', {
+      reason,
+      error: err instanceof Error ? err : new Error('Failed to load mints'),
+    });
+  } finally {
+    log.debug('mint.list.load.done', { reason });
+    io.setIsLoading(false);
+  }
+}
+
+async function getMintInfoImpl(manager: ReturnType<typeof useManager>, mintUrl: string) {
+  try {
+    log.debug('mint.info.fetch.start', { ...mintUrlLogFields(mintUrl) });
+    // SWR through `mintMetadataStore`: cached fresh resolves instantly, stale
+    // resolves with the prior value and refreshes in the background, miss
+    // awaits coco's `getMintInfo` (which itself blocks on HTTP only when
+    // its own 5-minute window has expired).
+    const info = await getCachedMintInfo((url) => manager.mint.getMintInfo(url), mintUrl);
+    log.debug('mint.info.fetch.success', {
+      ...mintUrlLogFields(mintUrl),
+      hasName: typeof info.name === 'string' && info.name.length > 0,
+      hasNuts: !!info.nuts,
+    });
+    return info;
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to get mint info');
+    log.error('mint.info.fetch.error', { ...mintUrlLogFields(mintUrl), error });
+    throw error;
+  }
+}
+
 /**
  * Subscribes to the trusted-mints list and re-exposes `getMintInfo` behind
  * loading state. Stays reactive to coco's mint:* events so consumers see
@@ -37,68 +104,12 @@ export function useMintManagement() {
   const [isLoading, setIsLoading] = useState(false);
 
   const loadMints = useCallback(
-    async (reason: string = 'manual') => {
-      log.debug('mint.list.load.request', { reason, hasInflight: !!inflightLoad });
-      // Only surface a loading state when there is nothing cached to show for
-      // this Manager — a warm re-open keeps the prior mints visible while the
-      // refresh runs underneath.
-      const hasCached = lastLoad?.manager === manager && lastLoad.mints.length > 0;
-      setIsLoading(!hasCached);
-
-      try {
-        // Reuse an in-flight promise if another consumer is already loading.
-        let promise = inflightLoad;
-        if (promise) {
-          log.debug('mint.list.load.join_inflight', { reason });
-        } else {
-          promise = inflightLoad = (async () => {
-            log.debug('mint.list.load.start', { reason });
-            try {
-              return await manager.mint.getAllTrustedMints();
-            } finally {
-              inflightLoad = null;
-              log.debug('mint.list.load.clear_inflight', { reason });
-            }
-          })();
-        }
-        const allMints = await promise;
-        lastLoad = { manager, mints: allMints };
-        setMints(allMints);
-        log.info('mint.list.load.success', { reason, count: allMints.length });
-      } catch (err) {
-        log.error('mint.list.load.error', {
-          reason,
-          error: err instanceof Error ? err : new Error('Failed to load mints'),
-        });
-      } finally {
-        log.debug('mint.list.load.done', { reason });
-        setIsLoading(false);
-      }
-    },
+    (reason: string = 'manual') => loadMintsImpl(manager, reason, { setIsLoading, setMints }),
     [manager]
   );
 
   const getMintInfo = useCallback(
-    async (mintUrl: string) => {
-      try {
-        log.debug('mint.info.fetch.start', { ...mintUrlLogFields(mintUrl) });
-        // SWR through `mintMetadataStore`: cached fresh resolves instantly, stale
-        // resolves with the prior value and refreshes in the background, miss
-        // awaits coco's `getMintInfo` (which itself blocks on HTTP only when
-        // its own 5-minute window has expired).
-        const info = await getCachedMintInfo((url) => manager.mint.getMintInfo(url), mintUrl);
-        log.debug('mint.info.fetch.success', {
-          ...mintUrlLogFields(mintUrl),
-          hasName: typeof info.name === 'string' && info.name.length > 0,
-          hasNuts: !!info.nuts,
-        });
-        return info;
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error('Failed to get mint info');
-        log.error('mint.info.fetch.error', { ...mintUrlLogFields(mintUrl), error });
-        throw error;
-      }
-    },
+    (mintUrl: string) => getMintInfoImpl(manager, mintUrl),
     [manager]
   );
 

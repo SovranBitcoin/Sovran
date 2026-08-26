@@ -57,6 +57,51 @@ const DEFAULT_DENSITY_INDEX = 2; // L (150 bytes, ecosystem default)
 
 const LOGO_SIZE = 54;
 
+// Module scope: the try/catch (with throw + timing) cannot be lowered by the
+// React Compiler — inside the component's effect it made the whole component
+// skip compilation. Encoding is synchronous, so the effect just applies the
+// returned result.
+function encodeUrParts(
+  address: string,
+  fragmentSize: number,
+  needsAnimation: boolean
+): { ok: true; parts: string[] } | { ok: false; message: string } {
+  const encodeStart = performance.now();
+  try {
+    // `UR.from` does the string -> Buffer conversion with bc-ur's own bundled
+    // `buffer`, so the payload never depends on whichever library happened to
+    // install a `Buffer` global first.
+    const ur = UR.from(address);
+    const encoder = new UREncoder(ur, fragmentSize, 0);
+    const encodedParts = encoder.encodeWhole();
+
+    if (encodedParts.length === 0) {
+      throw new Error('UR encoding produced no parts');
+    }
+
+    const duration = Math.round(performance.now() - encodeStart);
+    log.info('ui.qrcode.ur_encoded', {
+      inputLength: address.length,
+      partCount: encodedParts.length,
+      fragmentSize,
+      firstPartLength: encodedParts[0].length,
+      duration_ms: duration,
+    });
+
+    return { ok: true, parts: encodedParts };
+  } catch (error) {
+    log.error('ui.qrcode.encode_failed', {
+      error,
+      addressLength: address.length,
+      needsAnimation,
+    });
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'Failed to encode QR data',
+    };
+  }
+}
+
 interface AnimatedQRCodeProps {
   padding?: number;
   unit: string;
@@ -112,8 +157,6 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
     (address != null && address.length > MAX_QR_DATA_LENGTH) ||
     (!E2E_STATIC_QR && animateProp && address != null && address.length >= ANIMATE_THRESHOLD);
 
-  const encodeStartRef = useRef(0);
-
   // Encode address for animated QR code
   useEffect(() => {
     if (!address) {
@@ -139,43 +182,15 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
     }
 
     setIsEncoding(true);
-    encodeStartRef.current = performance.now();
-
-    try {
-      // `UR.from` does the string -> Buffer conversion with bc-ur's own bundled
-      // `buffer`, so the payload never depends on whichever library happened to
-      // install a `Buffer` global first.
-      const ur = UR.from(address);
-      const encoder = new UREncoder(ur, activeFragmentSize, 0);
-      const encodedParts = encoder.encodeWhole();
-
-      if (encodedParts.length === 0) {
-        throw new Error('UR encoding produced no parts');
-      }
-
-      const duration = Math.round(performance.now() - encodeStartRef.current);
-      log.info('ui.qrcode.ur_encoded', {
-        inputLength: address.length,
-        partCount: encodedParts.length,
-        fragmentSize: activeFragmentSize,
-        intervalMs: activeIntervalMs,
-        firstPartLength: encodedParts[0].length,
-        duration_ms: duration,
-      });
-
-      setParts(encodedParts);
+    const result = encodeUrParts(address, activeFragmentSize, needsAnimation);
+    if (result.ok) {
+      setParts(result.parts);
       setEncodingError(null);
-    } catch (error) {
-      log.error('ui.qrcode.encode_failed', {
-        error,
-        addressLength: address.length,
-        needsAnimation,
-      });
-      setEncodingError(error instanceof Error ? error.message : 'Failed to encode QR data');
+    } else {
+      setEncodingError(result.message);
       setParts([]);
-    } finally {
-      setIsEncoding(false);
     }
+    setIsEncoding(false);
   }, [address, needsAnimation, activeFragmentSize]);
 
   // Cycle through QR code parts at the selected speed

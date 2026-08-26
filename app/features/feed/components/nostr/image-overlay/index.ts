@@ -16,7 +16,7 @@
  */
 
 // Provider & hook
-export { ImageOverlayProvider, useImageOverlay } from './provider';
+export { ImageOverlayProvider, useImageOverlay, trackFeedScrollOffset } from './provider';
 
 // Main overlay component
 export { AnimatedImageOverlay } from './AnimatedImageOverlay';

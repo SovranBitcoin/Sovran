@@ -39,6 +39,117 @@ const EMPTY_ZUSTAND_GROUPS: ZustandInventory = {
   existingUncategorizedStoreKeys: [],
 };
 
+// ── Handler bodies — module scope ──
+// try/finally cannot be lowered by the React Compiler; inside the component
+// these handlers made it skip the whole screen. Hoisted here the screen
+// compiles and the handlers stay thin arrows over explicit setters.
+
+type SetError = (value: string | null) => void;
+
+async function exportLogFileAction(io: {
+  setError: SetError;
+  setIsExportingLogs: (value: boolean) => void;
+  setLogFileInfo: (value: LogFileInfo) => void;
+}): Promise<void> {
+  io.setIsExportingLogs(true);
+  try {
+    const shared = await exportLogFile();
+    if (!shared) {
+      Alert.alert('No logs yet', 'Enable "Save logs to file", reproduce the issue, then export.');
+    }
+  } catch (exportError) {
+    io.setError(exportError instanceof Error ? exportError.message : 'Export failed');
+  } finally {
+    io.setIsExportingLogs(false);
+    io.setLogFileInfo(getLogFileInfo());
+  }
+}
+
+async function loadStorageSnapshotImpl(
+  profiles: Parameters<typeof getStorageInventorySnapshot>[0],
+  refresh: boolean,
+  io: {
+    setError: SetError;
+    setIsLoading: (value: boolean) => void;
+    setIsRefreshing: (value: boolean) => void;
+    setZustandGroups: (value: ZustandInventory) => void;
+    setSecureStoreKeys: (value: string[]) => void;
+    setCocoDbFiles: (value: string[]) => void;
+    setCocoBackupFiles: (value: string[]) => void;
+    setSecureStoreMeta: (value: { existing: number; total: number }) => void;
+  }
+): Promise<void> {
+  if (refresh) {
+    io.setIsRefreshing(true);
+  } else {
+    io.setIsLoading(true);
+  }
+
+  try {
+    io.setError(null);
+    const snapshot = await getStorageInventorySnapshot(profiles);
+
+    const secureEntries = snapshot.secureStore
+      .filter((entry) => entry.exists)
+      .map((entry) => entry.key)
+      .sort();
+
+    io.setZustandGroups(snapshot.zustand);
+    io.setSecureStoreKeys(secureEntries);
+    io.setCocoDbFiles(snapshot.cocoDatabases);
+    io.setCocoBackupFiles(snapshot.cocoBackups);
+    io.setSecureStoreMeta({
+      existing: secureEntries.length,
+      total: snapshot.secureStore.length,
+    });
+  } catch (snapshotError) {
+    io.setError(snapshotError instanceof Error ? snapshotError.message : 'Unknown error');
+  } finally {
+    io.setIsLoading(false);
+    io.setIsRefreshing(false);
+  }
+}
+
+async function shareStorageDumpAction(io: {
+  setError: SetError;
+  setIsSharing: (value: boolean) => void;
+}): Promise<void> {
+  io.setIsSharing(true);
+  try {
+    const dump = await getFullAsyncStorageDump();
+    const jsonString = JSON.stringify(dump, null, 2);
+    await Share.share({ message: jsonString, title: 'AsyncStorage Full Dump' });
+  } catch (shareError) {
+    io.setError(shareError instanceof Error ? shareError.message : 'Share failed');
+  } finally {
+    io.setIsSharing(false);
+  }
+}
+
+async function copyCocoReportAction(setError: SetError): Promise<void> {
+  try {
+    await Clipboard.setStringAsync(buildCocoFeedbackReport());
+    Alert.alert('Copied', 'coco v2 feedback report copied — paste into a cashubtc/coco issue.');
+  } catch (copyError) {
+    setError(copyError instanceof Error ? copyError.message : 'Copy failed');
+  }
+}
+
+async function copyDebugLogsAction(io: {
+  setError: SetError;
+  setIsCopyingLogs: (value: boolean) => void;
+}): Promise<void> {
+  io.setIsCopyingLogs(true);
+  try {
+    await Clipboard.setStringAsync(log.dumpForLLM());
+    Alert.alert('Copied', 'Debug logs copied to clipboard.');
+  } catch (copyError) {
+    io.setError(copyError instanceof Error ? copyError.message : 'Copy failed');
+  } finally {
+    io.setIsCopyingLogs(false);
+  }
+}
+
 interface SectionProps {
   title: string;
   subtitle: string;
@@ -196,20 +307,8 @@ export const SettingsStorageScreen = () => {
     refreshLogFileInfo();
   };
 
-  const handleExportLogFile = async () => {
-    setIsExportingLogs(true);
-    try {
-      const shared = await exportLogFile();
-      if (!shared) {
-        Alert.alert('No logs yet', 'Enable "Save logs to file", reproduce the issue, then export.');
-      }
-    } catch (exportError) {
-      setError(exportError instanceof Error ? exportError.message : 'Export failed');
-    } finally {
-      setIsExportingLogs(false);
-      refreshLogFileInfo();
-    }
-  };
+  const handleExportLogFile = () =>
+    exportLogFileAction({ setError, setIsExportingLogs, setLogFileInfo });
 
   const handleClearLogFile = () => {
     clearLogFile();
@@ -227,37 +326,17 @@ export const SettingsStorageScreen = () => {
   // optimization, not a contract.
   // ast-grep-ignore: no-manual-memo-tsx
   const loadSnapshot = useCallback(
-    async (refresh = false) => {
-      if (refresh) {
-        setIsRefreshing(true);
-      } else {
-        setIsLoading(true);
-      }
-
-      try {
-        setError(null);
-        const snapshot = await getStorageInventorySnapshot(profiles);
-
-        const secureEntries = snapshot.secureStore
-          .filter((entry) => entry.exists)
-          .map((entry) => entry.key)
-          .sort();
-
-        setZustandGroups(snapshot.zustand);
-        setSecureStoreKeys(secureEntries);
-        setCocoDbFiles(snapshot.cocoDatabases);
-        setCocoBackupFiles(snapshot.cocoBackups);
-        setSecureStoreMeta({
-          existing: secureEntries.length,
-          total: snapshot.secureStore.length,
-        });
-      } catch (snapshotError) {
-        setError(snapshotError instanceof Error ? snapshotError.message : 'Unknown error');
-      } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
-      }
-    },
+    (refresh = false) =>
+      loadStorageSnapshotImpl(profiles, refresh, {
+        setError,
+        setIsLoading,
+        setIsRefreshing,
+        setZustandGroups,
+        setSecureStoreKeys,
+        setCocoDbFiles,
+        setCocoBackupFiles,
+        setSecureStoreMeta,
+      }),
     [profiles]
   );
 
@@ -265,39 +344,11 @@ export const SettingsStorageScreen = () => {
     void loadSnapshot();
   }, [loadSnapshot]);
 
-  const handleShareDump = async () => {
-    setIsSharing(true);
-    try {
-      const dump = await getFullAsyncStorageDump();
-      const jsonString = JSON.stringify(dump, null, 2);
-      await Share.share({ message: jsonString, title: 'AsyncStorage Full Dump' });
-    } catch (shareError) {
-      setError(shareError instanceof Error ? shareError.message : 'Share failed');
-    } finally {
-      setIsSharing(false);
-    }
-  };
+  const handleShareDump = () => shareStorageDumpAction({ setError, setIsSharing });
 
-  const handleCopyCocoReport = async () => {
-    try {
-      await Clipboard.setStringAsync(buildCocoFeedbackReport());
-      Alert.alert('Copied', 'coco v2 feedback report copied — paste into a cashubtc/coco issue.');
-    } catch (copyError) {
-      setError(copyError instanceof Error ? copyError.message : 'Copy failed');
-    }
-  };
+  const handleCopyCocoReport = () => copyCocoReportAction(setError);
 
-  const handleCopyDebugLogs = async () => {
-    setIsCopyingLogs(true);
-    try {
-      await Clipboard.setStringAsync(log.dumpForLLM());
-      Alert.alert('Copied', 'Debug logs copied to clipboard.');
-    } catch (copyError) {
-      setError(copyError instanceof Error ? copyError.message : 'Copy failed');
-    } finally {
-      setIsCopyingLogs(false);
-    }
-  };
+  const handleCopyDebugLogs = () => copyDebugLogsAction({ setError, setIsCopyingLogs });
 
   const subtitle = isLoading
     ? 'Loading storage inventory...'
