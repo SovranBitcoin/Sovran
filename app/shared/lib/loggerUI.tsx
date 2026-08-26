@@ -86,6 +86,35 @@ function extractVisibleContent(node: ReactNode, depth: number = 0, maxDepth: num
   }
 }
 
+function logVisibleContent(ctx: {
+  children: ReactNode;
+  path: string;
+  screenLogger: Logger;
+  prevContentKey: React.MutableRefObject<string | undefined>;
+  prevContent: React.MutableRefObject<string[]>;
+}): void {
+  const { children, path, screenLogger, prevContentKey, prevContent } = ctx;
+  try {
+    const content = extractVisibleContent(children);
+    const contentKey = content.join('|');
+    if (prevContentKey.current === undefined) {
+      screenLogger.debug('ui.screen', { screen: path, content });
+    } else if (contentKey !== prevContentKey.current) {
+      const prevSet = new Set(prevContent.current);
+      const currSet = new Set(content);
+      const removed = prevContent.current.filter((c) => !currSet.has(c));
+      const added = content.filter((c) => !prevSet.has(c));
+      if (removed.length > 0 || added.length > 0) {
+        screenLogger.debug('ui.screen.diff', { screen: path, removed, added });
+      }
+    }
+    prevContentKey.current = contentKey;
+    prevContent.current = content;
+  } catch {
+    /* extractVisibleContent failed — skip content logging, don't break the app */
+  }
+}
+
 interface LogProps {
   /** Component name — used as the log path and correlation key */
   name: string;
@@ -152,25 +181,7 @@ export function Log({
     // render of every screen). Dynamic so dev / log-doctor builds still capture
     // `ui.screen` events after a runtime setLevel('debug').
     if (!screenLogger.isLevelEnabled('debug')) return;
-    try {
-      const content = extractVisibleContent(children);
-      const contentKey = content.join('|');
-      if (prevContentKey.current === undefined) {
-        screenLogger.debug('ui.screen', { screen: path, content });
-      } else if (contentKey !== prevContentKey.current) {
-        const prevSet = new Set(prevContent.current);
-        const currSet = new Set(content);
-        const removed = prevContent.current.filter((c) => !currSet.has(c));
-        const added = content.filter((c) => !prevSet.has(c));
-        if (removed.length > 0 || added.length > 0) {
-          screenLogger.debug('ui.screen.diff', { screen: path, removed, added });
-        }
-      }
-      prevContentKey.current = contentKey;
-      prevContent.current = content;
-    } catch {
-      /* extractVisibleContent failed — skip content logging, don't break the app */
-    }
+    logVisibleContent({ children, path, screenLogger, prevContentKey, prevContent });
   });
 
   const resolvedTestID = testID ?? deriveScreenTestID(name);

@@ -288,6 +288,69 @@ function DomainOption({
 
 // Sign with the active Nostr identity; the client itself (and the base URL
 // both halves of it must agree on) comes from `shared/lib/cashu/npc`.
+function checkDomainAvailability(name: string, domainValue: string): AvailabilityResult {
+  try {
+    const result = checkUsernameAvailability(name, domainValue);
+    return {
+      domain: domainValue,
+      available: result.available,
+      loading: false,
+      error: result.error,
+    };
+  } catch (e) {
+    if ((e as { name?: string })?.name === 'AbortError') {
+      return {
+        domain: domainValue,
+        available: null,
+        loading: false,
+      };
+    }
+    log.warn('onboarding.claim.availability_failed', {
+      domain: domainValue,
+      error: redactError(e),
+    });
+    return {
+      domain: domainValue,
+      available: null,
+      loading: false,
+      error: 'Failed to check',
+    };
+  }
+}
+
+async function claimNpcUsername(ctx: {
+  username: string;
+  privateKey: Uint8Array;
+  onClaimed: () => void;
+  setIsClaiming: (claiming: boolean) => void;
+}): Promise<void> {
+  const { username, privateKey, onClaimed, setIsClaiming } = ctx;
+  setIsClaiming(true);
+  try {
+    const client = npcClientForKey(privateKey);
+    await client.setUsername(username);
+    log.info('onboarding.claim.success', { usernameHash: hashUsername(username) });
+    Alert.alert('Claimed', `${username}@${NPC_DOMAIN} is yours.`, [
+      { text: 'OK', onPress: onClaimed },
+    ]);
+  } catch (error) {
+    if (error instanceof PaymentRequiredError) {
+      log.info('onboarding.claim.payment_required', {
+        usernameHash: hashUsername(username),
+      });
+      Alert.alert(
+        'Payment required',
+        'This username requires a Cashu payment. Paid claims aren’t supported in this screen yet — pick another username or try later.'
+      );
+      return;
+    }
+    log.error('onboarding.claim.failed', { error: redactError(error) });
+    Alert.alert('Could not claim', error instanceof Error ? error.message : 'Unknown error');
+  } finally {
+    setIsClaiming(false);
+  }
+}
+
 function npcClientForKey(privateKey: Uint8Array) {
   return createNpcClient(async (template: EventTemplate): Promise<VerifiedEvent> =>
     finalizeEvent(template, privateKey)
@@ -385,35 +448,7 @@ export function ClaimUsernameScreen() {
     const usernameHash = hashUsername(name);
     log.info('onboarding.claim.check_availability', { usernameHash });
     const results = await Promise.all(
-      DOMAINS.map(async (domain) => {
-        try {
-          const result = checkUsernameAvailability(name, domain.value);
-          return {
-            domain: domain.value,
-            available: result.available,
-            loading: false,
-            error: result.error,
-          };
-        } catch (e) {
-          if ((e as { name?: string })?.name === 'AbortError') {
-            return {
-              domain: domain.value,
-              available: null,
-              loading: false,
-            };
-          }
-          log.warn('onboarding.claim.availability_failed', {
-            domain: domain.value,
-            error: redactError(e),
-          });
-          return {
-            domain: domain.value,
-            available: null,
-            loading: false,
-            error: 'Failed to check',
-          };
-        }
-      })
+      DOMAINS.map(async (domain) => checkDomainAvailability(name, domain.value))
     );
 
     if (signal.aborted) return;
@@ -477,30 +512,12 @@ export function ClaimUsernameScreen() {
       return;
     }
 
-    setIsClaiming(true);
-    try {
-      const client = npcClientForKey(nostrKeys.privateKey);
-      await client.setUsername(username);
-      log.info('onboarding.claim.success', { usernameHash: hashUsername(username) });
-      Alert.alert('Claimed', `${username}@${NPC_DOMAIN} is yours.`, [
-        { text: 'OK', onPress: () => hero.closeClaimUsername() },
-      ]);
-    } catch (error) {
-      if (error instanceof PaymentRequiredError) {
-        log.info('onboarding.claim.payment_required', {
-          usernameHash: hashUsername(username),
-        });
-        Alert.alert(
-          'Payment required',
-          'This username requires a Cashu payment. Paid claims aren’t supported in this screen yet — pick another username or try later.'
-        );
-        return;
-      }
-      log.error('onboarding.claim.failed', { error: redactError(error) });
-      Alert.alert('Could not claim', error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      setIsClaiming(false);
-    }
+    await claimNpcUsername({
+      username,
+      privateKey: nostrKeys.privateKey,
+      onClaimed: () => hero.closeClaimUsername(),
+      setIsClaiming,
+    });
   };
 
   const selectedDomainLabel = DOMAINS.find((d) => d.id === selectedDomain)!.value;

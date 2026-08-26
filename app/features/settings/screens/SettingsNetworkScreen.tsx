@@ -11,6 +11,7 @@
 import React, { useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
+import type NDK from '@nostr-dev-kit/ndk-mobile';
 import { Button, Card, Input, ListGroup, Separator, Switch, TextField } from 'heroui-native';
 
 import Icon from 'assets/icons';
@@ -29,6 +30,36 @@ import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { Text } from '@/shared/ui/primitives/Text';
+
+async function publishRelayList(ctx: {
+  ndk: NDK;
+  entries: Parameters<typeof serializeRelayList>[0];
+  markPublished: (created: number) => void;
+  setPublishing: (publishing: boolean) => void;
+  setPublishMsg: (msg: string | null) => void;
+}): Promise<void> {
+  const { ndk, entries, markPublished, setPublishing, setPublishMsg } = ctx;
+  setPublishing(true);
+  setPublishMsg(null);
+  try {
+    const created = Math.floor(Date.now() / 1000);
+    const event = new NDKEvent(ndk);
+    event.kind = RELAY_LIST_KIND;
+    event.created_at = created;
+    event.tags = serializeRelayList(entries);
+    const targets = [...new Set([...getOwnWriteRelays(), ...DEFAULT_RELAYS])];
+    const result = await publishEvent({ ndk, event, relays: targets, resolveOn: 'all-settled' });
+    if (result.isOk()) {
+      markPublished(created);
+      log.info('settings.relays.published', { accepted: result.value.accepted.length });
+      setPublishMsg(`Published to ${result.value.accepted.length} relays.`);
+    } else {
+      setPublishMsg('Could not publish. Check your connection and try again.');
+    }
+  } finally {
+    setPublishing(false);
+  }
+}
 
 export function SettingsNetworkScreen() {
   useLifecycleLogger('SettingsNetworkScreen');
@@ -104,28 +135,9 @@ export function SettingsNetworkScreen() {
     setDraftUrl('');
   };
 
-  const handlePublish = async () => {
+  const handlePublish = () => {
     if (!ndk) return;
-    setPublishing(true);
-    setPublishMsg(null);
-    try {
-      const created = Math.floor(Date.now() / 1000);
-      const event = new NDKEvent(ndk);
-      event.kind = RELAY_LIST_KIND;
-      event.created_at = created;
-      event.tags = serializeRelayList(entries);
-      const targets = [...new Set([...getOwnWriteRelays(), ...DEFAULT_RELAYS])];
-      const result = await publishEvent({ ndk, event, relays: targets, resolveOn: 'all-settled' });
-      if (result.isOk()) {
-        markPublished(created);
-        log.info('settings.relays.published', { accepted: result.value.accepted.length });
-        setPublishMsg(`Published to ${result.value.accepted.length} relays.`);
-      } else {
-        setPublishMsg('Could not publish. Check your connection and try again.');
-      }
-    } finally {
-      setPublishing(false);
-    }
+    return publishRelayList({ ndk, entries, markPublished, setPublishing, setPublishMsg });
   };
 
   const sortedEntries = [...entries].sort((a, b) => a.url.localeCompare(b.url));

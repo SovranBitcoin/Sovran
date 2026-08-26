@@ -135,6 +135,64 @@ function EcashStatusPill({
   );
 }
 
+async function recoverPendingOperations(reservedTotal: number): Promise<void> {
+  walletLog.info('wallet.reserved.recovery_start', { reservedTotal });
+  try {
+    const manager = CocoManager.getInstance();
+
+    await manager.ops.send.recovery.run();
+    await manager.ops.melt.recovery.run();
+    // Also redeem any receives stranded in `executing` (e.g. P2PK tokens
+    // accepted while offline) so the same action drains incoming limbo.
+    await manager.ops.receive.recovery.run();
+    walletLog.info('wallet.reserved.recovery_complete');
+    staticPopup('reserved-proofs-freed', {
+      text:
+        'Recovery completed.\n' +
+        'Checked pending send, melt, and receive operations.\n' +
+        'If reserved balance is still stuck, use force cleanup.',
+    });
+  } catch (error) {
+    walletLog.error('wallet.reserved.recovery_failed', {
+      error: error instanceof Error ? error : new Error(String(error)),
+    });
+    staticPopup('reserved-proofs-failed', {
+      text: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+async function recoverPendingThenResolve(reservedTotal: number, resolve: () => void) {
+  walletLog.info('wallet.reserved.recovery_selected', { reservedTotal });
+  try {
+    await recoverPendingOperations(reservedTotal);
+  } finally {
+    resolve();
+  }
+}
+
+async function runRedeemingRecovery(lockedTotal: number): Promise<void> {
+  walletLog.info('wallet.redeeming.recovery_start', { lockedTotal });
+  try {
+    const manager = CocoManager.getInstance();
+    await manager.ops.receive.recovery.run();
+    walletLog.info('wallet.redeeming.recovery_complete');
+    staticPopup('redeem-receives-done', {
+      text:
+        'Checked unredeemed ecash.\n' +
+        'Anything redeemable is now in your balance. Tokens still waiting ' +
+        'need the mint to be reachable.',
+    });
+  } catch (error) {
+    walletLog.error('wallet.redeeming.recovery_failed', {
+      error: error instanceof Error ? error : new Error(String(error)),
+    });
+    staticPopup('redeem-receives-failed', {
+      text: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
 /**
  * Component that displays the primary balance with unit toggling capability
  */
@@ -218,33 +276,6 @@ export function PrimaryBalance({
   // Wrap the menu in a promise so a rapid second tap on the Reserved pill is
   // dropped by `useSingleFlight` until the first interaction settles.
   const handleReservedPressInner = useCallback(async () => {
-    const recoverPending = async () => {
-      walletLog.info('wallet.reserved.recovery_start', { reservedTotal });
-      try {
-        const manager = CocoManager.getInstance();
-
-        await manager.ops.send.recovery.run();
-        await manager.ops.melt.recovery.run();
-        // Also redeem any receives stranded in `executing` (e.g. P2PK tokens
-        // accepted while offline) so the same action drains incoming limbo.
-        await manager.ops.receive.recovery.run();
-        walletLog.info('wallet.reserved.recovery_complete');
-        staticPopup('reserved-proofs-freed', {
-          text:
-            'Recovery completed.\n' +
-            'Checked pending send, melt, and receive operations.\n' +
-            'If reserved balance is still stuck, use force cleanup.',
-        });
-      } catch (error) {
-        walletLog.error('wallet.reserved.recovery_failed', {
-          error: error instanceof Error ? error : new Error(String(error)),
-        });
-        staticPopup('reserved-proofs-failed', {
-          text: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    };
-
     walletLog.info('wallet.reserved.menu_open', { reservedTotal });
     await new Promise<void>((resolve) => {
       actionMenuPopup({
@@ -261,14 +292,7 @@ export function PrimaryBalance({
             text: 'Recover pending operations',
             description: 'Checks pending send, melt, and receive operations',
             icon: 'mdi:wrench',
-            onPress: async () => {
-              walletLog.info('wallet.reserved.recovery_selected', { reservedTotal });
-              try {
-                await recoverPending();
-              } finally {
-                resolve();
-              }
-            },
+            onPress: () => recoverPendingThenResolve(reservedTotal, resolve),
           },
         ],
       });
@@ -280,27 +304,10 @@ export function PrimaryBalance({
   // REDEEMING pill: retry redeeming received-but-unswapped ecash. Tapping runs
   // coco's receive recovery sweep, which swaps any `executing` receives once
   // the mint is reachable; on success they leave limbo and join the balance.
-  const handleRedeemingPressInner = useCallback(async () => {
-    walletLog.info('wallet.redeeming.recovery_start', { lockedTotal });
-    try {
-      const manager = CocoManager.getInstance();
-      await manager.ops.receive.recovery.run();
-      walletLog.info('wallet.redeeming.recovery_complete');
-      staticPopup('redeem-receives-done', {
-        text:
-          'Checked unredeemed ecash.\n' +
-          'Anything redeemable is now in your balance. Tokens still waiting ' +
-          'need the mint to be reachable.',
-      });
-    } catch (error) {
-      walletLog.error('wallet.redeeming.recovery_failed', {
-        error: error instanceof Error ? error : new Error(String(error)),
-      });
-      staticPopup('redeem-receives-failed', {
-        text: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  }, [lockedTotal]);
+  const handleRedeemingPressInner = useCallback(
+    () => runRedeemingRecovery(lockedTotal),
+    [lockedTotal]
+  );
 
   const handleRedeemingPress = useSingleFlight(handleRedeemingPressInner);
 

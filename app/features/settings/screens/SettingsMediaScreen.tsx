@@ -30,6 +30,20 @@ interface StatusColors {
   danger: string;
 }
 
+async function refreshOwnedBlobs(setRefreshing: (refreshing: boolean) => void): Promise<void> {
+  setRefreshing(true);
+  try {
+    const { markChecked } = useOwnedMediaStore.getState();
+    // Snapshot via getState so the probe loop isn't tied to a render closure.
+    for (const blob of selectOwnedBlobs(useOwnedMediaStore.getState())) {
+      const exists = await checkBlobExists(blob.url);
+      if (exists !== null) markChecked(blob.host, blob.sha256, exists);
+    }
+  } finally {
+    setRefreshing(false);
+  }
+}
+
 function hostLabel(host: string): string {
   try {
     return new URL(host).host;
@@ -226,19 +240,7 @@ export const SettingsMediaScreen = () => {
   const total = online.length + deleted.length;
 
   const [refreshing, setRefreshing] = useState(false);
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      const { markChecked } = useOwnedMediaStore.getState();
-      // Snapshot via getState so the probe loop isn't tied to a render closure.
-      for (const blob of selectOwnedBlobs(useOwnedMediaStore.getState())) {
-        const exists = await checkBlobExists(blob.url);
-        if (exists !== null) markChecked(blob.host, blob.sha256, exists);
-      }
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  const handleRefresh = () => refreshOwnedBlobs(setRefreshing);
 
   return (
     <ScreenWrapper name="SettingsMediaScreen" scroll="custom" safeArea>

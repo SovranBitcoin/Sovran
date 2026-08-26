@@ -182,6 +182,34 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
  * (reinstall, profile reset, iCloud restore, manual import). Block the app
  * behind /restore until that's resolved.
  */
+async function evaluateRestoreStatus(ctx: {
+  isCancelled: () => boolean;
+  seedCreatedAt: number | null;
+  setRestoreStatus: (status: 'pending' | 'not-needed') => void;
+  setEvaluated: React.Dispatch<React.SetStateAction<boolean>>;
+}): Promise<void> {
+  const { isCancelled, seedCreatedAt, setRestoreStatus, setEvaluated } = ctx;
+  try {
+    const mnemonic = await retrieveMnemonic();
+    if (isCancelled()) return;
+    if (!mnemonic) {
+      // No seed yet (brand new install). ensureMnemonicExists will mark
+      // seedCreatedAt when it generates one — leave restoreStatus alone.
+      setEvaluated(true);
+      return;
+    }
+    if (seedCreatedAt == null) {
+      log.info('gate.restore.needed', { reason: 'seed_pre_existed' });
+      setRestoreStatus('pending');
+    } else {
+      log.debug('gate.restore.skip', { seedCreatedAt });
+      setRestoreStatus('not-needed');
+    }
+  } finally {
+    if (!isCancelled()) setEvaluated(true);
+  }
+}
+
 const RestoreGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const hydrated = useWalletLifecycleHydrated();
   const restoreStatus = useWalletLifecycleStore((s) => s.restoreStatus);
@@ -213,27 +241,12 @@ const RestoreGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     // whose seed this install created to 'not-needed', and everyone else to
     // 'pending', which is what should have happened all along.
     let cancelled = false;
-    void (async () => {
-      try {
-        const mnemonic = await retrieveMnemonic();
-        if (cancelled) return;
-        if (!mnemonic) {
-          // No seed yet (brand new install). ensureMnemonicExists will mark
-          // seedCreatedAt when it generates one — leave restoreStatus alone.
-          setEvaluated(true);
-          return;
-        }
-        if (seedCreatedAt == null) {
-          log.info('gate.restore.needed', { reason: 'seed_pre_existed' });
-          setRestoreStatus('pending');
-        } else {
-          log.debug('gate.restore.skip', { seedCreatedAt });
-          setRestoreStatus('not-needed');
-        }
-      } finally {
-        if (!cancelled) setEvaluated(true);
-      }
-    })();
+    void evaluateRestoreStatus({
+      isCancelled: () => cancelled,
+      seedCreatedAt,
+      setRestoreStatus,
+      setEvaluated,
+    });
     return () => {
       cancelled = true;
     };

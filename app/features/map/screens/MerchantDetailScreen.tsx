@@ -35,6 +35,49 @@ const ParamsSchema = z.object({
   placeId: z.string().regex(/^\d{1,15}$/, 'placeId must be a positive integer'),
 });
 
+async function loadMerchantDetails(ctx: {
+  placeId: string | undefined;
+  signal: AbortSignal;
+  fetchPlaceDetails: (
+    id: number,
+    forceRefresh?: boolean,
+    controls?: { signal?: AbortSignal }
+  ) => Promise<BTCMapPlaceDetails>;
+  getCachedPlaceDetails: (id: number) => BTCMapPlaceDetails | null;
+  setPlace: (place: BTCMapPlaceDetails | null) => void;
+  setIsLoading: (loading: boolean) => void;
+}): Promise<void> {
+  const { placeId, signal, fetchPlaceDetails, getCachedPlaceDetails, setPlace, setIsLoading } = ctx;
+  if (!placeId) {
+    setIsLoading(false);
+    return;
+  }
+
+  const id = parseInt(placeId, 10);
+  if (isNaN(id)) {
+    setIsLoading(false);
+    return;
+  }
+
+  const cached = getCachedPlaceDetails(id);
+  if (cached) {
+    setPlace(cached);
+    setIsLoading(false);
+    return;
+  }
+
+  try {
+    const details = await fetchPlaceDetails(id, false, { signal });
+    if (signal.aborted) return;
+    setPlace(details);
+  } catch (err) {
+    if (isAbortError(err)) return;
+    log.error('map.merchant.fetch_failed', { error: err });
+  } finally {
+    if (!signal.aborted) setIsLoading(false);
+  }
+}
+
 export function MerchantDetailScreen() {
   useLifecycleLogger('MerchantDetailScreen');
   const navigation = useNavigation();
@@ -60,38 +103,14 @@ export function MerchantDetailScreen() {
   useEffect(() => {
     const controller = new AbortController();
 
-    const loadDetails = async () => {
-      if (!placeId) {
-        setIsLoading(false);
-        return;
-      }
-
-      const id = parseInt(placeId, 10);
-      if (isNaN(id)) {
-        setIsLoading(false);
-        return;
-      }
-
-      const cached = getCachedPlaceDetails(id);
-      if (cached) {
-        setPlace(cached);
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const details = await fetchPlaceDetails(id, false, { signal: controller.signal });
-        if (controller.signal.aborted) return;
-        setPlace(details);
-      } catch (err) {
-        if (isAbortError(err)) return;
-        log.error('map.merchant.fetch_failed', { error: err });
-      } finally {
-        if (!controller.signal.aborted) setIsLoading(false);
-      }
-    };
-
-    void loadDetails();
+    void loadMerchantDetails({
+      placeId,
+      signal: controller.signal,
+      fetchPlaceDetails,
+      getCachedPlaceDetails,
+      setPlace,
+      setIsLoading,
+    });
     return () => controller.abort();
   }, [placeId, fetchPlaceDetails, getCachedPlaceDetails]);
 

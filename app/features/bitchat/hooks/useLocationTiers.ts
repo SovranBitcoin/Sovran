@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
 import * as Location from 'expo-location';
 import { encodeGeohash } from 'bitchat-module/geohash';
 import type { LocationTier } from 'bitchat-module';
@@ -37,6 +37,79 @@ function namesFromPlacemark(
   };
 }
 
+async function computeLocationTiers(ctx: {
+  isCancelled: () => boolean;
+  setTiers: Dispatch<SetStateAction<TierEntry[]>>;
+  setError: (error: string | null) => void;
+  setLoading: (loading: boolean) => void;
+}): Promise<void> {
+  const { isCancelled, setTiers, setError, setLoading } = ctx;
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      setError('Location permission not granted');
+      setLoading(false);
+      return;
+    }
+
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+
+    if (isCancelled()) return;
+
+    const { latitude, longitude } = location.coords;
+
+    const bluetoothEntry: TierEntry = {
+      key: BLUETOOTH_TIER.key,
+      label: BLUETOOTH_TIER.label,
+      precision: 0,
+      geohash: 'mesh',
+      transport: 'ble',
+      icon: BLUETOOTH_TIER.icon,
+    };
+
+    const locationEntries: TierEntry[] = LOCATION_TIERS.map((tier) => ({
+      key: tier.key,
+      label: tier.label,
+      precision: tier.precision,
+      geohash: encodeGeohash(latitude, longitude, tier.precision),
+      transport: 'nostr' as const,
+      icon: tier.icon,
+    }));
+
+    setTiers([bluetoothEntry, ...locationEntries]);
+    setError(null);
+
+    // Reverse geocode after the tiers are on screen so we don't block the
+    // initial render. Apple rate-limits CLGeocoder aggressively, so we do
+    // one lookup and apply the result to every tier at once.
+    try {
+      const places = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (isCancelled() || places.length === 0) return;
+      const names = namesFromPlacemark(places[0]);
+      setTiers((prev) =>
+        prev.map((tier) => {
+          if (tier.transport === 'ble') return tier;
+          const name = names[tier.key as TierKey];
+          return name ? { ...tier, displayName: name } : tier;
+        })
+      );
+    } catch (e) {
+      // Reverse geocoding is best-effort; tiers still work without it.
+      bitchatLog.warn('bitchat.location_tiers.reverse_geocode_failed', {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  } catch (e) {
+    if (!isCancelled()) {
+      setError(e instanceof Error ? e.message : 'Failed to get location');
+    }
+  } finally {
+    if (!isCancelled()) setLoading(false);
+  }
+}
+
 export function useLocationTiers() {
   const [tiers, setTiers] = useState<TierEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,74 +118,12 @@ export function useLocationTiers() {
   useEffect(() => {
     let cancelled = false;
 
-    async function compute() {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setError('Location permission not granted');
-          setLoading(false);
-          return;
-        }
-
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-
-        if (cancelled) return;
-
-        const { latitude, longitude } = location.coords;
-
-        const bluetoothEntry: TierEntry = {
-          key: BLUETOOTH_TIER.key,
-          label: BLUETOOTH_TIER.label,
-          precision: 0,
-          geohash: 'mesh',
-          transport: 'ble',
-          icon: BLUETOOTH_TIER.icon,
-        };
-
-        const locationEntries: TierEntry[] = LOCATION_TIERS.map((tier) => ({
-          key: tier.key,
-          label: tier.label,
-          precision: tier.precision,
-          geohash: encodeGeohash(latitude, longitude, tier.precision),
-          transport: 'nostr' as const,
-          icon: tier.icon,
-        }));
-
-        setTiers([bluetoothEntry, ...locationEntries]);
-        setError(null);
-
-        // Reverse geocode after the tiers are on screen so we don't block the
-        // initial render. Apple rate-limits CLGeocoder aggressively, so we do
-        // one lookup and apply the result to every tier at once.
-        try {
-          const places = await Location.reverseGeocodeAsync({ latitude, longitude });
-          if (cancelled || places.length === 0) return;
-          const names = namesFromPlacemark(places[0]);
-          setTiers((prev) =>
-            prev.map((tier) => {
-              if (tier.transport === 'ble') return tier;
-              const name = names[tier.key as TierKey];
-              return name ? { ...tier, displayName: name } : tier;
-            })
-          );
-        } catch (e) {
-          // Reverse geocoding is best-effort; tiers still work without it.
-          bitchatLog.warn('bitchat.location_tiers.reverse_geocode_failed', {
-            error: e instanceof Error ? e.message : String(e),
-          });
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Failed to get location');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    void compute();
+    void computeLocationTiers({
+      isCancelled: () => cancelled,
+      setTiers,
+      setError,
+      setLoading,
+    });
     return () => {
       cancelled = true;
     };

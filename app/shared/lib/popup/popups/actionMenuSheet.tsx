@@ -33,6 +33,23 @@ interface ActionMenuSheetContentProps extends CustomSheetSharedProps {
   payload: ActionSheetPayloads['action-menu'];
 }
 
+type ActionMenuSheetButton = ActionSheetPayloads['action-menu']['buttons'][number];
+
+async function runSheetAction(button: ActionMenuSheetButton, close: () => void): Promise<void> {
+  try {
+    await button.onPress?.(close);
+  } catch (error) {
+    log.error('ui.action_menu.sheet.action_failed', {
+      testID: button.testID,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    // Mirror the menu-lane host: auto-dismiss unless the item
+    // deliberately keeps the surface open to swap content.
+    if (button.keepOpen !== true) close();
+  }
+}
+
 export function ActionMenuSheetContent({ payload, close }: ActionMenuSheetContentProps) {
   const { title, buttons, onDismiss } = payload;
 
@@ -82,20 +99,7 @@ export function ActionMenuSheetContent({ payload, close }: ActionMenuSheetConten
               onPress={() => {
                 if (disabled) return;
                 pickedRef.current = true;
-                void (async () => {
-                  try {
-                    await button.onPress?.(close);
-                  } catch (error) {
-                    log.error('ui.action_menu.sheet.action_failed', {
-                      testID: button.testID,
-                      error: error instanceof Error ? error.message : String(error),
-                    });
-                  } finally {
-                    // Mirror the menu-lane host: auto-dismiss unless the item
-                    // deliberately keeps the surface open to swap content.
-                    if (button.keepOpen !== true) close();
-                  }
-                })();
+                void runSheetAction(button, close);
               }}>
               <E2EActionMenuTargetMarker actionId={button.testID} disabled={disabled} />
               <SheetMenuRowContent

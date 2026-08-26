@@ -12,6 +12,51 @@ import { log } from '@/shared/lib/logger';
 // block-by-block and this only runs while an onchain-send detail is open.
 const MEMPOOL_TX_POLL_MS = 30_000;
 
+async function pollTxConfirmations(ctx: {
+  normalized: string;
+  requiredConfirmations: number;
+  isMounted: () => boolean;
+  stopPolling: () => void;
+  setStatus: (status: ChainTransactionStatus | null) => void;
+  setError: (error: Error | null) => void;
+  setIsLoading: (loading: boolean) => void;
+}): Promise<void> {
+  const {
+    normalized,
+    requiredConfirmations,
+    isMounted,
+    stopPolling,
+    setStatus,
+    setError,
+    setIsLoading,
+  } = ctx;
+  setIsLoading(true);
+  try {
+    const result = await defaultChainAdapter.getTransactionStatus(normalized);
+    if (!isMounted()) return;
+    setStatus(result);
+    setError(null);
+    log.debug('mempool.tx.confirmations.result', {
+      txidLength: normalized.length,
+      confirmed: result?.confirmed ?? null,
+      confirmations: result?.confirmations ?? null,
+    });
+    // Mined + at required depth: the rendered ring is capped there, so
+    // nothing another poll returns can change the UI.
+    if (shouldStopTxConfirmationPolling(result, requiredConfirmations)) {
+      stopPolling();
+    }
+  } catch (err) {
+    if (isMounted()) setError(err instanceof Error ? err : new Error(String(err)));
+    log.warn('mempool.tx.confirmations.failed', {
+      txidLength: normalized.length,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  } finally {
+    if (isMounted()) setIsLoading(false);
+  }
+}
+
 /**
  * Live confirmation status for a KNOWN transaction (onchain SEND), keyed off the
  * txid we already have from coco's melt-quote `outpoint`. Mainnet mempool.space
@@ -63,33 +108,16 @@ export function useMempoolTxConfirmations(
         interval = null;
       }
     };
-    const poll = async () => {
-      setIsLoading(true);
-      try {
-        const result = await defaultChainAdapter.getTransactionStatus(normalized);
-        if (!mounted) return;
-        setStatus(result);
-        setError(null);
-        log.debug('mempool.tx.confirmations.result', {
-          txidLength: normalized.length,
-          confirmed: result?.confirmed ?? null,
-          confirmations: result?.confirmations ?? null,
-        });
-        // Mined + at required depth: the rendered ring is capped there, so
-        // nothing another poll returns can change the UI.
-        if (shouldStopTxConfirmationPolling(result, requiredConfirmations)) {
-          stopPolling();
-        }
-      } catch (err) {
-        if (mounted) setError(err instanceof Error ? err : new Error(String(err)));
-        log.warn('mempool.tx.confirmations.failed', {
-          txidLength: normalized.length,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      } finally {
-        if (mounted) setIsLoading(false);
-      }
-    };
+    const poll = () =>
+      pollTxConfirmations({
+        normalized,
+        requiredConfirmations,
+        isMounted: () => mounted,
+        stopPolling,
+        setStatus,
+        setError,
+        setIsLoading,
+      });
 
     void poll();
     interval = setInterval(() => void poll(), MEMPOOL_TX_POLL_MS);

@@ -49,6 +49,35 @@ function buildInitialValues(inputs: ActionMenuInput[] | undefined): Record<strin
   return result;
 }
 
+async function runPrimaryAction(
+  action: ActionMenuPrimaryAction,
+  ctx: {
+    inputValues: Record<string, string>;
+    isSubmitting: boolean;
+    setError: React.Dispatch<React.SetStateAction<string | null>>;
+    setIsSubmitting: React.Dispatch<React.SetStateAction<boolean>>;
+    selectedRef: React.MutableRefObject<boolean>;
+    afterCloseRef: React.MutableRefObject<(() => void) | null>;
+  }
+): Promise<void> {
+  const { inputValues, isSubmitting, setError, setIsSubmitting, selectedRef, afterCloseRef } = ctx;
+  if (isSubmitting) return;
+  setError(null);
+  setIsSubmitting(true);
+  try {
+    await action.onPress(inputValues, {
+      setError,
+      close: (afterClose) => {
+        selectedRef.current = true;
+        afterCloseRef.current = afterClose ?? null;
+        dismissActionMenuPopup();
+      },
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+}
+
 /**
  * Why `BottomSheetTextInput` instead of heroui's `<Input>`:
  *
@@ -256,23 +285,15 @@ export function ActionMenuHost() {
   }, []);
 
   const handlePrimaryPressInner = useCallback(
-    async (action: ActionMenuPrimaryAction): Promise<void> => {
-      if (isSubmitting) return;
-      setError(null);
-      setIsSubmitting(true);
-      try {
-        await action.onPress(inputValues, {
-          setError,
-          close: (afterClose) => {
-            selectedRef.current = true;
-            afterCloseRef.current = afterClose ?? null;
-            dismissActionMenuPopup();
-          },
-        });
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
+    (action: ActionMenuPrimaryAction) =>
+      runPrimaryAction(action, {
+        inputValues,
+        isSubmitting,
+        setError,
+        setIsSubmitting,
+        selectedRef,
+        afterCloseRef,
+      }),
     [inputValues, isSubmitting]
   );
 

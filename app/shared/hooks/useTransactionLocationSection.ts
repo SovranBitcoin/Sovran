@@ -12,10 +12,39 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import {
   useTransactionLocation,
   useTransactionLocationStore,
+  type TransactionCoordinates,
   type TransactionLocation,
 } from '@/shared/stores/profile/transactionLocationStore';
 import { getLocationForTransaction } from '@/shared/hooks/useTransactionLocation';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
+
+async function captureLocationForTransaction(
+  transactionId: string,
+  setTransactionLocation: (id: string, location: TransactionCoordinates) => void,
+  setIsCapturing: (capturing: boolean) => void
+): Promise<boolean> {
+  setIsCapturing(true);
+  try {
+    // Temporarily enable location to get the current position
+    useSettingsStore.getState().setSendLocationEnabled(true);
+
+    const capturedLocation = await getLocationForTransaction();
+
+    if (capturedLocation) {
+      setTransactionLocation(transactionId, capturedLocation);
+      setTransactionAnnotation(`id:${transactionId}`, {
+        location: { lat: capturedLocation.latitude, lng: capturedLocation.longitude },
+      });
+      return true;
+    }
+    return false;
+  } catch (error) {
+    log.error('hooks.tx_location.capture_failed', { error });
+    return false;
+  } finally {
+    setIsCapturing(false);
+  }
+}
 
 interface UseTransactionLocationSectionResult {
   location: TransactionLocation | null;
@@ -61,28 +90,7 @@ export function useTransactionLocationSection(
 
   const attachCurrentLocation = useCallback(async (): Promise<boolean> => {
     if (!transactionId) return false;
-
-    setIsCapturing(true);
-    try {
-      // Temporarily enable location to get the current position
-      useSettingsStore.getState().setSendLocationEnabled(true);
-
-      const capturedLocation = await getLocationForTransaction();
-
-      if (capturedLocation) {
-        setTransactionLocation(transactionId, capturedLocation);
-        setTransactionAnnotation(`id:${transactionId}`, {
-          location: { lat: capturedLocation.latitude, lng: capturedLocation.longitude },
-        });
-        return true;
-      }
-      return false;
-    } catch (error) {
-      log.error('hooks.tx_location.capture_failed', { error });
-      return false;
-    } finally {
-      setIsCapturing(false);
-    }
+    return captureLocationForTransaction(transactionId, setTransactionLocation, setIsCapturing);
   }, [transactionId, setTransactionLocation]);
 
   return {

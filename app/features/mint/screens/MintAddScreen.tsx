@@ -326,6 +326,98 @@ function MintItem({
   );
 }
 
+async function addSelectedMints(
+  selectedMints: Set<string>,
+  setIsAdding: (adding: boolean) => void
+): Promise<void> {
+  log.info('mint.add.batch.start', { count: selectedMints.size });
+  setIsAdding(true);
+  try {
+    if (!CocoManager.isInitialized()) {
+      log.error('mint.add.batch.manager_not_initialized');
+      staticPopup('manager-not-initialized');
+      setIsAdding(false);
+      return;
+    }
+
+    const manager = CocoManager.getInstance();
+    const results: string[] = [];
+    const errors: { mintUrl: string; error: string }[] = [];
+
+    // Normalize all URLs to ensure https:// prefix before adding.
+    // normalizeUrlForApi strips any http(s)?:// prefix and re-prepends https://,
+    // so plaintext-http URLs from the search backend can't bypass the upgrade.
+    const mintUrlsToAdd = Array.from(selectedMints).map(normalizeUrlForApi);
+
+    for (let i = 0; i < mintUrlsToAdd.length; i++) {
+      const mintUrl = mintUrlsToAdd[i];
+      const itemT0 = performance.now();
+      log.debug('mint.add.item.adding', {
+        index: i + 1,
+        total: mintUrlsToAdd.length,
+        ...mintUrlLogFields(mintUrl),
+      });
+      try {
+        await manager.mint.addMint(mintUrl, { trusted: true });
+        const addDuration = Math.round(performance.now() - itemT0);
+        log.info('mint.add.item.added', {
+          ...mintUrlLogFields(mintUrl),
+          duration_ms: addDuration,
+        });
+        results.push(mintUrl);
+
+        // Restore proofs for the newly added mint
+        try {
+          const restoreT0 = performance.now();
+          await manager.wallet.restore(mintUrl);
+          log.info('mint.add.restore.success', {
+            ...mintUrlLogFields(mintUrl),
+            duration_ms: Math.round(performance.now() - restoreT0),
+          });
+        } catch (restoreErr) {
+          log.warn('mint.add.restore.failed', {
+            ...mintUrlLogFields(mintUrl),
+            error: restoreErr instanceof Error ? restoreErr.message : String(restoreErr),
+          });
+        }
+
+        if (i < mintUrlsToAdd.length - 1) {
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      } catch (err) {
+        log.error('mint.add.item.failed', {
+          ...mintUrlLogFields(mintUrl),
+          duration_ms: Math.round(performance.now() - itemT0),
+          error: err instanceof Error ? err.message : String(err),
+        });
+        errors.push({ mintUrl, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+
+    log.info('mint.add.batch.complete', { added: results.length, failed: errors.length });
+    // Give the MintProvider's `mint:added` listener a tick to refetch
+    // `trustedMints` before we pop back. Without this delay the parent
+    // Mint List screen sometimes refocuses before the new mint is in
+    // its `useMints()` snapshot, leaving the row missing until the next
+    // background tick.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    if (errors.length === 0) {
+      paramPopup('mints-added', { added: results.length });
+      router.back();
+    } else if (results.length > 0) {
+      paramPopup('mints-added', { added: results.length, failed: errors.length });
+      router.back();
+    } else {
+      staticPopup('mints-add-failed');
+    }
+  } catch {
+    log.error('mint.add.batch.unexpected_error');
+    staticPopup('mints-add-failed');
+  } finally {
+    setIsAdding(false);
+  }
+}
+
 export function MintAddScreen() {
   useLifecycleLogger('MintAddScreen');
   const surface = useThemeColor('surface');
@@ -514,93 +606,7 @@ export function MintAddScreen() {
       return;
     }
     if (isAdding) return;
-
-    log.info('mint.add.batch.start', { count: selectedMints.size });
-    setIsAdding(true);
-    try {
-      if (!CocoManager.isInitialized()) {
-        log.error('mint.add.batch.manager_not_initialized');
-        staticPopup('manager-not-initialized');
-        setIsAdding(false);
-        return;
-      }
-
-      const manager = CocoManager.getInstance();
-      const results: string[] = [];
-      const errors: { mintUrl: string; error: string }[] = [];
-
-      // Normalize all URLs to ensure https:// prefix before adding.
-      // normalizeUrlForApi strips any http(s)?:// prefix and re-prepends https://,
-      // so plaintext-http URLs from the search backend can't bypass the upgrade.
-      const mintUrlsToAdd = Array.from(selectedMints).map(normalizeUrlForApi);
-
-      for (let i = 0; i < mintUrlsToAdd.length; i++) {
-        const mintUrl = mintUrlsToAdd[i];
-        const itemT0 = performance.now();
-        log.debug('mint.add.item.adding', {
-          index: i + 1,
-          total: mintUrlsToAdd.length,
-          ...mintUrlLogFields(mintUrl),
-        });
-        try {
-          await manager.mint.addMint(mintUrl, { trusted: true });
-          const addDuration = Math.round(performance.now() - itemT0);
-          log.info('mint.add.item.added', {
-            ...mintUrlLogFields(mintUrl),
-            duration_ms: addDuration,
-          });
-          results.push(mintUrl);
-
-          // Restore proofs for the newly added mint
-          try {
-            const restoreT0 = performance.now();
-            await manager.wallet.restore(mintUrl);
-            log.info('mint.add.restore.success', {
-              ...mintUrlLogFields(mintUrl),
-              duration_ms: Math.round(performance.now() - restoreT0),
-            });
-          } catch (restoreErr) {
-            log.warn('mint.add.restore.failed', {
-              ...mintUrlLogFields(mintUrl),
-              error: restoreErr instanceof Error ? restoreErr.message : String(restoreErr),
-            });
-          }
-
-          if (i < mintUrlsToAdd.length - 1) {
-            await new Promise((r) => setTimeout(r, 100));
-          }
-        } catch (err) {
-          log.error('mint.add.item.failed', {
-            ...mintUrlLogFields(mintUrl),
-            duration_ms: Math.round(performance.now() - itemT0),
-            error: err instanceof Error ? err.message : String(err),
-          });
-          errors.push({ mintUrl, error: err instanceof Error ? err.message : String(err) });
-        }
-      }
-
-      log.info('mint.add.batch.complete', { added: results.length, failed: errors.length });
-      // Give the MintProvider's `mint:added` listener a tick to refetch
-      // `trustedMints` before we pop back. Without this delay the parent
-      // Mint List screen sometimes refocuses before the new mint is in
-      // its `useMints()` snapshot, leaving the row missing until the next
-      // background tick.
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      if (errors.length === 0) {
-        paramPopup('mints-added', { added: results.length });
-        router.back();
-      } else if (results.length > 0) {
-        paramPopup('mints-added', { added: results.length, failed: errors.length });
-        router.back();
-      } else {
-        staticPopup('mints-add-failed');
-      }
-    } catch {
-      log.error('mint.add.batch.unexpected_error');
-      staticPopup('mints-add-failed');
-    } finally {
-      setIsAdding(false);
-    }
+    await addSelectedMints(selectedMints, setIsAdding);
   };
 
   // Feed the result List skeleton placeholders during the first search so the

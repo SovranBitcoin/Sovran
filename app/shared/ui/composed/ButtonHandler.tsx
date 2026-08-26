@@ -101,6 +101,43 @@ export interface ButtonHandlerButton {
 
 type ButtonHandlerActionButton = ButtonHandlerButton;
 
+// Keep async action failures contained so overflow actions do not surface as
+// unhandled promise rejections on Android.
+async function runMenuItemAction(button: ButtonHandlerActionButton): Promise<void> {
+  if (button.disabled) return;
+  try {
+    await button.onPress?.();
+  } catch (error) {
+    log.error('ui.button_handler.menu_action_failed', {
+      testID: button.testID,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+// The inner shared `Button` already routes its onPress through
+// `useSingleFlight`, so a rapid second tap is dropped before reaching
+// this wrapper. We track the in-flight button by its visible-array index
+// so siblings keep their own visual state while one action runs.
+async function runButtonAction(
+  button: ButtonHandlerActionButton,
+  idx: number,
+  setLoadingIdx: React.Dispatch<React.SetStateAction<number | null>>
+): Promise<void> {
+  if (button.disabled) return;
+  setLoadingIdx(idx);
+  try {
+    await button.onPress?.();
+  } catch (error) {
+    log.error('ui.button_handler.action_failed', {
+      testID: button.testID,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    setLoadingIdx((current) => (current === idx ? null : current));
+  }
+}
+
 /**
  * Props for the ButtonHandler component
  *
@@ -173,20 +210,6 @@ export function ButtonHandler({
     ];
   }, [visibleButtons]);
 
-  // Keep async action failures contained so overflow actions do not surface as
-  // unhandled promise rejections on Android.
-  const handleMenuItemPress = async (button: ButtonHandlerActionButton): Promise<void> => {
-    if (button.disabled) return;
-    try {
-      await button.onPress?.();
-    } catch (error) {
-      log.error('ui.button_handler.menu_action_failed', {
-        testID: button.testID,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  };
-
   // The overflow sheet is the FullWindowOverlay-backed `actionMenuSheet()`
   // lane (PopupHost's standalone <BottomSheet>). ButtonHandler footers live
   // inside route modals (e.g. SendTokenScreen in `(transactions-flow)`), and
@@ -208,30 +231,14 @@ export function ButtonHandler({
         // (Check Status, Cancel transaction). Returning void keeps the sheet
         // closing immediately on tap, matching the previous host's behavior.
         onPress: () => {
-          void handleMenuItemPress(button);
+          void runMenuItemAction(button);
         },
       })),
     });
   };
 
-  // The inner shared `Button` already routes its onPress through
-  // `useSingleFlight`, so a rapid second tap is dropped before reaching
-  // this wrapper. We track the in-flight button by its visible-array index
-  // so siblings keep their own visual state while one action runs.
-  const handleButtonPress = async (button: ButtonHandlerActionButton, idx: number) => {
-    if (button.disabled) return;
-    setLoadingIdx(idx);
-    try {
-      await button.onPress?.();
-    } catch (error) {
-      log.error('ui.button_handler.action_failed', {
-        testID: button.testID,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      setLoadingIdx((current) => (current === idx ? null : current));
-    }
-  };
+  const handleButtonPress = (button: ButtonHandlerActionButton, idx: number) =>
+    runButtonAction(button, idx, setLoadingIdx);
 
   return (
     <Log name="ButtonHandler">
