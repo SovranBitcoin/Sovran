@@ -13,11 +13,7 @@ import { FiatCurrencyPillAndroidMenu } from '@/features/wallet/components/FiatCu
 
 const mockSetDisplayCurrency = jest.fn();
 const mockActionMenuPopup = jest.fn();
-const mockLocationSectionState = {
-  location: { latitude: 51.5, longitude: -0.12 },
-  isRevealed: false,
-  reveal: jest.fn(),
-};
+const mockTransactionLocation = { latitude: 51.5, longitude: -0.12 };
 
 jest.mock('@/shared/lib/popup/popups/actionMenu', () => ({
   actionMenuPopup: (...args: unknown[]) => mockActionMenuPopup(...args),
@@ -34,8 +30,10 @@ jest.mock('@/shared/stores/global/settingsStore', () => ({
   ) => selector({ displayCurrency: 'usd', setDisplayCurrency: mockSetDisplayCurrency }),
 }));
 
-jest.mock('@/shared/hooks/useTransactionLocationSection', () => ({
-  useTransactionLocationSection: () => mockLocationSectionState,
+// Reveal is local `useState` in the component now; only the stored location
+// comes from outside, so that is all this needs to supply.
+jest.mock('@/shared/stores/profile/transactionLocationStore', () => ({
+  useTransactionLocation: () => mockTransactionLocation,
 }));
 
 jest.mock('@/shared/lib/logger', () => ({
@@ -161,8 +159,6 @@ describe('Android UI regressions', () => {
   beforeEach(() => {
     mockSetDisplayCurrency.mockReset();
     mockActionMenuPopup.mockReset();
-    mockLocationSectionState.isRevealed = false;
-    mockLocationSectionState.reveal.mockReset();
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
       if (String(args[0]).includes('react-test-renderer is deprecated')) return;
@@ -233,9 +229,13 @@ describe('Android UI regressions', () => {
     expect(findAllByType(renderer!, 'LinearGradient')).toHaveLength(0);
     expect(findAllByType(renderer!, 'Pressable')).toHaveLength(1);
 
+    // Reveal is local state now, so the observable effect is that the
+    // tap-to-reveal placeholder is gone. Asserting the map mounts instead
+    // would be environment-dependent: Android only renders GoogleMaps.View
+    // when a Maps API key is configured.
     act(() => {
       findAllByType(renderer!, 'Pressable')[0].props.onPress();
     });
-    expect(mockLocationSectionState.reveal).toHaveBeenCalledTimes(1);
+    expect(findAllByType(renderer!, 'Pressable')).toHaveLength(0);
   });
 });

@@ -122,7 +122,17 @@ jest.mock('@/shared/stores/runtime/mockDataStore', () => ({
 jest.mock('@/shared/lib/popup', () => ({ staticPopup: jest.fn() }));
 jest.mock('@/shared/lib/logger', () => {
   const logger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
-  return { cashuLog: logger, chatLog: logger, log: logger, useLifecycleLogger: jest.fn() };
+  return {
+    cashuLog: logger,
+    chatLog: logger,
+    log: logger,
+    useLifecycleLogger: jest.fn(),
+    // CashuTokenBubble's decode path spreads these into its log fields, and
+    // its catch turns a missing symbol into a silently unrendered bubble.
+    mintUrlLogFields: () => ({}),
+    redactError: (error: unknown) => error,
+    storeLog: logger,
+  };
 });
 jest.mock('@/shared/hooks/useThemeColor', () => ({
   useThemeColor: (tokens: string | readonly string[]) =>

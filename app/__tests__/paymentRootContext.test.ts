@@ -21,11 +21,29 @@ function expectBefore(source: string, first: string, second: string): void {
   expect(secondIndex).toBeGreaterThan(firstIndex);
 }
 
+/**
+ * Some screens hoist the Colada call into a module-scope helper so the React
+ * Compiler can lower the component (a try/catch in render bails it out). That
+ * puts the machine call ABOVE the handler in source order, which a plain
+ * `expectBefore` on the raw call reads as a violation even though the runtime
+ * order is right. Follow the indirection instead: the handler must clear before
+ * invoking the helper, and the helper must be the thing that calls the machine.
+ */
+function expectBeforeVia(source: string, clear: string, via: string, start: string): void {
+  expectBefore(source, clear, via);
+
+  const helperIndex = source.indexOf(`function ${via.replace(/\($/, '')}`);
+  expect(helperIndex).toBeGreaterThanOrEqual(0);
+  expect(source.indexOf(start, helperIndex)).toBeGreaterThan(helperIndex);
+}
+
 describe('fresh payment-root context clearing', () => {
   it.each([
     {
       file: 'app/features/user/screens/UserProfileScreen.tsx',
       clear: "clearPaymentContext('user.profile.send_money')",
+      // Hoisted to module scope for the React Compiler; assert through it.
+      via: 'startSendMoneyToProfile(',
       start: 'machine.startSendEcash({',
     },
     {
@@ -50,8 +68,10 @@ describe('fresh payment-root context clearing', () => {
       clear: "clearPaymentContext('feed.zap_post')",
       start: 'machine.startSendEcash({',
     },
-  ])('$file clears stale routing state before starting Colada', ({ file, clear, start }) => {
-    expectBefore(readSource(file), clear, start);
+  ])('$file clears stale routing state before starting Colada', ({ file, clear, via, start }) => {
+    const source = readSource(file);
+    if (via) expectBeforeVia(source, clear, via, start);
+    else expectBefore(source, clear, start);
   });
 
   it('owns deep-link context clearing in the app without importing app stores into wallet', () => {

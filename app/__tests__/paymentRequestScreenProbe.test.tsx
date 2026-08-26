@@ -85,6 +85,13 @@ jest.mock('@/features/transactions', () => ({
     bip321.optionKinds ? { title: 'Payment Methods', value: usedKind } : null,
     { title: 'Date', value: createdAt },
   ],
+  amountDetailItem: ({ amount, unit }: { amount: unknown; unit: string }) => ({
+    title: 'Amount',
+    value: `${String(amount)} ${unit}`,
+  }),
+  stateDetailItem: (state: string) => ({ title: 'State', value: state }),
+  quoteIdDetailItem: (quoteId?: string) => (quoteId ? { title: 'Quote ID', value: quoteId } : null),
+  mintDetailItem: (mintUrl?: string | null) => (mintUrl ? { title: 'Mint', value: mintUrl } : null),
 }));
 jest.mock('@/shared/lib/logger', () => ({
   log: { debug: jest.fn(), warn: jest.fn() },

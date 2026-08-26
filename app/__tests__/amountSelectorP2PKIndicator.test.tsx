@@ -22,6 +22,10 @@ jest.mock('@/shared/lib/logger', () => ({
   Log: ({ children }: React.PropsWithChildren) => <>{children}</>,
   useLifecycleLogger: jest.fn(),
   walletLog: { debug: jest.fn(), info: jest.fn() },
+  // persistConfig's onRehydrateStorage error branch calls storeLog.warn; a
+  // missing symbol throws inside zustand's rehydrate and fails the suite.
+  storeLog: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  redactError: (error: unknown) => error,
 }));
 jest.mock('@/shared/stores/runtime/routstrTopUpStore', () => ({
   useRoutstrTopUpStore: jest.fn(() => false),

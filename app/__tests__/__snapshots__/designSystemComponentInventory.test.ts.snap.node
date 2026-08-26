@@ -133,6 +133,7 @@ exports[`Design System component inventory tracks the complete reusable componen
     "features/transactions/components/detail/TransactionSourceSection.tsx",
     "features/transactions/components/detail/ZappedPostSection.tsx",
     "features/transactions/components/detail/timeline/ExpiryCountdown.tsx",
+    "features/transactions/components/detail/transactionDetailRows.tsx",
     "features/user/components/SendMessageMenu.tsx",
     "features/wallet/components/Account.tsx",
     "features/wallet/components/BitcoinNearYou.tsx",
@@ -240,6 +241,6 @@ exports[`Design System component inventory tracks the complete reusable componen
     "shared/ui/primitives/View/Stack.tsx",
     "shared/ui/primitives/icon-symbol.tsx",
   ],
-  "total": 234,
+  "total": 235,
 }
 `;
