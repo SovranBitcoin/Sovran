@@ -1,0 +1,307 @@
+{
+  "$comment": "Files containing at least one function the React Compiler cannot compile. Ratcheted by scripts/check-react-compiler.mjs — this list may only shrink. Regenerate with `bun run check:react-compiler:update`.",
+  "bailouts": {
+    "app/_layout.tsx": [
+      "Cannot access refs during render"
+    ],
+    "app/(drawer)/_layout.tsx": [
+      "Hooks may not be referenced as normal values, they must be called. See https://react.dev/reference/rules/react-calls-components-and-hooks#never-pass-around-hook",
+      "Cannot access refs during render"
+    ],
+    "features/ai/components/ModelChip.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "features/ai/hooks/useAiSend.ts": [
+      "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
+      "(BuildHIR::lowerStatement) Support ThrowStatement inside of try/catch",
+      "(BuildHIR::lowerStatement) Handle for-await loops",
+      "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause"
+    ],
+    "features/bitchat/hooks/useBitchatBLEIdentityMaterial.ts": [
+      "Existing memoization could not be preserved"
+    ],
+    "features/bitchat/hooks/useBitchatNickname.ts": [
+      "Existing memoization could not be preserved"
+    ],
+    "features/contacts/components/SearchPostsList.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "features/feed/components/nostr/image-overlay/AnimatedImageOverlay.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "features/feed/components/nostr/image-overlay/ImageBlock.tsx": [
+      "Existing memoization could not be preserved"
+    ],
+    "features/feed/components/nostr/image-overlay/provider.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "features/feed/components/nostr/NoteContent.tsx": [
+      "Cannot access refs during render",
+      "(BuildHIR::lowerExpression) Handle UpdateExpression to variables captured within lambdas."
+    ],
+    "features/feed/components/nostr/PostCard.tsx": [
+      "Cannot access refs during render",
+      "This value cannot be modified"
+    ],
+    "features/feed/components/thread-embed/EmbedActionBar.tsx": [
+      "This value cannot be modified"
+    ],
+    "features/feed/components/thread-embed/ThreadEmbedProvider.tsx": [
+      "This value cannot be modified"
+    ],
+    "features/feed/components/thread-embed/ThreadEmbedSheet.tsx": [
+      "This value cannot be modified"
+    ],
+    "features/feed/components/ThreadReplyBar.tsx": [
+      "Cannot access refs during render"
+    ],
+    "features/feed/components/ThreadView.tsx": [
+      "This value cannot be modified"
+    ],
+    "features/feed/components/UserFeed.tsx": [
+      "Cannot access refs during render"
+    ],
+    "features/feed/hooks/useFeedCardProps.ts": [
+      "Cannot access refs during render"
+    ],
+    "features/feed/hooks/useFeedRows.ts": [
+      "Cannot access refs during render"
+    ],
+    "features/feed/hooks/useNostrEngagement.ts": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "features/feed/screens/NotificationFollowersScreen.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "features/feed/screens/NotificationsScreen.tsx": [
+      "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause",
+      "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
+      "Unexpected terminal kind `optional` for ternary test block"
+    ],
+    "features/feed/screens/StoriesScreen.tsx": [
+      "Cannot access refs during render"
+    ],
+    "features/map/screens/MapScreen.tsx": [
+      "This value cannot be modified"
+    ],
+    "features/mint/hooks/useMintRebalanceOrchestrator.ts": [
+      "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
+      "(BuildHIR::lowerStatement) Support ThrowStatement inside of try/catch",
+      "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause"
+    ],
+    "features/mint/hooks/useStickyMintSelectorItems.ts": [
+      "Cannot access refs during render"
+    ],
+    "features/mint/screens/MintInfoScreen.tsx": [
+      "This value cannot be modified"
+    ],
+    "features/mint/screens/MintSelectFlowScreen.tsx": [
+      "Existing memoization could not be preserved"
+    ],
+    "features/nearPay/hooks/useNutDropCelebration.ts": [
+      "Cannot access refs during render"
+    ],
+    "features/nearPay/hooks/useRememberPeers.ts": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "features/nearPay/screens/NearPayScreen.tsx": [
+      "Cannot access refs during render"
+    ],
+    "features/nostrSigner/components/PermissionGestureDemo.tsx": [
+      "This value cannot be modified"
+    ],
+    "features/nostrSigner/components/SignerApprovalSheetContent.tsx": [
+      "Cannot access refs during render"
+    ],
+    "features/onboarding/components/OnboardingInnerCarousel.tsx": [
+      "Cannot access refs during render"
+    ],
+    "features/onboarding/components/OnboardingPaginationItem.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "features/onboarding/components/OnboardingScreen.tsx": [
+      "Cannot access refs during render"
+    ],
+    "features/payments/hooks/useMintContacts.ts": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "features/receive/components/ReceiveUnifiedTab.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "features/receive/screens/OnchainReceiveScreen.tsx": [
+      "Existing memoization could not be preserved"
+    ],
+    "features/receive/screens/ReceivePaymentRequestQuoteScreen.tsx": [
+      "Cannot access refs during render"
+    ],
+    "features/send/providers/Colada.tsx": [
+      "Cannot access refs during render"
+    ],
+    "features/send/screens/OnchainSendScreen.tsx": [
+      "Existing memoization could not be preserved"
+    ],
+    "features/send/screens/SendScreen.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "features/settings/design-system/fadeRevealStress.tsx": [
+      "Hooks must be the same function on every render, but this value may change over time to a different function. See https://react.dev/reference/rules/react-calls-"
+    ],
+    "features/settings/screens/SettingsRecoveryScreen.tsx": [
+      "(BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause",
+      "(BuildHIR::lowerStatement) Handle TryStatement without a catch clause"
+    ],
+    "features/theme/lib/useAlbumList.ts": [
+      "(BuildHIR::lowerExpression) Handle ||= operators in AssignmentExpression"
+    ],
+    "features/theme/screens/GalleryScreen.tsx": [
+      "Existing memoization could not be preserved"
+    ],
+    "features/transactions/components/detail/timeline/TimelineCard.tsx": [
+      "Cannot access refs during render"
+    ],
+    "features/transactions/components/detail/ZappedPostSection.tsx": [
+      "Existing memoization could not be preserved"
+    ],
+    "features/transactions/components/Transactions.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "features/transactions/screens/SwapTransactionScreen.tsx": [
+      "Existing memoization could not be preserved"
+    ],
+    "features/wallet/components/Account.tsx": [
+      "Cannot access refs during render"
+    ],
+    "features/whitenoise/WhitenoiseProvider.tsx": [
+      "Existing memoization could not be preserved"
+    ],
+    "shared/blocks/InitializationGate.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "shared/blocks/popup/PopupHost.tsx": [
+      "Cannot access refs during render"
+    ],
+    "shared/blocks/SovranTabBar.tsx": [
+      "This value cannot be modified"
+    ],
+    "shared/blocks/status/LoadingIndicator.tsx": [
+      "Cannot access refs during render",
+      "Cannot reassign variables declared outside of the component/hook"
+    ],
+    "shared/blocks/transfer/TransferStepChain.tsx": [
+      "Cannot access refs during render"
+    ],
+    "shared/hooks/useNostrProfileMetadata.ts": [
+      "Cannot access refs during render",
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "shared/hooks/useShallowMemo.ts": [
+      "Cannot access refs during render"
+    ],
+    "shared/lib/contentShiftLog.ts": [
+      "Cannot access refs during render",
+      "Cannot reassign variables declared outside of the component/hook"
+    ],
+    "shared/lib/debug/fadeRevealProbe.ts": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "shared/lib/loggerCore.ts": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "shared/lib/loggerHooks.ts": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "shared/lib/nostr/useEntityCache.ts": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "shared/lib/popup/E2EActionMenuProbe.tsx": [
+      "(BuildHIR::lowerExpression) Support UpdateExpression where argument is a global"
+    ],
+    "shared/lib/popup/PaymentStatusToast.tsx": [
+      "Cannot access refs during render"
+    ],
+    "shared/lib/popup/popups/modelPicker.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "shared/lib/popup/popups/paymentOptionsSheet.tsx": [
+      "Cannot access refs during render"
+    ],
+    "shared/lib/utils.tsx": [
+      "This value cannot be modified"
+    ],
+    "shared/providers/BackgroundProvider.tsx": [
+      "This value cannot be modified",
+      "Existing memoization could not be preserved"
+    ],
+    "shared/providers/CocoProvider.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "shared/providers/InitializationProvider.tsx": [
+      "Cannot access refs during render",
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "shared/providers/NostrKeysProvider.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "shared/providers/NostrNDKProvider.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "shared/providers/PricelistProvider.tsx": [
+      "(BuildHIR::lowerExpression) Handle UpdateExpression to variables captured within lambdas."
+    ],
+    "shared/providers/WalletContextProvider.tsx": [
+      "Cannot access refs during render"
+    ],
+    "shared/ui/composed/AmountFormatter.tsx": [
+      "Cannot access refs during render"
+    ],
+    "shared/ui/composed/BootEntrance.tsx": [
+      "Cannot access refs during render"
+    ],
+    "shared/ui/composed/BottomButtons.tsx": [
+      "(BuildHIR::node.lowerReorderableExpression) Expression type `ConditionalExpression` cannot be safely reordered"
+    ],
+    "shared/ui/composed/CapsuleButton/CapsuleButton.liquid.tsx": [
+      "Cannot access refs during render"
+    ],
+    "shared/ui/composed/chat/LiquidChatComposer.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "shared/ui/composed/chat/useChatSurfacePerfLogger.ts": [
+      "Cannot access refs during render",
+      "This value cannot be modified"
+    ],
+    "shared/ui/composed/CustomKeyboard.tsx": [
+      "Existing memoization could not be preserved"
+    ],
+    "shared/ui/composed/DetailsList.tsx": [
+      "Support functions with unreachable code that may contain hoisted declarations"
+    ],
+    "shared/ui/composed/Screen.tsx": [
+      "React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled"
+    ],
+    "shared/ui/composed/ScrollEdgeFade.tsx": [
+      "(BuildHIR::node.lowerReorderableExpression) Expression type `ConditionalExpression` cannot be safely reordered"
+    ],
+    "shared/ui/composed/search/SearchOverlay.tsx": [
+      "(BuildHIR::node.lowerReorderableExpression) Expression type `TemplateLiteral` cannot be safely reordered"
+    ],
+    "shared/ui/composed/SpriteView.tsx": [
+      "Cannot access refs during render"
+    ],
+    "shared/ui/primitives/Button.tsx": [
+      "Cannot access refs during render"
+    ],
+    "shared/ui/primitives/Pressable.tsx": [
+      "Existing memoization could not be preserved"
+    ],
+    "shared/ui/primitives/Skeleton.tsx": [
+      "Cannot reassign variables declared outside of the component/hook"
+    ],
+    "shared/ui/primitives/Spinner.tsx": [
+      "Cannot reassign variables declared outside of the component/hook"
+    ],
+    "shared/ui/primitives/Text.tsx": [
+      "Cannot reassign variables declared outside of the component/hook"
+    ]
+  }
+}
