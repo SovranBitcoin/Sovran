@@ -486,10 +486,18 @@ export function ClaimUsernameScreen() {
     return availabilityResults.find((r) => r.domain === domainValue);
   };
 
-  // Check if selected domain is available
+  // Gate on "not known-taken", not on "known-free". checkUsernameAvailability
+  // deliberately returns `null` (unknown) for every well-formed name — there is
+  // no pre-check endpoint, the claim attempt is the check. Requiring `=== true`
+  // here left Continue permanently disabled and made the whole screen dead.
+  // A settled result must exist: `availabilityResults` is [] before the first
+  // check and whenever the field is empty, so "no result" must stay disabled.
   const selectedDomainValue = DOMAINS.find((d) => d.id === selectedDomain)?.value;
+  const selectedDomainResult = availabilityResults.find((r) => r.domain === selectedDomainValue);
   const selectedDomainAvailable =
-    availabilityResults.find((r) => r.domain === selectedDomainValue)?.available === true;
+    selectedDomainResult != null &&
+    !selectedDomainResult.loading &&
+    selectedDomainResult.available !== false;
 
   // Claim the username via npubcash-sdk. Mirrors eNuts's NpcService.requestNpcUsername:
   // attempt setUsername; on PaymentRequiredError, surface the paid-claim path

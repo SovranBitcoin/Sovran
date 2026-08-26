@@ -1,6 +1,6 @@
 import { Manager } from '@cashu/coco-core';
 import type { Plugin } from '@cashu/coco-core/plugin';
-import { createCashuSeedGetter, deriveStandardCashuSeed } from 'wallet';
+import { createCashuSeedGetter, deriveStandardCashuSeed, withTimeout } from 'wallet';
 import { CocoCoreLogger } from './cocoLogger';
 import {
   ExpoSqliteRepositories,
@@ -57,6 +57,13 @@ const GIVEAWAY_P2PK_SECRET: string | null =
   Constants.expoConfig.extra.giveawayP2pkSecret.length > 0
     ? Constants.expoConfig.extra.giveawayP2pkSecret
     : null;
+
+/**
+ * Ceiling on the npub.cash lock-state check that runs during plugin init.
+ * Generous enough for a cold cellular round trip, short enough that a
+ * blackholed host cannot hold up the funds-recovery steps behind it.
+ */
+const NPC_UNLOCK_CHECK_TIMEOUT_MS = 5_000;
 
 interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
@@ -1084,7 +1091,15 @@ export class CocoManager {
     signer: NpcSigner
   ): Promise<void> {
     try {
-      const info = await account.getInfo();
+      // Bounded. `catch` handles rejection, not latency, and this is the only
+      // network call between plugin init and every funds-recovery step that
+      // follows (reconcileLegacyMintQuotes, the mint-operation watcher,
+      // requeuePaidMintQuotes, the send/melt/receive recovery runs). The SDK
+      // uses a bare fetch with no AbortSignal, and React Native sets OkHttp to
+      // no timeout at all on Android, so a blackholed npub.cash host would
+      // otherwise never settle — leaving `isBackgroundRunning` latched, which
+      // getCleanupReadiness() uses to refuse profile switches.
+      const info = await withTimeout(account.getInfo(), NPC_UNLOCK_CHECK_TIMEOUT_MS, 'npc.getInfo');
       if (!info.lockQuote) {
         cashuLog.debug('cashu.manager.npc_quotes_already_unlocked');
         return;
