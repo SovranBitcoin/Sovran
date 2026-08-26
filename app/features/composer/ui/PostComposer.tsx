@@ -7,7 +7,7 @@
  * `ComposeConfig`; the char meter enforces the relay-sourced budget; send goes
  * through the outbox-aware publish seam.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -76,8 +76,7 @@ const OUTCOME_MESSAGE: Partial<Record<PublishOutcome, string>> = {
 
 // Module-scope because the upload try/catch (throw + value blocks inside try)
 // bails the React Compiler on any render-scoped function containing it.
-// Verbatim former handlePost body; the thin useCallback wrapper keeps the dep
-// contract.
+// Verbatim former handlePost body.
 async function runComposerPost(ctx: {
   postingRef: React.MutableRefObject<boolean>;
   canPost: boolean;
@@ -170,6 +169,17 @@ const PLACEHOLDER: Record<string, string> = {
 
 const COMPOSER_VISUAL_SCOPE = 'composer.post';
 
+/** Single-author profiles map for a quoted/replied card, so its avatar and
+ *  display name resolve without a feed-wide profile map. */
+function buildSingleProfileMap(
+  event: FeedEvent | null | undefined,
+  profile: ProfileInfo | null | undefined
+): Map<string, ProfileInfo> {
+  const map = new Map<string, ProfileInfo>();
+  if (event && profile) map.set(event.pubkey, profile);
+  return map;
+}
+
 export function PostComposer() {
   const { ndk } = useNDK();
   const blocks = useComposerStore((s) => s.blocks);
@@ -224,13 +234,7 @@ export function PostComposer() {
 
   const isReply = target?.mode === 'reply' && !!parentEvent;
   const isQuote = target?.mode === 'quote' && !!parentEvent;
-  // Profiles map for the quoted card: just the quoted author, so its avatar and
-  // display name resolve without a feed-wide profile map.
-  const quotedProfiles = useMemo(() => {
-    const map = new Map<string, ProfileInfo>();
-    if (parentEvent && parentProfile) map.set(parentEvent.pubkey, parentProfile);
-    return map;
-  }, [parentEvent, parentProfile]);
+  const quotedProfiles = buildSingleProfileMap(parentEvent, parentProfile);
   const textBlock = blocks.find((b) => b.kind === 'text');
   // Plain on purpose: a manual useMemo here is the one memo the React Compiler
   // cannot preserve in this component — it bails the whole file (verified with
@@ -306,31 +310,28 @@ export function PostComposer() {
     },
   });
 
-  const handleCancel = useCallback(() => {
+  const handleCancel = () => {
     close();
     router.back();
-  }, [close]);
+  };
 
   const uploadsRef = useUploadAbortMap();
 
-  const handlePost = useCallback(
-    () =>
-      runComposerPost({
-        postingRef,
-        canPost,
-        setBusy,
-        setError,
-        setPostProgress,
-        mediaBlocks,
-        ndk,
-        uploads: uploadsRef.current,
-        updateBlock,
-        publish,
-      }),
-    [canPost, publish, mediaBlocks, ndk, updateBlock, uploadsRef]
-  );
+  const handlePost = () =>
+    runComposerPost({
+      postingRef,
+      canPost,
+      setBusy,
+      setError,
+      setPostProgress,
+      mediaBlocks,
+      ndk,
+      uploads: uploadsRef.current,
+      updateBlock,
+      publish,
+    });
 
-  const handleAddMedia = useCallback(async () => {
+  const handleAddMedia = async () => {
     if (mediaBlocks.length >= config.maxMedia) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -349,17 +350,14 @@ export function PostComposer() {
       width: asset.width,
       height: asset.height,
     });
-  }, [mediaBlocks.length, config.maxMedia, addMediaBlock]);
+  };
 
   // Cancel any in-flight upload before dropping the block.
-  const handleRemoveMedia = useCallback(
-    (id: string) => {
-      uploadsRef.current.get(id)?.abort();
-      uploadsRef.current.delete(id);
-      removeBlock(id);
-    },
-    [removeBlock, uploadsRef]
-  );
+  const handleRemoveMedia = (id: string) => {
+    uploadsRef.current.get(id)?.abort();
+    uploadsRef.current.delete(id);
+    removeBlock(id);
+  };
 
   return (
     <KeyboardAvoidingView
@@ -689,11 +687,7 @@ function ReplyOriginalPost({
 }) {
   const name = profile?.name || `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
   const shift = useShiftLogger('ReplyOriginalPost');
-  const profiles = useMemo(() => {
-    const map = new Map<string, ProfileInfo>();
-    if (profile) map.set(event.pubkey, profile);
-    return map;
-  }, [event.pubkey, profile]);
+  const profiles = buildSingleProfileMap(event, profile);
 
   return (
     <VisualLayoutProbe

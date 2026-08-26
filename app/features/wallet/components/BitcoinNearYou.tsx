@@ -77,6 +77,9 @@ function MapPreview({
   const useChrome = Platform.OS === 'ios';
   const isDark = scheme === 'dark';
 
+  // Library boundary: expo-maps native views compare props by reference — a
+  // fresh cameraPosition each render can re-apply the camera. Kept manual.
+  // ast-grep-ignore: no-manual-memo-tsx
   const cameraPosition = useMemo(
     () => ({ coordinates: { latitude, longitude }, zoom: MAP_ZOOM }),
     [latitude, longitude]
@@ -190,6 +193,9 @@ async function resolveNearbyCoords(ctx: {
   }
 }
 
+// Component-identity memo: the parent's compile state isn't verified, so this
+// stays until a pass audits the consumer (removal only shifts re-render cost).
+// ast-grep-ignore: no-manual-memo-tsx
 export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
   const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
   const mockMode = useSettingsStore((s) => s.mockMode);
@@ -249,6 +255,9 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
     };
   }, [mockMode]);
 
+  // Feeds expo-maps `markers` (reference-compared at the native boundary) and
+  // does real per-place compute. Kept manual; see cameraPosition above.
+  // ast-grep-ignore: no-manual-memo-tsx
   const nearbyMarkers = useMemo((): NearbyMapMarker[] => {
     const places = placesCache?.data;
     if (!places?.length) return [];

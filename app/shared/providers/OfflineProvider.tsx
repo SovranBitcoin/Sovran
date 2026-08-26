@@ -251,6 +251,9 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => startConnectivityEngine({ isCheckingRef, setNetworkOffline }), []);
 
+  // Context provider `value` — consumers can't opt out of identity churn, so
+  // this stays manually memoized even under the React Compiler (hazard class).
+  // ast-grep-ignore: no-manual-memo-tsx
   const contextValue = useMemo(() => ({ isOffline }), [isOffline]);
 
   return <OfflineContext.Provider value={contextValue}>{children}</OfflineContext.Provider>;
@@ -267,43 +270,28 @@ export function OfflineShell({ children }: { children: React.ReactNode }) {
   const frame = useSafeAreaFrame();
   const offlineAccentColor = info;
   const offlineTextColor = foreground;
-  const screenCornerRadius = useMemo(
-    () => getIosCornerRadius(frame.width, frame.height),
-    [frame.height, frame.width]
-  );
-  const shellCornerStyle = useMemo(
-    () => ({
-      borderRadius: screenCornerRadius,
-      ...(Platform.OS === 'ios'
-        ? ({
-            borderCurve: 'continuous',
-          } as const)
-        : null),
-    }),
-    [screenCornerRadius]
-  );
-  const outerShellStyle = useMemo(
-    () => ({
-      backgroundColor: isOffline ? offlineAccentColor : 'transparent',
-    }),
-    [isOffline, offlineAccentColor]
-  );
-  const topSectionStyle = useMemo(
-    () => ({
-      height: isOffline ? BANNER_HEIGHT + insets.top : 0,
-    }),
-    [insets.top, isOffline]
-  );
-  const contentShellStyle = useMemo(() => {
-    const inset = isOffline ? BORDER_WIDTH : 0;
-    const contentRadius = Math.max(0, screenCornerRadius - inset);
-    return {
-      marginTop: inset,
-      marginBottom: inset,
-      marginHorizontal: inset,
-      borderRadius: contentRadius,
-    };
-  }, [isOffline, screenCornerRadius]);
+  const screenCornerRadius = getIosCornerRadius(frame.width, frame.height);
+  const shellCornerStyle = {
+    borderRadius: screenCornerRadius,
+    ...(Platform.OS === 'ios'
+      ? ({
+          borderCurve: 'continuous',
+        } as const)
+      : null),
+  };
+  const outerShellStyle = {
+    backgroundColor: isOffline ? offlineAccentColor : 'transparent',
+  };
+  const topSectionStyle = {
+    height: isOffline ? BANNER_HEIGHT + insets.top : 0,
+  };
+  const contentShellInset = isOffline ? BORDER_WIDTH : 0;
+  const contentShellStyle = {
+    marginTop: contentShellInset,
+    marginBottom: contentShellInset,
+    marginHorizontal: contentShellInset,
+    borderRadius: Math.max(0, screenCornerRadius - contentShellInset),
+  };
 
   return (
     <View style={[styles.outerShell, shellCornerStyle, outerShellStyle]}>
