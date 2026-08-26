@@ -117,6 +117,36 @@ interface ScanOutcome {
   lockedPending?: boolean;
 }
 
+/**
+ * One scan attempt with the busy flags the overlay reads. Every entry point
+ * (live barcode, paste, gallery) must leave `isProcessingRef` / `loading` /
+ * `progress` unwound on failure or the screen stays stuck mid-scan with no
+ * way back. Module-scope because the try/catch (value blocks inside it) bails
+ * the React Compiler when it lives in a render-scoped function.
+ */
+async function runScanAttempt(ctx: {
+  failureEvent: string;
+  scan: () => Promise<ScanOutcome | undefined> | undefined;
+  setProgress: (n: number) => void;
+  setLoading: (b: boolean) => void;
+  isProcessingRef: React.MutableRefObject<boolean>;
+}) {
+  const { failureEvent, scan, setProgress, setLoading, isProcessingRef } = ctx;
+  isProcessingRef.current = true;
+  setLoading(true);
+  try {
+    const result = await scan();
+    applyScanResult(result, setProgress, setLoading, isProcessingRef);
+  } catch (err) {
+    log.error(failureEvent, {
+      error: err instanceof Error ? err : new Error(String(err)),
+    });
+    setLoading(false);
+    setProgress(0);
+    isProcessingRef.current = false;
+  }
+}
+
 function applyScanResult(
   result: ScanOutcome | undefined,
   setProgress: (n: number) => void,
@@ -226,30 +256,10 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
     }
   };
 
-  /**
-   * Run one scan attempt through the payment machine with the busy flags the
-   * overlay reads. Every entry point (live barcode, paste, gallery) must leave
-   * `isProcessingRef` / `loading` / `progress` unwound on failure or the screen
-   * stays stuck mid-scan with no way back.
-   */
-  const runScan = async (
+  const runScan = (
     failureEvent: string,
     scan: () => Promise<ScanOutcome | undefined> | undefined
-  ) => {
-    isProcessingRef.current = true;
-    setLoading(true);
-    try {
-      const result = await scan();
-      applyScanResult(result, setProgress, setLoading, isProcessingRef);
-    } catch (err) {
-      log.error(failureEvent, {
-        error: err instanceof Error ? err : new Error(String(err)),
-      });
-      setLoading(false);
-      setProgress(0);
-      isProcessingRef.current = false;
-    }
-  };
+  ) => runScanAttempt({ failureEvent, scan, setProgress, setLoading, isProcessingRef });
 
   const handleScan = async (data: ScanningData) => {
     const isUr = data.data.toLowerCase().startsWith('ur:');
@@ -302,19 +312,9 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
   const handleGalleryPress = async () => {
     if (!shouldAcceptScan()) return;
     log.info('camera.scan.gallery');
-    isProcessingRef.current = true;
-    setLoading(true);
-    try {
-      const result = await machine.scan?.(undefined, { source: 'gallery' });
-      applyScanResult(result, setProgress, setLoading, isProcessingRef);
-    } catch (err) {
-      log.error('camera.scan.gallery_failed', {
-        error: err instanceof Error ? err : new Error(String(err)),
-      });
-      setLoading(false);
-      setProgress(0);
-      isProcessingRef.current = false;
-    }
+    await runScan('camera.scan.gallery_failed', () =>
+      machine.scan?.(undefined, { source: 'gallery' })
+    );
   };
 
   const handleCameraReady = () => {

@@ -59,6 +59,33 @@ async function fetchFromNagg(eventId: string): Promise<CacheEntry | null> {
   }
 }
 
+// Relay fallback — covers nagg outages and notes nagg hasn't indexed.
+// Module-scope because the try/catch (value blocks inside it) would bail the
+// React Compiler if it lived in the hook's effect closure.
+async function fetchFromRelay(
+  eventId: string,
+  ndk: NonNullable<ReturnType<typeof useNDK>['ndk']>
+): Promise<CacheEntry | null> {
+  try {
+    const ndkEvent = await ndk.fetchEvent({ ids: [eventId] });
+    if (ndkEvent && typeof ndkEvent.content === 'string') {
+      return {
+        event: {
+          id: eventId,
+          kind: ndkEvent.kind ?? 1,
+          pubkey: ndkEvent.pubkey,
+          content: ndkEvent.content,
+          tags: ndkEvent.tags as string[][],
+          created_at: ndkEvent.created_at ?? 0,
+        },
+      };
+    }
+  } catch (error) {
+    nostrLog.debug('nostr.signer.preview_ndk_failed', { error: redactError(error) });
+  }
+  return null;
+}
+
 export function useReferencedEventPreview(eventId: string | undefined): ReferencedEventPreview {
   const { ndk } = useNDK();
   const [resolved, setResolved] = useState<{ id: string; entry: CacheEntry } | null>(() => {
@@ -78,24 +105,7 @@ export function useReferencedEventPreview(eventId: string | undefined): Referenc
     void (async () => {
       let entry = await fetchFromNagg(eventId);
       if (entry === null && ndk) {
-        // Relay fallback — covers nagg outages and notes nagg hasn't indexed.
-        try {
-          const ndkEvent = await ndk.fetchEvent({ ids: [eventId] });
-          if (ndkEvent && typeof ndkEvent.content === 'string') {
-            entry = {
-              event: {
-                id: eventId,
-                kind: ndkEvent.kind ?? 1,
-                pubkey: ndkEvent.pubkey,
-                content: ndkEvent.content,
-                tags: ndkEvent.tags as string[][],
-                created_at: ndkEvent.created_at ?? 0,
-              },
-            };
-          }
-        } catch (error) {
-          nostrLog.debug('nostr.signer.preview_ndk_failed', { error: redactError(error) });
-        }
+        entry = await fetchFromRelay(eventId, ndk);
       }
       const final: CacheEntry = entry ?? 'missing';
       cachePut(eventId, final);

@@ -78,6 +78,166 @@ function summarizeReachability(result: OfflineReachabilityResult) {
   };
 }
 
+// The connectivity engine, hoisted to module scope: the closure state
+// (++checkId, ??= hysteresis writes, try/finally mutex) is syntax the React
+// Compiler can't lower, and inside the component it bailed the whole provider.
+// Verbatim former effect body; returns the effect's cleanup function.
+function startConnectivityEngine(ctx: {
+  isCheckingRef: React.MutableRefObject<boolean>;
+  setNetworkOffline: React.Dispatch<React.SetStateAction<boolean>>;
+}): () => void {
+  const { isCheckingRef, setNetworkOffline } = ctx;
+  let mounted = true;
+  let interval: ReturnType<typeof setInterval> | null = null;
+  let networkSubscription: { remove: () => void } | null = null;
+  let lastOffline: boolean | null = null;
+  let lastCheckId = 0;
+  // Offline-confirmation (hysteresis) state — see constants above.
+  let offlineSince: number | null = null;
+  let offlineEvals = 0;
+  let recheckTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastEvalAt = 0;
+
+  const commit = (
+    nowOffline: boolean,
+    reachabilityLog: ReturnType<typeof summarizeReachability>
+  ) => {
+    setNetworkOffline((prev) => {
+      if (prev !== nowOffline) {
+        log.info('provider.offline.transition', {
+          from: prev ? 'offline' : 'online',
+          to: nowOffline ? 'offline' : 'online',
+          ...reachabilityLog,
+        });
+      }
+      return nowOffline;
+    });
+  };
+
+  const applyState = async (state: Network.NetworkState) => {
+    const checkId = ++lastCheckId;
+    try {
+      const reachability = await resolveOfflineReachability(state);
+      if (!mounted || checkId !== lastCheckId) return;
+      const nowOffline = reachability.isOffline;
+      const reachabilityLog = summarizeReachability(reachability);
+      // Only log when state actually changes to reduce noise.
+      if (lastOffline !== nowOffline) {
+        log.debug('provider.offline.network_state', {
+          isConnected: state.isConnected,
+          isInternetReachable: state.isInternetReachable,
+          type: state.type,
+          resolvedOffline: nowOffline,
+          ...reachabilityLog,
+        });
+        lastOffline = nowOffline;
+      }
+      if (!nowOffline) {
+        if (offlineSince !== null) {
+          log.debug('provider.offline.pending_cancelled', { evals: offlineEvals });
+        }
+        offlineSince = null;
+        offlineEvals = 0;
+        if (recheckTimer) {
+          clearTimeout(recheckTimer);
+          recheckTimer = null;
+        }
+        commit(false, reachabilityLog);
+        return;
+      }
+      offlineEvals += 1;
+      offlineSince ??= Date.now();
+      const confirmed =
+        offlineEvals >= OFFLINE_CONFIRM_CHECKS && Date.now() - offlineSince >= OFFLINE_CONFIRM_MS;
+      if (confirmed) {
+        commit(true, reachabilityLog);
+        return;
+      }
+      log.debug('provider.offline.pending', {
+        evals: offlineEvals,
+        sinceMs: Date.now() - offlineSince,
+        ...reachabilityLog,
+      });
+      recheckTimer ??= setTimeout(() => {
+        recheckTimer = null;
+        void runConnectivityCheck();
+      }, OFFLINE_RECHECK_DELAY_MS);
+    } catch (err) {
+      log.warn('provider.offline.check_failed', {
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+    }
+  };
+
+  const runConnectivityCheck = async () => {
+    if (!mounted || isCheckingRef.current) return;
+    // Coalesce listener bursts and overlapping poll/listener triggers — the
+    // pending re-check (1200ms) and the poll (3000ms) clear this naturally.
+    if (Date.now() - lastEvalAt < MIN_EVAL_INTERVAL_MS) return;
+    lastEvalAt = Date.now();
+    isCheckingRef.current = true;
+    try {
+      const state = await Network.getNetworkStateAsync();
+      await applyState(state);
+    } catch (err) {
+      log.warn('provider.offline.check_failed', {
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+    } finally {
+      isCheckingRef.current = false;
+    }
+  };
+
+  log.debug('provider.offline.init', { pollIntervalMs: CONNECTIVITY_POLL_MS });
+  void runConnectivityCheck();
+  // Route listener events through runConnectivityCheck (mutex + coalescing)
+  // instead of applyState directly: getNetworkStateAsync re-reads fresh
+  // state, and the native module already delays emissions for staleness.
+  networkSubscription = Network.addNetworkStateListener(() => {
+    void runConnectivityCheck();
+  });
+  interval = setInterval(runConnectivityCheck, CONNECTIVITY_POLL_MS);
+
+  const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+    if (nextAppState === 'active') {
+      log.debug('provider.offline.app_foregrounded', { reason: 'app_state_active' });
+      void runConnectivityCheck();
+    }
+  });
+
+  const onWebOnline = () => {
+    log.info('provider.offline.web_event', { event: 'online' });
+    void runConnectivityCheck();
+  };
+
+  const onWebOffline = () => {
+    log.info('provider.offline.web_event', { event: 'offline' });
+    setNetworkOffline(true);
+  };
+
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.addEventListener('online', onWebOnline);
+    window.addEventListener('offline', onWebOffline);
+  }
+
+  return () => {
+    mounted = false;
+    if (interval) {
+      clearInterval(interval);
+    }
+    networkSubscription?.remove();
+    appStateSubscription.remove();
+    if (recheckTimer) {
+      clearTimeout(recheckTimer);
+      recheckTimer = null;
+    }
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.removeEventListener('online', onWebOnline);
+      window.removeEventListener('offline', onWebOffline);
+    }
+  };
+}
+
 // Context-only provider. Mount above any consumer that needs to react to live
 // network state — including colada's machine, which derives the
 // offline send-flow branch from getOffline(). The visual offline banner lives
@@ -89,157 +249,7 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || networkOffline;
 
-  useEffect(() => {
-    let mounted = true;
-    let interval: ReturnType<typeof setInterval> | null = null;
-    let networkSubscription: { remove: () => void } | null = null;
-    let lastOffline: boolean | null = null;
-    let lastCheckId = 0;
-    // Offline-confirmation (hysteresis) state — see constants above.
-    let offlineSince: number | null = null;
-    let offlineEvals = 0;
-    let recheckTimer: ReturnType<typeof setTimeout> | null = null;
-    let lastEvalAt = 0;
-
-    const commit = (
-      nowOffline: boolean,
-      reachabilityLog: ReturnType<typeof summarizeReachability>
-    ) => {
-      setNetworkOffline((prev) => {
-        if (prev !== nowOffline) {
-          log.info('provider.offline.transition', {
-            from: prev ? 'offline' : 'online',
-            to: nowOffline ? 'offline' : 'online',
-            ...reachabilityLog,
-          });
-        }
-        return nowOffline;
-      });
-    };
-
-    const applyState = async (state: Network.NetworkState) => {
-      const checkId = ++lastCheckId;
-      try {
-        const reachability = await resolveOfflineReachability(state);
-        if (!mounted || checkId !== lastCheckId) return;
-        const nowOffline = reachability.isOffline;
-        const reachabilityLog = summarizeReachability(reachability);
-        // Only log when state actually changes to reduce noise.
-        if (lastOffline !== nowOffline) {
-          log.debug('provider.offline.network_state', {
-            isConnected: state.isConnected,
-            isInternetReachable: state.isInternetReachable,
-            type: state.type,
-            resolvedOffline: nowOffline,
-            ...reachabilityLog,
-          });
-          lastOffline = nowOffline;
-        }
-        if (!nowOffline) {
-          if (offlineSince !== null) {
-            log.debug('provider.offline.pending_cancelled', { evals: offlineEvals });
-          }
-          offlineSince = null;
-          offlineEvals = 0;
-          if (recheckTimer) {
-            clearTimeout(recheckTimer);
-            recheckTimer = null;
-          }
-          commit(false, reachabilityLog);
-          return;
-        }
-        offlineEvals += 1;
-        offlineSince ??= Date.now();
-        const confirmed =
-          offlineEvals >= OFFLINE_CONFIRM_CHECKS && Date.now() - offlineSince >= OFFLINE_CONFIRM_MS;
-        if (confirmed) {
-          commit(true, reachabilityLog);
-          return;
-        }
-        log.debug('provider.offline.pending', {
-          evals: offlineEvals,
-          sinceMs: Date.now() - offlineSince,
-          ...reachabilityLog,
-        });
-        recheckTimer ??= setTimeout(() => {
-          recheckTimer = null;
-          void runConnectivityCheck();
-        }, OFFLINE_RECHECK_DELAY_MS);
-      } catch (err) {
-        log.warn('provider.offline.check_failed', {
-          error: err instanceof Error ? err : new Error(String(err)),
-        });
-      }
-    };
-
-    const runConnectivityCheck = async () => {
-      if (!mounted || isCheckingRef.current) return;
-      // Coalesce listener bursts and overlapping poll/listener triggers — the
-      // pending re-check (1200ms) and the poll (3000ms) clear this naturally.
-      if (Date.now() - lastEvalAt < MIN_EVAL_INTERVAL_MS) return;
-      lastEvalAt = Date.now();
-      isCheckingRef.current = true;
-      try {
-        const state = await Network.getNetworkStateAsync();
-        await applyState(state);
-      } catch (err) {
-        log.warn('provider.offline.check_failed', {
-          error: err instanceof Error ? err : new Error(String(err)),
-        });
-      } finally {
-        isCheckingRef.current = false;
-      }
-    };
-
-    log.debug('provider.offline.init', { pollIntervalMs: CONNECTIVITY_POLL_MS });
-    void runConnectivityCheck();
-    // Route listener events through runConnectivityCheck (mutex + coalescing)
-    // instead of applyState directly: getNetworkStateAsync re-reads fresh
-    // state, and the native module already delays emissions for staleness.
-    networkSubscription = Network.addNetworkStateListener(() => {
-      void runConnectivityCheck();
-    });
-    interval = setInterval(runConnectivityCheck, CONNECTIVITY_POLL_MS);
-
-    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
-        log.debug('provider.offline.app_foregrounded', { reason: 'app_state_active' });
-        void runConnectivityCheck();
-      }
-    });
-
-    const onWebOnline = () => {
-      log.info('provider.offline.web_event', { event: 'online' });
-      void runConnectivityCheck();
-    };
-
-    const onWebOffline = () => {
-      log.info('provider.offline.web_event', { event: 'offline' });
-      setNetworkOffline(true);
-    };
-
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.addEventListener('online', onWebOnline);
-      window.addEventListener('offline', onWebOffline);
-    }
-
-    return () => {
-      mounted = false;
-      if (interval) {
-        clearInterval(interval);
-      }
-      networkSubscription?.remove();
-      appStateSubscription.remove();
-      if (recheckTimer) {
-        clearTimeout(recheckTimer);
-        recheckTimer = null;
-      }
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.removeEventListener('online', onWebOnline);
-        window.removeEventListener('offline', onWebOffline);
-      }
-    };
-  }, []);
+  useEffect(() => startConnectivityEngine({ isCheckingRef, setNetworkOffline }), []);
 
   const contextValue = useMemo(() => ({ isOffline }), [isOffline]);
 

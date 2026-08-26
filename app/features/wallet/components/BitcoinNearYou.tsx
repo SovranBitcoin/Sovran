@@ -153,6 +153,43 @@ function MapPreview({
   );
 }
 
+// Module-scope because the try/catch (value blocks inside it) would bail the
+// React Compiler if it stayed in the effect's render-scoped closure. Verbatim
+// former effect IIFE body; `cancelled` reads go through the getter.
+async function resolveNearbyCoords(ctx: {
+  isCancelled: () => boolean;
+  setPermStatus: (status: 'granted' | 'denied') => void;
+  setCoords: (coords: { latitude: number; longitude: number }) => void;
+}) {
+  const { isCancelled, setPermStatus, setCoords } = ctx;
+  try {
+    // Request (not just check) permission, matching every other location
+    // consumer in the app (MapScreen, useTransactionLocation,
+    // useLocationTiers). The old check-only call left permission
+    // undetermined, so this card never had a fix and stayed on the London
+    // default.
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (!isCancelled()) setPermStatus(status === 'granted' ? 'granted' : 'denied');
+    if (status !== 'granted') return;
+
+    // Last-known gives an instant first paint, but returns null when the OS
+    // has no cached fix (fresh boot, no recent location use) — which was the
+    // other path into the London fallback. Fall back to a live fix.
+    let loc = await Location.getLastKnownPositionAsync();
+    if (!loc && !isCancelled()) {
+      loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+    }
+    if (loc && !isCancelled()) {
+      const safe = applySafetyOffset(loc.coords.latitude, loc.coords.longitude);
+      setCoords(safe);
+    }
+  } catch {
+    // keep default
+  }
+}
+
 export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
   const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
   const mockMode = useSettingsStore((s) => s.mockMode);
@@ -201,34 +238,11 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
 
     let cancelled = false;
 
-    void (async () => {
-      try {
-        // Request (not just check) permission, matching every other location
-        // consumer in the app (MapScreen, useTransactionLocation,
-        // useLocationTiers). The old check-only call left permission
-        // undetermined, so this card never had a fix and stayed on the London
-        // default.
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (!cancelled) setPermStatus(status === 'granted' ? 'granted' : 'denied');
-        if (status !== 'granted') return;
-
-        // Last-known gives an instant first paint, but returns null when the OS
-        // has no cached fix (fresh boot, no recent location use) — which was the
-        // other path into the London fallback. Fall back to a live fix.
-        let loc = await Location.getLastKnownPositionAsync();
-        if (!loc && !cancelled) {
-          loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-        }
-        if (loc && !cancelled) {
-          const safe = applySafetyOffset(loc.coords.latitude, loc.coords.longitude);
-          setCoords(safe);
-        }
-      } catch {
-        // keep default
-      }
-    })();
+    void resolveNearbyCoords({
+      isCancelled: () => cancelled,
+      setPermStatus,
+      setCoords,
+    });
 
     return () => {
       cancelled = true;

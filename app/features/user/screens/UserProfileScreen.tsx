@@ -18,6 +18,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import type { SharedValue } from 'react-native-reanimated';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Image as ExpoImage } from 'expo-image';
 import { Stack } from 'expo-router';
@@ -407,6 +408,19 @@ function ProfileStatsGrid({
 // Top Followers Section
 // ============================================================================
 
+// Module-scope so the shared-value write stays outside component render
+// functions (the React Compiler bails on any function containing a
+// `sharedValue.value =` assignment).
+function startFadeReveal(fadeAnim: SharedValue<number>, durationMs: number, onSettled: () => void) {
+  fadeAnim.value = withTiming(
+    1,
+    { duration: durationMs, easing: Easing.out(Easing.cubic) },
+    (finished) => {
+      if (finished) runOnJS(onSettled)();
+    }
+  );
+}
+
 function TopFollowers({
   topFollowers,
   isLoading,
@@ -426,7 +440,6 @@ function TopFollowers({
   // silently drop the UI-thread-applied opacity (elements vanish while the
   // shared value still reads 1). A plain style can't be clobbered.
   const [fadeSettled, setFadeSettled] = useState(false);
-  const settleFade = () => setFadeSettled(true);
 
   const GRID_PADDING = 32;
   const GRID_GAP = 12;
@@ -438,18 +451,12 @@ function TopFollowers({
 
   useEffect(() => {
     if (followersWithProfiles.length > 0) {
-      fadeAnim.value = withTiming(
-        1,
-        { duration: 400, easing: Easing.out(Easing.cubic) },
-        (finished) => {
-          if (finished) runOnJS(settleFade)();
-        }
-      );
+      startFadeReveal(fadeAnim, 400, () => setFadeSettled(true));
       // Failsafe: settle even if the completion callback is lost mid-churn.
-      const timer = setTimeout(settleFade, 1000);
+      const timer = setTimeout(() => setFadeSettled(true), 1000);
       return () => clearTimeout(timer);
     }
-  }, [followersWithProfiles.length, fadeAnim, settleFade]);
+  }, [followersWithProfiles.length, fadeAnim]);
   // [DEBUG-inv] catches the reveal animation never flushing (invisible follower grid)
   useFadeRevealProbe('profile.topFollowers', fadeAnim, {
     enabled: followersWithProfiles.length > 0,
@@ -591,7 +598,6 @@ function BannerWithAvatar({
   // a Fabric re-render commit can drop UI-thread-applied props (the invisible
   // pfp+ring), and this header re-renders constantly. See settledReveal.
   const [avatarSettled, setAvatarSettled] = useState(false);
-  const settleAvatar = () => setAvatarSettled(true);
   const [bannerStatus, setBannerStatus] = useState<'loading' | 'loaded' | 'failed'>('loading');
 
   const fallbackIndex = pubkey ? parseInt(pubkey.slice(0, 8), 16) % 8 : 0;
@@ -639,17 +645,11 @@ function BannerWithAvatar({
   }, [bannerUrl]);
 
   useEffect(() => {
-    fadeAnim.value = withTiming(
-      1,
-      { duration: 500, easing: Easing.out(Easing.cubic) },
-      (finished) => {
-        if (finished) runOnJS(settleAvatar)();
-      }
-    );
+    startFadeReveal(fadeAnim, 500, () => setAvatarSettled(true));
     // Failsafe: settle even if the completion callback is lost mid-churn.
-    const timer = setTimeout(settleAvatar, 1100);
+    const timer = setTimeout(() => setAvatarSettled(true), 1100);
     return () => clearTimeout(timer);
-  }, [fadeAnim, settleAvatar]);
+  }, [fadeAnim]);
   // [DEBUG-inv] catches the reveal animation never flushing (invisible pfp)
   useFadeRevealProbe('profile.avatar', fadeAnim, { deadlineMs: 1500 });
 
@@ -885,6 +885,116 @@ function BannerWithAvatar({
 // Main Component
 // ============================================================================
 
+type NostrSocialState = ReturnType<typeof useNostrSocialStore.getState>;
+
+// Module-scope because the publish path throws inside try/catch, which the
+// React Compiler can't lower — keeping it in render would bail the whole
+// component. Body is the verbatim former handleToggleFollowInner.
+// Module-scope for the same compiler reason as toggleFollowContacts (the
+// try/catch around startSendEcash bails the component). Verbatim former
+// handleSendMoney IIFE body; the optional-chaining reads moved to the caller.
+async function startSendMoneyToProfile(ctx: {
+  machine: ReturnType<typeof usePaymentFlowMachine>;
+  pubkey: string;
+  meltTarget: string;
+  displayName: string;
+  avatarUrl: string | null;
+  nip05: string | null;
+}) {
+  const { machine, pubkey, meltTarget, displayName, avatarUrl, nip05 } = ctx;
+  try {
+    await machine.startSendEcash({
+      reset: true,
+      meltTarget,
+      recipientPubkey: pubkey,
+      recipientProfile: {
+        displayName,
+        avatarUrl,
+        nip05,
+      },
+    });
+    paymentLog.info('user.profile.send_money.started', {
+      recipientPubkeyLength: pubkey.length,
+      meltTargetLength: meltTarget.length,
+    });
+  } catch (error) {
+    paymentLog.warn('user.profile.send_money.failed_to_start', {
+      recipientPubkeyLength: pubkey.length,
+      meltTargetLength: meltTarget.length,
+      error: error instanceof Error ? error : new Error(String(error)),
+    });
+  }
+}
+
+async function toggleFollowContacts(ctx: {
+  pubkey: string;
+  ownPubkey: string | undefined;
+  ndk: ReturnType<typeof useNDK>['ndk'];
+  followInFlight: boolean;
+  isFollowingProfile: boolean;
+  contactsTags: NostrSocialState['contactsTags'];
+  contactsContent: NostrSocialState['contactsContent'];
+  setContactsFromRelay: NostrSocialState['setContactsFromRelay'];
+  setFollowOptimistic: NostrSocialState['setFollowOptimistic'];
+  clearFollowOptimistic: NostrSocialState['clearFollowOptimistic'];
+}) {
+  const {
+    pubkey,
+    ownPubkey,
+    ndk,
+    followInFlight,
+    isFollowingProfile,
+    contactsTags,
+    contactsContent,
+    setContactsFromRelay,
+    setFollowOptimistic,
+    clearFollowOptimistic,
+  } = ctx;
+  if (!pubkey || !ownPubkey || !ndk) {
+    nostrLog.warn('user.profile.follow.precondition_failed', {
+      hasPubkey: !!pubkey,
+      hasNostrKeys: !!ownPubkey,
+      hasNdk: !!ndk,
+    });
+    paramPopup('engagement-update-failed', 'follow');
+    return;
+  }
+  if (ownPubkey === pubkey || followInFlight) return;
+
+  const shouldFollow = !isFollowingProfile;
+  nostrLog.info('user.profile.follow.toggle', { pubkey, shouldFollow });
+  setFollowOptimistic(pubkey, shouldFollow, true);
+
+  const nextTags = buildUpdatedContactTags(
+    contactsTags.map((tag) => [...tag]),
+    pubkey,
+    shouldFollow
+  );
+  const createdAt = Math.floor(Date.now() / 1000);
+
+  try {
+    const contactEvent = new NDKEvent(ndk);
+    contactEvent.kind = Contacts;
+    contactEvent.tags = nextTags;
+    contactEvent.content = contactsContent;
+    contactEvent.created_at = createdAt;
+    // Contact list is replaceable + important: land it on as many write relays
+    // as possible via the central seam (outbox-aware, with retry).
+    const published = await publishEvent({ ndk, event: contactEvent, resolveOn: 'all-settled' });
+    if (published.isErr()) throw new Error('contacts publish failed');
+    nostrLog.info('user.profile.follow.published', { pubkey, shouldFollow });
+    setContactsFromRelay({ tags: nextTags, content: contactsContent, createdAt });
+    clearFollowOptimistic(pubkey);
+  } catch (e) {
+    nostrLog.error('user.profile.follow.failed', {
+      pubkey,
+      error: e instanceof Error ? e : new Error(String(e)),
+    });
+    clearFollowOptimistic(pubkey);
+    paramPopup('engagement-update-failed', 'follow');
+  }
+}
+
 export function UserProfileScreen() {
   useLifecycleLogger('UserProfileScreen', nostrLog);
 
@@ -986,30 +1096,14 @@ export function UserProfileScreen() {
       hasAvatarUrl: !!cachedProfile?.picture,
       hasNip05: !!cachedProfile?.nip05,
     });
-    void (async () => {
-      try {
-        await machine.startSendEcash({
-          reset: true,
-          meltTarget,
-          recipientPubkey: pubkey,
-          recipientProfile: {
-            displayName,
-            avatarUrl: cachedProfile?.picture ?? null,
-            nip05: cachedProfile?.nip05 ?? null,
-          },
-        });
-        paymentLog.info('user.profile.send_money.started', {
-          recipientPubkeyLength: pubkey.length,
-          meltTargetLength: meltTarget.length,
-        });
-      } catch (error) {
-        paymentLog.warn('user.profile.send_money.failed_to_start', {
-          recipientPubkeyLength: pubkey.length,
-          meltTargetLength: meltTarget.length,
-          error: error instanceof Error ? error : new Error(String(error)),
-        });
-      }
-    })();
+    void startSendMoneyToProfile({
+      machine,
+      pubkey,
+      meltTarget,
+      displayName,
+      avatarUrl: cachedProfile?.picture ?? null,
+      nip05: cachedProfile?.nip05 ?? null,
+    });
   };
 
   const followerCount = profileData?.followers;
@@ -1091,56 +1185,23 @@ export function UserProfileScreen() {
     }
   };
 
-  const handleToggleFollowInner = async () => {
-    if (!pubkey || !nostrKeys?.pubkey || !ndk) {
-      nostrLog.warn('user.profile.follow.precondition_failed', {
-        hasPubkey: !!pubkey,
-        hasNostrKeys: !!nostrKeys?.pubkey,
-        hasNdk: !!ndk,
-      });
-      paramPopup('engagement-update-failed', 'follow');
-      return;
-    }
-    if (nostrKeys.pubkey === pubkey || followInFlight) return;
-
-    const shouldFollow = !isFollowingProfile;
-    nostrLog.info('user.profile.follow.toggle', { pubkey, shouldFollow });
-    setFollowOptimistic(pubkey, shouldFollow, true);
-
-    const nextTags = buildUpdatedContactTags(
-      contactsTags.map((tag) => [...tag]),
-      pubkey,
-      shouldFollow
-    );
-    const createdAt = Math.floor(Date.now() / 1000);
-
-    try {
-      const contactEvent = new NDKEvent(ndk);
-      contactEvent.kind = Contacts;
-      contactEvent.tags = nextTags;
-      contactEvent.content = contactsContent;
-      contactEvent.created_at = createdAt;
-      // Contact list is replaceable + important: land it on as many write relays
-      // as possible via the central seam (outbox-aware, with retry).
-      const published = await publishEvent({ ndk, event: contactEvent, resolveOn: 'all-settled' });
-      if (published.isErr()) throw new Error('contacts publish failed');
-      nostrLog.info('user.profile.follow.published', { pubkey, shouldFollow });
-      setContactsFromRelay({ tags: nextTags, content: contactsContent, createdAt });
-      clearFollowOptimistic(pubkey);
-    } catch (e) {
-      nostrLog.error('user.profile.follow.failed', {
-        pubkey,
-        error: e instanceof Error ? e : new Error(String(e)),
-      });
-      clearFollowOptimistic(pubkey);
-      paramPopup('engagement-update-failed', 'follow');
-    }
-  };
-
   // `followInFlight` is store-derived state and lands a render too late;
   // a rapid double-tap on Follow runs `setFollowOptimistic` twice and races
   // a second kind-3 publish with the first's `clearFollowOptimistic`.
-  const handleToggleFollow = useSingleFlight(handleToggleFollowInner);
+  const handleToggleFollow = useSingleFlight(() =>
+    toggleFollowContacts({
+      pubkey,
+      ownPubkey: nostrKeys?.pubkey,
+      ndk,
+      followInFlight,
+      isFollowingProfile,
+      contactsTags,
+      contactsContent,
+      setContactsFromRelay,
+      setFollowOptimistic,
+      clearFollowOptimistic,
+    })
+  );
 
   const handleMintInfoPress = () => {
     if (!profileMintUrl) return;

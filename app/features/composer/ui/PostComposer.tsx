@@ -74,6 +74,94 @@ const OUTCOME_MESSAGE: Partial<Record<PublishOutcome, string>> = {
   failed: 'Could not publish to any relay. Try again.',
 };
 
+// Module-scope because the upload try/catch (throw + value blocks inside try)
+// bails the React Compiler on any render-scoped function containing it.
+// Verbatim former handlePost body; the thin useCallback wrapper keeps the dep
+// contract.
+async function runComposerPost(ctx: {
+  postingRef: React.MutableRefObject<boolean>;
+  canPost: boolean;
+  setBusy: (busy: boolean) => void;
+  setError: (error: string | null) => void;
+  setPostProgress: (progress: { done: number; total: number } | null) => void;
+  mediaBlocks: ComposerBlock[];
+  ndk: ReturnType<typeof useNDK>['ndk'];
+  uploads: Map<string, AbortController>;
+  updateBlock: ReturnType<typeof useComposerStore.getState>['updateBlock'];
+  publish: ReturnType<typeof usePublishNote>;
+}) {
+  const {
+    postingRef,
+    canPost,
+    setBusy,
+    setError,
+    setPostProgress,
+    mediaBlocks,
+    ndk,
+    uploads,
+    updateBlock,
+    publish,
+  } = ctx;
+  if (postingRef.current || !canPost) return;
+  postingRef.current = true;
+  setBusy(true);
+  setError(null);
+
+  // Upload is deferred to here: re-encode + PUT every media block that has no
+  // descriptor yet, then publish. Abort the whole post if any upload fails so
+  // we never publish a note missing one of its images.
+  const pending = mediaBlocks.filter(
+    (b): b is Extract<ComposerBlock, { kind: 'media' }> =>
+      b.kind === 'media' && !b.descriptor && !!b.localUri
+  );
+  const imageCount = pending.length;
+  if (imageCount > 0) setPostProgress({ done: 0, total: imageCount + 1 });
+
+  let done = 0;
+  try {
+    if (!ndk) throw { type: 'no-ndk' };
+    // The upload machinery (per-block abort registration, abort-siblings →
+    // allSettled → record-orphans on failure) lives in uploadMediaBlocks —
+    // shared with ThreadReplyBar so the orphan protocol can't diverge.
+    await uploadMediaBlocks({
+      ndk,
+      blocks: pending,
+      uploads,
+      patchBlock: updateBlock,
+      onBlockUploaded: () => {
+        done += 1;
+        if (imageCount > 0) setPostProgress({ done, total: imageCount + 1 });
+      },
+      onOrphans: (orphans) => useOwnedMediaStore.getState().recordBlobs(orphans),
+    });
+  } catch (e) {
+    postingRef.current = false;
+    setBusy(false);
+    setPostProgress(null);
+    const type = (e as { type?: string }).type;
+    // A cancel (block removed mid-upload) is silent; everything else surfaces.
+    setError(
+      type === 'canceled'
+        ? null
+        : type === 'too-large'
+          ? 'That file is too large to upload.'
+          : 'Media upload failed. Try again.'
+    );
+    return;
+  }
+
+  const outcome = await publish();
+  postingRef.current = false;
+  setBusy(false);
+  if (outcome === 'ok') {
+    if (imageCount > 0) setPostProgress({ done: imageCount + 1, total: imageCount + 1 });
+    router.back();
+    return;
+  }
+  setPostProgress(null);
+  setError(OUTCOME_MESSAGE[outcome] ?? 'Something went wrong.');
+}
+
 const PLACEHOLDER: Record<string, string> = {
   new: "What's happening?",
   reply: 'Post your reply',
@@ -144,7 +232,10 @@ export function PostComposer() {
     return map;
   }, [parentEvent, parentProfile]);
   const textBlock = blocks.find((b) => b.kind === 'text');
-  const mediaBlocks = useMemo(() => blocks.filter((b) => b.kind === 'media'), [blocks]);
+  // Plain on purpose: a manual useMemo here is the one memo the React Compiler
+  // cannot preserve in this component — it bails the whole file (verified with
+  // the per-file compiler audit). The compiler memoizes the filter itself.
+  const mediaBlocks = blocks.filter((b) => b.kind === 'media');
   const textLength = textBlock?.kind === 'text' ? textBlock.text.length : 0;
   const hasPostContent =
     (textBlock?.kind === 'text' && textBlock.text.trim().length > 0) || mediaBlocks.length > 0;
@@ -222,66 +313,22 @@ export function PostComposer() {
 
   const uploadsRef = useUploadAbortMap();
 
-  const handlePost = useCallback(async () => {
-    if (postingRef.current || !canPost) return;
-    postingRef.current = true;
-    setBusy(true);
-    setError(null);
-
-    // Upload is deferred to here: re-encode + PUT every media block that has no
-    // descriptor yet, then publish. Abort the whole post if any upload fails so
-    // we never publish a note missing one of its images.
-    const pending = mediaBlocks.filter(
-      (b): b is Extract<ComposerBlock, { kind: 'media' }> =>
-        b.kind === 'media' && !b.descriptor && !!b.localUri
-    );
-    const imageCount = pending.length;
-    if (imageCount > 0) setPostProgress({ done: 0, total: imageCount + 1 });
-
-    let done = 0;
-    try {
-      if (!ndk) throw { type: 'no-ndk' };
-      // The upload machinery (per-block abort registration, abort-siblings →
-      // allSettled → record-orphans on failure) lives in uploadMediaBlocks —
-      // shared with ThreadReplyBar so the orphan protocol can't diverge.
-      await uploadMediaBlocks({
+  const handlePost = useCallback(
+    () =>
+      runComposerPost({
+        postingRef,
+        canPost,
+        setBusy,
+        setError,
+        setPostProgress,
+        mediaBlocks,
         ndk,
-        blocks: pending,
         uploads: uploadsRef.current,
-        patchBlock: updateBlock,
-        onBlockUploaded: () => {
-          done += 1;
-          if (imageCount > 0) setPostProgress({ done, total: imageCount + 1 });
-        },
-        onOrphans: (orphans) => useOwnedMediaStore.getState().recordBlobs(orphans),
-      });
-    } catch (e) {
-      postingRef.current = false;
-      setBusy(false);
-      setPostProgress(null);
-      const type = (e as { type?: string }).type;
-      // A cancel (block removed mid-upload) is silent; everything else surfaces.
-      setError(
-        type === 'canceled'
-          ? null
-          : type === 'too-large'
-            ? 'That file is too large to upload.'
-            : 'Media upload failed. Try again.'
-      );
-      return;
-    }
-
-    const outcome = await publish();
-    postingRef.current = false;
-    setBusy(false);
-    if (outcome === 'ok') {
-      if (imageCount > 0) setPostProgress({ done: imageCount + 1, total: imageCount + 1 });
-      router.back();
-      return;
-    }
-    setPostProgress(null);
-    setError(OUTCOME_MESSAGE[outcome] ?? 'Something went wrong.');
-  }, [canPost, publish, mediaBlocks, ndk, updateBlock, uploadsRef]);
+        updateBlock,
+        publish,
+      }),
+    [canPost, publish, mediaBlocks, ndk, updateBlock, uploadsRef]
+  );
 
   const handleAddMedia = useCallback(async () => {
     if (mediaBlocks.length >= config.maxMedia) return;
