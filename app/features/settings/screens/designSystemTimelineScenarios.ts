@@ -10,6 +10,7 @@ import {
   buildOnchainRequiredConfirmationProgress,
   buildSatisfiedOnchainConfirmationProgress,
 } from '@/shared/lib/cashu/onchainMint';
+import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 
 /**
  * Dev-only fixtures that drive the Timeline showcase on the Design System screen.
@@ -79,8 +80,10 @@ function mintEntry(
   { createdAt }: BaseFields,
   metadata?: Record<string, string>
 ): HistoryEntry {
-  return {
+  return asHistoryEntry({
     id: `ds-mint-${state}`,
+    source: 'legacy',
+    legacyHistoryId: `ds-mint-${state}`,
     type: 'mint',
     createdAt,
     mintUrl: DEMO_MINT_URL,
@@ -90,12 +93,14 @@ function mintEntry(
     paymentRequest: '',
     state,
     ...(metadata ? { metadata } : {}),
-  } as unknown as HistoryEntry;
+  });
 }
 
 function meltEntry(state: string, { createdAt }: BaseFields): HistoryEntry {
-  return {
+  return asHistoryEntry({
     id: `ds-melt-${state}`,
+    source: 'legacy',
+    legacyHistoryId: `ds-melt-${state}`,
     type: 'melt',
     createdAt,
     mintUrl: DEMO_MINT_URL,
@@ -103,12 +108,14 @@ function meltEntry(state: string, { createdAt }: BaseFields): HistoryEntry {
     amount: DEMO_AMOUNT,
     quoteId: 'ds-melt-quote',
     state,
-  } as unknown as HistoryEntry;
+  });
 }
 
 function sendEntry(state: string, { createdAt }: BaseFields): HistoryEntry {
-  return {
+  return asHistoryEntry({
     id: `ds-send-${state}`,
+    source: 'legacy',
+    legacyHistoryId: `ds-send-${state}`,
     type: 'send',
     createdAt,
     mintUrl: DEMO_MINT_URL,
@@ -116,23 +123,28 @@ function sendEntry(state: string, { createdAt }: BaseFields): HistoryEntry {
     amount: DEMO_AMOUNT,
     operationId: 'ds-send-op',
     state,
-  } as unknown as HistoryEntry;
+  });
 }
 
 function receiveEntry(state: string, { createdAt }: BaseFields): HistoryEntry {
-  return {
+  return asHistoryEntry({
     id: `ds-receive-${state}`,
+    source: 'legacy',
+    legacyHistoryId: `ds-receive-${state}`,
     type: 'receive',
     createdAt,
     mintUrl: DEMO_MINT_URL,
     unit: DEMO_UNIT,
     amount: DEMO_AMOUNT,
     state,
-  } as unknown as HistoryEntry;
+  });
 }
 
 /** Minimal melt quote — the Timeline only reads `expiry` for the countdown / expired branch. */
 function meltQuote(expirySeconds: number): MeltQuoteBolt11Response {
+  // Dev-only demo stub; fabricating the full cashu-ts quote would assert
+  // fields the Timeline never reads.
+  // ast-grep-ignore: double-assertion-ts
   return { expiry: expirySeconds } as unknown as MeltQuoteBolt11Response;
 }
 
@@ -406,14 +418,11 @@ export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
 // ---------------------------------------------------------------------------
 
 function entryState(entry: HistoryEntry): string {
-  return String((entry as unknown as Record<string, unknown>).state ?? '');
+  return entry.state;
 }
 
 function isOnchainEntry(entry: HistoryEntry): boolean {
-  const metadata = (entry as unknown as Record<string, unknown>).metadata;
-  const meta =
-    metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>) : undefined;
-  return meta?.method === 'onchain';
+  return entry.metadata?.method === 'onchain';
 }
 
 // The real normalizers from colada's one state owner — the debug readout can

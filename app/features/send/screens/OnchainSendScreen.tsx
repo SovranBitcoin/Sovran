@@ -16,7 +16,7 @@ import React, { useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { withAlpha } from '@/shared/lib/color';
 
-import type { HistoryEntry, MeltHistoryEntry } from '@cashu/coco-core';
+import type { MeltHistoryEntry } from '@cashu/coco-core';
 import {
   buildOnchainConfirmationProgressFromTx,
   parseOutpoint,
@@ -54,6 +54,7 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useOnchainMeltOutpointDiscovery } from '@/shared/hooks/useOnchainMeltOutpointDiscovery';
 import { useOnchainMeltQuote } from '@/shared/hooks/useOnchainMeltQuote';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 import { staticPopup } from '@/shared/lib/popup';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { formatAmount } from '@/shared/lib/currency';
@@ -258,14 +259,14 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
     <TransactionDetailShell
       screenName="OnchainSendScreen"
       testID={`onchain-send-id-${entry.id}`}
-      entry={entry as unknown as HistoryEntry}
+      entry={asHistoryEntry(entry)}
       mintInfo={mintInfo}
       source={source}
       footer={bottomButtons}
       timeline={
         <>
           <HistoryEntryTimeline
-            historyEntry={(timelineEntry ?? entry) as unknown as HistoryEntry}
+            historyEntry={asHistoryEntry(timelineEntry ?? entry)}
             // Only `expiry` is read for melts: it drives the countdown badge
             // while UNPAID and flips the timeline to "Expired" once passed.
             // Gated on the RESOLVED state so a settled/in-flight send never
@@ -273,7 +274,10 @@ export function OnchainSendScreen({ meltHistoryEntry, onCancel }: OnchainSendScr
             // (Prop is typed for bolt11; redesign will retype it.)
             meltQuote={
               quote.expiry != null && canOnchainMeltQuoteExpire(meltState)
-                ? ({ expiry: quote.expiry } as unknown as React.ComponentProps<
+                ? // Prop is typed for the bolt11 quote; only `expiry` is read
+                  // for melts (retype queued).
+                  // ast-grep-ignore: double-assertion-tsx
+                  ({ expiry: quote.expiry } as unknown as React.ComponentProps<
                     typeof HistoryEntryTimeline
                   >['meltQuote'])
                 : undefined

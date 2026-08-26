@@ -82,6 +82,9 @@ function publishHistoryUpdated(bus: ColadaSubscriptionBus, updated: unknown): vo
   // strict equality, so without this every live melt update was silently
   // dropped and the timeline never advanced past UNPAID. This mirrors the
   // transaction-list read model, which normalizes at its own boundary.
+  // Untyped bus EntryRecord crossing colada's normalizeHistoryEntry seam; the
+  // shape is unknowable at this boundary.
+  // ast-grep-ignore: double-assertion-ts
   const entry = normalizeHistoryEntry(raw as unknown as HistoryEntry) as unknown as EntryRecord;
   bus.publish({
     type: 'history.updated',
@@ -103,9 +106,13 @@ function publishMeltUpdated(
   // publishHistoryUpdated's normalizeHistoryEntry. Belt-and-braces: run the
   // entry through normalizeHistoryEntry anyway so this publisher can never
   // regress into the object-amount/raw-state drop again.
+  // Untyped bus operation record; see publishHistoryUpdated's boundary note.
+  // ast-grep-ignore: double-assertion-ts
   const mapped = meltOperationToScreenActionEntry(operation as unknown as MeltOperationLike);
   const entry = mapped
-    ? (normalizeHistoryEntry(mapped as unknown as HistoryEntry) as unknown as EntryRecord)
+    ? // Same untyped-bus boundary as above.
+      // ast-grep-ignore: double-assertion-ts
+      (normalizeHistoryEntry(mapped as unknown as HistoryEntry) as unknown as EntryRecord)
     : null;
   const operationRecord = asEntryRecord(operation);
   const operationId = getStringField(operationRecord, 'id');

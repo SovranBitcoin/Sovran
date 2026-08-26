@@ -37,6 +37,7 @@ import {
 } from '@/features/receive/lib/creqMintSelection';
 import { MAX_ADVERTISED_MINTS } from '@/features/receive/lib/standingQuoteIdentityStore';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -114,7 +115,7 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
     if (!entry) return null;
     const state =
       prState === 'requested' ? 'executing' : prState === 'paid' ? 'prepared' : 'finalized';
-    return {
+    return asHistoryEntry({
       id: `pr-${entry.operationId}`,
       type: 'receive',
       source: 'operation',
@@ -130,7 +131,7 @@ export const ReceivePaymentRequestQuoteScreen = memo(function ReceivePaymentRequ
         source: 'payment-request',
         ...(prState === 'requested' ? { paymentRequestPending: '1' } : {}),
       },
-    } as unknown as HistoryEntry;
+    });
   }, [entry, prState]);
 
   // Resolve the keyring P2PK pubkey (the only key coco's claim path can sign

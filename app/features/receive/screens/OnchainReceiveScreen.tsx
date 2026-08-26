@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 
 import type { MintInfo } from '@cashu/cashu-ts';
-import type { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
+import type { MintHistoryEntry } from '@cashu/coco-core';
 import { getOnchainConfirmationProgress, isMintQuotePaymentObserved } from 'wallet';
+import type { DecoratedEntryFields } from 'wallet';
 import type { BoundAction } from 'wallet/react';
 
 import { MintSelector } from '@/features/wallet';
@@ -25,6 +26,7 @@ import {
   getOnchainMintAddress,
   getOnchainMintQuoteRequiredConfirmations,
 } from '@/shared/lib/cashu/onchainMint';
+import { asHistoryEntry } from '@/shared/lib/cashu/syntheticHistory';
 import { formatAmount } from '@/shared/lib/currency';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { openExternalUrl } from '@/shared/lib/url';
@@ -42,10 +44,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 
 const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
 
-export type OnchainReceiveEntry = Omit<MintHistoryEntry, 'createdAt' | 'updatedAt'> & {
-  createdAt: { datetime: string };
-  updatedAt?: unknown;
-};
+export type OnchainReceiveEntry = MintHistoryEntry & DecoratedEntryFields;
 
 interface OnchainReceiveScreenProps {
   entry: OnchainReceiveEntry;
@@ -68,7 +67,8 @@ export function OnchainReceiveScreen({
 }: OnchainReceiveScreenProps) {
   useLifecycleLogger('OnchainReceiveScreen');
   const { width: windowWidth } = useWindowDimensions();
-  const onchainAddress = getOnchainMintAddress(entry as unknown as HistoryEntry);
+  const historyEntry = asHistoryEntry(entry);
+  const onchainAddress = getOnchainMintAddress(historyEntry);
   const mempool = useMempoolAddressSummary(onchainAddress);
   const bip321 = useBip321Info(entry.id);
   const isPaid = isMintQuotePaymentObserved(entry);
@@ -77,7 +77,7 @@ export function OnchainReceiveScreen({
   const isHistoryView = useIsTransactionHistoryView();
   const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
   const requiredConfirmations = getOnchainMintQuoteRequiredConfirmations(
-    entry as unknown as HistoryEntry,
+    historyEntry,
     mintInfo,
     entry.unit ?? 'sat'
   );
@@ -93,8 +93,7 @@ export function OnchainReceiveScreen({
         : buildOnchainRequiredConfirmationProgress(requiredConfirmations)),
     [isPaid, observedConfirmationProgress, requiredConfirmations]
   );
-  const paymentInfoValue =
-    getMintQuotePaymentValue(entry as unknown as HistoryEntry) ?? entry.paymentRequest;
+  const paymentInfoValue = getMintQuotePaymentValue(historyEntry) ?? entry.paymentRequest;
   // Once the deposit is visible on our own explorer, offer a deep link to the
   // funding transaction (falling back to the address page) so the user can
   // watch confirmations at the source. Gated on an observed payment so the link
@@ -201,7 +200,7 @@ export function OnchainReceiveScreen({
     <TransactionDetailShell
       screenName="OnchainReceiveScreen"
       testID={`mint-quote-id-${entry.id}`}
-      entry={entry as unknown as HistoryEntry}
+      entry={historyEntry}
       source={source}
       footer={bottomButtons}
       beforeStatus={
@@ -226,10 +225,7 @@ export function OnchainReceiveScreen({
               onRequestMintList={onRequestMintList}
             />
           ) : mintInfo ? (
-            <HistoryEntryRefresh
-              mintInfo={mintInfo}
-              historyEntry={entry as unknown as HistoryEntry}
-            />
+            <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={historyEntry} />
           ) : null}
           {entry.metadata?.memo && <Card message={entry.metadata.memo} variant="info" />}
         </>
@@ -237,7 +233,7 @@ export function OnchainReceiveScreen({
       timeline={
         <>
           <HistoryEntryTimeline
-            historyEntry={entry as unknown as HistoryEntry}
+            historyEntry={historyEntry}
             onchainConfirmationProgress={onchainConfirmationProgress}
           />
           {explorerLinkUrl && <OpenInExplorerLink url={explorerLinkUrl} />}
