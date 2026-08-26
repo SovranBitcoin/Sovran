@@ -12,7 +12,7 @@
  * passing an unmemoized closure — the identity of the feed is stated, not
  * inferred from dependency arrays.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { paymentLog } from '@/shared/lib/logger';
 import type { DmEnvelopePage } from '../data/dmEnvelopeClient';
@@ -40,6 +40,35 @@ interface DmEnvelopePagesOptions {
   onReset: () => void;
   /** Log event for a failed first page. */
   failureEvent: string;
+}
+
+/** The `loadMore` fetch body, verbatim: fetch one older page and track it. */
+async function fetchNextDmPage(ctx: {
+  until: number;
+  pageLimit: number;
+  cursor: ReturnType<typeof createDmEnvelopeCursor>;
+  fetchPage: DmEnvelopePagesOptions['fetchPage'];
+  onPage: DmEnvelopePagesOptions['onPage'];
+  loadingMoreRef: MutableRefObject<boolean>;
+  setHasMore: (hasMore: boolean) => void;
+  setError: (error: Error | null) => void;
+}): Promise<void> {
+  const { until, pageLimit, cursor, fetchPage, onPage, loadingMoreRef, setHasMore, setError } = ctx;
+  loadingMoreRef.current = true;
+  try {
+    const page = await fetchPage({ until, refresh: false });
+    const fresh = cursor.track(page);
+    onPage(page);
+    // Stop on a short page (the end) OR a full page with nothing new — the
+    // server ignored `until`, or this window is drained. A page can be full
+    // of envelopes yet hold no messages for the caller's filter, so "nothing
+    // new" has to mean new ENVELOPES, not new results.
+    setHasMore(page.envelopes.length >= pageLimit && fresh > 0);
+  } catch (e) {
+    setError(e instanceof Error ? e : new Error(String(e)));
+  } finally {
+    loadingMoreRef.current = false;
+  }
 }
 
 export function useDmEnvelopePages({
@@ -120,21 +149,16 @@ export function useDmEnvelopePages({
   const loadMore = useCallback(async () => {
     const until = cursorRef.current.nextUntil();
     if (loadingMoreRef.current || !hasMore || !feedKey || until === undefined) return;
-    loadingMoreRef.current = true;
-    try {
-      const page = await fetchPageRef.current({ until, refresh: false });
-      const fresh = cursorRef.current.track(page);
-      onPageRef.current(page);
-      // Stop on a short page (the end) OR a full page with nothing new — the
-      // server ignored `until`, or this window is drained. A page can be full
-      // of envelopes yet hold no messages for the caller's filter, so "nothing
-      // new" has to mean new ENVELOPES, not new results.
-      setHasMore(page.envelopes.length >= pageLimit && fresh > 0);
-    } catch (e) {
-      setError(e instanceof Error ? e : new Error(String(e)));
-    } finally {
-      loadingMoreRef.current = false;
-    }
+    await fetchNextDmPage({
+      until,
+      pageLimit,
+      cursor: cursorRef.current,
+      fetchPage: fetchPageRef.current,
+      onPage: onPageRef.current,
+      loadingMoreRef,
+      setHasMore,
+      setError,
+    });
   }, [hasMore, feedKey, pageLimit, fetchPageRef, onPageRef]);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);

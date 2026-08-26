@@ -49,6 +49,62 @@ function hasP2PKProofs(proofs: readonly { secret: string }[]): boolean {
   });
 }
 
+/** Decode + log a chat ecash token, verbatim from the render memo; null when invalid. */
+function decodeCashuTokenBubble(token: string, isOwn: boolean): DecodedCashuTokenBubble | null {
+  try {
+    const decoded = getTokenMetadata(token);
+    const next = {
+      amount: amountToNumber(decoded.amount),
+      unit: decoded.unit || 'sats',
+      mintUrl: decoded.mint || '',
+      proofCount: decoded.incompleteProofs.length,
+      hasP2PKProofs: hasP2PKProofs(decoded.incompleteProofs),
+    };
+    log.info('chat.cashu_token.detected', {
+      ...tokenLogFields(token),
+      ...mintUrlLogFields(next.mintUrl),
+      isOwn,
+      amount: next.amount,
+      unit: next.unit,
+      proofCount: next.proofCount,
+      hasP2PKProofs: next.hasP2PKProofs,
+      expectedNext: isOwn ? 'cancel_or_ignore' : 'redeem_affordance',
+    });
+    return next;
+  } catch (error) {
+    log.warn('chat.cashu_token.decode_failed', {
+      ...tokenLogFields(token),
+      isOwn,
+      error,
+    });
+    return null;
+  }
+}
+
+/**
+ * Build the receive history entry for the tap-to-redeem navigation, verbatim
+ * from the press handler; surfaces the invalid-token popup and returns null
+ * when the token can't build one.
+ */
+function buildReceiveEntrySafe(
+  token: string,
+  decodedToken: DecodedCashuTokenBubble,
+  isOwn: boolean
+): ReturnType<typeof buildReceiveHistoryEntry> | null {
+  try {
+    return buildReceiveHistoryEntry(token, decodedToken.unit);
+  } catch (error) {
+    log.error('chat.cashu_token.build_receive_history_failed', {
+      ...tokenLogFields(token),
+      ...mintUrlLogFields(decodedToken.mintUrl),
+      isOwn,
+      error,
+    });
+    staticPopup('invalid-token');
+    return null;
+  }
+}
+
 /**
  * Inline ecash redeem affordance rendered alongside a chat-message bubble.
  * Lifted from `features/user/screens/UserMessagesScreen.tsx` so every DM
@@ -63,36 +119,10 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
     'success',
   ] as const);
 
-  const decodedToken = React.useMemo<DecodedCashuTokenBubble | null>(() => {
-    try {
-      const decoded = getTokenMetadata(token);
-      const next = {
-        amount: amountToNumber(decoded.amount),
-        unit: decoded.unit || 'sats',
-        mintUrl: decoded.mint || '',
-        proofCount: decoded.incompleteProofs.length,
-        hasP2PKProofs: hasP2PKProofs(decoded.incompleteProofs),
-      };
-      log.info('chat.cashu_token.detected', {
-        ...tokenLogFields(token),
-        ...mintUrlLogFields(next.mintUrl),
-        isOwn,
-        amount: next.amount,
-        unit: next.unit,
-        proofCount: next.proofCount,
-        hasP2PKProofs: next.hasP2PKProofs,
-        expectedNext: isOwn ? 'cancel_or_ignore' : 'redeem_affordance',
-      });
-      return next;
-    } catch (error) {
-      log.warn('chat.cashu_token.decode_failed', {
-        ...tokenLogFields(token),
-        isOwn,
-        error,
-      });
-      return null;
-    }
-  }, [isOwn, token]);
+  const decodedToken = React.useMemo<DecodedCashuTokenBubble | null>(
+    () => decodeCashuTokenBubble(token, isOwn),
+    [isOwn, token]
+  );
 
   const usdAmount = decodedToken
     ? formatAmount(
@@ -111,19 +141,8 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
       return;
     }
 
-    let receiveHistoryEntry: ReturnType<typeof buildReceiveHistoryEntry>;
-    try {
-      receiveHistoryEntry = buildReceiveHistoryEntry(token, decodedToken.unit);
-    } catch (error) {
-      log.error('chat.cashu_token.build_receive_history_failed', {
-        ...tokenLogFields(token),
-        ...mintUrlLogFields(decodedToken.mintUrl),
-        isOwn,
-        error,
-      });
-      staticPopup('invalid-token');
-      return;
-    }
+    const receiveHistoryEntry = buildReceiveEntrySafe(token, decodedToken, isOwn);
+    if (!receiveHistoryEntry) return;
 
     log.info('chat.cashu_token.navigate_receive_token', {
       ...tokenLogFields(token),

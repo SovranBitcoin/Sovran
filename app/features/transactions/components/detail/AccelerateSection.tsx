@@ -43,6 +43,20 @@ interface AccelerateOfferDisplay {
   etaMinutes: number;
 }
 
+/** The press body, verbatim: single-flight the invoice creation behind `busy`. */
+async function runAccelerate(
+  onAccelerate: () => Promise<void>,
+  setBusy: (busy: boolean) => void
+): Promise<void> {
+  setBusy(true);
+  paymentLog.info('send.onchain.accelerate.pressed', {});
+  try {
+    await onAccelerate();
+  } finally {
+    setBusy(false);
+  }
+}
+
 interface AccelerateSectionProps {
   /** Priced offer; null hides the CTA (paired with `accelerating` state). */
   offer: AccelerateOfferDisplay | null;
@@ -58,13 +72,7 @@ export function AccelerateSection({ offer, accelerating, onAccelerate }: Acceler
 
   const handlePress = useCallback(async () => {
     if (busy) return;
-    setBusy(true);
-    paymentLog.info('send.onchain.accelerate.pressed', {});
-    try {
-      await onAccelerate();
-    } finally {
-      setBusy(false);
-    }
+    await runAccelerate(onAccelerate, setBusy);
   }, [busy, onAccelerate]);
 
   if (!offer && !accelerating) return null;

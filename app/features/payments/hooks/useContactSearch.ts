@@ -29,6 +29,68 @@ const SEARCH_DEBOUNCE_MS = 250;
 // Anything shorter is rejected upstream, so suppress the request entirely.
 export const CONTACT_SEARCH_MIN_LENGTH = 3;
 
+/** The search-effect fetch body, verbatim: query the facade and seed caches. */
+async function runContactSearch(ctx: {
+  query: string;
+  signal: AbortSignal;
+  setSearchResults: (results: SearchResultData[]) => void;
+  setSearchLoading: (loading: boolean) => void;
+}): Promise<void> {
+  const { query, signal, setSearchResults, setSearchLoading } = ctx;
+  try {
+    paymentLog.debug('payment.contacts.search', { query, limit: 10 });
+    const result = await searchProfilesViaFacade({
+      query,
+      limit: 10,
+      signal,
+    });
+    if (signal.aborted) return;
+    if (result.isOk()) {
+      const data = result.value;
+      if (data.results && Array.isArray(data.results)) {
+        const formatted: SearchResultData[] = data.results.map((res) => ({
+          pubkey: res.pubkey,
+          profile: res,
+        }));
+        paymentLog.info('payment.contacts.search.results', {
+          query,
+          resultCount: formatted.length,
+        });
+        setSearchResults(formatted);
+        if (formatted.length > 0) {
+          const seeds: Record<string, { name?: string; picture?: string }> = {};
+          for (const r of formatted) {
+            seeds[r.pubkey] = {
+              ...(r.profile.displayName || r.profile.name
+                ? { name: r.profile.displayName ?? r.profile.name }
+                : {}),
+              ...(r.profile.picture ? { picture: r.profile.picture } : {}),
+            };
+          }
+          seedLowConfidenceProfiles(seeds);
+        }
+      } else {
+        setSearchResults([]);
+      }
+    } else {
+      paymentLog.warn('payment.contacts.search.failed', {
+        query,
+        error: redactError(result.error),
+      });
+      setSearchResults([]);
+    }
+  } catch (err) {
+    if (signal.aborted) return;
+    paymentLog.error('payment.contacts.search.error', {
+      query,
+      error: redactError(err),
+    });
+    setSearchResults([]);
+  } finally {
+    if (!signal.aborted) setSearchLoading(false);
+  }
+}
+
 export function useContactSearch(searchQuery: string) {
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
   const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
@@ -64,62 +126,12 @@ export function useContactSearch(searchQuery: string) {
     setSearchLoading(true);
     setHasSearched(true);
 
-    const search = async () => {
-      try {
-        paymentLog.debug('payment.contacts.search', { query: debouncedQuery, limit: 10 });
-        const result = await searchProfilesViaFacade({
-          query: debouncedQuery,
-          limit: 10,
-          signal: controller.signal,
-        });
-        if (controller.signal.aborted) return;
-        if (result.isOk()) {
-          const data = result.value;
-          if (data.results && Array.isArray(data.results)) {
-            const formatted: SearchResultData[] = data.results.map((res) => ({
-              pubkey: res.pubkey,
-              profile: res,
-            }));
-            paymentLog.info('payment.contacts.search.results', {
-              query: debouncedQuery,
-              resultCount: formatted.length,
-            });
-            setSearchResults(formatted);
-            if (formatted.length > 0) {
-              const seeds: Record<string, { name?: string; picture?: string }> = {};
-              for (const r of formatted) {
-                seeds[r.pubkey] = {
-                  ...(r.profile.displayName || r.profile.name
-                    ? { name: r.profile.displayName ?? r.profile.name }
-                    : {}),
-                  ...(r.profile.picture ? { picture: r.profile.picture } : {}),
-                };
-              }
-              seedLowConfidenceProfiles(seeds);
-            }
-          } else {
-            setSearchResults([]);
-          }
-        } else {
-          paymentLog.warn('payment.contacts.search.failed', {
-            query: debouncedQuery,
-            error: redactError(result.error),
-          });
-          setSearchResults([]);
-        }
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        paymentLog.error('payment.contacts.search.error', {
-          query: debouncedQuery,
-          error: redactError(err),
-        });
-        setSearchResults([]);
-      } finally {
-        if (!controller.signal.aborted) setSearchLoading(false);
-      }
-    };
-
-    void search();
+    void runContactSearch({
+      query: debouncedQuery,
+      signal: controller.signal,
+      setSearchResults,
+      setSearchLoading,
+    });
     return () => controller.abort();
   }, [debouncedQuery]);
 

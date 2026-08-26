@@ -11,7 +11,7 @@
  * the Nostr identity (name + pfp) and tap → `onStartContactSend`, mirroring
  * selecting a contact.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchNip05Pubkey, type DestinationDescriptor, type DestinationIcon } from 'wallet';
 import * as nip19 from 'nostr-tools/nip19';
 
@@ -43,6 +43,35 @@ function truncateMiddle(value: string, head = 10, tail = 6): string {
   return `${value.slice(0, head)}…${value.slice(-tail)}`;
 }
 
+/** npub → hex pubkey; undefined for anything that doesn't decode as an npub. */
+function decodeNpubHex(value: string): string | undefined {
+  try {
+    const decoded = nip19.decode(value);
+    return decoded.type === 'npub' ? (decoded.data as string) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The lightning-address NIP-05 lookup, verbatim from the resolve effect. */
+async function resolveLnaddrPubkey(ctx: {
+  value: string;
+  signal: AbortSignal;
+  isCancelled: () => boolean;
+  setLnaddrHex: (hex: string | null) => void;
+  setNip05Resolving: (resolving: boolean) => void;
+}): Promise<void> {
+  const { value, signal, isCancelled, setLnaddrHex, setNip05Resolving } = ctx;
+  try {
+    const pk = await fetchNip05Pubkey(value, { signal });
+    if (!isCancelled()) setLnaddrHex(pk ?? null);
+  } catch (e) {
+    if (!isCancelled()) paymentLog.debug('send.detected.nip05.failed', { error: redactError(e) });
+  } finally {
+    if (!isCancelled()) setNip05Resolving(false);
+  }
+}
+
 interface ContactSendTarget {
   pubkey: string;
   displayName: string | null;
@@ -70,15 +99,7 @@ export function DetectedActionRow({
 
   // npub → hex (synchronous). A pubkey-ref (creq P2PK lock) is carried but not
   // hydrated in v1.
-  const npubHex = useMemo(() => {
-    if (ref?.type !== 'npub') return undefined;
-    try {
-      const decoded = nip19.decode(ref.value);
-      return decoded.type === 'npub' ? (decoded.data as string) : undefined;
-    } catch {
-      return undefined;
-    }
-  }, [ref?.type, ref?.value]);
+  const npubHex = ref?.type === 'npub' ? decodeNpubHex(ref.value) : undefined;
 
   // lightning address → hex via NIP-05 (async, cancellable; mirrors AmountFlowScreen).
   const [lnaddrHex, setLnaddrHex] = useState<string | null>(null);
@@ -93,16 +114,13 @@ export function DetectedActionRow({
     let cancelled = false;
     setLnaddrHex(null);
     setNip05Resolving(true);
-    void (async () => {
-      try {
-        const pk = await fetchNip05Pubkey(ref.value, { signal: controller.signal });
-        if (!cancelled) setLnaddrHex(pk ?? null);
-      } catch (e) {
-        if (!cancelled) paymentLog.debug('send.detected.nip05.failed', { error: redactError(e) });
-      } finally {
-        if (!cancelled) setNip05Resolving(false);
-      }
-    })();
+    void resolveLnaddrPubkey({
+      value: ref.value,
+      signal: controller.signal,
+      isCancelled: () => cancelled,
+      setLnaddrHex,
+      setNip05Resolving,
+    });
     return () => {
       cancelled = true;
       controller.abort();

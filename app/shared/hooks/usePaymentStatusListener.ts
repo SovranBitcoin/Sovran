@@ -251,6 +251,112 @@ function activateReceiveProcessing({
   paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
 }
 
+type CocoManager = NonNullable<ReturnType<typeof useManagerContext>['manager']>;
+
+/**
+ * The NPC branch of `mint-op:pending`, verbatim: fetch the canonical quote
+ * row, gate on PAID + swap suppression + freshness, then surface the
+ * receive-processing toast.
+ */
+async function surfaceNpcPaidQuote(ctx: {
+  manager: CocoManager;
+  mintUrl: string;
+  quoteId: string;
+  amount: number;
+  unit: string;
+  isDisposed: () => boolean;
+}): Promise<void> {
+  const { manager, mintUrl, quoteId, amount, unit, isDisposed } = ctx;
+  if (isDisposed()) return;
+  // v2 moved remote-state observation off the operation onto the
+  // canonical quote row — fetch it for the PAID check + NPC freshness.
+  let state: string | undefined;
+  let lastObservedRemoteStateAt: number | undefined;
+  try {
+    const quote = await manager.quotes.mint.get({ mintUrl, quoteId });
+    if (isDisposed()) return;
+    // coco's Mint Quote Accounting refactor removed the observation
+    // fields from mint quotes: state is now derived from
+    // amountPaid/amountIssued, and the local (millisecond) `updatedAt` is
+    // the observation timestamp. `remoteUpdatedAt` is NOT a substitute —
+    // it is mint-reported protocol *seconds*.
+    state = quote ? getMintQuoteRemoteState(quote) : undefined;
+    lastObservedRemoteStateAt = quote?.updatedAt;
+  } catch (error) {
+    paymentLog.debug('hook.payment_status.mint_quote_lookup_failed', {
+      quoteId,
+      ...mintUrlLogFields(mintUrl),
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+  paymentLog.debug('hook.payment_status.mint_quote_added', {
+    quoteId,
+    state,
+    ...mintUrlLogFields(mintUrl),
+  });
+  if (state !== 'PAID') return;
+
+  if (isSwapStatusActive()) {
+    paymentLog.info('hook.payment_status.suppressed_for_swap', {
+      quoteId,
+      ...mintUrlLogFields(mintUrl),
+      phase: 'mint_quote_added',
+    });
+    return;
+  }
+
+  if (!shouldShowNpcReceivePopup(lastObservedRemoteStateAt)) {
+    paymentLog.info('hook.payment_status.npc_quote_suppressed', {
+      quoteId,
+      ...mintUrlLogFields(mintUrl),
+      observedAt: lastObservedRemoteStateAt ?? null,
+      ageMs:
+        typeof lastObservedRemoteStateAt === 'number'
+          ? Date.now() - lastObservedRemoteStateAt
+          : null,
+      reason: lastObservedRemoteStateAt == null ? 'no_observed_at' : 'too_old',
+    });
+    return;
+  }
+
+  activateReceiveProcessing({
+    processingLogEvent: 'hook.payment_status.npc_receive_processing',
+    quoteId,
+    mintUrl,
+    amount,
+    unit,
+  });
+}
+
+/**
+ * Rotate the standing NUT-18 payment request after a claim landed on it,
+ * verbatim from the `receive-op:finalized` handler. Best-effort.
+ */
+async function rotateStandingCreqAfterClaim(ctx: {
+  manager: CocoManager;
+  requestOpId: string;
+  unit: string;
+}): Promise<void> {
+  const { manager, requestOpId, unit } = ctx;
+  try {
+    const trusted = await manager.mint.getAllTrustedMints();
+    await rotateStandingPaymentRequest(
+      manager,
+      { unit, mints: trusted.map((m) => m.mintUrl).slice(0, 5) },
+      {
+        get: (key) => useMintStore.getState().standingQuotes[key],
+        set: (key, id) => useMintStore.getState().setStandingQuote(key, id),
+      }
+    );
+  } catch (err) {
+    paymentLog.warn('hook.payment_status.creq_standing_rotation_failed', {
+      requestOpId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 export function usePaymentStatusListener(): void {
   const { manager } = useManagerContext();
 
@@ -327,68 +433,14 @@ export function usePaymentStatusListener(): void {
 
       const { quoteId, unit } = operation;
       const amount = amountToNumber(operation.amount);
-      void (async () => {
-        if (disposed) return;
-        // v2 moved remote-state observation off the operation onto the
-        // canonical quote row — fetch it for the PAID check + NPC freshness.
-        let state: string | undefined;
-        let lastObservedRemoteStateAt: number | undefined;
-        try {
-          const quote = await manager.quotes.mint.get({ mintUrl, quoteId });
-          if (disposed) return;
-          // coco's Mint Quote Accounting refactor removed the observation
-          // fields from mint quotes: state is now derived from
-          // amountPaid/amountIssued, and the local (millisecond) `updatedAt` is
-          // the observation timestamp. `remoteUpdatedAt` is NOT a substitute —
-          // it is mint-reported protocol *seconds*.
-          state = quote ? getMintQuoteRemoteState(quote) : undefined;
-          lastObservedRemoteStateAt = quote?.updatedAt;
-        } catch (error) {
-          paymentLog.debug('hook.payment_status.mint_quote_lookup_failed', {
-            quoteId,
-            ...mintUrlLogFields(mintUrl),
-            error: error instanceof Error ? error.message : String(error),
-          });
-          return;
-        }
-        paymentLog.debug('hook.payment_status.mint_quote_added', {
-          quoteId,
-          state,
-          ...mintUrlLogFields(mintUrl),
-        });
-        if (state !== 'PAID') return;
-
-        if (isSwapStatusActive()) {
-          paymentLog.info('hook.payment_status.suppressed_for_swap', {
-            quoteId,
-            ...mintUrlLogFields(mintUrl),
-            phase: 'mint_quote_added',
-          });
-          return;
-        }
-
-        if (!shouldShowNpcReceivePopup(lastObservedRemoteStateAt)) {
-          paymentLog.info('hook.payment_status.npc_quote_suppressed', {
-            quoteId,
-            ...mintUrlLogFields(mintUrl),
-            observedAt: lastObservedRemoteStateAt ?? null,
-            ageMs:
-              typeof lastObservedRemoteStateAt === 'number'
-                ? Date.now() - lastObservedRemoteStateAt
-                : null,
-            reason: lastObservedRemoteStateAt == null ? 'no_observed_at' : 'too_old',
-          });
-          return;
-        }
-
-        activateReceiveProcessing({
-          processingLogEvent: 'hook.payment_status.npc_receive_processing',
-          quoteId,
-          mintUrl,
-          amount,
-          unit,
-        });
-      })();
+      void surfaceNpcPaidQuote({
+        manager,
+        mintUrl,
+        quoteId,
+        amount,
+        unit,
+        isDisposed: () => disposed,
+      });
     });
 
     const offRedeemed = manager.on('mint-op:finalized', ({ mintUrl, operationId, operation }) => {
@@ -521,24 +573,7 @@ export function usePaymentStatusListener(): void {
             requestOpId,
             unit: op.unit,
           });
-          void (async () => {
-            try {
-              const trusted = await manager.mint.getAllTrustedMints();
-              await rotateStandingPaymentRequest(
-                manager,
-                { unit: op.unit, mints: trusted.map((m) => m.mintUrl).slice(0, 5) },
-                {
-                  get: (key) => useMintStore.getState().standingQuotes[key],
-                  set: (key, id) => useMintStore.getState().setStandingQuote(key, id),
-                }
-              );
-            } catch (err) {
-              paymentLog.warn('hook.payment_status.creq_standing_rotation_failed', {
-                requestOpId,
-                error: err instanceof Error ? err.message : String(err),
-              });
-            }
-          })();
+          void rotateStandingCreqAfterClaim({ manager, requestOpId, unit: op.unit });
         }
       }
     });

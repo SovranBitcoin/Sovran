@@ -17,7 +17,7 @@
  * 30s (suppressed by the ambient flag in the nfc scan source) and re-arms.
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
@@ -32,6 +32,7 @@ import { showActionSheet } from '@/shared/lib/popup';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { walletLog } from '@/shared/lib/logger';
 
 /** Pause between re-arm cycles; also the NFC-disabled re-check interval. */
@@ -46,11 +47,27 @@ interface AmbientNfcMachine {
   scan?: (data?: undefined, opts?: { source: 'nfc' }) => Promise<unknown> | unknown;
 }
 
+/**
+ * One armed scan, verbatim from the re-arming loop: waits on machine.scan
+ * (source 'nfc'), swallows the quiet 30s timeout, and always drops the
+ * ambient-cycle flag.
+ */
+async function runAmbientNfcScan(machine: AmbientNfcMachine): Promise<void> {
+  try {
+    await machine.scan?.(undefined, { source: 'nfc' });
+  } catch (err) {
+    walletLog.debug('wallet.nfc.ambient_cycle_error', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  } finally {
+    setAmbientNfcCycle(false);
+  }
+}
+
 export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
   // The machine object identity changes across renders; the loop reads the
   // latest through a ref so focus/blur is the only thing that restarts it.
-  const machineRef = useRef(machine);
-  machineRef.current = machine;
+  const machineRef = useLatestRef(machine);
 
   useFocusEffect(
     useCallback(() => {
@@ -115,15 +132,7 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
           // no payment popup up means no flow is active, so clearing stale
           // amount/mint context before a read can enter the machine is safe.
           clearPaymentContext('wallet.nfc_ambient');
-          try {
-            await machineRef.current.scan?.(undefined, { source: 'nfc' });
-          } catch (err) {
-            walletLog.debug('wallet.nfc.ambient_cycle_error', {
-              error: err instanceof Error ? err.message : String(err),
-            });
-          } finally {
-            setAmbientNfcCycle(false);
-          }
+          await runAmbientNfcScan(machineRef.current);
           if (!active) break;
           await delay(REARM_DELAY_MS);
         }
@@ -147,6 +156,6 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
         void releaseSession();
         walletLog.info('wallet.nfc.ambient_arm_stop');
       };
-    }, [])
+    }, [machineRef])
   );
 }
